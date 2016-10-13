@@ -1,81 +1,121 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 13 Oct 2016 11:54:11 +0100
-Subject: [PATCH V3 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
-In-Reply-To: <1475875882-2604-9-git-send-email-tbaicar@codeaurora.org> (Tyler
- Baicar's message of "Fri, 7 Oct 2016 15:31:20 -0600")
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-9-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <87mvi8seng.fsf@e105922-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 13 Oct 2016 12:02:57 +0100
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <781b6bb229ed566e1b948bfcea18bb61@codeaurora.org>
+References: <66a031ac2405e352ab0d5f19d7ddb8e9@codeaurora.org>
+ <20161001181101.GA17554@remoulade>
+ <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+ <20161004101208.GA18083@leverpostej>
+ <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+ <20161004191159.GA32596@leverpostej>
+ <54b18de220f61747bf1c3cdf2a1b9447@codeaurora.org>
+ <20161005151057.GJ3142@twins.programming.kicks-ass.net>
+ <a0aa2dba916aafb188f8b1b11aca1599@codeaurora.org>
+ <781b6bb229ed566e1b948bfcea18bb61@codeaurora.org>
+Message-ID: <20161013110256.GA436@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Brent,
 
-One last comment...
+On Wed, Oct 12, 2016 at 04:01:06PM -0400, bdegraaf at codeaurora.org wrote:
+> I am still working through some additional analyses for mixed accesses,
+> but I thought I'd send along some sample commit text for the fix as it
+> currently stands.  Please feel free to comment if you see something that
+> needs clarification.
 
-Tyler Baicar <tbaicar@codeaurora.org> writes:
+Everything from this point down needs clarification.
 
-> UEFI spec allows for non-standard section in Common Platform Error
-> Record. This is defined in section N.2.3 of UEFI version 2.5.
->
-> Currently if the CPER section's type (UUID) does not match with
-> any section type that the kernel knows how to parse, trace event
-> is not generated for such section. And thus user is not able to know
-> happening of such hardware error, including error record of
-> non-standard section.
->
-> This commit generates a trace event which contains raw error data
-> for unrecognized CPER section.
->
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  drivers/acpi/apei/ghes.c | 18 +++++++++++++++++-
->  drivers/ras/ras.c        |  1 +
->  include/ras/ras_event.h  | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 63 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 36894c8..cb4c7f4 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -49,6 +49,7 @@
->  #include <acpi/ghes.h>
->  #include <acpi/apei.h>
->  #include <asm/tlbflush.h>
-> +#include <ras/ras_event.h>
->  
->  #ifdef CONFIG_HAVE_ACPI_APEI_SEA
->  #include <asm/system_misc.h>
-> @@ -468,12 +469,21 @@ static void ghes_do_proc(struct ghes *ghes,
->  	int sev, sec_sev;
->  	struct acpi_hest_generic_data *gdata;
->  	uuid_le sec_type;
-> +	uuid_le *fru_id;
-> +	char *fru_text = "";
->  
->  	sev = ghes_severity(estatus->error_severity);
->  	apei_estatus_for_each_section(estatus, gdata) {
->  		sec_sev = ghes_severity(gdata->error_severity);
->  		sec_type = *(uuid_le *)gdata->section_type;
->  
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
-> +			fru_id = (uuid_le *)gdata->fru_id;
-> +		else
-> +			fru_id = &NULL_UUID_LE;
+> All arm64 lockref accesses that occur without taking the spinlock must
+> behave like true atomics, ensuring successive operations are all done
+> sequentially.
 
-fru_id can be initialised at declaration and drop the else here. The
-same is already being done for fru_text.
+What is a "true atomic"? What do you mean by "successive"? What do you
+mean by "done sequentially"?
 
-Thanks,
-Punit
+The guarantee provided by lockref is that, if you hold the spinlock, then
+you don't need to use atomics to inspect the reference count, as it is
+guaranteed to be stable. You can't just go around replacing spin_lock
+calls with lockref_get -- that's not what this is about.
 
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
-> +			fru_text = gdata->fru_text;
-> +
->  		if (!uuid_le_cmp(sec_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
+> Currently
+> the lockref accesses, when decompiled, look like the following sequence:
+> 
+>                     <Lockref "unlocked" Access [A]>
+> 
+>                     // Lockref "unlocked" (B)
+>                 1:  ldxr   x0, [B]         // Exclusive load
+>                      <change lock_count B>
+>                     stxr   w1, x0, [B]
+>                     cbnz   w1, 1b
+> 
+>                      <Lockref "unlocked" Access [C]>
+> 
+> Even though access to the lock_count is protected by exclusives, this is not
+> enough
+> to guarantee order: The lock_count must change atomically, in order, so the
+> only
+> permitted ordering would be:
+>                               A -> B -> C
 
-[...]
+Says who? Please point me at a piece of code that relies on this. I'm
+willing to believe that are bugs in this area, but waving your hands around
+and saying certain properties "must" hold is not helpful unless you can
+say *why* they must hold and *where* that is required.
+
+> Unfortunately, this is not the case by the letter of the architecture and,
+> in fact,
+> the accesses to A and C are not protected by any sort of barrier, and hence
+> are
+> permitted to reorder freely, resulting in orderings such as
+> 
+>                            Bl -> A -> C -> Bs
+
+Again, why is this a problem? It's exactly the same as if you did:
+
+	spin_lock(lock);
+	inc_ref_cnt();
+	spin_unlock(lock);
+
+Accesses outside of the critical section can still be reordered. Big deal.
+
+> In this specific scenario, since "change lock_count" could be an
+> increment, a decrement or even a set to a specific value, there could be
+> trouble. 
+
+What trouble?
+
+> With more agents accessing the lockref without taking the lock, even
+> scenarios where the cmpxchg passes falsely can be encountered, as there is
+> no guarantee that the the "old" value will not match exactly a newer value
+> due to out-of-order access by a combination of agents that increment and
+> decrement the lock_count by the same amount.
+
+This is the A-B-A problem, but I don't see why it affects us here. We're
+dealing with a single reference count.
+
+> Since multiple agents are accessing this without locking the spinlock,
+> this access must have the same protections in place as atomics do in the
+> arch's atomic.h.
+
+Why? I don't think that it does. Have a look at how lockref is used by
+the dcache code: it's really about keeping a reference to a dentry,
+which may be in the process of being unhashed and removed. The
+interaction with concurrent updaters to the dentry itself is handled
+using a seqlock, which does have the necessary barriers. Yes, the code
+is extremely complicated, but given that you're reporting issues based
+on code inspection, then you'll need to understand what you're changing.
+
+> Fortunately, the fix is not complicated: merely removing the errant
+> _relaxed option on the cmpxchg64 is enough to introduce exactly the same
+> code sequence justified in commit 8e86f0b409a44193f1587e87b69c5dcf8f65be67
+> to fix arm64 atomics.
+
+I introduced cmpxchg64_relaxed precisely for the lockref case. I still
+don't see a compelling reason to strengthen it. If you think there's a bug,
+please spend the effort to describe how it manifests and what can actually
+go wrong in the existing codebase. Your previous patches fixing so-called
+bugs found by inspection have both turned out to be bogus, so I'm sorry,
+but I'm not exactly leaping on your contributions to this.
+
+Will
