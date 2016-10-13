@@ -1,47 +1,100 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 12 Oct 2016 18:31:18 -0500
-Subject: [PATCH/RFT 07/12] USB: ohci-da8xx: Request gpios and handle
- interrupt in the driver
-In-Reply-To: <CAKXjFTMO_tCzLxc5wznrW_g6rxMYT8jBgHCtiFfpHq_6M=RZWA@mail.gmail.com>
-References: <1475858577-10366-1-git-send-email-ahaslam@baylibre.com>
- <1475858577-10366-8-git-send-email-ahaslam@baylibre.com>
- <22f1532a-b651-3330-b2ce-9a64a35c85af@lechnology.com>
- <CAKXjFTMO_tCzLxc5wznrW_g6rxMYT8jBgHCtiFfpHq_6M=RZWA@mail.gmail.com>
-Message-ID: <ca0cd34a-c904-e3b8-b9a9-55017265dc89@lechnology.com>
+From: lstoakes@gmail.com (Lorenzo Stoakes)
+Date: Thu, 13 Oct 2016 01:20:10 +0100
+Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly pass
+ FOLL_* flags
+Message-ID: <20161013002020.3062-1-lstoakes@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/12/2016 10:01 AM, Axel Haslam wrote:
-> I  agree that we should use a regulator for the vbus power.
-> i will make that change.  However, im not so sure about using the
-> regulator for the overcurrent handling. There seems to be no other
-> driver doing this, and as you mention, we would need to change the regulator
-> framework, which might not be justifiable. I think there is not another way
-> to handle the over current notification other than powering the port off.
+This patch series adjusts functions in the get_user_pages* family such that
+desired FOLL_* flags are passed as an argument rather than implied by flags.
 
-The regulator framework has REGULATOR_EVENT_OVER_CURRENT already. 
-Perhaps this could be of some use? For example you could extend the 
-existing gpio-regulator driver with an optional overcurrent gpio pin.
+The purpose of this change is to make the use of FOLL_FORCE explicit so it is
+easier to grep for and clearer to callers that this flag is being used. The use
+of FOLL_FORCE is an issue as it overrides missing VM_READ/VM_WRITE flags for the
+VMA whose pages we are reading from/writing to, which can result in surprising
+behaviour.
 
+The patch series came out of the discussion around commit 38e0885, which
+addressed a BUG_ON() being triggered when a page was faulted in with PROT_NONE
+set but having been overridden by FOLL_FORCE. do_numa_page() was run on the
+assumption the page _must_ be one marked for NUMA node migration as an actual
+PROT_NONE page would have been dealt with prior to this code path, however
+FOLL_FORCE introduced a situation where this assumption did not hold.
 
->
-> how about using regulator for vbus, but keeping gpio for overcurrent
-> notifications?
+See https://marc.info/?l=linux-mm&m=147585445805166 for the patch proposal.
 
-See the suggestion above about extending the gpio-regulator driver.
+Lorenzo Stoakes (10):
+  mm: remove write/force parameters from __get_user_pages_locked()
+  mm: remove write/force parameters from __get_user_pages_unlocked()
+  mm: replace get_user_pages_unlocked() write/force parameters with gup_flags
+  mm: replace get_user_pages_locked() write/force parameters with gup_flags
+  mm: replace get_vaddr_frames() write/force parameters with gup_flags
+  mm: replace get_user_pages() write/force parameters with gup_flags
+  mm: replace get_user_pages_remote() write/force parameters with gup_flags
+  mm: replace __access_remote_vm() write parameter with gup_flags
+  mm: replace access_remote_vm() write parameter with gup_flags
+  mm: replace access_process_vm() write parameter with gup_flags
 
-
-> For the usersapce handling you describe above, maybe we should be able to
-> listen for an usb overcurrent uevent in userspace? it seems this
-> question was asked
-> a couple of years back[1], but im not sure what the conclusion was. In any case,
-> we could have DT and non-DT based ohci-da8xx working,
-> And could work on a uevent notification for the scenario you describe
-> above which
-> i think is not specific to the ohci-da8xx.
->
-> [1]http://linux-usb.vger.kernel.narkive.com/SjcUB5hk/how-best-to-get-over-current-notification-to-user-application
-
-Thanks for the link. Too bad it seems nothing ever became of this. I 
-guess it will be up to me to bring up the discussion again if I really 
-want it.
+ arch/alpha/kernel/ptrace.c                         |  9 ++--
+ arch/blackfin/kernel/ptrace.c                      |  5 ++-
+ arch/cris/arch-v32/drivers/cryptocop.c             |  4 +-
+ arch/cris/arch-v32/kernel/ptrace.c                 |  4 +-
+ arch/ia64/kernel/err_inject.c                      |  2 +-
+ arch/ia64/kernel/ptrace.c                          | 14 +++---
+ arch/m32r/kernel/ptrace.c                          | 15 ++++---
+ arch/mips/kernel/ptrace32.c                        |  5 ++-
+ arch/mips/mm/gup.c                                 |  2 +-
+ arch/powerpc/kernel/ptrace32.c                     |  5 ++-
+ arch/s390/mm/gup.c                                 |  3 +-
+ arch/score/kernel/ptrace.c                         | 10 +++--
+ arch/sh/mm/gup.c                                   |  3 +-
+ arch/sparc/kernel/ptrace_64.c                      | 24 +++++++----
+ arch/sparc/mm/gup.c                                |  3 +-
+ arch/x86/kernel/step.c                             |  3 +-
+ arch/x86/mm/gup.c                                  |  2 +-
+ arch/x86/mm/mpx.c                                  |  5 +--
+ arch/x86/um/ptrace_32.c                            |  3 +-
+ arch/x86/um/ptrace_64.c                            |  3 +-
+ drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c            |  7 ++-
+ drivers/gpu/drm/etnaviv/etnaviv_gem.c              |  7 ++-
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c            |  3 +-
+ drivers/gpu/drm/i915/i915_gem_userptr.c            |  6 ++-
+ drivers/gpu/drm/radeon/radeon_ttm.c                |  3 +-
+ drivers/gpu/drm/via/via_dmablit.c                  |  4 +-
+ drivers/infiniband/core/umem.c                     |  6 ++-
+ drivers/infiniband/core/umem_odp.c                 |  7 ++-
+ drivers/infiniband/hw/mthca/mthca_memfree.c        |  2 +-
+ drivers/infiniband/hw/qib/qib_user_pages.c         |  3 +-
+ drivers/infiniband/hw/usnic/usnic_uiom.c           |  5 ++-
+ drivers/media/pci/ivtv/ivtv-udma.c                 |  4 +-
+ drivers/media/pci/ivtv/ivtv-yuv.c                  |  5 ++-
+ drivers/media/platform/omap/omap_vout.c            |  2 +-
+ drivers/media/v4l2-core/videobuf-dma-sg.c          |  7 ++-
+ drivers/media/v4l2-core/videobuf2-memops.c         |  6 ++-
+ drivers/misc/mic/scif/scif_rma.c                   |  3 +-
+ drivers/misc/sgi-gru/grufault.c                    |  2 +-
+ drivers/platform/goldfish/goldfish_pipe.c          |  3 +-
+ drivers/rapidio/devices/rio_mport_cdev.c           |  3 +-
+ drivers/scsi/st.c                                  |  5 +--
+ .../interface/vchiq_arm/vchiq_2835_arm.c           |  3 +-
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.c  |  3 +-
+ drivers/video/fbdev/pvr2fb.c                       |  4 +-
+ drivers/virt/fsl_hypervisor.c                      |  4 +-
+ fs/exec.c                                          |  9 +++-
+ fs/proc/base.c                                     | 19 +++++---
+ include/linux/mm.h                                 | 18 ++++----
+ kernel/events/uprobes.c                            |  6 ++-
+ kernel/ptrace.c                                    | 16 ++++---
+ mm/frame_vector.c                                  |  9 ++--
+ mm/gup.c                                           | 50 ++++++++++------------
+ mm/memory.c                                        | 16 ++++---
+ mm/mempolicy.c                                     |  2 +-
+ mm/nommu.c                                         | 38 +++++++---------
+ mm/process_vm_access.c                             |  7 ++-
+ mm/util.c                                          |  8 ++--
+ net/ceph/pagevec.c                                 |  2 +-
+ security/tomoyo/domain.c                           |  2 +-
+ virt/kvm/async_pf.c                                |  3 +-
+ virt/kvm/kvm_main.c                                | 11 +++--
+ 61 files changed, 260 insertions(+), 187 deletions(-)
