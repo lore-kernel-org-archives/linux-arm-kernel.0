@@ -1,328 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 13 Oct 2016 09:28:08 +0100
-Subject: [PATCH 2/3] irqchip: mtk-cirq: Add mediatek mtk-cirq implement
-In-Reply-To: <1476335194-26604-3-git-send-email-youlin.pei@mediatek.com>
-References: <1476335194-26604-1-git-send-email-youlin.pei@mediatek.com>
- <1476335194-26604-3-git-send-email-youlin.pei@mediatek.com>
-Message-ID: <20161013092808.3c4181dd@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 13 Oct 2016 09:50:15 +0100
+Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <c17a0c03-5037-d88d-f096-4cc72dbfcb99@codeaurora.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
+ <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
+ <c17a0c03-5037-d88d-f096-4cc72dbfcb99@codeaurora.org>
+Message-ID: <064dca7d-0625-c0d0-09ae-72ef7abdc63f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2016 13:06:33 +0800
-Youlin Pei <youlin.pei@mediatek.com> wrote:
+On 12/10/16 23:10, Baicar, Tyler wrote:
+> Hello Suzuki,
+>
+> Thank you for the feedback! Responses below.
+>
+>
+> On 10/11/2016 11:28 AM, Suzuki K Poulose wrote:
+>> On 07/10/16 22:31, Tyler Baicar wrote:
+>>> Currently when a RAS error is reported it is not timestamped.
+>>> The ACPI 6.1 spec adds the timestamp field to the generic error
+>>> data entry v3 structure. The timestamp of when the firmware
+>>> generated the error is now being reported.
+>>>
+>>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>>> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>>
+>> Please could you keep the people who reviewed/commented on your series in the past,
+>> whenever you post a new version ?
+> Do you mean to just send the new version to their e-mail directly in addition to the lists? If so, I will do that next time.
 
-> This commit add the mtk-cirq implement for mt2701.
+If you send a new version of a series to the list, it is a good idea to keep
+the people who commented (significantly) on your previous version in Cc, especially
+when you have addressed their feedback. That will help them to keep track of the
+series. People can always see the new version in the list, but then it is so easy
+to miss something in the 100s of emails you get each day. I am sure people have
+special filters for the emails based on if they are in Cc/To etc.
 
-Can you please expand this a bit?
+>
+> I know you provided good feedback on the previous patchset, but I did not have anyone specifically respond to add "reviewed-by:...". I don't think I should add reviewed-by for someone unless they specifically add it in a response :)
 
-> 
-> Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
-> ---
->  drivers/irqchip/Makefile       |    2 +-
->  drivers/irqchip/irq-mtk-cirq.c |  257 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 258 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/irqchip/irq-mtk-cirq.c
-> 
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 4c203b6..eee95c6 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -59,7 +59,7 @@ obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
->  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
->  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
->  obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
-> -obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
-> +obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o irq-mtk-cirq.o
->  obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
->  obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
->  obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
-> diff --git a/drivers/irqchip/irq-mtk-cirq.c b/drivers/irqchip/irq-mtk-cirq.c
-> new file mode 100644
-> index 0000000..544767d
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-mtk-cirq.c
-> @@ -0,0 +1,257 @@
-> +/*
-> + * Copyright (c) 2016 MediaTek Inc.
-> + * Author: Youlin.Pei <youlin.pei@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/irq.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/syscore_ops.h>
-> +
-> +#define CIRQ_MASK_SET	0xC0
-> +#define CIRQ_MASK_CLR	0x100
-> +#define CIRQ_SENS_SET	0x180
-> +#define CIRQ_SENS_CLR	0x1C0
-> +#define CIRQ_POL_SET	0x240
-> +#define CIRQ_POL_CLR	0x280
-> +#define CIRQ_CONTROL	0x300
-> +
-> +#define CIRQ_EN		0x1
-> +#define CIRQ_EDGE	0x2
-> +#define CIRQ_FLUSH	0x4
-> +
-> +#define CIRQ_IRQ_NUM    0x200
-> +
-> +struct mtk_cirq_chip_data {
-> +	void __iomem *base;
-> +	unsigned int ext_irq_start;
-> +};
-> +
-> +struct mtk_cirq_chip_data *cirq_data;
+No, I haven't yet "Reviewed-by" your patches. I had some comments on it, which means
+I expected it to be addressed as you committed in your response.
 
-Any reason why this is not static?
+>>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>>> index 3021f0e..c8488f1 100644
+>>> --- a/drivers/acpi/apei/ghes.c
+>>> +++ b/drivers/acpi/apei/ghes.c
+>>> @@ -80,6 +80,10 @@
 
-> +
-> +static void mtk_cirq_write_mask(struct irq_data *data, unsigned int offset)
-> +{
-> +	struct mtk_cirq_chip_data *chip_data = data->chip_data;
-> +	unsigned int cirq_num = data->hwirq - chip_data->ext_irq_start;
+> I think that should work to avoid duplication. I will move them to a header file in the next patchset.
+>>> +
+>>> +static void cper_estatus_print_section_v300(const char *pfx,
+>>> +    const struct acpi_hest_generic_data_v300 *gdata)
+>>> +{
+>>> +    __u8 hour, min, sec, day, mon, year, century, *timestamp;
+>>> +
+>>> +    if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+>>> +        timestamp = (__u8 *)&(gdata->time_stamp);
+>>> +        memcpy(&sec, timestamp, 1);
+>>> +        memcpy(&min, timestamp + 1, 1);
+>>> +        memcpy(&hour, timestamp + 2, 1);
+>>> +        memcpy(&day, timestamp + 4, 1);
+>>> +        memcpy(&mon, timestamp + 5, 1);
+>>> +        memcpy(&year, timestamp + 6, 1);
+>>> +        memcpy(&century, timestamp + 7, 1);
+>>> +        printk("%stime: ", pfx);
+>>> +        printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
+>>
+>> What format is the (timestamp + 3) stored in ? Does it need conversion ?
+> The third byte of the timestamp is currently only used to determine if the time is precise or not. Bit 0 is used to specify that and the other bits in this byte are marked as reserved. This is shown in table 247 of the UEFI spec 2.6:
+>
+> Byte 3:
+>   Bit 0 ? Timestamp is precise if this bit is set and correlates to the time of the error event.
+>   Bit 7:1 ? Reserved
 
-I wonder why you have to compute this offset. Ideally, data->hwirq
-should be the bit position (starting at zero). The fact that you have
-an offset between the pin number in this driver and the IRQ number in
-the GIC or sysirq should be resolved at alloc time.
+Is it always the same endianness as that of the CPU ?
 
-> +	u32 mask = 1 << (cirq_num % 32);
-> +
-> +	writel(mask, chip_data->base + offset + (cirq_num / 32) * 4);
-> +}
-> +
-> +static void mtk_cirq_mask(struct irq_data *data)
-> +{
-> +	mtk_cirq_write_mask(data, CIRQ_MASK_SET);
-> +	irq_chip_mask_parent(data);
-> +}
-> +
-> +static void mtk_cirq_unmask(struct irq_data *data)
-> +{
-> +	mtk_cirq_write_mask(data, CIRQ_MASK_CLR);
-> +	irq_chip_unmask_parent(data);
-> +}
-> +
-> +static int mtk_cirq_set_type(struct irq_data *data, unsigned int type)
-> +{
-> +	int ret;
-> +
-> +	switch (type & IRQ_TYPE_SENSE_MASK) {
-> +	case IRQ_TYPE_EDGE_FALLING:
-> +		mtk_cirq_write_mask(data, CIRQ_POL_CLR);
-> +		mtk_cirq_write_mask(data, CIRQ_SENS_CLR);
-> +		break;
-> +	case IRQ_TYPE_EDGE_RISING:
-> +		mtk_cirq_write_mask(data, CIRQ_POL_SET);
-> +		mtk_cirq_write_mask(data, CIRQ_SENS_CLR);
-> +		break;
-> +	case IRQ_TYPE_LEVEL_LOW:
-> +		mtk_cirq_write_mask(data, CIRQ_POL_CLR);
-> +		mtk_cirq_write_mask(data, CIRQ_SENS_SET);
-> +		break;
-> +	case IRQ_TYPE_LEVEL_HIGH:
-> +		mtk_cirq_write_mask(data, CIRQ_POL_SET);
-> +		mtk_cirq_write_mask(data, CIRQ_SENS_SET);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	data = data->parent_data;
-> +	ret = data->chip->irq_set_type(data, type);
-> +	return ret;
-> +}
-> +
-> +static struct irq_chip mtk_cirq_chip = {
-> +	.name			= "MT_CIRQ",
-> +	.irq_mask		= mtk_cirq_mask,
-> +	.irq_unmask		= mtk_cirq_unmask,
-> +	.irq_eoi		= irq_chip_eoi_parent,
-> +	.irq_set_type		= mtk_cirq_set_type,
-> +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-> +#ifdef CONFIG_SMP
-> +	.irq_set_affinity	= irq_chip_set_affinity_parent,
-> +#endif
-> +};
-
-I'm surprised that you don't implement irq_set_wake. Do you wake-up on
-*any* interrupt?
-
-> +
-> +static int mtk_cirq_domain_translate(struct irq_domain *d,
-> +				     struct irq_fwspec *fwspec,
-> +				     unsigned long *hwirq,
-> +				     unsigned int *type)
-> +{
-> +	if (is_of_node(fwspec->fwnode)) {
-> +		if (fwspec->param_count != 3)
-> +			return -EINVAL;
-> +
-> +		/* No PPI should point to this domain */
-> +		if (fwspec->param[0] != 0)
-> +			return -EINVAL;
-> +
-> +		/* cirq support irq number check */
-> +		if (fwspec->param[1] < ;)
-> +			return -EINVAL;
-> +
-> +		*hwirq = fwspec->param[1];
-
-So if you turn this into:
-
-		*hwirq = fwspec->param[1] - cirq_data->ext_irq_start;
-
-and drop the above offset computing in your write function, you'd have
-something that'd make a bit more sense.
-
-> +		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
-> +		return 0;
-> +	}
-> +
-> +	return -EINVAL;
-> +}
-> +
-> +static int mtk_cirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				 unsigned int nr_irqs, void *arg)
-> +{
-> +	int i;
-> +	irq_hw_number_t hwirq;
-> +	struct irq_fwspec *fwspec = arg;
-> +	struct irq_fwspec parent_fwspec = *fwspec;
-> +
-> +	if (fwspec->param_count != 3)
-> +		return -EINVAL;
-> +
-> +	/* cirq doesn't support PPI */
-> +	if (fwspec->param[0])
-> +		return -EINVAL;
-> +
-> +	if (fwspec->param[1] < cirq_data->ext_irq_start)
-> +		return -EINVAL;
-> +
-> +	hwirq = fwspec->param[1];
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-> +					      &mtk_cirq_chip,
-> +					      domain->host_data);
-> +
-> +	parent_fwspec.fwnode = domain->parent->fwnode;
-> +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
-> +					    &parent_fwspec);
-> +}
-> +
-> +static const struct irq_domain_ops cirq_domain_ops = {
-> +	.translate	= mtk_cirq_domain_translate,
-> +	.alloc		= mtk_cirq_domain_alloc,
-> +	.free		= irq_domain_free_irqs_common,
-> +};
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int mtk_cirq_suspend(void)
-> +{
-> +	u32 value;
-> +
-> +	/* set edge_only mode, record edge-triggerd interrupts */
-> +	/* enable cirq */
-> +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
-> +	value |= (CIRQ_EDGE | CIRQ_EN);
-> +	writel(value, cirq_data->base + CIRQ_CONTROL);
-> +	return 0;
-> +}
-> +
-> +static void mtk_cirq_resume(void)
-> +{
-> +	u32 value;
-> +
-> +	/* flush recored interrupts, will send signals to parent controller */
-> +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
-> +	writel(value | CIRQ_FLUSH, cirq_data->base + CIRQ_CONTROL);
-> +
-> +	/* disable cirq */
-> +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
-> +	value &= ~(CIRQ_EDGE | CIRQ_EN);
-> +	writel(value, cirq_data->base + CIRQ_CONTROL);
-> +}
-> +
-> +static struct syscore_ops mtk_cirq_syscore_ops = {
-> +	.suspend	= mtk_cirq_suspend,
-> +	.resume		= mtk_cirq_resume,
-> +};
-> +
-> +static void mtk_cirq_syscore_init(void)
-> +{
-> +	register_syscore_ops(&mtk_cirq_syscore_ops);
-> +}
-> +#else
-> +static inline void mtk_cirq_syscore_init(void) {}
-> +#endif
-> +
-> +static int __init mtk_cirq_of_init(struct device_node *node,
-> +				   struct device_node *parent)
-> +{
-> +	struct irq_domain *domain, *domain_parent;
-> +	int ret;
-> +
-> +	domain_parent = irq_find_host(parent);
-> +	if (!domain_parent) {
-> +		pr_err("mtk_cirq: interrupt-parent not found\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	cirq_data = kzalloc(sizeof(*cirq_data), GFP_KERNEL);
-> +	if (!cirq_data)
-> +		return -ENOMEM;
-> +
-> +	cirq_data->base = of_iomap(node, 0);
-> +	if (!cirq_data->base) {
-> +		pr_err("mtk_cirq: unable to map cirq register\n");
-> +		ret = -ENXIO;
-> +		goto out_free;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "mediatek,ext-irq-start",
-> +				 &cirq_data->ext_irq_start)) {
-> +		ret = -EINVAL;
-> +		goto out_free;
-> +	}
-> +
-> +	domain = irq_domain_add_hierarchy(domain_parent, 0, CIRQ_IRQ_NUM, node,
-> +					  &cirq_domain_ops, cirq_data);
-> +	if (!domain) {
-> +		ret = -ENOMEM;
-> +		goto out_unmap;
-> +	}
-> +
-> +	mtk_cirq_syscore_init();
-> +
-> +	return 0;
-> +
-> +out_unmap:
-> +	iounmap(cirq_data->base);
-> +out_free:
-> +	kfree(cirq_data);
-> +	return ret;
-> +}
-> +
-> +IRQCHIP_DECLARE(mtk_cirq, "mediatek,mt2701-cirq", mtk_cirq_of_init);
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Cheers
+Suzuki
