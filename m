@@ -1,98 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Oct 2016 13:25:53 +0100
-Subject: [PATCH v3 1/5] arm64: mm: BUG on unsupported manipulations of
- live kernel mappings
-In-Reply-To: <20161012150428.s4gajqlnnivo6bld@localhost>
-References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476271425-19401-2-git-send-email-ard.biesheuvel@linaro.org>
- <20161012150428.s4gajqlnnivo6bld@localhost>
-Message-ID: <CAKv+Gu8p06DBaDgmJ3KSSfNVDox=wOTav48kti+Y0gYtQhEC_g@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 13 Oct 2016 14:27:15 +0200
+Subject: [PATCH 2/2] power/reset: at91-poweroff: timely shitdown LPDDR
+ memories
+In-Reply-To: <20161013110317.ee6by6njrvs53ztx@piout.net>
+References: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
+ <20161007163427.11454-3-alexandre.belloni@free-electrons.com>
+ <CACh+v5NCxPb_U8HOeczHicCD-Wp8BqBzvc1LtCzmEXZ74Cgshw@mail.gmail.com>
+ <20161013110317.ee6by6njrvs53ztx@piout.net>
+Message-ID: <CACh+v5PgwXsCoMROO+Vftx8bbhTXP1V-JdZmdwWJ0tgOUW1Axw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2016 at 16:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Oct 12, 2016 at 12:23:41PM +0100, Ard Biesheuvel wrote:
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -28,8 +28,6 @@
->>  #include <linux/memblock.h>
->>  #include <linux/fs.h>
->>  #include <linux/io.h>
->> -#include <linux/slab.h>
->> -#include <linux/stop_machine.h>
->>
->>  #include <asm/barrier.h>
->>  #include <asm/cputype.h>
->> @@ -95,6 +93,12 @@ static phys_addr_t __init early_pgtable_alloc(void)
->>       return phys;
->>  }
->>
->> +/*
->> + * The following mapping attributes may be updated in live
->> + * kernel mappings without the need for break-before-make.
->> + */
->> +static const pteval_t modifiable_attr_mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
->> +
->>  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>                                 unsigned long end, unsigned long pfn,
->>                                 pgprot_t prot,
->> @@ -115,8 +119,18 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->>
->>       pte = pte_set_fixmap_offset(pmd, addr);
->>       do {
->> +             pte_t old_pte = *pte;
->> +
->>               set_pte(pte, pfn_pte(pfn, prot));
->>               pfn++;
->> +
->> +             /*
->> +              * After the PTE entry has been populated once, we
->> +              * only allow updates to the permission attributes.
->> +              */
->> +             BUG_ON(pte_val(old_pte) != 0 &&
->> +                    ((pte_val(old_pte) ^ pte_val(*pte)) &
->> +                     ~modifiable_attr_mask) != 0);
+2016-10-13 13:03 GMT+02:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 12/10/2016 at 14:48:27 +0200, Jean-Jacques Hiblot wrote :
+>> > +static void at91_lpddr_poweroff(void)
+>> > +{
+>> > +       asm volatile(
+>> > +               /* Align to cache lines */
+>> > +               ".balign 32\n\t"
+>> > +
+>> > +               "       ldr     r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
+>> At first sight, it looks useless. I assume it's used to preload the
+>> TLB before the LPDDR is turned off.
+>> A comment to explain why this line is useful would prevent its removal.
 >
-> Please turn this check into a single macro. You have it in three places
-> already (though with different types but a macro would do). Something
-> like below (feel free to come up with a better macro name):
+> Yes, this is the case. I can add a comment.
 >
->                 BUG_ON(!safe_pgattr_change(old_pte, *pte));
+> Anyway, I would prefer the whole thing to run from SRAM, as a PIE
+> instead of relying on the cache.
+
+Instead of copying into the SRAM, you can make the cache reliable by
+preloading it, much like the TLB.
+LDI is probably not available for most of atmel's SOC, so the only way
+I can think of, is to execute code from the targeted area. here is an
+example:
++               /*
++                * Jump to the end of the sequence to preload instruction cache
++                * It only works because the sequence is short enough not to
++                * sit accross more than 2 cache lines
++                */
++               "       b end_of_sequence\n\t"
++               "start_of_sequence:\n\t"
++
+                /* Power down SDRAM0 */
+                "       str     %1, [%0, #"
+__stringify(AT91_DDRSDRC_LPR) "]\n\t"
+                /* Shutdown CPU */
+                "       str     %3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
+
+                "       b       .\n\t"
++
++               /*
++                * we're now 100% sure that the code to shutdown the LPDDR and
++                * the CPU is in cache, go back to do the actual job
++                */
++               "end_of_sequence:\n\t"
++               "       b start_of_sequence\n\t"
+                :
+
+
 >
-
-Something like below? With that, I can also fold the PMD and PUD
-versions of the BUG() together.
-
-"""
-/*
- * Returns whether updating a live page table entry is safe:
- * - if the old and new values are identical,
- * - if an invalid mapping is turned into a valid one (or vice versa),
- * - if the entry is a block or page mapping, and the old and new values
- *   only differ in the PXN/RDONLY/WRITE bits.
- *
- * NOTE: 'safe' does not imply that no TLB maintenance is required, it only
- *       means that no TLB conflicts should occur as a result of the update.
- */
-#define __set_pgattr_is_safe(type, old, new, blocktype) \
-(type ## _val(old) == type ## _val(new) || \
-((type ## _val(old) ^ type ## _val(new)) & PTE_VALID) != 0 || \
-(((type ## _val(old) & PTE_TYPE_MASK) == blocktype) && \
- (((type ## _val(old) ^ type ## _val(new)) & \
-   ~(PTE_PXN | PTE_RDONLY | PTE_WRITE)) == 0)))
-
-static inline bool set_live_pte_is_safe(pte_t old, pte_t new)
-{
-return __set_pgattr_is_safe(pte, old, new, PTE_TYPE_PAGE);
-}
-
-static inline bool set_live_pmd_is_safe(pmd_t old, pmd_t new)
-{
-return __set_pgattr_is_safe(pmd, old, new, PMD_TYPE_SECT);
-}
-
-static inline bool set_live_pud_is_safe(pud_t old, pud_t new)
-{
-return __set_pgattr_is_safe(pud, old, new, PUD_TYPE_SECT);
-}
-"""
+>> > +       ddr_type = readl(mpddrc_base + AT91_DDRSDRC_MDR) & AT91_DDRSDRC_MD;
+>> > +       if ((ddr_type == AT91_DDRSDRC_MD_LPDDR2) ||
+>> > +           (ddr_type == AT91_DDRSDRC_MD_LPDDR3))
+>> Souldn't there be something like "pm_power_off = at91_lpddr_poweroff;" here ?
+>>
+>
+> Indeed
+>
+>
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
