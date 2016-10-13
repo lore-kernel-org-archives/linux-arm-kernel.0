@@ -1,80 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 13 Oct 2016 09:04:42 +0200
-Subject: [PATCH v7 2/8] power: add power sequence library
-In-Reply-To: <20161013012216.GA8114@b29397-desktop>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
- <4691591.qnCGxrEkrZ@phil> <20161013012216.GA8114@b29397-desktop>
-Message-ID: <10186696.bBGEe05eC7@phil>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 13 Oct 2016 09:05:35 +0200
+Subject: [PATCH 4/4] staging/vchi: Remove dependency on CONFIG_BROKEN.
+In-Reply-To: <20161003185209.27733-5-eric@anholt.net>
+References: <20161003185209.27733-1-eric@anholt.net>
+ <20161003185209.27733-5-eric@anholt.net>
+Message-ID: <20161013070535.GA23147@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. Oktober 2016, 09:22:16 CEST schrieb Peter Chen:
-> On Wed, Oct 12, 2016 at 12:30:29PM +0200, Heiko Stuebner wrote:
-> > Hi,
-> > 
-> > Am Dienstag, 20. September 2016, 11:36:41 CEST schrieb Peter Chen:
-> > > We have an well-known problem that the device needs to do some power
-> > > sequence before it can be recognized by related host, the typical
-> > > example like hard-wired mmc devices and usb devices.
-> > > 
-> > > This power sequence is hard to be described at device tree and handled
-> > > by
-> > > related host driver, so we have created a common power sequence
-> > > library to cover this requirement. The core code has supplied
-> > > some common helpers for host driver, and individual power sequence
-> > > libraries handle kinds of power sequence for devices.
-> > > 
-> > > pwrseq_generic is intended for general purpose of power sequence, which
-> > > handles gpios and clocks currently, and can cover regulator and pinctrl
-> > > in future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > > if only one power sequence is needed, else call of_pwrseq_on_list
-> > > /of_pwrseq_off_list instead (eg, USB hub driver).
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> > 
-> > first of all, glad to see this move forward. I've only some qualms with
-> > the
-> > static number of allocated power sequences below.
+On Mon, Oct 03, 2016 at 11:52:09AM -0700, Eric Anholt wrote:
+> The driver builds now.
 > 
-> Thanks for commenting it, the preallocate way is not a good way, but I
-> can't find suitable way. See below comments.
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  drivers/staging/vc04_services/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> > > +static int __init pwrseq_generic_register(void)
-> > > +{
-> > > +	struct pwrseq_generic *pwrseq_gen;
-> > > +	int i;
-> > > +
-> > > +	for (i = 0; i < CONFIG_PWRSEQ_GENERIC_INSTANCE_NUMBER; i++) {
-> > > +		pwrseq_gen = kzalloc(sizeof(*pwrseq_gen), GFP_KERNEL);
-> > > +		if (!pwrseq_gen)
-> > > +			return -ENOMEM;
-> > > +
-> > > +		pwrseq_gen->pwrseq.pwrseq_of_match_table = generic_id_table;
-> > > +		pwrseq_gen->pwrseq.get = pwrseq_generic_get;
-> > > +		pwrseq_gen->pwrseq.on = pwrseq_generic_on;
-> > > +		pwrseq_gen->pwrseq.off = pwrseq_generic_off;
-> > > +		pwrseq_gen->pwrseq.put = pwrseq_generic_put;
-> > > +		pwrseq_gen->pwrseq.free = pwrseq_generic_free;
-> > > +
-> > > +		pwrseq_register(&pwrseq_gen->pwrseq);
-> > > +	}
-> > > +
-> > > +	return 0;
-> > > +}
-> > > +postcore_initcall(pwrseq_generic_register)
-> > 
-> > I see that you need to have it preallocated for the compatible matching,
-> > but wouldn't it also work to either just register the type and allocate
-> > dynamically or otherwise just allocate a new spare everytime
-> > pwrseq_generic_get() picks up the previous spare?
-> 
-> Before compatible matching, the host driver doesn't know which pwrseq type
-> for its child node, then doesn't know which pwrseq instance needs to be
-> allocated. From dts, we don't know which pwrseq type for the node.
+> diff --git a/drivers/staging/vc04_services/Kconfig b/drivers/staging/vc04_services/Kconfig
+> index 9676fb29075a..db8e1beb89f9 100644
+> --- a/drivers/staging/vc04_services/Kconfig
+> +++ b/drivers/staging/vc04_services/Kconfig
+> @@ -1,6 +1,6 @@
+>  config BCM2708_VCHIQ
+>  	tristate "Videocore VCHIQ"
+> -	depends on RASPBERRYPI_FIRMWARE && BROKEN
+> +	depends on RASPBERRYPI_FIRMWARE
+>  	default y
+>  	help
+>  		Kernel to VideoCore communication interface for the
 
-yes, that is why I was suggesting allocating one (or two) here in 
-pwrseq_generic_register() and every time pwrseq_generic_get() grabs the last 
-free sequence instance, you allocate a new free spare one in that function.
+I've dropped this patch from my branch as there are build errors on
+arm64 systems still, and we don't want regressions like that.
+
+I've forwarded you the error messages, and I'll be glad to add this
+patch back once these issues are fixed.
+
+thanks,
+
+greg k-h
