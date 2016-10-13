@@ -1,80 +1,117 @@
-From: karl.beldan@gmail.com (Karl Beldan)
-Date: Thu, 13 Oct 2016 07:14:54 +0000
-Subject: [PATCH] ARM: dts: da850: Add basic DTS for the L138/C6748 Dev Kit
-In-Reply-To: <20160804234349.GA4391@gobelin>
-References: <20160804144332.4841-1-kbeldan@baylibre.com>
- <20160804182902.GA22499@rob-hp-laptop>
- <20160804210326.GE15013@gobelin>
- <CAL_Jsq+3eWgcYc=wpgVCadSFQUyE+WLfA3kTb10AuoZfiKsKog@mail.gmail.com>
- <20160804234349.GA4391@gobelin>
-Message-ID: <20161013071454.a44v7oikcifxklty@gobelin>
+From: christian.koenig@amd.com (=?UTF-8?Q?Christian_K=c3=b6nig?=)
+Date: Thu, 13 Oct 2016 09:32:51 +0200
+Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
+ pass FOLL_* flags
+In-Reply-To: <20161013002020.3062-1-lstoakes@gmail.com>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+Message-ID: <914b917f-6871-2ba3-95ba-981dd2855743@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 04, 2016 at 11:43:49PM +0000, Karl Beldan wrote:
-> On Thu, Aug 04, 2016 at 04:13:10PM -0500, Rob Herring wrote:
-> > +Peter H
-> > 
-> > On Thu, Aug 4, 2016 at 4:03 PM, Karl Beldan <kbeldan@baylibre.com> wrote:
-> > > On Thu, Aug 04, 2016 at 01:29:02PM -0500, Rob Herring wrote:
-> > >> On Thu, Aug 04, 2016 at 02:43:32PM +0000, Karl Beldan wrote:
-> > >> > The LCDK is the successor to the late Hawkboard and has the same machine
-> > >> > number.
-> > >> > Among the differences are the flash (16bits vs 8bits) and some pins
-> > >> > (MMC, LEDs, buttons, some external connectors), however the main
-> > >> > components remain the same (eth. PHY, Audio Codec, Video decoder and
-> > >> > DAC) except for the main PMIC, different and hard-wired on the LCDK (the
-> > >> > LDOs and DCDCs are always ON).
-> > >> > A DT-only boot with this addition gives functional uart, reboot via
-> > >> > watchdog, rtc, ethernet and MMC (I added the CD gpio for the MMC
-> > >> > although davinci_mmc doesn't call yet the mmc core OF facilities).
-> > 
-> > [...]
-> > 
-> > >> > +   aliases {
-> > >> > +           serial2 = &serial2;
-> > >> > +   };
-> > >> > +
-> > >> > +   chosen {
-> > >> > +           bootargs = "console=ttyS2,115200n8 earlycon";
-> > >>
-> > >> You don't need console with stdout-path set. And really, earlycon should
-> > >> not be the default.
-> > >>
-> > > Ok for earlycon.
-> > >
-> > > For the console, I thought likewise .. until I _struggled_ to understand
-> > > why the console was disappearing under my feet.
-> > > It seemed even stranger when I started looking at the codepath because
-> > > drivers/of/base.c would properly add_preferred_console as expected after
-> > > the corresponding UART was added. But the reality was there, without it
-> > > the console was not like stdout-path.
-> > > Among the commits that could instill doubt as to whether stdout-path
-> > > rules is f64255b5072d:
-> > > "The assumption that at least 1 preferred console will be registered
-> > > when the stdout-path property is set is invalid, which can result in
-> > > _no_ consoles.", though it didn't answer my question.
-> > > I started looking whether tty0 was not getting in the way and in the end
-> > > I came up with setting console.
-> > > But you seem affirmative.
-> > 
-> > There have been some issues in this area, but I thought they were in
-> > conjunction with earlycon and solved now. This is a fairly common
-> > review request for dts files, so I'm surprised if it doesn't work
-> > right. Maybe having tty0 or not has some influence. Or people just
-> > accept review comments without testing or caring...
-> > 
-> I can assure you I tested without early{con,printk} ;).
-> 
-> Now I have just rechecked the codepaths and something caught my
-> attention in kernel/printk/printk.c:__add_preferred_console(): if
-> console_cmdline is empty selected_console gets unconditionally set to
-> zero ! Knowing this I confirmed by replacing with idx (works), and also
-> by using ttyS0 (i.e. alias serial0 = &uart2) (works), this would not
-> affect DTs using serial0. It's late here so I'll stop there.
->  
+Am 13.10.2016 um 02:20 schrieb Lorenzo Stoakes:
+> This patch series adjusts functions in the get_user_pages* family such that
+> desired FOLL_* flags are passed as an argument rather than implied by flags.
+>
+> The purpose of this change is to make the use of FOLL_FORCE explicit so it is
+> easier to grep for and clearer to callers that this flag is being used. The use
+> of FOLL_FORCE is an issue as it overrides missing VM_READ/VM_WRITE flags for the
+> VMA whose pages we are reading from/writing to, which can result in surprising
+> behaviour.
+>
+> The patch series came out of the discussion around commit 38e0885, which
+> addressed a BUG_ON() being triggered when a page was faulted in with PROT_NONE
+> set but having been overridden by FOLL_FORCE. do_numa_page() was run on the
+> assumption the page _must_ be one marked for NUMA node migration as an actual
+> PROT_NONE page would have been dealt with prior to this code path, however
+> FOLL_FORCE introduced a situation where this assumption did not hold.
+>
+> See https://marc.info/?l=linux-mm&m=147585445805166 for the patch proposal.
+>
+> Lorenzo Stoakes (10):
+>    mm: remove write/force parameters from __get_user_pages_locked()
+>    mm: remove write/force parameters from __get_user_pages_unlocked()
+>    mm: replace get_user_pages_unlocked() write/force parameters with gup_flags
+>    mm: replace get_user_pages_locked() write/force parameters with gup_flags
+>    mm: replace get_vaddr_frames() write/force parameters with gup_flags
+>    mm: replace get_user_pages() write/force parameters with gup_flags
+>    mm: replace get_user_pages_remote() write/force parameters with gup_flags
+>    mm: replace __access_remote_vm() write parameter with gup_flags
+>    mm: replace access_remote_vm() write parameter with gup_flags
+>    mm: replace access_process_vm() write parameter with gup_flags
 
-The stdout-path bug was fixed last week by Paul Burton in 05fd007e4629 
-("console: don't prefer first registered if DT specifies stdout-path").
- 
-Karl
+Patch number 6 in this series (which touches drivers I co-maintain) is 
+Acked-by: Christian K?nig <christian.koenig@amd.com>.
+
+In general looks like a very nice cleanup to me, but I'm not enlightened 
+enough to full judge.
+
+Regards,
+Christian.
+
+>
+>   arch/alpha/kernel/ptrace.c                         |  9 ++--
+>   arch/blackfin/kernel/ptrace.c                      |  5 ++-
+>   arch/cris/arch-v32/drivers/cryptocop.c             |  4 +-
+>   arch/cris/arch-v32/kernel/ptrace.c                 |  4 +-
+>   arch/ia64/kernel/err_inject.c                      |  2 +-
+>   arch/ia64/kernel/ptrace.c                          | 14 +++---
+>   arch/m32r/kernel/ptrace.c                          | 15 ++++---
+>   arch/mips/kernel/ptrace32.c                        |  5 ++-
+>   arch/mips/mm/gup.c                                 |  2 +-
+>   arch/powerpc/kernel/ptrace32.c                     |  5 ++-
+>   arch/s390/mm/gup.c                                 |  3 +-
+>   arch/score/kernel/ptrace.c                         | 10 +++--
+>   arch/sh/mm/gup.c                                   |  3 +-
+>   arch/sparc/kernel/ptrace_64.c                      | 24 +++++++----
+>   arch/sparc/mm/gup.c                                |  3 +-
+>   arch/x86/kernel/step.c                             |  3 +-
+>   arch/x86/mm/gup.c                                  |  2 +-
+>   arch/x86/mm/mpx.c                                  |  5 +--
+>   arch/x86/um/ptrace_32.c                            |  3 +-
+>   arch/x86/um/ptrace_64.c                            |  3 +-
+>   drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c            |  7 ++-
+>   drivers/gpu/drm/etnaviv/etnaviv_gem.c              |  7 ++-
+>   drivers/gpu/drm/exynos/exynos_drm_g2d.c            |  3 +-
+>   drivers/gpu/drm/i915/i915_gem_userptr.c            |  6 ++-
+>   drivers/gpu/drm/radeon/radeon_ttm.c                |  3 +-
+>   drivers/gpu/drm/via/via_dmablit.c                  |  4 +-
+>   drivers/infiniband/core/umem.c                     |  6 ++-
+>   drivers/infiniband/core/umem_odp.c                 |  7 ++-
+>   drivers/infiniband/hw/mthca/mthca_memfree.c        |  2 +-
+>   drivers/infiniband/hw/qib/qib_user_pages.c         |  3 +-
+>   drivers/infiniband/hw/usnic/usnic_uiom.c           |  5 ++-
+>   drivers/media/pci/ivtv/ivtv-udma.c                 |  4 +-
+>   drivers/media/pci/ivtv/ivtv-yuv.c                  |  5 ++-
+>   drivers/media/platform/omap/omap_vout.c            |  2 +-
+>   drivers/media/v4l2-core/videobuf-dma-sg.c          |  7 ++-
+>   drivers/media/v4l2-core/videobuf2-memops.c         |  6 ++-
+>   drivers/misc/mic/scif/scif_rma.c                   |  3 +-
+>   drivers/misc/sgi-gru/grufault.c                    |  2 +-
+>   drivers/platform/goldfish/goldfish_pipe.c          |  3 +-
+>   drivers/rapidio/devices/rio_mport_cdev.c           |  3 +-
+>   drivers/scsi/st.c                                  |  5 +--
+>   .../interface/vchiq_arm/vchiq_2835_arm.c           |  3 +-
+>   .../vc04_services/interface/vchiq_arm/vchiq_arm.c  |  3 +-
+>   drivers/video/fbdev/pvr2fb.c                       |  4 +-
+>   drivers/virt/fsl_hypervisor.c                      |  4 +-
+>   fs/exec.c                                          |  9 +++-
+>   fs/proc/base.c                                     | 19 +++++---
+>   include/linux/mm.h                                 | 18 ++++----
+>   kernel/events/uprobes.c                            |  6 ++-
+>   kernel/ptrace.c                                    | 16 ++++---
+>   mm/frame_vector.c                                  |  9 ++--
+>   mm/gup.c                                           | 50 ++++++++++------------
+>   mm/memory.c                                        | 16 ++++---
+>   mm/mempolicy.c                                     |  2 +-
+>   mm/nommu.c                                         | 38 +++++++---------
+>   mm/process_vm_access.c                             |  7 ++-
+>   mm/util.c                                          |  8 ++--
+>   net/ceph/pagevec.c                                 |  2 +-
+>   security/tomoyo/domain.c                           |  2 +-
+>   virt/kvm/async_pf.c                                |  3 +-
+>   virt/kvm/kvm_main.c                                | 11 +++--
+>   61 files changed, 260 insertions(+), 187 deletions(-)
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
