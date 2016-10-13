@@ -1,54 +1,79 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Oct 2016 17:57:33 +0100
-Subject: [PATCH v3 3/5] arm64: mm: set the contiguous bit for kernel
- mappings where appropriate
-In-Reply-To: <20161013162806.GH21592@e104818-lin.cambridge.arm.com>
+Date: Thu, 13 Oct 2016 17:58:06 +0100
+Subject: [PATCH v3 1/5] arm64: mm: BUG on unsupported manipulations of
+ live kernel mappings
+In-Reply-To: <20161013165112.GI21592@e104818-lin.cambridge.arm.com>
 References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476271425-19401-4-git-send-email-ard.biesheuvel@linaro.org>
- <20161013162806.GH21592@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9WqUvtHRJvgWhsvYwFOgho97EaLV4qojaa0fjGpJT3WQ@mail.gmail.com>
+ <1476271425-19401-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161012150428.s4gajqlnnivo6bld@localhost>
+ <CAKv+Gu8p06DBaDgmJ3KSSfNVDox=wOTav48kti+Y0gYtQhEC_g@mail.gmail.com>
+ <20161013144450.GG21592@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9E27mrC3k37nbGAxo_C6D7_svRFZXXzoP2Rzc+XATm0A@mail.gmail.com>
+ <20161013165112.GI21592@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu9iakPzFAz0uut4D2upXdpTgodOBW9T40djRgzWOLgO_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2016 at 17:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, Oct 12, 2016 at 12:23:43PM +0100, Ard Biesheuvel wrote:
->> Now that we no longer allow live kernel PMDs to be split, it is safe to
->> start using the contiguous bit for kernel mappings. So set the contiguous
->> bit in the kernel page mappings for regions whose size and alignment are
->> suitable for this.
+On 13 October 2016 at 17:51, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Thu, Oct 13, 2016 at 03:48:04PM +0100, Ard Biesheuvel wrote:
+>> On 13 October 2016 at 15:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Thu, Oct 13, 2016 at 01:25:53PM +0100, Ard Biesheuvel wrote:
+>> >
+>> > (fixing up alignment to make it readable)
+>> >
 >>
->> This enables the following contiguous range sizes for the virtual mapping
->> of the kernel image, and for the linear mapping:
+>> I apologise on Gmail's behalf
 >>
->>           granule size |  cont PTE  |  cont PMD  |
->>           -------------+------------+------------+
->>                4 KB    |    64 KB   |   32 MB    |
->>               16 KB    |     2 MB   |    1 GB*   |
->>               64 KB    |     2 MB   |   16 GB*   |
+>> >> """
+>> >> /*
+>> >>  * Returns whether updating a live page table entry is safe:
+>> >>  * - if the old and new values are identical,
+>> >>  * - if an invalid mapping is turned into a valid one (or vice versa),
+>> >>  * - if the entry is a block or page mapping, and the old and new values
+>> >>  *   only differ in the PXN/RDONLY/WRITE bits.
+>> >>  *
+>> >>  * NOTE: 'safe' does not imply that no TLB maintenance is required, it only
+>> >>  *       means that no TLB conflicts should occur as a result of the update.
+>> >>  */
+>> >> #define __set_pgattr_is_safe(type, old, new, blocktype) \
+>> >>       (type ## _val(old) == type ## _val(new) || \
+>> >>        ((type ## _val(old) ^ type ## _val(new)) & PTE_VALID) != 0 || \
+>> >>        (((type ## _val(old) & PTE_TYPE_MASK) == blocktype) && \
+>> >>         (((type ## _val(old) ^ type ## _val(new)) & \
+>> >>        ~(PTE_PXN | PTE_RDONLY | PTE_WRITE)) == 0)))
+>> >>
+>> >> static inline bool set_live_pte_is_safe(pte_t old, pte_t new)
+>> >> {
+>> >>       return __set_pgattr_is_safe(pte, old, new, PTE_TYPE_PAGE);
+>> >> }
+>> >>
+>> >> static inline bool set_live_pmd_is_safe(pmd_t old, pmd_t new)
+>> >> {
+>> >>       return __set_pgattr_is_safe(pmd, old, new, PMD_TYPE_SECT);
+>> >> }
+>> >>
+>> >> static inline bool set_live_pud_is_safe(pud_t old, pud_t new)
+>> >> {
+>> >>       return __set_pgattr_is_safe(pud, old, new, PUD_TYPE_SECT);
+>> >> }
+>> >
+>> > The set_ prefix is slightly confusing as it suggests (to me) having a
+>> > side effect. Maybe pgattr_set_is_safe()?
+>> >
+>> > But it looks like we make it more complicated needed by using pte_t
+>> > instead of pteval_t as argument. How about just using the pteval_t as
+>> > argument (and it's fine to call it with pmdval_t, pudval_t as well):
+>> >
+>> > #define pgattr_set_is_safe(oldval, newval) \
+>> >         ...
 >>
->> * only when built for 3 or more levels of translation
+>> Well, the only problem there is that the permission bit check should
+>> only apply to level 3 page mappings (bit[1] == 1) and level 1/2 block
+>> mappings (bit[1] == 0), so we would still need two versions
 >
-> I assume the limitation to have contiguous PMD only with 3 or move
-> levels is because of the way p*d folding was implemented in the kernel.
-> With nopmd, looping over pmds is done in __create_pgd_mapping() rather
-> than alloc_init_pmd().
->
-> A potential solution would be to replicate the contiguous pmd code to
-> the pud and pgd level, though we probably won't benefit from any
-> contiguous entries at higher level (when more than 2 levels).
-> Alternatively, with an #ifdef __PGTABLE_PMD_FOLDED, we could set the
-> PMD_CONT in prot in __create_pgd_mapping() directly (if the right
-> addr/phys alignment).
+> I was suggesting that you only replace the "... & ~modifiable_attr_mask"
+> check in your patch to avoid writing it three times. The macro that you
+> proposed above does more but it is also more unreadable.
 >
 
-Indeed. See the next patch :-)
-
-> Anyway, it's probably not worth the effort given that 42-bit VA with 64K
-> pages is becoming a less likely configuration (36-bit VA with 16K pages
-> is even less likely, also depending on EXPERT).
->
-
-This is the reason I put it in a separate patch: this one contains the
-most useful combinations, and the next patch adds the missing ones,
-but clutters up the code significantly. I'm perfectly happy to drop 4
-and 5 if you don't think it is worth the trouble.
+Ah ok, fair enough
