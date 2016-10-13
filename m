@@ -1,146 +1,268 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 13 Oct 2016 09:56:50 +0800
-Subject: Question: Re: [PATCH] drm/bridge: analogix: protect power when
- get_modes or detect
-In-Reply-To: <CAOw6vbKe0d66O1MymP24UQ-M3EmdR+=pZVWmgZG9iVm5x1Arrg@mail.gmail.com>
-References: <1476266442-29803-1-git-send-email-mark.yao@rock-chips.com>
- <57FE0EF5.7010207@rock-chips.com>
- <CAOw6vbKe0d66O1MymP24UQ-M3EmdR+=pZVWmgZG9iVm5x1Arrg@mail.gmail.com>
-Message-ID: <57FEE9E2.20505@rock-chips.com>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Thu, 13 Oct 2016 06:58:12 +0200
+Subject: [PATCH v3 3/6] pwm: imx: support output polarity inversion
+In-Reply-To: <ff9ba34df2729204c617685dd26ea625@agner.ch>
+References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
+ <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
+ <5325a332099473a2d8382530f79c5a8e@agner.ch>
+ <20161013001540.7f759158@jawa>
+ <ff9ba34df2729204c617685dd26ea625@agner.ch>
+Message-ID: <20161013065812.0da91859@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?10?12? 22:51, Sean Paul wrote:
-> On Wed, Oct 12, 2016 at 6:22 AM, Mark yao <mark.yao@rock-chips.com> wrote:
->> I'm not familiar with the analogix driver, maybe use a power reference count
->> would better then direct power on/off analogix_dp.
->>
->> Does anyone has the idea to protect detect and get_modes context?
->>
-> I'm not sure a reference count is going to help here. The common
-> pattern is to call detect() followed by get_modes() and then modeset.
-> However, it's not guaranteed that any one of those functions will be
-> called after the other. So, if you leave things on after detect or
-> get_modes, you might be wasting power (or worse).
->
-> I recently ran into this exact problem with a panel we're using. Check
-> out "0b8b059a7: drm/bridge: analogix_dp: Ensure the panel is properly
-> prepared/unprepared". Perhaps you can piggyback on that function to
-> add your pm_runtime and plat_data callbacks (since using dpms_mode
-> might be racey).
->
-> Sean
-Hi Sean
+Hi Stefan,
 
-Thanks for your advice.
+> On 2016-10-12 15:15, Lukasz Majewski wrote:
+> > Hi Stefan,
+> > 
+> >> On 2016-10-07 08:11, Bhuvanchandra DV wrote:
+> >> > From: Lothar Wassmann <LW@KARO-electronics.de>
+> >> >
+> >> > The i.MX pwm unit on i.MX27 and newer SoCs provides a
+> >> > configurable output polarity. This patch adds support to utilize
+> >> > this feature where available.
+> >> >
+> >> > Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+> >> > Signed-off-by: Lukasz Majewski <l.majewski@samsung.com>
+> >> > Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
+> >> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> >> > Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >> > ---
+> >> >  Documentation/devicetree/bindings/pwm/imx-pwm.txt |  6 +--
+> >> >  drivers/pwm/pwm-imx.c                             | 51
+> >> > +++++++++++++++++++++-- 2 files changed, 51 insertions(+), 6
+> >> > deletions(-)
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> >> > b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> >> > index e00c2e9..c61bdf8 100644
+> >> > --- a/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> >> > +++ b/Documentation/devicetree/bindings/pwm/imx-pwm.txt
+> >> > @@ -6,8 +6,8 @@ Required properties:
+> >> >    - "fsl,imx1-pwm" for PWM compatible with the one integrated on
+> >> > i.MX1
+> >> >    - "fsl,imx27-pwm" for PWM compatible with the one integrated
+> >> > on i.MX27
+> >> >  - reg: physical base address and length of the controller's
+> >> > registers -- #pwm-cells: should be 2. See pwm.txt in this
+> >> > directory for a description of
+> >> > -  the cells format.
+> >> > +- #pwm-cells: 2 for i.MX1 and 3 for i.MX27 and newer SoCs. See
+> >> > pwm.txt
+> >> > +  in this directory for a description of the cells format.
+> >> >  - clocks : Clock specifiers for both ipg and per clocks.
+> >> >  - clock-names : Clock names should include both "ipg" and "per"
+> >> >  See the clock consumer binding,
+> >> > @@ -17,7 +17,7 @@ See the clock consumer binding,
+> >> >  Example:
+> >> >
+> >> >  pwm1: pwm at 53fb4000 {
+> >> > -	#pwm-cells = <2>;
+> >> > +	#pwm-cells = <3>;
+> >> >  	compatible = "fsl,imx53-pwm", "fsl,imx27-pwm";
+> >> >  	reg = <0x53fb4000 0x4000>;
+> >> >  	clocks = <&clks IMX5_CLK_PWM1_IPG_GATE>,
+> >> > diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+> >> > index d600fd5..c37d223 100644
+> >> > --- a/drivers/pwm/pwm-imx.c
+> >> > +++ b/drivers/pwm/pwm-imx.c
+> >> > @@ -38,6 +38,7 @@
+> >> >  #define MX3_PWMCR_DOZEEN		(1 << 24)
+> >> >  #define MX3_PWMCR_WAITEN		(1 << 23)
+> >> >  #define MX3_PWMCR_DBGEN			(1 << 22)
+> >> > +#define MX3_PWMCR_POUTC			(1 << 18)
+> >> >  #define MX3_PWMCR_CLKSRC_IPG_HIGH	(2 << 16)
+> >> >  #define MX3_PWMCR_CLKSRC_IPG		(1 << 16)
+> >> >  #define MX3_PWMCR_SWR			(1 << 3)
+> >> > @@ -180,6 +181,9 @@ static int imx_pwm_config_v2(struct pwm_chip
+> >> > *chip, if (enable)
+> >> >  		cr |= MX3_PWMCR_EN;
+> >> >
+> >> > +	if (pwm->args.polarity == PWM_POLARITY_INVERSED)
+> >> > +		cr |= MX3_PWMCR_POUTC;
+> >> > +
+> >>
+> >> This seems wrong to me, the config callback is meant for
+> >> period/duty cycle only.
+> > 
+> > If it is meant only for that, then the polarity should be removed
+> > from it.
+> > 
+> > However after very quick testing, at least on my setup, it turns out
+> > that removing this lines causes polarity to _not_ being set (and the
+> > polarity is not inverted).
+> > 
+> > I will investigate this further on my setup and hopefully sent
+> > proper patch.
+> > 
+> >> The set_polarity callback should get called in case a
+> >> different polarity is requested.
+> > 
+> > On my setup the pwm2 is set from DT and pwm_backlight_probe() calls
+> > pwm_apply_args(), so everything should work. However, as I mentioned
+> > above there still is some problem with inversion setting.
+> > 
+> >>
+> >>
+> >> >  	writel(cr, imx->mmio_base + MX3_PWMCR);
+> >> >
+> >> >  	return 0;
+> >> > @@ -240,27 +244,62 @@ static void imx_pwm_disable(struct pwm_chip
+> >> > *chip, struct pwm_device *pwm)
+> >> >  	clk_disable_unprepare(imx->clk_per);
+> >> >  }
+> >> >
+> >> > -static struct pwm_ops imx_pwm_ops = {
+> >> > +static int imx_pwm_set_polarity(struct pwm_chip *chip, struct
+> >> > pwm_device *pwm,
+> >> > +				enum pwm_polarity polarity)
+> >> > +{
+> >> > +	struct imx_chip *imx = to_imx_chip(chip);
+> >> > +	u32 val;
+> >> > +
+> >> > +	if (polarity == pwm->args.polarity)
+> >> > +		return 0;
+> >>
+> >> I don't think that this is right. Today, pwm_apply_args (in
+> >> include/linux/pwm.h) copies the polarity from args to
+> >> state.polarity, which is then passed as polarity argument to this
+> >> function. So this will always return 0 afaict.
+> > 
+> > Yes, I've overlooked it (that the state is copied).
+> > 
+> > It can be dropped.
+> 
+> Did you do the above test with that line dropped?
 
-I re-test the detect and get_modes, only use pm_runtime_get/put also can 
-fix my problem.
-without plat_data callbacks can avoid race to dpms_mode.
+Yes. The above code has been also removed.
 
-I had send v2 patch,  you can review it.
+Best regards,
+?ukasz Majewski
 
-Thanks.
+> 
+> > 
+> >>
+> >> I would just drop that.
+> >>
+> >> There is probably one little problem in the current state of
+> >> affairs: If the bootloader makes use of a PWM channel with
+> >> inverted state, then the kernel would not know about that and
+> >> currently assume a wrong initial state... I guess at one point in
+> >> time we should implement the state retrieval callback and move to
+> >> the new atomic PWM API, which would mean to implement apply
+> >> callback.
+> > 
+> > Are there any patches on the horizon?
+> > 
+> 
+> Not that I know of...
+> 
+> --
+> Stefan
+> 
+> >>
+> >> --
+> >> Stefan
+> >>
+> >>
+> >> > +
+> >> > +	val = readl(imx->mmio_base + MX3_PWMCR);
+> >> > +
+> >> > +	if (polarity == PWM_POLARITY_INVERSED)
+> >> > +		val |= MX3_PWMCR_POUTC;
+> >> > +	else
+> >> > +		val &= ~MX3_PWMCR_POUTC;
+> >> > +
+> >> > +	writel(val, imx->mmio_base + MX3_PWMCR);
+> >> > +
+> >> > +	dev_dbg(imx->chip.dev, "%s: polarity set to %s\n",
+> >> > __func__,
+> >> > +		polarity == PWM_POLARITY_INVERSED ? "inverted" :
+> >> > "normal"); +
+> >> > +	return 0;
+> >> > +}
+> >> > +
+> >> > +static struct pwm_ops imx_pwm_ops_v1 = {
+> >> >  	.enable = imx_pwm_enable,
+> >> >  	.disable = imx_pwm_disable,
+> >> >  	.config = imx_pwm_config,
+> >> >  	.owner = THIS_MODULE,
+> >> >  };
+> >> >
+> >> > +static struct pwm_ops imx_pwm_ops_v2 = {
+> >> > +	.enable = imx_pwm_enable,
+> >> > +	.disable = imx_pwm_disable,
+> >> > +	.set_polarity = imx_pwm_set_polarity,
+> >> > +	.config = imx_pwm_config,
+> >> > +	.owner = THIS_MODULE,
+> >> > +};
+> >> > +
+> >> >  struct imx_pwm_data {
+> >> >  	int (*config)(struct pwm_chip *chip,
+> >> >  		struct pwm_device *pwm, int duty_ns, int
+> >> > period_ns); void (*set_enable)(struct pwm_chip *chip, bool
+> >> > enable);
+> >> > +	struct pwm_ops *pwm_ops;
+> >> >  };
+> >> >
+> >> >  static struct imx_pwm_data imx_pwm_data_v1 = {
+> >> >  	.config = imx_pwm_config_v1,
+> >> >  	.set_enable = imx_pwm_set_enable_v1,
+> >> > +	.pwm_ops = &imx_pwm_ops_v1,
+> >> >  };
+> >> >
+> >> >  static struct imx_pwm_data imx_pwm_data_v2 = {
+> >> >  	.config = imx_pwm_config_v2,
+> >> >  	.set_enable = imx_pwm_set_enable_v2,
+> >> > +	.pwm_ops = &imx_pwm_ops_v2,
+> >> >  };
+> >> >
+> >> >  static const struct of_device_id imx_pwm_dt_ids[] = {
+> >> > @@ -282,6 +321,8 @@ static int imx_pwm_probe(struct
+> >> > platform_device *pdev) if (!of_id)
+> >> >  		return -ENODEV;
+> >> >
+> >> > +	data = of_id->data;
+> >> > +
+> >> >  	imx = devm_kzalloc(&pdev->dev, sizeof(*imx),
+> >> > GFP_KERNEL); if (imx == NULL)
+> >> >  		return -ENOMEM;
+> >> > @@ -300,18 +341,22 @@ static int imx_pwm_probe(struct
+> >> > platform_device *pdev) return PTR_ERR(imx->clk_ipg);
+> >> >  	}
+> >> >
+> >> > -	imx->chip.ops = &imx_pwm_ops;
+> >> > +	imx->chip.ops = data->pwm_ops;
+> >> >  	imx->chip.dev = &pdev->dev;
+> >> >  	imx->chip.base = -1;
+> >> >  	imx->chip.npwm = 1;
+> >> >  	imx->chip.can_sleep = true;
+> >> > +	if (data->pwm_ops->set_polarity) {
+> >> > +		dev_dbg(&pdev->dev, "PWM supports output
+> >> > inversion\n");
+> >> > +		imx->chip.of_xlate = of_pwm_xlate_with_flags;
+> >> > +		imx->chip.of_pwm_n_cells = 3;
+> >> > +	}
+> >> >
+> >> >  	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> >  	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+> >> >  	if (IS_ERR(imx->mmio_base))
+> >> >  		return PTR_ERR(imx->mmio_base);
+> >> >
+> >> > -	data = of_id->data;
+> >> >  	imx->config = data->config;
+> >> >  	imx->set_enable = data->set_enable;
+> >>
+> > 
+> > Best regards,
+> > 
+> > ?ukasz Majewski
 
->
->> I found many other connector driver also direct access register on detect or
->> get_modes, no problem for it?
->>
->> On 2016?10?12? 18:00, Mark Yao wrote:
->>
->> The drm callback ->detect and ->get_modes seems is not power safe,
->> they may be called when device is power off, do register access on
->> detect or get_modes will cause system die.
->>
->> Here is the path call ->detect before analogix_dp power on
->> [<ffffff800843babc>] analogix_dp_detect+0x44/0xdc
->> [<ffffff80083fd840>]
->> drm_helper_probe_single_connector_modes_merge_bits+0xe8/0x41c
->> [<ffffff80083fdb84>] drm_helper_probe_single_connector_modes+0x10/0x18
->> [<ffffff8008418d24>] drm_mode_getconnector+0xf4/0x304
->> [<ffffff800840cff0>] drm_ioctl+0x23c/0x390
->> [<ffffff80081a8adc>] do_vfs_ioctl+0x4b8/0x58c
->> [<ffffff80081a8c10>] SyS_ioctl+0x60/0x88
->>
->> Cc: Inki Dae <inki.dae@samsung.com>
->> Cc: Sean Paul <seanpaul@chromium.org>
->> Cc: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
->> Cc: "Ville Syrj?l?" <ville.syrjala@linux.intel.com>
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->>   drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 28
->> ++++++++++++++++++++++
->>   1 file changed, 28 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> index efac8ab..09dece2 100644
->> --- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> +++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
->> @@ -1062,6 +1062,13 @@ int analogix_dp_get_modes(struct drm_connector
->> *connector)
->>    return 0;
->>    }
->>
->> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
->> + pm_runtime_get_sync(dp->dev);
->> +
->> + if (dp->plat_data->power_on)
->> + dp->plat_data->power_on(dp->plat_data);
->> + }
->> +
->>    if (analogix_dp_handle_edid(dp) == 0) {
->>    drm_mode_connector_update_edid_property(&dp->connector, edid);
->>    num_modes += drm_add_edid_modes(&dp->connector, edid);
->> @@ -1073,6 +1080,13 @@ int analogix_dp_get_modes(struct drm_connector
->> *connector)
->>    if (dp->plat_data->get_modes)
->>    num_modes += dp->plat_data->get_modes(dp->plat_data, connector);
->>
->> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
->> + if (dp->plat_data->power_off)
->> + dp->plat_data->power_off(dp->plat_data);
->> +
->> + pm_runtime_put_sync(dp->dev);
->> + }
->> +
->>    ret = analogix_dp_prepare_panel(dp, false, false);
->>    if (ret)
->>    DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
->> @@ -1106,9 +1120,23 @@ analogix_dp_detect(struct drm_connector *connector,
->> bool force)
->>    return connector_status_disconnected;
->>    }
->>
->> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
->> + pm_runtime_get_sync(dp->dev);
->> +
->> + if (dp->plat_data->power_on)
->> + dp->plat_data->power_on(dp->plat_data);
->> + }
->> +
->>    if (!analogix_dp_detect_hpd(dp))
->>    status = connector_status_connected;
->>
->> + if (dp->dpms_mode != DRM_MODE_DPMS_ON) {
->> + if (dp->plat_data->power_off)
->> + dp->plat_data->power_off(dp->plat_data);
->> +
->> + pm_runtime_put_sync(dp->dev);
->> + }
->> +
->>    ret = analogix_dp_prepare_panel(dp, false, false);
->>    if (ret)
->>    DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
->>
->>
->>
->> --
->> ?ark Yao
->
->
-
-
--- 
-?ark Yao
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/03447ea2/attachment-0001.sig>
