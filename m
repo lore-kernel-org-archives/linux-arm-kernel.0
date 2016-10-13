@@ -1,69 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 13 Oct 2016 15:48:04 +0100
-Subject: [PATCH v3 1/5] arm64: mm: BUG on unsupported manipulations of
- live kernel mappings
-In-Reply-To: <20161013144450.GG21592@e104818-lin.cambridge.arm.com>
-References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476271425-19401-2-git-send-email-ard.biesheuvel@linaro.org>
- <20161012150428.s4gajqlnnivo6bld@localhost>
- <CAKv+Gu8p06DBaDgmJ3KSSfNVDox=wOTav48kti+Y0gYtQhEC_g@mail.gmail.com>
- <20161013144450.GG21592@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9E27mrC3k37nbGAxo_C6D7_svRFZXXzoP2Rzc+XATm0A@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Thu, 13 Oct 2016 17:04:06 +0200
+Subject: [PATCH 2/2] power/reset: at91-poweroff: timely shitdown LPDDR
+ memories
+In-Reply-To: <20161013134710.rbvsiyu6ala673g4@piout.net>
+References: <20161007163427.11454-1-alexandre.belloni@free-electrons.com>
+ <20161007163427.11454-3-alexandre.belloni@free-electrons.com>
+ <CACh+v5NCxPb_U8HOeczHicCD-Wp8BqBzvc1LtCzmEXZ74Cgshw@mail.gmail.com>
+ <20161013110317.ee6by6njrvs53ztx@piout.net>
+ <CACh+v5PgwXsCoMROO+Vftx8bbhTXP1V-JdZmdwWJ0tgOUW1Axw@mail.gmail.com>
+ <20161013134710.rbvsiyu6ala673g4@piout.net>
+Message-ID: <CACh+v5OH4WdMPFiui3q-QDx7s5JrGPxZ8Mc9fJux54hiZV9+fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2016 at 15:44, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Thu, Oct 13, 2016 at 01:25:53PM +0100, Ard Biesheuvel wrote:
->
-> (fixing up alignment to make it readable)
->
-
-I apologise on Gmail's behalf
-
->> """
->> /*
->>  * Returns whether updating a live page table entry is safe:
->>  * - if the old and new values are identical,
->>  * - if an invalid mapping is turned into a valid one (or vice versa),
->>  * - if the entry is a block or page mapping, and the old and new values
->>  *   only differ in the PXN/RDONLY/WRITE bits.
->>  *
->>  * NOTE: 'safe' does not imply that no TLB maintenance is required, it only
->>  *       means that no TLB conflicts should occur as a result of the update.
->>  */
->> #define __set_pgattr_is_safe(type, old, new, blocktype) \
->>       (type ## _val(old) == type ## _val(new) || \
->>        ((type ## _val(old) ^ type ## _val(new)) & PTE_VALID) != 0 || \
->>        (((type ## _val(old) & PTE_TYPE_MASK) == blocktype) && \
->>         (((type ## _val(old) ^ type ## _val(new)) & \
->>        ~(PTE_PXN | PTE_RDONLY | PTE_WRITE)) == 0)))
+2016-10-13 15:47 GMT+02:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> On 13/10/2016 at 14:27:15 +0200, Jean-Jacques Hiblot wrote :
+>> 2016-10-13 13:03 GMT+02:00 Alexandre Belloni
+>> <alexandre.belloni@free-electrons.com>:
+>> > On 12/10/2016 at 14:48:27 +0200, Jean-Jacques Hiblot wrote :
+>> >> > +static void at91_lpddr_poweroff(void)
+>> >> > +{
+>> >> > +       asm volatile(
+>> >> > +               /* Align to cache lines */
+>> >> > +               ".balign 32\n\t"
+>> >> > +
+>> >> > +               "       ldr     r6, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
+>> >> At first sight, it looks useless. I assume it's used to preload the
+>> >> TLB before the LPDDR is turned off.
+>> >> A comment to explain why this line is useful would prevent its removal.
+>> >
+>> > Yes, this is the case. I can add a comment.
+>> >
+>> > Anyway, I would prefer the whole thing to run from SRAM, as a PIE
+>> > instead of relying on the cache.
 >>
->> static inline bool set_live_pte_is_safe(pte_t old, pte_t new)
->> {
->>       return __set_pgattr_is_safe(pte, old, new, PTE_TYPE_PAGE);
->> }
+>> Instead of copying into the SRAM, you can make the cache reliable by
+>> preloading it, much like the TLB.
+>> LDI is probably not available for most of atmel's SOC, so the only way
+>> I can think of, is to execute code from the targeted area. here is an
+>> example:
+>> +               /*
+>> +                * Jump to the end of the sequence to preload instruction cache
+>> +                * It only works because the sequence is short enough not to
+>> +                * sit accross more than 2 cache lines
+>> +                */
+>> +               "       b end_of_sequence\n\t"
+>> +               "start_of_sequence:\n\t"
+>> +
+>>                 /* Power down SDRAM0 */
+>>                 "       str     %1, [%0, #"
+>> __stringify(AT91_DDRSDRC_LPR) "]\n\t"
+>>                 /* Shutdown CPU */
+>>                 "       str     %3, [%2, #" __stringify(AT91_SHDW_CR) "]\n\t"
 >>
->> static inline bool set_live_pmd_is_safe(pmd_t old, pmd_t new)
->> {
->>       return __set_pgattr_is_safe(pmd, old, new, PMD_TYPE_SECT);
->> }
+>>                 "       b       .\n\t"
+>> +
+>> +               /*
+>> +                * we're now 100% sure that the code to shutdown the LPDDR and
+>> +                * the CPU is in cache, go back to do the actual job
+>> +                */
+>> +               "end_of_sequence:\n\t"
+>> +               "       b start_of_sequence\n\t"
+>>                 :
 >>
->> static inline bool set_live_pud_is_safe(pud_t old, pud_t new)
->> {
->>       return __set_pgattr_is_safe(pud, old, new, PUD_TYPE_SECT);
->> }
 >
-> The set_ prefix is slightly confusing as it suggests (to me) having a
-> side effect. Maybe pgattr_set_is_safe()?
+> I don't think this is necessary. By aligning the instructions properly,
+> we are already sure the whole code is loaded into the cache.
+right I didn't see the align directive.
 >
-> But it looks like we make it more complicated needed by using pte_t
-> instead of pteval_t as argument. How about just using the pteval_t as
-> argument (and it's fine to call it with pmdval_t, pudval_t as well):
+> My plan is to get rid of the assembly and use PIE so it is written in C
+> and we can properly separate the RAM stuff in the ddrc driver.
 >
-> #define pgattr_set_is_safe(oldval, newval) \
->         ...
+> The mpddrc driver could load its shutdown function in SRAM. The reset
+> controller driver would load the reset function in SRAM and the shutdown
+> controller would load the poweroff function in SRAM. It would e quite
+> cleaner than what we have here.
 >
-
-Well, the only problem there is that the permission bit check should
-only apply to level 3 page mappings (bit[1] == 1) and level 1/2 block
-mappings (bit[1] == 0), so we would still need two versions
+> --
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
