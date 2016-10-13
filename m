@@ -1,71 +1,46 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Thu, 13 Oct 2016 09:19:50 -0700
-Subject: [PATCH] perf: xgene: Remove bogus IS_ERR() check
-In-Reply-To: <20161013102939.GA22356@remoulade>
-References: <1476290367-8092-1-git-send-email-ttnguyen@apm.com>
- <20161013102939.GA22356@remoulade>
-Message-ID: <CACgAJHym_PMAvMMn7aP6accbFff5nSBzQcJxBLTjVD8i29LU1Q@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Oct 2016 17:28:06 +0100
+Subject: [PATCH v3 3/5] arm64: mm: set the contiguous bit for kernel
+ mappings where appropriate
+In-Reply-To: <1476271425-19401-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476271425-19401-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161013162806.GH21592@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Oct 12, 2016 at 12:23:43PM +0100, Ard Biesheuvel wrote:
+> Now that we no longer allow live kernel PMDs to be split, it is safe to
+> start using the contiguous bit for kernel mappings. So set the contiguous
+> bit in the kernel page mappings for regions whose size and alignment are
+> suitable for this.
+> 
+> This enables the following contiguous range sizes for the virtual mapping
+> of the kernel image, and for the linear mapping:
+> 
+>           granule size |  cont PTE  |  cont PMD  |
+>           -------------+------------+------------+
+>                4 KB    |    64 KB   |   32 MB    |
+>               16 KB    |     2 MB   |    1 GB*   |
+>               64 KB    |     2 MB   |   16 GB*   |
+> 
+> * only when built for 3 or more levels of translation
 
-On Thu, Oct 13, 2016 at 3:29 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Oct 12, 2016 at 09:39:27AM -0700, Tai Nguyen wrote:
->> This patch fixes the warning issue with static checker.
->> The bug is reported in [1]
->>
->> [1] https://www.spinics.net/lists/arm-kernel/msg535957.html
->>
->> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
->
-> Please put the problem description in the commit message:
->
->   In acpi_get_pmu_hw_inf we pass the address of a local variable to IS_ERR(),
->   which doesn't make sense, as the pointer must be a real, valid pointer. This
->   doesn't cause a functional problem, as IS_ERR() will evaluate as false, but
->   the check is bogus and causes static checkers to complain.
->
->   Remove the bogus check.
->
-> Please also add a Reported-by for Dan.
->
-> The patch itself is fine, so with the above, you can add:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-> Please Cc Will Deacon when sending that, I expect that he will pick it up
-> (though perhaps not until rc1 given this is not a critical issue).
->
+I assume the limitation to have contiguous PMD only with 3 or move
+levels is because of the way p*d folding was implemented in the kernel.
+With nopmd, looping over pmds is done in __create_pgd_mapping() rather
+than alloc_init_pmd().
 
-Thanks. I'll send the updated patch shortly.
+A potential solution would be to replicate the contiguous pmd code to
+the pud and pgd level, though we probably won't benefit from any
+contiguous entries at higher level (when more than 2 levels).
+Alternatively, with an #ifdef __PGTABLE_PMD_FOLDED, we could set the
+PMD_CONT in prot in __create_pgd_mapping() directly (if the right
+addr/phys alignment).
 
-Regards,
-Tai
-
-[...]
->> ---
->>  drivers/perf/xgene_pmu.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
->> index c2ac764..a8ac4bc 100644
->> --- a/drivers/perf/xgene_pmu.c
->> +++ b/drivers/perf/xgene_pmu.c
->> @@ -1011,7 +1011,7 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
->>       rc = acpi_dev_get_resources(adev, &resource_list,
->>                                   acpi_pmu_dev_add_resource, &res);
->>       acpi_dev_free_resource_list(&resource_list);
->> -     if (rc < 0 || IS_ERR(&res)) {
->> +     if (rc < 0) {
->>               dev_err(dev, "PMU type %d: No resource address found\n", type);
->>               goto err;
->>       }
->> --
->> 1.9.1
->>
-
-
+Anyway, it's probably not worth the effort given that 42-bit VA with 64K
+pages is becoming a less likely configuration (36-bit VA with 16K pages
+is even less likely, also depending on EXPERT).
 
 -- 
-Tai
+Catalin
