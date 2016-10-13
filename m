@@ -1,69 +1,70 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 13 Oct 2016 21:17:48 +0800
-Subject: [arm-soc:to-build 4/4]
- drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c:4586:10:
- warning: 'is_11d' may be used uninitialized in this function
-Message-ID: <201610132130.BqYTDuDA%fengguang.wu@intel.com>
+Date: Thu, 13 Oct 2016 21:26:03 +0800
+Subject: [arm-soc:to-build 4/4] include/linux/buffer_head.h:340:16: warning:
+ 'bno' may be used uninitialized in this function
+Message-ID: <201610132148.TWDi70Ia%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
 head:   346c22ea9cb8d0ee331c73529b205414e43a4655
 commit: 346c22ea9cb8d0ee331c73529b205414e43a4655 [4/4] Revert "Disable "maybe-uninitialized" warning globally"
-config: powerpc-allyesconfig (attached as .config)
-compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+config: blackfin-BF526-EZBRD_defconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
 reproduce:
         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         git checkout 346c22ea9cb8d0ee331c73529b205414e43a4655
         # save the attached .config to linux build tree
-        make.cross ARCH=powerpc 
+        make.cross ARCH=blackfin 
 
 Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
 http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
 All warnings (new ones prefixed by >>):
 
-   drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c: In function 'brcmf_cfg80211_start_ap':
->> drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c:4586:10: warning: 'is_11d' may be used uninitialized in this function [-Wmaybe-uninitialized]
-       err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_REGULATORY,
-             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-              is_11d);
-              ~~~~~~~
+   In file included from fs/ext2/inode.c:32:0:
+   fs/ext2/inode.c: In function 'ext2_get_block':
+>> include/linux/buffer_head.h:340:16: warning: 'bno' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     bh->b_blocknr = block;
+     ~~~~~~~~~~~~~~^~~~~~~
+   fs/ext2/inode.c:783:6: note: 'bno' was declared here
+     u32 bno;
+         ^~~
 
-vim +/is_11d +4586 drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
+vim +/bno +340 include/linux/buffer_head.h
 
-a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4570  
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4571  			/* RSN IE */
-a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4572  			err = brcmf_configure_wpaie(ifp, tmp_ie, true);
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4573  			if (err < 0)
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4574  				goto exit;
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4575  		}
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4576  	} else {
-d96b801f drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Arend van Spriel 2012-12-05  4577  		brcmf_dbg(TRACE, "No WPA(2) IEs found\n");
-1f170110 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2013-02-06  4578  		brcmf_configure_opensecurity(ifp);
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4579  	}
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4580  
-a0f07959 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2013-02-08  4581  	brcmf_config_ap_mgmt_ie(ifp->vif, &settings->beacon);
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4582  
-8707e08d drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c Rafa? Mi?ecki    2016-05-27  4583  	/* Parameters shared by all radio interfaces */
-a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4584  	if (!mbss) {
-b3589dfe drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c Hante Meuleman   2016-09-19  4585  		if ((supports_11d) && (is_11d != ifp->vif->is_11d)) {
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21 @4586  			err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_REGULATORY,
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4587  						    is_11d);
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4588  			if (err < 0) {
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4589  				brcmf_err("Regulatory Set Error, %d\n", err);
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4590  				goto exit;
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4591  			}
-98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4592  		}
-1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4593  		if (settings->beacon_interval) {
-ac24be6f drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Arend van Spriel 2012-10-22  4594  			err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_BCNPRD,
+bd7ade3c Nikolay Borisov  2015-07-02  324  sb_getblk_gfp(struct super_block *sb, sector_t block, gfp_t gfp)
+bd7ade3c Nikolay Borisov  2015-07-02  325  {
+bd7ade3c Nikolay Borisov  2015-07-02  326  	return __getblk_gfp(sb->s_bdev, block, sb->s_blocksize, gfp);
+bd7ade3c Nikolay Borisov  2015-07-02  327  }
+bd7ade3c Nikolay Borisov  2015-07-02  328  
+^1da177e Linus Torvalds   2005-04-16  329  static inline struct buffer_head *
+^1da177e Linus Torvalds   2005-04-16  330  sb_find_get_block(struct super_block *sb, sector_t block)
+^1da177e Linus Torvalds   2005-04-16  331  {
+^1da177e Linus Torvalds   2005-04-16  332  	return __find_get_block(sb->s_bdev, block, sb->s_blocksize);
+^1da177e Linus Torvalds   2005-04-16  333  }
+^1da177e Linus Torvalds   2005-04-16  334  
+^1da177e Linus Torvalds   2005-04-16  335  static inline void
+^1da177e Linus Torvalds   2005-04-16  336  map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
+^1da177e Linus Torvalds   2005-04-16  337  {
+^1da177e Linus Torvalds   2005-04-16  338  	set_buffer_mapped(bh);
+^1da177e Linus Torvalds   2005-04-16  339  	bh->b_bdev = sb->s_bdev;
+^1da177e Linus Torvalds   2005-04-16 @340  	bh->b_blocknr = block;
+b0cf2321 Badari Pulavarty 2006-03-26  341  	bh->b_size = sb->s_blocksize;
+^1da177e Linus Torvalds   2005-04-16  342  }
+^1da177e Linus Torvalds   2005-04-16  343  
+^1da177e Linus Torvalds   2005-04-16  344  static inline void wait_on_buffer(struct buffer_head *bh)
+^1da177e Linus Torvalds   2005-04-16  345  {
+^1da177e Linus Torvalds   2005-04-16  346  	might_sleep();
+a9877cc2 Richard Kennedy  2010-08-09  347  	if (buffer_locked(bh))
+^1da177e Linus Torvalds   2005-04-16  348  		__wait_on_buffer(bh);
 
-:::::: The code at line 4586 was first introduced by commit
-:::::: 98027769828f772c7ce69b6e58d37b78ebe8ab28 brcmfmac: enable 802.11d support in firmware
+:::::: The code at line 340 was first introduced by commit
+:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
 
-:::::: TO: Arend van Spriel <arend@broadcom.com>
-:::::: CC: Kalle Valo <kvalo@codeaurora.org>
+:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
+:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -72,6 +73,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 50804 bytes
+Size: 14504 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/18fc4945/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/085a2c6b/attachment-0001.gz>
