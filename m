@@ -1,70 +1,69 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 13 Oct 2016 21:26:03 +0800
-Subject: [arm-soc:to-build 4/4] include/linux/buffer_head.h:340:16: warning:
- 'bno' may be used uninitialized in this function
-Message-ID: <201610132148.TWDi70Ia%fengguang.wu@intel.com>
+Date: Thu, 13 Oct 2016 21:25:59 +0800
+Subject: [arm-soc:to-build 4/4] arch/s390/pci/pci_dma.c:309:13: warning: 'pa'
+ may be used uninitialized in this function
+Message-ID: <201610132149.t5xXbZdB%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
 head:   346c22ea9cb8d0ee331c73529b205414e43a4655
 commit: 346c22ea9cb8d0ee331c73529b205414e43a4655 [4/4] Revert "Disable "maybe-uninitialized" warning globally"
-config: blackfin-BF526-EZBRD_defconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
+config: s390-default_defconfig (attached as .config)
+compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
 reproduce:
         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         git checkout 346c22ea9cb8d0ee331c73529b205414e43a4655
         # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+        make.cross ARCH=s390 
 
 Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
 http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
 All warnings (new ones prefixed by >>):
 
-   In file included from fs/ext2/inode.c:32:0:
-   fs/ext2/inode.c: In function 'ext2_get_block':
->> include/linux/buffer_head.h:340:16: warning: 'bno' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     bh->b_blocknr = block;
-     ~~~~~~~~~~~~~~^~~~~~~
-   fs/ext2/inode.c:783:6: note: 'bno' was declared here
-     u32 bno;
-         ^~~
+   arch/s390/pci/pci_dma.c: In function '__s390_dma_map_sg':
+>> arch/s390/pci/pci_dma.c:309:13: warning: 'pa' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     } __packed data = {rc, addr};
+                ^~~~
+   arch/s390/pci/pci_dma.c:426:16: note: 'pa' was declared here
+     unsigned long pa;
+                   ^~
 
-vim +/bno +340 include/linux/buffer_head.h
+vim +/pa +309 arch/s390/pci/pci_dma.c
 
-bd7ade3c Nikolay Borisov  2015-07-02  324  sb_getblk_gfp(struct super_block *sb, sector_t block, gfp_t gfp)
-bd7ade3c Nikolay Borisov  2015-07-02  325  {
-bd7ade3c Nikolay Borisov  2015-07-02  326  	return __getblk_gfp(sb->s_bdev, block, sb->s_blocksize, gfp);
-bd7ade3c Nikolay Borisov  2015-07-02  327  }
-bd7ade3c Nikolay Borisov  2015-07-02  328  
-^1da177e Linus Torvalds   2005-04-16  329  static inline struct buffer_head *
-^1da177e Linus Torvalds   2005-04-16  330  sb_find_get_block(struct super_block *sb, sector_t block)
-^1da177e Linus Torvalds   2005-04-16  331  {
-^1da177e Linus Torvalds   2005-04-16  332  	return __find_get_block(sb->s_bdev, block, sb->s_blocksize);
-^1da177e Linus Torvalds   2005-04-16  333  }
-^1da177e Linus Torvalds   2005-04-16  334  
-^1da177e Linus Torvalds   2005-04-16  335  static inline void
-^1da177e Linus Torvalds   2005-04-16  336  map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
-^1da177e Linus Torvalds   2005-04-16  337  {
-^1da177e Linus Torvalds   2005-04-16  338  	set_buffer_mapped(bh);
-^1da177e Linus Torvalds   2005-04-16  339  	bh->b_bdev = sb->s_bdev;
-^1da177e Linus Torvalds   2005-04-16 @340  	bh->b_blocknr = block;
-b0cf2321 Badari Pulavarty 2006-03-26  341  	bh->b_size = sb->s_blocksize;
-^1da177e Linus Torvalds   2005-04-16  342  }
-^1da177e Linus Torvalds   2005-04-16  343  
-^1da177e Linus Torvalds   2005-04-16  344  static inline void wait_on_buffer(struct buffer_head *bh)
-^1da177e Linus Torvalds   2005-04-16  345  {
-^1da177e Linus Torvalds   2005-04-16  346  	might_sleep();
-a9877cc2 Richard Kennedy  2010-08-09  347  	if (buffer_locked(bh))
-^1da177e Linus Torvalds   2005-04-16  348  		__wait_on_buffer(bh);
+828b35f6 Jan Glauber         2012-11-29  293  		goto out;
+13954fd6 Sebastian Ott       2016-09-08  294  
+13954fd6 Sebastian Ott       2016-09-08  295  	if (zdev->tlb_refresh || s390_iommu_strict)
+828b35f6 Jan Glauber         2012-11-29  296  		bitmap_clear(zdev->iommu_bitmap, offset, size);
+13954fd6 Sebastian Ott       2016-09-08  297  	else
+13954fd6 Sebastian Ott       2016-09-08  298  		bitmap_set(zdev->lazy_bitmap, offset, size);
+13954fd6 Sebastian Ott       2016-09-08  299  
+828b35f6 Jan Glauber         2012-11-29  300  out:
+828b35f6 Jan Glauber         2012-11-29  301  	spin_unlock_irqrestore(&zdev->iommu_bitmap_lock, flags);
+828b35f6 Jan Glauber         2012-11-29  302  }
+828b35f6 Jan Glauber         2012-11-29  303  
+52d43d81 Sebastian Ott       2015-10-26  304  static inline void zpci_err_dma(unsigned long rc, unsigned long addr)
+52d43d81 Sebastian Ott       2015-10-26  305  {
+52d43d81 Sebastian Ott       2015-10-26  306  	struct {
+52d43d81 Sebastian Ott       2015-10-26  307  		unsigned long rc;
+52d43d81 Sebastian Ott       2015-10-26  308  		unsigned long addr;
+52d43d81 Sebastian Ott       2015-10-26 @309  	} __packed data = {rc, addr};
+52d43d81 Sebastian Ott       2015-10-26  310  
+52d43d81 Sebastian Ott       2015-10-26  311  	zpci_err_hex(&data, sizeof(data));
+52d43d81 Sebastian Ott       2015-10-26  312  }
+52d43d81 Sebastian Ott       2015-10-26  313  
+828b35f6 Jan Glauber         2012-11-29  314  static dma_addr_t s390_dma_map_pages(struct device *dev, struct page *page,
+828b35f6 Jan Glauber         2012-11-29  315  				     unsigned long offset, size_t size,
+828b35f6 Jan Glauber         2012-11-29  316  				     enum dma_data_direction direction,
+00085f1e Krzysztof Kozlowski 2016-08-03  317  				     unsigned long attrs)
 
-:::::: The code at line 340 was first introduced by commit
-:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
+:::::: The code at line 309 was first introduced by commit
+:::::: 52d43d8184b1840c7cf6136724223585f51a1074 s390/pci_dma: improve debugging of errors during dma map
 
-:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
-:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
+:::::: TO: Sebastian Ott <sebott@linux.vnet.ibm.com>
+:::::: CC: Martin Schwidefsky <schwidefsky@de.ibm.com>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -73,6 +72,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 14504 bytes
+Size: 16396 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/085a2c6b/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/6b7b2883/attachment-0001.gz>
