@@ -1,101 +1,43 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Thu, 13 Oct 2016 08:03:55 -0600
-Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <87shs1sb1b.fsf@e105922-lin.cambridge.arm.com>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
- <87shs1sb1b.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <90d13241-d6b9-0b81-9f92-71df99b91b67@codeaurora.org>
+From: labath@google.com (Pavel Labath)
+Date: Thu, 13 Oct 2016 15:29:17 +0100
+Subject: [PATCH 3/4] arm64: Allow hw watchpoint of length 3,5,6 and 7
+In-Reply-To: <1bc0dce6-eb26-dbf5-dd0c-d36055f5f1fe@redhat.com>
+References: <cover.1476251587.git.panand@redhat.com>
+ <d6ebb3e9776154da4c1a41f17446e9e31c891a7d.1476251587.git.panand@redhat.com>
+ <CAH=s-PNFESLA6TTem-49g0CKsjpKOsj1XYfPUXz6YbEfMWXqXg@mail.gmail.com>
+ <1bc0dce6-eb26-dbf5-dd0c-d36055f5f1fe@redhat.com>
+Message-ID: <CAJt8pk-7XntQkfojtnP7ZLk6=CWKLfdvK1+vMzJxoRBxgwiW+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Punit,
-
-
-On 10/12/2016 12:00 PM, Punit Agrawal wrote:
-> Tyler Baicar <tbaicar@codeaurora.org> writes:
+On 13 October 2016 at 11:22, Pratyush Anand <panand@redhat.com> wrote:
 >
->> ARM APEI extension proposal added SEA (Synchrounous External
->> Abort) notification type for ARMv8.
->> Add a new GHES error source handling function for SEA. If an error
->> source's notification type is SEA, then this function can be registered
->> into the SEA exception handler. That way GHES will parse and report
->> SEA exceptions when they occur.
+>
+> On Wednesday 12 October 2016 04:46 PM, Yao Qi wrote:
 >>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> This patch fails to apply for me on v4.8. Is there a different tree this
-> is based on?
-This patch was giving me some grief as well. I'm not sure why that is 
-because this patchset was based on the 4.8 kernel with the dependent 
-patch for initial APEI support.
-> One comment below.
+>> On Wed, Oct 12, 2016 at 6:58 AM, Pratyush Anand <panand@redhat.com> wrote:
+>>>
+>>> Since, arm64 can support all offset within a double word limit.
+>>> Therefore,
+>>> now support other lengths within that range as well.
+>>
+>>
+>> How does ptracer (like GDB) detect kernel has already supported all byte
+>> address select values?  I suppose ptrace(NT_ARM_HW_WATCH, ) with
+>> len is 3 or 5 fail on current kernel but is of success after your patches
+>> applied.
+>>
 >
-> [...]
+> Thanks for testing these patches.
 >
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index c8488f1..28d5a09 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -50,6 +50,10 @@
->>   #include <acpi/apei.h>
->>   #include <asm/tlbflush.h>
->>   
->> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->> +#include <asm/system_misc.h>
->> +#endif
->> +
->>   #include "apei-internal.h"
->>   
->>   #define GHES_PFX	"GHES: "
->> @@ -779,6 +783,62 @@ static struct notifier_block ghes_notifier_sci = {
->>   	.notifier_call = ghes_notify_sci,
->>   };
->>   
->> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->> +static LIST_HEAD(ghes_sea);
->> +
->> +static int ghes_notify_sea(struct notifier_block *this,
->> +				  unsigned long event, void *data)
->> +{
->> +	struct ghes *ghes;
->> +	int ret = NOTIFY_DONE;
->> +
->> +	rcu_read_lock();
->> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
->> +		if (!ghes_proc(ghes))
->> +			ret = NOTIFY_OK;
-> Not something you've introduced but it looks like ghes_proc erroneously
-> never returns anything other than 0. I plan to post the below fix to
-> address it.
->
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 60746ef..caea575 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -662,7 +662,7 @@ static int ghes_proc(struct ghes *ghes)
->          ghes_do_proc(ghes, ghes->estatus);
->   out:
->          ghes_clear_estatus(ghes);
-> -   return 0;
-> + return rc;
->   }
-Yes, this definitely should be fixed :)
+> I do not know if we can know that other than the failure of
+> ptrace(PTRACE_SETREGSET, .., NT_ARM_HW_WATCH, ..). I do not see any such
+> option in `man ptrace`.
+That's how I intend to implement support for this in LLDB.
+if (setExactWatchpoint())
+  return true; // watchpoint set, new kernel
+if (setApproxWatchpoint())
+  return true; // watchpoint set, old kernel
+return false; // watchpoints not working
 
-Thanks,
-Tyler
->> +	}
->> +	rcu_read_unlock();
->> +
->> +	return ret;
->> +}
->> +
-> [...]
->
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+seems straight-forward enough to me.
