@@ -1,55 +1,44 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 13 Oct 2016 16:57:39 +0800
-Subject: [PATCH v7 2/8] power: add power sequence library
-In-Reply-To: <10186696.bBGEe05eC7@phil>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
- <4691591.qnCGxrEkrZ@phil> <20161013012216.GA8114@b29397-desktop>
- <10186696.bBGEe05eC7@phil>
-Message-ID: <20161013085739.GA19151@b29397-desktop>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 13 Oct 2016 11:25:14 +0200
+Subject: [PATCH 0/2] arm64 kexec-tools fixups
+In-Reply-To: <ebe32436-6069-06c5-702f-d435d0dacd48@suse.com>
+References: <cover.1476134309.git.geoff@infradead.org>
+ <ebe32436-6069-06c5-702f-d435d0dacd48@suse.com>
+Message-ID: <20161013092514.GP18804@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2016 at 09:04:42AM +0200, Heiko Stuebner wrote:
-> > > > +static int __init pwrseq_generic_register(void)
-> > > > +{
-> > > > +	struct pwrseq_generic *pwrseq_gen;
-> > > > +	int i;
-> > > > +
-> > > > +	for (i = 0; i < CONFIG_PWRSEQ_GENERIC_INSTANCE_NUMBER; i++) {
-> > > > +		pwrseq_gen = kzalloc(sizeof(*pwrseq_gen), GFP_KERNEL);
-> > > > +		if (!pwrseq_gen)
-> > > > +			return -ENOMEM;
-> > > > +
-> > > > +		pwrseq_gen->pwrseq.pwrseq_of_match_table = generic_id_table;
-> > > > +		pwrseq_gen->pwrseq.get = pwrseq_generic_get;
-> > > > +		pwrseq_gen->pwrseq.on = pwrseq_generic_on;
-> > > > +		pwrseq_gen->pwrseq.off = pwrseq_generic_off;
-> > > > +		pwrseq_gen->pwrseq.put = pwrseq_generic_put;
-> > > > +		pwrseq_gen->pwrseq.free = pwrseq_generic_free;
-> > > > +
-> > > > +		pwrseq_register(&pwrseq_gen->pwrseq);
-> > > > +	}
-> > > > +
-> > > > +	return 0;
-> > > > +}
-> > > > +postcore_initcall(pwrseq_generic_register)
-> > > 
-> > > I see that you need to have it preallocated for the compatible matching,
-> > > but wouldn't it also work to either just register the type and allocate
-> > > dynamically or otherwise just allocate a new spare everytime
-> > > pwrseq_generic_get() picks up the previous spare?
-> > 
-> > Before compatible matching, the host driver doesn't know which pwrseq type
-> > for its child node, then doesn't know which pwrseq instance needs to be
-> > allocated. From dts, we don't know which pwrseq type for the node.
+On Tue, Oct 11, 2016 at 12:20:41PM +0200, Matthias Brugger wrote:
 > 
-> yes, that is why I was suggesting allocating one (or two) here in 
-> pwrseq_generic_register() and every time pwrseq_generic_get() grabs the last 
-> free sequence instance, you allocate a new free spare one in that function.
+> 
+> On 10/10/2016 11:22 PM, Geoff Levand wrote:
+> >Hi Simon,
+> >
+> >Fixes for 'make tarball'.  Please apply.
+> >
+> >-Geoff
+> >
+> >The following changes since commit 6e8804f9ca67bee65aedd5e1cdf504737ab5c7ed:
+> >
+> >  multiboot: Use the "reserved" type for non-ram zones (2016-10-07 11:54:44 +0900)
+> >
+> >are available in the git repository at:
+> >
+> >  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git for-merge-arm64-dist
+> >
+> >for you to fetch changes up to 3552a3e85a910688d932535549b35354a54927ad:
+> >
+> >  arm64: Add missing kexec dist files (2016-10-10 14:15:21 -0700)
+> >
+> >----------------------------------------------------------------
+> >Geoff Levand (2):
+> >      arm64: Cleanup kexec Makefile
+> >      arm64: Add missing kexec dist files
+> >
+> > kexec/arch/arm64/Makefile | 15 +++++++++------
+> > 1 file changed, 9 insertions(+), 6 deletions(-)
+> >
+> 
+> Reviewed-by: Matthias Brugger <mbrugger@suse.com>
 
-Good idea.
-
--- 
-
-Best Regards,
-Peter Chen
+Thanks, applied.
