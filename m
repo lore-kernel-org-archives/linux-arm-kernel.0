@@ -1,30 +1,44 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 13 Oct 2016 22:27:57 +0200
-Subject: [PATCH v3 0/3] usb/phy: Add Amlogic Meson8b and GXBB USB support
-In-Reply-To: <20161001121900.1168-1-martin.blumenstingl@googlemail.com>
-References: <20160904213152.25837-1-martin.blumenstingl@googlemail.com>
- <20161001121900.1168-1-martin.blumenstingl@googlemail.com>
-Message-ID: <CAFBinCCoVOxyVYdNxeNyUhAK+T1+gBW0d1oDUgVpOZZHBjN9Wg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 13 Oct 2016 22:42:35 +0200
+Subject: Low network throughput on i.MX28
+In-Reply-To: <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+References: <1476313753.2065.11.camel@embedded.rocks>
+ <20161013084807.6a231fdb@ipc1.ka-ro>
+ <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+Message-ID: <20161013204234.c5d7htdngtmj4goh@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hello,
 
-On Sat, Oct 1, 2016 at 2:18 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> Martin Blumenstingl (3):
->   Documentation: dt-bindings: update the meson-usb2-phy example
->   Documentation: dt-bindings: rename meson-usb2-phy to meson8b-usb2-phy
-these two already got an ACK by the devicetree maintainers
+On Thu, Oct 13, 2016 at 09:43:00PM +0200, J?rg Krause wrote:
+> Am 13. Oktober 2016 08:48:07 MESZ, schrieb "Lothar Wa?mann" <LW@KARO-electronics.de>:
+> >This is the iperf output on a TX28 with current mainline kernel
+> >(4.8.0-rc5):
+> >------------------------------------------------------------
+> >Client connecting to 192.168.100.1, TCP port 5001
+> >TCP window size: 43.8 KByte (default)
+> >------------------------------------------------------------
+> >[  3] local 192.168.100.56 port 60325 connected with 192.168.100.1 port
+> >5001
+> >[ ID] Interval       Transfer     Bandwidth
+> >[  3]  0.0-10.0 sec  57.5 MBytes  48.2 Mbits/sec
 
->   phy: meson: add USB2 PHY support for Meson8b and GXBB
-did you already have time to review the USB2 PHY driver from patch 3/3?
-please let me know if there's something we have to change, then I'll
-take care of it
+Just for the record: I have another i.MX28 system here and got 43
+Mbits/sec with PREEMPT_NONE and 37 Mbits/sec with PREEMPT_RT both using
+a 3.14 kernel.
 
-would you like to get all patches through the PHY tree or should Kevin
-take some of these?
+> >You might check your kernel DEBUG configs (especially
+> >CONFIG_DEBUG_PAGEALLOC).
+> 
+> Thanks for sharing the iperf output. What LAN transceiver does the
+> TX28 has assembled?
 
+My system has a Marvell Switch (88e6083) as "transceiver".
 
-Regards,
-Martin
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
