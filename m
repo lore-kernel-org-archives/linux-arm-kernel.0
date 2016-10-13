@@ -1,144 +1,77 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 13 Oct 2016 14:14:48 +0100
-Subject: [PATCH V3 10/10] arm64: KVM: add guest SEA support
-In-Reply-To: <1475875882-2604-11-git-send-email-tbaicar@codeaurora.org> (Tyler
- Baicar's message of "Fri, 7 Oct 2016 15:31:22 -0600")
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <87h98gs853.fsf@e105922-lin.cambridge.arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 13 Oct 2016 21:17:48 +0800
+Subject: [arm-soc:to-build 4/4]
+ drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c:4586:10:
+ warning: 'is_11d' may be used uninitialized in this function
+Message-ID: <201610132130.BqYTDuDA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
+head:   346c22ea9cb8d0ee331c73529b205414e43a4655
+commit: 346c22ea9cb8d0ee331c73529b205414e43a4655 [4/4] Revert "Disable "maybe-uninitialized" warning globally"
+config: powerpc-allyesconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 346c22ea9cb8d0ee331c73529b205414e43a4655
+        # save the attached .config to linux build tree
+        make.cross ARCH=powerpc 
 
-I know I've had my last comment already ;), but I thought I'd rather
-raise the question than stay confused...
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-Tyler Baicar <tbaicar@codeaurora.org> writes:
+All warnings (new ones prefixed by >>):
 
-> Currently external aborts are unsupported by the guest abort
-> handling. Add handling for SEAs so that the host kernel reports
-> SEAs which occur in the guest kernel.
->
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  arch/arm/include/asm/kvm_arm.h       |  1 +
->  arch/arm/include/asm/system_misc.h   |  5 +++++
->  arch/arm/kvm/mmu.c                   | 15 +++++++++++++--
->  arch/arm64/include/asm/kvm_arm.h     |  1 +
->  arch/arm64/include/asm/system_misc.h |  2 ++
->  arch/arm64/mm/fault.c                | 13 +++++++++++++
->  6 files changed, 35 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index e22089f..33a77509 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -187,6 +187,7 @@
->  #define FSC_FAULT	(0x04)
->  #define FSC_ACCESS	(0x08)
->  #define FSC_PERM	(0x0c)
-> +#define FSC_EXTABT	(0x10)
->  
->  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->  #define HPFAR_MASK	(~0xf)
-> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
-> index a3d61ad..86e1faa 100644
-> --- a/arch/arm/include/asm/system_misc.h
-> +++ b/arch/arm/include/asm/system_misc.h
-> @@ -24,4 +24,9 @@ extern unsigned int user_debug;
->  
->  #endif /* !__ASSEMBLY__ */
->  
-> +inline int handle_guest_sea(unsigned long addr, unsigned int esr)
-> +{
-> +	return -1;
-> +}
-> +
->  #endif /* __ASM_ARM_SYSTEM_MISC_H */
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index e9a5c0e..24cde84 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -29,6 +29,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/virt.h>
-> +#include <asm/system_misc.h>
->  
->  #include "trace.h"
->  
-> @@ -1441,8 +1442,18 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  	/* Check the stage-2 fault is trans. fault or write fault */
->  	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-> -	    fault_status != FSC_ACCESS) {
-> +
-> +	if (fault_status == FSC_EXTABT) {
-> +		if(handle_guest_sea((unsigned long)fault_ipa,
-> +				    kvm_vcpu_get_hsr(vcpu))) {
-> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-> +				kvm_vcpu_trap_get_class(vcpu),
-> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-> +			return -EFAULT;
-> +		}
-> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-> +		   fault_status != FSC_ACCESS) {
->  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->  			kvm_vcpu_trap_get_class(vcpu),
->  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 4b5c977..be0efb6 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -201,6 +201,7 @@
->  #define FSC_FAULT	ESR_ELx_FSC_FAULT
->  #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
->  #define FSC_PERM	ESR_ELx_FSC_PERM
-> +#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
->  
->  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->  #define HPFAR_MASK	(~UL(0xf))
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 90daf4a..8522fff 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -77,4 +77,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->  int sea_register_handler_chain(struct notifier_block *nb);
->  void sea_unregister_handler_chain(struct notifier_block *nb);
->  
-> +int handle_guest_sea(unsigned long addr, unsigned int esr);
-> +
->  #endif	/* __ASM_SYSTEM_MISC_H */
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 81cb7ad..d714432 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
->  }
->  
->  /*
-> + * Handle Synchronous External Aborts that occur in a guest kernel.
-> + */
-> +int handle_guest_sea(unsigned long addr, unsigned int esr)
-> +{
-> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
-> +
-> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-> +		fault_name(esr), esr, addr);
-> +
-> +	return 0;
-> +}
+   drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c: In function 'brcmf_cfg80211_start_ap':
+>> drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c:4586:10: warning: 'is_11d' may be used uninitialized in this function [-Wmaybe-uninitialized]
+       err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_REGULATORY,
+             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+              is_11d);
+              ~~~~~~~
 
-Don't we need to pass the abort to the guest?
+vim +/is_11d +4586 drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 
-Thanks,
-Punit
+a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4570  
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4571  			/* RSN IE */
+a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4572  			err = brcmf_configure_wpaie(ifp, tmp_ie, true);
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4573  			if (err < 0)
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4574  				goto exit;
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4575  		}
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4576  	} else {
+d96b801f drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Arend van Spriel 2012-12-05  4577  		brcmf_dbg(TRACE, "No WPA(2) IEs found\n");
+1f170110 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2013-02-06  4578  		brcmf_configure_opensecurity(ifp);
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4579  	}
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4580  
+a0f07959 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2013-02-08  4581  	brcmf_config_ap_mgmt_ie(ifp->vif, &settings->beacon);
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4582  
+8707e08d drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c Rafa? Mi?ecki    2016-05-27  4583  	/* Parameters shared by all radio interfaces */
+a44aa400 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Hante Meuleman   2014-12-03  4584  	if (!mbss) {
+b3589dfe drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c Hante Meuleman   2016-09-19  4585  		if ((supports_11d) && (is_11d != ifp->vif->is_11d)) {
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21 @4586  			err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_REGULATORY,
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4587  						    is_11d);
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4588  			if (err < 0) {
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4589  				brcmf_err("Regulatory Set Error, %d\n", err);
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4590  				goto exit;
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4591  			}
+98027769 drivers/net/wireless/brcm80211/brcmfmac/cfg80211.c          Arend van Spriel 2014-12-21  4592  		}
+1a873342 drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Hante Meuleman   2012-09-27  4593  		if (settings->beacon_interval) {
+ac24be6f drivers/net/wireless/brcm80211/brcmfmac/wl_cfg80211.c       Arend van Spriel 2012-10-22  4594  			err = brcmf_fil_cmd_int_set(ifp, BRCMF_C_SET_BCNPRD,
 
-> +
-> +/*
->   * Dispatch a data abort to the relevant handler.
->   */
->  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+:::::: The code at line 4586 was first introduced by commit
+:::::: 98027769828f772c7ce69b6e58d37b78ebe8ab28 brcmfmac: enable 802.11d support in firmware
+
+:::::: TO: Arend van Spriel <arend@broadcom.com>
+:::::: CC: Kalle Valo <kvalo@codeaurora.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 50804 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161013/18fc4945/attachment-0001.gz>
