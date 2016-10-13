@@ -1,39 +1,58 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 13 Oct 2016 15:52:17 +0530
-Subject: [PATCH 3/4] arm64: Allow hw watchpoint of length 3,5,6 and 7
-In-Reply-To: <CAH=s-PNFESLA6TTem-49g0CKsjpKOsj1XYfPUXz6YbEfMWXqXg@mail.gmail.com>
-References: <cover.1476251587.git.panand@redhat.com>
- <d6ebb3e9776154da4c1a41f17446e9e31c891a7d.1476251587.git.panand@redhat.com>
- <CAH=s-PNFESLA6TTem-49g0CKsjpKOsj1XYfPUXz6YbEfMWXqXg@mail.gmail.com>
-Message-ID: <1bc0dce6-eb26-dbf5-dd0c-d36055f5f1fe@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Oct 2016 11:29:40 +0100
+Subject: [PATCH] perf: xgene: Remove bogus IS_ERR() check
+In-Reply-To: <1476290367-8092-1-git-send-email-ttnguyen@apm.com>
+References: <1476290367-8092-1-git-send-email-ttnguyen@apm.com>
+Message-ID: <20161013102939.GA22356@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 12, 2016 at 09:39:27AM -0700, Tai Nguyen wrote:
+> This patch fixes the warning issue with static checker.
+> The bug is reported in [1]
+> 
+> [1] https://www.spinics.net/lists/arm-kernel/msg535957.html
+> 
+> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
 
+Please put the problem description in the commit message:
 
-On Wednesday 12 October 2016 04:46 PM, Yao Qi wrote:
-> On Wed, Oct 12, 2016 at 6:58 AM, Pratyush Anand <panand@redhat.com> wrote:
->> Since, arm64 can support all offset within a double word limit. Therefore,
->> now support other lengths within that range as well.
->
-> How does ptracer (like GDB) detect kernel has already supported all byte
-> address select values?  I suppose ptrace(NT_ARM_HW_WATCH, ) with
-> len is 3 or 5 fail on current kernel but is of success after your patches
-> applied.
->
+  In acpi_get_pmu_hw_inf we pass the address of a local variable to IS_ERR(),
+  which doesn't make sense, as the pointer must be a real, valid pointer. This
+  doesn't cause a functional problem, as IS_ERR() will evaluate as false, but
+  the check is bogus and causes static checkers to complain.
 
-Thanks for testing these patches.
+  Remove the bogus check.
 
-I do not know if we can know that other than the failure of 
-ptrace(PTRACE_SETREGSET, .., NT_ARM_HW_WATCH, ..). I do not see any such 
-option in `man ptrace`.
+Please also add a Reported-by for Dan.
 
+The patch itself is fine, so with the above, you can add:
 
-> GDB is aware of the byte address select limitation in kernel, so it always
-> sets 1,2,4,8 in len in ctrl.  GDB needs to know whether the limitation is still
-> there or not.
->
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Not sure if other than "kernel version" anything will help here.
+Please Cc Will Deacon when sending that, I expect that he will pick it up
+(though perhaps not until rc1 given this is not a critical issue).
 
-~Pratyush
+Thanks,
+Mark.
+
+> ---
+>  drivers/perf/xgene_pmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+> index c2ac764..a8ac4bc 100644
+> --- a/drivers/perf/xgene_pmu.c
+> +++ b/drivers/perf/xgene_pmu.c
+> @@ -1011,7 +1011,7 @@ xgene_pmu_dev_ctx *acpi_get_pmu_hw_inf(struct xgene_pmu *xgene_pmu,
+>  	rc = acpi_dev_get_resources(adev, &resource_list,
+>  				    acpi_pmu_dev_add_resource, &res);
+>  	acpi_dev_free_resource_list(&resource_list);
+> -	if (rc < 0 || IS_ERR(&res)) {
+> +	if (rc < 0) {
+>  		dev_err(dev, "PMU type %d: No resource address found\n", type);
+>  		goto err;
+>  	}
+> -- 
+> 1.9.1
+> 
