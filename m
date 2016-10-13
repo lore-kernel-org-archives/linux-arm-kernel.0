@@ -1,132 +1,64 @@
-From: labath@google.com (Pavel Labath)
-Date: Thu, 13 Oct 2016 18:03:05 +0100
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
- <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
- <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
-Message-ID: <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 13 Oct 2016 18:27:54 +0100
+Subject: [PATCH v3 3/5] arm64: mm: set the contiguous bit for kernel
+ mappings where appropriate
+In-Reply-To: <CAKv+Gu9WqUvtHRJvgWhsvYwFOgho97EaLV4qojaa0fjGpJT3WQ@mail.gmail.com>
+References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476271425-19401-4-git-send-email-ard.biesheuvel@linaro.org>
+ <20161013162806.GH21592@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9WqUvtHRJvgWhsvYwFOgho97EaLV4qojaa0fjGpJT3WQ@mail.gmail.com>
+Message-ID: <20161013172754.GJ21592@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 October 2016 at 10:58, Pratyush Anand <panand@redhat.com> wrote:
-> Hi Pavel,
->
-> Thanks a lot for your testing.
->
-> On Wed, Oct 12, 2016 at 7:20 PM, Pavel Labath <labath@google.com> wrote:
->> Hello Pratyush,
->>
->> I am sorry about the delay. I have finally had a chance to try out
->> your changes today. Response inline.
->>
->> On 8 October 2016 at 06:10, Pratyush Anand <panand@redhat.com> wrote:
->>> On Fri, Oct 7, 2016 at 10:54 PM, Pavel Labath <labath@google.com> wrote:
->>>> The thing is, I have observed different behavior here depending on the
->>>> exact hardware used. I don't have the exact parameters with me now,
->>>> but I can look it up next week.
->>>>
->>>> The thing is that the spec is imprecise about what exact address the
->>>> hardware can report for the watchpoint hit. I presume that is
->>>> deliberate to give some leeway to implementers. The spec says the
->>>> address can be anywhere in the range from the lowest memory address
->>>> accessed by the instruction to the highest address watched by the
->>>> watchpoint,
->>>
->>> I think, my patches should  be able to take care of the above condition.
->> Unfortunately, the patch does not solve the problem for my hardware,
->> because of the leeway you give in watchpoint_handler is not big
->> enough. It does work however, if I change the line
->>> if (addr + 7 < val + lens || addr > val + lene)
->> to
->>> if (addr + 15 < val + lens || addr > val + lene)
->
-> Yes, I missed that floating point register will be of size 16.
->
->> I do not think we can assume that address reported by the hardware
->> will be at most 7 bytes off from the address we put the watchpoint at.
->> There is nothing in the spec that guarantees that, and it does not
->> seem to be enough for some hardware. In fact, I am not sure we can
->> assume 15 is enough either, but maybe it can do for now, until we can
->
-> Right. It might even be bigger, in case of cache maintenance instructions.
->
->> find hardware that does not work with that (I haven't yet tried what
->> happens it the watchpoint is triggered by cache management
->> instructions, which can access much larger blocks of memory).
->
-> Not, sure, may be it can lie in cache line size range.
->
->>
->> For reference, the hardware in question is:
->>> Processor : AArch64 Processor rev 0 (aarch64)
->>> processor : 0
->>> min_vddcx : 400000
->>> min_vddmx : 490000
->>> BogoMIPS : 38.00
->>> Features : fp asimd evtstrm aes pmull sha1 sha2 crc32
->>> CPU implementer : 0x51
->>> CPU architecture: 8
->>> CPU variant : 0x2
->>> CPU part : 0x201
->>> CPU revision : 0
->>> CPU param : 300 468 468 621 939 299 445 445 621 1077
->>> Hardware : Qualcomm Technologies, Inc MSM8996pro
->>
->> And this is how it behaves:
->> The output of the test app triggering the watchpoint (I have set a
->> single-byte watchpoint at 555556705f)
->>>
->>> Writing to: 555556705f, size: 1
->>> Writing to: 555556705e, size: 2
->>> Writing to: 555556705c, size: 4
->>> Writing to: 5555567058, size: 8
->>> Writing to: 5555567050, size: 16
->>> Writing to: 5555567040, size: 32
->>
->> The addresses received by the kernel:
->> [  251.812166] c1   3780 hw-breakpoint: watchpoint_handler: addr:
->> 555556705f, val+lens: 555556705f, val+lene: 555556705f
->> [  251.820341] c1   3781 hw-breakpoint: watchpoint_handler: addr:
->> 555556705e, val+lens: 555556705f, val+lene: 555556705f
->> [  251.825572] c0   3782 hw-breakpoint: watchpoint_handler: addr:
->> 555556705c, val+lens: 555556705f, val+lene: 555556705f
->> [  251.831085] c0   3783 hw-breakpoint: watchpoint_handler: addr:
->> 5555567058, val+lens: 555556705f, val+lene: 555556705f
->> [  251.835804] c0   3784 hw-breakpoint: watchpoint_handler: addr:
->> 5555567050, val+lens: 555556705f, val+lene: 555556705f
->> [  251.841350] c0   3785 hw-breakpoint: watchpoint_handler: addr:
->> 5555567050, val+lens: 555556705f, val+lene: 555556705f
->>
->> Note that for the case of 16 and 32-byte access it returns the address
->> 5555567050 -- this is why the "+15" is sufficient for me.
->>
->>
->> The other thing I am not so sure about in your patch is that it has
->> potential to mis-attribute the watchpoint hit if we have two
->> watchpoints close together. For example, if I have first watchpoint on
->> 0x1008-0x100f and a second one on 0x1000-0x1007, *and* the application
->> writes one byte to 0x1004, then your code will still attribute the hit
->> to the first watchpoint, even though it was not really triggered. This
->
-> Hummm..yes, thanks for pointing it out.
-> There could be only two solutions for it:
-> (1) We read instruction at the location regs->pc and analyse it and
-> find the size of read/write.
-> or(2) What you have suggested in your patch.
->
-> I think, its easier to go with your implementation. So, I have taken
-> your patch and updated my perf/upstream_arm64_devel branch. May be you
-> can give it a test for your test cases.
+On Thu, Oct 13, 2016 at 05:57:33PM +0100, Ard Biesheuvel wrote:
+> On 13 October 2016 at 17:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Wed, Oct 12, 2016 at 12:23:43PM +0100, Ard Biesheuvel wrote:
+> >> Now that we no longer allow live kernel PMDs to be split, it is safe to
+> >> start using the contiguous bit for kernel mappings. So set the contiguous
+> >> bit in the kernel page mappings for regions whose size and alignment are
+> >> suitable for this.
+> >>
+> >> This enables the following contiguous range sizes for the virtual mapping
+> >> of the kernel image, and for the linear mapping:
+> >>
+> >>           granule size |  cont PTE  |  cont PMD  |
+> >>           -------------+------------+------------+
+> >>                4 KB    |    64 KB   |   32 MB    |
+> >>               16 KB    |     2 MB   |    1 GB*   |
+> >>               64 KB    |     2 MB   |   16 GB*   |
+> >>
+> >> * only when built for 3 or more levels of translation
+> >
+> > I assume the limitation to have contiguous PMD only with 3 or move
+> > levels is because of the way p*d folding was implemented in the kernel.
+> > With nopmd, looping over pmds is done in __create_pgd_mapping() rather
+> > than alloc_init_pmd().
+> >
+> > A potential solution would be to replicate the contiguous pmd code to
+> > the pud and pgd level, though we probably won't benefit from any
+> > contiguous entries at higher level (when more than 2 levels).
+> > Alternatively, with an #ifdef __PGTABLE_PMD_FOLDED, we could set the
+> > PMD_CONT in prot in __create_pgd_mapping() directly (if the right
+> > addr/phys alignment).
+> 
+> Indeed. See the next patch :-)
 
-I've checked out the new version of your branch, and it works great.
-I'll write a patch with additional test cases to go on top of your
-branch, as the tests there do not capture the bug I was fixing.
+I got there eventually ;).
 
-regards,
-Pavel
+> > Anyway, it's probably not worth the effort given that 42-bit VA with 64K
+> > pages is becoming a less likely configuration (36-bit VA with 16K pages
+> > is even less likely, also depending on EXPERT).
+> 
+> This is the reason I put it in a separate patch: this one contains the
+> most useful combinations, and the next patch adds the missing ones,
+> but clutters up the code significantly. I'm perfectly happy to drop 4
+> and 5 if you don't think it is worth the trouble.
+
+I'll have a look at patch 4 first.
+
+Both 64KB contiguous pmd and 4K contiguous pud give us a 16GB range
+which (AFAIK) is less likely to be optimised in hardware.
+
+-- 
+Catalin
