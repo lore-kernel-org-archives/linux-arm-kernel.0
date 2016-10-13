@@ -1,88 +1,80 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 13 Oct 2016 09:01:29 +0200
-Subject: [PATCH v2] sdhci-esdhc-imx: Correct two register accesses
-In-Reply-To: <1476124792-18441-1-git-send-email-aaron.brice@datasoft.com>
-References: <1476124792-18441-1-git-send-email-aaron.brice@datasoft.com>
-Message-ID: <CAPDyKFpxi0yLSjdSFQSJarBssFyBZ0JDQ518ACLtpfUB3Wp1wA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 13 Oct 2016 09:04:42 +0200
+Subject: [PATCH v7 2/8] power: add power sequence library
+In-Reply-To: <20161013012216.GA8114@b29397-desktop>
+References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
+ <4691591.qnCGxrEkrZ@phil> <20161013012216.GA8114@b29397-desktop>
+Message-ID: <10186696.bBGEe05eC7@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2016 at 20:39, Aaron Brice <aaron.brice@datasoft.com> wrote:
->
->  - The DMA error interrupt bit is in a different position as
->    compared to the sdhci standard.  This is accounted for in
->    many cases, but not handled in the case of clearing the
->    INT_STATUS register by writing a 1 to that location.
->  - The HOST_CONTROL register is very different as compared to
->    the sdhci standard.  This is accounted for in the write
->    case, but not when read back out (which it is in the sdhci
->    code).
->
-> Signed-off-by: Dave Russell <david.russell@datasoft.com>
-> Signed-off-by: Aaron Brice <aaron.brice@datasoft.com>
-> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
+Am Donnerstag, 13. Oktober 2016, 09:22:16 CEST schrieb Peter Chen:
+> On Wed, Oct 12, 2016 at 12:30:29PM +0200, Heiko Stuebner wrote:
+> > Hi,
+> > 
+> > Am Dienstag, 20. September 2016, 11:36:41 CEST schrieb Peter Chen:
+> > > We have an well-known problem that the device needs to do some power
+> > > sequence before it can be recognized by related host, the typical
+> > > example like hard-wired mmc devices and usb devices.
+> > > 
+> > > This power sequence is hard to be described at device tree and handled
+> > > by
+> > > related host driver, so we have created a common power sequence
+> > > library to cover this requirement. The core code has supplied
+> > > some common helpers for host driver, and individual power sequence
+> > > libraries handle kinds of power sequence for devices.
+> > > 
+> > > pwrseq_generic is intended for general purpose of power sequence, which
+> > > handles gpios and clocks currently, and can cover regulator and pinctrl
+> > > in future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > > if only one power sequence is needed, else call of_pwrseq_on_list
+> > > /of_pwrseq_off_list instead (eg, USB hub driver).
+> > > 
+> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> > 
+> > first of all, glad to see this move forward. I've only some qualms with
+> > the
+> > static number of allocated power sequences below.
+> 
+> Thanks for commenting it, the preallocate way is not a good way, but I
+> can't find suitable way. See below comments.
+> 
+> > > +static int __init pwrseq_generic_register(void)
+> > > +{
+> > > +	struct pwrseq_generic *pwrseq_gen;
+> > > +	int i;
+> > > +
+> > > +	for (i = 0; i < CONFIG_PWRSEQ_GENERIC_INSTANCE_NUMBER; i++) {
+> > > +		pwrseq_gen = kzalloc(sizeof(*pwrseq_gen), GFP_KERNEL);
+> > > +		if (!pwrseq_gen)
+> > > +			return -ENOMEM;
+> > > +
+> > > +		pwrseq_gen->pwrseq.pwrseq_of_match_table = generic_id_table;
+> > > +		pwrseq_gen->pwrseq.get = pwrseq_generic_get;
+> > > +		pwrseq_gen->pwrseq.on = pwrseq_generic_on;
+> > > +		pwrseq_gen->pwrseq.off = pwrseq_generic_off;
+> > > +		pwrseq_gen->pwrseq.put = pwrseq_generic_put;
+> > > +		pwrseq_gen->pwrseq.free = pwrseq_generic_free;
+> > > +
+> > > +		pwrseq_register(&pwrseq_gen->pwrseq);
+> > > +	}
+> > > +
+> > > +	return 0;
+> > > +}
+> > > +postcore_initcall(pwrseq_generic_register)
+> > 
+> > I see that you need to have it preallocated for the compatible matching,
+> > but wouldn't it also work to either just register the type and allocate
+> > dynamically or otherwise just allocate a new spare everytime
+> > pwrseq_generic_get() picks up the previous spare?
+> 
+> Before compatible matching, the host driver doesn't know which pwrseq type
+> for its child node, then doesn't know which pwrseq instance needs to be
+> allocated. From dts, we don't know which pwrseq type for the node.
 
-Thanks, applied for fixes!
-
-Kind regards
-Uffe
-
->
-> v1 -> v2:
-> - rename long_val to val
->
->  drivers/mmc/host/sdhci-esdhc-imx.c | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index 1f54fd8..7123ef9 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -346,7 +346,8 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
->         struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
->         u32 data;
->
-> -       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)) {
-> +       if (unlikely(reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE ||
-> +                       reg == SDHCI_INT_STATUS)) {
->                 if ((val & SDHCI_INT_CARD_INT) && !esdhc_is_usdhc(imx_data)) {
->                         /*
->                          * Clear and then set D3CD bit to avoid missing the
-> @@ -555,6 +556,25 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->         esdhc_clrset_le(host, 0xffff, val, reg);
->  }
->
-> +static u8 esdhc_readb_le(struct sdhci_host *host, int reg)
-> +{
-> +       u8 ret;
-> +       u32 val;
-> +
-> +       switch (reg) {
-> +       case SDHCI_HOST_CONTROL:
-> +               val = readl(host->ioaddr + reg);
-> +
-> +               ret = val & SDHCI_CTRL_LED;
-> +               ret |= (val >> 5) & SDHCI_CTRL_DMA_MASK;
-> +               ret |= (val & ESDHC_CTRL_4BITBUS);
-> +               ret |= (val & ESDHC_CTRL_8BITBUS) << 3;
-> +               return ret;
-> +       }
-> +
-> +       return readb(host->ioaddr + reg);
-> +}
-> +
->  static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  {
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> @@ -947,6 +967,7 @@ static void esdhc_set_timeout(struct sdhci_host *host, struct mmc_command *cmd)
->  static struct sdhci_ops sdhci_esdhc_ops = {
->         .read_l = esdhc_readl_le,
->         .read_w = esdhc_readw_le,
-> +       .read_b = esdhc_readb_le,
->         .write_l = esdhc_writel_le,
->         .write_w = esdhc_writew_le,
->         .write_b = esdhc_writeb_le,
-> --
-> 2.7.4
->
+yes, that is why I was suggesting allocating one (or two) here in 
+pwrseq_generic_register() and every time pwrseq_generic_get() grabs the last 
+free sequence instance, you allocate a new free spare one in that function.
