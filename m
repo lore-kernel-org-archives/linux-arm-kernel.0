@@ -1,82 +1,163 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 13 Oct 2016 15:02:39 -0500
-Subject: [PATCH V2 1/3] Revert "ACPI,PCI,IRQ: reduce static IRQ array
- size to 16"
-In-Reply-To: <498097a5-f75c-d2dd-f134-148b3fb8e1ed@codeaurora.org>
-References: <1475615720-31047-1-git-send-email-okaya@codeaurora.org>
- <1475615720-31047-2-git-send-email-okaya@codeaurora.org>
- <20161012221357.GB15116@localhost>
- <09f93442-89c8-7b2c-467d-d29b857739ff@codeaurora.org>
- <20161013181535.GB21529@localhost>
- <498097a5-f75c-d2dd-f134-148b3fb8e1ed@codeaurora.org>
-Message-ID: <20161013200238.GE21529@localhost>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Thu, 13 Oct 2016 14:14:27 -0600
+Subject: [PATCH V3 10/10] arm64: KVM: add guest SEA support
+In-Reply-To: <87h98gs853.fsf@e105922-lin.cambridge.arm.com>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-11-git-send-email-tbaicar@codeaurora.org>
+ <87h98gs853.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <afa9a3c6-7516-cf5c-2366-f826f914d582@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2016 at 03:36:11PM -0400, Sinan Kaya wrote:
-> On 10/13/2016 2:15 PM, Bjorn Helgaas wrote:
-> > It seems like the problem is that we removed acpi_penalize_sci_irq(),
-> > which told us the polarity and trigger mode.  We tried to get that
-> > information via irq_get_trigger_type(), but that didn't work in this
-> > case because we use the acpi_irq_get_penalty() path before the SCI is
-> > registered.
-> > 
-> > It makes sense to me to add acpi_penalize_sci_irq() back in, which is
-> > what patch [3/3] does.
-> > 
-> > I don't understand how *this* patch, which basically just increases
-> > the penalty array size from 16 to 256, helps fix the problem.  It
-> > seems like this patch should only matter if the SCI were some IRQ
-> > between 16 and 255.
-> 
-> 
-> I see your point. The original code supported 256 interrupts. 
-> 
-> The machine where we had the problem had an SCI interrupt of 11. So,
-> this patch does not necessarily fix anything for this machine alone.
-> However, to be safe; I wanted to go back to the old behavior to fix
-> the SCI issue for all existing platforms.
+Hello Punit,
 
-I saw a previous email that said the SCI interrupt could not be
-greater than 256, but I don't know where that restriction is.  I'm
-pretty sure the FADT field is 2 bytes, which would mean it could be up
-to 65535.
+On 10/13/2016 7:14 AM, Punit Agrawal wrote:
+> Hi Tyler,
+>
+> I know I've had my last comment already ;), but I thought I'd rather
+> raise the question than stay confused...
+>
+> Tyler Baicar <tbaicar@codeaurora.org> writes:
+>
+>> Currently external aborts are unsupported by the guest abort
+>> handling. Add handling for SEAs so that the host kernel reports
+>> SEAs which occur in the guest kernel.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> ---
+>>   arch/arm/include/asm/kvm_arm.h       |  1 +
+>>   arch/arm/include/asm/system_misc.h   |  5 +++++
+>>   arch/arm/kvm/mmu.c                   | 15 +++++++++++++--
+>>   arch/arm64/include/asm/kvm_arm.h     |  1 +
+>>   arch/arm64/include/asm/system_misc.h |  2 ++
+>>   arch/arm64/mm/fault.c                | 13 +++++++++++++
+>>   6 files changed, 35 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>> index e22089f..33a77509 100644
+>> --- a/arch/arm/include/asm/kvm_arm.h
+>> +++ b/arch/arm/include/asm/kvm_arm.h
+>> @@ -187,6 +187,7 @@
+>>   #define FSC_FAULT	(0x04)
+>>   #define FSC_ACCESS	(0x08)
+>>   #define FSC_PERM	(0x0c)
+>> +#define FSC_EXTABT	(0x10)
+>>   
+>>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>   #define HPFAR_MASK	(~0xf)
+>> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+>> index a3d61ad..86e1faa 100644
+>> --- a/arch/arm/include/asm/system_misc.h
+>> +++ b/arch/arm/include/asm/system_misc.h
+>> @@ -24,4 +24,9 @@ extern unsigned int user_debug;
+>>   
+>>   #endif /* !__ASSEMBLY__ */
+>>   
+>> +inline int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>> +	return -1;
+>> +}
+>> +
+>>   #endif /* __ASM_ARM_SYSTEM_MISC_H */
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index e9a5c0e..24cde84 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -29,6 +29,7 @@
+>>   #include <asm/kvm_asm.h>
+>>   #include <asm/kvm_emulate.h>
+>>   #include <asm/virt.h>
+>> +#include <asm/system_misc.h>
+>>   
+>>   #include "trace.h"
+>>   
+>> @@ -1441,8 +1442,18 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>   
+>>   	/* Check the stage-2 fault is trans. fault or write fault */
+>>   	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> -	    fault_status != FSC_ACCESS) {
+>> +
+>> +	if (fault_status == FSC_EXTABT) {
+>> +		if(handle_guest_sea((unsigned long)fault_ipa,
+>> +				    kvm_vcpu_get_hsr(vcpu))) {
+>> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>> +				kvm_vcpu_trap_get_class(vcpu),
+>> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+>> +			return -EFAULT;
+>> +		}
+>> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> +		   fault_status != FSC_ACCESS) {
+>>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>   			kvm_vcpu_trap_get_class(vcpu),
+>>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 4b5c977..be0efb6 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -201,6 +201,7 @@
+>>   #define FSC_FAULT	ESR_ELx_FSC_FAULT
+>>   #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>>   #define FSC_PERM	ESR_ELx_FSC_PERM
+>> +#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
+>>   
+>>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>   #define HPFAR_MASK	(~UL(0xf))
+>> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+>> index 90daf4a..8522fff 100644
+>> --- a/arch/arm64/include/asm/system_misc.h
+>> +++ b/arch/arm64/include/asm/system_misc.h
+>> @@ -77,4 +77,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>>   int sea_register_handler_chain(struct notifier_block *nb);
+>>   void sea_unregister_handler_chain(struct notifier_block *nb);
+>>   
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr);
+>> +
+>>   #endif	/* __ASM_SYSTEM_MISC_H */
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 81cb7ad..d714432 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
+>>   }
+>>   
+>>   /*
+>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>> + */
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>> +
+>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>> +		fault_name(esr), esr, addr);
+>> +
+>> +	return 0;
+>> +}
+> Don't we need to pass the abort to the guest?
+This requires some infrastructure to implement virtual "ACPI platform 
+error interface" to expose the details of the abort to the guest. This 
+patchset does not cover that and focuses on feature parity with other 
+architectures that support APEI. There are discussions among Linaro 
+partners about how this can be achieved in the long term, but that work 
+is outside the scope of this patchset. This patch will ensure that if a 
+guest encounters one of these errors then it will be reported before 
+getting killed. Before this patch we would just get an unsupported FSC 
+print out and then the guest would be killed.
 
-To fix this problem, I think we only need to fix the penalty for the
-SCI interrupt.  It seems better to add a single "sci_penalty"
-variable, set it to PIRQ_PENALTY_PCI_USING if it's level/low or
-PIRQ_PENALTY_ISA_ALWAYS otherwise, and add "sci_penalty" in when
-appropriate.  That should fix it for *any* SCI IRQ, not just those
-less than 256, and we don't have to add these extra penalty table
-entries that are all unused (except possibly for one entry if we have
-an SCI in the 16-255 range).
+Thanks,
+Tyler
+>
+> Thanks,
+> Punit
+>
+>> +
+>> +/*
+>>    * Dispatch a data abort to the relevant handler.
+>>    */
+>>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 
-Something like this:
-
-  static int sci_irq, sci_penalty;
-
-  void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-  {
-    sci = irq;
-    if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
-        polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
-      sci_penalty = PIRQ_PENALTY_PCI_USING;
-    else
-      sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
-  }
-
-  static int acpi_irq_get_penalty(int irq)
-  {
-    int penalty = 0;
-
-    if (irq == sci_irq)
-      penalty += sci_penalty;
-    ...
-  }
-
-One could argue that ACPI devices can use IRQs above 15, and we should
-handle penalties for them, too.  But the table is the wrong mechanism
-for that, because it handles penalties for IRQs < 256, but IRQs above
-that would mysteriously be handled differently.
-
-Bjorn
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
