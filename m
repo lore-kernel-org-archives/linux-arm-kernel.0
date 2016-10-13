@@ -1,80 +1,73 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 13 Oct 2016 09:22:16 +0800
-Subject: [PATCH v7 2/8] power: add power sequence library
-In-Reply-To: <4691591.qnCGxrEkrZ@phil>
-References: <1474342607-27512-1-git-send-email-peter.chen@nxp.com>
- <1474342607-27512-3-git-send-email-peter.chen@nxp.com>
- <4691591.qnCGxrEkrZ@phil>
-Message-ID: <20161013012216.GA8114@b29397-desktop>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Thu, 13 Oct 2016 09:50:38 +0800
+Subject: [PATCH v2] drm/bridge: analogix: protect power when get_modes or
+ detect
+In-Reply-To: <1476266442-29803-1-git-send-email-mark.yao@rock-chips.com>
+References: <1476266442-29803-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1476323438-8435-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 12:30:29PM +0200, Heiko Stuebner wrote:
-> Hi,
-> 
-> Am Dienstag, 20. September 2016, 11:36:41 CEST schrieb Peter Chen:
-> > We have an well-known problem that the device needs to do some power
-> > sequence before it can be recognized by related host, the typical
-> > example like hard-wired mmc devices and usb devices.
-> > 
-> > This power sequence is hard to be described at device tree and handled by
-> > related host driver, so we have created a common power sequence
-> > library to cover this requirement. The core code has supplied
-> > some common helpers for host driver, and individual power sequence
-> > libraries handle kinds of power sequence for devices.
-> > 
-> > pwrseq_generic is intended for general purpose of power sequence, which
-> > handles gpios and clocks currently, and can cover regulator and pinctrl
-> > in future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > if only one power sequence is needed, else call of_pwrseq_on_list
-> > /of_pwrseq_off_list instead (eg, USB hub driver).
-> >
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> 
-> first of all, glad to see this move forward. I've only some qualms with the 
-> static number of allocated power sequences below.
-> 
+The drm callback ->detect and ->get_modes seems is not power safe,
+they may be called when device is power off, do register access on
+detect or get_modes will cause system die.
 
-Thanks for commenting it, the preallocate way is not a good way, but I
-can't find suitable way. See below comments.
+Here is the path call ->detect before analogix_dp power on
+[<ffffff800843babc>] analogix_dp_detect+0x44/0xdc
+[<ffffff80083fd840>] drm_helper_probe_single_connector_modes_merge_bits+0xe8/0x41c
+[<ffffff80083fdb84>] drm_helper_probe_single_connector_modes+0x10/0x18
+[<ffffff8008418d24>] drm_mode_getconnector+0xf4/0x304
+[<ffffff800840cff0>] drm_ioctl+0x23c/0x390
+[<ffffff80081a8adc>] do_vfs_ioctl+0x4b8/0x58c
+[<ffffff80081a8c10>] SyS_ioctl+0x60/0x88
 
-> > +static int __init pwrseq_generic_register(void)
-> > +{
-> > +	struct pwrseq_generic *pwrseq_gen;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < CONFIG_PWRSEQ_GENERIC_INSTANCE_NUMBER; i++) {
-> > +		pwrseq_gen = kzalloc(sizeof(*pwrseq_gen), GFP_KERNEL);
-> > +		if (!pwrseq_gen)
-> > +			return -ENOMEM;
-> > +
-> > +		pwrseq_gen->pwrseq.pwrseq_of_match_table = generic_id_table;
-> > +		pwrseq_gen->pwrseq.get = pwrseq_generic_get;
-> > +		pwrseq_gen->pwrseq.on = pwrseq_generic_on;
-> > +		pwrseq_gen->pwrseq.off = pwrseq_generic_off;
-> > +		pwrseq_gen->pwrseq.put = pwrseq_generic_put;
-> > +		pwrseq_gen->pwrseq.free = pwrseq_generic_free;
-> > +
-> > +		pwrseq_register(&pwrseq_gen->pwrseq);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +postcore_initcall(pwrseq_generic_register)
-> 
-> I see that you need to have it preallocated for the compatible matching, but 
-> wouldn't it also work to either just register the type and allocate 
-> dynamically or otherwise just allocate a new spare everytime 
-> pwrseq_generic_get() picks up the previous spare?
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Sean Paul <seanpaul@chromium.org>
+Cc: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+Cc: "Ville Syrj?l?" <ville.syrjala@linux.intel.com>
 
-Before compatible matching, the host driver doesn't know which pwrseq type
-for its child node, then doesn't know which pwrseq instance needs to be
-allocated. From dts, we don't know which pwrseq type for the node.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in v2:
+- remove sub device power on/off callback, use pm_runtime_get/put is enough
+to fix my problem, so will can avoid race to dpms.
 
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index efac8ab..ff2d328 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -1062,11 +1062,15 @@ int analogix_dp_get_modes(struct drm_connector *connector)
+ 		return 0;
+ 	}
+ 
++	pm_runtime_get_sync(dp->dev);
++
+ 	if (analogix_dp_handle_edid(dp) == 0) {
+ 		drm_mode_connector_update_edid_property(&dp->connector, edid);
+ 		num_modes += drm_add_edid_modes(&dp->connector, edid);
+ 	}
+ 
++	pm_runtime_put(dp->dev);
++
+ 	if (dp->plat_data->panel)
+ 		num_modes += drm_panel_get_modes(dp->plat_data->panel);
+ 
+@@ -1106,9 +1110,13 @@ analogix_dp_detect(struct drm_connector *connector, bool force)
+ 		return connector_status_disconnected;
+ 	}
+ 
++	pm_runtime_get_sync(dp->dev);
++
+ 	if (!analogix_dp_detect_hpd(dp))
+ 		status = connector_status_connected;
+ 
++	pm_runtime_put(dp->dev);
++
+ 	ret = analogix_dp_prepare_panel(dp, false, false);
+ 	if (ret)
+ 		DRM_ERROR("Failed to unprepare panel (%d)\n", ret);
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
