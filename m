@@ -1,92 +1,43 @@
-From: lersek@redhat.com (Laszlo Ersek)
-Date: Fri, 14 Oct 2016 18:22:55 +0200
-Subject: aarch64 ACPI boot regressed by commit 7ba5f605f3a0 ("arm64/numa:
- remove the limitation that cpu0 must bind to node0")
-In-Reply-To: <20161014154231.GA4411@red-moon>
-References: <4a64cd93-5ead-aad6-1057-f42224d65b43@redhat.com>
- <20161014080524.4hm2b4p373r7rhel@hawk.localdomain>
- <04f22a79-301b-f05b-033d-c7a24c9f4084@redhat.com>
- <d26ea7ca-6b65-b3a6-591e-ab892f1815e7@redhat.com>
- <b8b58d52-691c-11f0-2d26-a51e03430771@redhat.com>
- <20161014154231.GA4411@red-moon>
-Message-ID: <c8b9f6fc-3a4b-f74a-c930-f500bcc00a1d@redhat.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 14 Oct 2016 17:28:58 +0100
+Subject: [PATCH V3 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <912acc88-fbaf-2576-8048-1fcc67439600@codeaurora.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-3-git-send-email-tbaicar@codeaurora.org>
+ <3f17d0a8-6b63-5792-903a-341effaae432@arm.com>
+ <c17a0c03-5037-d88d-f096-4cc72dbfcb99@codeaurora.org>
+ <064dca7d-0625-c0d0-09ae-72ef7abdc63f@arm.com>
+ <912acc88-fbaf-2576-8048-1fcc67439600@codeaurora.org>
+Message-ID: <38c7c9ac-e8ad-6fb5-3ee9-3ba85e4b8299@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/16 17:42, Lorenzo Pieralisi wrote:
-> On Fri, Oct 14, 2016 at 05:27:58PM +0200, Laszlo Ersek wrote:
->> On 10/14/16 17:01, Laszlo Ersek wrote:
+On 13/10/16 20:37, Baicar, Tyler wrote:
+> Hello Suzuki,
+>
+> On 10/13/2016 2:50 AM, Suzuki K Poulose wrote:
+>> On 12/10/16 23:10, Baicar, Tyler wrote:
+
+>>>> Please could you keep the people who reviewed/commented on your series in the past,
+>>>> whenever you post a new version ?
+>>> Do you mean to just send the new version to their e-mail directly in addition to the lists? If so, I will do that next time.
 >>
->>> Maybe the code I
->>> tried to analyze in this email was never *meant* to associate CPU#0 with
->>> any NUMA node at all (not even node 0); instead, other code -- for
->>> example code removed by 7ba5f605f3a0 -- was meant to perform that
->>> association.
+>> If you send a new version of a series to the list, it is a good idea to keep
+>> the people who commented (significantly) on your previous version in Cc, especially
+>> when you have addressed their feedback. That will help them to keep track of the
+>> series. People can always see the new version in the list, but then it is so easy
+>> to miss something in the 100s of emails you get each day. I am sure people have
+>> special filters for the emails based on if they are in Cc/To etc.
 >>
->> Staring a bit more at the code, this looks very likely; in acpi_map_gic_cpu_interface() we have
->>
->>> 	/* Check if GICC structure of boot CPU is available in the MADT */
->>> 	if (cpu_logical_map(0) == hwid) {
->>> 		if (bootcpu_valid) {
->>> 			pr_err("duplicate boot CPU MPIDR: 0x%llx in MADT\n",
->>> 			       hwid);
->>> 			return;
->>> 		}
->>> 		bootcpu_valid = true;
->>> 		return;
->>> 	}
->>
->> which means that this callback function (for parsing the GICC
->> structures in the MADT) expects to find the boot processor as well.
->>
->> Upon finding the boot processor, we set bootcpu_valid to true, and
->> that's it -- no association with any NUMA node, and no incrementing of
->> "cpu_count".
-> 
-> Yes, because that's to check the MADT contains the boot cpu hwid.
-> 
-> Does this help (compile tested only) ?
-> 
-> -- >8 -- 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index d3f151c..8507703 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -544,6 +544,7 @@ static int __init smp_cpu_setup(int cpu)
->  			return;
->  		}
->  		bootcpu_valid = true;
-> +		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
->  		return;
->  	}
->  
-> 
+> Okay, understood. I'll make sure to add those who have commented in the cc/to list to avoid the e-mail filters.
 
-Your patch applies to the tree at v4.8-14604-g29fbff8698fc, but the function the hunk modifies is not smp_cpu_setup(), it is acpi_map_gic_cpu_interface():
+Thanks !
 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index d3f151cfd4a1..8507703dabe4 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -544,6 +544,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->  			return;
->  		}
->  		bootcpu_valid = true;
-> +		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
->  		return;
->  	}
-> 
+>> Is it always the same endianness as that of the CPU ?
+> It is a fair assumption that the firmware populating this record will use a CPU of the same endianness. There is no mechanism in the spec to indicate otherwise.
 
-Anyway, your patch works with both the two-node NUMA configuration Drew suggested for testing, and with the single-node config that I originally used for the bisection. Therefore:
+Yep, you are right. The EFI expects the EL2/EL1 to be of the same endianness
 
-Tested-by: Laszlo Ersek <lersek@redhat.com>
-Reported-by: Laszlo Ersek <lersek@redhat.com>
-
-Thank you very much for the quick bugfix! And, I think your patch (when you send it for real) should carry
-
-Fixes: 7ba5f605f3a0d9495aad539eeb8346d726dfc183
-
-too, because it supplies the cpu#0<->node#xxx association that 7ba5f605f3a0 removed not just for DT, but also for ACPI.
-
-Cheers!
-Laszlo
+Cheers
+Suzuki
