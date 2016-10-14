@@ -1,231 +1,281 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 14 Oct 2016 11:18:14 +0200
-Subject: [PATCH v2 1/6] clk: stm32f4: Add LSI & LSE clocks
+Date: Fri, 14 Oct 2016 11:18:18 +0200
+Subject: [PATCH v2 5/6] clk: stm32f469: Add QSPI clock
 In-Reply-To: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
 References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1476436699-21879-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1476436699-21879-6-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch introduces the support of the LSI & LSE clocks.
-The clock drivers needs to disable the power domain write protection
-using syscon/regmap to enable these clocks.
+This patch adds the QSPI clock for stm32f469 discovery board.
+The gate mapping is a little bit different from stm32f429 soc.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 138 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 134 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
+ drivers/clk/clk-stm32f4.c                          | 173 ++++++++++++++++++---
+ 2 files changed, 158 insertions(+), 19 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+index c209de6..0532d81 100644
+--- a/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
++++ b/Documentation/devicetree/bindings/clock/st,stm32-rcc.txt
+@@ -7,7 +7,9 @@ Please refer to clock-bindings.txt for common clock controller binding usage.
+ Please also refer to reset.txt for common reset controller binding usage.
+ 
+ Required properties:
+-- compatible: Should be "st,stm32f42xx-rcc"
++- compatible: Should be:
++  "st,stm32f42xx-rcc"
++  "st,stm32f469-rcc"
+ - reg: should be register base and length as documented in the
+   datasheet
+ - #reset-cells: 1, see below
 diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 02d6810..789a8f77 100644
+index bf9448d..8544214 100644
 --- a/drivers/clk/clk-stm32f4.c
 +++ b/drivers/clk/clk-stm32f4.c
-@@ -19,10 +19,14 @@
- #include <linux/clk-provider.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/ioport.h>
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
+@@ -46,7 +46,7 @@ struct stm32f4_gate_data {
+ 	unsigned long flags;
+ };
  
- #define STM32F4_RCC_PLLCFGR		0x04
- #define STM32F4_RCC_CFGR		0x08
-@@ -31,6 +35,8 @@
- #define STM32F4_RCC_AHB3ENR		0x38
- #define STM32F4_RCC_APB1ENR		0x40
- #define STM32F4_RCC_APB2ENR		0x44
-+#define STM32F4_RCC_BDCR		0x70
-+#define STM32F4_RCC_CSR			0x74
- 
- struct stm32f4_gate_data {
- 	u8	offset;
-@@ -120,13 +126,13 @@ struct stm32f4_gate_data {
+-static const struct stm32f4_gate_data stm32f4_gates[] __initconst = {
++static const struct stm32f4_gate_data stm32f429_gates[] __initconst = {
+ 	{ STM32F4_RCC_AHB1ENR,  0,	"gpioa",	"ahb_div" },
+ 	{ STM32F4_RCC_AHB1ENR,  1,	"gpiob",	"ahb_div" },
+ 	{ STM32F4_RCC_AHB1ENR,  2,	"gpioc",	"ahb_div" },
+@@ -126,23 +126,109 @@ struct stm32f4_gate_data {
  	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
  };
  
-+enum { SYSTICK, FCLK, CLK_LSI, CLK_LSE, END_PRIMARY_CLK };
- /*
-  * MAX_CLKS is the maximum value in the enumeration below plus the combined
-  * hweight of stm32f42xx_gate_map (plus one).
-  */
--#define MAX_CLKS 74
-+#define MAX_CLKS (71 + END_PRIMARY_CLK + 1)
++static const struct stm32f4_gate_data stm32f469_gates[] __initconst = {
++	{ STM32F4_RCC_AHB1ENR,  0,	"gpioa",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  1,	"gpiob",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  2,	"gpioc",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  3,	"gpiod",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  4,	"gpioe",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  5,	"gpiof",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  6,	"gpiog",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  7,	"gpioh",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  8,	"gpioi",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR,  9,	"gpioj",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 10,	"gpiok",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 12,	"crc",		"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 18,	"bkpsra",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 20,	"ccmdatam",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 21,	"dma1",		"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 22,	"dma2",		"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 23,	"dma2d",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 25,	"ethmac",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 26,	"ethmactx",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 27,	"ethmacrx",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 28,	"ethmacptp",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 29,	"otghs",	"ahb_div" },
++	{ STM32F4_RCC_AHB1ENR, 30,	"otghsulpi",	"ahb_div" },
++
++	{ STM32F4_RCC_AHB2ENR,  0,	"dcmi",		"ahb_div" },
++	{ STM32F4_RCC_AHB2ENR,  4,	"cryp",		"ahb_div" },
++	{ STM32F4_RCC_AHB2ENR,  5,	"hash",		"ahb_div" },
++	{ STM32F4_RCC_AHB2ENR,  6,	"rng",		"pll48" },
++	{ STM32F4_RCC_AHB2ENR,  7,	"otgfs",	"pll48" },
++
++	{ STM32F4_RCC_AHB3ENR,  0,	"fmc",		"ahb_div",
++		CLK_IGNORE_UNUSED },
++	{ STM32F4_RCC_AHB3ENR,  1,	"qspi",		"ahb_div",
++		CLK_IGNORE_UNUSED },
++
++	{ STM32F4_RCC_APB1ENR,  0,	"tim2",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  1,	"tim3",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  2,	"tim4",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  3,	"tim5",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  4,	"tim6",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  5,	"tim7",		"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  6,	"tim12",	"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  7,	"tim13",	"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR,  8,	"tim14",	"apb1_mul" },
++	{ STM32F4_RCC_APB1ENR, 11,	"wwdg",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 14,	"spi2",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 15,	"spi3",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 17,	"uart2",	"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 18,	"uart3",	"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 19,	"uart4",	"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 20,	"uart5",	"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 21,	"i2c1",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 22,	"i2c2",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 23,	"i2c3",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 25,	"can1",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 26,	"can2",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 28,	"pwr",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 29,	"dac",		"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 30,	"uart7",	"apb1_div" },
++	{ STM32F4_RCC_APB1ENR, 31,	"uart8",	"apb1_div" },
++
++	{ STM32F4_RCC_APB2ENR,  0,	"tim1",		"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR,  1,	"tim8",		"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR,  4,	"usart1",	"apb2_div" },
++	{ STM32F4_RCC_APB2ENR,  5,	"usart6",	"apb2_div" },
++	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
++	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 16,	"tim9",		"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR, 17,	"tim10",	"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR, 18,	"tim11",	"apb2_mul" },
++	{ STM32F4_RCC_APB2ENR, 20,	"spi5",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 21,	"spi6",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 22,	"sai1",		"apb2_div" },
++	{ STM32F4_RCC_APB2ENR, 26,	"ltdc",		"apb2_div" },
++};
++
+ enum { SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC, END_PRIMARY_CLK };
+-/*
+- * MAX_CLKS is the maximum value in the enumeration below plus the combined
+- * hweight of stm32f42xx_gate_map (plus one).
+- */
+-#define MAX_CLKS (71 + END_PRIMARY_CLK + 1)
  
--enum { SYSTICK, FCLK };
  
  /*
   * This bitmask tells us which bit offsets (0..192) on STM32F4[23]xxx
-@@ -259,7 +265,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	u64 table[ARRAY_SIZE(stm32f42xx_gate_map)];
+  * have gate bits associated with them. Its combined hweight is 71.
+  */
+-static const u64 stm32f42xx_gate_map[] = { 0x000000f17ef417ffull,
+-					   0x0000000000000001ull,
+-					   0x04777f33f6fec9ffull };
++#define MAX_GATE_MAP 3
++
++static const u64 stm32f42xx_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
++						       0x0000000000000001ull,
++						       0x04777f33f6fec9ffull };
++
++static const u64 stm32f46xx_gate_map[MAX_GATE_MAP] = { 0x000000f17ef417ffull,
++						       0x0000000000000003ull,
++						       0x0c777f33f6fec9ffull };
++
++const u64 *stm32f4_gate_map;
++
++static struct clk_hw **clks;
+ 
+-static struct clk_hw *clks[MAX_CLKS];
+ static DEFINE_SPINLOCK(stm32f4_clk_lock);
+ static void __iomem *base;
+ 
+@@ -262,7 +348,7 @@ static void stm32f4_rcc_register_pll(const char *hse_clk, const char *hsi_clk)
+  */
+ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
+ {
+-	u64 table[ARRAY_SIZE(stm32f42xx_gate_map)];
++	u64 table[MAX_GATE_MAP];
  
  	if (primary == 1) {
--		if (WARN_ON(secondary > FCLK))
-+		if (WARN_ON(secondary >= END_PRIMARY_CLK))
- 			return -EINVAL;
+ 		if (WARN_ON(secondary >= END_PRIMARY_CLK))
+@@ -270,7 +356,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
  		return secondary;
  	}
-@@ -276,7 +282,7 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	table[BIT_ULL_WORD(secondary)] &=
- 	    GENMASK_ULL(secondary % BITS_PER_LONG_LONG, 0);
  
--	return FCLK + hweight64(table[0]) +
-+	return END_PRIMARY_CLK - 1 + hweight64(table[0]) +
- 	       (BIT_ULL_WORD(secondary) >= 1 ? hweight64(table[1]) : 0) +
- 	       (BIT_ULL_WORD(secondary) >= 2 ? hweight64(table[2]) : 0);
- }
-@@ -292,8 +298,110 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
- 	return clks[i];
- }
+-	memcpy(table, stm32f42xx_gate_map, sizeof(table));
++	memcpy(table, stm32f4_gate_map, sizeof(table));
  
-+static struct regmap *pdrm;
-+
-+static inline void disable_power_domain_write_protection(void)
-+{
-+	regmap_update_bits(pdrm, 0x00, (1 << 8), (1 << 8));
-+}
-+
-+static inline void enable_power_domain_write_protection(void)
-+{
-+	regmap_update_bits(pdrm, 0x00, (1 << 8), (0 << 8));
-+}
-+
-+struct stm32_rgate {
-+	struct	clk_hw hw;
-+	struct	clk_gate gate;
-+	u8	bit_rdy_idx;
+ 	/* only bits set in table can be used as indices */
+ 	if (WARN_ON(secondary >= BITS_PER_BYTE * sizeof(table) ||
+@@ -532,10 +618,42 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ 	{ 0 },
+ };
+ 
++struct stm32f4_clk_data {
++	const struct stm32f4_gate_data *gates_data;
++	const u64 *gates_map;
++	int gates_num;
 +};
 +
-+#define RTC_TIMEOUT 1000000
-+
-+#define to_rgclk(_hw) container_of(_hw, struct stm32_rgate, hw)
-+
-+static int rgclk_enable(struct clk_hw *hw)
-+{
-+	struct stm32_rgate *rgate = to_rgclk(hw);
-+	struct clk_hw *gate_hw = &rgate->gate.hw;
-+	struct clk_gate *gate = to_clk_gate(gate_hw);
-+	u32 reg;
-+	int ret;
-+
-+	__clk_hw_set_clk(gate_hw, hw);
-+
-+	disable_power_domain_write_protection();
-+
-+	clk_gate_ops.enable(gate_hw);
-+
-+	ret = readl_relaxed_poll_timeout_atomic(gate->reg, reg,
-+			reg & rgate->bit_rdy_idx, 1000, RTC_TIMEOUT);
-+
-+	enable_power_domain_write_protection();
-+
-+	return ret;
-+}
-+
-+static void rgclk_disable(struct clk_hw *hw)
-+{
-+	clk_gate_ops.disable(hw);
-+}
-+
-+static int rgclk_is_enabled(struct clk_hw *hw)
-+{
-+	return clk_gate_ops.is_enabled(hw);
-+}
-+
-+
-+static const struct clk_ops rgclk_ops = {
-+	.enable = rgclk_enable,
-+	.disable = rgclk_disable,
-+	.is_enabled = rgclk_is_enabled,
++static const struct stm32f4_clk_data stm32f429_clk_data = {
++	.gates_data	= stm32f429_gates,
++	.gates_map	= stm32f42xx_gate_map,
++	.gates_num	= ARRAY_SIZE(stm32f429_gates),
 +};
 +
-+static struct clk_hw *clk_register_rgate(struct device *dev, const char *name,
-+		const char *parent_name, unsigned long flags,
-+		void __iomem *reg, u8 bit_idx, u8 bit_rdy_idx,
-+		u8 clk_gate_flags, spinlock_t *lock)
-+{
-+	struct stm32_rgate *rgate;
-+	struct clk_init_data init = { NULL };
-+	struct clk_hw *hw;
-+	int ret;
++static const struct stm32f4_clk_data stm32f469_clk_data = {
++	.gates_data	= stm32f469_gates,
++	.gates_map	= stm32f46xx_gate_map,
++	.gates_num	= ARRAY_SIZE(stm32f469_gates),
++};
 +
-+	rgate = kzalloc(sizeof(*rgate), GFP_KERNEL);
-+	if (!rgate)
-+		return ERR_PTR(-ENOMEM);
++static const struct of_device_id stm32f4_of_match[] = {
++	{
++		.compatible = "st,stm32f42xx-rcc",
++		.data = &stm32f429_clk_data
++	},
++	{
++		.compatible = "st,stm32f469-rcc",
++		.data = &stm32f469_clk_data
++	},
++	{}
++};
 +
-+	init.name = name;
-+	init.ops = &rgclk_ops;
-+	init.flags = flags | CLK_IS_BASIC;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	rgate->hw.init = &init;
-+	rgate->bit_rdy_idx = bit_rdy_idx;
-+
-+	rgate->gate.lock = lock;
-+	rgate->gate.reg = reg;
-+	rgate->gate.bit_idx = bit_idx;
-+
-+	hw = &rgate->hw;
-+	ret = clk_hw_register(dev, hw);
-+	if (ret) {
-+		kfree(rgate);
-+		hw = ERR_PTR(ret);
-+	}
-+
-+	return hw;
-+}
-+
- static const char *sys_parents[] __initdata =   { "hsi", NULL, "pll" };
+ static void __init stm32f4_rcc_init(struct device_node *np)
+ {
+ 	const char *hse_clk;
+ 	int n;
++	const struct of_device_id *match;
++	const struct stm32f4_clk_data *data;
  
-+const char *rtc_parents[4] = {
-+	"no-clock", "lse", "lsi", "hse-rtc"
-+};
-+
- static const struct clk_div_table ahb_div_table[] = {
- 	{ 0x0,   1 }, { 0x1,   1 }, { 0x2,   1 }, { 0x3,   1 },
- 	{ 0x4,   1 }, { 0x5,   1 }, { 0x6,   1 }, { 0x7,   1 },
-@@ -319,6 +427,12 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 		return;
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+@@ -549,6 +667,19 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 		goto fail;
  	}
  
-+	pdrm = syscon_regmap_lookup_by_phandle(np, "st,syscfg");
-+	if (IS_ERR(pdrm)) {
-+		pr_err("%s: Unable to get syscfg\n", __func__);
++	match = of_match_node(stm32f4_of_match, np);
++	if (WARN_ON(!match))
++		return;
++
++	data = match->data;
++
++	clks = kmalloc_array(data->gates_num + END_PRIMARY_CLK,
++			sizeof(struct clk_hw *), GFP_KERNEL);
++	if (!clks)
 +		goto fail;
-+	}
++
++	stm32f4_gate_map = data->gates_map;
 +
  	hse_clk = of_clk_get_parent_name(np, 0);
  
  	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
-@@ -371,6 +485,22 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 		}
- 	}
+@@ -581,11 +712,15 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 	clks[FCLK] = clk_hw_register_fixed_factor(NULL, "fclk", "ahb_div",
+ 					       0, 1, 1);
  
-+	clks[CLK_LSI] = clk_register_rgate(NULL, "lsi", "clk-lsi", 0,
-+			base + STM32F4_RCC_CSR, 0, 2, 0, &stm32f4_clk_lock);
+-	for (n = 0; n < ARRAY_SIZE(stm32f4_gates); n++) {
+-		const struct stm32f4_gate_data *gd = &stm32f4_gates[n];
+-		unsigned int secondary =
+-		    8 * (gd->offset - STM32F4_RCC_AHB1ENR) + gd->bit_idx;
+-		int idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
++	for (n = 0; n < data->gates_num; n++) {
++		const struct stm32f4_gate_data *gd;
++		unsigned int secondary;
++		int idx;
 +
-+	if (IS_ERR(clks[CLK_LSI])) {
-+		pr_err("Unable to register lsi clock\n");
-+		goto fail;
-+	}
-+
-+	clks[CLK_LSE] = clk_register_rgate(NULL, "lse", "clk-lse", 0,
-+			base + STM32F4_RCC_BDCR, 0, 2, 0, &stm32f4_clk_lock);
-+
-+	if (IS_ERR(clks[CLK_LSE])) {
-+		pr_err("Unable to register lse clock\n");
-+		goto fail;
-+	}
-+
++		gd = (struct stm32f4_gate_data *) &data->gates_data[n];
++		secondary = 8 * (gd->offset - STM32F4_RCC_AHB1ENR) +
++			gd->bit_idx;
++		idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
+ 
+ 		if (idx < 0)
+ 			goto fail;
+@@ -637,6 +772,8 @@ static void __init stm32f4_rcc_init(struct device_node *np)
  	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
  	return;
  fail:
++	kfree(clks);
+ 	iounmap(base);
+ }
+-CLK_OF_DECLARE(stm32f4_rcc, "st,stm32f42xx-rcc", stm32f4_rcc_init);
++CLK_OF_DECLARE(stm32f42xx_rcc, "st,stm32f42xx-rcc", stm32f4_rcc_init);
++CLK_OF_DECLARE(stm32f46xx_rcc, "st,stm32f469-rcc", stm32f4_rcc_init);
 -- 
 1.9.1
