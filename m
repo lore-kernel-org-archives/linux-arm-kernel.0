@@ -1,41 +1,33 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 14 Oct 2016 10:47:56 -0700
-Subject: [PATCH v3 8/8] PM / doc: Update device documentation for devices in
- IRQ safe PM domains
-In-Reply-To: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1476467276-75094-9-git-send-email-lina.iyer@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 14 Oct 2016 18:51:30 +0100
+Subject: [PATCH v3 4/5] arm64: mm: support additional contiguous kernel
+ mapping region sizes
+In-Reply-To: <20161014102853.GA23339@e104818-lin.cambridge.arm.com>
+References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476271425-19401-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20161014102853.GA23339@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_AF8o0dVP_Q=6FH_eu7wdmXS9sM35gcYbjjRCQicko0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update documentation to reflect the changes made to support IRQ safe PM
-domains.
+On 14 October 2016 at 11:28, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Wed, Oct 12, 2016 at 12:23:44PM +0100, Ard Biesheuvel wrote:
+>> Extend the basic support for kernel mappings using contiguous regions
+>> by adding support for contiguous PUDs (4k granule only), either as a
+>> discrete level or folded into the PGDs. In the same way, handle folded
+>> PMDs so that contiguous PMDs (for 16k and 64k granule kernels) will
+>> work as expected for 2 levels of translation as well.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/pgtable-hwdef.h |  6 +++
+>>  arch/arm64/mm/mmu.c                    | 40 +++++++++++++++++++-
+>>  2 files changed, 44 insertions(+), 2 deletions(-)
+>
+> After looking at this patch, I concluded it's not worth hassle as no
+> hardware I'm aware of currently would benefit from it.  We can revisit
+> it in the future if we hear otherwise.
+>
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- Documentation/power/devices.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-index 8ba6625..0401b53 100644
---- a/Documentation/power/devices.txt
-+++ b/Documentation/power/devices.txt
-@@ -607,7 +607,14 @@ individually.  Instead, a set of devices sharing a power resource can be put
- into a low-power state together at the same time by turning off the shared
- power resource.  Of course, they also need to be put into the full-power state
- together, by turning the shared power resource on.  A set of devices with this
--property is often referred to as a power domain.
-+property is often referred to as a power domain. A power domain may also be
-+nested inside another power domain.
-+
-+Devices and PM domains may be defined as IRQ-safe, if they can be powered
-+on/off even when the IRQs are disabled. An IRQ-safe device in a domain will
-+disallow power management on the domain, unless the domain is also defined as
-+IRQ-safe. The restriction this framework imposes on the parent domain of an
-+IRQ-safe domain is that it must also be defined as IRQ-safe.
- 
- Support for power domains is provided through the pm_domain field of struct
- device.  This field is a pointer to an object of type struct dev_pm_domain,
--- 
-2.7.4
+That is what I expected, which is why this is a separate patch. I will
+drop this patch and the next one from the next version of the series.
