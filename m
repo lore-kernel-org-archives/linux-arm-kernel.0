@@ -1,165 +1,78 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 14 Oct 2016 12:40:19 +0200
-Subject: [PATCH v4 2/2] crypto: marvell - Don't break chain for
- computable last ahash requests
-In-Reply-To: <20161005075633.12711-3-romain.perier@free-electrons.com>
-References: <20161005075633.12711-1-romain.perier@free-electrons.com>
- <20161005075633.12711-3-romain.perier@free-electrons.com>
-Message-ID: <20161014124019.2e9a685c@bbrezillon>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 14 Oct 2016 12:25:11 +0100
+Subject: [PATCH v14 04/16] iommu/dma: MSI doorbell alloc/free
+In-Reply-To: <1476278544-3397-5-git-send-email-eric.auger@redhat.com> (Eric
+ Auger's message of "Wed, 12 Oct 2016 13:22:12 +0000")
+References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
+ <1476278544-3397-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <87lgxrqijs.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  5 Oct 2016 09:56:33 +0200
-Romain Perier <romain.perier@free-electrons.com> wrote:
+Hi Eric,
 
-> Currently, the driver breaks chain for all kind of hash requests in order to
-> don't override intermediate states of partial ahash updates. However, some final
-> ahash requests can be directly processed by the engine, and so without
-> intermediate state. This is typically the case for most for the HMAC requests
-> processed via IPSec.
-> 
-> This commits adds a TDMA descriptor to copy context for these of requests
-> into the "op" dma pool, then it allow to chain these requests at the DMA level.
-> The 'complete' operation is also updated to retrieve the MAC digest from the
-> right location.
-> 
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+One query and a comment below.
 
-Minor comments below, otherwise it looks good.
+Eric Auger <eric.auger@redhat.com> writes:
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
+> We introduce the capability to (un)register MSI doorbells.
+>
+> A doorbell region is characterized by its physical address base, size,
+> and whether it its safe (ie. it implements IRQ remapping). A doorbell
+> can be per-cpu or global. We currently only care about global doorbells.
+>
+> A function returns whether all registered doorbells are safe.
+>
+> MSI controllers likely to work along with IOMMU that translate MSI
+> transaction must register their doorbells to allow device assignment
+> with MSI support.  Otherwise the MSI transactions will cause IOMMU faults.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>
 > ---
-> 
-> Changes in v4:
->  - Remove the dummy descriptor at the end of the chain, when a TDMA_RESULT
->    is present. So, we re-wrote a bit the code of ahash_complete accordingly.
-> 
-> Changes in v3:
->  - Copy the whole context back to RAM and not just the digest. Also
->    fixed a rebase issue ^^ (whoops)
-> 
-> Changes in v2:
->  - Replaced BUG_ON by an error
->  - Add a variable "break_chain", with "type" to break the chain
-> 
->  drivers/crypto/marvell/hash.c | 65 ++++++++++++++++++++++++++++++++-----------
->  1 file changed, 49 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/crypto/marvell/hash.c b/drivers/crypto/marvell/hash.c
-> index 9f28468..2a92605 100644
-> --- a/drivers/crypto/marvell/hash.c
-> +++ b/drivers/crypto/marvell/hash.c
-> @@ -312,24 +312,40 @@ static void mv_cesa_ahash_complete(struct crypto_async_request *req)
->  	int i;
+>
+> v13 -> v14:
+> - previously in msi-doorbell.h/c
+> ---
+>  drivers/iommu/dma-iommu.c | 75 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/dma-iommu.h | 41 ++++++++++++++++++++++++++
+>  2 files changed, 116 insertions(+)
+>
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index d45f9a0..d8a7d86 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -43,6 +43,38 @@ struct iommu_dma_cookie {
+>  	spinlock_t		msi_lock;
+>  };
 >  
->  	digsize = crypto_ahash_digestsize(crypto_ahash_reqtfm(ahashreq));
-> -	for (i = 0; i < digsize / 4; i++)
-> -		creq->state[i] = readl_relaxed(engine->regs + CESA_IVDIG(i));
->  
-> -	if (creq->last_req) {
-> +	if (mv_cesa_req_get_type(&creq->base) == CESA_DMA_REQ &&
-> +	    (creq->base.chain.last->flags & CESA_TDMA_TYPE_MSK) == CESA_TDMA_RESULT) {
+> +/**
+> + * struct iommu_msi_doorbell_info - MSI doorbell region descriptor
+> + * @percpu_doorbells: per cpu doorbell base address
+> + * @global_doorbell: base address of the doorbell
+> + * @doorbell_is_percpu: is the doorbell per cpu or global?
+> + * @safe: true if irq remapping is implemented
+> + * @size: size of the doorbell
+> + */
+> +struct iommu_msi_doorbell_info {
+> +	union {
+> +		phys_addr_t __percpu    *percpu_doorbells;
 
-Maybe it's time to create an helper to extract the TDMA desc type (as
-you did for the CESA req type with mv_cesa_req_get_type()).
+Out of curiosity, have you come across systems that have per-cpu
+doorbells? I couldn't find a system that'd help solidify my
+understanding on it's usage.
 
-> +		__le32 *data = NULL;
-> +
->  		/*
-> -		 * Hardware's MD5 digest is in little endian format, but
-> -		 * SHA in big endian format
-> +		 * Result is already in the correct endianess when the SA is
-> +		 * used
->  		 */
-> -		if (creq->algo_le) {
-> -			__le32 *result = (void *)ahashreq->result;
-> +		data = creq->base.chain.last->op->ctx.hash.hash;
-> +		for (i = 0; i < digsize / 4; i++)
-> +			creq->state[i] = cpu_to_le32(data[i]);
->  
-> -			for (i = 0; i < digsize / 4; i++)
-> -				result[i] = cpu_to_le32(creq->state[i]);
-> -		} else {
-> -			__be32 *result = (void *)ahashreq->result;
-> +		memcpy(ahashreq->result, data, digsize);
-> +	} else {
-> +		for (i = 0; i < digsize / 4; i++)
-> +			creq->state[i] = readl_relaxed(engine->regs +
-> +						       CESA_IVDIG(i));
-> +		if (creq->last_req) {
-> +			/*
-> +			* Hardware's MD5 digest is in little endian format, but
-> +			* SHA in big endian format
-> +			*/
-> +			if (creq->algo_le) {
-> +				__le32 *result = (void *)ahashreq->result;
-> +
-> +				for (i = 0; i < digsize / 4; i++)
-> +					result[i] = cpu_to_le32(creq->state[i]);
-> +			} else {
-> +				__be32 *result = (void *)ahashreq->result;
->  
-> -			for (i = 0; i < digsize / 4; i++)
-> -				result[i] = cpu_to_be32(creq->state[i]);
-> +				for (i = 0; i < digsize / 4; i++)
-> +					result[i] = cpu_to_be32(creq->state[i]);
-> +			}
->  		}
->  	}
->  
-> @@ -504,6 +520,12 @@ mv_cesa_ahash_dma_last_req(struct mv_cesa_tdma_chain *chain,
->  						CESA_SA_DESC_CFG_LAST_FRAG,
->  				      CESA_SA_DESC_CFG_FRAG_MSK);
->  
-> +		ret = mv_cesa_dma_add_result_op(chain,
-> +						CESA_SA_CFG_SRAM_OFFSET,
-> +						CESA_SA_DATA_SRAM_OFFSET,
-> +						CESA_TDMA_SRC_IN_SRAM, flags);
-> +		if (ret)
-> +			return ERR_PTR(-ENOMEM);
->  		return op;
->  	}
->  
-> @@ -564,6 +586,7 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
->  	struct mv_cesa_op_ctx *op = NULL;
->  	unsigned int frag_len;
->  	int ret;
-> +	u32 type;
->  
->  	basereq->chain.first = NULL;
->  	basereq->chain.last = NULL;
-> @@ -635,7 +658,15 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
->  		goto err_free_tdma;
->  	}
->  
-> -	if (op) {
-> +	/*
-> +	 * If results are copied via DMA, this means that this
-> +	 * request can be directly processed by the engine,
-> +	 * without partial updates. So we can chain it at the
-> +	 * DMA level with other requests.
-> +	 */
+> +		phys_addr_t             global_doorbell;
+> +	};
+> +	bool    doorbell_is_percpu;
+> +	bool    safe;
 
-Can you move this comment where it really belongs: when you
-conditionally set the CESA_TDMA_BREAK_CHAIN flag.
+Although you've got the comment above, 'safe' doesn't quite convey it's
+purpose. Can this be renamed to something more descriptive -
+'intr_remapping' or 'intr_isolation' perhaps?
 
-> +	type = basereq->chain.last->flags & CESA_TDMA_TYPE_MSK;
-> +
-> +	if (op && type != CESA_TDMA_RESULT) {
->  		/* Add dummy desc to wait for crypto operation end */
->  		ret = mv_cesa_dma_add_dummy_end(&basereq->chain, flags);
->  		if (ret)
-> @@ -648,8 +679,10 @@ static int mv_cesa_ahash_dma_req_init(struct ahash_request *req)
->  	else
->  		creq->cache_ptr = 0;
->  
-> -	basereq->chain.last->flags |= (CESA_TDMA_END_OF_REQ |
-> -				       CESA_TDMA_BREAK_CHAIN);
-> +	basereq->chain.last->flags |= CESA_TDMA_END_OF_REQ;
-> +
-> +	if (type != CESA_TDMA_RESULT)
-> +		basereq->chain.last->flags |= CESA_TDMA_BREAK_CHAIN;
->  
->  	return 0;
->  
+Thanks,
+Punit
+
+
+[...]
