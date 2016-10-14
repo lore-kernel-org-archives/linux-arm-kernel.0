@@ -1,102 +1,30 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 14 Oct 2016 10:39:50 +0100
-Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <90d13241-d6b9-0b81-9f92-71df99b91b67@codeaurora.org> (Tyler
- Baicar's message of "Thu, 13 Oct 2016 08:03:55 -0600")
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
- <87shs1sb1b.fsf@e105922-lin.cambridge.arm.com>
- <90d13241-d6b9-0b81-9f92-71df99b91b67@codeaurora.org>
-Message-ID: <874m4fs1zt.fsf@e105922-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Oct 2016 11:28:54 +0100
+Subject: [PATCH v3 4/5] arm64: mm: support additional contiguous kernel
+ mapping region sizes
+In-Reply-To: <1476271425-19401-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476271425-19401-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161014102853.GA23339@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Baicar, Tyler" <tbaicar@codeaurora.org> writes:
+On Wed, Oct 12, 2016 at 12:23:44PM +0100, Ard Biesheuvel wrote:
+> Extend the basic support for kernel mappings using contiguous regions
+> by adding support for contiguous PUDs (4k granule only), either as a
+> discrete level or folded into the PGDs. In the same way, handle folded
+> PMDs so that contiguous PMDs (for 16k and 64k granule kernels) will
+> work as expected for 2 levels of translation as well.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h |  6 +++
+>  arch/arm64/mm/mmu.c                    | 40 +++++++++++++++++++-
+>  2 files changed, 44 insertions(+), 2 deletions(-)
 
-> Hello Punit,
->
->
-> On 10/12/2016 12:00 PM, Punit Agrawal wrote:
->> Tyler Baicar <tbaicar@codeaurora.org> writes:
->>
->>> ARM APEI extension proposal added SEA (Synchrounous External
->>> Abort) notification type for ARMv8.
->>> Add a new GHES error source handling function for SEA. If an error
->>> source's notification type is SEA, then this function can be registered
->>> into the SEA exception handler. That way GHES will parse and report
->>> SEA exceptions when they occur.
->>>
->>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->> This patch fails to apply for me on v4.8. Is there a different tree this
->> is based on?
-> This patch was giving me some grief as well. I'm not sure why that is
-> because this patchset was based on the 4.8 kernel with the dependent
-> patch for initial APEI support.
+After looking at this patch, I concluded it's not worth hassle as no
+hardware I'm aware of currently would benefit from it.  We can revisit
+it in the future if we hear otherwise.
 
-That explains it!. I've missed out the dependency called out in the
-cover letter.
-
-
->> One comment below.
->>
->> [...]
->>
->>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->>> index c8488f1..28d5a09 100644
->>> --- a/drivers/acpi/apei/ghes.c
->>> +++ b/drivers/acpi/apei/ghes.c
->>> @@ -50,6 +50,10 @@
->>>   #include <acpi/apei.h>
->>>   #include <asm/tlbflush.h>
->>>   +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->>> +#include <asm/system_misc.h>
->>> +#endif
->>> +
->>>   #include "apei-internal.h"
->>>     #define GHES_PFX	"GHES: "
->>> @@ -779,6 +783,62 @@ static struct notifier_block ghes_notifier_sci = {
->>>   	.notifier_call = ghes_notify_sci,
->>>   };
->>>   +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->>> +static LIST_HEAD(ghes_sea);
->>> +
->>> +static int ghes_notify_sea(struct notifier_block *this,
->>> +				  unsigned long event, void *data)
->>> +{
->>> +	struct ghes *ghes;
->>> +	int ret = NOTIFY_DONE;
->>> +
->>> +	rcu_read_lock();
->>> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
->>> +		if (!ghes_proc(ghes))
->>> +			ret = NOTIFY_OK;
->> Not something you've introduced but it looks like ghes_proc erroneously
->> never returns anything other than 0. I plan to post the below fix to
->> address it.
->>
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 60746ef..caea575 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -662,7 +662,7 @@ static int ghes_proc(struct ghes *ghes)
->>          ghes_do_proc(ghes, ghes->estatus);
->>   out:
->>          ghes_clear_estatus(ghes);
->> -   return 0;
->> + return rc;
->>   }
-> Yes, this definitely should be fixed :)
->
-> Thanks,
-> Tyler
->>> +	}
->>> +	rcu_read_unlock();
->>> +
->>> +	return ret;
->>> +}
->>> +
->> [...]
->>
+-- 
+Catalin
