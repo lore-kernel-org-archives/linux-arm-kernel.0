@@ -1,107 +1,102 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Thu, 13 Oct 2016 17:34:08 -0600
-Subject: [PATCH V3 06/10] acpi: apei: panic OS with fatal error status
- block
-In-Reply-To: <bf911628-71be-0dca-f1c7-c12e681bd37f@arm.com>
-References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
- <1475875882-2604-7-git-send-email-tbaicar@codeaurora.org>
- <bf911628-71be-0dca-f1c7-c12e681bd37f@arm.com>
-Message-ID: <18205aac-02ae-bd45-2d2d-aa01cf845ae7@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 14 Oct 2016 01:24:12 +0100
+Subject: [RFC] arm64: Enforce observed order for spinlock and data
+In-Reply-To: <f35bbb7a559933abfc559548e860d641@codeaurora.org>
+References: <b86926dc0203384522e0e6ce18bbb132@codeaurora.org>
+ <20161004101208.GA18083@leverpostej>
+ <884bd5d3a9a1bcf2a276130ffc17412a@codeaurora.org>
+ <20161004191159.GA32596@leverpostej>
+ <54b18de220f61747bf1c3cdf2a1b9447@codeaurora.org>
+ <20161005151057.GJ3142@twins.programming.kicks-ass.net>
+ <a0aa2dba916aafb188f8b1b11aca1599@codeaurora.org>
+ <781b6bb229ed566e1b948bfcea18bb61@codeaurora.org>
+ <20161013110256.GA436@arm.com>
+ <f35bbb7a559933abfc559548e860d641@codeaurora.org>
+Message-ID: <20161014002412.GC24167@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Suzuki,
+On Thu, Oct 13, 2016 at 04:00:47PM -0400, bdegraaf at codeaurora.org wrote:
+> On 2016-10-13 07:02, Will Deacon wrote:
+> >Brent,
+> >
+> >On Wed, Oct 12, 2016 at 04:01:06PM -0400, bdegraaf at codeaurora.org wrote:
+> >
+> >Everything from this point down needs clarification.
+> >
+> >>All arm64 lockref accesses that occur without taking the spinlock must
+> >>behave like true atomics, ensuring successive operations are all done
+> >>sequentially.
+> >
+> >What is a "true atomic"? What do you mean by "successive"? What do you
+> >mean by "done sequentially"?
+> 
+> Despite the use case in dentry, lockref itself is a generic locking API, and
+> any problems I describe here are with the generic API itself, not necessarily
+> the dentry use case.  I'm not patching dentry--I'm fixing lockref.
 
-On 10/13/2016 7:00 AM, Suzuki K Poulose wrote:
-> On 07/10/16 22:31, Tyler Baicar wrote:
->> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
->>
->> Even if an error status block's severity is fatal, the kernel does not
->> honor the severity level and panic.
->>
->> With the firmware first model, the platform could inform the OS about a
->> fatal hardware error through the non-NMI GHES notification type. The OS
->> should panic when a hardware error record is received with this
->> severity.
->>
->> Call panic() after CPER data in error status block is printed if
->> severity is fatal, before each error section is handled.
->>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> ---
->>  drivers/acpi/apei/ghes.c | 10 ++++++++--
->>  1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index 28d5a09..36894c8 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -141,6 +141,8 @@ static unsigned long ghes_estatus_pool_size_request;
->>  static struct ghes_estatus_cache 
->> *ghes_estatus_caches[GHES_ESTATUS_CACHES_SIZE];
->>  static atomic_t ghes_estatus_cache_alloced;
->>
->> +static int ghes_panic_timeout __read_mostly = 30;
->> +
->>  static int ghes_ioremap_init(void)
->>  {
->>      ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
->> @@ -715,6 +717,12 @@ static int ghes_proc(struct ghes *ghes)
->>          if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
->>              ghes_estatus_cache_add(ghes->generic, ghes->estatus);
->>      }
->> +    if (ghes_severity(ghes->estatus->error_severity) >= 
->> GHES_SEV_PANIC) {
->> +        if (panic_timeout == 0)
->> +            panic_timeout = ghes_panic_timeout;
->> +        panic("Fatal hardware error!");
->
-> I think there is a chance that we might miss the o/p of 
-> ghes_print_estatus() as we use
-> no pfx, and it could default to the normal loglevel and would never 
-> get printed
-> if panic() is encountered before it. On the other hand, there is 
-> already a
-> __ghes_panic() which does similar stuff. Is there a way we could reuse
-> (may be even parts of) it ? Or at least use KERN_EMERG for the 
-> ghes_print_estatus(),
-> if the severity could result in panic() ?
-__ghes_panic() does additional handling which we do not want to do here. 
-I could make the following a helper function so it is not duplicated though:
+Having spent the best part of a week looking at this myself, my view is that if
+there is any problem it's simply that the semantics of lockref are unclear; we
+can fix that by clarifying the imprecise wording in the lockref documentation
+(i.e. the comment block in <linux/lockref.h>).
 
-if (panic_timeout == 0)
-     panic_timeout = ghes_panic_timeout;
-panic("Fatal hardware error!");
+As far as I can tell, the only fundamental requirement is that an agent holding
+the lock won't see the count change under its feet. Ordering requirements for
+agents performing updates without holding the lock were never strictly defined,
+and the de-facto ordering requirements of existing users (e.g. none in the case
+of the dentry cache) appear to be met.
 
-The pfx is actually being calculated already in __ghes_print_estatus():
+[...]
 
-         if (pfx == NULL) {
-                 if (ghes_severity(estatus->error_severity) <=
-                     GHES_SEV_CORRECTED)
-                         pfx = KERN_WARNING;
-                 else
-                         pfx = KERN_ERR;
-         }
+> At the time lockref was introduced, The Linux Foundation gave a presentation
+> at LinuxCon 2014 that can be found at the following link:
+> 
+> https://events.linuxfoundation.org/sites/events/files/slides/linuxcon-2014-locking-final.pdf
+> 
+> On page 46, it outlines the lockref API. The first lines of the slide give
+> the
+> relevant details.
+> 
+> Lockref
+> ? *Generic* mechanism to *atomically* update a reference count that is
+>   protected by a spinlock without actually acquiring the spinlock itself.
 
- From ghes.h:
+... which is exactly what lockref does today. The count is updated atomically
+(i.e. there are no intervening stores between the load and store to the count)
+it's just that this atomic update has no enforced ordering against other memory
+accesses.
 
-enum {
-         GHES_SEV_NO = 0x0,
-         GHES_SEV_CORRECTED = 0x1,
-         GHES_SEV_RECOVERABLE = 0x2,
-         GHES_SEV_PANIC = 0x3,
-};
+This is a generically useful primitive, as-is.
 
-This will make the pfx KERN_ERR for the case of a panic.
+> >Again, why is this a problem? It's exactly the same as if you did:
+> >
+> >	spin_lock(lock);
+> >	inc_ref_cnt();
+> >	spin_unlock(lock);
+> >
+> >Accesses outside of the critical section can still be reordered. Big deal.
+> 
+> Since the current code resembles but actually has *fewer* ordering effects
+> compared to the example used by your atomic.h commit, even though A->B->C is
+> in program order, it could access out of order according to your own commit
+> text on commit 8e86f0b409a44193f1587e87b69c5dcf8f65be67.
+
+This case is not comparable. The atomic_* API has a documented requirement that
+the atomic operations in question operate as full barriers, as is called out in
+the commit message. Lockref has no such documented requirement.
+
+[...]
+
+> Again, this is a generic API, not an API married to dentry. If it were for
+> dentry's sole use, it should not be accessible outside of the dentry code.
+> While the cmpxchg64_relaxed case may be OK for dentry, it is not OK for the
+> generic case.
+
+Again, you are assuming a specific set of semantics that lockref is not
+documented as having (and which contemporary code does not require). 
+
+If you have a use-case for which you want stronger semantics, that is a
+different story entirely.
 
 Thanks,
-Tyler
->
-> Cheers
-> Suzuki
->
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Mark.
