@@ -1,29 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 14 Oct 2016 16:18:06 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: temporarily remove emmc hs200
- speed from rk3288-veyron-speedy.
-In-Reply-To: <87twd1vzc5.fsf@aikidev.net>
-References: <87twd1vzc5.fsf@aikidev.net>
-Message-ID: <1556360.cZVpdmzNha@phil>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 14 Oct 2016 11:34:59 -0300
+Subject: [PATCH 0/3] thermal: Fix module autoload for drivers
+Message-ID: <1476455702-21748-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 27. September 2016, 13:53:46 CEST schrieb Vagrant Cascadian:
-> This essentially mimics what was done with rk3288-veyron-minnie in
-> commit 984926781122f034d5bc9962815d135b6c4a8e1d.
-> 
-> The eMMC of the speedy Chromebook also appears to need the same tuning
-> workaround, as it frequently fails to recognize the eMMC without it.
-> 
-> Signed-off-by: Vagrant Cascadian <vagrantc@aikidev.net>
+Hello,
 
-applied as fix for 4.9.
+This small series contains trivial fixes to allow modules to be autoloaded
+when its correspoinding thermal device is registered.
 
-Your mail client mangled that patch a lot (tabs etc), so it didn't apply 
-cleanly. As it is a quite small one, I fixed that up myself, but please try to 
-make your mail client send correct patches in the future or use git send-email 
-:-)
+Best regards,
+Javier
 
 
-Thanks
-Heiko
+Javier Martinez Canillas (3):
+  thermal: max77620: Fix module autoload
+  thermal: tango: Fix module autoload
+  thermal: db8500: Fix module autoload
+
+ drivers/thermal/db8500_thermal.c   | 1 +
+ drivers/thermal/max77620_thermal.c | 1 +
+ drivers/thermal/tango_thermal.c    | 1 +
+ 3 files changed, 3 insertions(+)
+
+-- 
+2.7.4
