@@ -1,24 +1,21 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 14 Oct 2016 10:33:43 -0300
-Subject: [PATCH v3 1/2] clk: imx: fix integer overflow in AV PLL round rate
-In-Reply-To: <4d2e3a91dfb74209735c940b51d7efc9ba2ed69b.1476267249.git.emil@limesaudio.com>
+Date: Fri, 14 Oct 2016 10:34:23 -0300
+Subject: [PATCH v3 2/2] clk: imx: improve precision of AV PLL to 1 Hz
+In-Reply-To: <66f5967187f915fe7039f4dbfb77db88a2423094.1476267249.git.emil@limesaudio.com>
 References: <cover.1476267249.git.emil@limesaudio.com>
- <4d2e3a91dfb74209735c940b51d7efc9ba2ed69b.1476267249.git.emil@limesaudio.com>
-Message-ID: <CAOMZO5BdtKb7fOceRz0yiDyBedV_7p+e7f9FoNJY2CsvSv+oBQ@mail.gmail.com>
+ <66f5967187f915fe7039f4dbfb77db88a2423094.1476267249.git.emil@limesaudio.com>
+Message-ID: <CAOMZO5DuT4QAOLc9mv4HkpTZN1v_TguDDDcZwy0pR2FTwH4BPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Oct 12, 2016 at 7:31 AM, Emil Lundmark <emil@limesaudio.com> wrote:
-> Since 'parent_rate * mfn' may overflow 32 bits, the result should be
-> stored using 64 bits.
+> The audio and video PLLs are designed to have a precision of 1 Hz if some
+> conditions are met. The current implementation only allows a precision that
+> depends on the rate of the parent clock. E.g., if the parent clock is 24
+> MHz, the precision will be 24 Hz; or more generally the precision will be
+...
+> I reckon this is the intention by the design of the clock rate formula.
 >
-> The problem was discovered when trying to set the rate of the audio PLL
-> (pll4_post_div) on an i.MX6Q. The desired rate was 196.608 MHz, but
-> the actual rate returned was 192.000570 MHz. The round rate function should
-> have been able to return 196.608 MHz, i.e., the desired rate.
->
-> Fixes: ba7f4f557eb6 ("clk: imx: correct AV PLL rate formula")
-> Cc: Anson Huang <b20788@freescale.com>
 > Signed-off-by: Emil Lundmark <emil@limesaudio.com>
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
