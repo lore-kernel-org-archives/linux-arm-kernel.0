@@ -1,30 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Oct 2016 11:28:54 +0100
-Subject: [PATCH v3 4/5] arm64: mm: support additional contiguous kernel
- mapping region sizes
-In-Reply-To: <1476271425-19401-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476271425-19401-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476271425-19401-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161014102853.GA23339@e104818-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 14 Oct 2016 11:33:44 +0100
+Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
+In-Reply-To: <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk>
+References: <E1btqa6-0001tx-HV@optimist>
+ <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk>
+Message-ID: <20161014103344.GB3304@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 12:23:44PM +0100, Ard Biesheuvel wrote:
-> Extend the basic support for kernel mappings using contiguous regions
-> by adding support for contiguous PUDs (4k granule only), either as a
-> discrete level or folded into the PGDs. In the same way, handle folded
-> PMDs so that contiguous PMDs (for 16k and 64k granule kernels) will
-> work as expected for 2 levels of translation as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/pgtable-hwdef.h |  6 +++
->  arch/arm64/mm/mmu.c                    | 40 +++++++++++++++++++-
->  2 files changed, 44 insertions(+), 2 deletions(-)
+On Tue, 11 Oct 2016, Mark Brown wrote:
 
-After looking at this patch, I concluded it's not worth hassle as no
-hardware I'm aware of currently would benefit from it.  We can revisit
-it in the future if we hear otherwise.
+> On Tue, Oct 11, 2016 at 07:30:35AM +0100, Build bot for Mark Brown wrote:
+> 
+> Linus' tree is currently failing to build arm and arm64 allmodconfigs
+> with:
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> 
+> > 	arm-allmodconfig
+> > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
+> 
+> due to 6556bdacf646fc (mfd: tps65217: Add support for IRQs) since
+> irq_set_parent() isn't exported.  This has been present in -next
+> for getting on for a month, a patch was proposed adding the relevant
+> export but that isn't present in -next yet.
+> 
+> The function is being used in order to enable lazy IRQ disabling for
+> threaded interrupts:
+> 
+> 	https://www.spinics.net/lists/arm-kernel/msg532864.html
+> 
+> What's the plan for getting this fixed in Linus' tree?
+
+Here's the conversation:
+
+  https://www.spinics.net/lists/arm-kernel/msg531850.html
+
+I'm waiting on a firm answer from Arnd and Thomas before applying
+anything.
 
 -- 
-Catalin
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
