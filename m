@@ -1,34 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 14 Oct 2016 19:26:37 +0100
-Subject: [PATCH] arm64: kaslr: fix breakage with CONFIG_MODVERSIONS=y
-In-Reply-To: <CAKv+Gu-sdgkoQvbpgHXZmDyxg6NTGJpC+hsqzdbwTkny+TeqfA@mail.gmail.com>
-References: <1476376929-29688-1-git-send-email-ard.biesheuvel@linaro.org>
- <57FFE78E.4040002@codeaurora.org>
- <CAKv+Gu-sdgkoQvbpgHXZmDyxg6NTGJpC+hsqzdbwTkny+TeqfA@mail.gmail.com>
-Message-ID: <20161014182637.GF6534@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 14 Oct 2016 15:44:05 -0300
+Subject: [PATCH] clk: samsung: clk-exynos-audss: Fix module autoload
+Message-ID: <1476470645-22159-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 07:23:15PM +0100, Ard Biesheuvel wrote:
-> On 13 October 2016 at 20:59, Timur Tabi <timur@codeaurora.org> wrote:
-> > Ard Biesheuvel wrote:
-> >>
-> >> As it turns out, the KASLR code breaks CONFIG_MODVERSIONS, since the
-> >> kcrctab has an absolute address field that is relocated at runtime
-> >> when the kernel offset is randomized.
-> >>
-> >> This has been fixed already for PowerPC in the past, so simply wire up
-> >> the existing code dealing with this issue.
-> >>
-> >> Signed-off-by: Ard Biesheuvel<ard.biesheuvel@linaro.org>
-> >
-> >
-> > Tested-by: Timur Tabi <timur@codeaurora.org>
-> >
-> 
-> Thanks. I will resend this with a fixes: tag and a better description
+If the driver is built as a module, autoload won't work because the module
+alias information is not filled. So user-space can't match the registered
+device with the corresponding module.
 
-Feel free, but I already queued it locally and added the Fixes tag myself.
-I'm just waiting for Lorenzo to post a fix to the ACPI NUMA stuff, then
-I'll send these two up together next week.
-Will
+Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+
+Before this patch:
+
+$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
+alias:          platform:exynos-audss-clk
+
+After this patch:
+
+$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
+alias:          platform:exynos-audss-clk
+alias:          of:N*T*Csamsung,exynos5420-audss-clockC*
+alias:          of:N*T*Csamsung,exynos5420-audss-clock
+alias:          of:N*T*Csamsung,exynos5410-audss-clockC*
+alias:          of:N*T*Csamsung,exynos5410-audss-clock
+alias:          of:N*T*Csamsung,exynos5250-audss-clockC*
+alias:          of:N*T*Csamsung,exynos5250-audss-clock
+alias:          of:N*T*Csamsung,exynos4210-audss-clockC*
+alias:          of:N*T*Csamsung,exynos4210-audss-clock
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+
+ drivers/clk/samsung/clk-exynos-audss.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 51d152f735cc..17e68a724945 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -106,6 +106,7 @@ static const struct of_device_id exynos_audss_clk_of_match[] = {
+ 	},
+ 	{ },
+ };
++MODULE_DEVICE_TABLE(of, exynos_audss_clk_of_match);
+ 
+ static void exynos_audss_clk_teardown(void)
+ {
+-- 
+2.7.4
