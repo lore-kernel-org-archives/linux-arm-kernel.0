@@ -1,108 +1,168 @@
-From: jteki@openedev.com (Jagan Teki)
-Date: Fri, 14 Oct 2016 14:57:23 +0530
-Subject: [PATCH v7 5/5] ARM: dts: imx6qdl-icore: Add FEC support
-In-Reply-To: <1476437243-13297-1-git-send-email-jteki@openedev.com>
-References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
-Message-ID: <1476437243-13297-6-git-send-email-jteki@openedev.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 14 Oct 2016 10:38:16 +0100
+Subject: [PATCH V3 10/10] arm64: KVM: add guest SEA support
+In-Reply-To: <afa9a3c6-7516-cf5c-2366-f826f914d582@codeaurora.org> (Tyler
+ Baicar's message of "Thu, 13 Oct 2016 14:14:27 -0600")
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-11-git-send-email-tbaicar@codeaurora.org>
+ <87h98gs853.fsf@e105922-lin.cambridge.arm.com>
+ <afa9a3c6-7516-cf5c-2366-f826f914d582@codeaurora.org>
+Message-ID: <878ttrs22f.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+"Baicar, Tyler" <tbaicar@codeaurora.org> writes:
 
-Add FEC support for Engicam i.CoreM6 dql modules.
+> Hello Punit,
+>
+> On 10/13/2016 7:14 AM, Punit Agrawal wrote:
+>> Hi Tyler,
+>>
+>> I know I've had my last comment already ;), but I thought I'd rather
+>> raise the question than stay confused...
+>>
+>> Tyler Baicar <tbaicar@codeaurora.org> writes:
+>>
+>>> Currently external aborts are unsupported by the guest abort
+>>> handling. Add handling for SEAs so that the host kernel reports
+>>> SEAs which occur in the guest kernel.
+>>>
+>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>> ---
+>>>   arch/arm/include/asm/kvm_arm.h       |  1 +
+>>>   arch/arm/include/asm/system_misc.h   |  5 +++++
+>>>   arch/arm/kvm/mmu.c                   | 15 +++++++++++++--
+>>>   arch/arm64/include/asm/kvm_arm.h     |  1 +
+>>>   arch/arm64/include/asm/system_misc.h |  2 ++
+>>>   arch/arm64/mm/fault.c                | 13 +++++++++++++
+>>>   6 files changed, 35 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>>> index e22089f..33a77509 100644
+>>> --- a/arch/arm/include/asm/kvm_arm.h
+>>> +++ b/arch/arm/include/asm/kvm_arm.h
+>>> @@ -187,6 +187,7 @@
+>>>   #define FSC_FAULT	(0x04)
+>>>   #define FSC_ACCESS	(0x08)
+>>>   #define FSC_PERM	(0x0c)
+>>> +#define FSC_EXTABT	(0x10)
+>>>     /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>>   #define HPFAR_MASK	(~0xf)
+>>> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+>>> index a3d61ad..86e1faa 100644
+>>> --- a/arch/arm/include/asm/system_misc.h
+>>> +++ b/arch/arm/include/asm/system_misc.h
+>>> @@ -24,4 +24,9 @@ extern unsigned int user_debug;
+>>>     #endif /* !__ASSEMBLY__ */
+>>>   +inline int handle_guest_sea(unsigned long addr, unsigned int
+>>> esr)
+>>> +{
+>>> +	return -1;
+>>> +}
+>>> +
+>>>   #endif /* __ASM_ARM_SYSTEM_MISC_H */
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index e9a5c0e..24cde84 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -29,6 +29,7 @@
+>>>   #include <asm/kvm_asm.h>
+>>>   #include <asm/kvm_emulate.h>
+>>>   #include <asm/virt.h>
+>>> +#include <asm/system_misc.h>
+>>>     #include "trace.h"
+>>>   @@ -1441,8 +1442,18 @@ int kvm_handle_guest_abort(struct kvm_vcpu
+>>> *vcpu, struct kvm_run *run)
+>>>     	/* Check the stage-2 fault is trans. fault or write fault */
+>>>   	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>>> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>>> -	    fault_status != FSC_ACCESS) {
+>>> +
+>>> +	if (fault_status == FSC_EXTABT) {
+>>> +		if(handle_guest_sea((unsigned long)fault_ipa,
+>>> +				    kvm_vcpu_get_hsr(vcpu))) {
+>>> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>> +				kvm_vcpu_trap_get_class(vcpu),
+>>> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>>> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+>>> +			return -EFAULT;
+>>> +		}
+>>> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>>> +		   fault_status != FSC_ACCESS) {
+>>>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>>   			kvm_vcpu_trap_get_class(vcpu),
+>>>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>>> index 4b5c977..be0efb6 100644
+>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>> @@ -201,6 +201,7 @@
+>>>   #define FSC_FAULT	ESR_ELx_FSC_FAULT
+>>>   #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>>>   #define FSC_PERM	ESR_ELx_FSC_PERM
+>>> +#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
+>>>     /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>>>   #define HPFAR_MASK	(~UL(0xf))
+>>> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+>>> index 90daf4a..8522fff 100644
+>>> --- a/arch/arm64/include/asm/system_misc.h
+>>> +++ b/arch/arm64/include/asm/system_misc.h
+>>> @@ -77,4 +77,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>>>   int sea_register_handler_chain(struct notifier_block *nb);
+>>>   void sea_unregister_handler_chain(struct notifier_block *nb);
+>>>   +int handle_guest_sea(unsigned long addr, unsigned int esr);
+>>> +
+>>>   #endif	/* __ASM_SYSTEM_MISC_H */
+>>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>>> index 81cb7ad..d714432 100644
+>>> --- a/arch/arm64/mm/fault.c
+>>> +++ b/arch/arm64/mm/fault.c
+>>> @@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
+>>>   }
+>>>     /*
+>>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>>> + */
+>>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>>> +{
+>>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>>> +
+>>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>> +		fault_name(esr), esr, addr);
+>>> +
+>>> +	return 0;
+>>> +}
+>> Don't we need to pass the abort to the guest?
+> This requires some infrastructure to implement virtual "ACPI platform
+> error interface" to expose the details of the abort to the guest. This
+> patchset does not cover that and focuses on feature parity with other
+> architectures that support APEI. There are discussions among Linaro
+> partners about how this can be achieved in the long term, but that
+> work is outside the scope of this patchset. This patch will ensure
+> that if a guest encounters one of these errors then it will be
+> reported before getting killed. Before this patch we would just get an
+> unsupported FSC print out and then the guest would be killed.
 
-Observed similar 'eth0: link is not ready' issue which was
-discussed in [1] due rmii mode with external ref_clk, so added
-clock node along with the properties mentioned by Shawn in [2]
+OK.
 
-FEC link log:
-------------
-$ ifconfig eth0 up
-[   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
-               [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-[   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+I think we might be talking about different things though.
 
-[1] https://patchwork.kernel.org/patch/3491061/
-[2] https://patchwork.kernel.org/patch/3490511/
+I am referring to the injection of the synchronous external abort into
+the guest - similar to what's been done for prefetch abort in the
+kvm_guest_handle_abort.
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v7:
-        - none
-Changes for v6:
-        - none
-Changes for v5:
-        - new patch
+Maybe there is no benefit in passing the abort to the guest. In that
+case, can you please add a comment where you handle external abort
+(FSC_EXTABT) in kvm_guest_handle_abort.
 
- arch/arm/boot/dts/imx6qdl-icore.dtsi | 37 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index 4e79858..972f48f 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -48,6 +48,18 @@
- 		reg = <0x10000000 0x80000000>;
- 	};
- 
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		rmii_clk: clock at 0 {
-+			compatible = "fixed-clock";
-+			reg = <0>;
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;  /* 25MHz for example */
-+		};
-+	};
-+
- 	reg_3p3v: regulator-3p3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "3P3V";
-@@ -93,6 +105,15 @@
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
- };
- 
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+	clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
-+	phy-mode = "rmii";
-+	status = "okay";
-+};
-+
- &gpmi {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_gpmi_nand>;
-@@ -150,6 +171,22 @@
- };
- 
- &iomuxc {
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_flexcan1: flexcan1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
--- 
-2.7.4
+>
+> Thanks,
+> Tyler
+>>
+>> Thanks,
+>> Punit
+>>
+>>> +
+>>> +/*
+>>>    * Dispatch a data abort to the relevant handler.
+>>>    */
+>>>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
