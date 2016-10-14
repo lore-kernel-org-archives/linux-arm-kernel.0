@@ -1,51 +1,35 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 14 Oct 2016 15:44:05 -0300
-Subject: [PATCH] clk: samsung: clk-exynos-audss: Fix module autoload
-Message-ID: <1476470645-22159-1-git-send-email-javier@osg.samsung.com>
+From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
+Date: Fri, 14 Oct 2016 20:55:06 +0200
+Subject: [PATCH v3 1/2] devicetree: Add vendor prefix for Rikomagic
+In-Reply-To: <7746988.aAT8rmUZDV@phil>
+References: <cover.1475957884.git.paweljarosz3691@gmail.com>
+ <d51c7719a314f723a0a69b932997502a2fe0e3ee.1475957884.git.paweljarosz3691@gmail.com>
+ <7746988.aAT8rmUZDV@phil>
+Message-ID: <ded14706-1b9d-1808-283c-bdf3f1b51abf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver is built as a module, autoload won't work because the module
-alias information is not filled. So user-space can't match the registered
-device with the corresponding module.
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
+>> 69caf14..3edfa08 100644
+>> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> @@ -224,6 +224,7 @@ realtek Realtek Semiconductor Corp.
+>>   renesas	Renesas Electronics Corporation
+>>   richtek	Richtek Technology Corporation
+>>   ricoh	Ricoh Co. Ltd.
+>> +rikomagic	Rikomagic
+> 				^ Rikomagic Tech Corp. Ltd
+>
+> (according to http://www.rikomagic.com/en/index.html)
+>
+> But I can change that myself. I'll just need to wait a bit more if Rob or Mark
+> want to Ack this vendor-prefix addition.
+>
+>
+> Heiko
 
-Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+Sorry for that.
 
-Before this patch:
 
-$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-alias:          platform:exynos-audss-clk
-
-After this patch:
-
-$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-alias:          platform:exynos-audss-clk
-alias:          of:N*T*Csamsung,exynos5420-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5420-audss-clock
-alias:          of:N*T*Csamsung,exynos5410-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5410-audss-clock
-alias:          of:N*T*Csamsung,exynos5250-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5250-audss-clock
-alias:          of:N*T*Csamsung,exynos4210-audss-clockC*
-alias:          of:N*T*Csamsung,exynos4210-audss-clock
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-
- drivers/clk/samsung/clk-exynos-audss.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 51d152f735cc..17e68a724945 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -106,6 +106,7 @@ static const struct of_device_id exynos_audss_clk_of_match[] = {
- 	},
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, exynos_audss_clk_of_match);
- 
- static void exynos_audss_clk_teardown(void)
- {
--- 
-2.7.4
+Pawe?
