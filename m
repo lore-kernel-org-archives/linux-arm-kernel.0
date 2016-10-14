@@ -1,50 +1,40 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 14 Oct 2016 17:27:30 +0200
-Subject: [PATCH 2/3] thermal: tango: Fix module autoload
-In-Reply-To: <1476455702-21748-3-git-send-email-javier@osg.samsung.com>
-References: <1476455702-21748-1-git-send-email-javier@osg.samsung.com>
- <1476455702-21748-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <5800F962.8040605@sigmadesigns.com>
+From: lersek@redhat.com (Laszlo Ersek)
+Date: Fri, 14 Oct 2016 17:27:58 +0200
+Subject: aarch64 ACPI boot regressed by commit 7ba5f605f3a0 ("arm64/numa:
+ remove the limitation that cpu0 must bind to node0")
+In-Reply-To: <d26ea7ca-6b65-b3a6-591e-ab892f1815e7@redhat.com>
+References: <4a64cd93-5ead-aad6-1057-f42224d65b43@redhat.com>
+ <20161014080524.4hm2b4p373r7rhel@hawk.localdomain>
+ <04f22a79-301b-f05b-033d-c7a24c9f4084@redhat.com>
+ <d26ea7ca-6b65-b3a6-591e-ab892f1815e7@redhat.com>
+Message-ID: <b8b58d52-691c-11f0-2d26-a51e03430771@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/10/2016 16:35, Javier Martinez Canillas wrote:
+On 10/14/16 17:01, Laszlo Ersek wrote:
 
-> If the driver is built as a module, autoload won't work because the module
-> alias information is not filled. So user-space can't match the registered
-> device with the corresponding module.
-> 
-> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
-> 
-> Before this patch:
-> 
-> $ modinfo drivers/thermal/tango_thermal.ko | grep alias
-> $
-> 
-> After this patch:
-> 
-> $ modinfo drivers/thermal/tango_thermal.ko | grep alias
-> alias:          of:N*T*Csigma,smp8758-thermalC*
-> alias:          of:N*T*Csigma,smp8758-thermal
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  drivers/thermal/tango_thermal.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/thermal/tango_thermal.c b/drivers/thermal/tango_thermal.c
-> index 201304aeafeb..4e67795cb6ce 100644
-> --- a/drivers/thermal/tango_thermal.c
-> +++ b/drivers/thermal/tango_thermal.c
-> @@ -107,6 +107,7 @@ static const struct of_device_id tango_sensor_ids[] = {
->  	},
->  	{ /* sentinel */ }
->  };
-> +MODULE_DEVICE_TABLE(of, tango_sensor_ids);
+> Maybe the code I
+> tried to analyze in this email was never *meant* to associate CPU#0 with
+> any NUMA node at all (not even node 0); instead, other code -- for
+> example code removed by 7ba5f605f3a0 -- was meant to perform that
+> association.
 
-Thanks for fixing it :-)
+Staring a bit more at the code, this looks very likely; in acpi_map_gic_cpu_interface() we have
 
-Acked-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> 	/* Check if GICC structure of boot CPU is available in the MADT */
+> 	if (cpu_logical_map(0) == hwid) {
+> 		if (bootcpu_valid) {
+> 			pr_err("duplicate boot CPU MPIDR: 0x%llx in MADT\n",
+> 			       hwid);
+> 			return;
+> 		}
+> 		bootcpu_valid = true;
+> 		return;
+> 	}
 
-Regards.
+which means that this callback function (for parsing the GICC structures in the MADT) expects to find the boot processor as well.
+
+Upon finding the boot processor, we set bootcpu_valid to true, and that's it -- no association with any NUMA node, and no incrementing of "cpu_count".
+
+Thanks
+Laszlo
