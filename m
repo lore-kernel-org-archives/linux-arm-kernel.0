@@ -1,57 +1,56 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 14 Oct 2016 18:30:30 +0530
-Subject: [PATCH 6/9] ARM: DRA7: hwmod: Do not register RTC on DRA71
+Date: Fri, 14 Oct 2016 18:30:29 +0530
+Subject: [PATCH 5/9] ARM: OMAP2+: board-generic: add support for DRA71x family
 In-Reply-To: <20161014130033.14172-1-lokeshvutla@ti.com>
 References: <20161014130033.14172-1-lokeshvutla@ti.com>
-Message-ID: <20161014130033.14172-7-lokeshvutla@ti.com>
+Message-ID: <20161014130033.14172-6-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
+DRA71x processor family is a derivative of DRA722 ES2.0 targeted for
+infotainment systems.
 
-RTC is not available on DRA71x, so accessing any of the RTC
-register or clkctrl register will lead to a crash. So, do not
-register RTC hwmod for DRA71x.
-
-Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/omap/omap.txt | 6 ++++++
+ arch/arm/mach-omap2/board-generic.c                 | 1 +
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 1ab7096..7f48577 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -3845,7 +3845,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l3_main_1__pciess2,
- 	&dra7xx_l4_cfg__pciess2,
- 	&dra7xx_l3_main_1__qspi,
--	&dra7xx_l4_per3__rtcss,
- 	&dra7xx_l4_cfg__sata,
- 	&dra7xx_l4_cfg__smartreflex_core,
- 	&dra7xx_l4_cfg__smartreflex_mpu,
-@@ -3905,6 +3904,11 @@ static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index f53e2ee..454b1be 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -86,6 +86,9 @@ SoCs:
+ - DRA722
+   compatible = "ti,dra722", "ti,dra72", "ti,dra7"
+ 
++- DRA718
++  compatible = "ti,dra718", "ti,dra722", "ti,dra72", "ti,dra7"
++
+ - AM5728
+   compatible = "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+ 
+@@ -181,6 +184,9 @@ Boards:
+ - DRA722 EVM: Software Development Board for DRA722
+   compatible = "ti,dra72-evm", "ti,dra722", "ti,dra72", "ti,dra7"
+ 
++- DRA718 EVM: Software Development Board for DRA718
++  compatible = "ti,dra718-evm", "ti,dra718", "ti,dra722", "ti,dra72", "ti,dra7"
++
+ - DM3730 Logic PD Torpedo + Wireless: Commercial System on Module with WiFi and Bluetooth
+   compatible = "logicpd,dm3730-torpedo-devkit", "ti,omap3630", "ti,omap3"
+ 
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index bab814d..981b23a 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -341,6 +341,7 @@ static const char *const dra72x_boards_compat[] __initconst = {
+ 	"ti,am5718",
+ 	"ti,am5716",
+ 	"ti,dra722",
++	"ti,dra718",
  	NULL,
  };
  
-+static struct omap_hwmod_ocp_if *dra74x_dra72x_hwmod_ocp_ifs[] __initdata = {
-+	&dra7xx_l4_per3__rtcss,
-+	NULL,
-+};
-+
- int __init dra7xx_hwmod_init(void)
- {
- 	int ret;
-@@ -3920,5 +3924,9 @@ int __init dra7xx_hwmod_init(void)
- 	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
- 		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
- 
-+	/* now for the IPs *NOT* in dra71 */
-+	if (!ret && !of_machine_is_compatible("ti,dra718"))
-+		ret = omap_hwmod_register_links(dra74x_dra72x_hwmod_ocp_ifs);
-+
- 	return ret;
- }
 -- 
 2.9.3
