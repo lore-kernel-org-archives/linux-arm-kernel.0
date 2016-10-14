@@ -1,105 +1,88 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 14 Oct 2016 14:44:33 -0700
-Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <CAGXu5jKMZTo7m=ygm7x8w__1my0jiQiVAiv9NowQ8pfQqCnjmw@mail.gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Fri, 14 Oct 2016 14:58:18 -0700
+Subject: [PATCH V3 10/10] arm64: KVM: add guest SEA support
+In-Reply-To: <878ttrs22f.fsf@e105922-lin.cambridge.arm.com>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-11-git-send-email-tbaicar@codeaurora.org>
+ <87h98gs853.fsf@e105922-lin.cambridge.arm.com>
+ <afa9a3c6-7516-cf5c-2366-f826f914d582@codeaurora.org>
+ <878ttrs22f.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <4f99e989-cb7b-2bf3-a947-6f6713e55b6f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/14/2016 2:38 AM, Punit Agrawal wrote:
+> "Baicar, Tyler" <tbaicar@codeaurora.org> writes:
+>
+>> Hello Punit,
+>>
+>> On 10/13/2016 7:14 AM, Punit Agrawal wrote:
+>>> Hi Tyler,
+>>>
+>>> I know I've had my last comment already ;), but I thought I'd rather
+>>> raise the question than stay confused...
+>>>
+>>> Tyler Baicar <tbaicar@codeaurora.org> writes:
+>>>
+>>>> Currently external aborts are unsupported by the guest abort
+>>>> handling. Add handling for SEAs so that the host kernel reports
+>>>> SEAs which occur in the guest kernel.
+>>>>
+>>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>>> ---
+>>>>    arch/arm/include/asm/kvm_arm.h       |  1 +
+>>>>    arch/arm/include/asm/system_misc.h   |  5 +++++
+>>>>    arch/arm/kvm/mmu.c                   | 15 +++++++++++++--
+>>>>    arch/arm64/include/asm/kvm_arm.h     |  1 +
+>>>>    arch/arm64/include/asm/system_misc.h |  2 ++
+>>>>    arch/arm64/mm/fault.c                | 13 +++++++++++++
+>>>>    6 files changed, 35 insertions(+), 2 deletions(-)
+[...]
+>>>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>>>> index 81cb7ad..d714432 100644
+>>>> --- a/arch/arm64/mm/fault.c
+>>>> +++ b/arch/arm64/mm/fault.c
+>>>> @@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
+>>>>    }
+>>>>      /*
+>>>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>>>> + */
+>>>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>>>> +{
+>>>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>>>> +
+>>>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>>> +		fault_name(esr), esr, addr);
+>>>> +
+>>>> +	return 0;
+>>>> +}
+>>> Don't we need to pass the abort to the guest?
+>> This requires some infrastructure to implement virtual "ACPI platform
+>> error interface" to expose the details of the abort to the guest. This
+>> patchset does not cover that and focuses on feature parity with other
+>> architectures that support APEI. There are discussions among Linaro
+>> partners about how this can be achieved in the long term, but that
+>> work is outside the scope of this patchset. This patch will ensure
+>> that if a guest encounters one of these errors then it will be
+>> reported before getting killed. Before this patch we would just get an
+>> unsupported FSC print out and then the guest would be killed.
+> OK.
+>
+> I think we might be talking about different things though.
+>
+> I am referring to the injection of the synchronous external abort into
+> the guest - similar to what's been done for prefetch abort in the
+> kvm_guest_handle_abort.
+>
+> Maybe there is no benefit in passing the abort to the guest. In that
+> case, can you please add a comment where you handle external abort
+> (FSC_EXTABT) in kvm_guest_handle_abort.
+Yes, I will add a comment there in the next version.
 
-Just checking in on this feature -- I don't see it in -next nor
-already in the tree. Is there any chance this is going to make the
-v4.9 merge window?
-
-It didn't sound like there were any unresolved issues remaining?
-
-Thanks!
-
--Kees
-
-
-On Tue, Sep 13, 2016 at 10:46 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> This is the third version of the arm64 PAN emulation using TTBR0_EL1
-> switching. The series has not yet included the alternative nop patches
-> from Mark Rutland, nor the empty_zero_page from Ard B. This will be done
-> in a subsequent version once 4.9-rc1 is out (which will include Mark's
-> alternative nop patches).
->
-> Changes since v2:
->
-> - efi_set_pgd() reworked to update the saved ttbr0 during run-time
->   services as this value is used during exception return
->
-> - uaccess_(enable|disable) C macros no longer take an 'alt' parameter
->   Instead, uaccess_(enable|disable)_not_uao are introduced for the case
->   where hardware PAN switching is not required when UAO is present
->
-> - post_ttbr0_update_workaround macro no longer takes a 'ret' parameter
->
-> - system_supports_ttbr0_pan renamed to system_uses_ttbr0_pan
->
-> - init_thread_info.ttbr0 moved towards the end of the setup_arch()
->   function and comment updated
->
-> - vmlinux.lds.S fixed to use RESERVED_TTBR0_SIZE
->
-> - Config option changed to ARM64_SW_TTBR0_PAN
->
-> - Some comment clean-ups and commit log updates
->
-> Catalin Marinas (7):
->   arm64: Factor out PAN enabling/disabling into separate uaccess_*
->     macros
->   arm64: Factor out TTBR0_EL1 post-update workaround into a specific asm
->     macro
->   arm64: Introduce uaccess_{disable,enable} functionality based on
->     TTBR0_EL1
->   arm64: Disable TTBR0_EL1 during normal kernel execution
->   arm64: Handle faults caused by inadvertent user access with PAN
->     enabled
->   arm64: xen: Enable user access before a privcmd hvc call
->   arm64: Enable CONFIG_ARM64_SW_TTBR0_PAN
->
-> The patches are also available on this branch:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux ttbr0-pan
->
-> Thanks for reviewing/testing.
->
->  arch/arm64/Kconfig                      |   8 ++
->  arch/arm64/include/asm/assembler.h      |  33 +++++++
->  arch/arm64/include/asm/cpufeature.h     |   6 ++
->  arch/arm64/include/asm/efi.h            |  26 ++++-
->  arch/arm64/include/asm/futex.h          |  14 +--
->  arch/arm64/include/asm/kernel-pgtable.h |   7 ++
->  arch/arm64/include/asm/mmu_context.h    |  51 +++++++---
->  arch/arm64/include/asm/ptrace.h         |   2 +
->  arch/arm64/include/asm/thread_info.h    |   3 +
->  arch/arm64/include/asm/uaccess.h        | 163 ++++++++++++++++++++++++++++++--
->  arch/arm64/kernel/armv8_deprecated.c    |  10 +-
->  arch/arm64/kernel/asm-offsets.c         |   3 +
->  arch/arm64/kernel/cpufeature.c          |   1 +
->  arch/arm64/kernel/entry.S               |  71 +++++++++++++-
->  arch/arm64/kernel/head.S                |   6 +-
->  arch/arm64/kernel/setup.c               |   9 ++
->  arch/arm64/kernel/vmlinux.lds.S         |   5 +
->  arch/arm64/lib/clear_user.S             |   8 +-
->  arch/arm64/lib/copy_from_user.S         |   8 +-
->  arch/arm64/lib/copy_in_user.S           |   8 +-
->  arch/arm64/lib/copy_to_user.S           |   8 +-
->  arch/arm64/mm/context.c                 |   7 +-
->  arch/arm64/mm/fault.c                   |  22 +++--
->  arch/arm64/mm/proc.S                    |  11 +--
->  arch/arm64/xen/hypercall.S              |  19 ++++
->  25 files changed, 428 insertions(+), 81 deletions(-)
->
-
-
+Thanks,
+Tyler
 
 -- 
-Kees Cook
-Nexus Security
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
