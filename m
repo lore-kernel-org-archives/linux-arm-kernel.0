@@ -1,117 +1,652 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Oct 2016 09:53:31 +0200
-Subject: Add Allwinner Q8 tablets hardware manager
-Message-ID: <20161014075337.10452-1-hdegoede@redhat.com>
+Date: Fri, 14 Oct 2016 09:53:33 +0200
+Subject: [PATCH 2/6] misc: Add Allwinner Q8 tablet hardware manager
+In-Reply-To: <20161014075337.10452-1-hdegoede@redhat.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+Message-ID: <20161014075337.10452-3-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob, Mark, et al.,
+Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
+of which a new batch is produced every few weeks. Each batch uses a
+different mix of touchscreen, accelerometer and wifi peripherals.
 
-Here is a first non RFC posting of my q8 tablet hardwaremanager work,
-both the bindings as well as the in kernel implementation of it.
+Given that each batch is different creating a devicetree for each variant
+is not desirable. This commit adds a Q8 tablet hardware manager which
+auto-detects the touchscreen and accelerometer so that a single generic
+dts can be used for these tablets.
 
-Mark, I know that we discussed this at ELCE and you clearly indicated
-that according to you this does not belong in the kernel. I was a bit
-surprised by this part of the discussion.
+The wifi is connected to a discoverable bus (sdio or usb) and will be
+autodetected by the mmc resp. usb subsystems.
 
-I had posted a RFC earlier and Rob had indicated that given that the q8
-tablets are a special case, as my code uses actual probing rather then some
-pre-arranged id mechanism with say an eeprom, that doing this in a
-non-generic manner would be ok for my special case.
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/misc/Kconfig          |  11 +
+ drivers/misc/Makefile         |   1 +
+ drivers/misc/q8-hardwaremgr.c | 581 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 593 insertions(+)
+ create mode 100644 drivers/misc/q8-hardwaremgr.c
 
-So at ELCE I did not have all the arguments I had to do this in the kernel
-ready. I did actually make a concious choice for the kernel before starting
-work on this, thinking about this more I remembered most of the arguments I
-had when making my u-boot vs kernel decision. I still believe the kernel is
-the right place for this. See the list of reasons below.
-
-Regardless of where the implementation should go, please do review the
-bindings (the first patch in the set), as we need those regardless of where
-the actual code dealing with this is going to live.
-
-So on to why I believe that the kernel is the best place to do this, at least
-for my special use-case:
-
-1. Configurability
-
-Since the q8 tablets do not have any id mechanism I'm probing i2c busses to
-generate i2c client dt nodes with the right address and compatible.
-Some info in these nodes (e.g. touchscreen firmware-name) is not probable at
-all and gets set by heuristics. This heuristics may get things wrong.
-So my current implementation offers kernel cmdline options to override this.
-
-Although having to specify kernel cmdline options is not the plug and play
-experience I want to give end-users most distros do have documentation on
-how to do this and doing this is relatively easy for end-users. Moving this
-to the bootloader means moving to some bootloader specific config mechanism
-which is going to be quite hard (and possibly dangerous) for users to use.
-
-This alone to me is the reason to post the kernel implentation of my work
-for upstream inclusion despite of Mark's objections.
-
-2. Upgradability
-
-Most users treat the bootloader like they treat an x86 machine BIOS/EFI,
-they will never upgrade it unless they really have to. This means that it
-will be very difficult to get users to actual benefit from bug-fixes /
-improvements done to the probing code. Where as the kernel on boards running
-e.g. Debian or Fedora gets regular updates together with the rest of the
-system.
-
-3. Infrastructure
-
-The kernel simply has better infrastructure for doing these kind of things.
-Yes we could improve the bootloader, but the kernel is also improving and
-likely at a faster rate. Besides that the purpose of the bootloader is
-mostly to be simple and small, load the kernel and get out of the way, not
-to be a general purpose os kernel. So it will simply always have less
-infrastructure and that is a good thing, otherwise we will be writing
-another general purpose os which is a waste of effort.
-
-4. This is not a new board file
-
-Mark, at ELCE I got the feeling that your biggest worry / objection is
-that this will bring back board files, but that is not the case, if you
-look at the actual code it is nothing like a board-file at all. Where a
-board file was instantiating device after device after device from c-code,
-with maybe a few if-s in there to deal with board revisions. This code is
-all about figuring out which accelerometer and touchscreen there are,
-to then add nodes to the dt for this 2 devices, almost all the code is
-probing, the actual dt modifying code is tiny and no direct device
-instantiation is done at all.
-
-5. This is an exception, not the rule
-
-Yes this is introducing board (family of boards) specific c-code into the
-kernel, so in a way it is reminiscent of board files. But sometimes this is
-necessary, just look at all the vendor / platform specific code in the kernel
-in drivers/platform/x86, or all the places where DMI strings are used to
-uniquely identify a x86 board and adjust behavior.
-
-But this really is the exception, not the rule. I've written/upstreamed a
-number of drivers for q8 tablets hardware and if you look at e.g. the
-silead touchscreen driver then in linux-next this is already used for 5
-ARM dts files where no board specific C-code is involved at all.
-
-So this again is very different from the board file era, where C-code
-had to be used to fill device specific platform-data structs, here all
-necessary info is contained in the dt-binding and there are many users
-who do not need any board specific C-code in the kernel at all.
-
-So dt is working as it should and is avoiding board specific C-code for
-the majority of the cases. But sometimes hardware is not as we ideally
-would like it to be; and for those *exceptions* we are sometimes going
-to need C-code in the kernel, just like there is "board" specific C-code
-in the x86 code.
-
-Regards,
-
-Hans
-
-p.s.
-
-Note that the patches actually implementing the q8 hardware manager depend
-on Pantelis' "of: changesets" patches which are not upstream yet, so if we
-can agree on doing this in the kernel then this cannot be merged until those
-are merged. If we get a concensus on doing this in kernel being ok, then
-I'll post a new version of those patches unless Pantelis' beats me to it.
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index d002528..d6c1529 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -794,6 +794,17 @@ config PANEL_BOOT_MESSAGE
+ 	  An empty message will only clear the display at driver init time. Any other
+ 	  printf()-formatted message is valid with newline and escape codes.
+ 
++config Q8_HARDWAREMGR
++	bool "Allwinner Q8 tablet hardware manager"
++	depends on I2C
++	depends on (ARCH_SUNXI && GPIOLIB && OF && OF_DYNAMIC) || COMPILE_TEST
++	default	n
++	help
++	  This option enables support for autodetecting the touchscreen
++	  on Allwinner Q8 tablets.
++
++	  If unsure, say N.
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"
+diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+index fb32516..1a0ebb0 100644
+--- a/drivers/misc/Makefile
++++ b/drivers/misc/Makefile
+@@ -56,6 +56,7 @@ obj-$(CONFIG_ECHO)		+= echo/
+ obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
+ obj-$(CONFIG_CXL_BASE)		+= cxl/
+ obj-$(CONFIG_PANEL)             += panel.o
++obj-$(CONFIG_Q8_HARDWAREMGR)    += q8-hardwaremgr.o
+ 
+ lkdtm-$(CONFIG_LKDTM)		+= lkdtm_core.o
+ lkdtm-$(CONFIG_LKDTM)		+= lkdtm_bugs.o
+diff --git a/drivers/misc/q8-hardwaremgr.c b/drivers/misc/q8-hardwaremgr.c
+new file mode 100644
+index 0000000..346102d
+--- /dev/null
++++ b/drivers/misc/q8-hardwaremgr.c
+@@ -0,0 +1,581 @@
++/*
++ * Allwinner q8 formfactor tablet hardware manager
++ *
++ * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <asm/unaligned.h>
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/gpio/consumer.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
++#include <linux/slab.h>
++
++/*
++ * We can detect which touchscreen controller is used automatically,
++ * but some controllers can be wired up differently depending on the
++ * q8 PCB variant used, so they need different firmware files / settings.
++ *
++ * We allow the user to specify a firmware_variant to select a config
++ * from a list of known configs. We also allow overriding each setting
++ * individually.
++ */
++
++static int touchscreen_variant = -1;
++module_param(touchscreen_variant, int, 0444);
++MODULE_PARM_DESC(touchscreen_variant, "Touchscreen variant 0-x, -1 for auto");
++
++static int touchscreen_width = -1;
++module_param(touchscreen_width, int, 0444);
++MODULE_PARM_DESC(touchscreen_width, "Touchscreen width, -1 for auto");
++
++static int touchscreen_height = -1;
++module_param(touchscreen_height, int, 0444);
++MODULE_PARM_DESC(touchscreen_height, "Touchscreen height, -1 for auto");
++
++static int touchscreen_invert_x = -1;
++module_param(touchscreen_invert_x, int, 0444);
++MODULE_PARM_DESC(touchscreen_invert_x, "Touchscreen invert x, -1 for auto");
++
++static int touchscreen_invert_y = -1;
++module_param(touchscreen_invert_y, int, 0444);
++MODULE_PARM_DESC(touchscreen_invert_y, "Touchscreen invert y, -1 for auto");
++
++static int touchscreen_swap_x_y = -1;
++module_param(touchscreen_swap_x_y, int, 0444);
++MODULE_PARM_DESC(touchscreen_swap_x_y, "Touchscreen swap x y, -1 for auto");
++
++static char *touchscreen_fw_name;
++module_param(touchscreen_fw_name, charp, 0444);
++MODULE_PARM_DESC(touchscreen_fw_name, "Touchscreen firmware filename");
++
++enum soc {
++	a13,
++	a23,
++	a33,
++};
++
++#define TOUCHSCREEN_POWER_ON_DELAY	20
++#define SILEAD_REG_ID			0xFC
++#define EKTF2127_RESPONSE		0x52
++#define EKTF2127_REQUEST		0x53
++#define EKTF2127_WIDTH			0x63
++
++enum {
++	touchscreen_unknown,
++	gsl1680_a082,
++	gsl1680_b482,
++	ektf2127,
++	zet6251,
++};
++
++struct q8_hardwaremgr_device {
++	int model;
++	int addr;
++	const char *compatible;
++	bool delete_regulator;
++};
++
++struct q8_hardwaremgr_data {
++	struct device *dev;
++	enum soc soc;
++	struct q8_hardwaremgr_device touchscreen;
++	int touchscreen_variant;
++	int touchscreen_width;
++	int touchscreen_height;
++	int touchscreen_invert_x;
++	int touchscreen_invert_y;
++	int touchscreen_swap_x_y;
++	const char *touchscreen_fw_name;
++};
++
++typedef int (*bus_probe_func)(struct q8_hardwaremgr_data *data,
++			      struct i2c_adapter *adap);
++typedef int (*client_probe_func)(struct q8_hardwaremgr_data *data,
++				 struct i2c_client *client);
++
++static struct device_node *q8_hardware_mgr_apply_common(
++	struct q8_hardwaremgr_device *dev, struct of_changeset *cset,
++	const char *prefix)
++{
++	struct device_node *np;
++
++	np = of_find_node_by_name(of_root, prefix);
++	/* Never happens already checked in q8_hardwaremgr_do_probe() */
++	if (WARN_ON(!np))
++		return NULL;
++
++	of_changeset_init(cset);
++	of_changeset_add_property_u32(cset, np, "reg", dev->addr);
++	of_changeset_add_property_string(cset, np, "compatible",
++					 dev->compatible);
++	of_changeset_update_property_string(cset, np, "status", "okay");
++
++	if (dev->delete_regulator) {
++		struct property *p;
++
++		p = of_find_property(np, "vddio-supply", NULL);
++		/* Never happens already checked in q8_hardwaremgr_do_probe() */
++		if (WARN_ON(!p))
++			return np;
++
++		of_changeset_remove_property(cset, np, p);
++	}
++
++	return np; /* Allow the caller to make further changes */
++}
++
++static int q8_hardwaremgr_probe_client(struct q8_hardwaremgr_data *data,
++				       struct q8_hardwaremgr_device *dev,
++				       struct i2c_adapter *adap, u16 addr,
++				       client_probe_func client_probe)
++{
++	struct i2c_client *client;
++	int ret;
++
++	client = i2c_new_dummy(adap, addr);
++	if (!client)
++		return -ENOMEM;
++
++	/* ret will be one of 0: Success, -ETIMEDOUT: Bus stuck or -ENODEV */
++	ret = client_probe(data, client);
++	if (ret == 0)
++		dev->addr = addr;
++
++	i2c_unregister_device(client);
++
++	return ret;
++}
++
++#define PROBE_CLIENT(dev, addr, probe) \
++{ \
++	int ret = q8_hardwaremgr_probe_client(data, dev, adap, addr, probe); \
++	if (ret != -ENODEV) \
++		return ret; \
++}
++
++static int q8_hardwaremgr_probe_silead(struct q8_hardwaremgr_data *data,
++				       struct i2c_client *client)
++{
++	__le32 chip_id;
++	int ret;
++
++	ret = i2c_smbus_read_i2c_block_data(client, SILEAD_REG_ID,
++					    sizeof(chip_id), (u8 *)&chip_id);
++	if (ret != sizeof(chip_id))
++		return ret == -ETIMEDOUT ? -ETIMEDOUT : -ENODEV;
++
++	switch (le32_to_cpu(chip_id)) {
++	case 0xa0820000:
++		data->touchscreen.compatible = "silead,gsl1680";
++		data->touchscreen.model = gsl1680_a082;
++		dev_info(data->dev, "Silead touchscreen ID: 0xa0820000\n");
++		return 0;
++	case 0xb4820000:
++		data->touchscreen.compatible = "silead,gsl1680";
++		data->touchscreen.model = gsl1680_b482;
++		dev_info(data->dev, "Silead touchscreen ID: 0xb4820000\n");
++		return 0;
++	default:
++		dev_warn(data->dev, "Silead? touchscreen with unknown ID: 0x%08x\n",
++			 le32_to_cpu(chip_id));
++	}
++
++	return -ENODEV;
++}
++
++static int q8_hardwaremgr_probe_ektf2127(struct q8_hardwaremgr_data *data,
++					 struct i2c_client *client)
++{
++	unsigned char buff[4];
++	int ret;
++
++	/* Read hello, ignore data, depends on initial power state */
++	ret = i2c_master_recv(client, buff, 4);
++	if (ret != 4)
++		return ret == -ETIMEDOUT ? -ETIMEDOUT : -ENODEV;
++
++	/* Request width */
++	buff[0] = EKTF2127_REQUEST;
++	buff[1] = EKTF2127_WIDTH;
++	buff[2] = 0x00;
++	buff[3] = 0x00;
++	ret = i2c_master_send(client, buff, 4);
++	if (ret != 4)
++		return ret == -ETIMEDOUT ? -ETIMEDOUT : -ENODEV;
++
++	msleep(20);
++
++	/* Read response */
++	ret = i2c_master_recv(client, buff, 4);
++	if (ret != 4)
++		return ret == -ETIMEDOUT ? -ETIMEDOUT : -ENODEV;
++
++	if (buff[0] == EKTF2127_RESPONSE && buff[1] == EKTF2127_WIDTH) {
++		data->touchscreen.compatible = "elan,ektf2127";
++		data->touchscreen.model = ektf2127;
++		return 0;
++	}
++
++	return -ENODEV;
++}
++
++static int q8_hardwaremgr_probe_zet6251(struct q8_hardwaremgr_data *data,
++					struct i2c_client *client)
++{
++	unsigned char buff[4];
++	int ret;
++
++	/*
++	 * We only do a simple read finger data packet test, because some
++	 * versions require firmware to be loaded. If no firmware is loaded
++	 * the buffer will be filed with 0xff, so we ignore the contents.
++	 */
++	ret = i2c_master_recv(client, buff, 24);
++	if (ret != 24)
++		return ret == -ETIMEDOUT ? -ETIMEDOUT : -ENODEV;
++
++	data->touchscreen.compatible = "zeitec,zet6251";
++	data->touchscreen.model = zet6251;
++	return 0;
++}
++
++static int q8_hardwaremgr_probe_touchscreen(struct q8_hardwaremgr_data *data,
++					    struct i2c_adapter *adap)
++{
++	msleep(TOUCHSCREEN_POWER_ON_DELAY);
++
++	PROBE_CLIENT(&data->touchscreen, 0x40, q8_hardwaremgr_probe_silead);
++	PROBE_CLIENT(&data->touchscreen, 0x15, q8_hardwaremgr_probe_ektf2127);
++	PROBE_CLIENT(&data->touchscreen, 0x76, q8_hardwaremgr_probe_zet6251);
++
++	return -ENODEV;
++}
++
++static void q8_hardwaremgr_apply_gsl1680_a082_variant(
++	struct q8_hardwaremgr_data *data)
++{
++	if (touchscreen_variant != -1)
++		data->touchscreen_variant = touchscreen_variant;
++
++	switch (data->touchscreen_variant) {
++	default:
++		dev_warn(data->dev, "Error unknown touchscreen_variant %d using 0\n",
++			 touchscreen_variant);
++		/* Fall through */
++	case 0:
++		data->touchscreen_width = 1024;
++		data->touchscreen_height = 600;
++		data->touchscreen_fw_name = "gsl1680-a082-q8-700.fw";
++		break;
++	case 1:
++		data->touchscreen_width = 480;
++		data->touchscreen_height = 800;
++		data->touchscreen_swap_x_y = 1;
++		data->touchscreen_fw_name = "gsl1680-a082-q8-a70.fw";
++		break;
++	}
++}
++
++static void q8_hardwaremgr_apply_gsl1680_b482_variant(
++	struct q8_hardwaremgr_data *data)
++{
++	if (touchscreen_variant != -1)
++		data->touchscreen_variant = touchscreen_variant;
++
++	switch (data->touchscreen_variant) {
++	default:
++		dev_warn(data->dev, "Error unknown touchscreen_variant %d using 0\n",
++			 touchscreen_variant);
++		/* Fall through */
++	case 0:
++		data->touchscreen_width = 960;
++		data->touchscreen_height = 640;
++		data->touchscreen_fw_name = "gsl1680-b482-q8-d702.fw";
++		break;
++	case 1:
++		data->touchscreen_width = 960;
++		data->touchscreen_height = 640;
++		data->touchscreen_fw_name = "gsl1680-b482-q8-a70.fw";
++		break;
++	}
++}
++
++static void q8_hardwaremgr_issue_gsl1680_warning(
++	struct q8_hardwaremgr_data *data)
++{
++	dev_warn(data->dev, "gsl1680 touchscreen may require kernel cmdline parameters to function properly\n");
++	dev_warn(data->dev, "Try q8_hardwaremgr.touchscreen_invert_x=%d if x coordinates are inverted\n",
++		 !data->touchscreen_invert_x);
++	dev_warn(data->dev, "Try q8_hardwaremgr.touchscreen_variant=%d if coordinates are all over the place\n",
++		 !data->touchscreen_variant);
++
++#define	show(x) \
++	dev_info(data->dev, #x " %d (%s)\n", data->x, \
++		 (x == -1) ? "auto" : "user supplied")
++
++	show(touchscreen_variant);
++	show(touchscreen_width);
++	show(touchscreen_height);
++	show(touchscreen_invert_x);
++	show(touchscreen_invert_y);
++	show(touchscreen_swap_x_y);
++	dev_info(data->dev, "touchscreen_fw_name %s (%s)\n",
++		 data->touchscreen_fw_name,
++		 (touchscreen_fw_name == NULL) ? "auto" : "user supplied");
++#undef show
++}
++
++static void q8_hardwaremgr_apply_touchscreen(struct q8_hardwaremgr_data *data)
++{
++	struct of_changeset cset;
++	struct device_node *np;
++
++	switch (data->touchscreen.model) {
++	case touchscreen_unknown:
++		return;
++	case gsl1680_a082:
++		q8_hardwaremgr_apply_gsl1680_a082_variant(data);
++		break;
++	case gsl1680_b482:
++		q8_hardwaremgr_apply_gsl1680_b482_variant(data);
++		break;
++	case ektf2127:
++	case zet6251:
++		/* These have only 1 variant */
++		break;
++	}
++
++	if (touchscreen_width != -1)
++		data->touchscreen_width = touchscreen_width;
++
++	if (touchscreen_height != -1)
++		data->touchscreen_height = touchscreen_height;
++
++	if (touchscreen_invert_x != -1)
++		data->touchscreen_invert_x = touchscreen_invert_x;
++
++	if (touchscreen_invert_y != -1)
++		data->touchscreen_invert_y = touchscreen_invert_y;
++
++	if (touchscreen_swap_x_y != -1)
++		data->touchscreen_swap_x_y = touchscreen_swap_x_y;
++
++	if (touchscreen_fw_name)
++		data->touchscreen_fw_name = touchscreen_fw_name;
++
++	if (data->touchscreen.model == gsl1680_a082 ||
++	    data->touchscreen.model == gsl1680_b482)
++		q8_hardwaremgr_issue_gsl1680_warning(data);
++
++	np = q8_hardware_mgr_apply_common(&data->touchscreen, &cset,
++					  "touchscreen");
++	if (!np)
++		return;
++
++	if (data->touchscreen_width)
++		of_changeset_add_property_u32(&cset, np, "touchscreen-size-x",
++					      data->touchscreen_width);
++	if (data->touchscreen_height)
++		of_changeset_add_property_u32(&cset, np, "touchscreen-size-y",
++					      data->touchscreen_height);
++	if (data->touchscreen_invert_x)
++		of_changeset_add_property_bool(&cset, np,
++					       "touchscreen-inverted-x");
++	if (data->touchscreen_invert_y)
++		of_changeset_add_property_bool(&cset, np,
++					       "touchscreen-inverted-y");
++	if (data->touchscreen_swap_x_y)
++		of_changeset_add_property_bool(&cset, np,
++					       "touchscreen-swapped-x-y");
++	if (data->touchscreen_fw_name)
++		of_changeset_add_property_string(&cset, np, "firmware-name",
++						 data->touchscreen_fw_name);
++
++	of_changeset_apply(&cset);
++
++	of_node_put(np);
++}
++
++static int q8_hardwaremgr_do_probe(struct q8_hardwaremgr_data *data,
++				   struct q8_hardwaremgr_device *dev,
++				   const char *prefix, bus_probe_func func)
++{
++	struct device_node *np;
++	struct i2c_adapter *adap;
++	struct regulator *reg;
++	struct gpio_desc *gpio;
++	int ret = 0;
++
++	np = of_find_node_by_name(of_root, prefix);
++	if (!np) {
++		dev_err(data->dev, "Error %s node is missing\n", prefix);
++		return -EINVAL;
++	}
++
++	/*
++	 * Patch the dt_node into our device since there is no device for
++	 * the probed hw yet (status = disabled) .
++	 */
++	data->dev->of_node = np;
++
++	ret = pinctrl_bind_pins(data->dev);
++	if (ret)
++		goto put_node;
++
++	adap = of_get_i2c_adapter_by_node(np->parent);
++	if (!adap) {
++		ret = -EPROBE_DEFER;
++		goto put_pins;
++	}
++
++	reg = regulator_get_optional(data->dev, "vddio");
++	if (IS_ERR(reg)) {
++		ret = PTR_ERR(reg);
++		if (ret == -EPROBE_DEFER)
++			goto put_adapter;
++		reg = NULL;
++	}
++
++	gpio = fwnode_get_named_gpiod(&np->fwnode, "power-gpios");
++	if (IS_ERR(gpio)) {
++		ret = PTR_ERR(gpio);
++		if (ret == -EPROBE_DEFER)
++			goto put_reg;
++		gpio = NULL;
++	}
++
++	/* First try with only the power gpio driven high */
++	if (gpio) {
++		ret = gpiod_direction_output(gpio, 1);
++		if (ret)
++			goto put_gpio;
++	}
++
++	dev_info(data->dev, "Probing %s without a regulator\n", prefix);
++	ret = func(data, adap);
++	if (ret != 0 && reg) {
++		/* Second try, also enable the regulator */
++		ret = regulator_enable(reg);
++		if (ret)
++			goto restore_gpio;
++
++		dev_info(data->dev, "Probing %s with a regulator\n", prefix);
++		ret = func(data, adap);
++
++		regulator_disable(reg);
++	} else if (reg)
++		dev->delete_regulator = true; /* Regulator not needed */
++
++	if (ret == 0)
++		dev_info(data->dev, "Found %s at 0x%02x\n",
++			 dev->compatible, dev->addr);
++	else
++		ret = 0; /* Not finding a device is not an error */
++
++restore_gpio:
++	if (gpio)
++		gpiod_direction_output(gpio, 0);
++put_gpio:
++	if (gpio)
++		gpiod_put(gpio);
++put_reg:
++	if (reg)
++		regulator_put(reg);
++put_adapter:
++	i2c_put_adapter(adap);
++
++put_pins:
++	/* Undo our manual pinctrl_bind_pins() */
++	if (data->dev->pins) {
++		devm_pinctrl_put(data->dev->pins->p);
++		devm_kfree(data->dev, data->dev->pins);
++		data->dev->pins = NULL;
++	}
++
++put_node:
++	data->dev->of_node = NULL;
++	of_node_put(np);
++
++	return ret;
++}
++
++static int q8_hardwaremgr_probe(struct platform_device *pdev)
++{
++	struct q8_hardwaremgr_data *data;
++	int ret = 0;
++
++	data = kzalloc(sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	data->dev = &pdev->dev;
++	data->soc = (long)pdev->dev.platform_data;
++
++	ret = q8_hardwaremgr_do_probe(data, &data->touchscreen, "touchscreen",
++				      q8_hardwaremgr_probe_touchscreen);
++	if (ret)
++		goto error;
++
++	q8_hardwaremgr_apply_touchscreen(data);
++
++error:
++	kfree(data);
++
++	return ret;
++}
++
++static struct platform_driver q8_hardwaremgr_driver = {
++	.driver = {
++		.name	= "q8-hwmgr",
++	},
++	.probe	= q8_hardwaremgr_probe,
++};
++
++static int __init q8_hardwaremgr_init(void)
++{
++	struct platform_device *pdev;
++	enum soc soc;
++	int ret;
++
++	if (of_machine_is_compatible("allwinner,q8-a13"))
++		soc = a13;
++	else if (of_machine_is_compatible("allwinner,q8-a23"))
++		soc = a23;
++	else if (of_machine_is_compatible("allwinner,q8-a33"))
++		soc = a33;
++	else
++		return 0;
++
++	pdev = platform_device_alloc("q8-hwmgr", 0);
++	if (!pdev)
++		return -ENOMEM;
++
++	pdev->dev.platform_data = (void *)(long)soc;
++
++	ret = platform_device_add(pdev);
++	if (ret)
++		return ret;
++
++	return platform_driver_register(&q8_hardwaremgr_driver);
++}
++
++device_initcall(q8_hardwaremgr_init);
++
++MODULE_DESCRIPTION("Allwinner q8 formfactor tablet hardware manager");
++MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
++MODULE_LICENSE("GPL");
+-- 
+2.9.3
