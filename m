@@ -1,262 +1,77 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 14 Oct 2016 10:47:55 -0700
-Subject: [PATCH v3 7/8] PM / Domains: Support IRQ safe PM domains
-In-Reply-To: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1476467276-75094-8-git-send-email-lina.iyer@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 15 Oct 2016 02:19:14 +0800
+Subject: [arm-soc:to-build 18/18] drivers/spi/spi-fsl-espi.c:462:4: warning:
+ 'rx_data' may be used uninitialized in this function
+Message-ID: <201610150256.aVfqdtgA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic Power Domains currently support turning on/off only in process
-context. This prevents the usage of PM domains for domains that could be
-powered on/off in a context where IRQs are disabled. Many such domains
-exist today and do not get powered off, when the IRQ safe devices in
-that domain are powered off, because of this limitation.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
+head:   9f700f316330ee9341e1e817468bd272a4535291
+commit: 9f700f316330ee9341e1e817468bd272a4535291 [18/18] Revert "Disable "maybe-uninitialized" warning globally"
+config: powerpc-kmp204x_defconfig (attached as .config)
+compiler: powerpc-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 9f700f316330ee9341e1e817468bd272a4535291
+        # save the attached .config to linux build tree
+        make.cross ARCH=powerpc 
 
-However, not all domains can operate in IRQ safe contexts. Genpd
-therefore, has to support both cases where the domain may or may not
-operate in IRQ safe contexts. Configuring genpd to use an appropriate
-lock for that domain, would allow domains that have IRQ safe devices to
-runtime suspend and resume, in atomic context.
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-To achieve domain specific locking, set the domain's ->flag to
-GENPD_FLAG_IRQ_SAFE while defining the domain. This indicates that genpd
-should use a spinlock instead of a mutex for locking the domain. Locking
-is abstracted through genpd_lock() and genpd_unlock() functions that use
-the flag to determine the appropriate lock to be used for that domain.
+All warnings (new ones prefixed by >>):
 
-Domains that have lower latency to suspend and resume and can operate
-with IRQs disabled may now be able to save power, when the component
-devices and sub-domains are idle at runtime.
+   drivers/spi/spi-fsl-espi.c: In function 'fsl_espi_irq':
+>> drivers/spi/spi-fsl-espi.c:462:4: warning: 'rx_data' may be used uninitialized in this function [-Wmaybe-uninitialized]
+       mspi->get_rx(rx_data, mspi);
+       ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/spi/spi-fsl-espi.c:421:7: note: 'rx_data' was declared here
+      u32 rx_data, tmp;
+          ^~~~~~~
 
-The restriction this imposes on the domain hierarchy is that non-IRQ
-safe domains may not have IRQ-safe subdomains, but IRQ safe domains may
-have IRQ safe and non-IRQ safe subdomains and devices.
+vim +/rx_data +462 drivers/spi/spi-fsl-espi.c
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  446  		} else {
+6319a680 drivers/spi/spi-fsl-espi.c Nobuteru Hayashi 2016-03-18  447  			rx_nr_bytes = mspi->len;
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  448  			tmp = mspi->len;
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  449  			rx_data = 0;
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  450  			while (tmp--) {
+46afd38b drivers/spi/spi-fsl-espi.c Heiner Kallweit  2016-09-13  451  				rx_data_8 = fsl_espi_read_reg8(mspi,
+46afd38b drivers/spi/spi-fsl-espi.c Heiner Kallweit  2016-09-13  452  							       ESPI_SPIRF);
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  453  				rx_data |= (rx_data_8 << (tmp * 8));
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  454  			}
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  455  
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  456  			rx_data <<= (4 - mspi->len) * 8;
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  457  		}
+e6289d63 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-12-21  458  
+6319a680 drivers/spi/spi-fsl-espi.c Nobuteru Hayashi 2016-03-18  459  		mspi->len -= rx_nr_bytes;
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  460  
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  461  		if (mspi->rx)
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12 @462  			mspi->get_rx(rx_data, mspi);
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  463  	}
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  464  
+81abc2ec drivers/spi/spi-fsl-espi.c Heiner Kallweit  2016-09-13  465  	if (!(events & SPIE_TNF)) {
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  466  		int ret;
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  467  
+8b60d6c2 drivers/spi/spi_fsl_espi.c Mingkai Hu       2010-10-12  468  		/* spin until TX is done */
+46afd38b drivers/spi/spi-fsl-espi.c Heiner Kallweit  2016-09-13  469  		ret = spin_event_timeout(((events = fsl_espi_read_reg(
+81abc2ec drivers/spi/spi-fsl-espi.c Heiner Kallweit  2016-09-13  470  				mspi, ESPI_SPIE)) & SPIE_TNF), 1000, 0);
+
+:::::: The code at line 462 was first introduced by commit
+:::::: 8b60d6c25b2a2d3525d5322de856c3ca408e5783 spi/fsl_spi: add eSPI controller support
+
+:::::: TO: Mingkai Hu <Mingkai.hu@freescale.com>
+:::::: CC: Grant Likely <grant.likely@secretlab.ca>
+
 ---
- drivers/base/power/domain.c | 111 ++++++++++++++++++++++++++++++++++++++++----
- include/linux/pm_domain.h   |  10 +++-
- 2 files changed, 110 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 4194012..aac656a 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -74,11 +74,70 @@ static const struct genpd_lock_ops genpd_mtx_ops = {
- 	.unlock = genpd_unlock_mtx,
- };
- 
-+static void genpd_lock_spin(struct generic_pm_domain *genpd)
-+	__acquires(&genpd->slock)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&genpd->slock, flags);
-+	genpd->lock_flags = flags;
-+}
-+
-+static void genpd_lock_nested_spin(struct generic_pm_domain *genpd,
-+					int depth)
-+	__acquires(&genpd->slock)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave_nested(&genpd->slock, flags, depth);
-+	genpd->lock_flags = flags;
-+}
-+
-+static int genpd_lock_interruptible_spin(struct generic_pm_domain *genpd)
-+	__acquires(&genpd->slock)
-+{
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&genpd->slock, flags);
-+	genpd->lock_flags = flags;
-+	return 0;
-+}
-+
-+static void genpd_unlock_spin(struct generic_pm_domain *genpd)
-+	__releases(&genpd->slock)
-+{
-+	spin_unlock_irqrestore(&genpd->slock, genpd->lock_flags);
-+}
-+
-+static const struct genpd_lock_ops genpd_spin_ops = {
-+	.lock = genpd_lock_spin,
-+	.lock_nested = genpd_lock_nested_spin,
-+	.lock_interruptible = genpd_lock_interruptible_spin,
-+	.unlock = genpd_unlock_spin,
-+};
-+
- #define genpd_lock(p)			p->lock_ops->lock(p)
- #define genpd_lock_nested(p, d)		p->lock_ops->lock_nested(p, d)
- #define genpd_lock_interruptible(p)	p->lock_ops->lock_interruptible(p)
- #define genpd_unlock(p)			p->lock_ops->unlock(p)
- 
-+#define genpd_is_irq_safe(genpd)	(genpd->flags & GENPD_FLAG_IRQ_SAFE)
-+
-+static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
-+		struct generic_pm_domain *genpd)
-+{
-+	bool ret;
-+
-+	ret = pm_runtime_is_irq_safe(dev) && !genpd_is_irq_safe(genpd);
-+
-+	/* Warn once for each IRQ safe dev in no sleep domain */
-+	if (ret)
-+		dev_warn_once(dev, "PM domain %s will not be powered off\n",
-+				genpd->name);
-+
-+	return ret;
-+}
-+
- /*
-  * Get the generic PM domain for a particular struct device.
-  * This validates the struct device pointer, the PM domain pointer,
-@@ -343,7 +402,12 @@ static int genpd_poweroff(struct generic_pm_domain *genpd, bool is_async)
- 		if (stat > PM_QOS_FLAGS_NONE)
- 			return -EBUSY;
- 
--		if (!pm_runtime_suspended(pdd->dev) || pdd->dev->power.irq_safe)
-+		/*
-+		 * Do not allow PM domain to be powered off, when an IRQ safe
-+		 * device is part of a non-IRQ safe domain.
-+		 */
-+		if (!pm_runtime_suspended(pdd->dev) ||
-+			irq_safe_dev_in_no_sleep_domain(pdd->dev, genpd))
- 			not_suspended++;
- 	}
- 
-@@ -506,10 +570,10 @@ static int genpd_runtime_suspend(struct device *dev)
- 	}
- 
- 	/*
--	 * If power.irq_safe is set, this routine will be run with interrupts
--	 * off, so it can't use mutexes.
-+	 * If power.irq_safe is set, this routine may be run with
-+	 * IRQs disabled, so suspend only if the PM domain also is irq_safe.
- 	 */
--	if (dev->power.irq_safe)
-+	if (irq_safe_dev_in_no_sleep_domain(dev, genpd))
- 		return 0;
- 
- 	genpd_lock(genpd);
-@@ -543,8 +607,11 @@ static int genpd_runtime_resume(struct device *dev)
- 	if (IS_ERR(genpd))
- 		return -EINVAL;
- 
--	/* If power.irq_safe, the PM domain is never powered off. */
--	if (dev->power.irq_safe) {
-+	/*
-+	 * As we don't power off a non IRQ safe domain, which holds
-+	 * an IRQ safe device, we don't need to restore power to it.
-+	 */
-+	if (irq_safe_dev_in_no_sleep_domain(dev, genpd)) {
- 		timed = false;
- 		goto out;
- 	}
-@@ -586,7 +653,8 @@ static int genpd_runtime_resume(struct device *dev)
- err_stop:
- 	genpd_stop_dev(genpd, dev);
- err_poweroff:
--	if (!dev->power.irq_safe) {
-+	if (!pm_runtime_is_irq_safe(dev) ||
-+		(pm_runtime_is_irq_safe(dev) && genpd_is_irq_safe(genpd))) {
- 		genpd_lock(genpd);
- 		genpd_poweroff(genpd, 0);
- 		genpd_unlock(genpd);
-@@ -1223,6 +1291,17 @@ static int genpd_add_subdomain(struct generic_pm_domain *genpd,
- 	    || genpd == subdomain)
- 		return -EINVAL;
- 
-+	/*
-+	 * If the domain can be powered on/off in an IRQ safe
-+	 * context, ensure that the subdomain can also be
-+	 * powered on/off in that context.
-+	 */
-+	if (!genpd_is_irq_safe(genpd) && genpd_is_irq_safe(subdomain)) {
-+		WARN("Parent %s of subdomain %s must be IRQ safe\n",
-+				genpd->name, subdomain->name);
-+		return -EINVAL;
-+	}
-+
- 	link = kzalloc(sizeof(*link), GFP_KERNEL);
- 	if (!link)
- 		return -ENOMEM;
-@@ -1337,6 +1416,17 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
- 	return 0;
- }
- 
-+static void genpd_lock_init(struct generic_pm_domain *genpd)
-+{
-+	if (genpd->flags & GENPD_FLAG_IRQ_SAFE) {
-+		spin_lock_init(&genpd->slock);
-+		genpd->lock_ops = &genpd_spin_ops;
-+	} else {
-+		mutex_init(&genpd->mlock);
-+		genpd->lock_ops = &genpd_mtx_ops;
-+	}
-+}
-+
- /**
-  * pm_genpd_init - Initialize a generic I/O PM domain object.
-  * @genpd: PM domain object to initialize.
-@@ -1356,8 +1446,7 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
- 	INIT_LIST_HEAD(&genpd->master_links);
- 	INIT_LIST_HEAD(&genpd->slave_links);
- 	INIT_LIST_HEAD(&genpd->dev_list);
--	mutex_init(&genpd->mlock);
--	genpd->lock_ops = &genpd_mtx_ops;
-+	genpd_lock_init(genpd);
- 	genpd->gov = gov;
- 	INIT_WORK(&genpd->power_off_work, genpd_power_off_work_fn);
- 	atomic_set(&genpd->sd_count, 0);
-@@ -2131,7 +2220,9 @@ static int pm_genpd_summary_one(struct seq_file *s,
- 	}
- 
- 	list_for_each_entry(pm_data, &genpd->dev_list, list_node) {
--		kobj_path = kobject_get_path(&pm_data->dev->kobj, GFP_KERNEL);
-+		kobj_path = kobject_get_path(&pm_data->dev->kobj,
-+				genpd_is_irq_safe(genpd) ?
-+				GFP_ATOMIC : GFP_KERNEL);
- 		if (kobj_path == NULL)
- 			continue;
- 
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 811b968..81ece61 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -15,9 +15,11 @@
- #include <linux/err.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-+#include <linux/spinlock.h>
- 
- /* Defines used for the flags field in the struct generic_pm_domain */
- #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
-+#define GENPD_FLAG_IRQ_SAFE	(1U << 1) /* PM domain operates in atomic */
- 
- enum gpd_status {
- 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
-@@ -76,7 +78,13 @@ struct generic_pm_domain {
- 	unsigned int state_idx; /* state that genpd will go to when off */
- 	void *free; /* Free the state that was allocated for default */
- 	const struct genpd_lock_ops *lock_ops;
--	struct mutex mlock;
-+	union {
-+		struct mutex mlock;
-+		struct {
-+			spinlock_t slock;
-+			unsigned long lock_flags;
-+		};
-+	};
- 
- };
- 
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 16547 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161015/0ed9d6a0/attachment-0001.gz>
