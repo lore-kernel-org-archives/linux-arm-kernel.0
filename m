@@ -1,32 +1,37 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 14 Oct 2016 08:45:43 +0530
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
- <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
- <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
- <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
-Message-ID: <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Fri, 14 Oct 2016 08:13:49 +0200
+Subject: Low network throughput on i.MX28
+In-Reply-To: <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+References: <1476313753.2065.11.camel@embedded.rocks>
+ <20161013084807.6a231fdb@ipc1.ka-ro>
+ <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+Message-ID: <20161014081349.1afb22c6@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On Thu, 13 Oct 2016 21:43:00 +0200 J?rg Krause wrote:
+> Am 13. Oktober 2016 08:48:07 MESZ, schrieb "Lothar Wa?mann" <LW@KARO-electronics.de>:
+> >On Thu, 13 Oct 2016 01:09:13 +0200 J?rg Krause wrote:
+[...]
+> >This is the iperf output on a TX28 with current mainline kernel
+> >(4.8.0-rc5):
+> >------------------------------------------------------------
+> >Client connecting to 192.168.100.1, TCP port 5001
+> >TCP window size: 43.8 KByte (default)
+> >------------------------------------------------------------
+> >[  3] local 192.168.100.56 port 60325 connected with 192.168.100.1 port
+> >5001
+> >[ ID] Interval       Transfer     Bandwidth
+> >[  3]  0.0-10.0 sec  57.5 MBytes  48.2 Mbits/sec
+> >
+> >You might check your kernel DEBUG configs (especially
+> >CONFIG_DEBUG_PAGEALLOC).
+> 
+> Thanks for sharing the iperf output. What LAN transceiver does the TX28 has assembled?
+> 
+The ethernet PHY is an SMSC LAN8710A.
 
 
-On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
->> I think, its easier to go with your implementation. So, I have taken
->> > your patch and updated my perf/upstream_arm64_devel branch. May be you
->> > can give it a test for your test cases.
-> I've checked out the new version of your branch, and it works great.
-> I'll write a patch with additional test cases to go on top of your
-> branch, as the tests there do not capture the bug I was fixing.
-
-That would be great. We can send them all together as V2.
-
-Thanks for your help.
-
-~Pratyush
+Lothar Wa?mann
