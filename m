@@ -1,65 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 14 Oct 2016 09:53:37 +0200
-Subject: [PATCH 6/6] misc: q8-hardwaremgr: Add quirk handling
-In-Reply-To: <20161014075337.10452-1-hdegoede@redhat.com>
-References: <20161014075337.10452-1-hdegoede@redhat.com>
-Message-ID: <20161014075337.10452-7-hdegoede@redhat.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Fri, 14 Oct 2016 10:05:24 +0200
+Subject: aarch64 ACPI boot regressed by commit 7ba5f605f3a0 ("arm64/numa:
+ remove the limitation that cpu0 must bind to node0")
+In-Reply-To: <4a64cd93-5ead-aad6-1057-f42224d65b43@redhat.com>
+References: <4a64cd93-5ead-aad6-1057-f42224d65b43@redhat.com>
+Message-ID: <20161014080524.4hm2b4p373r7rhel@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some models require some special handling, e.g. one q8 tablet I've needs
-esp,crystal-26M-en = <1> in the sdio_wifi dt node for the wifi to work
-properly.
+On Fri, Oct 14, 2016 at 12:50:29AM +0200, Laszlo Ersek wrote:
+> (4) Analysis (well, a lame attempt at that, because I have zero
+> familiarity with this code). Let me quote the patch:
+> 
+> > commit 7ba5f605f3a0d9495aad539eeb8346d726dfc183
+> > Author: Zhen Lei <thunder.leizhen@huawei.com>
+> > Date:   Thu Sep 1 14:55:04 2016 +0800
+> >
+> >     arm64/numa: remove the limitation that cpu0 must bind to node0
+> >
+> >     1. Remove the old binding code.
+> >     2. Read the nid of cpu0 from dts.
+> >     3. Fallback the nid of cpu0 to 0 when numa=off is set in bootargs.
+> >
+> >     Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> >     Signed-off-by: Will Deacon <will.deacon@arm.com>
+> >
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index c3c08368a685..8b048e6ec34a 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -624,6 +624,7 @@ static void __init of_parse_and_init_cpus(void)
+> >  			}
+> >
+> >  			bootcpu_valid = true;
+> > +			early_map_cpu_to_node(0, of_node_to_nid(dn));
+> >
+> >  			/*
+> >  			 * cpu_logical_map has already been
+> > diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> > index 0a15f010b64a..778a985c8a70 100644
+> > --- a/arch/arm64/mm/numa.c
+> > +++ b/arch/arm64/mm/numa.c
+> > @@ -116,16 +116,24 @@ static void __init setup_node_to_cpumask_map(void)
+> >   */
+> >  void numa_store_cpu_info(unsigned int cpu)
+> >  {
+> > -	map_cpu_to_node(cpu, numa_off ? 0 : cpu_to_node_map[cpu]);
+> > +	map_cpu_to_node(cpu, cpu_to_node_map[cpu]);
+> >  }
+> >
+> >  void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+> >  {
+> >  	/* fallback to node 0 */
+> > -	if (nid < 0 || nid >= MAX_NUMNODES)
+> > +	if (nid < 0 || nid >= MAX_NUMNODES || numa_off)
+> >  		nid = 0;
 
-Add a q8_hardwaremgr_apply_quirks() helper function which identifies the
-tablet based on the detected soc, touchscreen, accelerometer combo and
-applies model specific quirks where necessary.
+The ACPI equivalent code must be missing (at least) the above, because,
+even with DT, mach-virt won't have cpu to node mappings unless numa
+is configured on the command line. Can you try adding something like
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/misc/q8-hardwaremgr.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+    -m 512 -smp 4 \
+    -numa node,mem=256M,cpus=0-1,nodeid=0 \
+    -numa node,mem=256M,cpus=2-3,nodeid=1
 
-diff --git a/drivers/misc/q8-hardwaremgr.c b/drivers/misc/q8-hardwaremgr.c
-index 95cdaf2..cbf4f61 100644
---- a/drivers/misc/q8-hardwaremgr.c
-+++ b/drivers/misc/q8-hardwaremgr.c
-@@ -715,6 +715,28 @@ static void q8_hardwaremgr_apply_accelerometer(struct q8_hardwaremgr_data *data)
- 	of_node_put(np);
- }
- 
-+static void q8_hardwaremgr_apply_quirks(struct q8_hardwaremgr_data *data)
-+{
-+	struct device_node *np;
-+	struct of_changeset cset;
-+
-+	/* This A33 tzx-723q4 PCB tablet with esp8089 needs crystal_26M_en=1 */
-+	if (data->soc == a33 && data->touchscreen.model == gsl1680_b482 &&
-+	    data->accelerometer.model == dmard09 && !data->has_rda599x) {
-+		dev_info(data->dev, "Applying crystal_26M_en=1 sdio_wifi quirk\n");
-+		np = of_find_node_by_name(of_root, "sdio_wifi");
-+		if (!np) {
-+			dev_warn(data->dev, "Could not find sdio_wifi dt node\n");
-+			return;
-+		}
-+		of_changeset_init(&cset);
-+		of_changeset_add_property_u32(&cset, np,
-+					      "esp,crystal-26M-en", 1);
-+		of_changeset_apply(&cset);
-+		of_node_put(np);
-+	}
-+}
-+
- static int q8_hardwaremgr_do_probe(struct q8_hardwaremgr_data *data,
- 				   struct q8_hardwaremgr_device *dev,
- 				   const char *prefix, bus_probe_func func)
-@@ -846,6 +868,7 @@ static int q8_hardwaremgr_probe(struct platform_device *pdev)
- 
- 	q8_hardwaremgr_apply_touchscreen(data);
- 	q8_hardwaremgr_apply_accelerometer(data);
-+	q8_hardwaremgr_apply_quirks(data);
- 
- error:
- 	kfree(data);
--- 
-2.9.3
+to your QEMU command line? Then when you boot with ACPI you'll get a
+SRAT. If that works, then we're just missing the "no SRAT, nid = 0"
+code (that should have been added with this patch)
+
+Thanks,
+drew
