@@ -1,48 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Oct 2016 22:12:04 +0200
-Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
-In-Reply-To: <20161014103344.GB3304@dell>
-References: <E1btqa6-0001tx-HV@optimist>
- <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk> <20161014103344.GB3304@dell>
-Message-ID: <5682869.nmeogTxQJD@wuerfel>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Fri, 14 Oct 2016 17:20:15 -0300
+Subject: [PATCH 27/57] [media] s5p-mfc: don't break long lines
+In-Reply-To: <cover.1476475770.git.mchehab@s-opensource.com>
+References: <cover.1476475770.git.mchehab@s-opensource.com>
+Message-ID: <acf4a56412e5aa0c9bc4d8e75714eb38fa7f4f28.1476475771.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 14, 2016 11:33:44 AM CEST Lee Jones wrote:
-> On Tue, 11 Oct 2016, Mark Brown wrote:
-> 
-> > On Tue, Oct 11, 2016 at 07:30:35AM +0100, Build bot for Mark Brown wrote:
-> > 
-> > Linus' tree is currently failing to build arm and arm64 allmodconfigs
-> > with:
-> > 
-> > >     arm64-allmodconfig
-> > > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-> > 
-> > >     arm-allmodconfig
-> > > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-> > 
-> > due to 6556bdacf646fc (mfd: tps65217: Add support for IRQs) since
-> > irq_set_parent() isn't exported.  This has been present in -next
-> > for getting on for a month, a patch was proposed adding the relevant
-> > export but that isn't present in -next yet.
-> > 
-> > The function is being used in order to enable lazy IRQ disabling for
-> > threaded interrupts:
-> > 
-> >       https://www.spinics.net/lists/arm-kernel/msg532864.html
-> > 
-> > What's the plan for getting this fixed in Linus' tree?
-> 
-> Here's the conversation:
-> 
->   https://www.spinics.net/lists/arm-kernel/msg531850.html
-> 
-> I'm waiting on a firm answer from Arnd and Thomas before applying
-> anything.
+Due to the 80-cols checkpatch warnings, several strings
+were broken into multiple lines. This is not considered
+a good practice anymore, as it makes harder to grep for
+strings at the source code. So, join those continuation
+lines.
 
-I don't understand what the hardware does, so I'm not really
-able to answer this. Maybe just mark the driver as 'depends on
-BROKEN' for now?
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 ++----
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c | 7 ++-----
+ 2 files changed, 4 insertions(+), 9 deletions(-)
 
-	Arnd
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 52081ddc9bf2..c0e464dcc7d0 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -793,8 +793,7 @@ static int vidioc_g_crop(struct file *file, void *priv,
+ 		cr->c.top = top;
+ 		cr->c.width = ctx->img_width - left - right;
+ 		cr->c.height = ctx->img_height - top - bottom;
+-		mfc_debug(2, "Cropping info [h264]: l=%d t=%d "
+-			"w=%d h=%d (r=%d b=%d fw=%d fh=%d\n", left, top,
++		mfc_debug(2, "Cropping info [h264]: l=%d t=%d w=%d h=%d (r=%d b=%d fw=%d fh=%d\n", left, top,
+ 			cr->c.width, cr->c.height, right, bottom,
+ 			ctx->buf_width, ctx->buf_height);
+ 	} else {
+@@ -802,8 +801,7 @@ static int vidioc_g_crop(struct file *file, void *priv,
+ 		cr->c.top = 0;
+ 		cr->c.width = ctx->img_width;
+ 		cr->c.height = ctx->img_height;
+-		mfc_debug(2, "Cropping info: w=%d h=%d fw=%d "
+-			"fh=%d\n", cr->c.width,	cr->c.height, ctx->buf_width,
++		mfc_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d\n", cr->c.width,	cr->c.height, ctx->buf_width,
+ 							ctx->buf_height);
+ 	}
+ 	return 0;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+index 81e1e4ce6c24..f4301d5bbd32 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
+@@ -1293,14 +1293,11 @@ static int s5p_mfc_run_init_dec_buffers(struct s5p_mfc_ctx *ctx)
+ 	 * First set the output frame buffers
+ 	 */
+ 	if (ctx->capture_state != QUEUE_BUFS_MMAPED) {
+-		mfc_err("It seems that not all destionation buffers were "
+-			"mmaped\nMFC requires that all destination are mmaped "
+-			"before starting processing\n");
++		mfc_err("It seems that not all destionation buffers were mmaped\nMFC requires that all destination are mmaped before starting processing\n");
+ 		return -EAGAIN;
+ 	}
+ 	if (list_empty(&ctx->src_queue)) {
+-		mfc_err("Header has been deallocated in the middle of"
+-			" initialization\n");
++		mfc_err("Header has been deallocated in the middle of initialization\n");
+ 		return -EIO;
+ 	}
+ 	temp_vb = list_entry(ctx->src_queue.next, struct s5p_mfc_buf, list);
+-- 
+2.7.4
