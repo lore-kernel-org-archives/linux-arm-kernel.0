@@ -1,37 +1,32 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 14 Oct 2016 18:30:33 +0530
-Subject: [PATCH 9/9] ARM: omap2plus_defconfig: Enable LP873X support
-In-Reply-To: <20161014130033.14172-1-lokeshvutla@ti.com>
-References: <20161014130033.14172-1-lokeshvutla@ti.com>
-Message-ID: <20161014130033.14172-10-lokeshvutla@ti.com>
+From: niklas.cassel@axis.com (Niklas Cassel)
+Date: Fri, 14 Oct 2016 15:08:08 +0200
+Subject: [RESEND PATCH 1/3] ARM: ARTPEC-6: add select MFD_SYSCON to
+ MACH_ARTPEC6
+Message-ID: <1476450488-4511-1-git-send-email-niklass@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LP873X family of PMICs are used in dra71x-evm, So enable the same.
+From: Niklas Cassel <niklas.cassel@axis.com>
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Since the ARTPEC-6 machine port already uses syscon,
+MACH_ARTPEC6 should select MFD_SYSCON.
+
+Signed-off-by: Niklas Cassel <niklas.cassel@axis.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-artpec/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 5695cff..e3fdf4d 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -267,11 +267,13 @@ CONFIG_TWL4030_WATCHDOG=m
- CONFIG_MFD_TI_AM335X_TSCADC=m
- CONFIG_MFD_PALMAS=y
- CONFIG_MFD_TPS65217=y
-+CONFIG_MFD_TI_LP873X=y
- CONFIG_MFD_TPS65218=y
- CONFIG_MFD_TPS65910=y
- CONFIG_TWL6040_CORE=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_LP872X=y
-+CONFIG_REGULATOR_LP873X=y
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_PBIAS=y
- CONFIG_REGULATOR_TI_ABB=y
+diff --git a/arch/arm/mach-artpec/Kconfig b/arch/arm/mach-artpec/Kconfig
+index 6cbe5a2..85a962a 100644
+--- a/arch/arm/mach-artpec/Kconfig
++++ b/arch/arm/mach-artpec/Kconfig
+@@ -14,6 +14,7 @@ config MACH_ARTPEC6
+ 	select HAVE_ARM_ARCH_TIMER
+ 	select HAVE_ARM_SCU
+ 	select HAVE_ARM_TWD if SMP
++	select MFD_SYSCON
+ 	help
+ 	  Support for Axis ARTPEC-6 ARM Cortex A9 Platform
+ 
 -- 
-2.9.3
+2.1.4
