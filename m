@@ -1,35 +1,53 @@
-From: paweljarosz3691@gmail.com (=?UTF-8?Q?Pawe=c5=82_Jarosz?=)
-Date: Fri, 14 Oct 2016 20:55:06 +0200
-Subject: [PATCH v3 1/2] devicetree: Add vendor prefix for Rikomagic
-In-Reply-To: <7746988.aAT8rmUZDV@phil>
-References: <cover.1475957884.git.paweljarosz3691@gmail.com>
- <d51c7719a314f723a0a69b932997502a2fe0e3ee.1475957884.git.paweljarosz3691@gmail.com>
- <7746988.aAT8rmUZDV@phil>
-Message-ID: <ded14706-1b9d-1808-283c-bdf3f1b51abf@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 14 Oct 2016 20:53:02 +0100
+Subject: [PATCH] arm64: kaslr: fix breakage with CONFIG_MODVERSIONS=y
+In-Reply-To: <20161014182637.GF6534@arm.com>
+References: <1476376929-29688-1-git-send-email-ard.biesheuvel@linaro.org>
+ <57FFE78E.4040002@codeaurora.org>
+ <CAKv+Gu-sdgkoQvbpgHXZmDyxg6NTGJpC+hsqzdbwTkny+TeqfA@mail.gmail.com>
+ <20161014182637.GF6534@arm.com>
+Message-ID: <CAKv+Gu9X3-mMk7_2R=LZ6V38f-dPYrcZkROrkQBde5H-kFcYbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> b/Documentation/devicetree/bindings/vendor-prefixes.txt index
->> 69caf14..3edfa08 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -224,6 +224,7 @@ realtek Realtek Semiconductor Corp.
->>   renesas	Renesas Electronics Corporation
->>   richtek	Richtek Technology Corporation
->>   ricoh	Ricoh Co. Ltd.
->> +rikomagic	Rikomagic
-> 				^ Rikomagic Tech Corp. Ltd
+On 14 October 2016 at 19:26, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 14, 2016 at 07:23:15PM +0100, Ard Biesheuvel wrote:
+>> On 13 October 2016 at 20:59, Timur Tabi <timur@codeaurora.org> wrote:
+>> > Ard Biesheuvel wrote:
+>> >>
+>> >> As it turns out, the KASLR code breaks CONFIG_MODVERSIONS, since the
+>> >> kcrctab has an absolute address field that is relocated at runtime
+>> >> when the kernel offset is randomized.
+>> >>
+>> >> This has been fixed already for PowerPC in the past, so simply wire up
+>> >> the existing code dealing with this issue.
+>> >>
+>> >> Signed-off-by: Ard Biesheuvel<ard.biesheuvel@linaro.org>
+>> >
+>> >
+>> > Tested-by: Timur Tabi <timur@codeaurora.org>
+>> >
+>>
+>> Thanks. I will resend this with a fixes: tag and a better description
 >
-> (according to http://www.rikomagic.com/en/index.html)
->
-> But I can change that myself. I'll just need to wait a bit more if Rob or Mark
-> want to Ack this vendor-prefix addition.
->
->
-> Heiko
+> Feel free, but I already queued it locally and added the Fixes tag myself.
+> I'm just waiting for Lorenzo to post a fix to the ACPI NUMA stuff, then
+> I'll send these two up together next week.
 
-Sorry for that.
+It's no big deal. The description is not entirely accurate in the
+sense that the kcrctab does not contain an absolute address field, but
+it masquerades as an absolute address so that the build system can
+populate the kcrctab entries using a linker script include containing
+name=value pairs. This does not only result in 4 wasted bytes per CRC,
+but on PPC64 and arm64 with CONFIG_RELOCATABLE=y, it also results in
+the breakage this patch addresses, and more importantly, results in a
+24 byte RELA entry per CRC in the __init section. So I intend to
+propose a patch to change this in the generic code, after which this
+patch could be reverted.
 
-
-Pawe?
+BTW, I spotted another KASLR issue, with ftrace this time, where it
+attempts to poke relative branches into modules targeting the core
+kernel, which is likely to fail when
+CONFIG_RANDOMIZE_MODULE_REGION_FULL=y. Should we address this at the
+Kconfig level? Or should we try to fix ftrace to support long
+branches?
