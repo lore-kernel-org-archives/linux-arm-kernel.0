@@ -1,74 +1,89 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 15 Oct 2016 14:03:20 +0200 (CEST)
-Subject: [PATCH 4/4] staging/vchi: Remove dependency on CONFIG_BROKEN.
-In-Reply-To: <20161015112740.GB11674@kroah.com>
-References: <20161003185209.27733-1-eric@anholt.net>
- <20161003185209.27733-5-eric@anholt.net> <20161013070535.GA23147@kroah.com>
- <886598225.386698.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
- <20161015112740.GB11674@kroah.com>
-Message-ID: <802844744.367926.03d4ebec-5a5b-44fb-88db-d39347125332.open-xchange@email.1und1.de>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Sat, 15 Oct 2016 14:39:59 +0200
+Subject: [PATCH V3 1/3] ACPI,
+ PCI IRQ: add PCI_USING penalty for ISA interrupts
+In-Reply-To: <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAJZ5v0iiU-1JwAows+WbE9v3pjYi9cRHDwtDEDBuCUjWk=o=KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Sat, Oct 15, 2016 at 6:31 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+> resource requirements") removed PCI_USING penalty from
+> acpi_pci_link_allocate function as there is no longer a fixed size penalty
+> array for both PCI interrupts greater than 16.
+>
+> The array size has been reduced to 16 and array name got prefixed as ISA
+> since it only is accountable for the ISA interrupts.
+>
+> The original change in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+> resource requirements") removed penalty assignment in the code for PCI
+> thinking that we will add the penalty later in acpi_irq_pci_sharing_penalty
+> function.
 
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 15. Oktober 2016 um
-> 13:27 geschrieben:
-> 
-> 
-> On Sat, Oct 15, 2016 at 10:35:25AM +0200, Stefan Wahren wrote:
-> > 
-> > > Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 13. Oktober 2016 um
-> > > 09:05 geschrieben:
-> > > 
-> > > 
-> > > On Mon, Oct 03, 2016 at 11:52:09AM -0700, Eric Anholt wrote:
-> > > > The driver builds now.
-> > > > 
-> > > > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > > > ---
-> > > >  drivers/staging/vc04_services/Kconfig | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/staging/vc04_services/Kconfig
-> > > > b/drivers/staging/vc04_services/Kconfig
-> > > > index 9676fb29075a..db8e1beb89f9 100644
-> > > > --- a/drivers/staging/vc04_services/Kconfig
-> > > > +++ b/drivers/staging/vc04_services/Kconfig
-> > > > @@ -1,6 +1,6 @@
-> > > >  config BCM2708_VCHIQ
-> > > >  	tristate "Videocore VCHIQ"
-> > > > -	depends on RASPBERRYPI_FIRMWARE && BROKEN
-> > > > +	depends on RASPBERRYPI_FIRMWARE
-> > > >  	default y
-> > > >  	help
-> > > >  		Kernel to VideoCore communication interface for the
-> > > 
-> > > I've dropped this patch from my branch as there are build errors on
-> > > arm64 systems still, and we don't want regressions like that.
-> > > 
-> > > I've forwarded you the error messages, and I'll be glad to add this
-> > > patch back once these issues are fixed.
-> > 
-> > I ask the author of this downstream pull request [1] to send the VHCIQ part
-> > as
-> > indiviual patches.
-> > He is interested to submit them upstream.
-> > 
-> > [1] - https://github.com/raspberrypi/linux/pull/1611
-> 
-> Ok, but what does that mean for us here?  The code should be all now
-> merged into our "upstream" trees, it just needs to be cleaned up
-> properly.
-> 
-> confused,
-> 
-> greg k-h
+I'd write the above this way:
 
-sorry for the confusion. I mean that he wants to send email patches based on
-your staging tree. So we avoid patching the kernel twice.
+"Commit 103544d86976 (ACPI,PCI,IRQ: reduce resource requirements)
+dropped the PCI_USING penalty from acpi_pci_link_allocate() with the
+assumption that the penalty will be added later in
+acpi_irq_pci_sharing_penalty()."
 
-The link was only for illustration that he already fixed most of the arm64 build
-issues.
+This conveys essentially the same information (up to some irrelevant
+bits), but in a clearer way IMO.
 
-Stefan
+>
+> However, this function only gets called if the IRQ number is greater than
+> 16 and acpi_irq_get_penalty function gets called before ACPI start in
+> acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
+> on iterating the link list.
+
+"However, acpi_irq_pci_sharing_penalty() is only called for IRQ
+numbers above 15.  Moreover, acpi_irq_get_penalty() is invoked by
+acpi_isa_irq_available() and acpi_penalize_isa_irq() before the ACPI
+initialization and the PCI interrupt links list is not ready at that
+point, so it cannot be relied on when computing the penalty."
+
+>
+> We need to add the PCI_USING penalty for ISA interrupts too if the link is
+> in use and matches our ISA IRQ number.
+
+"For this reason, the PCI_USING penalty has to be added in
+acpi_pci_link_allocate() directly if the link has been enabled
+successfully and the IRQ number is within the ISA range."
+
+IIUC
+
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..a212709 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -619,6 +619,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>                             acpi_device_bid(link->device));
+>                 return -ENODEV;
+>         } else {
+> +               if (link->irq.active < ACPI_MAX_ISA_IRQS)
+> +                       acpi_isa_irq_penalty[link->irq.active] +=
+> +                               PIRQ_PENALTY_PCI_USING;
+> +
+
+There's no need to break the line here and I would put the above after
+the printk().
+
+Or even after the whole "else" branch (which is unnecessary, but let's
+limit changes in this patch).
+
+>                 printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+>                        acpi_device_name(link->device),
+>                        acpi_device_bid(link->device), link->irq.active);
+> --
+
+Thanks,
+Rafael
