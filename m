@@ -1,98 +1,104 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 15 Oct 2016 18:16:05 +0200 (CEST)
-Subject: Low network throughput on i.MX28
-In-Reply-To: <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
-Message-ID: <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 15 Oct 2016 12:58:56 -0400
+Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
+ interrupts
+In-Reply-To: <CAJZ5v0iiU-1JwAows+WbE9v3pjYi9cRHDwtDEDBuCUjWk=o=KA@mail.gmail.com>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0iiU-1JwAows+WbE9v3pjYi9cRHDwtDEDBuCUjWk=o=KA@mail.gmail.com>
+Message-ID: <4b3f9df2-3fba-74f2-e944-aa474d35fed4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafael,
 
-> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Oktober 2016 um 11:41
-> geschrieben:
+On 10/15/2016 8:39 AM, Rafael J. Wysocki wrote:
+> On Sat, Oct 15, 2016 at 6:31 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+>> resource requirements") removed PCI_USING penalty from
+>> acpi_pci_link_allocate function as there is no longer a fixed size penalty
+>> array for both PCI interrupts greater than 16.
+>>
+>> The array size has been reduced to 16 and array name got prefixed as ISA
+>> since it only is accountable for the ISA interrupts.
+>>
+>> The original change in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+>> resource requirements") removed penalty assignment in the code for PCI
+>> thinking that we will add the penalty later in acpi_irq_pci_sharing_penalty
+>> function.
 > 
+> I'd write the above this way:
 > 
+> "Commit 103544d86976 (ACPI,PCI,IRQ: reduce resource requirements)
+> dropped the PCI_USING penalty from acpi_pci_link_allocate() with the
+> assumption that the penalty will be added later in
+> acpi_irq_pci_sharing_penalty()."
 > 
+> This conveys essentially the same information (up to some irrelevant
+> bits), but in a clearer way IMO.
 > 
-> Hi Stefan,
+>>
+>> However, this function only gets called if the IRQ number is greater than
+>> 16 and acpi_irq_get_penalty function gets called before ACPI start in
+>> acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
+>> on iterating the link list.
 > 
-> Am 15. Oktober 2016 10:59:41 MESZ, schrieb Stefan Wahren
-> <stefan.wahren@i2se.com>:
-> >Hi J?rg,
-> >
-> >> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Oktober 2016 um
-> >10:46
-> >> geschrieben:
-> >> 
-> >> 
-> >> Thanks!
-> >> 
-> >> 
-> >> For the record:
-> >> 
-> >> Note, this is the result for the wireless interface.
-> >> 
-> >> I got one of my custom boards running the legacy Linux Kernel 2.6.35
-> >> officially supported from Freescale (NXP) and the bcmdhd driver from
-> >> the Wiced project, where I get >20Mbps TCP throughput. The firmware
-> >> version reported is:
-> >> 
-> >> # wl ver
-> >> 5.90 RC115.2
-> >> wl0: Apr 24 2014 14:08:41 version 5.90.195.89.24 FWID 01-bc2d0891
-> >> 
-> >> 
-> >> I got it also running with the Linux Kernel 4.1.15 from Freescale
-> >[2],
-> >> which is not officially supported for the i.MX28 target, with the
-> >> latest bcmdhd version where I get <7Mbps TCP throughput (which is
-> >much
-> >> the same I get with the brcmfmac driver). The firmware version
-> >reported
-> >> is:
-> >> 
-> >> # wl ver
-> >> 1.107 RC5.0
-> >> wl0: Aug??8 2016 02:17:48 version 5.90.232 FWID 01-0
-> >> 
-> >> So, probably something is missing in the newer Kernel version, which
-> >is
-> >> present in the legacy Kernel 2.6.35.
-> >> 
-> >> [1]
-> >http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
-> >> imx_2.6.35_1.1.0
-> >> [2]
-> >http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
-> >> imx_4.1.15_1.0.0_ga
-> >
-> >during implementation of DDR mode for the mmc driver [1] i noticed a
-> >performance
-> >gap between the vendor kernel and mainline by a factor of 2. I expect
-> >that your
-> >wireless interface is connected via SDIO.
+> "However, acpi_irq_pci_sharing_penalty() is only called for IRQ
+> numbers above 15.  Moreover, acpi_irq_get_penalty() is invoked by
+> acpi_isa_irq_available() and acpi_penalize_isa_irq() before the ACPI
+> initialization and the PCI interrupt links list is not ready at that
+> point, so it cannot be relied on when computing the penalty."
 > 
-> Yes, it is. I had the suspicion that the MMC or the DMA driver is the
-> bootleneck, too.
+>>
+>> We need to add the PCI_USING penalty for ISA interrupts too if the link is
+>> in use and matches our ISA IRQ number.
 > 
-> >
-> >[1] -
-> >http://linux-arm-kernel.infradead.narkive.com/GNkqjvo8/patch-rfc-0-3-mmc-mxs-mmc-implement-ddr-support
+> "For this reason, the PCI_USING penalty has to be added in
+> acpi_pci_link_allocate() directly if the link has been enabled
+> successfully and the IRQ number is within the ISA range."
 > 
-> Looks like the patches might help.
+> IIUC
+> 
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/acpi/pci_link.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+>> index c983bf7..a212709 100644
+>> --- a/drivers/acpi/pci_link.c
+>> +++ b/drivers/acpi/pci_link.c
+>> @@ -619,6 +619,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>>                             acpi_device_bid(link->device));
+>>                 return -ENODEV;
+>>         } else {
+>> +               if (link->irq.active < ACPI_MAX_ISA_IRQS)
+>> +                       acpi_isa_irq_penalty[link->irq.active] +=
+>> +                               PIRQ_PENALTY_PCI_USING;
+>> +
+> 
+> There's no need to break the line here and I would put the above after
+> the printk().
+> 
+> Or even after the whole "else" branch (which is unnecessary, but let's
+> limit changes in this patch).
+> 
+>>                 printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+>>                        acpi_device_name(link->device),
+>>                        acpi_device_bid(link->device), link->irq.active);
+>> --
+> 
 
-Unfortunately not, the performance gain is smaller than expected.
+Thanks for the feedback. I can resubmit with the comments corrected. I'll wait
+until I hear from Bjorn first.
 
-> Have you tried SDIO wifi so far?
-
-No.
-
+> Thanks,
+> Rafael
 > 
-> J?rg
->
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
