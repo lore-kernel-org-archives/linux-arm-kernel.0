@@ -1,50 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 15 Oct 2016 20:27:11 +0300
-Subject: [PATCH] clk: samsung: clk-exynos-audss: Fix module autoload
-In-Reply-To: <1476470645-22159-1-git-send-email-javier@osg.samsung.com>
-References: <1476470645-22159-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20161015172711.GA6465@kozik-lap>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sat, 15 Oct 2016 23:12:33 +0530
+Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
+In-Reply-To: <1475672732-17111-3-git-send-email-bgolaszewski@baylibre.com>
+References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
+ <1475672732-17111-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <2d276e51-9d37-8648-4aad-283bb2b23626@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 03:44:05PM -0300, Javier Martinez Canillas wrote:
-> If the driver is built as a module, autoload won't work because the module
-> alias information is not filled. So user-space can't match the registered
-> device with the corresponding module.
+On Wednesday 05 October 2016 06:35 PM, Bartosz Golaszewski wrote:
+> From: Karl Beldan <kbeldan@baylibre.com>
 > 
-> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+> Add pins used by the LCD controller and a disabled LCDC node to be
+> reused in device trees including da850.dtsi.
 > 
-> Before this patch:
-> 
-> $ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-> alias:          platform:exynos-audss-clk
-> 
-> After this patch:
-> 
-> $ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-> alias:          platform:exynos-audss-clk
-> alias:          of:N*T*Csamsung,exynos5420-audss-clockC*
-> alias:          of:N*T*Csamsung,exynos5420-audss-clock
-> alias:          of:N*T*Csamsung,exynos5410-audss-clockC*
-> alias:          of:N*T*Csamsung,exynos5410-audss-clock
-> alias:          of:N*T*Csamsung,exynos5250-audss-clockC*
-> alias:          of:N*T*Csamsung,exynos5250-audss-clock
-> alias:          of:N*T*Csamsung,exynos4210-audss-clockC*
-> alias:          of:N*T*Csamsung,exynos4210-audss-clock
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
+> [Bartosz:
+>   - added the commit description
+>   - changed the dt node name to a generic one
+>   - added a da850-specific compatible string
+>   - removed the tilcdc,panel node
+>   - moved the pins definitions to da850.dtsi as suggested by
+>     Sekhar Nori (was in: da850-lcdk.dts)]
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
+>  arch/arm/boot/dts/da850.dtsi | 29 +++++++++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
 > 
->  drivers/clk/samsung/clk-exynos-audss.c | 1 +
->  1 file changed, 1 insertion(+)
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index f79e1b9..32908ae 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
 
-Indeed, this was missed by 4d252fd5719b thus I think it could be
-mentioned as fix tag (just for reference...):
-Fixes: 4d252fd5719b ("clk: samsung: Allow modular build of the Audio Subsystem CLKCON driver")
+> @@ -399,6 +420,14 @@
+>  				<&edma0 0 1>;
+>  			dma-names = "tx", "rx";
+>  		};
+> +
+> +		display: display at 213000 {
+> +			compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
 
-Anyway, this fixes the issue, so:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+This should instead be:
 
-Best regards,
-Krzysztof
+compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
+
+as the closest match should appear first in the list.
+
+> +			reg = <0x213000 0x1000>;
+> +			interrupt-parent = <&intc>
+
+No need of specifying the interrupt-parent as it is assumed to be that
+from the parent node (soc) if left unspecified.
+
+I made these two fixes locally and pushed the two patches in this series
+to v4.10/dt branch of my tree (for URL see MAINTAINERS). Can you take a
+look and make sure I did not mess anything up?
+
+Regards,
+Sekhar
