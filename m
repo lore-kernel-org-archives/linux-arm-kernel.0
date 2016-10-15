@@ -1,121 +1,52 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sat, 15 Oct 2016 00:31:06 -0400
-Subject: [PATCH V3 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
-References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1476505867-24599-3-git-send-email-okaya@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 15 Oct 2016 09:53:30 +0200 (CEST)
+Subject: [PATCH 3/4] ARM: bcm2835: Add #define for VCHIQ property message.
+In-Reply-To: <20161003185209.27733-4-eric@anholt.net>
+References: <20161003185209.27733-1-eric@anholt.net>
+ <20161003185209.27733-4-eric@anholt.net>
+Message-ID: <487621239.358635.2bd73c71-f221-4323-833d-b752e7c41a53.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCI function was removed in two steps (first refactor and then remove).
-This patch does the revert in one step.
+Hi Greg,
 
-The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-refactored the original code so that SCI penalty is calculated dynamically
-by the time get_penalty function is called. This patch does a partial
-revert for the SCI functionality only.
+> Eric Anholt <eric@anholt.net> hat am 3. Oktober 2016 um 20:52 geschrieben:
+> 
+> 
+> This comes from the downstream tree and is needed for the new VCHIQ
+> driver in staging.
 
-The commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize function") is
-for the removal of the function. SCI penalty API was replaced by the
-runtime penalty calculation based on the value of
-acpi_gbl_FADT.sci_interrupt.
+maybe it's not clear from the commit message, but RPI_FIRMWARE_VCHIQ_INIT is
+already used in
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
 
-The IRQ type does not get updated at the right time for some platforms and
-results in incorrect penalty assignment for PCI IRQs as
-irq_get_trigger_type returns the wrong type.
+So this patch fixes also a build issue.
 
-The register_gsi function delivers the IRQ found in the ACPI table to
-the interrupt controller driver.  Penalties are calculated before a
-link object is enabled to find out which interrupt has the least number
-of users. By the time penalties are calculated, the IRQ is not registered
-yet and the API returns the wrong type.
-
-Tested-by: Jonathan Liu <net147@gmail.com>
-Tested-by: Ondrej Zary <linux@rainbow-software.org>
-Link: https://lkml.org/lkml/2016/10/4/283
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
----
- arch/x86/kernel/acpi/boot.c |  1 +
- drivers/acpi/pci_link.c     | 32 +++++++++++++-------------------
- include/linux/acpi.h        |  1 +
- 3 files changed, 15 insertions(+), 19 deletions(-)
-
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index 90d84c3..0ffd26e 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
- 		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
- 
- 	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
-+	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
- 
- 	/*
- 	 * stash over-ride to indicate we've been here
-diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-index a212709..1934e2a 100644
---- a/drivers/acpi/pci_link.c
-+++ b/drivers/acpi/pci_link.c
-@@ -494,27 +494,10 @@ static int acpi_irq_pci_sharing_penalty(int irq)
- 
- static int acpi_irq_get_penalty(int irq)
- {
--	int penalty = 0;
--
--	/*
--	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
--	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
--	* use for PCI IRQs.
--	*/
--	if (irq == acpi_gbl_FADT.sci_interrupt) {
--		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
--
--		if (type != IRQ_TYPE_LEVEL_LOW)
--			penalty += PIRQ_PENALTY_ISA_ALWAYS;
--		else
--			penalty += PIRQ_PENALTY_PCI_USING;
--	}
--
- 	if (irq < ACPI_MAX_ISA_IRQS)
--		return penalty + acpi_isa_irq_penalty[irq];
-+		return acpi_isa_irq_penalty[irq];
- 
--	penalty += acpi_irq_pci_sharing_penalty(irq);
--	return penalty;
-+	return acpi_irq_pci_sharing_penalty(irq);
- }
- 
- int __init acpi_irq_penalty_init(void)
-@@ -885,6 +868,17 @@ bool acpi_isa_irq_available(int irq)
- 		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
- }
- 
-+void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-+{
-+	if (irq >= 0 && irq < ARRAY_SIZE(acpi_isa_irq_penalty)) {
-+		if (trigger != ACPI_MADT_TRIGGER_LEVEL ||
-+		    polarity != ACPI_MADT_POLARITY_ACTIVE_LOW)
-+			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_ISA_ALWAYS;
-+		else
-+			acpi_isa_irq_penalty[irq] += PIRQ_PENALTY_PCI_USING;
-+	}
-+}
-+
- /*
-  * Over-ride default table to reserve additional IRQs for use by ISA
-  * e.g. acpi_irq_isa=5
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index c5eaf2f..67d1d3e 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -318,6 +318,7 @@ struct pci_dev;
- int acpi_pci_irq_enable (struct pci_dev *dev);
- void acpi_penalize_isa_irq(int irq, int active);
- bool acpi_isa_irq_available(int irq);
-+void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
- void acpi_pci_irq_disable (struct pci_dev *dev);
- 
- extern int ec_read(u8 addr, u8 *val);
--- 
-1.9.1
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  include/soc/bcm2835/raspberrypi-firmware.h | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h
+> b/include/soc/bcm2835/raspberrypi-firmware.h
+> index 3fb357193f09..a06baffdf580 100644
+> --- a/include/soc/bcm2835/raspberrypi-firmware.h
+> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
+> @@ -109,6 +109,8 @@ enum rpi_firmware_property_tag {
+>  	RPI_FIRMWARE_FRAMEBUFFER_SET_OVERSCAN =               0x0004800a,
+>  	RPI_FIRMWARE_FRAMEBUFFER_SET_PALETTE =                0x0004800b,
+>  
+> +	RPI_FIRMWARE_VCHIQ_INIT =                             0x00048010,
+> +
+>  	RPI_FIRMWARE_GET_COMMAND_LINE =                       0x00050001,
+>  	RPI_FIRMWARE_GET_DMA_CHANNELS =                       0x00060001,
+>  };
+> -- 
+> 2.9.3
+> 
+> 
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
