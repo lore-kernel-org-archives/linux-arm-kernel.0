@@ -1,58 +1,76 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 15 Oct 2016 10:35:25 +0200 (CEST)
-Subject: [PATCH 4/4] staging/vchi: Remove dependency on CONFIG_BROKEN.
-In-Reply-To: <20161013070535.GA23147@kroah.com>
-References: <20161003185209.27733-1-eric@anholt.net>
- <20161003185209.27733-5-eric@anholt.net> <20161013070535.GA23147@kroah.com>
-Message-ID: <886598225.386698.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Sat, 15 Oct 2016 10:46:11 +0200
+Subject: Low network throughput on i.MX28
+In-Reply-To: <20161014081349.1afb22c6@ipc1.ka-ro>
+References: <1476313753.2065.11.camel@embedded.rocks>
+ <20161013084807.6a231fdb@ipc1.ka-ro>
+ <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+ <20161014081349.1afb22c6@ipc1.ka-ro>
+Message-ID: <1476521171.1670.2.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 13. Oktober 2016 um
-> 09:05 geschrieben:
+On Fri, 2016-10-14 at 08:13 +0200, Lothar Wa?mann wrote:
+> Hi,
 > 
+> On Thu, 13 Oct 2016 21:43:00 +0200 J?rg Krause wrote:
+> > Am 13. Oktober 2016 08:48:07 MESZ, schrieb "Lothar Wa?mann" <LW@KAR
+> > O-electronics.de>:
+> > > On Thu, 13 Oct 2016 01:09:13 +0200 J?rg Krause wrote:
 > 
-> On Mon, Oct 03, 2016 at 11:52:09AM -0700, Eric Anholt wrote:
-> > The driver builds now.
+> [...]
+> > > This is the iperf output on a TX28 with current mainline kernel
+> > > (4.8.0-rc5):
+> > > ------------------------------------------------------------
+> > > Client connecting to 192.168.100.1, TCP port 5001
+> > > TCP window size: 43.8 KByte (default)
+> > > ------------------------------------------------------------
+> > > [??3] local 192.168.100.56 port 60325 connected with
+> > > 192.168.100.1 port
+> > > 5001
+> > > [ ID] Interval???????Transfer?????Bandwidth
+> > > [??3]??0.0-10.0 sec??57.5 MBytes??48.2 Mbits/sec
+> > > 
+> > > You might check your kernel DEBUG configs (especially
+> > > CONFIG_DEBUG_PAGEALLOC).
 > > 
-> > Signed-off-by: Eric Anholt <eric@anholt.net>
-> > ---
-> >  drivers/staging/vc04_services/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > Thanks for sharing the iperf output. What LAN transceiver does the
+> > TX28 has assembled?
 > > 
-> > diff --git a/drivers/staging/vc04_services/Kconfig
-> > b/drivers/staging/vc04_services/Kconfig
-> > index 9676fb29075a..db8e1beb89f9 100644
-> > --- a/drivers/staging/vc04_services/Kconfig
-> > +++ b/drivers/staging/vc04_services/Kconfig
-> > @@ -1,6 +1,6 @@
-> >  config BCM2708_VCHIQ
-> >  	tristate "Videocore VCHIQ"
-> > -	depends on RASPBERRYPI_FIRMWARE && BROKEN
-> > +	depends on RASPBERRYPI_FIRMWARE
-> >  	default y
-> >  	help
-> >  		Kernel to VideoCore communication interface for the
 > 
-> I've dropped this patch from my branch as there are build errors on
-> arm64 systems still, and we don't want regressions like that.
-> 
-> I've forwarded you the error messages, and I'll be glad to add this
-> patch back once these issues are fixed.
+> The ethernet PHY is an SMSC LAN8710A.
 
-I ask the author of this downstream pull request [1] to send the VHCIQ part as
-indiviual patches.
-He is interested to submit them upstream.
+Thanks!
 
-[1] - https://github.com/raspberrypi/linux/pull/1611
 
-> 
-> thanks,
-> 
-> greg k-h
-> 
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+For the record:
+
+Note, this is the result for the wireless interface.
+
+I got one of my custom boards running the legacy Linux Kernel 2.6.35
+officially supported from Freescale (NXP) and the bcmdhd driver from
+the Wiced project, where I get >20Mbps TCP throughput. The firmware
+version reported is:
+
+# wl ver
+5.90 RC115.2
+wl0: Apr 24 2014 14:08:41 version 5.90.195.89.24 FWID 01-bc2d0891
+
+
+I got it also running with the Linux Kernel 4.1.15 from Freescale [2],
+which is not officially supported for the i.MX28 target, with the
+latest bcmdhd version where I get <7Mbps TCP throughput (which is much
+the same I get with the brcmfmac driver). The firmware version reported
+is:
+
+# wl ver
+1.107 RC5.0
+wl0: Aug??8 2016 02:17:48 version 5.90.232 FWID 01-0
+
+So, probably something is missing in the newer Kernel version, which is
+present in the legacy Kernel 2.6.35.
+
+[1] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
+imx_2.6.35_1.1.0
+[2] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
+imx_4.1.15_1.0.0_ga
