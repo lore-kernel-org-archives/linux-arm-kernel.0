@@ -1,74 +1,58 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Sat, 15 Oct 2016 16:12:02 +0800
-Subject: [arm-soc:to-build 23/23] arch/sh/kernel/cpu/clock.c:25:6: warning:
- 'ret' may be used uninitialized in this function
-Message-ID: <201610151651.uAeRGaCR%fengguang.wu@intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 15 Oct 2016 10:35:25 +0200 (CEST)
+Subject: [PATCH 4/4] staging/vchi: Remove dependency on CONFIG_BROKEN.
+In-Reply-To: <20161013070535.GA23147@kroah.com>
+References: <20161003185209.27733-1-eric@anholt.net>
+ <20161003185209.27733-5-eric@anholt.net> <20161013070535.GA23147@kroah.com>
+Message-ID: <886598225.386698.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
-head:   0f460ef4d0b0e50f64b03962048dec6fa1d40d20
-commit: 0f460ef4d0b0e50f64b03962048dec6fa1d40d20 [23/23] Revert "Disable "maybe-uninitialized" warning globally"
-config: sh-allmodconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 0f460ef4d0b0e50f64b03962048dec6fa1d40d20
-        # save the attached .config to linux build tree
-        make.cross ARCH=sh 
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 13. Oktober 2016 um
+> 09:05 geschrieben:
+> 
+> 
+> On Mon, Oct 03, 2016 at 11:52:09AM -0700, Eric Anholt wrote:
+> > The driver builds now.
+> > 
+> > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > ---
+> >  drivers/staging/vc04_services/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/staging/vc04_services/Kconfig
+> > b/drivers/staging/vc04_services/Kconfig
+> > index 9676fb29075a..db8e1beb89f9 100644
+> > --- a/drivers/staging/vc04_services/Kconfig
+> > +++ b/drivers/staging/vc04_services/Kconfig
+> > @@ -1,6 +1,6 @@
+> >  config BCM2708_VCHIQ
+> >  	tristate "Videocore VCHIQ"
+> > -	depends on RASPBERRYPI_FIRMWARE && BROKEN
+> > +	depends on RASPBERRYPI_FIRMWARE
+> >  	default y
+> >  	help
+> >  		Kernel to VideoCore communication interface for the
+> 
+> I've dropped this patch from my branch as there are build errors on
+> arm64 systems still, and we don't want regressions like that.
+> 
+> I've forwarded you the error messages, and I'll be glad to add this
+> patch back once these issues are fixed.
 
-All warnings (new ones prefixed by >>):
+I ask the author of this downstream pull request [1] to send the VHCIQ part as
+indiviual patches.
+He is interested to submit them upstream.
 
-   arch/sh/kernel/cpu/clock.c: In function 'clk_init':
->> arch/sh/kernel/cpu/clock.c:25:6: warning: 'ret' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     int ret;
-         ^~~
+[1] - https://github.com/raspberrypi/linux/pull/1611
 
-vim +/ret +25 arch/sh/kernel/cpu/clock.c
-
-36ddf31b6 Paul Mundt  2006-01-16   9   *	Written by Tuukka Tikkanen <tuukka.tikkanen@elektrobit.com>
-36ddf31b6 Paul Mundt  2006-01-16  10   *
-1d118562c Paul Mundt  2006-12-01  11   *  Modified for omap shared clock framework by Tony Lindgren <tony@atomide.com>
-1d118562c Paul Mundt  2006-12-01  12   *
-36ddf31b6 Paul Mundt  2006-01-16  13   * This file is subject to the terms and conditions of the GNU General Public
-36ddf31b6 Paul Mundt  2006-01-16  14   * License.  See the file "COPYING" in the main directory of this archive
-36ddf31b6 Paul Mundt  2006-01-16  15   * for more details.
-36ddf31b6 Paul Mundt  2006-01-16  16   */
-36ddf31b6 Paul Mundt  2006-01-16  17  #include <linux/kernel.h>
-36ddf31b6 Paul Mundt  2006-01-16  18  #include <linux/init.h>
-51a5006af Paul Mundt  2010-03-08  19  #include <linux/clk.h>
-36ddf31b6 Paul Mundt  2006-01-16  20  #include <asm/clock.h>
-253b0887b Paul Mundt  2009-05-13  21  #include <asm/machvec.h>
-36ddf31b6 Paul Mundt  2006-01-16  22  
-36ddf31b6 Paul Mundt  2006-01-16  23  int __init clk_init(void)
-36ddf31b6 Paul Mundt  2006-01-16  24  {
-253b0887b Paul Mundt  2009-05-13 @25  	int ret;
-36ddf31b6 Paul Mundt  2006-01-16  26  
-15f0c8f2f Rich Felker 2016-07-31  27  #ifndef CONFIG_COMMON_CLK
-253b0887b Paul Mundt  2009-05-13  28  	ret = arch_clk_init();
-253b0887b Paul Mundt  2009-05-13  29  	if (unlikely(ret)) {
-253b0887b Paul Mundt  2009-05-13  30  		pr_err("%s: CPU clock registration failed.\n", __func__);
-253b0887b Paul Mundt  2009-05-13  31  		return ret;
-36ddf31b6 Paul Mundt  2006-01-16  32  	}
-15f0c8f2f Rich Felker 2016-07-31  33  #endif
-
-:::::: The code at line 25 was first introduced by commit
-:::::: 253b0887b3736160feac9ccdcf146a2073e41463 sh: clkfwk: Rework legacy CPG clock handling.
-
-:::::: TO: Paul Mundt <lethal@linux-sh.org>
-:::::: CC: Paul Mundt <lethal@linux-sh.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 42098 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161015/dd2d2730/attachment-0001.gz>
+> 
+> thanks,
+> 
+> greg k-h
+> 
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
