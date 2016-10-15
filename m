@@ -1,29 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 15 Oct 2016 15:35:49 +0100
-Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
- switching
-In-Reply-To: <CAGXu5jKMZTo7m=ygm7x8w__1my0jiQiVAiv9NowQ8pfQqCnjmw@mail.gmail.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <CAGXu5jKMZTo7m=ygm7x8w__1my0jiQiVAiv9NowQ8pfQqCnjmw@mail.gmail.com>
-Message-ID: <20161015143548.GA31114@MBP.local>
+From: manu@bidouilliste.com (Emmanuel Vadot)
+Date: Sat, 15 Oct 2016 17:23:40 +0200
+Subject: [PATCH] ARM: dts: sunxi: Add cpu-supply for Olimex A20 EVB
+Message-ID: <20161015152340.43315-1-manu@bidouilliste.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+sun7i-a20-olimex-som-evb.dts doesn't contain cpu-supply needed for
+voltage-scaling with cpufreq-dt so define it.
+The default voltages are defined in sun7i-a20.dtsi.
 
-On Fri, Oct 14, 2016 at 02:44:33PM -0700, Kees Cook wrote:
-> Just checking in on this feature -- I don't see it in -next nor
-> already in the tree. Is there any chance this is going to make the
-> v4.9 merge window?
+Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-As I said in the cover letter, I'll rebase it on top of 4.9-rc1 as there
-are some clean-ups that this series would conflict with. So I am
-targeting 4.10 with this patch series.
-
-> It didn't sound like there were any unresolved issues remaining?
-
-There are a few issues spotted by Mark which I'll address in the next
-version, but nothing major.
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+index 23aacce..134e0c1 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -88,6 +88,10 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
+ &codec {
+ 	status = "okay";
+ };
 -- 
-Catalin
+2.9.2
