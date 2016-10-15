@@ -1,73 +1,24 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 15 Oct 2016 19:32:01 +0200
-Subject: [PATCH 1/2] i2c: bcm-iproc: constify i2c_adapter_quirks structures
-In-Reply-To: <1476552722-12352-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1476552722-12352-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1476552722-12352-2-git-send-email-Julia.Lawall@lip6.fr>
+From: ayaka@soulik.info (ayaka)
+Date: Sun, 16 Oct 2016 02:03:11 +0800
+Subject: rockchip: drm: analogix_dp-rockchip would stock the kernel
+Message-ID: <1a7ebbe4-a9d8-610d-7cd5-41f5fe8355a5@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for i2c_adapter_quirks structures that are only stored in the
-quirks field of an i2c_adapter structure.  This field is declared
-const, so i2c_adapter_quirks structures that have this property can be
-declared as const also.
-
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct i2c_adapter_quirks i at p = { ... };
-
-@ok@
-identifier r.i;
-struct i2c_adapter e;
-position p;
-@@
-e.quirks = &i at p;
-
-@bad@
-position p != {r.p,ok.p};
-identifier r.i;
-struct i2c_adapter_quirks e;
-@@
-e at i@p
-
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct i2c_adapter_quirks i = { ... };
-// </smpl>
-
-The effect on the layout of the .o file is shown by the following
-output of the size command, first before then after the
-transformation:
-
-   text    data     bss     dec     hex filename
-   3458     744       8    4210    1072 drivers/i2c/busses/i2c-bcm-iproc.o
-   3490     720       8    4218    107a drivers/i2c/busses/i2c-bcm-iproc.o
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/i2c/busses/i2c-bcm-iproc.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
-index 326b3db..318df55 100644
---- a/drivers/i2c/busses/i2c-bcm-iproc.c
-+++ b/drivers/i2c/busses/i2c-bcm-iproc.c
-@@ -395,7 +395,7 @@ static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
- 	.functionality = bcm_iproc_i2c_functionality,
- };
- 
--static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
-+static const struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
- 	/* need to reserve one byte in the FIFO for the slave address */
- 	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
- };
+Hello:
+    I meet a problem with eDP in rk3288 with the linux next 20161006, it 
+is just like the early stage of 4.4
+kernel.  I have added a eDP panel entry in the firefly reload board, 
+once the kernel loaded analogix_dp-rockchip.ko, after printed the 
+following two lines, the kernel stop working.
+rockchip-drm display-subsystem: bound ff940000.vop (ops 
+vop_component_ops [rockchipdrm])
+rockchip-drm display-subsystem: bound ff930000.vop (ops 
+vop_component_ops [rockchipdrm])
+In the early June of the 4.4 kernel, I meet the same problem with rk3288 
+evb board with different error message, I have to disable the display 
+system that time.
+   In the today test, I meet the same problem with rk3399 evb board in 4.4.
+   I have no idea what caused that, and it is a little hard to debug as 
+kernel still would never kill that task.
+                                                             Randy Li
