@@ -1,78 +1,59 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg_Krause?=)
-Date: Sat, 15 Oct 2016 13:18:36 +0200
-Subject: Low network throughput on i.MX28
-In-Reply-To: <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro> <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
-Message-ID: <008013C9-A089-4EAB-94B3-2D0490E64CC5@embedded.rocks>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 15 Oct 2016 13:27:40 +0200
+Subject: [PATCH 4/4] staging/vchi: Remove dependency on CONFIG_BROKEN.
+In-Reply-To: <886598225.386698.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
+References: <20161003185209.27733-1-eric@anholt.net>
+ <20161003185209.27733-5-eric@anholt.net>
+ <20161013070535.GA23147@kroah.com>
+ <886598225.386698.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
+Message-ID: <20161015112740.GB11674@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Oct 15, 2016 at 10:35:25AM +0200, Stefan Wahren wrote:
+> 
+> > Greg Kroah-Hartman <gregkh@linuxfoundation.org> hat am 13. Oktober 2016 um
+> > 09:05 geschrieben:
+> > 
+> > 
+> > On Mon, Oct 03, 2016 at 11:52:09AM -0700, Eric Anholt wrote:
+> > > The driver builds now.
+> > > 
+> > > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > > ---
+> > >  drivers/staging/vc04_services/Kconfig | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/staging/vc04_services/Kconfig
+> > > b/drivers/staging/vc04_services/Kconfig
+> > > index 9676fb29075a..db8e1beb89f9 100644
+> > > --- a/drivers/staging/vc04_services/Kconfig
+> > > +++ b/drivers/staging/vc04_services/Kconfig
+> > > @@ -1,6 +1,6 @@
+> > >  config BCM2708_VCHIQ
+> > >  	tristate "Videocore VCHIQ"
+> > > -	depends on RASPBERRYPI_FIRMWARE && BROKEN
+> > > +	depends on RASPBERRYPI_FIRMWARE
+> > >  	default y
+> > >  	help
+> > >  		Kernel to VideoCore communication interface for the
+> > 
+> > I've dropped this patch from my branch as there are build errors on
+> > arm64 systems still, and we don't want regressions like that.
+> > 
+> > I've forwarded you the error messages, and I'll be glad to add this
+> > patch back once these issues are fixed.
+> 
+> I ask the author of this downstream pull request [1] to send the VHCIQ part as
+> indiviual patches.
+> He is interested to submit them upstream.
+> 
+> [1] - https://github.com/raspberrypi/linux/pull/1611
 
+Ok, but what does that mean for us here?  The code should be all now
+merged into our "upstream" trees, it just needs to be cleaned up
+properly.
 
-Am 15. Oktober 2016 10:59:41 MESZ, schrieb Stefan Wahren <stefan.wahren@i2se.com>:
->Hi J?rg,
->
->> J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Oktober 2016 um
->10:46
->> geschrieben:
->> 
->> 
->> Thanks!
->> 
->> 
->> For the record:
->> 
->> Note, this is the result for the wireless interface.
->> 
->> I got one of my custom boards running the legacy Linux Kernel 2.6.35
->> officially supported from Freescale (NXP) and the bcmdhd driver from
->> the Wiced project, where I get >20Mbps TCP throughput. The firmware
->> version reported is:
->> 
->> # wl ver
->> 5.90 RC115.2
->> wl0: Apr 24 2014 14:08:41 version 5.90.195.89.24 FWID 01-bc2d0891
->> 
->> 
->> I got it also running with the Linux Kernel 4.1.15 from Freescale
->[2],
->> which is not officially supported for the i.MX28 target, with the
->> latest bcmdhd version where I get <7Mbps TCP throughput (which is
->much
->> the same I get with the brcmfmac driver). The firmware version
->reported
->> is:
->> 
->> # wl ver
->> 1.107 RC5.0
->> wl0: Aug??8 2016 02:17:48 version 5.90.232 FWID 01-0
->> 
->> So, probably something is missing in the newer Kernel version, which
->is
->> present in the legacy Kernel 2.6.35.
->> 
->> [1]
->http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
->> imx_2.6.35_1.1.0
->> [2]
->http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?h=
->> imx_4.1.15_1.0.0_ga
->
->during implementation of DDR mode for the mmc driver [1] i noticed a
->performance
->gap between the vendor kernel and mainline by a factor of 2. I expect
->that your
->wireless interface is connected via SDIO.
+confused,
 
-I wonder if this [2] might be related. As far as I can see it is not present in mainline.
-
->
->[1] -
->http://linux-arm-kernel.infradead.narkive.com/GNkqjvo8/patch-rfc-0-3-mmc-mxs-mmc-implement-ddr-support
-
-[2]
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_2.6.35_1.1.0&id=c105f3ef1d461aaeedbc6361941096b6684cc812
+greg k-h
