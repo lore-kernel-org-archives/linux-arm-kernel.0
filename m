@@ -1,33 +1,24 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 17 Oct 2016 00:25:55 +0900
-Subject: [PATCH] clk: uniphier: fix type of variable passed to regmap_read()
-Message-ID: <1476631555-2059-1-git-send-email-yamada.masahiro@socionext.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 16 Oct 2016 17:29:31 +0200
+Subject: [PATCH] ARM/orion/gpio: Replace three seq_printf() calls by
+ seq_puts() in orion_gpio_dbg_show()
+In-Reply-To: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
+References: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
+Message-ID: <20161016152931.GA14097@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 3rd argument of regmap_read() takes a pointer to unsigned int.
-This driver is saved just because u32 happens to be typedef'ed as
-unsigned int, but we should not rely on that fact.  Change the
-variable type just in case.
+On Sun, Oct 16, 2016 at 12:38:26PM +0200, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 16 Oct 2016 12:30:48 +0200
+> 
+> Strings which did not contain data format specifications should be put
+> into a sequence. Thus use the corresponding function "seq_puts".
+> 
+> This issue was detected by using the Coccinelle software.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
- drivers/clk/uniphier/clk-uniphier-mux.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/uniphier/clk-uniphier-mux.c b/drivers/clk/uniphier/clk-uniphier-mux.c
-index 15a2f2c..2c243a8 100644
---- a/drivers/clk/uniphier/clk-uniphier-mux.c
-+++ b/drivers/clk/uniphier/clk-uniphier-mux.c
-@@ -42,7 +42,7 @@ static u8 uniphier_clk_mux_get_parent(struct clk_hw *hw)
- 	struct uniphier_clk_mux *mux = to_uniphier_clk_mux(hw);
- 	int num_parents = clk_hw_get_num_parents(hw);
- 	int ret;
--	u32 val;
-+	unsigned int val;
- 	u8 i;
- 
- 	ret = regmap_read(mux->regmap, mux->reg, &val);
--- 
-1.9.1
+    Andrew
