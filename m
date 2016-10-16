@@ -1,59 +1,150 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sun, 16 Oct 2016 10:45:07 -0300
-Subject: [PATCH v2] clk: samsung: clk-exynos-audss: Fix module autoload
-Message-ID: <1476625507-21377-1-git-send-email-javier@osg.samsung.com>
+From: linux@mniewoehner.de (Michael =?ISO-8859-1?Q?Niew=F6hner?=)
+Date: Sun, 16 Oct 2016 16:19:57 +0200
+Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
+In-Reply-To: <1475871962.1697.12.camel@mniewoehner.de>
+References: <1472414695.3845.3.camel@mniewoehner.de>
+ <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
+ <1472468730.4925.3.camel@mniewoehner.de>
+ <CANAwSgQMsK8YPxR==UXtR49kiJzYhkzvSCNwn8mDJfj-3wpa2w@mail.gmail.com>
+ <CAFp+6iGrS0DTP=KUKDvk3NwWB32+1uj-irKT6fn5XTcfk572Hg@mail.gmail.com>
+ <1475578687.1912.28.camel@mniewoehner.de>
+ <CAFp+6iGx-jf+xrdHF=0J3FK9dDBg54zESYNVo8bz2Qz6G4gEZg@mail.gmail.com>
+ <1475771380.22019.5.camel@mniewoehner.de> <87y420wqoy.fsf@linux.intel.com>
+ <1475871962.1697.12.camel@mniewoehner.de>
+Message-ID: <1476627597.1752.3.camel@mniewoehner.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver is built as a module, autoload won't work because the module
-alias information is not filled. So user-space can't match the registered
-device with the corresponding module.
+Hi Felipe,
+On Fri, 2016-10-07 at 22:26 +0200, Michael Niew?hner wrote:
+> Hi Felipe,
+> 
+> On Fr, 2016-10-07 at 10:42 +0300, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > Michael Niew?hner <linux@mniewoehner.de> writes:
+> > > 
+> > > > 
+> > > > The clocks are same across working/non-working.
+> > > > Is it possible to bisect the commit that's causing hang for 4.8x ?
+> > > 
+> > > 
+> > > [c499ff71ff2a281366c6ec7a904c547d806cbcd1] usb: dwc3: core: re-factor init and exit paths
+> > > This patch causes both the hang on reboot and the lsusb hang.
+> > 
+> > How to reproduce? Why don't we see this on x86 and TI boards? I'm
+> > guessing this is failed bisection, as I can't see anything in that
+> > commit that would cause reboot hang. Also, that code path is *NOT*
+> > executed when you run lsusb.
+> > 
+> 
+> I've tested this procedure multiple times to be sure:
+> 
+> - checkout?c499ff71, compile, boot the odroid
+> - run lsusb -v => lsusb hangs, can't terminate with ctrl-c
+> - hard reset, after boot run poweroff or reboot => board does not completely power off / reboot (see log below)
+> - revert c499ff71, mrproper, compile, boot the odroid
+> - run lsusb -v => shows full output, not hanging
+> - run reboot or poweroff => board powers off / reboots just fine
+> 
+> 
+> dmesg poweroff not working:
+> ...
+> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
+> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
+> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
+> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
+> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
+> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
+> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
+> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
+> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
+> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
+> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
+> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
+> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
+> [??121.171739] systemd-shutdown[1]: Powering off.
+> 
+> => at this point removing the sd card would show a message?
+> "removed mmc0" (not sure what the real message was...) so the board is not completely off.
+> 
+> 
+> dmesg poweroff working:
+> ...
+> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
+> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
+> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
+> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
+> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
+> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
+> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
+> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
+> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
+> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
+> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
+> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
+> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
+> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
+> [??121.171739] systemd-shutdown[1]: Powering off.
+> [??121.182331] rebo?
+> 
+> 
+> 
+> Best regards
+> Michael Niew?hner
 
-Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 
-Before this patch:
+I did some more tests with next-20161016. Reverting / commenting out
+one part of your patch "solves" the lsusb hang, the reboot problem
+and also the "debounce failed" message. [1]
+Another "solution" is to call phy_power_off before phy_power_on. [2]
 
-$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-alias:          platform:exynos-audss-clk
+Disclaimer: I have no idea what I was doing ;-) These were just some
+simple trial-and-error attempts that maybe help to find the real
+cause of the problems.
 
-After this patch:
+[1]
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index 7287a76..5ef589d 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -724,6 +724,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
+?	/* Adjust Frame Length */
+?	dwc3_frame_length_adjustment(dwc);
+?
++/*
+?	usb_phy_set_suspend(dwc->usb2_phy, 0);
+?	usb_phy_set_suspend(dwc->usb3_phy, 0);
+?	ret = phy_power_on(dwc->usb2_generic_phy);
+@@ -733,6 +734,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
+?	ret = phy_power_on(dwc->usb3_generic_phy);
+?	if (ret < 0)
+?		goto err3;
++*/
+?
+?	ret = dwc3_event_buffers_setup(dwc);
+?	if (ret) {
 
-$ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
-alias:          platform:exynos-audss-clk
-alias:          of:N*T*Csamsung,exynos5420-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5420-audss-clock
-alias:          of:N*T*Csamsung,exynos5410-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5410-audss-clock
-alias:          of:N*T*Csamsung,exynos5250-audss-clockC*
-alias:          of:N*T*Csamsung,exynos5250-audss-clock
-alias:          of:N*T*Csamsung,exynos4210-audss-clockC*
-alias:          of:N*T*Csamsung,exynos4210-audss-clock
+[2]
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index 7287a76..f6c8e13 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -726,6 +726,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
+?
+????????usb_phy_set_suspend(dwc->usb2_phy, 0);
+????????usb_phy_set_suspend(dwc->usb3_phy, 0);
++???????phy_power_off(dwc->usb2_generic_phy);
++???????phy_power_off(dwc->usb3_generic_phy);
+????????ret = phy_power_on(dwc->usb2_generic_phy);
+????????if (ret < 0)
+????????????????goto err2;
 
-Fixes: 4d252fd5719b ("clk: samsung: Allow modular build of the Audio Subsystem CLKCON driver")
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
 
----
-
-Changes in v2:
-- Add fixes tag. Suggested by Krzysztof Kozlowski.
-- Add Krzysztof Kozlowski's Reviewed-by and Tested-by tags.
-
- drivers/clk/samsung/clk-exynos-audss.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 51d152f735cc..17e68a724945 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -106,6 +106,7 @@ static const struct of_device_id exynos_audss_clk_of_match[] = {
- 	},
- 	{ },
- };
-+MODULE_DEVICE_TABLE(of, exynos_audss_clk_of_match);
- 
- static void exynos_audss_clk_teardown(void)
- {
--- 
-2.7.4
+Best regards
+Michael
