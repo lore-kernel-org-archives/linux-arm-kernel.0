@@ -1,70 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 15 Oct 2016 22:38:36 +0100
-Subject: WARNING: SOMEONE RECEIVING THIS HAS BEEN HACKED (was: Re: [PATCH v2
- 0/4] PXA cpufreq conversion to clock API)
-In-Reply-To: <20161015203421.GG1041@n2100.armlinux.org.uk>
-References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
- <20161015203421.GG1041@n2100.armlinux.org.uk>
-Message-ID: <20161015213836.GH1041@n2100.armlinux.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Sat, 15 Oct 2016 19:04:21 -0700
+Subject: [PATCH v3 0/7] arm64: Privileged Access Never using TTBR0_EL1
+ switching
+In-Reply-To: <20161015143548.GA31114@MBP.local>
+References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
+ <CAGXu5jKMZTo7m=ygm7x8w__1my0jiQiVAiv9NowQ8pfQqCnjmw@mail.gmail.com>
+ <20161015143548.GA31114@MBP.local>
+Message-ID: <CAGXu5jJE475sVEkb=cTXFxoM+zt2x2rAAX+qDz3wyJ1Gi5kyyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+On Sat, Oct 15, 2016 at 7:35 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> Hi Kees,
+>
+> On Fri, Oct 14, 2016 at 02:44:33PM -0700, Kees Cook wrote:
+>> Just checking in on this feature -- I don't see it in -next nor
+>> already in the tree. Is there any chance this is going to make the
+>> v4.9 merge window?
+>
+> As I said in the cover letter, I'll rebase it on top of 4.9-rc1 as there
+> are some clean-ups that this series would conflict with. So I am
+> targeting 4.10 with this patch series.
+>
+>> It didn't sound like there were any unresolved issues remaining?
+>
+> There are a few issues spotted by Mark which I'll address in the next
+> version, but nothing major.
 
-Looks like gmail's been hacked (or something).  Within 50 minutes of
-sending the reply below, I've received at least 10 replies with the
-following headers:
+Ah-ha! I misunderstood that to mean -rc2. :) Thanks for the update!
 
-In-Reply-To: <20161015203421.GG1041@n2100.armlinux.org.uk>
-References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr> <20161015203421.GG1041@n2100.armlinux.org.uk>
-
-from various gmail.com addresses, each and every one containing some kind
-of spam.  Each reply is from a victim of spam - the replies themselves are
-people replying to the spam that they have received.  The quoted message
-is allegedly from me, and even includes the line:
-
- "On 15 Oct 2016, at 21:34, Russell King - ARM Linux <linux@armlinux.org.uk>
- wrote:"
-
-which is the time I sent the original message.
-
-It's either that gmail has been hacked, or one of the mailing lists in
-the recipients of this message has been hacked.
-
-On Sat, Oct 15, 2016 at 09:34:21PM +0100, Russell King - ARM Linux wrote:
-> On Sat, Oct 15, 2016 at 09:57:26PM +0200, Robert Jarzmik wrote:
-> > Hi,
-> > 
-> > This serie is a preparation to shift the cpufreq of pxa2xx platforms to clocks
-> > API.
-> > 
-> > The first 3 patches are review and merge material :
-> >  - patch 1/4 for Viresh and Rafael
-> >  - patches 2/4 and 3/4 for me
-> > 
-> > The 4th on is for review but not merge, as the clock changes must be fully
-> > reviewed and go in first as a prequisite
-> 
-> Have you tested whether this patch set results in functional cpufreq
-> support - looking at drivers/clk/pxa, the CPU clock is read-only -
-> it can't be used to change the clock rate.  So, I very much doubt this
-> has been functionally tested.
-> 
-> Don't forget that changing the CPU clock rate needs other changes
-> (like the memory clock rate) so all that code you're removing in
-> patch 4 (which does the actual clock change) needs to go somewhere.
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-Kees
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kees Cook
+Nexus Security
