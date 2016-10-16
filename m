@@ -1,33 +1,33 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 17 Oct 2016 00:11:14 +0900
-Subject: [PATCH] clk: uniphier: add system clock support for sLD3 SoC
-Message-ID: <1476630674-29402-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 17 Oct 2016 00:25:55 +0900
+Subject: [PATCH] clk: uniphier: fix type of variable passed to regmap_read()
+Message-ID: <1476631555-2059-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I do not know why, but I missed to add this compatible string in
-the initial commit of this driver.
+The 3rd argument of regmap_read() takes a pointer to unsigned int.
+This driver is saved just because u32 happens to be typedef'ed as
+unsigned int, but we should not rely on that fact.  Change the
+variable type just in case.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/clk/uniphier/clk-uniphier-core.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clk/uniphier/clk-uniphier-mux.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
-index 5ffb898..f4e0f6b 100644
---- a/drivers/clk/uniphier/clk-uniphier-core.c
-+++ b/drivers/clk/uniphier/clk-uniphier-core.c
-@@ -111,6 +111,10 @@ static int uniphier_clk_remove(struct platform_device *pdev)
- static const struct of_device_id uniphier_clk_match[] = {
- 	/* System clock */
- 	{
-+		.compatible = "socionext,uniphier-sld3-clock",
-+		.data = uniphier_sld3_sys_clk_data,
-+	},
-+	{
- 		.compatible = "socionext,uniphier-ld4-clock",
- 		.data = uniphier_ld4_sys_clk_data,
- 	},
+diff --git a/drivers/clk/uniphier/clk-uniphier-mux.c b/drivers/clk/uniphier/clk-uniphier-mux.c
+index 15a2f2c..2c243a8 100644
+--- a/drivers/clk/uniphier/clk-uniphier-mux.c
++++ b/drivers/clk/uniphier/clk-uniphier-mux.c
+@@ -42,7 +42,7 @@ static u8 uniphier_clk_mux_get_parent(struct clk_hw *hw)
+ 	struct uniphier_clk_mux *mux = to_uniphier_clk_mux(hw);
+ 	int num_parents = clk_hw_get_num_parents(hw);
+ 	int ret;
+-	u32 val;
++	unsigned int val;
+ 	u8 i;
+ 
+ 	ret = regmap_read(mux->regmap, mux->reg, &val);
 -- 
 1.9.1
