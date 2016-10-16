@@ -1,38 +1,47 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 16 Oct 2016 17:33:16 +0200
-Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
-In-Reply-To: <20151007110112.GD3485@piout.net>
-References: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
- <20151007110112.GD3485@piout.net>
-Message-ID: <20161016153316.rsrcgnki6kn7gola@finsecur.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 17 Oct 2016 00:42:42 +0900
+Subject: [PATCH 1/2] arm64: dts: uniphier: increase register region size of
+ sysctrl node
+Message-ID: <1476632563-7446-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The System Control node has 0x10000 byte of registers.  The current
+reg size must be expanded to use the cpufreq driver because the
+registers controlling CPU frequency are located at offset 0x8000.
 
-On Wed, Oct 07, 2015 at 01:01:12PM +0200, Alexandre Belloni wrote:
-> On 06/10/2015 at 22:28:45 +0200, Sylvain Rochet wrote :
-> > Since turning on idle-halt in commit 5161b31dc39a (watchdog:
-> > at91sam9_wdt: better watchdog support"), SoCs compatible with
-> > at91sam9260-wdt not using a device tree no longer reboot if the watchdog
-> > times out while the CPU is in idle state. Removing the
-> > AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
-> > 
-> > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> > Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
-> > Cc: <stable@vger.kernel.org> # 3.14+
-> 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> However, we don't really care about that for kernels after 3.18 as no
-> users are using pdata anymore.
-> I think you could send a follow-up patch removing pdata support
-> completely.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Looks like this one falls through the cracks, it didn't reach mainline 
-and therefore wasn't applied to stable branches.
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-I just checked, it still apply properly on today's linux-next branch.
-
-Cheers,
-Sylvain
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 3eb4c42..da3cdd8 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -320,7 +320,7 @@
+ 		sysctrl at 61840000 {
+ 			compatible = "socionext,uniphier-ld11-sysctrl",
+ 				     "simple-mfd", "syscon";
+-			reg = <0x61840000 0x4000>;
++			reg = <0x61840000 0x10000>;
+ 
+ 			sys_clk: clock {
+ 				compatible = "socionext,uniphier-ld11-clock";
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 08fd7cf..efb47ea 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -311,7 +311,7 @@
+ 		sysctrl at 61840000 {
+ 			compatible = "socionext,uniphier-sysctrl",
+ 				     "simple-mfd", "syscon";
+-			reg = <0x61840000 0x4000>;
++			reg = <0x61840000 0x10000>;
+ 
+ 			sys_clk: clock {
+ 				compatible = "socionext,uniphier-ld20-clock";
+-- 
+1.9.1
