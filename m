@@ -1,32 +1,51 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Sun, 16 Oct 2016 18:43:26 +0200
-Subject: [PATCH] ARM: at91/dt: pullup dbgu rx instead of tx
-In-Reply-To: <6d2d5aba-cca3-93c6-0c59-3acbbd7b6169@lysator.liu.se>
-References: <1443105855-15738-1-git-send-email-peda@lysator.liu.se>
- <20150924144753.GY4287@piout.net>
- <6d2d5aba-cca3-93c6-0c59-3acbbd7b6169@lysator.liu.se>
-Message-ID: <20161016164326.ep4gjpbeubyfgsjq@finsecur.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sun, 16 Oct 2016 21:03:52 +0200
+Subject: [PATCH] ARM64-cpuinfo: Combine six calls for sequence output into one
+ seq_printf() call in c_show()
+Message-ID: <83d98772-8872-1b75-a9a5-5f08b8462e18@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sun, 16 Oct 2016 20:48:28 +0200
 
-On Sun, Oct 16, 2016 at 12:57:09PM +0200, Peter Rosin wrote:
-> Hi again,
-> 
-> I forgot about this, and it's been a year. But isn't it time to
-> upstream those pull-up fixes that Sylvain provided?
+Some data were printed into a sequence by six separate function calls.
+Print the same data by a single function call instead.
 
-Thank you for your reminder, actually I waited an answer on this nice 
-subject: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368643.html
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ arch/arm64/kernel/cpuinfo.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-But this is not relevant for this change anyway, if we should set a 
-pull-(up|down) on all push-pull pads to reduce power consumption it 
-should be enforced in the pinctrl driver, the dt must stay logical.
-
-I just sent a v2 with all useless comments removed as suggested by 
-Alexandre and without the explanation about the removed extra power 
-consumption when removing a pull-(up|down) on a push-pull output because 
-it does even seem to be the contrary on Atmel SoCs.
-
-Sylvain
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index b3d5b3e..f22687d 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -148,14 +148,17 @@ static int c_show(struct seq_file *m, void *v)
+ 				if (elf_hwcap & (1 << j))
+ 					seq_printf(m, " %s", hwcap_str[j]);
+ 		}
+-		seq_puts(m, "\n");
+-
+-		seq_printf(m, "CPU implementer\t: 0x%02x\n",
+-			   MIDR_IMPLEMENTOR(midr));
+-		seq_printf(m, "CPU architecture: 8\n");
+-		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
+-		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
+-		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
++		seq_printf(m,
++			   "\n"
++			   "CPU implementer\t: 0x%02x\n"
++			   "CPU architecture: 8\n"
++			   "CPU variant\t: 0x%x\n"
++			   "CPU part\t: 0x%03x\n"
++			   "CPU revision\t: %d\n\n",
++			   MIDR_IMPLEMENTOR(midr),
++			   MIDR_VARIANT(midr),
++			   MIDR_PARTNUM(midr),
++			   MIDR_REVISION(midr));
+ 	}
+ 
+ 	return 0;
+-- 
+2.10.1
