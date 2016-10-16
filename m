@@ -1,35 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 17 Oct 2016 00:42:43 +0900
-Subject: [PATCH 2/2] ARM: dts: uniphier: increase register region size of
- sysctrl node
-In-Reply-To: <1476632563-7446-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1476632563-7446-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1476632563-7446-2-git-send-email-yamada.masahiro@socionext.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 16 Oct 2016 08:50:54 -0700
+Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
+In-Reply-To: <20161016153316.rsrcgnki6kn7gola@finsecur.com>
+References: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20151007110112.GD3485@piout.net>
+ <20161016153316.rsrcgnki6kn7gola@finsecur.com>
+Message-ID: <67fe262e-31e4-b9dc-da71-af601079bfec@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Control node has 0x10000 byte of registers.  The current
-reg size must be expanded to use the cpufreq driver because the
-registers controlling CPU frequency are located at offset 0x8000.
+On 10/16/2016 08:33 AM, Sylvain Rochet wrote:
+> Hi,
+>
+> On Wed, Oct 07, 2015 at 01:01:12PM +0200, Alexandre Belloni wrote:
+>> On 06/10/2015 at 22:28:45 +0200, Sylvain Rochet wrote :
+>>> Since turning on idle-halt in commit 5161b31dc39a (watchdog:
+>>> at91sam9_wdt: better watchdog support"), SoCs compatible with
+>>> at91sam9260-wdt not using a device tree no longer reboot if the watchdog
+>>> times out while the CPU is in idle state. Removing the
+>>> AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
+>>>
+>>> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+>>> Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
+>>> Cc: <stable@vger.kernel.org> # 3.14+
+>>
+>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>
+>> However, we don't really care about that for kernels after 3.18 as no
+>> users are using pdata anymore.
+>> I think you could send a follow-up patch removing pdata support
+>> completely.
+>
+> Looks like this one falls through the cracks, it didn't reach mainline
+> and therefore wasn't applied to stable branches.
+>
+Possibly that happened because you did not copy the watchdog mailing list.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Guenter
 
- arch/arm/boot/dts/uniphier-common32.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/uniphier-common32.dtsi b/arch/arm/boot/dts/uniphier-common32.dtsi
-index 8c8a851..d067f38 100644
---- a/arch/arm/boot/dts/uniphier-common32.dtsi
-+++ b/arch/arm/boot/dts/uniphier-common32.dtsi
-@@ -183,7 +183,7 @@
- 		sysctrl at 61840000 {
- 			compatible = "socionext,uniphier-sysctrl",
- 				     "simple-mfd", "syscon";
--			reg = <0x61840000 0x4000>;
-+			reg = <0x61840000 0x10000>;
- 
- 			sys_clk: clock {
- 				#clock-cells = <1>;
--- 
-1.9.1
+> I just checked, it still apply properly on today's linux-next branch.
+>
+> Cheers,
+> Sylvain
+>
