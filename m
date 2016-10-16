@@ -1,44 +1,56 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Sun, 16 Oct 2016 12:38:26 +0200
-Subject: [PATCH] ARM/orion/gpio: Replace three seq_printf() calls by
- seq_puts() in orion_gpio_dbg_show()
-Message-ID: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
+From: peda@lysator.liu.se (Peter Rosin)
+Date: Sun, 16 Oct 2016 12:57:09 +0200
+Subject: [PATCH] ARM: at91/dt: pullup dbgu rx instead of tx
+In-Reply-To: <20150924144753.GY4287@piout.net>
+References: <1443105855-15738-1-git-send-email-peda@lysator.liu.se>
+ <20150924144753.GY4287@piout.net>
+Message-ID: <6d2d5aba-cca3-93c6-0c59-3acbbd7b6169@lysator.liu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Sun, 16 Oct 2016 12:30:48 +0200
+Hi again,
 
-Strings which did not contain data format specifications should be put
-into a sequence. Thus use the corresponding function "seq_puts".
+I forgot about this, and it's been a year. But isn't it time to
+upstream those pull-up fixes that Sylvain provided?
 
-This issue was detected by using the Coccinelle software.
+Cheers,
+Peter
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- arch/arm/plat-orion/gpio.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index f740693..26a531e 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -478,13 +478,13 @@ static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 			   (data_in ^ in_pol) & msk  ? "hi" : "lo",
- 			   in_pol & msk ? "lo" : "hi");
- 		if (!((edg_msk | lvl_msk) & msk)) {
--			seq_printf(s, " disabled\n");
-+			seq_puts(s, " disabled\n");
- 			continue;
- 		}
- 		if (edg_msk & msk)
--			seq_printf(s, " edge ");
-+			seq_puts(s, " edge ");
- 		if (lvl_msk & msk)
--			seq_printf(s, " level");
-+			seq_puts(s, " level");
- 		seq_printf(s, " (%s)\n", cause & msk ? "pending" : "clear  ");
- 	}
- }
--- 
-2.10.1
+On 2015-09-24 16:47, Alexandre Belloni wrote:
+> Hi Peter,
+> 
+> Thanks for the patch but you actually got beaten by Sylvain:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368426.html
+> 
+> On 24/09/2015 at 16:44:15 +0200, Peter Rosin wrote :
+>> From: Peter Rosin <peda@axentia.se>
+>>
+>> It seems pointless to pullup the tx line, but there is value in pulling
+>> up the rx line.
+>>
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>> ---
+>>  arch/arm/boot/dts/sama5d3.dtsi |    4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+>> index 9e2444b07bce..304a40c5552a 100644
+>> --- a/arch/arm/boot/dts/sama5d3.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+>> @@ -545,8 +545,8 @@
+>>  				dbgu {
+>>  					pinctrl_dbgu: dbgu-0 {
+>>  						atmel,pins =
+>> -							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB30 periph A */
+>> -							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PB31 periph A with pullup */
+>> +							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PB30 periph A with pullup */
+>> +							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB31 periph A */
+>>  					};
+>>  				};
+>>  
+>> -- 
+>> 1.7.10.4
+>>
+> 
