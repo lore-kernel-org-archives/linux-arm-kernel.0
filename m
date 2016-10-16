@@ -1,29 +1,67 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 16 Oct 2016 20:25:14 +0900
-Subject: [PATCH] arm64: uniphier: select ARCH_HAS_RESET_CONTROLLER
-In-Reply-To: <1475893534-12198-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1475893534-12198-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQvjnwh351eWLUYLykZfo1qKKr-5rAVT190Z5TJku2p4Q@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sun, 16 Oct 2016 10:44:41 -0300
+Subject: [PATCH] clk: samsung: clk-exynos-audss: Fix module autoload
+In-Reply-To: <20161015172711.GA6465@kozik-lap>
+References: <1476470645-22159-1-git-send-email-javier@osg.samsung.com>
+ <20161015172711.GA6465@kozik-lap>
+Message-ID: <521c63ea-2564-1739-696f-bc9178eab838@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-08 11:25 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
-> merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> This is a counter-part of the following ARM-32bit variant:
-> https://patchwork.kernel.org/patch/9341021/
->
-> As discussed with Philipp, we go ARCH_HAS_RESET_CONTROLLER for now.
+Hello Krzysztof,
+
+On 10/15/2016 02:27 PM, Krzysztof Kozlowski wrote:
+> On Fri, Oct 14, 2016 at 03:44:05PM -0300, Javier Martinez Canillas wrote:
+>> If the driver is built as a module, autoload won't work because the module
+>> alias information is not filled. So user-space can't match the registered
+>> device with the corresponding module.
+>>
+>> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+>>
+>> Before this patch:
+>>
+>> $ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
+>> alias:          platform:exynos-audss-clk
+>>
+>> After this patch:
+>>
+>> $ modinfo drivers/clk/samsung/clk-exynos-audss.ko | grep alias
+>> alias:          platform:exynos-audss-clk
+>> alias:          of:N*T*Csamsung,exynos5420-audss-clockC*
+>> alias:          of:N*T*Csamsung,exynos5420-audss-clock
+>> alias:          of:N*T*Csamsung,exynos5410-audss-clockC*
+>> alias:          of:N*T*Csamsung,exynos5410-audss-clock
+>> alias:          of:N*T*Csamsung,exynos5250-audss-clockC*
+>> alias:          of:N*T*Csamsung,exynos5250-audss-clock
+>> alias:          of:N*T*Csamsung,exynos4210-audss-clockC*
+>> alias:          of:N*T*Csamsung,exynos4210-audss-clock
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>
+>>  drivers/clk/samsung/clk-exynos-audss.c | 1 +
+>>  1 file changed, 1 insertion(+)
+> 
+> Indeed, this was missed by 4d252fd5719b thus I think it could be
+> mentioned as fix tag (just for reference...):
+> Fixes: 4d252fd5719b ("clk: samsung: Allow modular build of the Audio Subsystem CLKCON driver")
 >
 
-Patch applied.
+Indeed. I missed that, sorry. I'll post a v2 including this information.
+ 
+> Anyway, this fixes the issue, so:
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+>
 
+Thanks!
+ 
+> Best regards,
+> Krzysztof
+> 
 
-
+Best regards,
 -- 
-Best Regards
-Masahiro Yamada
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
