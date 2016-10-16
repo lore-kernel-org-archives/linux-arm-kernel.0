@@ -1,56 +1,29 @@
-From: peda@lysator.liu.se (Peter Rosin)
-Date: Sun, 16 Oct 2016 12:57:09 +0200
-Subject: [PATCH] ARM: at91/dt: pullup dbgu rx instead of tx
-In-Reply-To: <20150924144753.GY4287@piout.net>
-References: <1443105855-15738-1-git-send-email-peda@lysator.liu.se>
- <20150924144753.GY4287@piout.net>
-Message-ID: <6d2d5aba-cca3-93c6-0c59-3acbbd7b6169@lysator.liu.se>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 16 Oct 2016 20:25:14 +0900
+Subject: [PATCH] arm64: uniphier: select ARCH_HAS_RESET_CONTROLLER
+In-Reply-To: <1475893534-12198-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1475893534-12198-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQvjnwh351eWLUYLykZfo1qKKr-5rAVT190Z5TJku2p4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi again,
+2016-10-08 11:25 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> The UniPhier reset driver (drivers/reset/reset-uniphier.c) has been
+> merged.  Select ARCH_HAS_RESET_CONTROLLER from the SoC Kconfig.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+> This is a counter-part of the following ARM-32bit variant:
+> https://patchwork.kernel.org/patch/9341021/
+>
+> As discussed with Philipp, we go ARCH_HAS_RESET_CONTROLLER for now.
+>
 
-I forgot about this, and it's been a year. But isn't it time to
-upstream those pull-up fixes that Sylvain provided?
-
-Cheers,
-Peter
+Patch applied.
 
 
-On 2015-09-24 16:47, Alexandre Belloni wrote:
-> Hi Peter,
-> 
-> Thanks for the patch but you actually got beaten by Sylvain:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368426.html
-> 
-> On 24/09/2015 at 16:44:15 +0200, Peter Rosin wrote :
->> From: Peter Rosin <peda@axentia.se>
->>
->> It seems pointless to pullup the tx line, but there is value in pulling
->> up the rx line.
->>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Peter Rosin <peda@axentia.se>
->> ---
->>  arch/arm/boot/dts/sama5d3.dtsi |    4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
->> index 9e2444b07bce..304a40c5552a 100644
->> --- a/arch/arm/boot/dts/sama5d3.dtsi
->> +++ b/arch/arm/boot/dts/sama5d3.dtsi
->> @@ -545,8 +545,8 @@
->>  				dbgu {
->>  					pinctrl_dbgu: dbgu-0 {
->>  						atmel,pins =
->> -							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PB30 periph A */
->> -							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_PULL_UP>;	/* PB31 periph A with pullup */
->> +							<AT91_PIOB 30 AT91_PERIPH_A AT91_PINCTRL_PULL_UP	/* PB30 periph A with pullup */
->> +							 AT91_PIOB 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PB31 periph A */
->>  					};
->>  				};
->>  
->> -- 
->> 1.7.10.4
->>
-> 
+
+-- 
+Best Regards
+Masahiro Yamada
