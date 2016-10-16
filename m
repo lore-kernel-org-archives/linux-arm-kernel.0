@@ -1,150 +1,564 @@
-From: linux@mniewoehner.de (Michael =?ISO-8859-1?Q?Niew=F6hner?=)
-Date: Sun, 16 Oct 2016 16:19:57 +0200
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <1475871962.1697.12.camel@mniewoehner.de>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
- <1472468730.4925.3.camel@mniewoehner.de>
- <CANAwSgQMsK8YPxR==UXtR49kiJzYhkzvSCNwn8mDJfj-3wpa2w@mail.gmail.com>
- <CAFp+6iGrS0DTP=KUKDvk3NwWB32+1uj-irKT6fn5XTcfk572Hg@mail.gmail.com>
- <1475578687.1912.28.camel@mniewoehner.de>
- <CAFp+6iGx-jf+xrdHF=0J3FK9dDBg54zESYNVo8bz2Qz6G4gEZg@mail.gmail.com>
- <1475771380.22019.5.camel@mniewoehner.de> <87y420wqoy.fsf@linux.intel.com>
- <1475871962.1697.12.camel@mniewoehner.de>
-Message-ID: <1476627597.1752.3.camel@mniewoehner.de>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 16 Oct 2016 16:44:23 +0200
+Subject: [PATCH v2] ARM: dts: imx6sx: Add UDOO Neo support
+Message-ID: <1476629064-10634-1-git-send-email-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-On Fri, 2016-10-07 at 22:26 +0200, Michael Niew?hner wrote:
-> Hi Felipe,
-> 
-> On Fr, 2016-10-07 at 10:42 +0300, Felipe Balbi wrote:
-> > Hi,
-> > 
-> > Michael Niew?hner <linux@mniewoehner.de> writes:
-> > > 
-> > > > 
-> > > > The clocks are same across working/non-working.
-> > > > Is it possible to bisect the commit that's causing hang for 4.8x ?
-> > > 
-> > > 
-> > > [c499ff71ff2a281366c6ec7a904c547d806cbcd1] usb: dwc3: core: re-factor init and exit paths
-> > > This patch causes both the hang on reboot and the lsusb hang.
-> > 
-> > How to reproduce? Why don't we see this on x86 and TI boards? I'm
-> > guessing this is failed bisection, as I can't see anything in that
-> > commit that would cause reboot hang. Also, that code path is *NOT*
-> > executed when you run lsusb.
-> > 
-> 
-> I've tested this procedure multiple times to be sure:
-> 
-> - checkout?c499ff71, compile, boot the odroid
-> - run lsusb -v => lsusb hangs, can't terminate with ctrl-c
-> - hard reset, after boot run poweroff or reboot => board does not completely power off / reboot (see log below)
-> - revert c499ff71, mrproper, compile, boot the odroid
-> - run lsusb -v => shows full output, not hanging
-> - run reboot or poweroff => board powers off / reboots just fine
-> 
-> 
-> dmesg poweroff not working:
-> ...
-> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
-> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
-> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
-> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
-> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
-> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
-> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
-> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
-> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
-> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
-> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
-> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
-> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
-> [??121.171739] systemd-shutdown[1]: Powering off.
-> 
-> => at this point removing the sd card would show a message?
-> "removed mmc0" (not sure what the real message was...) so the board is not completely off.
-> 
-> 
-> dmesg poweroff working:
-> ...
-> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
-> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
-> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
-> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
-> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
-> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
-> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
-> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
-> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
-> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
-> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
-> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
-> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
-> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
-> [??121.171739] systemd-shutdown[1]: Powering off.
-> [??121.182331] rebo?
-> 
-> 
-> 
-> Best regards
-> Michael Niew?hner
+Add initial device trees for UDOO Neo Basic, Extended and Full boards:
+* Serial console is enabled, other serial ports are prepared.
+* I2C based PMIC is enabled.
+* Ethernet is enabled for Basic and Full.
+* SDHC is enabled, with the SDIO_PWR GPIO modeled as a regulator.
+* Both user LEDs are enabled, with the orange one reserved for the M4
+  and with the SD card as default trigger for the red LED.
 
+The decision on a board compatible string is deferred to later.
 
-I did some more tests with next-20161016. Reverting / commenting out
-one part of your patch "solves" the lsusb hang, the reboot problem
-and also the "debounce failed" message. [1]
-Another "solution" is to call phy_power_off before phy_power_on. [2]
+Cc: Ettore Chimenti <ettore.chimenti@udoo.org>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v1 -> v2:
+ * Dropped iomuxc imx6sx-udoo-neo subnode (Uwe)
+ * Reordered status property (Shawn)
+ * Used vmmc-supply and dropped always-on (Shawn)
+ * Fixed fec1 reset gpio (Uwe)
+ 
+ arch/arm/boot/dts/Makefile                     |   5 +-
+ arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts    |  69 ++++++
+ arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts |  54 +++++
+ arch/arm/boot/dts/imx6sx-udoo-neo-full.dts     |  69 ++++++
+ arch/arm/boot/dts/imx6sx-udoo-neo.dtsi         | 293 +++++++++++++++++++++++++
+ 5 files changed, 489 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
 
-Disclaimer: I have no idea what I was doing ;-) These were just some
-simple trial-and-error attempts that maybe help to find the real
-cause of the problems.
-
-[1]
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 7287a76..5ef589d 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -724,6 +724,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
-?	/* Adjust Frame Length */
-?	dwc3_frame_length_adjustment(dwc);
-?
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index befcd2619902..259117a97f28 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -416,7 +416,10 @@ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb-reva.dtb \
+ 	imx6sx-sdb-sai.dtb \
+-	imx6sx-sdb.dtb
++	imx6sx-sdb.dtb \
++	imx6sx-udoo-neo-basic.dtb \
++	imx6sx-udoo-neo-extended.dtb \
++	imx6sx-udoo-neo-full.dtb
+ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-14x14-evk.dtb \
+ 	imx6ul-geam-kit.dtb \
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+new file mode 100644
+index 000000000000..0b888789efc6
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
+@@ -0,0 +1,69 @@
 +/*
-?	usb_phy_set_suspend(dwc->usb2_phy, 0);
-?	usb_phy_set_suspend(dwc->usb3_phy, 0);
-?	ret = phy_power_on(dwc->usb2_generic_phy);
-@@ -733,6 +734,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
-?	ret = phy_power_on(dwc->usb3_generic_phy);
-?	if (ret < 0)
-?		goto err3;
-+*/
-?
-?	ret = dwc3_event_buffers_setup(dwc);
-?	if (ret) {
-
-[2]
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 7287a76..f6c8e13 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -726,6 +726,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
-?
-????????usb_phy_set_suspend(dwc->usb2_phy, 0);
-????????usb_phy_set_suspend(dwc->usb3_phy, 0);
-+???????phy_power_off(dwc->usb2_generic_phy);
-+???????phy_power_off(dwc->usb3_generic_phy);
-????????ret = phy_power_on(dwc->usb2_generic_phy);
-????????if (ret < 0)
-????????????????goto err2;
-
-
-Best regards
-Michael
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Basic";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x20000000>;
++	};
++};
++
++&fec1 {
++	phy-handle = <&ethphy1>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+new file mode 100644
+index 000000000000..d6fdd17cd3ac
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
+@@ -0,0 +1,54 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Extended";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+new file mode 100644
+index 000000000000..d8c3577c9dd5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "imx6sx-udoo-neo.dtsi"
++
++/ {
++	model = "UDOO Neo Full";
++	compatible = "fsl,imx6sx";
++
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
++};
++
++&fec1 {
++	phy-handle = <&ethphy1>;
++	status = "okay";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy at 0 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+new file mode 100644
+index 000000000000..314d25b15641
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+@@ -0,0 +1,293 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "imx6sx.dtsi"
++
++/ {
++	compatible = "fsl,imx6sx";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		red {
++			label = "udoo-neo:red:mmc";
++			gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			linux,default-trigger = "mmc0";
++		};
++
++		orange {
++			label = "udoo-neo:orange:user";
++			gpios = <&gpio4 6 GPIO_ACTIVE_HIGH>;
++			default-state = "keep";
++		};
++	};
++
++	sdio_pwr_reg: sd-gpio-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-name = "SDIO_PWR";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++	};
++};
++
++&cpu0 {
++	arm-supply = <&sw1a_reg>;
++	soc-supply = <&sw1c_reg>;
++};
++
++&fec1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet1>;
++	phy-mode = "rmii";
++	phy-reset-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	clock-frequency = <100000>;
++	status = "okay";
++
++	pmic: pmic at 08 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw1c_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			sw2_reg: sw2 {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1850000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			swbst_reg: swbst {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++			};
++
++			snvs_reg: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			vgen1_reg: vldo1 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen2_reg: vldo2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3_reg: vccsd {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen4_reg: v33 {
++				regulator-min-microvolt = <2850000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen5_reg: vldo3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++
++			vgen6_reg: vldo4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&iomuxc {
++	pinctrl_enet1: enet1grp {
++		fsl,pins =
++			<MX6SX_PAD_ENET1_CRS__GPIO2_IO_1	0xa0b1>,
++			<MX6SX_PAD_ENET1_MDC__ENET1_MDC		0xa0b1>,
++			<MX6SX_PAD_ENET1_MDIO__ENET1_MDIO	0xa0b1>,
++			<MX6SX_PAD_RGMII1_TD0__ENET1_TX_DATA_0	0xa0b1>,
++			<MX6SX_PAD_RGMII1_TD1__ENET1_TX_DATA_1	0xa0b1>,
++			<MX6SX_PAD_RGMII1_TX_CTL__ENET1_TX_EN	0xa0b1>,
++
++			<MX6SX_PAD_ENET1_TX_CLK__ENET1_REF_CLK1	0x3081>,
++			<MX6SX_PAD_ENET2_TX_CLK__GPIO2_IO_9	0x3081>,
++			<MX6SX_PAD_RGMII1_RD0__ENET1_RX_DATA_0	0x3081>,
++			<MX6SX_PAD_RGMII1_RD1__ENET1_RX_DATA_1	0x3081>,
++			<MX6SX_PAD_RGMII1_RX_CTL__ENET1_RX_EN	0x3081>,
++			<MX6SX_PAD_RGMII1_RXC__ENET1_RX_ER	0x3081>,
++
++			<MX6SX_PAD_ENET2_RX_CLK__ENET2_REF_CLK_25M	0x91>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO00__I2C1_SCL		0x4001b8b1>,
++			<MX6SX_PAD_GPIO1_IO01__I2C1_SDA		0x4001b8b1>;
++	};
++
++	pinctrl_uart1: uart1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1>,
++			<MX6SX_PAD_GPIO1_IO05__UART1_RX		0x1b0b1>;
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO06__UART2_TX		0x1b0b1>,
++			<MX6SX_PAD_GPIO1_IO07__UART2_RX		0x1b0b1>;
++	};
++
++	pinctrl_uart5: uart5grp {
++		fsl,pins =
++			<MX6SX_PAD_SD4_DATA4__UART5_RX		0x1b0b1>,
++			<MX6SX_PAD_SD4_DATA5__UART5_TX		0x1b0b1>;
++	};
++
++	pinctrl_uart6: uart6grp {
++		fsl,pins =
++			<MX6SX_PAD_CSI_DATA00__UART6_RI_B	0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA01__UART6_DSR_B	0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA02__UART6_DTR_B	0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA03__UART6_DCD_B	0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA04__UART6_RX		0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA05__UART6_TX		0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA06__UART6_RTS_B	0x1b0b1>,
++			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins =
++			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
++			<MX6SX_PAD_SD2_CLK__USDHC2_CLK		0x10059>,
++			<MX6SX_PAD_SD2_DATA0__USDHC2_DATA0	0x17059>,
++			<MX6SX_PAD_SD2_DATA1__USDHC2_DATA1	0x17059>,
++			<MX6SX_PAD_SD2_DATA2__USDHC2_DATA2	0x17059>,
++			<MX6SX_PAD_SD2_DATA3__USDHC2_DATA3	0x17059>,
++			<MX6SX_PAD_SD1_DATA0__GPIO6_IO_2	0x17059>; /* CD */
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++/* Cortex-M4 serial */
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "disabled";
++};
++
++/* Arduino serial */
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	status = "disabled";
++};
++
++&uart6 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart6>;
++	uart-has-rtscts;
++	status = "disabled";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	vmmc-supply = <&sdio_pwr_reg>;
++	bus-width = <4>;
++	cd-gpios = <&gpio6 2 GPIO_ACTIVE_LOW>;
++	no-1-8-v;
++	keep-power-in-suspend;
++	wakeup-source;
++	status = "okay";
++};
+-- 
+2.6.6
