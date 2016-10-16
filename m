@@ -1,151 +1,33 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 16 Oct 2016 23:59:18 +0900
-Subject: [PATCH 3/3] arm64: dts: uniphier: add CPU clocks and OPP tables for
- LD20 SoC
-In-Reply-To: <1476629958-25368-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1476629958-25368-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1476629958-25368-4-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 17 Oct 2016 00:11:14 +0900
+Subject: [PATCH] clk: uniphier: add system clock support for sLD3 SoC
+Message-ID: <1476630674-29402-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a CPU clock to every CPU node and CPU OPP tables to use the
-generic cpufreq driver.  All the CPUs in each cluster share the
-same OPP table.
-
-Note:
-clock-latency-ns (300ns) was calculated based on the CPU-gear switch
-sequencer spec; it takes 12 clock cycles on the sequencer running
-at 50 MHz, plus a bit additional latency.
+I do not know why, but I missed to add this compatible string in
+the initial commit of this driver.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 84 ++++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
+ drivers/clk/uniphier/clk-uniphier-core.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 6f48e82..0ebcdbb 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -79,28 +79,36 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a72", "arm,armv8";
- 			reg = <0 0x000>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a72", "arm,armv8";
- 			reg = <0 0x001>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu2: cpu at 100 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0 0x100>;
-+			clocks = <&sys_clk 33>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		cpu3: cpu at 101 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0 0x101>;
-+			clocks = <&sys_clk 33>;
- 			enable-method = "psci";
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 	};
- 
-@@ -109,6 +117,82 @@
- 		method = "smc";
- 	};
- 
-+	cluster0_opp: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 250000000 {
-+			opp-hz = /bits/ 64 <250000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 275000000 {
-+			opp-hz = /bits/ 64 <275000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 550000000 {
-+			opp-hz = /bits/ 64 <550000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 666666666 {
-+			opp-hz = /bits/ 64 <666667000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 733333333 {
-+			opp-hz = /bits/ 64 <733334000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			clock-latency-ns = <300>;
-+		};
-+	};
-+
-+	cluster1_opp: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 250000000 {
-+			opp-hz = /bits/ 64 <250000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 275000000 {
-+			opp-hz = /bits/ 64 <275000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 500000000 {
-+			opp-hz = /bits/ 64 <500000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 550000000 {
-+			opp-hz = /bits/ 64 <550000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 666666666 {
-+			opp-hz = /bits/ 64 <666667000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 733333333 {
-+			opp-hz = /bits/ 64 <733334000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			clock-latency-ns = <300>;
-+		};
-+	};
-+
- 	clocks {
- 		refclk: ref {
- 			compatible = "fixed-clock";
+diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
+index 5ffb898..f4e0f6b 100644
+--- a/drivers/clk/uniphier/clk-uniphier-core.c
++++ b/drivers/clk/uniphier/clk-uniphier-core.c
+@@ -111,6 +111,10 @@ static int uniphier_clk_remove(struct platform_device *pdev)
+ static const struct of_device_id uniphier_clk_match[] = {
+ 	/* System clock */
+ 	{
++		.compatible = "socionext,uniphier-sld3-clock",
++		.data = uniphier_sld3_sys_clk_data,
++	},
++	{
+ 		.compatible = "socionext,uniphier-ld4-clock",
+ 		.data = uniphier_ld4_sys_clk_data,
+ 	},
 -- 
 1.9.1
