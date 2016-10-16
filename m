@@ -1,78 +1,60 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 16 Oct 2016 21:49:43 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: temporarily remove emmc hs200
- speed from rk3288-veyron-speedy.
-In-Reply-To: <87twd1vzc5.fsf@aikidev.net>
-References: <87twd1vzc5.fsf@aikidev.net>
-Message-ID: <1476647383.3885.3.camel@paulk.fr>
+Date: Sun, 16 Oct 2016 22:01:41 +0200
+Subject: RK3288 USB issues with ath9k_htc Wi-Fi dongles on veyron devices
+Message-ID: <1476648101.3885.14.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I'm trying to use ath9k_htc Wi-Fi dongles with various rk3288 veyron devices,
+which currently do not work.
 
-Le mardi 27 septembre 2016 ? 13:53 -0700, Vagrant Cascadian a ?crit?:
-> This essentially mimics what was done with rk3288-veyron-minnie in
-> commit 984926781122f034d5bc9962815d135b6c4a8e1d.
-> 
-> The eMMC of the speedy Chromebook also appears to need the same tuning
-> workaround, as it frequently fails to recognize the eMMC without it.
+I have a bunch of different dongles, that all work nicely with other devices.
+The kernel I'm running is 4.9-rc1 and the USB connectors I'm using are linked to
+OTG and HOST1 (both DWC2 controllers).
 
-I have a device where (without this patch) eMMC sometimes fails, with:
-[????3.561010] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 175
-[????3.571742] mmc2: new HS200 MMC card at address 0001
-[????3.571943] mmcblk2: mmc2:0001 HAG2e 14.7 GiB?
-[????3.572026] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
-[????3.572107] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
-[????3.572181] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
-[????3.685647] mmcblk2: error -110 transferring data, sector 0, nr 8, cmd response 0x900, card status 0x0
+I have applied the latest version of Randy Li's patches, that fix an USB error
+with these controllers. They do not fix my issue, or otherwise change the
+behavior I'm seeing. The very same device running with the chromeos-3.14 kernel
+works nicely and doesn't have this issue.
 
-And sometimes works, with:
-[????3.451058] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to 176
-[????3.491093] mmc2: new HS200 MMC card at address 0001
-[????3.491277] mmcblk2: mmc2:0001 HAG2e 14.7 GiB?
-[????3.491345] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
-[????3.491409] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
-[????3.491474] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
-[????3.493548]??mmcblk2: p1 p2
+There are two different cases, that happen interchangeably and randomly:
 
-However, with this change, it always fails, with:
-[????3.322129] mmc_host mmc2: Bus speed (slot 0) = 50000000Hz (slot req 52000000Hz, actual 50000000HZ div = 0)
-[????3.333174] mmc2: error -110 whilst initialising MMC card
+1. The dongle is detected and the driver is probed but the first register reads
+fail:
 
-I don't have so much time to investigate this issue, but it's clear that this
-patch doesn't fix the issue (and actually worsens it) for my device.
+[??322.841142] usb 2-1: new high-speed USB device number 3 using dwc2
+[??323.104591] usb 2-1: ath9k_htc: Firmware ath9k_htc/htc_9271-1.4.0.fw requested
+[??323.113489] usb 2-1: Direct firmware load for ath9k_htc/htc_9271-1.4.0.fw failed with error -2
+[??323.122204] usb 2-1: ath9k_htc: Firmware htc_9271.fw requested
+[??323.414012] usb 2-1: ath9k_htc: Transferred FW: htc_9271.fw, size: 51008
+[??323.665556] ath9k_htc 2-1:1.0: ath9k_htc: HTC initialized with 33 credits
+[??324.710992] ath: phy1: Timeout waiting for WMI command: WMI_REG_READ_CMDID
+[??324.717899] ath: phy1: REGISTER READ FAILED: (0x4020, -110)
+[??324.723525] ath: phy1: Mac Chip Rev 0x0f.3 is not supported by this driver
+[??324.730416] ath: phy1: Unable to initialize hardware; initialization status: -95
+[??324.737853] ath: phy1: Unable to initialize hardware; initialization status: -95
+[??324.745296] ath9k_htc: Failed to initialize the device
+[??324.755440] usb 2-1: ath9k_htc: USB layer deinitialized
+
+2. The dongle is detected, the first few register reads succeed but register
+reads fail as soon as the dongle enters power-saving mode:
+
+[???68.070377] ath: phy0: Removed a station entry for VIF 0 (idx: 0)
+[???68.078752] ath: phy0: Detach Interface at idx: 0
+[???68.085260] ath: phy0: AWAKE -> FULL-SLEEP
+[???68.090766] ath: phy0: FULL-SLEEP -> AWAKE
+[???68.107512] ath: phy0: AWAKE -> FULL-SLEEP
+[???68.112756] ath: phy0: Driver halt
+[???68.117108] ath: phy0: Starting driver with initial channel: 2412 MHz
+[???68.123577] ath: phy0: FULL-SLEEP -> AWAKE
+[???69.191104] ath: phy0: Timeout waiting for WMI command: WMI_REG_READ_CMDID
+[???69.197987] ath: phy0: REGISTER READ FAILED: (0x7044, -110)
+[???70.231015] ath: phy0: Timeout waiting for WMI command: WMI_REG_RMW_CMDID
+
+What could be causing these issues?
 
 Cheers!
 
-> Signed-off-by: Vagrant Cascadian <vagrantc@aikidev.net>
-> ---
-> Changes in v2:
-> ?- Added Signed-off-by.
-> 
-> ?arch/arm/boot/dts/rk3288-veyron-speedy.dts | 5 +++++
-> ?1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> index a0d033f..500fd18 100644
-> --- a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> +++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> @@ -124,6 +124,11 @@
-> ????????????&sdmmc_bus4>;
-> ?};
-> 
-> +
-> +&emmc {
-> +???????/delete-property/mmc-hs200-1_8v;
-> +};
-> +
-> ?&vcc_5v {
-> ????enable-active-high;
-> ????gpio = <&gpio7 21 GPIO_ACTIVE_HIGH>;
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
 -- 
 Paul Kocialkowski, developer of free digital technology at the lower levels
 
@@ -85,4 +67,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161016/6ae8dfd0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161016/1b55bd2d/attachment.sig>
