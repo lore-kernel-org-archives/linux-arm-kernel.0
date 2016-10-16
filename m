@@ -1,24 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 16 Oct 2016 17:29:31 +0200
-Subject: [PATCH] ARM/orion/gpio: Replace three seq_printf() calls by
- seq_puts() in orion_gpio_dbg_show()
-In-Reply-To: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
-References: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
-Message-ID: <20161016152931.GA14097@lunn.ch>
+From: sylvain.rochet@finsecur.com (Sylvain Rochet)
+Date: Sun, 16 Oct 2016 17:33:16 +0200
+Subject: [PATCH] watchdog: at91sam9: keep watchdog running in idle mode
+In-Reply-To: <20151007110112.GD3485@piout.net>
+References: <1444163325-3041-1-git-send-email-sylvain.rochet@finsecur.com>
+ <20151007110112.GD3485@piout.net>
+Message-ID: <20161016153316.rsrcgnki6kn7gola@finsecur.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 16, 2016 at 12:38:26PM +0200, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Sun, 16 Oct 2016 12:30:48 +0200
-> 
-> Strings which did not contain data format specifications should be put
-> into a sequence. Thus use the corresponding function "seq_puts".
-> 
-> This issue was detected by using the Coccinelle software.
-> 
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Hi,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+On Wed, Oct 07, 2015 at 01:01:12PM +0200, Alexandre Belloni wrote:
+> On 06/10/2015 at 22:28:45 +0200, Sylvain Rochet wrote :
+> > Since turning on idle-halt in commit 5161b31dc39a (watchdog:
+> > at91sam9_wdt: better watchdog support"), SoCs compatible with
+> > at91sam9260-wdt not using a device tree no longer reboot if the watchdog
+> > times out while the CPU is in idle state. Removing the
+> > AT91_WDT_WDIDLEHLT flag that was set by default fixes this.
+> > 
+> > Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
+> > Fixes: 5161b31dc39a ("watchdog: at91sam9_wdt: better watchdog support")
+> > Cc: <stable@vger.kernel.org> # 3.14+
+> 
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> However, we don't really care about that for kernels after 3.18 as no
+> users are using pdata anymore.
+> I think you could send a follow-up patch removing pdata support
+> completely.
 
-    Andrew
+Looks like this one falls through the cracks, it didn't reach mainline 
+and therefore wasn't applied to stable branches.
+
+I just checked, it still apply properly on today's linux-next branch.
+
+Cheers,
+Sylvain
