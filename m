@@ -1,49 +1,30 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 17 Oct 2016 12:06:21 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu: Work around ARM DMA configuration
-In-Reply-To: <5cf1acbf9c42cc99e5cc0dacb50b7a92c3bd0feb.1476702234.git.robin.murphy@arm.com>
-References: <5cf1acbf9c42cc99e5cc0dacb50b7a92c3bd0feb.1476702234.git.robin.murphy@arm.com>
-Message-ID: <25ca566fd29eb25e09969f6c3ea58f819e8bc19b.1476702234.git.robin.murphy@arm.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Mon, 17 Oct 2016 16:39:22 +0530
+Subject: [PATCH] crygpu/drm/exynos/exynos_hdmi - Unmap region obtained by
+ of_iomap
+Message-ID: <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32-bit ARM DMA configuration code predates the IOMMU core's default
-domain functionality, and instead relies on allocating its own domains
-and attaching any devices using the generic IOMMU binding to them.
-Unfortunately, it does this relatively early on in the creation of the
-device, before we've seen our add_device callback, which leads us to
-attempt to operate on a half-configured master.
+Free memory mapping, if hdmi_probe is not successful.
 
-To avoid a crash, check for this situation on attach, but refuse to
-play, as there's nothing we can do. This at least allows VFIO to keep
-working for people who update their 32-bit DTs to the generic binding,
-albeit with a few (innocuous) warnings from the DMA layer on boot.
-
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/iommu/arm-smmu.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/gpu/drm/exynos/exynos_hdmi.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c841eb7a1a74..3af7f8f62d0a 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1228,6 +1228,16 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
- 		return -ENXIO;
- 	}
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 2275efe..9b7857b 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -1901,6 +1901,8 @@ err_disable_pm_runtime:
+ err_hdmiphy:
+ 	if (hdata->hdmiphy_port)
+ 		put_device(&hdata->hdmiphy_port->dev);
++	if (hdata->regs_hdmiphy)
++		iounmap(hdata->regs_hdmiphy);
+ err_ddc:
+ 	put_device(&hdata->ddc_adpt->dev);
  
-+	/*
-+	 * FIXME: The arch/arm DMA API code tries to attach devices to its own
-+	 * domains between of_xlate() and add_device() - we have no way to cope
-+	 * with that, so until ARM gets converted to rely on groups and default
-+	 * domains, just say no (but more politely than by dereferencing NULL).
-+	 * This should be at least a WARN_ON once that's sorted.
-+	 */
-+	if (!fwspec->iommu_priv)
-+		return -ENODEV;
-+
- 	smmu = fwspec_smmu(fwspec);
- 	/* Ensure that the domain is finalised */
- 	ret = arm_smmu_init_domain_context(domain, smmu);
 -- 
-1.9.1
+1.7.9.5
