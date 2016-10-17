@@ -1,64 +1,144 @@
-From: randy.li@rock-chips.com (Randy Li)
-Date: Mon, 17 Oct 2016 09:12:50 +0800
-Subject: rockchip: drm: analogix_dp-rockchip would stock the kernel
-In-Reply-To: <580421E5.9030609@rock-chips.com>
-References: <1a7ebbe4-a9d8-610d-7cd5-41f5fe8355a5@soulik.info>
- <580421E5.9030609@rock-chips.com>
-Message-ID: <e04e8feb-030e-5c74-cc77-5b6f58e24a2d@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 17 Oct 2016 09:30:59 +0800
+Subject: [PATCH v8 0/8] power: add power sequence library
+In-Reply-To: <5097336.earU4jV2qd@vostro.rjw.lan>
+References: <1476413995-20361-1-git-send-email-peter.chen@nxp.com>
+ <5097336.earU4jV2qd@vostro.rjw.lan>
+Message-ID: <20161017013058.GA1301@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 14, 2016 at 02:09:31PM +0200, Rafael J. Wysocki wrote:
+> On Friday, October 14, 2016 10:59:47 AM Peter Chen wrote:
+> > Hi all,
+> > 
+> > This is a follow-up for my last power sequence framework patch set [1].
+> > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> > power sequence instances will be added at postcore_initcall, the match
+> > criteria is compatible string first, if the compatible string is not
+> > matched between dts and library, it will try to use generic power sequence.
+> > 	 
+> > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence instance is needed, for more power sequences
+> > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> > 
+> > In future, if there are special power sequence requirements, the special
+> > power sequence library can be created.
+> > 
+> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> > two hot-plug devices to simulate this use case, the related binding
+> > change is updated at patch [1/6], The udoo board changes were tested
+> > using my last power sequence patch set.[3]
+> > 
+> > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> > need to power on itself before it can be found by ULPI bus.
+> > 
+> > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> > 
+> > Changes for v8:
+> > - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+> >   preallocate instances problem which the number of instance is decided at
+> >   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+> > - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+> >   match method. [Patch 2/8]
+> > - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+> > 
+> > Changes for v7:
+> > - Create kinds of power sequence instance at postcore_initcall, and match
+> >   the instance with node using compatible string, the beneit of this is
+> >   the host driver doesn't need to consider which pwrseq instance needs
+> >   to be used, and pwrseq core will match it, however, it eats some memories
+> >   if less power sequence instances are used. [Patch 2/8]
+> > - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+> > - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+> >   use device_node for parameters at pwrseq_on. [Patch 2/8]
+> > - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+> > - Tested three pwrseq instances together using both specific compatible string and
+> >   generic libraries.
+> > 
+> > Changes for v6:
+> > - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+> > - Change chipidea core of_node assignment for coming user. (patch [5/6])
+> > - Applies Joshua Clayton's three dts changes for two boards,
+> >   the USB device's reg has only #address-cells, but without #size-cells.
+> > 
+> > Changes for v5:
+> > - Delete pwrseq_register/pwrseq_unregister, which is useless currently
+> > - Fix the linker error when the pwrseq user is compiled as module
+> > 
+> > Changes for v4:
+> > - Create the patch on next-20160722 
+> > - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+> > - Using more friendly wait method for reset gpio [Patch 2/6]
+> > - Support multiple input clocks [Patch 2/6]
+> > - Add Rob Herring's ack for DT changes
+> > - Add Joshua Clayton's Tested-by
+> > 
+> > Changes for v3:
+> > - Delete "power-sequence" property at binding-doc, and change related code
+> >   at both library and user code.
+> > - Change binding-doc example node name with Rob's comments
+> > - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+> >   add additional code request gpio with proper gpio flags
+> > - Add Philipp Zabel's Ack and MAINTAINER's entry
+> > 
+> > Changes for v2:
+> > - Delete "pwrseq" prefix and clock-names for properties at dt binding
+> > - Should use structure not but its pointer for kzalloc
+> > - Since chipidea core has no of_node, let core's of_node equals glue
+> >   layer's at core's probe
+> > 
+> > Joshua Clayton (2):
+> >   ARM: dts: imx6qdl: Enable usb node children with <reg>
+> >   ARM: dts: imx6q-evi: Fix onboard hub reset line
+> > 
+> > Peter Chen (6):
+> >   binding-doc: power: pwrseq-generic: add binding doc for generic power
+> >     sequence library
+> >   power: add power sequence library
+> >   binding-doc: usb: usb-device: add optional properties for power
+> >     sequence
+> >   usb: core: add power sequence handling for USB devices
+> >   usb: chipidea: let chipidea core device of_node equal's glue layer
+> >     device of_node
+> >   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+> > 
+> >  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 ++++++
+> >  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+> >  MAINTAINERS                                        |   9 +
+> >  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
+> >  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++-
+> >  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+> >  drivers/power/Kconfig                              |   1 +
+> >  drivers/power/Makefile                             |   1 +
+> >  drivers/power/pwrseq/Kconfig                       |  19 ++
+> >  drivers/power/pwrseq/Makefile                      |   2 +
+> >  drivers/power/pwrseq/core.c                        | 191 +++++++++++++++++++++
+> >  drivers/power/pwrseq/pwrseq_generic.c              | 183 ++++++++++++++++++++
+> >  drivers/usb/chipidea/core.c                        |  27 ++-
+> >  drivers/usb/core/hub.c                             |  41 ++++-
+> >  drivers/usb/core/hub.h                             |   1 +
+> >  include/linux/power/pwrseq.h                       |  72 ++++++++
+> >  16 files changed, 621 insertions(+), 41 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> >  create mode 100644 drivers/power/pwrseq/Kconfig
+> >  create mode 100644 drivers/power/pwrseq/Makefile
+> >  create mode 100644 drivers/power/pwrseq/core.c
+> >  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+> >  create mode 100644 include/linux/power/pwrseq.h
+> 
+> Meta question: Who's the maintainer you are targetting this at?
+> 
 
-
-On 10/17/2016 08:57 AM, Mark yao wrote:
-> On 2016?10?16? 02:03, ayaka wrote:
->> Hello:
->>    I meet a problem with eDP in rk3288 with the linux next 20161006,
->> it is just like the early stage of 4.4
->> kernel.  I have added a eDP panel entry in the firefly reload board,
->> once the kernel loaded analogix_dp-rockchip.ko, after printed the
->> following two lines, the kernel stop working.
->> rockchip-drm display-subsystem: bound ff940000.vop (ops
->> vop_component_ops [rockchipdrm])
->> rockchip-drm display-subsystem: bound ff930000.vop (ops
->> vop_component_ops [rockchipdrm])
->
-> Hi ayaka
->
-> This log seems no problem.
-I found the problem, it is the eDP_AVDD_1V0 and eDP_AVDD_1V8 must have a 
-proper power supply. I would submit a patch to enable the regulator at 
-DP driver.
->
-> How about tested it with build-in? we had test it with build-in.
->
-> Maybe this patch can help you, you can have a try.
->     https://patchwork.kernel.org/patch/9374135
->
-> Thanks.
->
->> In the early June of the 4.4 kernel, I meet the same problem with
->> rk3288 evb board with different error message, I have to disable the
->> display system that time.
->>   In the today test, I meet the same problem with rk3399 evb board in
->> 4.4.
->>   I have no idea what caused that, and it is a little hard to debug as
->> kernel still would never kill that task.
->>                                                             Randy Li
->>
->>
->>
->
->
+Sebastian Reichel mentioned it is better through your tree.
+I could be the maintainer for it, and send "GIT PULL" for you
+through my git
+(https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/)
+Is it ok for you?
 
 -- 
-Randy Li
-The third produce department
-===========================================================================
-This email message, including any attachments, is for the sole
-use of the intended recipient(s) and may contain confidential and
-privileged information. Any unauthorized review, use, disclosure or
-distribution is prohibited. If you are not the intended recipient, please
-contact the sender by reply e-mail and destroy all copies of the original
-message. [Fuzhou Rockchip Electronics, INC. China mainland]
-===========================================================================
+
+Best Regards,
+Peter Chen
