@@ -1,137 +1,64 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 17 Oct 2016 16:46:50 +0100
-Subject: [PATCH v7 REPOST 9/9] arm64: add sysfs cpu_capacity attribute
-In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
-References: <20161017154650.18779-1-juri.lelli@arm.com>
-Message-ID: <20161017154650.18779-10-juri.lelli@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 17 Oct 2016 17:52:07 +0200
+Subject: [PATCH] ARM/orion/gpio: Replace three seq_printf() calls by
+ seq_puts() in orion_gpio_dbg_show()
+In-Reply-To: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net> (SF
+ Markus Elfring's message of "Sun, 16 Oct 2016 12:38:26 +0200")
+References: <92ba3c30-386a-bb86-623d-0917cd9e61a2@users.sourceforge.net>
+Message-ID: <87a8e3ezx4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a sysfs cpu_capacity attribute with which it is possible to read and
-write (thus over-writing default values) CPUs capacity. This might be
-useful in situations where values needs changing after boot.
-
-The new attribute shows up as:
-
- /sys/devices/system/cpu/cpu*/cpu_capacity
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
----
-
-Changes from v5:
-  - add mutex to protect cpu_scale (as pointed out by Morten off-line)
----
- arch/arm64/kernel/topology.c | 73 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 73 insertions(+)
-
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index b75b0ba2e113..cff34cc858b7 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -26,6 +26,7 @@
- #include <asm/topology.h>
+Hi Markus,
  
- static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-+static DEFINE_MUTEX(cpu_scale_mutex);
- 
- unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
- {
-@@ -37,6 +38,76 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
- 	per_cpu(cpu_scale, cpu) = capacity;
- }
- 
-+#ifdef CONFIG_PROC_SYSCTL
-+#include <asm/cpu.h>
-+#include <linux/string.h>
-+static ssize_t show_cpu_capacity(struct device *dev,
-+				 struct device_attribute *attr,
-+				 char *buf)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	ssize_t rc;
-+	int cpunum = cpu->dev.id;
-+	unsigned long capacity = arch_scale_cpu_capacity(NULL, cpunum);
-+
-+	rc = sprintf(buf, "%lu\n", capacity);
-+
-+	return rc;
-+}
-+
-+static ssize_t store_cpu_capacity(struct device *dev,
-+				  struct device_attribute *attr,
-+				  const char *buf,
-+				  size_t count)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	int this_cpu = cpu->dev.id, i;
-+	unsigned long new_capacity;
-+	ssize_t ret;
-+
-+	if (count) {
-+		char *p = (char *) buf;
-+
-+		ret = kstrtoul(p, 0, &new_capacity);
-+		if (ret)
-+			return ret;
-+		if (new_capacity > SCHED_CAPACITY_SCALE)
-+			return -EINVAL;
-+
-+		mutex_lock(&cpu_scale_mutex);
-+		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
-+			set_capacity_scale(i, new_capacity);
-+		mutex_unlock(&cpu_scale_mutex);
-+	}
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR(cpu_capacity,
-+		   0644,
-+		   show_cpu_capacity,
-+		   store_cpu_capacity);
-+
-+static int register_cpu_capacity_sysctl(void)
-+{
-+	int i;
-+	struct device *cpu;
-+
-+	for_each_possible_cpu(i) {
-+		cpu = get_cpu_device(i);
-+		if (!cpu) {
-+			pr_err("%s: too early to get CPU%d device!\n",
-+			       __func__, i);
-+			continue;
-+		}
-+		device_create_file(cpu, &dev_attr_cpu_capacity);
-+	}
-+
-+	return 0;
-+}
-+late_initcall(register_cpu_capacity_sysctl);
-+#endif
-+
- static u32 capacity_scale;
- static u32 *raw_capacity;
- static bool cap_parsing_failed;
-@@ -87,6 +158,7 @@ static void normalize_cpu_capacity(void)
- 		return;
- 
- 	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
-+	mutex_lock(&cpu_scale_mutex);
- 	for_each_possible_cpu(cpu) {
- 		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
- 			 cpu, raw_capacity[cpu]);
-@@ -96,6 +168,7 @@ static void normalize_cpu_capacity(void)
- 		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
- 			cpu, arch_scale_cpu_capacity(NULL, cpu));
- 	}
-+	mutex_unlock(&cpu_scale_mutex);
- }
- 
- #ifdef CONFIG_CPU_FREQ
+ On dim., oct. 16 2016, SF Markus Elfring <elfring@users.sourceforge.net> wrote:
+
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 16 Oct 2016 12:30:48 +0200
+>
+> Strings which did not contain data format specifications should be put
+> into a sequence. Thus use the corresponding function "seq_puts".
+>
+> This issue was detected by using the Coccinelle software.
+>
+Applied on mvebu/drivers
+
+Thanks,
+
+Gregory
+
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  arch/arm/plat-orion/gpio.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
+> index f740693..26a531e 100644
+> --- a/arch/arm/plat-orion/gpio.c
+> +++ b/arch/arm/plat-orion/gpio.c
+> @@ -478,13 +478,13 @@ static void orion_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+>  			   (data_in ^ in_pol) & msk  ? "hi" : "lo",
+>  			   in_pol & msk ? "lo" : "hi");
+>  		if (!((edg_msk | lvl_msk) & msk)) {
+> -			seq_printf(s, " disabled\n");
+> +			seq_puts(s, " disabled\n");
+>  			continue;
+>  		}
+>  		if (edg_msk & msk)
+> -			seq_printf(s, " edge ");
+> +			seq_puts(s, " edge ");
+>  		if (lvl_msk & msk)
+> -			seq_printf(s, " level");
+> +			seq_puts(s, " level");
+>  		seq_printf(s, " (%s)\n", cause & msk ? "pending" : "clear  ");
+>  	}
+>  }
+> -- 
+> 2.10.1
+>
+
 -- 
-2.10.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
