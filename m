@@ -1,32 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Oct 2016 15:43:10 -0700
-Subject: [PATCH] clk: hi6220: use CLK_OF_DECLARE_DRIVER for sysctrl and
- mediactrl clock init
-In-Reply-To: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
-References: <1475933892-16021-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20161017224310.GM8871@codeaurora.org>
+Date: Mon, 17 Oct 2016 16:13:50 -0700
+Subject: [PATCH] bus: qcom-ebi2: depend on ARCH_QCOM or COMPILE_TEST
+In-Reply-To: <1475582179-5085-1-git-send-email-linus.walleij@linaro.org>
+References: <1475582179-5085-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161017231350.GN8871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08, Shawn Guo wrote:
-> The hi6220-sysctrl and hi6220-mediactrl are not only clock provider but
-> also reset controller.  It worked fine that single sysctrl/mediactrl
-> device node in DT can be used to initialize clock driver and populate
-> platform device for reset controller.  But it stops working after
-> commit 989eafd0b609 ("clk: core: Avoid double initialization of clocks")
-> gets merged.  The commit sets flag OF_POPULATED during clock
-> initialization to skip the platform device populating for the same
-> device node.  On hi6220, it effectively makes hi6220-sysctrl reset
-> driver not probe any more.
+On 10/04, Linus Walleij wrote:
+> This hides the option for people who do not want their Kconfig
+> vision cluttered (i.e. x86) and enables compile testing apart
+> from the supported main arch.
 > 
-> The patch changes hi6220 sysctrl and mediactrl clock init macro from
-> CLK_OF_DECLARE to CLK_OF_DECLARE_DRIVER, so that the reset driver using
-> the same hardware block can continue working.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
 
-Applied to clk-fixes
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
