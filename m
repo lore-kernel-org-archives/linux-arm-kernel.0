@@ -1,49 +1,92 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 17 Oct 2016 19:50:48 +0200
-Subject: Regression: usb serial gadget on sama5d3 broken
-In-Reply-To: <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
-References: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
- <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
-Message-ID: <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Oct 2016 18:57:48 +0100
+Subject: [PATCH 1/2] iommu/arm-smmu: Don't inadvertently reject multiple
+ SMMUv3s
+In-Reply-To: <f9dfa5a4-f42a-265f-ab84-7599f2de37ed@arm.com>
+References: <5cf1acbf9c42cc99e5cc0dacb50b7a92c3bd0feb.1476702234.git.robin.murphy@arm.com>
+ <20161017132146.GA26341@red-moon>
+ <f9dfa5a4-f42a-265f-ab84-7599f2de37ed@arm.com>
+Message-ID: <20161017175748.GB28817@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-17 16:54, Nicolas Ferre wrote:
-> Le 17/10/2016 ? 14:53, Peter Rosin a ?crit :
->> Hi!
->>
->> I'm suffering from a regression while using the usb gadget port on the
->> sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
->>
->> I get this message when I try to connect:
->> udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
->>
->> A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
->> USB endpoint nodes".
->>
->> And indeed, reverting that commit on top of v4.9-rc1 fixes things,
->> although that doesn't look like the best of fixes...
->>
->> BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
->> somewhere in the overlayfs area. I hope I will never ever need to bisect
->> in the v4.6..v4.7 area again. This was the second time, the first time
->> I was chasing a gpio interrupt bug, but I never found out what was wrong
->> and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
->> was bad, it was just too painful to look for things that already seemed
->> fixed.
+On Mon, Oct 17, 2016 at 03:19:46PM +0100, Robin Murphy wrote:
+> Hi Lorenzo,
 > 
-> I guess that you are referring to the regression listed here:
-> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1239220.html
+> On 17/10/16 14:21, Lorenzo Pieralisi wrote:
+> > On Mon, Oct 17, 2016 at 12:06:20PM +0100, Robin Murphy wrote:
+> >> We now delay installing our per-bus iommu_ops until we know an SMMU has
+> >> successfully probed, as they don't serve much purpose beforehand, and
+> >> doing so also avoids fights between multiple IOMMU drivers in a single
+> >> kernel. However, the upshot of passing the return value of bus_set_iommu()
+> >> back from our probe function is that if there happens to be more than
+> >> one SMMUv3 device in a system, the second and subsequent probes will
+> >> wind up returning -EBUSY to the driver core and getting torn down again.
+> >>
+> >> There are essentially 3 cases in which bus_set_iommu() returns nonzero:
+> >> 1. The bus already has iommu_ops installed
+> >> 2. One of the add_device callbacks from the initial notifier failed
+> >> 3. Allocating or installing the notifier itself failed
+> >>
+> >> The first two are down to devices other than the SMMU in question, so
+> >> shouldn't abort an otherwise-successful SMMU probe, whilst the third is
+> >> indicative of the kind of catastrophic system failure which isn't going
+> >> to get much further anyway. Consequently, there is little harm in
+> >> ignoring the return value either way.
+> >>
+> >> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >> ---
+> >>  drivers/iommu/arm-smmu-v3.c | 11 ++++-------
+> >>  1 file changed, 4 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> >> index 15c01c3cd540..74fbef384deb 100644
+> >> --- a/drivers/iommu/arm-smmu-v3.c
+> >> +++ b/drivers/iommu/arm-smmu-v3.c
+> >> @@ -2637,16 +2637,13 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> >>  	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
+> >>  #ifdef CONFIG_PCI
+> >>  	pci_request_acs();
+> >> -	ret = bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+> >> -	if (ret)
+> >> -		return ret;
+> >> +	bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+> >>  #endif
+> >>  #ifdef CONFIG_ARM_AMBA
+> >> -	ret = bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+> >> -	if (ret)
+> >> -		return ret;
+> >> +	bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+> >>  #endif
+> >> -	return bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+> >> +	bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+> >> +	return 0;
+> > 
+> > Nit: I do not see why you would not take the same approach as
+> > the ARM SMMUv1/v2, namely checking if ops are already set and
+> > skip the call if that's the case.
 > 
-> The patch is available and will hopefully land in an official kernel
-> soon (4.8.1) as said by Felipe and Greg.
-> 
-> Sorry for the inconvenience. Best regards,
+> Well, I'd say it really goes the other way around - since the very first
+> thing bus_set_iommu() does is check if ops are present, and return if
+> so, and the v2 driver already doesn't care about that return value,
+> there's not really any need for it to duplicate the check either. I
+> didn't change it at the time to avoid cluttering the gigantic rework any
+> further, but I could spin a cleanup patch if you like.
 
-Ok, I tried "usb: gadget: udc: atmel: fix endpoint name" and it fixes
-things for me too. But shouldn't the memory for the now dynamic name be
-allocated with devm_kasprintf instead of that plain kasprint? If you
-are pedantic...
+No worries, it was to understand if there was a reason to keep
+the code different and after another look I agree with what
+you are saying (by checking if ops are present you could eg
+avoid calling pci_request_acs() every probe but that's a detail).
 
-Cheers,
-Peter
+Thanks for fixing it !
+Lorenzo
+
+> > Anyway:
+> > 
+> > Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> 
+> Thanks!
+> 
+> Robin.
+> 
