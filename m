@@ -1,33 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 17 Oct 2016 18:34:49 +0200
-Subject: [PATCH] ARM: dts: novena: Enable PWM1
-Message-ID: <20161017163449.11990-1-marex@denx.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 17 Oct 2016 17:39:22 +0100
+Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for heterogeneous
+ systems
+In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
+References: <20161017154650.18779-1-juri.lelli@arm.com>
+Message-ID: <66c7bbfd-ec3f-ff43-9a06-ae644d9ee9d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PWM1, otherwise the backlight cannot work.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
----
- arch/arm/boot/dts/imx6q-novena.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-novena.dts b/arch/arm/boot/dts/imx6q-novena.dts
-index 1723e89e..758bca9 100644
---- a/arch/arm/boot/dts/imx6q-novena.dts
-+++ b/arch/arm/boot/dts/imx6q-novena.dts
-@@ -451,6 +451,10 @@
- 	status = "okay";
- };
- 
-+&pwm1 {
-+	status = "okay";
-+};
-+
- &sata {
- 	target-supply = <&reg_sata>;
- 	fsl,transmit-level-mV = <1025>;
+On 17/10/16 16:46, Juri Lelli wrote:
+> Hi all,
+>
+> this is a repost of version 7 of "CPUs capacity information for heterogeneous
+> systems" patchset [1] (please refer to previous postings to get some context).
+> I only added Juno r1 dts, as discussed off-line with Sudeep meanwhile (no code
+> changes at all, so that's why I'm saying this is a repost).
+>
+> I'm reposting as I didn't receive any comment (despite pinging people) on the
+> original v7 posting (apart from Vincent acking patches 2 and 4, thanks!). I
+> then waited until merge window for 4.9 was closed.
+>
+> I'm thus now assuming that everybody is OK with the patches and that they can
+> be queued for 4.10 (we certainly need this plumbing at this point). Please
+> speak if my assumption is wrong (and provide feedback! :).
+> Otherwise I'm going to:
+>
+>  - use Russell's patching system for patches 2 and 8
+>  - ask Sudeep to pull patches 3,5,6 and 7
+
+I have applied 3 to [1] and 5,6,7 to [2]. Let me know if things change
+and you want me to drop them with some cosmetic subject change and
+updated changelog.
+
 -- 
-2.9.3
+Regards,
+Sudeep
+
+[1] git.kernel.org/sudeep.holla/linux/h/vexpress-dt/for-next
+[2] git.kernel.org/sudeep.holla/linux/h/juno-dt/for-next
