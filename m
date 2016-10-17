@@ -1,71 +1,57 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 17 Oct 2016 13:13:35 +0100
-Subject: [PATCH 2/3] arm64: dts: Update AMD Seattle to generic IOMMU binding
-In-Reply-To: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
-References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
-Message-ID: <ba181e825cd125690bdded339f2003730d7d866e.1476706244.git.robin.murphy@arm.com>
+From: wenpan@hisilicon.com (Pan Wen)
+Date: Mon, 17 Oct 2016 20:07:03 +0800
+Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
+In-Reply-To: <20161017120705.3726-1-wenpan@hisilicon.com>
+References: <20161017120705.3726-1-wenpan@hisilicon.com>
+Message-ID: <20161017120705.3726-2-wenpan@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMU-401 supports stream matching, so with the SMMU implementation of
-the generic "iommus" binding we can use masks to nicely simplify the
-XGBE's blocks of contiguous stream IDs.
+Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
 
-CC: Tom Lendacky <thomas.lendacky@amd.com>
-CC: Suravee Suthikulpanit <suravee.suthikulpanit@amd.com>
-CC: Brijesh Singh <brijeshkumar.singh@amd.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Pan Wen <wenpan@hisilicon.com>
 ---
- arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi | 16 ++++------------
- 1 file changed, 4 insertions(+), 12 deletions(-)
+ arch/arm/mach-hisi/Kconfig | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
-index 8e8631952497..4cd0a443d4f6 100644
---- a/arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
-+++ b/arch/arm64/boot/dts/amd/amd-seattle-xgbe-b.dtsi
-@@ -54,8 +54,8 @@
- 		clocks = <&xgmacclk0_dma_250mhz>, <&xgmacclk0_ptp_250mhz>;
- 		clock-names = "dma_clk", "ptp_clk";
- 		phy-mode = "xgmii";
--		#stream-id-cells = <16>;
- 		dma-coherent;
-+		iommus = <&xgmac0_smmu 0x00 0x17>;
- 	};
+diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
+index a3b091a..03d8379 100644
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -1,12 +1,14 @@
+ config ARCH_HISI
+ 	bool "Hisilicon SoC Support"
+-	depends on ARCH_MULTI_V7
+ 	select ARM_AMBA
+-	select ARM_GIC
++	select ARM_GIC if ARCH_MULTI_V7
++	select ARM_VIC if ARCH_MULTI_V5
+ 	select ARM_TIMER_SP804
+ 	select POWER_RESET
+ 	select POWER_RESET_HISI
+ 	select POWER_SUPPLY
++	select PINCTRL
++	select PINCTRL_SINGLE
  
- 	xgmac1: xgmac at e0900000 {
-@@ -80,8 +80,8 @@
- 		clocks = <&xgmacclk1_dma_250mhz>, <&xgmacclk1_ptp_250mhz>;
- 		clock-names = "dma_clk", "ptp_clk";
- 		phy-mode = "xgmii";
--		#stream-id-cells = <16>;
- 		dma-coherent;
-+		iommus = <&xgmac1_smmu 0x00 0x17>;
- 	};
+ if ARCH_HISI
  
- 	xgmac0_smmu: smmu at e0600000 {
-@@ -93,11 +93,7 @@
- 			       */
- 			      <0 336 4>,
- 			      <0 336 4>;
--
--		 mmu-masters = <&xgmac0
--			  0  1  2  3  4  5  6  7
--			 16 17 18 19 20 21 22 23
--		 >;
-+		#iommu-cells = <2>;
- 	 };
+@@ -18,8 +20,6 @@ config ARCH_HI3xxx
+ 	select CACHE_L2X0
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select PINCTRL
+-	select PINCTRL_SINGLE
+ 	help
+ 	  Support for Hisilicon Hi36xx SoC family
  
- 	 xgmac1_smmu: smmu at e0800000 {
-@@ -109,9 +105,5 @@
- 			       */
- 			      <0 335 4>,
- 			      <0 335 4>;
--
--		 mmu-masters = <&xgmac1
--			  0  1  2  3  4  5  6  7
--			 16 17 18 19 20 21 22 23
--		 >;
-+		#iommu-cells = <2>;
- 	 };
+@@ -48,8 +48,6 @@ config ARCH_HIX5HD2
+ 	select CACHE_L2X0
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select PINCTRL
+-	select PINCTRL_SINGLE
+ 	help
+ 	  Support for Hisilicon HIX5HD2 SoC family
+ endmenu
 -- 
-1.9.1
+2.9.3
