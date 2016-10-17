@@ -1,10 +1,10 @@
 From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Mon, 17 Oct 2016 11:53:08 +0530
-Subject: [PATCH v2] spi: spi-fsl-dspi: Add DMA support for Vybrid
-In-Reply-To: <607397542d083f13dc98909958672eeb0d326c79.1475578195.git.maitysanchayan@gmail.com>
-References: <8ccf4f2f4e6739410d9e242f9d0e3f3bcc76d0e2.1475498805.git.maitysanchayan@gmail.com>
- <607397542d083f13dc98909958672eeb0d326c79.1475578195.git.maitysanchayan@gmail.com>
-Message-ID: <20161017062308.GA3478@Sanchayan-Arch.localdomain>
+Date: Mon, 17 Oct 2016 11:54:36 +0530
+Subject: [PATCH] ARM: dts: imx6: Add support for Toradex Colibri iMX6
+ module
+In-Reply-To: <20160921112438.8661-1-maitysanchayan@gmail.com>
+References: <20160921112438.8661-1-maitysanchayan@gmail.com>
+Message-ID: <20161017062435.GB3478@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,401 +12,1187 @@ Hello,
 
 Ping?
 
-Regards,
-Sanchayan.
+- Sanchayan.
 
-On 16-10-04 16:28:33, Sanchayan Maity wrote:
-> Add DMA support for Vybrid.
+On 16-09-21 16:54:38, Sanchayan Maity wrote:
+> Add support for Toradex Colibri iMX6 module.
 > 
 > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 > ---
-> Changes since v1:
-> - Change in the dspi_dma_xfer function. Use more apt DSPI_FIFO_SIZE
-> instead of sizeof(u32)
-> - Do not set RSER on every iteration of loop
+>  arch/arm/boot/dts/Makefile                   |   1 +
+>  arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts | 253 ++++++++
+>  arch/arm/boot/dts/imx6qdl-colibri.dtsi       | 890 +++++++++++++++++++++++++++
+>  3 files changed, 1144 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-colibri.dtsi
 > 
-> Tested on Toradex Colibri Vybrid VF61 module with spi based MCP CAN 251x
-> and spidev using RX/TX loopback and based on shawn's for-next branch
-> currently at 4.8-rc1.
-> 
-> Regards,
-> Sanchayan.
-> ---
->  drivers/spi/spi-fsl-dspi.c | 291 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 291 insertions(+)
-> 
-> diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-> index 9e9dadb..0f81075 100644
-> --- a/drivers/spi/spi-fsl-dspi.c
-> +++ b/drivers/spi/spi-fsl-dspi.c
-> @@ -15,6 +15,8 @@
->  
->  #include <linux/clk.h>
->  #include <linux/delay.h>
-> +#include <linux/dmaengine.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/err.h>
->  #include <linux/errno.h>
->  #include <linux/interrupt.h>
-> @@ -40,6 +42,7 @@
->  #define TRAN_STATE_WORD_ODD_NUM	0x04
->  
->  #define DSPI_FIFO_SIZE			4
-> +#define DSPI_DMA_BUFSIZE		(DSPI_FIFO_SIZE * 1024)
->  
->  #define SPI_MCR		0x00
->  #define SPI_MCR_MASTER		(1 << 31)
-> @@ -71,6 +74,11 @@
->  #define SPI_SR_EOQF		0x10000000
->  #define SPI_SR_TCFQF		0x80000000
->  
-> +#define SPI_RSER_TFFFE		BIT(25)
-> +#define SPI_RSER_TFFFD		BIT(24)
-> +#define SPI_RSER_RFDFE		BIT(17)
-> +#define SPI_RSER_RFDFD		BIT(16)
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f79cac2..44ff380 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -323,6 +323,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6dl-aristainetos_7.dtb \
+>  	imx6dl-aristainetos2_4.dtb \
+>  	imx6dl-aristainetos2_7.dtb \
+> +	imx6dl-colibri-eval-v3.dtb \
+>  	imx6dl-cubox-i.dtb \
+>  	imx6dl-dfi-fs700-m60.dtb \
+>  	imx6dl-gw51xx.dtb \
+> diff --git a/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+> new file mode 100644
+> index 0000000..e0c2172
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6dl-colibri-eval-v3.dts
+> @@ -0,0 +1,253 @@
+> +/*
+> + * Copyright 2014-2016 Toradex AG
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 > +
->  #define SPI_RSER		0x30
->  #define SPI_RSER_EOQFE		0x10000000
->  #define SPI_RSER_TCFQE		0x80000000
-> @@ -108,6 +116,8 @@
->  
->  #define SPI_TCR_TCNT_MAX	0x10000
->  
-> +#define DMA_COMPLETION_TIMEOUT	msecs_to_jiffies(3000)
+> +/dts-v1/;
 > +
->  struct chip_data {
->  	u32 mcr_val;
->  	u32 ctar_val;
-> @@ -117,6 +127,7 @@ struct chip_data {
->  enum dspi_trans_mode {
->  	DSPI_EOQ_MODE = 0,
->  	DSPI_TCFQ_MODE,
-> +	DSPI_DMA_MODE,
->  };
->  
->  struct fsl_dspi_devtype_data {
-> @@ -139,6 +150,22 @@ static const struct fsl_dspi_devtype_data ls2085a_data = {
->  	.max_clock_factor = 8,
->  };
->  
-> +struct fsl_dspi_dma {
-> +	u32 curr_xfer_len;
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "imx6dl.dtsi"
+> +#include "imx6qdl-colibri.dtsi"
 > +
-> +	u32 *tx_dma_buf;
-> +	struct dma_chan *chan_tx;
-> +	dma_addr_t tx_dma_phys;
-> +	struct completion cmd_tx_complete;
-> +	struct dma_async_tx_descriptor *tx_desc;
+> +/ {
+> +	model = "Toradex Colibri iMX6DL/S on Colibri Evaluation Board V3";
+> +	compatible = "toradex,colibri_imx6dl-eval-v3", "toradex,colibri_imx6dl",
+> +		     "fsl,imx6dl";
 > +
-> +	u32 *rx_dma_buf;
-> +	struct dma_chan *chan_rx;
-> +	dma_addr_t rx_dma_phys;
-> +	struct completion cmd_rx_complete;
-> +	struct dma_async_tx_descriptor *rx_desc;
+> +	aliases {
+> +		i2c0 = &i2c2;
+> +		i2c1 = &i2c3;
+> +	};
+> +
+> +	aliases {
+> +		rtc0 = &rtc_i2c;
+> +		rtc1 = &snvs_rtc;
+> +	};
+> +
+> +	clocks {
+> +		/* Fixed crystal dedicated to mcp251x */
+> +		clk16m: clk at 1 {
+> +			compatible = "fixed-clock";
+> +			reg = <1>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <16000000>;
+> +			clock-output-names = "clk16m";
+> +		};
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_keys>;
+> +
+> +		wakeup {
+> +			label = "Wake-Up";
+> +			gpios = <&gpio2 22 GPIO_ACTIVE_HIGH>; /* SODIMM 45 */
+> +			linux,code = <KEY_WAKEUP>;
+> +			debounce-interval = <10>;
+> +			wakeup-source;
+> +		};
+> +	};
+> +
+> +	lcd_display: display at di0 {
+> +		compatible = "fsl,imx-parallel-display";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		interface-pix-fmt = "bgr666";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ipu1_lcdif>;
+> +		status = "okay";
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			lcd_display_in: endpoint {
+> +				remote-endpoint = <&ipu1_di0_disp0>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +
+> +			lcd_display_out: endpoint {
+> +				remote-endpoint = <&lcd_panel_in>;
+> +			};
+> +		};
+> +	};
+> +
+> +	panel: panel {
+> +		/*
+> +		 * edt,et057090dhu: EDT 5.7" LCD TFT
+> +		 * edt,et070080dh6: EDT 7.0" LCD TFT
+> +		 */
+> +		compatible = "edt,et057090dhu";
+> +		backlight = <&backlight>;
+> +
+> +		port {
+> +			lcd_panel_in: endpoint {
+> +				remote-endpoint = <&lcd_display_out>;
+> +			};
+> +		};
+> +	};
 > +};
 > +
->  struct fsl_dspi {
->  	struct spi_master	*master;
->  	struct platform_device	*pdev;
-> @@ -165,6 +192,7 @@ struct fsl_dspi {
->  	u32			waitflags;
->  
->  	u32			spi_tcnt;
-> +	struct fsl_dspi_dma	*dma;
->  };
->  
->  static inline int is_double_byte_mode(struct fsl_dspi *dspi)
-> @@ -368,6 +396,259 @@ static void dspi_tcfq_read(struct fsl_dspi *dspi)
->  	dspi_data_from_popr(dspi, rx_word);
->  }
->  
-> +static void dspi_tx_dma_callback(void *arg)
-> +{
-> +	struct fsl_dspi *dspi = arg;
-> +	struct fsl_dspi_dma *dma = dspi->dma;
+> +&backlight {
+> +	brightness-levels = <0 127 191 223 239 247 251 255>;
+> +	default-brightness-level = <1>;
+> +	status = "okay";
+> +};
 > +
-> +	complete(&dma->cmd_tx_complete);
-> +}
+> +/* Colibri SSP */
+> +&ecspi4 {
+> +	status = "okay";
 > +
-> +static void dspi_rx_dma_callback(void *arg)
-> +{
-> +	struct fsl_dspi *dspi = arg;
-> +	struct fsl_dspi_dma *dma = dspi->dma;
-> +	int rx_word;
-> +	int i, len;
-> +	u16 d;
+> +	mcp251x0: mcp251x at 1 {
+> +		compatible = "microchip,mcp2515";
+> +		reg = <0>;
+> +		clocks = <&clk16m>;
+> +		interrupt-parent = <&gpio3>;
+> +		interrupts = <27 0x2>;
+> +		spi-max-frequency = <10000000>;
+> +		status = "okay";
+> +	};
+> +};
 > +
-> +	rx_word = is_double_byte_mode(dspi);
+> +&hdmi {
+> +	status = "okay";
+> +};
 > +
-> +	len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> +/*
+> + * Colibri I2C: I2C3_SDA/SCL on SODIMM 194/196 (e.g. RTC on carrier board)
+> + */
+> +&i2c3 {
+> +	status = "okay";
 > +
-> +	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
-> +		for (i = 0; i < len; i++) {
-> +			d = dspi->dma->rx_dma_buf[i];
-> +			rx_word ? (*(u16 *)dspi->rx = d) :
-> +						(*(u8 *)dspi->rx = d);
-> +			dspi->rx += rx_word + 1;
-> +		}
-> +	}
+> +	/* M41T0M6 real time clock on carrier board */
+> +	rtc_i2c: rtc at 68 {
+> +		compatible = "st,m41t00";
+> +		reg = <0x68>;
+> +	};
+> +};
 > +
-> +	complete(&dma->cmd_rx_complete);
-> +}
+> +&ipu1_di0_disp0 {
+> +	remote-endpoint = <&lcd_display_in>;
+> +};
 > +
-> +static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
-> +{
-> +	struct fsl_dspi_dma *dma = dspi->dma;
-> +	struct device *dev = &dspi->pdev->dev;
-> +	int time_left;
-> +	int tx_word;
-> +	int i, len;
-> +	u16 val;
+> +&pwm1 {
+> +	status = "okay";
+> +};
 > +
-> +	tx_word = is_double_byte_mode(dspi);
+> +&pwm2 {
+> +	status = "okay";
+> +};
 > +
-> +	len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
+> +&pwm3 {
+> +	status = "okay";
+> +};
 > +
-> +	for (i = 0; i < len - 1; i++) {
-> +		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-> +		dspi->dma->tx_dma_buf[i] =
-> +			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
-> +			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
-> +		dspi->tx += tx_word + 1;
-> +	}
+> +&pwm4 {
+> +	status = "okay";
+> +};
 > +
-> +	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-> +	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
-> +					SPI_PUSHR_PCS(dspi->cs) |
-> +					SPI_PUSHR_CTAS(0);
-> +	dspi->tx += tx_word + 1;
+> +&reg_usb_host_vbus {
+> +	status = "okay";
+> +};
 > +
-> +	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-> +					dma->tx_dma_phys,
-> +					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-> +					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!dma->tx_desc) {
-> +		dev_err(dev, "Not able to get desc for DMA xfer\n");
-> +		return -EIO;
-> +	}
+> +&uart1 {
+> +	status = "okay";
+> +};
 > +
-> +	dma->tx_desc->callback = dspi_tx_dma_callback;
-> +	dma->tx_desc->callback_param = dspi;
-> +	if (dma_submit_error(dmaengine_submit(dma->tx_desc))) {
-> +		dev_err(dev, "DMA submit failed\n");
-> +		return -EINVAL;
-> +	}
+> +&uart2 {
+> +	status = "okay";
+> +};
 > +
-> +	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
-> +					dma->rx_dma_phys,
-> +					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-> +					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!dma->rx_desc) {
-> +		dev_err(dev, "Not able to get desc for DMA xfer\n");
-> +		return -EIO;
-> +	}
+> +&uart3 {
+> +	status = "okay";
+> +};
 > +
-> +	dma->rx_desc->callback = dspi_rx_dma_callback;
-> +	dma->rx_desc->callback_param = dspi;
-> +	if (dma_submit_error(dmaengine_submit(dma->rx_desc))) {
-> +		dev_err(dev, "DMA submit failed\n");
-> +		return -EINVAL;
-> +	}
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_host_vbus>;
+> +	status = "okay";
+> +};
 > +
-> +	reinit_completion(&dspi->dma->cmd_rx_complete);
-> +	reinit_completion(&dspi->dma->cmd_tx_complete);
+> +&usbotg {
+> +	status = "okay";
+> +};
 > +
-> +	dma_async_issue_pending(dma->chan_rx);
-> +	dma_async_issue_pending(dma->chan_tx);
+> +/* Colibri MMC */
+> +&usdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_mmc_cd>;
+> +	cd-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* MMCD */
+> +	status = "okay";
+> +};
 > +
-> +	time_left = wait_for_completion_timeout(&dspi->dma->cmd_tx_complete,
-> +					DMA_COMPLETION_TIMEOUT);
-> +	if (time_left == 0) {
-> +		dev_err(dev, "DMA tx timeout\n");
-> +		dmaengine_terminate_all(dma->chan_tx);
-> +		dmaengine_terminate_all(dma->chan_rx);
-> +		return -ETIMEDOUT;
-> +	}
+> +&weim {
+> +	status = "okay";
 > +
-> +	time_left = wait_for_completion_timeout(&dspi->dma->cmd_rx_complete,
-> +					DMA_COMPLETION_TIMEOUT);
-> +	if (time_left == 0) {
-> +		dev_err(dev, "DMA rx timeout\n");
-> +		dmaengine_terminate_all(dma->chan_tx);
-> +		dmaengine_terminate_all(dma->chan_rx);
-> +		return -ETIMEDOUT;
-> +	}
+> +	/* weim memory map: 32MB on CS0, 32MB on CS1, 32MB on CS2 */
+> +	ranges = <0 0 0x08000000 0x02000000
+> +		  1 0 0x0a000000 0x02000000
+> +		  2 0 0x0c000000 0x02000000>;
 > +
-> +	return 0;
-> +}
+> +	/* SRAM on Colibri nEXT_CS0 */
+> +	sram at 0,0 {
+> +		compatible = "cypress,cy7c1019dv33-10zsxi, mtd-ram";
+> +		reg = <0 0 0x00010000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		bank-width = <2>;
+> +		fsl,weim-cs-timing = <0x00010081 0x00000000 0x04000000
+> +				      0x00000000 0x04000040 0x00000000>;
+> +	};
 > +
-> +static int dspi_dma_xfer(struct fsl_dspi *dspi)
-> +{
-> +	struct fsl_dspi_dma *dma = dspi->dma;
-> +	struct device *dev = &dspi->pdev->dev;
-> +	int curr_remaining_bytes;
-> +	int ret = 0;
+> +	/* SRAM on Colibri nEXT_CS1 */
+> +	sram at 1,0 {
+> +		compatible = "cypress,cy7c1019dv33-10zsxi, mtd-ram";
+> +		reg = <1 0 0x00010000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		bank-width = <2>;
+> +		fsl,weim-cs-timing = <0x00010081 0x00000000 0x04000000
+> +				      0x00000000 0x04000040 0x00000000>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+> new file mode 100644
+> index 0000000..e6faa65
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+> @@ -0,0 +1,890 @@
+> +/*
+> + * Copyright 2014-2016 Toradex AG
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2011 Linaro Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 > +
-> +	curr_remaining_bytes = dspi->len;
-> +	while (curr_remaining_bytes) {
-> +		/* Check if current transfer fits the DMA buffer */
-> +		dma->curr_xfer_len = curr_remaining_bytes;
-> +		if (curr_remaining_bytes > DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE)
-> +			dma->curr_xfer_len = DSPI_DMA_BUFSIZE / DSPI_FIFO_SIZE;
+> +#include <dt-bindings/gpio/gpio.h>
 > +
-> +		ret = dspi_next_xfer_dma_submit(dspi);
-> +		if (ret) {
-> +			dev_err(dev, "DMA transfer failed\n");
-> +			goto exit;
+> +/ {
+> +	model = "Toradex Colibri iMX6DL/S Module";
+> +	compatible = "toradex,colibri_imx6dl", "fsl,imx6dl";
 > +
-> +		} else {
-> +			curr_remaining_bytes -= dma->curr_xfer_len;
-> +			if (curr_remaining_bytes < 0)
-> +				curr_remaining_bytes = 0;
-> +			dspi->len = curr_remaining_bytes;
-> +		}
-> +	}
+> +	backlight: backlight {
+> +		compatible = "pwm-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_gpio_bl_on>;
+> +		pwms = <&pwm3 0 5000000>;
+> +		enable-gpios = <&gpio3 26 GPIO_ACTIVE_HIGH>; /* Colibri BL_ON */
+> +		status = "disabled";
+> +	};
 > +
-> +exit:
-> +	return ret;
-> +}
+> +	reg_1p8v: regulator-1p8v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "1P8V";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +		regulator-always-on;
+> +	};
 > +
-> +static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
-> +{
-> +	struct fsl_dspi_dma *dma;
-> +	struct dma_slave_config cfg;
-> +	struct device *dev = &dspi->pdev->dev;
-> +	int ret;
+> +	reg_2p5v: regulator-2p5v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "2P5V";
+> +		regulator-min-microvolt = <2500000>;
+> +		regulator-max-microvolt = <2500000>;
+> +		regulator-always-on;
+> +	};
 > +
-> +	dma = devm_kzalloc(dev, sizeof(*dma), GFP_KERNEL);
-> +	if (!dma)
-> +		return -ENOMEM;
+> +	reg_3p3v: regulator-3p3v {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3P3V";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
 > +
-> +	dma->chan_rx = dma_request_slave_channel(dev, "rx");
-> +	if (!dma->chan_rx) {
-> +		dev_err(dev, "rx dma channel not available\n");
-> +		ret = -ENODEV;
-> +		return ret;
-> +	}
+> +	reg_usb_host_vbus: regulator-usb-host-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_regulator_usbh_pwr>;
+> +		regulator-name = "usb_host_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>; /* USBH_PEN */
+> +		status = "disabled";
+> +	};
 > +
-> +	dma->chan_tx = dma_request_slave_channel(dev, "tx");
-> +	if (!dma->chan_tx) {
-> +		dev_err(dev, "tx dma channel not available\n");
-> +		ret = -ENODEV;
-> +		goto err_tx_channel;
-> +	}
+> +	sound {
+> +		compatible = "fsl,imx-audio-sgtl5000";
+> +		model = "imx6dl-colibri-sgtl5000";
+> +		ssi-controller = <&ssi1>;
+> +		audio-codec = <&codec>;
+> +		audio-routing =
+> +			"Headphone Jack", "HP_OUT",
+> +			"LINE_IN", "Line In Jack",
+> +			"MIC_IN", "Mic Jack",
+> +			"Mic Jack", "Mic Bias";
+> +		mux-int-port = <1>;
+> +		mux-ext-port = <5>;
+> +	};
 > +
-> +	dma->tx_dma_buf = dma_alloc_coherent(dev, DSPI_DMA_BUFSIZE,
-> +					&dma->tx_dma_phys, GFP_KERNEL);
-> +	if (!dma->tx_dma_buf) {
-> +		ret = -ENOMEM;
-> +		goto err_tx_dma_buf;
-> +	}
+> +	/* Optional S/PDIF in on SODIMM 88 and out on SODIMM 90, 137 or 168 */
+> +	sound_spdif: sound-spdif {
+> +		compatible = "fsl,imx-audio-spdif";
+> +		model = "imx-spdif";
+> +		spdif-controller = <&spdif>;
+> +		spdif-in;
+> +		spdif-out;
+> +		status = "disabled";
+> +	};
+> +};
 > +
-> +	dma->rx_dma_buf = dma_alloc_coherent(dev, DSPI_DMA_BUFSIZE,
-> +					&dma->rx_dma_phys, GFP_KERNEL);
-> +	if (!dma->rx_dma_buf) {
-> +		ret = -ENOMEM;
-> +		goto err_rx_dma_buf;
-> +	}
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux &pinctrl_mic_gnd>;
+> +	status = "okay";
+> +};
 > +
-> +	cfg.src_addr = phy_addr + SPI_POPR;
-> +	cfg.dst_addr = phy_addr + SPI_PUSHR;
-> +	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +	cfg.src_maxburst = 1;
-> +	cfg.dst_maxburst = 1;
+> +/* Optional on SODIMM 55/63 */
+> +&can1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan1>;
+> +	status = "disabled";
+> +};
 > +
-> +	cfg.direction = DMA_DEV_TO_MEM;
-> +	ret = dmaengine_slave_config(dma->chan_rx, &cfg);
-> +	if (ret) {
-> +		dev_err(dev, "can't configure rx dma channel\n");
-> +		ret = -EINVAL;
-> +		goto err_slave_config;
-> +	}
+> +/* Optional on SODIMM 178/188 */
+> +&can2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_flexcan2>;
+> +	status = "disabled";
+> +};
 > +
-> +	cfg.direction = DMA_MEM_TO_DEV;
-> +	ret = dmaengine_slave_config(dma->chan_tx, &cfg);
-> +	if (ret) {
-> +		dev_err(dev, "can't configure tx dma channel\n");
-> +		ret = -EINVAL;
-> +		goto err_slave_config;
-> +	}
+> +/* Colibri SSP */
+> +&ecspi4 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio5 2 GPIO_ACTIVE_HIGH>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi4>;
+> +	status = "disabled";
+> +};
 > +
-> +	dspi->dma = dma;
-> +	dspi->devtype_data->trans_mode = DSPI_DMA_MODE;
-> +	init_completion(&dma->cmd_tx_complete);
-> +	init_completion(&dma->cmd_rx_complete);
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rmii";
+> +	status = "okay";
+> +};
 > +
-> +	return 0;
+> +&hdmi {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hdmi_ddc>;
+> +	status = "disabled";
+> +};
 > +
-> +err_slave_config:
-> +	devm_kfree(dev, dma->rx_dma_buf);
-> +err_rx_dma_buf:
-> +	devm_kfree(dev, dma->tx_dma_buf);
-> +err_tx_dma_buf:
-> +	dma_release_channel(dma->chan_tx);
-> +err_tx_channel:
-> +	dma_release_channel(dma->chan_rx);
+> +/*
+> + * PWR_I2C: power I2C to audio codec, PMIC, temperature sensor and
+> + * touch screen controller
+> + */
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
 > +
-> +	devm_kfree(dev, dma);
-> +	dspi->dma = NULL;
+> +	pmic: pfuze100 at 08 {
+> +		compatible = "fsl,pfuze100";
+> +		reg = <0x08>;
 > +
-> +	return ret;
-> +}
+> +		regulators {
+> +			sw1a_reg: sw1ab {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
 > +
-> +static void dspi_release_dma(struct fsl_dspi *dspi)
-> +{
-> +	struct fsl_dspi_dma *dma = dspi->dma;
-> +	struct device *dev = &dspi->pdev->dev;
+> +			sw1c_reg: sw1c {
+> +				regulator-min-microvolt = <300000>;
+> +				regulator-max-microvolt = <1875000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-ramp-delay = <6250>;
+> +			};
 > +
-> +	if (dma) {
-> +		if (dma->chan_tx) {
-> +			dma_unmap_single(dev, dma->tx_dma_phys,
-> +					DSPI_DMA_BUFSIZE, DMA_TO_DEVICE);
-> +			dma_release_channel(dma->chan_tx);
-> +		}
+> +			sw3a_reg: sw3a {
+> +				regulator-min-microvolt = <400000>;
+> +				regulator-max-microvolt = <1975000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
 > +
-> +		if (dma->chan_rx) {
-> +			dma_unmap_single(dev, dma->rx_dma_phys,
-> +					DSPI_DMA_BUFSIZE, DMA_FROM_DEVICE);
-> +			dma_release_channel(dma->chan_rx);
-> +		}
-> +	}
-> +}
+> +			swbst_reg: swbst {
+> +				regulator-min-microvolt = <5000000>;
+> +				regulator-max-microvolt = <5150000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
 > +
->  static int dspi_transfer_one_message(struct spi_master *master,
->  		struct spi_message *message)
->  {
-> @@ -424,6 +705,12 @@ static int dspi_transfer_one_message(struct spi_master *master,
->  			regmap_write(dspi->regmap, SPI_RSER, SPI_RSER_TCFQE);
->  			dspi_tcfq_write(dspi);
->  			break;
-> +		case DSPI_DMA_MODE:
-> +			regmap_write(dspi->regmap, SPI_RSER,
-> +				SPI_RSER_TFFFE | SPI_RSER_TFFFD |
-> +				SPI_RSER_RFDFE | SPI_RSER_RFDFD);
-> +			status = dspi_dma_xfer(dspi);
-> +			goto out;
->  		default:
->  			dev_err(&dspi->pdev->dev, "unsupported trans_mode %u\n",
->  				trans_mode);
-> @@ -730,6 +1017,9 @@ static int dspi_probe(struct platform_device *pdev)
->  	}
->  	clk_prepare_enable(dspi->clk);
->  
-> +	if (dspi_request_dma(dspi, res->start))
-> +		dev_warn(&pdev->dev, "can't get dma channels\n");
+> +			snvs_reg: vsnvs {
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <3000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
 > +
->  	master->max_speed_hz =
->  		clk_get_rate(dspi->clk) / dspi->devtype_data->max_clock_factor;
->  
-> @@ -758,6 +1048,7 @@ static int dspi_remove(struct platform_device *pdev)
->  	struct fsl_dspi *dspi = spi_master_get_devdata(master);
->  
->  	/* Disconnect from the SPI framework */
-> +	dspi_release_dma(dspi);
->  	clk_disable_unprepare(dspi->clk);
->  	spi_unregister_master(dspi->master);
->  	spi_master_put(dspi->master);
+> +			vref_reg: vrefddr {
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			/* vgen1: unused */
+> +
+> +			vgen2_reg: vgen2 {
+> +				regulator-min-microvolt = <800000>;
+> +				regulator-max-microvolt = <1550000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			/* vgen3: unused */
+> +
+> +			vgen4_reg: vgen4 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen5_reg: vgen5 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +
+> +			vgen6_reg: vgen6 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +			};
+> +		};
+> +	};
+> +
+> +	codec: sgtl5000 at 0a {
+> +		compatible = "fsl,sgtl5000";
+> +		reg = <0x0a>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		VDDA-supply = <&reg_2p5v>;
+> +		VDDIO-supply = <&reg_3p3v>;
+> +	};
+> +
+> +	/* STMPE811 touch screen controller */
+> +	stmpe811 at 41 {
+> +		compatible = "st,stmpe811";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_touch_int>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x41>;
+> +		interrupts = <20 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-parent = <&gpio6>;
+> +		interrupt-controller;
+> +		id = <0>;
+> +		blocks = <0x5>;
+> +		irq-trigger = <0x1>;
+> +
+> +		stmpe_touchscreen {
+> +			compatible = "st,stmpe-ts";
+> +			reg = <0>;
+> +			/* 3.25 MHz ADC clock speed */
+> +			st,adc-freq = <1>;
+> +			/* 8 sample average control */
+> +			st,ave-ctrl = <3>;
+> +			/* 7 length fractional part in z */
+> +			st,fraction-z = <7>;
+> +			/*
+> +			 * 50 mA typical 80 mA max touchscreen drivers
+> +			 * current limit value
+> +			 */
+> +			st,i-drive = <1>;
+> +			/* 12-bit ADC */
+> +			st,mod-12b = <1>;
+> +			/* internal ADC reference */
+> +			st,ref-sel = <0>;
+> +			/* ADC converstion time: 80 clocks */
+> +			st,sample-time = <4>;
+> +			/* 1 ms panel driver settling time */
+> +			st,settling = <3>;
+> +			/* 5 ms touch detect interrupt delay */
+> +			st,touch-det-delay = <5>;
+> +		};
+> +	};
+> +};
+> +
+> +/*
+> + * I2C3_SDA/SCL on SODIMM 194/196 (e.g. RTC on carrier board)
+> + */
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default", "recovery";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	pinctrl-1 = <&pinctrl_i2c3_recovery>;
+> +	scl-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+> +	sda-gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri PWM<B> */
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri PWM<D> */
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri PWM<A> */
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri PWM<C> */
+> +&pwm4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm4>;
+> +	status = "disabled";
+> +};
+> +
+> +/* Optional S/PDIF out on SODIMM 137 */
+> +&spdif {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_spdif>;
+> +	status = "disabled";
+> +};
+> +
+> +&ssi1 {
+> +	status = "okay";
+> +};
+> +
+> +/* Colibri UART_A */
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1_dte &pinctrl_uart1_ctrl>;
+> +	fsl,dte-mode;
+> +	uart-has-rtscts;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri UART_B */
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2_dte>;
+> +	fsl,dte-mode;
+> +	uart-has-rtscts;
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri UART_C */
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3_dte>;
+> +	fsl,dte-mode;
+> +	status = "disabled";
+> +};
+> +
+> +&usbotg {
+> +	pinctrl-names = "default";
+> +	disable-over-current;
+> +	dr_mode = "peripheral";
+> +	status = "disabled";
+> +};
+> +
+> +/* Colibri MMC */
+> +&usdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc1>;
+> +	vqmmc-supply = <&reg_3p3v>;
+> +	bus-width = <4>;
+> +	voltage-ranges = <3300 3300>;
+> +	status = "disabled";
+> +};
+> +
+> +/* eMMC */
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	vqmmc-supply = <&reg_3p3v>;
+> +	bus-width = <8>;
+> +	voltage-ranges = <3300 3300>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&weim {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_weim_sram  &pinctrl_weim_cs0
+> +		     &pinctrl_weim_cs1   &pinctrl_weim_cs2
+> +		     &pinctrl_weim_rdnwr &pinctrl_weim_npwe>;
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	status = "disabled";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl_audmux: audmuxgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_COL0__AUD5_TXC	0x130b0
+> +			MX6QDL_PAD_KEY_ROW0__AUD5_TXD	0x130b0
+> +			MX6QDL_PAD_KEY_COL1__AUD5_TXFS	0x130b0
+> +			MX6QDL_PAD_KEY_ROW1__AUD5_RXD	0x130b0
+> +			/* SGTL5000 sys_mclk */
+> +			MX6QDL_PAD_GPIO_0__CCM_CLKO1	0x000b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_cam_mclk: cammclkgrp {
+> +		fsl,pins = <
+> +			/* Parallel Camera CAM sys_mclk */
+> +			MX6QDL_PAD_NANDF_CS2__CCM_CLKO2	0x00b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_ecspi4: ecspi4grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_D22__ECSPI4_MISO	0x100b1
+> +			MX6QDL_PAD_EIM_D28__ECSPI4_MOSI	0x100b1
+> +			MX6QDL_PAD_EIM_D21__ECSPI4_SCLK 0x100b1
+> +			/* SPI CS */
+> +			MX6QDL_PAD_EIM_A25__GPIO5_IO02	0x000b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_enet: enetgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+> +			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
+> +			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
+> +			MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x1b0b0
+> +			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
+> +			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
+> +			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
+> +			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
+> +			MX6QDL_PAD_GPIO_16__ENET_REF_CLK     ((1<<30) | 0x1b0b0)
+> +		>;
+> +	};
+> +
+> +	pinctrl_flexcan1: flexcan1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX		0x1b0b0
+> +			MX6QDL_PAD_GPIO_8__FLEXCAN1_RX		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_flexcan2: flexcan2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x1b0b0
+> +			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_gpio_bl_on: gpioblon {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_D26__GPIO3_IO26		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_gpio_keys: gpiokeys {
+> +		fsl,pins = <
+> +			/* Power button */
+> +			MX6QDL_PAD_EIM_A16__GPIO2_IO22		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_hdmi_ddc: hdmiddcgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_COL3__HDMI_TX_DDC_SCL 0x4001b8b1
+> +			MX6QDL_PAD_KEY_ROW3__HDMI_TX_DDC_SDA 0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c2: i2c2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_EB2__I2C2_SCL 0x4001b8b1
+> +			MX6QDL_PAD_EIM_D16__I2C2_SDA 0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c3: i2c3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
+> +			MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_i2c3_recovery: i2c3recoverygrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_3__GPIO1_IO03 0x4001b8b1
+> +			MX6QDL_PAD_GPIO_6__GPIO1_IO06 0x4001b8b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_ipu1_csi0: ipu1csi0grp { /* Parallel Camera */
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_A17__IPU1_CSI1_DATA12	0xb0b1
+> +			MX6QDL_PAD_EIM_A18__IPU1_CSI1_DATA13	0xb0b1
+> +			MX6QDL_PAD_EIM_A19__IPU1_CSI1_DATA14	0xb0b1
+> +			MX6QDL_PAD_EIM_A20__IPU1_CSI1_DATA15	0xb0b1
+> +			MX6QDL_PAD_EIM_A21__IPU1_CSI1_DATA16	0xb0b1
+> +			MX6QDL_PAD_EIM_A22__IPU1_CSI1_DATA17	0xb0b1
+> +			MX6QDL_PAD_EIM_A23__IPU1_CSI1_DATA18	0xb0b1
+> +			MX6QDL_PAD_EIM_A24__IPU1_CSI1_DATA19	0xb0b1
+> +			MX6QDL_PAD_EIM_D17__IPU1_CSI1_PIXCLK	0xb0b1
+> +			MX6QDL_PAD_EIM_EB3__IPU1_CSI1_HSYNC	0xb0b1
+> +			MX6QDL_PAD_EIM_D29__IPU1_CSI1_VSYNC	0xb0b1
+> +			/* Disable PWM pins on camera interface */
+> +			MX6QDL_PAD_SD4_DAT1__GPIO2_IO09		0x40
+> +			MX6QDL_PAD_GPIO_1__GPIO1_IO01		0x40
+> +		>;
+> +	};
+> +
+> +	pinctrl_ipu1_lcdif: ipu1lcdifgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK	0xa1
+> +			MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15		0xa1
+> +			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02		0xa1
+> +			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03		0xa1
+> +			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00	0xa1
+> +			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01	0xa1
+> +			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02	0xa1
+> +			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03	0xa1
+> +			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04	0xa1
+> +			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05	0xa1
+> +			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06	0xa1
+> +			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07	0xa1
+> +			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08	0xa1
+> +			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09	0xa1
+> +			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10	0xa1
+> +			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11	0xa1
+> +			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12	0xa1
+> +			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13	0xa1
+> +			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14	0xa1
+> +			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15	0xa1
+> +			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16	0xa1
+> +			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17	0xa1
+> +		>;
+> +	};
+> +
+> +	pinctrl_mic_gnd: gpiomicgnd {
+> +		fsl,pins = <
+> +			/* Controls Mic GND, PU or '1' pull Mic GND to GND */
+> +			MX6QDL_PAD_RGMII_TD1__GPIO6_IO21 0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_mmc_cd: gpiommccd {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_NANDF_D5__GPIO2_IO05	0x80000000
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm1: pwm1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_9__PWM1_OUT	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm2: pwm2grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_1__PWM2_OUT	0x1b0b1
+> +			MX6QDL_PAD_EIM_A21__GPIO2_IO17	0x00040
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm3: pwm3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD4_DAT1__PWM3_OUT	0x1b0b1
+> +			MX6QDL_PAD_EIM_A22__GPIO2_IO16	0x00040
+> +		>;
+> +	};
+> +
+> +	pinctrl_pwm4: pwm4grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD4_DAT2__PWM4_OUT	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_regulator_usbh_pwr: gpioregusbhpwrgrp {
+> +		fsl,pins = <
+> +			/* USBH_EN */
+> +			MX6QDL_PAD_EIM_D31__GPIO3_IO31	0x0f058
+> +		>;
+> +	};
+> +
+> +	pinctrl_spdif: spdifgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_GPIO_17__SPDIF_OUT 0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_touch_int: gpiotouchintgrp {
+> +		fsl,pins = <
+> +			/* STMPE811 interrupt */
+> +			MX6QDL_PAD_RGMII_TD0__GPIO6_IO20 0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart1_dce: uart1dcegrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
+> +			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
+> +		>;
+> +	};
+> +
+> +	/* DTE mode */
+> +	pinctrl_uart1_dte: uart1dtegrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_CSI0_DAT10__UART1_RX_DATA 0x1b0b1
+> +			MX6QDL_PAD_CSI0_DAT11__UART1_TX_DATA 0x1b0b1
+> +			MX6QDL_PAD_EIM_D19__UART1_RTS_B	0x1b0b1
+> +			MX6QDL_PAD_EIM_D20__UART1_CTS_B 0x1b0b1
+> +		>;
+> +	};
+> +
+> +	/* Additional DTR, DSR, DCD */
+> +	pinctrl_uart1_ctrl: uart1ctrlgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_D23__UART1_DCD_B 0x1b0b0
+> +			MX6QDL_PAD_EIM_D24__UART1_DTR_B 0x1b0b0
+> +			MX6QDL_PAD_EIM_D25__UART1_DSR_B 0x1b0b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart2_dte: uart2dtegrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD4_DAT4__UART2_TX_DATA	0x1b0b1
+> +			MX6QDL_PAD_SD4_DAT7__UART2_RX_DATA	0x1b0b1
+> +			MX6QDL_PAD_SD4_DAT6__UART2_RTS_B	0x1b0b1
+> +			MX6QDL_PAD_SD4_DAT5__UART2_CTS_B	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_uart3_dte: uart3dtegrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD4_CLK__UART3_TX_DATA	0x1b0b1
+> +			MX6QDL_PAD_SD4_CMD__UART3_RX_DATA	0x1b0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_usbc_det: usbcdetgrp {
+> +		fsl,pins = <
+> +			/* USBC_DET */
+> +			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
+> +			/* USBC_DET_EN */
+> +			MX6QDL_PAD_RGMII_TX_CTL__GPIO6_IO26	0x0f058
+> +			/* USBC_DET_OVERWRITE */
+> +			MX6QDL_PAD_RGMII_RXC__GPIO6_IO30	0x0f058
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc1: usdhc1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD1_CMD__SD1_CMD	0x17071
+> +			MX6QDL_PAD_SD1_CLK__SD1_CLK	0x10071
+> +			MX6QDL_PAD_SD1_DAT0__SD1_DATA0	0x17071
+> +			MX6QDL_PAD_SD1_DAT1__SD1_DATA1	0x17071
+> +			MX6QDL_PAD_SD1_DAT2__SD1_DATA2	0x17071
+> +			MX6QDL_PAD_SD1_DAT3__SD1_DATA3	0x17071
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc3: usdhc3grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
+> +			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
+> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
+> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
+> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
+> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
+> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x17059
+> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x17059
+> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x17059
+> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x17059
+> +			/* eMMC reset */
+> +			MX6QDL_PAD_SD3_RST__SD3_RESET	0x17059
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc3_100mhz: usdhc3100mhzgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170b9
+> +			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100b9
+> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170b9
+> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170b9
+> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170b9
+> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170b9
+> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x170b9
+> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x170b9
+> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x170b9
+> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x170b9
+> +			/* eMMC reset */
+> +			MX6QDL_PAD_SD3_RST__SD3_RESET	0x170b9
+> +		>;
+> +	};
+> +
+> +	pinctrl_usdhc3_200mhz: usdhc3200mhzgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170f9
+> +			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100f9
+> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170f9
+> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170f9
+> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170f9
+> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170f9
+> +			MX6QDL_PAD_SD3_DAT4__SD3_DATA4	0x170f9
+> +			MX6QDL_PAD_SD3_DAT5__SD3_DATA5	0x170f9
+> +			MX6QDL_PAD_SD3_DAT6__SD3_DATA6	0x170f9
+> +			MX6QDL_PAD_SD3_DAT7__SD3_DATA7	0x170f9
+> +			/* eMMC reset */
+> +			MX6QDL_PAD_SD3_RST__SD3_RESET	0x170f9
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_cs0: weimcs0grp {
+> +		fsl,pins = <
+> +			/* nEXT_CS0 */
+> +			MX6QDL_PAD_EIM_CS0__EIM_CS0_B	0xb0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_cs1: weimcs1grp {
+> +		fsl,pins = <
+> +			/* nEXT_CS1 */
+> +			MX6QDL_PAD_EIM_CS1__EIM_CS1_B	0xb0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_cs2: weimcs2grp {
+> +		fsl,pins = <
+> +			/* nEXT_CS2 */
+> +			MX6QDL_PAD_SD2_DAT1__EIM_CS2_B	0xb0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_sram: weimsramgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_OE__EIM_OE_B		0xb0b1
+> +			MX6QDL_PAD_EIM_RW__EIM_RW		0xb0b1
+> +			/* Data */
+> +			MX6QDL_PAD_CSI0_DATA_EN__EIM_DATA00	0x1b0b0
+> +			MX6QDL_PAD_CSI0_VSYNC__EIM_DATA01	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT4__EIM_DATA02	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT5__EIM_DATA03	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT6__EIM_DATA04	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT7__EIM_DATA05	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT8__EIM_DATA06	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT9__EIM_DATA07	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT12__EIM_DATA08	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT13__EIM_DATA09	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT14__EIM_DATA10	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT15__EIM_DATA11	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT16__EIM_DATA12	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT17__EIM_DATA13	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT18__EIM_DATA14	0x1b0b0
+> +			MX6QDL_PAD_CSI0_DAT19__EIM_DATA15	0x1b0b0
+> +			/* Address */
+> +			MX6QDL_PAD_EIM_DA15__EIM_AD15		0xb0b1
+> +			MX6QDL_PAD_EIM_DA14__EIM_AD14		0xb0b1
+> +			MX6QDL_PAD_EIM_DA13__EIM_AD13		0xb0b1
+> +			MX6QDL_PAD_EIM_DA12__EIM_AD12		0xb0b1
+> +			MX6QDL_PAD_EIM_DA11__EIM_AD11		0xb0b1
+> +			MX6QDL_PAD_EIM_DA10__EIM_AD10		0xb0b1
+> +			MX6QDL_PAD_EIM_DA9__EIM_AD09		0xb0b1
+> +			MX6QDL_PAD_EIM_DA8__EIM_AD08		0xb0b1
+> +			MX6QDL_PAD_EIM_DA7__EIM_AD07		0xb0b1
+> +			MX6QDL_PAD_EIM_DA6__EIM_AD06		0xb0b1
+> +			MX6QDL_PAD_EIM_DA5__EIM_AD05		0xb0b1
+> +			MX6QDL_PAD_EIM_DA4__EIM_AD04		0xb0b1
+> +			MX6QDL_PAD_EIM_DA3__EIM_AD03		0xb0b1
+> +			MX6QDL_PAD_EIM_DA2__EIM_AD02		0xb0b1
+> +			MX6QDL_PAD_EIM_DA1__EIM_AD01		0xb0b1
+> +			MX6QDL_PAD_EIM_DA0__EIM_AD00		0xb0b1
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_rdnwr: weimrdnwr {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD2_CLK__GPIO1_IO10		0x0040
+> +			MX6QDL_PAD_RGMII_TD3__GPIO6_IO23	0x130b0
+> +		>;
+> +	};
+> +
+> +	pinctrl_weim_npwe: weimnpwe {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_SD2_DAT3__GPIO1_IO12		0x0040
+> +			MX6QDL_PAD_RGMII_TD2__GPIO6_IO22	0x130b0
+> +		>;
+> +	};
+> +
+> +	/* ADDRESS[16:18] [25] used as GPIO */
+> +	pinctrl_weim_gpio_1: weimgpio-1 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
+> +			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11		0x1b0b0
+> +			MX6QDL_PAD_KEY_COL2__GPIO4_IO10		0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x1b0b0
+> +			MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	/* ADDRESS[19:24] used as GPIO */
+> +	pinctrl_weim_gpio_2: weimgpio-2 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11		0x1b0b0
+> +			MX6QDL_PAD_KEY_COL2__GPIO4_IO10		0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT22__GPIO5_IO16	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT21__GPIO5_IO15	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT20__GPIO5_IO14	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT19__GPIO5_IO13	0x1b0b0
+> +			MX6QDL_PAD_DISP0_DAT18__GPIO5_IO12	0x1b0b0
+> +			MX6QDL_PAD_NANDF_D1__GPIO2_IO01		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	/* DATA[16:31] used as GPIO */
+> +	pinctrl_weim_gpio_3: weimgpio-3 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_LBA__GPIO2_IO27		0x1b0b0
+> +			MX6QDL_PAD_EIM_BCLK__GPIO6_IO31		0x1b0b0
+> +			MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x1b0b0
+> +			MX6QDL_PAD_NANDF_CS1__GPIO6_IO14	0x1b0b0
+> +			MX6QDL_PAD_NANDF_RB0__GPIO6_IO10	0x1b0b0
+> +			MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x1b0b0
+> +			MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09	0x1b0b0
+> +			MX6QDL_PAD_NANDF_CS0__GPIO6_IO11	0x1b0b0
+> +			MX6QDL_PAD_NANDF_CLE__GPIO6_IO07	0x1b0b0
+> +			MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x1b0b0
+> +			MX6QDL_PAD_CSI0_MCLK__GPIO5_IO19	0x1b0b0
+> +			MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18	0x1b0b0
+> +			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0
+> +			MX6QDL_PAD_GPIO_5__GPIO1_IO05		0x1b0b0
+> +			MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	/* DQM[0:3] used as GPIO */
+> +	pinctrl_weim_gpio_4: weimgpio-4 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b0
+> +			MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b0
+> +			MX6QDL_PAD_SD2_DAT2__GPIO1_IO13		0x1b0b0
+> +			MX6QDL_PAD_NANDF_D0__GPIO2_IO00		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	/* RDY used as GPIO */
+> +	pinctrl_weim_gpio_5: weimgpio-5 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_EIM_WAIT__GPIO5_IO00		0x1b0b0
+> +		>;
+> +	};
+> +
+> +	/* ADDRESS[16] DATA[30] used as GPIO */
+> +	pinctrl_weim_gpio_6: weimgpio-6 {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x1b0b0
+> +			MX6QDL_PAD_KEY_COL4__GPIO4_IO14		0x1b0b0
+> +		>;
+> +	};
+> +};
 > -- 
 > 2.10.0
 > 
