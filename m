@@ -1,30 +1,31 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 17 Oct 2016 16:39:22 +0530
-Subject: [PATCH] crygpu/drm/exynos/exynos_hdmi - Unmap region obtained by
- of_iomap
-Message-ID: <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 17 Oct 2016 20:11:59 +0900
+Subject: [PATCH] usb: ehci-platform: increase EHCI_MAX_RSTS to 4
+Message-ID: <1476702719-10337-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Free memory mapping, if hdmi_probe is not successful.
+Socionext LD11 SoC (arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi)
+needs to handle 4 reset lines for EHCI.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c |    2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 2275efe..9b7857b 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1901,6 +1901,8 @@ err_disable_pm_runtime:
- err_hdmiphy:
- 	if (hdata->hdmiphy_port)
- 		put_device(&hdata->hdmiphy_port->dev);
-+	if (hdata->regs_hdmiphy)
-+		iounmap(hdata->regs_hdmiphy);
- err_ddc:
- 	put_device(&hdata->ddc_adpt->dev);
+ drivers/usb/host/ehci-platform.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index 876dca4..a268d9e 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -39,7 +39,7 @@
  
+ #define DRIVER_DESC "EHCI generic platform driver"
+ #define EHCI_MAX_CLKS 4
+-#define EHCI_MAX_RSTS 3
++#define EHCI_MAX_RSTS 4
+ #define hcd_to_ehci_priv(h) ((struct ehci_platform_priv *)hcd_to_ehci(h)->priv)
+ 
+ struct ehci_platform_priv {
 -- 
-1.7.9.5
+1.9.1
