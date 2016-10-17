@@ -1,30 +1,64 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Mon, 17 Oct 2016 11:23:52 +0200
-Subject: [PATCH 10/10] mm: replace access_process_vm() write parameter
- with gup_flags
-In-Reply-To: <20161013002020.3062-11-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161013002020.3062-11-lstoakes@gmail.com>
-Message-ID: <20161017092352.GH30704@axis.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Oct 2016 11:23:49 +0200
+Subject: [PATCH] ARM: defconfig: update U8500 defconfig
+Message-ID: <1476696229-1964-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 13, 2016 at 01:20:20AM +0100, Lorenzo Stoakes wrote:
-> This patch removes the write parameter from access_process_vm() and replaces it
-> with a gup_flags parameter as use of this function previously _implied_
-> FOLL_FORCE, whereas after this patch callers explicitly pass this flag.
-> 
-> We make this explicit as use of FOLL_FORCE can result in surprising behaviour
-> (and hence bugs) within the mm subsystem.
-> 
-> Signed-off-by: Lorenzo Stoakes <lstoakes@gmail.com>
-> ---
->  arch/cris/arch-v32/kernel/ptrace.c |  4 ++--
+Some config options like perf events and PM are now implicit,
+we have an upstream driver for the AK8974, and we really
+want the HRTIMER software triggers from configfs with some
+of the sensors.
 
-For the CRIS part:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this wherever your usual batch of
+defconfig changes go.
+---
+ arch/arm/configs/u8500_defconfig | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-
-/^JN - Jesper Nilsson
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index b7b09189f1c5..e2151a7aaf49 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -4,7 +4,6 @@ CONFIG_NO_HZ_IDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_KALLSYMS_ALL=y
+-CONFIG_PERF_EVENTS=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+@@ -26,7 +25,6 @@ CONFIG_CPU_IDLE=y
+ CONFIG_ARM_U8500_CPUIDLE=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+-CONFIG_PM=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+ CONFIG_UNIX=y
+@@ -108,18 +106,19 @@ CONFIG_DMADEVICES=y
+ CONFIG_STE_DMA40=y
+ CONFIG_HSEM_U8500=y
+ CONFIG_IIO=y
+-CONFIG_IIO_BUFFER=y
++CONFIG_IIO_SW_TRIGGER=y
+ CONFIG_IIO_ST_ACCEL_3AXIS=y
+ CONFIG_IIO_ST_GYRO_3AXIS=y
+ CONFIG_BH1780=y
++CONFIG_AK8974=y
+ CONFIG_IIO_ST_MAGN_3AXIS=y
++CONFIG_IIO_HRTIMER_TRIGGER=y
+ CONFIG_IIO_ST_PRESS=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+ CONFIG_EXT2_FS_SECURITY=y
+ CONFIG_EXT3_FS=y
+-CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
 -- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+2.7.4
