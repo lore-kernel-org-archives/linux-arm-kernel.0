@@ -1,62 +1,170 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 17 Oct 2016 10:33:58 +0300
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <1475672732-17111-3-git-send-email-bgolaszewski@baylibre.com>
- <2d276e51-9d37-8648-4aad-283bb2b23626@ti.com>
- <1e23c3e9-d34b-1d8f-8565-c9932a60fd32@ti.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
-Message-ID: <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 17 Oct 2016 10:55:26 +0300
+Subject: [PATCH 7/10] mmc: sdhci-xenon: Add support to PHYs of Marvell
+ Xenon SDHC
+In-Reply-To: <bcf4abca-9f2e-6d1b-6690-d672766e18cb@marvell.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <e08ffb085d02a784b28456ac47fa4dc6540a9139.1475853198.git-series.gregory.clement@free-electrons.com>
+ <bfe30317-bb3b-b3dc-e9df-87b6ba100307@intel.com>
+ <bcf4abca-9f2e-6d1b-6690-d672766e18cb@marvell.com>
+Message-ID: <63e2bacf-6ad9-5e20-2c49-e77eb362ccfc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/16 10:12, Sekhar Nori wrote:
-> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
->> On 15/10/16 20:42, Sekhar Nori wrote:
->>
->>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>>> index f79e1b9..32908ae 100644
->>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>
->>>> @@ -399,6 +420,14 @@
->>>>  				<&edma0 0 1>;
->>>>  			dma-names = "tx", "rx";
->>>>  		};
->>>> +
->>>> +		display: display at 213000 {
->>>> +			compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
->>>
->>> This should instead be:
->>>
->>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
->>>
->>> as the closest match should appear first in the list.
->>
->> Actually I don't think that's correct. The LCDC on da850 is not
->> compatible with the LCDC on AM335x. I think it should be just
->> "ti,da850-tilcdc".
+On 12/10/16 15:17, Ziji Hu wrote:
+> Hi Adrian,
 > 
-> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
-> the case, I wonder how the patch passed testing. Bartosz?
+> On 2016/10/11 20:39, Adrian Hunter wrote:
+>> On 07/10/16 18:22, Gregory CLEMENT wrote:
+>>> From: Ziji Hu <huziji@marvell.com>
+>>>
+>>> Marvell Xenon eMMC/SD/SDIO Host Controller contains PHY.
+>>> Three types of PHYs are supported.
+>>>
+>>> Add support to multiple types of PHYs init and configuration.
+>>> Add register definitions of PHYs.
+>>>
+>>> Signed-off-by: Hu Ziji <huziji@marvell.com>
+>>> Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>  MAINTAINERS                        |    1 +-
+>>>  drivers/mmc/host/Makefile          |    2 +-
+>>>  drivers/mmc/host/sdhci-xenon-phy.c | 1141 +++++++++++++++++++++++++++++-
+>>>  drivers/mmc/host/sdhci-xenon-phy.h |  157 ++++-
+>>>  drivers/mmc/host/sdhci-xenon.c     |    4 +-
+>>>  drivers/mmc/host/sdhci-xenon.h     |   17 +-
+>>>  6 files changed, 1321 insertions(+), 1 deletion(-)
+>>>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
+>>>  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.h
+>>>
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>> index 859420e5dfd3..b5673c2ee5f2 100644
+>>> --- a/MAINTAINERS
+>>> +++ b/MAINTAINERS
+>>> @@ -7583,6 +7583,7 @@ M:	Ziji Hu <huziji@marvell.com>
+>>>  L:	linux-mmc at vger.kernel.org
+>>>  S:	Supported
+>>>  F:	drivers/mmc/host/sdhci-xenon.*
+>>> +F:	drivers/mmc/host/sdhci-xenon-phy.*
+>>>  F:	Documentation/devicetree/bindings/mmc/marvell,sdhci-xenon.txt
+>>>  
+>>>  MATROX FRAMEBUFFER DRIVER
+>>> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+>>> index 75eaf743486c..4f2854556ff7 100644
+>>> --- a/drivers/mmc/host/Makefile
+>>> +++ b/drivers/mmc/host/Makefile
+>>> @@ -82,4 +82,4 @@ ifeq ($(CONFIG_CB710_DEBUG),y)
+>>>  endif
+>>>  
+>>>  obj-$(CONFIG_MMC_SDHCI_XENON)	+= sdhci-xenon-driver.o
+>>> -sdhci-xenon-driver-y		+= sdhci-xenon.o
+>>> +sdhci-xenon-driver-y		+= sdhci-xenon.o sdhci-xenon-phy.o
+>>> diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
+>>> new file mode 100644
+>>> index 000000000000..4eb8fea1bec9
+>>> --- /dev/null
+>>> +++ b/drivers/mmc/host/sdhci-xenon-phy.c
+>>
+>> <SNIP>
+>>
+>>> +static int __xenon_emmc_delay_adj_test(struct mmc_card *card)
+>>> +{
+>>> +	int err;
+>>> +	u8 *ext_csd = NULL;
+>>> +
+>>> +	err = mmc_get_ext_csd(card, &ext_csd);
+>>> +	kfree(ext_csd);
+>>> +
+>>> +	return err;
+>>> +}
+>>> +
+>>> +static int __xenon_sdio_delay_adj_test(struct mmc_card *card)
+>>> +{
+>>> +	struct mmc_command cmd = {0};
+>>> +	int err;
+>>> +
+>>> +	cmd.opcode = SD_IO_RW_DIRECT;
+>>> +	cmd.flags = MMC_RSP_R5 | MMC_CMD_AC;
+>>> +
+>>> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
+>>> +	if (err)
+>>> +		return err;
+>>> +
+>>> +	if (cmd.resp[0] & R5_ERROR)
+>>> +		return -EIO;
+>>> +	if (cmd.resp[0] & R5_FUNCTION_NUMBER)
+>>> +		return -EINVAL;
+>>> +	if (cmd.resp[0] & R5_OUT_OF_RANGE)
+>>> +		return -ERANGE;
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int __xenon_sd_delay_adj_test(struct mmc_card *card)
+>>> +{
+>>> +	struct mmc_command cmd = {0};
+>>> +	int err;
+>>> +
+>>> +	cmd.opcode = MMC_SEND_STATUS;
+>>> +	cmd.arg = card->rca << 16;
+>>> +	cmd.flags = MMC_RSP_R1 | MMC_CMD_AC;
+>>> +
+>>> +	err = mmc_wait_for_cmd(card->host, &cmd, 0);
+>>> +	return err;
+>>> +}
+>>> +
+>>> +static int xenon_delay_adj_test(struct mmc_card *card)
+>>> +{
+>>> +	WARN_ON(!card);
+>>> +	WARN_ON(!card->host);
+>>> +
+>>> +	if (mmc_card_mmc(card))
+>>> +		return __xenon_emmc_delay_adj_test(card);
+>>> +	else if (mmc_card_sd(card))
+>>> +		return __xenon_sd_delay_adj_test(card);
+>>> +	else if (mmc_card_sdio(card))
+>>> +		return __xenon_sdio_delay_adj_test(card);
+>>> +	else
+>>> +		return -EINVAL;
+>>> +}
+>>
+>> So you are issuing commands from the ->set_ios() callback.  I would want to
+>> get Ulf's OK for that before going further.
+>>
+> 	Yes, you are correct.
+> 	In some speed mode, Xenon SDHC has to send a series of transfers to search for a perfect sampling point in PHY delay line.
+> 	It is like tuning process.
+> 
+>> One thing: you will need to ensure you don't trigger get HS400 re-tuning
+>> because it will call back into ->set_ios().
+>>
+> 	Could you please make the term "HS400 re-tuning" more detailed?
+> 	In current MMC driver, "HS400 re-tuning" will go back to HS200, execute HS200 tuning and come back to HS400.
+> 	I'm sure our Xenon SDHC will not execute it.
 
-AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
-similar, but different.
+Currently, re-tuning is automatically enabled whenever tuning is executed,
+and then re-tuning will be done periodically or after CRC errors.  The
+function to disable re-tuning mmc_retune_disable() is not exported, however
+if you have you are determining the sampling point your own way, you could
+simply not implement ->execute_tuning() and then there would be no tuning
+and no re-tuning.
 
-The driver gets the version number from LCDC's register, and acts based
-on that, so afaik the compatible string doesn't really affect the
-functionality (as long as it matches).
-
-But even if it works with the current driver, I don't think
-"ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/b6ff5ea1/attachment.sig>
+> 
+> 	However, in coming eMMC 5.2, there is a real HS400 re-tuning, in which tuning can be directly executed in HS400 mode.
+> 	Our Xenon SDHC will neither trigger this HS400 re-tuning.
+> 	But since so far there is no such feature in MMC driver, I cannot give you a 100% guarantee now.
+> 
+>> And you have the problem that you need to get a reference to the card before
+>> the card device has been added.  As I wrote in response to the previous
+>> patch, you should get Ulf's help with that too.
+>>
+> 	Sure.
+> 	I will get card_candidate solved at first.
+> 	Thank you again for your review and help.
+> 
+> 	Thank you.
+> 
+> Best regards,
+> Hu Ziji
+>>
+> 
