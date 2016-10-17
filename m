@@ -1,57 +1,113 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Oct 2016 19:19:35 +0100
-Subject: [PATCH] arm64: sysreg: Fix use of XZR in write_sysreg_s
-In-Reply-To: <1476724859-18818-1-git-send-email-will.deacon@arm.com>
-References: <1476724859-18818-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20161017181935.GD23170@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Oct 2016 19:38:07 +0100
+Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
+Message-ID: <20161017183806.GG5601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 06:20:59PM +0100, Will Deacon wrote:
-> Commit 8a71f0c656e0 ("arm64: sysreg: replace open-coded mrs_s/msr_s with
-> {read,write}_sysreg_s") introduced a write_sysreg_s macro for writing
-> to system registers that are not supported by binutils.
-> 
-> Unfortunately, this was implemented with the wrong template (%0 vs %x0),
-> so in the case that we are writing a constant 0, we will generate
-> invalid instruction syntax and bail with a cryptic assembler error:
-> 
->   | Error: constant expression required
-> 
-> This patch fixes the template.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi all,
 
-Whoops; I should've spotted that in review. FWIW:
+I'm seeing an arm64 build failure with -rc1 and GCC trunk, although I
+believe that the new compiler behaviour at the heart of the problem
+has the potential to affect other architectures and other pieces of
+kernel code relying on dead-code elimination to remove deliberately
+undefined functions.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+The failure looks like:
 
-Thanks,
-Mark.
+  | drivers/built-in.o: In function `armada_3700_add_composite_clk':
+  |
+  | linux/drivers/clk/mvebu/armada-37xx-periph.c:351:
+  | undefined reference to `____ilog2_NaN'
+  |
+  | linux/drivers/clk/mvebu/armada-37xx-periph.c:351:(.text+0xc72e0):
+  | relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+  | `____ilog2_NaN'
+  |
+  | make: *** [vmlinux] Error 1
 
-> ---
->  arch/arm64/include/asm/sysreg.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index e8d46e8e6079..6c80b3699cb8 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -286,7 +286,7 @@ asm(
->  
->  #define write_sysreg_s(v, r) do {					\
->  	u64 __val = (u64)v;						\
-> -	asm volatile("msr_s " __stringify(r) ", %0" : : "rZ" (__val));	\
-> +	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
->  } while (0)
->  
->  static inline void config_sctlr_el1(u32 clear, u32 set)
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+and if we look at the source for armada_3700_add_composite_clk, we see
+that this is caused by:
+
+  int table_size = 0;
+
+  rate->reg = reg + (u64)rate->reg;
+  for (clkt = rate->table; clkt->div; clkt++)
+	 table_size++;
+  rate->width = order_base_2(table_size);
+
+order_base_2 calls ilog2, which has the ____ilog2_NaN call:
+
+#define ilog2(n)				\
+(						\
+	__builtin_constant_p(n) ? (		\
+		(n) < 1 ? ____ilog2_NaN() :	\
+
+This is because we're in a curious case where GCC has emitted a
+special-cased version of armada_3700_add_composite_clk, with table_size
+effectively constant-folded as 0. Whilst we shouldn't see this in a
+non-buggy kernel (hence the deliberate call to the undefined function
+____ilog2_NaN), it means that the final link fails because we have a
+____ilog2_NaN in the code, with a runtime check on table_size.
+
+In other words, __builtin_constant_p appears to be weaker than we've
+been assuming. Talking to the compiler guys here, this is due to the
+"jump-threading" optimisation pass, so the patch below disables that.
+
+A simpler example is:
+
+int foo();
+int bar();
+
+int count(int *argc)
+{
+	int table_size = 0;
+
+	for (; *argc; argc++)
+		table_size++;
+
+	if (__builtin_constant_p(table_size))
+		return table_size == 0 ? foo() : bar();
+
+	return bar();
+}
+
+which compiles to:
+
+count:
+	ldr	w0, [x0]
+	cbz	w0, .L4
+	b	bar
+	.p2align 3
+.L4:
+	b	foo
+
+and, with the "optimisation" disabled:
+
+count:
+	b	bar
+
+Thoughts? It feels awfully fragile disabling passes like this, but with
+GCC transforming the code like this, I can't immediately think of a way
+to preserve the intended behaviour of the code.
+
+Will
+
+--->8
+
+diff --git a/Makefile b/Makefile
+index 512e47a53e9a..750873d6d11e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -641,6 +641,11 @@ endif
+ # Tell gcc to never replace conditional load with a non-conditional one
+ KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+ 
++# Stop gcc from converting switches into a form that defeats dead code
++# elimination and can subsequently lead to calls to intentionally
++# undefined functions appearing in the final link.
++KBUILD_CFLAGS	+= $(call cc-option,--param=max-fsm-thread-path-insns=1)
++
+ include scripts/Makefile.gcc-plugins
+ 
+ ifdef CONFIG_READABLE_ASM
