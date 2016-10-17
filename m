@@ -1,30 +1,23 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 17 Oct 2016 15:49:29 +0200
-Subject: [PATCH 0/2] mmc: sdhci-iproc: Add byte register access support
-In-Reply-To: <1476297352-7812-1-git-send-email-scott.branden@broadcom.com>
-References: <1476297352-7812-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <CAPDyKFpsTNKCC3dTJUipRVhALh2=4YJ5k6Ofp9TUu0RjKO6FaA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Oct 2016 15:48:49 +0200
+Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
+In-Reply-To: <20161017120705.3726-2-wenpan@hisilicon.com>
+References: <20161017120705.3726-1-wenpan@hisilicon.com>
+ <20161017120705.3726-2-wenpan@hisilicon.com>
+Message-ID: <5893354.6MrIxqzRoI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2016 at 20:35, Scott Branden <scott.branden@broadcom.com> wrote:
-> Add brcm,sdhci-iproc compat string and code for support of newer versions of
-> sdhci-iproc controller that allow byte-wise register accesses.
->
-> Scott Branden (2):
->   mmc: sdhci-iproc: Add brcm,sdhci-iproc compat string in bindings
->     document
->   mmc: sdhci-iproc: support standard byte register accesses
->
->  .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  1 +
->  drivers/mmc/host/sdhci-iproc.c                     | 35 ++++++++++++++++++++--
->  2 files changed, 34 insertions(+), 2 deletions(-)
->
-> --
-> 2.5.0
->
+On Monday, October 17, 2016 8:07:03 PM CEST Pan Wen wrote:
+> Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
+> 
+> Signed-off-by: Pan Wen <wenpan@hisilicon.com>
+> 
 
-Thanks, applied for next!
+Looks ok. I've added Marty Plummer to Cc, he was recently proposing
+patches for Hi3520, which I think is closely related to this one.
+Please try to work together so the patches don't conflict. It should
+be fairly straightforward since you are basically doing the same
+change here.
 
-Kind regards
-Uffe
+	Arnd
