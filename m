@@ -1,8 +1,8 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 17 Oct 2016 14:57:22 +0000
-Subject: [PATCH -next] PCI: rockchip: Add missing of_node_put() in
- rockchip_pcie_init_irq_domain()
-Message-ID: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
+Date: Mon, 17 Oct 2016 14:58:17 +0000
+Subject: [PATCH -next] PCI: xilinx-nwl: Add missing of_node_put() in
+ nwl_pcie_init_irq_domain()
+Message-ID: <1476716297-31808-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,17 +16,17 @@ This is detected by Coccinelle semantic patch.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/pci/host/pcie-rockchip.c | 1 +
+ drivers/pci/host/pcie-xilinx-nwl.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index e0b22da..ab88859 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -949,6 +949,7 @@ static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
- 						    &intx_domain_ops, rockchip);
- 	if (!rockchip->irq_domain) {
- 		dev_err(dev, "failed to get a INTx IRQ domain\n");
-+		of_node_put(intc);
- 		return -EINVAL;
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 43eaa4a..c16b26c 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -535,6 +535,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 
+ 	if (!pcie->legacy_irq_domain) {
+ 		dev_err(dev, "failed to create IRQ domain\n");
++		of_node_put(legacy_intc_node);
+ 		return -ENOMEM;
  	}
