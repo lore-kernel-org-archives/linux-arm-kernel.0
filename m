@@ -1,46 +1,53 @@
 From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 17 Oct 2016 16:24:31 -0700
-Subject: [PATCH v2] arm64: defconfig: enable EEPROM_AT25 config option
-In-Reply-To: <CAOesGMijByw1FYt42toNF6pAEykks_agetQybhgMQj8nAc6xdg@mail.gmail.com>
-References: <1476298306-9138-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMijByw1FYt42toNF6pAEykks_agetQybhgMQj8nAc6xdg@mail.gmail.com>
-Message-ID: <207706e2-8fd4-748f-2ee7-3c372b447a7d@broadcom.com>
+Date: Mon, 17 Oct 2016 16:27:05 -0700
+Subject: [PATCH 3/3] arm64: dts: Update Broadcom NS2 to generic IOMMU
+ binding
+In-Reply-To: <6f96a6cc-7e12-6827-ce88-65e2accda576@broadcom.com>
+References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
+ <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
+ <6f96a6cc-7e12-6827-ce88-65e2accda576@broadcom.com>
+Message-ID: <fd300ca1-e848-f6dd-b8eb-5883ac441f07@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Florian,
 
-On 16-10-17 02:58 PM, Olof Johansson wrote:
-> Hi,
->
-> On Wed, Oct 12, 2016 at 11:51 AM, Scott Branden
-> <scott.branden@broadcom.com> wrote:
->> Enable support for on board SPI EEPROM by turning on
->> CONFIG_EEPROM_AT25.  This needs to be on in order to
->> boot and test the kernel with a static rootfs image
->> that is not rebuilt everytime the kernel is rebuilt.
->
-> If we did this for every kernel option we'd get a huge kernel.
->
-> In general, we've said that static options for what's needed to boot
-> to rootfs (i.e. storage and network drivers for nfsroot) are fine to
-> enable statically.
->
-> I doubt you need the EEPROM driver to boot to rootfs on your system,
-> so please enable it as a module instead.
->
-> Look into using config fragments in case you need to modify the
-> options for local builds, it should be a convenient way to have a
-> small delta to apply to fit your internal needs, instead of completely
-> forking the config file.
+Could you add this to the queue?
 
-Do you allow such config fragments to be upstreamed or do we need to 
-maintain these in our tree?
-
+On 16-10-17 02:50 PM, Ray Jui wrote:
+> Hi Robin,
 >
+> On 10/17/2016 5:13 AM, Robin Murphy wrote:
+>> With the "mmu-masters" property now deprecated and optional, the
+>> generic binding offers a more efficient way to specify no masters.
+>>
+>> CC: Ray Jui <rjui@broadcom.com>
+>> CC: Scott Branden <sbranden@broadcom.com>
+>> CC: Jon Mason <jonmason@broadcom.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/broadcom/ns2.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>> b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>> index d95dc408629a..65530e193e8a 100644
+>> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>> @@ -248,7 +248,7 @@
+>>                       <GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH>,
+>>                       <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>,
+>>                       <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
+>> -            mmu-masters;
+>> +            #iommu-cells = <1>;
+>>          };
+>>
+>>          pinctrl: pinctrl at 6501d130 {
+>>
 >
-> -Olof
+> Thanks!
 >
+> Acked-by: Ray Jui <ray.jui@broadcom.com>
 
 Thanks,
   Scott
