@@ -1,77 +1,118 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Mon, 17 Oct 2016 11:09:31 -0500
-Subject: [PATCH v20 00/10] Device Tree support for FPGA Programming
-Message-ID: <20161017160941.4205-1-atull@opensource.altera.com>
+Date: Mon, 17 Oct 2016 11:09:33 -0500
+Subject: [PATCH v20 02/10] doc: fpga-mgr: add fpga image info to api
+In-Reply-To: <20161017160941.4205-1-atull@opensource.altera.com>
+References: <20161017160941.4205-1-atull@opensource.altera.com>
+Message-ID: <20161017160941.4205-3-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset supports FPGA programming under the control
-of Device Tree overlays.
+This patch adds a minor change in the FPGA Mangager API
+to hold information that is specific to an FPGA image
+file.  This change is expected to bring little, if any,
+pain.
 
-Changes from v19:
- * One line fix in FPGA Freeze Bridge DT binding doc (s/_/-/).
- * Squashed patches that add FPGA image info struct so they
-   won't break bisect.
- * Minor changes as suggested for the SoCFPGA Arria10 support.
- * Added Rob's reviewed-by for the FPGA Regions binding doc.
- * Added Moritz' ack for the sysfs document patch.
+An FPGA image file will have particulars that affect how the
+image is programmed to the FPGA.  One example is that
+current 'flags' currently has one bit which shows whether the
+FPGA image was built for full reconfiguration or partial
+reconfiguration.  Another example is timeout values for
+enabling or disabling the bridges in the FPGA.  As the
+complexity of the FPGA design increases, the bridges in the
+FPGA may take longer times to enable or disable.
 
-The following were acked so they are no longer in this patch set:
- * bindings for Altera SOCFPGA bridges
-   https://patchwork.kernel.org/patch/9226093/
- * bindings for Arria 10 FPGA Mgr
-   https://patchwork.kernel.org/patch/9226111/
- * "[PATCH v3] of/overlay: add of overlay notifications"
-   https://lkml.org/lkml/2016/4/19/704
+This patch documents the change in the FPGA Manager API
+functions, replacing the 'u32 flag' parameter with a pointer
+to struct fpga_image_info.
 
-The patchset is dependent on:
- * Pantelis Antonious's dtc changes for dynamic device tree.
-    https://github.com/pantoniou/dtc.git
- * Pantelis' configfs interface patches and fixes
-    https://github.com/pantoniou/linux-beagle-track-mainline
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
+---
+v19: Added in v19 of this patchset
+v20: No change for this patch in v20 of patchset
+---
+ Documentation/fpga/fpga-mgr.txt | 32 +++++++++++++++++++++-----------
+ 1 file changed, 21 insertions(+), 11 deletions(-)
 
-Alan
-
-Alan Tull (10):
-  fpga: add bindings document for fpga region
-  doc: fpga-mgr: add fpga image info to api
-  add bindings document for altera freeze bridge
-  add sysfs document for fpga bridge class
-  fpga-mgr: add fpga image information struct
-  fpga: add fpga bridge framework
-  fpga: fpga-region: device tree control for FPGA
-  ARM: socfpga: fpga bridge driver support
-  fpga: add altera freeze bridge support
-  fpga-manager: Add Socfpga Arria10 support
-
- Documentation/ABI/testing/sysfs-class-fpga-bridge  |  11 +
- .../bindings/fpga/altera-freeze-bridge.txt         |  23 +
- .../devicetree/bindings/fpga/fpga-region.txt       | 494 +++++++++++++++++
- Documentation/fpga/fpga-mgr.txt                    |  32 +-
- drivers/fpga/Kconfig                               |  36 ++
- drivers/fpga/Makefile                              |   9 +
- drivers/fpga/altera-fpga2sdram.c                   | 180 ++++++
- drivers/fpga/altera-freeze-bridge.c                | 273 ++++++++++
- drivers/fpga/altera-hps2fpga.c                     | 221 ++++++++
- drivers/fpga/fpga-bridge.c                         | 398 ++++++++++++++
- drivers/fpga/fpga-mgr.c                            |  17 +-
- drivers/fpga/fpga-region.c                         | 603 +++++++++++++++++++++
- drivers/fpga/socfpga-a10.c                         | 556 +++++++++++++++++++
- drivers/fpga/socfpga.c                             |   7 +-
- drivers/fpga/zynq-fpga.c                           |  10 +-
- include/linux/fpga/fpga-bridge.h                   |  60 ++
- include/linux/fpga/fpga-mgr.h                      |  25 +-
- 17 files changed, 2925 insertions(+), 30 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-class-fpga-bridge
- create mode 100644 Documentation/devicetree/bindings/fpga/altera-freeze-bridge.txt
- create mode 100644 Documentation/devicetree/bindings/fpga/fpga-region.txt
- create mode 100644 drivers/fpga/altera-fpga2sdram.c
- create mode 100644 drivers/fpga/altera-freeze-bridge.c
- create mode 100644 drivers/fpga/altera-hps2fpga.c
- create mode 100644 drivers/fpga/fpga-bridge.c
- create mode 100644 drivers/fpga/fpga-region.c
- create mode 100644 drivers/fpga/socfpga-a10.c
- create mode 100644 include/linux/fpga/fpga-bridge.h
-
+diff --git a/Documentation/fpga/fpga-mgr.txt b/Documentation/fpga/fpga-mgr.txt
+index ce3e84f..9227e3f 100644
+--- a/Documentation/fpga/fpga-mgr.txt
++++ b/Documentation/fpga/fpga-mgr.txt
+@@ -18,21 +18,25 @@ API Functions:
+ To program the FPGA from a file or from a buffer:
+ -------------------------------------------------
+ 
+-	int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
++	int fpga_mgr_buf_load(struct fpga_manager *mgr,
++			      struct fpga_image_info *info,
+ 		              const char *buf, size_t count);
+ 
+ Load the FPGA from an image which exists as a buffer in memory.
+ 
+-	int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
++	int fpga_mgr_firmware_load(struct fpga_manager *mgr,
++				   struct fpga_image_info *info,
+ 		                   const char *image_name);
+ 
+ Load the FPGA from an image which exists as a file.  The image file must be on
+-the firmware search path (see the firmware class documentation).
+-
+-For both these functions, flags == 0 for normal full reconfiguration or
+-FPGA_MGR_PARTIAL_RECONFIG for partial reconfiguration.  If successful, the FPGA
+-ends up in operating mode.  Return 0 on success or a negative error code.
++the firmware search path (see the firmware class documentation).  If successful,
++the FPGA ends up in operating mode.  Return 0 on success or a negative error
++code.
+ 
++A FPGA design contained in a FPGA image file will likely have particulars that
++affect how the image is programmed to the FPGA.  These are contained in struct
++fpga_image_info.  Currently the only such particular is a single flag bit
++indicating whether the image is for full or partial reconfiguration.
+ 
+ To get/put a reference to a FPGA manager:
+ -----------------------------------------
+@@ -70,8 +74,11 @@ struct device_node *mgr_node = ...
+ char *buf = ...
+ int count = ...
+ 
++/* struct with information about the FPGA image to program. */
++struct fpga_image_info info;
++
+ /* flags indicates whether to do full or partial reconfiguration */
+-int flags = 0;
++info.flags = 0;
+ 
+ int ret;
+ 
+@@ -79,7 +86,7 @@ int ret;
+ struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ 
+ /* Load the buffer to the FPGA */
+-ret = fpga_mgr_buf_load(mgr, flags, buf, count);
++ret = fpga_mgr_buf_load(mgr, &info, buf, count);
+ 
+ /* Release the FPGA manager */
+ fpga_mgr_put(mgr);
+@@ -96,8 +103,11 @@ struct device_node *mgr_node = ...
+ /* FPGA image is in this file which is in the firmware search path */
+ const char *path = "fpga-image-9.rbf"
+ 
++/* struct with information about the FPGA image to program. */
++struct fpga_image_info info;
++
+ /* flags indicates whether to do full or partial reconfiguration */
+-int flags = 0;
++info.flags = 0;
+ 
+ int ret;
+ 
+@@ -105,7 +115,7 @@ int ret;
+ struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ 
+ /* Get the firmware image (path) and load it to the FPGA */
+-ret = fpga_mgr_firmware_load(mgr, flags, path);
++ret = fpga_mgr_firmware_load(mgr, &info, path);
+ 
+ /* Release the FPGA manager */
+ fpga_mgr_put(mgr);
 -- 
 2.10.1
