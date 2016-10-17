@@ -1,122 +1,71 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Mon, 17 Oct 2016 11:09:37 -0500
-Subject: [PATCH v20 06/10] fpga: add fpga bridge framework
+Date: Mon, 17 Oct 2016 11:09:40 -0500
+Subject: [PATCH v20 09/10] fpga: add altera freeze bridge support
 In-Reply-To: <20161017160941.4205-1-atull@opensource.altera.com>
 References: <20161017160941.4205-1-atull@opensource.altera.com>
-Message-ID: <20161017160941.4205-7-atull@opensource.altera.com>
+Message-ID: <20161017160941.4205-10-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This framework adds API functions for enabling/
-disabling FPGA bridges under kernel control.
-
-This allows the Linux kernel to disable FPGA bridges
-during FPGA reprogramming and to enable FPGA bridges
-when FPGA reprogramming is done.  This framework is
-be manufacturer-agnostic, allowing it to be used in
-interfaces that use the FPGA Manager Framework to
-reprogram FPGA's.
-
-The functions are:
-* of_fpga_bridge_get
-* fpga_bridge_put
-   Get/put an exclusive reference to a FPGA bridge.
-
-* fpga_bridge_enable
-* fpga_bridge_disable
-   Enable/Disable traffic through a bridge.
-
-* fpga_bridge_register
-* fpga_bridge_unregister
-   Register/unregister a device-specific low level FPGA
-   Bridge driver.
-
-Get an exclusive reference to a bridge and add it to a list:
-* fpga_bridge_get_to_list
-
-To enable/disable/put a set of bridges that are on a list:
-* fpga_bridges_enable
-* fpga_bridges_disable
-* fpga_bridges_put
+Add a low level driver for Altera Freeze Bridges to the FPGA Bridge
+framework.  A freeze bridge is a bridge that exists in the FPGA
+fabric to isolate one region of the FPGA from the busses while that
+one region is being reprogrammed.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
 ---
-v2:  Minor cleanup
-v12: Bump version to line up with simple fpga bus
-     Remove sysfs
-     Improve get/put functions, get the low level driver too.
-     Clean up class implementation
-     Add kernel doc documentation
-     Rename (un)register_fpga_bridge -> fpga_bridge_(un)register
-v13: Add inlined empty functions for if not CONFIG_FPGA_BRIDGE
-     Clean up debugging
-     Remove unneeded #include in .h
-     Remove unnecessary prints
-     Remove 'label' DT binding.
-     Document the mutex
-v14: Allow bridges with no ops
-     *const* struct fpga_bridge_ops
-     Add functions to git/put/enable/disable list of bridges
-     Add list node to struct fpga_bridge
-     Do of_node_get/put in of_fpga_bridge_get()
-     Add r/o attributes: name and state
-v15: No change in this patch for v15 of this patch set
-v16: Remove of_get_fpga_bus function
-v17: No change to this patch in v17 of patch set
-v18: No change to this patch in v18 of patch set
-v19: Use fpga image info struct
-     Support fpga image specific timeouts
-     Support child fpga-regions by doing of_platform_populate
-     make a tristate in Kconfig
+v19: added in v19 of patchset as it needs for fpga info struct
 v20: No change for this patch in v20 of patchset
 ---
- drivers/fpga/Kconfig             |   7 +
- drivers/fpga/Makefile            |   3 +
- drivers/fpga/fpga-bridge.c       | 398 +++++++++++++++++++++++++++++++++++++++
- include/linux/fpga/fpga-bridge.h |  60 ++++++
- 4 files changed, 468 insertions(+)
- create mode 100644 drivers/fpga/fpga-bridge.c
- create mode 100644 include/linux/fpga/fpga-bridge.h
+ drivers/fpga/Kconfig                |   9 ++
+ drivers/fpga/Makefile               |   1 +
+ drivers/fpga/altera-freeze-bridge.c | 273 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 283 insertions(+)
+ create mode 100644 drivers/fpga/altera-freeze-bridge.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index cd84934..9b20f45 100644
+index 5605ad6..8fe6a84 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -26,6 +26,13 @@ config FPGA_MGR_ZYNQ_FPGA
- 	help
- 	  FPGA manager driver support for Xilinx Zynq FPGAs.
+@@ -47,6 +47,15 @@ config SOCFPGA_FPGA_BRIDGE
+ 	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
+ 	  devices.
  
-+config FPGA_BRIDGE
-+	tristate "FPGA Bridge Framework"
-+	depends on OF
++config ALTERA_FREEZE_BRIDGE
++	tristate "Altera FPGA Freeze Bridge"
++	depends on ARCH_SOCFPGA && FPGA_BRIDGE
 +	help
-+	  Say Y here if you want to support bridges connected between host
-+	  processors and FPGAs or between FPGAs.
++	  Say Y to enable drivers for Altera FPGA Freeze bridges.  A
++	  freeze bridge is a bridge that exists in the FPGA fabric to
++	  isolate one region of the FPGA from the busses while that
++	  region is being reprogrammed.
 +
  endif # FPGA
  
  endmenu
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 8d83fc6..4baef00 100644
+index e658436..a6f874d 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -8,3 +8,6 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
- # FPGA Manager Drivers
- obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
- obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
-+
-+# FPGA Bridge Drivers
-+obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
-diff --git a/drivers/fpga/fpga-bridge.c b/drivers/fpga/fpga-bridge.c
+@@ -12,6 +12,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+ # FPGA Bridge Drivers
+ obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
+ obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
++obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
+ 
+ # High Level Interfaces
+ obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+diff --git a/drivers/fpga/altera-freeze-bridge.c b/drivers/fpga/altera-freeze-bridge.c
 new file mode 100644
-index 0000000..5a733c8
+index 0000000..8dcd9fb
 --- /dev/null
-+++ b/drivers/fpga/fpga-bridge.c
-@@ -0,0 +1,398 @@
++++ b/drivers/fpga/altera-freeze-bridge.c
+@@ -0,0 +1,273 @@
 +/*
-+ * FPGA Bridge Framework Driver
++ * FPGA Freeze Bridge Controller
 + *
-+ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
++ *  Copyright (C) 2016 Altera Corporation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -130,452 +79,261 @@ index 0000000..5a733c8
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/fpga/fpga-bridge.h>
-+#include <linux/idr.h>
++#include <linux/delay.h>
++#include <linux/io.h>
 +#include <linux/kernel.h>
++#include <linux/of_device.h>
 +#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <linux/fpga/fpga-bridge.h>
 +
-+static DEFINE_IDA(fpga_bridge_ida);
-+static struct class *fpga_bridge_class;
++#define FREEZE_CSR_STATUS_OFFSET		0
++#define FREEZE_CSR_CTRL_OFFSET			4
++#define FREEZE_CSR_ILLEGAL_REQ_OFFSET		8
++#define FREEZE_CSR_REG_VERSION			12
 +
-+/* Lock for adding/removing bridges to linked lists*/
-+spinlock_t bridge_list_lock;
++#define FREEZE_CSR_SUPPORTED_VERSION		2
 +
-+static int fpga_bridge_of_node_match(struct device *dev, const void *data)
-+{
-+	return dev->of_node == data;
-+}
++#define FREEZE_CSR_STATUS_FREEZE_REQ_DONE	BIT(0)
++#define FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE	BIT(1)
 +
-+/**
-+ * fpga_bridge_enable - Enable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_enable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "enable\n");
++#define FREEZE_CSR_CTRL_FREEZE_REQ		BIT(0)
++#define FREEZE_CSR_CTRL_RESET_REQ		BIT(1)
++#define FREEZE_CSR_CTRL_UNFREEZE_REQ		BIT(2)
 +
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 1);
++#define FREEZE_BRIDGE_NAME			"freeze"
 +
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_enable);
-+
-+/**
-+ * fpga_bridge_disable - Disable transactions on the bridge
-+ *
-+ * @bridge: FPGA bridge
-+ *
-+ * Return: 0 for success, error code otherwise.
-+ */
-+int fpga_bridge_disable(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "disable\n");
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_set)
-+		return bridge->br_ops->enable_set(bridge, 0);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_disable);
-+
-+/**
-+ * of_fpga_bridge_get - get an exclusive reference to a fpga bridge
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ * @info: fpga image specific information
-+ *
-+ * Return fpga_bridge struct if successful.
-+ * Return -EBUSY if someone already has a reference to the bridge.
-+ * Return -ENODEV if @np is not a FPGA Bridge.
-+ */
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *np,
-+				       struct fpga_image_info *info)
-+
-+{
++struct altera_freeze_br_data {
 +	struct device *dev;
-+	struct fpga_bridge *bridge;
-+	int ret = -ENODEV;
-+
-+	of_node_get(np);
-+
-+	dev = class_find_device(fpga_bridge_class, NULL, np,
-+				fpga_bridge_of_node_match);
-+	if (!dev)
-+		goto err_dev;
-+
-+	bridge = to_fpga_bridge(dev);
-+	if (!bridge)
-+		goto err_dev;
-+
-+	bridge->info = info;
-+
-+	if (!mutex_trylock(&bridge->mutex)) {
-+		ret = -EBUSY;
-+		goto err_dev;
-+	}
-+
-+	if (!try_module_get(dev->parent->driver->owner))
-+		goto err_ll_mod;
-+
-+	dev_dbg(&bridge->dev, "get\n");
-+
-+	return bridge;
-+
-+err_ll_mod:
-+	mutex_unlock(&bridge->mutex);
-+err_dev:
-+	put_device(dev);
-+	of_node_put(np);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(of_fpga_bridge_get);
-+
-+/**
-+ * fpga_bridge_put - release a reference to a bridge
-+ *
-+ * @bridge: FPGA bridge
-+ */
-+void fpga_bridge_put(struct fpga_bridge *bridge)
-+{
-+	dev_dbg(&bridge->dev, "put\n");
-+
-+	bridge->info = NULL;
-+	module_put(bridge->dev.parent->driver->owner);
-+	mutex_unlock(&bridge->mutex);
-+	put_device(&bridge->dev);
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_put);
-+
-+/**
-+ * fpga_bridges_enable - enable bridges in a list
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Enable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
-+ */
-+int fpga_bridges_enable(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
-+	int ret;
-+
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_enable(bridge);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_enable);
-+
-+/**
-+ * fpga_bridges_disable - disable bridges in a list
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Disable each bridge in the list.  If list is empty, do nothing.
-+ *
-+ * Return 0 for success or empty bridge list; return error code otherwise.
-+ */
-+int fpga_bridges_disable(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node;
-+	int ret;
-+
-+	list_for_each(node, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+		ret = fpga_bridge_disable(bridge);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_disable);
-+
-+/**
-+ * fpga_bridges_put - put bridges
-+ *
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * For each bridge in the list, put the bridge and remove it from the list.
-+ * If list is empty, do nothing.
-+ */
-+void fpga_bridges_put(struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	struct list_head *node, *next;
-+	unsigned long flags;
-+
-+	list_for_each_safe(node, next, bridge_list) {
-+		bridge = list_entry(node, struct fpga_bridge, node);
-+
-+		fpga_bridge_put(bridge);
-+
-+		spin_lock_irqsave(&bridge_list_lock, flags);
-+		list_del(&bridge->node);
-+		spin_unlock_irqrestore(&bridge_list_lock, flags);
-+	}
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridges_put);
-+
-+/**
-+ * fpga_bridges_get_to_list - get a bridge, add it to a list
-+ *
-+ * @np: node pointer of a FPGA bridge
-+ * @info: fpga image specific information
-+ * @bridge_list: list of FPGA bridges
-+ *
-+ * Get an exclusive reference to the bridge and and it to the list.
-+ *
-+ * Return 0 for success, error code from of_fpga_bridge_get() othewise.
-+ */
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct fpga_image_info *info,
-+			    struct list_head *bridge_list)
-+{
-+	struct fpga_bridge *bridge;
-+	unsigned long flags;
-+
-+	bridge = of_fpga_bridge_get(np, info);
-+	if (IS_ERR(bridge))
-+		return PTR_ERR(bridge);
-+
-+	spin_lock_irqsave(&bridge_list_lock, flags);
-+	list_add(&bridge->node, bridge_list);
-+	spin_unlock_irqrestore(&bridge_list_lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(fpga_bridge_get_to_list);
-+
-+static ssize_t name_show(struct device *dev,
-+			 struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+
-+	return sprintf(buf, "%s\n", bridge->name);
-+}
-+
-+static ssize_t state_show(struct device *dev,
-+			  struct device_attribute *attr, char *buf)
-+{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
-+	int enable = 1;
-+
-+	if (bridge->br_ops && bridge->br_ops->enable_show)
-+		enable = bridge->br_ops->enable_show(bridge);
-+
-+	return sprintf(buf, "%s\n", enable ? "enabled" : "disabled");
-+}
-+
-+static DEVICE_ATTR_RO(name);
-+static DEVICE_ATTR_RO(state);
-+
-+static struct attribute *fpga_bridge_attrs[] = {
-+	&dev_attr_name.attr,
-+	&dev_attr_state.attr,
-+	NULL,
++	void __iomem *base_addr;
++	bool enable;
 +};
-+ATTRIBUTE_GROUPS(fpga_bridge);
 +
-+/**
-+ * fpga_bridge_register - register a fpga bridge driver
-+ * @dev:	FPGA bridge device from pdev
-+ * @name:	FPGA bridge name
-+ * @br_ops:	pointer to structure of fpga bridge ops
-+ * @priv:	FPGA bridge private data
-+ *
-+ * Return: 0 for success, error code otherwise.
++/*
++ * Poll status until status bit is set or we have a timeout.
 + */
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv)
++static int altera_freeze_br_req_ack(struct altera_freeze_br_data *priv,
++				    u32 timeout, u32 req_ack)
 +{
-+	struct fpga_bridge *bridge;
-+	int id, ret = 0;
++	struct device *dev = priv->dev;
++	void __iomem *csr_illegal_req_addr = priv->base_addr +
++					     FREEZE_CSR_ILLEGAL_REQ_OFFSET;
++	u32 status, illegal, ctrl;
++	int ret = -ETIMEDOUT;
 +
-+	if (!name || !strlen(name)) {
-+		dev_err(dev, "Attempt to register with no name!\n");
-+		return -EINVAL;
-+	}
++	do {
++		illegal = readl(csr_illegal_req_addr);
++		if (illegal) {
++			dev_err(dev, "illegal request detected 0x%x", illegal);
 +
-+	bridge = kzalloc(sizeof(*bridge), GFP_KERNEL);
-+	if (!bridge)
-+		return -ENOMEM;
++			writel(1, csr_illegal_req_addr);
 +
-+	id = ida_simple_get(&fpga_bridge_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0) {
-+		ret = id;
-+		goto error_kfree;
-+	}
++			illegal = readl(csr_illegal_req_addr);
++			if (illegal)
++				dev_err(dev, "illegal request not cleared 0x%x",
++					illegal);
 +
-+	mutex_init(&bridge->mutex);
-+	INIT_LIST_HEAD(&bridge->node);
++			ret = -EINVAL;
++			break;
++		}
 +
-+	bridge->name = name;
-+	bridge->br_ops = br_ops;
-+	bridge->priv = priv;
++		status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++		dev_dbg(dev, "%s %x %x\n", __func__, status, req_ack);
++		status &= req_ack;
++		if (status) {
++			ctrl = readl(priv->base_addr + FREEZE_CSR_CTRL_OFFSET);
++			dev_dbg(dev, "%s request %x acknowledged %x %x\n",
++				__func__, req_ack, status, ctrl);
++			ret = 0;
++			break;
++		}
 +
-+	device_initialize(&bridge->dev);
-+	bridge->dev.class = fpga_bridge_class;
-+	bridge->dev.parent = dev;
-+	bridge->dev.of_node = dev->of_node;
-+	bridge->dev.id = id;
-+	dev_set_drvdata(dev, bridge);
++		udelay(1);
++	} while (timeout--);
 +
-+	ret = dev_set_name(&bridge->dev, "br%d", id);
-+	if (ret)
-+		goto error_device;
-+
-+	ret = device_add(&bridge->dev);
-+	if (ret)
-+		goto error_device;
-+
-+	of_platform_populate(dev->of_node, NULL, NULL, dev);
-+
-+	dev_info(bridge->dev.parent, "fpga bridge [%s] registered\n",
-+		 bridge->name);
-+
-+	return 0;
-+
-+error_device:
-+	ida_simple_remove(&fpga_bridge_ida, id);
-+error_kfree:
-+	kfree(bridge);
++	if (ret == -ETIMEDOUT)
++		dev_err(dev, "%s timeout waiting for 0x%x\n",
++			__func__, req_ack);
 +
 +	return ret;
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_register);
 +
-+/**
-+ * fpga_bridge_unregister - unregister a fpga bridge driver
-+ * @dev: FPGA bridge device from pdev
++static int altera_freeze_br_do_freeze(struct altera_freeze_br_data *priv,
++				      u32 timeout)
++{
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
++	int ret;
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	if (status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already disabled %d\n",
++			__func__, status);
++		return 0;
++	} else if (!(status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not enabled %d\n", __func__, status);
++		return -EINVAL;
++	}
++
++	writel(FREEZE_CSR_CTRL_FREEZE_REQ, csr_ctrl_addr);
++
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_FREEZE_REQ_DONE);
++
++	if (ret)
++		writel(0, csr_ctrl_addr);
++	else
++		writel(FREEZE_CSR_CTRL_RESET_REQ, csr_ctrl_addr);
++
++	return ret;
++}
++
++static int altera_freeze_br_do_unfreeze(struct altera_freeze_br_data *priv,
++					u32 timeout)
++{
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
++	int ret;
++
++	writel(0, csr_ctrl_addr);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already enabled %d\n",
++			__func__, status);
++		return 0;
++	} else if (!(status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not frozen %d\n", __func__, status);
++		return -EINVAL;
++	}
++
++	writel(FREEZE_CSR_CTRL_UNFREEZE_REQ, csr_ctrl_addr);
++
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	writel(0, csr_ctrl_addr);
++
++	return ret;
++}
++
++/*
++ * enable = 1 : allow traffic through the bridge
++ * enable = 0 : disable traffic through the bridge
 + */
-+void fpga_bridge_unregister(struct device *dev)
++static int altera_freeze_br_enable_set(struct fpga_bridge *bridge,
++				       bool enable)
 +{
-+	struct fpga_bridge *bridge = dev_get_drvdata(dev);
++	struct altera_freeze_br_data *priv = bridge->priv;
++	struct fpga_image_info *info = bridge->info;
++	u32 timeout = 0;
++	int ret;
 +
-+	/*
-+	 * If the low level driver provides a method for putting bridge into
-+	 * a desired state upon unregister, do it.
-+	 */
-+	if (bridge->br_ops && bridge->br_ops->fpga_bridge_remove)
-+		bridge->br_ops->fpga_bridge_remove(bridge);
++	if (enable) {
++		if (info)
++			timeout = info->enable_timeout_us;
 +
-+	device_unregister(&bridge->dev);
++		ret = altera_freeze_br_do_unfreeze(bridge->priv, timeout);
++	} else {
++		if (info)
++			timeout = info->disable_timeout_us;
++
++		ret = altera_freeze_br_do_freeze(bridge->priv, timeout);
++	}
++
++	if (!ret)
++		priv->enable = enable;
++
++	return ret;
 +}
-+EXPORT_SYMBOL_GPL(fpga_bridge_unregister);
 +
-+static void fpga_bridge_dev_release(struct device *dev)
++static int altera_freeze_br_enable_show(struct fpga_bridge *bridge)
 +{
-+	struct fpga_bridge *bridge = to_fpga_bridge(dev);
++	struct altera_freeze_br_data *priv = bridge->priv;
 +
-+	ida_simple_remove(&fpga_bridge_ida, bridge->dev.id);
-+	kfree(bridge);
++	return priv->enable;
 +}
 +
-+static int __init fpga_bridge_dev_init(void)
++static struct fpga_bridge_ops altera_freeze_br_br_ops = {
++	.enable_set = altera_freeze_br_enable_set,
++	.enable_show = altera_freeze_br_enable_show,
++};
++
++static const struct of_device_id altera_freeze_br_of_match[] = {
++	{ .compatible = "altr,freeze-bridge-controller", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, altera_freeze_br_of_match);
++
++static int altera_freeze_br_probe(struct platform_device *pdev)
 +{
-+	spin_lock_init(&bridge_list_lock);
++	struct device *dev = &pdev->dev;
++	struct device_node *np = pdev->dev.of_node;
++	struct altera_freeze_br_data *priv;
++	struct resource *res;
++	u32 status, revision;
 +
-+	fpga_bridge_class = class_create(THIS_MODULE, "fpga_bridge");
-+	if (IS_ERR(fpga_bridge_class))
-+		return PTR_ERR(fpga_bridge_class);
++	if (!np)
++		return -ENODEV;
 +
-+	fpga_bridge_class->dev_groups = fpga_bridge_groups;
-+	fpga_bridge_class->dev_release = fpga_bridge_dev_release;
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = dev;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->base_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->base_addr))
++		return PTR_ERR(priv->base_addr);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)
++		priv->enable = 1;
++
++	revision = readl(priv->base_addr + FREEZE_CSR_REG_VERSION);
++	if (revision != FREEZE_CSR_SUPPORTED_VERSION)
++		dev_warn(dev,
++			 "%s Freeze Controller unexpected revision %d != %d\n",
++			 __func__, revision, FREEZE_CSR_SUPPORTED_VERSION);
++
++	return fpga_bridge_register(dev, FREEZE_BRIDGE_NAME,
++				    &altera_freeze_br_br_ops, priv);
++}
++
++static int altera_freeze_br_remove(struct platform_device *pdev)
++{
++	fpga_bridge_unregister(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static void __exit fpga_bridge_dev_exit(void)
-+{
-+	class_destroy(fpga_bridge_class);
-+	ida_destroy(&fpga_bridge_ida);
-+}
++static struct platform_driver altera_freeze_br_driver = {
++	.probe = altera_freeze_br_probe,
++	.remove = altera_freeze_br_remove,
++	.driver = {
++		.name	= "altera_freeze_br",
++		.of_match_table = of_match_ptr(altera_freeze_br_of_match),
++	},
++};
 +
-+MODULE_DESCRIPTION("FPGA Bridge Driver");
++module_platform_driver(altera_freeze_br_driver);
++
++MODULE_DESCRIPTION("Altera Freeze Bridge");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
 +MODULE_LICENSE("GPL v2");
-+
-+subsys_initcall(fpga_bridge_dev_init);
-+module_exit(fpga_bridge_dev_exit);
-diff --git a/include/linux/fpga/fpga-bridge.h b/include/linux/fpga/fpga-bridge.h
-new file mode 100644
-index 0000000..dba6e3c
---- /dev/null
-+++ b/include/linux/fpga/fpga-bridge.h
-@@ -0,0 +1,60 @@
-+#include <linux/device.h>
-+#include <linux/fpga/fpga-mgr.h>
-+
-+#ifndef _LINUX_FPGA_BRIDGE_H
-+#define _LINUX_FPGA_BRIDGE_H
-+
-+struct fpga_bridge;
-+
-+/**
-+ * struct fpga_bridge_ops - ops for low level FPGA bridge drivers
-+ * @enable_show: returns the FPGA bridge's status
-+ * @enable_set: set a FPGA bridge as enabled or disabled
-+ * @fpga_bridge_remove: set FPGA into a specific state during driver remove
-+ */
-+struct fpga_bridge_ops {
-+	int (*enable_show)(struct fpga_bridge *bridge);
-+	int (*enable_set)(struct fpga_bridge *bridge, bool enable);
-+	void (*fpga_bridge_remove)(struct fpga_bridge *bridge);
-+};
-+
-+/**
-+ * struct fpga_bridge - FPGA bridge structure
-+ * @name: name of low level FPGA bridge
-+ * @dev: FPGA bridge device
-+ * @mutex: enforces exclusive reference to bridge
-+ * @br_ops: pointer to struct of FPGA bridge ops
-+ * @info: fpga image specific information
-+ * @node: FPGA bridge list node
-+ * @priv: low level driver private date
-+ */
-+struct fpga_bridge {
-+	const char *name;
-+	struct device dev;
-+	struct mutex mutex; /* for exclusive reference to bridge */
-+	const struct fpga_bridge_ops *br_ops;
-+	struct fpga_image_info *info;
-+	struct list_head node;
-+	void *priv;
-+};
-+
-+#define to_fpga_bridge(d) container_of(d, struct fpga_bridge, dev)
-+
-+struct fpga_bridge *of_fpga_bridge_get(struct device_node *node,
-+				       struct fpga_image_info *info);
-+void fpga_bridge_put(struct fpga_bridge *bridge);
-+int fpga_bridge_enable(struct fpga_bridge *bridge);
-+int fpga_bridge_disable(struct fpga_bridge *bridge);
-+
-+int fpga_bridges_enable(struct list_head *bridge_list);
-+int fpga_bridges_disable(struct list_head *bridge_list);
-+void fpga_bridges_put(struct list_head *bridge_list);
-+int fpga_bridge_get_to_list(struct device_node *np,
-+			    struct fpga_image_info *info,
-+			    struct list_head *bridge_list);
-+
-+int fpga_bridge_register(struct device *dev, const char *name,
-+			 const struct fpga_bridge_ops *br_ops, void *priv);
-+void fpga_bridge_unregister(struct device *dev);
-+
-+#endif /* _LINUX_FPGA_BRIDGE_H */
 -- 
 2.10.1
