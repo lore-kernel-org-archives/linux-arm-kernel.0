@@ -1,44 +1,59 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 17 Oct 2016 13:33:59 +0200
-Subject: [PATCH] crygpu/drm/exynos/exynos_hdmi - Unmap region obtained by
- of_iomap
-In-Reply-To: <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <CGME20161017111000eucas1p13f38f6daa20992f6aa3c9dfc8d2ab495@eucas1p1.samsung.com>
- <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <0147af61-e96e-ba43-55b9-6a58a1539666@samsung.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 17 Oct 2016 14:40 +0300
+Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
+In-Reply-To: <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com>
+References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
+ <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
+ <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com>
+Message-ID: <4975084.EGQPv58AK6@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Hi,
+On Monday 17 Oct 2016 10:33:58 Tomi Valkeinen wrote:
+> On 17/10/16 10:12, Sekhar Nori wrote:
+>> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
+>>> On 15/10/16 20:42, Sekhar Nori wrote:
+>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
+>>>>> b/arch/arm/boot/dts/da850.dtsi
+>>>>> index f79e1b9..32908ae 100644
+>>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>>> @@ -399,6 +420,14 @@
+>>>>>  				<&edma0 0 1>;
+>>>>>  			dma-names = "tx", "rx";
+>>>>>  		};
+>>>>> +
+>>>>> +		display: display at 213000 {
+>>>>> +			compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
+>>>> 
+>>>> This should instead be:
+>>>> 
+>>>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
+>>>> 
+>>>> as the closest match should appear first in the list.
+>>> 
+>>> Actually I don't think that's correct. The LCDC on da850 is not
+>>> compatible with the LCDC on AM335x. I think it should be just
+>>> "ti,da850-tilcdc".
+>> 
+>> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
+>> the case, I wonder how the patch passed testing. Bartosz?
+> 
+> AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
+> similar, but different.
+> 
+> The driver gets the version number from LCDC's register, and acts based
+> on that, so afaik the compatible string doesn't really affect the
+> functionality (as long as it matches).
+> 
+> But even if it works with the current driver, I don't think
+> "ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
 
-On 17.10.2016 13:09, Arvind Yadav wrote:
-> Free memory mapping, if hdmi_probe is not successful.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+If the hardware provides IP revision information, how about just "ti,lcdc" ?
 
-Subject prefix is incorrect.
+-- 
+Regards,
 
-> ---
->  drivers/gpu/drm/exynos/exynos_hdmi.c |    2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> index 2275efe..9b7857b 100644
-> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-> @@ -1901,6 +1901,8 @@ err_disable_pm_runtime:
->  err_hdmiphy:
->  	if (hdata->hdmiphy_port)
->  		put_device(&hdata->hdmiphy_port->dev);
-> +	if (hdata->regs_hdmiphy)
-> +		iounmap(hdata->regs_hdmiphy);
-
-Thats OK, you can add also unmap to hdmi_remove.
-
-Regards
-Andrzej
-
->  err_ddc:
->  	put_device(&hdata->ddc_adpt->dev);
->  
+Laurent Pinchart
