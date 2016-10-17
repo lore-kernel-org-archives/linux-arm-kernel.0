@@ -1,76 +1,18 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 17 Oct 2016 15:29:23 +0300
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <4975084.EGQPv58AK6@avalon>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
- <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com> <4975084.EGQPv58AK6@avalon>
-Message-ID: <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 17 Oct 2016 14:30:43 +0200
+Subject: [PATCH] usb: ehci-platform: increase EHCI_MAX_RSTS to 4
+In-Reply-To: <1476702719-10337-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1476702719-10337-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161017123043.GA15142@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/16 14:40, Laurent Pinchart wrote:
-> Hello,
-> 
-> On Monday 17 Oct 2016 10:33:58 Tomi Valkeinen wrote:
->> On 17/10/16 10:12, Sekhar Nori wrote:
->>> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
->>>> On 15/10/16 20:42, Sekhar Nori wrote:
->>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
->>>>>> b/arch/arm/boot/dts/da850.dtsi
->>>>>> index f79e1b9..32908ae 100644
->>>>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>>>> @@ -399,6 +420,14 @@
->>>>>>  				<&edma0 0 1>;
->>>>>>  			dma-names = "tx", "rx";
->>>>>>  		};
->>>>>> +
->>>>>> +		display: display at 213000 {
->>>>>> +			compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
->>>>>
->>>>> This should instead be:
->>>>>
->>>>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
->>>>>
->>>>> as the closest match should appear first in the list.
->>>>
->>>> Actually I don't think that's correct. The LCDC on da850 is not
->>>> compatible with the LCDC on AM335x. I think it should be just
->>>> "ti,da850-tilcdc".
->>>
->>> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
->>> the case, I wonder how the patch passed testing. Bartosz?
->>
->> AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
->> similar, but different.
->>
->> The driver gets the version number from LCDC's register, and acts based
->> on that, so afaik the compatible string doesn't really affect the
->> functionality (as long as it matches).
->>
->> But even if it works with the current driver, I don't think
->> "ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
-> 
-> If the hardware provides IP revision information, how about just "ti,lcdc" ?
+On Mon, Oct 17, 2016 at 08:11:59PM +0900, Masahiro Yamada wrote:
+> Socionext LD11 SoC (arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi)
+> needs to handle 4 reset lines for EHCI.
 
-Maybe, and I agree that's the "correct" way, but looking at the history,
-it's not just once or twice when we've suddenly found out some
-difference or bug or such in an IP revision, or the integration to a
-SoC, that can't be found based on the IP revision.
+Why?  What makes it different from other EHCI implementations?
 
-That's why I feel it's usually safer to have the SoC revision there in
-the compatible string.
+thanks,
 
-That said, we have only a few different old SoCs with LCDC (compared to,
-say, OMAP DSS) so in this case perhaps just "ti,lcdc" would be fine.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/6c32126e/attachment.sig>
+greg k-h
