@@ -1,59 +1,58 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 17 Oct 2016 16:40:14 -0300
-Subject: [PATCH] hwrng: meson: Fix module autoload for OF registration
-Message-ID: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 17 Oct 2016 22:42:10 +0300
+Subject: [PATCH v8 1/2] ARM: dts: Add TOPEET itop core board SCP package
+ version
+In-Reply-To: <0326b619-3af5-e4ef-2251-16e60105ef67@soulik.info>
+References: <1474300103-26659-1-git-send-email-ayaka@soulik.info>
+ <1474300103-26659-2-git-send-email-ayaka@soulik.info>
+ <20161017162759.GA25818@kozik-lap>
+ <0326b619-3af5-e4ef-2251-16e60105ef67@soulik.info>
+Message-ID: <20161017194210.GA26723@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver is built as a module, autoload won't work because the module
-alias information is not filled. So user-space can't match the registered
-device with the corresponding module.
+On Tue, Oct 18, 2016 at 01:57:47AM +0800, ayaka wrote:
+> 
+> 
+> On 10/18/2016 12:27 AM, Krzysztof Kozlowski wrote:
+> >On Mon, Sep 19, 2016 at 11:48:22PM +0800, Randy Li wrote:
+> >>The TOPEET itop is a samsung exnynos 4412 core board, which have
+> >>two package versions. This patch add the support for SCP version.
+> >>
+> >>Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
+> >>PMIC. The future features are in the based board. Also MFC and
+> >>watchdog have been enabled.
+> >>
+> >>Signed-off-by: Randy Li <ayaka@soulik.info>
+> >>---
+> >>  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 501 ++++++++++++++++++++++++
+> >>  1 file changed, 501 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+> >I wanted to apply it... but then I saw a bunch of checkpatch trivial issues.
+> >Really, after v8? The code must compile (v6 did not compile...), there
+> >should be no warnings from smatch, sparse and checkpatch (only the last
+> >one is applicable for DTS). Unless of course checkpatch would be
+> >wrong... but in this case it is correct. You did not follow coding
+> >style:
+> >
+> >WARNING: please, no spaces at the start of a line
+> >#134: FILE: arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi:109:
+> >+        devfreq = <&bus_leftbus>;$
+> >
+> >ERROR: code indent should use tabs where possible
+> >#135: FILE: arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi:110:
+> >+        status = "okay";$
+> Oh, it is a copy mistake, the copy operation makes the original tab becomes
+> spaces.
+> Should I send a new version to correct them?
 
-Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+Yes, please send new version. The DTS (code) itself looked fine, so only
+the checkpatch issues are remaining.
 
-Before this patch:
+BTW, why are you copying the files? Even if you have multiple trees
+(like product/vendor kernel and mainline) then you can easily move
+patches with cherry-pick, apply or am commands. Then finally just 'git
+format-patch -2 -v9' and 'git send-email'.
 
-$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-alias:          platform:meson-rng
-
-After this patch:
-
-$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-alias:          platform:meson-rng
-alias:          of:N*T*Camlogic,meson-rngC*
-alias:          of:N*T*Camlogic,meson-rng
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
-
- drivers/char/hw_random/meson-rng.c | 1 +
- drivers/char/tpm/Kconfig           | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/char/hw_random/meson-rng.c b/drivers/char/hw_random/meson-rng.c
-index 58bef39f7286..51864a509be7 100644
---- a/drivers/char/hw_random/meson-rng.c
-+++ b/drivers/char/hw_random/meson-rng.c
-@@ -110,6 +110,7 @@ static const struct of_device_id meson_rng_of_match[] = {
- 	{ .compatible = "amlogic,meson-rng", },
- 	{},
- };
-+MODULE_DEVICE_TABLE(of, meson_rng_of_match);
- 
- static struct platform_driver meson_rng_driver = {
- 	.probe	= meson_rng_probe,
-diff --git a/drivers/char/tpm/Kconfig b/drivers/char/tpm/Kconfig
-index 9faa0b1e7766..982ed2fe927c 100644
---- a/drivers/char/tpm/Kconfig
-+++ b/drivers/char/tpm/Kconfig
-@@ -32,7 +32,7 @@ config TCG_TIS_CORE
- 
- config TCG_TIS
- 	tristate "TPM Interface Specification 1.2 Interface / TPM 2.0 FIFO Interface"
--	depends on X86
-+	depends on X86 || COMPILE_TEST
- 	select TCG_TIS_CORE
- 	---help---
- 	  If you have a TPM security chip that is compliant with the
--- 
-2.7.4
+Best regards,
+Krzysztof
