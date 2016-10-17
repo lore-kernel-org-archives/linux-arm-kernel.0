@@ -1,51 +1,73 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 17 Oct 2016 09:28:39 +0200
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <1475672732-17111-3-git-send-email-bgolaszewski@baylibre.com>
- <2d276e51-9d37-8648-4aad-283bb2b23626@ti.com>
- <1e23c3e9-d34b-1d8f-8565-c9932a60fd32@ti.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
-Message-ID: <CAMpxmJXTRZg-BLyT7TBCrfySSaCDVrkEArPpD8cVrAZ4qX0ULQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 17 Oct 2016 09:30:53 +0200
+Subject: [PATCH v3 0/8] PM / Domains: DT support for domain idle states &
+ atomic PM domains
+In-Reply-To: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
+References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFpQwOkXUk8wT6sZ-Ad4XpTnyodK5m24fYJ3P+1QtS0XOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-17 9:12 GMT+02:00 Sekhar Nori <nsekhar@ti.com>:
-> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
->> On 15/10/16 20:42, Sekhar Nori wrote:
->>
->>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->>>> index f79e1b9..32908ae 100644
->>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>
->>>> @@ -399,6 +420,14 @@
->>>>                             <&edma0 0 1>;
->>>>                     dma-names = "tx", "rx";
->>>>             };
->>>> +
->>>> +           display: display at 213000 {
->>>> +                   compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
->>>
->>> This should instead be:
->>>
->>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
->>>
->>> as the closest match should appear first in the list.
->>
->> Actually I don't think that's correct. The LCDC on da850 is not
->> compatible with the LCDC on AM335x. I think it should be just
->> "ti,da850-tilcdc".
+On 14 October 2016 at 19:47, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Hi all,
 >
-> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
-> the case, I wonder how the patch passed testing. Bartosz?
+> Changes since v2 [3] -
+> - Addressed review comments from v2.
+>         - domain-idle-states documentation updated
+>         - fixed compiler issues with imx driver
+>         - minor code change in pm_domains.c
+> - The series is available at [4].
+>
+> Changes since v1 [2] -
+> - Addressed review comments from v1.
+>         - Fixes around dynamic allocation of genpd states
+>         - Used OF method for iterating phandles
+>         - Updated documentation, examples
+>         - Rename state variable (provider -> fwnode)
+> - The series is available at [3].
+>
+> The changes from [1] are -
+> - Allocating memory for domain idle states dynamically
+> - Conform to naming conventions for internal and exported genpd functions
+> - DT binding example for domain-idle-state
+> - Use fwnode instead of of_node
+> - Handle atomic case for removal of PM Domain
+> - Rebase on top of Rafael's pm/genpd tree
+>
+> Thanks,
+> Lina
+>
+> Lina Iyer (8):
+>   PM / Domains: Make genpd state allocation dynamic
+>   PM / Domain: Add residency property to genpd states
+>   PM / Domains: Allow domain power states to be read from DT
+>   PM / Domains: Save the fwnode in genpd_power_state
+>   dt/bindings: Update binding for PM domain idle states
+>   PM / Domains: Abstract genpd locking
+>   PM / Domains: Support IRQ safe PM domains
+>   PM / doc: Update device documentation for devices in IRQ safe PM
+>     domains
+>
+>  .../devicetree/bindings/power/power_domain.txt     |  43 +++
+>  Documentation/power/devices.txt                    |   9 +-
+>  arch/arm/mach-imx/gpc.c                            |  17 +-
+>  drivers/base/power/domain.c                        | 358 +++++++++++++++++----
+>  include/linux/pm_domain.h                          |  28 +-
+>  5 files changed, 383 insertions(+), 72 deletions(-)
 >
 
-DA850 uses revision 1 of the IP while am33xx is equipped with rev 2.
-The driver reads the appropriate register, detects the revision and
-sets the corresponding field in struct tilcdc_drm_private in
-tilcdc_load().
+Rafael, Lina,
 
-Thanks,
-Bartosz
+This looks good to me! Unless any other objections, I suggest to apply
+this to get it tested in linux-next.
+
+Kind regards
+Uffe
+
+> --
+> 2.7.4
+>
+> [1]. https://www.spinics.net/lists/arm-kernel/msg526814.html
+> [2]. http://www.spinics.net/lists/arm-kernel/msg535106.html
+> [3]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-v2
+> [4]. https://git.linaro.org/people/lina.iyer/linux-next.git/shortlog/refs/heads/genpd-v3
