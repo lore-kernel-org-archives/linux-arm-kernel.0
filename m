@@ -1,43 +1,51 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 17 Oct 2016 19:27:59 +0300
-Subject: [PATCH v8 1/2] ARM: dts: Add TOPEET itop core board SCP package
- version
-In-Reply-To: <1474300103-26659-2-git-send-email-ayaka@soulik.info>
-References: <1474300103-26659-1-git-send-email-ayaka@soulik.info>
- <1474300103-26659-2-git-send-email-ayaka@soulik.info>
-Message-ID: <20161017162759.GA25818@kozik-lap>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 17 Oct 2016 18:30:47 +0200
+Subject: [PATCH 0/3] ARM: da850: new drivers for better LCDC support
+Message-ID: <1476721850-454-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 11:48:22PM +0800, Randy Li wrote:
-> The TOPEET itop is a samsung exnynos 4412 core board, which have
-> two package versions. This patch add the support for SCP version.
-> 
-> Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
-> PMIC. The future features are in the based board. Also MFC and
-> watchdog have been enabled.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 501 ++++++++++++++++++++++++
->  1 file changed, 501 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+This series adds two new drivers in order to better support the LCDC
+rev1 present on the da850 boards.
 
-I wanted to apply it... but then I saw a bunch of checkpatch trivial issues.
-Really, after v8? The code must compile (v6 did not compile...), there
-should be no warnings from smatch, sparse and checkpatch (only the last
-one is applicable for DTS). Unless of course checkpatch would be
-wrong... but in this case it is correct. You did not follow coding
-style:
+The first patch adds a new memory driver which allows to write to the
+DDR2/mDDR memory controller present on the da8xx SoCs.
 
-WARNING: please, no spaces at the start of a line
-#134: FILE: arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi:109:
-+        devfreq = <&bus_leftbus>;$
+The second patch adds a new bus driver which allows to interact with
+the SYSCFG module of da8xx SoCs.
 
-ERROR: code indent should use tabs where possible
-#135: FILE: arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi:110:
-+        status = "okay";$
+Both drivers are incomplete - they currently only implement the
+functionalities required to correctly support the LCDC on da850
+boards. The first driver only allows to specify the value of the PBBP
+register, while the second allows to modify all master peripheral
+priorities, but doesn't know about other syscfg registers yet.
 
+Potential extensions of these drivers should be straightforward in the
+future.
 
-Best regards,
-Krzysztof
+The last patch adds disabled nodes for the above drivers to da850.dtsi.
+
+Tested on a da850-lcdk with a display connected over VGA.
+
+Bartosz Golaszewski (3):
+  ARM: memory: da8xx-ddrctl: new driver
+  ARM: bus: da8xx-syscfg: new driver
+  ARM: dts: da850: add the syscfg and ddrctl nodes
+
+ .../devicetree/bindings/bus/ti,da850-syscfg.txt    |  63 +++++++
+ .../memory-controllers/ti-da8xx-ddrctl.txt         |  25 +++
+ arch/arm/boot/dts/da850.dtsi                       |  10 +
+ drivers/bus/Kconfig                                |   8 +
+ drivers/bus/Makefile                               |   2 +
+ drivers/bus/da8xx-syscfg.c                         | 206 +++++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/da8xx-ddrctl.c                      |  77 ++++++++
+ 9 files changed, 400 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-syscfg.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+ create mode 100644 drivers/bus/da8xx-syscfg.c
+ create mode 100644 drivers/memory/da8xx-ddrctl.c
+
+-- 
+2.9.3
