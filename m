@@ -1,64 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Oct 2016 11:23:49 +0200
-Subject: [PATCH] ARM: defconfig: update U8500 defconfig
-Message-ID: <1476696229-1964-1-git-send-email-linus.walleij@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 17 Oct 2016 11:34:32 +0200
+Subject: [PATCH 1/2] ARM: oxnas: Add OX820 SMP support
+In-Reply-To: <14513531.isB50DxNJf@wuerfel>
+References: <20161017084303.20078-1-narmstrong@baylibre.com>
+ <20161017084303.20078-2-narmstrong@baylibre.com>
+ <14513531.isB50DxNJf@wuerfel>
+Message-ID: <9124cda0-d16b-0992-2552-8a617aeb5d40@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some config options like perf events and PM are now implicit,
-we have an upstream driver for the AK8974, and we really
-want the HRTIMER software triggers from configfs with some
-of the sensors.
+On 10/17/2016 11:06 AM, Arnd Bergmann wrote:
+> On Monday, October 17, 2016 10:43:02 AM CEST Neil Armstrong wrote:
+>> +
+>> +       /*
+>> +        * This is really belt and braces; we hold unintended secondary
+>> +        * CPUs in the holding pen until we're ready for them.  However,
+>> +        * since we haven't sent them a soft interrupt, they shouldn't
+>> +        * be there.
+>> +        */
+>> +       write_pen_release(cpu);
+>> +
+>> +       /*
+>> +        * Enable GIC cpu interface in CPU Interface Control Register
+>> +        */
+>> +       writel(GIC_CPU_CTRL_ENABLE,
+>> +               gic_cpu_ctrl + GIC_NCPU_OFFSET(cpu) + GIC_CPU_CTRL);
+>> +
+>> +       /*
+>> +        * Send the secondary CPU a soft interrupt, thereby causing
+>> +        * the boot monitor to read the system wide flags register,
+>> +        * and branch to the address found there.
+>> +        */
+>> +
+>> +       arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+>> +       timeout = jiffies + (1 * HZ);
+>> +       while (time_before(jiffies, timeout)) {
+>> +               smp_rmb();
+>> +               if (read_pen_release() == -1)
+>> +                       break;
+>> +
+>> +               udelay(10);
+>> +       }
+>>
+> 
+> This seems to have been copied from plat-versatile, but is really
+> not needed here since you apparently have proper hardware support for
+> starting up the CPUs.
+Yes it seems.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this wherever your usual batch of
-defconfig changes go.
----
- arch/arm/configs/u8500_defconfig | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> Any reason you can't just write to the cpu_ctrl register
+> once and keep going without that whole holding_pen loop
+> and spinlock?
+I suppose but I did not find any good examples except the plat-versatile code.
+I will try some simpler code.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index b7b09189f1c5..e2151a7aaf49 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -4,7 +4,6 @@ CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
--CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
-@@ -26,7 +25,6 @@ CONFIG_CPU_IDLE=y
- CONFIG_ARM_U8500_CPUIDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
--CONFIG_PM=y
- CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
-@@ -108,18 +106,19 @@ CONFIG_DMADEVICES=y
- CONFIG_STE_DMA40=y
- CONFIG_HSEM_U8500=y
- CONFIG_IIO=y
--CONFIG_IIO_BUFFER=y
-+CONFIG_IIO_SW_TRIGGER=y
- CONFIG_IIO_ST_ACCEL_3AXIS=y
- CONFIG_IIO_ST_GYRO_3AXIS=y
- CONFIG_BH1780=y
-+CONFIG_AK8974=y
- CONFIG_IIO_ST_MAGN_3AXIS=y
-+CONFIG_IIO_HRTIMER_TRIGGER=y
- CONFIG_IIO_ST_PRESS=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT2_FS_SECURITY=y
- CONFIG_EXT3_FS=y
--CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
--- 
-2.7.4
+> 
+> 	Arnd
+> 
+
+Neil
