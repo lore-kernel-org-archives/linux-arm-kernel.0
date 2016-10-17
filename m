@@ -1,13 +1,12 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon, 17 Oct 2016 18:34:11 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Increase CMA size
-Message-ID: <20161017163411.11888-1-marex@denx.de>
+Date: Mon, 17 Oct 2016 18:34:33 +0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select the es8328 codec driver
+Message-ID: <20161017163433.11938-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase the CMA size to 64 MiB, otherwise it isn't possible to use
-etnaviv driver on systems with 1920x1080 panel due to insufficient
-memory .
+Select CONFIG_SND_SOC_ES8328 so that we can have audio functional
+by default on Kosagi Novena boards.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
@@ -17,16 +16,16 @@ Cc: Shawn Guo <shawnguo@kernel.org>
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 8ec4dbb..8e66e22 100644
+index 8e66e22..cbe7faf 100644
 --- a/arch/arm/configs/imx_v6_v7_defconfig
 +++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -86,6 +86,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- CONFIG_DMA_CMA=y
-+CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_IMX_WEIM=y
- CONFIG_CONNECTOR=y
- CONFIG_MTD=y
+@@ -257,6 +257,7 @@ CONFIG_SND_IMX_SOC=y
+ CONFIG_SND_SOC_PHYCORE_AC97=y
+ CONFIG_SND_SOC_EUKREA_TLV320=y
+ CONFIG_SND_SOC_IMX_WM8962=y
++CONFIG_SND_SOC_IMX_ES8328=y
+ CONFIG_SND_SOC_IMX_SGTL5000=y
+ CONFIG_SND_SOC_IMX_SPDIF=y
+ CONFIG_SND_SOC_IMX_MC13783=y
 -- 
 2.9.3
