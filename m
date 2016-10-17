@@ -1,41 +1,39 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 17 Oct 2016 09:58:39 -0700
-Subject: [PATCH v4 2/7] ARM: dts: bcm283x: Define standard pinctrl groups
- in the gpio node.
-In-Reply-To: <1474274603-24215-3-git-send-email-kraxel@redhat.com>
-References: <1474274603-24215-1-git-send-email-kraxel@redhat.com>
- <1474274603-24215-3-git-send-email-kraxel@redhat.com>
-Message-ID: <87shrukj40.fsf@eliezer.anholt.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 17 Oct 2016 18:20:59 +0100
+Subject: [PATCH] arm64: sysreg: Fix use of XZR in write_sysreg_s
+Message-ID: <1476724859-18818-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerd Hoffmann <kraxel@redhat.com> writes:
+Commit 8a71f0c656e0 ("arm64: sysreg: replace open-coded mrs_s/msr_s with
+{read,write}_sysreg_s") introduced a write_sysreg_s macro for writing
+to system registers that are not supported by binutils.
 
-> From: Eric Anholt <eric@anholt.net>
->
-> The BCM2835-ARM-Peripherals.pdf documentation specifies what the
-> function selects do for the pins, and there are a bunch of obvious
-> groupings to be made.  With these created, we'll be able to replace
-> bcm2835-rpi.dtsi's main "set all of these pins to alt0" with
-> references to specific groups we want enabled.
->
-> Also add pinctrl groups for emmc and sdhost.
->
-> Based on patches by Eric Anholt <eric@anholt.net>
+Unfortunately, this was implemented with the wrong template (%0 vs %x0),
+so in the case that we are writing a constant 0, we will generate
+invalid instruction syntax and bail with a cryptic assembler error:
 
-I amended this line to "Based on patches by Eric Anholt, with fixups by
-Gerd Hoffmann." to explain why it had me as author but you in signoff.
+  | Error: constant expression required
 
-I had to resolve some conflicts on the way in because apparently you had
-built this against a tree with 14 and 15 already dropped from alt0.  I
-think those resolutions were sufficiently mechanical that it didn't
-merit a respin.
+This patch fixes the template.
 
-Merged the series to bcm2835-dt-next.  Thanks for getting this done!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/8fe3d040/attachment.sig>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index e8d46e8e6079..6c80b3699cb8 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -286,7 +286,7 @@ asm(
+ 
+ #define write_sysreg_s(v, r) do {					\
+ 	u64 __val = (u64)v;						\
+-	asm volatile("msr_s " __stringify(r) ", %0" : : "rZ" (__val));	\
++	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
+ } while (0)
+ 
+ static inline void config_sctlr_el1(u32 clear, u32 set)
+-- 
+2.1.4
