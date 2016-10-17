@@ -1,106 +1,71 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Oct 2016 11:52:53 +0100
-Subject: [PATCHv2 1/4] arm64: dump: Make ptdump debugfs a separate option
-In-Reply-To: <1476311522-15381-2-git-send-email-labbott@redhat.com>
-References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
- <1476311522-15381-2-git-send-email-labbott@redhat.com>
-Message-ID: <20161017105252.GA29095@leverpostej>
+Date: Mon, 17 Oct 2016 11:56:05 +0100
+Subject: [PATCH] ARM64-cpuinfo: Combine six calls for sequence output
+ into one seq_printf() call in c_show()
+In-Reply-To: <83d98772-8872-1b75-a9a5-5f08b8462e18@users.sourceforge.net>
+References: <83d98772-8872-1b75-a9a5-5f08b8462e18@users.sourceforge.net>
+Message-ID: <20161017105605.GB29095@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laura,
+On Sun, Oct 16, 2016 at 09:03:52PM +0200, SF Markus Elfring wrote:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Sun, 16 Oct 2016 20:48:28 +0200
+> 
+> Some data were printed into a sequence by six separate function calls.
+> Print the same data by a single function call instead.
 
-In looking at this, I realised I was confused about ptdump_initialize()
-previously, and now see why we can't decouple the debugfs registration
-of the kernel page tables from the rest of the ptdump init. Sorry for
-the noise on that.
+... why?
 
-Aside from one issue below, this looks good to me.
+Beyond simply having fewer function calls, is there an upside?
 
-On Wed, Oct 12, 2016 at 03:31:59PM -0700, Laura Abbott wrote:
-> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-> index 07b8ed0..7c35689 100644
-> --- a/arch/arm64/include/asm/ptdump.h
-> +++ b/arch/arm64/include/asm/ptdump.h
-> @@ -16,9 +16,10 @@
->  #ifndef __ASM_PTDUMP_H
->  #define __ASM_PTDUMP_H
->  
-> -#ifdef CONFIG_ARM64_PTDUMP
-> +#ifdef CONFIG_ARM64_PTDUMP_CORE
->  
->  #include <linux/mm_types.h>
-> +#include <linux/seq_file.h>
->  
->  struct addr_marker {
->  	unsigned long start_address;
-> @@ -32,13 +33,15 @@ struct ptdump_info {
->  	unsigned long			max_addr;
->  };
->  
-> -int ptdump_register(struct ptdump_info *info, const char *name);
-> -
-> +void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
-> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
-> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
->  #else
-> -static inline int ptdump_register(struct ptdump_info *info, const char *name)
-> +static inline int ptdump_debugfs_register(struct ptdump_info *info,
-> +					const char *name)
->  {
->  	return 0;
->  }
-> -#endif /* CONFIG_ARM64_PTDUMP */
-> +#endif
-
-I think you didn't mean to remove the existing endif here?
-
-It's still needed to guard the CONFIG_ARM64_PTDUMP_CORE case, and the
-new one is needed for the new #ifdef CONFIG_ARM64_PTDUMP_DEBUGFS.
-Without it, I get a build error with this patch atop of v4.9-rc1 with
-CONFIG_ARM64_PTDUMP_DEBUGFS selected:
-
-[mark at leverpostej:~/src/linux]% uselinaro 15.08 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j10 -s
-In file included from arch/arm64/mm/ptdump_debugfs.c:4:0:
-./arch/arm64/include/asm/ptdump.h:16:0: error: unterminated #ifndef
- #ifndef __ASM_PTDUMP_H
- ^
-make[1]: *** [arch/arm64/mm/ptdump_debugfs.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
-
-With that #endif restored, everything works fine. So FWIW, with that:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-[...]
-
-> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-> index 7c75a8d..33d35e8 100644
-> --- a/drivers/firmware/efi/arm-runtime.c
-> +++ b/drivers/firmware/efi/arm-runtime.c
-> @@ -39,7 +39,7 @@ static struct mm_struct efi_mm = {
->  	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
->  };
->  
-> -#ifdef CONFIG_ARM64_PTDUMP
-> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
->  #include <asm/ptdump.h>
->  
->  static struct ptdump_info efi_ptdump_info = {
-> @@ -53,10 +53,9 @@ static struct ptdump_info efi_ptdump_info = {
->  
->  static int __init ptdump_init(void)
->  {
-> -	return ptdump_register(&efi_ptdump_info, "efi_page_tables");
-> +	return ptdump_debugfs_register(&efi_ptdump_info, "efi_page_tables");
->  }
->  device_initcall(ptdump_init);
-> -
->  #endif
-
-For the EFI changes, we'll need an ack from Ard or Matt; this should
-probably be Cc'd to the linux-efi list for that.
+This makes it harder to see the relationship between the format strings
+and their associated data, and makes the code longer.
 
 Thanks,
 Mark.
+
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  arch/arm64/kernel/cpuinfo.c | 19 +++++++++++--------
+>  1 file changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index b3d5b3e..f22687d 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -148,14 +148,17 @@ static int c_show(struct seq_file *m, void *v)
+>  				if (elf_hwcap & (1 << j))
+>  					seq_printf(m, " %s", hwcap_str[j]);
+>  		}
+> -		seq_puts(m, "\n");
+> -
+> -		seq_printf(m, "CPU implementer\t: 0x%02x\n",
+> -			   MIDR_IMPLEMENTOR(midr));
+> -		seq_printf(m, "CPU architecture: 8\n");
+> -		seq_printf(m, "CPU variant\t: 0x%x\n", MIDR_VARIANT(midr));
+> -		seq_printf(m, "CPU part\t: 0x%03x\n", MIDR_PARTNUM(midr));
+> -		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
+> +		seq_printf(m,
+> +			   "\n"
+> +			   "CPU implementer\t: 0x%02x\n"
+> +			   "CPU architecture: 8\n"
+> +			   "CPU variant\t: 0x%x\n"
+> +			   "CPU part\t: 0x%03x\n"
+> +			   "CPU revision\t: %d\n\n",
+> +			   MIDR_IMPLEMENTOR(midr),
+> +			   MIDR_VARIANT(midr),
+> +			   MIDR_PARTNUM(midr),
+> +			   MIDR_REVISION(midr));
+>  	}
+>  
+>  	return 0;
+> -- 
+> 2.10.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
