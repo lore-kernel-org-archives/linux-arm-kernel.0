@@ -1,111 +1,82 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 17 Oct 2016 18:31:58 +0100
-Subject: [PATCH 1/2] ARM: vexpress: refine MCPM smp operations override
- criteria
-In-Reply-To: <20160923140303.GA26672@red-moon>
-References: <20160923130907.4187-1-lorenzo.pieralisi@arm.com>
- <20160923140303.GA26672@red-moon>
-Message-ID: <3d228f5f-8fb8-91f4-4572-4aeda679d36e@arm.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 17 Oct 2016 10:49:10 -0700
+Subject: [PATCH 1/2] i2c: bcm-iproc: constify i2c_adapter_quirks structures
+In-Reply-To: <1476552722-12352-2-git-send-email-Julia.Lawall@lip6.fr>
+References: <1476552722-12352-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1476552722-12352-2-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <cb5bd61e-6dd6-1c39-ed0e-10a38dfa3e5e@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Julia,
 
-
-On 23/09/16 15:03, Lorenzo Pieralisi wrote:
-> On Fri, Sep 23, 2016 at 02:09:06PM +0100, Lorenzo Pieralisi wrote:
->> Current vexpress smp init code detects whether to override the
->> default smp ops with MCPM smp ops by matching the "cci-400"
->> compatible string, in that MCPM requires control over CCI ports
->> to manage low-power states entry/exit.
->>
->> The "cci-400" compatible string check is a necessary but not
->> sufficient condition for MCPM to work, because the cci-400
->> can be made visible to the kernel, but firmware can nonetheless
->> disable non-secure CCI ports control, while still allowing PMU
->> access; if booted in non-secure world, the kernel would still
->> blindly override smp operations with MCPM operations, resulting
->> in kernel faults when the CCI ports programming interface is
->> accessed from non-secure world.
->>
->> This means that the "cci-400" compatible string check would
->> result in a false positive in systems that eg boot in HYP mode,
->> where CCI ports non-secure access is explicitly not allowed,
->> and it is reported in the respective device tree nodes with
->> CCI ports marked as disabled.
->>
->> Refactor the smp operations initialization to make sure that
->> the kernel is actually allowed to take control over CCI ports
->> (by enabling MCPM smp operations) before overriding default
->> vexpress smp operations.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Liviu Dudau <liviu.dudau@arm.com>
->> Cc: Sudeep Holla <sudeep.holla@arm.com>
->> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/mach-vexpress/platsmp.c | 31 ++++++++++++++++++++++++-------
->>  1 file changed, 24 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
->> index 8b8d072..6cfd782 100644
->> --- a/arch/arm/mach-vexpress/platsmp.c
->> +++ b/arch/arm/mach-vexpress/platsmp.c
->> @@ -26,17 +26,34 @@
->>  bool __init vexpress_smp_init_ops(void)
->>  {
->>  #ifdef CONFIG_MCPM
->> +	int cpu;
->> +	struct device_node *cpu_node, *cci_node;
->> +
->>  	/*
->> -	 * The best way to detect a multi-cluster configuration at the moment
->> -	 * is to look for the presence of a CCI in the system.
->> +	 * The best way to detect a multi-cluster configuration
->> +	 * is to detect if the kernel can take over CCI ports
->> +	 * control. Loop over possible CPUs and check if CCI
->> +	 * port control is available.
->>  	 * Override the default vexpress_smp_ops if so.
->>  	 */
->> -	struct device_node *node;
->> -	node = of_find_compatible_node(NULL, NULL, "arm,cci-400");
->> -	if (node && of_device_is_available(node)) {
->> -		mcpm_smp_set_ops();
->> -		return true;
->> +	for_each_possible_cpu(cpu) {
->> +		bool available;
->> +
->> +		cpu_node = of_get_cpu_node(cpu, NULL);
->> +		if (WARN(!cpu_node, "Missing cpu device node!"))
->> +			return false;
->> +
->> +		cci_node = of_parse_phandle(cpu_node, "cci-control-port", 0);
->> +		available = cci_node && of_device_is_available(cci_node);
->> +		of_node_put(cci_node);
->> +		of_node_put(cpu_node);
->> +
->> +		if (!available)
->> +			return false;
->>  	}
->> +
->> +	mcpm_smp_set_ops();
->> +	return true;
->>  #endif
->>  	return false;
+On 10/15/2016 10:32 AM, Julia Lawall wrote:
+> Check for i2c_adapter_quirks structures that are only stored in the
+> quirks field of an i2c_adapter structure.  This field is declared
+> const, so i2c_adapter_quirks structures that have this property can be
+> declared as const also.
 >
-> For the records, while moving the code around I missed I was ending
-> up with this idiotic double return, I have already reworked the patch
-> and will squash changes in the final version if we agree on the bulk of
-> the code.
+> The semantic patch that makes this change is as follows:
+> (http://coccinelle.lip6.fr/)
+>
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct i2c_adapter_quirks i at p = { ... };
+>
+> @ok@
+> identifier r.i;
+> struct i2c_adapter e;
+> position p;
+> @@
+> e.quirks = &i at p;
+>
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> struct i2c_adapter_quirks e;
+> @@
+> e at i@p
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct i2c_adapter_quirks i = { ... };
+> // </smpl>
+>
+> The effect on the layout of the .o file is shown by the following
+> output of the size command, first before then after the
+> transformation:
+>
+>    text    data     bss     dec     hex filename
+>    3458     744       8    4210    1072 drivers/i2c/busses/i2c-bcm-iproc.o
+>    3490     720       8    4218    107a drivers/i2c/busses/i2c-bcm-iproc.o
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+>  drivers/i2c/busses/i2c-bcm-iproc.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
+> index 326b3db..318df55 100644
+> --- a/drivers/i2c/busses/i2c-bcm-iproc.c
+> +++ b/drivers/i2c/busses/i2c-bcm-iproc.c
+> @@ -395,7 +395,7 @@ static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
+>  	.functionality = bcm_iproc_i2c_functionality,
+>  };
+>
+> -static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
+> +static const struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
+>  	/* need to reserve one byte in the FIFO for the slave address */
+>  	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
+>  };
 >
 
-I applied both patches to [1] with the fix for the above issue. Let me
-know if that's fine. I have tested both hyp mode boot and SVC mode +
-MCPM boot with latest u-boot by just fliping a bit in the firmware
-(board.txt) without recompiling the kernel.
+Change looks good. Thanks.
 
--- 
-Regards,
-Sudeep
-
-[1] git.kernel.org/sudeep.holla/linux/h/vexpress/for-next
+Acked-by: Ray Jui <ray.jui@broadcom.com>
