@@ -1,35 +1,51 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 17 Oct 2016 14:55:40 +0000
-Subject: [PATCH -next] PCI: layerscape: Remove redundant dev_err call in
- ls_pcie_probe()
-Message-ID: <1476716140-30608-1-git-send-email-weiyj.lk@gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 17 Oct 2016 15:56:49 +0100
+Subject: [PATCH v2] arm64: kernel: numa: fix ACPI boot cpu numa node mapping
+Message-ID: <20161017145649.6189-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Commit 7ba5f605f3a0 ("arm64/numa: remove the limitation that cpu0 must
+bind to node0") removed the numa cpu<->node mapping restriction whereby
+logical cpu 0 always corresponds to numa node 0; removing the
+restriction was correct, in that it does not really exist in practice
+but the commit only updated the early mapping of logical cpu 0 to its
+real numa node for the DT boot path, missing the ACPI one, leading to
+boot failures on ACPI systems owing to missing cpu<->node map for
+logical cpu 0.
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
+Fix the issue by updating the ACPI boot path with code that carries out
+the early cpu<->node mapping also for the boot cpu (ie cpu 0), mirroring
+what is currently done in the DT boot path.
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Fixes: 7ba5f605f3a0 ("arm64/numa: remove the limitation that cpu0 must bind to node0")
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Tested-by: Laszlo Ersek <lersek@redhat.com>
+Reported-by: Laszlo Ersek <lersek@redhat.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Laszlo Ersek <lersek@redhat.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Andrew Jones <drjones@redhat.com>
+Cc: Zhen Lei <thunder.leizhen@huawei.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/pci/host/pci-layerscape.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+v1 -> v2
+	- Updated commit log to reflect boot failures set-ups
+ 
+ arch/arm64/kernel/smp.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 2cb7315..bbd3d23 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -251,10 +251,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d3f151c..8507703 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -544,6 +544,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 			return;
+ 		}
+ 		bootcpu_valid = true;
++		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
+ 		return;
+ 	}
  
- 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
- 	pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
--	if (IS_ERR(pcie->pp.dbi_base)) {
--		dev_err(dev, "missing *regs* space\n");
-+	if (IS_ERR(pcie->pp.dbi_base))
- 		return PTR_ERR(pcie->pp.dbi_base);
--	}
- 
- 	pcie->drvdata = match->data;
- 	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
+-- 
+2.10.0
