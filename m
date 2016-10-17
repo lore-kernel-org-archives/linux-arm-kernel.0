@@ -1,31 +1,54 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Mon, 17 Oct 2016 14:53:05 +0200
-Subject: Regression: usb serial gadget on sama5d3 broken
-Message-ID: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 17 Oct 2016 21:59:48 +0900
+Subject: [PATCH] usb: ehci-platform: increase EHCI_MAX_RSTS to 4
+In-Reply-To: <20161017123043.GA15142@kroah.com>
+References: <1476702719-10337-1-git-send-email-yamada.masahiro@socionext.com>
+ <20161017123043.GA15142@kroah.com>
+Message-ID: <CAK7LNARfi29fzERqwr46z7rVW1S7k85q349WR_3RFxWE6tVTWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Greg,
 
-I'm suffering from a regression while using the usb gadget port on the
-sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
 
-I get this message when I try to connect:
-udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
+2016-10-17 21:30 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
+> On Mon, Oct 17, 2016 at 08:11:59PM +0900, Masahiro Yamada wrote:
+>> Socionext LD11 SoC (arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi)
+>> needs to handle 4 reset lines for EHCI.
+>
+> Why?  What makes it different from other EHCI implementations?
+>
+> thanks,
+>
+> greg k-h
 
-A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
-USB endpoint nodes".
 
-And indeed, reverting that commit on top of v4.9-rc1 fixes things,
-although that doesn't look like the best of fixes...
+This is a generic EHCI driver, but the number of clocks/resets
+are SoC-specific.
 
-BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
-somewhere in the overlayfs area. I hope I will never ever need to bisect
-in the v4.6..v4.7 area again. This was the second time, the first time
-I was chasing a gpio interrupt bug, but I never found out what was wrong
-and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
-was bad, it was just too painful to look for things that already seemed
-fixed.
 
-Cheers,
-Peter
+
+The following patch you picked up will remind you something?
+
+
+
+commit 73577d61799e8d8bb7d69a9acdc54923e5998138
+Author: Icenowy Zheng <icenowy@aosc.xyz>
+Date:   Fri Aug 12 11:06:22 2016 +0800
+
+    ehci-platform: add the max clock number to 4
+
+    Allwinner A64 EHCI requires 4 clocks to be enabled.
+
+    Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+    Acked-by: Alan Stern <stern@rowland.harvard.edu>
+    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
