@@ -1,67 +1,28 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 17 Oct 2016 19:47:38 +0300
-Subject: =?UTF-8?B?NC43LjYtPjQuOC4xIFBvc3NpYmxlIHJlZ3Jlc3Npb24=?=
-Message-ID: <1476722858.483756177@f140.i.mail.ru>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 17 Oct 2016 17:51:46 +0100
+Subject: [PATCH] ARM: dts: mps2: remove skeleton.dtsi include and fix unit
+ address warnings
+In-Reply-To: <1476704849-24039-1-git-send-email-vladimir.murzin@arm.com>
+References: <1476704849-24039-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <8b698799-6c7a-d20a-6e54-ddd9eb329369@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-After a kernel update from 4.7.6 to 4.8.1, the bug appear once kernel run "init".
-...
-VFS: Mounted root (squashfs filesystem) readonly on device 31:3.
-devtmpfs: mounted
-Freeing unused kernel memory: 144K (c04da000 - c04fe000)
-This architecture does not have kernel memory protection.
-
-Please press Enter to activate this console.
-starting pid 448, tty '': '-/bin/ash'
-Unable to handle kernel NULL pointer dereference at virtual address 00000008
-pgd = c3b58000
-[00000008] *pgd=800000000, *pte=00000000, *ppte=feff4140
-Internal error: Oops: 63c11817 [#1] PREEMPT ARM
-CPU: 0 PID: 448 Comm: ash Not tainted 4.8.1+ #1
-Hardware name: Cirrus Logic CLPS711X (Device Tree Support)
-task: c39e03a0 ti: c3b4e000 task.ti: c3b4e000
-PC is at __dabt_svc+0x4c/0x60
-LR is at do_page_fault+0x144/0x2ac
-pc : [<c000d3ac>]    lr : [<c000fcec>]    psr: 60000093
-sp : c3b4fe6c  ip : 00000001  fp : b6f1bf88
-r10: c387a5a0  r9 : 00000000  r8 : e4e0e001
-r7 : bee3ef83  r6 : 00100000  r5 :  80000013 r4 : c022fcf8
-r3 : 00000000  r2 : 00000008  r1 : bf000000  r0 : 00000000
-Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 0000217f  Table: c3b58055  DAC: 00000055
-Process ash (pid: 448, stack limit = 0xc3b4e190)
-Stack: (0xc3b4fe6c to 0xc3b50000)
-fe60:                            bee3ef83 c05168d1 ffffffff 00000000 c3adfe80
-fe80: c3a03300 00000000 c3b4fed0 c3a03400 bee3ef83 c387a5a0 b6f1bf88 00000001
-fea0: c3b4febc 00000076 c022fcf8  80000013 ffffffff 0000003f bf000000 bee3ef83
-fec0: 00000004 00000000 c3adfe80 c00e432c 00000812 00000005 00000001 00000006
-fee0: b6f1b000 00000000 00010000 0003c944 0004d000 0004d439 00010000 b6f1b000
-ff00: 00000005 00000000 00015ecc c3b4fed0 0000000a 00000000 00000000 c00a1dc0
-ff20: befff000 c3a03300 c3b4e000 c0507cd8 c0508024 fffffff8 c3a03300 00000000
-ff40: c0516a58 c00a35bc c39e03a0 000001c0 bea84ce8 0004e008 c3b3a000 c00a3ac0
-ff60: c3b40374 c3b3a000 bea84d11 00000000 c0500188 bea84d11 bea84ce8 00000001
-ff80: 0000000b c000a304 c3b4e000 00000000 bea84ce4 c00a3cd0 00000000 bea84d11
-ffa0: bea84ce8 c000a160 bea84d11 bea84ce8 bea84d11 bea84ce8 0004e008 0004d450
-ffc0: bea84d11 bea84ce8 00000001 0000000b b6f45ee4 00000000 b6f5ff70 bea84ce4
-ffe0: b6f2f130 bea84cb0 b6f2f194 b6ef29f4 a0000010 bea84d11 02c7cffa 02c7cffd
-[<c000d3ac>] (__dabt_svc) from [<c022fcf8>] (__copy_to_user_std+0xf8/0x330)
-[<c022fcf8>] (__copy_to_user_std) from [<c00e432c>] (load_elf_binary+0x920/0x107c)
-[<c00e432c>] (load_elf_binary) from [<c00a35bc>] (search_binary_handler+0x80/0x16c)
-[<c00a35bc>] (search_binary_handler) from [<c00a3ac0>] (do_execveat_common+0x418/0x600)
-[<c00a3ac0>] (do_execveat_common) from [<c00a3cd0>] (do_execve+0x28/0x30)
-[<c00a3cd0>] (do_execve) from [<c000a160>] (ret_fast_syscall+0x0/0x30)
-Code: e1a0200d eb00136b e321f093 e59d104c (e5891008)
----[ end trace 4b4f8086ebef98c5 ]---
-process '-/bin/ash' (pid 448) exited. Scheduling for restart.
 
 
-Git-bisect found a bad commit: "ARM: save and reset the address limit when entering an exception"
-Reverting this commit on top of 4.8.1 solve this problem.
+On 17/10/16 12:47, Vladimir Murzin wrote:
+> Removale of skeleton.dtsi allows us also to fix the following
+> warning from the dts compiler:
+>   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+>
+> by adding proper unit addresses to the memory nodes.
+>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Can anyone have similar problems? Any ideas?
+It's always better to cc device-tree list, anyways applied this to [1].
 
-Thanks.
----
+--
+Regards,
+Sudeep
+
+[1] git.kernel.org/sudeep.holla/linux/h/vexpress-dt/for-next
