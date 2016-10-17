@@ -1,82 +1,49 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 17 Oct 2016 10:49:10 -0700
-Subject: [PATCH 1/2] i2c: bcm-iproc: constify i2c_adapter_quirks structures
-In-Reply-To: <1476552722-12352-2-git-send-email-Julia.Lawall@lip6.fr>
-References: <1476552722-12352-1-git-send-email-Julia.Lawall@lip6.fr>
- <1476552722-12352-2-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <cb5bd61e-6dd6-1c39-ed0e-10a38dfa3e5e@broadcom.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 17 Oct 2016 19:50:48 +0200
+Subject: Regression: usb serial gadget on sama5d3 broken
+In-Reply-To: <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
+References: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
+ <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
+Message-ID: <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+On 2016-10-17 16:54, Nicolas Ferre wrote:
+> Le 17/10/2016 ? 14:53, Peter Rosin a ?crit :
+>> Hi!
+>>
+>> I'm suffering from a regression while using the usb gadget port on the
+>> sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
+>>
+>> I get this message when I try to connect:
+>> udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
+>>
+>> A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
+>> USB endpoint nodes".
+>>
+>> And indeed, reverting that commit on top of v4.9-rc1 fixes things,
+>> although that doesn't look like the best of fixes...
+>>
+>> BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
+>> somewhere in the overlayfs area. I hope I will never ever need to bisect
+>> in the v4.6..v4.7 area again. This was the second time, the first time
+>> I was chasing a gpio interrupt bug, but I never found out what was wrong
+>> and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
+>> was bad, it was just too painful to look for things that already seemed
+>> fixed.
+> 
+> I guess that you are referring to the regression listed here:
+> https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1239220.html
+> 
+> The patch is available and will hopefully land in an official kernel
+> soon (4.8.1) as said by Felipe and Greg.
+> 
+> Sorry for the inconvenience. Best regards,
 
-On 10/15/2016 10:32 AM, Julia Lawall wrote:
-> Check for i2c_adapter_quirks structures that are only stored in the
-> quirks field of an i2c_adapter structure.  This field is declared
-> const, so i2c_adapter_quirks structures that have this property can be
-> declared as const also.
->
-> The semantic patch that makes this change is as follows:
-> (http://coccinelle.lip6.fr/)
->
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct i2c_adapter_quirks i at p = { ... };
->
-> @ok@
-> identifier r.i;
-> struct i2c_adapter e;
-> position p;
-> @@
-> e.quirks = &i at p;
->
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct i2c_adapter_quirks e;
-> @@
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct i2c_adapter_quirks i = { ... };
-> // </smpl>
->
-> The effect on the layout of the .o file is shown by the following
-> output of the size command, first before then after the
-> transformation:
->
->    text    data     bss     dec     hex filename
->    3458     744       8    4210    1072 drivers/i2c/busses/i2c-bcm-iproc.o
->    3490     720       8    4218    107a drivers/i2c/busses/i2c-bcm-iproc.o
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
->
-> ---
->  drivers/i2c/busses/i2c-bcm-iproc.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-bcm-iproc.c b/drivers/i2c/busses/i2c-bcm-iproc.c
-> index 326b3db..318df55 100644
-> --- a/drivers/i2c/busses/i2c-bcm-iproc.c
-> +++ b/drivers/i2c/busses/i2c-bcm-iproc.c
-> @@ -395,7 +395,7 @@ static uint32_t bcm_iproc_i2c_functionality(struct i2c_adapter *adap)
->  	.functionality = bcm_iproc_i2c_functionality,
->  };
->
-> -static struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
-> +static const struct i2c_adapter_quirks bcm_iproc_i2c_quirks = {
->  	/* need to reserve one byte in the FIFO for the slave address */
->  	.max_read_len = M_TX_RX_FIFO_SIZE - 1,
->  };
->
+Ok, I tried "usb: gadget: udc: atmel: fix endpoint name" and it fixes
+things for me too. But shouldn't the memory for the now dynamic name be
+allocated with devm_kasprintf instead of that plain kasprint? If you
+are pedantic...
 
-Change looks good. Thanks.
-
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+Cheers,
+Peter
