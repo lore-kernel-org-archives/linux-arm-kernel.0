@@ -1,14 +1,14 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 17 Oct 2016 16:46:47 +0100
-Subject: [PATCH v7 REPOST 6/9] arm64,
- dts: add Juno r1 cpu capacity-dmips-mhz information
+Date: Mon, 17 Oct 2016 16:46:46 +0100
+Subject: [PATCH v7 REPOST 5/9] arm64,
+ dts: add Juno cpu capacity-dmips-mhz information
 In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
 References: <20161017154650.18779-1-juri.lelli@arm.com>
-Message-ID: <20161017154650.18779-7-juri.lelli@arm.com>
+Message-ID: <20161017154650.18779-6-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Juno r1 cpu capacity-dmips-mhz information.
+Add Juno cpu capacity-dmips-mhz information.
 
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Pawel Moll <pawel.moll@arm.com>
@@ -25,18 +25,25 @@ Cc: Olof Johansson <olof@lixom.net>
 Cc: Robin Murphy <robin.murphy@arm.com>
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
+
+Changes from v1:
+  - capacity-scale removed
+
+Changes from v4:
+  - binding changed to capacity-dmips-mhz
 
 Changes from v6:
-  - new patch as per off-line discussion with Sudeep
+  - s/bindings// in changelog
 ---
- arch/arm64/boot/dts/arm/juno-r1.dts | 6 ++++++
+ arch/arm64/boot/dts/arm/juno.dts | 6 ++++++
  1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index 123a58b29cbd..3be8a3ef671c 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index a7270eff6939..6b4135e9cfe5 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
 @@ -90,6 +90,7 @@
  			next-level-cache = <&A57_L2>;
  			clocks = <&scpi_dvfs 0>;
