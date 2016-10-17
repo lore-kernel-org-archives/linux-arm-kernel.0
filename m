@@ -1,113 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Oct 2016 19:38:07 +0100
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-Message-ID: <20161017183806.GG5601@arm.com>
+From: oss@buserror.net (Scott Wood)
+Date: Mon, 17 Oct 2016 13:42:23 -0500
+Subject: [PATCH] clk: qoriq: Don't allow CPU clocks higher than starting value
+Message-ID: <1476729743-15563-1-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The boot-time frequency of a CPU is considered its rated maximum, as we
+have no other source of such information.  However, this was previously
+only used for chips with 80% restrictions on secondary PLLs.  This
+usually wasn't a problem because most chips/configs boot with a divider
+of /1, with other dividers being used only for dynamic frequency
+reduction.  However, at least one config (LS1021A at less than 1 GHz)
+uses a different divider for top speed.  This was causing cpufreq to set
+a frequency beyond the chip's rated speed.
 
-I'm seeing an arm64 build failure with -rc1 and GCC trunk, although I
-believe that the new compiler behaviour at the heart of the problem
-has the potential to affect other architectures and other pieces of
-kernel code relying on dead-code elimination to remove deliberately
-undefined functions.
+This is fixed by applying a 100%-of-initial-speed limit to all CPU PLLs,
+similar to the existing 80% limit that only applied to some.
 
-The failure looks like:
+Signed-off-by: Scott Wood <oss@buserror.net>
+Cc: stable at vger.kernel.org
+---
+ drivers/clk/clk-qoriq.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-  | drivers/built-in.o: In function `armada_3700_add_composite_clk':
-  |
-  | linux/drivers/clk/mvebu/armada-37xx-periph.c:351:
-  | undefined reference to `____ilog2_NaN'
-  |
-  | linux/drivers/clk/mvebu/armada-37xx-periph.c:351:(.text+0xc72e0):
-  | relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-  | `____ilog2_NaN'
-  |
-  | make: *** [vmlinux] Error 1
-
-and if we look at the source for armada_3700_add_composite_clk, we see
-that this is caused by:
-
-  int table_size = 0;
-
-  rate->reg = reg + (u64)rate->reg;
-  for (clkt = rate->table; clkt->div; clkt++)
-	 table_size++;
-  rate->width = order_base_2(table_size);
-
-order_base_2 calls ilog2, which has the ____ilog2_NaN call:
-
-#define ilog2(n)				\
-(						\
-	__builtin_constant_p(n) ? (		\
-		(n) < 1 ? ____ilog2_NaN() :	\
-
-This is because we're in a curious case where GCC has emitted a
-special-cased version of armada_3700_add_composite_clk, with table_size
-effectively constant-folded as 0. Whilst we shouldn't see this in a
-non-buggy kernel (hence the deliberate call to the undefined function
-____ilog2_NaN), it means that the final link fails because we have a
-____ilog2_NaN in the code, with a runtime check on table_size.
-
-In other words, __builtin_constant_p appears to be weaker than we've
-been assuming. Talking to the compiler guys here, this is due to the
-"jump-threading" optimisation pass, so the patch below disables that.
-
-A simpler example is:
-
-int foo();
-int bar();
-
-int count(int *argc)
-{
-	int table_size = 0;
-
-	for (; *argc; argc++)
-		table_size++;
-
-	if (__builtin_constant_p(table_size))
-		return table_size == 0 ? foo() : bar();
-
-	return bar();
-}
-
-which compiles to:
-
-count:
-	ldr	w0, [x0]
-	cbz	w0, .L4
-	b	bar
-	.p2align 3
-.L4:
-	b	foo
-
-and, with the "optimisation" disabled:
-
-count:
-	b	bar
-
-Thoughts? It feels awfully fragile disabling passes like this, but with
-GCC transforming the code like this, I can't immediately think of a way
-to preserve the intended behaviour of the code.
-
-Will
-
---->8
-
-diff --git a/Makefile b/Makefile
-index 512e47a53e9a..750873d6d11e 100644
---- a/Makefile
-+++ b/Makefile
-@@ -641,6 +641,11 @@ endif
- # Tell gcc to never replace conditional load with a non-conditional one
- KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index 20b1055..80ae2a5 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -700,6 +700,7 @@ static struct clk * __init create_mux_common(struct clockgen *cg,
+ 					     struct mux_hwclock *hwc,
+ 					     const struct clk_ops *ops,
+ 					     unsigned long min_rate,
++					     unsigned long max_rate,
+ 					     unsigned long pct80_rate,
+ 					     const char *fmt, int idx)
+ {
+@@ -728,6 +729,8 @@ static struct clk * __init create_mux_common(struct clockgen *cg,
+ 			continue;
+ 		if (rate < min_rate)
+ 			continue;
++		if (rate > max_rate)
++			continue;
  
-+# Stop gcc from converting switches into a form that defeats dead code
-+# elimination and can subsequently lead to calls to intentionally
-+# undefined functions appearing in the final link.
-+KBUILD_CFLAGS	+= $(call cc-option,--param=max-fsm-thread-path-insns=1)
-+
- include scripts/Makefile.gcc-plugins
+ 		parent_names[j] = div->name;
+ 		hwc->parent_to_clksel[j] = i;
+@@ -759,7 +762,7 @@ static struct clk * __init create_one_cmux(struct clockgen *cg, int idx)
+ 	struct mux_hwclock *hwc;
+ 	const struct clockgen_pll_div *div;
+ 	unsigned long plat_rate, min_rate;
+-	u64 pct80_rate;
++	u64 max_rate, pct80_rate;
+ 	u32 clksel;
  
- ifdef CONFIG_READABLE_ASM
+ 	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
+@@ -787,8 +790,8 @@ static struct clk * __init create_one_cmux(struct clockgen *cg, int idx)
+ 		return NULL;
+ 	}
+ 
+-	pct80_rate = clk_get_rate(div->clk);
+-	pct80_rate *= 8;
++	max_rate = clk_get_rate(div->clk);
++	pct80_rate = max_rate * 8;
+ 	do_div(pct80_rate, 10);
+ 
+ 	plat_rate = clk_get_rate(cg->pll[PLATFORM_PLL].div[PLL_DIV1].clk);
+@@ -798,7 +801,7 @@ static struct clk * __init create_one_cmux(struct clockgen *cg, int idx)
+ 	else
+ 		min_rate = plat_rate / 2;
+ 
+-	return create_mux_common(cg, hwc, &cmux_ops, min_rate,
++	return create_mux_common(cg, hwc, &cmux_ops, min_rate, max_rate,
+ 				 pct80_rate, "cg-cmux%d", idx);
+ }
+ 
+@@ -813,7 +816,7 @@ static struct clk * __init create_one_hwaccel(struct clockgen *cg, int idx)
+ 	hwc->reg = cg->regs + 0x20 * idx + 0x10;
+ 	hwc->info = cg->info.hwaccel[idx];
+ 
+-	return create_mux_common(cg, hwc, &hwaccel_ops, 0, 0,
++	return create_mux_common(cg, hwc, &hwaccel_ops, 0, ULONG_MAX, 0,
+ 				 "cg-hwaccel%d", idx);
+ }
+ 
+-- 
+2.7.4
