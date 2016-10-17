@@ -1,51 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 17 Oct 2016 15:56:49 +0100
-Subject: [PATCH v2] arm64: kernel: numa: fix ACPI boot cpu numa node mapping
-Message-ID: <20161017145649.6189-1-lorenzo.pieralisi@arm.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 17 Oct 2016 14:57:22 +0000
+Subject: [PATCH -next] PCI: rockchip: Add missing of_node_put() in
+ rockchip_pcie_init_irq_domain()
+Message-ID: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7ba5f605f3a0 ("arm64/numa: remove the limitation that cpu0 must
-bind to node0") removed the numa cpu<->node mapping restriction whereby
-logical cpu 0 always corresponds to numa node 0; removing the
-restriction was correct, in that it does not really exist in practice
-but the commit only updated the early mapping of logical cpu 0 to its
-real numa node for the DT boot path, missing the ACPI one, leading to
-boot failures on ACPI systems owing to missing cpu<->node map for
-logical cpu 0.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Fix the issue by updating the ACPI boot path with code that carries out
-the early cpu<->node mapping also for the boot cpu (ie cpu 0), mirroring
-what is currently done in the DT boot path.
+This node pointer is returned by of_get_next_child() with refcount
+incremented in this function. of_node_put() on it before exitting
+this function on error.
 
-Fixes: 7ba5f605f3a0 ("arm64/numa: remove the limitation that cpu0 must bind to node0")
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Laszlo Ersek <lersek@redhat.com>
-Reported-by: Laszlo Ersek <lersek@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Laszlo Ersek <lersek@redhat.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Andrew Jones <drjones@redhat.com>
-Cc: Zhen Lei <thunder.leizhen@huawei.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+This is detected by Coccinelle semantic patch.
+
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
-v1 -> v2
-	- Updated commit log to reflect boot failures set-ups
- 
- arch/arm64/kernel/smp.c | 1 +
+ drivers/pci/host/pcie-rockchip.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d3f151c..8507703 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -544,6 +544,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
- 			return;
- 		}
- 		bootcpu_valid = true;
-+		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
- 		return;
+diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+index e0b22da..ab88859 100644
+--- a/drivers/pci/host/pcie-rockchip.c
++++ b/drivers/pci/host/pcie-rockchip.c
+@@ -949,6 +949,7 @@ static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
+ 						    &intx_domain_ops, rockchip);
+ 	if (!rockchip->irq_domain) {
+ 		dev_err(dev, "failed to get a INTx IRQ domain\n");
++		of_node_put(intc);
+ 		return -EINVAL;
  	}
- 
--- 
-2.10.0
