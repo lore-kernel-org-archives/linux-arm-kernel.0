@@ -1,219 +1,303 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 17 Oct 2016 11:14:22 +0300
-Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <6bed26dc-f4c1-7f0d-36b6-d7d5fcbf0da9@marvell.com>
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
- <ecde22fd342b0b2001ff5676ea1e67b7226d6946.1475853198.git-series.gregory.clement@free-electrons.com>
- <1b015f16-aa37-591c-3299-9431f6e82cce@intel.com>
- <4009a66b-1e09-0780-b7c1-128ff1401b5f@marvell.com>
- <7939a923-eb97-ca44-ac4c-f0a3cd4f45bc@intel.com>
- <6bed26dc-f4c1-7f0d-36b6-d7d5fcbf0da9@marvell.com>
-Message-ID: <ec7a2658-5af3-bff8-3cb8-adb72406df5c@intel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 17 Oct 2016 10:25:29 +0200
+Subject: [PATCH v4 2/8] scpi: Add alternative legacy structures, functions
+ and macros
+In-Reply-To: <7bf3b68c-19aa-85c3-8b20-66b7380eaf3f@arm.com>
+References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
+ <1475652814-30619-3-git-send-email-narmstrong@baylibre.com>
+ <7bf3b68c-19aa-85c3-8b20-66b7380eaf3f@arm.com>
+Message-ID: <ecdedaf0-a4a4-9881-1068-9f186f7ac6af@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/10/16 08:38, Ziji Hu wrote:
-> Hi Adrian,
+On 10/10/2016 04:36 PM, Sudeep Holla wrote:
+> Hi Neil,
 > 
-> On 2016/10/12 21:07, Adrian Hunter wrote:
->> On 12/10/16 14:58, Ziji Hu wrote:
->>> Hi Adrian,
->>>
->>> 	Thank you very much for your review.
->>> 	I will firstly fix the typo.
->>>
->>> On 2016/10/11 20:37, Adrian Hunter wrote:
-> <snip>
->>>>> +
->>>>> +static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
->>>>> +					     struct mmc_ios *ios)
->>>>> +{
->>>>> +	struct sdhci_host *host = mmc_priv(mmc);
->>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
->>>>> +
->>>>> +	/*
->>>>> +	 * Before SD/SDIO set signal voltage, SD bus clock should be
->>>>> +	 * disabled. However, sdhci_set_clock will also disable the Internal
->>>>> +	 * clock in mmc_set_signal_voltage().
->>>>> +	 * If Internal clock is disabled, the 3.3V/1.8V bit can not be updated.
->>>>> +	 * Thus here manually enable internal clock.
->>>>> +	 *
->>>>> +	 * After switch completes, it is unnecessary to disable internal clock,
->>>>> +	 * since keeping internal clock active obeys SD spec.
->>>>> +	 */
->>>>> +	enable_xenon_internal_clk(host);
->>>>> +
->>>>> +	if (priv->card_candidate) {
->>>>
->>>> mmc_power_up() calls __mmc_set_signal_voltage() calls
->>>> host->ops->start_signal_voltage_switch so priv->card_candidate could be an
->>>> invalid reference to an old card.
->>>>
->>>> So that's not going to work if the card changes - not only for removable
->>>> cards but even for eMMC if init fails and retries.
->>>>
->>> 	As you point out, this piece of code have defects, even though it actually works on Marvell multiple platforms, unless eMMC card is removable.
->>>
->>> 	I can add a property to explicitly indicate eMMC type in DTS.
->>> 	Then card_candidate access can be removed here.
->>> 	Does it sounds more reasonable to you?
->>
->> Sure
->>
->>>
->>>>> +		if (mmc_card_mmc(priv->card_candidate))
->>>>> +			return xenon_emmc_signal_voltage_switch(mmc, ios);
->>>>
->>>> So if all you need to know is whether it is a eMMC, why can't DT tell you?
->>>>
->>> 	I can add an eMMC type property in DTS, to remove the card_candidate access here.
->>>
->>>>> +	}
->>>>> +
->>>>> +	return sdhci_start_signal_voltage_switch(mmc, ios);
->>>>> +}
->>>>> +
->>>>> +/*
->>>>> + * After determining which slot is used for SDIO,
->>>>> + * some additional task is required.
->>>>> + */
->>>>> +static void xenon_init_card(struct mmc_host *mmc, struct mmc_card *card)
->>>>> +{
->>>>> +	struct sdhci_host *host = mmc_priv(mmc);
->>>>> +	u32 reg;
->>>>> +	u8 slot_idx;
->>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
->>>>> +
->>>>> +	/* Link the card for delay adjustment */
->>>>> +	priv->card_candidate = card;
->>>>
->>>> You really need a better way to get the card.  I suggest you take up the
->>>> issue with Ulf.  One possibility is to have mmc core set host->card = card
->>>> much earlier.
->>>>
->>> 	Could you please tell me if any issue related to card_candidate still exists, after the card_candidate is removed from xenon_start_signal_voltage_switch() in above?
->>> 	It seems that when init_card is called, the structure card has already been updated and stable in MMC/SD/SDIO initialization sequence.
->>> 	May I keep it here?
->>
->> It works by accident rather than by design.  We can do better.
->>
-> 	Could you please tell me some details which are satisfied about card_candidate?
+> Sorry, I could not reply to your response on v3. Anyways I will review v4.
 > 
-> 	I must admit that card_candidate in xenon_start_signal_voltage_switch() is imperfect.
-> 	But card_candidate in init_card() and later in set_ios() work by design, rather than by accident. We did a lot of tests on several platforms.
-> 	
-> 	The structure mmc_card passed in here is a stable one. Thus in my very own opinion, it is safe and stable to use mmc_card here.
-> 	card_candidate is used only in card initialization. It is not active in later transfers after initialization is done.
-> 	It will always updated with mmc_card in next card initialization.
+> On 05/10/16 08:33, Neil Armstrong wrote:
+>> This patch adds support for the Legacy SCPI protocol in early JUNO versions and
+>> shipped Amlogic ARMv8 based SoCs. Some Rockchip SoC are also known to use this
+>> version of protocol with extended vendor commands
+>> .
+>> In order to support the legacy SCPI protocol variant, add back the structures
+>> and macros that varies against the final specification.
+>> Then add indirection table for legacy commands.
+>> Finally Add bitmap field for channel selection since the Legacy protocol mandates to
+>> send a selected subset of the commands on the high priority channel instead of the
+>> low priority channel.
+>>
+>> The message sending path differs from the final SCPI procotocol because the
+>> Amlogic SCP firmware always reply 1 instead of a special value containing the command
+>> byte and replied rx data length.
+>> For this reason commands queuing cannot be used and we assume the reply command is
+>> the head of the rx_pending list since we ensure sequential command sending with a
+>> separate dedicated mutex.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/firmware/arm_scpi.c | 221 +++++++++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 199 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index 498afa0..6244eb1 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+> 
+> [...]
+> 
+>> @@ -307,21 +398,46 @@ static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
+>>          return;
+>>      }
+>>
+>> -    list_for_each_entry(t, &ch->rx_pending, node)
+>> -        if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
+>> -            list_del(&t->node);
+>> -            match = t;
+>> -            break;
+>> -        }
+>> +    /* Command type is not replied by the SCP Firmware in legacy Mode
+>> +     * We should consider that command is the head of pending RX commands
+>> +     * if the list is not empty. In TX only mode, the list would be empty.
+>> +     */
+>> +    if (scpi_info->is_legacy) {
+>> +        match = list_first_entry(&ch->rx_pending, struct scpi_xfer,
+>> +                     node);
+>> +        list_del(&match->node);
+>> +    } else {
+>> +        list_for_each_entry(t, &ch->rx_pending, node)
+>> +            if (CMD_XTRACT_UNIQ(t->cmd) == CMD_XTRACT_UNIQ(cmd)) {
+>> +                list_del(&t->node);
+>> +                match = t;
+>> +                break;
+>> +            }
+>> +    }
+>>      /* check if wait_for_completion is in progress or timed-out */
+>>      if (match && !completion_done(&match->done)) {
+>> -        struct scpi_shared_mem *mem = ch->rx_payload;
+>> -        unsigned int len = min(match->rx_len, CMD_SIZE(cmd));
+>> +        unsigned int len;
+>> +
+>> +        if (scpi_info->is_legacy) {
+>> +            struct legacy_scpi_shared_mem *mem = ch->rx_payload;
+>> +
+>> +            /* RX Length is not replied by the lagcy Firmware */
+>> +            len = match->rx_len;
+>> +
+>> +            match->status = le32_to_cpu(mem->status);
+>> +            memcpy_fromio(match->rx_buf, mem->payload, len);
+> 
+> The above 2 seems common to both, no ?
 
-Ok, so maybe just add some comments and more explanation of how it works.
-
+No, the shared_mem structure differs.
 
 > 
->>>
->>>>> +	/* Set tuning functionality of this slot */
->>>>> +	xenon_slot_tuning_setup(host);
->>>>> +
->>>>> +	slot_idx = priv->slot_idx;
->>>>> +	if (!mmc_card_sdio(card)) {
->>>>> +		/* Re-enable the Auto-CMD12 cap flag. */
->>>>> +		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
->>>>> +		host->flags |= SDHCI_AUTO_CMD12;
->>>>> +
->>>>> +		/* Clear SDIO Card Inserted indication */
->>>>> +		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
->>>>> +		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
->>>>> +		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
->>>>> +
->>>>> +		if (mmc_card_mmc(card)) {
->>>>> +			mmc->caps |= MMC_CAP_NONREMOVABLE;
->>>>> +			if (!(host->quirks2 & SDHCI_QUIRK2_NO_1_8_V))
->>>>> +				mmc->caps |= MMC_CAP_1_8V_DDR;
->>>>> +			/*
->>>>> +			 * Force to clear BUS_TEST to
->>>>> +			 * skip bus_test_pre and bus_test_post
->>>>> +			 */
->>>>> +			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->>>>> +			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
->>>>> +				      MMC_CAP2_PACKED_CMD;
->>>>> +			if (mmc->caps & MMC_CAP_8_BIT_DATA)
->>>>> +				mmc->caps2 |= MMC_CAP2_HS400_1_8V;
->>>>> +		}
->>>>> +	} else {
->>>>> +		/*
->>>>> +		 * Delete the Auto-CMD12 cap flag.
->>>>> +		 * Otherwise, when sending multi-block CMD53,
->>>>> +		 * Driver will set Transfer Mode Register to enable Auto CMD12.
->>>>> +		 * However, SDIO device cannot recognize CMD12.
->>>>> +		 * Thus SDHC will time-out for waiting for CMD12 response.
->>>>> +		 */
->>>>> +		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
->>>>> +		host->flags &= ~SDHCI_AUTO_CMD12;
->>>>
->>>> sdhci_set_transfer_mode() won't enable auto-CMD12 for CMD53 anyway, so is
->>>> this needed?
->>>>
->>> 	In Xenon driver, Auto-CMD12 flag is set to enable full support to Auto-CMD feature, both Auto-CMD12 and Auto-CMD23.
->>> 	As a result, when Xenon SDHC slot can both support SD and SDIO, Auto-CMD12 is disabled when SDIO card is inserted, and renabled when SD is inserted.
->>>
->>> 	I recheck the sdhci code to set Auto-CMD bit in Transfer Mode register, in sdhci_set_transfer_mode():
->>> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1)
->>> 	As you can see, as long as it is CMD18/CMD25 OR there are multiple data blocks, Auto-CMD field will be set.
->>> 	CMD53 doesn't have CMD23. Thus Auto-CMD12 is selected since Auto-CMD12 flag is set.
->>> 	Thus I have to clear Auto-CMD12 to avoid issuing Auto-CMD12 in SDIO transfer.
+>> +        } else {
+>> +            struct scpi_shared_mem *mem = ch->rx_payload;
+>> +
+>> +            len = min(match->rx_len, CMD_SIZE(cmd));
+>> +
+>> +            match->status = le32_to_cpu(mem->status);
+>> +            memcpy_fromio(match->rx_buf, mem->payload, len);
+>> +        }
 >>
->>
->> The code is:
->>
->> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
->> 		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
->> 		/*
->> 		 * If we are sending CMD23, CMD12 never gets sent
->> 		 * on successful completion (so no Auto-CMD12).
->> 		 */
->> 		if (sdhci_auto_cmd12(host, cmd->mrq) &&
->> 		    (cmd->opcode != SD_IO_RW_EXTENDED))
->> 			mode |= SDHCI_TRNS_AUTO_CMD12;
->> 		else if (cmd->mrq->sbc && (host->flags & SDHCI_AUTO_CMD23)) {
->> 			mode |= SDHCI_TRNS_AUTO_CMD23;
->> 			sdhci_writel(host, cmd->mrq->sbc->arg, SDHCI_ARGUMENT2);
->> 		}
->> 	}
->>
->> You can see the check for SD_IO_RW_EXTENDED which is CMD53.
->>
-> 	Sorry. I didn't notice CMD53 check was added.
-> 	I introduced this Auto-CMD12 hack since kernel 3.8. It seems that this check is not added in kernel 3.8.
-> 	Thanks for the information. I will remove the Auto-CMD12 hack.
+>> -        match->status = le32_to_cpu(mem->status);
+>> -        memcpy_fromio(match->rx_buf, mem->payload, len);
+>>          if (match->rx_len > len)
+>>              memset(match->rx_buf + len, 0, match->rx_len - len);
+>> +
 > 
->>>
->>> 	I just meet a similar issue in RPMB.
->>> 	When Auto-CMD12 flag is set, eMMC RPMB access will trigger Auto-CMD12, since CMD25 is in use.
->>> 	It will cause RPMB access failed.
->>
->> Can you explain more about the RPMB issue.  Doesn't it use CMD23, so CMD12
->> wouldn't be used - auto or manually.
->>
-> 	RPMB go through the MMC ioctl routine.
-> 	Unlike normal data transfer, MMC ioctl for RPMB explicitly issues CMD23. When CMD25 is issued, there is neither data->sbc nor Auto-CMD23.
-> 	As a result, sdhci driver will automatically enable Auto-CMD12 for RPMB CMD25 if Auto-CMD12 flag is set.
+> Spurious ?
 
-OK, so SDHCI should also not allow auto-cmd12 if there is no stop command
-i.e. data->stop is null.
+Yep
 
 > 
->>>
->>> 	One possible solution is to drop Auto-CMD12 support and use Auto-CMD23 only, in Xenon driver.
->>> 	May I know you opinion, please?
->>
->> I don't use auto-CMD12 because I don't know if it provides any benefit and
->> sdhci does not seem to have implemented Auto CMD12 Error Recovery, although
->> I have never looked at it closely.
->>
-> 	Actually, Auto-CMD23 is always used on our Xenon. Auto-CMD12 is not used at all.
-> 	But since this driver is a general one for all Marvell products, Auto-CMD12 is also supported in case that Auto-CMD23 is not available.
->  
+>>          complete(&match->done);
+>>      }
+>>      spin_unlock_irqrestore(&ch->rx_lock, flags);
+>> @@ -331,7 +447,12 @@ static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
+>>  {
+>>      struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>>      struct scpi_shared_mem *mem = ch->rx_payload;
+>> -    u32 cmd = le32_to_cpu(mem->command);
+>> +    u32 cmd;
+>> +
+>> +    if (scpi_info->is_legacy)
+>> +        cmd = *(u32 *)msg;
 > 
+> Do we need do this if it doesn't contain command ?
+
+No, will remove.
+
+> 
+>> +    else
+>> +        cmd = le32_to_cpu(mem->command);
+>>
+>>      scpi_process_cmd(ch, cmd);
+>>  }
+>> @@ -343,17 +464,26 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+>>      struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
+>>      struct scpi_shared_mem *mem = (struct scpi_shared_mem *)ch->tx_payload;
+>>
+>> -    if (t->tx_buf)
+>> -        memcpy_toio(mem->payload, t->tx_buf, t->tx_len);
+>> +    if (t->tx_buf) {
+>> +        if (scpi_info->is_legacy)
+>> +            memcpy_toio(ch->tx_payload, t->tx_buf, t->tx_len);
+>> +        else
+>> +            memcpy_toio(mem->payload, t->tx_buf, t->tx_len);
+>> +    }
+>> +
+>>      if (t->rx_buf) {
+>>          if (!(++ch->token))
+>>              ++ch->token;
+>>          ADD_SCPI_TOKEN(t->cmd, ch->token);
+>> +        if (scpi_info->is_legacy)
+>> +            t->slot = t->cmd;
+> 
+> I thought passing token was not an issue from your previous response,
+> but you are overriding it here, why ?
+
+Indeed, I can leave it, but it's useless since it won't serve to distinguish multiple similar commands.
+
+> 
+>>          spin_lock_irqsave(&ch->rx_lock, flags);
+>>          list_add_tail(&t->node, &ch->rx_pending);
+>>          spin_unlock_irqrestore(&ch->rx_lock, flags);
+>>      }
+>> -    mem->command = cpu_to_le32(t->cmd);
+>> +
+>> +    if (!scpi_info->is_legacy)
+>> +        mem->command = cpu_to_le32(t->cmd);
+>>  }
+>>
+>>  static struct scpi_xfer *get_scpi_xfer(struct scpi_chan *ch)
+>> @@ -396,21 +526,37 @@ static int scpi_send_message(unsigned int offset, void *tx_buf,
+>>
+>>      cmd = scpi_info->scpi_cmds[offset];
+>>
+>> -    chan = atomic_inc_return(&scpi_info->next_chan) % scpi_info->num_chans;
+>> +    if (scpi_info->is_legacy)
+>> +        chan = test_bit(cmd, scpi_info->cmd_priority) ? 1 : 0;
+>> +    else
+>> +        chan = atomic_inc_return(&scpi_info->next_chan) %
+>> +            scpi_info->num_chans;
+>>      scpi_chan = scpi_info->channels + chan;
+>>
+>>      msg = get_scpi_xfer(scpi_chan);
+>>      if (!msg)
+>>          return -ENOMEM;
+>>
+>> -    msg->slot = BIT(SCPI_SLOT);
+>> -    msg->cmd = PACK_SCPI_CMD(cmd, tx_len);
+>> +    if (scpi_info->is_legacy) {
+>> +        msg->cmd = PACK_LEGACY_SCPI_CMD(cmd, tx_len);
+>> +        msg->slot = msg->cmd;
+>> +    } else {
+>> +        msg->slot = BIT(SCPI_SLOT);
+>> +        msg->cmd = PACK_SCPI_CMD(cmd, tx_len);
+>> +    }
+>>      msg->tx_buf = tx_buf;
+>>      msg->tx_len = tx_len;
+>>      msg->rx_buf = rx_buf;
+>>      msg->rx_len = rx_len;
+>>      init_completion(&msg->done);
+>>
+>> +    /* Since we cannot distinguish the original command in the
+>> +     * MHU reply stat value from a Legacy SCP firmware, ensure
+>> +     * sequential command sending to the firmware.
+>> +     */
+> 
+> OK this comment now questions the existence of this extra lock.
+> The mailbox will always send the commands in the sequential order.
+> It's only firmware that can re-order the response. Since that can't
+> happen in you case, I really don't see the need for this.
+> 
+> Please explain the race you would see without this locking. Yes I
+> understand that only one command is supposed to be sent to firmware at a
+> time. Suppose you allow more callers here, all will wait on the
+> completion flags and the first in the list gets unblocked right ?
+> I am just trying to understand if there's real need for this extra
+> lock when we already have that from the list.
+
+In my current tests I have huge kernel hang when having multiple callers,
+I must find out where this issue comes from...
+In any case, we have an issue about the command sequencing.
+If we push a tx-only command and then right after a tx-rx command, the
+mailbox callback from the first command won't be able to distinguish which
+command is handled !
+In this case, the rx_pending list will not be empty, some garbage will be returned
+to the second command handler and the real data from the second command handling
+will be lost thinking it's a tx-only command.
+
+
+We have two choices here :
+ - Also push the tx-only commands to the rx_pending list, and also wait for their completion
+ - Add an extra lock
+
+What is your preferred scheme ?
+
+>> +    if (scpi_info->is_legacy)
+>> +        mutex_lock(&scpi_chan->legacy_lock);
+>> +
+>>      ret = mbox_send_message(scpi_chan->chan, msg);
+>>      if (ret < 0 || !rx_buf)
+>>          goto out;
+>> @@ -421,9 +567,13 @@ static int scpi_send_message(unsigned int offset, void *tx_buf,
+>>          /* first status word */
+>>          ret = msg->status;
+>>  out:
+>> -    if (ret < 0 && rx_buf) /* remove entry from the list if timed-out */
+>> +    if (ret < 0 && rx_buf)
+>> +        /* remove entry from the list if timed-out */
+>>          scpi_process_cmd(scpi_chan, msg->cmd);
+>>
+>> +    if (scpi_info->is_legacy)
+>> +        mutex_unlock(&scpi_chan->legacy_lock);
+>> +
+>>      put_scpi_xfer(msg, scpi_chan);
+>>      /* SCPI error codes > 0, translate them to Linux scale*/
+>>      return ret > 0 ? scpi_to_linux_errno(ret) : ret;
+> 
+> [...]
+> 
+>> @@ -525,7 +687,6 @@ static struct scpi_dvfs_info *scpi_dvfs_get_info(u8 domain)
+>>
+>>      info->count = DVFS_OPP_COUNT(buf.header);
+>>      info->latency = DVFS_LATENCY(buf.header) * 1000; /* uS to nS */
+>> -
+> 
+> Spurious ?
+
+Indeed.
+
+> 
+>>      info->opps = kcalloc(info->count, sizeof(*opp), GFP_KERNEL);
+>>      if (!info->opps) {
+>>          kfree(info);
+>> @@ -580,9 +741,13 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
+>>
+>>      ret = scpi_send_message(CMD_SENSOR_VALUE, &id, sizeof(id),
+>>                  &buf, sizeof(buf));
+>> -    if (!ret)
+>> -        *val = (u64)le32_to_cpu(buf.hi_val) << 32 |
+>> -            le32_to_cpu(buf.lo_val);
+>> +    if (!ret) {
+>> +        if (scpi_info->is_legacy)
+>> +            *val = (u64)le32_to_cpu(buf.lo_val);
+>> +        else
+>> +            *val = (u64)le32_to_cpu(buf.hi_val) << 32 |
+>> +                le32_to_cpu(buf.lo_val);
+>> +    }
+> 
+> Not required as I have mentioned couple of times in previous versions,
+> it's zero filled by the driver.
+> 
+
+OK
+
+I will fix the issues, but I need your advice for the locking scheme. I really want this
+to be merged and be able to go forward !
+
+Thanks,
+Neil
