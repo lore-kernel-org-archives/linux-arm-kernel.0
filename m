@@ -1,39 +1,43 @@
-From: leoyang.li@nxp.com (Li Yang)
-Date: Mon, 17 Oct 2016 16:44:06 -0500
-Subject: [PATCH] PCI: layerscape: Fix kernel panic on accessing NULL pointer
-Message-ID: <1476740647-11155-1-git-send-email-leoyang.li@nxp.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Mon, 17 Oct 2016 14:50:24 -0700
+Subject: [PATCH 3/3] arm64: dts: Update Broadcom NS2 to generic IOMMU
+ binding
+In-Reply-To: <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
+References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
+ <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
+Message-ID: <6f96a6cc-7e12-6827-ce88-65e2accda576@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit fefe6733e added reference to the pcie->drvdata before it is
-initialized which causes a kernel panic.  Fix the problem by
-initializing the pcie->drvdata earlier before it is used.
+Hi Robin,
 
-Reported-by: Stuart Yoder <stuart.yoder@nxp.com>
-Signed-off-by: Li Yang <leoyang.li@nxp.com>
----
- drivers/pci/host/pci-layerscape.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 10/17/2016 5:13 AM, Robin Murphy wrote:
+> With the "mmu-masters" property now deprecated and optional, the
+> generic binding offers a more efficient way to specify no masters.
+>
+> CC: Ray Jui <rjui@broadcom.com>
+> CC: Scott Branden <sbranden@broadcom.com>
+> CC: Jon Mason <jonmason@broadcom.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> index d95dc408629a..65530e193e8a 100644
+> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> @@ -248,7 +248,7 @@
+>  				     <GIC_SPI 260 IRQ_TYPE_LEVEL_HIGH>,
+>  				     <GIC_SPI 261 IRQ_TYPE_LEVEL_HIGH>,
+>  				     <GIC_SPI 262 IRQ_TYPE_LEVEL_HIGH>;
+> -			mmu-masters;
+> +			#iommu-cells = <1>;
+>  		};
+>
+>  		pinctrl: pinctrl at 6501d130 {
+>
 
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 2cb7315..958187f 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -245,6 +245,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 	if (!pcie)
- 		return -ENOMEM;
- 
-+	pcie->drvdata = match->data;
- 	pp = &pcie->pp;
- 	pp->dev = dev;
- 	pp->ops = pcie->drvdata->ops;
-@@ -256,7 +257,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
- 		return PTR_ERR(pcie->pp.dbi_base);
- 	}
- 
--	pcie->drvdata = match->data;
- 	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
- 
- 	if (!ls_pcie_is_bridge(pcie))
--- 
-1.9.0
+Thanks!
+
+Acked-by: Ray Jui <ray.jui@broadcom.com>
