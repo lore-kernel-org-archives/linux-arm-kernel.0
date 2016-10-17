@@ -1,160 +1,219 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 17 Oct 2016 11:08:17 +0300
-Subject: PROBLEM: DWC3 USB 3.0 not working on Odroid-XU4 with Exynos 5422
-In-Reply-To: <1476627597.1752.3.camel@mniewoehner.de>
-References: <1472414695.3845.3.camel@mniewoehner.de>
- <87lgzgdof3.fsf@linux.intel.com> <57C41582.1030604@linux.intel.com>
- <1472468730.4925.3.camel@mniewoehner.de>
- <CANAwSgQMsK8YPxR==UXtR49kiJzYhkzvSCNwn8mDJfj-3wpa2w@mail.gmail.com>
- <CAFp+6iGrS0DTP=KUKDvk3NwWB32+1uj-irKT6fn5XTcfk572Hg@mail.gmail.com>
- <1475578687.1912.28.camel@mniewoehner.de>
- <CAFp+6iGx-jf+xrdHF=0J3FK9dDBg54zESYNVo8bz2Qz6G4gEZg@mail.gmail.com>
- <1475771380.22019.5.camel@mniewoehner.de> <87y420wqoy.fsf@linux.intel.com>
- <1475871962.1697.12.camel@mniewoehner.de>
- <1476627597.1752.3.camel@mniewoehner.de>
-Message-ID: <874m4btn2m.fsf@linux.intel.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 17 Oct 2016 11:14:22 +0300
+Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <6bed26dc-f4c1-7f0d-36b6-d7d5fcbf0da9@marvell.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <ecde22fd342b0b2001ff5676ea1e67b7226d6946.1475853198.git-series.gregory.clement@free-electrons.com>
+ <1b015f16-aa37-591c-3299-9431f6e82cce@intel.com>
+ <4009a66b-1e09-0780-b7c1-128ff1401b5f@marvell.com>
+ <7939a923-eb97-ca44-ac4c-f0a3cd4f45bc@intel.com>
+ <6bed26dc-f4c1-7f0d-36b6-d7d5fcbf0da9@marvell.com>
+Message-ID: <ec7a2658-5af3-bff8-3cb8-adb72406df5c@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13/10/16 08:38, Ziji Hu wrote:
+> Hi Adrian,
+> 
+> On 2016/10/12 21:07, Adrian Hunter wrote:
+>> On 12/10/16 14:58, Ziji Hu wrote:
+>>> Hi Adrian,
+>>>
+>>> 	Thank you very much for your review.
+>>> 	I will firstly fix the typo.
+>>>
+>>> On 2016/10/11 20:37, Adrian Hunter wrote:
+> <snip>
+>>>>> +
+>>>>> +static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
+>>>>> +					     struct mmc_ios *ios)
+>>>>> +{
+>>>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * Before SD/SDIO set signal voltage, SD bus clock should be
+>>>>> +	 * disabled. However, sdhci_set_clock will also disable the Internal
+>>>>> +	 * clock in mmc_set_signal_voltage().
+>>>>> +	 * If Internal clock is disabled, the 3.3V/1.8V bit can not be updated.
+>>>>> +	 * Thus here manually enable internal clock.
+>>>>> +	 *
+>>>>> +	 * After switch completes, it is unnecessary to disable internal clock,
+>>>>> +	 * since keeping internal clock active obeys SD spec.
+>>>>> +	 */
+>>>>> +	enable_xenon_internal_clk(host);
+>>>>> +
+>>>>> +	if (priv->card_candidate) {
+>>>>
+>>>> mmc_power_up() calls __mmc_set_signal_voltage() calls
+>>>> host->ops->start_signal_voltage_switch so priv->card_candidate could be an
+>>>> invalid reference to an old card.
+>>>>
+>>>> So that's not going to work if the card changes - not only for removable
+>>>> cards but even for eMMC if init fails and retries.
+>>>>
+>>> 	As you point out, this piece of code have defects, even though it actually works on Marvell multiple platforms, unless eMMC card is removable.
+>>>
+>>> 	I can add a property to explicitly indicate eMMC type in DTS.
+>>> 	Then card_candidate access can be removed here.
+>>> 	Does it sounds more reasonable to you?
+>>
+>> Sure
+>>
+>>>
+>>>>> +		if (mmc_card_mmc(priv->card_candidate))
+>>>>> +			return xenon_emmc_signal_voltage_switch(mmc, ios);
+>>>>
+>>>> So if all you need to know is whether it is a eMMC, why can't DT tell you?
+>>>>
+>>> 	I can add an eMMC type property in DTS, to remove the card_candidate access here.
+>>>
+>>>>> +	}
+>>>>> +
+>>>>> +	return sdhci_start_signal_voltage_switch(mmc, ios);
+>>>>> +}
+>>>>> +
+>>>>> +/*
+>>>>> + * After determining which slot is used for SDIO,
+>>>>> + * some additional task is required.
+>>>>> + */
+>>>>> +static void xenon_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>>>>> +{
+>>>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>>>> +	u32 reg;
+>>>>> +	u8 slot_idx;
+>>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>>>> +
+>>>>> +	/* Link the card for delay adjustment */
+>>>>> +	priv->card_candidate = card;
+>>>>
+>>>> You really need a better way to get the card.  I suggest you take up the
+>>>> issue with Ulf.  One possibility is to have mmc core set host->card = card
+>>>> much earlier.
+>>>>
+>>> 	Could you please tell me if any issue related to card_candidate still exists, after the card_candidate is removed from xenon_start_signal_voltage_switch() in above?
+>>> 	It seems that when init_card is called, the structure card has already been updated and stable in MMC/SD/SDIO initialization sequence.
+>>> 	May I keep it here?
+>>
+>> It works by accident rather than by design.  We can do better.
+>>
+> 	Could you please tell me some details which are satisfied about card_candidate?
+> 
+> 	I must admit that card_candidate in xenon_start_signal_voltage_switch() is imperfect.
+> 	But card_candidate in init_card() and later in set_ios() work by design, rather than by accident. We did a lot of tests on several platforms.
+> 	
+> 	The structure mmc_card passed in here is a stable one. Thus in my very own opinion, it is safe and stable to use mmc_card here.
+> 	card_candidate is used only in card initialization. It is not active in later transfers after initialization is done.
+> 	It will always updated with mmc_card in next card initialization.
 
-Hi,
+Ok, so maybe just add some comments and more explanation of how it works.
 
-Michael Niew?hner <linux@mniewoehner.de> writes:
-> Hi Felipe,
-> On Fri, 2016-10-07 at 22:26 +0200, Michael Niew?hner wrote:
->> Hi Felipe,
->> 
->> On Fr, 2016-10-07 at 10:42 +0300, Felipe Balbi wrote:
->> > Hi,
->> > 
->> > Michael Niew?hner <linux@mniewoehner.de> writes:
->> > > 
->> > > > 
->> > > > The clocks are same across working/non-working.
->> > > > Is it possible to bisect the commit that's causing hang for 4.8x ?
->> > > 
->> > > 
->> > > [c499ff71ff2a281366c6ec7a904c547d806cbcd1] usb: dwc3: core: re-factor init and exit paths
->> > > This patch causes both the hang on reboot and the lsusb hang.
->> > 
->> > How to reproduce? Why don't we see this on x86 and TI boards? I'm
->> > guessing this is failed bisection, as I can't see anything in that
->> > commit that would cause reboot hang. Also, that code path is *NOT*
->> > executed when you run lsusb.
->> > 
->> 
->> I've tested this procedure multiple times to be sure:
->> 
->> - checkout?c499ff71, compile, boot the odroid
->> - run lsusb -v => lsusb hangs, can't terminate with ctrl-c
->> - hard reset, after boot run poweroff or reboot => board does not completely power off / reboot (see log below)
->> - revert c499ff71, mrproper, compile, boot the odroid
->> - run lsusb -v => shows full output, not hanging
->> - run reboot or poweroff => board powers off / reboots just fine
->> 
->> 
->> dmesg poweroff not working:
->> ...
->> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
->> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
->> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
->> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
->> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
->> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
->> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
->> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
->> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
->> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
->> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
->> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
->> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
->> [??121.171739] systemd-shutdown[1]: Powering off.
->> 
->> => at this point removing the sd card would show a message?
->> "removed mmc0" (not sure what the real message was...) so the board is not completely off.
->> 
->> 
->> dmesg poweroff working:
->> ...
->> [??120.733519] systemd-journald[144]: systemd-journald stopped as pid 144???????
->> [??120.742663] systemd-shutdown[1]: Sending SIGKILL to remaining processes...???
->> [??120.769212] systemd-shutdown[1]: Unmounting file systems.????????????????????
->> [??120.773713] systemd-shutdown[1]: Unmounting /sys/kernel/debug.???????????????
->> [??120.827211] systemd-shutdown[1]: Unmounting /dev/mqueue.?????????????????????
->> [??121.081672] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.091687] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.095608] EXT4-fs (mmcblk1p2): re-mounted. Opts: (null)????????????????????
->> [??121.101014] systemd-shutdown[1]: All filesystems unmounted.??????????????????
->> [??121.106523] systemd-shutdown[1]: Deactivating swaps.?????????????????????????
->> [??121.111585] systemd-shutdown[1]: All swaps deactivated.??????????????????????
->> [??121.116661] systemd-shutdown[1]: Detaching loop devices.?????????????????????
->> [??121.126395] systemd-shutdown[1]: All loop devices detached.??????????????????
->> [??121.130525] systemd-shutdown[1]: Detaching DM devices.???????????????????????
->> [??121.135824] systemd-shutdown[1]: All DM devices detached.????????????????????
->> [??121.166327] systemd-shutdown[1]: /lib/systemd/system-shutdown succeeded.?????
->> [??121.171739] systemd-shutdown[1]: Powering off.
->> [??121.182331] rebo?
->> 
->> 
->> 
->> Best regards
->> Michael Niew?hner
->
->
-> I did some more tests with next-20161016. Reverting / commenting out
-> one part of your patch "solves" the lsusb hang, the reboot problem
-> and also the "debounce failed" message. [1]
-> Another "solution" is to call phy_power_off before phy_power_on. [2]
->
-> Disclaimer: I have no idea what I was doing ;-) These were just some
-> simple trial-and-error attempts that maybe help to find the real
-> cause of the problems.
->
-> [1]
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 7287a76..5ef589d 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -724,6 +724,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
-> ?	/* Adjust Frame Length */
-> ?	dwc3_frame_length_adjustment(dwc);
-> ?
-> +/*
-> ?	usb_phy_set_suspend(dwc->usb2_phy, 0);
-> ?	usb_phy_set_suspend(dwc->usb3_phy, 0);
-> ?	ret = phy_power_on(dwc->usb2_generic_phy);
-> @@ -733,6 +734,7 @@ static int dwc3_core_init(struct dwc3 *dwc)
-> ?	ret = phy_power_on(dwc->usb3_generic_phy);
-> ?	if (ret < 0)
-> ?		goto err3;
-> +*/
-> ?
-> ?	ret = dwc3_event_buffers_setup(dwc);
-> ?	if (ret) {
->
-> [2]
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 7287a76..f6c8e13 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -726,6 +726,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
-> ?
-> ????????usb_phy_set_suspend(dwc->usb2_phy, 0);
-> ????????usb_phy_set_suspend(dwc->usb3_phy, 0);
-> +???????phy_power_off(dwc->usb2_generic_phy);
-> +???????phy_power_off(dwc->usb3_generic_phy);
 
-This looks like a PHY driver bug to me. Which PHY driver are you using?
+> 
+>>>
+>>>>> +	/* Set tuning functionality of this slot */
+>>>>> +	xenon_slot_tuning_setup(host);
+>>>>> +
+>>>>> +	slot_idx = priv->slot_idx;
+>>>>> +	if (!mmc_card_sdio(card)) {
+>>>>> +		/* Re-enable the Auto-CMD12 cap flag. */
+>>>>> +		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>>>> +		host->flags |= SDHCI_AUTO_CMD12;
+>>>>> +
+>>>>> +		/* Clear SDIO Card Inserted indication */
+>>>>> +		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
+>>>>> +		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
+>>>>> +		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
+>>>>> +
+>>>>> +		if (mmc_card_mmc(card)) {
+>>>>> +			mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>>>> +			if (!(host->quirks2 & SDHCI_QUIRK2_NO_1_8_V))
+>>>>> +				mmc->caps |= MMC_CAP_1_8V_DDR;
+>>>>> +			/*
+>>>>> +			 * Force to clear BUS_TEST to
+>>>>> +			 * skip bus_test_pre and bus_test_post
+>>>>> +			 */
+>>>>> +			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+>>>>> +			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+>>>>> +				      MMC_CAP2_PACKED_CMD;
+>>>>> +			if (mmc->caps & MMC_CAP_8_BIT_DATA)
+>>>>> +				mmc->caps2 |= MMC_CAP2_HS400_1_8V;
+>>>>> +		}
+>>>>> +	} else {
+>>>>> +		/*
+>>>>> +		 * Delete the Auto-CMD12 cap flag.
+>>>>> +		 * Otherwise, when sending multi-block CMD53,
+>>>>> +		 * Driver will set Transfer Mode Register to enable Auto CMD12.
+>>>>> +		 * However, SDIO device cannot recognize CMD12.
+>>>>> +		 * Thus SDHC will time-out for waiting for CMD12 response.
+>>>>> +		 */
+>>>>> +		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>>>> +		host->flags &= ~SDHCI_AUTO_CMD12;
+>>>>
+>>>> sdhci_set_transfer_mode() won't enable auto-CMD12 for CMD53 anyway, so is
+>>>> this needed?
+>>>>
+>>> 	In Xenon driver, Auto-CMD12 flag is set to enable full support to Auto-CMD feature, both Auto-CMD12 and Auto-CMD23.
+>>> 	As a result, when Xenon SDHC slot can both support SD and SDIO, Auto-CMD12 is disabled when SDIO card is inserted, and renabled when SD is inserted.
+>>>
+>>> 	I recheck the sdhci code to set Auto-CMD bit in Transfer Mode register, in sdhci_set_transfer_mode():
+>>> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1)
+>>> 	As you can see, as long as it is CMD18/CMD25 OR there are multiple data blocks, Auto-CMD field will be set.
+>>> 	CMD53 doesn't have CMD23. Thus Auto-CMD12 is selected since Auto-CMD12 flag is set.
+>>> 	Thus I have to clear Auto-CMD12 to avoid issuing Auto-CMD12 in SDIO transfer.
+>>
+>>
+>> The code is:
+>>
+>> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
+>> 		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
+>> 		/*
+>> 		 * If we are sending CMD23, CMD12 never gets sent
+>> 		 * on successful completion (so no Auto-CMD12).
+>> 		 */
+>> 		if (sdhci_auto_cmd12(host, cmd->mrq) &&
+>> 		    (cmd->opcode != SD_IO_RW_EXTENDED))
+>> 			mode |= SDHCI_TRNS_AUTO_CMD12;
+>> 		else if (cmd->mrq->sbc && (host->flags & SDHCI_AUTO_CMD23)) {
+>> 			mode |= SDHCI_TRNS_AUTO_CMD23;
+>> 			sdhci_writel(host, cmd->mrq->sbc->arg, SDHCI_ARGUMENT2);
+>> 		}
+>> 	}
+>>
+>> You can see the check for SD_IO_RW_EXTENDED which is CMD53.
+>>
+> 	Sorry. I didn't notice CMD53 check was added.
+> 	I introduced this Auto-CMD12 hack since kernel 3.8. It seems that this check is not added in kernel 3.8.
+> 	Thanks for the information. I will remove the Auto-CMD12 hack.
+> 
+>>>
+>>> 	I just meet a similar issue in RPMB.
+>>> 	When Auto-CMD12 flag is set, eMMC RPMB access will trigger Auto-CMD12, since CMD25 is in use.
+>>> 	It will cause RPMB access failed.
+>>
+>> Can you explain more about the RPMB issue.  Doesn't it use CMD23, so CMD12
+>> wouldn't be used - auto or manually.
+>>
+> 	RPMB go through the MMC ioctl routine.
+> 	Unlike normal data transfer, MMC ioctl for RPMB explicitly issues CMD23. When CMD25 is issued, there is neither data->sbc nor Auto-CMD23.
+> 	As a result, sdhci driver will automatically enable Auto-CMD12 for RPMB CMD25 if Auto-CMD12 flag is set.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/a826b912/attachment-0001.sig>
+OK, so SDHCI should also not allow auto-cmd12 if there is no stop command
+i.e. data->stop is null.
+
+> 
+>>>
+>>> 	One possible solution is to drop Auto-CMD12 support and use Auto-CMD23 only, in Xenon driver.
+>>> 	May I know you opinion, please?
+>>
+>> I don't use auto-CMD12 because I don't know if it provides any benefit and
+>> sdhci does not seem to have implemented Auto CMD12 Error Recovery, although
+>> I have never looked at it closely.
+>>
+> 	Actually, Auto-CMD23 is always used on our Xenon. Auto-CMD12 is not used at all.
+> 	But since this driver is a general one for all Marvell products, Auto-CMD12 is also supported in case that Auto-CMD23 is not available.
+>  
+> 
