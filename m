@@ -1,100 +1,56 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 17 Oct 2016 16:26:23 +0100
-Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
- dma_set_mask_and_coherent
-Message-ID: <20161017152623.7649-1-punit.agrawal@arm.com>
+From: rbilovol@cisco.com (Ruslan Bilovol)
+Date: Mon, 17 Oct 2016 18:41:01 +0300
+Subject: [PATCH v26 0/7] arm64: add kdump support
+In-Reply-To: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+References: <20160907042908.6232-1-takahiro.akashi@linaro.org>
+Message-ID: <3400bddc-9c6e-b69a-b57d-62921197bef9@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dma mapping api howto gives the impression that using the
-dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
-to check all the components in the path from the device to memory for
-addressing restrictions. In systems with address translations between
-the device and memory (e.g., when using IOMMU), this implies that a
-successful call to set set dma mask has checked the addressing
-constraints of the intermediaries as well.
+Hi,
 
-For the IOMMU drivers in the tree, the check is actually performed while
-allocating the DMA buffer rather than when the DMA mask is
-configured. For MMUs that do not support the full device addressing
-capability, the allocations are made from a reduced address space.
+On 09/07/2016 07:29 AM, AKASHI Takahiro wrote:
+>      v26-specific note: After a comment from Rob[0], an idea of adding
+>      "linux,usable-memory-range" was dropped. Instead, an existing
+>      "reserved-memory" node will be used to limit usable memory ranges
+>      on crash dump kernel.
+>      This works not only on UEFI/ACPI systems but also on DT-only systems,
+>      but if he really insists on using DT-specific "usable-memory" property,
+>      I will post additional patches for kexec-tools. Those would be
+>      redundant, though.
+>      Even in that case, the kernel will not have to be changed.
+>
+> This patch series adds kdump support on arm64.
+> There are some prerequisite patches [1],[2].
+>
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools, which have not yet been merged upstream, are needed.
+> Please always use my latest kdump patches, v3 [3].
+>
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>    - crash utility (coming v7.1.6 or later) [4]
+>      (Necessary patches have already been queued in the master.)
+>
+>
+> [0] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452582.html
+> [1] "arm64: mark reserved memblock regions explicitly in iomem"
+>      http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/450433.html
+> [2] "efi: arm64: treat regions with WT/WC set but WB cleared as memory"
+>      http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/451491.html
+> [3] T.B.D.
+> [4] https://github.com/crash-utility/crash.git
 
-Update the documentation to clarify that even though the call to
-dma_set_mask_and_coherent succeeds, it may not be possible to use the
-full addressing capability of the device.
+Are you going to rebase your patch series onto v4.9-rc1 tag soon? I see
+that patches [1] and [2] are already in v4.9-rc1, but when tried to apply
+this series, I've got conflict on first patch of the series ("arm64: kdump:
+reserve memory for crash dump kernel"). I want to try arm64 kdump
+patches again on my board, so I'm interested in this. The question is
+whether I need to rebase it myself or you will do the same (and address
+comments) soon.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Jonathan Corbet <corbet@lwn.net>
----
- Documentation/DMA-API-HOWTO.txt | 39 +++++++++++++++++++++++----------------
- 1 file changed, 23 insertions(+), 16 deletions(-)
+Also I see Geoff published v6 of arm64 kexec-tools patches, so same
+question is applicable to "(kexec-tools) arm64: add kdump support"
+patch series.
 
-diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
-index 979228b..240d1ee 100644
---- a/Documentation/DMA-API-HOWTO.txt
-+++ b/Documentation/DMA-API-HOWTO.txt
-@@ -159,39 +159,46 @@ support 64-bit addressing (DAC) for all transactions.  And at least
- one platform (SGI SN2) requires 64-bit consistent allocations to
- operate correctly when the IO bus is in PCI-X mode.
- 
--For correct operation, you must interrogate the kernel in your device
--probe routine to see if the DMA controller on the machine can properly
--support the DMA addressing limitation your device has.  It is good
-+For correct operation, you must inform the kernel in your device probe
-+routine to see if the DMA controller on the machine can properly
-+support the DMA addressing capabilities your device has.  It is good
- style to do this even if your device holds the default setting,
- because this shows that you did think about these issues wrt. your
- device.
- 
--The query is performed via a call to dma_set_mask_and_coherent():
-+The call to inform the kernel is performed via a call to
-+dma_set_mask_and_coherent():
- 
- 	int dma_set_mask_and_coherent(struct device *dev, u64 mask);
- 
--which will query the mask for both streaming and coherent APIs together.
--If you have some special requirements, then the following two separate
--queries can be used instead:
-+which will set the mask for both streaming and coherent APIs together.
-+If there are some special requirements, then the following two
-+separate functions can be used instead:
- 
--	The query for streaming mappings is performed via a call to
--	dma_set_mask():
-+	The configuration for streaming mappings is performed via a
-+	call to dma_set_mask():
- 
- 		int dma_set_mask(struct device *dev, u64 mask);
- 
--	The query for consistent allocations is performed via a call
--	to dma_set_coherent_mask():
-+	The configuration for consistent allocations is performed via
-+	a call to dma_set_coherent_mask():
- 
- 		int dma_set_coherent_mask(struct device *dev, u64 mask);
- 
- Here, dev is a pointer to the device struct of your device, and mask
- is a bit mask describing which bits of an address your device
- supports.  It returns zero if your card can perform DMA properly on
--the machine given the address mask you provided.  In general, the
--device struct of your device is embedded in the bus-specific device
--struct of your device.  For example, &pdev->dev is a pointer to the
--device struct of a PCI device (pdev is a pointer to the PCI device
--struct of your device).
-+the machine given the address mask you provided.  Subsequent to
-+calling the above apis, DMA allocations will be made from address
-+space that conforms to the mask.  The DMA allocation space maybe
-+further restricted if devices along the patch to memory have stricter
-+addressing requirements than the device performing the DMA, e.g.,
-+IOMMU.
-+
-+In general, the device struct of your device is embedded in the
-+bus-specific device struct of your device.  For example, &pdev->dev is
-+a pointer to the device struct of a PCI device (pdev is a pointer to
-+the PCI device struct of your device).
- 
- If it returns non-zero, your device cannot perform DMA properly on
- this platform, and attempting to do so will result in undefined
--- 
-2.9.3
+Thanks,
+Ruslan
