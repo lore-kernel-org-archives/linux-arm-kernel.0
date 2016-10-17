@@ -1,56 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 17 Oct 2016 18:50:34 +0200 (CEST)
-Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
-In-Reply-To: <20161014103344.GB3304@dell>
-References: <E1btqa6-0001tx-HV@optimist>
- <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk> <20161014103344.GB3304@dell>
-Message-ID: <alpine.DEB.2.20.1610171848110.4991@nanos>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 17 Oct 2016 09:54:15 -0700
+Subject: [PATCH 1/3] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <1476721850-454-2-git-send-email-bgolaszewski@baylibre.com>
+ (Bartosz Golaszewski's message of "Mon, 17 Oct 2016 18:30:48 +0200")
+References: <1476721850-454-1-git-send-email-bgolaszewski@baylibre.com>
+ <1476721850-454-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <7h8ttmdih4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Oct 2016, Lee Jones wrote:
-> On Tue, 11 Oct 2016, Mark Brown wrote:
-> 
-> > On Tue, Oct 11, 2016 at 07:30:35AM +0100, Build bot for Mark Brown wrote:
-> > 
-> > Linus' tree is currently failing to build arm and arm64 allmodconfigs
-> > with:
-> > 
-> > > 	arm64-allmodconfig
-> > > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-> > 
-> > > 	arm-allmodconfig
-> > > ERROR: "irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-> > 
-> > due to 6556bdacf646fc (mfd: tps65217: Add support for IRQs) since
-> > irq_set_parent() isn't exported.  This has been present in -next
-> > for getting on for a month, a patch was proposed adding the relevant
-> > export but that isn't present in -next yet.
-> > 
-> > The function is being used in order to enable lazy IRQ disabling for
-> > threaded interrupts:
-> > 
-> > 	https://www.spinics.net/lists/arm-kernel/msg532864.html
-> > 
-> > What's the plan for getting this fixed in Linus' tree?
-> 
-> Here's the conversation:
-> 
->   https://www.spinics.net/lists/arm-kernel/msg531850.html
-> 
-> I'm waiting on a firm answer from Arnd and Thomas before applying
-> anything.
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
 
-As I said, we can export it, if it's needed to make the driver modular. But
-we definitely don't want to export it just to make the build happy.
+> Create a new driver for the da8xx DDR2/mDDR controller and implement
+> support for writing to the Peripheral Bus Burst Priority Register.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Grigoryi has an excellent answer here:
+[...]
 
-   https://www.spinics.net/lists/arm-kernel/msg532864.html
+> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+> new file mode 100644
+> index 0000000..dcd0a61
+> --- /dev/null
+> +++ b/drivers/memory/da8xx-ddrctl.c
+> @@ -0,0 +1,77 @@
+> +/*
+> + * TI da8xx DDR2/mDDR controller driver
+> + *
+> + * Copyright (C) 2016 BayLibre SAS
+> + *
+> + * Author:
+> + *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +
+> +#define DA8XX_DDR_CTL_BASE	0xB0000000
 
-Only the driver authors/maintainers can decide whether this is the case or
-not.
+This base addr should be the reg property of the node.
 
-Thanks,
+> +#define DA8XX_PBBPR_OFFSET	0x00000020
+> +#define DA8XX_PBBPR_REG(p)	((p) + DA8XX_PBBPR_OFFSET)
 
-	tglx
+Kevin
