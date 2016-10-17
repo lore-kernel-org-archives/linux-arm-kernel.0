@@ -1,108 +1,70 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Mon, 17 Oct 2016 11:09:39 -0500
-Subject: [PATCH v20 08/10] ARM: socfpga: fpga bridge driver support
+Date: Mon, 17 Oct 2016 11:09:41 -0500
+Subject: [PATCH v20 10/10] fpga-manager: Add Socfpga Arria10 support
 In-Reply-To: <20161017160941.4205-1-atull@opensource.altera.com>
 References: <20161017160941.4205-1-atull@opensource.altera.com>
-Message-ID: <20161017160941.4205-9-atull@opensource.altera.com>
+Message-ID: <20161017160941.4205-11-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Supports Altera SOCFPGA bridges:
- * fpga2sdram
- * fpga2hps
- * hps2fpga
- * lwhps2fpga
-
-Allows enabling/disabling the bridges through the FPGA
-Bridge Framework API functions.
-
-The fpga2sdram driver only supports enabling and disabling
-of the ports that been configured early on.  This is due to
-a hardware limitation where the read, write, and command
-ports on the fpga2sdram bridge can only be reconfigured
-while there are no transactions to the sdram, i.e. when
-running out of OCRAM before the kernel boots.
-
-Device tree property 'init-val' configures the driver to
-enable or disable the bridge during probe.  If the property
-does not exist, the driver will leave the bridge in its
-current state.
+Add low level driver to support reprogramming FPGAs for Altera
+SoCFPGA Arria10.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
-Signed-off-by: Matthew Gerlach <mgerlach@altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
-v2:  Use resets instead of directly writing reset registers
-v12: Bump version to align with simple-fpga-bus version
-     Get rid of the sysfs interface
-     fpga2sdram: get configuration stored in handoff register
-v13: Remove unneeded WARN_ON
-     Change property from init-val to bridge-enable
-     Checkpatch cleanup
-     Fix email address
-v14: use module_platform_driver
-     remove unused struct field and some #defines
-     don't really need exclamation points on error msgs
-     *const* struct fpga_bridge_ops
-v15: No change in this patch for v15 of this patch set
-v16: No change in this patch for v16 of this patch set
-v17: No change to this patch for v17 of this patch set
-v18: Eliminate need to specify reset names since only one reset
-v19: Set bridge state before registering driver with framework
-     Include fix for drivers sharing the l3_remap_value reg
-     use devm_clk_get
-     make tristate in Kconfig
-     documentation of handoff registers
-v20: No change for this patch in v20 of patchset
+v19: Added to this patchset as has been changed to use
+       fpga image information struct
+     a checkpatch fix of a block comment
+     do not use clk_put because we are using devm_clk_get
+v20: use regmap_read_poll_timeout
+     Add some macros/comments
+     remove some debug prints
 ---
- drivers/fpga/Kconfig             |   7 ++
- drivers/fpga/Makefile            |   1 +
- drivers/fpga/altera-fpga2sdram.c | 180 +++++++++++++++++++++++++++++++
- drivers/fpga/altera-hps2fpga.c   | 221 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 409 insertions(+)
- create mode 100644 drivers/fpga/altera-fpga2sdram.c
- create mode 100644 drivers/fpga/altera-hps2fpga.c
+ drivers/fpga/Kconfig       |   6 +
+ drivers/fpga/Makefile      |   1 +
+ drivers/fpga/socfpga-a10.c | 556 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 563 insertions(+)
+ create mode 100644 drivers/fpga/socfpga-a10.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index e0e1257..5605ad6 100644
+index 8fe6a84..889e4c3 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -40,6 +40,13 @@ config FPGA_BRIDGE
- 	  Say Y here if you want to support bridges connected between host
- 	  processors and FPGAs or between FPGAs.
+@@ -26,6 +26,12 @@ config FPGA_MGR_SOCFPGA
+ 	help
+ 	  FPGA manager driver support for Altera SOCFPGA.
  
-+config SOCFPGA_FPGA_BRIDGE
-+	tristate "Altera SoCFPGA FPGA Bridges"
-+	depends on ARCH_SOCFPGA && FPGA_BRIDGE
++config FPGA_MGR_SOCFPGA_A10
++	tristate "Altera SoCFPGA Arria10"
++	depends on ARCH_SOCFPGA
 +	help
-+	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
-+	  devices.
++	  FPGA manager driver support for Altera Arria10 SoCFPGA.
 +
- endif # FPGA
- 
- endmenu
+ config FPGA_MGR_ZYNQ_FPGA
+ 	tristate "Xilinx Zynq FPGA"
+ 	depends on ARCH_ZYNQ || COMPILE_TEST
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 8d746c3..e658436 100644
+index a6f874d..8df07bc 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
+@@ -7,6 +7,7 @@ obj-$(CONFIG_FPGA)			+= fpga-mgr.o
+ 
+ # FPGA Manager Drivers
+ obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
++obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
+ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
  
  # FPGA Bridge Drivers
- obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
-+obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
- 
- # High Level Interfaces
- obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-diff --git a/drivers/fpga/altera-fpga2sdram.c b/drivers/fpga/altera-fpga2sdram.c
+diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
 new file mode 100644
-index 0000000..7ab358e
+index 0000000..ccd9fb2
 --- /dev/null
-+++ b/drivers/fpga/altera-fpga2sdram.c
-@@ -0,0 +1,180 @@
++++ b/drivers/fpga/socfpga-a10.c
+@@ -0,0 +1,556 @@
 +/*
-+ * FPGA to SDRAM Bridge Driver for Altera SoCFPGA Devices
++ * FPGA Manager Driver for Altera Arria10 SoCFPGA
 + *
-+ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
++ * Copyright (C) 2015-2016 Altera Corporation
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -117,332 +79,495 @@ index 0000000..7ab358e
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+/*
-+ * This driver manages a bridge between an FPGA and the SDRAM used by the ARM
-+ * host processor system (HPS).
-+ *
-+ * The bridge contains 4 read ports, 4 write ports, and 6 command ports.
-+ * Reconfiguring these ports requires that no SDRAM transactions occur during
-+ * reconfiguration.  The code reconfiguring the ports cannot run out of SDRAM
-+ * nor can the FPGA access the SDRAM during reconfiguration.  This driver does
-+ * not support reconfiguring the ports.  The ports are configured by code
-+ * running out of on chip ram before Linux is started and the configuration
-+ * is passed in a handoff register in the system manager.
-+ *
-+ * This driver supports enabling and disabling of the configured ports, which
-+ * allows for safe reprogramming of the FPGA, assuming that the new FPGA image
-+ * uses the same port configuration.  Bridges must be disabled before
-+ * reprogramming the FPGA and re-enabled after the FPGA has been programmed.
-+ */
-+
-+#include <linux/fpga/fpga-bridge.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/delay.h>
++#include <linux/fpga/fpga-mgr.h>
++#include <linux/io.h>
 +#include <linux/module.h>
-+#include <linux/of_platform.h>
++#include <linux/of_address.h>
 +#include <linux/regmap.h>
 +
-+#define ALT_SDR_CTL_FPGAPORTRST_OFST		0x80
-+#define ALT_SDR_CTL_FPGAPORTRST_PORTRSTN_MSK	0x00003fff
-+#define ALT_SDR_CTL_FPGAPORTRST_RD_SHIFT	0
-+#define ALT_SDR_CTL_FPGAPORTRST_WR_SHIFT	4
-+#define ALT_SDR_CTL_FPGAPORTRST_CTRL_SHIFT	8
++#define A10_FPGAMGR_DCLKCNT_OFST				0x08
++#define A10_FPGAMGR_DCLKSTAT_OFST				0x0c
++#define A10_FPGAMGR_IMGCFG_CTL_00_OFST				0x70
++#define A10_FPGAMGR_IMGCFG_CTL_01_OFST				0x74
++#define A10_FPGAMGR_IMGCFG_CTL_02_OFST				0x78
++#define A10_FPGAMGR_IMGCFG_STAT_OFST				0x80
++
++#define A10_FPGAMGR_DCLKSTAT_DCLKDONE				BIT(0)
++
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG		BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS		BIT(1)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE		BIT(2)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG			BIT(8)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_NSTATUS_OE		BIT(16)
++#define A10_FPGAMGR_IMGCFG_CTL_00_S2F_CONDONE_OE		BIT(24)
++
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG		BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST		BIT(16)
++#define A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE			BIT(24)
++
++#define A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL			BIT(0)
++#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK		(BIT(16) | BIT(17))
++#define A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT			16
++#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH			BIT(24)
++#define A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT		24
++
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR			BIT(0)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_EARLY_USERMODE		BIT(1)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE			BIT(2)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN			BIT(4)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN			BIT(6)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY			BIT(9)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE			BIT(10)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR			BIT(11)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN			BIT(12)
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK	(BIT(16) | BIT(17) | BIT(18))
++#define A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT		        16
++
++/* FPGA CD Ratio Value */
++#define CDRATIO_x1						0x0
++#define CDRATIO_x2						0x1
++#define CDRATIO_x4						0x2
++#define CDRATIO_x8						0x3
++
++/* Configuration width 16/32 bit */
++#define CFGWDTH_32						1
++#define CFGWDTH_16						0
 +
 +/*
-+ * From the Cyclone V HPS Memory Map document:
-+ *   These registers are used to store handoff information between the
-+ *   preloader and the OS. These 8 registers can be used to store any
-+ *   information. The contents of these registers have no impact on
-+ *   the state of the HPS hardware.
++ * struct a10_fpga_priv - private data for fpga manager
++ * @regmap: regmap for register access
++ * @fpga_data_addr: iomap for single address data register to FPGA
++ * @clk: clock
 + */
-+#define SYSMGR_ISWGRP_HANDOFF3          (0x8C)
-+
-+#define F2S_BRIDGE_NAME "fpga2sdram"
-+
-+struct alt_fpga2sdram_data {
-+	struct device *dev;
-+	struct regmap *sdrctl;
-+	int mask;
++struct a10_fpga_priv {
++	struct regmap *regmap;
++	void __iomem *fpga_data_addr;
++	struct clk *clk;
 +};
 +
-+static int alt_fpga2sdram_enable_show(struct fpga_bridge *bridge)
++static bool socfpga_a10_fpga_writeable_reg(struct device *dev, unsigned int reg)
 +{
-+	struct alt_fpga2sdram_data *priv = bridge->priv;
-+	int value;
-+
-+	regmap_read(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST, &value);
-+
-+	return (value & priv->mask) == priv->mask;
++	switch (reg) {
++	case A10_FPGAMGR_DCLKCNT_OFST:
++	case A10_FPGAMGR_DCLKSTAT_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
++		return true;
++	}
++	return false;
 +}
 +
-+static inline int _alt_fpga2sdram_enable_set(struct alt_fpga2sdram_data *priv,
-+					     bool enable)
++static bool socfpga_a10_fpga_readable_reg(struct device *dev, unsigned int reg)
 +{
-+	return regmap_update_bits(priv->sdrctl, ALT_SDR_CTL_FPGAPORTRST_OFST,
-+				  priv->mask, enable ? priv->mask : 0);
++	switch (reg) {
++	case A10_FPGAMGR_DCLKCNT_OFST:
++	case A10_FPGAMGR_DCLKSTAT_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_00_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_01_OFST:
++	case A10_FPGAMGR_IMGCFG_CTL_02_OFST:
++	case A10_FPGAMGR_IMGCFG_STAT_OFST:
++		return true;
++	}
++	return false;
 +}
 +
-+static int alt_fpga2sdram_enable_set(struct fpga_bridge *bridge, bool enable)
++static const struct regmap_config socfpga_a10_fpga_regmap_config = {
++	.reg_bits = 32,
++	.reg_stride = 4,
++	.val_bits = 32,
++	.writeable_reg = socfpga_a10_fpga_writeable_reg,
++	.readable_reg = socfpga_a10_fpga_readable_reg,
++	.max_register = A10_FPGAMGR_IMGCFG_STAT_OFST,
++	.cache_type = REGCACHE_NONE,
++};
++
++/*
++ * from the register map description of cdratio in imgcfg_ctrl_02:
++ *  Normal Configuration    : 32bit Passive Parallel
++ *  Partial Reconfiguration : 16bit Passive Parallel
++ */
++static void socfpga_a10_fpga_set_cfg_width(struct a10_fpga_priv *priv,
++					   int width)
 +{
-+	return _alt_fpga2sdram_enable_set(bridge->priv, enable);
++	width <<= A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH_SHIFT;
++
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_CFGWIDTH, width);
 +}
 +
-+struct prop_map {
-+	char *prop_name;
-+	u32 *prop_value;
-+	u32 prop_max;
++static void socfpga_a10_fpga_generate_dclks(struct a10_fpga_priv *priv,
++					    u32 count)
++{
++	u32 val;
++
++	/* Clear any existing DONE status. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
++		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++
++	/* Issue the DCLK regmap. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKCNT_OFST, count);
++
++	/* wait till the dclkcnt done */
++	regmap_read_poll_timeout(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST, val,
++				 val, 1, 100);
++
++	/* Clear DONE status. */
++	regmap_write(priv->regmap, A10_FPGAMGR_DCLKSTAT_OFST,
++		     A10_FPGAMGR_DCLKSTAT_DCLKDONE);
++}
++
++#define RBF_ENCRYPTION_MODE_OFFSET		69
++#define RBF_DECOMPRESS_OFFSET			229
++
++static int socfpga_a10_fpga_encrypted(u32 *buf32, size_t buf32_size)
++{
++	if (buf32_size < RBF_ENCRYPTION_MODE_OFFSET + 1)
++		return -EINVAL;
++
++	/* Is the bitstream encrypted? */
++	return ((buf32[RBF_ENCRYPTION_MODE_OFFSET] >> 2) & 3) != 0;
++}
++
++static int socfpga_a10_fpga_compressed(u32 *buf32, size_t buf32_size)
++{
++	if (buf32_size < RBF_DECOMPRESS_OFFSET + 1)
++		return -EINVAL;
++
++	/* Is the bitstream compressed? */
++	return !((buf32[RBF_DECOMPRESS_OFFSET] >> 1) & 1);
++}
++
++static unsigned int socfpga_a10_fpga_get_cd_ratio(unsigned int cfg_width,
++						  bool encrypt, bool compress)
++{
++	unsigned int cd_ratio;
++
++	/*
++	 * cd ratio is dependent on cfg width and whether the bitstream
++	 * is encrypted and/or compressed.
++	 *
++	 * | width | encr. | compr. | cd ratio |
++	 * |  16   |   0   |   0    |     1    |
++	 * |  16   |   0   |   1    |     4    |
++	 * |  16   |   1   |   0    |     2    |
++	 * |  16   |   1   |   1    |     4    |
++	 * |  32   |   0   |   0    |     1    |
++	 * |  32   |   0   |   1    |     8    |
++	 * |  32   |   1   |   0    |     4    |
++	 * |  32   |   1   |   1    |     8    |
++	 */
++	if (!compress && !encrypt)
++		return CDRATIO_x1;
++
++	if (compress)
++		cd_ratio = CDRATIO_x4;
++	else
++		cd_ratio = CDRATIO_x2;
++
++	/* If 32 bit, double the cd ratio by incrementing the field  */
++	if (cfg_width == CFGWDTH_32)
++		cd_ratio += 1;
++
++	return cd_ratio;
++}
++
++static int socfpga_a10_fpga_set_cdratio(struct fpga_manager *mgr,
++					unsigned int cfg_width,
++					const char *buf, size_t count)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	unsigned int cd_ratio;
++	int encrypt, compress;
++
++	encrypt = socfpga_a10_fpga_encrypted((u32 *)buf, count / 4);
++	if (encrypt < 0)
++		return -EINVAL;
++
++	compress = socfpga_a10_fpga_compressed((u32 *)buf, count / 4);
++	if (compress < 0)
++		return -EINVAL;
++
++	cd_ratio = socfpga_a10_fpga_get_cd_ratio(cfg_width, encrypt, compress);
++
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_MASK,
++			   cd_ratio << A10_FPGAMGR_IMGCFG_CTL_02_CDRATIO_SHIFT);
++
++	return 0;
++}
++
++static u32 socfpga_a10_fpga_read_stat(struct a10_fpga_priv *priv)
++{
++	u32 val;
++
++	regmap_read(priv->regmap, A10_FPGAMGR_IMGCFG_STAT_OFST, &val);
++
++	return val;
++}
++
++static int socfpga_a10_fpga_wait_for_pr_ready(struct a10_fpga_priv *priv)
++{
++	u32 reg, i;
++
++	for (i = 0; i < 10 ; i++) {
++		reg = socfpga_a10_fpga_read_stat(priv);
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
++			return -EINVAL;
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
++			return 0;
++	}
++
++	return -ETIMEDOUT;
++}
++
++static int socfpga_a10_fpga_wait_for_pr_done(struct a10_fpga_priv *priv)
++{
++	u32 reg, i;
++
++	for (i = 0; i < 10 ; i++) {
++		reg = socfpga_a10_fpga_read_stat(priv);
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_ERROR)
++			return -EINVAL;
++
++		if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_DONE)
++			return 0;
++	}
++
++	return -ETIMEDOUT;
++}
++
++/* Start the FPGA programming by initialize the FPGA Manager */
++static int socfpga_a10_fpga_write_init(struct fpga_manager *mgr,
++				       struct fpga_image_info *info,
++				       const char *buf, size_t count)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	unsigned int cfg_width;
++	u32 msel, stat, mask;
++	int ret;
++
++	if (info->flags & FPGA_MGR_PARTIAL_RECONFIG)
++		cfg_width = CFGWDTH_16;
++	else
++		return -EINVAL;
++
++	/* Check for passive parallel (msel == 000 or 001) */
++	msel = socfpga_a10_fpga_read_stat(priv);
++	msel &= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_MASK;
++	msel >>= A10_FPGAMGR_IMGCFG_STAT_F2S_MSEL_SHIFT;
++	if ((msel != 0) && (msel != 1)) {
++		dev_dbg(&mgr->dev, "Fail: invalid msel=%d\n", msel);
++		return -EINVAL;
++	}
++
++	/* Make sure no external devices are interfering */
++	stat = socfpga_a10_fpga_read_stat(priv);
++	mask = A10_FPGAMGR_IMGCFG_STAT_F2S_NCONFIG_PIN |
++	       A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN;
++	if ((stat & mask) != mask)
++		return -EINVAL;
++
++	/* Set cfg width */
++	socfpga_a10_fpga_set_cfg_width(priv, cfg_width);
++
++	/* Determine cd ratio from bitstream header and set cd ratio */
++	ret = socfpga_a10_fpga_set_cdratio(mgr, cfg_width, buf, count);
++	if (ret)
++		return ret;
++
++	/*
++	 * Clear s2f_nce to enable chip select.  Leave pr_request
++	 * unasserted and override disabled.
++	 */
++	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++		     A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
++
++	/* Set cfg_ctrl to enable s2f dclk and data */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL);
++
++	/*
++	 * Disable overrides not needed for pr.
++	 * s2f_config==1 leaves reset deasseted.
++	 */
++	regmap_write(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_00_OFST,
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NCONFIG |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_NSTATUS |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NENABLE_CONDONE |
++		     A10_FPGAMGR_IMGCFG_CTL_00_S2F_NCONFIG);
++
++	/* Enable override for data, dclk, nce, and pr_request to CSS */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG, 0);
++
++	/* Send some clocks to clear out any errors */
++	socfpga_a10_fpga_generate_dclks(priv, 256);
++
++	/* Assert pr_request */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST);
++
++	/* Provide 2048 DCLKs before starting the config data streaming. */
++	socfpga_a10_fpga_generate_dclks(priv, 0x7ff);
++
++	/* Wait for pr_ready */
++	return socfpga_a10_fpga_wait_for_pr_ready(priv);
++}
++
++/*
++ * write data to the FPGA data register
++ */
++static int socfpga_a10_fpga_write(struct fpga_manager *mgr, const char *buf,
++				  size_t count)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 *buffer_32 = (u32 *)buf;
++	size_t i = 0;
++
++	if (count <= 0)
++		return -EINVAL;
++
++	/* Write out the complete 32-bit chunks */
++	while (count >= sizeof(u32)) {
++		writel(buffer_32[i++], priv->fpga_data_addr);
++		count -= sizeof(u32);
++	}
++
++	/* Write out remaining non 32-bit chunks */
++	switch (count) {
++	case 3:
++		writel(buffer_32[i++] & 0x00ffffff, priv->fpga_data_addr);
++		break;
++	case 2:
++		writel(buffer_32[i++] & 0x0000ffff, priv->fpga_data_addr);
++		break;
++	case 1:
++		writel(buffer_32[i++] & 0x000000ff, priv->fpga_data_addr);
++		break;
++	case 0:
++		break;
++	default:
++		/* This will never happen */
++		return -EFAULT;
++	}
++
++	return 0;
++}
++
++static int socfpga_a10_fpga_write_complete(struct fpga_manager *mgr,
++					   struct fpga_image_info *info)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 reg;
++	int ret;
++
++	/* Wait for pr_done */
++	ret = socfpga_a10_fpga_wait_for_pr_done(priv);
++
++	/* Clear pr_request */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_PR_REQUEST, 0);
++
++	/* Send some clocks to clear out any errors */
++	socfpga_a10_fpga_generate_dclks(priv, 256);
++
++	/* Disable s2f dclk and data */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_02_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_02_EN_CFG_CTRL, 0);
++
++	/* Deassert chip select */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NCE);
++
++	/* Disable data, dclk, nce, and pr_request override to CSS */
++	regmap_update_bits(priv->regmap, A10_FPGAMGR_IMGCFG_CTL_01_OFST,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG,
++			   A10_FPGAMGR_IMGCFG_CTL_01_S2F_NENABLE_CONFIG);
++
++	/* Return any errors regarding pr_done or pr_error */
++	if (ret)
++		return ret;
++
++	/* Final check */
++	reg = socfpga_a10_fpga_read_stat(priv);
++
++	if (((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE) == 0) ||
++	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CONDONE_PIN) == 0) ||
++	    ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)) {
++		dev_dbg(&mgr->dev,
++			"Timeout in final check. Status=%08xf\n", reg);
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
++static enum fpga_mgr_states socfpga_a10_fpga_state(struct fpga_manager *mgr)
++{
++	struct a10_fpga_priv *priv = mgr->priv;
++	u32 reg = socfpga_a10_fpga_read_stat(priv);
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_USERMODE)
++		return FPGA_MGR_STATE_OPERATING;
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_PR_READY)
++		return FPGA_MGR_STATE_WRITE;
++
++	if (reg & A10_FPGAMGR_IMGCFG_STAT_F2S_CRC_ERROR)
++		return FPGA_MGR_STATE_WRITE_COMPLETE_ERR;
++
++	if ((reg & A10_FPGAMGR_IMGCFG_STAT_F2S_NSTATUS_PIN) == 0)
++		return FPGA_MGR_STATE_RESET;
++
++	return FPGA_MGR_STATE_UNKNOWN;
++}
++
++static const struct fpga_manager_ops socfpga_a10_fpga_mgr_ops = {
++	.state = socfpga_a10_fpga_state,
++	.write_init = socfpga_a10_fpga_write_init,
++	.write = socfpga_a10_fpga_write,
++	.write_complete = socfpga_a10_fpga_write_complete,
 +};
 +
-+static const struct fpga_bridge_ops altera_fpga2sdram_br_ops = {
-+	.enable_set = alt_fpga2sdram_enable_set,
-+	.enable_show = alt_fpga2sdram_enable_show,
-+};
-+
-+static const struct of_device_id altera_fpga_of_match[] = {
-+	{ .compatible = "altr,socfpga-fpga2sdram-bridge" },
-+	{},
-+};
-+
-+static int alt_fpga_bridge_probe(struct platform_device *pdev)
++static int socfpga_a10_fpga_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct alt_fpga2sdram_data *priv;
-+	u32 enable;
-+	struct regmap *sysmgr;
-+	int ret = 0;
++	struct a10_fpga_priv *priv;
++	void __iomem *reg_base;
++	struct resource *res;
++	int ret;
 +
 +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 +	if (!priv)
 +		return -ENOMEM;
 +
-+	priv->dev = dev;
++	/* First mmio base is for register access */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg_base = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg_base))
++		return PTR_ERR(reg_base);
 +
-+	priv->sdrctl = syscon_regmap_lookup_by_compatible("altr,sdr-ctl");
-+	if (IS_ERR(priv->sdrctl)) {
-+		dev_err(dev, "regmap for altr,sdr-ctl lookup failed.\n");
-+		return PTR_ERR(priv->sdrctl);
-+	}
++	/* Second mmio base is for writing FPGA image data */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	priv->fpga_data_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->fpga_data_addr))
++		return PTR_ERR(priv->fpga_data_addr);
 +
-+	sysmgr = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
-+	if (IS_ERR(priv->sdrctl)) {
-+		dev_err(dev, "regmap for altr,sys-mgr lookup failed.\n");
-+		return PTR_ERR(sysmgr);
-+	}
-+
-+	/* Get f2s bridge configuration saved in handoff register */
-+	regmap_read(sysmgr, SYSMGR_ISWGRP_HANDOFF3, &priv->mask);
-+
-+	ret = fpga_bridge_register(dev, F2S_BRIDGE_NAME,
-+				   &altera_fpga2sdram_br_ops, priv);
-+	if (ret)
-+		return ret;
-+
-+	dev_info(dev, "driver initialized with handoff %08x\n", priv->mask);
-+
-+	if (!of_property_read_u32(dev->of_node, "bridge-enable", &enable)) {
-+		if (enable > 1) {
-+			dev_warn(dev, "invalid bridge-enable %u > 1\n", enable);
-+		} else {
-+			dev_info(dev, "%s bridge\n",
-+				 (enable ? "enabling" : "disabling"));
-+			ret = _alt_fpga2sdram_enable_set(priv, enable);
-+			if (ret) {
-+				fpga_bridge_unregister(&pdev->dev);
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static int alt_fpga_bridge_remove(struct platform_device *pdev)
-+{
-+	fpga_bridge_unregister(&pdev->dev);
-+
-+	return 0;
-+}
-+
-+MODULE_DEVICE_TABLE(of, altera_fpga_of_match);
-+
-+static struct platform_driver altera_fpga_driver = {
-+	.probe = alt_fpga_bridge_probe,
-+	.remove = alt_fpga_bridge_remove,
-+	.driver = {
-+		.name	= "altera_fpga2sdram_bridge",
-+		.of_match_table = of_match_ptr(altera_fpga_of_match),
-+	},
-+};
-+
-+module_platform_driver(altera_fpga_driver);
-+
-+MODULE_DESCRIPTION("Altera SoCFPGA FPGA to SDRAM Bridge");
-+MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/fpga/altera-hps2fpga.c b/drivers/fpga/altera-hps2fpga.c
-new file mode 100644
-index 0000000..63ff0e3
---- /dev/null
-+++ b/drivers/fpga/altera-hps2fpga.c
-@@ -0,0 +1,221 @@
-+/*
-+ * FPGA to/from HPS Bridge Driver for Altera SoCFPGA Devices
-+ *
-+ *  Copyright (C) 2013-2016 Altera Corporation, All Rights Reserved.
-+ *
-+ * Includes this patch from the mailing list:
-+ *   fpga: altera-hps2fpga: fix HPS2FPGA bridge visibility to L3 masters
-+ *   Signed-off-by: Anatolij Gustschin <agust@denx.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/*
-+ * This driver manages bridges on a Altera SOCFPGA between the ARM host
-+ * processor system (HPS) and the embedded FPGA.
-+ *
-+ * This driver supports enabling and disabling of the configured ports, which
-+ * allows for safe reprogramming of the FPGA, assuming that the new FPGA image
-+ * uses the same port configuration.  Bridges must be disabled before
-+ * reprogramming the FPGA and re-enabled after the FPGA has been programmed.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/fpga/fpga-bridge.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/spinlock.h>
-+
-+#define ALT_L3_REMAP_OFST			0x0
-+#define ALT_L3_REMAP_MPUZERO_MSK		0x00000001
-+#define ALT_L3_REMAP_H2F_MSK			0x00000008
-+#define ALT_L3_REMAP_LWH2F_MSK			0x00000010
-+
-+#define HPS2FPGA_BRIDGE_NAME			"hps2fpga"
-+#define LWHPS2FPGA_BRIDGE_NAME			"lwhps2fpga"
-+#define FPGA2HPS_BRIDGE_NAME			"fpga2hps"
-+
-+struct altera_hps2fpga_data {
-+	const char *name;
-+	struct reset_control *bridge_reset;
-+	struct regmap *l3reg;
-+	unsigned int remap_mask;
-+	struct clk *clk;
-+};
-+
-+static int alt_hps2fpga_enable_show(struct fpga_bridge *bridge)
-+{
-+	struct altera_hps2fpga_data *priv = bridge->priv;
-+
-+	return reset_control_status(priv->bridge_reset);
-+}
-+
-+/* The L3 REMAP register is write only, so keep a cached value. */
-+static unsigned int l3_remap_shadow;
-+static spinlock_t l3_remap_lock;
-+
-+static int _alt_hps2fpga_enable_set(struct altera_hps2fpga_data *priv,
-+				    bool enable)
-+{
-+	unsigned long flags;
-+	int ret;
-+
-+	/* bring bridge out of reset */
-+	if (enable)
-+		ret = reset_control_deassert(priv->bridge_reset);
-+	else
-+		ret = reset_control_assert(priv->bridge_reset);
-+	if (ret)
-+		return ret;
-+
-+	/* Allow bridge to be visible to L3 masters or not */
-+	if (priv->remap_mask) {
-+		spin_lock_irqsave(&l3_remap_lock, flags);
-+		l3_remap_shadow |= ALT_L3_REMAP_MPUZERO_MSK;
-+
-+		if (enable)
-+			l3_remap_shadow |= priv->remap_mask;
-+		else
-+			l3_remap_shadow &= ~priv->remap_mask;
-+
-+		ret = regmap_write(priv->l3reg, ALT_L3_REMAP_OFST,
-+				   l3_remap_shadow);
-+		spin_unlock_irqrestore(&l3_remap_lock, flags);
-+	}
-+
-+	return ret;
-+}
-+
-+static int alt_hps2fpga_enable_set(struct fpga_bridge *bridge, bool enable)
-+{
-+	return _alt_hps2fpga_enable_set(bridge->priv, enable);
-+}
-+
-+static const struct fpga_bridge_ops altera_hps2fpga_br_ops = {
-+	.enable_set = alt_hps2fpga_enable_set,
-+	.enable_show = alt_hps2fpga_enable_show,
-+};
-+
-+static struct altera_hps2fpga_data hps2fpga_data  = {
-+	.name = HPS2FPGA_BRIDGE_NAME,
-+	.remap_mask = ALT_L3_REMAP_H2F_MSK,
-+};
-+
-+static struct altera_hps2fpga_data lwhps2fpga_data  = {
-+	.name = LWHPS2FPGA_BRIDGE_NAME,
-+	.remap_mask = ALT_L3_REMAP_LWH2F_MSK,
-+};
-+
-+static struct altera_hps2fpga_data fpga2hps_data  = {
-+	.name = FPGA2HPS_BRIDGE_NAME,
-+};
-+
-+static const struct of_device_id altera_fpga_of_match[] = {
-+	{ .compatible = "altr,socfpga-hps2fpga-bridge",
-+	  .data = &hps2fpga_data },
-+	{ .compatible = "altr,socfpga-lwhps2fpga-bridge",
-+	  .data = &lwhps2fpga_data },
-+	{ .compatible = "altr,socfpga-fpga2hps-bridge",
-+	  .data = &fpga2hps_data },
-+	{},
-+};
-+
-+static int alt_fpga_bridge_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct altera_hps2fpga_data *priv;
-+	const struct of_device_id *of_id;
-+	u32 enable;
-+	int ret;
-+
-+	of_id = of_match_device(altera_fpga_of_match, dev);
-+	priv = (struct altera_hps2fpga_data *)of_id->data;
-+
-+	priv->bridge_reset = of_reset_control_get_by_index(dev->of_node, 0);
-+	if (IS_ERR(priv->bridge_reset)) {
-+		dev_err(dev, "Could not get %s reset control\n", priv->name);
-+		return PTR_ERR(priv->bridge_reset);
-+	}
-+
-+	priv->l3reg = syscon_regmap_lookup_by_compatible("altr,l3regs");
-+	if (IS_ERR(priv->l3reg)) {
-+		dev_err(dev, "regmap for altr,l3regs lookup failed\n");
-+		return PTR_ERR(priv->l3reg);
-+	}
++	/* regmap for register access */
++	priv->regmap = devm_regmap_init_mmio(dev, reg_base,
++					     &socfpga_a10_fpga_regmap_config);
++	if (IS_ERR(priv->regmap))
++		return -ENODEV;
 +
 +	priv->clk = devm_clk_get(dev, NULL);
 +	if (IS_ERR(priv->clk)) {
@@ -456,55 +581,41 @@ index 0000000..63ff0e3
 +		return -EBUSY;
 +	}
 +
-+	spin_lock_init(&l3_remap_lock);
-+
-+	if (!of_property_read_u32(dev->of_node, "bridge-enable", &enable)) {
-+		if (enable > 1) {
-+			dev_warn(dev, "invalid bridge-enable %u > 1\n", enable);
-+		} else {
-+			dev_info(dev, "%s bridge\n",
-+				 (enable ? "enabling" : "disabling"));
-+
-+			ret = _alt_hps2fpga_enable_set(priv, enable);
-+			if (ret) {
-+				fpga_bridge_unregister(&pdev->dev);
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return fpga_bridge_register(dev, priv->name, &altera_hps2fpga_br_ops,
-+				    priv);
++	return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
++				 &socfpga_a10_fpga_mgr_ops, priv);
 +}
 +
-+static int alt_fpga_bridge_remove(struct platform_device *pdev)
++static int socfpga_a10_fpga_remove(struct platform_device *pdev)
 +{
-+	struct fpga_bridge *bridge = platform_get_drvdata(pdev);
-+	struct altera_hps2fpga_data *priv = bridge->priv;
++	struct fpga_manager *mgr = platform_get_drvdata(pdev);
++	struct a10_fpga_priv *priv = mgr->priv;
 +
-+	fpga_bridge_unregister(&pdev->dev);
-+
++	fpga_mgr_unregister(&pdev->dev);
 +	clk_disable_unprepare(priv->clk);
-+	clk_put(priv->clk);
 +
 +	return 0;
 +}
 +
-+MODULE_DEVICE_TABLE(of, altera_fpga_of_match);
++static const struct of_device_id socfpga_a10_fpga_of_match[] = {
++	{ .compatible = "altr,socfpga-a10-fpga-mgr", },
++	{},
++};
 +
-+static struct platform_driver alt_fpga_bridge_driver = {
-+	.probe = alt_fpga_bridge_probe,
-+	.remove = alt_fpga_bridge_remove,
++MODULE_DEVICE_TABLE(of, socfpga_a10_fpga_of_match);
++
++static struct platform_driver socfpga_a10_fpga_driver = {
++	.probe = socfpga_a10_fpga_probe,
++	.remove = socfpga_a10_fpga_remove,
 +	.driver = {
-+		.name	= "altera_hps2fpga_bridge",
-+		.of_match_table = of_match_ptr(altera_fpga_of_match),
++		.name	= "socfpga_a10_fpga_manager",
++		.of_match_table = socfpga_a10_fpga_of_match,
 +	},
 +};
 +
-+module_platform_driver(alt_fpga_bridge_driver);
++module_platform_driver(socfpga_a10_fpga_driver);
 +
-+MODULE_DESCRIPTION("Altera SoCFPGA HPS to FPGA Bridge");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
++MODULE_DESCRIPTION("SoCFPGA Arria10 FPGA Manager");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.10.1
