@@ -1,67 +1,34 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 17 Oct 2016 12:47:29 +0100
-Subject: [PATCH] ARM: dts: mps2: remove skeleton.dtsi include and fix unit
- address warnings
-Message-ID: <1476704849-24039-1-git-send-email-vladimir.murzin@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Oct 2016 13:48:57 +0200
+Subject: [PATCH 0/6] ARM: sun5i: chip: Misc improvements
+Message-ID: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removale of skeleton.dtsi allows us also to fix the following
-warning from the dts compiler:
-  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Hi,
 
-by adding proper unit addresses to the memory nodes.
+This is a bunch of patches I gathered for the CHIP, that enables a few
+things, like the WiFi regulators (and its associated power sequence), a few
+optional buses, etc.
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/boot/dts/mps2-an385.dts |    2 +-
- arch/arm/boot/dts/mps2-an399.dts |    2 +-
- arch/arm/boot/dts/mps2.dtsi      |    4 +++-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+Let me know what you think,
+Maxime
 
-diff --git a/arch/arm/boot/dts/mps2-an385.dts b/arch/arm/boot/dts/mps2-an385.dts
-index 31c374d..aebbebf 100644
---- a/arch/arm/boot/dts/mps2-an385.dts
-+++ b/arch/arm/boot/dts/mps2-an385.dts
-@@ -59,7 +59,7 @@
- 		stdout-path = "serial0:9600n8";
- 	};
- 
--	memory {
-+	memory at 21000000 {
- 		device_type = "memory";
- 		reg = <0x21000000 0x1000000>;
- 	};
-diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
-index 5e7e5ca..349abf7 100644
---- a/arch/arm/boot/dts/mps2-an399.dts
-+++ b/arch/arm/boot/dts/mps2-an399.dts
-@@ -59,7 +59,7 @@
- 		stdout-path = "serial0:9600n8";
- 	};
- 
--	memory {
-+	memory at 60000000 {
- 		device_type = "memory";
- 		reg = <0x60000000 0x1000000>;
- 	};
-diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
-index efb8a03..2346739 100644
---- a/arch/arm/boot/dts/mps2.dtsi
-+++ b/arch/arm/boot/dts/mps2.dtsi
-@@ -42,10 +42,12 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--#include "skeleton.dtsi"
- #include "armv7-m.dtsi"
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	oscclk0: clk-osc0 {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
+Antoine Tenart (1):
+  ARM: sun5i: chip: add a node for the w1 gpio controller
+
+Maxime Ripard (5):
+  ARM: sun5i: chip: Enable Wi-Fi SDIO chip
+  ARM: sun5i: Rename A10s pins
+  ARM: sun5i: Add SPI2 pins
+  ARM: sun5i: Add RGB 565 LCD pins
+  ARM: sun5i: chip: Add optional buses
+
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  4 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  4 +-
+ arch/arm/boot/dts/sun5i-r8-chip.dts              | 69 +++++++++++++++++-
+ arch/arm/boot/dts/sun5i.dtsi                     | 24 ++++++-
+ 4 files changed, 97 insertions(+), 4 deletions(-)
+
 -- 
-1.7.9.5
+git-series 0.8.10
