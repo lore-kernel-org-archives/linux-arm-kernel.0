@@ -1,59 +1,67 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Oct 2016 14:40 +0300
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
- <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com>
-Message-ID: <4975084.EGQPv58AK6@avalon>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 17 Oct 2016 12:47:29 +0100
+Subject: [PATCH] ARM: dts: mps2: remove skeleton.dtsi include and fix unit
+ address warnings
+Message-ID: <1476704849-24039-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Removale of skeleton.dtsi allows us also to fix the following
+warning from the dts compiler:
+  Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-On Monday 17 Oct 2016 10:33:58 Tomi Valkeinen wrote:
-> On 17/10/16 10:12, Sekhar Nori wrote:
->> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
->>> On 15/10/16 20:42, Sekhar Nori wrote:
->>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
->>>>> b/arch/arm/boot/dts/da850.dtsi
->>>>> index f79e1b9..32908ae 100644
->>>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>>> @@ -399,6 +420,14 @@
->>>>>  				<&edma0 0 1>;
->>>>>  			dma-names = "tx", "rx";
->>>>>  		};
->>>>> +
->>>>> +		display: display at 213000 {
->>>>> +			compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
->>>> 
->>>> This should instead be:
->>>> 
->>>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
->>>> 
->>>> as the closest match should appear first in the list.
->>> 
->>> Actually I don't think that's correct. The LCDC on da850 is not
->>> compatible with the LCDC on AM335x. I think it should be just
->>> "ti,da850-tilcdc".
->> 
->> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
->> the case, I wonder how the patch passed testing. Bartosz?
-> 
-> AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
-> similar, but different.
-> 
-> The driver gets the version number from LCDC's register, and acts based
-> on that, so afaik the compatible string doesn't really affect the
-> functionality (as long as it matches).
-> 
-> But even if it works with the current driver, I don't think
-> "ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
+by adding proper unit addresses to the memory nodes.
 
-If the hardware provides IP revision information, how about just "ti,lcdc" ?
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm/boot/dts/mps2-an385.dts |    2 +-
+ arch/arm/boot/dts/mps2-an399.dts |    2 +-
+ arch/arm/boot/dts/mps2.dtsi      |    4 +++-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/boot/dts/mps2-an385.dts b/arch/arm/boot/dts/mps2-an385.dts
+index 31c374d..aebbebf 100644
+--- a/arch/arm/boot/dts/mps2-an385.dts
++++ b/arch/arm/boot/dts/mps2-an385.dts
+@@ -59,7 +59,7 @@
+ 		stdout-path = "serial0:9600n8";
+ 	};
+ 
+-	memory {
++	memory at 21000000 {
+ 		device_type = "memory";
+ 		reg = <0x21000000 0x1000000>;
+ 	};
+diff --git a/arch/arm/boot/dts/mps2-an399.dts b/arch/arm/boot/dts/mps2-an399.dts
+index 5e7e5ca..349abf7 100644
+--- a/arch/arm/boot/dts/mps2-an399.dts
++++ b/arch/arm/boot/dts/mps2-an399.dts
+@@ -59,7 +59,7 @@
+ 		stdout-path = "serial0:9600n8";
+ 	};
+ 
+-	memory {
++	memory at 60000000 {
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x1000000>;
+ 	};
+diff --git a/arch/arm/boot/dts/mps2.dtsi b/arch/arm/boot/dts/mps2.dtsi
+index efb8a03..2346739 100644
+--- a/arch/arm/boot/dts/mps2.dtsi
++++ b/arch/arm/boot/dts/mps2.dtsi
+@@ -42,10 +42,12 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-#include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ 
+ / {
++	#address-cells = <1>;
++	#size-cells = <1>;
++
+ 	oscclk0: clk-osc0 {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
