@@ -1,29 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 17 Oct 2016 17:47:02 +0100
-Subject: [PATCH 1/3] arm64/dts: Add SMMUs to Juno
-In-Reply-To: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
-References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
-Message-ID: <a8396d14-7f4b-692a-1ed3-bfb76add8b6e@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 17 Oct 2016 19:46:09 +0300
+Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable exynos-gsc driver as
+ module
+In-Reply-To: <1475677469-1524-2-git-send-email-javier@osg.samsung.com>
+References: <1475677469-1524-1-git-send-email-javier@osg.samsung.com>
+ <1475677469-1524-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <20161017164609.GB15435@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 05, 2016 at 11:24:29AM -0300, Javier Martinez Canillas wrote:
+> Exynos5 SoCs have a General SCALER (GSCALER) IP block that can be used
+> to do video streams scaling and color space conversions by hardware.
+> Enable support for its driver as a module so the GSCALER can be tested.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 
 
-On 17/10/16 13:13, Robin Murphy wrote:
-> Juno has seperate MMU-401 instances in front of the DMA-330, both HDLCD
-> controllers, the USB host controller, the PCIe root complex, and the
-> CoreSight ETR. Since there is still work to do to make all the relevant
-> subsystems interact nicely with the presence of an IOMMU, add the nodes
-> to aid develompent and testing but leave them disabled by default to
-> avoid nasty surprises.
->
-> CC: Liviu Dudau <liviu.dudau@arm.com>
-> CC: Sudeep Holla <sudeep.holla@arm.com>
 
-Applied to [1] with $subject reformatted and typos fixed
+Thanks, applied.
 
--- 
-Regards,
-Sudeep
-
-[1] git.kernel.org/sudeep.holla/linux/h/juno-dt/for-next
+Best regards,
+Krzysztof
