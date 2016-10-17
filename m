@@ -1,39 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 17 Oct 2016 18:20:59 +0100
-Subject: [PATCH] arm64: sysreg: Fix use of XZR in write_sysreg_s
-Message-ID: <1476724859-18818-1-git-send-email-will.deacon@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 17 Oct 2016 10:29:18 -0700
+Subject: [PATCH V3 RFT 3/5] ARM64: dts: bcm283x: Use dtsi for USB host mode
+In-Reply-To: <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+References: <1471792204-21908-1-git-send-email-stefan.wahren@i2se.com>
+ <1471792204-21908-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87lgxmkhox.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8a71f0c656e0 ("arm64: sysreg: replace open-coded mrs_s/msr_s with
-{read,write}_sysreg_s") introduced a write_sysreg_s macro for writing
-to system registers that are not supported by binutils.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-Unfortunately, this was implemented with the wrong template (%0 vs %x0),
-so in the case that we are writing a constant 0, we will generate
-invalid instruction syntax and bail with a cryptic assembler error:
+> In case dr_mode isn't passed via DT, the dwc2 driver defaults
+> to OTG mode. But the Raspberry Pi 3 is designed only for host mode.
+> So fix this issue by linking to the dtsi file which set the dr_mode
+> to host.
+>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-  | Error: constant expression required
-
-This patch fixes the template.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/sysreg.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index e8d46e8e6079..6c80b3699cb8 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -286,7 +286,7 @@ asm(
- 
- #define write_sysreg_s(v, r) do {					\
- 	u64 __val = (u64)v;						\
--	asm volatile("msr_s " __stringify(r) ", %0" : : "rZ" (__val));	\
-+	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
- } while (0)
- 
- static inline void config_sctlr_el1(u32 clear, u32 set)
--- 
-2.1.4
+Applied Gerd's Tested-by and merged to bcm2835-dt-64-next.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/1eb7a5d5/attachment.sig>
