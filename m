@@ -1,85 +1,324 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 17 Oct 2016 16:46:41 +0100
-Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for heterogeneous
- systems
-Message-ID: <20161017154650.18779-1-juri.lelli@arm.com>
+Date: Mon, 17 Oct 2016 16:46:42 +0100
+Subject: [PATCH v7 REPOST 1/9] Documentation: arm: define DT cpu
+ capacity-dmips-mhz bindings
+In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
+References: <20161017154650.18779-1-juri.lelli@arm.com>
+Message-ID: <20161017154650.18779-2-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+ARM systems may be configured to have cpus with different power/performance
+characteristics within the same chip. In this case, additional information
+has to be made available to the kernel (the scheduler in particular) for it
+to be aware of such differences and take decisions accordingly.
 
-this is a repost of version 7 of "CPUs capacity information for heterogeneous
-systems" patchset [1] (please refer to previous postings to get some context).
-I only added Juno r1 dts, as discussed off-line with Sudeep meanwhile (no code
-changes at all, so that's why I'm saying this is a repost).
+Therefore, this patch aims at standardizing cpu capacities device tree
+bindings for ARM platforms. Bindings define cpu capacity-dmips-mhz
+parameter, to allow operating systems to retrieve such information from
+the device tree and initialize related kernel structures, paving the way
+for common code in the kernel to deal with heterogeneity.
 
-I'm reposting as I didn't receive any comment (despite pinging people) on the
-original v7 posting (apart from Vincent acking patches 2 and 4, thanks!). I
-then waited until merge window for 4.9 was closed.
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
 
-I'm thus now assuming that everybody is OK with the patches and that they can
-be queued for 4.10 (we certainly need this plumbing at this point). Please
-speak if my assumption is wrong (and provide feedback! :).
-Otherwise I'm going to:
+Changes from v1:
+ - removed section regarding capacity-scale
+ - added information regarding normalization
 
- - use Russell's patching system for patches 2 and 8
- - ask Sudeep to pull patches 3,5,6 and 7
- - ask Catalin/Will to pull patches 1,4 and 9
+Changes from v4:
+ - binding changed to capacity-dmips-mhz
+ - sections and changelod updated accordingly
 
-Do you think we might get into trouble splitting the merge process this way?
-Please let me know how to proceed otherwise.
-
-As per orginal v7 posting, patches high level description:
-
- o 01/09 introduces documentation for the new optional DT binding
- o [02-07]/09 add cpu-capacity attribute to TC2, Juno, Juno r1 and Juno r2 DTs
-   and provide parsing of such information at boot time
- o [08-09]/09 introduce sysfs attribute
-
-In case you would like to test this out, I updated the branch here:
-
- git://linux-arm.org/linux-jl.git upstream/default_caps_v7
-
-This branch contains additional patches, useful to better understand how CPU
-capacity information is actually used by the scheduler.
-
-These patches also form the basis for Morten/Dietmar's "Clean-ups and
-asymmetric cpu capacity support" series [2] (and the EAS stack in general).
-
-Best,
-
-- Juri
-
-[1] v1 - https://lkml.org/lkml/2015/11/23/391
-    v2 - https://lkml.org/lkml/2016/1/8/417
-    v3 - https://lkml.org/lkml/2016/2/3/405
-    v4 - https://lkml.org/lkml/2016/3/18/350
-    v5 - https://lkml.org/lkml/2016/6/15/291
-    v6 - https://lkml.org/lkml/2016/7/19/419
-    v7 - https://lkml.org/lkml/2016/9/5/409
-[2] https://lkml.org/lkml/2016/10/14/312 
-
-Juri Lelli (9):
-  Documentation: arm: define DT cpu capacity-dmips-mhz bindings
-  arm: parse cpu capacity-dmips-mhz from DT
-  arm, dts: add TC2 cpu capacity-dmips-mhz information
-  arm64: parse cpu capacity-dmips-mhz from DT
-  arm64, dts: add Juno cpu capacity-dmips-mhz information
-  arm64, dts: add Juno r1 cpu capacity-dmips-mhz information
-  arm64, dts: add Juno r2 cpu capacity-dmips-mhz information
-  arm: add sysfs cpu_capacity attribute
-  arm64: add sysfs cpu_capacity attribute
-
+Changes from v5:
+ - addressed Mark and Vincent comments
+---
  .../devicetree/bindings/arm/cpu-capacity.txt       | 236 +++++++++++++++++++++
  Documentation/devicetree/bindings/arm/cpus.txt     |  10 +
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |   5 +
- arch/arm/kernel/topology.c                         | 229 +++++++++++++++++++-
- arch/arm64/boot/dts/arm/juno-r1.dts                |   6 +
- arch/arm64/boot/dts/arm/juno-r2.dts                |   6 +
- arch/arm64/boot/dts/arm/juno.dts                   |   6 +
- arch/arm64/kernel/topology.c                       | 232 +++++++++++++++++++-
- 8 files changed, 728 insertions(+), 2 deletions(-)
+ 2 files changed, 246 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
 
+diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+new file mode 100644
+index 000000000000..7809fbe0cdb7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+@@ -0,0 +1,236 @@
++==========================================
++ARM CPUs capacity bindings
++==========================================
++
++==========================================
++1 - Introduction
++==========================================
++
++ARM systems may be configured to have cpus with different power/performance
++characteristics within the same chip. In this case, additional information has
++to be made available to the kernel for it to be aware of such differences and
++take decisions accordingly.
++
++==========================================
++2 - CPU capacity definition
++==========================================
++
++CPU capacity is a number that provides the scheduler information about CPUs
++heterogeneity. Such heterogeneity can come from micro-architectural differences
++(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
++(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
++context is about differing performance characteristics; this binding tries to
++capture a first-order approximation of the relative performance of CPUs.
++
++CPU capacities are obtained by running a suitable benchmark. This binding makes
++no guarantees on the validity or suitability of any particular benchmark, the
++final capacity should, however, be:
++
++* A "single-threaded" or CPU affine benchmark
++* Divided by the running frequency of the CPU executing the benchmark
++* Not subject to dynamic frequency scaling of the CPU
++
++For the time being we however advise usage of the Dhrystone benchmark. What
++above thus becomes:
++
++CPU capacities are obtained by running the Dhrystone benchmark on each CPU at
++max frequency (with caches enabled). The obtained DMIPS score is then divided
++by the frequency (in MHz) at which the benchmark has been run, so that
++DMIPS/MHz are obtained.  Such values are then normalized w.r.t. the highest
++score obtained in the system.
++
++==========================================
++3 - capacity-dmips-mhz
++==========================================
++
++capacity-dmips-mhz is an optional cpu node [1] property: u32 value
++representing CPU capacity expressed in normalized DMIPS/MHz. At boot time, the
++maximum frequency available to the cpu is then used to calculate the capacity
++value internally used by the kernel.
++
++capacity-dmips-mhz property is all-or-nothing: if it is specified for a cpu
++node, it has to be specified for every other cpu nodes, or the system will
++fall back to the default capacity value for every CPU. If cpufreq is not
++available, final capacities are calculated by directly using capacity-dmips-
++mhz values (normalized w.r.t. the highest value found while parsing the DT).
++
++===========================================
++4 - Examples
++===========================================
++
++Example 1 (ARM 64-bit, 6-cpu system, two clusters):
++capacities-dmips-mhz are scaled w.r.t. 1024 (cpu at 0 and cpu at 1)
++supposing cluster0 at max-freq=1100 and custer1 at max-freq=850,
++final capacities are 1024 for cluster0 and 446 for cluster1
++
++cpus {
++	#address-cells = <2>;
++	#size-cells = <0>;
++
++	cpu-map {
++		cluster0 {
++			core0 {
++				cpu = <&A57_0>;
++			};
++			core1 {
++				cpu = <&A57_1>;
++			};
++		};
++
++		cluster1 {
++			core0 {
++				cpu = <&A53_0>;
++			};
++			core1 {
++				cpu = <&A53_1>;
++			};
++			core2 {
++				cpu = <&A53_2>;
++			};
++			core3 {
++				cpu = <&A53_3>;
++			};
++		};
++	};
++
++	idle-states {
++		entry-method = "arm,psci";
++
++		CPU_SLEEP_0: cpu-sleep-0 {
++			compatible = "arm,idle-state";
++			arm,psci-suspend-param = <0x0010000>;
++			local-timer-stop;
++			entry-latency-us = <100>;
++			exit-latency-us = <250>;
++			min-residency-us = <150>;
++		};
++
++		CLUSTER_SLEEP_0: cluster-sleep-0 {
++			compatible = "arm,idle-state";
++			arm,psci-suspend-param = <0x1010000>;
++			local-timer-stop;
++			entry-latency-us = <800>;
++			exit-latency-us = <700>;
++			min-residency-us = <2500>;
++		};
++	};
++
++	A57_0: cpu at 0 {
++		compatible = "arm,cortex-a57","arm,armv8";
++		reg = <0x0 0x0>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A57_L2>;
++		clocks = <&scpi_dvfs 0>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <1024>;
++	};
++
++	A57_1: cpu at 1 {
++		compatible = "arm,cortex-a57","arm,armv8";
++		reg = <0x0 0x1>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A57_L2>;
++		clocks = <&scpi_dvfs 0>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <1024>;
++	};
++
++	A53_0: cpu at 100 {
++		compatible = "arm,cortex-a53","arm,armv8";
++		reg = <0x0 0x100>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A53_L2>;
++		clocks = <&scpi_dvfs 1>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <578>;
++	};
++
++	A53_1: cpu at 101 {
++		compatible = "arm,cortex-a53","arm,armv8";
++		reg = <0x0 0x101>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A53_L2>;
++		clocks = <&scpi_dvfs 1>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <578>;
++	};
++
++	A53_2: cpu at 102 {
++		compatible = "arm,cortex-a53","arm,armv8";
++		reg = <0x0 0x102>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A53_L2>;
++		clocks = <&scpi_dvfs 1>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <578>;
++	};
++
++	A53_3: cpu at 103 {
++		compatible = "arm,cortex-a53","arm,armv8";
++		reg = <0x0 0x103>;
++		device_type = "cpu";
++		enable-method = "psci";
++		next-level-cache = <&A53_L2>;
++		clocks = <&scpi_dvfs 1>;
++		cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
++		capacity-dmips-mhz = <578>;
++	};
++
++	A57_L2: l2-cache0 {
++		compatible = "cache";
++	};
++
++	A53_L2: l2-cache1 {
++		compatible = "cache";
++	};
++};
++
++Example 2 (ARM 32-bit, 4-cpu system, two clusters,
++	   cpus 0,1 at 1GHz, cpus 2,3 at 500MHz):
++capacities-dmips-mhz are scaled w.r.t. 2 (cpu at 0 and cpu at 1), this means that first
++cpu at 0 and cpu at 1 are twice fast than cpu at 2 and cpu at 3 (at the same frequency)
++
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	cpu0: cpu at 0 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a15";
++		reg = <0>;
++		capacity-dmips-mhz = <2>;
++	};
++
++	cpu1: cpu at 1 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a15";
++		reg = <1>;
++		capacity-dmips-mhz = <2>;
++	};
++
++	cpu2: cpu at 2 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a15";
++		reg = <0x100>;
++		capacity-dmips-mhz = <1>;
++	};
++
++	cpu3: cpu at 3 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a15";
++		reg = <0x101>;
++		capacity-dmips-mhz = <1>;
++	};
++};
++
++===========================================
++5 - References
++===========================================
++
++[1] ARM Linux Kernel documentation - CPUs bindings
++    Documentation/devicetree/bindings/arm/cpus.txt
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index e6782d50cbcd..c1dcf4cade2e 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -241,6 +241,14 @@ nodes to be present and contain the properties described below.
+ 			# List of phandles to idle state nodes supported
+ 			  by this cpu [3].
+ 
++	- capacity-dmips-mhz
++		Usage: Optional
++		Value type: <u32>
++		Definition:
++			# u32 value representing CPU capacity [3] in
++			  DMIPS/MHz, relative to highest capacity-dmips-mhz
++			  in the system.
++
+ 	- rockchip,pmu
+ 		Usage: optional for systems that have an "enable-method"
+ 		       property value of "rockchip,rk3066-smp"
+@@ -464,3 +472,5 @@ cpus {
+ [2] arm/msm/qcom,kpss-acc.txt
+ [3] ARM Linux kernel documentation - idle states bindings
+     Documentation/devicetree/bindings/arm/idle-states.txt
++[3] ARM Linux kernel documentation - cpu capacity bindings
++    Documentation/devicetree/bindings/arm/cpu-capacity.txt
 -- 
 2.10.0
