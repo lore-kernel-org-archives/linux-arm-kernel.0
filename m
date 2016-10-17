@@ -1,21 +1,34 @@
-From: roy.zang@nxp.com (Roy Zang)
-Date: Mon, 17 Oct 2016 21:58:19 +0000
-Subject: [PATCH] PCI: layerscape: Fix kernel panic on accessing NULL
- pointer
-References: <1476740647-11155-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <HE1PR0402MB2748D72F81AE2193AD2197A98BD00@HE1PR0402MB2748.eurprd04.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Oct 2016 14:58:42 -0700
+Subject: [PATCH v2] arm64: defconfig: enable EEPROM_AT25 config option
+In-Reply-To: <1476298306-9138-1-git-send-email-scott.branden@broadcom.com>
+References: <1476298306-9138-1-git-send-email-scott.branden@broadcom.com>
+Message-ID: <CAOesGMijByw1FYt42toNF6pAEykks_agetQybhgMQj8nAc6xdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2016 04:50 PM, Li Yang wrote:
-> Commit fefe6733e added reference to the pcie->drvdata before it is
-> initialized which causes a kernel panic.  Fix the problem by
-> initializing the pcie->drvdata earlier before it is used.
->
-> Reported-by: Stuart Yoder <stuart.yoder@nxp.com>
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
-> ---
+Hi,
 
- Acked-by:  Roy Zang <roy.zang@nxp.com>
+On Wed, Oct 12, 2016 at 11:51 AM, Scott Branden
+<scott.branden@broadcom.com> wrote:
+> Enable support for on board SPI EEPROM by turning on
+> CONFIG_EEPROM_AT25.  This needs to be on in order to
+> boot and test the kernel with a static rootfs image
+> that is not rebuilt everytime the kernel is rebuilt.
 
-Roy
+If we did this for every kernel option we'd get a huge kernel.
+
+In general, we've said that static options for what's needed to boot
+to rootfs (i.e. storage and network drivers for nfsroot) are fine to
+enable statically.
+
+I doubt you need the EEPROM driver to boot to rootfs on your system,
+so please enable it as a module instead.
+
+Look into using config fragments in case you need to modify the
+options for local builds, it should be a convenient way to have a
+small delta to apply to fit your internal needs, instead of completely
+forking the config file.
+
+
+-Olof
