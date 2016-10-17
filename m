@@ -1,183 +1,63 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 17 Oct 2016 12:49:20 +0100
-Subject: [PATCH 1/2] iommu/mediatek: Convert M4Uv2 to iommu_fwspec
-Message-ID: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Oct 2016 13:49:03 +0200
+Subject: [PATCH 6/6] ARM: sun5i: chip: Add optional buses
+In-Reply-To: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
+References: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <54f17420e7532087c4c63db46a282bfc1678d39e.1476704881.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our per-device data consists of the M4U instance and firmware-provided
-list of LARB IDs, which is a perfect fit for the generic iommu_fwspec
-machinery. Use that directly as a simpler alternative to the custom
-archdata code.
+The I2C1 and SPI2 buses are exposed on the CHIP headers, and are not
+explicitly dedicated to anything.
 
-CC: Yong Wu <yong.wu@mediatek.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Add them to the DTS with the muxing already set, but keep them disabled.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
+ arch/arm/boot/dts/sun5i-r8-chip.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+), 0 deletions(-)
 
-These are fairly mechanical cleanups, so I'm pretty confident, but it
-still bears mentioning that they're only compile-tested as I don't have
-the relevant hardware.
-
-Robin.
-
- drivers/iommu/mtk_iommu.c | 75 ++++++++++++-----------------------------------
- 1 file changed, 18 insertions(+), 57 deletions(-)
-
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index b12c12d74c33..13bb57995cd3 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -195,14 +195,14 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
- static void mtk_iommu_config(struct mtk_iommu_data *data,
- 			     struct device *dev, bool enable)
- {
--	struct mtk_iommu_client_priv *head, *cur, *next;
- 	struct mtk_smi_larb_iommu    *larb_mmu;
- 	unsigned int                 larbid, portid;
-+	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
-+	int i;
+diff --git a/arch/arm/boot/dts/sun5i-r8-chip.dts b/arch/arm/boot/dts/sun5i-r8-chip.dts
+index 059d86865b73..c6da5ad37152 100644
+--- a/arch/arm/boot/dts/sun5i-r8-chip.dts
++++ b/arch/arm/boot/dts/sun5i-r8-chip.dts
+@@ -56,9 +56,11 @@
  
--	head = dev->archdata.iommu;
--	list_for_each_entry_safe(cur, next, &head->client, client) {
--		larbid = MTK_M4U_TO_LARB(cur->mtk_m4u_id);
--		portid = MTK_M4U_TO_PORT(cur->mtk_m4u_id);
-+	for (i = 0; i < fwspec->num_ids; ++i) {
-+		larbid = MTK_M4U_TO_LARB(fwspec->ids[i]);
-+		portid = MTK_M4U_TO_PORT(fwspec->ids[i]);
- 		larb_mmu = &data->smi_imu.larb_imu[larbid];
+ 	aliases {
+ 		i2c0 = &i2c0;
++		i2c1 = &i2c1;
+ 		i2c2 = &i2c2;
+ 		serial0 = &uart1;
+ 		serial1 = &uart3;
++		spi0 = &spi2;
+ 	};
  
- 		dev_dbg(dev, "%s iommu port: %d\n",
-@@ -282,14 +282,12 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
- 				   struct device *dev)
- {
- 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
--	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
--	struct mtk_iommu_data *data;
-+	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
- 	int ret;
+ 	chosen {
+@@ -126,6 +128,12 @@
  
--	if (!priv)
-+	if (!data)
- 		return -ENODEV;
+ #include "axp209.dtsi"
  
--	data = dev_get_drvdata(priv->m4udev);
- 	if (!data->m4u_dom) {
- 		data->m4u_dom = dom;
- 		ret = mtk_iommu_domain_finalise(data);
-@@ -310,13 +308,11 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
- static void mtk_iommu_detach_device(struct iommu_domain *domain,
- 				    struct device *dev)
- {
--	struct mtk_iommu_client_priv *priv = dev->archdata.iommu;
--	struct mtk_iommu_data *data;
-+	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "disabled";
++};
++
+ &i2c2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c2_pins_a>;
+@@ -257,6 +265,12 @@
+ 	status = "okay";
+ };
  
--	if (!priv)
-+	if (!data)
- 		return;
- 
--	data = dev_get_drvdata(priv->m4udev);
- 	mtk_iommu_config(data, dev, false);
- }
- 
-@@ -366,8 +362,8 @@ static int mtk_iommu_add_device(struct device *dev)
- {
- 	struct iommu_group *group;
- 
--	if (!dev->archdata.iommu) /* Not a iommu client device */
--		return -ENODEV;
-+	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
-+		return -ENODEV; /* Not a iommu client device */
- 
- 	group = iommu_group_get_for_dev(dev);
- 	if (IS_ERR(group))
-@@ -379,33 +375,21 @@ static int mtk_iommu_add_device(struct device *dev)
- 
- static void mtk_iommu_remove_device(struct device *dev)
- {
--	struct mtk_iommu_client_priv *head, *cur, *next;
--
--	head = dev->archdata.iommu;
--	if (!head)
-+	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
- 		return;
- 
--	list_for_each_entry_safe(cur, next, &head->client, client) {
--		list_del(&cur->client);
--		kfree(cur);
--	}
--	kfree(head);
--	dev->archdata.iommu = NULL;
--
- 	iommu_group_remove_device(dev);
-+	iommu_fwspec_free(dev);
- }
- 
- static struct iommu_group *mtk_iommu_device_group(struct device *dev)
- {
--	struct mtk_iommu_data *data;
--	struct mtk_iommu_client_priv *priv;
-+	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
- 
--	priv = dev->archdata.iommu;
--	if (!priv)
-+	if (!data)
- 		return ERR_PTR(-ENODEV);
- 
- 	/* All the client devices are in the same m4u iommu-group */
--	data = dev_get_drvdata(priv->m4udev);
- 	if (!data->m4u_group) {
- 		data->m4u_group = iommu_group_alloc();
- 		if (IS_ERR(data->m4u_group))
-@@ -416,7 +400,6 @@ static struct iommu_group *mtk_iommu_device_group(struct device *dev)
- 
- static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
- {
--	struct mtk_iommu_client_priv *head, *priv, *next;
- 	struct platform_device *m4updev;
- 
- 	if (args->args_count != 1) {
-@@ -425,38 +408,16 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 		return -EINVAL;
- 	}
- 
--	if (!dev->archdata.iommu) {
-+	if (!dev->iommu_fwspec->iommu_priv) {
- 		/* Get the m4u device */
- 		m4updev = of_find_device_by_node(args->np);
- 		if (WARN_ON(!m4updev))
- 			return -EINVAL;
- 
--		head = kzalloc(sizeof(*head), GFP_KERNEL);
--		if (!head)
--			return -ENOMEM;
--
--		dev->archdata.iommu = head;
--		INIT_LIST_HEAD(&head->client);
--		head->m4udev = &m4updev->dev;
--	} else {
--		head = dev->archdata.iommu;
-+		dev->iommu_fwspec->iommu_priv = platform_get_drvdata(m4updev);
- 	}
- 
--	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
--	if (!priv)
--		goto err_free_mem;
--
--	priv->mtk_m4u_id = args->args[0];
--	list_add_tail(&priv->client, &head->client);
--
--	return 0;
--
--err_free_mem:
--	list_for_each_entry_safe(priv, next, &head->client, client)
--		kfree(priv);
--	kfree(head);
--	dev->archdata.iommu = NULL;
--	return -ENOMEM;
-+	return iommu_fwspec_add_ids(dev, args->args, 1);
- }
- 
- static struct iommu_ops mtk_iommu_ops = {
++&spi2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi2_pins_a>;
++	status = "disabled";
++};
++
+ &tcon0 {
+ 	status = "okay";
+ };
 -- 
-1.9.1
+git-series 0.8.10
