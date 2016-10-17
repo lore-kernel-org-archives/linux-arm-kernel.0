@@ -1,49 +1,37 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 17 Oct 2016 16:51:17 -0300
-Subject: [PATCH v2] hwrng: meson: Fix module autoload for OF registration
-Message-ID: <1476733877-20275-1-git-send-email-javier@osg.samsung.com>
+Date: Mon, 17 Oct 2016 16:53:31 -0300
+Subject: [PATCH] hwrng: meson: Fix module autoload for OF registration
+In-Reply-To: <CAOMZO5B+iDyNJ-heFU2Th-HQHocLS3Lz5zV7hFhiLs7ESJt2gw@mail.gmail.com>
+References: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
+ <CAOMZO5B+iDyNJ-heFU2Th-HQHocLS3Lz5zV7hFhiLs7ESJt2gw@mail.gmail.com>
+Message-ID: <82c306bc-4214-b923-ea45-f6358ed49722@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver is built as a module, autoload won't work because the module
-alias information is not filled. So user-space can't match the registered
-device with the corresponding module.
+Hello Fabio,
 
-Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+On 10/17/2016 04:45 PM, Fabio Estevam wrote:
+> On Mon, Oct 17, 2016 at 5:40 PM, Javier Martinez Canillas
+> <javier@osg.samsung.com> wrote:
+> 
+>> --- a/drivers/char/tpm/Kconfig
+>> +++ b/drivers/char/tpm/Kconfig
+>> @@ -32,7 +32,7 @@ config TCG_TIS_CORE
+>>
+>>  config TCG_TIS
+>>         tristate "TPM Interface Specification 1.2 Interface / TPM 2.0 FIFO Interface"
+>> -       depends on X86
+>> +       depends on X86 || COMPILE_TEST
+> 
+> This is a separate change.
+> 
 
-Before this patch:
+Yes, I did a commit by mistake. Sorry about that.
 
-$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-alias:          platform:meson-rng
+Jason already pointed out and I posted a v2.
 
-After this patch:
-
-$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-alias:          platform:meson-rng
-alias:          of:N*T*Camlogic,meson-rngC*
-alias:          of:N*T*Camlogic,meson-rng
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
-Changes in v2:
-- Remove unrelated changes added by mistake. Suggested by Jason Gunthorpe.
-
- drivers/char/hw_random/meson-rng.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/char/hw_random/meson-rng.c b/drivers/char/hw_random/meson-rng.c
-index 58bef39f7286..51864a509be7 100644
---- a/drivers/char/hw_random/meson-rng.c
-+++ b/drivers/char/hw_random/meson-rng.c
-@@ -110,6 +110,7 @@ static const struct of_device_id meson_rng_of_match[] = {
- 	{ .compatible = "amlogic,meson-rng", },
- 	{},
- };
-+MODULE_DEVICE_TABLE(of, meson_rng_of_match);
- 
- static struct platform_driver meson_rng_driver = {
- 	.probe	= meson_rng_probe,
+Best regards,
 -- 
-2.7.4
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
