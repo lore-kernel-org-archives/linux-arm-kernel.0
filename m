@@ -1,76 +1,91 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Oct 2016 15:44:48 +0300
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <4975084.EGQPv58AK6@avalon> <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
-Message-ID: <1615142.iysWriV8vb@avalon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Oct 2016 13:47:21 +0100
+Subject: [PATCHv2 4/4] arm64: dump: Add checking for writable and
+ exectuable pages
+In-Reply-To: <1476311522-15381-5-git-send-email-labbott@redhat.com>
+References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
+ <1476311522-15381-5-git-send-email-labbott@redhat.com>
+Message-ID: <20161017124721.GF29095@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Wed, Oct 12, 2016 at 03:32:02PM -0700, Laura Abbott wrote:
+> +config DEBUG_WX
+> +	bool "Warn on W+X mappings at boot"
+> +	select ARM64_PTDUMP_CORE
+> +	---help---
+> +	  Generate a warning if any W+X mappings are found at boot.
+> +
+> +	  This is useful for discovering cases where the kernel is leaving
+> +	  W+X mappings after applying NX, as such mappings are a security risk.
+> +	  This check also includes UXN, which should be set on all kernel
+> +	  mappings.
+> +
+> +	  Look for a message in dmesg output like this:
+> +
+> +	    arm64/mm: Checked W+X mappings: passed, no W+X pages found.
+> +
+> +	  or like this, if the check failed:
+> +
+> +	    arm64/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
+> +
+> +	  Note that even if the check fails, your kernel is possibly
+> +	  still fine, as W+X mappings are not a security hole in
+> +	  themselves, what they do is that they make the exploitation
+> +	  of other unfixed kernel bugs easier.
+> +
+> +	  There is no runtime or memory usage effect of this option
+> +	  once the kernel has booted up - it's a one time check.
+> +
+> +	  If in doubt, say "Y".
+> +
+> +
 
-On Monday 17 Oct 2016 15:29:23 Tomi Valkeinen wrote:
-> On 17/10/16 14:40, Laurent Pinchart wrote:
-> > On Monday 17 Oct 2016 10:33:58 Tomi Valkeinen wrote:
-> >> On 17/10/16 10:12, Sekhar Nori wrote:
-> >>> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
-> >>>> On 15/10/16 20:42, Sekhar Nori wrote:
-> >>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
-> >>>>>> b/arch/arm/boot/dts/da850.dtsi
-> >>>>>> index f79e1b9..32908ae 100644
-> >>>>>> --- a/arch/arm/boot/dts/da850.dtsi
-> >>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
-> >>>>>> @@ -399,6 +420,14 @@
-> >>>>>>  				<&edma0 0 1>;
-> >>>>>>  			dma-names = "tx", "rx";
-> >>>>>>  		};
-> >>>>>> +
-> >>>>>> +		display: display at 213000 {
-> >>>>>> +			compatible = "ti,am33xx-tilcdc", "ti,da850-
-tilcdc";
-> >>>>> 
-> >>>>> This should instead be:
-> >>>>> 
-> >>>>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
-> >>>>> 
-> >>>>> as the closest match should appear first in the list.
-> >>>> 
-> >>>> Actually I don't think that's correct. The LCDC on da850 is not
-> >>>> compatible with the LCDC on AM335x. I think it should be just
-> >>>> "ti,da850-tilcdc".
-> >>> 
-> >>> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
-> >>> the case, I wonder how the patch passed testing. Bartosz?
-> >> 
-> >> AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
-> >> similar, but different.
-> >> 
-> >> The driver gets the version number from LCDC's register, and acts based
-> >> on that, so afaik the compatible string doesn't really affect the
-> >> functionality (as long as it matches).
-> >> 
-> >> But even if it works with the current driver, I don't think
-> >> "ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
-> > 
-> > If the hardware provides IP revision information, how about just "ti,lcdc"
-> > ?
->
-> Maybe, and I agree that's the "correct" way, but looking at the history,
-> it's not just once or twice when we've suddenly found out some
-> difference or bug or such in an IP revision, or the integration to a
-> SoC, that can't be found based on the IP revision.
-> 
-> That's why I feel it's usually safer to have the SoC revision there in
-> the compatible string.
-> 
-> That said, we have only a few different old SoCs with LCDC (compared to,
-> say, OMAP DSS) so in this case perhaps just "ti,lcdc" would be fine.
+Trivial nit: for consistency with the rest of the file, there should
+only be one line space between options.
 
-You obviously know more than I do on this topic so I'll trust your opinion. If 
-the version register isn't enough I'm fine with multiple compatible strings.
+>  config DEBUG_SET_MODULE_RONX
+>  	bool "Set loadable kernel module data as NX and text as RO"
+>  	depends on MODULES
+> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
+> index 8fc0957..6afd847 100644
+> --- a/arch/arm64/include/asm/ptdump.h
+> +++ b/arch/arm64/include/asm/ptdump.h
+> @@ -42,5 +42,13 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
+>  	return 0;
+>  }
+>  #endif
+> +void ptdump_check_wx(void);
+> +#endif /* CONFIG_ARM64_PTDUMP_CORE */
 
--- 
-Regards,
+... ah, here's the missing #endif from patch 1.
 
-Laurent Pinchart
+Assuming that gets sorted out, this looks good to me, and works on juno,
+so FWIW:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+[...]
+
+> +static void note_prot_uxn(struct pg_state *st, unsigned long addr)
+> +{
+> +	if (!st->check_wx)
+> +		return;
+> +
+> +	if ((st->current_prot & PTE_UXN) == PTE_UXN)
+> +		return;
+> +
+> +	WARN_ONCE(1, "arm64/mm: Found non-UXN mapping at address %p/%pS\n",
+> +		  (void *)st->start_address, (void *)st->start_address);
+> +
+> +	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
+> +}
+
+As a future thought (I've scope-creeped this enough with the UXN check),
+there are some other checks that we could add, like verifying the AP
+bits don't allow user data access. That might be worth considering, with
+DEBUG_WX becoming a more general kernel page table sanity check.
+
+Thanks,
+Mark.
