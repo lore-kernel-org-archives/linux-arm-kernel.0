@@ -1,50 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 17 Oct 2016 16:18:39 +0100
-Subject: [PATCH] arm64: kaslr: keep modules close to the kernel when
- DYNAMIC_FTRACE=y
-Message-ID: <1476717519-28424-1-git-send-email-ard.biesheuvel@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 17 Oct 2016 17:23:32 +0200
+Subject: [PATCH] ARM: imx: gpc: Initialize all power domains
+In-Reply-To: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
+References: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <1476717812.2259.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RANDOMIZE_MODULE_REGION_FULL Kconfig option allows KASLR to be
-configured in such a way that kernel modules and the core kernel are
-allocated completely independently, which implies that modules are likely
-to require branches via PLT entries to reach the core kernel. The dynamic
-ftrace code does not expect that, and assumes that it can patch module
-code to perform a relative branch to anywhere in the core kernel. This
-may result in errors such as
+Am Dienstag, den 11.10.2016, 14:53 -0300 schrieb Fabio Estevam:
+> When booting a kernel built with multi_v7_defconfig the following
+> probe error is seen:
+> 
+> imx-gpc: probe of 20dc000.gpc failed with error -22
+> 
+> Later on the kernel crashes like this:
+> 
+> [    1.723358] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+> [    1.731500] pgd = c0204000
+> [    1.731863] hctosys: unable to open rtc device (rtc0)
+> [    1.739301] [00000040] *pgd=00000000
+> [    1.739310] Internal error: Oops: 5 [#1] SMP ARM
+> [    1.739319] Modules linked in:
+> [    1.739328] CPU: 1 PID: 95 Comm: kworker/1:4 Not tainted 4.8.0-11897-g6b5e09a #1
+> [    1.739331] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+> [    1.739352] Workqueue: pm genpd_power_off_work_fn
+> [    1.739356] task: ee63d400 task.stack: ee70a000
+> [    1.739365] PC is at mutex_lock+0xc/0x4c
+> [    1.739374] LR is at regulator_disable+0x2c/0x60
+> [    1.739379] pc : [<c0bc0da0>]    lr : [<c06e4b10>]    psr: 60000013
+> [    1.739379] sp : ee70beb0  ip : 10624dd3  fp : ee6e6280
+> [    1.739382] r10: eefb0900  r9 : 00000000  r8 : c1309918
+> [    1.739385] r7 : 00000000  r6 : 00000040  r5 : 00000000  r4 : 00000040
+> [    1.739390] r3 : 0000004c  r2 : 7fffd540  r1 : 000001e4  r0 : 00000040
+> 
+> The gpc probe fails because of_genpd_add_provider_onecell() checks
+> if all the domains are initialized via pm_genpd_present() function
+> and it returns an error on the multi_v7_defconfig case.
+> 
+> In order to fix this error, initialize all the imx_gpc_domains, not
+> only the imx6q_pu_domain.base one.
+> 
+> Reported-by: Olof's autobooter <build@lixom.net>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-  branch_imm_common: offset out of range
-  ------------[ cut here ]------------
-  WARNING: CPU: 3 PID: 196 at kernel/trace/ftrace.c:1995 ftrace_bug+0x220/0x2e8
-  Modules linked in:
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-  CPU: 3 PID: 196 Comm: systemd-udevd Not tainted 4.8.0-22-generic #24
-  Hardware name: AMD Seattle/Seattle, BIOS 10:34:40 Oct  6 2016
-  task: ffff8d1bef7dde80 task.stack: ffff8d1bef6b0000
-  PC is at ftrace_bug+0x220/0x2e8
-  LR is at ftrace_process_locs+0x330/0x430
-
-So make RANDOMIZE_MODULE_REGION_FULL mutually exclusive with DYNAMIC_FTRACE
-at the Kconfig level.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 30398dbc940a..969ef880d234 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -915,7 +915,7 @@ config RANDOMIZE_BASE
- 
- config RANDOMIZE_MODULE_REGION_FULL
- 	bool "Randomize the module region independently from the core kernel"
--	depends on RANDOMIZE_BASE
-+	depends on RANDOMIZE_BASE && !DYNAMIC_FTRACE
- 	default y
- 	help
- 	  Randomizes the location of the module region without considering the
--- 
-2.7.4
+> ---
+>  arch/arm/mach-imx/gpc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 0df062d..d0463e9 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -430,7 +430,8 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+>  	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+>  		return 0;
+>  
+> -	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+> +	for (i = 0; i < ARRAY_SIZE(imx_gpc_domains); i++)
+> +		pm_genpd_init(imx_gpc_domains[i], NULL, false);
+>  	return of_genpd_add_provider_onecell(dev->of_node,
+>  					     &imx_gpc_onecell_data);
+>  
