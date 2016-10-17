@@ -1,44 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Oct 2016 00:16:08 +0200
-Subject: [PATCH 20/28] net: bcm63xx: avoid referencing uninitialized variable
-In-Reply-To: <20161017220342.1627073-1-arnd@arndb.de>
-References: <20161017220342.1627073-1-arnd@arndb.de>
-Message-ID: <20161017221650.1902729-1-arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Oct 2016 15:20:55 -0700
+Subject: [PATCH] clk: uniphier: add system clock support for sLD3 SoC
+In-Reply-To: <1476630674-29402-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1476630674-29402-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161017222055.GC8871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc found a reference to an uninitialized variable in the error handling
-of bcm_enet_open, introduced by a recent cleanup:
+On 10/17, Masahiro Yamada wrote:
+> I do not know why, but I missed to add this compatible string in
+> the initial commit of this driver.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-drivers/net/ethernet/broadcom/bcm63xx_enet.c: In function 'bcm_enet_open'
-drivers/net/ethernet/broadcom/bcm63xx_enet.c:1129:2: warning: 'phydev' may be used uninitialized in this function [-Wmaybe-uninitialized]
+Applied to clk-fixes
 
-This makes the use of that variable conditional, so we only reference it
-here after it has been used before. Unlike my normal patches, I have not
-build-tested this one, as I don't currently have mips test in my
-randconfig setup.
-
-Fixes: 625eb8667d6f ("net: ethernet: broadcom: bcm63xx: use phydev from struct net_device")
-Cc: Philippe Reynes <tremyfr@gmail.com>
-Reported-by: kbuild test robot <fengguang.wu@intel.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index ae364c7..5370909 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1126,7 +1126,8 @@ static int bcm_enet_open(struct net_device *dev)
- 	free_irq(dev->irq, dev);
- 
- out_phy_disconnect:
--	phy_disconnect(phydev);
-+	if (priv->has_phy)
-+		phy_disconnect(phydev);
- 
- 	return ret;
- }
 -- 
-2.9.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
