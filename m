@@ -1,30 +1,106 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Oct 2016 11:49:36 +0100
-Subject: master build: 2 failures 4 warnings (v4.8-11811-g35ff96d)
-In-Reply-To: <5682869.nmeogTxQJD@wuerfel>
-References: <E1btqa6-0001tx-HV@optimist>
- <20161011101630.xtlcpw76nwjwcbzg@sirena.org.uk>
- <20161014103344.GB3304@dell> <5682869.nmeogTxQJD@wuerfel>
-Message-ID: <20161017104936.GA10208@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Oct 2016 11:52:53 +0100
+Subject: [PATCHv2 1/4] arm64: dump: Make ptdump debugfs a separate option
+In-Reply-To: <1476311522-15381-2-git-send-email-labbott@redhat.com>
+References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
+ <1476311522-15381-2-git-send-email-labbott@redhat.com>
+Message-ID: <20161017105252.GA29095@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 10:12:04PM +0200, Arnd Bergmann wrote:
-> On Friday, October 14, 2016 11:33:44 AM CEST Lee Jones wrote:
+Hi Laura,
 
-> > I'm waiting on a firm answer from Arnd and Thomas before applying
-> > anything.
+In looking at this, I realised I was confused about ptdump_initialize()
+previously, and now see why we can't decouple the debugfs registration
+of the kernel page tables from the rest of the ptdump init. Sorry for
+the noise on that.
 
-> I don't understand what the hardware does, so I'm not really
-> able to answer this. Maybe just mark the driver as 'depends on
-> BROKEN' for now?
+Aside from one issue below, this looks good to me.
 
-There are a few boards using it, we should probably revert the broken
-patches rather than just completely disable the driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161017/3b8b7d09/attachment-0001.sig>
+On Wed, Oct 12, 2016 at 03:31:59PM -0700, Laura Abbott wrote:
+> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
+> index 07b8ed0..7c35689 100644
+> --- a/arch/arm64/include/asm/ptdump.h
+> +++ b/arch/arm64/include/asm/ptdump.h
+> @@ -16,9 +16,10 @@
+>  #ifndef __ASM_PTDUMP_H
+>  #define __ASM_PTDUMP_H
+>  
+> -#ifdef CONFIG_ARM64_PTDUMP
+> +#ifdef CONFIG_ARM64_PTDUMP_CORE
+>  
+>  #include <linux/mm_types.h>
+> +#include <linux/seq_file.h>
+>  
+>  struct addr_marker {
+>  	unsigned long start_address;
+> @@ -32,13 +33,15 @@ struct ptdump_info {
+>  	unsigned long			max_addr;
+>  };
+>  
+> -int ptdump_register(struct ptdump_info *info, const char *name);
+> -
+> +void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
+> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
+>  #else
+> -static inline int ptdump_register(struct ptdump_info *info, const char *name)
+> +static inline int ptdump_debugfs_register(struct ptdump_info *info,
+> +					const char *name)
+>  {
+>  	return 0;
+>  }
+> -#endif /* CONFIG_ARM64_PTDUMP */
+> +#endif
+
+I think you didn't mean to remove the existing endif here?
+
+It's still needed to guard the CONFIG_ARM64_PTDUMP_CORE case, and the
+new one is needed for the new #ifdef CONFIG_ARM64_PTDUMP_DEBUGFS.
+Without it, I get a build error with this patch atop of v4.9-rc1 with
+CONFIG_ARM64_PTDUMP_DEBUGFS selected:
+
+[mark at leverpostej:~/src/linux]% uselinaro 15.08 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j10 -s
+In file included from arch/arm64/mm/ptdump_debugfs.c:4:0:
+./arch/arm64/include/asm/ptdump.h:16:0: error: unterminated #ifndef
+ #ifndef __ASM_PTDUMP_H
+ ^
+make[1]: *** [arch/arm64/mm/ptdump_debugfs.o] Error 1
+make[1]: *** Waiting for unfinished jobs....
+
+With that #endif restored, everything works fine. So FWIW, with that:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+[...]
+
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 7c75a8d..33d35e8 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -39,7 +39,7 @@ static struct mm_struct efi_mm = {
+>  	.mmlist			= LIST_HEAD_INIT(efi_mm.mmlist),
+>  };
+>  
+> -#ifdef CONFIG_ARM64_PTDUMP
+> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+>  #include <asm/ptdump.h>
+>  
+>  static struct ptdump_info efi_ptdump_info = {
+> @@ -53,10 +53,9 @@ static struct ptdump_info efi_ptdump_info = {
+>  
+>  static int __init ptdump_init(void)
+>  {
+> -	return ptdump_register(&efi_ptdump_info, "efi_page_tables");
+> +	return ptdump_debugfs_register(&efi_ptdump_info, "efi_page_tables");
+>  }
+>  device_initcall(ptdump_init);
+> -
+>  #endif
+
+For the EFI changes, we'll need an ack from Ard or Matt; this should
+probably be Cc'd to the linux-efi list for that.
+
+Thanks,
+Mark.
