@@ -1,79 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 17 Oct 2016 16:17:25 -0500
-Subject: [PATCH V4 1/2] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <1476738177-24979-2-git-send-email-agustinv@codeaurora.org>
-References: <1476738177-24979-1-git-send-email-agustinv@codeaurora.org>
- <1476738177-24979-2-git-send-email-agustinv@codeaurora.org>
-Message-ID: <58053FE5.3020208@codeaurora.org>
+From: leoyang.li@nxp.com (Li Yang)
+Date: Mon, 17 Oct 2016 16:44:06 -0500
+Subject: [PATCH] PCI: layerscape: Fix kernel panic on accessing NULL pointer
+Message-ID: <1476740647-11155-1-git-send-email-leoyang.li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just a few nits:
+Commit fefe6733e added reference to the pcie->drvdata before it is
+initialized which causes a kernel panic.  Fix the problem by
+initializing the pcie->drvdata earlier before it is used.
 
-Agustin Vega-Frias wrote:
-> +int acpi_irq_domain_register_irq(struct acpi_resource_source *source, u32 hwirq,
-> +				 int trigger, int polarity)
-> +{
-> +	struct irq_fwspec fwspec;
-> +	struct acpi_device *device;
-> +	acpi_handle handle;
-> +	acpi_status status;
-> +	int ret;
-> +
-> +	if (source->string_length == 0)
+Reported-by: Stuart Yoder <stuart.yoder@nxp.com>
+Signed-off-by: Li Yang <leoyang.li@nxp.com>
+---
+ drivers/pci/host/pci-layerscape.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Would (!source->string_length) be more meaningful?
-
-> +		return acpi_register_gsi(NULL, hwirq, trigger, polarity);
-> +
-> +	status = acpi_get_handle(NULL, source->string_ptr, &handle);
-> +	if (ACPI_FAILURE(status))
-> +		return -ENODEV;
-> +
-> +	device = acpi_bus_get_acpi_device(handle);
-> +	if (!device)
-> +		return -ENODEV;
-> +
-> +	if (acpi_irq_domain_ensure_probed(device))
-> +		return -ENODEV;
-> +
-> +	fwspec.fwnode = &device->fwnode;
-> +	fwspec.param[0] = hwirq;
-> +	fwspec.param[1] = acpi_dev_get_irq_type(trigger, polarity);
-> +	fwspec.param_count = 2;
-> +
-> +	ret = irq_create_fwspec_mapping(&fwspec);
-> +	acpi_bus_put_acpi_device(device);
-> +	return ret;
-
-Blank line before 'return'.
-
-> -static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
-> +static void acpi_dev_get_irqresource(struct resource *res, u32 hwirq,
-> +				     struct acpi_resource_source *source,
-
-This should probably be a 'const', because ...
-
-> @@ -448,6 +449,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->   {
->   	struct acpi_resource_irq *irq;
->   	struct acpi_resource_extended_irq *ext_irq;
-> +	struct acpi_resource_source dummy = { 0, 0, NULL };
-
-... then you can make this a static const, which will reduce code size 
-and improve performance.
-
-> @@ -1024,6 +1030,43 @@ struct acpi_probe_entry {
->   					  (&ACPI_PROBE_TABLE_END(t) -	\
->   					   &ACPI_PROBE_TABLE(t)));	\
->   	})
-> +
-> +#define ACPI_HID_LEN 9
-
-Please add a comment for this.
-
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 2cb7315..958187f 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -245,6 +245,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 	if (!pcie)
+ 		return -ENOMEM;
+ 
++	pcie->drvdata = match->data;
+ 	pp = &pcie->pp;
+ 	pp->dev = dev;
+ 	pp->ops = pcie->drvdata->ops;
+@@ -256,7 +257,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(pcie->pp.dbi_base);
+ 	}
+ 
+-	pcie->drvdata = match->data;
+ 	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
+ 
+ 	if (!ls_pcie_is_bridge(pcie))
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.0
