@@ -1,42 +1,36 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 17 Oct 2016 17:39:22 +0100
-Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for heterogeneous
- systems
-In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
-References: <20161017154650.18779-1-juri.lelli@arm.com>
-Message-ID: <66c7bbfd-ec3f-ff43-9a06-ae644d9ee9d9@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 17 Oct 2016 09:40:30 -0700
+Subject: [PATCH 3/5] [media] rc: meson-ir: Fix module autoload
+In-Reply-To: <1476719053-17600-4-git-send-email-javier@osg.samsung.com>
+References: <1476719053-17600-1-git-send-email-javier@osg.samsung.com>
+ <1476719053-17600-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAOi56cWAaQ51mQG2LrQEg5B4aRcLFzOZAn9hPtGK06xXj0sHmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/10/16 16:46, Juri Lelli wrote:
-> Hi all,
+On Mon, Oct 17, 2016 at 8:44 AM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> If the driver is built as a module, autoload won't work because the module
+> alias information is not filled. So user-space can't match the registered
+> device with the corresponding module.
 >
-> this is a repost of version 7 of "CPUs capacity information for heterogeneous
-> systems" patchset [1] (please refer to previous postings to get some context).
-> I only added Juno r1 dts, as discussed off-line with Sudeep meanwhile (no code
-> changes at all, so that's why I'm saying this is a repost).
+> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 >
-> I'm reposting as I didn't receive any comment (despite pinging people) on the
-> original v7 posting (apart from Vincent acking patches 2 and 4, thanks!). I
-> then waited until merge window for 4.9 was closed.
+> Before this patch:
 >
-> I'm thus now assuming that everybody is OK with the patches and that they can
-> be queued for 4.10 (we certainly need this plumbing at this point). Please
-> speak if my assumption is wrong (and provide feedback! :).
-> Otherwise I'm going to:
+> $ modinfo drivers/media/rc/meson-ir.ko | grep alias
+> $
 >
->  - use Russell's patching system for patches 2 and 8
->  - ask Sudeep to pull patches 3,5,6 and 7
+> After this patch:
+>
+> $ modinfo drivers/media/rc/meson-ir.ko | grep alias
+> alias:          of:N*T*Camlogic,meson-gxbb-irC*
+> alias:          of:N*T*Camlogic,meson-gxbb-ir
+> alias:          of:N*T*Camlogic,meson8b-irC*
+> alias:          of:N*T*Camlogic,meson8b-ir
+> alias:          of:N*T*Camlogic,meson6-irC*
+> alias:          of:N*T*Camlogic,meson6-ir
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-I have applied 3 to [1] and 5,6,7 to [2]. Let me know if things change
-and you want me to drop them with some cosmetic subject change and
-updated changelog.
-
--- 
-Regards,
-Sudeep
-
-[1] git.kernel.org/sudeep.holla/linux/h/vexpress-dt/for-next
-[2] git.kernel.org/sudeep.holla/linux/h/juno-dt/for-next
+Acked-by: Kevin Hilman <khilman@baylibre.com>
