@@ -1,45 +1,53 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 17 Oct 2016 23:00:19 +0200
-Subject: [PATCH v20 02/10] doc: fpga-mgr: add fpga image info to api
-In-Reply-To: <20161017160941.4205-3-atull@opensource.altera.com>
-References: <20161017160941.4205-1-atull@opensource.altera.com>
- <20161017160941.4205-3-atull@opensource.altera.com>
-Message-ID: <CAAtXAHcpwmW_7f2F9vk49hAHpOTs4rk9fFvLzn5zNdPZCy_O7A@mail.gmail.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Mon, 17 Oct 2016 17:02:55 -0400
+Subject: [PATCH V4 0/2] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1476738177-24979-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-couple of nits inline and some comments on ordering the patches ;-)
+The first patch adds support for ResourceSource/IRQ domain mapping
+when using Extended IRQ Resources with a specific ResourceSource.
+The core ACPI resource management code has been changed to lookup
+the IRQ domain when an IRQ resource indicates a ResourceSource,
+and register the IRQ on that domain, instead of a GSI.
 
-On Mon, Oct 17, 2016 at 6:09 PM, Alan Tull <atull@opensource.altera.com> wrote:
-> This patch adds a minor change in the FPGA Mangager API
+The second patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
 
-s/Mangager/Manager/
+Changes V1 -> V2:
+* Remove use of GPIO library for the combiner
+* Refactor to use fwnode/ResourceSource to IRQ domain mapping
+  introduced in ACPI core
 
-> to hold information that is specific to an FPGA image
-> file.  This change is expected to bring little, if any,
-> pain.
->
-> An FPGA image file will have particulars that affect how the
-> image is programmed to the FPGA.  One example is that
-> current 'flags' currently has one bit which shows whether the
-> FPGA image was built for full reconfiguration or partial
-> reconfiguration.  Another example is timeout values for
-> enabling or disabling the bridges in the FPGA.  As the
-> complexity of the FPGA design increases, the bridges in the
-> FPGA may take longer times to enable or disable.
+Changes V2 -> V3:
+* Removed parsing of _PRS to find IRQs
+* Removed acpi_irq_domain_create and acpi_irq_domain_remove
 
-According for the current ordering bridges are not yet defined if we
-merge patches in this order?
-Not terrible imho, but I thought I'd point it out. Would swapping the
-order make sense?
+Changes V3 -> V3:
+* Add a DSDT device probe table that is used to probe DSDT IRQ chips
+  as necessary when converting HW IRQs to Linux IRQs
+* Describe IRQ combiner registers as ACPI Register resources
 
-I also think [5/10] should be squashed together with this commit to
-make it an atomic change.
+Agustin Vega-Frias (2):
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
 
-Apart from my comments above feel free to add my Acked-by
+ drivers/acpi/Makefile               |   1 +
+ drivers/acpi/irqdomain.c            | 135 +++++++++++++++
+ drivers/acpi/resource.c             |  21 ++-
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 332 ++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h   |   1 +
+ include/linux/acpi.h                |  50 ++++++
+ include/linux/irqchip.h             |  17 +-
+ 9 files changed, 554 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/acpi/irqdomain.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
 
-Thanks for keeping this going,
-
-Moritz
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
