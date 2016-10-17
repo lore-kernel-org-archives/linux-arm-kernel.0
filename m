@@ -1,25 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Oct 2016 13:46:18 -0700
-Subject: [PATCH] bus: qcom-ebi2: depend on ARCH_QCOM or COMPILE_TEST
-In-Reply-To: <1475582179-5085-1-git-send-email-linus.walleij@linaro.org>
-References: <1475582179-5085-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161017204618.GB3264@localhost>
+Date: Mon, 17 Oct 2016 13:46:03 -0700
+Subject: [PATCH] ARM: dts: fix the SD card on the Snowball
+In-Reply-To: <1475830337-13016-1-git-send-email-linus.walleij@linaro.org>
+References: <1475830337-13016-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161017204603.GA3264@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 04, 2016 at 01:56:19PM +0200, Linus Walleij wrote:
-> This hides the option for people who do not want their Kconfig
-> vision cluttered (i.e. x86) and enables compile testing apart
-> from the supported main arch.
+On Fri, Oct 07, 2016 at 10:52:17AM +0200, Linus Walleij wrote:
+> This fixes a very annoying regression on the Snowball SD card
+> that has been around for a while. It turns out that the device
+> tree does not configure the direction pins properly, nor sets
+> up the pins for the voltage converter properly at boot. Unless
+> all things are correctly set up, the feedback clock will not
+> work, and makes the driver spew messages in the console (but
+> it works, very slowly):
 > 
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
+> root at Ux500:/ mount /dev/mmcblk0p2 /mnt/
+> [    9.953460] mmci-pl18x 80126000.sdi0_per1: error during DMA transfer!
+> [    9.960296] mmcblk0: error -110 sending status command, retrying
+> [    9.966461] mmcblk0: error -110 sending status command, retrying
+> [    9.972534] mmcblk0: error -110 sending status command, aborting
+> 
+> Fix this by rectifying the device tree to correspond to that of
+> the Ux500 HREF boards plus the DAT31DIR setting that is unique for
+> the Snowball, and things start working smoothly. Add in the SDR12
+> and SDR25 modes which this host can do without any problems.
+> 
+> I don't know if this has ever been correct, sadly. It works after
+> this patch.
+> 
+> Cc: stable at vger.kernel.org
+> Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> ARM SoC people: please apply this to next/drivers as well
-> or as a fix depending on timing.
+> ARM SoC folks: please apply this directly for fixes.
 
-Applied to fixes. Thanks.
+Applied, thanks.
 
 
 -Olof
