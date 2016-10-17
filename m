@@ -1,41 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 17 Oct 2016 16:54:21 +0200
-Subject: Regression: usb serial gadget on sama5d3 broken
-In-Reply-To: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
-References: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
-Message-ID: <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 17 Oct 2016 14:55:40 +0000
+Subject: [PATCH -next] PCI: layerscape: Remove redundant dev_err call in
+ ls_pcie_probe()
+Message-ID: <1476716140-30608-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 17/10/2016 ? 14:53, Peter Rosin a ?crit :
-> Hi!
-> 
-> I'm suffering from a regression while using the usb gadget port on the
-> sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
-> 
-> I get this message when I try to connect:
-> udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
-> 
-> A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
-> USB endpoint nodes".
-> 
-> And indeed, reverting that commit on top of v4.9-rc1 fixes things,
-> although that doesn't look like the best of fixes...
-> 
-> BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
-> somewhere in the overlayfs area. I hope I will never ever need to bisect
-> in the v4.6..v4.7 area again. This was the second time, the first time
-> I was chasing a gpio interrupt bug, but I never found out what was wrong
-> and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
-> was bad, it was just too painful to look for things that already seemed
-> fixed.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-I guess that you are referring to the regression listed here:
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1239220.html
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
-The patch is available and will hopefully land in an official kernel
-soon (4.8.1) as said by Felipe and Greg.
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/pci/host/pci-layerscape.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Sorry for the inconvenience. Best regards,
--- 
-Nicolas Ferre
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 2cb7315..bbd3d23 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -251,10 +251,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+ 
+ 	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+ 	pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
+-	if (IS_ERR(pcie->pp.dbi_base)) {
+-		dev_err(dev, "missing *regs* space\n");
++	if (IS_ERR(pcie->pp.dbi_base))
+ 		return PTR_ERR(pcie->pp.dbi_base);
+-	}
+ 
+ 	pcie->drvdata = match->data;
+ 	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
