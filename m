@@ -1,35 +1,19 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 17 Oct 2016 12:44:06 -0700
-Subject: [PATCH 5/5] MAINTAINERS: Add the staging vchiq driver as a bcm2835
- responsibility.
-In-Reply-To: <20161017194406.1080-1-eric@anholt.net>
-References: <20161017194406.1080-1-eric@anholt.net>
-Message-ID: <20161017194406.1080-6-eric@anholt.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 17 Oct 2016 13:45:01 -0600
+Subject: [PATCH] hwrng: meson: Fix module autoload for OF registration
+In-Reply-To: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
+References: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20161017194501.GD8122@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's being merged to support firmware communication on the Raspberry
-Pi, so we should probably send its patches to linux-rpi-kernel.
+On Mon, Oct 17, 2016 at 04:40:14PM -0300, Javier Martinez Canillas wrote:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+>  drivers/char/hw_random/meson-rng.c | 1 +
+>  drivers/char/tpm/Kconfig           | 2 +-
 
-Greg, I'd be pulling this one through broadcom trees.
+Looks like this patch should not have tpm in it.
 
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1cd38a7e0064..8ed85a51d9c1 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2586,6 +2586,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
- S:	Maintained
- N:	bcm2835
-+F:	drivers/staging/vc04_services
- 
- BROADCOM BCM47XX MIPS ARCHITECTURE
- M:	Hauke Mehrtens <hauke@hauke-m.de>
--- 
-2.9.3
+Jason
