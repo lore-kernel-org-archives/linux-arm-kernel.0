@@ -1,29 +1,44 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 17 Oct 2016 13:30:59 +0200
-Subject: ARM64-cpuinfo: Combine six calls for sequence output into one
- seq_printf() call in c_show()
-In-Reply-To: <20161017105605.GB29095@leverpostej>
-References: <83d98772-8872-1b75-a9a5-5f08b8462e18@users.sourceforge.net>
- <20161017105605.GB29095@leverpostej>
-Message-ID: <a09542e6-9851-45ef-583d-338205217cfc@users.sourceforge.net>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 17 Oct 2016 13:33:59 +0200
+Subject: [PATCH] crygpu/drm/exynos/exynos_hdmi - Unmap region obtained by
+ of_iomap
+In-Reply-To: <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <CGME20161017111000eucas1p13f38f6daa20992f6aa3c9dfc8d2ab495@eucas1p1.samsung.com>
+ <1476702562-24422-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <0147af61-e96e-ba43-55b9-6a58a1539666@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Some data were printed into a sequence by six separate function calls.
->> Print the same data by a single function call instead.
-> 
-> ... why?
-> 
-> Beyond simply having fewer function calls, is there an upside?
 
-Will it matter to improve run time characteristics at this source code place?
+Hi,
 
+On 17.10.2016 13:09, Arvind Yadav wrote:
+> Free memory mapping, if hdmi_probe is not successful.
+>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-> This makes it harder to see the relationship between the format strings
-> and their associated data, and makes the code longer.
+Subject prefix is incorrect.
 
-Do you prefer an other layout for the passed data so that the increase
-of line count in my update suggestion would look differently?
+> ---
+>  drivers/gpu/drm/exynos/exynos_hdmi.c |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> index 2275efe..9b7857b 100644
+> --- a/drivers/gpu/drm/exynos/exynos_hdmi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+> @@ -1901,6 +1901,8 @@ err_disable_pm_runtime:
+>  err_hdmiphy:
+>  	if (hdata->hdmiphy_port)
+>  		put_device(&hdata->hdmiphy_port->dev);
+> +	if (hdata->regs_hdmiphy)
+> +		iounmap(hdata->regs_hdmiphy);
 
-Regards,
-Markus
+Thats OK, you can add also unmap to hdmi_remove.
+
+Regards
+Andrzej
+
+>  err_ddc:
+>  	put_device(&hdata->ddc_adpt->dev);
+>  
