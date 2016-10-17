@@ -1,56 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 17 Oct 2016 21:00:49 +0200
-Subject: Regression: usb serial gadget on sama5d3 broken
-In-Reply-To: <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
-References: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
- <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
- <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
-Message-ID: <20161017190049.d2kw7kua7crysuvs@piout.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 17 Oct 2016 16:40:14 -0300
+Subject: [PATCH] hwrng: meson: Fix module autoload for OF registration
+Message-ID: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/2016 at 19:50:48 +0200, Peter Rosin wrote :
-> On 2016-10-17 16:54, Nicolas Ferre wrote:
-> > Le 17/10/2016 ? 14:53, Peter Rosin a ?crit :
-> >> Hi!
-> >>
-> >> I'm suffering from a regression while using the usb gadget port on the
-> >> sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
-> >>
-> >> I get this message when I try to connect:
-> >> udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
-> >>
-> >> A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
-> >> USB endpoint nodes".
-> >>
-> >> And indeed, reverting that commit on top of v4.9-rc1 fixes things,
-> >> although that doesn't look like the best of fixes...
-> >>
-> >> BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
-> >> somewhere in the overlayfs area. I hope I will never ever need to bisect
-> >> in the v4.6..v4.7 area again. This was the second time, the first time
-> >> I was chasing a gpio interrupt bug, but I never found out what was wrong
-> >> and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
-> >> was bad, it was just too painful to look for things that already seemed
-> >> fixed.
-> > 
-> > I guess that you are referring to the regression listed here:
-> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1239220.html
-> > 
-> > The patch is available and will hopefully land in an official kernel
-> > soon (4.8.1) as said by Felipe and Greg.
-> > 
-> > Sorry for the inconvenience. Best regards,
-> 
-> Ok, I tried "usb: gadget: udc: atmel: fix endpoint name" and it fixes
-> things for me too. But shouldn't the memory for the now dynamic name be
-> allocated with devm_kasprintf instead of that plain kasprint? If you
-> are pedantic...
-> 
+If the driver is built as a module, autoload won't work because the module
+alias information is not filled. So user-space can't match the registered
+device with the corresponding module.
 
-That wouldn't be a bad idea.
+Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 
+Before this patch:
+
+$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
+alias:          platform:meson-rng
+
+After this patch:
+
+$ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
+alias:          platform:meson-rng
+alias:          of:N*T*Camlogic,meson-rngC*
+alias:          of:N*T*Camlogic,meson-rng
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+
+ drivers/char/hw_random/meson-rng.c | 1 +
+ drivers/char/tpm/Kconfig           | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/char/hw_random/meson-rng.c b/drivers/char/hw_random/meson-rng.c
+index 58bef39f7286..51864a509be7 100644
+--- a/drivers/char/hw_random/meson-rng.c
++++ b/drivers/char/hw_random/meson-rng.c
+@@ -110,6 +110,7 @@ static const struct of_device_id meson_rng_of_match[] = {
+ 	{ .compatible = "amlogic,meson-rng", },
+ 	{},
+ };
++MODULE_DEVICE_TABLE(of, meson_rng_of_match);
+ 
+ static struct platform_driver meson_rng_driver = {
+ 	.probe	= meson_rng_probe,
+diff --git a/drivers/char/tpm/Kconfig b/drivers/char/tpm/Kconfig
+index 9faa0b1e7766..982ed2fe927c 100644
+--- a/drivers/char/tpm/Kconfig
++++ b/drivers/char/tpm/Kconfig
+@@ -32,7 +32,7 @@ config TCG_TIS_CORE
+ 
+ config TCG_TIS
+ 	tristate "TPM Interface Specification 1.2 Interface / TPM 2.0 FIFO Interface"
+-	depends on X86
++	depends on X86 || COMPILE_TEST
+ 	select TCG_TIS_CORE
+ 	---help---
+ 	  If you have a TPM security chip that is compliant with the
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
