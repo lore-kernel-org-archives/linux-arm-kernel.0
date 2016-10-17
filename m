@@ -1,120 +1,56 @@
-From: rric@kernel.org (Robert Richter)
-Date: Mon, 17 Oct 2016 20:58:01 +0200
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161006161114.GH22012@rric.localdomain>
-References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
- <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
- <20161006161114.GH22012@rric.localdomain>
-Message-ID: <20161017185801.GT25086@rric.localdomain>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 17 Oct 2016 21:00:49 +0200
+Subject: Regression: usb serial gadget on sama5d3 broken
+In-Reply-To: <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
+References: <569c65cd-4e2e-4455-c24c-074f8c5fd315@axentia.se>
+ <38ca0db7-9bc6-7258-b102-ea9fdeb9b03c@atmel.com>
+ <621565bc-2fa0-bbd1-80cd-6c9b2a494faa@axentia.se>
+Message-ID: <20161017190049.d2kw7kua7crysuvs@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark, Will, any opinion here?
+On 17/10/2016 at 19:50:48 +0200, Peter Rosin wrote :
+> On 2016-10-17 16:54, Nicolas Ferre wrote:
+> > Le 17/10/2016 ? 14:53, Peter Rosin a ?crit :
+> >> Hi!
+> >>
+> >> I'm suffering from a regression while using the usb gadget port on the
+> >> sama5d3 to get terminal access to the device in question (CONFIG_USB_G_SERIAL).
+> >>
+> >> I get this message when I try to connect:
+> >> udc: ep: Invalid setup request: 02.01 v0000 i0081 l0, halting endpoint...
+> >>
+> >> A bisect blames commit v4.7-rc1-21-gc32b5bcfa3c4 "ARM: dts: at91: Fix
+> >> USB endpoint nodes".
+> >>
+> >> And indeed, reverting that commit on top of v4.9-rc1 fixes things,
+> >> although that doesn't look like the best of fixes...
+> >>
+> >> BTW, the bisect was extremely painful since v4.7-rc1 seemed broken
+> >> somewhere in the overlayfs area. I hope I will never ever need to bisect
+> >> in the v4.6..v4.7 area again. This was the second time, the first time
+> >> I was chasing a gpio interrupt bug, but I never found out what was wrong
+> >> and stopped looking when v4.9-rc1 turned out to be ok even though v4.8
+> >> was bad, it was just too painful to look for things that already seemed
+> >> fixed.
+> > 
+> > I guess that you are referring to the regression listed here:
+> > https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1239220.html
+> > 
+> > The patch is available and will hopefully land in an official kernel
+> > soon (4.8.1) as said by Felipe and Greg.
+> > 
+> > Sorry for the inconvenience. Best regards,
+> 
+> Ok, I tried "usb: gadget: udc: atmel: fix endpoint name" and it fixes
+> things for me too. But shouldn't the memory for the now dynamic name be
+> allocated with devm_kasprintf instead of that plain kasprint? If you
+> are pedantic...
+> 
 
-Thanks,
+That wouldn't be a bad idea.
 
--Robert
-
-On 06.10.16 18:11:14, Robert Richter wrote:
-> Ard,
-> 
-> thank you for your answer and you explanation.
-> 
-> On 06.10.16 11:00:33, Ard Biesheuvel wrote:
-> > On 6 October 2016 at 10:52, Robert Richter <rrichter@cavium.com> wrote:
-> > > There is a memory setup problem on ThunderX systems with certain
-> > > memory configurations. The symptom is
-> > >
-> > >  kernel BUG at mm/page_alloc.c:1848!
-> > >
-> > > This happens for some configs with 64k page size enabled. The bug
-> > > triggers for page zones with some pages in the zone not assigned to
-> > > this particular zone. In my case some pages that are marked as nomap
-> > > were not reassigned to the new zone of node 1, so those are still
-> > > assigned to node 0.
-> > >
-> > > The reason for the mis-configuration is a change in pfn_valid() which
-> > > reports pages marked nomap as invalid:
-> > >
-> > >  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
-> > >
-> > 
-> > These pages are owned by the firmware, which may map it with
-> > attributes that conflict with the attributes we use for the linear
-> > mapping. This means they should not be covered by the linear mapping.
-> > 
-> > > This causes pages marked as nomap being no long reassigned to the new
-> > > zone in memmap_init_zone() by calling __init_single_pfn().
-> > >
-> > 
-> > This sounds like the root cause of your issue. Could we not fix that instead?
-> 
-> Yes, this is proposal b) from my last mail that would work too: I
-> implemented an arm64 private early_pfn_valid() function that uses
-> memblock_is_memory() to setup all pages of a zone. Though, I think
-> this is the wrong way and thus I prefer this patch instead. I see
-> serveral reasons for this:
-> 
-> Inconsistent use of struct *page, it is initialized but never used
-> again.
-> 
-> Other archs only do a basic range check in pfn_valid(), the default
-> implementation just returns if the whole section is valid. As I
-> understand the code, if the mem range is not aligned to the section,
-> then there will be pfn's in the section that don't have physical mem
-> attached. The page is then just initialized, it's not marked reserved
-> nor the refcount is non-zero. It is then simply not used. This is how
-> no-map pages should be handled too.
-> 
-> I think pfn_valid() is just a quick check if the pfn's struct *page
-> can be used. There is a good description for this in include/linux/
-> mmzone.h. So there can be memory holes that have a valid pfn.
-> 
-> If the no-map memory needs special handling, then additional checks
-> need to be added to the particular code (as in ioremap.c). It's imo
-> wrong to (mis-)use pfn_valid for that.
-> 
-> Variant b) involves generic mm code to fix it for arm64, this patch is
-> an arm64 change only. This makes it harder to get a fix for it.
-> (Though maybe only a problem of patch logistics.)
-> 
-> > 
-> > > Fixing this by restoring the old behavior of pfn_valid() to use
-> > > memblock_is_memory().
-> > 
-> > This is incorrect imo. In general, pfn_valid() means ordinary memory
-> > covered by the linear mapping and the struct page array. Returning
-> > reserved ranges that the kernel should not even touch only to please
-> > the NUMA code seems like an inappropriate way to deal with this issue.
-> 
-> As said above, it is not marked as reserved, it is treated like
-> non-existing memory.
-> 
-> This has been observed for non-numa kernels too and can happen for
-> each zone that is only partly initialized.
-> 
-> I think the patch addresses your concerns. I can't see there the
-> kernel uses memory marked as nomap in a wrong way.
-> 
-> Thanks,
-> 
-> -Robert
-> 
-> > 
-> > > Also changing users of pfn_valid() in arm64 code
-> > > to use memblock_is_map_memory() where necessary. This only affects
-> > > code in ioremap.c. The code in mmu.c still can use the new version of
-> > > pfn_valid().
-> > >
-> > > Should be marked stable v4.5..
-> > >
-> > > Signed-off-by: Robert Richter <rrichter@cavium.com>
-> > > ---
-> > >  arch/arm64/mm/init.c    | 2 +-
-> > >  arch/arm64/mm/ioremap.c | 5 +++--
-> > >  2 files changed, 4 insertions(+), 3 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
