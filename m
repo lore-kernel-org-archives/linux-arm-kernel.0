@@ -1,19 +1,22 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 17 Oct 2016 13:45:01 -0600
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 17 Oct 2016 17:45:33 -0200
 Subject: [PATCH] hwrng: meson: Fix module autoload for OF registration
 In-Reply-To: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
 References: <1476733214-19044-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20161017194501.GD8122@obsidianresearch.com>
+Message-ID: <CAOMZO5B+iDyNJ-heFU2Th-HQHocLS3Lz5zV7hFhiLs7ESJt2gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 04:40:14PM -0300, Javier Martinez Canillas wrote:
+On Mon, Oct 17, 2016 at 5:40 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
->  drivers/char/hw_random/meson-rng.c | 1 +
->  drivers/char/tpm/Kconfig           | 2 +-
+> --- a/drivers/char/tpm/Kconfig
+> +++ b/drivers/char/tpm/Kconfig
+> @@ -32,7 +32,7 @@ config TCG_TIS_CORE
+>
+>  config TCG_TIS
+>         tristate "TPM Interface Specification 1.2 Interface / TPM 2.0 FIFO Interface"
+> -       depends on X86
+> +       depends on X86 || COMPILE_TEST
 
-Looks like this patch should not have tpm in it.
-
-Jason
+This is a separate change.
