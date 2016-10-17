@@ -1,91 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Oct 2016 13:47:21 +0100
-Subject: [PATCHv2 4/4] arm64: dump: Add checking for writable and
- exectuable pages
-In-Reply-To: <1476311522-15381-5-git-send-email-labbott@redhat.com>
-References: <1476311522-15381-1-git-send-email-labbott@redhat.com>
- <1476311522-15381-5-git-send-email-labbott@redhat.com>
-Message-ID: <20161017124721.GF29095@leverpostej>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 17 Oct 2016 14:51:03 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.8 (#3)
+In-Reply-To: <4853532.G9HOlQ47QA@wuerfel> (Arnd Bergmann's message of "Wed, 21
+ Sep 2016 22:33:01 +0200")
+References: <87intq5z0o.fsf@free-electrons.com> <4853532.G9HOlQ47QA@wuerfel>
+Message-ID: <87insrf8aw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 03:32:02PM -0700, Laura Abbott wrote:
-> +config DEBUG_WX
-> +	bool "Warn on W+X mappings at boot"
-> +	select ARM64_PTDUMP_CORE
-> +	---help---
-> +	  Generate a warning if any W+X mappings are found at boot.
-> +
-> +	  This is useful for discovering cases where the kernel is leaving
-> +	  W+X mappings after applying NX, as such mappings are a security risk.
-> +	  This check also includes UXN, which should be set on all kernel
-> +	  mappings.
-> +
-> +	  Look for a message in dmesg output like this:
-> +
-> +	    arm64/mm: Checked W+X mappings: passed, no W+X pages found.
-> +
-> +	  or like this, if the check failed:
-> +
-> +	    arm64/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
-> +
-> +	  Note that even if the check fails, your kernel is possibly
-> +	  still fine, as W+X mappings are not a security hole in
-> +	  themselves, what they do is that they make the exploitation
-> +	  of other unfixed kernel bugs easier.
-> +
-> +	  There is no runtime or memory usage effect of this option
-> +	  once the kernel has booted up - it's a one time check.
-> +
-> +	  If in doubt, say "Y".
-> +
-> +
+Hi Arnd,
+ 
+ On mer., sept. 21 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Trivial nit: for consistency with the rest of the file, there should
-only be one line space between options.
+> On Tuesday, September 20, 2016 6:14:47 PM CEST Gregory CLEMENT wrote:
+>> mvebu fixes for 4.8 (part 3)
+>> 
+>> - Select corediv clk for all mvebu v7 SoC
+>> - Fix clocksource for CP110 master SPI0 for Armada 7K/8K
+>> 
+>
+> Pulled into fixes, thanks!
 
->  config DEBUG_SET_MODULE_RONX
->  	bool "Set loadable kernel module data as NX and text as RO"
->  	depends on MODULES
-> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-> index 8fc0957..6afd847 100644
-> --- a/arch/arm64/include/asm/ptdump.h
-> +++ b/arch/arm64/include/asm/ptdump.h
-> @@ -42,5 +42,13 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
->  	return 0;
->  }
->  #endif
-> +void ptdump_check_wx(void);
-> +#endif /* CONFIG_ARM64_PTDUMP_CORE */
+I don't see this patch in the v4.8 or the v4.9-rc1.
 
-... ah, here's the missing #endif from patch 1.
+I think it slipped through the cracks as there were the only one in the
+fixes branches.
 
-Assuming that gets sorted out, this looks good to me, and works on juno,
-so FWIW:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-[...]
-
-> +static void note_prot_uxn(struct pg_state *st, unsigned long addr)
-> +{
-> +	if (!st->check_wx)
-> +		return;
-> +
-> +	if ((st->current_prot & PTE_UXN) == PTE_UXN)
-> +		return;
-> +
-> +	WARN_ONCE(1, "arm64/mm: Found non-UXN mapping at address %p/%pS\n",
-> +		  (void *)st->start_address, (void *)st->start_address);
-> +
-> +	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-> +}
-
-As a future thought (I've scope-creeped this enough with the UXN check),
-there are some other checks that we could add, like verifying the AP
-bits don't allow user data access. That might be worth considering, with
-DEBUG_WX becoming a more general kernel page table sanity check.
+Do you think you could make them part of your next pull request for
+fixes for 4.9-rc2?
 
 Thanks,
-Mark.
+
+Gregory
+
+>
+> 	Arnd
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
