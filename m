@@ -1,54 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 17 Oct 2016 21:59:48 +0900
-Subject: [PATCH] usb: ehci-platform: increase EHCI_MAX_RSTS to 4
-In-Reply-To: <20161017123043.GA15142@kroah.com>
-References: <1476702719-10337-1-git-send-email-yamada.masahiro@socionext.com>
- <20161017123043.GA15142@kroah.com>
-Message-ID: <CAK7LNARfi29fzERqwr46z7rVW1S7k85q349WR_3RFxWE6tVTWA@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 17 Oct 2016 15:03:00 +0200
+Subject: [PATCH v4 0/1] Armada 7k/8k CP110 system controller fixes
+In-Reply-To: <CAPv3WKf13FJxGkpt+OcNO--hRQoZr-TtuzCcAJrQwFXjqRgM2Q@mail.gmail.com>
+References: <1474789673-3837-1-git-send-email-mw@semihalf.com>
+ <CAPv3WKf13FJxGkpt+OcNO--hRQoZr-TtuzCcAJrQwFXjqRgM2Q@mail.gmail.com>
+Message-ID: <CAPv3WKdhe+3_2wjSwKD3i0OY5W3aPiaZAnAaidanyAzvvH6d6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Hi Stephen,
 
+Since merge window is closed, I kindly remind about remaining patch.
 
-2016-10-17 21:30 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> On Mon, Oct 17, 2016 at 08:11:59PM +0900, Masahiro Yamada wrote:
->> Socionext LD11 SoC (arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi)
->> needs to handle 4 reset lines for EHCI.
+Best regards,
+Marcin
+
+2016-10-06 21:24 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
+> Hi Stephen,
 >
-> Why?  What makes it different from other EHCI implementations?
+> Do you have any further comments on the remaining patch?
 >
-> thanks,
+> Best regards,
+> Marcin
 >
-> greg k-h
-
-
-This is a generic EHCI driver, but the number of clocks/resets
-are SoC-specific.
-
-
-
-The following patch you picked up will remind you something?
-
-
-
-commit 73577d61799e8d8bb7d69a9acdc54923e5998138
-Author: Icenowy Zheng <icenowy@aosc.xyz>
-Date:   Fri Aug 12 11:06:22 2016 +0800
-
-    ehci-platform: add the max clock number to 4
-
-    Allwinner A64 EHCI requires 4 clocks to be enabled.
-
-    Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-    Acked-by: Alan Stern <stern@rowland.harvard.edu>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 2016-09-25 9:47 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
+>> Hi,
+>>
+>> Two patches from the third version of the patchset have already been
+>> applied, so I re-send the last one with corrected allocation of
+>> clock data, which was pointed in the review.
+>>
+>> Any feedback would be very welcome.
+>>
+>> Best regards,
+>> Marcin
+>>
+>> Changelog:
+>> v4 <- v3
+>> * fix allocation of clock data
+>>
+>> v3 <- v2
+>> * return -ENOMEM on alloc failures
+>>
+>> v1 <- v2
+>> * replace setting CLK_IS_BASIC flag with clearing init structure fields
+>>   with memset
+>> * minor improvements of allocation and error checking
+>> * add migration to clk_hw
+>>
+>>
+>> Marcin Wojtas (1):
+>>   clk: mvebu: migrate CP110 system controller to clk_hw API and
+>>     registration
+>>
+>>  drivers/clk/mvebu/cp110-system-controller.c | 150 +++++++++++++---------------
+>>  1 file changed, 72 insertions(+), 78 deletions(-)
+>>
+>> --
+>> 1.8.3.1
+>>
