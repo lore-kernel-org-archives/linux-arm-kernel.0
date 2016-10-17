@@ -1,40 +1,32 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 17 Oct 2016 14:59:04 +0000
-Subject: [PATCH -next] PCI: xilinx: Add missing of_node_put() in
- xilinx_pcie_init_irq_domain()
-Message-ID: <1476716344-1050-1-git-send-email-weiyj.lk@gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 17 Oct 2016 16:00:46 +0100
+Subject: [PATCH] irqchip: gic-v3-its: fix entry size mask for GITS_BASER
+Message-ID: <1476716446-28646-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Entry Size in GITS_BASER<n> occupies 5 bits [52:48], but we mask out 8
+bits.
 
-This node pointer is returned by of_get_next_child() with refcount
-incremented in this function. of_node_put() on it before exitting
-this function on error.
+Fixes: cc2d3216f53c ("irqchip: GICv3: ITS command queue")
 
-This is detected by Coccinelle semantic patch.
-
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- drivers/pci/host/pcie-xilinx.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index c8616fa..7100ee5 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -529,6 +529,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
- 						 port);
- 	if (!port->leg_domain) {
- 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-+		of_node_put(pcie_intc_node);
- 		return -ENODEV;
- 	}
- 
-@@ -540,6 +541,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
- 							 &xilinx_pcie_msi_chip);
- 		if (!port->msi_domain) {
- 			dev_err(dev, "Failed to get a MSI IRQ domain\n");
-+			of_node_put(pcie_intc_node);
- 			return -ENODEV;
- 		}
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 7dec96f..5118d3a 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -290,7 +290,7 @@
+ #define GITS_BASER_TYPE_SHIFT			(56)
+ #define GITS_BASER_TYPE(r)		(((r) >> GITS_BASER_TYPE_SHIFT) & 7)
+ #define GITS_BASER_ENTRY_SIZE_SHIFT		(48)
+-#define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0xff) + 1)
++#define GITS_BASER_ENTRY_SIZE(r)	((((r) >> GITS_BASER_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
+ #define GITS_BASER_SHAREABILITY_SHIFT	(10)
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+-- 
+1.7.9.5
