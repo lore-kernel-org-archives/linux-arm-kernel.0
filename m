@@ -1,54 +1,29 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 17 Oct 2016 17:46:58 +0100
-Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for
- heterogeneous systems
-In-Reply-To: <66c7bbfd-ec3f-ff43-9a06-ae644d9ee9d9@arm.com>
-References: <20161017154650.18779-1-juri.lelli@arm.com>
- <66c7bbfd-ec3f-ff43-9a06-ae644d9ee9d9@arm.com>
-Message-ID: <20161017164658.GE25339@e106622-lin>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 17 Oct 2016 17:47:02 +0100
+Subject: [PATCH 1/3] arm64/dts: Add SMMUs to Juno
+In-Reply-To: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
+References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
+Message-ID: <a8396d14-7f4b-692a-1ed3-bfb76add8b6e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
 
-On 17/10/16 17:39, Sudeep Holla wrote:
-> 
-> 
-> On 17/10/16 16:46, Juri Lelli wrote:
-> >Hi all,
-> >
-> >this is a repost of version 7 of "CPUs capacity information for heterogeneous
-> >systems" patchset [1] (please refer to previous postings to get some context).
-> >I only added Juno r1 dts, as discussed off-line with Sudeep meanwhile (no code
-> >changes at all, so that's why I'm saying this is a repost).
-> >
-> >I'm reposting as I didn't receive any comment (despite pinging people) on the
-> >original v7 posting (apart from Vincent acking patches 2 and 4, thanks!). I
-> >then waited until merge window for 4.9 was closed.
-> >
-> >I'm thus now assuming that everybody is OK with the patches and that they can
-> >be queued for 4.10 (we certainly need this plumbing at this point). Please
-> >speak if my assumption is wrong (and provide feedback! :).
-> >Otherwise I'm going to:
-> >
-> > - use Russell's patching system for patches 2 and 8
-> > - ask Sudeep to pull patches 3,5,6 and 7
-> 
-> I have applied 3 to [1] and 5,6,7 to [2]. Let me know if things change
-> and you want me to drop them with some cosmetic subject change and
-> updated changelog.
-> 
 
-Thanks!
+On 17/10/16 13:13, Robin Murphy wrote:
+> Juno has seperate MMU-401 instances in front of the DMA-330, both HDLCD
+> controllers, the USB host controller, the PCIe root complex, and the
+> CoreSight ETR. Since there is still work to do to make all the relevant
+> subsystems interact nicely with the presence of an IOMMU, add the nodes
+> to aid develompent and testing but leave them disabled by default to
+> avoid nasty surprises.
+>
+> CC: Liviu Dudau <liviu.dudau@arm.com>
+> CC: Sudeep Holla <sudeep.holla@arm.com>
 
-Best,
+Applied to [1] with $subject reformatted and typos fixed
 
-- Juri
+-- 
+Regards,
+Sudeep
 
-> -- 
-> Regards,
-> Sudeep
-> 
-> [1] git.kernel.org/sudeep.holla/linux/h/vexpress-dt/for-next
-> [2] git.kernel.org/sudeep.holla/linux/h/juno-dt/for-next
-> 
+[1] git.kernel.org/sudeep.holla/linux/h/juno-dt/for-next
