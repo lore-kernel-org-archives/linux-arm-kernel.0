@@ -1,81 +1,102 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 18 Oct 2016 20:31:32 +0100
-Subject: [PATCH 1/3] ARM: remove indirection of asm/mach-types.h
-Message-ID: <E1bwa6m-0004ZS-VJ@rmk-PC.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 18 Oct 2016 21:45:05 +0200
+Subject: [PATCH 02/28] [v2] mtd: mtk: avoid warning in mtk_ecc_encode
+In-Reply-To: <1476785552.24626.4.camel@mtkswgap22>
+References: <20161017220342.1627073-1-arnd@arndb.de>
+ <20161017220557.1688282-2-arnd@arndb.de>
+ <20161018071948.0b7eef05@bbrezillon>
+ <1476785552.24626.4.camel@mtkswgap22>
+Message-ID: <20161018214505.489628db@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arrange for mach-types.h to be directly generated in the relevant
-path, so we don't need a one-liner file in arch/arm/include/asm/.
+On Tue, 18 Oct 2016 18:12:32 +0800
+RogerCC.Lin <rogercc.lin@mediatek.com> wrote:
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/Makefile                 |  2 +-
- arch/arm/include/asm/Kbuild       |  2 ++
- arch/arm/include/asm/mach-types.h |  1 -
- arch/arm/tools/Makefile           | 16 +++++++++++++++-
- 4 files changed, 18 insertions(+), 3 deletions(-)
- delete mode 100644 arch/arm/include/asm/mach-types.h
+> On Tue, 2016-10-18 at 07:19 +0200, Boris Brezillon wrote:
+> > On Tue, 18 Oct 2016 00:05:31 +0200
+> > Arnd Bergmann <arnd@arndb.de> wrote:
+> >   
+> > > When building with -Wmaybe-uninitialized, gcc produces a silly false positive
+> > > warning for the mtk_ecc_encode function:
+> > > 
+> > > drivers/mtd/nand/mtk_ecc.c: In function 'mtk_ecc_encode':
+> > > drivers/mtd/nand/mtk_ecc.c:402:15: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> > > 
+> > > The function for some reason contains a double byte swap on big-endian
+> > > builds to get the OOB data into the correct order again, and is written
+> > > in a slightly confusing way.
+> > > 
+> > > Using a simple memcpy32_fromio() to read the data simplifies it a lot
+> > > so it becomes more readable and produces no warning. However, the
+> > > output might not have 32-bit alignment, so we have to use another
+> > > memcpy to avoid taking alignment faults or writing beyond the end
+> > > of the array.
+> > > 
+> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>  
+> > 
+> > Jorge, RogerCC, can I have an Acked-by and/or Tested-by for this patch?  
+> Tested, this patch is OK,
+> Tested-by: RogerCC Lin <rogercc.lin@mediatek.com>
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 6be9ee148b78..2208a73ba1d4 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -312,7 +312,7 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
- boot := arch/arm/boot
- 
- archprepare:
--	$(Q)$(MAKE) $(build)=arch/arm/tools include/generated/mach-types.h
-+	$(Q)$(MAKE) $(build)=arch/arm/tools kapi
- 
- # Convert bzImage to zImage
- bzImage: zImage
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index 0745538b26d3..5b06064946ce 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -39,3 +39,5 @@ generic-y += termios.h
- generic-y += timex.h
- generic-y += trace_clock.h
- generic-y += unaligned.h
-+
-+generated-y += mach-types.h
-diff --git a/arch/arm/include/asm/mach-types.h b/arch/arm/include/asm/mach-types.h
-deleted file mode 100644
-index 948178cc6ba8..000000000000
---- a/arch/arm/include/asm/mach-types.h
-+++ /dev/null
-@@ -1 +0,0 @@
--#include <generated/mach-types.h>
-diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-index 6e4cd1867a9f..bdf48e4949ad 100644
---- a/arch/arm/tools/Makefile
-+++ b/arch/arm/tools/Makefile
-@@ -4,10 +4,24 @@
- # Copyright (C) 2001 Russell King
- #
- 
-+gen := arch/$(ARCH)/include/generated
-+kapi := $(gen)/asm
-+
-+kapi-hdrs-y := $(kapi)/mach-types.h
-+
-+targets += $(addprefix ../../../,$(kapi-hdrs-y))
-+
-+PHONY += kapi
-+
-+kapi:	$(kapi-hdrs-y)
-+
-+# Create output directory if not already present
-+_dummy := $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)')
-+
- quiet_cmd_gen_mach = GEN     $@
-       cmd_gen_mach = mkdir -p $(dir $@) && \
- 		     $(AWK) -f $(filter-out $(PHONY),$^) > $@ || \
- 		     { rm -f $@; /bin/false; }
- 
--include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
-+$(kapi)/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
- 	$(call if_changed,gen_mach)
--- 
-2.1.0
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Brian, can you take this patch for the next -rc?
+
+> 
+> >   
+> > > ---
+> > > v2: move temporary buffer into struct mtk_ecc instead of having it
+> > >     on the stack, as suggested by Boris Brezillon
+> > > ---
+> > >  drivers/mtd/nand/mtk_ecc.c | 19 +++++++++----------
+> > >  1 file changed, 9 insertions(+), 10 deletions(-)
+> > > 
+> > > diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
+> > > index d54f666..dbf2562 100644
+> > > --- a/drivers/mtd/nand/mtk_ecc.c
+> > > +++ b/drivers/mtd/nand/mtk_ecc.c
+> > > @@ -86,6 +86,8 @@ struct mtk_ecc {
+> > >  	struct completion done;
+> > >  	struct mutex lock;
+> > >  	u32 sectors;
+> > > +
+> > > +	u8 eccdata[112];
+> > >  };
+> > >  
+> > >  static inline void mtk_ecc_wait_idle(struct mtk_ecc *ecc,
+> > > @@ -366,9 +368,8 @@ int mtk_ecc_encode(struct mtk_ecc *ecc, struct mtk_ecc_config *config,
+> > >  		   u8 *data, u32 bytes)
+> > >  {
+> > >  	dma_addr_t addr;
+> > > -	u8 *p;
+> > > -	u32 len, i, val;
+> > > -	int ret = 0;
+> > > +	u32 len;
+> > > +	int ret;
+> > >  
+> > >  	addr = dma_map_single(ecc->dev, data, bytes, DMA_TO_DEVICE);
+> > >  	ret = dma_mapping_error(ecc->dev, addr);
+> > > @@ -393,14 +394,12 @@ int mtk_ecc_encode(struct mtk_ecc *ecc, struct mtk_ecc_config *config,
+> > >  
+> > >  	/* Program ECC bytes to OOB: per sector oob = FDM + ECC + SPARE */
+> > >  	len = (config->strength * ECC_PARITY_BITS + 7) >> 3;
+> > > -	p = data + bytes;
+> > >  
+> > > -	/* write the parity bytes generated by the ECC back to the OOB region */
+> > > -	for (i = 0; i < len; i++) {
+> > > -		if ((i % 4) == 0)
+> > > -			val = readl(ecc->regs + ECC_ENCPAR(i / 4));
+> > > -		p[i] = (val >> ((i % 4) * 8)) & 0xff;
+> > > -	}
+> > > +	/* write the parity bytes generated by the ECC back to temp buffer */
+> > > +	__ioread32_copy(ecc->eccdata, ecc->regs + ECC_ENCPAR(0), round_up(len, 4));
+> > > +
+> > > +	/* copy into possibly unaligned OOB region with actual length */
+> > > +	memcpy(data + bytes, ecc->eccdata, len);
+> > >  timeout:
+> > >  
+> > >  	dma_unmap_single(ecc->dev, addr, bytes, DMA_TO_DEVICE);  
+> >   
+> 
+> 
