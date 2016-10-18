@@ -1,36 +1,51 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 17 Oct 2016 18:43:37 -0600
-Subject: [PATCH] media: s5p-mfc include buffer size in error message
-Message-ID: <20161018004337.26831-1-shuahkh@osg.samsung.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 18 Oct 2016 08:50:28 +0800
+Subject: [PATCH -next] PCI: rockchip: Add missing of_node_put() in
+ rockchip_pcie_init_irq_domain()
+In-Reply-To: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
+References: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <87c39739-c9d0-b307-5256-591ef7324ffa@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include buffer size in s5p_mfc_alloc_priv_buf() the error message when it
-fails to allocate the buffer. Remove the debug message that does the same.
+? 2016/10/17 22:57, Wei Yongjun ??:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+>
+> This node pointer is returned by of_get_next_child() with refcount
+> incremented in this function. of_node_put() on it before exitting
+> this function on error.
+>
+> This is detected by Coccinelle semantic patch.
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
----
- drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Thanks for fixing this.
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-index 1e72502..eee16a1 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-@@ -40,12 +40,11 @@ void s5p_mfc_init_regs(struct s5p_mfc_dev *dev)
- int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
- 					struct s5p_mfc_priv_buf *b)
- {
--	mfc_debug(3, "Allocating priv: %zu\n", b->size);
--
- 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
- 
- 	if (!b->virt) {
--		mfc_err("Allocating private buffer failed\n");
-+		mfc_err("Allocating private buffer of size %zu failed\n",
-+			b->size);
- 		return -ENOMEM;
- 	}
- 
+Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
+
+>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/pci/host/pcie-rockchip.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index e0b22da..ab88859 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -949,6 +949,7 @@ static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
+>  						    &intx_domain_ops, rockchip);
+>  	if (!rockchip->irq_domain) {
+>  		dev_err(dev, "failed to get a INTx IRQ domain\n");
+> +		of_node_put(intc);
+>  		return -EINVAL;
+>  	}
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
 -- 
-2.7.4
+Best Regards
+Shawn Lin
