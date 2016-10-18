@@ -1,20 +1,25 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 17 Oct 2016 17:54:57 -0700
-Subject: [PATCH v2 2/2] arm64: dts: Updated NAND DT properties for NS2 SVK
-In-Reply-To: <8832e18c-cd77-9fe1-8bd8-a2d65390666a@broadcom.com>
-References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
- <1469051631-7896-3-git-send-email-ray.jui@broadcom.com>
- <8832e18c-cd77-9fe1-8bd8-a2d65390666a@broadcom.com>
-Message-ID: <9657d27d-dbfa-e629-f5d4-4f7a748d5033@gmail.com>
+Date: Mon, 17 Oct 2016 17:58:05 -0700
+Subject: [PATCH 3/3] arm64: dts: Update Broadcom NS2 to generic IOMMU
+ binding
+In-Reply-To: <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
+References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
+ <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
+Message-ID: <77abd968-f412-a118-5b19-5faf539f33be@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2016 01:49 PM, Ray Jui wrote:
-> Hi Florian,
+On 10/17/2016 05:13 AM, Robin Murphy wrote:
+> With the "mmu-masters" property now deprecated and optional, the
+> generic binding offers a more efficient way to specify no masters.
 > 
-> Would you be able to help to queue the following patch for v4.10? Sorry
-> I did not include you in the "To" field of the original email.
+> CC: Ray Jui <rjui@broadcom.com>
+> CC: Scott Branden <sbranden@broadcom.com>
+> CC: Jon Mason <jonmason@broadcom.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Applied, thanks!
+Applied, did you use get_maintainers.pl for this file? It did not land
+in bcm-kernel-feedback-list at broadcom.com and as such did not get picked
+by the patchwork instance behind..
 -- 
 Florian
