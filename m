@@ -1,41 +1,58 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Oct 2016 11:28:18 +0100
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <20161018100002.GA4347@xo-6d-61-c0.localdomain>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
- <20161018100002.GA4347@xo-6d-61-c0.localdomain>
-Message-ID: <20161018102818.GA1212@red-moon>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 18 Oct 2016 11:27:45 +0100
+Subject: [PATCH 0/3] PAN Fixes
+Message-ID: <1476786468-2173-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
-> Hi!
-> 
-> > >b. in arm64, if some platform has its own suspend flow,  couldn't it
-> > >adopts arm/match-xxx to register its own global suspend method?
-> > >
-> > 
-> > No, PSCI is highly recommended.
-> 
-> Relying on firmware for suspend on x86 was a great disaster, lets not
-> repeat that mistake. arm32 has better powermanagement than x86 ever
-> will (see Nokia N900 for example) -- feel free to copy that code from
-> arm32.
+Hi all,
 
-Yes sure, feel free to copy my:
+This series fixes two issues for PAN discovered by Vladimir and Tony:
+ * Patch 2 changes the cpu_enable_pan() to not only enable the automatic
+   PAN setting when return to the kernel from userspace, but also turn
+   it on right now. This covers the case where a pre-empted task may be
+   migrated to a new CPU that hasn't yet done a return-to-user.
 
-NACKed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ * Patch 1 is a prerequisite which fixes the enable() calls to not use
+   an IPI, (details in the patch). This means we can modify PSTATE from
+   an enable call, which is broken today, but we don't actually depend
+   on it...
 
-to all the resulting patches then. On ARM64 if he wants to implement
-suspend-to-RAM his PSCI firmware will have to implement PSCI system
-suspend method, end of this discussion.
+Patch 3 fixes a third issue where we lose the PSTATE value over cpu-idle,
+this will be a problem in the same pre-empted task migrated to a
+'new' CPU case above, and if we return from idle to a user task, (which
+I believe suspend-to-ram does).
 
-By the way, why are you advising people on this subject ?
+Patch 1 changes the prototype of all the enable calls, so can't be
+backported. I will produce separate backports for v4.4.25 and v4.7.8.
 
-What do you know about the PSCI firmware interface to state what
-you are saying above ?
+Based on v4.9-rc1, with [0] applied locally to fix cpuhotplug. This
+series can be retrieved from:
 
-Lorenzo
+
+Thanks,
+
+James
+
+
+[0]  https://www.spinics.net/lists/kernel/msg2357812.html
+
+James Morse (3):
+  arm64: cpufeature: Schedule enable() calls instead of calling them via
+    IPI
+  arm64: mm: Set PSTATE.PAN from the cpu_enable_pan() call
+  arm64: suspend: Reconfigure PSTATE after resume from idle
+
+ arch/arm64/include/asm/cpufeature.h |  2 +-
+ arch/arm64/include/asm/exec.h       |  3 +++
+ arch/arm64/include/asm/processor.h  |  6 +++---
+ arch/arm64/kernel/cpu_errata.c      |  3 ++-
+ arch/arm64/kernel/cpufeature.c      | 10 +++++++++-
+ arch/arm64/kernel/process.c         |  3 ++-
+ arch/arm64/kernel/suspend.c         | 11 +++++++++++
+ arch/arm64/kernel/traps.c           |  3 ++-
+ arch/arm64/mm/fault.c               | 15 +++++++++++++--
+ 9 files changed, 46 insertions(+), 10 deletions(-)
+
+-- 
+2.8.0.rc3
