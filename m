@@ -1,45 +1,18 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 18 Oct 2016 09:43:03 +0200
-Subject: [PATCH 2/3] ARM: socfpga: socrates: enable qspi
-In-Reply-To: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
-References: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
-Message-ID: <20161018074304.6744-2-s.trumtrar@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 18 Oct 2016 15:43:00 +0800
+Subject: [PATCH v2 9/9] ARM: sunxi: Convert pinctrl nodes to generic
+ bindings
+In-Reply-To: <e32d044d2d967f24f12d83eea50e7f14f2ae1073.1476200742.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <e32d044d2d967f24f12d83eea50e7f14f2ae1073.1476200742.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67_4iriM2WS33hUWzNZY8R2WvGjqzntGBPGmNkr1Ryr_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the qspi controller on the socrates and add the flash chip.
+On Tue, Oct 11, 2016 at 11:46 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Now that we can handle the generic pinctrl bindings, convert our DT to it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-index d79853775061..c3d52f27b21e 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-@@ -80,3 +80,22 @@
- &mmc {
- 	status = "okay";
- };
-+
-+&qspi {
-+	status = "okay";
-+
-+	flash: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "n25q256a";
-+		reg = <0>;
-+		spi-max-frequency = <100000000>;
-+		m25p,fast-read;
-+		cdns,read-delay = <4>;
-+		cdns,tshsl-ns = <50>;
-+		cdns,tsd2d-ns = <50>;
-+		cdns,tchsh-ns = <4>;
-+		cdns,tslch-ns = <4>;
-+		status = "okay";
-+	};
-+};
--- 
-2.9.3
+Acked-by: Chen-Yu Tsai <wens@csie.org>
