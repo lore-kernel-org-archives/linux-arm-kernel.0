@@ -1,66 +1,33 @@
 From: ayaka@soulik.info (Randy Li)
-Date: Wed, 19 Oct 2016 01:18:49 +0800
-Subject: [PATCH v9 2/2] ARM: dts: add TOPEET itop elite based board
+Date: Wed, 19 Oct 2016 01:18:48 +0800
+Subject: [PATCH v9 1/2] ARM: dts: Add TOPEET itop core board SCP package
+ version
 In-Reply-To: <1476811129-4450-1-git-send-email-ayaka@soulik.info>
 References: <devicetree@vger.kernel.org>
  <1476811129-4450-1-git-send-email-ayaka@soulik.info>
-Message-ID: <1476811129-4450-3-git-send-email-ayaka@soulik.info>
+Message-ID: <1476811129-4450-2-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TOPEET itop exynos 4412 have three versions base board. The
-Elite version is the cheap one without too much peripheral devices
-on it.
+The TOPEET itop is a samsung exnynos 4412 core board, which have
+two package versions. This patch add the support for SCP version.
 
-Currently supported are serial console, wired networking(USB),
-USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
-PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
-enabled.
-
-The FIMC is not used for camera currently, I enabled it just for a
-colorspace converter.
+Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
+PMIC. The future features are in the based board. Also MFC and
+watchdog have been enabled.
 
 Signed-off-by: Randy Li <ayaka@soulik.info>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- .../bindings/arm/samsung/samsung-boards.txt        |   3 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/exynos4412-itop-elite.dts        | 240 +++++++++++++++++++++
- 3 files changed, 244 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos4412-itop-elite.dts
+ arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 501 ++++++++++++++++++++++++
+ 1 file changed, 501 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-index 0ea7f14..5160fa5 100644
---- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-@@ -22,6 +22,9 @@ Required root node properties:
-   * FriendlyARM
- 	- "friendlyarm,tiny4412"  - for Exynos4412-based FriendlyARM
- 				    TINY4412 board.
-+  * TOPEET
-+	- "topeet,itop4412-elite" - for Exynos4412-based TOPEET
-+                                    Elite base board.
- 
-   * Google
- 	- "google,pi"		- for Exynos5800-based Google Peach Pi
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..d709f74 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -136,6 +136,7 @@ dtb-$(CONFIG_ARCH_EXYNOS4) += \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
- 	exynos4210-universal_c210.dtb \
-+	exynos4412-itop-elite.dtb \
- 	exynos4412-odroidu3.dtb \
- 	exynos4412-odroidx.dtb \
- 	exynos4412-odroidx2.dtb \
-diff --git a/arch/arm/boot/dts/exynos4412-itop-elite.dts b/arch/arm/boot/dts/exynos4412-itop-elite.dts
+diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
 new file mode 100644
-index 0000000..7440e54
+index 0000000..881dc76
 --- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-itop-elite.dts
-@@ -0,0 +1,240 @@
++++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+@@ -0,0 +1,501 @@
 +/*
 + * TOPEET's Exynos4412 based itop board device tree source
 + *
@@ -68,237 +35,498 @@ index 0000000..7440e54
 + *			https://www.sumomo.mobi
 + *			Randy Li <ayaka@soulik.info>
 + *
-+ * Device tree source file for TOPEET iTop Exynos 4412 core board
-+ * which is based on Samsung's Exynos4412 SoC.
++ * Device tree source file for TOPEET iTop Exynos 4412 SCP package core
++ * board which is based on Samsung's Exynos4412 SoC.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
 +
-+/dts-v1/;
-+#include <dt-bindings/pwm/pwm.h>
-+#include <dt-bindings/sound/samsung-i2s.h>
-+#include "exynos4412-itop-scp-core.dtsi"
++#include <dt-bindings/clock/samsung,s2mps11.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "exynos4412.dtsi"
++#include "exynos4412-ppmu-common.dtsi"
++#include "exynos-mfc-reserved-memory.dtsi"
 +
 +/ {
-+	model = "TOPEET iTop 4412 Elite board based on Exynos4412";
-+	compatible = "topeet,itop4412-elite", "samsung,exynos4412", "samsung,exynos4";
-+
-+	chosen {
-+		bootargs = "root=/dev/mmcblk0p2 rw rootfstype=ext4 rootdelay=1 rootwait";
-+		stdout-path = "serial2:115200n8";
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0x40000000 0x40000000>;
 +	};
 +
-+	leds {
-+		compatible = "gpio-leds";
++	firmware at 0203F000 {
++		compatible = "samsung,secure-firmware";
++		reg = <0x0203F000 0x1000>;
++	};
 +
-+		led2 {
-+			label = "red:system";
-+			gpios = <&gpx1 0 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti";
++			clock-frequency = <0>;
 +		};
 +
-+		led3 {
-+			label = "red:user";
-+			gpios = <&gpk1 1 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
++		xusbxti {
++			compatible = "samsung,clock-xusbxti";
++			clock-frequency = <24000000>;
 +		};
 +	};
 +
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		home {
-+			label = "GPIO Key Home";
-+			linux,code = <KEY_HOME>;
-+			gpios = <&gpx1 1 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		back {
-+			label = "GPIO Key Back";
-+			linux,code = <KEY_BACK>;
-+			gpios = <&gpx1 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		sleep {
-+			label = "GPIO Key Sleep";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpx3 3 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		vol-up {
-+			label = "GPIO Key Vol+";
-+			linux,code = <KEY_UP>;
-+			gpios = <&gpx2 1 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		vol-down {
-+			label = "GPIO Key Vol-";
-+			linux,code = <KEY_DOWN>;
-+			gpios = <&gpx2 0 GPIO_ACTIVE_LOW>;
++	thermal-zones {
++		cpu_thermal: cpu-thermal {
++			cooling-maps {
++				map0 {
++				     /* Corresponds to 800MHz at freq_table */
++				     cooling-device = <&cpu0 7 7>;
++				};
++				map1 {
++				     /* Corresponds to 200MHz at freq_table */
++				     cooling-device = <&cpu0 13 13>;
++			       };
++		       };
 +		};
 +	};
 +
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "wm-sound";
-+
-+		assigned-clocks = <&clock_audss EXYNOS_MOUT_AUDSS>,
-+				<&clock_audss EXYNOS_MOUT_I2S>,
-+				<&clock_audss EXYNOS_DOUT_SRP>,
-+				<&clock_audss EXYNOS_DOUT_AUD_BUS>;
-+		assigned-clock-parents = <&clock CLK_FOUT_EPLL>,
-+				<&clock_audss EXYNOS_MOUT_AUDSS>;
-+		assigned-clock-rates = <0>,
-+				<0>,
-+				<112896000>,
-+				<11289600>;
-+
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&link0_codec>;
-+		simple-audio-card,frame-master = <&link0_codec>;
-+
-+		simple-audio-card,widgets =
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In",
-+			"Line", "Line Out",
-+			"Speaker", "Speaker",
-+			"Headphone", "Headphone Jack";
-+		simple-audio-card,routing =
-+			"Headphone Jack", "HP_L",
-+			"Headphone Jack", "HP_R",
-+			"Speaker", "SPK_LP",
-+			"Speaker", "SPK_LN",
-+			"Speaker", "SPK_RP",
-+			"Speaker", "SPK_RN",
-+			"LINPUT1", "Mic Jack",
-+			"LINPUT3", "Mic Jack",
-+			"RINPUT1", "Mic Jack",
-+			"RINPUT2", "Mic Jack";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&i2s0 0>;
-+		};
-+
-+		link0_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&i2s0 CLK_I2S_CDCLK>;
-+			system-clock-frequency = <11289600>;
-+		};
-+	};
-+
-+	beep {
-+		compatible = "pwm-beeper";
-+		pwms = <&pwm 0 4000000 PWM_POLARITY_INVERTED>;
-+	};
-+
-+	camera: camera {
-+		pinctrl-0 = <&cam_port_a_clk_active>;
++	usb-hub {
++		compatible = "smsc,usb3503a";
++		reset-gpios = <&gpm2 4 GPIO_ACTIVE_LOW>;
++		connect-gpios = <&gpm3 3 GPIO_ACTIVE_HIGH>;
++		intn-gpios = <&gpx2 3 GPIO_ACTIVE_HIGH>;
 +		pinctrl-names = "default";
-+		status = "okay";
-+		assigned-clocks = <&clock CLK_MOUT_CAM0>;
-+		assigned-clock-parents = <&clock CLK_XUSBXTI>;
++		pinctrl-0 = <&hsic_reset>;
 +	};
 +};
 +
-+&adc {
-+	vdd-supply = <&ldo3_reg>;
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
 +	status = "okay";
 +};
 +
-+&ehci {
-+	status = "okay";
-+	/* In order to reset USB ethernet */
-+	samsung,vbus-gpio = <&gpc0 1 GPIO_ACTIVE_HIGH>;
-+
-+	port at 0 {
-+		status = "okay";
-+	};
-+
-+	port at 2 {
-+		status = "okay";
-+	};
-+};
-+
-+&exynos_usbphy {
++&bus_acp {
++	devfreq = <&bus_dmc>;
 +	status = "okay";
 +};
 +
-+&fimc_0 {
++&bus_c2c {
++	devfreq = <&bus_dmc>;
 +	status = "okay";
-+	assigned-clocks = <&clock CLK_MOUT_FIMC0>,
-+			<&clock CLK_SCLK_FIMC0>;
-+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
-+	assigned-clock-rates = <0>, <176000000>;
++};
++
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
++
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
 +};
 +
 +&hsotg {
-+	dr_mode = "peripheral";
-+	status = "okay";
++	vusb_d-supply = <&ldo15_reg>;
++	vusb_a-supply = <&ldo12_reg>;
 +};
 +
-+&i2c_4 {
++&i2c_1 {
++	#address-cells = <1>;
++	#size-cells = <0>;
 +	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <100000>;
-+	pinctrl-0 = <&i2c4_bus>;
++	samsung,i2c-max-bus-freq = <400000>;
++	pinctrl-0 = <&i2c1_bus>;
 +	pinctrl-names = "default";
 +	status = "okay";
 +
-+	codec: wm8960 at 1a {
-+		compatible = "wlf,wm8960";
-+		reg = <0x1a>;
-+		clocks = <&pmu_system_controller 0>;
-+		clock-names = "MCLK1";
-+		wlf,shared-lrclk;
-+		#sound-dai-cells = <0>;
++	s5m8767: s5m8767-pmic at 66 {
++		compatible = "samsung,s5m8767-pmic";
++		reg = <0x66>;
++
++		s5m8767,pmic-buck-default-dvs-idx = <3>;
++
++		s5m8767,pmic-buck-dvs-gpios = <&gpb 5 GPIO_ACTIVE_HIGH>,
++						 <&gpb 6 GPIO_ACTIVE_HIGH>,
++						 <&gpb 7 GPIO_ACTIVE_HIGH>;
++
++		s5m8767,pmic-buck-ds-gpios = <&gpm3 5 GPIO_ACTIVE_HIGH>,
++						<&gpm3 6 GPIO_ACTIVE_HIGH>,
++						<&gpm3 7 GPIO_ACTIVE_HIGH>;
++
++		/* VDD_ARM */
++		s5m8767,pmic-buck2-dvs-voltage = <1356250>, <1300000>,
++						 <1243750>, <1118750>,
++						 <1068750>, <1012500>,
++						 <956250>, <900000>;
++		/* VDD_INT */
++		s5m8767,pmic-buck3-dvs-voltage = <1000000>, <1000000>,
++						 <925000>, <925000>,
++						 <887500>, <887500>,
++						 <850000>, <850000>;
++		/* VDD_G3D */
++		s5m8767,pmic-buck4-dvs-voltage = <1081250>, <1081250>,
++						 <1025000>, <950000>,
++						 <918750>, <900000>,
++						 <875000>, <831250>;
++
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "VDD_ALIVE";
++				regulator-min-microvolt = <1100000>;
++				regulator-max-microvolt = <1100000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			/* SCP uses 1.5v, POP uses 1.2v */
++			ldo2_reg: LDO2 {
++				regulator-name = "VDDQ_M12";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo3_reg: LDO3 {
++				regulator-name = "VDDIOAP_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo4_reg: LDO4 {
++				regulator-name = "VDDQ_PRE";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo5_reg: LDO5 {
++				regulator-name = "VDD_LDO5";
++				op_mode = <0>; /* Always off Mode */
++			};
++
++			ldo6_reg: LDO6 {
++				regulator-name = "VDD10_MPLL";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo7_reg: LDO7 {
++				regulator-name = "VDD10_XPLL";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo8_reg: LDO8 {
++				regulator-name = "VDD10_MIPI";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo9_reg: LDO9 {
++				regulator-name = "VDD33_LCD";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo10_reg: LDO10 {
++				regulator-name = "VDD18_MIPI";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo11_reg: LDO11 {
++				regulator-name = "VDD18_ABB1";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo12_reg: LDO12 {
++				regulator-name = "VDD33_UOTG";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo13_reg: LDO13 {
++				regulator-name = "VDDIOPERI_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo14_reg: LDO14 {
++				regulator-name = "VDD18_ABB02";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo15_reg: LDO15 {
++				regulator-name = "VDD10_USH";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo16_reg: LDO16 {
++				regulator-name = "VDD18_HSIC";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo17_reg: LDO17 {
++				regulator-name = "VDDIOAP_MMC012_28";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			/* Used by HSIC */
++			ldo18_reg: LDO18 {
++				regulator-name = "VDDIOPERI_28";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo19_reg: LDO19 {
++				regulator-name = "VDD_LDO19";
++				op_mode = <0>; /* Always off Mode */
++			};
++
++			ldo20_reg: LDO20 {
++				regulator-name = "VDD28_CAM";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo21_reg: LDO21 {
++				regulator-name = "VDD28_AF";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo22_reg: LDO22 {
++				regulator-name = "VDDA28_2M";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo23_reg: LDO23 {
++				regulator-name = "VDD28_TF";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo24_reg: LDO24 {
++				regulator-name = "VDD33_A31";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo25_reg: LDO25 {
++				regulator-name = "VDD18_CAM";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo26_reg: LDO26 {
++				regulator-name = "VDD18_A31";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo27_reg: LDO27 {
++				regulator-name = "GPS_1V8";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			ldo28_reg: LDO28 {
++				regulator-name = "DVDD12";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck1_reg: BUCK1 {
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <850000>;
++				regulator-max-microvolt	= <1100000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck2_reg: BUCK2 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <850000>;
++				regulator-max-microvolt	= <1456250>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck3_reg: BUCK3 {
++				regulator-name = "vdd_int";
++				regulator-min-microvolt = <875000>;
++				regulator-max-microvolt	= <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck4_reg: BUCK4 {
++				regulator-name = "vdd_g3d";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck5_reg: BUCK5 {
++				regulator-name = "vdd_m12";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck6_reg: BUCK6 {
++				regulator-name = "vdd12_5m";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck7_reg: BUCK7 {
++				regulator-name = "pvdd_buck7";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <2000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck8_reg: BUCK8 {
++				regulator-name = "pvdd_buck8";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++				op_mode = <1>; /* Normal Mode */
++			};
++
++			buck9_reg: BUCK9 {
++				regulator-name = "vddf28_emmc";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt	= <3000000>;
++				op_mode = <1>; /* Normal Mode */
++			};
++		};
++
++		s5m8767_osc: clocks {
++			#clock-cells = <1>;
++			clock-output-names = "s5m8767_ap",
++					"s5m8767_cp", "s5m8767_bt";
++		};
++
 +	};
 +};
 +
-+&i2s0 {
-+	pinctrl-0 = <&i2s0_bus>;
++&mfc {
++	status = "okay";
++};
++
++&mshc_0 {
++	pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
 +	pinctrl-names = "default";
 +	status = "okay";
-+	clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+		 <&clock_audss EXYNOS_DOUT_AUD_BUS>,
-+		 <&clock_audss EXYNOS_SCLK_I2S>;
-+	clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
++	vmmc-supply = <&buck9_reg>;
++	num-slots = <1>;
++	broken-cd;
++	card-detect-delay = <200>;
++	samsung,dw-mshc-ciu-div = <3>;
++	samsung,dw-mshc-sdr-timing = <2 3>;
++	samsung,dw-mshc-ddr-timing = <1 2>;
++	bus-width = <8>;
++	cap-mmc-highspeed;
 +};
 +
 +&pinctrl_1 {
-+	ether-reset {
-+		samsung,pins = "gpc0-1";
++	hsic_reset: hsic-reset {
++		samsung,pins = "gpm2-4";
 +		samsung,pin-function = <EXYNOS_PIN_PDN_OUT1>;
 +		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-+		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
++		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV4>;
 +	};
 +};
 +
-+&pwm {
++&rtc {
 +	status = "okay";
-+	pinctrl-0 = <&pwm0_out>;
-+	pinctrl-names = "default";
-+	samsung,pwm-outputs = <0>;
++	clocks = <&clock CLK_RTC>, <&s5m8767_osc S2MPS11_CLK_AP>;
++	clock-names = "rtc", "rtc_src";
 +};
 +
-+&sdhci_2 {
-+	bus-width = <4>;
-+	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_bus4>;
-+	pinctrl-names = "default";
-+	cd-gpio = <&gpx0 7 GPIO_ACTIVE_LOW>;
-+	cap-sd-highspeed;
-+	vmmc-supply = <&ldo23_reg>;
-+	vqmmc-supply = <&ldo17_reg>;
++&tmu {
++	vtmu-supply = <&ldo16_reg>;
 +	status = "okay";
 +};
 +
-+&serial_1 {
-+	status = "okay";
-+};
-+
-+&serial_2 {
++&watchdog {
 +	status = "okay";
 +};
 -- 
