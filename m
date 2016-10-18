@@ -1,85 +1,82 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Tue, 18 Oct 2016 18:45:33 -0200
-Subject: [PATCH v2 21/58] exynos4-is: don't break long lines
-In-Reply-To: <cover.1476822924.git.mchehab@s-opensource.com>
-References: <cover.1476822924.git.mchehab@s-opensource.com>
-Message-ID: <ba44fe26d33c384380ea655abd459260a13f0f30.1476822924.git.mchehab@s-opensource.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Oct 2016 13:48:26 -0700
+Subject: [PATCH v2] arm64: defconfig: enable EEPROM_AT25 config option
+In-Reply-To: <89501c0e-b544-8d5c-a158-7a3484af935d@broadcom.com>
+References: <1476298306-9138-1-git-send-email-scott.branden@broadcom.com>
+ <CAOesGMijByw1FYt42toNF6pAEykks_agetQybhgMQj8nAc6xdg@mail.gmail.com>
+ <207706e2-8fd4-748f-2ee7-3c372b447a7d@broadcom.com>
+ <CAOesGMhSic4k3K6oSxf+GMWVFZvvJYE4aZpmzS29qZLwakvLsA@mail.gmail.com>
+ <89501c0e-b544-8d5c-a158-7a3484af935d@broadcom.com>
+Message-ID: <CAOesGMjLOhCBX1K_A_BB8TcMr3Ki5jagvPvxiihdJVXZ1LLmpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the 80-cols restrictions, and latter due to checkpatch
-warnings, several strings were broken into multiple lines. This
-is not considered a good practice anymore, as it makes harder
-to grep for strings at the source code.
+On Tue, Oct 18, 2016 at 1:38 PM, Scott Branden
+<scott.branden@broadcom.com> wrote:
+> Hi Olof,
+>
+> On 16-10-17 05:04 PM, Olof Johansson wrote:
+>>
+>> On Mon, Oct 17, 2016 at 4:24 PM, Scott Branden
+>> <scott.branden@broadcom.com> wrote:
+>>>
+>>> Hi Olof,
+>>>
+>>> On 16-10-17 02:58 PM, Olof Johansson wrote:
+>>>>
+>>>>
+>>>> Hi,
+>>>>
+>>>> On Wed, Oct 12, 2016 at 11:51 AM, Scott Branden
+>>>> <scott.branden@broadcom.com> wrote:
+>>>>>
+>>>>>
+>>>>> Enable support for on board SPI EEPROM by turning on
+>>>>> CONFIG_EEPROM_AT25.  This needs to be on in order to
+>>>>> boot and test the kernel with a static rootfs image
+>>>>> that is not rebuilt everytime the kernel is rebuilt.
+>>>>
+>>>>
+>>>>
+>>>> If we did this for every kernel option we'd get a huge kernel.
+>>>>
+>>>> In general, we've said that static options for what's needed to boot
+>>>> to rootfs (i.e. storage and network drivers for nfsroot) are fine to
+>>>> enable statically.
+>>>>
+>>>> I doubt you need the EEPROM driver to boot to rootfs on your system,
+>>>> so please enable it as a module instead.
+>
+> OK, I will upstream as module and need config fragments maintained locally
+> in order to test defconfig on our test setup.
 
-As we're right now fixing other drivers due to KERN_CONT, we need
-to be able to identify what printk strings don't end with a "\n".
-It is a way easier to detect those if we don't break long lines.
+Great.
 
-So, join those continuation lines.
+>>>>
+>>>>
+>>>> Look into using config fragments in case you need to modify the
+>>>> options for local builds, it should be a convenient way to have a
+>>>> small delta to apply to fit your internal needs, instead of completely
+>>>> forking the config file.
+>>>
+>>>
+>>>
+>>> Do you allow such config fragments to be upstreamed or do we need to
+>>> maintain these in our tree?
+>>
+>>
+>> There's no place for them upstream. Maintain locally or in a separate
+>> repo.
+>
+> If that is the case - shall we cleanup arch/arm/configs and delete
+> dram_0x00000000.config that was introduced in the 4.4 kernel?
 
-The patch was generated via the script below, and manually
-adjusted if needed.
+That one is a bit different, in that it allows us to do defconfig
+consolidation, and as such keeps the number of defconfigs needed down.
 
-</script>
-use Text::Tabs;
-while (<>) {
-	if ($next ne "") {
-		$c=$_;
-		if ($c =~ /^\s+\"(.*)/) {
-			$c2=$1;
-			$next =~ s/\"\n$//;
-			$n = expand($next);
-			$funpos = index($n, '(');
-			$pos = index($c2, '",');
-			if ($funpos && $pos > 0) {
-				$s1 = substr $c2, 0, $pos + 2;
-				$s2 = ' ' x ($funpos + 1) . substr $c2, $pos + 2;
-				$s2 =~ s/^\s+//;
+In particular, see the email from Arnd here:
 
-				$s2 = ' ' x ($funpos + 1) . $s2 if ($s2 ne "");
+http://marc.info/?l=linux-arm-kernel&m=145700132713703
 
-				print unexpand("$next$s1\n");
-				print unexpand("$s2\n") if ($s2 ne "");
-			} else {
-				print "$next$c2\n";
-			}
-			$next="";
-			next;
-		} else {
-			print $next;
-		}
-		$next="";
-	} else {
-		if (m/\"$/) {
-			if (!m/\\n\"$/) {
-				$next=$_;
-				next;
-			}
-		}
-	}
-	print $_;
-}
-</script>
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/exynos4-is/media-dev.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index 1a1154a9dfa4..e3a8709138fa 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -938,8 +938,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
- 
- 			csis = fmd->csis[pdata->mux_id].sd;
- 			if (WARN(csis == NULL,
--				 "MIPI-CSI interface specified "
--				 "but s5p-csis module is not loaded!\n"))
-+				 "MIPI-CSI interface specified but s5p-csis module is not loaded!\n"))
- 				return -EINVAL;
- 
- 			pad = sensor->entity.num_pads - 1;
--- 
-2.7.4
+-Olof
