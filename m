@@ -1,61 +1,67 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 18 Oct 2016 17:30:50 +0200
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <20161013002020.3062-1-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
-Message-ID: <20161018153050.GC13117@dhcp22.suse.cz>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 18 Oct 2016 08:32:44 -0700
+Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
+ interrupts
+In-Reply-To: <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+ <20161018135912.GD18903@localhost>
+ <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
+Message-ID: <0a82f2ef-b072-d847-104a-320cf804ebd5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 13-10-16 01:20:10, Lorenzo Stoakes wrote:
-> This patch series adjusts functions in the get_user_pages* family such that
-> desired FOLL_* flags are passed as an argument rather than implied by flags.
-> 
-> The purpose of this change is to make the use of FOLL_FORCE explicit so it is
-> easier to grep for and clearer to callers that this flag is being used. The use
-> of FOLL_FORCE is an issue as it overrides missing VM_READ/VM_WRITE flags for the
-> VMA whose pages we are reading from/writing to, which can result in surprising
-> behaviour.
-> 
-> The patch series came out of the discussion around commit 38e0885, which
-> addressed a BUG_ON() being triggered when a page was faulted in with PROT_NONE
-> set but having been overridden by FOLL_FORCE. do_numa_page() was run on the
-> assumption the page _must_ be one marked for NUMA node migration as an actual
-> PROT_NONE page would have been dealt with prior to this code path, however
-> FOLL_FORCE introduced a situation where this assumption did not hold.
-> 
-> See https://marc.info/?l=linux-mm&m=147585445805166 for the patch proposal.
+Sorry, I think I didn't have enough morning coffee.
 
-I like this cleanup. Tracking FOLL_FORCE users was always a nightmare
-and the flag behavior is really subtle so we should better be explicit
-about it. I haven't gone through each patch separately but rather
-applied the whole series and checked the resulting diff. This all seems
-OK to me and feel free to add
-Acked-by: Michal Hocko <mhocko@suse.com>
+Looking at these again and trying to be specific.
 
-I am wondering whether we can go further. E.g. it is not really clear to
-me whether we need an explicit FOLL_REMOTE when we can in fact check
-mm != current->mm and imply that. Maybe there are some contexts which
-wouldn't work, I haven't checked.
+On 10/18/2016 8:20 AM, Sinan Kaya wrote:
+> It seems wrong to me that we call acpi_irq_get_penalty() from
+>> acpi_irq_penalty_update() and acpi_penalize_isa_irq().  It seems like they
+>> should just manipulate acpi_isa_irq_penalty[irq] directly.
+>> 
+>> acpi_irq_penalty_update() is for command-line parameters, so it certainly
+>> doesn't need the acpi_irq_pci_sharing_penalty() information (the
+>> acpi_link_list should be empty at the time we process the command-line
+>> parameters).
 
-Then I am also wondering about FOLL_TOUCH behavior.
-__get_user_pages_unlocked has only few callers which used to be
-get_user_pages_unlocked before 1e9877902dc7e ("mm/gup: Introduce
-get_user_pages_remote()"). To me a dropped FOLL_TOUCH seems
-unintentional. Now that get_user_pages_unlocked has gup_flags argument I
-guess we might want to get rid of the __g-u-p-u version altogether, no?
+Calling acpi_irq_get_penalty for ISA IRQ is OK as long as it doesn't have
+any dynamic IRQ calculation such that acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty.
 
-__get_user_pages is quite low level and imho shouldn't be exported. It's
-only user - kvm - should rather pull those two functions to gup instead
-and export them. There is nothing really KVM specific in them.
+If this is broken, then we need special care so that we don't assign
+dynamically calcualted sci_penalty back to acpi_isa_irq_penalty[irq]. This
+results in returning incorrect penalty as
 
-I also cannot say I would be entirely thrilled about get_user_pages_locked,
-we only have one user which can simply do lock g-u-p unlock AFAICS.
+acpi_irq_get_penalty = acpi_isa_irq_original_penalty[irq] + 2 * sci_penalty.
 
-I guess there is more work in that area and I do not want to impose all
-that work on you, but I couldn't resist once I saw you playing in that
-area ;) Definitely a good start!
+Now that we added sci_penalty into the acpi_irq_get_penalty function,
+calling acpi_irq_get_penalty is not correct anymore. This line here needs to
+be replaced with acpi_isa_irq_penalty[irq] as you suggested.
+
+                if (used)
+                        new_penalty = acpi_irq_get_penalty(irq) +
+                                        PIRQ_PENALTY_ISA_USED;
+                else
+                        new_penalty = 0;
+
+                acpi_isa_irq_penalty[irq] = new_penalty;
+
+
+>> 
+>> acpi_penalize_isa_irq() is telling us that a PNP or ACPI device is using
+>> the IRQ -- this should modify the IRQ's penalty, but it shouldn't depend on
+>> the acpi_irq_pci_sharing_penalty() value at all.
+>> 
+
+Same problem here. This line will be broken after the sci_penalty change.
+
+                acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+                  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+
+
+
+
 -- 
-Michal Hocko
-SUSE Labs
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
