@@ -1,164 +1,144 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 18 Oct 2016 12:29:28 -0400
-Subject: [PATCH V7 2/3] stm class: ftrace: Add ftrace-export-over-stm
- driver
-In-Reply-To: <1476778140-10319-3-git-send-email-zhang.chunyan@linaro.org>
-References: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
- <1476778140-10319-3-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <20161018122928.0c9449a4@gandalf.local.home>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 18 Oct 2016 17:29:58 +0100
+Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
+In-Reply-To: <0143426e-7e92-aaff-7641-519e1f63e075@siemens.com>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+ <c8a1898e-e60f-b25a-f4d2-7384f04b6f3f@siemens.com>
+ <20161018160638.GA24851@griffinp-ThinkPad-X1-Carbon-2nd>
+ <0143426e-7e92-aaff-7641-519e1f63e075@siemens.com>
+Message-ID: <20161018162958.GA28359@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016 16:08:59 +0800
-Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+Hi Jan,
 
-> This patch adds a driver that models itself as an stm_source called
-> stm_ftrace. Once the stm device and stm_ftrace have been linked via
-> sysfs, the driver registers itself as a trace_export and everything
-> passed to the interface from Ftrace subsystem will end up in the STM
-> trace engine.
+On Tue, 18 Oct 2016, Jan Kiszka wrote:
+
+> On 2016-10-18 18:06, Peter Griffin wrote:
+> > Hi Jan,
+> > 
+> > On Tue, 18 Oct 2016, Jan Kiszka wrote:
+> > 
+> >> On 2016-10-18 17:07, Peter Griffin wrote:
+> >>> lx-fdtdump dumps the flatenned device tree passed to the kernel
+> >>> from the bootloader to a file called fdtdump.dtb to allow further
+> >>> post processing on the machine running GDB. The fdt header is also
+> >>> also printed in the GDB console. For example:
+> >>>
+> >>> (gdb) lx-fdtdump
+> >>> fdt_magic:         0xD00DFEED
+> >>> fdt_totalsize:     0xC108
+> >>> off_dt_struct:     0x38
+> >>> off_dt_strings:    0x3804
+> >>> off_mem_rsvmap:    0x28
+> >>> version:           17
+> >>> last_comp_version: 16
+> >>> Dumped fdt to fdtdump.dtb
+> >>>
+> >>>> fdtdump fdtdump.dtb | less
+> >>>
+> >>> This command is useful as the bootloader can often re-write parts
+> >>> of the device tree, and this can sometimes cause the kernel to not
+> >>> boot.
+> >>>
+> >>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> >>> ---
+> >>>  scripts/gdb/linux/constants.py.in |  8 +++++
+> >>>  scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
+> >>>  2 files changed, 77 insertions(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
+> >>> index 7986f4e..43c6241 100644
+> >>> --- a/scripts/gdb/linux/constants.py.in
+> >>> +++ b/scripts/gdb/linux/constants.py.in
+> >>> @@ -14,6 +14,7 @@
+> >>>  
+> >>>  #include <linux/fs.h>
+> >>>  #include <linux/mount.h>
+> >>> +#include <linux/of_fdt.h>
+> >>>  
+> >>>  /* We need to stringify expanded macros so that they can be parsed */
+> >>>  
+> >>> @@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
+> >>>  LX_VALUE(MNT_NOATIME)
+> >>>  LX_VALUE(MNT_NODIRATIME)
+> >>>  LX_VALUE(MNT_RELATIME)
+> >>> +
+> >>> +/* linux/of_fdt.h> */
+> >>> +LX_VALUE(OF_DT_HEADER)
+> >>> +
+> >>> +/* Kernel Configs */
+> >>> +LX_CONFIG(CONFIG_OF)
+> >>> +
+> >>> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+> >>> index 38b1f09..f20fcfa 100644
+> >>> --- a/scripts/gdb/linux/proc.py
+> >>> +++ b/scripts/gdb/linux/proc.py
+> >>> @@ -16,7 +16,7 @@ from linux import constants
+> >>>  from linux import utils
+> >>>  from linux import tasks
+> >>>  from linux import lists
+> >>> -
+> >>> +from struct import *
+> >>>  
+> >>>  class LxCmdLine(gdb.Command):
+> >>>      """ Report the Linux Commandline used in the current kernel.
+> >>> @@ -195,3 +195,71 @@ values of that process namespace"""
+> >>>                          info_opts(MNT_INFO, m_flags)))
+> >>>  
+> >>>  LxMounts()
+> >>> +
+> >>> +class LxFdtDump(gdb.Command):
+> >>> +    """Output Flattened Device Tree header and dump FDT blob to a file
+> >>> +       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
+> >>> +
+> >>> +    def __init__(self):
+> >>> +        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
+> >>> +
+> >>> +    def fdthdr_to_cpu(self, fdt_header):
+> >>> +
+> >>> +            fdt_header_be = ">IIIIIII"
+> >>> +            fdt_header_le = "<IIIIIII"
+> >>> +
+> >>> +            if utils.get_target_endianness() == 1:
+> >>> +                output_fmt = fdt_header_le
+> >>> +            else:
+> >>> +                output_fmt = fdt_header_be
+> >>> +
+> >>> +            return unpack(output_fmt, pack(fdt_header_be,
+> >>> +                                           fdt_header['magic'],
+> >>> +                                           fdt_header['totalsize'],
+> >>> +                                           fdt_header['off_dt_struct'],
+> >>> +                                           fdt_header['off_dt_strings'],
+> >>> +                                           fdt_header['off_mem_rsvmap'],
+> >>> +                                           fdt_header['version'],
+> >>> +                                           fdt_header['last_comp_version']))
+> >>> +
+> >>> +    def invoke(self, arg, from_tty):
+> >>> +
+> >>> +        if constants.LX_CONFIG_OF:
+> >>> +
+> >>> +            filename = "fdtdump.dtb"
+> >>
+> >> Why not specifying the file name as argument? Safer than silently
+> >> overwriting potentially pre-existing files or failing without
+> >> alternatives if the current directory is not writable.
+> > 
+> > Good idea, I will update to have the filename as the command argument in v2.
+> > 
 > 
-> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> ---
->  drivers/hwtracing/stm/Kconfig  | 11 ++++++
->  drivers/hwtracing/stm/Makefile |  2 +
->  drivers/hwtracing/stm/ftrace.c | 88 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 101 insertions(+)
->  create mode 100644 drivers/hwtracing/stm/ftrace.c
+> Also check gdb.COMPLETE_FILENAME [1] at that chance. :)
 > 
-> diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
-> index 847a39b..b34ea96 100644
-> --- a/drivers/hwtracing/stm/Kconfig
-> +++ b/drivers/hwtracing/stm/Kconfig
-> @@ -39,4 +39,15 @@ config STM_SOURCE_HEARTBEAT
->  	  If you want to send heartbeat messages over STM devices,
->  	  say Y.
->  
-> +config STM_SOURCE_FTRACE
-> +	tristate "Copy the output from kernel Ftrace to STM engine"
-> +	depends on TRACING
+> Jan
+> 
+> [1]
+> https://sourceware.org/gdb/onlinedocs/gdb/Commands-In-Python.html#Commands-In-Python
+> 
 
-I think it should depend on FUNCTION_TRACER
+Thanks for the tip, that is very cool!
 
-> +	help
-> +	  This option can be used to copy the output from kernel Ftrace
-> +	  to STM engine. Enabling this option will introduce a slight
-> +	  timing effect.
-> +
-> +	  If you want to send kernel Ftrace messages over STM devices,
-> +	  say Y.
-> +
->  endif
-> diff --git a/drivers/hwtracing/stm/Makefile b/drivers/hwtracing/stm/Makefile
-> index a9ce3d4..3abd84c 100644
-> --- a/drivers/hwtracing/stm/Makefile
-> +++ b/drivers/hwtracing/stm/Makefile
-> @@ -6,6 +6,8 @@ obj-$(CONFIG_STM_DUMMY)	+= dummy_stm.o
->  
->  obj-$(CONFIG_STM_SOURCE_CONSOLE)	+= stm_console.o
->  obj-$(CONFIG_STM_SOURCE_HEARTBEAT)	+= stm_heartbeat.o
-> +obj-$(CONFIG_STM_SOURCE_FTRACE)		+= stm_ftrace.o
->  
->  stm_console-y		:= console.o
->  stm_heartbeat-y		:= heartbeat.o
-> +stm_ftrace-y		:= ftrace.o
-> diff --git a/drivers/hwtracing/stm/ftrace.c b/drivers/hwtracing/stm/ftrace.c
-> new file mode 100644
-> index 0000000..1a114c8f
-> --- /dev/null
-> +++ b/drivers/hwtracing/stm/ftrace.c
-> @@ -0,0 +1,88 @@
-> +/*
-> + * Simple kernel driver to link kernel Ftrace and an STM device
-> + * Copyright (c) 2016, Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * STM Ftrace will be registered as a trace_export.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/stm.h>
-> +#include <linux/trace.h>
-> +
-> +#define STM_FTRACE_NR_CHANNELS 1
-> +#define STM_FTRACE_CHAN 0
-> +
-> +static int stm_ftrace_link(struct stm_source_data *data);
-> +static void stm_ftrace_unlink(struct stm_source_data *data);
-> +
-> +static struct stm_ftrace {
-> +	struct stm_source_data	data;
-> +	struct trace_export	ftrace;
-> +} stm_ftrace = {
-> +	.data	= {
-> +		.name		= "ftrace",
-> +		.nr_chans	= STM_FTRACE_NR_CHANNELS,
-> +		.link		= stm_ftrace_link,
-> +		.unlink		= stm_ftrace_unlink,
-> +	},
-> +};
-> +
-> +/**
-> + * stm_ftrace_write() - write data to STM via 'stm_ftrace' source
-> + * @buf:	buffer containing the data packet
-> + * @len:	length of the data packet
-> + */
-> +static void notrace
-> +stm_ftrace_write(const char *buf, unsigned int len)
-> +{
-> +	stm_source_write(&stm_ftrace.data, STM_FTRACE_CHAN, buf, len);
-> +}
-> +
-> +static int stm_ftrace_link(struct stm_source_data *data)
-> +{
-> +	struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
-> +
-> +	sf->ftrace.write = stm_ftrace_write;
-> +	sf->ftrace.next = NULL;
+Will add gdb.COMPLETE_FILENAME in V2.
 
-Why setting this to NULL? register_ftrace_export() should not require
-nor depend on that.
+regads,
 
--- Steve
-
-> +
-> +	return register_ftrace_export(&sf->ftrace);
-> +}
-> +
-> +static void stm_ftrace_unlink(struct stm_source_data *data)
-> +{
-> +	struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
-> +
-> +	unregister_ftrace_export(&sf->ftrace);
-> +}
-> +
-> +static int __init stm_ftrace_init(void)
-> +{
-> +	int ret;
-> +
-> +	ret = stm_source_register_device(NULL, &stm_ftrace.data);
-> +	if (ret)
-> +		pr_err("Failed to register stm_source - ftrace.\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static void __exit stm_ftrace_exit(void)
-> +{
-> +	stm_source_unregister_device(&stm_ftrace.data);
-> +}
-> +
-> +module_init(stm_ftrace_init);
-> +module_exit(stm_ftrace_exit);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_DESCRIPTION("stm_ftrace driver");
-> +MODULE_AUTHOR("Chunyan Zhang <zhang.chunyan@linaro.org>");
+Peter.
