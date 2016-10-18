@@ -1,200 +1,162 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Oct 2016 17:04:02 +0100
-Subject: [PATCH v6 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
+Date: Tue, 18 Oct 2016 17:04:10 +0100
+Subject: [PATCH v6 12/16] drivers: iommu: arm-smmu: split probe functions into
+ DT/generic portions
 In-Reply-To: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
 References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161018160414.1228-5-lorenzo.pieralisi@arm.com>
+Message-ID: <20161018160414.1228-13-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_iommu_{set/get}_ops() API is used to associate a device
-tree node with a specific set of IOMMU operations. The same
-kernel interface is required on systems booting with ACPI, where
-devices are not associated with a device tree node, therefore
-the interface requires generalization.
+Current ARM SMMU probe functions intermingle HW and DT probing
+in the initialization functions to detect and programme the ARM SMMU
+driver features. In order to allow probing the ARM SMMU with other
+firmwares than DT, this patch splits the ARM SMMU init functions into
+DT and HW specific portions so that other FW interfaces (ie ACPI) can
+reuse the HW probing functions and skip the DT portion accordingly.
 
-The struct device fwnode member represents the fwnode token
-associated with the device and the struct it points at is firmware
-specific; regardless, it is initialized on both ACPI and DT systems
-and makes an ideal candidate to use it to associate a set of IOMMU
-operations to a given device, through its struct device.fwnode member
-pointer.
-
-Convert the DT specific of_iommu_{set/get}_ops() interface to
-use struct device.fwnode as a look-up token, making the interface
-usable on ACPI systems.
+This patch implements no functional change, only code reshuffling.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
 ---
- drivers/iommu/iommu.c    | 43 +++++++++++++++++++++++++++++++++++++++++++
- drivers/iommu/of_iommu.c | 39 ---------------------------------------
- include/linux/iommu.h    | 14 ++++++++++++++
- include/linux/of_iommu.h | 12 ++++++++++--
- 4 files changed, 67 insertions(+), 41 deletions(-)
+ drivers/iommu/arm-smmu.c | 62 +++++++++++++++++++++++++++++-------------------
+ 1 file changed, 37 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 9a2f196..320eb8c 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1615,6 +1615,49 @@ int iommu_request_dm_for_dev(struct device *dev)
- 	return ret;
- }
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9b0b501..813dbf2 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1656,7 +1656,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	unsigned long size;
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 	u32 id;
+-	bool cttw_dt, cttw_reg;
++	bool cttw_reg, cttw_fw = smmu->features & ARM_SMMU_FEAT_COHERENT_WALK;
+ 	int i;
  
-+struct fwnode_iommu_node {
-+	struct list_head list;
-+	struct fwnode_handle *fwnode;
-+	const struct iommu_ops *ops;
-+};
-+static LIST_HEAD(fwnode_iommu_list);
-+static DEFINE_SPINLOCK(fwnode_iommu_lock);
-+
-+void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-+			  const struct iommu_ops *ops)
-+{
-+	struct fwnode_iommu_node *iommu =
-+				kzalloc(sizeof(*iommu), GFP_KERNEL);
-+
-+	if (WARN_ON(!iommu))
-+		return;
-+
-+	if (is_of_node(fwnode))
-+		of_node_get(to_of_node(fwnode));
-+
-+	INIT_LIST_HEAD(&iommu->list);
-+	iommu->fwnode = fwnode;
-+	iommu->ops = ops;
-+	spin_lock(&fwnode_iommu_lock);
-+	list_add_tail(&iommu->list, &fwnode_iommu_list);
-+	spin_unlock(&fwnode_iommu_lock);
-+}
-+
-+const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
-+{
-+	struct fwnode_iommu_node *node;
-+	const struct iommu_ops *ops = NULL;
-+
-+	spin_lock(&fwnode_iommu_lock);
-+	list_for_each_entry(node, &fwnode_iommu_list, list)
-+		if (node->fwnode == fwnode) {
-+			ops = node->ops;
-+			break;
-+		}
-+	spin_unlock(&fwnode_iommu_lock);
-+	return ops;
-+}
-+
- int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
- 		      const struct iommu_ops *ops)
+ 	dev_notice(smmu->dev, "probing hardware configuration...\n");
+@@ -1701,20 +1701,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 
+ 	/*
+ 	 * In order for DMA API calls to work properly, we must defer to what
+-	 * the DT says about coherency, regardless of what the hardware claims.
++	 * the FW says about coherency, regardless of what the hardware claims.
+ 	 * Fortunately, this also opens up a workaround for systems where the
+ 	 * ID register value has ended up configured incorrectly.
+ 	 */
+-	cttw_dt = of_dma_is_coherent(smmu->dev->of_node);
+ 	cttw_reg = !!(id & ID0_CTTW);
+-	if (cttw_dt)
+-		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
+-	if (cttw_dt || cttw_reg)
++	if (cttw_fw || cttw_reg)
+ 		dev_notice(smmu->dev, "\t%scoherent table walk\n",
+-			   cttw_dt ? "" : "non-");
+-	if (cttw_dt != cttw_reg)
++			   cttw_fw ? "" : "non-");
++	if (cttw_fw != cttw_reg)
+ 		dev_notice(smmu->dev,
+-			   "\t(IDR0.CTTW overridden by dma-coherent property)\n");
++			   "\t(IDR0.CTTW overridden by FW configuration)\n");
+ 
+ 	/* Max. number of entries we have for stream matching/indexing */
+ 	size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
+@@ -1895,15 +1892,25 @@ static const struct of_device_id arm_smmu_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+ 
+-static int arm_smmu_device_dt_probe(struct platform_device *pdev)
++static int arm_smmu_device_dt_probe(struct platform_device *pdev,
++				    struct arm_smmu_device *smmu)
  {
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index 5b82862..0f57ddc 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -96,45 +96,6 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
- }
- EXPORT_SYMBOL_GPL(of_get_dma_window);
+ 	const struct arm_smmu_match_data *data;
+-	struct resource *res;
+-	struct arm_smmu_device *smmu;
+ 	struct device *dev = &pdev->dev;
+-	int num_irqs, i, err;
+ 	bool legacy_binding;
  
--struct of_iommu_node {
--	struct list_head list;
--	struct device_node *np;
--	const struct iommu_ops *ops;
--};
--static LIST_HEAD(of_iommu_list);
--static DEFINE_SPINLOCK(of_iommu_lock);
--
--void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops)
--{
--	struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
--
--	if (WARN_ON(!iommu))
--		return;
--
--	of_node_get(np);
--	INIT_LIST_HEAD(&iommu->list);
--	iommu->np = np;
--	iommu->ops = ops;
--	spin_lock(&of_iommu_lock);
--	list_add_tail(&iommu->list, &of_iommu_list);
--	spin_unlock(&of_iommu_lock);
--}
--
--const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
--{
--	struct of_iommu_node *node;
--	const struct iommu_ops *ops = NULL;
--
--	spin_lock(&of_iommu_lock);
--	list_for_each_entry(node, &of_iommu_list, list)
--		if (node->np == np) {
--			ops = node->ops;
--			break;
--		}
--	spin_unlock(&of_iommu_lock);
--	return ops;
--}
--
- static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
- {
- 	struct of_phandle_args *iommu_spec = data;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 436dc21..15d5478 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -351,6 +351,9 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
- 		      const struct iommu_ops *ops);
- void iommu_fwspec_free(struct device *dev);
- int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-+void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-+			  const struct iommu_ops *ops);
-+const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode);
++	if (of_property_read_u32(dev->of_node, "#global-interrupts",
++				 &smmu->num_global_irqs)) {
++		dev_err(dev, "missing #global-interrupts property\n");
++		return -ENODEV;
++	}
++
++	data = of_device_get_match_data(dev);
++	smmu->version = data->version;
++	smmu->model = data->model;
++
++	parse_driver_options(smmu);
++
+ 	legacy_binding = of_find_property(dev->of_node, "mmu-masters", NULL);
+ 	if (legacy_binding && !using_generic_binding) {
+ 		if (!using_legacy_binding)
+@@ -1916,6 +1923,19 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
  
- #else /* CONFIG_IOMMU_API */
- 
-@@ -580,6 +583,17 @@ static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
- 	return -ENODEV;
- }
- 
-+static inline void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-+					const struct iommu_ops *ops)
-+{
++	if (of_dma_is_coherent(smmu->dev->of_node))
++		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
++
++	return 0;
 +}
 +
-+static inline
-+const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
++static int arm_smmu_device_probe(struct platform_device *pdev)
 +{
-+	return NULL;
-+}
++	struct resource *res;
++	struct arm_smmu_device *smmu;
++	struct device *dev = &pdev->dev;
++	int num_irqs, i, err;
 +
- #endif /* CONFIG_IOMMU_API */
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+ 	if (!smmu) {
+ 		dev_err(dev, "failed to allocate arm_smmu_device\n");
+@@ -1923,9 +1943,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	}
+ 	smmu->dev = dev;
  
- #endif /* __LINUX_IOMMU_H */
-diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-index e80b9c7..7681007 100644
---- a/include/linux/of_iommu.h
-+++ b/include/linux/of_iommu.h
-@@ -31,8 +31,16 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+-	data = of_device_get_match_data(dev);
+-	smmu->version = data->version;
+-	smmu->model = data->model;
++	err = arm_smmu_device_dt_probe(pdev, smmu);
++	if (err)
++		return err;
  
- #endif	/* CONFIG_OF_IOMMU */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	smmu->base = devm_ioremap_resource(dev, res);
+@@ -1933,12 +1953,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		return PTR_ERR(smmu->base);
+ 	smmu->size = resource_size(res);
  
--void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
--const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-+static inline void of_iommu_set_ops(struct device_node *np,
-+				    const struct iommu_ops *ops)
-+{
-+	fwnode_iommu_set_ops(&np->fwnode, ops);
-+}
-+
-+static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-+{
-+	return fwnode_iommu_get_ops(&np->fwnode);
-+}
+-	if (of_property_read_u32(dev->of_node, "#global-interrupts",
+-				 &smmu->num_global_irqs)) {
+-		dev_err(dev, "missing #global-interrupts property\n");
+-		return -ENODEV;
+-	}
+-
+ 	num_irqs = 0;
+ 	while ((res = platform_get_resource(pdev, IORESOURCE_IRQ, num_irqs))) {
+ 		num_irqs++;
+@@ -1973,8 +1987,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	if (err)
+ 		return err;
  
- extern struct of_device_id __iommu_of_table;
+-	parse_driver_options(smmu);
+-
+ 	if (smmu->version == ARM_SMMU_V2 &&
+ 	    smmu->num_context_banks != smmu->num_context_irqs) {
+ 		dev_err(dev,
+@@ -2036,7 +2048,7 @@ static struct platform_driver arm_smmu_driver = {
+ 		.name		= "arm-smmu",
+ 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
+ 	},
+-	.probe	= arm_smmu_device_dt_probe,
++	.probe	= arm_smmu_device_probe,
+ 	.remove	= arm_smmu_device_remove,
+ };
  
 -- 
 2.10.0
