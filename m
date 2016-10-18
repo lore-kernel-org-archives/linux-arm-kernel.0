@@ -1,32 +1,32 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 18 Oct 2016 10:57:57 +0300
-Subject: [PATCH 0/7] ARM: AMx3xx/DRA7: crypto IP support data
-In-Reply-To: <1476777018-526-1-git-send-email-t-kristo@ti.com>
-References: <1476777018-526-1-git-send-email-t-kristo@ti.com>
-Message-ID: <755f47fc-0522-5d9b-eb36-168e3033cf5d@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 18 Oct 2016 15:57:29 +0800
+Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6 as
+ parent
+In-Reply-To: <20161018095044.d1664c4935ad13007453fb35@free.fr>
+References: <20161018054209.24546-1-wens@csie.org>
+ <20161018095044.d1664c4935ad13007453fb35@free.fr>
+Message-ID: <CAGb2v641uy84D3j0q0s+ft+xiTnzDOS8m_GsKd-L3-F1aoUAHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/16 10:50, Tero Kristo wrote:
-> Hi,
+On Tue, Oct 18, 2016 at 3:50 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> On Tue, 18 Oct 2016 13:42:09 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
 >
-> This series finalizes the crypto support for amx3xx / dra7 socs,
-> adding the hwmod data and fixing one issue with l4sec clockdomain
-> on dra7.
+>> On the A31, the DMA engine only works if AHB1 is clocked from PLL6.
+>> In addition, the hstimer is clocked from AHB1, and if AHB1 is clocked
+>> from the CPU clock, and cpufreq is working, we get an unstable timer.
+>>
+>> Force the AHB1 clock to use PLL6 as its parent. Previously this was done
+>> in the device tree with the assigned-clocks and assigned-clocks-parent
+>> bindings. However with this new monolithic driver, the system critical
+>> clocks aren't exported through the device tree. The alternative is to
+>> force this setting in the driver before the clocks are registered.
 >
-> Branch against 4.9-rc1 available here:
-> tree: https://github.com/t-kristo/linux-pm.git
-> branch: 4.9-rc1-crypto-data
->
-> -Tero
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+> It should be simpler to export the constant (CLK_AHB1) instead of
+> adding code...
 
-Argh, sorry about the spam. Had trouble with suppress-cc options as Joel 
-Fernandez has left TI a while back and was getting bounces.
+I get you. But the plan is to not export system core clocks that
+don't have a direct user.
 
--Tero
+ChenYu
