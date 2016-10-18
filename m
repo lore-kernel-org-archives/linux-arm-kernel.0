@@ -1,29 +1,43 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 18 Oct 2016 09:50:44 +0200
-Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6
- as parent
-In-Reply-To: <20161018054209.24546-1-wens@csie.org>
-References: <20161018054209.24546-1-wens@csie.org>
-Message-ID: <20161018095044.d1664c4935ad13007453fb35@free.fr>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Tue, 18 Oct 2016 09:53:02 +0200
+Subject: [PATCH 05/19] ARM: multi_v7_defconfig: Remove miphy365 phy.
+In-Reply-To: <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <ad4daf4b-5d2e-e99c-0b01-cf48a747394d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016 13:42:09 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+Hi
 
-> On the A31, the DMA engine only works if AHB1 is clocked from PLL6.
-> In addition, the hstimer is clocked from AHB1, and if AHB1 is clocked
-> from the CPU clock, and cpufreq is working, we get an unstable timer.
+On 09/14/2016 03:27 PM, Peter Griffin wrote:
+> This IP is only found on STiH415/6 silicon and support
+> for these SoCs is being removed from the kernel.
 > 
-> Force the AHB1 clock to use PLL6 as its parent. Previously this was done
-> in the device tree with the assigned-clocks and assigned-clocks-parent
-> bindings. However with this new monolithic driver, the system critical
-> clocks aren't exported through the device tree. The alternative is to
-> force this setting in the driver before the clocks are registered.
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <kishon@ti.com>
 
-It should be simpler to export the constant (CLK_AHB1) instead of
-adding code...
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Applied on sti-defconfig-for-4.10 branch
+
+Thanks 
+
+
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2c8665c..949ab7f 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -854,7 +854,6 @@ CONFIG_PHY_ROCKCHIP_DP=m
+>  CONFIG_PHY_ROCKCHIP_USB=m
+>  CONFIG_PHY_QCOM_APQ8064_SATA=m
+>  CONFIG_PHY_MIPHY28LP=y
+> -CONFIG_PHY_MIPHY365X=y
+>  CONFIG_PHY_RCAR_GEN2=m
+>  CONFIG_PHY_STIH41X_USB=y
+>  CONFIG_PHY_STIH407_USB=y
+> 
