@@ -1,68 +1,27 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 18 Oct 2016 13:46:27 +0100
-Subject: [PATCH] arm64/kprobes: Tidy up sign-extension usage
-Message-ID: <f25b75bf250827113d4269614ba7936e870b0646.1476794661.git.robin.murphy@arm.com>
+From: jack@suse.cz (Jan Kara)
+Date: Tue, 18 Oct 2016 14:50:26 +0200
+Subject: [PATCH 03/10] mm: replace get_user_pages_unlocked() write/force
+ parameters with gup_flags
+In-Reply-To: <20161013002020.3062-4-lstoakes@gmail.com>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+ <20161013002020.3062-4-lstoakes@gmail.com>
+Message-ID: <20161018125026.GC29967@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kprobes does not need its own homebrewed (and frankly inscrutable) sign
-extension macro; just use the standard kernel functions instead. Since
-the compiler actually recognises the sign-extension idiom of the latter,
-we also get the small bonus of some nicer codegen, as each displacement
-calculation helper then compiles to a single optimal SBFX instruction.
+On Thu 13-10-16 01:20:13, Lorenzo Stoakes wrote:
+> This patch removes the write and force parameters from get_user_pages_unlocked()
+> and replaces them with a gup_flags parameter to make the use of FOLL_FORCE
+> explicit in callers as use of this flag can result in surprising behaviour (and
+> hence bugs) within the mm subsystem.
+> 
+> Signed-off-by: Lorenzo Stoakes <lstoakes@gmail.com>
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/kernel/probes/simulate-insn.c | 16 +++++++---------
- 1 file changed, 7 insertions(+), 9 deletions(-)
+Looks good. You can add:
 
-diff --git a/arch/arm64/kernel/probes/simulate-insn.c b/arch/arm64/kernel/probes/simulate-insn.c
-index 8977ce9d009d..357d3efe1366 100644
---- a/arch/arm64/kernel/probes/simulate-insn.c
-+++ b/arch/arm64/kernel/probes/simulate-insn.c
-@@ -13,28 +13,26 @@
-  * General Public License for more details.
-  */
- 
-+#include <linux/bitops.h>
- #include <linux/kernel.h>
- #include <linux/kprobes.h>
- 
- #include "simulate-insn.h"
- 
--#define sign_extend(x, signbit)		\
--	((x) | (0 - ((x) & (1 << (signbit)))))
--
- #define bbl_displacement(insn)		\
--	sign_extend(((insn) & 0x3ffffff) << 2, 27)
-+	sign_extend32(((insn) & 0x3ffffff) << 2, 27)
- 
- #define bcond_displacement(insn)	\
--	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+	sign_extend32(((insn >> 5) & 0x7ffff) << 2, 20)
- 
- #define cbz_displacement(insn)	\
--	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+	sign_extend32(((insn >> 5) & 0x7ffff) << 2, 20)
- 
- #define tbz_displacement(insn)	\
--	sign_extend(((insn >> 5) & 0x3fff) << 2, 15)
-+	sign_extend32(((insn >> 5) & 0x3fff) << 2, 15)
- 
- #define ldr_displacement(insn)	\
--	sign_extend(((insn >> 5) & 0x7ffff) << 2, 20)
-+	sign_extend32(((insn >> 5) & 0x7ffff) << 2, 20)
- 
- static inline void set_x_reg(struct pt_regs *regs, int reg, u64 val)
- {
-@@ -106,7 +104,7 @@ static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
- 
- 	xn = opcode & 0x1f;
- 	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
--	imm = sign_extend(imm, 20);
-+	imm = sign_extend64(imm, 20);
- 	if (opcode & 0x80000000)
- 		val = (imm<<12) + (addr & 0xfffffffffffff000);
- 	else
+Reviewed-by: Jan Kara <jack@suse.cz>
+
+								Honza
 -- 
-1.9.1
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
