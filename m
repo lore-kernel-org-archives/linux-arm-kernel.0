@@ -1,48 +1,79 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Oct 2016 16:56:36 -0600
-Subject: [PATCH] Revert "gpio/mvebu: convert to use irq_domain_add_simple()"
-Message-ID: <1476831396-24359-1-git-send-email-jgunthorpe@obsidianresearch.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 18 Oct 2016 18:08:32 -0500
+Subject: [PATCH V4 0/5] firmware: Add support for TI System Control Interface
+ (TI-SCI) protocol driver
+Message-ID: <20161018230837.6515-1-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit ce931f571b6dcf8534e8740e8cd16565cf362536.
+Version 4 of the series is basically a rebase to v4.9-rc1, no functional
+changes.
 
-The only difference betwen _simple and _legacy is that _simple
-calls irq_alloc_descs, however mvebu_gpio_probe already called
-irq_alloc_descs a few lines above.
+Texas Instruments' Keystone generation System on Chips (SoC)
+starting with 66AK2G02[1], now include a dedicated SoC System Control
+entity called PMMC(Power Management Micro Controller) in line with
+ARM architecture recommendations. The function of this module is
+to integrate all system operations in a centralized location.
+Communication with the SoC System Control entity from various
+processing units like ARM/DSP occurs over Message Manager hardware
+block.
 
-This fixes these kernel error messages from the double call
-to irq_alloc_descs:
+This series adds the base support for TI System Control Interface
+(TI-SCI) protocol[2]. The protocol is built on top of Texas
+Instrument's Message Manager communication mechanism[3].
 
- irq: Cannot allocate irq_descs @ IRQ34, assuming pre-allocated
- irq: Cannot allocate irq_descs @ IRQ66, assuming pre-allocated
+Overall architecture is very similar to SCPI[4] as follows:
++-------------+   +---------+     +------^-----+
+| TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
++------+------+   +----+----+     +------+-----+
+       |               |                 |
+       |          +----v--------------+  |
+       +----------> TISCI Protocol(*) <--+
+                  +----+--------------+
+                       |
+                   +---v-----------+
+                   | MAILBOX  FWK  |
+                   +---+-----------+
+                       |
+                   +---v-----------+
+                   |  TI MSGMGR    |-> TISCI hardware block
+                   +---------------+
+(*) This series.
 
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Fixes: ce931f571b6d ("gpio/mvebu: convert to use irq_domain_add_simple()")
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/gpio/gpio-mvebu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index cd5dc27320a2..2e0c8d8b7792 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -807,8 +807,8 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
- 			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
- 
- 	/* Setup irq domain on top of the generic chip. */
--	mvchip->domain = irq_domain_add_simple(np, mvchip->chip.ngpio,
--					       mvchip->irqbase,
-+	mvchip->domain = irq_domain_add_legacy(np, mvchip->chip.ngpio,
-+					       mvchip->irqbase, 0,
- 					       &irq_domain_simple_ops,
- 					       mvchip);
- 	if (!mvchip->domain) {
+V4 of the series is based off v4.9-rc1 and is also available here:
+https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.10/tisci-base-v4
+Quick boot test: http://pastebin.ubuntu.com/23346183/
+
+Changes since v3:
+	- rebase to v4.9-rc1
+	- minor checkpatch fixes
+
+V3: https://lkml.org/lkml/2016/9/6/747
+V2: https://lkml.org/lkml/2016/8/30/273
+V1: https://lkml.org/lkml/2016/8/19/768
+
+Nishanth Menon (5):
+  Documentation: Add support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: Add basic support for TI System Control Interface (TI-SCI)
+    protocol
+  firmware: ti_sci: Add support for Device control
+  firmware: ti_sci: Add support for Clock control
+  firmware: ti_sci: Add support for reboot core service
+
+ .../devicetree/bindings/arm/keystone/ti,sci.txt    |   81 +
+ MAINTAINERS                                        |   10 +
+ drivers/firmware/Kconfig                           |   15 +
+ drivers/firmware/Makefile                          |    1 +
+ drivers/firmware/ti_sci.c                          | 1991 ++++++++++++++++++++
+ drivers/firmware/ti_sci.h                          |  492 +++++
+ include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
+ 7 files changed, 2839 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+ create mode 100644 drivers/firmware/ti_sci.c
+ create mode 100644 drivers/firmware/ti_sci.h
+ create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
+
 -- 
-2.1.4
+2.10.0
