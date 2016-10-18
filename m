@@ -1,10 +1,10 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 11:46:09 -0500
+Date: Tue, 18 Oct 2016 11:47:05 -0500
 Subject: [PATCH v5 23/23] phy: Add support for Qualcomm's USB HS phy
 In-Reply-To: <20161018015636.11701-24-stephen.boyd@linaro.org>
 References: <20161018015636.11701-1-stephen.boyd@linaro.org>
  <20161018015636.11701-24-stephen.boyd@linaro.org>
-Message-ID: <20161018164609.g4lfe4zgxviwgr3n@rob-hp-laptop>
+Message-ID: <20161018164705.viqrzpn3bnwns2mc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
