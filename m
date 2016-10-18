@@ -1,44 +1,83 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 18 Oct 2016 16:50:17 +0530
-Subject: [PATCH v4 1/4] net: phy: dp83867: Add documentation for optional
- impedance control
+Date: Tue, 18 Oct 2016 16:50:18 +0530
+Subject: [PATCH v4 2/4] net: phy: dp83867: add support for MAC impedance
+ configuration
 In-Reply-To: <20161018112020.30273-1-mugunthanvnm@ti.com>
 References: <20161018112020.30273-1-mugunthanvnm@ti.com>
-Message-ID: <20161018112020.30273-2-mugunthanvnm@ti.com>
+Message-ID: <20161018112020.30273-3-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documention of ti,min-output-impedance and ti,max-output-impedance
-which can be used to correct MAC impedance mismatch using phy extended
-registers.
+Add support for programmable MAC impedance configuration
 
 Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- Documentation/devicetree/bindings/net/ti,dp83867.txt | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/net/phy/dp83867.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/ti,dp83867.txt b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-index 5d21141..85bf945 100644
---- a/Documentation/devicetree/bindings/net/ti,dp83867.txt
-+++ b/Documentation/devicetree/bindings/net/ti,dp83867.txt
-@@ -9,6 +9,18 @@ Required properties:
- 	- ti,fifo-depth - Transmitt FIFO depth- see dt-bindings/net/ti-dp83867.h
- 		for applicable values
+diff --git a/drivers/net/phy/dp83867.c b/drivers/net/phy/dp83867.c
+index 91177a4..1b63924 100644
+--- a/drivers/net/phy/dp83867.c
++++ b/drivers/net/phy/dp83867.c
+@@ -33,6 +33,7 @@
+ /* Extended Registers */
+ #define DP83867_RGMIICTL	0x0032
+ #define DP83867_RGMIIDCTL	0x0086
++#define DP83867_IO_MUX_CFG	0x0170
  
-+Optional property:
-+	- ti,min-output-impedance - MAC Interface Impedance control to set
-+				    the programmable output impedance to
-+				    minimum value (35 ohms).
-+	- ti,max-output-impedance - MAC Interface Impedance control to set
-+				    the programmable output impedance to
-+				    maximum value (70 ohms).
-+
-+Note: ti,min-output-impedance and ti,max-output-impedance are mutually
-+      exclusive. When both properties are present ti,max-output-impedance
-+      takes precedence.
-+
- Default child nodes are standard Ethernet PHY device
- nodes as described in Documentation/devicetree/bindings/net/phy.txt
+ #define DP83867_SW_RESET	BIT(15)
+ #define DP83867_SW_RESTART	BIT(14)
+@@ -62,10 +63,17 @@
+ /* RGMIIDCTL bits */
+ #define DP83867_RGMII_TX_CLK_DELAY_SHIFT	4
  
++/* IO_MUX_CFG bits */
++#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL	0x1f
++
++#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX	0x0
++#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN	0x1f
++
+ struct dp83867_private {
+ 	int rx_id_delay;
+ 	int tx_id_delay;
+ 	int fifo_depth;
++	int io_impedance;
+ };
+ 
+ static int dp83867_ack_interrupt(struct phy_device *phydev)
+@@ -111,6 +119,14 @@ static int dp83867_of_init(struct phy_device *phydev)
+ 	if (!of_node)
+ 		return -ENODEV;
+ 
++	dp83867->io_impedance = -EINVAL;
++
++	/* Optional configuration */
++	if (of_property_read_bool(of_node, "ti,max-output-impedance"))
++		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX;
++	else if (of_property_read_bool(of_node, "ti,min-output-impedance"))
++		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN;
++
+ 	ret = of_property_read_u32(of_node, "ti,rx-internal-delay",
+ 				   &dp83867->rx_id_delay);
+ 	if (ret)
+@@ -184,6 +200,18 @@ static int dp83867_config_init(struct phy_device *phydev)
+ 
+ 		phy_write_mmd_indirect(phydev, DP83867_RGMIIDCTL,
+ 				       DP83867_DEVADDR, delay);
++
++		if (dp83867->io_impedance >= 0) {
++			val = phy_read_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
++						    DP83867_DEVADDR);
++
++			val &= ~DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
++			val |= dp83867->io_impedance &
++			       DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
++
++			phy_write_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
++					       DP83867_DEVADDR, val);
++		}
+ 	}
+ 
+ 	return 0;
 -- 
 2.10.1.445.g3cdd5d1
