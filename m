@@ -1,61 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 18 Oct 2016 08:20:55 -0700
-Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
- interrupts
-In-Reply-To: <20161018135912.GD18903@localhost>
-References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
- <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
- <20161018135912.GD18903@localhost>
-Message-ID: <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
+From: kieran@bingham.xyz (Kieran Bingham)
+Date: Tue, 18 Oct 2016 16:27:48 +0100
+Subject: [PATCH 2/2] scripts/gdb: fixup some pep8 errors in proc.py
+In-Reply-To: <1476803249-23328-2-git-send-email-peter.griffin@linaro.org>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+ <1476803249-23328-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <477b66cc-05dc-57fa-38fb-f80510935c2e@bingham.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2016 6:59 AM, Bjorn Helgaas wrote:
->> However, this function only gets called if the IRQ number is greater than
->> > 16 and acpi_irq_get_penalty function gets called before ACPI start in
->> > acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
->> > on iterating the link list.
+Hi Pete,
 
-Maybe, I am missing context here. I can add this paragraph to the commit. 
-
-When we started cleaning the code we got rid of the acpi_irq_penalty_init function
-in favor of acpi_irq_pci_sharing_penalty function as it does have some fair
-amount of code duplication.
-
-I tried putting back the acpi_irq_pci_sharing_penalty function into the ISA
-IRQ path again during the debug and the machine died way too early. We couldn't
-collect any debug message.
-
-This is telling me that we can't even iterate the link list when these two API
-is called. ISA IRQ need to be handled with special care due to calling order.
-
-
-> It seems wrong to me that we call acpi_irq_get_penalty() from
-> acpi_irq_penalty_update() and acpi_penalize_isa_irq().  It seems like they
-> should just manipulate acpi_isa_irq_penalty[irq] directly.
+On 18/10/16 16:07, Peter Griffin wrote:
+> proc.py:22:1: E302 expected 2 blank lines, found 1
+> proc.py:200:1: E302 expected 2 blank lines, found 1
 > 
-> acpi_irq_penalty_update() is for command-line parameters, so it certainly
-> doesn't need the acpi_irq_pci_sharing_penalty() information (the
-> acpi_link_list should be empty at the time we process the command-line
-> parameters).
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  scripts/gdb/linux/proc.py | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> acpi_penalize_isa_irq() is telling us that a PNP or ACPI device is using
-> the IRQ -- this should modify the IRQ's penalty, but it shouldn't depend on
-> the acpi_irq_pci_sharing_penalty() value at all.
+> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+> index f20fcfa..2d6f74e 100644
+> --- a/scripts/gdb/linux/proc.py
+> +++ b/scripts/gdb/linux/proc.py
+> @@ -18,6 +18,7 @@ from linux import tasks
+>  from linux import lists
+>  from struct import *
+>  
+> +
+
+This was added by patch 1, and can be squashed there.
+
+>  class LxCmdLine(gdb.Command):
+>      """ Report the Linux Commandline used in the current kernel.
+>          Equivalent to cat /proc/cmdline on a running target"""
+> @@ -196,6 +197,7 @@ values of that process namespace"""
+>  
+>  LxMounts()
+>  
+> +
+
+Likewise...
+
+>  class LxFdtDump(gdb.Command):
+>      """Output Flattened Device Tree header and dump FDT blob to a file
+>         Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
 > 
-
-acpi_irq_get_penalty function knows how to deal with ISA IRQ. So, it is harmless
-to call it. Also, reading the acpi_isa_irq_penalty array directly isn't also right.
-It doesn't contain the SCI penalty. So, it returns incorrect penalty value.
-
-The rule of thumb is:
-- all PCI/SCI penalty reads need to go through acpi_isa_irq_penalty function
-- all ISA penalty writes need to go through acpi_isa_irq_penalty array directly.
-- we do not support modifying the PCI IRQ penalties greater than the ISA IRQ numbers.
-The original code supported this.
-
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards
+
+Kieran Bingham
