@@ -1,54 +1,48 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Oct 2016 11:55:53 +0100
-Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
-In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8nwLZ_oC4Vx6S8aXyNJKRsVMnk-9hP=oADcyBzMSZv=w@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 18 Oct 2016 11:59:31 +0100
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <20161018104539.GB15639@leverpostej>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <20161018100002.GA4347@xo-6d-61-c0.localdomain>
+ <20161018104539.GB15639@leverpostej>
+Message-ID: <95484b8f-58de-3588-ac91-5ec21e66ab05@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2016 at 19:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
-> currently work, or have ever worked correctly when built for big endian. So this
-> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
-> well, and an additional fix for XTS which escaped my attention before.
+
+
+On 18/10/16 11:45, Mark Rutland wrote:
+> On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
+>>>> b. in arm64, if some platform has its own suspend flow,  couldn't it
+>>>> adopts arm/match-xxx to register its own global suspend method?
+>>>
+>>> No, PSCI is highly recommended.
+>>
+>> Relying on firmware for suspend on x86 was a great disaster, lets not repeat
+>> that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
+>> for example) -- feel free to copy that code from arm32.
 >
-> Each of these patches carries a fixes tag, and could be backported to stable.
-> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
-> fix is compatible with, not the patch that introduced the algorithm. This is due
-> to the fact that the key schedules are incompatible between generic AES and the
-> arm64 Crypto Extensions implementation (but only when building for big endian)
-> This is not a problem in practice, but it does mean that the AES-CCM and AES in
-> EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
-> one that is compatible with the generic AES key schedule generation code (which
-> it currently no longer uses)
+> Quite frankly, copying hundreds of lines of board-specific code
+> (including assembly that won't compile) is unlikely to help.
 >
-> In any case, please apply with cc to stable.
+> So far arm64 requires well-defined, standard, reusable interfaces (e.g.
+> PSCI). That cleanly separates concerns (e.g. anyone can implement the
+> backend without mandatory changes to the kernel), and keeps things
+> maintainable.
+>
+> ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
+> can use and build atop of. It's open source (three-clause BSD with DCO),
+> and accepts board ports. You can have a completely open stack,
+> regardless of whether part of that stack is firmware.
 >
 
-Ping?
+I think you missed to add the link[1]
 
-> Ard Biesheuvel (8):
->   crypto: arm64/aes-ce - fix for big endian
->   crypto: arm64/ghash-ce - fix for big endian
->   crypto: arm64/sha1-ce - fix for big endian
->   crypto: arm64/sha2-ce - fix for big endian
->   crypto: arm64/aes-ccm-ce: fix for big endian
->   crypto: arm64/aes-neon - fix for big endian
->   crypto: arm64/aes-xts-ce: fix for big endian
->   crypto: arm/aes-ce - fix for big endian
->
->  arch/arm/crypto/aes-ce-glue.c       |  5 ++
->  arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
->  arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
->  arch/arm64/crypto/aes-ce.S          |  1 +
->  arch/arm64/crypto/aes-modes.S       |  3 +-
->  arch/arm64/crypto/aes-neon.S        | 25 +++++----
->  arch/arm64/crypto/ghash-ce-core.S   |  6 +--
->  arch/arm64/crypto/sha1-ce-core.S    |  4 +-
->  arch/arm64/crypto/sha2-ce-core.S    |  4 +-
->  9 files changed, 72 insertions(+), 54 deletions(-)
->
-> --
-> 2.7.4
->
+-- 
+Regards,
+Sudeep
+
+[1] https://github.com/ARM-software/arm-trusted-firmware
