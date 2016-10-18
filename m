@@ -1,40 +1,53 @@
-From: smueller@chronox.de (Stephan Mueller)
-Date: Tue, 18 Oct 2016 16:24:22 +0200
-Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
-In-Reply-To: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1722218.eZlGktOxfL@tauon.atsec.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 18 Oct 2016 09:27:43 -0500
+Subject: [PATCH 4/9] regulator: lp873x: Add support for populating input
+ supply
+In-Reply-To: <20161014130033.14172-5-lokeshvutla@ti.com>
+References: <20161014130033.14172-1-lokeshvutla@ti.com>
+ <20161014130033.14172-5-lokeshvutla@ti.com>
+Message-ID: <20161018142743.xfgjuaw4wlssmoxq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 18. Oktober 2016, 14:34:27 CEST schrieb Corentin Labbe:
+On Fri, Oct 14, 2016 at 06:30:28PM +0530, Lokesh Vutla wrote:
+> In order to have a proper topology of regulators for a platform, each
+> registering regulator needs to populate supply_name field for identifying
+> its supply's name. Add supply_name field for lp873x regulators.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
+>  drivers/regulator/lp873x-regulator.c             | 1 +
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/lp873x.txt b/Documentation/devicetree/bindings/mfd/lp873x.txt
+> index 52766c2..936cba3 100644
+> --- a/Documentation/devicetree/bindings/mfd/lp873x.txt
+> +++ b/Documentation/devicetree/bindings/mfd/lp873x.txt
+> @@ -7,6 +7,9 @@ Required properties:
+>    - #gpio-cells:	Should be two.  The first cell is the pin number and
+>  			the second cell is used to specify flags.
+>  			See ../gpio/gpio.txt for more information.
+> +  - xxx-supply:		Phandle to parent supply node of each regulator
+> +			populated under regulators node. xxx should match
+> +			the supply_name populated in driver.
 
-Hi Corentin,
+xxx-in-supply?
 
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
-> b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c new file mode 100644
-> index 0000000..95fadb7
-> --- /dev/null
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
-> @@ -0,0 +1,70 @@
-> +#include "sun4i-ss.h"
+>    - regulators:	List of child nodes that specify the regulator
+>  			initialization data.
+>  Example:
+> @@ -17,6 +20,11 @@ pmic: lp8733 at 60 {
+>  	gpio-controller;
+>  	#gpio-cells = <2>;
+>  
+> +	buck0-in-supply = <&vsys_3v3>;
+> +	buck1-in-supply = <&vsys_3v3>;
+> +	ldo0-in-supply = <&vsys_3v3>;
+> +	ldo1-in-supply = <&vsys_3v3>;
 > +
-> +static int sun4i_ss_hwrng_init(struct hwrng *hwrng)
-> +{
-> +	struct sun4i_ss_ctx *ss;
-> +
-> +	ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
-> +	get_random_bytes(ss->seed, SS_SEED_LEN);
-
-Is it wise to call get_random_bytes once in the init function and never 
-thereafter?
-
-This init function may be called during boot time of the kernel at which the 
-input_pool may not yet have received sufficient amounts of entropy.
-
-What about registering a callback with add_random_ready_callback and seed 
-again when sufficient entropy was collected?
-
-
-Ciao
-Stephan
+>  	regulators {
+>  		lp8733_buck0: buck0 {
+>  			regulator-name = "lp8733-buck0";
