@@ -1,142 +1,36 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 17 Oct 2016 17:42:51 -0700
-Subject: [PATCH v5 2/2] power: qcom_smbb: Add otg regulator for control of vbus
-In-Reply-To: <20161018004251.28733-1-stephen.boyd@linaro.org>
-References: <20161018004251.28733-1-stephen.boyd@linaro.org>
-Message-ID: <20161018004251.28733-3-stephen.boyd@linaro.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 17 Oct 2016 18:43:37 -0600
+Subject: [PATCH] media: s5p-mfc include buffer size in error message
+Message-ID: <20161018004337.26831-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Bird, Tim" <Tim.Bird@sonymobile.com>
+Include buffer size in s5p_mfc_alloc_priv_buf() the error message when it
+fails to allocate the buffer. Remove the debug message that does the same.
 
-Add a regulator to control the OTG chargepath switch.  This
-is used by USB code to control VBUS direction - out for host mode
-on the OTG port, and in for charging mode.
-
-Signed-off-by: Tim Bird <tim.bird@sonymobile.com>
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
-[stephen.boyd at linaro.org: Fix supply name, constify ops, drop
-machine.h and of_regulator.h includes]
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 ---
- drivers/power/supply/qcom_smbb.c | 70 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/power/supply/qcom_smbb.c b/drivers/power/supply/qcom_smbb.c
-index b5896ba2a602..5bdde6108c12 100644
---- a/drivers/power/supply/qcom_smbb.c
-+++ b/drivers/power/supply/qcom_smbb.c
-@@ -35,6 +35,7 @@
- #include <linux/regmap.h>
- #include <linux/slab.h>
- #include <linux/extcon.h>
-+#include <linux/regulator/driver.h>
- 
- #define SMBB_CHG_VMAX		0x040
- #define SMBB_CHG_VSAFE		0x041
-@@ -72,6 +73,8 @@
- #define BTC_CTRL_HOT_EXT_N	BIT(0)
- 
- #define SMBB_USB_IMAX		0x344
-+#define SMBB_USB_OTG_CTL	0x348
-+#define OTG_CTL_EN		BIT(0)
- #define SMBB_USB_ENUM_TIMER_STOP 0x34e
- #define ENUM_TIMER_STOP		BIT(0)
- #define SMBB_USB_SEC_ACCESS	0x3d0
-@@ -125,6 +128,9 @@ struct smbb_charger {
- 	struct power_supply *dc_psy;
- 	struct power_supply *bat_psy;
- 	struct regmap *regmap;
-+
-+	struct regulator_desc otg_rdesc;
-+	struct regulator_dev *otg_reg;
- };
- 
- static const unsigned int smbb_usb_extcon_cable[] = {
-@@ -787,12 +793,56 @@ static const struct power_supply_desc dc_psy_desc = {
- 	.property_is_writeable = smbb_charger_writable_property,
- };
- 
-+static int smbb_chg_otg_enable(struct regulator_dev *rdev)
-+{
-+	struct smbb_charger *chg = rdev_get_drvdata(rdev);
-+	int rc;
-+
-+	rc = regmap_update_bits(chg->regmap, chg->addr + SMBB_USB_OTG_CTL,
-+				OTG_CTL_EN, OTG_CTL_EN);
-+	if (rc)
-+		dev_err(chg->dev, "failed to update OTG_CTL\n");
-+	return rc;
-+}
-+
-+static int smbb_chg_otg_disable(struct regulator_dev *rdev)
-+{
-+	struct smbb_charger *chg = rdev_get_drvdata(rdev);
-+	int rc;
-+
-+	rc = regmap_update_bits(chg->regmap, chg->addr + SMBB_USB_OTG_CTL,
-+				OTG_CTL_EN, 0);
-+	if (rc)
-+		dev_err(chg->dev, "failed to update OTG_CTL\n");
-+	return rc;
-+}
-+
-+static int smbb_chg_otg_is_enabled(struct regulator_dev *rdev)
-+{
-+	struct smbb_charger *chg = rdev_get_drvdata(rdev);
-+	unsigned int value = 0;
-+	int rc;
-+
-+	rc = regmap_read(chg->regmap, chg->addr + SMBB_USB_OTG_CTL, &value);
-+	if (rc)
-+		dev_err(chg->dev, "failed to read OTG_CTL\n");
-+
-+	return !!(value & OTG_CTL_EN);
-+}
-+
-+static const struct regulator_ops smbb_chg_otg_ops = {
-+	.enable = smbb_chg_otg_enable,
-+	.disable = smbb_chg_otg_disable,
-+	.is_enabled = smbb_chg_otg_is_enabled,
-+};
-+
- static int smbb_charger_probe(struct platform_device *pdev)
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+index 1e72502..eee16a1 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+@@ -40,12 +40,11 @@ void s5p_mfc_init_regs(struct s5p_mfc_dev *dev)
+ int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
+ 					struct s5p_mfc_priv_buf *b)
  {
- 	struct power_supply_config bat_cfg = {};
- 	struct power_supply_config usb_cfg = {};
- 	struct power_supply_config dc_cfg = {};
- 	struct smbb_charger *chg;
-+	struct regulator_config config = { };
- 	int rc, i;
+-	mfc_debug(3, "Allocating priv: %zu\n", b->size);
+-
+ 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
  
- 	chg = devm_kzalloc(&pdev->dev, sizeof(*chg), GFP_KERNEL);
-@@ -905,6 +955,26 @@ static int smbb_charger_probe(struct platform_device *pdev)
- 		}
+ 	if (!b->virt) {
+-		mfc_err("Allocating private buffer failed\n");
++		mfc_err("Allocating private buffer of size %zu failed\n",
++			b->size);
+ 		return -ENOMEM;
  	}
  
-+	/*
-+	 * otg regulator is used to control VBUS voltage direction
-+	 * when USB switches between host and gadget mode
-+	 */
-+	chg->otg_rdesc.id = -1;
-+	chg->otg_rdesc.name = "otg-vbus";
-+	chg->otg_rdesc.ops = &smbb_chg_otg_ops;
-+	chg->otg_rdesc.owner = THIS_MODULE;
-+	chg->otg_rdesc.type = REGULATOR_VOLTAGE;
-+	chg->otg_rdesc.supply_name = "usb-otg-in";
-+	chg->otg_rdesc.of_match = "otg-vbus";
-+
-+	config.dev = &pdev->dev;
-+	config.driver_data = chg;
-+
-+	chg->otg_reg = devm_regulator_register(&pdev->dev, &chg->otg_rdesc,
-+					       &config);
-+	if (IS_ERR(chg->otg_reg))
-+		return PTR_ERR(chg->otg_reg);
-+
- 	chg->jeita_ext_temp = of_property_read_bool(pdev->dev.of_node,
- 			"qcom,jeita-extended-temp-range");
- 
 -- 
-2.10.0.297.gf6727b0
+2.7.4
