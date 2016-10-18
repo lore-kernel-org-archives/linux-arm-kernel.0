@@ -1,32 +1,108 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 08:16:14 -0500
-Subject: [PATCH 1/2] mmc: sdhci-iproc: Add brcm, sdhci-iproc compat string
- in bindings document
-In-Reply-To: <1476297352-7812-2-git-send-email-scott.branden@broadcom.com>
-References: <1476297352-7812-1-git-send-email-scott.branden@broadcom.com>
- <1476297352-7812-2-git-send-email-scott.branden@broadcom.com>
-Message-ID: <20161018131614.lskxbdir3ghun5md@rob-hp-laptop>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 18 Oct 2016 15:29:54 +0200
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
+In-Reply-To: <d95c3035-e3cd-a93c-d408-27f4c8dba589@marvell.com> (Ziji Hu's
+ message of "Tue, 11 Oct 2016 18:03:47 +0800")
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <fc0ca2b3140287cbccf5c176a12b7dce25d06a47.1475853198.git-series.gregory.clement@free-electrons.com>
+ <20161010213417.GA11795@rob-hp-laptop>
+ <d95c3035-e3cd-a93c-d408-27f4c8dba589@marvell.com>
+Message-ID: <87k2d5eqel.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 11:35:51AM -0700, Scott Branden wrote:
-> Adds brcm,sdhci-iproc compat string to DT bindings document for
-> the iProc SDHCI driver.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
-> index be56d2b..aa58b94 100644
-> --- a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
-> @@ -7,6 +7,7 @@ Required properties:
->  - compatible : Should be one of the following
->  	       "brcm,bcm2835-sdhci"
->  	       "brcm,sdhci-iproc-cygnus"
-> +	       "brcm,sdhci-iproc"
+Hi Rob,
+ 
+ On mar., oct. 11 2016, Ziji Hu <huziji@marvell.com> wrote:
+[...]
 
-Seems kind of generic. SoC specific compatible strings please.
+>>> +  Different Xenon SDHC release has different register set size.
+>>> +  The specific size should also refer to the SOC implementation.
+>>> +
+>>> +Optional Properties:
+>>> +- Slot Index
+>>> +  A single Xenon IP can support multiple slots.
+>>> +  During initialization, each slot should set corresponding setting bit in
+>>> +  some Xenon-specific registers. The corresponding bit is determined by
+>>> +  this property.
+>>> +  - xenon,slotno = <slot_index>;
+>> 
+>> Slots should probably be represented as child nodes with the reg 
+>> property being the slot number.
+>
+> 	Since each SDHC slot is independent, I find it is more
+> convenient to implement each one as independent SD host/MMC host
+> instant.
+> 	Otherwise, a main function should loop and initialize each
+> slot, like sdhci-pci. I prefer to avoiding such a unnecessary main
+> function.
+>
+> 	It is very hard to determine the slot number by reg property.
+> 	Xenon slots are likely to be different types. 1st slot might
+> be eMMC and 2nd one might be SD. They might have different register
+> size.
+> 	The register size might also varies in different Xenon versions.
+>
+
+Something that took me a while to figure out is that even it is the same
+hardware block which handle multiple SoCs.
+
+Each slots is managed by its own set of register. From the point of view
+of the OS, it is as if we have an independent controller for each
+slot.
+
+But for an obscure reason, some command need to know which slot is
+used. That's why we ended with this property.
+
+With some example what you had in mind was something like that:
+sdhci at aa0000 {
+		compatible = "marvell,armada-3700-sdhci";
+		reg = <0xaa0000 0x1000>;
+[...]
+                slot0 {
+                      /* slot0 is an eMMC */
+                      reg = <0>;
+                      bus-width = <8>;
+                      xenon,pad-type = "fixed-1-8v";
+
+                }
+                slot1 {
+                      /* slot1 is an SD Card */
+                      reg = <1>;
+                      bus-width = <4>;
+                      xenon,pad-type = "fixed-1-8v";
+
+                }
+	};
+
+But it won't work as each slot uses its own address registers, that why we
+ended with this:
+sdhci at aa0000 {
+                /* slot0 is an eMMC */
+		compatible = "marvell,armada-3700-sdhci";
+		reg = <0xaa0000 0x1000>;
+[...]
+                xenon,slotno = <0>;
+                bus-width = <8>;
+                xenon,pad-type = "fixed-1-8v";
+	};
+sdhci at bb0000 {
+                /* slot1 is an SD Card */
+		compatible = "marvell,armada-3700-sdhci";
+		reg = <0xbb0000 0x1000>;
+[...]
+                xenon,slotno = <1>;
+                bus-width = <4>;
+                xenon,pad-type = "fixed-1-8v";
+	};
+
+I hope it is more clear now.
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
