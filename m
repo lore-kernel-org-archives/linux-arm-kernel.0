@@ -1,29 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 11:47:05 -0500
-Subject: [PATCH v5 23/23] phy: Add support for Qualcomm's USB HS phy
-In-Reply-To: <20161018015636.11701-24-stephen.boyd@linaro.org>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-24-stephen.boyd@linaro.org>
-Message-ID: <20161018164705.viqrzpn3bnwns2mc@rob-hp-laptop>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Oct 2016 11:05:10 -0600
+Subject: [PATCH] [ARM] Fix stack alignment when processing backtraces
+Message-ID: <20161018170510.GA12248@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 06:56:36PM -0700, Stephen Boyd wrote:
-> The high-speed phy on qcom SoCs is controlled via the ULPI
-> viewport.
-> 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  86 +++++++
+The dumpstm helper within c_backtrace pushed 5 dwords onto the stack
+causing the stack to become unaligned and then calls printk. This
+causes memory corruption in the kernel which assumes AAPCS calling
+convention.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Since this bit of asm doesn't use the standard prologue just add
+another register to restore alignment.
 
->  drivers/phy/Kconfig                                |   8 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-qcom-usb-hs.c                      | 286 +++++++++++++++++++++
->  4 files changed, 381 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
+Fixes: 7ab3f8d595a1b ("[ARM] Add ability to dump exception stacks to kernel backtraces")
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+---
+ arch/arm/lib/backtrace.S | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+In my case the kernel was hitting a WARN_ON during boot and then
+reliably failed to start the compiled-in initramfs.
+
+I'm inferring that the stack misalignment caused some kind of memory
+corruption which wiped out the unpacked initramfs.
+
+Saw with gcc 5.4.0 on a kirkwood armv5te
+
+diff --git a/arch/arm/lib/backtrace.S b/arch/arm/lib/backtrace.S
+index fab5a50503ae..25e1cce19991 100644
+--- a/arch/arm/lib/backtrace.S
++++ b/arch/arm/lib/backtrace.S
+@@ -116,7 +116,8 @@ ENDPROC(c_backtrace)
+ #define reg   r5
+ #define stack r6
+ 
+-.Ldumpstm:	stmfd	sp!, {instr, reg, stack, r7, lr}
++	        /* Must maintain 8 byte stack alignment */
++.Ldumpstm:	stmfd	sp!, {r3, instr, reg, stack, r7, lr}
+ 		mov	stack, r0
+ 		mov	instr, r1
+ 		mov	reg, #10
+@@ -140,7 +141,7 @@ ENDPROC(c_backtrace)
+ 		teq	r7, #0
+ 		adrne	r0, .Lcr
+ 		blne	printk
+-		ldmfd	sp!, {instr, reg, stack, r7, pc}
++		ldmfd	sp!, {r3, instr, reg, stack, r7, pc}
+ 
+ .Lfp:		.asciz	" r%d:%08x%s"
+ .Lcr:		.asciz	"\n"
+-- 
+2.1.4
