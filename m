@@ -1,44 +1,18 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 18 Oct 2016 09:50:13 +0200
-Subject: [PATCH 04/19] MAINTAINERS: Remove phy-stih41x-usb.c entry from
- STi arch
-In-Reply-To: <1473859677-9231-5-git-send-email-peter.griffin@linaro.org>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-5-git-send-email-peter.griffin@linaro.org>
-Message-ID: <4108140b-ac27-42e6-8c25-d65caff70e12@st.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 18 Oct 2016 10:50:11 +0300
+Subject: [PATCH 0/7] ARM: AMx3xx/DRA7: crypto IP support data
+Message-ID: <1476777018-526-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi,
 
-On 09/14/2016 03:27 PM, Peter Griffin wrote:
-> Remove this driver as the IP is only found on STiH415/6
-> silicon, and support for these SoC's is being removed
-> from the kernel.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Cc: <kishon@ti.com>
+This series finalizes the crypto support for amx3xx / dra7 socs,
+adding the hwmod data and fixing one issue with l4sec clockdomain
+on dra7.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Branch against 4.9-rc1 available here:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 4.9-rc1-crypto-data
 
-Applied on sti-dt-for-4.10 branch
-
-Thanks 
-
-> ---
->  MAINTAINERS | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 12c271c..6a278b9 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1755,7 +1755,6 @@ F:	drivers/media/platform/sti/c8sectpfe/
->  F:	drivers/mmc/host/sdhci-st.c
->  F:	drivers/phy/phy-miphy28lp.c
->  F:	drivers/phy/phy-stih407-usb.c
-> -F:	drivers/phy/phy-stih41x-usb.c
->  F:	drivers/pinctrl/pinctrl-st.c
->  F:	drivers/remoteproc/st_remoteproc.c
->  F:	drivers/reset/sti/
-> 
+-Tero
