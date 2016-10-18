@@ -1,34 +1,46 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Tue, 18 Oct 2016 19:37:18 +0800
-Subject: [PATCH 1/2] iommu/mediatek: Convert M4Uv2 to iommu_fwspec
-In-Reply-To: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
-References: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
-Message-ID: <1476790638.3062.1.camel@mhfsdcap03>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 18 Oct 2016 17:08:35 +0530
+Subject: [PATCH v2 1/4] cpufreq: pxa: use generic platdev driver for
+ device-tree
+In-Reply-To: <1476561450-28407-2-git-send-email-robert.jarzmik@free.fr>
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20161018113835.GB11471@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-10-17 at 12:49 +0100, Robin Murphy wrote:
-> Our per-device data consists of the M4U instance and firmware-provided
-> list of LARB IDs, which is a perfect fit for the generic iommu_fwspec
-> machinery. Use that directly as a simpler alternative to the custom
-> archdata code.
+On 15-10-16, 21:57, Robert Jarzmik wrote:
+> For device-tree based pxa25x and pxa27x platforms, cpufreq-dt driver is
+> doing the job as well as pxa2xx-cpufreq, so add these platforms to the
+> compatibility list.
 > 
-> CC: Yong Wu <yong.wu@mediatek.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> This won't work for legacy non device-tree platforms where
+> pxa2xx-cpufreq is still required.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > ---
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> These are fairly mechanical cleanups, so I'm pretty confident, but it
-> still bears mentioning that they're only compile-tested as I don't have
-> the relevant hardware.
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 0bb44d5b5df4..356825b5c9b8 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -32,6 +32,8 @@ static const struct of_device_id machines[] __initconst = {
+>  	{ .compatible = "fsl,imx7d", },
+>  
+>  	{ .compatible = "marvell,berlin", },
+> +	{ .compatible = "marvell,pxa250", },
+> +	{ .compatible = "marvell,pxa270", },
+>  
+>  	{ .compatible = "samsung,exynos3250", },
+>  	{ .compatible = "samsung,exynos4210", },
 
-Thanks for the improvement.
+Isn't there a race between cpufreq-dt and the platform driver to
+register first ?
 
-Tested-by: Yong Wu <yong.wu@mediatek.com>
+Also, it seems that atleast the next two patches are required before
+applying this? You need to fix the order if that is the case.
 
-> 
-> Robin.
-> 
->  drivers/iommu/mtk_iommu.c | 75 ++++++++++++-----------------------------------
->  1 file changed, 18 insertions(+), 57 deletions(-)
-> 
-[...]
+-- 
+viresh
