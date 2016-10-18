@@ -1,171 +1,215 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 18 Oct 2016 09:10:38 -0700
-Subject: [PATCH V2 3/4] ACPI,PCI,IRQ: separate ISA penalty calculation
-In-Reply-To: <20161018104649.GA13940@localhost>
-References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
- <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
- <20161018104649.GA13940@localhost>
-Message-ID: <17ab5714-0e2e-8b5f-356f-8f2019a0177b@codeaurora.org>
+From: prasannatsmkumar@gmail.com (PrasannaKumar Muralidharan)
+Date: Tue, 18 Oct 2016 21:39:17 +0530
+Subject: [PATCH] crypto: sun4i-ss: support the Security System PRNG
+In-Reply-To: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1476794067-28563-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <CANc+2y63p1b5ATDY0oU4nLckk9CJhSs3CXGHy=NwoXn_awP9aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2016 3:46 AM, Bjorn Helgaas wrote:
-> Hi Sinan,
-> 
-> On Wed, Jun 29, 2016 at 04:27:37AM -0400, Sinan Kaya wrote:
->> Since commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
->> the penalty values are calculated on the fly rather than boot time.
->>
->> This works fine for PCI interrupts but not so well for the ISA interrupts.
->> Whether an ISA interrupt is in use or not information is not available
->> inside the pci_link.c file. This information gets sent externally via
->> acpi_penalize_isa_irq function. If active is true, then the IRQ is in use
->> by ISA. Otherwise, IRQ is in use by PCI.
->>
->> Since the current code relies on PCI Link object for determination of
->> penalties, we are factoring in the PCI penalty twice after
->> acpi_penalize_isa_irq function is called.
-> 
-> I know this patch has already been merged, but I'm confused.
-> 
-> Can you be a little more specific about how we factor in the PCI
-> penalty twice?  I think that when we enumerate an enabled link device,
-> we call acpi_penalize_isa_irq(x) in this path:
-> 
->   pnpacpi_allocated_resource
->     pnpacpi_add_irqresource
->       pcibios_penalize_isa_irq
->         acpi_penalize_isa_irq
->           acpi_isa_irq_penalty[x] = PIRQ_PENALTY_ISA_USED
-> 
+Hi Corentin,
 
-This is not really a problem but more information about how things work. 
-I was trying to point out the fact that acpi_penalize_isa_irq is changing
-the penalties externally while ISA IRQs get initialized based on the active
-parameter. 
+I have a few minor comments.
 
-The penalty determination of ISA IRQ goes through 2 paths.
-1. assign PCI_USING during power up via acpi_irq_penalty_init
-2. update the penalty with acpi_irq_pci_sharing_penalty function based on active
-parameter.
+On 18 October 2016 at 18:04, Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+> From: LABBE Corentin <clabbe.montjoie@gmail.com>
+>
+> The Security System have a PRNG.
+> This patch add support for it as an hwrng.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  drivers/crypto/Kconfig                   |  8 ++++
+>  drivers/crypto/sunxi-ss/Makefile         |  1 +
+>  drivers/crypto/sunxi-ss/sun4i-ss-core.c  | 14 +++++++
+>  drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c | 70 ++++++++++++++++++++++++++++++++
+>  drivers/crypto/sunxi-ss/sun4i-ss.h       |  8 ++++
+>  5 files changed, 101 insertions(+)
+>  create mode 100644 drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+>
+> diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+> index 4d2b81f..38f7aca 100644
+> --- a/drivers/crypto/Kconfig
+> +++ b/drivers/crypto/Kconfig
+> @@ -538,6 +538,14 @@ config CRYPTO_DEV_SUN4I_SS
+>           To compile this driver as a module, choose M here: the module
+>           will be called sun4i-ss.
+>
+> +config CRYPTO_DEV_SUN4I_SS_PRNG
+> +       bool "Support for Allwinner Security System PRNG"
+> +       depends on CRYPTO_DEV_SUN4I_SS
+> +       select HW_RANDOM
+> +       help
+> +         This driver provides kernel-side support for the Pseudo-Random
+> +         Number Generator found in the Security System.
+> +
+>  config CRYPTO_DEV_ROCKCHIP
+>         tristate "Rockchip's Cryptographic Engine driver"
+>         depends on OF && ARCH_ROCKCHIP
+> diff --git a/drivers/crypto/sunxi-ss/Makefile b/drivers/crypto/sunxi-ss/Makefile
+> index 8f4c7a2..ca049ee 100644
+> --- a/drivers/crypto/sunxi-ss/Makefile
+> +++ b/drivers/crypto/sunxi-ss/Makefile
+> @@ -1,2 +1,3 @@
+>  obj-$(CONFIG_CRYPTO_DEV_SUN4I_SS) += sun4i-ss.o
+>  sun4i-ss-y += sun4i-ss-core.o sun4i-ss-hash.o sun4i-ss-cipher.o
+> +sun4i-ss-$(CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG) += sun4i-ss-hwrng.o
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> index 3ac6c6c..fa739de 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> @@ -359,6 +359,16 @@ static int sun4i_ss_probe(struct platform_device *pdev)
+>                 }
+>         }
+>         platform_set_drvdata(pdev, ss);
+> +
+> +#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
+> +       /* Voluntarily made the PRNG optional */
+> +       err = sun4i_ss_hwrng_register(&ss->hwrng);
+> +       if (!err)
+> +               dev_info(ss->dev, "sun4i-ss PRNG loaded");
+> +       else
+> +               dev_err(ss->dev, "sun4i-ss PRNG failed");
+> +#endif
+> +
+>         return 0;
+>  error_alg:
+>         i--;
+> @@ -386,6 +396,10 @@ static int sun4i_ss_remove(struct platform_device *pdev)
+>         int i;
+>         struct sun4i_ss_ctx *ss = platform_get_drvdata(pdev);
+>
+> +#ifdef CONFIG_CRYPTO_DEV_SUN4I_SS_PRNG
+> +       sun4i_ss_hwrng_remove(&ss->hwrng);
+> +#endif
+> +
+>         for (i = 0; i < ARRAY_SIZE(ss_algs); i++) {
+>                 switch (ss_algs[i].type) {
+>                 case CRYPTO_ALG_TYPE_ABLKCIPHER:
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+> new file mode 100644
+> index 0000000..95fadb7
+> --- /dev/null
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-hwrng.c
+> @@ -0,0 +1,70 @@
+> +#include "sun4i-ss.h"
+> +
+> +static int sun4i_ss_hwrng_init(struct hwrng *hwrng)
+> +{
+> +       struct sun4i_ss_ctx *ss;
+> +
+> +       ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
+> +       get_random_bytes(ss->seed, SS_SEED_LEN);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sun4i_ss_hwrng_read(struct hwrng *hwrng, void *buf,
+> +                              size_t max, bool wait)
+> +{
+> +       int i;
+> +       u32 v;
+> +       u32 *data = buf;
+> +       const u32 mode = SS_OP_PRNG | SS_PRNG_CONTINUE | SS_ENABLED;
+> +       size_t len;
+> +       struct sun4i_ss_ctx *ss;
+> +
+> +       ss = container_of(hwrng, struct sun4i_ss_ctx, hwrng);
+> +       len = min_t(size_t, SS_DATA_LEN, max);
+> +
+> +       spin_lock_bh(&ss->slock);
 
+Is spin_lock_bh really required here? I could see it is being used in
+sun4i-ss-hash.c but could not find any comment/info about the need.
 
-> And I see that acpi_irq_penalty_init() also adds in some penalty
-> (either "PIRQ_PENALTY_PCI_POSSIBLE / possible_count" or
-> PIRQ_PENALTY_PCI_POSSIBLE).  And when we call acpi_irq_get_penalty(x),
-> we add in PIRQ_PENALTY_PCI_USING.
-> 
-> It doesn't seem right to me that we're adding both
-> PIRQ_PENALTY_ISA_USED and PIRQ_PENALTY_PCI_USING.  Is that the problem
-> you're referring to?
+> +       writel(mode, ss->base + SS_CTL);
+> +
+> +       /* write the seed */
+> +       for (i = 0; i < SS_SEED_LEN / 4; i++)
+> +               writel(ss->seed[i], ss->base + SS_KEY0 + i * 4);
+> +       writel(mode | SS_PRNG_START, ss->base + SS_CTL);
+> +
+> +       /* Read the random data */
+> +       readsl(ss->base + SS_TXFIFO, data, len / 4);
+> +
+> +       if (len % 4 > 0) {
+> +               v = readl(ss->base + SS_TXFIFO);
+> +               memcpy(data + len / 4, &v, len % 4);
+> +       }
 
-Correct, this is the one. What happened in this case is that 
-acpi_irq_penalty_init added a PCI_USING penalty during boot. Then, when we
-wanted to get the penalty for an ISA IRQ. This added another PCI_USING penalty
-in acpi_irq_pci_sharing_penalty function in addition to originally added penalty.
+hwrng core asks for "rng_buffer_size()" of data which is a multiple of
+4. So len % 4 will be 0. I think the above check is not required. Feel
+free to correct if I am wrong.
 
-Now, we have 2 * PCI_USING assigned to an ISA IRQ.
-
-> 
->> This change is limiting the newly added functionality to just PCI
->> interrupts so that old behavior is still maintained.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/acpi/pci_link.c | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
->> index 714ba4d..8c08971 100644
->> --- a/drivers/acpi/pci_link.c
->> +++ b/drivers/acpi/pci_link.c
->> @@ -496,9 +496,6 @@ static int acpi_irq_get_penalty(int irq)
->>  {
->>  	int penalty = 0;
->>  
->> -	if (irq < ACPI_MAX_ISA_IRQS)
->> -		penalty += acpi_isa_irq_penalty[irq];
->> -
->>  	/*
->>  	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
->>  	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
->> @@ -513,6 +510,9 @@ static int acpi_irq_get_penalty(int irq)
->>  			penalty += PIRQ_PENALTY_PCI_USING;
->>  	}
->>  
->> +	if (irq < ACPI_MAX_ISA_IRQS)
->> +		return penalty + acpi_isa_irq_penalty[irq];
->> +
->>  	penalty += acpi_irq_pci_sharing_penalty(irq);
->>  	return penalty;
-> 
-> I don't understand what's going on here.
-> 
-> acpi_irq_pci_sharing_penalty(X) basically tells us how many link
-> devices are already using IRQ X.  This change makes it so we don't
-> consider that information if X < ACPI_MAX_ISA_IRQS.
-> 
-
-The ISA IRQ doesn't need the penalties coming from
-acpi_irq_pci_sharing_penalty function since acpi_irq_pci_sharing_penalty
-is intended do the same thing as acpi_irq_penalty_init. It is just smarter
-to cover more IRQ range.
-
-Since acpi_irq_penalty_init is called during boot for the ISA IRQS, calling
-acpi_irq_pci_sharing_penalty again is incorrect.
-
-
-> Let's say we have several link devices that are initially disabled,
-> e.g.,
-> 
->   LNKA (IRQs 9 10 11)
->   LNKB (IRQs 9 10 11)
->   LNKC (IRQs 9 10 11)
-> 
-> When we enable these, I think we'll choose the same IRQ for all of
-> them because we no longer look at the other links to see how they're
-> configured.
-
-You are right. This is the reason why I have this patch.
-
-[PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
-
-The penalties get assigned by the acpi_irq_penalty_init and acpi_penalize_isa_irq
-functions before the PCI Link object is created until this moment. 
-
-By the time link object is getting initialized, the code chooses the correct penalty here:
-
-/
- * Select the best IRQ.  This is done in reverse to promote
- * the use of IRQs 9, 10, 11, and >15.
- */
-for (i = (link->irq.possible_count - 1); i >= 0; i--) {
-        if (acpi_irq_get_penalty(irq) >
-            acpi_irq_get_penalty(link->irq.possible[i]))
-                irq = link->irq.possible[i];
-}
-
-and the code needs to increment the penalty on this IRQ so that the next PCI Link object
-would find another IRQ. This is missing right now.
-
-
-> 
->>  }
->> -- 
->> 1.8.2.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +       /* Update the seed */
+> +       for (i = 0; i < SS_SEED_LEN / 4; i++) {
+> +               v = readl(ss->base + SS_KEY0 + i * 4);
+> +               ss->seed[i] = v;
+> +       }
+> +
+> +       writel(0, ss->base + SS_CTL);
+> +       spin_unlock_bh(&ss->slock);
+> +       return len;
+> +}
+> +
+> +int sun4i_ss_hwrng_register(struct hwrng *hwrng)
+> +{
+> +       hwrng->name = "sun4i Security System PRNG";
+> +       hwrng->init = sun4i_ss_hwrng_init;
+> +       hwrng->read = sun4i_ss_hwrng_read;
+> +       hwrng->quality = 1000;
+> +
+> +       /* Cannot use devm_hwrng_register() since we need to hwrng_unregister
+> +        * before stopping clocks/regulator
+> +        */
+> +       return hwrng_register(hwrng);
+> +}
+> +
+> +void sun4i_ss_hwrng_remove(struct hwrng *hwrng)
+> +{
+> +       hwrng_unregister(hwrng);
+> +}
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss.h b/drivers/crypto/sunxi-ss/sun4i-ss.h
+> index f04c0f8..1297510 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss.h
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss.h
+> @@ -23,6 +23,7 @@
+>  #include <linux/scatterlist.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/delay.h>
+> +#include <linux/hw_random.h>
+>  #include <crypto/md5.h>
+>  #include <crypto/sha.h>
+>  #include <crypto/hash.h>
+> @@ -125,6 +126,9 @@
+>  #define SS_RXFIFO_EMP_INT_ENABLE       (1 << 2)
+>  #define SS_TXFIFO_AVA_INT_ENABLE       (1 << 0)
+>
+> +#define SS_SEED_LEN (192 / 8)
+> +#define SS_DATA_LEN (160 / 8)
+> +
+>  struct sun4i_ss_ctx {
+>         void __iomem *base;
+>         int irq;
+> @@ -134,6 +138,8 @@ struct sun4i_ss_ctx {
+>         struct device *dev;
+>         struct resource *res;
+>         spinlock_t slock; /* control the use of the device */
+> +       struct hwrng hwrng;
+> +       u32 seed[SS_SEED_LEN / 4];
+>  };
+>
+>  struct sun4i_ss_alg_template {
+> @@ -199,3 +205,5 @@ int sun4i_ss_des_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
+>                         unsigned int keylen);
+>  int sun4i_ss_des3_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
+>                          unsigned int keylen);
+> +int sun4i_ss_hwrng_register(struct hwrng *hwrng);
+> +void sun4i_ss_hwrng_remove(struct hwrng *hwrng);
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> 2.7.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
