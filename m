@@ -1,35 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 18 Oct 2016 12:25:42 +0200
-Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
-In-Reply-To: <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
-References: <20161005155112.13774-1-hdegoede@redhat.com>
- <20161005155112.13774-2-hdegoede@redhat.com>
- <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
-Message-ID: <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Oct 2016 11:25:50 +0100
+Subject: [PATCH] ARM: dts: realview: Extend PBX family memory description
+In-Reply-To: <1476778873-12210-1-git-send-email-linus.walleij@linaro.org>
+References: <1476778873-12210-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161018102550.GM1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 18, 2016 at 10:21:13AM +0200, Linus Walleij wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
+> 
+> All three platforms sharing the later RealView Platform Baseboard memory
+> map - PBX-A9, PB-A8 and PB11MPCore, provide 512MB of DDR SDRAM on the
+> baseboard, of which the boot alias at 0x0 maps the first 256MB. Expand
+> the size of the default memory node to reflect that, and describe the
+> full memory regions in each board's DTS, but leave those commented by
+> default to avoid breaking existing bootloaders.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: I forgot to send this patch for ARM SoC earlier.
+> As it is a small change I suggest you just apply it to the ARM
+> SoC tree as I do not foresee any other RealView work in the near
+> future. If you think it can go into v4.9 then put it in as a fix,
+> else just push it to the next merge window.
+> Robin: sorry for screwing up :(
 
-On 18-10-16 07:25, Chen-Yu Tsai wrote:
-> On Wed, Oct 5, 2016 at 11:51 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The i2c subsys does not load modules by compatible, only by
->> i2c-id, with e.g. a modalias of: "i2c:axp209".
->>
->> Populate the axp20x_i2c_id[] table with supported ids, so that
->> module auto-loading will work.
->>
->> Reported-by: Dennis Gilmore <dennis@ausil.us>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
->
-> Even though axp20x-i2c seems to be the only "DT only" i2c client,
-> would it make sense to add DT-based module autoloading to the i2c
-> core?
+Normally, memory nodes describe different regions of unique memory.
+This is not unique memory, but is an alias of some already-described
+memory.
 
-If it is not too invasive, then yes that would be a sensible addition IMHO.
+The problem with adding the aliased memory addresses is that we end
+up needing platform knowledge to reject the "other alias" from the
+memory description, which really isn't good.
 
-Regards,
+The only reason it works is that we reject memory nodes where the
+physical address < PHYS_OFFSET.  That works provided the alias is
+below PHYS_OFFSET, but that isn't always the case.
 
-Hans
+So, I think it is completely wrong to describe the aliased memory
+regions in DT.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently@9.6Mbps down 400kbps up
+according to speedtest.net.
