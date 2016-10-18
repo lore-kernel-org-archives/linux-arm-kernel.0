@@ -1,170 +1,116 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 18 Oct 2016 10:39:05 +0100
-Subject: [RESEND PATCH v10 00/11] Add support for FDMA DMA controller and slim
- core rproc found on STi chipsets
-Message-ID: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+Date: Tue, 18 Oct 2016 10:39:09 +0100
+Subject: [PATCH v10 04/11] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
+In-Reply-To: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1476783556-2501-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod and Bjorn,
+This patch adds the DT binding documentation for the FDMA constroller
+found on STi based chipsets from STMicroelectronics.
 
-This patchset adds support for the Flexible Direct Memory Access (FDMA) core
-found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
-with a dedicated firmware. It is a general purpose DMA controller supporting
-16 independent channels and data can be moved from memory to memory or between
-memory and paced latency critical real time targets.
-
-[..]
-
-V10 series updates remoteproc kconfig subsystem to use 'depends on' rather
-than select for the remoteproc core. Remoteproc client drivers now need to
-'depends on' for the core part.
-
-This avoids the Kconfig recursive dependency errors and reliance on the DRM
-patch included with the v9 series. Patches are also included for enabling the
-remoteproc core in the multi_v7 defconfig. All patches for DRM subsystem have
-been removed.
-
-Note there is no longer a depedency with the DRM_VIRTIO_GPU driver in this series,
-only remoteproc and dmaengine subsystems.
-
-regards,
-
-Peter.
-
-v10 RESEND
- - Rebase on v4.9-rc1
-
-Changes since v9:
- - Update remoteproc Kconfig to 'depends on'
- - Add remoteproc core to multi_v7 defconfig
- - Remove drm patches
- - rebase v4.8
-
-Changes since v8:
- - Add MODULE_ALIAS (Vinod)
- - devm_kzalloc to devm_kcalloc (Vinod)
- - quisce tasklet initialised by vchan_init() (Vinod)
- - Don't make SLIM rproc user selectable (Bjorn)
- - slim_rproc: Ensure clocks enabled before firmware load (Peter)
- - Various code style nits / commit message change (Lee)
- - Separate patch for '\n' kconfig removal (Vinod)
- - Fix clock bug when booting without clk_ignore_unused param
-
-Changes since v7:
- - Rebase on v4.8-rc3 (Peter)
- - Double check that len is <= mem[i].size (Bjorn)
- - Remove if (!fw) checks (Bjorn)
- - Omit reference from fw_ops struct (Bjorn)
- - Call rproc_del() before rproc_put() (Bjorn)
- - Fix some odd line breaks (Bjorn)
- - Rename SLIM_* and slim_* with st prefix (Bjorn)
-
-Changes since v6:
- - Fix recursive Kconfig warning (Patrice)
- - Fix various Intel zero day compiler warnings
- - Remove all changes related to late firmware load (now relies on initramfs) (Peter)
-
-Changes since v5:
- - Remove optional rsc table and go back to dummy resource table (Bjorn)
- - Retry rproc_fw_config_virtio() from rproc_boot() if previously failed (Peter)
- - Fixup some kbuild warnings
- - rebase on v4.7-rc5
- - Remove some patches which were merged via ASoC tree
-
-Changes since v4:
- - Make rsc table optional in remoteproc (Peter)
- - Various fixups to STi audio DT nodes (Arnaud)
- - Bulk rename of xp70 to slim (Peter)
- - Update my email to @linaro.org (Lee)
- - rebase on v4.7-rc2 (Peter)
- - Don't make ST_SLIM_REMOTEPROC user selectable (Bjorn)
- - -EPROBE_DEFER if rproc_boot fails when allocating DMA channel (Arnaud / Peter)
- - Drop some unnecessary headers (Vinod / Bjorn)
- - Change to writel now we have several mappings (Bjorn)
- - Remove io_res, rproc, and some unused structure fields / #define (Bjorn)
- - put clks in error path, also put clks before rproc_put() (Bjorn)
- - Make enum less generic (Bjorn)
- - Make slim_rproc_alloc() return a st_slim_rproc reference (Bjorn)
- - Alphabetical naming in Kconfig & Makefile (Vinod)
- - Add FDMA prefix to REQ_CTRL* (Vinod)
- - Print ret on some error paths (Vinod)
- - Add some acked-by (Peter)
-
-Changes since v3:
- - Remove elf loading code from fdma driver (Vinod)
- - Remove fdma_ prefix for clock names (Arnd)
- - Make _xlate use dma_get_any_channel rather than request_channel (Arnd)
- - Make a common function for _prep_ routines (Vinod)
- - Make driver depend on COMPILE_TEST (Arnd)
- - Remove unnecessary st_fdma_filter_fn (Arnd)
- - Enable FDMA as a module (Arnd)
- - Drop fdma_ clock prefix (Arnd)
- - Fix description as well as example for st, prefix (Arnd)
- - Remove string concatenation from fdma register macros to ease grep'ability (Arnd)
- - Add a XP70 rproc driver for ELF firmware loading and start/stop control (Peter)
- - Add myself as a author of the driver (Peter)
-
-Changes since v2:
- - Change to dma-controller (Arnd)
- - Remove platform data header file and simplifiy code (Arnd)
- - Remove FW_LOADER_USER_HELPER_FALLBACK and rework firmware loading to device config (Vinod)
- - Use SET_RUNTIME_PM_OPS helpers (Vinod)
- - Remove fdma-id dt prop and use compatibles to generate different fdma firmware names (Arnd / Lee)
- - Add sti-asoc-card DT nodes and pinmux config for uniperif player & reader (Peter)
- - Update sti-asoc-card DT binding documentation (Peter)
- - Enable STi audio drivers in multi_v7_defconfig (Peter)
-
-Changes since v1:
- - split into smaller patches for easier / faster review (Vinod)
- - new fill_hw_mode() with common code (Vinod)
- - new config_reqctrl() called from *_prep() instead of device_config cb (Vinod)
- - fdma-xbar support removed (Peter)
- - rework firmware name mechanism so fwname isn't in DT (Peter / Lee)
- - st_fdma_seg_to_mem can be static (Paul)
- - EXPORT_SYMBOL st_fdma_filter_fn not required (Paul)
- - s/channel/channels (vinod)
- - better describe "Must be <3>" (vinod)
- - sizeof(*ehdr) (vinod)
- - print values on error debug (vinod)
- - empty line (Vinod)
- - Update to -EIO (Vinod)
- - Make st_fdma tristate (Paul)
- - Remove __exit tag from .remove (Maxime)
- - Update MAINTAINERS rule to fdma* (Lee)
- - Unit address should match reg property (Lee)
-
-Peter Griffin (11):
-  remoteproc: st_slim_rproc: add a slimcore rproc driver
-  MAINTAINERS: Add st slim core rproc driver to STi section.
-  remoteproc: Update Kconfig setup to 'depends on REMOTEPROC'
-  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
-    documentation
-  dmaengine: st_fdma: Add STMicroelectronics FDMA driver header file
-  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
-  MAINTAINERS: Add FDMA driver files to STi section.
-  ARM: multi_v7_defconfig: Enable remoteproc core
-  ARM: multi_v7_defconfig: Enable st_remoteproc driver.
-  ARM: multi_v7_defconfig: Enable STi FDMA driver
-  ARM: multi_v7_defconfig: Enable STi and simple-card drivers.
-
- Documentation/devicetree/bindings/dma/st_fdma.txt |  87 +++
- MAINTAINERS                                       |   3 +
- arch/arm/configs/multi_v7_defconfig               |   6 +
- drivers/dma/Kconfig                               |  13 +
- drivers/dma/Makefile                              |   1 +
- drivers/dma/st_fdma.c                             | 899 ++++++++++++++++++++++
- drivers/dma/st_fdma.h                             | 249 ++++++
- drivers/remoteproc/Kconfig                        |  25 +-
- drivers/remoteproc/Makefile                       |   1 +
- drivers/remoteproc/st_slim_rproc.c                | 364 +++++++++
- include/linux/remoteproc/st_slim_rproc.h          |  58 ++
- 11 files changed, 1697 insertions(+), 9 deletions(-)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/dma/st_fdma.txt | 87 +++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
- create mode 100644 drivers/dma/st_fdma.c
- create mode 100644 drivers/dma/st_fdma.h
- create mode 100644 drivers/remoteproc/st_slim_rproc.c
- create mode 100644 include/linux/remoteproc/st_slim_rproc.h
 
+diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+new file mode 100644
+index 0000000..495d853
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+@@ -0,0 +1,87 @@
++* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
++
++The FDMA is a general-purpose direct memory access controller capable of
++supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
++The FDMA is based on a Slim processor which requires a firmware.
++
++* FDMA Controller
++
++Required properties:
++- compatible	: Should be one of
++		 - st,stih407-fdma-mpe31-11, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-12, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-13, "st,slim-rproc";
++- reg		: Should contain an entry for each name in reg-names
++- reg-names	: Must contain "slimcore", "dmem", "peripherals", "imem" entries
++- interrupts	: Should contain one interrupt shared by all channels
++- dma-channels	: Number of channels supported by the controller
++- #dma-cells	: Must be <3>. See DMA client section below
++- clocks	: Must contain an entry for each clock
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++
++Example:
++
++	fdma0: dma-controller at 8e20000 {
++		compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
++		reg = <0x8e20000 0x8000>,
++		      <0x8e30000 0x3000>,
++		      <0x8e37000 0x1000>,
++		      <0x8e38000 0x8000>;
++		reg-names = "slimcore", "dmem", "peripherals", "imem";
++		clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
++		interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
++		dma-channels = <16>;
++		#dma-cells = <3>;
++	};
++
++* DMA client
++
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 4 cells:
++1. A phandle pointing to the FDMA controller
++2. The request line number
++3. A 32bit mask specifying (see include/linux/platform_data/dma-st-fdma.h)
++ -bit 2-0: Holdoff value, dreq will be masked for
++	0x0: 0-0.5us
++	0x1: 0.5-1us
++	0x2: 1-1.5us
++ -bit 17: data swap
++	0x0: disabled
++	0x1: enabled
++ -bit 21: Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 22: 2 STBus Initiator Coprocessor interface
++	0x0: high priority port
++	0x1: low priority port
++4. transfers type
++ 0 free running
++ 1 paced
++
++Example:
++
++	sti_uni_player2: sti-uni-player at 2 {
++		compatible = "st,sti-uni-player";
++		status = "disabled";
++		#sound-dai-cells = <0>;
++		st,syscfg = <&syscfg_core>;
++		clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clock-parents = <&clk_s_d0_quadfs 2>;
++		assigned-clock-rates = <50000000>;
++		reg = <0x8D82000 0x158>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		dmas = <&fdma0 4 0 1>;
++		dai-name = "Uni Player #1 (DAC)";
++		dma-names = "tx";
++		st,uniperiph-id = <2>;
++		st,version = <5>;
++		st,mode = "PCM";
++	};
 -- 
 1.9.1
