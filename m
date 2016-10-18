@@ -1,64 +1,60 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 18 Oct 2016 11:27:47 +0100
-Subject: [PATCH 2/3] arm64: mm: Set PSTATE.PAN from the cpu_enable_pan() call
-In-Reply-To: <1476786468-2173-1-git-send-email-james.morse@arm.com>
-References: <1476786468-2173-1-git-send-email-james.morse@arm.com>
-Message-ID: <1476786468-2173-3-git-send-email-james.morse@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 18 Oct 2016 11:40:58 +0100
+Subject: [PATCH] ARM: dts: realview: Extend PBX family memory description
+In-Reply-To: <20161018102550.GM1041@n2100.armlinux.org.uk>
+References: <1476778873-12210-1-git-send-email-linus.walleij@linaro.org>
+ <20161018102550.GM1041@n2100.armlinux.org.uk>
+Message-ID: <51ce7710-b215-d1d0-7696-6c85293f3d7e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 338d4f49d6f7 ("arm64: kernel: Add support for Privileged Access
-Never") enabled PAN by enabling the 'SPAN' feature-bit in SCTLR_EL1.
-This means the PSTATE.PAN bit won't be set until the next return to the
-kernel from userspace. On a preemptible kernel we may schedule work that
-accesses userspace on a CPU before it has done this.
+On 18/10/16 11:25, Russell King - ARM Linux wrote:
+> On Tue, Oct 18, 2016 at 10:21:13AM +0200, Linus Walleij wrote:
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> All three platforms sharing the later RealView Platform Baseboard memory
+>> map - PBX-A9, PB-A8 and PB11MPCore, provide 512MB of DDR SDRAM on the
+>> baseboard, of which the boot alias at 0x0 maps the first 256MB. Expand
+>> the size of the default memory node to reflect that, and describe the
+>> full memory regions in each board's DTS, but leave those commented by
+>> default to avoid breaking existing bootloaders.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ARM SoC folks: I forgot to send this patch for ARM SoC earlier.
+>> As it is a small change I suggest you just apply it to the ARM
+>> SoC tree as I do not foresee any other RealView work in the near
+>> future. If you think it can go into v4.9 then put it in as a fix,
+>> else just push it to the next merge window.
+>> Robin: sorry for screwing up :(
+> 
+> Normally, memory nodes describe different regions of unique memory.
+> This is not unique memory, but is an alias of some already-described
+> memory.
 
-Now that cpufeature enable() calls are scheduled via stop_machine(), we
-can set PSTATE.PAN from the cpu_enable_pan() call.
+Well, really, this is _the_ memory, and the 256MB at 0 is the alias, but
+only the separate PB11MPCore DTS has the luxury of being correct from
+the off, thanks to the precedent of the QEMU PB-A8 model being popular
+and expecting to use the low alias.
 
-Add WARN_ON_ONCE(in_interrupt()) to check the PSTATE value we updated
-is not immediately discarded.
+> The problem with adding the aliased memory addresses is that we end
+> up needing platform knowledge to reject the "other alias" from the
+> memory description, which really isn't good.
+> 
+> The only reason it works is that we reject memory nodes where the
+> physical address < PHYS_OFFSET.  That works provided the alias is
+> below PHYS_OFFSET, but that isn't always the case.
 
-Reported-by: Tony Thompson <anthony.thompson@arm.com>
-Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
+Look again ;) It works perfectly because whilst the information is in
+the DTS for completeness, as-is it's not in the DTB that the kernel
+gets. And if someone _does_ adjust their kernel load address and
+uncomment the .dts node accordingly, the "reg" property from the .dtsi
+node gets overridden, not added to, so it's still fine.
 
----
-This patch depends on 'arm64: cpufeature: Schedule enable() calls instead
-of calling them via IPI', which doesn't apply to linux-stable versions
-before v4.8.
+Robin.
 
- arch/arm64/mm/fault.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 3e9ff9b0c78d..f942ab6cc206 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -29,7 +29,9 @@
- #include <linux/sched.h>
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
-+#include <linux/preempt.h>
- 
-+#include <asm/bug.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
- #include <asm/debug-monitors.h>
-@@ -672,7 +674,14 @@ NOKPROBE_SYMBOL(do_debug_exception);
- #ifdef CONFIG_ARM64_PAN
- int cpu_enable_pan(void *__unused)
- {
-+	/*
-+	 * We modify PSTATE. This won't work from irq context as the PSTATE
-+	 * is discared once we return from the exception.
-+	 */
-+	WARN_ON_ONCE(in_interrupt());
-+
- 	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
-+	asm(SET_PSTATE_PAN(1));
- 	return 0;
- }
- #endif /* CONFIG_ARM64_PAN */
--- 
-2.8.0.rc3
+> 
+> So, I think it is completely wrong to describe the aliased memory
+> regions in DT.
+> 
