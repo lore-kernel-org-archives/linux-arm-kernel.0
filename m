@@ -1,38 +1,44 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 18 Oct 2016 09:47:28 +0200
-Subject: [PATCH 02/19] phy: stih41x-usb: Remove usb phy driver and dt
- binding documentation.
-In-Reply-To: <20160923150656.GB9176@rob-hp-laptop>
+Date: Tue, 18 Oct 2016 09:48:19 +0200
+Subject: [PATCH 03/19] MAINTAINERS: Remove phy-miphy365x.c entry from STi
+ arch
+In-Reply-To: <1473859677-9231-4-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-3-git-send-email-peter.griffin@linaro.org>
- <20160923150656.GB9176@rob-hp-laptop>
-Message-ID: <778bd4b2-9e82-326b-f6e0-43360323d453@st.com>
+ <1473859677-9231-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <aab225f3-2482-4a08-1149-4220327f81d7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi 
+Hi
 
-On 09/23/2016 05:06 PM, Rob Herring wrote:
-> On Wed, Sep 14, 2016 at 02:27:40PM +0100, Peter Griffin wrote:
->> This phy is only used on STiH415/6 based silicon, and support for
->> these SoC's is being removed from the kernel.
->>
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> Cc: <kishon@ti.com>
->> ---
->>  .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 ---
+On 09/14/2016 03:27 PM, Peter Griffin wrote:
+> Remove this driver as the IP is only found on STiH415/6
+> silicon, and support for these SoC's is being removed
+> from the kernel.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <kishon@ti.com>
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
 Applied on sti-dt-for-4.10 branch
 
 Thanks 
 
-
+> ---
+>  MAINTAINERS | 1 -
+>  1 file changed, 1 deletion(-)
 > 
->>  drivers/phy/Kconfig                                |   8 -
->>  drivers/phy/Makefile                               |   1 -
->>  drivers/phy/phy-stih41x-usb.c                      | 188 ---------------------
->>  4 files changed, 221 deletions(-)
->>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
->>  delete mode 100644 drivers/phy/phy-stih41x-usb.c
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index db814a8..12c271c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1754,7 +1754,6 @@ F:	drivers/media/rc/st_rc.c
+>  F:	drivers/media/platform/sti/c8sectpfe/
+>  F:	drivers/mmc/host/sdhci-st.c
+>  F:	drivers/phy/phy-miphy28lp.c
+> -F:	drivers/phy/phy-miphy365x.c
+>  F:	drivers/phy/phy-stih407-usb.c
+>  F:	drivers/phy/phy-stih41x-usb.c
+>  F:	drivers/pinctrl/pinctrl-st.c
+> 
