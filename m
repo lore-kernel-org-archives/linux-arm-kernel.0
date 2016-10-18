@@ -1,26 +1,21 @@
-From: jack@suse.cz (Jan Kara)
-Date: Tue, 18 Oct 2016 14:43:05 +0200
-Subject: [PATCH 01/10] mm: remove write/force parameters from
- __get_user_pages_locked()
-In-Reply-To: <20161013002020.3062-2-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161013002020.3062-2-lstoakes@gmail.com>
-Message-ID: <20161018124305.GA29967@quack2.suse.cz>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 18 Oct 2016 07:43:49 -0500
+Subject: [PATCH v2 6/9] dt-bindings: pinctrl: Deprecate sunxi pinctrl
+ bindings
+In-Reply-To: <ee6d214a14ed31689c5f70fc6ee5736c3d26737b.1476200742.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <ee6d214a14ed31689c5f70fc6ee5736c3d26737b.1476200742.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20161018124349.qxsrpx3yjy62bqhp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 13-10-16 01:20:11, Lorenzo Stoakes wrote:
-> This patch removes the write and force parameters from __get_user_pages_locked()
-> to make the use of FOLL_FORCE explicit in callers as use of this flag can result
-> in surprising behaviour (and hence bugs) within the mm subsystem.
+On Tue, Oct 11, 2016 at 05:46:04PM +0200, Maxime Ripard wrote:
+> The generic pin configuration and multiplexing should be preferred now,
+> even though we still support the old one.
 > 
-> Signed-off-by: Lorenzo Stoakes <lstoakes@gmail.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+), 0 deletions(-)
 
-Looks good. You can add:
-
-Reviewed-by: Jan Kara <jack@suse.cz>
-
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+Acked-by: Rob Herring <robh@kernel.org>
