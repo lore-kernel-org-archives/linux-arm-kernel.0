@@ -1,25 +1,34 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 18 Oct 2016 13:20:32 +0800
-Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
-In-Reply-To: <20161018015636.11701-3-stephen.boyd@linaro.org>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-3-stephen.boyd@linaro.org>
-Message-ID: <CAGb2v65n3ciP6dud8EqPU+pn0JnO+-Oqxgm+Z3vs+j-A7AbL1Q@mail.gmail.com>
+Date: Tue, 18 Oct 2016 13:25:01 +0800
+Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
+In-Reply-To: <20161005155112.13774-2-hdegoede@redhat.com>
+References: <20161005155112.13774-1-hdegoede@redhat.com>
+ <20161005155112.13774-2-hdegoede@redhat.com>
+Message-ID: <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> The ULPI bus can be built as a module, and it will soon be
-> calling these functions when it supports probing devices from DT.
-> Export them so they can be used by the ULPI module.
+On Wed, Oct 5, 2016 at 11:51 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The i2c subsys does not load modules by compatible, only by
+> i2c-id, with e.g. a modalias of: "i2c:axp209".
 >
-> Acked-by: Rob Herring <robh@kernel.org>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Populate the axp20x_i2c_id[] table with supported ids, so that
+> module auto-loading will work.
+>
+> Reported-by: Dennis Gilmore <dennis@ausil.us>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-I'm interested in this as well. The sunxi-rsb bus is non-enumerable
-and DT only, and existing slave device drivers can be built as modules.
-We'd need this to support modalias loading of drivers.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
+Even though axp20x-i2c seems to be the only "DT only" i2c client,
+would it make sense to add DT-based module autoloading to the i2c
+core?
+
+This also made me realize we probably don't have module auto-loading
+for sunxi-rsb either.
+
+Both should be doable with Stephen Boyd's "of: device: Export
+of_device_{get_modalias, uvent_modalias} to modules" patch.
+
+Regards
 ChenYu
