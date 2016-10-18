@@ -1,46 +1,142 @@
-From: jack@suse.cz (Jan Kara)
-Date: Tue, 18 Oct 2016 14:54:25 +0200
-Subject: [PATCH 04/10] mm: replace get_user_pages_locked() write/force
- parameters with gup_flags
-In-Reply-To: <20161013002020.3062-5-lstoakes@gmail.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161013002020.3062-5-lstoakes@gmail.com>
-Message-ID: <20161018125425.GD29967@quack2.suse.cz>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Oct 2016 14:00:47 +0100
+Subject: [PATCH] arm64: Cortex-A53 errata workaround: check for kernel
+ addresses
+In-Reply-To: <20161018111627.17366-1-andre.przywara@arm.com>
+References: <20161018111627.17366-1-andre.przywara@arm.com>
+Message-ID: <20161018130047.GC15639@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 13-10-16 01:20:14, Lorenzo Stoakes wrote:
-> This patch removes the write and force parameters from get_user_pages_locked()
-> and replaces them with a gup_flags parameter to make the use of FOLL_FORCE
-> explicit in callers as use of this flag can result in surprising behaviour (and
-> hence bugs) within the mm subsystem.
-> 
-> Signed-off-by: Lorenzo Stoakes <lstoakes@gmail.com>
+On Tue, Oct 18, 2016 at 12:16:27PM +0100, Andre Przywara wrote:
+> Commit 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on
+> errata-affected core") adds code to execute cache maintenance instructions
+> in the kernel on behalf of userland on CPUs with certain ARM CPU errata.
+> It turns out that the address hasn't been checked to be a valid user
+> space address, allowing userland to clean cache lines in kernel space.
+> Fix this by introducing an access_ok() check before executing the
+> instructions on behalf of userland, taking care of tagged pointers on
+> the way.
+
+It would be worth calling out why we need access_ok_tagged here (i.e.
+since this is not a syscall, the tag bits may validly be set, and we
+must mask them out to check the "real" address).
+
+> Reported-by: Kristina Martsenko <kristina.martsenko@arm.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Cc: <stable@vger.kernel.org> # 4.8.x
+
+It would be good to have an explicit:
+
+Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
+
 > ---
->  include/linux/mm.h |  2 +-
->  mm/frame_vector.c  |  8 +++++++-
->  mm/gup.c           | 12 +++---------
->  mm/nommu.c         |  5 ++++-
->  4 files changed, 15 insertions(+), 12 deletions(-)
+>  arch/arm64/include/asm/uaccess.h |  4 ++++
+>  arch/arm64/kernel/traps.c        | 32 ++++++++++++++++++++++++++++----
+>  2 files changed, 32 insertions(+), 4 deletions(-)
 > 
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index 6adc4bc..27ab538 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -1282,7 +1282,7 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
->  			    int write, int force, struct page **pages,
->  			    struct vm_area_struct **vmas);
->  long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
-> -		    int write, int force, struct page **pages, int *locked);
-> +		    unsigned int gup_flags, struct page **pages, int *locked);
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index bcaf6fb..f842b47 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -21,6 +21,7 @@
+>  /*
+>   * User space memory access functions
+>   */
+> +#include <linux/bitops.h>
+>  #include <linux/kasan-checks.h>
+>  #include <linux/string.h>
+>  #include <linux/thread_info.h>
+> @@ -103,6 +104,9 @@ static inline void set_fs(mm_segment_t fs)
+>  })
+>  
+>  #define access_ok(type, addr, size)	__range_ok(addr, size)
+> +#define access_ok_tagged(type, addr, size)  access_ok(type,		       \
+> +						      sign_extend64(addr, 55), \
+> +						      size)
+>  #define user_addr_max			get_fs
+>  
+>  #define _ASM_EXTABLE(from, to)						\
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 5ff020f..04ea0d7 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -447,6 +447,30 @@ void cpu_enable_cache_maint_trap(void *__unused)
+>  		: "=r" (res)					\
+>  		: "r" (address), "i" (-EFAULT) )
+>  
+> +enum {USER_CACHE_MAINT_DC_CIVAC, USER_CACHE_MAINT_IC_IVAU};
+> +
+> +static int do_user_cache_maint(int ins_type, unsigned long address)
+> +{
+> +	int ret;
+> +	unsigned long cl_size = cache_line_size();
+> +
+> +	if (!access_ok_tagged(VERIFY_READ,
+> +			      round_down(address, cl_size),
+> +			      cl_size))
+> +		return -EFAULT;
 
-Hum, the prototype is inconsistent with e.g. __get_user_pages_unlocked()
-where gup_flags come after **pages argument. Actually it makes more sense
-to have it before **pages so that input arguments come first and output
-arguments second but I don't care that much. But it definitely should be
-consistent...
+We're only checking the D$ line size here; the I$ is not reported by
+cache_line_size().
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+We may as well use PAGE_SIZE here, given cache lines have to be
+naturally aligned and permissions are at page granularity. There's no
+functional difference, but the value can't change under our feet, and
+the compiler may be able to better optimize by folding the contant in.
+
+> +
+> +	switch (ins_type) {
+> +	case USER_CACHE_MAINT_DC_CIVAC:
+> +		__user_cache_maint("dc civac", address, ret);
+> +		break;
+> +	case USER_CACHE_MAINT_IC_IVAU:
+> +		__user_cache_maint("ic ivau", address, ret);
+> +		break;
+> +	}
+> +
+> +	return ret;
+> +}
+
+We could make this function a macro (passing in the instruction
+explicitly), and avoid the enum and switch.
+
+Other than that, this looks good to me.
+
+Thanks,
+Mark.
+
+> +
+>  static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+>  {
+>  	unsigned long address;
+> @@ -458,16 +482,16 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
+>  
+>  	switch (crm) {
+>  	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
+> -		__user_cache_maint("dc civac", address, ret);
+> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
+>  		break;
+>  	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
+> -		__user_cache_maint("dc civac", address, ret);
+> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
+>  		break;
+>  	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
+> -		__user_cache_maint("dc civac", address, ret);
+> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
+>  		break;
+>  	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
+> -		__user_cache_maint("ic ivau", address, ret);
+> +		ret = do_user_cache_maint(USER_CACHE_MAINT_IC_IVAU, address);
+>  		break;
+>  	default:
+>  		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
+> -- 
+> 2.9.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
