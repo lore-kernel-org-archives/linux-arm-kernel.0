@@ -1,65 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 18 Oct 2016 14:48:04 +0530
-Subject: [STLinux Kernel] [PATCH 01/19] phy: phy-miphy365x: Remove
- miphy365 driver and dt binding documentation.
-In-Reply-To: <75b370f3-a1cd-ac6e-ce8a-b77e4c0c3847@st.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Tue, 18 Oct 2016 11:22:06 +0200
+Subject: [PATCH 05/19] ARM: multi_v7_defconfig: Remove miphy365 phy.
+In-Reply-To: <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-2-git-send-email-peter.griffin@linaro.org>
- <20160923150636.GA9176@rob-hp-laptop>
- <12506413-515f-1a33-a642-ede60287ca3b@st.com>
- <75b370f3-a1cd-ac6e-ce8a-b77e4c0c3847@st.com>
-Message-ID: <5805E8CC.9070702@ti.com>
+ <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
+Message-ID: <91306f3f-1dc9-fe8c-1a08-5e47d20c5f70@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi
 
+On 09/14/2016 03:27 PM, Peter Griffin wrote:
+> This IP is only found on STiH415/6 silicon and support
+> for these SoCs is being removed from the kernel.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Cc: <kishon@ti.com>
 
-On Tuesday 18 October 2016 02:15 PM, Patrice Chotard wrote:
-> 
-> 
-> On 10/18/2016 09:47 AM, Patrice Chotard wrote:
->> Hi
->>
->> On 09/23/2016 05:06 PM, Rob Herring wrote:
->>> On Wed, Sep 14, 2016 at 02:27:39PM +0100, Peter Griffin wrote:
->>>> This phy is only used on STiH415/6 based silicon, and support for
->>>> these SoC's is being removed from the kernel.
->>>>
->>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>>> Cc: <kishon@ti.com>
->>>> ---
->>>>  .../devicetree/bindings/phy/phy-miphy365x.txt      |  77 ---
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> Applied on sti-dt-for-4.10 branch
-> 
-> 
-> Sorry, i did a mistake, these patch should go in linux-phy tree.
-> Kishon will you take care of it ?
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-yes, I will.
+Applied on STi-defconfig-for-4.10 branch
 
 Thanks
-Kishon
 
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> Thanks
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2c8665c..949ab7f 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -854,7 +854,6 @@ CONFIG_PHY_ROCKCHIP_DP=m
+>  CONFIG_PHY_ROCKCHIP_USB=m
+>  CONFIG_PHY_QCOM_APQ8064_SATA=m
+>  CONFIG_PHY_MIPHY28LP=y
+> -CONFIG_PHY_MIPHY365X=y
+>  CONFIG_PHY_RCAR_GEN2=m
+>  CONFIG_PHY_STIH41X_USB=y
+>  CONFIG_PHY_STIH407_USB=y
 > 
->>
->> Thanks 
->>
->>>
->>>>  drivers/phy/Kconfig                                |  10 -
->>>>  drivers/phy/Makefile                               |   1 -
->>>>  drivers/phy/phy-miphy365x.c                        | 625 ---------------------
->>>>  4 files changed, 713 deletions(-)
->>>>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-miphy365x.txt
->>>>  delete mode 100644 drivers/phy/phy-miphy365x.c
->>
->>
->> _______________________________________________
->> Kernel mailing list
->> Kernel at stlinux.com
->> http://www.stlinux.com/mailman/listinfo/kernel
->>
