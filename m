@@ -1,35 +1,33 @@
-From: atull@opensource.altera.com (atull)
-Date: Tue, 18 Oct 2016 13:34:17 -0500
-Subject: [PATCH v20 03/10] add bindings document for altera freeze bridge
-In-Reply-To: <20161018162656.dsx7hnip3xqm7j26@rob-hp-laptop>
-References: <20161017160941.4205-1-atull@opensource.altera.com>
- <20161017160941.4205-4-atull@opensource.altera.com>
- <20161018162656.dsx7hnip3xqm7j26@rob-hp-laptop>
-Message-ID: <alpine.DEB.2.02.1610181334040.20737@linuxheads99>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Tue, 18 Oct 2016 12:00:34 -0700
+Subject: [PATCH v1 0/4] Add support for Broadcom iProc mailbox controller
+Message-ID: <1476817238-1226-1-git-send-email-jonathan.richardson@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016, Rob Herring wrote:
+This patch set contains mailbox support for Broadcom iProc based SoC's. The
+mailbox controller handles all communication with a Cortex-M0 MCU processor that
+provides support for power, clock, and reset management.
 
-> On Mon, Oct 17, 2016 at 11:09:34AM -0500, Alan Tull wrote:
-> > Add bindings document for the Altera Freeze Bridge.  A Freeze
-> > Bridge is used to gate traffic to/from a region of a FPGA
-> > such that that region can be reprogrammed.  The Freeze Bridge
-> > exist in FPGA fabric that is not currently being reconfigured.
-> > 
-> > Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> > Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
-> > ---
-> > v19: Added in v19 of patchset, uses fpga image info struct
-> > v20: fix one underscore to hyphen
-> > ---
-> >  .../bindings/fpga/altera-freeze-bridge.txt         | 23 ++++++++++++++++++++++
-> >  1 file changed, 23 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/fpga/altera-freeze-bridge.txt
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
+The patch set enables the mailbox controller for Cygnus and also interrupt
+support for the Cygnus CRMU GPIO driver which requires use of the M0 processor.
 
-Thanks!
+Jonathan Richardson (4):
+  dt-bindings: Document Broadcom iProc mailbox controller driver
+  mailbox: Add iProc mailbox controller driver
+  ARM: dts: Enable Broadcom iProc mailbox controller
+  ARM: dts: Enable interrupt support for cygnus crmu gpio driver
 
-Alan
+ .../bindings/mailbox/brcm,iproc-mailbox.txt        |  20 +
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  12 +
+ drivers/mailbox/Kconfig                            |  10 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/bcm-iproc-mailbox.c                | 422 +++++++++++++++++++++
+ include/linux/bcm_iproc_mailbox.h                  |  32 ++
+ 6 files changed, 498 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
+ create mode 100644 drivers/mailbox/bcm-iproc-mailbox.c
+ create mode 100644 include/linux/bcm_iproc_mailbox.h
+
+-- 
+1.9.1
