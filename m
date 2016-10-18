@@ -1,211 +1,124 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Oct 2016 17:04:14 +0100
-Subject: [PATCH v6 16/16] drivers: acpi: iort: introduce iort_iommu_configure
-In-Reply-To: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
-References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161018160414.1228-17-lorenzo.pieralisi@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 18 Oct 2016 17:06:38 +0100
+Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
+In-Reply-To: <c8a1898e-e60f-b25a-f4d2-7384f04b6f3f@siemens.com>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+ <c8a1898e-e60f-b25a-f4d2-7384f04b6f3f@siemens.com>
+Message-ID: <20161018160638.GA24851@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT based systems have a generic kernel API to configure IOMMUs
-for devices (ie of_iommu_configure()).
+Hi Jan,
 
-On ARM based ACPI systems, the of_iommu_configure() equivalent can
-be implemented atop ACPI IORT kernel API, with the corresponding
-functions to map device identifiers to IOMMUs and retrieve the
-corresponding IOMMU operations necessary for DMA operations set-up.
+On Tue, 18 Oct 2016, Jan Kiszka wrote:
 
-By relying on the iommu_fwspec generic kernel infrastructure,
-implement the IORT based IOMMU configuration for ARM ACPI systems
-and hook it up in the ACPI kernel layer that implements DMA
-configuration for a device.
+> On 2016-10-18 17:07, Peter Griffin wrote:
+> > lx-fdtdump dumps the flatenned device tree passed to the kernel
+> > from the bootloader to a file called fdtdump.dtb to allow further
+> > post processing on the machine running GDB. The fdt header is also
+> > also printed in the GDB console. For example:
+> > 
+> > (gdb) lx-fdtdump
+> > fdt_magic:         0xD00DFEED
+> > fdt_totalsize:     0xC108
+> > off_dt_struct:     0x38
+> > off_dt_strings:    0x3804
+> > off_mem_rsvmap:    0x28
+> > version:           17
+> > last_comp_version: 16
+> > Dumped fdt to fdtdump.dtb
+> > 
+> >> fdtdump fdtdump.dtb | less
+> > 
+> > This command is useful as the bootloader can often re-write parts
+> > of the device tree, and this can sometimes cause the kernel to not
+> > boot.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  scripts/gdb/linux/constants.py.in |  8 +++++
+> >  scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
+> >  2 files changed, 77 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
+> > index 7986f4e..43c6241 100644
+> > --- a/scripts/gdb/linux/constants.py.in
+> > +++ b/scripts/gdb/linux/constants.py.in
+> > @@ -14,6 +14,7 @@
+> >  
+> >  #include <linux/fs.h>
+> >  #include <linux/mount.h>
+> > +#include <linux/of_fdt.h>
+> >  
+> >  /* We need to stringify expanded macros so that they can be parsed */
+> >  
+> > @@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
+> >  LX_VALUE(MNT_NOATIME)
+> >  LX_VALUE(MNT_NODIRATIME)
+> >  LX_VALUE(MNT_RELATIME)
+> > +
+> > +/* linux/of_fdt.h> */
+> > +LX_VALUE(OF_DT_HEADER)
+> > +
+> > +/* Kernel Configs */
+> > +LX_CONFIG(CONFIG_OF)
+> > +
+> > diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+> > index 38b1f09..f20fcfa 100644
+> > --- a/scripts/gdb/linux/proc.py
+> > +++ b/scripts/gdb/linux/proc.py
+> > @@ -16,7 +16,7 @@ from linux import constants
+> >  from linux import utils
+> >  from linux import tasks
+> >  from linux import lists
+> > -
+> > +from struct import *
+> >  
+> >  class LxCmdLine(gdb.Command):
+> >      """ Report the Linux Commandline used in the current kernel.
+> > @@ -195,3 +195,71 @@ values of that process namespace"""
+> >                          info_opts(MNT_INFO, m_flags)))
+> >  
+> >  LxMounts()
+> > +
+> > +class LxFdtDump(gdb.Command):
+> > +    """Output Flattened Device Tree header and dump FDT blob to a file
+> > +       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
+> > +
+> > +    def __init__(self):
+> > +        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
+> > +
+> > +    def fdthdr_to_cpu(self, fdt_header):
+> > +
+> > +            fdt_header_be = ">IIIIIII"
+> > +            fdt_header_le = "<IIIIIII"
+> > +
+> > +            if utils.get_target_endianness() == 1:
+> > +                output_fmt = fdt_header_le
+> > +            else:
+> > +                output_fmt = fdt_header_be
+> > +
+> > +            return unpack(output_fmt, pack(fdt_header_be,
+> > +                                           fdt_header['magic'],
+> > +                                           fdt_header['totalsize'],
+> > +                                           fdt_header['off_dt_struct'],
+> > +                                           fdt_header['off_dt_strings'],
+> > +                                           fdt_header['off_mem_rsvmap'],
+> > +                                           fdt_header['version'],
+> > +                                           fdt_header['last_comp_version']))
+> > +
+> > +    def invoke(self, arg, from_tty):
+> > +
+> > +        if constants.LX_CONFIG_OF:
+> > +
+> > +            filename = "fdtdump.dtb"
+> 
+> Why not specifying the file name as argument? Safer than silently
+> overwriting potentially pre-existing files or failing without
+> alternatives if the current directory is not writable.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/arm64/iort.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/acpi/scan.c       |  7 +++-
- include/linux/acpi_iort.h |  6 +++
- 3 files changed, 111 insertions(+), 1 deletion(-)
+Good idea, I will update to have the filename as the command argument in v2.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index db7b153..5741bfd 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -28,6 +28,8 @@
- 
- #define IORT_TYPE_MASK(type)	(1 << (type))
- #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
-+#define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
-+				(1 << ACPI_IORT_NODE_SMMU_V3))
- 
- struct iort_its_msi_chip {
- 	struct list_head	list;
-@@ -501,6 +503,103 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id)
- 	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
- }
- 
-+static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-+{
-+	u32 *rid = data;
-+
-+	*rid = alias;
-+	return 0;
-+}
-+
-+static int arm_smmu_iort_xlate(struct device *dev, u32 streamid,
-+			       struct fwnode_handle *fwnode,
-+			       const struct iommu_ops *ops)
-+{
-+	int ret = iommu_fwspec_init(dev, fwnode, ops);
-+
-+	if (!ret)
-+		ret = iommu_fwspec_add_ids(dev, &streamid, 1);
-+
-+	return ret;
-+}
-+
-+static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
-+					struct acpi_iort_node *node,
-+					u32 streamid)
-+{
-+	struct fwnode_handle *iort_fwnode = NULL;
-+	const struct iommu_ops *ops = NULL;
-+	int ret = -ENODEV;
-+
-+	if (node) {
-+		iort_fwnode = iort_get_fwnode(node);
-+		if (!iort_fwnode)
-+			return NULL;
-+
-+		ops = fwnode_iommu_get_ops(iort_fwnode);
-+		if (!ops)
-+			return NULL;
-+
-+		ret = arm_smmu_iort_xlate(dev, streamid,
-+					  iort_fwnode, ops);
-+	}
-+
-+	return ret ? NULL : ops;
-+}
-+
-+/**
-+ * iort_iommu_configure - Set-up IOMMU configuration for a device.
-+ *
-+ * @dev: device to configure
-+ *
-+ * Returns: iommu_ops pointer on configuration success
-+ *          NULL on configuration failure
-+ */
-+const struct iommu_ops *iort_iommu_configure(struct device *dev)
-+{
-+	struct acpi_iort_node *node, *parent;
-+	const struct iommu_ops *ops = NULL;
-+	u32 streamid = 0;
-+
-+	if (dev_is_pci(dev)) {
-+		struct pci_bus *bus = to_pci_dev(dev)->bus;
-+		u32 rid;
-+
-+		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
-+				       &rid);
-+
-+		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-+				      iort_match_node_callback, &bus->dev);
-+		if (!node)
-+			return NULL;
-+
-+		parent = iort_node_map_rid(node, rid, &streamid,
-+					   IORT_IOMMU_TYPE);
-+
-+		ops = iort_iommu_xlate(dev, parent, streamid);
-+
-+	} else {
-+		int i = 0;
-+
-+		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-+				      iort_match_node_callback, dev);
-+		if (!node)
-+			return NULL;
-+
-+		parent = iort_node_get_id(node, &streamid,
-+					  IORT_IOMMU_TYPE, i++);
-+
-+		while (parent) {
-+			ops = iort_iommu_xlate(dev, parent, streamid);
-+
-+			parent = iort_node_get_id(node, &streamid,
-+						  IORT_IOMMU_TYPE, i++);
-+		}
-+	}
-+
-+	return ops;
-+}
-+
- static void __init acpi_iort_register_irq(int hwirq, const char *name,
- 					  int trigger,
- 					  struct resource *res)
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 694e0b6..e5f7004 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -7,6 +7,7 @@
- #include <linux/slab.h>
- #include <linux/kernel.h>
- #include <linux/acpi.h>
-+#include <linux/acpi_iort.h>
- #include <linux/signal.h>
- #include <linux/kthread.h>
- #include <linux/dmi.h>
-@@ -1377,6 +1378,8 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
-  */
- void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
-+	const struct iommu_ops *iommu;
-+
- 	/*
- 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
- 	 * setup the correct supported mask.
-@@ -1391,11 +1394,13 @@ void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
- 
-+	iommu = iort_iommu_configure(dev);
-+
- 	/*
- 	 * Assume dma valid range starts at 0 and covers the whole
- 	 * coherent_dma_mask.
- 	 */
--	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
-+	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
- 			   attr == DEV_DMA_COHERENT);
- }
- EXPORT_SYMBOL_GPL(acpi_dma_configure);
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 79ba1bb..dcb2b60 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -34,6 +34,8 @@ void acpi_iort_init(void);
- bool iort_node_match(u8 type);
- u32 iort_msi_map_rid(struct device *dev, u32 req_id);
- struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
-+/* IOMMU interface */
-+const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
- static inline bool iort_node_match(u8 type) { return false; }
-@@ -42,6 +44,10 @@ static inline u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- 							u32 req_id)
- { return NULL; }
-+/* IOMMU interface */
-+static inline
-+const struct iommu_ops *iort_iommu_configure(struct device *dev)
-+{ return NULL; }
- #endif
- 
- #define IORT_ACPI_DECLARE(name, table_id, fn)		\
--- 
-2.10.0
+regards,
+
+Peter
