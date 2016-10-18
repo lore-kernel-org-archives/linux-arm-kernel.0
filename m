@@ -1,56 +1,118 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Oct 2016 16:40:19 -0700
-Subject: [PATCH/RESEND] thermal: qcom-spmi: Treat reg property as a single cell
-Message-ID: <20161018234019.5489-1-sboyd@codeaurora.org>
+Date: Tue, 18 Oct 2016 16:42:00 -0700
+Subject: [PATCH/RESEND] recordmcount: arm: Implement make_nop
+Message-ID: <20161018234200.5804-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We only read the first element of the reg property to figure out
-the offset of the temperature sensor inside the PMIC.
-Furthermore, we want to remove the second element in DT, so just
-don't read the second element so that probe keeps working if we
-change the DT in the future.
+In similar spirit to x86 and arm64 support, add a make_nop_arm()
+to replace calls to mcount with a nop in sections that aren't
+traced.
 
-Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Acked-by: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
+ scripts/recordmcount.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-This was sent in January of this year but hasn't been picked up.
-
- drivers/thermal/qcom-spmi-temp-alarm.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/thermal/qcom-spmi-temp-alarm.c b/drivers/thermal/qcom-spmi-temp-alarm.c
-index 819c6d5d7aa7..f50241962ad2 100644
---- a/drivers/thermal/qcom-spmi-temp-alarm.c
-+++ b/drivers/thermal/qcom-spmi-temp-alarm.c
-@@ -200,7 +200,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	struct qpnp_tm_chip *chip;
- 	struct device_node *node;
- 	u8 type, subtype;
--	u32 res[2];
-+	u32 res;
- 	int ret, irq;
+diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+index 5423a58d1b06..aeb34223167c 100644
+--- a/scripts/recordmcount.c
++++ b/scripts/recordmcount.c
+@@ -213,6 +213,59 @@ static int make_nop_x86(void *map, size_t const offset)
+ 	return 0;
+ }
  
- 	node = pdev->dev.of_node;
-@@ -215,7 +215,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	if (!chip->map)
- 		return -ENXIO;
- 
--	ret = of_property_read_u32_array(node, "reg", res, 2);
-+	ret = of_property_read_u32(node, "reg", &res);
- 	if (ret < 0)
- 		return ret;
- 
-@@ -228,7 +228,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
- 	if (PTR_ERR(chip->adc) == -EPROBE_DEFER)
- 		return PTR_ERR(chip->adc);
- 
--	chip->base = res[0];
-+	chip->base = res;
- 
- 	ret = qpnp_tm_read(chip, QPNP_TM_REG_TYPE, &type);
- 	if (ret < 0) {
++static unsigned char ideal_nop4_arm_le[4] = { 0x00, 0x00, 0xa0, 0xe1 }; /* mov r0, r0 */
++static unsigned char ideal_nop4_arm_be[4] = { 0xe1, 0xa0, 0x00, 0x00 }; /* mov r0, r0 */
++static unsigned char *ideal_nop4_arm;
++
++static unsigned char bl_mcount_arm_le[4] = { 0xfe, 0xff, 0xff, 0xeb }; /* bl */
++static unsigned char bl_mcount_arm_be[4] = { 0xeb, 0xff, 0xff, 0xfe }; /* bl */
++static unsigned char *bl_mcount_arm;
++
++static unsigned char push_arm_le[4] = { 0x04, 0xe0, 0x2d, 0xe5 }; /* push {lr} */
++static unsigned char push_arm_be[4] = { 0xe5, 0x2d, 0xe0, 0x04 }; /* push {lr} */
++static unsigned char *push_arm;
++
++static unsigned char ideal_nop2_thumb_le[2] = { 0x00, 0xbf }; /* nop */
++static unsigned char ideal_nop2_thumb_be[2] = { 0xbf, 0x00 }; /* nop */
++static unsigned char *ideal_nop2_thumb;
++
++static unsigned char push_bl_mcount_thumb_le[6] = { 0x00, 0xb5, 0xff, 0xf7, 0xfe, 0xff }; /* push {lr}, bl */
++static unsigned char push_bl_mcount_thumb_be[6] = { 0xb5, 0x00, 0xf7, 0xff, 0xff, 0xfe }; /* push {lr}, bl */
++static unsigned char *push_bl_mcount_thumb;
++
++static int make_nop_arm(void *map, size_t const offset)
++{
++	char *ptr;
++	int cnt = 1;
++	int nop_size;
++	size_t off = offset;
++
++	ptr = map + offset;
++	if (memcmp(ptr, bl_mcount_arm, 4) == 0) {
++		if (memcmp(ptr - 4, push_arm, 4) == 0) {
++			off -= 4;
++			cnt = 2;
++		}
++		ideal_nop = ideal_nop4_arm;
++		nop_size = 4;
++	} else if (memcmp(ptr - 2, push_bl_mcount_thumb, 6) == 0) {
++		cnt = 3;
++		nop_size = 2;
++		off -= 2;
++		ideal_nop = ideal_nop2_thumb;
++	} else
++		return -1;
++
++	/* Convert to nop */
++	ulseek(fd_map, off, SEEK_SET);
++
++	do {
++		uwrite(fd_map, ideal_nop, nop_size);
++	} while (--cnt > 0);
++
++	return 0;
++}
++
+ static unsigned char ideal_nop4_arm64[4] = {0x1f, 0x20, 0x03, 0xd5};
+ static int make_nop_arm64(void *map, size_t const offset)
+ {
+@@ -430,6 +483,11 @@ do_file(char const *const fname)
+ 			w2 = w2rev;
+ 			w8 = w8rev;
+ 		}
++		ideal_nop4_arm = ideal_nop4_arm_le;
++		bl_mcount_arm = bl_mcount_arm_le;
++		push_arm = push_arm_le;
++		ideal_nop2_thumb = ideal_nop2_thumb_le;
++		push_bl_mcount_thumb = push_bl_mcount_thumb_le;
+ 		break;
+ 	case ELFDATA2MSB:
+ 		if (*(unsigned char const *)&endian != 0) {
+@@ -438,6 +496,11 @@ do_file(char const *const fname)
+ 			w2 = w2rev;
+ 			w8 = w8rev;
+ 		}
++		ideal_nop4_arm = ideal_nop4_arm_be;
++		bl_mcount_arm = bl_mcount_arm_be;
++		push_arm = push_arm_be;
++		ideal_nop2_thumb = ideal_nop2_thumb_be;
++		push_bl_mcount_thumb = push_bl_mcount_thumb_be;
+ 		break;
+ 	}  /* end switch */
+ 	if (memcmp(ELFMAG, ehdr->e_ident, SELFMAG) != 0
+@@ -463,6 +526,8 @@ do_file(char const *const fname)
+ 		break;
+ 	case EM_ARM:	 reltype = R_ARM_ABS32;
+ 			 altmcount = "__gnu_mcount_nc";
++			 make_nop = make_nop_arm;
++			 rel_type_nop = R_ARM_NONE;
+ 			 break;
+ 	case EM_AARCH64:
+ 			reltype = R_AARCH64_ABS64;
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
