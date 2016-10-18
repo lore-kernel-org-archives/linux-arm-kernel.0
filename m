@@ -1,108 +1,45 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Oct 2016 15:29:54 +0200
-Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
- Controller
-In-Reply-To: <d95c3035-e3cd-a93c-d408-27f4c8dba589@marvell.com> (Ziji Hu's
- message of "Tue, 11 Oct 2016 18:03:47 +0800")
-References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
- <fc0ca2b3140287cbccf5c176a12b7dce25d06a47.1475853198.git-series.gregory.clement@free-electrons.com>
- <20161010213417.GA11795@rob-hp-laptop>
- <d95c3035-e3cd-a93c-d408-27f4c8dba589@marvell.com>
-Message-ID: <87k2d5eqel.fsf@free-electrons.com>
+From: lstoakes@gmail.com (Lorenzo Stoakes)
+Date: Tue, 18 Oct 2016 14:56:09 +0100
+Subject: [PATCH 04/10] mm: replace get_user_pages_locked() write/force
+ parameters with gup_flags
+In-Reply-To: <20161018125425.GD29967@quack2.suse.cz>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+ <20161013002020.3062-5-lstoakes@gmail.com>
+ <20161018125425.GD29967@quack2.suse.cz>
+Message-ID: <20161018135609.GA30025@lucifer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
- 
- On mar., oct. 11 2016, Ziji Hu <huziji@marvell.com> wrote:
-[...]
-
->>> +  Different Xenon SDHC release has different register set size.
->>> +  The specific size should also refer to the SOC implementation.
->>> +
->>> +Optional Properties:
->>> +- Slot Index
->>> +  A single Xenon IP can support multiple slots.
->>> +  During initialization, each slot should set corresponding setting bit in
->>> +  some Xenon-specific registers. The corresponding bit is determined by
->>> +  this property.
->>> +  - xenon,slotno = <slot_index>;
->> 
->> Slots should probably be represented as child nodes with the reg 
->> property being the slot number.
+On Tue, Oct 18, 2016 at 02:54:25PM +0200, Jan Kara wrote:
+> > @@ -1282,7 +1282,7 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
+> >  			    int write, int force, struct page **pages,
+> >  			    struct vm_area_struct **vmas);
+> >  long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
+> > -		    int write, int force, struct page **pages, int *locked);
+> > +		    unsigned int gup_flags, struct page **pages, int *locked);
 >
-> 	Since each SDHC slot is independent, I find it is more
-> convenient to implement each one as independent SD host/MMC host
-> instant.
-> 	Otherwise, a main function should loop and initialize each
-> slot, like sdhci-pci. I prefer to avoiding such a unnecessary main
-> function.
->
-> 	It is very hard to determine the slot number by reg property.
-> 	Xenon slots are likely to be different types. 1st slot might
-> be eMMC and 2nd one might be SD. They might have different register
-> size.
-> 	The register size might also varies in different Xenon versions.
->
+> Hum, the prototype is inconsistent with e.g. __get_user_pages_unlocked()
+> where gup_flags come after **pages argument. Actually it makes more sense
+> to have it before **pages so that input arguments come first and output
+> arguments second but I don't care that much. But it definitely should be
+> consistent...
 
-Something that took me a while to figure out is that even it is the same
-hardware block which handle multiple SoCs.
+It was difficult to decide quite how to arrange parameters as there was
+inconsitency with regards to parameter ordering already - for example
+__get_user_pages() places its flags argument before pages whereas, as you note,
+__get_user_pages_unlocked() puts them afterwards.
 
-Each slots is managed by its own set of register. From the point of view
-of the OS, it is as if we have an independent controller for each
-slot.
+I ended up compromising by trying to match the existing ordering of the function
+as much as I could by replacing write, force pairs with gup_flags in the same
+location (with the exception of get_user_pages_unlocked() which I felt should
+match __get_user_pages_unlocked() in signature) or if there was already a
+gup_flags parameter as in the case of __get_user_pages_unlocked() I simply
+removed the write, force pair and left the flags as the last parameter.
 
-But for an obscure reason, some command need to know which slot is
-used. That's why we ended with this property.
+I am happy to rearrange parameters as needed, however I am not sure if it'd be
+worthwhile for me to do so (I am keen to try to avoid adding too much noise here
+:)
 
-With some example what you had in mind was something like that:
-sdhci at aa0000 {
-		compatible = "marvell,armada-3700-sdhci";
-		reg = <0xaa0000 0x1000>;
-[...]
-                slot0 {
-                      /* slot0 is an eMMC */
-                      reg = <0>;
-                      bus-width = <8>;
-                      xenon,pad-type = "fixed-1-8v";
-
-                }
-                slot1 {
-                      /* slot1 is an SD Card */
-                      reg = <1>;
-                      bus-width = <4>;
-                      xenon,pad-type = "fixed-1-8v";
-
-                }
-	};
-
-But it won't work as each slot uses its own address registers, that why we
-ended with this:
-sdhci at aa0000 {
-                /* slot0 is an eMMC */
-		compatible = "marvell,armada-3700-sdhci";
-		reg = <0xaa0000 0x1000>;
-[...]
-                xenon,slotno = <0>;
-                bus-width = <8>;
-                xenon,pad-type = "fixed-1-8v";
-	};
-sdhci at bb0000 {
-                /* slot1 is an SD Card */
-		compatible = "marvell,armada-3700-sdhci";
-		reg = <0xbb0000 0x1000>;
-[...]
-                xenon,slotno = <1>;
-                bus-width = <4>;
-                xenon,pad-type = "fixed-1-8v";
-	};
-
-I hope it is more clear now.
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+If we were to rearrange parameters for consistency I'd suggest adjusting
+__get_user_pages_unlocked() to put gup_flags before pages and do the same with
+get_user_pages_unlocked(), let me know what you think.
