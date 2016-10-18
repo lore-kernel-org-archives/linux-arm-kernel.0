@@ -1,53 +1,49 @@
-From: kieran@bingham.xyz (Kieran Bingham)
-Date: Tue, 18 Oct 2016 16:27:48 +0100
-Subject: [PATCH 2/2] scripts/gdb: fixup some pep8 errors in proc.py
-In-Reply-To: <1476803249-23328-2-git-send-email-peter.griffin@linaro.org>
-References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
- <1476803249-23328-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <477b66cc-05dc-57fa-38fb-f80510935c2e@bingham.xyz>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 18 Oct 2016 17:30:11 +0200
+Subject: [PATCH v2 2/4] ARM: dts: pxa: add pxa25x cpu operating points
+In-Reply-To: <20161018113944.GC11471@vireshk-i7> (Viresh Kumar's message of
+ "Tue, 18 Oct 2016 17:09:44 +0530")
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-3-git-send-email-robert.jarzmik@free.fr>
+ <20161018113944.GC11471@vireshk-i7>
+Message-ID: <87vawp4qv0.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pete,
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-On 18/10/16 16:07, Peter Griffin wrote:
-> proc.py:22:1: E302 expected 2 blank lines, found 1
-> proc.py:200:1: E302 expected 2 blank lines, found 1
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  scripts/gdb/linux/proc.py | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
-> index f20fcfa..2d6f74e 100644
-> --- a/scripts/gdb/linux/proc.py
-> +++ b/scripts/gdb/linux/proc.py
-> @@ -18,6 +18,7 @@ from linux import tasks
->  from linux import lists
->  from struct import *
->  
-> +
+> On 15-10-16, 21:57, Robert Jarzmik wrote:
+>> Add the relevant data taken from the PXA 25x Electrical, Mechanical, and
+>> Thermal Specfication. This will be input data for cpufreq-dt driver.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>>  arch/arm/boot/dts/pxa25x.dtsi | 25 +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+>> index 0d1e012178c4..16b4e8bad4a5 100644
+>> --- a/arch/arm/boot/dts/pxa25x.dtsi
+>> +++ b/arch/arm/boot/dts/pxa25x.dtsi
+>> @@ -89,4 +89,29 @@
+>>  		clocks = <&clktimer>;
+>>  		status = "okay";
+>>  	};
+>> +
+>> +	pxa250_opp_table: opp_table0 {
+>> +		compatible = "operating-points-v2";
+>> +
+>> +		opp at 99500 {
+>
+> We have been keeping the values in ^^^ same as the values present
+> below. Any specific reason for making it different here ?
+No, that's a good comment, I'll change that.
 
-This was added by patch 1, and can be squashed there.
+I wrote this incrementaly, first the node, then the opp-hz. Then I realized that
+the source crystal, at 3.8684 MHz didn't provide a round 99.5 MHz core clock,
+but a 99.5328 MHz clock.
 
->  class LxCmdLine(gdb.Command):
->      """ Report the Linux Commandline used in the current kernel.
->          Equivalent to cat /proc/cmdline on a running target"""
-> @@ -196,6 +197,7 @@ values of that process namespace"""
->  
->  LxMounts()
->  
-> +
-
-Likewise...
-
->  class LxFdtDump(gdb.Command):
->      """Output Flattened Device Tree header and dump FDT blob to a file
->         Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
-> 
+Anyway, I'll change that ... let's say into opp at 99533 in this case ?
 
 -- 
-Regards
-
-Kieran Bingham
+Robert
