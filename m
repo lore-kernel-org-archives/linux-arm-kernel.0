@@ -1,41 +1,45 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 18 Oct 2016 09:43:02 +0200
-Subject: [PATCH 1/3] ARM: socfpga: dtsi: add qspi node
-Message-ID: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
+Date: Tue, 18 Oct 2016 09:43:03 +0200
+Subject: [PATCH 2/3] ARM: socfpga: socrates: enable qspi
+In-Reply-To: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
+References: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
+Message-ID: <20161018074304.6744-2-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the qspi node to the socfpga dtsi file.
+Enable the qspi controller on the socrates and add the flash chip.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/socfpga_cyclone5_socrates.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 9f48141270b8..0dc96d2248a6 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -705,6 +705,20 @@
- 			reg = <0xffff0000 0x10000>;
- 		};
- 
-+		qspi: spi at ff705000 {
-+			compatible = "cdns,qspi-nor";
-+                        #address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0xff705000 0x1000>,
-+			      <0xffa00000 0x1000>;
-+			interrupts = <0 151 4>;
-+			cdns,fifo-depth = <128>;
-+			cdns,fifo-width = <4>;
-+			cdns,trigger-address = <0x00000000>;
-+			clocks = <&qspi_clk>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+index d79853775061..c3d52f27b21e 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
+@@ -80,3 +80,22 @@
+ &mmc {
+ 	status = "okay";
+ };
 +
- 		rst: rstmgr at ffd05000 {
- 			#reset-cells = <1>;
- 			compatible = "altr,rst-mgr";
++&qspi {
++	status = "okay";
++
++	flash: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q256a";
++		reg = <0>;
++		spi-max-frequency = <100000000>;
++		m25p,fast-read;
++		cdns,read-delay = <4>;
++		cdns,tshsl-ns = <50>;
++		cdns,tsd2d-ns = <50>;
++		cdns,tchsh-ns = <4>;
++		cdns,tslch-ns = <4>;
++		status = "okay";
++	};
++};
 -- 
 2.9.3
