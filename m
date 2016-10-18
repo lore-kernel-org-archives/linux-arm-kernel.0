@@ -1,133 +1,87 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Oct 2016 17:04:01 +0100
-Subject: [PATCH v6 03/16] drivers: acpi: iort: add support for IOMMU fwnode
- registration
+Date: Tue, 18 Oct 2016 17:04:13 +0100
+Subject: [PATCH v6 15/16] drivers: acpi: iort: add single mapping function
 In-Reply-To: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
 References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161018160414.1228-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20161018160414.1228-16-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI IORT table provide entries for IOMMU (aka SMMU in ARM world)
-components that allow creating the kernel data structures required to
-probe and initialize the IOMMU devices.
+The current IORT id mapping API requires components to provide
+an input requester ID (a Bus-Device-Function (BDF) identifier for
+PCI devices) to translate an input identifier to an output
+identifier through an IORT range mapping.
 
-This patch provides support in the IORT kernel code to register IOMMU
-components and their respective fwnode.
+Named components do not have an identifiable source ID therefore
+their respective input/output mapping can only be defined in
+IORT tables through single mappings, that provide a translation
+that does not require any input identifier.
+
+Current IORT interface for requester id mappings (iort_node_map_rid())
+is not suitable for components that do not provide a requester id,
+so it cannot be used for IORT named components.
+
+Add an interface to the IORT API to enable retrieval of id
+by allowing an indexed walk of the single mappings array for
+a given component, therefore completing the IORT mapping API.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/arm64/iort.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
+ drivers/acpi/arm64/iort.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 6b51ca7..75ff7fa 100644
+index f205d41..db7b153 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -20,7 +20,9 @@
+@@ -318,6 +318,45 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 	return 0;
+ }
  
- #include <linux/acpi_iort.h>
- #include <linux/kernel.h>
-+#include <linux/list.h>
- #include <linux/pci.h>
-+#include <linux/slab.h>
- 
- struct iort_its_msi_chip {
- 	struct list_head	list;
-@@ -28,6 +30,90 @@ struct iort_its_msi_chip {
- 	u32			translation_id;
- };
- 
-+struct iort_fwnode {
-+	struct list_head list;
-+	struct acpi_iort_node *iort_node;
-+	struct fwnode_handle *fwnode;
-+};
-+static LIST_HEAD(iort_fwnode_list);
-+static DEFINE_SPINLOCK(iort_fwnode_lock);
-+
-+/**
-+ * iort_set_fwnode() - Create iort_fwnode and use it to register
-+ *		       iommu data in the iort_fwnode_list
-+ *
-+ * @node: IORT table node associated with the IOMMU
-+ * @fwnode: fwnode associated with the IORT node
-+ *
-+ * Returns: 0 on success
-+ *          <0 on failure
-+ */
-+static inline int iort_set_fwnode(struct acpi_iort_node *iort_node,
-+				  struct fwnode_handle *fwnode)
++static
++struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
++					u32 *id_out, u8 type_mask,
++					int index)
 +{
-+	struct iort_fwnode *np;
++	struct acpi_iort_node *parent;
++	struct acpi_iort_id_mapping *map;
 +
-+	np = kzalloc(sizeof(struct iort_fwnode), GFP_ATOMIC);
++	if (!node->mapping_offset || !node->mapping_count ||
++				     index >= node->mapping_count)
++		return NULL;
 +
-+	if (WARN_ON(!np))
-+		return -ENOMEM;
++	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
++			   node->mapping_offset);
 +
-+	INIT_LIST_HEAD(&np->list);
-+	np->iort_node = iort_node;
-+	np->fwnode = fwnode;
++	/* Firmware bug! */
++	if (!map->output_reference) {
++		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
++		       node, node->type);
++		return NULL;
++	}
 +
-+	spin_lock(&iort_fwnode_lock);
-+	list_add_tail(&np->list, &iort_fwnode_list);
-+	spin_unlock(&iort_fwnode_lock);
++	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
++			       map->output_reference);
 +
-+	return 0;
-+}
++	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
++		return NULL;
 +
-+/**
-+ * iort_get_fwnode() - Retrieve fwnode associated with an IORT node
-+ *
-+ * @node: IORT table node to be looked-up
-+ *
-+ * Returns: fwnode_handle pointer on success, NULL on failure
-+ */
-+static inline
-+struct fwnode_handle *iort_get_fwnode(struct acpi_iort_node *node)
-+{
-+	struct iort_fwnode *curr;
-+	struct fwnode_handle *fwnode = NULL;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry(curr, &iort_fwnode_list, list) {
-+		if (curr->iort_node == node) {
-+			fwnode = curr->fwnode;
-+			break;
++	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
++		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
++		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++			*id_out = map[index].output_base;
++			return parent;
 +		}
 +	}
-+	spin_unlock(&iort_fwnode_lock);
 +
-+	return fwnode;
++	return NULL;
 +}
 +
-+/**
-+ * iort_delete_fwnode() - Delete fwnode associated with an IORT node
-+ *
-+ * @node: IORT table node associated with fwnode to delete
-+ */
-+static inline void iort_delete_fwnode(struct acpi_iort_node *node)
-+{
-+	struct iort_fwnode *curr, *tmp;
-+
-+	spin_lock(&iort_fwnode_lock);
-+	list_for_each_entry_safe(curr, tmp, &iort_fwnode_list, list) {
-+		if (curr->iort_node == node) {
-+			list_del(&curr->list);
-+			kfree(curr);
-+			break;
-+		}
-+	}
-+	spin_unlock(&iort_fwnode_lock);
-+}
-+
- typedef acpi_status (*iort_find_node_callback)
- 	(struct acpi_iort_node *node, void *context);
- 
+ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 						u32 rid_in, u32 *rid_out,
+ 						u8 type_mask)
 -- 
 2.10.0
