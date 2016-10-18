@@ -1,50 +1,63 @@
 From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Tue, 18 Oct 2016 13:41:48 -0400
-Subject: [PATCH V5 1/2] ACPI: Add support for ResourceSource/IRQ domain mapping
+Date: Tue, 18 Oct 2016 13:41:49 -0400
+Subject: [PATCH V5 2/2] irqchip: qcom: Add IRQ combiner driver
 In-Reply-To: <1476812509-2760-1-git-send-email-agustinv@codeaurora.org>
 References: <1476812509-2760-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <1476812509-2760-2-git-send-email-agustinv@codeaurora.org>
+Message-ID: <1476812509-2760-3-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows irqchip drivers to associate an ACPI DSDT device to
-an IRQ domain and provides support for using the ResourceSource
-in Extended IRQ Resources to find the domain and map the IRQs
-specified on that domain.
+Driver for interrupt combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
+
+An interrupt combiner in this block combines a set of interrupts by
+OR'ing the individual interrupt signals into a summary interrupt
+signal routed to a parent interrupt controller, and provides read-
+only, 32-bit registers to query the status of individual interrupts.
+The status bit for IRQ n is bit (n % 32) within register (n / 32)
+of the given combiner. Thus, each combiner can be described as a set
+of register offsets and the number of IRQs managed.
 
 Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
 ---
- drivers/acpi/Makefile             |   1 +
- drivers/acpi/irqdomain.c          | 141 ++++++++++++++++++++++++++++++++++++++
- drivers/acpi/resource.c           |  21 +++---
- include/asm-generic/vmlinux.lds.h |   1 +
- include/linux/acpi.h              |  71 +++++++++++++++++++
- include/linux/irqchip.h           |  17 ++++-
- 6 files changed, 240 insertions(+), 12 deletions(-)
- create mode 100644 drivers/acpi/irqdomain.c
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 332 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 341 insertions(+)
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
 
-diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-index 9ed0878..880401b 100644
---- a/drivers/acpi/Makefile
-+++ b/drivers/acpi/Makefile
-@@ -57,6 +57,7 @@ acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
- acpi-y				+= acpi_lpat.o
- acpi-$(CONFIG_ACPI_GENERIC_GSI) += gsi.o
- acpi-$(CONFIG_ACPI_WATCHDOG)	+= acpi_watchdog.o
-+acpi-$(CONFIG_IRQ_DOMAIN)	+= irqdomain.o
- 
- # These are (potentially) separate modules
- 
-diff --git a/drivers/acpi/irqdomain.c b/drivers/acpi/irqdomain.c
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 82b0b5d..8e0cbbb 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -279,3 +279,11 @@ config EZNPS_GIC
+ config STM32_EXTI
+ 	bool
+ 	select IRQ_DOMAIN
++
++config QCOM_IRQ_COMBINER
++	bool "QCOM IRQ combiner support"
++	depends on ARCH_QCOM && ACPI
++	select IRQ_DOMAIN
++	help
++	  Say yes here to add support for the IRQ combiner devices embedded
++	  in Qualcomm Technologies chips.
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index e4dbfc8..1818a0b 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -74,3 +74,4 @@ obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
+ obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
+ obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o
+ obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
++obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+diff --git a/drivers/irqchip/qcom-irq-combiner.c b/drivers/irqchip/qcom-irq-combiner.c
 new file mode 100644
-index 0000000..c53b9f4
+index 0000000..b117cd7
 --- /dev/null
-+++ b/drivers/acpi/irqdomain.c
-@@ -0,0 +1,141 @@
-+/*
-+ * ACPI ResourceSource/IRQ domain mapping support
-+ *
-+ * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++++ b/drivers/irqchip/qcom-irq-combiner.c
+@@ -0,0 +1,332 @@
++/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -55,365 +68,327 @@ index 0000000..c53b9f4
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
++
++/*
++ * Driver for interrupt combiners in the Top-level Control and Status
++ * Registers (TCSR) hardware block in Qualcomm Technologies chips.
++ * An interrupt combiner in this block combines a set of interrupts by
++ * OR'ing the individual interrupt signals into a summary interrupt
++ * signal routed to a parent interrupt controller, and provides read-
++ * only, 32-bit registers to query the status of individual interrupts.
++ * The status bit for IRQ n is bit (n % 32) within register (n / 32)
++ * of the given combiner. Thus, each combiner can be described as a set
++ * of register offsets and the number of IRQs managed.
++ */
++
 +#include <linux/acpi.h>
-+#include <linux/irq.h>
++#include <linux/err.h>
++#include <linux/irqchip.h>
++#include <linux/irqchip/chained_irq.h>
 +#include <linux/irqdomain.h>
 +
-+/**
-+ * acpi_irq_domain_ensure_probed() - Check if the device has registered
-+ *                                   an IRQ domain and probe as necessary
-+ *
-+ * @device: Device to check and probe
-+ *
-+ * Returns: 0 on success, -ENODEV otherwise
-+ */
-+static int acpi_irq_domain_ensure_probed(struct acpi_device *device)
++#define REG_SIZE 32
++
++struct combiner_reg {
++	void __iomem *addr;
++	unsigned long mask;
++};
++
++struct combiner {
++	struct irq_chip     irq_chip;
++	struct irq_domain   *domain;
++	int                 parent_irq;
++	u32                 nirqs;
++	u32                 nregs;
++	struct combiner_reg regs[0];
++};
++
++static inline u32 irq_register(int irq)
 +{
-+	struct acpi_dsdt_probe_entry *entry;
-+
-+	if (irq_find_matching_fwnode(&device->fwnode, DOMAIN_BUS_ANY) != 0)
-+		return 0;
-+
-+	for (entry = &__dsdt_acpi_probe_table;
-+	     entry < &__dsdt_acpi_probe_table_end; entry++)
-+		if (strcmp(entry->_hid, acpi_device_hid(device)) == 0)
-+			return entry->probe(device);
-+
-+	return -ENODEV;
++	return irq / REG_SIZE;
 +}
 +
-+/**
-+ * acpi_irq_domain_register_irq() - Register the mapping for an IRQ produced
-+ *                                  by the given acpi_resource_source to a
-+ *                                  Linux IRQ number
-+ * @source: IRQ source
-+ * @hwirq: Hardware IRQ number
-+ * @trigger: trigger type of the IRQ number to be mapped
-+ * @polarity: polarity of the IRQ to be mapped
-+ *
-+ * Returns: a valid linux IRQ number on success
-+ *          -ENODEV if the given acpi_resource_source cannot be found
-+ *          -EPROBE_DEFER if the IRQ domain has not been registered
-+ *          -EINVAL for all other errors
-+ */
-+int acpi_irq_domain_register_irq(const struct acpi_resource_source *source,
-+				 u32 hwirq, int trigger, int polarity)
++static inline u32 irq_bit(int irq)
 +{
-+	struct irq_fwspec fwspec;
-+	struct acpi_device *device;
-+	acpi_handle handle;
-+	acpi_status status;
-+	int ret;
++	return irq % REG_SIZE;
 +
-+	/* An empty acpi_resource_source means it is a GSI */
-+	if (!source->string_length)
-+		return acpi_register_gsi(NULL, hwirq, trigger, polarity);
-+
-+	status = acpi_get_handle(NULL, source->string_ptr, &handle);
-+	if (ACPI_FAILURE(status))
-+		return -ENODEV;
-+
-+	device = acpi_bus_get_acpi_device(handle);
-+	if (!device)
-+		return -ENODEV;
-+
-+	ret = acpi_irq_domain_ensure_probed(device);
-+	if (ret)
-+		goto out_put_device;
-+
-+	fwspec.fwnode = &device->fwnode;
-+	fwspec.param[0] = hwirq;
-+	fwspec.param[1] = acpi_dev_get_irq_type(trigger, polarity);
-+	fwspec.param_count = 2;
-+
-+	ret = irq_create_fwspec_mapping(&fwspec);
-+
-+out_put_device:
-+	acpi_bus_put_acpi_device(device);
-+
-+	return ret;
 +}
-+EXPORT_SYMBOL_GPL(acpi_irq_domain_register_irq);
 +
-+/**
-+ * acpi_irq_domain_unregister_irq() - Delete the mapping for an IRQ produced
-+ *                                    by the given acpi_resource_source to a
-+ *                                    Linux IRQ number
-+ * @source: IRQ source
-+ * @hwirq: Hardware IRQ number
-+ *
-+ * Returns: 0 on success
-+ *          -ENODEV if the given acpi_resource_source cannot be found
-+ *          -EINVAL for all other errors
-+ */
-+int acpi_irq_domain_unregister_irq(const struct acpi_resource_source *source,
-+				   u32 hwirq)
++static inline int irq_nr(u32 reg, u32 bit)
 +{
-+	struct irq_domain *domain;
-+	struct acpi_device *device;
-+	acpi_handle handle;
-+	acpi_status status;
-+	int ret = 0;
++	return reg * REG_SIZE + bit;
++}
 +
-+	if (!source->string_length) {
-+		acpi_unregister_gsi(hwirq);
-+		return 0;
++/*
++ * Handler for the cascaded IRQ.
++ */
++static void combiner_handle_irq(struct irq_desc *desc)
++{
++	struct combiner *combiner = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	u32 reg;
++
++	chained_irq_enter(chip, desc);
++
++	for (reg = 0; reg < combiner->nregs; reg++) {
++		int virq;
++		int hwirq;
++		u32 bit;
++		u32 status;
++
++		if (combiner->regs[reg].mask == 0)
++			continue;
++
++		status = readl_relaxed(combiner->regs[reg].addr);
++		status &= combiner->regs[reg].mask;
++
++		while (status) {
++			bit = __ffs(status);
++			status &= ~(1 << bit);
++			hwirq = irq_nr(reg, bit);
++			virq = irq_find_mapping(combiner->domain, hwirq);
++			if (virq >= 0)
++				generic_handle_irq(virq);
++
++		}
 +	}
 +
-+	status = acpi_get_handle(NULL, source->string_ptr, &handle);
-+	if (ACPI_FAILURE(status))
-+		return -ENODEV;
-+
-+	device = acpi_bus_get_acpi_device(handle);
-+	if (!device)
-+		return -ENODEV;
-+
-+	domain = irq_find_matching_fwnode(&device->fwnode, DOMAIN_BUS_ANY);
-+	if (!domain) {
-+		ret = -EINVAL;
-+		goto out_put_device;
-+	}
-+
-+	irq_dispose_mapping(irq_find_mapping(domain, hwirq));
-+
-+out_put_device:
-+	acpi_bus_put_acpi_device(device);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(acpi_irq_domain_unregister_irq);
-diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-index 56241eb..3fb7abf 100644
---- a/drivers/acpi/resource.c
-+++ b/drivers/acpi/resource.c
-@@ -381,14 +381,15 @@ static void acpi_dev_irqresource_disabled(struct resource *res, u32 gsi)
- 	res->flags = IORESOURCE_IRQ | IORESOURCE_DISABLED | IORESOURCE_UNSET;
- }
- 
--static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
-+static void acpi_dev_get_irqresource(struct resource *res, u32 hwirq,
-+				     const struct acpi_resource_source *source,
- 				     u8 triggering, u8 polarity, u8 shareable,
- 				     bool legacy)
- {
- 	int irq, p, t;
- 
--	if (!valid_IRQ(gsi)) {
--		acpi_dev_irqresource_disabled(res, gsi);
-+	if ((source->string_length == 0) && !valid_IRQ(hwirq)) {
-+		acpi_dev_irqresource_disabled(res, hwirq);
- 		return;
- 	}
- 
-@@ -402,25 +403,25 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
- 	 * using extended IRQ descriptors we take the IRQ configuration
- 	 * from _CRS directly.
- 	 */
--	if (legacy && !acpi_get_override_irq(gsi, &t, &p)) {
-+	if (legacy && !acpi_get_override_irq(hwirq, &t, &p)) {
- 		u8 trig = t ? ACPI_LEVEL_SENSITIVE : ACPI_EDGE_SENSITIVE;
- 		u8 pol = p ? ACPI_ACTIVE_LOW : ACPI_ACTIVE_HIGH;
- 
- 		if (triggering != trig || polarity != pol) {
--			pr_warning("ACPI: IRQ %d override to %s, %s\n", gsi,
--				   t ? "level" : "edge", p ? "low" : "high");
-+			pr_warn("ACPI: IRQ %d override to %s, %s\n", hwirq,
-+				t ? "level" : "edge", p ? "low" : "high");
- 			triggering = trig;
- 			polarity = pol;
- 		}
- 	}
- 
- 	res->flags = acpi_dev_irq_flags(triggering, polarity, shareable);
--	irq = acpi_register_gsi(NULL, gsi, triggering, polarity);
-+	irq = acpi_irq_domain_register_irq(source, hwirq, triggering, polarity);
- 	if (irq >= 0) {
- 		res->start = irq;
- 		res->end = irq;
- 	} else {
--		acpi_dev_irqresource_disabled(res, gsi);
-+		acpi_dev_irqresource_disabled(res, hwirq);
- 	}
- }
- 
-@@ -446,6 +447,7 @@ static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
- bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 				 struct resource *res)
- {
-+	const struct acpi_resource_source dummy = { 0, 0, NULL };
- 	struct acpi_resource_irq *irq;
- 	struct acpi_resource_extended_irq *ext_irq;
- 
-@@ -460,7 +462,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 			acpi_dev_irqresource_disabled(res, 0);
- 			return false;
- 		}
--		acpi_dev_get_irqresource(res, irq->interrupts[index],
-+		acpi_dev_get_irqresource(res, irq->interrupts[index], &dummy,
- 					 irq->triggering, irq->polarity,
- 					 irq->sharable, true);
- 		break;
-@@ -471,6 +473,7 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
- 			return false;
- 		}
- 		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-+					 &ext_irq->resource_source,
- 					 ext_irq->triggering, ext_irq->polarity,
- 					 ext_irq->sharable, false);
- 		break;
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 3074796..f808afdc 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -563,6 +563,7 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
-+	ACPI_PROBE_TABLE(dsdt)						\
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index ddbeda6..bb1a838 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -26,6 +26,7 @@
- #include <linux/resource_ext.h>
- #include <linux/device.h>
- #include <linux/property.h>
-+#include <linux/irqdomain.h>
- 
- #ifndef _LINUX
- #define _LINUX
-@@ -321,6 +322,31 @@ void acpi_set_irq_model(enum acpi_irq_model_id model,
-  */
- void acpi_unregister_gsi (u32 gsi);
- 
-+#ifdef CONFIG_IRQ_DOMAIN
-+
-+int acpi_irq_domain_register_irq(const struct acpi_resource_source *source,
-+				 u32 hwirq, int trigger, int polarity);
-+int acpi_irq_domain_unregister_irq(const struct acpi_resource_source *source,
-+				   u32 hwirq);
-+
-+#else
-+
-+static inline int acpi_irq_domain_register_irq(
-+	const struct acpi_resource_source *source, u32 hwirq, int trigger,
-+	int polarity)
-+{
-+	return acpi_register_gsi(NULL, hwirq, trigger, polarity);
++	chained_irq_exit(chip, desc);
 +}
 +
-+static inline int acpi_irq_domain_unregister_irq(
-+	const struct acpi_resource_source *source,  u32 hwirq)
++/*
++ * irqchip callbacks
++ */
++
++static void combiner_irq_chip_mask_irq(struct irq_data *data)
 +{
-+	acpi_unregister_gsi(hwirq);
++	struct combiner *combiner = irq_data_get_irq_chip_data(data);
++	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
++
++	clear_bit(irq_bit(data->hwirq), &reg->mask);
++}
++
++static void combiner_irq_chip_unmask_irq(struct irq_data *data)
++{
++	struct combiner *combiner = irq_data_get_irq_chip_data(data);
++	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
++
++	set_bit(irq_bit(data->hwirq), &reg->mask);
++}
++
++/*
++ * irq_domain_ops callbacks
++ */
++
++static int combiner_irq_map(struct irq_domain *domain, unsigned int irq,
++				   irq_hw_number_t hwirq)
++{
++	struct combiner *combiner = domain->host_data;
++
++	if (hwirq >= combiner->nirqs)
++		return -EINVAL;
++
++	irq_set_chip_and_handler(irq, &combiner->irq_chip, handle_level_irq);
++	irq_set_chip_data(irq, combiner);
++	irq_set_parent(irq, combiner->parent_irq);
++	irq_set_noprobe(irq);
 +	return 0;
 +}
 +
-+#endif /* CONFIG_IRQ_DOMAIN */
++static void combiner_irq_unmap(struct irq_domain *domain, unsigned int irq)
++{
++	irq_set_chip_and_handler(irq, NULL, NULL);
++	irq_set_chip_data(irq, NULL);
++	irq_set_parent(irq, -1);
++}
 +
- struct pci_dev;
- 
- int acpi_pci_irq_enable (struct pci_dev *dev);
-@@ -1024,6 +1050,34 @@ struct acpi_probe_entry {
- 					  (&ACPI_PROBE_TABLE_END(t) -	\
- 					   &ACPI_PROBE_TABLE(t)));	\
- 	})
++#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
++static int combiner_irq_translate(struct irq_domain *d, struct irq_fwspec *fws,
++				  unsigned long *hwirq, unsigned int *type)
++{
++	if (is_acpi_node(fws->fwnode)) {
++		if (fws->param_count != 2)
++			return -EINVAL;
 +
-+/* Length of Hardware ID field in DSDT entries as per ACPI spec */
-+#define ACPI_HID_LEN 9
++		*hwirq = fws->param[0];
++		*type = fws->param[1];
++		return 0;
++	}
 +
-+typedef int (*acpi_dsdt_handler)(struct acpi_device *);
++	return -EINVAL;
++}
++#endif
 +
-+/**
-+ * struct acpi_probe_dsdt_entry - boot-time probing entry for DSDT devices
-+ * @hid:		_HID of the device
-+ * @fn:		Callback to the driver being probed
-+ * @driver_data:	Sideband data provided back to the driver
-+ */
-+struct acpi_dsdt_probe_entry {
-+	__u8 _hid[ACPI_HID_LEN];
-+	acpi_dsdt_handler probe;
++static const struct irq_domain_ops domain_ops = {
++	.map = combiner_irq_map,
++	.unmap = combiner_irq_unmap,
++#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
++	.translate = combiner_irq_translate
++#endif
 +};
 +
-+#define ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)			\
-+	static const struct acpi_dsdt_probe_entry __acpi_probe_##name	\
-+		__used __section(__dsdt_acpi_probe_table) =		\
-+		{							\
-+			._hid = hid,					\
-+			.probe = fn,					\
-+		}
++/*
++ * Device probing
++ */
 +
-+extern struct acpi_dsdt_probe_entry __dsdt_acpi_probe_table;
-+extern struct acpi_dsdt_probe_entry __dsdt_acpi_probe_table_end;
++static acpi_status count_registers_cb(struct acpi_resource *ares, void *context)
++{
++	int *count = context;
 +
- #else
- static inline int acpi_dev_get_property(struct acpi_device *adev,
- 					const char *name, acpi_object_type type,
-@@ -1101,8 +1155,25 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
- 		     (void *) data }
- 
- #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
++	if (ares->type == ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
++		++(*count);
++	return AE_OK;
++}
 +
-+#define ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)			\
-+	static const void *__acpi_probe_##name[]			\
-+		__attribute__((unused))				\
-+		 = { (void *) hid,					\
-+		     (void *) fn }
++static int count_registers(struct acpi_device *adev)
++{
++	acpi_status status;
++	int count = 0;
 +
- #endif
- 
-+#define MADT_IRQCHIP_ACPI_DECLARE(name, subtable, validate, data, fn)	\
-+	ACPI_DECLARE_PROBE_ENTRY(irqchip, name, ACPI_SIG_MADT,		\
-+				 subtable, validate, data, fn)
++	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
++		return -EINVAL;
 +
-+#define DSDT_IRQCHIP_ACPI_DECLARE(name, hid, fn)	\
-+	ACPI_DECLARE_DSDT_PROBE_ENTRY(name, hid, fn)
++	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
++				     count_registers_cb, &count);
++	if (ACPI_FAILURE(status))
++		return -EINVAL;
++	return count;
++}
 +
-+#define __IRQCHIP_ACPI_DECLARE(_a1, _a2, _a3, _a4, _a5, type, ...)	\
-+	type##_IRQCHIP_ACPI_DECLARE
++struct get_registers_context {
++	struct device *dev;
++	struct combiner *combiner;
++	int err;
++};
 +
- #ifdef CONFIG_ACPI_TABLE_UPGRADE
- void acpi_table_upgrade(void);
- #else
-diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
-index 89c34b2..c2d0c12 100644
---- a/include/linux/irqchip.h
-+++ b/include/linux/irqchip.h
-@@ -29,6 +29,10 @@
- /*
-  * This macro must be used by the different irqchip drivers to declare
-  * the association between their version and their initialization function.
-+ * Two syntaxes are supported depending on the table where the irqchip device
-+ * is declared:
-+ *
-+ * - MADT irqchip syntax, which requires the following five arguments:
-  *
-  * @name: name that must be unique accross all IRQCHIP_ACPI_DECLARE of the
-  * same file.
-@@ -37,10 +41,17 @@
-  *            Can be NULL.
-  * @data: data to be checked by the validate function.
-  * @fn: initialization function
-+ *
-+ * - DSDT irqchip syntax, which requires the following three arguments:
-+ *
-+ * @name: name that must be unique across all IRQCHIP_ACPI_DECLARE of the
-+ * same file.
-+ * @hid: _HID of the DSDT device
-+ * @fn: initialization function
-  */
--#define IRQCHIP_ACPI_DECLARE(name, subtable, validate, data, fn)	\
--	ACPI_DECLARE_PROBE_ENTRY(irqchip, name, ACPI_SIG_MADT, 		\
--				 subtable, validate, data, fn)
++static acpi_status get_registers_cb(struct acpi_resource *ares, void *context)
++{
++	struct get_registers_context *ctx = context;
++	struct acpi_resource_generic_register *reg;
++	phys_addr_t paddr;
++	void __iomem *vaddr;
 +
-+#define IRQCHIP_ACPI_DECLARE(...)					\
-+	__IRQCHIP_ACPI_DECLARE(__VA_ARGS__, MADT, _unused, DSDT)(__VA_ARGS__)
- 
- #ifdef CONFIG_IRQCHIP
- void irqchip_init(void);
++	if (ares->type != ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
++		return AE_OK;
++
++	reg = &ares->data.generic_reg;
++	paddr = reg->address;
++	if ((reg->space_id != ACPI_SPACE_MEM) ||
++	    (reg->bit_offset != 0) ||
++	    (reg->bit_width > REG_SIZE)) {
++		dev_err(ctx->dev, "Bad register resource @%pa\n", &paddr);
++		ctx->err = -EINVAL;
++		return AE_ERROR;
++	}
++
++	vaddr = devm_ioremap(ctx->dev, reg->address, REG_SIZE);
++	if (IS_ERR(vaddr)) {
++		dev_err(ctx->dev, "Can't map register @%pa\n", &paddr);
++		ctx->err = PTR_ERR(vaddr);
++		return AE_ERROR;
++	}
++
++	ctx->combiner->regs[ctx->combiner->nregs].addr = vaddr;
++	ctx->combiner->nirqs += reg->bit_width;
++	ctx->combiner->nregs++;
++	return AE_OK;
++}
++
++static int get_registers(struct acpi_device *adev, struct combiner *comb)
++{
++	acpi_status status;
++	struct get_registers_context ctx;
++
++	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
++		return -EINVAL;
++
++	ctx.dev = &adev->dev;
++	ctx.combiner = comb;
++	ctx.err = 0;
++
++	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
++				     get_registers_cb, &ctx);
++	if (ACPI_FAILURE(status))
++		return ctx.err;
++	return 0;
++}
++
++static acpi_status get_parent_irq_cb(struct acpi_resource *ares, void *context)
++{
++	int *irq = context;
++	struct acpi_resource_extended_irq *eirq;
++
++	if (ares->type != ACPI_RESOURCE_TYPE_EXTENDED_IRQ)
++		return AE_OK;
++
++	eirq = &ares->data.extended_irq;
++	*irq = acpi_irq_domain_register_irq(&eirq->resource_source,
++					    eirq->interrupts[0],
++					    eirq->triggering, eirq->polarity);
++	return AE_OK;
++}
++
++static int get_parent_irq(struct acpi_device *adev)
++{
++	acpi_status status;
++	int irq = -1;
++
++	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
++		return -EINVAL;
++
++	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
++				     get_parent_irq_cb, &irq);
++	if (ACPI_FAILURE(status))
++		return -EINVAL;
++	return irq;
++}
++
++static int __init combiner_probe(struct acpi_device *adev)
++{
++	struct combiner *combiner;
++	size_t alloc_sz;
++	u32 nregs;
++	int err;
++
++	nregs = count_registers(adev);
++	if (nregs <= 0) {
++		dev_err(&adev->dev, "Error reading register resources\n");
++		return -EINVAL;
++	}
++
++	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
++	combiner = devm_kzalloc(&adev->dev, alloc_sz, GFP_KERNEL);
++	if (!combiner)
++		return -ENOMEM;
++
++	err = get_registers(adev, combiner);
++	if (err < 0)
++		return err;
++
++	combiner->parent_irq = get_parent_irq(adev);
++	if (combiner->parent_irq <= 0) {
++		dev_err(&adev->dev, "Error getting IRQ resource\n");
++		return -EINVAL;
++	}
++
++	combiner->domain = irq_domain_create_linear(
++		&adev->fwnode, combiner->nirqs, &domain_ops, combiner);
++	if (!combiner->domain)
++		/* Errors printed by irq_domain_create_linear */
++		return -ENODEV;
++
++	irq_set_chained_handler_and_data(combiner->parent_irq,
++					 combiner_handle_irq, combiner);
++	combiner->irq_chip.irq_mask = combiner_irq_chip_mask_irq;
++	combiner->irq_chip.irq_unmask = combiner_irq_chip_unmask_irq;
++	combiner->irq_chip.name = dev_name(&adev->dev);
++
++	dev_info(&adev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
++		 combiner->parent_irq, combiner->nirqs, combiner->regs[0].addr);
++	return 0;
++}
++
++IRQCHIP_ACPI_DECLARE(qcom_combiner, "QCOM80B1", combiner_probe);
 -- 
 Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
