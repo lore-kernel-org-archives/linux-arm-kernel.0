@@ -1,35 +1,145 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 17 Oct 2016 17:16:02 -0700
-Subject: [PATCH] extcon: qcom-spmi-misc: Sync the extcon state on interrupt
-Message-ID: <20161018001602.18617-1-stephen.boyd@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 18 Oct 2016 02:35:38 +0200
+Subject: [PATCH v8 0/8] power: add power sequence library
+In-Reply-To: <20161017013058.GA1301@b29397-desktop>
+References: <1476413995-20361-1-git-send-email-peter.chen@nxp.com>
+ <5097336.earU4jV2qd@vostro.rjw.lan> <20161017013058.GA1301@b29397-desktop>
+Message-ID: <5513671.XlE8bb9pVt@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver was changed after submission to use the new style APIs
-like extcon_set_state(). Unfortunately, that only sets the state,
-and doesn't notify any consumers that the cable state has
-changed. Use extcon_set_state_sync() here instead so that we
-notify cable consumers of the state change. This fixes USB
-host-device role switching on the db8074 platform.
+On Monday, October 17, 2016 09:30:59 AM Peter Chen wrote:
+> On Fri, Oct 14, 2016 at 02:09:31PM +0200, Rafael J. Wysocki wrote:
+> > On Friday, October 14, 2016 10:59:47 AM Peter Chen wrote:
+> > > Hi all,
+> > > 
+> > > This is a follow-up for my last power sequence framework patch set [1].
+> > > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> > > power sequence instances will be added at postcore_initcall, the match
+> > > criteria is compatible string first, if the compatible string is not
+> > > matched between dts and library, it will try to use generic power sequence.
+> > > 	 
+> > > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > > if only one power sequence instance is needed, for more power sequences
+> > > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> > > 
+> > > In future, if there are special power sequence requirements, the special
+> > > power sequence library can be created.
+> > > 
+> > > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> > > two hot-plug devices to simulate this use case, the related binding
+> > > change is updated at patch [1/6], The udoo board changes were tested
+> > > using my last power sequence patch set.[3]
+> > > 
+> > > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> > > need to power on itself before it can be found by ULPI bus.
+> > > 
+> > > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> > > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> > > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> > > 
+> > > Changes for v8:
+> > > - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+> > >   preallocate instances problem which the number of instance is decided at
+> > >   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+> > > - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+> > >   match method. [Patch 2/8]
+> > > - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+> > > 
+> > > Changes for v7:
+> > > - Create kinds of power sequence instance at postcore_initcall, and match
+> > >   the instance with node using compatible string, the beneit of this is
+> > >   the host driver doesn't need to consider which pwrseq instance needs
+> > >   to be used, and pwrseq core will match it, however, it eats some memories
+> > >   if less power sequence instances are used. [Patch 2/8]
+> > > - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+> > > - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+> > >   use device_node for parameters at pwrseq_on. [Patch 2/8]
+> > > - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+> > > - Tested three pwrseq instances together using both specific compatible string and
+> > >   generic libraries.
+> > > 
+> > > Changes for v6:
+> > > - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+> > > - Change chipidea core of_node assignment for coming user. (patch [5/6])
+> > > - Applies Joshua Clayton's three dts changes for two boards,
+> > >   the USB device's reg has only #address-cells, but without #size-cells.
+> > > 
+> > > Changes for v5:
+> > > - Delete pwrseq_register/pwrseq_unregister, which is useless currently
+> > > - Fix the linker error when the pwrseq user is compiled as module
+> > > 
+> > > Changes for v4:
+> > > - Create the patch on next-20160722 
+> > > - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+> > > - Using more friendly wait method for reset gpio [Patch 2/6]
+> > > - Support multiple input clocks [Patch 2/6]
+> > > - Add Rob Herring's ack for DT changes
+> > > - Add Joshua Clayton's Tested-by
+> > > 
+> > > Changes for v3:
+> > > - Delete "power-sequence" property at binding-doc, and change related code
+> > >   at both library and user code.
+> > > - Change binding-doc example node name with Rob's comments
+> > > - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+> > >   add additional code request gpio with proper gpio flags
+> > > - Add Philipp Zabel's Ack and MAINTAINER's entry
+> > > 
+> > > Changes for v2:
+> > > - Delete "pwrseq" prefix and clock-names for properties at dt binding
+> > > - Should use structure not but its pointer for kzalloc
+> > > - Since chipidea core has no of_node, let core's of_node equals glue
+> > >   layer's at core's probe
+> > > 
+> > > Joshua Clayton (2):
+> > >   ARM: dts: imx6qdl: Enable usb node children with <reg>
+> > >   ARM: dts: imx6q-evi: Fix onboard hub reset line
+> > > 
+> > > Peter Chen (6):
+> > >   binding-doc: power: pwrseq-generic: add binding doc for generic power
+> > >     sequence library
+> > >   power: add power sequence library
+> > >   binding-doc: usb: usb-device: add optional properties for power
+> > >     sequence
+> > >   usb: core: add power sequence handling for USB devices
+> > >   usb: chipidea: let chipidea core device of_node equal's glue layer
+> > >     device of_node
+> > >   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+> > > 
+> > >  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 ++++++
+> > >  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+> > >  MAINTAINERS                                        |   9 +
+> > >  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
+> > >  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++-
+> > >  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+> > >  drivers/power/Kconfig                              |   1 +
+> > >  drivers/power/Makefile                             |   1 +
+> > >  drivers/power/pwrseq/Kconfig                       |  19 ++
+> > >  drivers/power/pwrseq/Makefile                      |   2 +
+> > >  drivers/power/pwrseq/core.c                        | 191 +++++++++++++++++++++
+> > >  drivers/power/pwrseq/pwrseq_generic.c              | 183 ++++++++++++++++++++
+> > >  drivers/usb/chipidea/core.c                        |  27 ++-
+> > >  drivers/usb/core/hub.c                             |  41 ++++-
+> > >  drivers/usb/core/hub.h                             |   1 +
+> > >  include/linux/power/pwrseq.h                       |  72 ++++++++
+> > >  16 files changed, 621 insertions(+), 41 deletions(-)
+> > >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+> > >  create mode 100644 drivers/power/pwrseq/Kconfig
+> > >  create mode 100644 drivers/power/pwrseq/Makefile
+> > >  create mode 100644 drivers/power/pwrseq/core.c
+> > >  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+> > >  create mode 100644 include/linux/power/pwrseq.h
+> > 
+> > Meta question: Who's the maintainer you are targetting this at?
+> > 
+> 
+> Sebastian Reichel mentioned it is better through your tree.
+> I could be the maintainer for it, and send "GIT PULL" for you
+> through my git
+> (https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/)
+> Is it ok for you?
 
-Fixes: 38085c987f52 ("extcon: Add support for qcom SPMI PMIC USB id detection hardware")
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
- drivers/extcon/extcon-qcom-spmi-misc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Let me review the series first. :-)
 
-diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
-index ca957a5f4291..b8cde096a808 100644
---- a/drivers/extcon/extcon-qcom-spmi-misc.c
-+++ b/drivers/extcon/extcon-qcom-spmi-misc.c
-@@ -51,7 +51,7 @@ static void qcom_usb_extcon_detect_cable(struct work_struct *work)
- 	if (ret)
- 		return;
- 
--	extcon_set_state(info->edev, EXTCON_USB_HOST, !id);
-+	extcon_set_state_sync(info->edev, EXTCON_USB_HOST, !id);
- }
- 
- static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
--- 
-2.10.0.297.gf6727b0
+Thanks,
+Rafael
