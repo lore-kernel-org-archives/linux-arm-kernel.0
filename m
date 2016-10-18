@@ -1,121 +1,229 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 18 Oct 2016 14:08:38 +0200
-Subject: [RFC PATCH] mtd: nand: Add OX820 NAND Support
-In-Reply-To: <20161018115115.GF1641@makrotopia.org>
-References: <20161018090927.1990-1-narmstrong@baylibre.com>
- <20161018110807.GD1641@makrotopia.org>
- <c377cb60-a359-62c1-dc6b-7b0be8b8e228@baylibre.com>
- <20161018115115.GF1641@makrotopia.org>
-Message-ID: <ff8fb0cf-a442-12dc-3365-fd3417ae887c@baylibre.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Tue, 18 Oct 2016 20:09:25 +0800
+Subject: [PATCH 6/10] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <ec7a2658-5af3-bff8-3cb8-adb72406df5c@intel.com>
+References: <cover.990e3503c30c18ecf50dd48bce3d52811f03ca22.1475853198.git-series.gregory.clement@free-electrons.com>
+ <ecde22fd342b0b2001ff5676ea1e67b7226d6946.1475853198.git-series.gregory.clement@free-electrons.com>
+ <1b015f16-aa37-591c-3299-9431f6e82cce@intel.com>
+ <4009a66b-1e09-0780-b7c1-128ff1401b5f@marvell.com>
+ <7939a923-eb97-ca44-ac4c-f0a3cd4f45bc@intel.com>
+ <6bed26dc-f4c1-7f0d-36b6-d7d5fcbf0da9@marvell.com>
+ <ec7a2658-5af3-bff8-3cb8-adb72406df5c@intel.com>
+Message-ID: <d6429afb-ed45-e0c7-917f-54fd8c69fb11@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2016 01:51 PM, Daniel Golle wrote:
-> Hi Neil,
-> 
-> On Tue, Oct 18, 2016 at 01:24:22PM +0200, Neil Armstrong wrote:
->> On 10/18/2016 01:08 PM, Daniel Golle wrote:
->>> Hi Neil,
+Hi Adrian,
+
+On 2016/10/17 16:14, Adrian Hunter wrote:
+> On 13/10/16 08:38, Ziji Hu wrote:
+>> Hi Adrian,
+>>
+>> On 2016/10/12 21:07, Adrian Hunter wrote:
+>>> On 12/10/16 14:58, Ziji Hu wrote:
+>>>> Hi Adrian,
+>>>>
+>>>> 	Thank you very much for your review.
+>>>> 	I will firstly fix the typo.
+>>>>
+>>>> On 2016/10/11 20:37, Adrian Hunter wrote:
+>> <snip>
+>>>>>> +
+>>>>>> +static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
+>>>>>> +					     struct mmc_ios *ios)
+>>>>>> +{
+>>>>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * Before SD/SDIO set signal voltage, SD bus clock should be
+>>>>>> +	 * disabled. However, sdhci_set_clock will also disable the Internal
+>>>>>> +	 * clock in mmc_set_signal_voltage().
+>>>>>> +	 * If Internal clock is disabled, the 3.3V/1.8V bit can not be updated.
+>>>>>> +	 * Thus here manually enable internal clock.
+>>>>>> +	 *
+>>>>>> +	 * After switch completes, it is unnecessary to disable internal clock,
+>>>>>> +	 * since keeping internal clock active obeys SD spec.
+>>>>>> +	 */
+>>>>>> +	enable_xenon_internal_clk(host);
+>>>>>> +
+>>>>>> +	if (priv->card_candidate) {
+>>>>>
+>>>>> mmc_power_up() calls __mmc_set_signal_voltage() calls
+>>>>> host->ops->start_signal_voltage_switch so priv->card_candidate could be an
+>>>>> invalid reference to an old card.
+>>>>>
+>>>>> So that's not going to work if the card changes - not only for removable
+>>>>> cards but even for eMMC if init fails and retries.
+>>>>>
+>>>> 	As you point out, this piece of code have defects, even though it actually works on Marvell multiple platforms, unless eMMC card is removable.
+>>>>
+>>>> 	I can add a property to explicitly indicate eMMC type in DTS.
+>>>> 	Then card_candidate access can be removed here.
+>>>> 	Does it sounds more reasonable to you?
 >>>
->>> great to see progress towards supporting OX820!
->>> The NAND driver I hacked up for Kernel 4.1 and 4.4 in OpenWrt/LEDE
->>> looks very similar, see
+>>> Sure
 >>>
->>> https://git.lede-project.org/?p=lede/dangole/staging.git;a=blob;f=target/linux/oxnas/files/drivers/mtd/nand/oxnas_nand.c;h=f5a142950e32227fee304de731e619278350a91b;hb=refs/heads/oxnas-nand
+>>>>
+>>>>>> +		if (mmc_card_mmc(priv->card_candidate))
+>>>>>> +			return xenon_emmc_signal_voltage_switch(mmc, ios);
+>>>>>
+>>>>> So if all you need to know is whether it is a eMMC, why can't DT tell you?
+>>>>>
+>>>> 	I can add an eMMC type property in DTS, to remove the card_candidate access here.
+>>>>
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return sdhci_start_signal_voltage_switch(mmc, ios);
+>>>>>> +}
+>>>>>> +
+>>>>>> +/*
+>>>>>> + * After determining which slot is used for SDIO,
+>>>>>> + * some additional task is required.
+>>>>>> + */
+>>>>>> +static void xenon_init_card(struct mmc_host *mmc, struct mmc_card *card)
+>>>>>> +{
+>>>>>> +	struct sdhci_host *host = mmc_priv(mmc);
+>>>>>> +	u32 reg;
+>>>>>> +	u8 slot_idx;
+>>>>>> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>>>>> +	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>>>>> +
+>>>>>> +	/* Link the card for delay adjustment */
+>>>>>> +	priv->card_candidate = card;
+>>>>>
+>>>>> You really need a better way to get the card.  I suggest you take up the
+>>>>> issue with Ulf.  One possibility is to have mmc core set host->card = card
+>>>>> much earlier.
+>>>>>
+>>>> 	Could you please tell me if any issue related to card_candidate still exists, after the card_candidate is removed from xenon_start_signal_voltage_switch() in above?
+>>>> 	It seems that when init_card is called, the structure card has already been updated and stable in MMC/SD/SDIO initialization sequence.
+>>>> 	May I keep it here?
 >>>
->>> To me therefore this looks quite good, just one small question below.
+>>> It works by accident rather than by design.  We can do better.
+>>>
+>> 	Could you please tell me some details which are satisfied about card_candidate?
 >>
->> Hi Daniel,
+>> 	I must admit that card_candidate in xenon_start_signal_voltage_switch() is imperfect.
+>> 	But card_candidate in init_card() and later in set_ios() work by design, rather than by accident. We did a lot of tests on several platforms.
+>> 	
+>> 	The structure mmc_card passed in here is a stable one. Thus in my very own opinion, it is safe and stable to use mmc_card here.
+>> 	card_candidate is used only in card initialization. It is not active in later transfers after initialization is done.
+>> 	It will always updated with mmc_card in next card initialization.
+> 
+> Ok, so maybe just add some comments and more explanation of how it works.
+> 
+> 
+	Sure. I will add more detailed comments.
 >>
->> Yes, I work step by step, I hope to have something booting for 4.10 !
+>>>>
+>>>>>> +	/* Set tuning functionality of this slot */
+>>>>>> +	xenon_slot_tuning_setup(host);
+>>>>>> +
+>>>>>> +	slot_idx = priv->slot_idx;
+>>>>>> +	if (!mmc_card_sdio(card)) {
+>>>>>> +		/* Re-enable the Auto-CMD12 cap flag. */
+>>>>>> +		host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>>>>> +		host->flags |= SDHCI_AUTO_CMD12;
+>>>>>> +
+>>>>>> +		/* Clear SDIO Card Inserted indication */
+>>>>>> +		reg = sdhci_readl(host, SDHC_SYS_CFG_INFO);
+>>>>>> +		reg &= ~(1 << (slot_idx + SLOT_TYPE_SDIO_SHIFT));
+>>>>>> +		sdhci_writel(host, reg, SDHC_SYS_CFG_INFO);
+>>>>>> +
+>>>>>> +		if (mmc_card_mmc(card)) {
+>>>>>> +			mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>>>>> +			if (!(host->quirks2 & SDHCI_QUIRK2_NO_1_8_V))
+>>>>>> +				mmc->caps |= MMC_CAP_1_8V_DDR;
+>>>>>> +			/*
+>>>>>> +			 * Force to clear BUS_TEST to
+>>>>>> +			 * skip bus_test_pre and bus_test_post
+>>>>>> +			 */
+>>>>>> +			mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+>>>>>> +			mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+>>>>>> +				      MMC_CAP2_PACKED_CMD;
+>>>>>> +			if (mmc->caps & MMC_CAP_8_BIT_DATA)
+>>>>>> +				mmc->caps2 |= MMC_CAP2_HS400_1_8V;
+>>>>>> +		}
+>>>>>> +	} else {
+>>>>>> +		/*
+>>>>>> +		 * Delete the Auto-CMD12 cap flag.
+>>>>>> +		 * Otherwise, when sending multi-block CMD53,
+>>>>>> +		 * Driver will set Transfer Mode Register to enable Auto CMD12.
+>>>>>> +		 * However, SDIO device cannot recognize CMD12.
+>>>>>> +		 * Thus SDHC will time-out for waiting for CMD12 response.
+>>>>>> +		 */
+>>>>>> +		host->quirks &= ~SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+>>>>>> +		host->flags &= ~SDHCI_AUTO_CMD12;
+>>>>>
+>>>>> sdhci_set_transfer_mode() won't enable auto-CMD12 for CMD53 anyway, so is
+>>>>> this needed?
+>>>>>
+>>>> 	In Xenon driver, Auto-CMD12 flag is set to enable full support to Auto-CMD feature, both Auto-CMD12 and Auto-CMD23.
+>>>> 	As a result, when Xenon SDHC slot can both support SD and SDIO, Auto-CMD12 is disabled when SDIO card is inserted, and renabled when SD is inserted.
+>>>>
+>>>> 	I recheck the sdhci code to set Auto-CMD bit in Transfer Mode register, in sdhci_set_transfer_mode():
+>>>> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1)
+>>>> 	As you can see, as long as it is CMD18/CMD25 OR there are multiple data blocks, Auto-CMD field will be set.
+>>>> 	CMD53 doesn't have CMD23. Thus Auto-CMD12 is selected since Auto-CMD12 flag is set.
+>>>> 	Thus I have to clear Auto-CMD12 to avoid issuing Auto-CMD12 in SDIO transfer.
+>>>
+>>>
+>>> The code is:
+>>>
+>>> 	if (mmc_op_multi(cmd->opcode) || data->blocks > 1) {
+>>> 		mode = SDHCI_TRNS_BLK_CNT_EN | SDHCI_TRNS_MULTI;
+>>> 		/*
+>>> 		 * If we are sending CMD23, CMD12 never gets sent
+>>> 		 * on successful completion (so no Auto-CMD12).
+>>> 		 */
+>>> 		if (sdhci_auto_cmd12(host, cmd->mrq) &&
+>>> 		    (cmd->opcode != SD_IO_RW_EXTENDED))
+>>> 			mode |= SDHCI_TRNS_AUTO_CMD12;
+>>> 		else if (cmd->mrq->sbc && (host->flags & SDHCI_AUTO_CMD23)) {
+>>> 			mode |= SDHCI_TRNS_AUTO_CMD23;
+>>> 			sdhci_writel(host, cmd->mrq->sbc->arg, SDHCI_ARGUMENT2);
+>>> 		}
+>>> 	}
+>>>
+>>> You can see the check for SD_IO_RW_EXTENDED which is CMD53.
+>>>
+>> 	Sorry. I didn't notice CMD53 check was added.
+>> 	I introduced this Auto-CMD12 hack since kernel 3.8. It seems that this check is not added in kernel 3.8.
+>> 	Thanks for the information. I will remove the Auto-CMD12 hack.
 >>
->> Indeed, they look identical except the part_probes[] stuff, are they necessary ?
+>>>>
+>>>> 	I just meet a similar issue in RPMB.
+>>>> 	When Auto-CMD12 flag is set, eMMC RPMB access will trigger Auto-CMD12, since CMD25 is in use.
+>>>> 	It will cause RPMB access failed.
+>>>
+>>> Can you explain more about the RPMB issue.  Doesn't it use CMD23, so CMD12
+>>> wouldn't be used - auto or manually.
+>>>
+>> 	RPMB go through the MMC ioctl routine.
+>> 	Unlike normal data transfer, MMC ioctl for RPMB explicitly issues CMD23. When CMD25 is issued, there is neither data->sbc nor Auto-CMD23.
+>> 	As a result, sdhci driver will automatically enable Auto-CMD12 for RPMB CMD25 if Auto-CMD12 flag is set.
 > 
-> Nah, this was dropped around kernel 4.7 from most drivers in favour of
-> using the default partition probes (ie. cmdline and dt) afaik.
+> OK, so SDHCI should also not allow auto-cmd12 if there is no stop command
+> i.e. data->stop is null.
 > 
+	data->stop and cmd->stop are forced to be NULL if Auto-CMD12 is enabled.
+	Instead, currently I use cmd->arg to check if it is a RPMB CMD25. If CMD25 argument is NULL, it should be RPMB access.
+	But I only verified it on Marvell platform. Please help check it when later I propose the formal patch.
+	
 >>
->> My primary source of code was Ma Haiju's tree and OPenWRT's tree, but would some people like to push some of the openwrt driver upstream somehow ?
+>>>>
+>>>> 	One possible solution is to drop Auto-CMD12 support and use Auto-CMD23 only, in Xenon driver.
+>>>> 	May I know you opinion, please?
+>>>
+>>> I don't use auto-CMD12 because I don't know if it provides any benefit and
+>>> sdhci does not seem to have implemented Auto CMD12 Error Recovery, although
+>>> I have never looked at it closely.
+>>>
+>> 	Actually, Auto-CMD23 is always used on our Xenon. Auto-CMD12 is not used at all.
+>> 	But since this driver is a general one for all Marvell products, Auto-CMD12 is also supported in case that Auto-CMD23 is not available.
+>>  
+>>
 > 
-> I was planning this somehow, but lack the resources to seriously move
-> forward. I've mostly been focussing on cleaning up Ma Haiju's code and
-> improving support for the SATA driver (ie. adding support for both
-> ports) and re-factoring the stmmac-based Ethernet driver to match the
-> current kernel driver's style.
-> However, I'm still using platform-specific includes (hardware.h) and
-> thus look forward to rebase SATA and Ethernet support on top of your
-> tree, as that would unluck ox820 support in multi-v6 instead of having
-> a platform-specific kernel.
-
-I made a fork of the SATA driver for the OX810SE who needs the external DMA
-to work since it lacks the SATA-sgdma as used in OX820.
-But it seems having Ethernet support would be easy, I can rework it and post it.
-
-Yes, It would be great to sync with the upstream tree at some point, please tell
-me how my work could be useful.
-
-I only own a PogoPlug v3 to support the basic OX820, but I will lack hardware to
-support PCIe and the dual SATA setup at some point.
-
-The next work I plan to do once the basic OX820 boot is merged is to push the USB,
-and the PLL support in the clock driver. The SATA and PCIe would be a natural following work.
-
-> 
-> Currently there are problems with the NAND driver failing to detect the
-> chip on non-PCIe platform like the PogoPlug V3 (non-Pro), MitraStar
-> STG-212 and probably other non-PCIe boards which I didn't check yet.
-> This magically happened when switching from kernel 4.1 to 4.4, I'm
-> bisecting this since, but the problem seems to be hidden somewhere
-> between the lines (ie. probe-order-related or such)...
-> Did you test your NAND driver on any non-PCIe boards and did it work?
-
-Actually I tested only on non-PCIe, since I only own a PogoPlug v3 (non-pro) and the
-probe works perfectly on 4.9-rc1 :
-[...]
-nand: Could not find valid ONFI parameter page; aborting
-nand: device found, Manufacturer ID: 0xad, Chip ID: 0xf1
-nand: Hynix NAND 128MiB 3,3V 8-bit
-nand: 128 MiB, SLC, erase size: 128 KiB, page size: 2048, OOB size: 64
-Scanning device for bad blocks
-Bad eraseblock 511 at 0x000003fe0000
-2 ofpart partitions found on MTD device 41000000.nand
-Creating 2 MTD partitions on "41000000.nand":
-0x000000000000-0x000000e00000 : "boot"
-0x000000e00000-0x000008000000 : "ubi"
-[...]
-# ubiattach -p /dev/mtd1
-ubi0: attaching mtd1
-ubi0: scanning is finished
-ubi0 warning: ubi_eba_init: cannot reserve enough PEBs for bad PEB handling, reserved 9, need 19
-ubi0: attached mtd1 (name "ubi", size 114 MiB)
-ubi0: PEB size: 131072 bytes (128 KiB), LEB size: 129024 bytes
-ubi0: min./max. I/O unit sizes: 2048/2048, sub-page size 512
-ubi0: VID header offset: 512 (aligned 512), data offset: 2048
-ubi0: good PEBs: 911, bad PEBs: 1, corrupted PEBs: 0
-ubi0: user volume: 1, internal volumes: 1, max. volumes count: 128
-ubi0: max/mean erase counter: 2/0, WL threshold: 4096, image sequence number: 0
-ubi0: available PEBs: 0, total reserved PEBs: 911, PEBs reserved for bad PEB handling: 9
-ubi0: background thread "ubi_bgt0d" started, PID 824
-UBI device number 0, total 911 LEBs (117540864 bytes, 112.1 MiB), available 0 LEBs (0 bytes), LEB size 129024 bytes (126.0 KiB)
-[...]
-
-> 
-> 
-> For a more or less complete history of the changes I made since
-> branching of Ma Haijun's tree, see
-> 
-> https://git.lede-project.org/?p=lede/dangole/staging.git;a=history;f=target/linux/oxnas;hb=refs/heads/oxnas-nand
-> 
-> and for the very early history, prior to the merge into the official
-> OpenWrt tree, see
-> 
-> http://gitorious.org/openwrt-oxnas/openwrt-oxnas.git
-> 
-
-Great, thanks for the hints.
-
-I did set up a ML for the upstream work at linux-oxnas at lists.tuxfamily.org and a patchwork interface https://patchwork.kernel.org/project/linux-oxnas/list/ if it can be helpful.
-
-I also idle on #linux-oxnas on freenode...
-
-Neil
