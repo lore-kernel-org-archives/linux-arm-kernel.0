@@ -1,79 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Oct 2016 10:46:14 +0200
-Subject: [PATCH] drm/sun4i: Add a few formats
-Message-ID: <20161018084614.2443-1-maxime.ripard@free-electrons.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Tue, 18 Oct 2016 10:52:29 +0200
+Subject: [STLinux Kernel] [PATCH 02/19] phy: stih41x-usb: Remove usb phy
+ driver and dt binding documentation.
+In-Reply-To: <778bd4b2-9e82-326b-f6e0-43360323d453@st.com>
+References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
+ <1473859677-9231-3-git-send-email-peter.griffin@linaro.org>
+ <20160923150656.GB9176@rob-hp-laptop>
+ <778bd4b2-9e82-326b-f6e0-43360323d453@st.com>
+Message-ID: <59fa8f92-114b-7b5f-fd2f-46c4f02b545e@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The planes can do more than what was previously exposed. Add support for
-them.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 ++++++
- 2 files changed, 26 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index afb7ddf660ef..b184a476a480 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -96,6 +96,22 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 		*mode = SUN4I_BACKEND_LAY_FBFMT_ARGB8888;
- 		break;
- 
-+	case DRM_FORMAT_ARGB4444:
-+		*mode = SUN4I_BACKEND_LAY_FBFMT_ARGB4444;
-+		break;
-+
-+	case DRM_FORMAT_ARGB1555:
-+		*mode = SUN4I_BACKEND_LAY_FBFMT_ARGB1555;
-+		break;
-+
-+	case DRM_FORMAT_RGBA5551:
-+		*mode = SUN4I_BACKEND_LAY_FBFMT_RGBA5551;
-+		break;
-+
-+	case DRM_FORMAT_RGBA4444:
-+		*mode = SUN4I_BACKEND_LAY_FBFMT_RGBA4444;
-+		break;
-+
- 	case DRM_FORMAT_XRGB8888:
- 		*mode = SUN4I_BACKEND_LAY_FBFMT_XRGB8888;
- 		break;
-@@ -104,6 +120,10 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
- 		*mode = SUN4I_BACKEND_LAY_FBFMT_RGB888;
- 		break;
- 
-+	case DRM_FORMAT_RGB565:
-+		*mode = SUN4I_BACKEND_LAY_FBFMT_RGB565;
-+		break;
-+
- 	default:
- 		return -EINVAL;
- 	}
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index f0035bf5efea..5d53c977bca5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -73,12 +73,18 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
- static const uint32_t sun4i_backend_layer_formats_primary[] = {
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_RGB888,
-+	DRM_FORMAT_RGB565,
- 	DRM_FORMAT_XRGB8888,
- };
- 
- static const uint32_t sun4i_backend_layer_formats_overlay[] = {
- 	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_ARGB4444,
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_RGBA5551,
-+	DRM_FORMAT_RGBA4444,
- 	DRM_FORMAT_RGB888,
-+	DRM_FORMAT_RGB565,
- 	DRM_FORMAT_XRGB8888,
- };
- 
--- 
-2.9.3
+On 10/18/2016 09:47 AM, Patrice Chotard wrote:
+> Hi 
+> 
+> On 09/23/2016 05:06 PM, Rob Herring wrote:
+>> On Wed, Sep 14, 2016 at 02:27:40PM +0100, Peter Griffin wrote:
+>>> This phy is only used on STiH415/6 based silicon, and support for
+>>> these SoC's is being removed from the kernel.
+>>>
+>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>> Cc: <kishon@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 ---
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> Applied on sti-dt-for-4.10 branch
+
+
+Sorry, i did a mistake, these patch should go in linux-phy tree.
+Kishon will you take care of it ?
+
+Thanks
+
+> 
+> Thanks 
+> 
+> 
+>>
+>>>  drivers/phy/Kconfig                                |   8 -
+>>>  drivers/phy/Makefile                               |   1 -
+>>>  drivers/phy/phy-stih41x-usb.c                      | 188 ---------------------
+>>>  4 files changed, 221 deletions(-)
+>>>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
+>>>  delete mode 100644 drivers/phy/phy-stih41x-usb.c
+> 
+> _______________________________________________
+> Kernel mailing list
+> Kernel at stlinux.com
+> http://www.stlinux.com/mailman/listinfo/kernel
+> 
