@@ -1,49 +1,54 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Oct 2016 11:52:19 +0100
-Subject: [PATCH 5/5] crypto: arm/sha2-ce - enable module autoloading based on
- CPU feature bits
-In-Reply-To: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1476787939-21889-6-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 18 Oct 2016 11:55:53 +0100
+Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
+In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8nwLZ_oC4Vx6S8aXyNJKRsVMnk-9hP=oADcyBzMSZv=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the module autoloadable by tying it to the CPU feature bit that
-describes whether the optional instructions it relies on are implemented
-by the current CPU.
+On 11 October 2016 at 19:15, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
+> currently work, or have ever worked correctly when built for big endian. So this
+> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
+> well, and an additional fix for XTS which escaped my attention before.
+>
+> Each of these patches carries a fixes tag, and could be backported to stable.
+> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
+> fix is compatible with, not the patch that introduced the algorithm. This is due
+> to the fact that the key schedules are incompatible between generic AES and the
+> arm64 Crypto Extensions implementation (but only when building for big endian)
+> This is not a problem in practice, but it does mean that the AES-CCM and AES in
+> EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
+> one that is compatible with the generic AES key schedule generation code (which
+> it currently no longer uses)
+>
+> In any case, please apply with cc to stable.
+>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/sha2-ce-glue.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+Ping?
 
-diff --git a/arch/arm/crypto/sha2-ce-glue.c b/arch/arm/crypto/sha2-ce-glue.c
-index 0755b2d657f3..df4dcef054ae 100644
---- a/arch/arm/crypto/sha2-ce-glue.c
-+++ b/arch/arm/crypto/sha2-ce-glue.c
-@@ -11,6 +11,7 @@
- #include <crypto/internal/hash.h>
- #include <crypto/sha.h>
- #include <crypto/sha256_base.h>
-+#include <linux/cpufeature.h>
- #include <linux/crypto.h>
- #include <linux/module.h>
- 
-@@ -100,8 +101,6 @@ static struct shash_alg algs[] = { {
- 
- static int __init sha2_ce_mod_init(void)
- {
--	if (!(elf_hwcap2 & HWCAP2_SHA2))
--		return -ENODEV;
- 	return crypto_register_shashes(algs, ARRAY_SIZE(algs));
- }
- 
-@@ -110,5 +109,5 @@ static void __exit sha2_ce_mod_fini(void)
- 	crypto_unregister_shashes(algs, ARRAY_SIZE(algs));
- }
- 
--module_init(sha2_ce_mod_init);
-+module_cpu_feature_match(SHA2, sha2_ce_mod_init);
- module_exit(sha2_ce_mod_fini);
--- 
-2.7.4
+> Ard Biesheuvel (8):
+>   crypto: arm64/aes-ce - fix for big endian
+>   crypto: arm64/ghash-ce - fix for big endian
+>   crypto: arm64/sha1-ce - fix for big endian
+>   crypto: arm64/sha2-ce - fix for big endian
+>   crypto: arm64/aes-ccm-ce: fix for big endian
+>   crypto: arm64/aes-neon - fix for big endian
+>   crypto: arm64/aes-xts-ce: fix for big endian
+>   crypto: arm/aes-ce - fix for big endian
+>
+>  arch/arm/crypto/aes-ce-glue.c       |  5 ++
+>  arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
+>  arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
+>  arch/arm64/crypto/aes-ce.S          |  1 +
+>  arch/arm64/crypto/aes-modes.S       |  3 +-
+>  arch/arm64/crypto/aes-neon.S        | 25 +++++----
+>  arch/arm64/crypto/ghash-ce-core.S   |  6 +--
+>  arch/arm64/crypto/sha1-ce-core.S    |  4 +-
+>  arch/arm64/crypto/sha2-ce-core.S    |  4 +-
+>  9 files changed, 72 insertions(+), 54 deletions(-)
+>
+> --
+> 2.7.4
+>
