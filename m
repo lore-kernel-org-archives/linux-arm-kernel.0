@@ -1,53 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 18 Oct 2016 13:14:38 +0100
-Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
-In-Reply-To: <20161018114932.GG10115@e104818-lin.cambridge.arm.com>
-References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161018114932.GG10115@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9wuXnrq77a3Zk0GnHgnkpURh=EegwgP+vAwMC=rdm3qA@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 18 Oct 2016 14:20:28 +0200
+Subject: [PATCH v4 3/9] drm/hisilicon/hibmc: Add support for frame buffer
+In-Reply-To: <58060529.5010708@huawei.com>
+References: <1476763284-100508-1-git-send-email-zourongrong@gmail.com>
+ <1476763284-100508-4-git-send-email-zourongrong@gmail.com>
+ <20161018074922.GZ20761@phenom.ffwll.local>
+ <58060529.5010708@huawei.com>
+Message-ID: <20161018122028.GB20761@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 October 2016 at 12:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Oct 11, 2016 at 07:15:12PM +0100, Ard Biesheuvel wrote:
->> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
->> currently work, or have ever worked correctly when built for big endian. So this
->> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
->> well, and an additional fix for XTS which escaped my attention before.
->>
->> Each of these patches carries a fixes tag, and could be backported to stable.
->> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
->> fix is compatible with, not the patch that introduced the algorithm.
->
-> I think for future reference, the Fixes tag should denote the commit
-> that introduced the issue. An explicit Cc: stable tag would state how
-> far back it should be applied.
->
+On Tue, Oct 18, 2016 at 07:19:05PM +0800, Rongrong Zou wrote:
+> Hi Daniel,
+> 
+> Thanks for your review!
+> 
+> ? 2016/10/18 15:49, Daniel Vetter ??:
+> > On Tue, Oct 18, 2016 at 12:01:18PM +0800, Rongrong Zou wrote:
+> > > Add support for fbdev and framebuffer.
+> > > 
+> > > Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+> > > ---
+> > >   drivers/gpu/drm/hisilicon/hibmc/Makefile          |   2 +-
+> > >   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   |  25 +++
+> > >   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  25 +++
+> > >   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 257 ++++++++++++++++++++++
+> > >   drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       |  67 ++++++
+> > >   5 files changed, 375 insertions(+), 1 deletion(-)
+> > >   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+> > > 
+> > > diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
+> > > index d5c40b8..810a37e 100644
+> > > --- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
+> > > +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
+> > > @@ -1,5 +1,5 @@
+> > >   ccflags-y := -Iinclude/drm
+> > > -hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o hibmc_ttm.o
+> > > +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
+> > > 
+> > >   obj-$(CONFIG_DRM_HISI_HIBMC)	+=hibmc-drm.o
+> > >   #obj-y	+= hibmc-drm.o
+> > > diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> > > index e118f3b..8ddb763 100644
+> > > --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> > > +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> > > @@ -66,11 +66,31 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+> > > 
+> > >   static int hibmc_pm_suspend(struct device *dev)
+> > >   {
+> > > +	struct pci_dev *pdev = to_pci_dev(dev);
+> > > +	struct drm_device *drm_dev = pci_get_drvdata(pdev);
+> > > +	struct hibmc_drm_device *hidev = drm_dev->dev_private;
+> > > +
+> > > +	if (hidev->fbdev.initialized) {
+> > 
+> > What do you need these checks for? This looks a bit fishy tbh ...
+> 
+> It is delivered from the bochs driver, and I will fix if there are
+> any problems, Thanks.
 
-OK, that sounds reasonable.
+Yeah, existing drivers aren't up to latest best practices. Not sure why
+that was added to bochs really ...
 
->> Ard Biesheuvel (8):
->>   crypto: arm64/aes-ce - fix for big endian
->>   crypto: arm64/ghash-ce - fix for big endian
->>   crypto: arm64/sha1-ce - fix for big endian
->>   crypto: arm64/sha2-ce - fix for big endian
->>   crypto: arm64/aes-ccm-ce: fix for big endian
->>   crypto: arm64/aes-neon - fix for big endian
->>   crypto: arm64/aes-xts-ce: fix for big endian
->>   crypto: arm/aes-ce - fix for big endian
->
-> The changes look fine to me but I can't claim I fully understand these
-> algorithms. FWIW:
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->
-> (Will may pick them up for 4.9-rcX)
+> 
+> > 
+> > > +		console_lock();
+> > > +		drm_fb_helper_set_suspend(&hidev->fbdev.helper, 1);
+> > > +		console_unlock();
+> > 
+> > drm_fb_helper_set_suspend_unlocked is the new fancy one. Please use that
+> > one instead. Also, that has the check you might need already included,
+> > which means you can nuke this entire function here and just call it
+> > directly.
+> 
+> So it should be wrote as:
+> static int hibmc_pm_suspend(struct device *dev)
+> {
+> 	...
+> 	drm_kms_helper_poll_disable(drm_dev);
+> 	drm_fb_helper_set_suspend_unlocked(&hidev->fbdev.helper, 1);
+> 	...
+> }
+> 
+> static int hibmc_pm_resume(struct device *dev)
+> {
+> 	...
+> 	drm_helper_resume_force_mode(drm_dev);
+> 	drm_fb_helper_set_suspend_unlocked(&hidev->fbdev.helper, 0);
+> 	drm_kms_helper_poll_enable(drm_dev);
+> 	...
+> }, is it ?
 
-Thanks, although I was kind of expecting Herbert to pick these up,
-given that #8 affects ARM not arm64.
-
-But if you (or Will) can pick up #1 to #7, that is also fine, then I
-can drop #8 into rmk's patch database.
-
-Thanks,
-Ard,
+Yup.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
