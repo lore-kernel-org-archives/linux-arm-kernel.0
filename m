@@ -1,111 +1,91 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Oct 2016 12:03:49 +0200
-Subject: [PATCH 0/5] drm/sun4i: Handle TV overscan
-In-Reply-To: <20161018092422.GJ1041@n2100.armlinux.org.uk>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <20161018092422.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <20161018100349.qm2f554oiwyjwrsi@lukather>
+From: rogercc.lin@mediatek.com (RogerCC.Lin)
+Date: Tue, 18 Oct 2016 18:12:32 +0800
+Subject: [PATCH 02/28] [v2] mtd: mtk: avoid warning in mtk_ecc_encode
+In-Reply-To: <20161018071948.0b7eef05@bbrezillon>
+References: <20161017220342.1627073-1-arnd@arndb.de>
+ <20161017220557.1688282-2-arnd@arndb.de>
+ <20161018071948.0b7eef05@bbrezillon>
+Message-ID: <1476785552.24626.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Tue, Oct 18, 2016 at 10:24:22AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 18, 2016 at 10:29:33AM +0200, Maxime Ripard wrote:
-> > The Allwinner display engine doesn't have any kind of hardware help to deal
-> > with TV overscan.
+On Tue, 2016-10-18 at 07:19 +0200, Boris Brezillon wrote:
+> On Tue, 18 Oct 2016 00:05:31 +0200
+> Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> I'm not sure I follow.  My understanding (from reading the CEA specs)
-> is that TVs are expected to overscan the image, so the upper left, and
-> bottom right pixels are not visible.
-
-Yes, this is why we have to work around it somehow.
-
-> I assume we are talking about TVs connected via HDMI.  In the HDMI AVI
-> infoframe, there are bits which specify whether the image should be
-> overscanned or underscanned - however, whether a TV implements those
-> bits is rather sketchy.  I assume when you say "any kind of hardware
-> help" you mean you can't control these bits?
+> > When building with -Wmaybe-uninitialized, gcc produces a silly false positive
+> > warning for the mtk_ecc_encode function:
+> > 
+> > drivers/mtd/nand/mtk_ecc.c: In function 'mtk_ecc_encode':
+> > drivers/mtd/nand/mtk_ecc.c:402:15: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> > 
+> > The function for some reason contains a double byte swap on big-endian
+> > builds to get the OOB data into the correct order again, and is written
+> > in a slightly confusing way.
+> > 
+> > Using a simple memcpy32_fromio() to read the data simplifies it a lot
+> > so it becomes more readable and produces no warning. However, the
+> > output might not have 32-bit alignment, so we have to use another
+> > memcpy to avoid taking alignment faults or writing beyond the end
+> > of the array.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> However, some (most?) TVs now implement a menu option which allows the
-> (over)scan mode to be selected.  Others assume that if it's a TV mode,
-> it's supposed to be overscanned, if it's a "PC" mode, it should be
-> underscanned and provide no option to change the behaviour.
+> Jorge, RogerCC, can I have an Acked-by and/or Tested-by for this patch?
+Tested, this patch is OK,
+Tested-by: RogerCC Lin <rogercc.lin@mediatek.com>
 
-We're talking about plain dumb composite output, so no infoframes,
-setup or anything here :)
-
-> > This means that if we use the only mode the hardware provides (either PAL
-> > or NTSC, or something else), most of the screens will crop the borders of
-> > the image, which is bad.
 > 
-> I think you're trying to apply monitor-type behaviour to TVs...
-
-Yes, kind of. Our users are usually running a desktop distro, and the
-default output on those boards are just plain composite, which means
-running any DE onto a TV.
-
-Note that it's not only about the interface itself, but you'll lose
-content for all pictures displayed. And no one cares about the TV safe
-area anymore these days (starting with the framebuffer console).
-
-> > We can however use somekind of a hack, to instead reduce the mode
-> > exposed to the userspace, and center it in the final image. We
-> > would expose different overscan ratio to be able to deal with most
-> > of the screens, each reducing more the displayable area.
+> > ---
+> > v2: move temporary buffer into struct mtk_ecc instead of having it
+> >     on the stack, as suggested by Boris Brezillon
+> > ---
+> >  drivers/mtd/nand/mtk_ecc.c | 19 +++++++++----------
+> >  1 file changed, 9 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
+> > index d54f666..dbf2562 100644
+> > --- a/drivers/mtd/nand/mtk_ecc.c
+> > +++ b/drivers/mtd/nand/mtk_ecc.c
+> > @@ -86,6 +86,8 @@ struct mtk_ecc {
+> >  	struct completion done;
+> >  	struct mutex lock;
+> >  	u32 sectors;
+> > +
+> > +	u8 eccdata[112];
+> >  };
+> >  
+> >  static inline void mtk_ecc_wait_idle(struct mtk_ecc *ecc,
+> > @@ -366,9 +368,8 @@ int mtk_ecc_encode(struct mtk_ecc *ecc, struct mtk_ecc_config *config,
+> >  		   u8 *data, u32 bytes)
+> >  {
+> >  	dma_addr_t addr;
+> > -	u8 *p;
+> > -	u32 len, i, val;
+> > -	int ret = 0;
+> > +	u32 len;
+> > +	int ret;
+> >  
+> >  	addr = dma_map_single(ecc->dev, data, bytes, DMA_TO_DEVICE);
+> >  	ret = dma_mapping_error(ecc->dev, addr);
+> > @@ -393,14 +394,12 @@ int mtk_ecc_encode(struct mtk_ecc *ecc, struct mtk_ecc_config *config,
+> >  
+> >  	/* Program ECC bytes to OOB: per sector oob = FDM + ECC + SPARE */
+> >  	len = (config->strength * ECC_PARITY_BITS + 7) >> 3;
+> > -	p = data + bytes;
+> >  
+> > -	/* write the parity bytes generated by the ECC back to the OOB region */
+> > -	for (i = 0; i < len; i++) {
+> > -		if ((i % 4) == 0)
+> > -			val = readl(ecc->regs + ECC_ENCPAR(i / 4));
+> > -		p[i] = (val >> ((i % 4) * 8)) & 0xff;
+> > -	}
+> > +	/* write the parity bytes generated by the ECC back to temp buffer */
+> > +	__ioread32_copy(ecc->eccdata, ecc->regs + ECC_ENCPAR(0), round_up(len, 4));
+> > +
+> > +	/* copy into possibly unaligned OOB region with actual length */
+> > +	memcpy(data + bytes, ecc->eccdata, len);
+> >  timeout:
+> >  
+> >  	dma_unmap_single(ecc->dev, addr, bytes, DMA_TO_DEVICE);
 > 
-> I'm not sure we need "a hack".  What if we treated the primary plane just
-> like any other (eg, overlay) plane?  We could then specify (eg) a 1920x1080
-> display mode, but with the primary plane reduced in size, positioned in
-> the centre of the display mode?
-> 
-> I know that there's hardware out there which can do exactly that - Marvell
-> Dove implements this: you set the display size separately from two planes,
-> one graphics plane and one video plane.  Both planes can be positioned
-> anywhere in the displayed size.
-
-This might have been poorly worded on my side, but it's exactly what
-I'm doing in those patches.
-
-> We could then specify at DRM level that a connected device overscans by
-> N%, and have the primary plane adjusted by DRM itself.
-
-I'd agree with you, however, there's a few issues with that I
-think.
-
-The first one is that this overscanning should be reported by the
-connector I guess? but this is really TV specific, so we need one way
-to let the user tell how the image is displayed on its side, and we
-cannot really autodetect it, and this needs to be done at runtime so
-that we can present some shiny interface to let it select which
-overscan ratio works for him/her.
-
-The second one is that we still need to expose the reduced modes to
-userspace, and not only the displayed size, so that the applications
-know what they must draw on. But I guess this could be adjusted by the
-core too.
-
-In order to work consistently, I think all planes should be adjusted
-that way, so that relative coordinates are from the primary plane
-origin, and not the display origin. But that could be adjusted too by
-the core I guess.
-
-The fourth one being the major one. Every time I raised the issue on
-IRC, the answer basically was "we don't care about analog", so I'm a
-bit pessimistic about whether dealing with this in the core would be
-accepted, hence why I chose to deal with this at the driver level.
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161018/64e682e0/attachment.sig>
