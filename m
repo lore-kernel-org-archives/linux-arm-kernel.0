@@ -1,104 +1,81 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 18 Oct 2016 05:46:49 -0500
-Subject: [PATCH V2 3/4] ACPI,PCI,IRQ: separate ISA penalty calculation
-In-Reply-To: <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
-References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
- <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20161018104649.GA13940@localhost>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 18 Oct 2016 12:47:54 +0200
+Subject: [v12, 0/8] Fix eSDHC host version register bug
+In-Reply-To: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+References: <1474441040-11946-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <CAPDyKFoit0sTPpfi2=AHcdZsDwOJxbBX68O-1jBFL=5JN0m6_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-
-On Wed, Jun 29, 2016 at 04:27:37AM -0400, Sinan Kaya wrote:
-> Since commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> the penalty values are calculated on the fly rather than boot time.
-> 
-> This works fine for PCI interrupts but not so well for the ISA interrupts.
-> Whether an ISA interrupt is in use or not information is not available
-> inside the pci_link.c file. This information gets sent externally via
-> acpi_penalize_isa_irq function. If active is true, then the IRQ is in use
-> by ISA. Otherwise, IRQ is in use by PCI.
-> 
-> Since the current code relies on PCI Link object for determination of
-> penalties, we are factoring in the PCI penalty twice after
-> acpi_penalize_isa_irq function is called.
-
-I know this patch has already been merged, but I'm confused.
-
-Can you be a little more specific about how we factor in the PCI
-penalty twice?  I think that when we enumerate an enabled link device,
-we call acpi_penalize_isa_irq(x) in this path:
-
-  pnpacpi_allocated_resource
-    pnpacpi_add_irqresource
-      pcibios_penalize_isa_irq
-        acpi_penalize_isa_irq
-          acpi_isa_irq_penalty[x] = PIRQ_PENALTY_ISA_USED
-
-And I see that acpi_irq_penalty_init() also adds in some penalty
-(either "PIRQ_PENALTY_PCI_POSSIBLE / possible_count" or
-PIRQ_PENALTY_PCI_POSSIBLE).  And when we call acpi_irq_get_penalty(x),
-we add in PIRQ_PENALTY_PCI_USING.
-
-It doesn't seem right to me that we're adding both
-PIRQ_PENALTY_ISA_USED and PIRQ_PENALTY_PCI_USING.  Is that the problem
-you're referring to?
-
-> This change is limiting the newly added functionality to just PCI
-> interrupts so that old behavior is still maintained.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/pci_link.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 714ba4d..8c08971 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -496,9 +496,6 @@ static int acpi_irq_get_penalty(int irq)
->  {
->  	int penalty = 0;
->  
-> -	if (irq < ACPI_MAX_ISA_IRQS)
-> -		penalty += acpi_isa_irq_penalty[irq];
-> -
->  	/*
->  	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
->  	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-> @@ -513,6 +510,9 @@ static int acpi_irq_get_penalty(int irq)
->  			penalty += PIRQ_PENALTY_PCI_USING;
->  	}
->  
-> +	if (irq < ACPI_MAX_ISA_IRQS)
-> +		return penalty + acpi_isa_irq_penalty[irq];
-> +
->  	penalty += acpi_irq_pci_sharing_penalty(irq);
->  	return penalty;
-
-I don't understand what's going on here.
-
-acpi_irq_pci_sharing_penalty(X) basically tells us how many link
-devices are already using IRQ X.  This change makes it so we don't
-consider that information if X < ACPI_MAX_ISA_IRQS.
-
-Let's say we have several link devices that are initially disabled,
-e.g.,
-
-  LNKA (IRQs 9 10 11)
-  LNKB (IRQs 9 10 11)
-  LNKC (IRQs 9 10 11)
-
-When we enable these, I think we'll choose the same IRQ for all of
-them because we no longer look@the other links to see how they're
-configured.
-
->  }
-> -- 
-> 1.8.2.1
-> 
+On 21 September 2016 at 08:57, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+> eSDHC controller. To match the SoC version and revision, 10 previous version
+> patchsets had tried many methods but all of them were rejected by reviewers.
+> Such as
+>         - dts compatible method
+>         - syscon method
+>         - ifdef PPC method
+>         - GUTS driver getting SVR method
+> Anrd suggested a soc_device_match method in v10, and this is the only available
+> method left now. This v11 patchset introduces the soc_device_match interface in
+> soc driver.
+>
+> The first six patches of Yangbo are to add the GUTS driver. This is used to
+> register a soc device which contain soc version and revision information.
+> The other two patches introduce the soc_device_match method in soc driver
+> and apply it on esdhc driver to fix this bug.
+>
+> Arnd Bergmann (1):
+>   base: soc: introduce soc_device_match() interface
+>
+> Yangbo Lu (7):
+>   dt: bindings: update Freescale DCFG compatible
+>   ARM64: dts: ls2080a: add device configuration node
+>   dt: bindings: move guts devicetree doc out of powerpc directory
+>   powerpc/fsl: move mpc85xx.h to include/linux/fsl
+>   soc: fsl: add GUTS driver for QorIQ platforms
+>   MAINTAINERS: add entry for Freescale SoC drivers
+>   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+>
+>  Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
+>  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+>  MAINTAINERS                                        |  11 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+>  arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+>  arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
+>  drivers/base/Kconfig                               |   1 +
+>  drivers/base/soc.c                                 |  66 ++++++
+>  drivers/clk/clk-qoriq.c                            |   3 +-
+>  drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+>  drivers/iommu/fsl_pamu.c                           |   3 +-
+>  drivers/mmc/host/Kconfig                           |   1 +
+>  drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+>  drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+>  drivers/soc/Kconfig                                |   2 +-
+>  drivers/soc/fsl/Kconfig                            |  19 ++
+>  drivers/soc/fsl/Makefile                           |   1 +
+>  drivers/soc/fsl/guts.c                             | 257 +++++++++++++++++++++
+>  include/linux/fsl/guts.h                           | 125 ++++++----
+>  .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+>  include/linux/sys_soc.h                            |   3 +
+>  21 files changed, 478 insertions(+), 61 deletions(-)
+>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+>  create mode 100644 drivers/soc/fsl/Kconfig
+>  create mode 100644 drivers/soc/fsl/guts.c
+>  rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.1.0.27.g96db324
+>
+
+This looks good to me! I am not sure which tree you want this to be
+picked up through, but unless no other volunteers I can take it
+through my mmc tree.
+
+Although, before considering to apply, I need an ack from Scott/Arnd
+for the guts driver in patch 5/8 and I need an ack from Greg for patch
+7/8, where the soc_device_match() interface is added (seems like you
+didn't add him on cc/to).
+
+Kind regards
+Uffe
