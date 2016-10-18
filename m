@@ -1,157 +1,316 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 18 Oct 2016 17:47:22 +0200
-Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
-In-Reply-To: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
-References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <c8a1898e-e60f-b25a-f4d2-7384f04b6f3f@siemens.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 18 Oct 2016 18:46:04 +0300
+Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support to
+ clockdomains
+In-Reply-To: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1476805568-19264-12-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-18 17:07, Peter Griffin wrote:
-> lx-fdtdump dumps the flatenned device tree passed to the kernel
-> from the bootloader to a file called fdtdump.dtb to allow further
-> post processing on the machine running GDB. The fdt header is also
-> also printed in the GDB console. For example:
-> 
-> (gdb) lx-fdtdump
-> fdt_magic:         0xD00DFEED
-> fdt_totalsize:     0xC108
-> off_dt_struct:     0x38
-> off_dt_strings:    0x3804
-> off_mem_rsvmap:    0x28
-> version:           17
-> last_comp_version: 16
-> Dumped fdt to fdtdump.dtb
-> 
->> fdtdump fdtdump.dtb | less
-> 
-> This command is useful as the bootloader can often re-write parts
-> of the device tree, and this can sometimes cause the kernel to not
-> boot.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  scripts/gdb/linux/constants.py.in |  8 +++++
->  scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 77 insertions(+), 1 deletion(-)
-> 
-> diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
-> index 7986f4e..43c6241 100644
-> --- a/scripts/gdb/linux/constants.py.in
-> +++ b/scripts/gdb/linux/constants.py.in
-> @@ -14,6 +14,7 @@
->  
->  #include <linux/fs.h>
->  #include <linux/mount.h>
-> +#include <linux/of_fdt.h>
->  
->  /* We need to stringify expanded macros so that they can be parsed */
->  
-> @@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
->  LX_VALUE(MNT_NOATIME)
->  LX_VALUE(MNT_NODIRATIME)
->  LX_VALUE(MNT_RELATIME)
-> +
-> +/* linux/of_fdt.h> */
-> +LX_VALUE(OF_DT_HEADER)
-> +
-> +/* Kernel Configs */
-> +LX_CONFIG(CONFIG_OF)
-> +
-> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
-> index 38b1f09..f20fcfa 100644
-> --- a/scripts/gdb/linux/proc.py
-> +++ b/scripts/gdb/linux/proc.py
-> @@ -16,7 +16,7 @@ from linux import constants
->  from linux import utils
->  from linux import tasks
->  from linux import lists
-> -
-> +from struct import *
->  
->  class LxCmdLine(gdb.Command):
->      """ Report the Linux Commandline used in the current kernel.
-> @@ -195,3 +195,71 @@ values of that process namespace"""
->                          info_opts(MNT_INFO, m_flags)))
->  
->  LxMounts()
-> +
-> +class LxFdtDump(gdb.Command):
-> +    """Output Flattened Device Tree header and dump FDT blob to a file
-> +       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
-> +
-> +    def __init__(self):
-> +        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
-> +
-> +    def fdthdr_to_cpu(self, fdt_header):
-> +
-> +            fdt_header_be = ">IIIIIII"
-> +            fdt_header_le = "<IIIIIII"
-> +
-> +            if utils.get_target_endianness() == 1:
-> +                output_fmt = fdt_header_le
-> +            else:
-> +                output_fmt = fdt_header_be
-> +
-> +            return unpack(output_fmt, pack(fdt_header_be,
-> +                                           fdt_header['magic'],
-> +                                           fdt_header['totalsize'],
-> +                                           fdt_header['off_dt_struct'],
-> +                                           fdt_header['off_dt_strings'],
-> +                                           fdt_header['off_mem_rsvmap'],
-> +                                           fdt_header['version'],
-> +                                           fdt_header['last_comp_version']))
-> +
-> +    def invoke(self, arg, from_tty):
-> +
-> +        if constants.LX_CONFIG_OF:
-> +
-> +            filename = "fdtdump.dtb"
+Clockdomains can now be used as clock providers in the system. This
+patch initializes the provider data during init, and parses the clocks
+while they are being registered. An xlate function for the provider
+is also given.
 
-Why not specifying the file name as argument? Safer than silently
-overwriting potentially pre-existing files or failing without
-alternatives if the current directory is not writable.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ .../devicetree/bindings/arm/omap/prcm.txt          |  13 ++
+ .../devicetree/bindings/clock/ti/clockdomain.txt   |  12 +-
+ arch/arm/mach-omap2/io.c                           |   2 +
+ drivers/clk/ti/clock.h                             |   1 +
+ drivers/clk/ti/clockdomain.c                       | 147 +++++++++++++++++++++
+ include/linux/clk/ti.h                             |   3 +
+ 6 files changed, 177 insertions(+), 1 deletion(-)
 
-> +
-> +            py_fdt_header_ptr = gdb.parse_and_eval(
-> +                "(const struct fdt_header *) initial_boot_params")
-> +            py_fdt_header = py_fdt_header_ptr.dereference()
-> +
-> +            fdt_header = self.fdthdr_to_cpu(py_fdt_header)
-> +
-> +            if fdt_header[0] != constants.LX_OF_DT_HEADER:
-> +                raise gdb.GdbError("No flattened device tree magic found\n")
-> +
-> +            gdb.write("fdt_magic:         0x{:02X}\n".format(fdt_header[0]))
-> +            gdb.write("fdt_totalsize:     0x{:02X}\n".format(fdt_header[1]))
-> +            gdb.write("off_dt_struct:     0x{:02X}\n".format(fdt_header[2]))
-> +            gdb.write("off_dt_strings:    0x{:02X}\n".format(fdt_header[3]))
-> +            gdb.write("off_mem_rsvmap:    0x{:02X}\n".format(fdt_header[4]))
-> +            gdb.write("version:           {}\n".format(fdt_header[5]))
-> +            gdb.write("last_comp_version: {}\n".format(fdt_header[6]))
-> +
-> +            inf = gdb.inferiors()[0]
-> +            fdt_buf = utils.read_memoryview(inf, py_fdt_header_ptr,
-> +                                            fdt_header[1]).tobytes()
-> +
-> +            try:
-> +                f = open(filename, 'wb')
-> +            except:
-> +                raise gdb.GdbError("Could not open file to dump fdt")
-> +
-> +            f.write(fdt_buf)
-> +            f.close()
-> +
-> +            gdb.write("Dumped fdt to " + filename + "\n")
-> +
-> +        else:
-> +            gdb.write("Kernel not compiled with CONFIG_OF\n")
-> +
-> +LxFdtDump()
-> 
-
-Jan
-
+diff --git a/Documentation/devicetree/bindings/arm/omap/prcm.txt b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+index 3eb6d7a..301f576 100644
+--- a/Documentation/devicetree/bindings/arm/omap/prcm.txt
++++ b/Documentation/devicetree/bindings/arm/omap/prcm.txt
+@@ -47,6 +47,19 @@ cm: cm at 48004000 {
+ 	};
+ }
+ 
++cm2: cm2 at 8000 {
++	compatible = "ti,omap4-cm2";
++	reg = <0x8000 0x3000>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 0x8000 0x3000>;
++
++	l4_per_clkdm: l4_per_clkdm {
++		compatible = "ti,clockdomain";
++		reg = <0x1400 0x200>;
++	};
++};
++
+ &cm_clocks {
+ 	omap2_32k_fck: omap_32k_fck {
+ 		#clock-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/clock/ti/clockdomain.txt b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+index cb76b3f..5d8ca61 100644
+--- a/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
++++ b/Documentation/devicetree/bindings/clock/ti/clockdomain.txt
+@@ -14,11 +14,21 @@ hardware hierarchy.
+ 
+ Required properties:
+ - compatible : shall be "ti,clockdomain"
+-- #clock-cells : from common clock binding; shall be set to 0.
++- #clock-cells : from common clock binding; shall be set to 1 if this
++		 clockdomain acts as a clock provider.
++
++Optional properties:
+ - clocks : link phandles of clocks within this domain
++- reg : address for the clockdomain
+ 
+ Examples:
+ 	dss_clkdm: dss_clkdm {
+ 		compatible = "ti,clockdomain";
+ 		clocks = <&dss1_alwon_fck_3430es2>, <&dss_ick_3430es2>;
+ 	};
++
++	l4_per_clkdm: l4_per_clkdm {
++		compatible = "ti,clockdomain";
++		#clock-cells = <1>;
++		reg = <0x1400 0x200>;
++	};
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 0e9acdd..c1a5cfb 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -794,6 +794,8 @@ int __init omap_clk_init(void)
+ 		if (ret)
+ 			return ret;
+ 
++		ti_dt_clockdomains_early_setup();
++
+ 		of_clk_init(NULL);
+ 
+ 		ti_dt_clk_init_retry_clks();
+diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
+index 9b8a5f2..f6383ab 100644
+--- a/drivers/clk/ti/clock.h
++++ b/drivers/clk/ti/clock.h
+@@ -205,6 +205,7 @@ struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
+ 
+ int ti_clk_get_memmap_index(struct device_node *node);
+ void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
++void __iomem *ti_clk_get_reg_addr_clkdm(const char *clkdm_name, u16 offset);
+ void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+ int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
+ 		      ti_of_clk_init_cb_t func);
+diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
+index 704157d..7b0a6c3 100644
+--- a/drivers/clk/ti/clockdomain.c
++++ b/drivers/clk/ti/clockdomain.c
+@@ -28,6 +28,23 @@
+ #define pr_fmt(fmt) "%s: " fmt, __func__
+ 
+ /**
++ * struct ti_clkdm - TI clockdomain data structure
++ * @name: name of the clockdomain
++ * @index: index of the clk_iomap struct for this clkdm
++ * @offset: clockdomain offset from the beginning of the iomap
++ * @link: link to the list
++ */
++struct ti_clkdm {
++	const char *name;
++	int index;
++	u32 offset;
++	struct list_head link;
++	struct list_head clocks;
++};
++
++static LIST_HEAD(clkdms);
++
++/**
+  * omap2_clkops_enable_clkdm - increment usecount on clkdm of @hw
+  * @hw: struct clk_hw * of the clock being enabled
+  *
+@@ -116,6 +133,8 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	struct clockdomain *clkdm;
+ 	const char *clk_name;
++	struct ti_clkdm *ti_clkdm;
++	bool match = false;
+ 
+ 	if (!clk->clkdm_name)
+ 		return;
+@@ -130,7 +149,21 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
+ 	} else {
+ 		pr_debug("clock: could not associate clk %s to clkdm %s\n",
+ 			 clk_name, clk->clkdm_name);
++		return;
+ 	}
++
++	list_for_each_entry(ti_clkdm, &clkdms, link) {
++		if (!strcmp(ti_clkdm->name, clk->clkdm_name)) {
++			match = true;
++			break;
++		}
++	}
++
++	if (!match)
++		return;
++
++	/* Add clock to the list of provided clocks */
++	list_add(&clk->clkdm_link, &ti_clkdm->clocks);
+ }
+ 
+ static void __init of_ti_clockdomain_setup(struct device_node *node)
+@@ -161,11 +194,125 @@ static void __init of_ti_clockdomain_setup(struct device_node *node)
+ 	}
+ }
+ 
++static struct clk_hw *clkdm_clk_xlate(struct of_phandle_args *clkspec,
++				      void *data)
++{
++	struct ti_clkdm *clkdm = data;
++	struct clk_hw_omap *clk;
++	u16 offset = clkspec->args[0];
++
++	list_for_each_entry(clk, &clkdm->clocks, clkdm_link)
++		if (((u32)clk->enable_reg & 0xffff) - clkdm->offset == offset)
++			return &clk->hw;
++
++	return ERR_PTR(-EINVAL);
++}
++
++static int ti_clk_register_clkdm(struct device_node *node)
++{
++	u64 clkdm_addr;
++	u64 inst_addr;
++	const __be32 *reg;
++	u32 offset;
++	int idx;
++	struct ti_clkdm *clkdm;
++	int ret;
++
++	reg = of_get_address(node, 0, NULL, NULL);
++	if (!reg)
++		return -ENOENT;
++
++	clkdm_addr = of_translate_address(node, reg);
++
++	reg = of_get_address(node->parent, 0, NULL, NULL);
++	if (!reg)
++		return -EINVAL;
++
++	inst_addr = of_translate_address(node->parent, reg);
++
++	offset = clkdm_addr - inst_addr;
++
++	idx = ti_clk_get_memmap_index(node->parent);
++
++	if (idx < 0) {
++		pr_err("bad memmap index for %s\n", node->name);
++		return idx;
++	}
++
++	clkdm = kzalloc(sizeof(*clkdm), GFP_KERNEL);
++	if (!clkdm)
++		return -ENOMEM;
++
++	clkdm->name = node->name;
++	clkdm->index = idx;
++	clkdm->offset = offset;
++
++	INIT_LIST_HEAD(&clkdm->clocks);
++
++	list_add(&clkdm->link, &clkdms);
++
++	ret = of_clk_add_hw_provider(node, clkdm_clk_xlate, clkdm);
++	if (ret) {
++		list_del(&clkdm->link);
++		kfree(clkdm);
++		return ret;
++	}
++
++	return 0;
++}
++
++/**
++ * ti_clk_get_reg_addr_clkdm - get register address relative to clockdomain
++ * @clkdm_name: parent clockdomain
++ * @offset: offset from the clockdomain
++ *
++ * Gets a register address relative to parent clockdomain. Searches the
++ * list of available clockdomain, and if match is found, calculates the
++ * register address from the iomap relative to the clockdomain.
++ * Returns the register address, or NULL if not found.
++ */
++void __iomem *ti_clk_get_reg_addr_clkdm(const char *clkdm_name, u16 offset)
++{
++	u32 reg;
++	struct clk_omap_reg *reg_setup;
++	struct ti_clkdm *clkdm;
++	bool match = false;
++
++	reg_setup = (struct clk_omap_reg *)&reg;
++
++	/* XXX: get offset from clkdm, get base for instance */
++	list_for_each_entry(clkdm, &clkdms, link) {
++		if (!strcmp(clkdm->name, clkdm_name)) {
++			match = true;
++			break;
++		}
++	}
++
++	if (!match) {
++		pr_err("%s: no entry for %s\n", __func__, clkdm_name);
++		return NULL;
++	}
++
++	reg_setup->offset = clkdm->offset + offset;
++	reg_setup->index = clkdm->index;
++
++	return (void __iomem *)reg;
++}
++
+ static const struct of_device_id ti_clkdm_match_table[] __initconst = {
+ 	{ .compatible = "ti,clockdomain" },
+ 	{ }
+ };
+ 
++void __init ti_dt_clockdomains_early_setup(void)
++{
++	struct device_node *np;
++
++	for_each_matching_node(np, ti_clkdm_match_table) {
++		ti_clk_register_clkdm(np);
++	}
++}
++
+ /**
+  * ti_dt_clockdomains_setup - setup device tree clockdomains
+  *
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 626ae94..afccb48 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -125,6 +125,7 @@ struct clk_hw_omap_ops {
+ /**
+  * struct clk_hw_omap - OMAP struct clk
+  * @node: list_head connecting this clock into the full clock list
++ * @clkdm_link: list_head connecting this clock into the clockdomain
+  * @enable_reg: register to write to enable the clock (see @enable_bit)
+  * @enable_bit: bitshift to write to enable/disable the clock (see @enable_reg)
+  * @flags: see "struct clk.flags possibilities" above
+@@ -137,6 +138,7 @@ struct clk_hw_omap_ops {
+ struct clk_hw_omap {
+ 	struct clk_hw		hw;
+ 	struct list_head	node;
++	struct list_head	clkdm_link;
+ 	unsigned long		fixed_rate;
+ 	u8			fixed_div;
+ 	void __iomem		*enable_reg;
+@@ -251,6 +253,7 @@ int omap2_reprogram_dpllcore(struct clk_hw *clk, unsigned long rate,
+ unsigned long omap2_get_dpll_rate(struct clk_hw_omap *clk);
+ 
+ void ti_dt_clk_init_retry_clks(void);
++void ti_dt_clockdomains_early_setup(void);
+ void ti_dt_clockdomains_setup(void);
+ int ti_clk_setup_ll_ops(struct ti_clk_ll_ops *ops);
+ 
 -- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
+1.9.1
