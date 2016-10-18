@@ -1,36 +1,32 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 18 Oct 2016 09:56:01 +0200
-Subject: [PATCH 08/19] thermal: sti: Remove obsolete platforms from the DT
- doc.
-In-Reply-To: <20160923150815.GD9176@rob-hp-laptop>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-9-git-send-email-peter.griffin@linaro.org>
- <20160923150815.GD9176@rob-hp-laptop>
-Message-ID: <cf070457-4bd5-46e1-ff91-7dab047ade55@st.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 18 Oct 2016 10:57:57 +0300
+Subject: [PATCH 0/7] ARM: AMx3xx/DRA7: crypto IP support data
+In-Reply-To: <1476777018-526-1-git-send-email-t-kristo@ti.com>
+References: <1476777018-526-1-git-send-email-t-kristo@ti.com>
+Message-ID: <755f47fc-0522-5d9b-eb36-168e3033cf5d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 18/10/16 10:50, Tero Kristo wrote:
+> Hi,
+>
+> This series finalizes the crypto support for amx3xx / dra7 socs,
+> adding the hwmod data and fixing one issue with l4sec clockdomain
+> on dra7.
+>
+> Branch against 4.9-rc1 available here:
+> tree: https://github.com/t-kristo/linux-pm.git
+> branch: 4.9-rc1-crypto-data
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
 
-On 09/23/2016 05:08 PM, Rob Herring wrote:
-> On Wed, Sep 14, 2016 at 02:27:46PM +0100, Peter Griffin wrote:
->> STiH415/6 SoC's are being removed from the kernel. This
->> patch removes the compatibles from the dt doc and also
->> updates the example to a supported platform.
->>
->> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> Cc: <rui.zhang@intel.com>
->> Cc: <edubezval@gmail.com>
->> Cc: <robh+dt@kernel.org>
->> ---
->>  .../devicetree/bindings/thermal/st-thermal.txt     | 28 +++++++---------------
->>  1 file changed, 9 insertions(+), 19 deletions(-)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Argh, sorry about the spam. Had trouble with suppress-cc options as Joel 
+Fernandez has left TI a while back and was getting bounces.
 
-
-Applied on sti-dt-for-4.10 branch
-
-Thanks 
-
-> 
+-Tero
