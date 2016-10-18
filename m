@@ -1,67 +1,58 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 18 Oct 2016 08:32:44 -0700
-Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
- interrupts
-In-Reply-To: <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
-References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
- <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
- <20161018135912.GD18903@localhost>
- <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
-Message-ID: <0a82f2ef-b072-d847-104a-320cf804ebd5@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 18 Oct 2016 17:35:39 +0200
+Subject: [PATCH v2 1/4] cpufreq: pxa: use generic platdev driver for
+ device-tree
+In-Reply-To: <20161018113835.GB11471@vireshk-i7> (Viresh Kumar's message of
+ "Tue, 18 Oct 2016 17:08:35 +0530")
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-2-git-send-email-robert.jarzmik@free.fr>
+ <20161018113835.GB11471@vireshk-i7>
+Message-ID: <87r37d4qlw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I think I didn't have enough morning coffee.
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-Looking at these again and trying to be specific.
-
-On 10/18/2016 8:20 AM, Sinan Kaya wrote:
-> It seems wrong to me that we call acpi_irq_get_penalty() from
->> acpi_irq_penalty_update() and acpi_penalize_isa_irq().  It seems like they
->> should just manipulate acpi_isa_irq_penalty[irq] directly.
+> On 15-10-16, 21:57, Robert Jarzmik wrote:
+>> For device-tree based pxa25x and pxa27x platforms, cpufreq-dt driver is
+>> doing the job as well as pxa2xx-cpufreq, so add these platforms to the
+>> compatibility list.
 >> 
->> acpi_irq_penalty_update() is for command-line parameters, so it certainly
->> doesn't need the acpi_irq_pci_sharing_penalty() information (the
->> acpi_link_list should be empty at the time we process the command-line
->> parameters).
-
-Calling acpi_irq_get_penalty for ISA IRQ is OK as long as it doesn't have
-any dynamic IRQ calculation such that acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty.
-
-If this is broken, then we need special care so that we don't assign
-dynamically calcualted sci_penalty back to acpi_isa_irq_penalty[irq]. This
-results in returning incorrect penalty as
-
-acpi_irq_get_penalty = acpi_isa_irq_original_penalty[irq] + 2 * sci_penalty.
-
-Now that we added sci_penalty into the acpi_irq_get_penalty function,
-calling acpi_irq_get_penalty is not correct anymore. This line here needs to
-be replaced with acpi_isa_irq_penalty[irq] as you suggested.
-
-                if (used)
-                        new_penalty = acpi_irq_get_penalty(irq) +
-                                        PIRQ_PENALTY_ISA_USED;
-                else
-                        new_penalty = 0;
-
-                acpi_isa_irq_penalty[irq] = new_penalty;
-
-
+>> This won't work for legacy non device-tree platforms where
+>> pxa2xx-cpufreq is still required.
 >> 
->> acpi_penalize_isa_irq() is telling us that a PNP or ACPI device is using
->> the IRQ -- this should modify the IRQ's penalty, but it shouldn't depend on
->> the acpi_irq_pci_sharing_penalty() value at all.
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>>  drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+>>  1 file changed, 2 insertions(+)
 >> 
+>> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+>> index 0bb44d5b5df4..356825b5c9b8 100644
+>> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+>> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+>> @@ -32,6 +32,8 @@ static const struct of_device_id machines[] __initconst = {
+>>  	{ .compatible = "fsl,imx7d", },
+>>  
+>>  	{ .compatible = "marvell,berlin", },
+>> +	{ .compatible = "marvell,pxa250", },
+>> +	{ .compatible = "marvell,pxa270", },
+>>  
+>>  	{ .compatible = "samsung,exynos3250", },
+>>  	{ .compatible = "samsung,exynos4210", },
+>
+> Isn't there a race between cpufreq-dt and the platform driver to
+> register first ?
+Ah, could you be more specific about the race you're talking of ?
 
-Same problem here. This line will be broken after the sci_penalty change.
+My understanding was that cpufreq-dt-platdev does create the device, and
+cpufreq-dt is a driver for it, so there is no race but a direct relationship
+AFAIU.
 
-                acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-                  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+> Also, it seems that atleast the next two patches are required before
+> applying this? You need to fix the order if that is the case.
+Ok, as you wish, let it become number 3 and (2, 3) become (1, 2).
 
-
-
+Cheers.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Robert
