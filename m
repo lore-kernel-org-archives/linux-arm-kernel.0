@@ -1,124 +1,142 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 18 Oct 2016 18:45:57 +0300
-Subject: [PATCHv4 04/15] clk: ti: add support for automatic clock alias
- generation
+Date: Tue, 18 Oct 2016 18:45:56 +0300
+Subject: [PATCHv4 03/15] dt-bindings: clock: add omap4 hwmod clock IDs
 In-Reply-To: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
 References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1476805568-19264-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1476805568-19264-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Large portions of the OMAP framework still depend on the support of
-having clock aliases in place, so add support functions for generating
-these automatically.
+Add IDs for omap4 hwmod clocks. These are basically register offsets
+from the beginning of the clockdomain address space.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk.c   | 64 ++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/ti/clock.h |  5 ++++
- 2 files changed, 69 insertions(+)
+ include/dt-bindings/clock/ti,omap44xx.h | 116 ++++++++++++++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+ create mode 100644 include/dt-bindings/clock/ti,omap44xx.h
 
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index 5fcf247..91bad55 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -24,6 +24,7 @@
- #include <linux/list.h>
- #include <linux/regmap.h>
- #include <linux/bootmem.h>
-+#include <linux/device.h>
- 
- #include "clock.h"
- 
-@@ -453,3 +454,66 @@ void omap2_clk_enable_init_clocks(const char **clk_names, u8 num_clocks)
- 		clk_prepare_enable(init_clk);
- 	}
- }
-+
-+/**
-+ * ti_clk_add_alias - add a clock alias for a TI clock
-+ * @dev: device alias for this clock
-+ * @clk: clock handle to create alias for
-+ * @con: connection ID for this clock
+diff --git a/include/dt-bindings/clock/ti,omap44xx.h b/include/dt-bindings/clock/ti,omap44xx.h
+new file mode 100644
+index 0000000..38af57d
+--- /dev/null
++++ b/include/dt-bindings/clock/ti,omap44xx.h
+@@ -0,0 +1,116 @@
++/*
++ * TI OMAP4 SoC clock definitions
 + *
-+ * Creates a clock alias for a TI clock. Allocates the clock lookup entry
-+ * and assigns the data to it. Returns 0 if successful, negative error
-+ * value otherwise.
-+ */
-+int ti_clk_add_alias(struct device *dev, struct clk *clk, const char *con)
-+{
-+	struct clk_lookup *cl;
-+
-+	if (!clk)
-+		return 0;
-+
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	cl = kzalloc(sizeof(*cl), GFP_KERNEL);
-+	if (!cl)
-+		return -ENOMEM;
-+
-+	if (dev)
-+		cl->dev_id = dev_name(dev);
-+	cl->con_id = con;
-+	cl->clk = clk;
-+
-+	clkdev_add(cl);
-+
-+	return 0;
-+}
-+
-+/**
-+ * ti_clk_register - register a TI clock to the common clock framework
-+ * @dev: device for this clock
-+ * @hw: hardware clock handle
-+ * @con: connection ID for this clock
++ * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
 + *
-+ * Registers a TI clock to the common clock framework, and adds a clock
-+ * alias for it. Returns a handle to the registered clock if successful,
-+ * ERR_PTR value in failure.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
-+			    const char *con)
-+{
-+	struct clk *clk;
-+	int ret;
 +
-+	clk = clk_register(dev, hw);
-+	if (IS_ERR(clk))
-+		return clk;
++#ifndef __DT_BINDINGS_CLOCK_TI_OMAP4_H__
++#define __DT_BINDINGS_CLOCK_TI_OMAP4_H__
 +
-+	ret = ti_clk_add_alias(dev, clk, con);
-+	if (ret) {
-+		clk_unregister(clk);
-+		return ERR_PTR(ret);
-+	}
++#define OMAP44XX_MPUSS_MPU 0x20
++#define OMAP44XX_TESLA_DSP 0x20
++#define OMAP44XX_TESLA_MMU_DSP 0x20
++#define OMAP44XX_ABE_L4_ABE 0x20
++#define OMAP44XX_ABE_AESS 0x28
++#define OMAP44XX_ABE_MCPDM 0x30
++#define OMAP44XX_ABE_DMIC 0x38
++#define OMAP44XX_ABE_MCASP 0x40
++#define OMAP44XX_ABE_MCBSP1 0x48
++#define OMAP44XX_ABE_MCBSP2 0x50
++#define OMAP44XX_ABE_MCBSP3 0x58
++#define OMAP44XX_ABE_SLIMBUS1 0x60
++#define OMAP44XX_ABE_TIMER5 0x68
++#define OMAP44XX_ABE_TIMER6 0x70
++#define OMAP44XX_ABE_TIMER7 0x78
++#define OMAP44XX_ABE_TIMER8 0x80
++#define OMAP44XX_ABE_WD_TIMER3 0x88
++#define OMAP44XX_L4_WKUP_L4_WKUP 0x20
++#define OMAP44XX_L4_WKUP_WD_TIMER2 0x30
++#define OMAP44XX_L4_WKUP_GPIO1 0x38
++#define OMAP44XX_L4_WKUP_TIMER1 0x40
++#define OMAP44XX_L4_WKUP_COUNTER_32K 0x50
++#define OMAP44XX_L4_WKUP_KBD 0x78
++#define OMAP44XX_EMU_SYS_DEBUGSS 0x20
++#define OMAP44XX_L3_DSS_DSS_CORE 0x20
++#define OMAP44XX_L3_DSS_DSS_RFBI 0x20
++#define OMAP44XX_L3_DSS_DSS_HDMI 0x20
++#define OMAP44XX_L3_DSS_DSS_DSI2 0x20
++#define OMAP44XX_L3_DSS_DSS_VENC 0x20
++#define OMAP44XX_L3_DSS_DSS_DISPC 0x20
++#define OMAP44XX_L3_DSS_DSS_DSI1 0x20
++#define OMAP44XX_ISS_FDIF 0x28
++#define OMAP44XX_L4_PER_GPIO2 0x60
++#define OMAP44XX_L4_PER_GPIO3 0x68
++#define OMAP44XX_L4_PER_GPIO4 0x70
++#define OMAP44XX_L4_PER_GPIO5 0x78
++#define OMAP44XX_L4_PER_GPIO6 0x80
++#define OMAP44XX_L4_PER_HDQ1W 0x88
++#define OMAP44XX_L4_PER_I2C1 0xa0
++#define OMAP44XX_L4_PER_I2C2 0xa8
++#define OMAP44XX_L4_PER_I2C3 0xb0
++#define OMAP44XX_L4_PER_I2C4 0xb8
++#define OMAP44XX_L4_PER_L4_PER 0xc0
++#define OMAP44XX_L3_GFX_GPU 0x20
++#define OMAP44XX_L3_INIT_HSI 0x38
++#define OMAP44XX_ISS_ISS 0x20
++#define OMAP44XX_L4_PER_MCBSP4 0xe0
++#define OMAP44XX_L4_PER_MCSPI1 0xf0
++#define OMAP44XX_L4_PER_MCSPI2 0xf8
++#define OMAP44XX_L4_PER_MCSPI3 0x100
++#define OMAP44XX_L4_PER_MCSPI4 0x108
++#define OMAP44XX_L4_PER_MMC3 0x120
++#define OMAP44XX_L4_PER_MMC4 0x128
++#define OMAP44XX_L3_INIT_MMC1 0x28
++#define OMAP44XX_L3_INIT_MMC2 0x30
++#define OMAP44XX_L3_INIT_OCP2SCP_USB_PHY 0xe0
++#define OMAP44XX_L4_PER_TIMER10 0x28
++#define OMAP44XX_L4_PER_TIMER11 0x30
++#define OMAP44XX_L4_PER_TIMER2 0x38
++#define OMAP44XX_L4_PER_TIMER3 0x40
++#define OMAP44XX_L4_PER_TIMER4 0x48
++#define OMAP44XX_L4_PER_TIMER9 0x50
++#define OMAP44XX_L4_PER_ELM 0x58
++#define OMAP44XX_L4_PER_SLIMBUS2 0x138
++#define OMAP44XX_L4_PER_UART1 0x140
++#define OMAP44XX_L4_PER_UART2 0x148
++#define OMAP44XX_L4_PER_UART3 0x150
++#define OMAP44XX_L4_PER_UART4 0x158
++#define OMAP44XX_L4_PER_MMC5 0x160
++#define OMAP44XX_L4_AO_SMARTREFLEX_CORE 0x38
++#define OMAP44XX_L4_AO_SMARTREFLEX_IVA 0x30
++#define OMAP44XX_L4_AO_SMARTREFLEX_MPU 0x28
++#define OMAP44XX_L3_INIT_USB_HOST_FS 0xd0
++#define OMAP44XX_L3_INIT_USB_HOST_HS 0x58
++#define OMAP44XX_L3_INIT_USB_OTG_HS 0x60
++#define OMAP44XX_L3_1_L3_MAIN_1 0x20
++#define OMAP44XX_L3_2_L3_MAIN_2 0x20
++#define OMAP44XX_L3_2_GPMC 0x28
++#define OMAP44XX_L3_2_OCMC_RAM 0x30
++#define OMAP44XX_DUCATI_IPU 0x20
++#define OMAP44XX_DUCATI_MMU_IPU 0x20
++#define OMAP44XX_L3_DMA_DMA_SYSTEM 0x20
++#define OMAP44XX_L3_EMIF_DMM 0x20
++#define OMAP44XX_L3_EMIF_EMIF1 0x30
++#define OMAP44XX_L3_EMIF_EMIF2 0x38
++#define OMAP44XX_D2D_C2C 0x20
++#define OMAP44XX_L4_CFG_L4_CFG 0x20
++#define OMAP44XX_L4_CFG_SPINLOCK 0x28
++#define OMAP44XX_L4_CFG_MAILBOX 0x30
++#define OMAP44XX_L3_INSTR_L3_MAIN_3 0x20
++#define OMAP44XX_L3_INSTR_L3_INSTR 0x28
++#define OMAP44XX_L3_INSTR_OCP_WP_NOC 0x40
++#define OMAP44XX_IVAHD_IVA 0x20
++#define OMAP44XX_IVAHD_SL2IF 0x28
++#define OMAP44XX_L3_INIT_USB_TLL_HS 0x68
 +
-+	return clk;
-+}
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 7eca8a1..6bf962d 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -16,6 +16,8 @@
- #ifndef __DRIVERS_CLK_TI_CLOCK__
- #define __DRIVERS_CLK_TI_CLOCK__
- 
-+#include <linux/clkdev.h>
-+
- enum {
- 	TI_CLK_FIXED,
- 	TI_CLK_MUX,
-@@ -189,6 +191,9 @@ struct ti_dt_clk {
- struct clk *ti_clk_register_divider(struct ti_clk *setup);
- struct clk *ti_clk_register_composite(struct ti_clk *setup);
- struct clk *ti_clk_register_dpll(struct ti_clk *setup);
-+struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
-+			    const char *con);
-+int ti_clk_add_alias(struct device *dev, struct clk *clk, const char *con);
- 
- struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup);
- struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup);
++#endif
 -- 
 1.9.1
