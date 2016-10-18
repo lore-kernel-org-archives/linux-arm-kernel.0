@@ -1,18 +1,29 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 18 Oct 2016 10:50:11 +0300
-Subject: [PATCH 0/7] ARM: AMx3xx/DRA7: crypto IP support data
-Message-ID: <1476777018-526-1-git-send-email-t-kristo@ti.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 18 Oct 2016 09:50:44 +0200
+Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6
+ as parent
+In-Reply-To: <20161018054209.24546-1-wens@csie.org>
+References: <20161018054209.24546-1-wens@csie.org>
+Message-ID: <20161018095044.d1664c4935ad13007453fb35@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 18 Oct 2016 13:42:09 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-This series finalizes the crypto support for amx3xx / dra7 socs,
-adding the hwmod data and fixing one issue with l4sec clockdomain
-on dra7.
+> On the A31, the DMA engine only works if AHB1 is clocked from PLL6.
+> In addition, the hstimer is clocked from AHB1, and if AHB1 is clocked
+> from the CPU clock, and cpufreq is working, we get an unstable timer.
+> 
+> Force the AHB1 clock to use PLL6 as its parent. Previously this was done
+> in the device tree with the assigned-clocks and assigned-clocks-parent
+> bindings. However with this new monolithic driver, the system critical
+> clocks aren't exported through the device tree. The alternative is to
+> force this setting in the driver before the clocks are registered.
 
-Branch against 4.9-rc1 available here:
-tree: https://github.com/t-kristo/linux-pm.git
-branch: 4.9-rc1-crypto-data
+It should be simpler to export the constant (CLK_AHB1) instead of
+adding code...
 
--Tero
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
