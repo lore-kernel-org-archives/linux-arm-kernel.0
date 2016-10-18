@@ -1,46 +1,87 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 18 Oct 2016 13:51:39 -0700
-Subject: [PATCH v5 00/23] Support qcom's HSIC USB and rewrite USB2 HS
- support
-In-Reply-To: <20161018093139.GB6294@b29397-desktop>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018093139.GB6294@b29397-desktop>
-Message-ID: <147682389932.20076.4186408979552866325@sboyd-linaro>
+Date: Tue, 18 Oct 2016 13:57:19 -0700
+Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a provider
+Message-ID: <20161018205719.20575-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-10-18 02:31:40)
-> On Mon, Oct 17, 2016 at 06:56:13PM -0700, Stephen Boyd wrote:
-> > I've also sent separate patches for other minor pieces to make this
-> > all work. The full tree can be found here[2], hacks and all to get
-> > things working. I've tested this on the db410c, apq8074 dragonboard,
-> > and ifc6410 with configfs gadgets and otg cables.
-> > 
-> > Patches based on v4.8-rc1
+These GPU drivers only depend on the RESET_CONTROLLER config
+option to fix build issues that existed when there weren't stub
+reset APIs for reset controller consumers. Given that these
+drivers aren't providing any reset controllers themselves, they
+don't actually depend on the API to build (just to function) so
+they don't need to depend on it. Remove the dependency to fix
+recursive build errors like the following:
 
-Oops should be v4.9-rc1 here.
+drivers/usb/Kconfig:39:error: recursive dependency detected!
+drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
+drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
+drivers/input/Kconfig:8:        symbol INPUT is selected by VT
+drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
+drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
+drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
+drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
+drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
+drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
+drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
+drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
+drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
+drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
 
-> > 
-> > Changes from v4:
-> >  * Picked up Acks from Rob
-> >  * Updated HS phy init sequence DT property to restrict it to offsets
-> 
-> I remembered that you got all my acks for chipidea patches, right? I did
-> not check for this series.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: <dri-devel@lists.freedesktop.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Mark Yao <mark.yao@rock-chips.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
 
-Sorry I've added in one more patch
+This has come out of some USB chipidea patches I've been working on. Please see
+http://lkml.kernel.org/r/20160907213519.27340-1-stephen.boyd at linaro.org for
+more details.
 
-   usb: chipidea: Emulate OTGSC interrupt enable path
+I'm resending with the ack from Philipp picked up.
 
-to fix extcon interrupt emulation even further.
+ drivers/gpu/drm/rockchip/Kconfig | 1 -
+ drivers/gpu/drm/tegra/Kconfig    | 1 -
+ drivers/gpu/ipu-v3/Kconfig       | 1 -
+ 3 files changed, 3 deletions(-)
 
-> 
-> Besides, the patch "gpu: Remove depends on RESET_CONTROLLER when not a
-> provider" [1]  still not be accepted, I need this patch to be merged
-> first, then apply your chipidea part, otherwise, there is a building
-> warning.
-> 
-> [1] https://patchwork.kernel.org/patch/9322583/
-
-Yes, I'm going to resend that patch now. I hope that David will apply it
-for -rc2.
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 3c58669a06ce..6f7f9c59f05b 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -1,7 +1,6 @@
+ config DRM_ROCKCHIP
+ 	tristate "DRM Support for Rockchip"
+ 	depends on DRM && ROCKCHIP_IOMMU
+-	depends on RESET_CONTROLLER
+ 	select DRM_GEM_CMA_HELPER
+ 	select DRM_KMS_HELPER
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
+index 63ebb154b9b5..bbf5a4b7e0b6 100644
+--- a/drivers/gpu/drm/tegra/Kconfig
++++ b/drivers/gpu/drm/tegra/Kconfig
+@@ -3,7 +3,6 @@ config DRM_TEGRA
+ 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
+ 	depends on COMMON_CLK
+ 	depends on DRM
+-	depends on RESET_CONTROLLER
+ 	select DRM_KMS_HELPER
+ 	select DRM_MIPI_DSI
+ 	select DRM_PANEL
+diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
+index aefdff95356d..08766c6e7856 100644
+--- a/drivers/gpu/ipu-v3/Kconfig
++++ b/drivers/gpu/ipu-v3/Kconfig
+@@ -1,7 +1,6 @@
+ config IMX_IPUV3_CORE
+ 	tristate "IPUv3 core support"
+ 	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
+-	depends on RESET_CONTROLLER
+ 	select GENERIC_IRQ_CHIP
+ 	help
+ 	  Choose this if you have a i.MX5/6 system and want to use the Image
+-- 
+2.10.0.297.gf6727b0
