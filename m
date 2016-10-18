@@ -1,37 +1,31 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 18 Oct 2016 17:44:59 +0800
-Subject: [PATCH v2] drm/mediatek: fix a typo
-In-Reply-To: <1476779039-28963-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1476779039-28963-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1476783899.25750.3.camel@mtksdaap41>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 18 Oct 2016 12:00:02 +0200
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+Message-ID: <20161018100002.GA4347@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
+Hi!
 
-On Tue, 2016-10-18 at 16:23 +0800, Bibby Hsieh wrote:
-> If we want to set the hardware OD to relay mode,
-> we have to set OD_CFG register rather than
-> OD_RELAYMODE; otherwise, the system will access
-> the wrong address.
+> >b. in arm64, if some platform has its own suspend flow,  couldn't it
+> >adopts arm/match-xxx to register its own global suspend method?
+> >
 > 
-> Fixes: 7216436420414144646f5d8343d061355fd23483 ("drm/mediatek: set mt8173 dithering function")
-> Cc: stable at vger.kernel.org # v4.9+
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index df33b3c..aa5f20f 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
->  			  unsigned int bpc)
->  {
->  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
-> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
-> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
->  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
->  }
->  
+> No, PSCI is highly recommended.
+
+Relying on firmware for suspend on x86 was a great disaster, lets not repeat
+that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
+for example) -- feel free to copy that code from arm32.
+
+Best regards,
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
