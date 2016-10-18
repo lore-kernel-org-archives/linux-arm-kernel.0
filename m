@@ -1,57 +1,56 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 18 Oct 2016 11:21:59 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: temporarily remove emmc hs200
- speed from rk3288-veyron-speedy.
-In-Reply-To: <1476647383.3885.3.camel@paulk.fr>
-References: <87twd1vzc5.fsf@aikidev.net> <1476647383.3885.3.camel@paulk.fr>
-Message-ID: <12872023.2LumKfgYDl@diego>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Oct 2016 10:24:22 +0100
+Subject: [PATCH 0/5] drm/sun4i: Handle TV overscan
+In-Reply-To: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20161018092422.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 16. Oktober 2016, 21:49:43 schrieb Paul Kocialkowski:
-> Hi,
-> 
-> Le mardi 27 septembre 2016 ? 13:53 -0700, Vagrant Cascadian a ?crit :
-> > This essentially mimics what was done with rk3288-veyron-minnie in
-> > commit 984926781122f034d5bc9962815d135b6c4a8e1d.
-> > 
-> > The eMMC of the speedy Chromebook also appears to need the same tuning
-> > workaround, as it frequently fails to recognize the eMMC without it.
-> 
-> I have a device where (without this patch) eMMC sometimes fails, with:
-> [    3.561010] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to
-> 175 [    3.571742] mmc2: new HS200 MMC card at address 0001
-> [    3.571943] mmcblk2: mmc2:0001 HAG2e 14.7 GiB 
-> [    3.572026] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
-> [    3.572107] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
-> [    3.572181] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
-> [    3.685647] mmcblk2: error -110 transferring data, sector 0, nr 8, cmd
-> response 0x900, card status 0x0
-> 
-> And sometimes works, with:
-> [    3.451058] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to
-> 176 [    3.491093] mmc2: new HS200 MMC card at address 0001
-> [    3.491277] mmcblk2: mmc2:0001 HAG2e 14.7 GiB 
-> [    3.491345] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
-> [    3.491409] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
-> [    3.491474] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
-> [    3.493548]  mmcblk2: p1 p2
-> 
-> However, with this change, it always fails, with:
-> [    3.322129] mmc_host mmc2: Bus speed (slot 0) = 50000000Hz (slot req
-> 52000000Hz, actual 50000000HZ div = 0) [    3.333174] mmc2: error -110
-> whilst initialising MMC card
-> 
-> I don't have so much time to investigate this issue, but it's clear that
-> this patch doesn't fix the issue (and actually worsens it) for my device.
+On Tue, Oct 18, 2016 at 10:29:33AM +0200, Maxime Ripard wrote:
+> The Allwinner display engine doesn't have any kind of hardware help to deal
+> with TV overscan.
 
-thanks for the heads up.
+I'm not sure I follow.  My understanding (from reading the CEA specs)
+is that TVs are expected to overscan the image, so the upper left, and
+bottom right pixels are not visible.
 
-As discussed on IRC we now have varying reports of the emmc working or not 
-working with and without that patch applied. So it's not really a bandaid fix 
-and I've thus dropped this patch again.
+I assume we are talking about TVs connected via HDMI.  In the HDMI AVI
+infoframe, there are bits which specify whether the image should be
+overscanned or underscanned - however, whether a TV implements those
+bits is rather sketchy.  I assume when you say "any kind of hardware
+help" you mean you can't control these bits?
 
-Still hoping someone will find the source of the problem somewhere :-)
+However, some (most?) TVs now implement a menu option which allows the
+(over)scan mode to be selected.  Others assume that if it's a TV mode,
+it's supposed to be overscanned, if it's a "PC" mode, it should be
+underscanned and provide no option to change the behaviour.
 
+> This means that if we use the only mode the hardware provides (either PAL
+> or NTSC, or something else), most of the screens will crop the borders of
+> the image, which is bad.
 
-Heiko
+I think you're trying to apply monitor-type behaviour to TVs...
+
+> We can however use somekind of a hack, to instead reduce the mode exposed
+> to the userspace, and center it in the final image. We would expose
+> different overscan ratio to be able to deal with most of the screens, each
+> reducing more the displayable area.
+
+I'm not sure we need "a hack".  What if we treated the primary plane just
+like any other (eg, overlay) plane?  We could then specify (eg) a 1920x1080
+display mode, but with the primary plane reduced in size, positioned in
+the centre of the display mode?
+
+I know that there's hardware out there which can do exactly that - Marvell
+Dove implements this: you set the display size separately from two planes,
+one graphics plane and one video plane.  Both planes can be positioned
+anywhere in the displayed size.
+
+We could then specify at DRM level that a connected device overscans by
+N%, and have the primary plane adjusted by DRM itself.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
