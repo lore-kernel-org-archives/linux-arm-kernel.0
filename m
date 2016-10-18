@@ -1,23 +1,39 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 18 Oct 2016 08:05:05 -0700
-Subject: [PATCH V3 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <20161018140543.GE18903@localhost>
-References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
- <1476505867-24599-3-git-send-email-okaya@codeaurora.org>
- <20161018140543.GE18903@localhost>
-Message-ID: <84372578-eb80-249f-01ef-b16f4a18a0fb@codeaurora.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 18 Oct 2016 16:07:29 +0100
+Subject: [PATCH 2/2] scripts/gdb: fixup some pep8 errors in proc.py
+In-Reply-To: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1476803249-23328-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2016 7:05 AM, Bjorn Helgaas wrote:
-> I think you should squash patches 2 & 3 and not bother with trying to
-> make this a revert followed by a fix.  Squashing them makes the git
-> history much easier to follow, plus you don't have to deal with the
-> headache of ensuring the intermediate state is correct and bisectable.
+proc.py:22:1: E302 expected 2 blank lines, found 1
+proc.py:200:1: E302 expected 2 blank lines, found 1
 
-OK. I can do that.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ scripts/gdb/linux/proc.py | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+index f20fcfa..2d6f74e 100644
+--- a/scripts/gdb/linux/proc.py
++++ b/scripts/gdb/linux/proc.py
+@@ -18,6 +18,7 @@ from linux import tasks
+ from linux import lists
+ from struct import *
+ 
++
+ class LxCmdLine(gdb.Command):
+     """ Report the Linux Commandline used in the current kernel.
+         Equivalent to cat /proc/cmdline on a running target"""
+@@ -196,6 +197,7 @@ values of that process namespace"""
+ 
+ LxMounts()
+ 
++
+ class LxFdtDump(gdb.Command):
+     """Output Flattened Device Tree header and dump FDT blob to a file
+        Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
