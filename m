@@ -1,10 +1,11 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 18 Oct 2016 09:53:02 +0200
-Subject: [PATCH 05/19] ARM: multi_v7_defconfig: Remove miphy365 phy.
-In-Reply-To: <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
+Date: Tue, 18 Oct 2016 09:53:19 +0200
+Subject: [PATCH 06/19] ARM: multi_v7_defconfig: Remove stih41x phy Kconfig
+ symbol.
+In-Reply-To: <1473859677-9231-7-git-send-email-peter.griffin@linaro.org>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-6-git-send-email-peter.griffin@linaro.org>
-Message-ID: <ad4daf4b-5d2e-e99c-0b01-cf48a747394d@st.com>
+ <1473859677-9231-7-git-send-email-peter.griffin@linaro.org>
+Message-ID: <ad2367f8-7c92-201a-59ec-1f0fc661d818@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,21 +24,20 @@ Applied on sti-defconfig-for-4.10 branch
 
 Thanks 
 
-
 > ---
 >  arch/arm/configs/multi_v7_defconfig | 1 -
 >  1 file changed, 1 deletion(-)
 > 
 > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2c8665c..949ab7f 100644
+> index 949ab7f..b26a541 100644
 > --- a/arch/arm/configs/multi_v7_defconfig
 > +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -854,7 +854,6 @@ CONFIG_PHY_ROCKCHIP_DP=m
->  CONFIG_PHY_ROCKCHIP_USB=m
+> @@ -855,7 +855,6 @@ CONFIG_PHY_ROCKCHIP_USB=m
 >  CONFIG_PHY_QCOM_APQ8064_SATA=m
 >  CONFIG_PHY_MIPHY28LP=y
-> -CONFIG_PHY_MIPHY365X=y
 >  CONFIG_PHY_RCAR_GEN2=m
->  CONFIG_PHY_STIH41X_USB=y
+> -CONFIG_PHY_STIH41X_USB=y
 >  CONFIG_PHY_STIH407_USB=y
+>  CONFIG_PHY_SUN4I_USB=y
+>  CONFIG_PHY_SUN9I_USB=y
 > 
