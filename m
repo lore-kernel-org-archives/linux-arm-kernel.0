@@ -1,31 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 18 Oct 2016 10:39:14 +0100
-Subject: [PATCH v10 09/11] ARM: multi_v7_defconfig: Enable st_remoteproc
- driver.
-In-Reply-To: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
-References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1476783556-2501-10-git-send-email-peter.griffin@linaro.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 18 Oct 2016 17:44:59 +0800
+Subject: [PATCH v2] drm/mediatek: fix a typo
+In-Reply-To: <1476779039-28963-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1476779039-28963-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1476783899.25750.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The st231 remote coprocessors are found on all STi chipsets.
+Acked-by: CK Hu <ck.hu@mediatek.com>
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 538c326..0a06af9 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -824,6 +824,7 @@ CONFIG_ROCKCHIP_IOMMU=y
- CONFIG_TEGRA_IOMMU_GART=y
- CONFIG_TEGRA_IOMMU_SMMU=y
- CONFIG_REMOTEPROC=m
-+CONFIG_ST_REMOTEPROC=m
- CONFIG_PM_DEVFREQ=y
- CONFIG_ARM_TEGRA_DEVFREQ=m
- CONFIG_MEMORY=y
--- 
-1.9.1
+On Tue, 2016-10-18 at 16:23 +0800, Bibby Hsieh wrote:
+> If we want to set the hardware OD to relay mode,
+> we have to set OD_CFG register rather than
+> OD_RELAYMODE; otherwise, the system will access
+> the wrong address.
+> 
+> Fixes: 7216436420414144646f5d8343d061355fd23483 ("drm/mediatek: set mt8173 dithering function")
+> Cc: stable at vger.kernel.org # v4.9+
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> ---
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> index df33b3c..aa5f20f 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+> @@ -123,7 +123,7 @@ static void mtk_od_config(struct mtk_ddp_comp *comp, unsigned int w,
+>  			  unsigned int bpc)
+>  {
+>  	writel(w << 16 | h, comp->regs + DISP_OD_SIZE);
+> -	writel(OD_RELAYMODE, comp->regs + OD_RELAYMODE);
+> +	writel(OD_RELAYMODE, comp->regs + OD_CFG);
+>  	mtk_dither_set(comp, bpc, DISP_OD_CFG);
+>  }
+>  
