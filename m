@@ -1,31 +1,56 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 18 Oct 2016 17:28:22 -0600
-Subject: [PATCH] media: s5p-mfc collapse two error message into one
-Message-ID: <20161018232822.17423-1-shuahkh@osg.samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 18 Oct 2016 16:40:19 -0700
+Subject: [PATCH/RESEND] thermal: qcom-spmi: Treat reg property as a single cell
+Message-ID: <20161018234019.5489-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s5p_mfc_alloc_priv_buf() prints two message to report invalid memory
-configuration error. Collapse them into a single message.
+We only read the first element of the reg property to figure out
+the offset of the temperature sensor inside the PMIC.
+Furthermore, we want to remove the second element in DT, so just
+don't read the second element so that probe keeps working if we
+change the DT in the future.
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-index eee16a1..44d2325 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
-@@ -49,8 +49,7 @@ int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
- 	}
+This was sent in January of this year but hasn't been picked up.
+
+ drivers/thermal/qcom-spmi-temp-alarm.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/thermal/qcom-spmi-temp-alarm.c b/drivers/thermal/qcom-spmi-temp-alarm.c
+index 819c6d5d7aa7..f50241962ad2 100644
+--- a/drivers/thermal/qcom-spmi-temp-alarm.c
++++ b/drivers/thermal/qcom-spmi-temp-alarm.c
+@@ -200,7 +200,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
+ 	struct qpnp_tm_chip *chip;
+ 	struct device_node *node;
+ 	u8 type, subtype;
+-	u32 res[2];
++	u32 res;
+ 	int ret, irq;
  
- 	if (b->dma < base) {
--		mfc_err("Invaling memory configuration!\n");
--		mfc_err("Allocated buffer (%pad) is lower than memory base address (%pad)\n",
-+		mfc_err("Invalid memory configuration - buffer (%pad) is below base memory address(%pad)\n",
- 			&b->dma, &base);
- 		dma_free_coherent(dev, b->size, b->virt, b->dma);
- 		return -ENOMEM;
+ 	node = pdev->dev.of_node;
+@@ -215,7 +215,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
+ 	if (!chip->map)
+ 		return -ENXIO;
+ 
+-	ret = of_property_read_u32_array(node, "reg", res, 2);
++	ret = of_property_read_u32(node, "reg", &res);
+ 	if (ret < 0)
+ 		return ret;
+ 
+@@ -228,7 +228,7 @@ static int qpnp_tm_probe(struct platform_device *pdev)
+ 	if (PTR_ERR(chip->adc) == -EPROBE_DEFER)
+ 		return PTR_ERR(chip->adc);
+ 
+-	chip->base = res[0];
++	chip->base = res;
+ 
+ 	ret = qpnp_tm_read(chip, QPNP_TM_REG_TYPE, &type);
+ 	if (ret < 0) {
 -- 
-2.7.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
