@@ -1,25 +1,32 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 18 Oct 2016 08:49:21 +0200
-Subject: [PATCH] ARM: pxa: fix pxa25x interrupt init
-In-Reply-To: <1474874511-26617-1-git-send-email-robert.jarzmik@free.fr>
- (Robert Jarzmik's message of "Mon, 26 Sep 2016 09:21:51 +0200")
-References: <1474874511-26617-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <878ttm5ez2.fsf@belgarion.home>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 18 Oct 2016 09:16:28 +0200
+Subject: [PATCH] pinctrl: st: don't specify default interrupt trigger
+Message-ID: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+From: Patrice Chotard <patrice.chotard@st.com>
 
-> In the device-tree case, the root interrupt controller cannot be
-> accessed through the 6th coprocessor, contrary to pxa27x and pxa3xx
-> architectures.
->
-> Fix it to behave as in non-devicetree builds.
->
-> Fixes: 32f17997c130 ("ARM: pxa: remove irq init from dt machines")
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Thanks to 332e99d5ae4 which now alerts of default
+trigger usage when configuring interrupts.
 
-Applied to pxa/fixes.
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ drivers/pinctrl/pinctrl-st.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+index 99da4cf..b7bb371 100644
+--- a/drivers/pinctrl/pinctrl-st.c
++++ b/drivers/pinctrl/pinctrl-st.c
+@@ -1512,7 +1512,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+ 	if (info->irqmux_base || gpio_irq > 0) {
+ 		err = gpiochip_irqchip_add(&bank->gpio_chip, &st_gpio_irqchip,
+ 					   0, handle_simple_irq,
+-					   IRQ_TYPE_LEVEL_LOW);
++					   IRQ_TYPE_NONE);
+ 		if (err) {
+ 			gpiochip_remove(&bank->gpio_chip);
+ 			dev_info(dev, "could not add irqchip\n");
 -- 
-Robert
+1.9.1
