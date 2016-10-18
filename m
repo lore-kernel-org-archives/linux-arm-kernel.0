@@ -1,113 +1,87 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue, 18 Oct 2016 16:09:00 +0800
-Subject: [PATCH V7 3/3] stm: Mark the functions of writing buffer with notrace
-In-Reply-To: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1476778140-10319-4-git-send-email-zhang.chunyan@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Oct 2016 10:21:13 +0200
+Subject: [PATCH] ARM: dts: realview: Extend PBX family memory description
+Message-ID: <1476778873-12210-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_STM_SOURCE_FTRACE is selected, Function trace data can be writen
-to sink via STM, all functions that related to writing data packets to
-STM should be marked 'notrace' to avoid being traced by Ftrace, otherwise
-the program would stall into an endless loop.
+From: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+All three platforms sharing the later RealView Platform Baseboard memory
+map - PBX-A9, PB-A8 and PB11MPCore, provide 512MB of DDR SDRAM on the
+baseboard, of which the boot alias at 0x0 maps the first 256MB. Expand
+the size of the default memory node to reflect that, and describe the
+full memory regions in each board's DTS, but leave those commented by
+default to avoid breaking existing bootloaders.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-stm.c |  2 +-
- drivers/hwtracing/intel_th/sth.c            | 11 +++++++----
- drivers/hwtracing/stm/core.c                |  7 ++++---
- drivers/hwtracing/stm/dummy_stm.c           |  2 +-
- include/linux/stm.h                         |  4 ++--
- 5 files changed, 15 insertions(+), 11 deletions(-)
+ARM SoC folks: I forgot to send this patch for ARM SoC earlier.
+As it is a small change I suggest you just apply it to the ARM
+SoC tree as I do not foresee any other RealView work in the near
+future. If you think it can go into v4.9 then put it in as a fix,
+else just push it to the next merge window.
+Robin: sorry for screwing up :(
+---
+ arch/arm/boot/dts/arm-realview-pba8.dts   | 8 ++++++++
+ arch/arm/boot/dts/arm-realview-pbx-a9.dts | 9 +++++++++
+ arch/arm/boot/dts/arm-realview-pbx.dtsi   | 4 ++--
+ 3 files changed, 19 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 49e0f1b..b7543bd 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -406,7 +406,7 @@ static long stm_generic_set_options(struct stm_data *stm_data,
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/arm-realview-pba8.dts b/arch/arm/boot/dts/arm-realview-pba8.dts
+index d3238c252b59..9f6c92b84f9f 100644
+--- a/arch/arm/boot/dts/arm-realview-pba8.dts
++++ b/arch/arm/boot/dts/arm-realview-pba8.dts
+@@ -40,6 +40,14 @@
+ 		};
+ 	};
  
--static ssize_t stm_generic_packet(struct stm_data *stm_data,
-+static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int master,
- 				  unsigned int channel,
- 				  unsigned int packet,
-diff --git a/drivers/hwtracing/intel_th/sth.c b/drivers/hwtracing/intel_th/sth.c
-index e1aee61..b034446 100644
---- a/drivers/hwtracing/intel_th/sth.c
-+++ b/drivers/hwtracing/intel_th/sth.c
-@@ -67,10 +67,13 @@ static void sth_iowrite(void __iomem *dest, const unsigned char *payload,
- 	}
- }
++	/*
++	 * Using the full 512MB of RAM will require bootloader
++	 * changes to not load the kernel to the alias at 0x0.
++	 */
++	memory {
++		/*reg = <0x70000000 0x20000000>; /* 512 MiB baseboard DDR */
++	};
++
+ 	pmu: pmu at 0 {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupt-parent = <&intc>;
+diff --git a/arch/arm/boot/dts/arm-realview-pbx-a9.dts b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
+index 90d00b407f85..9fef9188660a 100644
+--- a/arch/arm/boot/dts/arm-realview-pbx-a9.dts
++++ b/arch/arm/boot/dts/arm-realview-pbx-a9.dts
+@@ -60,6 +60,15 @@
+ 		};
+ 	};
  
--static ssize_t sth_stm_packet(struct stm_data *stm_data, unsigned int master,
--			      unsigned int channel, unsigned int packet,
--			      unsigned int flags, unsigned int size,
--			      const unsigned char *payload)
-+static ssize_t notrace sth_stm_packet(struct stm_data *stm_data,
-+				      unsigned int master,
-+				      unsigned int channel,
-+				      unsigned int packet,
-+				      unsigned int flags,
-+				      unsigned int size,
-+				      const unsigned char *payload)
- {
- 	struct sth_device *sth = container_of(stm_data, struct sth_device, stm);
- 	struct intel_th_channel __iomem *out =
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 51f81d6..37d3bcb 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -425,7 +425,7 @@ static int stm_file_assign(struct stm_file *stmf, char *id, unsigned int width)
- 	return ret;
- }
++	/*
++	 * There is 1GB of RAM total, but using all of it will require
++	 * bootloader changes to not load the kernel to the alias at 0x0.
++	 */
++	memory {
++		/*reg = <0x20000000 0x20000000>, /* 512 MiB daughterboard DDR2 */
++		/*      <0x70000000 0x20000000>; /* 512 MiB baseboard DDR */
++	};
++
+ 	L2: l2-cache {
+ 		compatible = "arm,pl310-cache";
+ 		reg = <0x1f002000 0x1000>;
+diff --git a/arch/arm/boot/dts/arm-realview-pbx.dtsi b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+index aeb49c4bd773..8477f667d27c 100644
+--- a/arch/arm/boot/dts/arm-realview-pbx.dtsi
++++ b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+@@ -38,8 +38,8 @@
+ 	};
  
--static ssize_t stm_write(struct stm_data *data, unsigned int master,
-+static ssize_t notrace stm_write(struct stm_data *data, unsigned int master,
- 			  unsigned int channel, const char *buf, size_t count)
- {
- 	unsigned int flags = STP_PACKET_TIMESTAMPED;
-@@ -1121,8 +1121,9 @@ void stm_source_unregister_device(struct stm_source_data *data)
- }
- EXPORT_SYMBOL_GPL(stm_source_unregister_device);
+ 	memory {
+-		/* 128 MiB memory @ 0x0 */
+-		reg = <0x00000000 0x08000000>;
++		/* 256 MiB alias of baseboard DDR @ 0x0 */
++		reg = <0x00000000 0x10000000>;
+ 	};
  
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count)
-+int notrace stm_source_write(struct stm_source_data *data,
-+			     unsigned int chan,
-+			     const char *buf, size_t count)
- {
- 	struct stm_source_device *src = data->src;
- 	struct stm_device *stm;
-diff --git a/drivers/hwtracing/stm/dummy_stm.c b/drivers/hwtracing/stm/dummy_stm.c
-index a86612d..c5f94ca 100644
---- a/drivers/hwtracing/stm/dummy_stm.c
-+++ b/drivers/hwtracing/stm/dummy_stm.c
-@@ -21,7 +21,7 @@
- #include <linux/slab.h>
- #include <linux/stm.h>
- 
--static ssize_t
-+static ssize_t notrace
- dummy_stm_packet(struct stm_data *stm_data, unsigned int master,
- 		 unsigned int channel, unsigned int packet, unsigned int flags,
- 		 unsigned int size, const unsigned char *payload)
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 8369d8a..210ff22 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -133,7 +133,7 @@ int stm_source_register_device(struct device *parent,
- 			       struct stm_source_data *data);
- void stm_source_unregister_device(struct stm_source_data *data);
- 
--int stm_source_write(struct stm_source_data *data, unsigned int chan,
--		     const char *buf, size_t count);
-+int notrace stm_source_write(struct stm_source_data *data, unsigned int chan,
-+			     const char *buf, size_t count);
- 
- #endif /* _STM_H_ */
+ 	/* The voltage to the MMC card is hardwired at 3.3V */
 -- 
 2.7.4
