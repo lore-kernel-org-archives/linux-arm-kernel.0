@@ -1,394 +1,187 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Tue, 18 Oct 2016 13:41:49 -0400
-Subject: [PATCH V5 2/2] irqchip: qcom: Add IRQ combiner driver
-In-Reply-To: <1476812509-2760-1-git-send-email-agustinv@codeaurora.org>
-References: <1476812509-2760-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <1476812509-2760-3-git-send-email-agustinv@codeaurora.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 18 Oct 2016 10:45:46 -0700
+Subject: [PATCH v2 1/2] remoteproc: core: Add rproc OF look-up functions
+In-Reply-To: <20160816143824.4120-1-lee.jones@linaro.org>
+References: <20160816143824.4120-1-lee.jones@linaro.org>
+Message-ID: <20161018174546.GY7509@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver for interrupt combiners in the Top-level Control and Status
-Registers (TCSR) hardware block in Qualcomm Technologies chips.
+On Tue 16 Aug 07:38 PDT 2016, Lee Jones wrote:
 
-An interrupt combiner in this block combines a set of interrupts by
-OR'ing the individual interrupt signals into a summary interrupt
-signal routed to a parent interrupt controller, and provides read-
-only, 32-bit registers to query the status of individual interrupts.
-The status bit for IRQ n is bit (n % 32) within register (n / 32)
-of the given combiner. Thus, each combiner can be described as a set
-of register offsets and the number of IRQs managed.
+> - of_rproc_by_index(): look-up and obtain a reference to a rproc
+>                        using the DT phandle "rprocs" and a index.
+> 
+> - of_rproc_by_name():  lookup and obtain a reference to a rproc
+>                        using the DT phandle "rprocs" and "rproc-names".
+> 
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
----
- drivers/irqchip/Kconfig             |   8 +
- drivers/irqchip/Makefile            |   1 +
- drivers/irqchip/qcom-irq-combiner.c | 332 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 341 insertions(+)
- create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+For the record; I have not picked these patches because I have not yet
+seen an acceptable proposal for a client - there are concerns about DT
+bindings of such client and questions on how to notify the client about
+life cycle changes in the remoteproc (i.e. crash recovery events).
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 82b0b5d..8e0cbbb 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -279,3 +279,11 @@ config EZNPS_GIC
- config STM32_EXTI
- 	bool
- 	select IRQ_DOMAIN
-+
-+config QCOM_IRQ_COMBINER
-+	bool "QCOM IRQ combiner support"
-+	depends on ARCH_QCOM && ACPI
-+	select IRQ_DOMAIN
-+	help
-+	  Say yes here to add support for the IRQ combiner devices embedded
-+	  in Qualcomm Technologies chips.
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e4dbfc8..1818a0b 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -74,3 +74,4 @@ obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
- obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
- obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o
- obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
-+obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
-diff --git a/drivers/irqchip/qcom-irq-combiner.c b/drivers/irqchip/qcom-irq-combiner.c
-new file mode 100644
-index 0000000..b117cd7
---- /dev/null
-+++ b/drivers/irqchip/qcom-irq-combiner.c
-@@ -0,0 +1,332 @@
-+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+/*
-+ * Driver for interrupt combiners in the Top-level Control and Status
-+ * Registers (TCSR) hardware block in Qualcomm Technologies chips.
-+ * An interrupt combiner in this block combines a set of interrupts by
-+ * OR'ing the individual interrupt signals into a summary interrupt
-+ * signal routed to a parent interrupt controller, and provides read-
-+ * only, 32-bit registers to query the status of individual interrupts.
-+ * The status bit for IRQ n is bit (n % 32) within register (n / 32)
-+ * of the given combiner. Thus, each combiner can be described as a set
-+ * of register offsets and the number of IRQs managed.
-+ */
-+
-+#include <linux/acpi.h>
-+#include <linux/err.h>
-+#include <linux/irqchip.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
-+
-+#define REG_SIZE 32
-+
-+struct combiner_reg {
-+	void __iomem *addr;
-+	unsigned long mask;
-+};
-+
-+struct combiner {
-+	struct irq_chip     irq_chip;
-+	struct irq_domain   *domain;
-+	int                 parent_irq;
-+	u32                 nirqs;
-+	u32                 nregs;
-+	struct combiner_reg regs[0];
-+};
-+
-+static inline u32 irq_register(int irq)
-+{
-+	return irq / REG_SIZE;
-+}
-+
-+static inline u32 irq_bit(int irq)
-+{
-+	return irq % REG_SIZE;
-+
-+}
-+
-+static inline int irq_nr(u32 reg, u32 bit)
-+{
-+	return reg * REG_SIZE + bit;
-+}
-+
-+/*
-+ * Handler for the cascaded IRQ.
-+ */
-+static void combiner_handle_irq(struct irq_desc *desc)
-+{
-+	struct combiner *combiner = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	u32 reg;
-+
-+	chained_irq_enter(chip, desc);
-+
-+	for (reg = 0; reg < combiner->nregs; reg++) {
-+		int virq;
-+		int hwirq;
-+		u32 bit;
-+		u32 status;
-+
-+		if (combiner->regs[reg].mask == 0)
-+			continue;
-+
-+		status = readl_relaxed(combiner->regs[reg].addr);
-+		status &= combiner->regs[reg].mask;
-+
-+		while (status) {
-+			bit = __ffs(status);
-+			status &= ~(1 << bit);
-+			hwirq = irq_nr(reg, bit);
-+			virq = irq_find_mapping(combiner->domain, hwirq);
-+			if (virq >= 0)
-+				generic_handle_irq(virq);
-+
-+		}
-+	}
-+
-+	chained_irq_exit(chip, desc);
-+}
-+
-+/*
-+ * irqchip callbacks
-+ */
-+
-+static void combiner_irq_chip_mask_irq(struct irq_data *data)
-+{
-+	struct combiner *combiner = irq_data_get_irq_chip_data(data);
-+	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
-+
-+	clear_bit(irq_bit(data->hwirq), &reg->mask);
-+}
-+
-+static void combiner_irq_chip_unmask_irq(struct irq_data *data)
-+{
-+	struct combiner *combiner = irq_data_get_irq_chip_data(data);
-+	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
-+
-+	set_bit(irq_bit(data->hwirq), &reg->mask);
-+}
-+
-+/*
-+ * irq_domain_ops callbacks
-+ */
-+
-+static int combiner_irq_map(struct irq_domain *domain, unsigned int irq,
-+				   irq_hw_number_t hwirq)
-+{
-+	struct combiner *combiner = domain->host_data;
-+
-+	if (hwirq >= combiner->nirqs)
-+		return -EINVAL;
-+
-+	irq_set_chip_and_handler(irq, &combiner->irq_chip, handle_level_irq);
-+	irq_set_chip_data(irq, combiner);
-+	irq_set_parent(irq, combiner->parent_irq);
-+	irq_set_noprobe(irq);
-+	return 0;
-+}
-+
-+static void combiner_irq_unmap(struct irq_domain *domain, unsigned int irq)
-+{
-+	irq_set_chip_and_handler(irq, NULL, NULL);
-+	irq_set_chip_data(irq, NULL);
-+	irq_set_parent(irq, -1);
-+}
-+
-+#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-+static int combiner_irq_translate(struct irq_domain *d, struct irq_fwspec *fws,
-+				  unsigned long *hwirq, unsigned int *type)
-+{
-+	if (is_acpi_node(fws->fwnode)) {
-+		if (fws->param_count != 2)
-+			return -EINVAL;
-+
-+		*hwirq = fws->param[0];
-+		*type = fws->param[1];
-+		return 0;
-+	}
-+
-+	return -EINVAL;
-+}
-+#endif
-+
-+static const struct irq_domain_ops domain_ops = {
-+	.map = combiner_irq_map,
-+	.unmap = combiner_irq_unmap,
-+#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-+	.translate = combiner_irq_translate
-+#endif
-+};
-+
-+/*
-+ * Device probing
-+ */
-+
-+static acpi_status count_registers_cb(struct acpi_resource *ares, void *context)
-+{
-+	int *count = context;
-+
-+	if (ares->type == ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
-+		++(*count);
-+	return AE_OK;
-+}
-+
-+static int count_registers(struct acpi_device *adev)
-+{
-+	acpi_status status;
-+	int count = 0;
-+
-+	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
-+		return -EINVAL;
-+
-+	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
-+				     count_registers_cb, &count);
-+	if (ACPI_FAILURE(status))
-+		return -EINVAL;
-+	return count;
-+}
-+
-+struct get_registers_context {
-+	struct device *dev;
-+	struct combiner *combiner;
-+	int err;
-+};
-+
-+static acpi_status get_registers_cb(struct acpi_resource *ares, void *context)
-+{
-+	struct get_registers_context *ctx = context;
-+	struct acpi_resource_generic_register *reg;
-+	phys_addr_t paddr;
-+	void __iomem *vaddr;
-+
-+	if (ares->type != ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
-+		return AE_OK;
-+
-+	reg = &ares->data.generic_reg;
-+	paddr = reg->address;
-+	if ((reg->space_id != ACPI_SPACE_MEM) ||
-+	    (reg->bit_offset != 0) ||
-+	    (reg->bit_width > REG_SIZE)) {
-+		dev_err(ctx->dev, "Bad register resource @%pa\n", &paddr);
-+		ctx->err = -EINVAL;
-+		return AE_ERROR;
-+	}
-+
-+	vaddr = devm_ioremap(ctx->dev, reg->address, REG_SIZE);
-+	if (IS_ERR(vaddr)) {
-+		dev_err(ctx->dev, "Can't map register @%pa\n", &paddr);
-+		ctx->err = PTR_ERR(vaddr);
-+		return AE_ERROR;
-+	}
-+
-+	ctx->combiner->regs[ctx->combiner->nregs].addr = vaddr;
-+	ctx->combiner->nirqs += reg->bit_width;
-+	ctx->combiner->nregs++;
-+	return AE_OK;
-+}
-+
-+static int get_registers(struct acpi_device *adev, struct combiner *comb)
-+{
-+	acpi_status status;
-+	struct get_registers_context ctx;
-+
-+	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
-+		return -EINVAL;
-+
-+	ctx.dev = &adev->dev;
-+	ctx.combiner = comb;
-+	ctx.err = 0;
-+
-+	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
-+				     get_registers_cb, &ctx);
-+	if (ACPI_FAILURE(status))
-+		return ctx.err;
-+	return 0;
-+}
-+
-+static acpi_status get_parent_irq_cb(struct acpi_resource *ares, void *context)
-+{
-+	int *irq = context;
-+	struct acpi_resource_extended_irq *eirq;
-+
-+	if (ares->type != ACPI_RESOURCE_TYPE_EXTENDED_IRQ)
-+		return AE_OK;
-+
-+	eirq = &ares->data.extended_irq;
-+	*irq = acpi_irq_domain_register_irq(&eirq->resource_source,
-+					    eirq->interrupts[0],
-+					    eirq->triggering, eirq->polarity);
-+	return AE_OK;
-+}
-+
-+static int get_parent_irq(struct acpi_device *adev)
-+{
-+	acpi_status status;
-+	int irq = -1;
-+
-+	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
-+		return -EINVAL;
-+
-+	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
-+				     get_parent_irq_cb, &irq);
-+	if (ACPI_FAILURE(status))
-+		return -EINVAL;
-+	return irq;
-+}
-+
-+static int __init combiner_probe(struct acpi_device *adev)
-+{
-+	struct combiner *combiner;
-+	size_t alloc_sz;
-+	u32 nregs;
-+	int err;
-+
-+	nregs = count_registers(adev);
-+	if (nregs <= 0) {
-+		dev_err(&adev->dev, "Error reading register resources\n");
-+		return -EINVAL;
-+	}
-+
-+	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
-+	combiner = devm_kzalloc(&adev->dev, alloc_sz, GFP_KERNEL);
-+	if (!combiner)
-+		return -ENOMEM;
-+
-+	err = get_registers(adev, combiner);
-+	if (err < 0)
-+		return err;
-+
-+	combiner->parent_irq = get_parent_irq(adev);
-+	if (combiner->parent_irq <= 0) {
-+		dev_err(&adev->dev, "Error getting IRQ resource\n");
-+		return -EINVAL;
-+	}
-+
-+	combiner->domain = irq_domain_create_linear(
-+		&adev->fwnode, combiner->nirqs, &domain_ops, combiner);
-+	if (!combiner->domain)
-+		/* Errors printed by irq_domain_create_linear */
-+		return -ENODEV;
-+
-+	irq_set_chained_handler_and_data(combiner->parent_irq,
-+					 combiner_handle_irq, combiner);
-+	combiner->irq_chip.irq_mask = combiner_irq_chip_mask_irq;
-+	combiner->irq_chip.irq_unmask = combiner_irq_chip_unmask_irq;
-+	combiner->irq_chip.name = dev_name(&adev->dev);
-+
-+	dev_info(&adev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
-+		 combiner->parent_irq, combiner->nirqs, combiner->regs[0].addr);
-+	return 0;
-+}
-+
-+IRQCHIP_ACPI_DECLARE(qcom_combiner, "QCOM80B1", combiner_probe);
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+I think the patches looks good, so once these open questions gets
+answered (or some new use case appear) I will pick these up again.
+
+Regards,
+Bjorn
+
+> ---
+> 
+> v1 => v2:
+>  - s/ti,rprocs/ti,rproc
+> 
+> drivers/remoteproc/remoteproc_core.c | 78 +++++++++++++++++++++++++++++++++++-
+>  include/linux/remoteproc.h           | 25 +++++++++++-
+>  2 files changed, 101 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index fe0539e..fe362fb 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -41,6 +41,8 @@
+>  #include <linux/virtio_ids.h>
+>  #include <linux/virtio_ring.h>
+>  #include <asm/byteorder.h>
+> +#include <linux/of.h>
+> +#include <linux/of_platform.h>
+>  
+>  #include "remoteproc_internal.h"
+>  
+> @@ -1191,6 +1193,81 @@ out:
+>  }
+>  EXPORT_SYMBOL(rproc_shutdown);
+>  
+> +#ifdef CONFIG_OF
+> +/**
+> + * of_get_rproc_by_index() - lookup and obtain a reference to an rproc
+> + * @np: node to search for rproc phandle
+> + * @index: index into the phandle list
+> + *
+> + * This function increments the remote processor's refcount, so always
+> + * use rproc_put() to decrement it back once rproc isn't needed anymore.
+> + *
+> + * Returns a pointer to the rproc struct on success or an appropriate error
+> + * code otherwise.
+> + */
+> +struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
+> +{
+> +	struct rproc *rproc = NULL, *r;
+> +	struct device_node *rproc_np;
+> +
+> +	if (index < 0) {
+> +		pr_err("Invalid index: %d\n", index);
+> +		return ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	rproc_np = of_parse_phandle(np, "rprocs", index);
+> +	if (!rproc_np) {
+> +		/* Unfortunately we have to support this, at least for now */
+> +		rproc_np = of_parse_phandle(np, "ti,rproc", index);
+> +		if (!rproc_np) {
+> +			pr_err("Failed to obtain phandle\n");
+> +			return ERR_PTR(-ENODEV);
+> +		}
+> +	}
+> +
+> +	mutex_lock(&rproc_list_mutex);
+> +	list_for_each_entry(r, &rproc_list, node) {
+> +		if (r->dev.parent && r->dev.parent->of_node == rproc_np) {
+> +			get_device(&r->dev);
+> +			rproc = r;
+> +			break;
+> +		}
+> +	}
+> +	mutex_unlock(&rproc_list_mutex);
+> +
+> +	of_node_put(rproc_np);
+> +
+> +	if (!rproc)
+> +		pr_err("Could not find rproc, deferring\n");
+> +
+> +	return rproc ?: ERR_PTR(-EPROBE_DEFER);
+> +}
+> +EXPORT_SYMBOL(of_get_rproc_by_index);
+> +
+> +/**
+> + * of_get_rproc_by_name() - lookup and obtain a reference to an rproc
+> + * @np: node to search for rproc
+> + * @name: name of the remoteproc from device's point of view
+> + *
+> + * This function increments the remote processor's refcount, so always
+> + * use rproc_put() to decrement it back once rproc isn't needed anymore.
+> + *
+> + * Returns a pointer to the rproc struct on success or an appropriate error
+> + * code otherwise.
+> + */
+> +struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+> +{
+> +	int index;
+> +
+> +	if (unlikely(!name))
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	index = of_property_match_string(np, "rproc-names", name);
+> +
+> +	return of_get_rproc_by_index(np, index);
+> +}
+> +EXPORT_SYMBOL(of_get_rproc_by_name);
+> +
+>  /**
+>   * rproc_get_by_phandle() - find a remote processor by phandle
+>   * @phandle: phandle to the rproc
+> @@ -1203,7 +1280,6 @@ EXPORT_SYMBOL(rproc_shutdown);
+>   *
+>   * Returns the rproc handle on success, and NULL on failure.
+>   */
+> -#ifdef CONFIG_OF
+>  struct rproc *rproc_get_by_phandle(phandle phandle)
+>  {
+>  	struct rproc *rproc = NULL, *r;
+> diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+> index 1c457a8..f130938 100644
+> --- a/include/linux/remoteproc.h
+> +++ b/include/linux/remoteproc.h
+> @@ -487,7 +487,6 @@ struct rproc_vdev {
+>  	u32 rsc_offset;
+>  };
+>  
+> -struct rproc *rproc_get_by_phandle(phandle phandle);
+>  struct rproc *rproc_alloc(struct device *dev, const char *name,
+>  				const struct rproc_ops *ops,
+>  				const char *firmware, int len);
+> @@ -511,4 +510,28 @@ static inline struct rproc *vdev_to_rproc(struct virtio_device *vdev)
+>  	return rvdev->rproc;
+>  }
+>  
+> +#ifdef CONFIG_OF
+> +extern struct rproc *of_get_rproc_by_index(struct device_node *np,
+> +					   int index);
+> +extern struct rproc *of_get_rproc_by_name(struct device_node *np,
+> +					  const char *name);
+> +extern struct rproc *rproc_get_by_phandle(phandle phandle);
+> +#else
+> +static inline
+> +struct rproc *of_get_rproc_by_index(struct device_node *np, int index)
+> +{
+> +	return NULL;
+> +}
+> +static inline
+> +struct rproc *of_get_rproc_by_name(struct device_node *np, const char *name)
+> +{
+> +	return NULL;
+> +}
+> +static inline
+> +struct rproc *rproc_get_by_phandle(phandle phandle)
+> +{
+> +	return NULL;
+> +}
+> +#endif /* CONFIG_OF */
+> +
+>  #endif /* REMOTEPROC_H */
+> -- 
+> 2.9.0
+> 
