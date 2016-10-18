@@ -1,45 +1,314 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 18 Oct 2016 13:08:52 -0700
-Subject: [PATCH 1/2] mmc: sdhci-iproc: Add brcm, sdhci-iproc compat string
- in bindings document
-In-Reply-To: <20161018131614.lskxbdir3ghun5md@rob-hp-laptop>
-References: <1476297352-7812-1-git-send-email-scott.branden@broadcom.com>
- <1476297352-7812-2-git-send-email-scott.branden@broadcom.com>
- <20161018131614.lskxbdir3ghun5md@rob-hp-laptop>
-Message-ID: <93502f42-ae86-742f-a8b1-3645005fa98e@broadcom.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 18 Oct 2016 22:17:44 +0200
+Subject: [RFC PATCH] mtd: nand: Add OX820 NAND Support
+In-Reply-To: <20161018090927.1990-1-narmstrong@baylibre.com>
+References: <20161018090927.1990-1-narmstrong@baylibre.com>
+Message-ID: <20161018221744.5e574e82@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Neil,
 
-On 16-10-18 06:16 AM, Rob Herring wrote:
-> On Wed, Oct 12, 2016 at 11:35:51AM -0700, Scott Branden wrote:
->> Adds brcm,sdhci-iproc compat string to DT bindings document for
->> the iProc SDHCI driver.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->>  Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
->> index be56d2b..aa58b94 100644
->> --- a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
->> +++ b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
->> @@ -7,6 +7,7 @@ Required properties:
->>  - compatible : Should be one of the following
->>  	       "brcm,bcm2835-sdhci"
->>  	       "brcm,sdhci-iproc-cygnus"
->> +	       "brcm,sdhci-iproc"
->
-> Seems kind of generic. SoC specific compatible strings please.
->
-The compatibility string is generic on purpose as it is not intended to 
-be SoC specific but work on all new iproc SoCs that have the proper 
-fixes in place for this block (unlike bcm2835 and cygnus class devices 
-which can only do 32-bit accesses).  I could call it brcm,sdhci-iproc-v2 
-if that is better or leave it as is.  Please let me know your preferences.
+On Tue, 18 Oct 2016 11:09:27 +0200
+Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-Regards,
-Scott
+> Add NAND driver to support the Oxford Semiconductor OX820 NAND Controller.
+> This is a simple memory mapped NAND controller with single chip select and
+> software ECC.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/mtd/oxnas-nand.txt         |  24 ++++
+>  drivers/mtd/nand/Kconfig                           |   5 +
+>  drivers/mtd/nand/Makefile                          |   1 +
+>  drivers/mtd/nand/oxnas_nand.c                      | 144 +++++++++++++++++++++
+>  4 files changed, 174 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+>  create mode 100644 drivers/mtd/nand/oxnas_nand.c
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/oxnas-nand.txt b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+> new file mode 100644
+> index 0000000..83b684d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+> @@ -0,0 +1,24 @@
+> +* Oxford Semiconductor OXNAS NAND Controller
+> +
+> +Please refer to nand.txt for generic information regarding MTD NAND bindings.
+> +
+> +Required properties:
+> + - compatible: "oxsemi,ox820-nand"
+> + - reg: Base address and length for NAND mapped memory.
+> +
+> +Optional Properties:
+> + - clocks: phandle to the NAND gate clock if needed.
+> + - resets: phandle to the NAND reset control if needed.
+> +
+> +Example:
+> +
+> +nand: nand at 41000000 {
+> +	compatible = "oxsemi,ox820-nand";
+> +	reg = <0x41000000 0x100000>;
+> +	nand-ecc-mode = "soft";
+> +	clocks = <&stdclk CLK_820_NAND>;
+> +	resets = <&reset RESET_NAND>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	status = "disabled";
+> +};
+
+Can you switch to new DT representation for NAND controllers, with one
+node for the NAND controller and NAND devices connected to this NAND
+controller defined as sub-nodes of this NAND controller [1]?
+
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 7b7a887..c023125 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -426,6 +426,11 @@ config MTD_NAND_ORION
+>  	  No board specific support is done by this driver, each board
+>  	  must advertise a platform_device for the driver to attach.
+>  
+> +config MTD_NAND_OXNAS
+> +	tristate "NAND Flash support for Oxford Semiconductor SoC"
+> +	help
+> +	  This enables the NAND flash controller on Oxford Semiconductor SoCs.
+> +
+>  config MTD_NAND_FSL_ELBC
+>  	tristate "NAND support for Freescale eLBC controllers"
+>  	depends on FSL_SOC
+> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+> index cafde6f..05fc054 100644
+> --- a/drivers/mtd/nand/Makefile
+> +++ b/drivers/mtd/nand/Makefile
+> @@ -35,6 +35,7 @@ obj-$(CONFIG_MTD_NAND_TMIO)		+= tmio_nand.o
+>  obj-$(CONFIG_MTD_NAND_PLATFORM)		+= plat_nand.o
+>  obj-$(CONFIG_MTD_NAND_PASEMI)		+= pasemi_nand.o
+>  obj-$(CONFIG_MTD_NAND_ORION)		+= orion_nand.o
+> +obj-$(CONFIG_MTD_NAND_OXNAS)		+= oxnas_nand.o
+>  obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_elbc_nand.o
+>  obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
+>  obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
+> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+> new file mode 100644
+> index 0000000..ee402ab
+> --- /dev/null
+> +++ b/drivers/mtd/nand/oxnas_nand.c
+> @@ -0,0 +1,144 @@
+> +/*
+> + * Oxford Semiconductor OXNAS NAND driver
+> + *
+> + * Heavily based on plat_nand.c :
+> + * Author: Vitaly Wool <vitalywool@gmail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/clk.h>
+> +#include <linux/reset.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/nand.h>
+> +#include <linux/mtd/partitions.h>
+> +
+> +/* nand commands */
+> +#define NAND_CMD_ALE		BIT(18)
+> +#define NAND_CMD_CLE		BIT(19)
+> +#define NAND_CMD_CS		0
+
+I guess this is zero here because you only support connecting a NAND to
+CS0.
+It's probably something like
+
+OX820_NAND_CS(x)		((x) << CS_FIELD_SHIFT)
+
+> +#define NAND_CMD_RESET		0xff
+
+Why do you have to redefine it? it's already defined here [2].
+
+> +#define NAND_CMD		(NAND_CMD_CS | NAND_CMD_CLE)
+> +#define NAND_ADDR		(NAND_CMD_CS | NAND_CMD_ALE)
+> +#define NAND_DATA		(NAND_CMD_CS)
+
+Please prefix those macros with OX820, has stated above, this can
+conflict with generic definitions.
+Also, I'm not sure you should pass the CS information here.
+
+> +
+> +struct oxnas_nand_data {
+> +	struct nand_chip	chip;
+> +	void __iomem		*io_base;
+> +	struct clk		*clk;
+> +};
+
+Even if your driver does not seem to support connecting several chips
+to the same controller, I'd like you to clearly separate the NAND
+controller and NAND chip objects:
+
+#define OXNAS_NAND_MAX_CHIPS	1
+
+struct oxnas_nand_controller {
+	struct nand_hw_control base;
+	void __iomem *io_base;
+	struct clk *clk;
+	struct nand_chip *chips[OXNAS_NAND_MAX_CHIPS];
+}
+
+> +
+> +static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+> +				unsigned int ctrl)
+> +{
+> +	struct nand_chip *this = mtd->priv;
+> +	unsigned long nandaddr = (unsigned long) this->IO_ADDR_W;
+
+Please use the ->io_base field directly, and do not use ->IO_ADDR_W/R
+(I'd like to get rid of them at some point).
+
+Also, declare the nandaddr as a void __iomem *, and use the '+'
+operator instead of '|'.
+
+> +
+> +	if (ctrl & NAND_CTRL_CHANGE) {
+> +		nandaddr &= ~(NAND_CMD | NAND_ADDR);
+
+This is not needed.
+
+> +		if (ctrl & NAND_CLE)
+> +			nandaddr |= NAND_CMD;
+> +		else if (ctrl & NAND_ALE)
+> +			nandaddr |= NAND_ADDR;
+> +		this->IO_ADDR_W = (void __iomem *) nandaddr;
+
+This is not needed, is it?
+
+> +	}
+> +
+> +	if (cmd != NAND_CMD_NONE)
+> +		writeb(cmd, (void __iomem *) nandaddr);
+> +}
+> +
+> +/*
+> + * Probe for the NAND device.
+> + */
+> +static int oxnas_nand_probe(struct platform_device *pdev)
+> +{
+> +	struct oxnas_nand_data *data;
+> +	struct mtd_info *mtd;
+> +	struct resource *res;
+> +	int err = 0;
+> +
+> +	/* Allocate memory for the device structure (and zero it) */
+> +	data = devm_kzalloc(&pdev->dev, sizeof(struct oxnas_nand_data),
+> +			    GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->io_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->io_base))
+> +		return PTR_ERR(data->io_base);
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk))
+> +		data->clk = NULL;
+> +
+> +	nand_set_flash_node(&data->chip, pdev->dev.of_node);
+> +	mtd = nand_to_mtd(&data->chip);
+> +	mtd->dev.parent = &pdev->dev;
+> +	mtd->priv = &data->chip;
+> +
+> +	data->chip.IO_ADDR_R = data->io_base;
+> +	data->chip.IO_ADDR_W = data->io_base;
+
+As I said above, don't use these fields.
+
+> +	data->chip.cmd_ctrl = oxnas_nand_cmd_ctrl;
+> +	data->chip.chip_delay = 30;
+> +	data->chip.ecc.mode = NAND_ECC_SOFT;
+> +	data->chip.ecc.algo = NAND_ECC_HAMMING;
+
+Probably a good idea to support soft ECC as well...
+
+> +
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	clk_prepare_enable(data->clk);
+> +	device_reset_optional(&pdev->dev);
+> +
+> +	/* Scan to find existence of the device */
+> +	if (nand_scan(mtd, 1)) {
+
+Why not returning nand_scan() error code?
+
+> +		err = -ENXIO;
+> +		goto out;
+
+Return directly here.
+
+> +	}
+> +
+> +	err = mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
+
+Use mtd_device_register() here.
+
+> +	if (!err)
+> +		return err;
+> +
+> +	nand_release(mtd);
+
+Why not
+
+	if (err)
+		nand_release(mtd);
+
+> +out:
+
+Drop this label.
+
+> +	return err;
+> +}
+> +
+> +static int oxnas_nand_remove(struct platform_device *pdev)
+> +{
+> +	struct oxnas_nand_data *data = platform_get_drvdata(pdev);
+> +
+> +	nand_release(nand_to_mtd(&data->chip));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id oxnas_nand_match[] = {
+> +	{ .compatible = "oxsemi,ox820-nand" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, oxnas_nand_match);
+> +
+> +static struct platform_driver oxnas_nand_driver = {
+> +	.probe	= oxnas_nand_probe,
+> +	.remove	= oxnas_nand_remove,
+> +	.driver	= {
+> +		.name		= "oxnas_nand",
+> +		.of_match_table = oxnas_nand_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(oxnas_nand_driver);
+> +
+> +MODULE_LICENSE("GPL");
+> +MODULE_AUTHOR("Vitaly Wool");
+> +MODULE_DESCRIPTION("Oxnas NAND driver");
+> +MODULE_ALIAS("platform:oxnas_nand");
+
+Thanks,
+
+Boris
+
+[1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/nand.txt?id=refs/tags/v4.9-rc1#n57
+[2]http://lxr.free-electrons.com/source/include/linux/mtd/nand.h#L90
