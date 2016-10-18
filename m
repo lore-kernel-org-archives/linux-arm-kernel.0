@@ -1,9 +1,9 @@
 From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Tue, 18 Oct 2016 18:45:37 -0200
-Subject: [PATCH v2 25/58] s5p-mfc: don't break long lines
+Date: Tue, 18 Oct 2016 18:45:33 -0200
+Subject: [PATCH v2 21/58] exynos4-is: don't break long lines
 In-Reply-To: <cover.1476822924.git.mchehab@s-opensource.com>
 References: <cover.1476822924.git.mchehab@s-opensource.com>
-Message-ID: <51f236263e90bbedcfc3c91522ee1d3ed7f53326.1476822925.git.mchehab@s-opensource.com>
+Message-ID: <ba44fe26d33c384380ea655abd459260a13f0f30.1476822924.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -64,59 +64,22 @@ while (<>) {
 
 Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 13 ++++++-------
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c |  7 ++-----
- 2 files changed, 8 insertions(+), 12 deletions(-)
+ drivers/media/platform/exynos4-is/media-dev.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 52081ddc9bf2..cf787eae11b7 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -793,18 +793,17 @@ static int vidioc_g_crop(struct file *file, void *priv,
- 		cr->c.top = top;
- 		cr->c.width = ctx->img_width - left - right;
- 		cr->c.height = ctx->img_height - top - bottom;
--		mfc_debug(2, "Cropping info [h264]: l=%d t=%d "
--			"w=%d h=%d (r=%d b=%d fw=%d fh=%d\n", left, top,
--			cr->c.width, cr->c.height, right, bottom,
--			ctx->buf_width, ctx->buf_height);
-+		mfc_debug(2, "Cropping info [h264]: l=%d t=%d w=%d h=%d (r=%d b=%d fw=%d fh=%d\n",
-+			  left, top, cr->c.width, cr->c.height, right, bottom,
-+			  ctx->buf_width, ctx->buf_height);
- 	} else {
- 		cr->c.left = 0;
- 		cr->c.top = 0;
- 		cr->c.width = ctx->img_width;
- 		cr->c.height = ctx->img_height;
--		mfc_debug(2, "Cropping info: w=%d h=%d fw=%d "
--			"fh=%d\n", cr->c.width,	cr->c.height, ctx->buf_width,
--							ctx->buf_height);
-+		mfc_debug(2, "Cropping info: w=%d h=%d fw=%d fh=%d\n",
-+			  cr->c.width,	cr->c.height, ctx->buf_width,
-+			  ctx->buf_height);
- 	}
- 	return 0;
- }
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-index 81e1e4ce6c24..f4301d5bbd32 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c
-@@ -1293,14 +1293,11 @@ static int s5p_mfc_run_init_dec_buffers(struct s5p_mfc_ctx *ctx)
- 	 * First set the output frame buffers
- 	 */
- 	if (ctx->capture_state != QUEUE_BUFS_MMAPED) {
--		mfc_err("It seems that not all destionation buffers were "
--			"mmaped\nMFC requires that all destination are mmaped "
--			"before starting processing\n");
-+		mfc_err("It seems that not all destionation buffers were mmaped\nMFC requires that all destination are mmaped before starting processing\n");
- 		return -EAGAIN;
- 	}
- 	if (list_empty(&ctx->src_queue)) {
--		mfc_err("Header has been deallocated in the middle of"
--			" initialization\n");
-+		mfc_err("Header has been deallocated in the middle of initialization\n");
- 		return -EIO;
- 	}
- 	temp_vb = list_entry(ctx->src_queue.next, struct s5p_mfc_buf, list);
+diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
+index 1a1154a9dfa4..e3a8709138fa 100644
+--- a/drivers/media/platform/exynos4-is/media-dev.c
++++ b/drivers/media/platform/exynos4-is/media-dev.c
+@@ -938,8 +938,7 @@ static int fimc_md_create_links(struct fimc_md *fmd)
+ 
+ 			csis = fmd->csis[pdata->mux_id].sd;
+ 			if (WARN(csis == NULL,
+-				 "MIPI-CSI interface specified "
+-				 "but s5p-csis module is not loaded!\n"))
++				 "MIPI-CSI interface specified but s5p-csis module is not loaded!\n"))
+ 				return -EINVAL;
+ 
+ 			pad = sensor->entity.num_pads - 1;
 -- 
 2.7.4
