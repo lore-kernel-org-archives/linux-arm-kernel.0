@@ -1,144 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 18 Oct 2016 16:07:28 +0100
-Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
-Message-ID: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 18 Oct 2016 16:09:04 +0100
+Subject: [PATCH] coresight: reset "enable_sink" flag when need be
+In-Reply-To: <1475874643-9464-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1475874643-9464-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <5129dc7c-7d62-1d7e-9535-0fd5baa6bd48@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lx-fdtdump dumps the flatenned device tree passed to the kernel
-from the bootloader to a file called fdtdump.dtb to allow further
-post processing on the machine running GDB. The fdt header is also
-also printed in the GDB console. For example:
+On 07/10/16 22:10, Mathieu Poirier wrote:
+> When using coresight from the perf interface sinks are specified
+> as part of the perf command line.  As such the sink needs to be
+> disabled once it has been acknowledged by the coresight framework.
+> Otherwise the sink stays enabled, which may interfere with other
+> sessions.
+>
 
-(gdb) lx-fdtdump
-fdt_magic:         0xD00DFEED
-fdt_totalsize:     0xC108
-off_dt_struct:     0x38
-off_dt_strings:    0x3804
-off_mem_rsvmap:    0x28
-version:           17
-last_comp_version: 16
-Dumped fdt to fdtdump.dtb
+I personally think the descriptions needs to be a bit more clearer
+from here on.
 
->fdtdump fdtdump.dtb | less
+> This patch removes the sink selection check from the build path
+> process and make it a function on it's own.  The function is
+> then used when operating from sysFS or perf to determine what
+> sink has been selected.
 
-This command is useful as the bootloader can often re-write parts
-of the device tree, and this can sometimes cause the kernel to not
-boot.
+I think you should mention that the helper function provides an
+option to "de-activate" the enabled sink, once it has been "found"
+by a lookup. Perf uses this option to de-activate the sink, while
+sysfs leaves it to the user to do the same.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- scripts/gdb/linux/constants.py.in |  8 +++++
- scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 77 insertions(+), 1 deletion(-)
+We don't have a mechanism to ensure that the "enabled" sink is
+the one perf really enabled for us. But there is nothing much we
+could do and should rely on the user to do it right for us.
 
-diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
-index 7986f4e..43c6241 100644
---- a/scripts/gdb/linux/constants.py.in
-+++ b/scripts/gdb/linux/constants.py.in
-@@ -14,6 +14,7 @@
- 
- #include <linux/fs.h>
- #include <linux/mount.h>
-+#include <linux/of_fdt.h>
- 
- /* We need to stringify expanded macros so that they can be parsed */
- 
-@@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
- LX_VALUE(MNT_NOATIME)
- LX_VALUE(MNT_NODIRATIME)
- LX_VALUE(MNT_RELATIME)
-+
-+/* linux/of_fdt.h> */
-+LX_VALUE(OF_DT_HEADER)
-+
-+/* Kernel Configs */
-+LX_CONFIG(CONFIG_OF)
-+
-diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
-index 38b1f09..f20fcfa 100644
---- a/scripts/gdb/linux/proc.py
-+++ b/scripts/gdb/linux/proc.py
-@@ -16,7 +16,7 @@ from linux import constants
- from linux import utils
- from linux import tasks
- from linux import lists
--
-+from struct import *
- 
- class LxCmdLine(gdb.Command):
-     """ Report the Linux Commandline used in the current kernel.
-@@ -195,3 +195,71 @@ values of that process namespace"""
-                         info_opts(MNT_INFO, m_flags)))
- 
- LxMounts()
-+
-+class LxFdtDump(gdb.Command):
-+    """Output Flattened Device Tree header and dump FDT blob to a file
-+       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
-+
-+    def __init__(self):
-+        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
-+
-+    def fdthdr_to_cpu(self, fdt_header):
-+
-+            fdt_header_be = ">IIIIIII"
-+            fdt_header_le = "<IIIIIII"
-+
-+            if utils.get_target_endianness() == 1:
-+                output_fmt = fdt_header_le
-+            else:
-+                output_fmt = fdt_header_be
-+
-+            return unpack(output_fmt, pack(fdt_header_be,
-+                                           fdt_header['magic'],
-+                                           fdt_header['totalsize'],
-+                                           fdt_header['off_dt_struct'],
-+                                           fdt_header['off_dt_strings'],
-+                                           fdt_header['off_mem_rsvmap'],
-+                                           fdt_header['version'],
-+                                           fdt_header['last_comp_version']))
-+
-+    def invoke(self, arg, from_tty):
-+
-+        if constants.LX_CONFIG_OF:
-+
-+            filename = "fdtdump.dtb"
-+
-+            py_fdt_header_ptr = gdb.parse_and_eval(
-+                "(const struct fdt_header *) initial_boot_params")
-+            py_fdt_header = py_fdt_header_ptr.dereference()
-+
-+            fdt_header = self.fdthdr_to_cpu(py_fdt_header)
-+
-+            if fdt_header[0] != constants.LX_OF_DT_HEADER:
-+                raise gdb.GdbError("No flattened device tree magic found\n")
-+
-+            gdb.write("fdt_magic:         0x{:02X}\n".format(fdt_header[0]))
-+            gdb.write("fdt_totalsize:     0x{:02X}\n".format(fdt_header[1]))
-+            gdb.write("off_dt_struct:     0x{:02X}\n".format(fdt_header[2]))
-+            gdb.write("off_dt_strings:    0x{:02X}\n".format(fdt_header[3]))
-+            gdb.write("off_mem_rsvmap:    0x{:02X}\n".format(fdt_header[4]))
-+            gdb.write("version:           {}\n".format(fdt_header[5]))
-+            gdb.write("last_comp_version: {}\n".format(fdt_header[6]))
-+
-+            inf = gdb.inferiors()[0]
-+            fdt_buf = utils.read_memoryview(inf, py_fdt_header_ptr,
-+                                            fdt_header[1]).tobytes()
-+
-+            try:
-+                f = open(filename, 'wb')
-+            except:
-+                raise gdb.GdbError("Could not open file to dump fdt")
-+
-+            f.write(fdt_buf)
-+            f.close()
-+
-+            gdb.write("Dumped fdt to " + filename + "\n")
-+
-+        else:
-+            gdb.write("Kernel not compiled with CONFIG_OF\n")
-+
-+LxFdtDump()
--- 
-1.9.1
+So, with the changes to description :
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
