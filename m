@@ -1,83 +1,44 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 18 Oct 2016 16:50:18 +0530
-Subject: [PATCH v4 2/4] net: phy: dp83867: add support for MAC impedance
- configuration
+Date: Tue, 18 Oct 2016 16:50:20 +0530
+Subject: [PATCH v4 4/4] ARM: dts: dra72-evm-revc: fix correct phy delay
 In-Reply-To: <20161018112020.30273-1-mugunthanvnm@ti.com>
 References: <20161018112020.30273-1-mugunthanvnm@ti.com>
-Message-ID: <20161018112020.30273-3-mugunthanvnm@ti.com>
+Message-ID: <20161018112020.30273-5-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for programmable MAC impedance configuration
+The current delay settings of the phy are not the optimal value,
+fix it with correct values.
 
 Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- drivers/net/phy/dp83867.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/boot/dts/dra72-evm-revc.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/phy/dp83867.c b/drivers/net/phy/dp83867.c
-index 91177a4..1b63924 100644
---- a/drivers/net/phy/dp83867.c
-+++ b/drivers/net/phy/dp83867.c
-@@ -33,6 +33,7 @@
- /* Extended Registers */
- #define DP83867_RGMIICTL	0x0032
- #define DP83867_RGMIIDCTL	0x0086
-+#define DP83867_IO_MUX_CFG	0x0170
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index 5450367..3b23b32 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -59,16 +59,16 @@
+ &davinci_mdio {
+ 	dp83867_0: ethernet-phy at 2 {
+ 		reg = <2>;
+-		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+-		ti,tx-internal-delay = <DP83867_RGMIIDCTL_1_NS>;
++		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_25_NS>;
++		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
+ 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+ 		ti,min-output-impedance;
+ 	};
  
- #define DP83867_SW_RESET	BIT(15)
- #define DP83867_SW_RESTART	BIT(14)
-@@ -62,10 +63,17 @@
- /* RGMIIDCTL bits */
- #define DP83867_RGMII_TX_CLK_DELAY_SHIFT	4
- 
-+/* IO_MUX_CFG bits */
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL	0x1f
-+
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX	0x0
-+#define DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN	0x1f
-+
- struct dp83867_private {
- 	int rx_id_delay;
- 	int tx_id_delay;
- 	int fifo_depth;
-+	int io_impedance;
- };
- 
- static int dp83867_ack_interrupt(struct phy_device *phydev)
-@@ -111,6 +119,14 @@ static int dp83867_of_init(struct phy_device *phydev)
- 	if (!of_node)
- 		return -ENODEV;
- 
-+	dp83867->io_impedance = -EINVAL;
-+
-+	/* Optional configuration */
-+	if (of_property_read_bool(of_node, "ti,max-output-impedance"))
-+		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MAX;
-+	else if (of_property_read_bool(of_node, "ti,min-output-impedance"))
-+		dp83867->io_impedance = DP83867_IO_MUX_CFG_IO_IMPEDANCE_MIN;
-+
- 	ret = of_property_read_u32(of_node, "ti,rx-internal-delay",
- 				   &dp83867->rx_id_delay);
- 	if (ret)
-@@ -184,6 +200,18 @@ static int dp83867_config_init(struct phy_device *phydev)
- 
- 		phy_write_mmd_indirect(phydev, DP83867_RGMIIDCTL,
- 				       DP83867_DEVADDR, delay);
-+
-+		if (dp83867->io_impedance >= 0) {
-+			val = phy_read_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
-+						    DP83867_DEVADDR);
-+
-+			val &= ~DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
-+			val |= dp83867->io_impedance &
-+			       DP83867_IO_MUX_CFG_IO_IMPEDANCE_CTRL;
-+
-+			phy_write_mmd_indirect(phydev, DP83867_IO_MUX_CFG,
-+					       DP83867_DEVADDR, val);
-+		}
- 	}
- 
- 	return 0;
+ 	dp83867_1: ethernet-phy at 3 {
+ 		reg = <3>;
+-		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_00_NS>;
+-		ti,tx-internal-delay = <DP83867_RGMIIDCTL_1_NS>;
++		ti,rx-internal-delay = <DP83867_RGMIIDCTL_2_25_NS>;
++		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
+ 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+ 		ti,min-output-imepdance;
+ 	};
 -- 
 2.10.1.445.g3cdd5d1
