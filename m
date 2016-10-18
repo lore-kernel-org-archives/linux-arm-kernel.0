@@ -1,38 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Oct 2016 11:45:39 +0100
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <20161018100002.GA4347@xo-6d-61-c0.localdomain>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
- <20161018100002.GA4347@xo-6d-61-c0.localdomain>
-Message-ID: <20161018104539.GB15639@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 18 Oct 2016 05:46:49 -0500
+Subject: [PATCH V2 3/4] ACPI,PCI,IRQ: separate ISA penalty calculation
+In-Reply-To: <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
+References: <1467188859-28188-1-git-send-email-okaya@codeaurora.org>
+ <1467188859-28188-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161018104649.GA13940@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
-> > >b. in arm64, if some platform has its own suspend flow,  couldn't it
-> > >adopts arm/match-xxx to register its own global suspend method?
-> > 
-> > No, PSCI is highly recommended.
+Hi Sinan,
+
+On Wed, Jun 29, 2016 at 04:27:37AM -0400, Sinan Kaya wrote:
+> Since commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
+> the penalty values are calculated on the fly rather than boot time.
 > 
-> Relying on firmware for suspend on x86 was a great disaster, lets not repeat
-> that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
-> for example) -- feel free to copy that code from arm32.
+> This works fine for PCI interrupts but not so well for the ISA interrupts.
+> Whether an ISA interrupt is in use or not information is not available
+> inside the pci_link.c file. This information gets sent externally via
+> acpi_penalize_isa_irq function. If active is true, then the IRQ is in use
+> by ISA. Otherwise, IRQ is in use by PCI.
+> 
+> Since the current code relies on PCI Link object for determination of
+> penalties, we are factoring in the PCI penalty twice after
+> acpi_penalize_isa_irq function is called.
 
-Quite frankly, copying hundreds of lines of board-specific code
-(including assembly that won't compile) is unlikely to help.
+I know this patch has already been merged, but I'm confused.
 
-So far arm64 requires well-defined, standard, reusable interfaces (e.g.
-PSCI). That cleanly separates concerns (e.g. anyone can implement the
-backend without mandatory changes to the kernel), and keeps things
-maintainable.
+Can you be a little more specific about how we factor in the PCI
+penalty twice?  I think that when we enumerate an enabled link device,
+we call acpi_penalize_isa_irq(x) in this path:
 
-ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
-can use and build atop of. It's open source (three-clause BSD with DCO),
-and accepts board ports. You can have a completely open stack,
-regardless of whether part of that stack is firmware.
+  pnpacpi_allocated_resource
+    pnpacpi_add_irqresource
+      pcibios_penalize_isa_irq
+        acpi_penalize_isa_irq
+          acpi_isa_irq_penalty[x] = PIRQ_PENALTY_ISA_USED
 
-Thanks,
-Mark.
+And I see that acpi_irq_penalty_init() also adds in some penalty
+(either "PIRQ_PENALTY_PCI_POSSIBLE / possible_count" or
+PIRQ_PENALTY_PCI_POSSIBLE).  And when we call acpi_irq_get_penalty(x),
+we add in PIRQ_PENALTY_PCI_USING.
+
+It doesn't seem right to me that we're adding both
+PIRQ_PENALTY_ISA_USED and PIRQ_PENALTY_PCI_USING.  Is that the problem
+you're referring to?
+
+> This change is limiting the newly added functionality to just PCI
+> interrupts so that old behavior is still maintained.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index 714ba4d..8c08971 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -496,9 +496,6 @@ static int acpi_irq_get_penalty(int irq)
+>  {
+>  	int penalty = 0;
+>  
+> -	if (irq < ACPI_MAX_ISA_IRQS)
+> -		penalty += acpi_isa_irq_penalty[irq];
+> -
+>  	/*
+>  	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
+>  	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
+> @@ -513,6 +510,9 @@ static int acpi_irq_get_penalty(int irq)
+>  			penalty += PIRQ_PENALTY_PCI_USING;
+>  	}
+>  
+> +	if (irq < ACPI_MAX_ISA_IRQS)
+> +		return penalty + acpi_isa_irq_penalty[irq];
+> +
+>  	penalty += acpi_irq_pci_sharing_penalty(irq);
+>  	return penalty;
+
+I don't understand what's going on here.
+
+acpi_irq_pci_sharing_penalty(X) basically tells us how many link
+devices are already using IRQ X.  This change makes it so we don't
+consider that information if X < ACPI_MAX_ISA_IRQS.
+
+Let's say we have several link devices that are initially disabled,
+e.g.,
+
+  LNKA (IRQs 9 10 11)
+  LNKB (IRQs 9 10 11)
+  LNKC (IRQs 9 10 11)
+
+When we enable these, I think we'll choose the same IRQ for all of
+them because we no longer look@the other links to see how they're
+configured.
+
+>  }
+> -- 
+> 1.8.2.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
