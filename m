@@ -1,65 +1,231 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 18 Oct 2016 14:36:02 +0530
-Subject: [STLinux Kernel] [PATCH 02/19] phy: stih41x-usb: Remove usb phy
- driver and dt binding documentation.
-In-Reply-To: <59fa8f92-114b-7b5f-fd2f-46c4f02b545e@st.com>
-References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-3-git-send-email-peter.griffin@linaro.org>
- <20160923150656.GB9176@rob-hp-laptop>
- <778bd4b2-9e82-326b-f6e0-43360323d453@st.com>
- <59fa8f92-114b-7b5f-fd2f-46c4f02b545e@st.com>
-Message-ID: <5805E5FA.6020609@ti.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 18 Oct 2016 11:09:27 +0200
+Subject: [RFC PATCH] mtd: nand: Add OX820 NAND Support
+Message-ID: <20161018090927.1990-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add NAND driver to support the Oxford Semiconductor OX820 NAND Controller.
+This is a simple memory mapped NAND controller with single chip select and
+software ECC.
 
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../devicetree/bindings/mtd/oxnas-nand.txt         |  24 ++++
+ drivers/mtd/nand/Kconfig                           |   5 +
+ drivers/mtd/nand/Makefile                          |   1 +
+ drivers/mtd/nand/oxnas_nand.c                      | 144 +++++++++++++++++++++
+ 4 files changed, 174 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+ create mode 100644 drivers/mtd/nand/oxnas_nand.c
 
-On Tuesday 18 October 2016 02:22 PM, Patrice Chotard wrote:
-> 
-> 
-> On 10/18/2016 09:47 AM, Patrice Chotard wrote:
->> Hi 
->>
->> On 09/23/2016 05:06 PM, Rob Herring wrote:
->>> On Wed, Sep 14, 2016 at 02:27:40PM +0100, Peter Griffin wrote:
->>>> This phy is only used on STiH415/6 based silicon, and support for
->>>> these SoC's is being removed from the kernel.
->>>>
->>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>>> Cc: <kishon@ti.com>
->>>> ---
->>>>  .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 ---
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> Applied on sti-dt-for-4.10 branch
-> 
-> 
-> Sorry, i did a mistake, these patch should go in linux-phy tree.
-> Kishon will you take care of it ?
-
-sure, will queue this.
-
-Thanks
-Kishon
-
-> 
-> Thanks
-> 
->>
->> Thanks 
->>
->>
->>>
->>>>  drivers/phy/Kconfig                                |   8 -
->>>>  drivers/phy/Makefile                               |   1 -
->>>>  drivers/phy/phy-stih41x-usb.c                      | 188 ---------------------
->>>>  4 files changed, 221 deletions(-)
->>>>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
->>>>  delete mode 100644 drivers/phy/phy-stih41x-usb.c
->>
->> _______________________________________________
->> Kernel mailing list
->> Kernel at stlinux.com
->> http://www.stlinux.com/mailman/listinfo/kernel
->>
+diff --git a/Documentation/devicetree/bindings/mtd/oxnas-nand.txt b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+new file mode 100644
+index 0000000..83b684d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+@@ -0,0 +1,24 @@
++* Oxford Semiconductor OXNAS NAND Controller
++
++Please refer to nand.txt for generic information regarding MTD NAND bindings.
++
++Required properties:
++ - compatible: "oxsemi,ox820-nand"
++ - reg: Base address and length for NAND mapped memory.
++
++Optional Properties:
++ - clocks: phandle to the NAND gate clock if needed.
++ - resets: phandle to the NAND reset control if needed.
++
++Example:
++
++nand: nand at 41000000 {
++	compatible = "oxsemi,ox820-nand";
++	reg = <0x41000000 0x100000>;
++	nand-ecc-mode = "soft";
++	clocks = <&stdclk CLK_820_NAND>;
++	resets = <&reset RESET_NAND>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	status = "disabled";
++};
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 7b7a887..c023125 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -426,6 +426,11 @@ config MTD_NAND_ORION
+ 	  No board specific support is done by this driver, each board
+ 	  must advertise a platform_device for the driver to attach.
+ 
++config MTD_NAND_OXNAS
++	tristate "NAND Flash support for Oxford Semiconductor SoC"
++	help
++	  This enables the NAND flash controller on Oxford Semiconductor SoCs.
++
+ config MTD_NAND_FSL_ELBC
+ 	tristate "NAND support for Freescale eLBC controllers"
+ 	depends on FSL_SOC
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index cafde6f..05fc054 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_MTD_NAND_TMIO)		+= tmio_nand.o
+ obj-$(CONFIG_MTD_NAND_PLATFORM)		+= plat_nand.o
+ obj-$(CONFIG_MTD_NAND_PASEMI)		+= pasemi_nand.o
+ obj-$(CONFIG_MTD_NAND_ORION)		+= orion_nand.o
++obj-$(CONFIG_MTD_NAND_OXNAS)		+= oxnas_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_elbc_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
+diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+new file mode 100644
+index 0000000..ee402ab
+--- /dev/null
++++ b/drivers/mtd/nand/oxnas_nand.c
+@@ -0,0 +1,144 @@
++/*
++ * Oxford Semiconductor OXNAS NAND driver
++ *
++ * Heavily based on plat_nand.c :
++ * Author: Vitaly Wool <vitalywool@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/clk.h>
++#include <linux/reset.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++
++/* nand commands */
++#define NAND_CMD_ALE		BIT(18)
++#define NAND_CMD_CLE		BIT(19)
++#define NAND_CMD_CS		0
++#define NAND_CMD_RESET		0xff
++#define NAND_CMD		(NAND_CMD_CS | NAND_CMD_CLE)
++#define NAND_ADDR		(NAND_CMD_CS | NAND_CMD_ALE)
++#define NAND_DATA		(NAND_CMD_CS)
++
++struct oxnas_nand_data {
++	struct nand_chip	chip;
++	void __iomem		*io_base;
++	struct clk		*clk;
++};
++
++static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
++				unsigned int ctrl)
++{
++	struct nand_chip *this = mtd->priv;
++	unsigned long nandaddr = (unsigned long) this->IO_ADDR_W;
++
++	if (ctrl & NAND_CTRL_CHANGE) {
++		nandaddr &= ~(NAND_CMD | NAND_ADDR);
++		if (ctrl & NAND_CLE)
++			nandaddr |= NAND_CMD;
++		else if (ctrl & NAND_ALE)
++			nandaddr |= NAND_ADDR;
++		this->IO_ADDR_W = (void __iomem *) nandaddr;
++	}
++
++	if (cmd != NAND_CMD_NONE)
++		writeb(cmd, (void __iomem *) nandaddr);
++}
++
++/*
++ * Probe for the NAND device.
++ */
++static int oxnas_nand_probe(struct platform_device *pdev)
++{
++	struct oxnas_nand_data *data;
++	struct mtd_info *mtd;
++	struct resource *res;
++	int err = 0;
++
++	/* Allocate memory for the device structure (and zero it) */
++	data = devm_kzalloc(&pdev->dev, sizeof(struct oxnas_nand_data),
++			    GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->io_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(data->io_base))
++		return PTR_ERR(data->io_base);
++
++	data->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(data->clk))
++		data->clk = NULL;
++
++	nand_set_flash_node(&data->chip, pdev->dev.of_node);
++	mtd = nand_to_mtd(&data->chip);
++	mtd->dev.parent = &pdev->dev;
++	mtd->priv = &data->chip;
++
++	data->chip.IO_ADDR_R = data->io_base;
++	data->chip.IO_ADDR_W = data->io_base;
++	data->chip.cmd_ctrl = oxnas_nand_cmd_ctrl;
++	data->chip.chip_delay = 30;
++	data->chip.ecc.mode = NAND_ECC_SOFT;
++	data->chip.ecc.algo = NAND_ECC_HAMMING;
++
++	platform_set_drvdata(pdev, data);
++
++	clk_prepare_enable(data->clk);
++	device_reset_optional(&pdev->dev);
++
++	/* Scan to find existence of the device */
++	if (nand_scan(mtd, 1)) {
++		err = -ENXIO;
++		goto out;
++	}
++
++	err = mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
++	if (!err)
++		return err;
++
++	nand_release(mtd);
++out:
++	return err;
++}
++
++static int oxnas_nand_remove(struct platform_device *pdev)
++{
++	struct oxnas_nand_data *data = platform_get_drvdata(pdev);
++
++	nand_release(nand_to_mtd(&data->chip));
++
++	return 0;
++}
++
++static const struct of_device_id oxnas_nand_match[] = {
++	{ .compatible = "oxsemi,ox820-nand" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, oxnas_nand_match);
++
++static struct platform_driver oxnas_nand_driver = {
++	.probe	= oxnas_nand_probe,
++	.remove	= oxnas_nand_remove,
++	.driver	= {
++		.name		= "oxnas_nand",
++		.of_match_table = oxnas_nand_match,
++	},
++};
++
++module_platform_driver(oxnas_nand_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Vitaly Wool");
++MODULE_DESCRIPTION("Oxnas NAND driver");
++MODULE_ALIAS("platform:oxnas_nand");
+-- 
+2.7.0
