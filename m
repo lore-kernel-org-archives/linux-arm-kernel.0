@@ -1,42 +1,38 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 18 Oct 2016 11:42:39 +0100
-Subject: [PATCH] ARM: dts: mps2: remove skeleton.dtsi include and fix unit
- address warnings
-In-Reply-To: <8b698799-6c7a-d20a-6e54-ddd9eb329369@arm.com>
-References: <1476704849-24039-1-git-send-email-vladimir.murzin@arm.com>
- <8b698799-6c7a-d20a-6e54-ddd9eb329369@arm.com>
-Message-ID: <5805FC9F.8080809@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Oct 2016 11:45:39 +0100
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <20161018100002.GA4347@xo-6d-61-c0.localdomain>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <20161018100002.GA4347@xo-6d-61-c0.localdomain>
+Message-ID: <20161018104539.GB15639@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/10/16 17:51, Sudeep Holla wrote:
+On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
+> > >b. in arm64, if some platform has its own suspend flow,  couldn't it
+> > >adopts arm/match-xxx to register its own global suspend method?
+> > 
+> > No, PSCI is highly recommended.
 > 
-> 
-> On 17/10/16 12:47, Vladimir Murzin wrote:
->> Removale of skeleton.dtsi allows us also to fix the following
->> warning from the dts compiler:
->>   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->>
->> by adding proper unit addresses to the memory nodes.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> 
-> It's always better to cc device-tree list, anyways applied this to [1].
+> Relying on firmware for suspend on x86 was a great disaster, lets not repeat
+> that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
+> for example) -- feel free to copy that code from arm32.
 
-Thanks!
+Quite frankly, copying hundreds of lines of board-specific code
+(including assembly that won't compile) is unlikely to help.
 
-Vladimir
+So far arm64 requires well-defined, standard, reusable interfaces (e.g.
+PSCI). That cleanly separates concerns (e.g. anyone can implement the
+backend without mandatory changes to the kernel), and keeps things
+maintainable.
 
-> 
-> -- 
-> Regards,
-> Sudeep
-> 
-> [1] git.kernel.org/sudeep.holla/linux/h/vexpress-dt/for-next
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
+can use and build atop of. It's open source (three-clause BSD with DCO),
+and accepts board ports. You can have a completely open stack,
+regardless of whether part of that stack is firmware.
+
+Thanks,
+Mark.
