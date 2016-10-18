@@ -1,37 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Oct 2016 17:18:58 +0200
-Subject: [PATCH] ASoC: PXA: Brownstone needs I2C
-Message-ID: <20161018151912.2742738-1-arnd@arndb.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 18 Oct 2016 08:20:55 -0700
+Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
+ interrupts
+In-Reply-To: <20161018135912.GD18903@localhost>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+ <20161018135912.GD18903@localhost>
+Message-ID: <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I rand into a new build error with SND_MMP_SOC_BROWNSTONE:
+On 10/18/2016 6:59 AM, Bjorn Helgaas wrote:
+>> However, this function only gets called if the IRQ number is greater than
+>> > 16 and acpi_irq_get_penalty function gets called before ACPI start in
+>> > acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
+>> > on iterating the link list.
 
-warning: (SND_MMP_SOC_BROWNSTONE && SND_SOC_SAMSUNG_SMDK_WM8994 && SND_SOC_SMDK_WM8994_PCM && SND_SOC_LITTLEMILL) selects MFD_WM8994 which has unmet direct dependencies (HAS_IOMEM && I2C)
-drivers/mfd/wm8994-core.c:688:1: error: data definition has no type or storage class [-Werror]
-drivers/mfd/wm8994-core.c:688:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+Maybe, I am missing context here. I can add this paragraph to the commit. 
 
-I don't see why this never showed up before, as the dependency seems to
-have been missing since the symbol was first introduced several years
-ago. This adds a dependency like the other drivers have.
+When we started cleaning the code we got rid of the acpi_irq_penalty_init function
+in favor of acpi_irq_pci_sharing_penalty function as it does have some fair
+amount of code duplication.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- sound/soc/pxa/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I tried putting back the acpi_irq_pci_sharing_penalty function into the ISA
+IRQ path again during the debug and the machine died way too early. We couldn't
+collect any debug message.
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index f2bf8661dd21..823b5a236d8d 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -208,7 +208,7 @@ config SND_PXA2XX_SOC_IMOTE2
- 
- config SND_MMP_SOC_BROWNSTONE
- 	tristate "SoC Audio support for Marvell Brownstone"
--	depends on SND_MMP_SOC && MACH_BROWNSTONE
-+	depends on SND_MMP_SOC && MACH_BROWNSTONE && I2C
- 	select SND_MMP_SOC_SSPA
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
+This is telling me that we can't even iterate the link list when these two API
+is called. ISA IRQ need to be handled with special care due to calling order.
+
+
+> It seems wrong to me that we call acpi_irq_get_penalty() from
+> acpi_irq_penalty_update() and acpi_penalize_isa_irq().  It seems like they
+> should just manipulate acpi_isa_irq_penalty[irq] directly.
+> 
+> acpi_irq_penalty_update() is for command-line parameters, so it certainly
+> doesn't need the acpi_irq_pci_sharing_penalty() information (the
+> acpi_link_list should be empty at the time we process the command-line
+> parameters).
+> 
+> acpi_penalize_isa_irq() is telling us that a PNP or ACPI device is using
+> the IRQ -- this should modify the IRQ's penalty, but it shouldn't depend on
+> the acpi_irq_pci_sharing_penalty() value at all.
+> 
+
+acpi_irq_get_penalty function knows how to deal with ISA IRQ. So, it is harmless
+to call it. Also, reading the acpi_isa_irq_penalty array directly isn't also right.
+It doesn't contain the SCI penalty. So, it returns incorrect penalty value.
+
+The rule of thumb is:
+- all PCI/SCI penalty reads need to go through acpi_isa_irq_penalty function
+- all ISA penalty writes need to go through acpi_isa_irq_penalty array directly.
+- we do not support modifying the PCI IRQ penalties greater than the ISA IRQ numbers.
+The original code supported this.
+
+
 -- 
-2.9.0
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
