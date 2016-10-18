@@ -1,68 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 09:30:37 -0500
-Subject: [PATCH 5/9] ARM: OMAP2+: board-generic: add support for DRA71x
- family
-In-Reply-To: <20161014130033.14172-6-lokeshvutla@ti.com>
-References: <20161014130033.14172-1-lokeshvutla@ti.com>
- <20161014130033.14172-6-lokeshvutla@ti.com>
-Message-ID: <20161018143037.xlmwmjzgtpu5dmbc@rob-hp-laptop>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 18 Oct 2016 20:13:06 +0530
+Subject: [RESEND PATCH v10 00/11] Add support for FDMA DMA controller and
+ slim core rproc found on STi chipsets
+In-Reply-To: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20161018144306.GX2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 06:30:29PM +0530, Lokesh Vutla wrote:
-> DRA71x processor family is a derivative of DRA722 ES2.0 targeted for
-> infotainment systems.
+On Tue, Oct 18, 2016 at 10:39:05AM +0100, Peter Griffin wrote:
+> Hi Vinod and Bjorn,
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  Documentation/devicetree/bindings/arm/omap/omap.txt | 6 ++++++
->  arch/arm/mach-omap2/board-generic.c                 | 1 +
->  2 files changed, 7 insertions(+)
+> This patchset adds support for the Flexible Direct Memory Access (FDMA) core
+> found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
+> with a dedicated firmware. It is a general purpose DMA controller supporting
+> 16 independent channels and data can be moved from memory to memory or between
+> memory and paced latency critical real time targets.
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index f53e2ee..454b1be 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -86,6 +86,9 @@ SoCs:
->  - DRA722
->    compatible = "ti,dra722", "ti,dra72", "ti,dra7"
->  
-> +- DRA718
-> +  compatible = "ti,dra718", "ti,dra722", "ti,dra72", "ti,dra7"
-
-Are dra72 and dra7 really useful? Your list is a bit long. Perhaps it is 
-time to drop those on new parts at least.
-
-Either way:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +
->  - AM5728
->    compatible = "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
->  
-> @@ -181,6 +184,9 @@ Boards:
->  - DRA722 EVM: Software Development Board for DRA722
->    compatible = "ti,dra72-evm", "ti,dra722", "ti,dra72", "ti,dra7"
->  
-> +- DRA718 EVM: Software Development Board for DRA718
-> +  compatible = "ti,dra718-evm", "ti,dra718", "ti,dra722", "ti,dra72", "ti,dra7"
-> +
->  - DM3730 Logic PD Torpedo + Wireless: Commercial System on Module with WiFi and Bluetooth
->    compatible = "logicpd,dm3730-torpedo-devkit", "ti,omap3630", "ti,omap3"
->  
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index bab814d..981b23a 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -341,6 +341,7 @@ static const char *const dra72x_boards_compat[] __initconst = {
->  	"ti,am5718",
->  	"ti,am5716",
->  	"ti,dra722",
-> +	"ti,dra718",
->  	NULL,
->  };
->  
-> -- 
-> 2.9.3
+> [..]
 > 
+> V10 series updates remoteproc kconfig subsystem to use 'depends on' rather
+> than select for the remoteproc core. Remoteproc client drivers now need to
+> 'depends on' for the core part.
+> 
+> This avoids the Kconfig recursive dependency errors and reliance on the DRM
+> patch included with the v9 series. Patches are also included for enabling the
+> remoteproc core in the multi_v7 defconfig. All patches for DRM subsystem have
+> been removed.
+> 
+> Note there is no longer a depedency with the DRM_VIRTIO_GPU driver in this series,
+> only remoteproc and dmaengine subsystems.
+
+That is a better approach and I have applied this now...
+
+-- 
+~Vinod
