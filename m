@@ -1,31 +1,47 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 18 Oct 2016 18:01:44 -0300
-Subject: [PATCH 0/4] i2c: Fix module autoload for some i2c busses platform
- drivers
-Message-ID: <1476824508-4679-1-git-send-email-javier@osg.samsung.com>
+Date: Tue, 18 Oct 2016 18:01:48 -0300
+Subject: [PATCH 4/4] i2c: digicolor: Fix module autoload
+In-Reply-To: <1476824508-4679-1-git-send-email-javier@osg.samsung.com>
+References: <1476824508-4679-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1476824508-4679-5-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+If the driver is built as a module, autoload won't work because the module
+alias information is not filled. So user-space can't match the registered
+device with the corresponding module.
 
-I noticed that module autoload won't be working in some of the i2c
-busses drivers. This patch series contains the fixes for these.
+Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 
-Best regards,
-Javier
+Before this patch:
 
+$ modinfo drivers/i2c/busses/i2c-digicolor.ko | grep alias
+$
 
-Javier Martinez Canillas (4):
-  i2c: jz4780: Fix module autoload
-  i2c: xlp9xx: Fix module autoload
-  i2c: xlr: Fix module autoload for OF registration
-  i2c: digicolor: Fix module autoload
+After this patch:
+
+$ modinfo drivers/i2c/busses/i2c-digicolor.ko | grep alias
+alias:          of:N*T*Ccnxt,cx92755-i2cC*
+alias:          of:N*T*Ccnxt,cx92755-i2c
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+---
 
  drivers/i2c/busses/i2c-digicolor.c | 1 +
- drivers/i2c/busses/i2c-jz4780.c    | 1 +
- drivers/i2c/busses/i2c-xlp9xx.c    | 1 +
- drivers/i2c/busses/i2c-xlr.c       | 1 +
- 4 files changed, 4 insertions(+)
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/i2c/busses/i2c-digicolor.c b/drivers/i2c/busses/i2c-digicolor.c
+index 9604024e0eb0..49f2084f7bb5 100644
+--- a/drivers/i2c/busses/i2c-digicolor.c
++++ b/drivers/i2c/busses/i2c-digicolor.c
+@@ -368,6 +368,7 @@ static const struct of_device_id dc_i2c_match[] = {
+ 	{ .compatible = "cnxt,cx92755-i2c" },
+ 	{ },
+ };
++MODULE_DEVICE_TABLE(of, dc_i2c_match);
+ 
+ static struct platform_driver dc_i2c_driver = {
+ 	.probe   = dc_i2c_probe,
 -- 
 2.7.4
