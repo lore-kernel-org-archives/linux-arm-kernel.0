@@ -1,133 +1,183 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 18 Oct 2016 18:46:02 +0300
-Subject: [PATCHv4 09/15] clk: ti: move omap2_init_clk_clkdm under TI clock
- driver
-In-Reply-To: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1476805568-19264-10-git-send-email-t-kristo@ti.com>
+From: kieran@bingham.xyz (Kieran Bingham)
+Date: Tue, 18 Oct 2016 16:56:39 +0100
+Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
+In-Reply-To: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <a440581a-e28c-2f9f-8110-26203e0b3809@bingham.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not needed outside the driver, so move it inside it and remove
-the prototype from the public header also.
+Hi Pete,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/clock.c  | 34 ----------------------------------
- drivers/clk/ti/clock.h       |  1 +
- drivers/clk/ti/clockdomain.c | 30 ++++++++++++++++++++++++++++++
- include/linux/clk/ti.h       |  1 -
- 4 files changed, 31 insertions(+), 35 deletions(-)
+Thanks for your patch.
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 5391b66..ce8e804 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -79,40 +79,6 @@ int __init omap2_clk_setup_ll_ops(void)
-  * OMAP2+ specific clock functions
-  */
- 
--/* Private functions */
--
--/* Public functions */
--
--/**
-- * omap2_init_clk_clkdm - look up a clockdomain name, store pointer in clk
-- * @clk: OMAP clock struct ptr to use
-- *
-- * Convert a clockdomain name stored in a struct clk 'clk' into a
-- * clockdomain pointer, and save it into the struct clk.  Intended to be
-- * called during clk_register().  No return value.
-- */
--void omap2_init_clk_clkdm(struct clk_hw *hw)
--{
--	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
--	struct clockdomain *clkdm;
--	const char *clk_name;
--
--	if (!clk->clkdm_name)
--		return;
--
--	clk_name = __clk_get_name(hw->clk);
--
--	clkdm = clkdm_lookup(clk->clkdm_name);
--	if (clkdm) {
--		pr_debug("clock: associated clk %s to clkdm %s\n",
--			 clk_name, clk->clkdm_name);
--		clk->clkdm = clkdm;
--	} else {
--		pr_debug("clock: could not associate clk %s to clkdm %s\n",
--			 clk_name, clk->clkdm_name);
--	}
--}
--
- static int __initdata mpurate;
- 
- /*
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 5675e37..9c85a51 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -232,6 +232,7 @@ int ti_clk_retry_init(struct device_node *node, struct clk_hw *hw,
- u8 ti_clk_mux_get_parent(struct clk_hw *hw);
- int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index);
- 
-+void omap2_init_clk_clkdm(struct clk_hw *hw);
- int omap2_clkops_enable_clkdm(struct clk_hw *hw);
- void omap2_clkops_disable_clkdm(struct clk_hw *hw);
- 
-diff --git a/drivers/clk/ti/clockdomain.c b/drivers/clk/ti/clockdomain.c
-index 6cf9dd1..704157d 100644
---- a/drivers/clk/ti/clockdomain.c
-+++ b/drivers/clk/ti/clockdomain.c
-@@ -103,6 +103,36 @@ void omap2_clkops_disable_clkdm(struct clk_hw *hw)
- 	ti_clk_ll_ops->clkdm_clk_disable(clk->clkdm, hw->clk);
- }
- 
-+/**
-+ * omap2_init_clk_clkdm - look up a clockdomain name, store pointer in clk
-+ * @clk: OMAP clock struct ptr to use
-+ *
-+ * Convert a clockdomain name stored in a struct clk 'clk' into a
-+ * clockdomain pointer, and save it into the struct clk.  Intended to be
-+ * called during clk_register().  No return value.
-+ */
-+void omap2_init_clk_clkdm(struct clk_hw *hw)
-+{
-+	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
-+	struct clockdomain *clkdm;
-+	const char *clk_name;
-+
-+	if (!clk->clkdm_name)
-+		return;
-+
-+	clk_name = __clk_get_name(hw->clk);
-+
-+	clkdm = ti_clk_ll_ops->clkdm_lookup(clk->clkdm_name);
-+	if (clkdm) {
-+		pr_debug("clock: associated clk %s to clkdm %s\n",
-+			 clk_name, clk->clkdm_name);
-+		clk->clkdm = clkdm;
-+	} else {
-+		pr_debug("clock: could not associate clk %s to clkdm %s\n",
-+			 clk_name, clk->clkdm_name);
-+	}
-+}
-+
- static void __init of_ti_clockdomain_setup(struct device_node *node)
- {
- 	struct clk *clk;
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index bc7fd8f..626ae94 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -238,7 +238,6 @@ struct ti_clk_ll_ops {
- 
- #define to_clk_hw_omap(_hw) container_of(_hw, struct clk_hw_omap, hw)
- 
--void omap2_init_clk_clkdm(struct clk_hw *clk);
- int omap2_clk_disable_autoidle_all(void);
- int omap2_clk_enable_autoidle_all(void);
- int omap2_clk_allow_idle(struct clk *clk);
+On 18/10/16 16:07, Peter Griffin wrote:
+> lx-fdtdump dumps the flatenned device tree passed to the kernel
+
+s/flatenned/flattened/
+
+> from the bootloader to a file called fdtdump.dtb to allow further
+> post processing on the machine running GDB. The fdt header is also
+> also printed in the GDB console. For example:
+> 
+
+Excellent - I've been looking forward to this
+
+General comment: It would be good to see the output filename
+configurable as a parameter, defaulting to fdtdump.dtb if none provided.
+
+Is this something you have time to add?
+
+> (gdb) lx-fdtdump
+> fdt_magic:         0xD00DFEED
+> fdt_totalsize:     0xC108
+> off_dt_struct:     0x38
+> off_dt_strings:    0x3804
+> off_mem_rsvmap:    0x28
+> version:           17
+> last_comp_version: 16
+> Dumped fdt to fdtdump.dtb
+> 
+>> fdtdump fdtdump.dtb | less
+> 
+> This command is useful as the bootloader can often re-write parts
+> of the device tree, and this can sometimes cause the kernel to not
+> boot.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  scripts/gdb/linux/constants.py.in |  8 +++++
+>  scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 77 insertions(+), 1 deletion(-)
+> 
+> diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
+> index 7986f4e..43c6241 100644
+> --- a/scripts/gdb/linux/constants.py.in
+> +++ b/scripts/gdb/linux/constants.py.in
+> @@ -14,6 +14,7 @@
+>  
+>  #include <linux/fs.h>
+>  #include <linux/mount.h>
+> +#include <linux/of_fdt.h>
+>  
+>  /* We need to stringify expanded macros so that they can be parsed */
+>  
+> @@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
+>  LX_VALUE(MNT_NOATIME)
+>  LX_VALUE(MNT_NODIRATIME)
+>  LX_VALUE(MNT_RELATIME)
+> +
+> +/* linux/of_fdt.h> */
+> +LX_VALUE(OF_DT_HEADER)
+> +
+> +/* Kernel Configs */
+> +LX_CONFIG(CONFIG_OF)
+> +
+> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+> index 38b1f09..f20fcfa 100644
+> --- a/scripts/gdb/linux/proc.py
+> +++ b/scripts/gdb/linux/proc.py
+> @@ -16,7 +16,7 @@ from linux import constants
+>  from linux import utils
+>  from linux import tasks
+>  from linux import lists
+> -
+> +from struct import *
+>  
+>  class LxCmdLine(gdb.Command):
+>      """ Report the Linux Commandline used in the current kernel.
+> @@ -195,3 +195,71 @@ values of that process namespace"""
+>                          info_opts(MNT_INFO, m_flags)))
+>  
+>  LxMounts()
+> +
+> +class LxFdtDump(gdb.Command):
+> +    """Output Flattened Device Tree header and dump FDT blob to a file
+> +       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
+> +
+> +    def __init__(self):
+> +        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
+> +
+> +    def fdthdr_to_cpu(self, fdt_header):
+> +
+> +            fdt_header_be = ">IIIIIII"
+> +            fdt_header_le = "<IIIIIII"
+> +
+> +            if utils.get_target_endianness() == 1:
+> +                output_fmt = fdt_header_le
+> +            else:
+> +                output_fmt = fdt_header_be
+> +
+> +            return unpack(output_fmt, pack(fdt_header_be,
+> +                                           fdt_header['magic'],
+> +                                           fdt_header['totalsize'],
+> +                                           fdt_header['off_dt_struct'],
+> +                                           fdt_header['off_dt_strings'],
+> +                                           fdt_header['off_mem_rsvmap'],
+> +                                           fdt_header['version'],
+> +                                           fdt_header['last_comp_version']))
+> +
+> +    def invoke(self, arg, from_tty):
+> +
+> +        if constants.LX_CONFIG_OF:
+> +
+> +            filename = "fdtdump.dtb"
+> +
+
+You could parse the arguments here to allow users to write to their own
+file / path ... arg is just a string, so you can either parse it as such
+or convert to argv with
+	argv = gdb.string_to_argv(arg)
+
+
+Aha - I see Jan beat me to it :)
+
+
+> +            py_fdt_header_ptr = gdb.parse_and_eval(
+> +                "(const struct fdt_header *) initial_boot_params")
+> +            py_fdt_header = py_fdt_header_ptr.dereference()
+> +
+> +            fdt_header = self.fdthdr_to_cpu(py_fdt_header)
+> +
+> +            if fdt_header[0] != constants.LX_OF_DT_HEADER:
+> +                raise gdb.GdbError("No flattened device tree magic found\n")
+> +
+> +            gdb.write("fdt_magic:         0x{:02X}\n".format(fdt_header[0]))
+> +            gdb.write("fdt_totalsize:     0x{:02X}\n".format(fdt_header[1]))
+> +            gdb.write("off_dt_struct:     0x{:02X}\n".format(fdt_header[2]))
+> +            gdb.write("off_dt_strings:    0x{:02X}\n".format(fdt_header[3]))
+> +            gdb.write("off_mem_rsvmap:    0x{:02X}\n".format(fdt_header[4]))
+> +            gdb.write("version:           {}\n".format(fdt_header[5]))
+> +            gdb.write("last_comp_version: {}\n".format(fdt_header[6]))
+> +
+> +            inf = gdb.inferiors()[0]
+> +            fdt_buf = utils.read_memoryview(inf, py_fdt_header_ptr,
+> +                                            fdt_header[1]).tobytes()
+> +
+> +            try:
+> +                f = open(filename, 'wb')
+> +            except:
+> +                raise gdb.GdbError("Could not open file to dump fdt")
+> +
+> +            f.write(fdt_buf)
+> +            f.close()
+> +
+> +            gdb.write("Dumped fdt to " + filename + "\n")
+> +
+> +        else:
+> +            gdb.write("Kernel not compiled with CONFIG_OF\n")
+
+Would it be cleaner to write
+  if not constants.LX_CONFIG_OF:
+      raise gdb.GdbError("Kernel not compiled with CONFIG_OF\n")
+
+at the beginning, and reduce the indentation level required ?
+
+> +
+> +LxFdtDump()
+> 
+
 -- 
-1.9.1
+Regards
+
+Kieran Bingham
