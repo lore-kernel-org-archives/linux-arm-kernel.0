@@ -1,55 +1,65 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 18 Oct 2016 10:59:15 +0200
-Subject: [STLinux Kernel] [PATCH 18/19] stmmac: dwmac-sti: Remove obsolete
- STi platforms
-In-Reply-To: <dcbb8065-b272-0a2f-8efb-c55217712caf@st.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 18 Oct 2016 14:36:02 +0530
+Subject: [STLinux Kernel] [PATCH 02/19] phy: stih41x-usb: Remove usb phy
+ driver and dt binding documentation.
+In-Reply-To: <59fa8f92-114b-7b5f-fd2f-46c4f02b545e@st.com>
 References: <1473859677-9231-1-git-send-email-peter.griffin@linaro.org>
- <1473859677-9231-19-git-send-email-peter.griffin@linaro.org>
- <20160923151142.GG9176@rob-hp-laptop>
- <dcbb8065-b272-0a2f-8efb-c55217712caf@st.com>
-Message-ID: <7b0ce054-b30b-3a8e-23b9-ca3a33a55e31@st.com>
+ <1473859677-9231-3-git-send-email-peter.griffin@linaro.org>
+ <20160923150656.GB9176@rob-hp-laptop>
+ <778bd4b2-9e82-326b-f6e0-43360323d453@st.com>
+ <59fa8f92-114b-7b5f-fd2f-46c4f02b545e@st.com>
+Message-ID: <5805E5FA.6020609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/18/2016 10:05 AM, Patrice Chotard wrote:
+On Tuesday 18 October 2016 02:22 PM, Patrice Chotard wrote:
 > 
 > 
-> On 09/23/2016 05:11 PM, Rob Herring wrote:
->> On Wed, Sep 14, 2016 at 02:27:56PM +0100, Peter Griffin wrote:
->>> This patch removes support for STiH415/6 SoC's from the
->>> dwmac-sti driver and dt binding doc, as support for these
->>> platforms is being removed from the kernel. It also removes
->>> STiD127 related code, which has never actually been supported
->>> upstream.
->>>
->>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>> Cc: <peppe.cavallaro@st.com>
->>> Cc: <alexandre.torgue@st.com>
->>> Cc: <netdev@vger.kernel.org>
->>> ---
->>>  .../devicetree/bindings/net/sti-dwmac.txt          |  3 +-
+> On 10/18/2016 09:47 AM, Patrice Chotard wrote:
+>> Hi 
 >>
->> Acked-by: Rob Herring <robh@kernel.org>
+>> On 09/23/2016 05:06 PM, Rob Herring wrote:
+>>> On Wed, Sep 14, 2016 at 02:27:40PM +0100, Peter Griffin wrote:
+>>>> This phy is only used on STiH415/6 based silicon, and support for
+>>>> these SoC's is being removed from the kernel.
+>>>>
+>>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>>> Cc: <kishon@ti.com>
+>>>> ---
+>>>>  .../devicetree/bindings/phy/phy-stih41x-usb.txt    |  24 ---
+>>>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+>> Applied on sti-dt-for-4.10 branch
 > 
 > 
-> Applied on sti-dt-for-4.10 branch
+> Sorry, i did a mistake, these patch should go in linux-phy tree.
+> Kishon will you take care of it ?
 
-
-Sorry, i did a mistake, these patch should go in stmmac tree.
-Peppe or Alexandre will you take care of it ?
+sure, will queue this.
 
 Thanks
+Kishon
+
 > 
-> Thanks 
+> Thanks
 > 
 >>
->>>  drivers/net/ethernet/stmicro/stmmac/dwmac-sti.c    | 37 ----------------------
->>>  2 files changed, 1 insertion(+), 39 deletions(-)
-> 
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
-> 
+>> Thanks 
+>>
+>>
+>>>
+>>>>  drivers/phy/Kconfig                                |   8 -
+>>>>  drivers/phy/Makefile                               |   1 -
+>>>>  drivers/phy/phy-stih41x-usb.c                      | 188 ---------------------
+>>>>  4 files changed, 221 deletions(-)
+>>>>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-stih41x-usb.txt
+>>>>  delete mode 100644 drivers/phy/phy-stih41x-usb.c
+>>
+>> _______________________________________________
+>> Kernel mailing list
+>> Kernel at stlinux.com
+>> http://www.stlinux.com/mailman/listinfo/kernel
+>>
