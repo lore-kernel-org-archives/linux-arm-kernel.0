@@ -1,372 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 18 Oct 2016 10:29:34 +0200
-Subject: [PATCH 1/5] drm/modes: Rewrite the command line parser
+Date: Tue, 18 Oct 2016 10:29:37 +0200
+Subject: [PATCH 4/5] drm/sun4i: Compute TCON1 mode from tv mode
 In-Reply-To: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <cf494b4e9585e720b2640705e3b2102c19d193c2.1476779323.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c2736e784c776479a251d3ddea5dd330eeb7e896.1476779323.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rewrite the command line parser in order to get away from the state machine
-parsing the video mode lines.
+Since the mode passed in mode_set is probably going to be a scaled down
+version of the TV mode, we cannot just use it.
 
-Hopefully, this will allow to extend it more easily to support named modes
-and / or properties set directly on the command line.
+Instead, try to retrieve the actual mode we want to set, and generate a drm
+mode from that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/drm_modes.c | 305 +++++++++++++++++++++++--------------
- 1 file changed, 190 insertions(+), 115 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/drm_modes.c b/drivers/gpu/drm/drm_modes.c
-index 53f07ac7c174..7d5bdca276f2 100644
---- a/drivers/gpu/drm/drm_modes.c
-+++ b/drivers/gpu/drm/drm_modes.c
-@@ -30,6 +30,7 @@
-  * authorization from the copyright holder(s) and author(s).
-  */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 6f8077013be3..f99886462cb8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -401,8 +401,13 @@ static void sun4i_tv_mode_set(struct drm_encoder *encoder,
+ 	struct sun4i_drv *drv = tv->drv;
+ 	struct sun4i_tcon *tcon = drv->tcon;
+ 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
++	struct drm_display_mode tv_drm_mode = { 0 };
  
-+#include <linux/ctype.h>
- #include <linux/list.h>
- #include <linux/list_sort.h>
- #include <linux/export.h>
-@@ -1261,6 +1262,131 @@ void drm_mode_connector_list_update(struct drm_connector *connector)
- }
- EXPORT_SYMBOL(drm_mode_connector_list_update);
+-	sun4i_tcon1_mode_set(tcon, mode);
++	strcpy(tv_drm_mode.name, "TV");
++	sun4i_tv_mode_to_drm_mode(tv_mode, &tv_drm_mode);
++	drm_mode_set_crtcinfo(&tv_drm_mode, CRTC_INTERLACE_HALVE_V);
++
++	sun4i_tcon1_mode_set(tcon, &tv_drm_mode);
  
-+static int drm_mode_parse_cmdline_bpp(const char *str, char **end_ptr,
-+				      struct drm_cmdline_mode *mode)
-+{
-+	if (str[0] != '-')
-+		return -EINVAL;
-+
-+	mode->bpp = simple_strtol(str + 1, end_ptr, 10);
-+	mode->bpp_specified = true;
-+
-+	return 0;
-+}
-+
-+static int drm_mode_parse_cmdline_refresh(const char *str, char **end_ptr,
-+					  struct drm_cmdline_mode *mode)
-+{
-+	if (str[0] != '@')
-+		return -EINVAL;
-+
-+	mode->refresh = simple_strtol(str + 1, end_ptr, 10);
-+	mode->refresh_specified = true;
-+
-+	return 0;
-+}
-+
-+static int drm_mode_parse_cmdline_extra(const char *str, int length,
-+					struct drm_connector *connector,
-+					struct drm_cmdline_mode *mode)
-+{
-+	int i;
-+
-+	for (i = 0; i < length; i++) {
-+		switch (str[i]) {
-+		case 'i':
-+			mode->interlace = true;
-+			break;
-+		case 'm':
-+			mode->margins = true;
-+			break;
-+		case 'D':
-+			if (mode->force != DRM_FORCE_UNSPECIFIED)
-+				return -EINVAL;
-+
-+			if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
-+			    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
-+				mode->force = DRM_FORCE_ON;
-+			else
-+				mode->force = DRM_FORCE_ON_DIGITAL;
-+			break;
-+		case 'd':
-+			if (mode->force != DRM_FORCE_UNSPECIFIED)
-+				return -EINVAL;
-+
-+			mode->force = DRM_FORCE_OFF;
-+			break;
-+		case 'e':
-+			if (mode->force != DRM_FORCE_UNSPECIFIED)
-+				return -EINVAL;
-+
-+			mode->force = DRM_FORCE_ON;
-+			break;
-+		default:
-+			return -EINVAL;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int drm_mode_parse_cmdline_res_mode(const char *str, unsigned int length,
-+					   bool extras,
-+					   struct drm_connector *connector,
-+					   struct drm_cmdline_mode *mode)
-+{
-+	bool rb = false, cvt = false;
-+	int xres = 0, yres = 0;
-+	int remaining, i;
-+	char *end_ptr;
-+
-+	xres = simple_strtol(str, &end_ptr, 10);
-+
-+	if (end_ptr[0] != 'x')
-+		return -EINVAL;
-+	end_ptr++;
-+
-+	yres = simple_strtol(end_ptr, &end_ptr, 10);
-+
-+	remaining = length - (end_ptr - str);
-+	if (remaining < 0)
-+		return -EINVAL;
-+
-+	for (i = 0; i < remaining; i++) {
-+		switch (end_ptr[i]) {
-+		case 'M':
-+			cvt = true;
-+			break;
-+		case 'R':
-+			rb = true;
-+			break;
-+		default:
-+			/*
-+			 * Try to pass that to our extras parsing
-+			 * function to handle the case where the
-+			 * extras are directly after the resolution
-+			 */
-+			if (extras) {
-+				int ret = drm_mode_parse_cmdline_extra(end_ptr + i,
-+								       1,
-+								       connector,
-+								       mode);
-+				if (ret)
-+					return ret;
-+			} else {
-+				return -EINVAL;
-+			}
-+		}
-+	}
-+
-+	mode->xres = xres;
-+	mode->yres = yres;
-+	mode->cvt = cvt;
-+	mode->rb = rb;
-+
-+	return 0;
-+}
-+
- /**
-  * drm_mode_parse_command_line_for_connector - parse command line modeline for connector
-  * @mode_option: optional per connector mode option
-@@ -1287,13 +1413,12 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
- 					       struct drm_cmdline_mode *mode)
- {
- 	const char *name;
--	unsigned int namelen;
--	bool res_specified = false, bpp_specified = false, refresh_specified = false;
--	unsigned int xres = 0, yres = 0, bpp = 32, refresh = 0;
--	bool yres_specified = false, cvt = false, rb = false;
--	bool interlace = false, margins = false, was_digit = false;
--	int i;
--	enum drm_connector_force force = DRM_FORCE_UNSPECIFIED;
-+	bool parse_extras = false;
-+	unsigned int bpp_off = 0, refresh_off = 0;
-+	unsigned int mode_end = 0;
-+	char *bpp_ptr = NULL, *refresh_ptr = NULL, *extra_ptr = NULL;
-+	char *bpp_end_ptr = NULL, *refresh_end_ptr = NULL;
-+	int ret;
- 
- #ifdef CONFIG_FB
- 	if (!mode_option)
-@@ -1306,127 +1431,77 @@ bool drm_mode_parse_command_line_for_connector(const char *mode_option,
- 	}
- 
- 	name = mode_option;
--	namelen = strlen(name);
--	for (i = namelen-1; i >= 0; i--) {
--		switch (name[i]) {
--		case '@':
--			if (!refresh_specified && !bpp_specified &&
--			    !yres_specified && !cvt && !rb && was_digit) {
--				refresh = simple_strtol(&name[i+1], NULL, 10);
--				refresh_specified = true;
--				was_digit = false;
--			} else
--				goto done;
--			break;
--		case '-':
--			if (!bpp_specified && !yres_specified && !cvt &&
--			    !rb && was_digit) {
--				bpp = simple_strtol(&name[i+1], NULL, 10);
--				bpp_specified = true;
--				was_digit = false;
--			} else
--				goto done;
--			break;
--		case 'x':
--			if (!yres_specified && was_digit) {
--				yres = simple_strtol(&name[i+1], NULL, 10);
--				yres_specified = true;
--				was_digit = false;
--			} else
--				goto done;
--			break;
--		case '0' ... '9':
--			was_digit = true;
--			break;
--		case 'M':
--			if (yres_specified || cvt || was_digit)
--				goto done;
--			cvt = true;
--			break;
--		case 'R':
--			if (yres_specified || cvt || rb || was_digit)
--				goto done;
--			rb = true;
--			break;
--		case 'm':
--			if (cvt || yres_specified || was_digit)
--				goto done;
--			margins = true;
--			break;
--		case 'i':
--			if (cvt || yres_specified || was_digit)
--				goto done;
--			interlace = true;
--			break;
--		case 'e':
--			if (yres_specified || bpp_specified || refresh_specified ||
--			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
--				goto done;
- 
--			force = DRM_FORCE_ON;
--			break;
--		case 'D':
--			if (yres_specified || bpp_specified || refresh_specified ||
--			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
--				goto done;
-+	if (!isdigit(name[0]))
-+		return false;
- 
--			if ((connector->connector_type != DRM_MODE_CONNECTOR_DVII) &&
--			    (connector->connector_type != DRM_MODE_CONNECTOR_HDMIB))
--				force = DRM_FORCE_ON;
--			else
--				force = DRM_FORCE_ON_DIGITAL;
--			break;
--		case 'd':
--			if (yres_specified || bpp_specified || refresh_specified ||
--			    was_digit || (force != DRM_FORCE_UNSPECIFIED))
--				goto done;
-+	/* Try to locate the bpp and refresh specifiers, if any */
-+	bpp_ptr = strchr(name, '-');
-+	if (bpp_ptr) {
-+		bpp_off = bpp_ptr - name;
-+		mode->bpp_specified = true;
-+	}
- 
--			force = DRM_FORCE_OFF;
--			break;
--		default:
--			goto done;
--		}
-+	refresh_ptr = strchr(name, '@');
-+	if (refresh_ptr) {
-+		refresh_off = refresh_ptr - name;
-+		mode->refresh_specified = true;
- 	}
- 
--	if (i < 0 && yres_specified) {
--		char *ch;
--		xres = simple_strtol(name, &ch, 10);
--		if ((ch != NULL) && (*ch == 'x'))
--			res_specified = true;
--		else
--			i = ch - name;
--	} else if (!yres_specified && was_digit) {
--		/* catch mode that begins with digits but has no 'x' */
--		i = 0;
-+	/* Locate the end of the name / resolution, and parse it */
-+	if (bpp_ptr && refresh_ptr) {
-+		mode_end = min(bpp_off, refresh_off);
-+	} else if (bpp_ptr) {
-+		mode_end = bpp_off;
-+	} else if (refresh_ptr) {
-+		mode_end = refresh_off;
-+	} else {
-+		mode_end = strlen(name);
-+		parse_extras = true;
- 	}
--done:
--	if (i >= 0) {
--		pr_warn("[drm] parse error at position %i in video mode '%s'\n",
--			i, name);
--		mode->specified = false;
-+
-+	ret = drm_mode_parse_cmdline_res_mode(name, mode_end,
-+					      parse_extras,
-+					      connector,
-+					      mode);
-+	if (ret)
- 		return false;
--	}
-+	mode->specified = true;
- 
--	if (res_specified) {
--		mode->specified = true;
--		mode->xres = xres;
--		mode->yres = yres;
-+	if (bpp_ptr) {
-+		ret = drm_mode_parse_cmdline_bpp(bpp_ptr, &bpp_end_ptr, mode);
-+		if (ret)
-+			return false;
- 	}
- 
--	if (refresh_specified) {
--		mode->refresh_specified = true;
--		mode->refresh = refresh;
-+	if (refresh_ptr) {
-+		ret = drm_mode_parse_cmdline_refresh(refresh_ptr,
-+						     &refresh_end_ptr, mode);
-+		if (ret)
-+			return false;
- 	}
- 
--	if (bpp_specified) {
--		mode->bpp_specified = true;
--		mode->bpp = bpp;
-+	/*
-+	 * Locate the end of the bpp / refresh, and parse the extras
-+	 * if relevant
-+	 */
-+	if (bpp_ptr && refresh_ptr)
-+		extra_ptr = max(bpp_end_ptr, refresh_end_ptr);
-+	else if (bpp_ptr)
-+		extra_ptr = bpp_end_ptr;
-+	else if (refresh_ptr)
-+		extra_ptr = refresh_end_ptr;
-+
-+	if (extra_ptr) {
-+		int remaining = strlen(name) - (extra_ptr - name);
-+
-+		/*
-+		 * We still have characters to process, while
-+		 * we shouldn't have any
-+		 */
-+		if (remaining > 0)
-+			return false;
- 	}
--	mode->rb = rb;
--	mode->cvt = cvt;
--	mode->interlace = interlace;
--	mode->margins = margins;
--	mode->force = force;
- 
- 	return true;
- }
+ 	/* Enable and map the DAC to the output */
+ 	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
 -- 
 git-series 0.8.10
