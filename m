@@ -1,25 +1,59 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 17 Oct 2016 17:58:05 -0700
-Subject: [PATCH 3/3] arm64: dts: Update Broadcom NS2 to generic IOMMU
- binding
-In-Reply-To: <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
-References: <acf4f770eab43fec8c5b6e9cddb6dd0defc52138.1476706244.git.robin.murphy@arm.com>
- <f2de1b15adb2f57529734a4769ef04d9cde3cc5d.1476706244.git.robin.murphy@arm.com>
-Message-ID: <77abd968-f412-a118-5b19-5faf539f33be@gmail.com>
+From: jiangyanpin77@gmail.com (jiangyanpin77)
+Date: Tue, 18 Oct 2016 09:12:43 +0800
+Subject: Can s3c2416 use two usb host?
+Message-ID: <ED961CC5932C48DEA8389141BFFFD396@jyp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2016 05:13 AM, Robin Murphy wrote:
-> With the "mmu-masters" property now deprecated and optional, the
-> generic binding offers a more efficient way to specify no masters.
-> 
-> CC: Ray Jui <rjui@broadcom.com>
-> CC: Scott Branden <sbranden@broadcom.com>
-> CC: Jon Mason <jonmason@broadcom.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Hi,
 
-Applied, did you use get_maintainers.pl for this file? It did not land
-in bcm-kernel-feedback-list at broadcom.com and as such did not get picked
-by the patchwork instance behind..
--- 
-Florian
+I am working on samsung s3c2416 ARM based Soc on
+ linux 3.1.8 kernel. By default, the Soc has one
+ USB host and one USB device/host. My USB host is
+ working fine. Since I need to use two USB host on my system,
+  I need to enable the USB device/host as a USB host.
+ I am using ARM9 based s3c2416 processor. The SoC has one USB host
+controller and one USB host/device controller. What are the
+register settings that should be done to enable both USB
+interfaces as USB host controller. ? There is a register PHYCTRL
+with address 0x4C00_0080. Its bit[0] says something on USB host
+mode and USB device mode. Is it this register which I should
+work on or any more register configurations are required ?
+
+
+
+
+
+ The following are the changes I have made for the same:
+
+ Register  Address        value
+  -----------------------------
+  PHYPWR    0x4C00_0084    0x0
+  PWRCFG    0x4C00_0060    (1<<4)
+  URSTCON   0x4C00_0088    (0<<2)|(1<<1)|(1<<0)
+  URSTCON   0x4C00_0088    (0<<2)|(0<<1)|(0<<0)
+  PHYCTRL   0x4C00_0080    (0<<3)|(0<<2)|(1<<1)|(1<<0)
+  UCLKCON   0x4C00_008C    0<<31)|(0<<2)|(1<<1)|(1<<0)
+ 
+  Once I try to plug in a  USB mass storage device (whose driver is present in
+  kernel), I get the following error:
+ 
+  usb 1-2: new full speed USB device using s3c2410-ohci and address 10
+  usb 1-2: device descriptor read/64, error -62
+  usb 1-2: device descriptor read/64, error -62
+  usb 1-2: new full speed USB device using s3c2410-ohci and address 11
+  usb 1-2: device descriptor read/64, error -62
+  usb 1-2: device descriptor read/64, error -62
+  usb 1-2: new full speed USB device using s3c2410-ohci and address 12
+  usb 1-2: device not accepting address 12, error -62
+  usb 1-2: new full speed USB device using s3c2410-ohci and address 13
+  usb 1-2: device not accepting address 13, error -62
+ 
+ 
+  Why is it throwing this error ? Is there any driver for USB hub missing in
+   linux 3.1.8 kernel, or do I need to modify more on register settings.
+ 
+  Please help.
+ 
+  Thank You
+  YanpinJiang
