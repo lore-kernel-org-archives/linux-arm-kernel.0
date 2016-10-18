@@ -1,32 +1,33 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 18 Oct 2016 20:34:14 +0300
-Subject: [PATCH v9 1/2] ARM: dts: Add TOPEET itop core board SCP package
- version
-In-Reply-To: <1476811129-4450-2-git-send-email-ayaka@soulik.info>
+Date: Tue, 18 Oct 2016 20:37:48 +0300
+Subject: [PATCH v9 2/2] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <1476811129-4450-3-git-send-email-ayaka@soulik.info>
 References: <devicetree@vger.kernel.org>
  <1476811129-4450-1-git-send-email-ayaka@soulik.info>
- <1476811129-4450-2-git-send-email-ayaka@soulik.info>
-Message-ID: <20161018173414.GA30003@kozik-lap>
+ <1476811129-4450-3-git-send-email-ayaka@soulik.info>
+Message-ID: <20161018173748.GB30003@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 01:18:48AM +0800, Randy Li wrote:
-> The TOPEET itop is a samsung exnynos 4412 core board, which have
-> two package versions. This patch add the support for SCP version.
+On Wed, Oct 19, 2016 at 01:18:49AM +0800, Randy Li wrote:
+> The TOPEET itop exynos 4412 have three versions base board. The
+> Elite version is the cheap one without too much peripheral devices
+> on it.
 > 
-> Currently supported are USB3503A HSIC, USB OTG, eMMC, rtc and
-> PMIC. The future features are in the based board. Also MFC and
-> watchdog have been enabled.
+> Currently supported are serial console, wired networking(USB),
+> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
+> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
+> enabled.
+> 
+> The FIMC is not used for camera currently, I enabled it just for a
+> colorspace converter.
 > 
 > Signed-off-by: Randy Li <ayaka@soulik.info>
-> ---
->  arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 501 ++++++++++++++++++++++++
->  1 file changed, 501 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-
-Thanks, applied, with minor changes in commit msg and fix in pin
-function (you used macro for pull up/down instead of function).
+Thanks, applied, with missing Rob's ack, minor changes in commit msg and
+fix in pin function (you used macro for pull up/down instead of
+function).
 
 Best regards,
 Krzysztof
