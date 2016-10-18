@@ -1,133 +1,44 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Tue, 18 Oct 2016 20:21:46 +0100
-Subject: [PATCH v2] drivers: psci: PSCI checker module
-In-Reply-To: <20160921143905.36197-1-kevin.brodsky@arm.com>
-References: <20160921143905.36197-1-kevin.brodsky@arm.com>
-Message-ID: <e57565e8-bec9-0460-32d5-fb9f868cc4f8@arm.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 18 Oct 2016 20:31:43 +0100
+Subject: [PATCH 3/3] ARM: wire up new pkey syscalls
+Message-ID: <E1bwa6x-0004Ze-8l@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Wire up the new pkey syscalls for ARM.  This illustrates the ease that
+the generated/tabular approach gives us: adding new system calls
+becomes much easier, and all the dependencies are automatically handled
+for the update.
 
-On 21/09/16 15:39, Kevin Brodsky wrote:
-> On arm and arm64, PSCI is one of the possible firmware interfaces
-> used for power management. This includes both turning CPUs on and off,
-> and suspending them (entering idle states).
-> 
-> This patch adds a PSCI checker module that enables basic testing of
-> PSCI operations during startup. There are two main tests: CPU
-> hotplugging and suspending.
-> 
-> In the hotplug tests, the hotplug API is used to turn off and on again
-> all CPUs in the system, and then all CPUs in each cluster, checking
-> the consistency of the return codes.
-> 
-> In the suspend tests, a high-priority thread is created on each core
-> and uses low-level cpuidle functionalities to enter suspend, in all
-> the possible states and multiple times. This should allow a maximum
-> number of CPUs to enter the same sleep state at the same or slightly
-> different time.
-> 
-> In essence, the suspend tests use a principle similar to that of the
-> intel_powerclamp driver (drivers/thermal/intel_powerclamp.c), but the
-> threads are only kept for the duration of the test (they are already
-> gone when userspace is started).
-> 
-> While in theory power management PSCI functions (CPU_{ON,OFF,SUSPEND})
-> could be directly called, this proved too difficult as it would imply
-> the duplication of all the logic used by the kernel to allow for a
-> clean shutdown/bringup/suspend of the CPU (the deepest sleep states
-> implying potentially the shutdown of the CPU).
-> 
-> Note that this file cannot be compiled as a loadable module, since it
-> uses a number of non-exported identifiers (essentially for
-> PSCI-specific checks and direct use of cpuidle) and relies on the
-> absence of userspace to avoid races when calling hotplug and cpuidle
-> functions.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> ---
-> Changelog v1..v2:
-> * Do not count tick_broadcast_enter() failures as errors, as they may
->   be unavoidable. When it happens, fall back to WFI.
-> * Do not count unexpected sleep states as errors (currently, the only
->   case is when falling back to WFI). Instead, report the number of
->   times it happens before the suspend thread exits.
-> * Use usecs_to_jiffies() to compute the suspend timeout. The previous
->   version resulted in a zero timeout if the target residency was
->   shorter than a jiffy.
-> * Various cleanup.
-> 
-> Thanks to Lorenzo for his help with improving this patch!
-> 
-> Kevin
-[...]
-> +
-> +static int suspend_tests(void)
-> +{
-> +	int i, cpu, err = 0;
-> +	struct task_struct **threads;
-> +	int nb_threads = 0;
-> +
-> +	threads = kmalloc_array(nb_available_cpus, sizeof(*threads),
-> +				GFP_KERNEL);
-> +	if (!threads)
-> +		return -ENOMEM;
-> +
-> +	for_each_online_cpu(cpu) {
-> +		struct task_struct *thread;
-> +		/* Check that cpuidle is available on that CPU. */
-> +		struct cpuidle_device *dev = per_cpu(cpuidle_devices, cpu);
-> +		struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
-> +
-> +		if (cpuidle_not_available(drv, dev)) {
-> +			pr_warn("cpuidle not available on CPU %d, ignoring\n",
-> +				cpu);
-> +			continue;
-> +		}
-> +
-> +		thread = kthread_create_on_cpu(suspend_stress_thread,
-> +					       (void *)(long)cpu, cpu,
-> +					       "psci_suspend_stress");
-> +		if (IS_ERR(thread))
-> +			pr_err("Failed to create kthread on CPU %d\n", cpu);
-> +		else
-> +			threads[nb_threads++] = thread;
-> +	}
-> +	if (nb_threads < 1) {
-> +		kfree(threads);
-> +		return -ENODEV;
-> +	}
-> +
-> +	atomic_set(&nb_active_threads, nb_threads);
-> +
-> +	/*
-> +	 * Stop cpuidle to prevent the idle tasks from entering a deep sleep
-> +	 * mode, as it might interfere with the suspend threads on other CPUs.
-> +	 * This does not prevent the suspend threads from using cpuidle (only
-> +	 * the idle tasks check this status).
-> +	 */
-> +	cpuidle_pause();
-> +
-> +	/*
-> +	 * Unpark the suspend threads. To avoid the main thread being preempted
-> +	 * before all the threads have been unparked, the suspend threads will
-> +	 * wait for the completion of suspend_threads_started.
-> +	 */
-> +	for (i = 0; i < nb_threads; ++i)
-> +		kthread_unpark(threads[i]);
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+Of course, this is development, and there will be a patch for -rc2 to
+wire these up in due course.  I'm using this as an illustration for
+this approach - compared with f2335a2a0a59 ("ARM: wire up preadv2 and
+pwritev2 syscalls") adding two syscalls, with a diffstat of:
 
-Just a heads up: this doesn't work anymore, since a65d4096
-(kthread/smpboot: do not park in kthread_create_on_cpu()), in 4.9-rc1. I
-think that the unpark call could be replaced by wake_up_process. The
-comment of kthread_create_on_cpu is now misleading.
+ arch/arm/include/asm/unistd.h      | 2 +-
+ arch/arm/include/uapi/asm/unistd.h | 2 ++
+ arch/arm/kernel/calls.S            | 4 +++-
+ 3 files changed, 6 insertions(+), 2 deletions(-)
 
-Thanks,
-Jean-Philippe
+vs this patch adding three plus reserving two, giving:
+
+ arch/arm/tools/syscall.tbl | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
+index 62285cbd09c0..c2af3b281bcb 100644
+--- a/arch/arm/tools/syscall.tbl
++++ b/arch/arm/tools/syscall.tbl
+@@ -426,3 +426,8 @@
+ 391	common	copy_file_range		sys_copy_file_range
+ 392	common	preadv2			sys_preadv2
+ 393	common	pwritev2		sys_pwritev2
++394	common	pkey_mprotect		sys_pkey_mprotect
++395	common	pkey_alloc		sys_pkey_alloc
++396	common	pkey_free		sys_pkey_free
++# 397 for pkey_get
++# 398 for pkey_set
+-- 
+2.1.0
