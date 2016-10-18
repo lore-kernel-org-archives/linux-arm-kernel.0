@@ -1,26 +1,34 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 18 Oct 2016 19:21:49 +0800
-Subject: [RFC] reduce latency in __purge_vmap_area_lazy
-In-Reply-To: <1476773771-11470-1-git-send-email-hch@lst.de>
-References: <1476773771-11470-1-git-send-email-hch@lst.de>
-Message-ID: <20161018192149.3de86109@xhacker>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 18 Oct 2016 19:37:18 +0800
+Subject: [PATCH 1/2] iommu/mediatek: Convert M4Uv2 to iommu_fwspec
+In-Reply-To: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
+References: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
+Message-ID: <1476790638.3062.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016 08:56:05 +0200 Christoph Hellwig wrote:
-
-> Hi all,
+On Mon, 2016-10-17 at 12:49 +0100, Robin Murphy wrote:
+> Our per-device data consists of the M4U instance and firmware-provided
+> list of LARB IDs, which is a perfect fit for the generic iommu_fwspec
+> machinery. Use that directly as a simpler alternative to the custom
+> archdata code.
 > 
-> this is my spin at sorting out the long lock hold times in
-> __purge_vmap_area_lazy.  It is based on the patch from Joel sent this
-> week.  I don't have any good numbers for it, but it survived an
-> xfstests run on XFS which is a significant vmalloc user.  The
-> changelogs could still be improved as well, but I'd rather get it
-> out quickly for feedback and testing.
+> CC: Yong Wu <yong.wu@mediatek.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> These are fairly mechanical cleanups, so I'm pretty confident, but it
+> still bears mentioning that they're only compile-tested as I don't have
+> the relevant hardware.
 
-I just tested this series, the preempt off ftrace log doesn't complain
-__purge_vmap_area_lazy any more in my test case, this latency is removed!
+Thanks for the improvement.
 
-So feel free to add
+Tested-by: Yong Wu <yong.wu@mediatek.com>
 
-Tested-by: Jisheng Zhang <jszhang@marvell.com>
+> 
+> Robin.
+> 
+>  drivers/iommu/mtk_iommu.c | 75 ++++++++++++-----------------------------------
+>  1 file changed, 18 insertions(+), 57 deletions(-)
+> 
+[...]
