@@ -1,139 +1,236 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 17 Oct 2016 18:56:17 -0700
-Subject: [PATCH v5 04/23] usb: chipidea: Only read/write OTGSC from one place
+Date: Mon, 17 Oct 2016 18:56:16 -0700
+Subject: [PATCH v5 03/23] usb: ulpi: Support device discovery via DT
 In-Reply-To: <20161018015636.11701-1-stephen.boyd@linaro.org>
 References: <20161018015636.11701-1-stephen.boyd@linaro.org>
-Message-ID: <20161018015636.11701-5-stephen.boyd@linaro.org>
+Message-ID: <20161018015636.11701-4-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the id and vbus detection done via extcon we need to make
-sure we poll the status of OTGSC properly by considering what the
-extcon is saying, and not just what the register is saying. Let's
-move this hw_wait_reg() function to the only place it's used and
-simplify it for polling the OTGSC register. Then we can make
-certain we only use the hw_read_otgsc() API to read OTGSC, which
-will make sure we properly handle extcon events.
+The qcom HSIC ULPI phy doesn't have any bits set in the vendor or
+product ID registers. This makes it impossible to make a ULPI
+driver match against the ID registers. Add support to discover
+the ULPI phys via DT help alleviate this problem. In the DT case,
+we'll look for a ULPI bus node underneath the device registering
+the ULPI viewport (or the parent of that device to support
+chipidea's device layout) and then match up the phy node
+underneath that with the ULPI device that's created.
 
-Acked-by: Peter Chen <peter.chen@nxp.com>
+The side benefit of this is that we can use standard properties
+in the phy node like clks, regulators, gpios, etc. because we
+don't have firmware like ACPI to turn these things on for us. And
+we can use the DT phy binding to point our phy consumer to the
+phy provider.
+
+The ULPI bus code supports native enumeration by reading the
+vendor ID and product ID registers at device creation time, but
+we can't be certain that those register reads will succeed if the
+phy is not powered up. To avoid any problems with reading the ID
+registers before the phy is powered we fallback to DT matching
+when the ID reads fail.
+
+If the ULPI spec had some generic power sequencing for these
+registers we could put that into the ULPI bus layer and power up
+the device before reading the ID registers. Unfortunately this
+doesn't exist and the power sequence is usually device specific.
+By having the device matched up with DT we can avoid this
+problem.
+
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
-Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
+Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Cc: <devicetree@vger.kernel.org>
+Cc: Rob Herring <robh+dt@kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/ci.h   |  3 ---
- drivers/usb/chipidea/core.c | 32 --------------------------------
- drivers/usb/chipidea/otg.c  | 34 ++++++++++++++++++++++++++++++----
- 3 files changed, 30 insertions(+), 39 deletions(-)
+ Documentation/devicetree/bindings/usb/ulpi.txt | 20 +++++++
+ drivers/usb/common/ulpi.c                      | 79 ++++++++++++++++++++++++--
+ 2 files changed, 93 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/ulpi.txt
 
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index cd414559040f..05bc4d631cb9 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -428,9 +428,6 @@ int hw_port_test_set(struct ci_hdrc *ci, u8 mode);
- 
- u8 hw_port_test_get(struct ci_hdrc *ci);
- 
--int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
--				u32 value, unsigned int timeout_ms);
--
- void ci_platform_configure(struct ci_hdrc *ci);
- 
- int dbg_create_files(struct ci_hdrc *ci);
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 69426e644d17..01390e02ee53 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -516,38 +516,6 @@ int hw_device_reset(struct ci_hdrc *ci)
- 	return 0;
- }
- 
--/**
-- * hw_wait_reg: wait the register value
-- *
-- * Sometimes, it needs to wait register value before going on.
-- * Eg, when switch to device mode, the vbus value should be lower
-- * than OTGSC_BSV before connects to host.
-- *
-- * @ci: the controller
-- * @reg: register index
-- * @mask: mast bit
-- * @value: the bit value to wait
-- * @timeout_ms: timeout in millisecond
-- *
-- * This function returns an error code if timeout
-- */
--int hw_wait_reg(struct ci_hdrc *ci, enum ci_hw_regs reg, u32 mask,
--				u32 value, unsigned int timeout_ms)
--{
--	unsigned long elapse = jiffies + msecs_to_jiffies(timeout_ms);
--
--	while (hw_read(ci, reg, mask) != value) {
--		if (time_after(jiffies, elapse)) {
--			dev_err(ci->dev, "timeout waiting for %08x in %d\n",
--					mask, reg);
--			return -ETIMEDOUT;
--		}
--		msleep(20);
--	}
--
--	return 0;
--}
--
- static irqreturn_t ci_irq(int irq, void *data)
- {
- 	struct ci_hdrc *ci = data;
-diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-index 03b6743461d1..a829607c3e4d 100644
---- a/drivers/usb/chipidea/otg.c
-+++ b/drivers/usb/chipidea/otg.c
-@@ -104,7 +104,31 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
- 		usb_gadget_vbus_disconnect(&ci->gadget);
- }
- 
--#define CI_VBUS_STABLE_TIMEOUT_MS 5000
-+/**
-+ * When we switch to device mode, the vbus value should be lower
-+ * than OTGSC_BSV before connecting to host.
-+ *
-+ * @ci: the controller
-+ *
-+ * This function returns an error code if timeout
-+ */
-+static int hw_wait_vbus_lower_bsv(struct ci_hdrc *ci)
-+{
-+	unsigned long elapse = jiffies + msecs_to_jiffies(5000);
-+	u32 mask = OTGSC_BSV;
+diff --git a/Documentation/devicetree/bindings/usb/ulpi.txt b/Documentation/devicetree/bindings/usb/ulpi.txt
+new file mode 100644
+index 000000000000..ca179dc4bd50
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ulpi.txt
+@@ -0,0 +1,20 @@
++ULPI bus binding
++----------------
 +
-+	while (hw_read_otgsc(ci, mask)) {
-+		if (time_after(jiffies, elapse)) {
-+			dev_err(ci->dev, "timeout waiting for %08x in OTGSC\n",
-+					mask);
-+			return -ETIMEDOUT;
-+		}
-+		msleep(20);
-+	}
++Phys that are behind a ULPI connection can be described with the following
++binding. The host controller shall have a "ulpi" named node as a child, and
++that node shall have one enabled node underneath it representing the ulpi
++device on the bus.
++
++EXAMPLE
++-------
++
++usb {
++	compatible = "vendor,usb-controller";
++
++	ulpi {
++		phy {
++			compatible = "vendor,phy";
++		};
++	};
++};
+diff --git a/drivers/usb/common/ulpi.c b/drivers/usb/common/ulpi.c
+index 8b317702d761..c9480d77810c 100644
+--- a/drivers/usb/common/ulpi.c
++++ b/drivers/usb/common/ulpi.c
+@@ -16,6 +16,9 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/acpi.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/clk/clk-conf.h>
+ 
+ /* -------------------------------------------------------------------------- */
+ 
+@@ -39,6 +42,10 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
+ 	struct ulpi *ulpi = to_ulpi_dev(dev);
+ 	const struct ulpi_device_id *id;
+ 
++	/* Some ULPI devices don't have a vendor id so rely on OF match */
++	if (ulpi->id.vendor == 0)
++		return of_driver_match_device(dev, driver);
++
+ 	for (id = drv->id_table; id->vendor; id++)
+ 		if (id->vendor == ulpi->id.vendor &&
+ 		    id->product == ulpi->id.product)
+@@ -50,6 +57,11 @@ static int ulpi_match(struct device *dev, struct device_driver *driver)
+ static int ulpi_uevent(struct device *dev, struct kobj_uevent_env *env)
+ {
+ 	struct ulpi *ulpi = to_ulpi_dev(dev);
++	int ret;
++
++	ret = of_device_uevent_modalias(dev, env);
++	if (ret != -ENODEV)
++		return ret;
+ 
+ 	if (add_uevent_var(env, "MODALIAS=ulpi:v%04xp%04x",
+ 			   ulpi->id.vendor, ulpi->id.product))
+@@ -60,6 +72,11 @@ static int ulpi_uevent(struct device *dev, struct kobj_uevent_env *env)
+ static int ulpi_probe(struct device *dev)
+ {
+ 	struct ulpi_driver *drv = to_ulpi_driver(dev->driver);
++	int ret;
++
++	ret = of_clk_set_defaults(dev->of_node, false);
++	if (ret < 0)
++		return ret;
+ 
+ 	return drv->probe(to_ulpi_dev(dev));
+ }
+@@ -87,8 +104,13 @@ static struct bus_type ulpi_bus = {
+ static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
+ 			     char *buf)
+ {
++	int len;
+ 	struct ulpi *ulpi = to_ulpi_dev(dev);
+ 
++	len = of_device_get_modalias(dev, buf, PAGE_SIZE - 1);
++	if (len != -ENODEV)
++		return len;
++
+ 	return sprintf(buf, "ulpi:v%04xp%04x\n",
+ 		       ulpi->id.vendor, ulpi->id.product);
+ }
+@@ -153,23 +175,45 @@ EXPORT_SYMBOL_GPL(ulpi_unregister_driver);
+ 
+ /* -------------------------------------------------------------------------- */
+ 
+-static int ulpi_register(struct device *dev, struct ulpi *ulpi)
++static int ulpi_of_register(struct ulpi *ulpi)
+ {
+-	int ret;
++	struct device_node *np = NULL, *child;
++	struct device *parent;
++
++	/* Find a ulpi bus underneath the parent or the grandparent */
++	parent = ulpi->dev.parent;
++	if (parent->of_node)
++		np = of_find_node_by_name(parent->of_node, "ulpi");
++	else if (parent->parent && parent->parent->of_node)
++		np = of_find_node_by_name(parent->parent->of_node, "ulpi");
++	if (!np)
++		return 0;
++
++	child = of_get_next_available_child(np, NULL);
++	of_node_put(np);
++	if (!child)
++		return -EINVAL;
+ 
+-	ulpi->dev.parent = dev; /* needed early for ops */
++	ulpi->dev.of_node = child;
 +
 +	return 0;
 +}
 +
- static void ci_handle_id_switch(struct ci_hdrc *ci)
++static int ulpi_read_id(struct ulpi *ulpi)
++{
++	int ret;
+ 
+ 	/* Test the interface */
+ 	ret = ulpi_write(ulpi, ULPI_SCRATCH, 0xaa);
+ 	if (ret < 0)
+-		return ret;
++		goto err;
+ 
+ 	ret = ulpi_read(ulpi, ULPI_SCRATCH);
+ 	if (ret < 0)
+ 		return ret;
+ 
+ 	if (ret != 0xaa)
+-		return -ENODEV;
++		goto err;
+ 
+ 	ulpi->id.vendor = ulpi_read(ulpi, ULPI_VENDOR_ID_LOW);
+ 	ulpi->id.vendor |= ulpi_read(ulpi, ULPI_VENDOR_ID_HIGH) << 8;
+@@ -177,13 +221,35 @@ static int ulpi_register(struct device *dev, struct ulpi *ulpi)
+ 	ulpi->id.product = ulpi_read(ulpi, ULPI_PRODUCT_ID_LOW);
+ 	ulpi->id.product |= ulpi_read(ulpi, ULPI_PRODUCT_ID_HIGH) << 8;
+ 
++	/* Some ULPI devices don't have a vendor id so rely on OF match */
++	if (ulpi->id.vendor == 0)
++		goto err;
++
++	request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
++	return 0;
++err:
++	of_device_request_module(&ulpi->dev);
++	return 0;
++}
++
++static int ulpi_register(struct device *dev, struct ulpi *ulpi)
++{
++	int ret;
++
++	ulpi->dev.parent = dev; /* needed early for ops */
+ 	ulpi->dev.bus = &ulpi_bus;
+ 	ulpi->dev.type = &ulpi_dev_type;
+ 	dev_set_name(&ulpi->dev, "%s.ulpi", dev_name(dev));
+ 
+ 	ACPI_COMPANION_SET(&ulpi->dev, ACPI_COMPANION(dev));
+ 
+-	request_module("ulpi:v%04xp%04x", ulpi->id.vendor, ulpi->id.product);
++	ret = ulpi_of_register(ulpi);
++	if (ret)
++		return ret;
++
++	ret = ulpi_read_id(ulpi);
++	if (ret)
++		return ret;
+ 
+ 	ret = device_register(&ulpi->dev);
+ 	if (ret)
+@@ -234,6 +300,7 @@ EXPORT_SYMBOL_GPL(ulpi_register_interface);
+  */
+ void ulpi_unregister_interface(struct ulpi *ulpi)
  {
- 	enum ci_role role = ci_otg_role(ci);
-@@ -116,9 +140,11 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
- 		ci_role_stop(ci);
- 
- 		if (role == CI_ROLE_GADGET)
--			/* wait vbus lower than OTGSC_BSV */
--			hw_wait_reg(ci, OP_OTGSC, OTGSC_BSV, 0,
--					CI_VBUS_STABLE_TIMEOUT_MS);
-+			/*
-+			 * wait vbus lower than OTGSC_BSV before connecting
-+			 * to host
-+			 */
-+			hw_wait_vbus_lower_bsv(ci);
- 
- 		ci_role_start(ci, role);
- 	}
++	of_node_put(ulpi->dev.of_node);
+ 	device_unregister(&ulpi->dev);
+ }
+ EXPORT_SYMBOL_GPL(ulpi_unregister_interface);
 -- 
 2.10.0.297.gf6727b0
