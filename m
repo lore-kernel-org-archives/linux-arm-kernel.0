@@ -1,142 +1,100 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 18 Oct 2016 14:00:47 +0100
-Subject: [PATCH] arm64: Cortex-A53 errata workaround: check for kernel
- addresses
-In-Reply-To: <20161018111627.17366-1-andre.przywara@arm.com>
-References: <20161018111627.17366-1-andre.przywara@arm.com>
-Message-ID: <20161018130047.GC15639@leverpostej>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Oct 2016 21:04:01 +0800
+Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <57c81498-78f1-8aac-01b1-b5445415d822@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 12:16:27PM +0100, Andre Przywara wrote:
-> Commit 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on
-> errata-affected core") adds code to execute cache maintenance instructions
-> in the kernel on behalf of userland on CPUs with certain ARM CPU errata.
-> It turns out that the address hasn't been checked to be a valid user
-> space address, allowing userland to clean cache lines in kernel space.
-> Fix this by introducing an access_ok() check before executing the
-> instructions on behalf of userland, taking care of tagged pointers on
-> the way.
-
-It would be worth calling out why we need access_ok_tagged here (i.e.
-since this is not a syscall, the tag bits may validly be set, and we
-must mask them out to check the "real" address).
-
-> Reported-by: Kristina Martsenko <kristina.martsenko@arm.com>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Cc: <stable@vger.kernel.org> # 4.8.x
-
-It would be good to have an explicit:
-
-Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
-
+On 2016/10/8 5:31, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchrounous External
+> Abort) notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
+>
+> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
 > ---
->  arch/arm64/include/asm/uaccess.h |  4 ++++
->  arch/arm64/kernel/traps.c        | 32 ++++++++++++++++++++++++++++----
->  2 files changed, 32 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index bcaf6fb..f842b47 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -21,6 +21,7 @@
+>  arch/arm64/Kconfig        |  1 +
+>  drivers/acpi/apei/Kconfig | 15 +++++++++
+>  drivers/acpi/apei/ghes.c  | 83 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 99 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index b380c87..ae34349 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -53,6 +53,7 @@ config ARM64
+>  	select HANDLE_DOMAIN_IRQ
+>  	select HARDIRQS_SW_RESEND
+>  	select HAVE_ACPI_APEI if (ACPI && EFI)
+> +	select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
+>  	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+>  	select HAVE_ARCH_AUDITSYSCALL
+>  	select HAVE_ARCH_BITREVERSE
+> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> index b0140c8..fb99c1c 100644
+> --- a/drivers/acpi/apei/Kconfig
+> +++ b/drivers/acpi/apei/Kconfig
+> @@ -4,6 +4,21 @@ config HAVE_ACPI_APEI
+>  config HAVE_ACPI_APEI_NMI
+>  	bool
+>
+> +config HAVE_ACPI_APEI_SEA
+> +	bool "APEI Synchronous External Abort logging/recovering support"
+> +	depends on ARM64
+> +	help
+> +	  This option should be enabled if the system supports
+> +	  firmware first handling of SEA (Synchronous External Abort).
+> +	  SEA happens with certain faults of data abort or instruction
+> +	  abort synchronous exceptions on ARMv8 systems. If a system
+> +	  supports firmware first handling of SEA, the platform analyzes
+> +	  and handles hardware error notifications with SEA, and it may then
+> +	  form a HW error record for the OS to parse and handle. This
+> +	  option allows the OS to look for such HW error record, and
+> +	  take appropriate action.
+
+OK, I can see that it's firmware first handling, so it's triggered
+by firmware to me, correct me if I'm wrong.
+
+[...]
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
 >  /*
->   * User space memory access functions
->   */
-> +#include <linux/bitops.h>
->  #include <linux/kasan-checks.h>
->  #include <linux/string.h>
->  #include <linux/thread_info.h>
-> @@ -103,6 +104,9 @@ static inline void set_fs(mm_segment_t fs)
->  })
->  
->  #define access_ok(type, addr, size)	__range_ok(addr, size)
-> +#define access_ok_tagged(type, addr, size)  access_ok(type,		       \
-> +						      sign_extend64(addr, 55), \
-> +						      size)
->  #define user_addr_max			get_fs
->  
->  #define _ASM_EXTABLE(from, to)						\
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 5ff020f..04ea0d7 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -447,6 +447,30 @@ void cpu_enable_cache_maint_trap(void *__unused)
->  		: "=r" (res)					\
->  		: "r" (address), "i" (-EFAULT) )
->  
-> +enum {USER_CACHE_MAINT_DC_CIVAC, USER_CACHE_MAINT_IC_IVAU};
-> +
-> +static int do_user_cache_maint(int ins_type, unsigned long address)
-> +{
-> +	int ret;
-> +	unsigned long cl_size = cache_line_size();
-> +
-> +	if (!access_ok_tagged(VERIFY_READ,
-> +			      round_down(address, cl_size),
-> +			      cl_size))
-> +		return -EFAULT;
-
-We're only checking the D$ line size here; the I$ is not reported by
-cache_line_size().
-
-We may as well use PAGE_SIZE here, given cache lines have to be
-naturally aligned and permissions are at page granularity. There's no
-functional difference, but the value can't change under our feet, and
-the compiler may be able to better optimize by folding the contant in.
-
-> +
-> +	switch (ins_type) {
-> +	case USER_CACHE_MAINT_DC_CIVAC:
-> +		__user_cache_maint("dc civac", address, ret);
+>   * printk is not safe in NMI context.  So in NMI handler, we allocate
+> @@ -1023,6 +1083,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  	case ACPI_HEST_NOTIFY_EXTERNAL:
+>  	case ACPI_HEST_NOTIFY_SCI:
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEA:
+> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
+> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+> +				generic->header.source_id);
+> +			rc = -ENOTSUPP;
+> +			goto err;
+> +		}
 > +		break;
-> +	case USER_CACHE_MAINT_IC_IVAU:
-> +		__user_cache_maint("ic ivau", address, ret);
-> +		break;
-> +	}
-> +
-> +	return ret;
-> +}
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+> @@ -1034,6 +1102,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>  			   generic->header.source_id);
+>  		goto err;
+> +	case ACPI_HEST_NOTIFY_GPIO:
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+> +			generic->header.source_id, generic->header.source_id);
 
-We could make this function a macro (passing in the instruction
-explicitly), and avoid the enum and switch.
+Hmm, some platform may trigger a interrupt to OS for firmware handling
+and it's in the ACPI 6.1 spec, is it a limitation now, or we need to
+add code later to support it?
 
-Other than that, this looks good to me.
-
-Thanks,
-Mark.
-
-> +
->  static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
->  {
->  	unsigned long address;
-> @@ -458,16 +482,16 @@ static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
->  
->  	switch (crm) {
->  	case ESR_ELx_SYS64_ISS_CRM_DC_CVAU:	/* DC CVAU, gets promoted */
-> -		__user_cache_maint("dc civac", address, ret);
-> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
->  		break;
->  	case ESR_ELx_SYS64_ISS_CRM_DC_CVAC:	/* DC CVAC, gets promoted */
-> -		__user_cache_maint("dc civac", address, ret);
-> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
->  		break;
->  	case ESR_ELx_SYS64_ISS_CRM_DC_CIVAC:	/* DC CIVAC */
-> -		__user_cache_maint("dc civac", address, ret);
-> +		ret = do_user_cache_maint(USER_CACHE_MAINT_DC_CIVAC, address);
->  		break;
->  	case ESR_ELx_SYS64_ISS_CRM_IC_IVAU:	/* IC IVAU */
-> -		__user_cache_maint("ic ivau", address, ret);
-> +		ret = do_user_cache_maint(USER_CACHE_MAINT_IC_IVAU, address);
->  		break;
->  	default:
->  		force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> -- 
-> 2.9.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks
+Hanjun
