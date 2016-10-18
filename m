@@ -1,125 +1,157 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 18 Oct 2016 18:46:00 +0300
-Subject: [PATCHv4 07/15] clk: ti: rename ti_clk_register_legacy_clks API
-In-Reply-To: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1476805568-19264-8-git-send-email-t-kristo@ti.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Tue, 18 Oct 2016 17:47:22 +0200
+Subject: [PATCH 1/2] scripts/gdb: add lx-fdtdump command
+In-Reply-To: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+References: <1476803249-23328-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <c8a1898e-e60f-b25a-f4d2-7384f04b6f3f@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drop the '_legacy_' part out of the name, as this will be used to register
-also non-legacy clocks in the following patches; namely the hwmod clocks.
+On 2016-10-18 17:07, Peter Griffin wrote:
+> lx-fdtdump dumps the flatenned device tree passed to the kernel
+> from the bootloader to a file called fdtdump.dtb to allow further
+> post processing on the machine running GDB. The fdt header is also
+> also printed in the GDB console. For example:
+> 
+> (gdb) lx-fdtdump
+> fdt_magic:         0xD00DFEED
+> fdt_totalsize:     0xC108
+> off_dt_struct:     0x38
+> off_dt_strings:    0x3804
+> off_mem_rsvmap:    0x28
+> version:           17
+> last_comp_version: 16
+> Dumped fdt to fdtdump.dtb
+> 
+>> fdtdump fdtdump.dtb | less
+> 
+> This command is useful as the bootloader can often re-write parts
+> of the device tree, and this can sometimes cause the kernel to not
+> boot.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  scripts/gdb/linux/constants.py.in |  8 +++++
+>  scripts/gdb/linux/proc.py         | 70 ++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 77 insertions(+), 1 deletion(-)
+> 
+> diff --git a/scripts/gdb/linux/constants.py.in b/scripts/gdb/linux/constants.py.in
+> index 7986f4e..43c6241 100644
+> --- a/scripts/gdb/linux/constants.py.in
+> +++ b/scripts/gdb/linux/constants.py.in
+> @@ -14,6 +14,7 @@
+>  
+>  #include <linux/fs.h>
+>  #include <linux/mount.h>
+> +#include <linux/of_fdt.h>
+>  
+>  /* We need to stringify expanded macros so that they can be parsed */
+>  
+> @@ -50,3 +51,10 @@ LX_VALUE(MNT_NOEXEC)
+>  LX_VALUE(MNT_NOATIME)
+>  LX_VALUE(MNT_NODIRATIME)
+>  LX_VALUE(MNT_RELATIME)
+> +
+> +/* linux/of_fdt.h> */
+> +LX_VALUE(OF_DT_HEADER)
+> +
+> +/* Kernel Configs */
+> +LX_CONFIG(CONFIG_OF)
+> +
+> diff --git a/scripts/gdb/linux/proc.py b/scripts/gdb/linux/proc.py
+> index 38b1f09..f20fcfa 100644
+> --- a/scripts/gdb/linux/proc.py
+> +++ b/scripts/gdb/linux/proc.py
+> @@ -16,7 +16,7 @@ from linux import constants
+>  from linux import utils
+>  from linux import tasks
+>  from linux import lists
+> -
+> +from struct import *
+>  
+>  class LxCmdLine(gdb.Command):
+>      """ Report the Linux Commandline used in the current kernel.
+> @@ -195,3 +195,71 @@ values of that process namespace"""
+>                          info_opts(MNT_INFO, m_flags)))
+>  
+>  LxMounts()
+> +
+> +class LxFdtDump(gdb.Command):
+> +    """Output Flattened Device Tree header and dump FDT blob to a file
+> +       Equivalent to 'cat /proc/fdt > fdtdump.dtb' on a running target"""
+> +
+> +    def __init__(self):
+> +        super(LxFdtDump, self).__init__("lx-fdtdump", gdb.COMMAND_DATA)
+> +
+> +    def fdthdr_to_cpu(self, fdt_header):
+> +
+> +            fdt_header_be = ">IIIIIII"
+> +            fdt_header_le = "<IIIIIII"
+> +
+> +            if utils.get_target_endianness() == 1:
+> +                output_fmt = fdt_header_le
+> +            else:
+> +                output_fmt = fdt_header_be
+> +
+> +            return unpack(output_fmt, pack(fdt_header_be,
+> +                                           fdt_header['magic'],
+> +                                           fdt_header['totalsize'],
+> +                                           fdt_header['off_dt_struct'],
+> +                                           fdt_header['off_dt_strings'],
+> +                                           fdt_header['off_mem_rsvmap'],
+> +                                           fdt_header['version'],
+> +                                           fdt_header['last_comp_version']))
+> +
+> +    def invoke(self, arg, from_tty):
+> +
+> +        if constants.LX_CONFIG_OF:
+> +
+> +            filename = "fdtdump.dtb"
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/clk/ti/clk-3xxx-legacy.c | 30 +++++++++++++++---------------
- drivers/clk/ti/clk.c             |  4 ++--
- drivers/clk/ti/clock.h           |  2 +-
- 3 files changed, 18 insertions(+), 18 deletions(-)
+Why not specifying the file name as argument? Safer than silently
+overwriting potentially pre-existing files or failing without
+alternatives if the current directory is not writable.
 
-diff --git a/drivers/clk/ti/clk-3xxx-legacy.c b/drivers/clk/ti/clk-3xxx-legacy.c
-index 0fbf8a9..5a860d2 100644
---- a/drivers/clk/ti/clk-3xxx-legacy.c
-+++ b/drivers/clk/ti/clk-3xxx-legacy.c
-@@ -4600,9 +4600,9 @@ int __init omap3430es1_clk_legacy_init(void)
- {
- 	int r;
- 
--	r = ti_clk_register_legacy_clks(omap3430es1_clks);
--	r |= ti_clk_register_legacy_clks(omap34xx_omap36xx_clks);
--	r |= ti_clk_register_legacy_clks(omap3xxx_clks);
-+	r = ti_clk_register_clks(omap3430es1_clks);
-+	r |= ti_clk_register_clks(omap34xx_omap36xx_clks);
-+	r |= ti_clk_register_clks(omap3xxx_clks);
- 
- 	omap3_clk_legacy_common_init();
- 
-@@ -4613,10 +4613,10 @@ int __init omap3430_clk_legacy_init(void)
- {
- 	int r;
- 
--	r = ti_clk_register_legacy_clks(omap34xx_omap36xx_clks);
--	r |= ti_clk_register_legacy_clks(omap36xx_omap3430es2plus_clks);
--	r |= ti_clk_register_legacy_clks(omap36xx_am35xx_omap3430es2plus_clks);
--	r |= ti_clk_register_legacy_clks(omap3xxx_clks);
-+	r = ti_clk_register_clks(omap34xx_omap36xx_clks);
-+	r |= ti_clk_register_clks(omap36xx_omap3430es2plus_clks);
-+	r |= ti_clk_register_clks(omap36xx_am35xx_omap3430es2plus_clks);
-+	r |= ti_clk_register_clks(omap3xxx_clks);
- 
- 	omap3_clk_legacy_common_init();
- 	omap3_clk_lock_dpll5();
-@@ -4629,11 +4629,11 @@ int __init omap36xx_clk_legacy_init(void)
- 	int r;
- 
- 	ti_clk_patch_legacy_clks(omap36xx_clk_patches);
--	r = ti_clk_register_legacy_clks(omap36xx_clks);
--	r |= ti_clk_register_legacy_clks(omap36xx_omap3430es2plus_clks);
--	r |= ti_clk_register_legacy_clks(omap34xx_omap36xx_clks);
--	r |= ti_clk_register_legacy_clks(omap36xx_am35xx_omap3430es2plus_clks);
--	r |= ti_clk_register_legacy_clks(omap3xxx_clks);
-+	r = ti_clk_register_clks(omap36xx_clks);
-+	r |= ti_clk_register_clks(omap36xx_omap3430es2plus_clks);
-+	r |= ti_clk_register_clks(omap34xx_omap36xx_clks);
-+	r |= ti_clk_register_clks(omap36xx_am35xx_omap3430es2plus_clks);
-+	r |= ti_clk_register_clks(omap3xxx_clks);
- 
- 	omap3_clk_legacy_common_init();
- 	omap3_clk_lock_dpll5();
-@@ -4645,9 +4645,9 @@ int __init am35xx_clk_legacy_init(void)
- {
- 	int r;
- 
--	r = ti_clk_register_legacy_clks(am35xx_clks);
--	r |= ti_clk_register_legacy_clks(omap36xx_am35xx_omap3430es2plus_clks);
--	r |= ti_clk_register_legacy_clks(omap3xxx_clks);
-+	r = ti_clk_register_clks(am35xx_clks);
-+	r |= ti_clk_register_clks(omap36xx_am35xx_omap3430es2plus_clks);
-+	r |= ti_clk_register_clks(omap3xxx_clks);
- 
- 	omap3_clk_legacy_common_init();
- 	omap3_clk_lock_dpll5();
-diff --git a/drivers/clk/ti/clk.c b/drivers/clk/ti/clk.c
-index f526f0d..7a445f4 100644
---- a/drivers/clk/ti/clk.c
-+++ b/drivers/clk/ti/clk.c
-@@ -291,6 +291,7 @@ void __init ti_clk_patch_legacy_clks(struct ti_clk **patch)
- 		patch++;
- 	}
- }
-+#endif
- 
- struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
- {
-@@ -376,7 +377,7 @@ struct clk __init *ti_clk_register_clk(struct ti_clk *setup)
- 	{ }
- };
- 
--int __init ti_clk_register_legacy_clks(struct ti_clk_alias *clks)
-+int __init ti_clk_register_clks(struct ti_clk_alias *clks)
- {
- 	struct clk *clk;
- 	bool retry;
-@@ -443,7 +444,6 @@ int __init ti_clk_register_legacy_clks(struct ti_clk_alias *clks)
- 
- 	return 0;
- }
--#endif
- 
- /**
-  * ti_clk_setup_features - setup clock features flags
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 6bf962d..5675e37 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -201,7 +201,7 @@ struct clk *ti_clk_register(struct device *dev, struct clk_hw *hw,
- 
- void ti_clk_patch_legacy_clks(struct ti_clk **patch);
- struct clk *ti_clk_register_clk(struct ti_clk *setup);
--int ti_clk_register_legacy_clks(struct ti_clk_alias *clks);
-+int ti_clk_register_clks(struct ti_clk_alias *clks);
- 
- void __iomem *ti_clk_get_reg_addr(struct device_node *node, int index);
- void ti_dt_clocks_register(struct ti_dt_clk *oclks);
+> +
+> +            py_fdt_header_ptr = gdb.parse_and_eval(
+> +                "(const struct fdt_header *) initial_boot_params")
+> +            py_fdt_header = py_fdt_header_ptr.dereference()
+> +
+> +            fdt_header = self.fdthdr_to_cpu(py_fdt_header)
+> +
+> +            if fdt_header[0] != constants.LX_OF_DT_HEADER:
+> +                raise gdb.GdbError("No flattened device tree magic found\n")
+> +
+> +            gdb.write("fdt_magic:         0x{:02X}\n".format(fdt_header[0]))
+> +            gdb.write("fdt_totalsize:     0x{:02X}\n".format(fdt_header[1]))
+> +            gdb.write("off_dt_struct:     0x{:02X}\n".format(fdt_header[2]))
+> +            gdb.write("off_dt_strings:    0x{:02X}\n".format(fdt_header[3]))
+> +            gdb.write("off_mem_rsvmap:    0x{:02X}\n".format(fdt_header[4]))
+> +            gdb.write("version:           {}\n".format(fdt_header[5]))
+> +            gdb.write("last_comp_version: {}\n".format(fdt_header[6]))
+> +
+> +            inf = gdb.inferiors()[0]
+> +            fdt_buf = utils.read_memoryview(inf, py_fdt_header_ptr,
+> +                                            fdt_header[1]).tobytes()
+> +
+> +            try:
+> +                f = open(filename, 'wb')
+> +            except:
+> +                raise gdb.GdbError("Could not open file to dump fdt")
+> +
+> +            f.write(fdt_buf)
+> +            f.close()
+> +
+> +            gdb.write("Dumped fdt to " + filename + "\n")
+> +
+> +        else:
+> +            gdb.write("Kernel not compiled with CONFIG_OF\n")
+> +
+> +LxFdtDump()
+> 
+
+Jan
+
 -- 
-1.9.1
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
