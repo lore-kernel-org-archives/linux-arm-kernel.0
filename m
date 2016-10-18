@@ -1,84 +1,92 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 11:03:17 -0500
-Subject: [RFC PATCH 1/3] ARM: dts: Add support for OX820 and Pogoplug V3
-In-Reply-To: <20161017124001.23820-2-narmstrong@baylibre.com>
-References: <20161017124001.23820-1-narmstrong@baylibre.com>
- <20161017124001.23820-2-narmstrong@baylibre.com>
-Message-ID: <20161018160317.dscfcbhkywmy3c37@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 18 Oct 2016 17:03:59 +0100
+Subject: [PATCH v6 01/16] drivers: acpi: add FWNODE_ACPI_STATIC fwnode type
+In-Reply-To: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
+References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20161018160414.1228-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 02:39:59PM +0200, Neil Armstrong wrote:
-> Add device tree for the Oxford Seminconductor OX820 SoC and the
-> Cloud Engines PogoPlug v3 board.
-> Add the SoC and board compatible strings to oxnas bindings.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/arm/oxnas.txt    |   5 +
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  .../boot/dts/cloudengines-pogoplug-series-3.dts    |  60 +++++
->  arch/arm/boot/dts/ox820.dtsi                       | 259 +++++++++++++++++++++
->  4 files changed, 326 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
->  create mode 100644 arch/arm/boot/dts/ox820.dtsi
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
-> index b9e4971..ac64e60 100644
-> --- a/Documentation/devicetree/bindings/arm/oxnas.txt
-> +++ b/Documentation/devicetree/bindings/arm/oxnas.txt
-> @@ -5,5 +5,10 @@ Boards with the OX810SE SoC shall have the following properties:
->    Required root node property:
->      compatible: "oxsemi,ox810se"
->  
-> +Boards with the OX820 SoC shall have the following properties:
-> +  Required root node property:
-> +    compatible: "oxsemi,ox820"
-> +
->  Board compatible values:
->    - "wd,mbwe" (OX810SE)
-> +  - "cloudengines,pogoplugv3" (OX820)
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index faacd52..5d9e8d5 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -588,7 +588,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
->  dtb-$(CONFIG_ARCH_PRIMA2) += \
->  	prima2-evb.dtb
->  dtb-$(CONFIG_ARCH_OXNAS) += \
-> -	wd-mbwe.dtb
-> +	wd-mbwe.dtb \
-> +	cloudengines-pogoplug-series-3.dtb
->  dtb-$(CONFIG_ARCH_QCOM) += \
->  	qcom-apq8060-dragonboard.dtb \
->  	qcom-apq8064-arrow-sd-600eval.dtb \
-> diff --git a/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts b/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
-> new file mode 100644
-> index 0000000..78d9149
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
-> @@ -0,0 +1,60 @@
-> +/*
-> + * cloudengines-pogoplug-series-3.dtsi - Device tree file for Cloud Engines PogoPlug Series 3
-> + *
-> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Licensed under GPLv2 or later
-> + */
-> +
-> +/dts-v1/;
-> +#include "ox820.dtsi"
-> +
-> +/ {
-> +	model = "Cloud Engines PogoPlug Series 3";
-> +
-> +	compatible = "cloudengines,pogoplugv3", "oxsemi,ox820";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk=serial";
+On systems booting with a device tree, every struct device is associated
+with a struct device_node, that provides its DT firmware representation.
+The device node can be used in generic kernel contexts (eg IRQ
+translation, IOMMU streamid mapping), to retrieve the properties
+associated with the device and carry out kernel operations accordingly.
+Owing to the 1:1 relationship between the device and its device_node,
+the device_node can also be used as a look-up token for the device (eg
+looking up a device through its device_node), to retrieve the device in
+kernel paths where the device_node is available.
 
-Use stdout-path and I don't think "earlyprintk=serial" is valid.
+On systems booting with ACPI, the same abstraction provided by
+the device_node is required to provide look-up functionality.
 
-With that,
+The struct acpi_device, that represents firmware objects in the
+ACPI namespace already includes a struct fwnode_handle of
+type FWNODE_ACPI as their member; the same abstraction is missing
+though for devices that are instantiated out of static ACPI tables
+entries (eg ARM SMMU devices).
 
-Acked-by: Rob Herring <robh@kernel.org>
+Add a new fwnode_handle type to associate devices created out
+of static ACPI table entries to the respective firmware components
+and create a simple ACPI core layer interface to dynamically allocate
+and free the corresponding firmware nodes so that kernel subsystems
+can use it to instantiate the nodes and associate them with the
+respective devices.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ include/linux/acpi.h   | 21 +++++++++++++++++++++
+ include/linux/fwnode.h |  3 ++-
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index ddbeda6..a284273 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -56,6 +56,27 @@ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
+ 	acpi_fwnode_handle(adev) : NULL)
+ #define ACPI_HANDLE(dev)		acpi_device_handle(ACPI_COMPANION(dev))
+ 
++static inline struct fwnode_handle *acpi_alloc_fwnode_static(void)
++{
++	struct fwnode_handle *fwnode;
++
++	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
++	if (!fwnode)
++		return NULL;
++
++	fwnode->type = FWNODE_ACPI_STATIC;
++
++	return fwnode;
++}
++
++static inline void acpi_free_fwnode_static(struct fwnode_handle *fwnode)
++{
++	if (WARN_ON(!fwnode || fwnode->type != FWNODE_ACPI_STATIC))
++		return;
++
++	kfree(fwnode);
++}
++
+ /**
+  * ACPI_DEVICE_CLASS - macro used to describe an ACPI device with
+  * the PCI-defined class-code information
+diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+index 8516717..8bd28ce 100644
+--- a/include/linux/fwnode.h
++++ b/include/linux/fwnode.h
+@@ -17,8 +17,9 @@ enum fwnode_type {
+ 	FWNODE_OF,
+ 	FWNODE_ACPI,
+ 	FWNODE_ACPI_DATA,
++	FWNODE_ACPI_STATIC,
+ 	FWNODE_PDATA,
+-	FWNODE_IRQCHIP,
++	FWNODE_IRQCHIP
+ };
+ 
+ struct fwnode_handle {
+-- 
+2.10.0
