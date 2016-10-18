@@ -1,33 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 18 Oct 2016 20:37:48 +0300
-Subject: [PATCH v9 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <1476811129-4450-3-git-send-email-ayaka@soulik.info>
-References: <devicetree@vger.kernel.org>
- <1476811129-4450-1-git-send-email-ayaka@soulik.info>
- <1476811129-4450-3-git-send-email-ayaka@soulik.info>
-Message-ID: <20161018173748.GB30003@kozik-lap>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Tue, 18 Oct 2016 13:41:47 -0400
+Subject: [PATCH V5 0/2] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1476812509-2760-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 01:18:49AM +0800, Randy Li wrote:
-> The TOPEET itop exynos 4412 have three versions base board. The
-> Elite version is the cheap one without too much peripheral devices
-> on it.
-> 
-> Currently supported are serial console, wired networking(USB),
-> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
-> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
-> enabled.
-> 
-> The FIMC is not used for camera currently, I enabled it just for a
-> colorspace converter.
-> 
-> Signed-off-by: Randy Li <ayaka@soulik.info>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-Thanks, applied, with missing Rob's ack, minor changes in commit msg and
-fix in pin function (you used macro for pull up/down instead of
-function).
+The first patch adds support for ResourceSource/IRQ domain mapping
+when using Extended IRQ Resources with a specific ResourceSource.
+The core ACPI resource management code has been changed to lookup
+the IRQ domain when an IRQ resource indicates a ResourceSource,
+and register the IRQ on that domain, instead of a GSI.
 
-Best regards,
-Krzysztof
+The second patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
+
+Changes V1 -> V2:
+* Remove use of GPIO library for the combiner
+* Refactor to use fwnode/ResourceSource to IRQ domain mapping
+  introduced in ACPI core
+
+Changes V2 -> V3:
+* Removed parsing of _PRS to find IRQs
+* Removed acpi_irq_domain_create and acpi_irq_domain_remove
+
+Changes V3 -> V4:
+* Add a DSDT device probe table that is used to probe DSDT IRQ chips
+  as necessary when converting HW IRQs to Linux IRQs
+* Describe IRQ combiner registers as ACPI Register resources
+
+Changes V4 -> V5:
+* Fix issues flagged by the 0-DAY build bot
+* Fix some minor style issues raised by Timur
+
+Agustin Vega-Frias (2):
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   1 +
+ drivers/acpi/irqdomain.c            | 141 +++++++++++++++
+ drivers/acpi/resource.c             |  21 ++-
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 332 ++++++++++++++++++++++++++++++++++++
+ include/asm-generic/vmlinux.lds.h   |   1 +
+ include/linux/acpi.h                |  71 ++++++++
+ include/linux/irqchip.h             |  17 +-
+ 9 files changed, 581 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/acpi/irqdomain.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
