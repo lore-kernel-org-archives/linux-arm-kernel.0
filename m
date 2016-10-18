@@ -1,21 +1,26 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 18 Oct 2016 07:43:49 -0500
-Subject: [PATCH v2 6/9] dt-bindings: pinctrl: Deprecate sunxi pinctrl
- bindings
-In-Reply-To: <ee6d214a14ed31689c5f70fc6ee5736c3d26737b.1476200742.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
- <ee6d214a14ed31689c5f70fc6ee5736c3d26737b.1476200742.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20161018124349.qxsrpx3yjy62bqhp@rob-hp-laptop>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 18 Oct 2016 20:44:05 +0800
+Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <496ddac3-a220-fd42-5ca1-3d0fb0238907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 05:46:04PM +0200, Maxime Ripard wrote:
-> The generic pin configuration and multiplexing should be preferred now,
-> even though we still support the old one.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+), 0 deletions(-)
+Hi Tyler,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On 2016/10/8 5:31, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchrounous External
+> Abort) notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
+
+Does this SEA is replayed by the firmware (firmware first handling)
+or directly triggered by the hardware when error is happened?
+
+Thanks
+Hanjun
