@@ -1,58 +1,131 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 17 Oct 2016 18:56:20 -0700
-Subject: [PATCH v5 07/23] usb: chipidea: Notify events when switching host mode
+Date: Mon, 17 Oct 2016 18:56:18 -0700
+Subject: [PATCH v5 05/23] usb: chipidea: Handle extcon events properly
 In-Reply-To: <20161018015636.11701-1-stephen.boyd@linaro.org>
 References: <20161018015636.11701-1-stephen.boyd@linaro.org>
-Message-ID: <20161018015636.11701-8-stephen.boyd@linaro.org>
+Message-ID: <20161018015636.11701-6-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chipidea/udc.c file sends a CI_HDRC_CONTROLLER_RESET_EVENT to
-the wrapper drivers when it calls hw_device_reset(), but that
-function is not called from chipidea/host.c. And the udc.c file
-sends the CI_HDRC_CONTROLLER_STOPPED_EVENT but the host.c file
-doesn't do anything.
-
-The intent of the reset event is to allow the wrapper driver to
-do any wrapper specific things after the reset bit has been set
-in the usb command register. Therefore, add this event hook in
-the host role after we toggle that bit.
-
-Similarly, the intent of the stopped event is to allow the
-wrapper driver to do any wrapper specific things after the device
-is stopped. So when we stop the host role, send the stopped
-event.
+We're currently emulating the vbus and id interrupts in the OTGSC
+read API, but we also need to make sure that if we're handling
+the events with extcon that we don't enable the interrupts for
+those events in the hardware. Therefore, properly emulate this
+register if we're using extcon, but don't enable the interrupts.
+This allows me to get my cable connect/disconnect working
+properly without getting spurious interrupts on my device that
+uses an extcon for these two events.
 
 Acked-by: Peter Chen <peter.chen@nxp.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: "Ivan T. Ivanov" <iivanov.xz@gmail.com>
+Fixes: 3ecb3e09b042 ("usb: chipidea: Use extcon framework for VBUS and ID detect")
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/usb/chipidea/host.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/usb/chipidea/otg.c   | 46 +++++++++++++++++++++++++++++++++++++++-----
+ include/linux/usb/chipidea.h |  2 ++
+ 2 files changed, 43 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/usb/chipidea/host.c b/drivers/usb/chipidea/host.c
-index 96ae69502c86..f036a9e39ced 100644
---- a/drivers/usb/chipidea/host.c
-+++ b/drivers/usb/chipidea/host.c
-@@ -90,6 +90,9 @@ static int ehci_ci_reset(struct usb_hcd *hcd)
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index a829607c3e4d..0cf149edddd8 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -44,12 +44,15 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+ 		else
+ 			val &= ~OTGSC_BSVIS;
  
- 	ehci->need_io_watchdog = 0;
- 
-+	if (ci->platdata->notify_event)
-+		ci->platdata->notify_event(ci, CI_HDRC_CONTROLLER_RESET_EVENT);
+-		cable->changed = false;
+-
+ 		if (cable->state)
+ 			val |= OTGSC_BSV;
+ 		else
+ 			val &= ~OTGSC_BSV;
 +
- 	ci_platform_configure(ci);
++		if (cable->enabled)
++			val |= OTGSC_BSVIE;
++		else
++			val &= ~OTGSC_BSVIE;
+ 	}
  
- 	return ret;
-@@ -187,6 +190,9 @@ static void host_stop(struct ci_hdrc *ci)
- 	struct usb_hcd *hcd = ci->hcd;
+ 	cable = &ci->platdata->id_extcon;
+@@ -59,15 +62,18 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+ 		else
+ 			val &= ~OTGSC_IDIS;
  
- 	if (hcd) {
-+		if (ci->platdata->notify_event)
-+			ci->platdata->notify_event(ci,
-+				CI_HDRC_CONTROLLER_STOPPED_EVENT);
- 		usb_remove_hcd(hcd);
- 		usb_put_hcd(hcd);
- 		if (ci->platdata->reg_vbus && !ci_otg_is_fsm_mode(ci) &&
+-		cable->changed = false;
+-
+ 		if (cable->state)
+ 			val |= OTGSC_ID;
+ 		else
+ 			val &= ~OTGSC_ID;
++
++		if (cable->enabled)
++			val |= OTGSC_IDIE;
++		else
++			val &= ~OTGSC_IDIE;
+ 	}
+ 
+-	return val;
++	return val & mask;
+ }
+ 
+ /**
+@@ -77,6 +83,36 @@ u32 hw_read_otgsc(struct ci_hdrc *ci, u32 mask)
+  */
+ void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
+ {
++	struct ci_hdrc_cable *cable;
++
++	cable = &ci->platdata->vbus_extcon;
++	if (!IS_ERR(cable->edev)) {
++		if (data & mask & OTGSC_BSVIS)
++			cable->changed = false;
++
++		/* Don't enable vbus interrupt if using external notifier */
++		if (data & mask & OTGSC_BSVIE) {
++			cable->enabled = true;
++			data &= ~OTGSC_BSVIE;
++		} else if (mask & OTGSC_BSVIE) {
++			cable->enabled = false;
++		}
++	}
++
++	cable = &ci->platdata->id_extcon;
++	if (!IS_ERR(cable->edev)) {
++		if (data & mask & OTGSC_IDIS)
++			cable->changed = false;
++
++		/* Don't enable id interrupt if using external notifier */
++		if (data & mask & OTGSC_IDIE) {
++			cable->enabled = true;
++			data &= ~OTGSC_IDIE;
++		} else if (mask & OTGSC_IDIE) {
++			cable->enabled = false;
++		}
++	}
++
+ 	hw_write(ci, OP_OTGSC, mask | OTGSC_INT_STATUS_BITS, data);
+ }
+ 
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 5dd75fa47dd8..f9be467d6695 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -14,6 +14,7 @@ struct ci_hdrc;
+  * struct ci_hdrc_cable - structure for external connector cable state tracking
+  * @state: current state of the line
+  * @changed: set to true when extcon event happen
++ * @enabled: set to true if we've enabled the vbus or id interrupt
+  * @edev: device which generate events
+  * @ci: driver state of the chipidea device
+  * @nb: hold event notification callback
+@@ -22,6 +23,7 @@ struct ci_hdrc;
+ struct ci_hdrc_cable {
+ 	bool				state;
+ 	bool				changed;
++	bool				enabled;
+ 	struct extcon_dev		*edev;
+ 	struct ci_hdrc			*ci;
+ 	struct notifier_block		nb;
 -- 
 2.10.0.297.gf6727b0
