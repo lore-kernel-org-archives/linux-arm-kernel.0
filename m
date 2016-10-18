@@ -1,410 +1,160 @@
 From: zourongrong@gmail.com (Rongrong Zou)
-Date: Tue, 18 Oct 2016 12:01:16 +0800
-Subject: [PATCH v4 1/9] drm/hisilicon/hibmc: Add hisilicon hibmc drm master
- driver
+Date: Tue, 18 Oct 2016 12:01:17 +0800
+Subject: [PATCH v4 2/9] drm/hisilicon/hibmc: Add video memory management
 In-Reply-To: <1476763284-100508-1-git-send-email-zourongrong@gmail.com>
 References: <1476763284-100508-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1476763284-100508-2-git-send-email-zourongrong@gmail.com>
+Message-ID: <1476763284-100508-3-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DRM master driver for Hisilicon Hibmc SoC which used for
-Out-of-band management. Blow is the general hardware connection,
-both the Hibmc and the host CPU are on the same mother board.
-
-+----------+       +----------+
-|          | PCIe  |  Hibmc   |
-|host CPU( |<----->| display  |
-|arm64,x86)|       |subsystem |
-+----------+       +----------+
+Hibmc have 32m video memory which can be accessed through PCIe by host,
+we use ttm to manage these memory.
 
 Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 ---
- drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
- drivers/gpu/drm/hisilicon/Makefile                |   1 +
- drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   7 +
- drivers/gpu/drm/hisilicon/hibmc/Makefile          |   5 +
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 270 ++++++++++++++++++++++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  35 +++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c |  85 +++++++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h |  28 +++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 212 +++++++++++++++++
- 9 files changed, 644 insertions(+)
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
+ drivers/gpu/drm/hisilicon/hibmc/Kconfig         |   1 +
+ drivers/gpu/drm/hisilicon/hibmc/Makefile        |   2 +-
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c |  11 +
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |  45 +++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c     | 491 ++++++++++++++++++++++++
+ 5 files changed, 549 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
 
-diff --git a/drivers/gpu/drm/hisilicon/Kconfig b/drivers/gpu/drm/hisilicon/Kconfig
-index 558c61b..2fd2724 100644
---- a/drivers/gpu/drm/hisilicon/Kconfig
-+++ b/drivers/gpu/drm/hisilicon/Kconfig
-@@ -2,4 +2,5 @@
- # hisilicon drm device configuration.
- # Please keep this list sorted alphabetically
- 
-+source "drivers/gpu/drm/hisilicon/hibmc/Kconfig"
- source "drivers/gpu/drm/hisilicon/kirin/Kconfig"
-diff --git a/drivers/gpu/drm/hisilicon/Makefile b/drivers/gpu/drm/hisilicon/Makefile
-index e3f6d49..c8155bf 100644
---- a/drivers/gpu/drm/hisilicon/Makefile
-+++ b/drivers/gpu/drm/hisilicon/Makefile
-@@ -2,4 +2,5 @@
- # Makefile for hisilicon drm drivers.
- # Please keep this list sorted alphabetically
- 
-+obj-$(CONFIG_DRM_HISI_HIBMC) += hibmc/
- obj-$(CONFIG_DRM_HISI_KIRIN) += kirin/
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/Kconfig b/drivers/gpu/drm/hisilicon/hibmc/Kconfig
-new file mode 100644
-index 0000000..a9af90d
---- /dev/null
+index a9af90d..bcb8c18 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/Kconfig
 +++ b/drivers/gpu/drm/hisilicon/hibmc/Kconfig
-@@ -0,0 +1,7 @@
-+config DRM_HISI_HIBMC
-+	tristate "DRM Support for Hisilicon Hibmc"
-+	depends on DRM && PCI
-+
-+	help
-+	  Choose this option if you have a Hisilicon Hibmc soc chipset.
-+	  If M is selected the module will be called hibmc-drm.
+@@ -1,6 +1,7 @@
+ config DRM_HISI_HIBMC
+ 	tristate "DRM Support for Hisilicon Hibmc"
+ 	depends on DRM && PCI
++	select DRM_TTM
+ 
+ 	help
+ 	  Choose this option if you have a Hisilicon Hibmc soc chipset.
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-new file mode 100644
-index 0000000..97cf4a0
---- /dev/null
+index 97cf4a0..d5c40b8 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
 +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-@@ -0,0 +1,5 @@
-+ccflags-y := -Iinclude/drm
-+hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o
-+
-+obj-$(CONFIG_DRM_HISI_HIBMC)	+=hibmc-drm.o
-+#obj-y	+= hibmc-drm.o
+@@ -1,5 +1,5 @@
+ ccflags-y := -Iinclude/drm
+-hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o
++hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o hibmc_ttm.o
+ 
+ obj-$(CONFIG_DRM_HISI_HIBMC)	+=hibmc-drm.o
+ #obj-y	+= hibmc-drm.o
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-new file mode 100644
-index 0000000..733c0dd
---- /dev/null
+index 733c0dd..e118f3b 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-@@ -0,0 +1,270 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
+@@ -31,6 +31,7 @@
+ #ifdef CONFIG_COMPAT
+ 	.compat_ioctl	= drm_compat_ioctl,
+ #endif
++	.mmap		= hibmc_mmap,
+ 	.poll		= drm_poll,
+ 	.read		= drm_read,
+ 	.llseek		= no_llseek,
+@@ -46,6 +47,8 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+ }
+ 
+ static struct drm_driver hibmc_driver = {
++	.driver_features	= DRIVER_GEM,
 +
-+#include <linux/module.h>
-+#include <linux/console.h>
-+
-+#include "hibmc_drm_drv.h"
-+#include "hibmc_drm_regs.h"
-+#include "hibmc_drm_power.h"
-+
-+static const struct file_operations hibmc_fops = {
-+	.owner		= THIS_MODULE,
-+	.open		= drm_open,
-+	.release	= drm_release,
-+	.unlocked_ioctl	= drm_ioctl,
-+#ifdef CONFIG_COMPAT
-+	.compat_ioctl	= drm_compat_ioctl,
-+#endif
-+	.poll		= drm_poll,
-+	.read		= drm_read,
-+	.llseek		= no_llseek,
-+};
-+
-+static int hibmc_enable_vblank(struct drm_device *dev, unsigned int pipe)
-+{
-+	return 0;
-+}
-+
-+static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
-+{
-+}
-+
-+static struct drm_driver hibmc_driver = {
-+	.fops			= &hibmc_fops,
-+	.name			= "hibmc",
-+	.date			= "20160828",
-+	.desc			= "hibmc drm driver",
-+	.major			= 1,
-+	.minor			= 0,
-+	.get_vblank_counter	= drm_vblank_no_hw_counter,
-+	.enable_vblank		= hibmc_enable_vblank,
-+	.disable_vblank		= hibmc_disable_vblank,
-+};
-+
-+static int hibmc_pm_suspend(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static int hibmc_pm_resume(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops hibmc_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(hibmc_pm_suspend,
-+				hibmc_pm_resume)
-+};
-+
-+static int hibmc_hw_config(struct hibmc_drm_device *hidev)
-+{
-+	unsigned int reg;
-+
-+	/* On hardware reset, power mode 0 is default. */
-+	hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
-+
-+	/* Enable display power gate & LOCALMEM power gate*/
-+	reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
-+	reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
-+	reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
-+	reg |= HIBMC_CURR_GATE_DISPLAY(ON);
-+	reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
-+
-+	hibmc_set_current_gate(hidev, reg);
-+
-+	/* Reset the memory controller. If the memory controller
-+	 * is not reset in chip,the system might hang when sw accesses
-+	 * the memory.The memory should be resetted after
-+	 * changing the MXCLK.
-+	 */
-+	reg = readl(hidev->mmio + HIBMC_MISC_CTRL);
-+	reg &= ~HIBMC_MSCCTL_LOCALMEM_RESET_MASK;
-+	reg |= HIBMC_MSCCTL_LOCALMEM_RESET(RESET);
-+	writel(reg, hidev->mmio + HIBMC_MISC_CTRL);
-+
-+	reg &= ~HIBMC_MSCCTL_LOCALMEM_RESET_MASK;
-+	reg |= HIBMC_MSCCTL_LOCALMEM_RESET(NORMAL);
-+
-+	writel(reg, hidev->mmio + HIBMC_MISC_CTRL);
-+
-+	/* We can add more initialization as needed. */
-+
-+	return 0;
-+}
-+
-+static int hibmc_hw_map(struct hibmc_drm_device *hidev)
-+{
-+	struct drm_device *dev = hidev->dev;
-+	struct pci_dev *pdev = dev->pdev;
-+	resource_size_t addr, size, ioaddr, iosize;
-+
-+	ioaddr = pci_resource_start(pdev, 1);
-+	iosize = MB(2);
-+
-+	hidev->mmio = ioremap_nocache(ioaddr, iosize);
-+
-+	if (!hidev->mmio) {
-+		DRM_ERROR("Cannot map mmio region\n");
-+		return -ENOMEM;
-+	}
-+
-+	addr = pci_resource_start(pdev, 0);
-+	size = MB(32);
-+
-+	hidev->fb_map = ioremap(addr, size);
-+	if (!hidev->fb_map) {
-+		DRM_ERROR("Cannot map framebuffer\n");
-+		return -ENOMEM;
-+	}
-+	hidev->fb_base = addr;
-+	hidev->fb_size = size;
-+
-+	return 0;
-+}
-+
-+static void hibmc_hw_fini(struct hibmc_drm_device *hidev)
-+{
-+	if (hidev->mmio)
-+		iounmap(hidev->mmio);
-+	if (hidev->fb_map)
-+		iounmap(hidev->fb_map);
-+}
-+
-+static int hibmc_hw_init(struct hibmc_drm_device *hidev)
-+{
-+	int ret;
-+
-+	ret = hibmc_hw_map(hidev);
-+	if (ret)
-+		return ret;
-+
-+	hibmc_hw_config(hidev);
-+
-+	return 0;
-+}
-+
-+static int hibmc_unload(struct drm_device *dev)
-+{
-+	struct hibmc_drm_device *hidev = dev->dev_private;
-+
-+	hibmc_hw_fini(hidev);
-+	dev->dev_private = NULL;
-+	return 0;
-+}
-+
-+static int hibmc_load(struct drm_device *dev, unsigned long flags)
-+{
-+	struct hibmc_drm_device *hidev;
-+	int ret;
-+
-+	hidev = devm_kzalloc(dev->dev, sizeof(*hidev), GFP_KERNEL);
-+	if (!hidev)
-+		return -ENOMEM;
-+	dev->dev_private = hidev;
-+	hidev->dev = dev;
-+
-+	ret = hibmc_hw_init(hidev);
+ 	.fops			= &hibmc_fops,
+ 	.name			= "hibmc",
+ 	.date			= "20160828",
+@@ -55,6 +58,10 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+ 	.get_vblank_counter	= drm_vblank_no_hw_counter,
+ 	.enable_vblank		= hibmc_enable_vblank,
+ 	.disable_vblank		= hibmc_disable_vblank,
++	.gem_free_object_unlocked = hibmc_gem_free_object,
++	.dumb_create            = hibmc_dumb_create,
++	.dumb_map_offset        = hibmc_dumb_mmap_offset,
++	.dumb_destroy           = drm_gem_dumb_destroy,
+ };
+ 
+ static int hibmc_pm_suspend(struct device *dev)
+@@ -183,6 +190,10 @@ static int hibmc_load(struct drm_device *dev, unsigned long flags)
+ 	if (ret)
+ 		goto err;
+ 
++	ret = hibmc_mm_init(hidev);
 +	if (ret)
 +		goto err;
 +
-+	return 0;
-+
-+err:
-+	hibmc_unload(dev);
-+	DRM_ERROR("failed to initialize drm driver.\n");
-+	return ret;
-+}
-+
-+static int hibmc_pci_probe(struct pci_dev *pdev,
-+			   const struct pci_device_id *ent)
-+{
-+	struct drm_device *dev;
-+	int ret;
-+
-+	dev = drm_dev_alloc(&hibmc_driver, &pdev->dev);
-+	if (!dev)
-+		return -ENOMEM;
-+
-+	dev->pdev = pdev;
-+	pci_set_drvdata(pdev, dev);
-+
-+	ret = pci_enable_device(pdev);
-+	if (ret)
-+		goto err_free;
-+
-+	ret = hibmc_load(dev, 0);
-+	if (ret)
-+		goto err_disable;
-+
-+	ret = drm_dev_register(dev, 0);
-+	if (ret)
-+		goto err_unload;
-+
-+	return 0;
-+
-+err_unload:
-+	hibmc_unload(dev);
-+err_disable:
-+	pci_disable_device(pdev);
-+err_free:
-+	drm_dev_unref(dev);
-+
-+	return ret;
-+}
-+
-+static void hibmc_pci_remove(struct pci_dev *pdev)
-+{
-+	struct drm_device *dev = pci_get_drvdata(pdev);
-+
-+	drm_dev_unregister(dev);
-+	hibmc_unload(dev);
-+	drm_dev_unref(dev);
-+}
-+
-+static struct pci_device_id hibmc_pci_table[] = {
-+	{0x19e5, 0x1711, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-+	{0,}
-+};
-+
-+static struct pci_driver hibmc_pci_driver = {
-+	.name =		"hibmc-drm",
-+	.id_table =	hibmc_pci_table,
-+	.probe =	hibmc_pci_probe,
-+	.remove =	hibmc_pci_remove,
-+	.driver.pm =    &hibmc_pm_ops,
-+};
-+
-+static int __init hibmc_init(void)
-+{
-+	return pci_register_driver(&hibmc_pci_driver);
-+}
-+
-+static void __exit hibmc_exit(void)
-+{
-+	return pci_unregister_driver(&hibmc_pci_driver);
-+}
-+
-+module_init(hibmc_init);
-+module_exit(hibmc_exit);
-+
-+MODULE_DEVICE_TABLE(pci, hibmc_pci_table);
-+MODULE_AUTHOR("RongrongZou <zourongrong@huawei.com>");
-+MODULE_DESCRIPTION("DRM Driver for Hisilicon Hibmc");
-+MODULE_LICENSE("GPL v2");
-+
+ 	return 0;
+ 
+ err:
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-new file mode 100644
-index 0000000..0037341
---- /dev/null
+index 0037341..00bb153 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-@@ -0,0 +1,35 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
+@@ -20,6 +20,8 @@
+ #define HIBMC_DRM_DRV_H
+ 
+ #include <drm/drmP.h>
++#include <drm/ttm/ttm_bo_driver.h>
++#include <drm/drm_gem.h>
+ 
+ struct hibmc_drm_device {
+ 	/* hw */
+@@ -30,6 +32,49 @@ struct hibmc_drm_device {
+ 
+ 	/* drm */
+ 	struct drm_device  *dev;
 +
-+#ifndef HIBMC_DRM_DRV_H
-+#define HIBMC_DRM_DRV_H
++	/* ttm */
++	struct {
++		struct drm_global_reference mem_global_ref;
++		struct ttm_bo_global_ref bo_global_ref;
++		struct ttm_bo_device bdev;
++		bool initialized;
++	} ttm;
 +
-+#include <drm/drmP.h>
-+
-+struct hibmc_drm_device {
-+	/* hw */
-+	void __iomem   *mmio;
-+	void __iomem   *fb_map;
-+	unsigned long  fb_base;
-+	unsigned long  fb_size;
-+
-+	/* drm */
-+	struct drm_device  *dev;
++	bool mm_inited;
+ };
+ 
++struct hibmc_bo {
++	struct ttm_buffer_object bo;
++	struct ttm_placement placement;
++	struct ttm_bo_kmap_obj kmap;
++	struct drm_gem_object gem;
++	struct ttm_place placements[3];
++	int pin_count;
 +};
 +
-+#endif
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
++static inline struct hibmc_bo *hibmc_bo(struct ttm_buffer_object *bo)
++{
++	return container_of(bo, struct hibmc_bo, bo);
++}
++
++static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
++{
++	return container_of(gem, struct hibmc_bo, gem);
++}
++
++#define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
++
++int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
++		     struct drm_gem_object **obj);
++
++int hibmc_mm_init(struct hibmc_drm_device *hibmc);
++int hibmc_bo_pin(struct hibmc_bo *bo, u32 pl_flag, u64 *gpu_addr);
++void hibmc_gem_free_object(struct drm_gem_object *obj);
++int hibmc_dumb_create(struct drm_file *file, struct drm_device *dev,
++		      struct drm_mode_create_dumb *args);
++int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
++			   u32 handle, u64 *offset);
++int hibmc_mmap(struct file *filp, struct vm_area_struct *vma);
++
+ #endif
+diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
 new file mode 100644
-index 0000000..1036542
+index 0000000..2dbef04
 --- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
-@@ -0,0 +1,85 @@
++++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
+@@ -0,0 +1,491 @@
 +/* Hisilicon Hibmc SoC drm driver
 + *
 + * Based on the bochs drm driver.
@@ -424,323 +174,477 @@ index 0000000..1036542
 + */
 +
 +#include "hibmc_drm_drv.h"
-+#include "hibmc_drm_regs.h"
++#include <ttm/ttm_page_alloc.h>
++#include <drm/drm_crtc_helper.h>
++#include <drm/drm_atomic_helper.h>
 +
-+/*
-+ * It can operate in one of three modes: 0, 1 or Sleep.
-+ */
-+void hibmc_set_power_mode(struct hibmc_drm_device *hidev,
-+			  unsigned int power_mode)
++static inline struct hibmc_drm_device *
++hibmc_bdev(struct ttm_bo_device *bd)
 +{
-+	unsigned int control_value = 0;
-+	void __iomem   *mmio = hidev->mmio;
++	return container_of(bd, struct hibmc_drm_device, ttm.bdev);
++}
 +
-+	if (power_mode > HIBMC_PW_MODE_CTL_MODE_SLEEP)
++static int
++hibmc_ttm_mem_global_init(struct drm_global_reference *ref)
++{
++	return ttm_mem_global_init(ref->object);
++}
++
++static void
++hibmc_ttm_mem_global_release(struct drm_global_reference *ref)
++{
++	ttm_mem_global_release(ref->object);
++}
++
++static int hibmc_ttm_global_init(struct hibmc_drm_device *hibmc)
++{
++	struct drm_global_reference *global_ref;
++	int r;
++
++	global_ref = &hibmc->ttm.mem_global_ref;
++	global_ref->global_type = DRM_GLOBAL_TTM_MEM;
++	global_ref->size = sizeof(struct ttm_mem_global);
++	global_ref->init = &hibmc_ttm_mem_global_init;
++	global_ref->release = &hibmc_ttm_mem_global_release;
++	r = drm_global_item_ref(global_ref);
++	if (r != 0) {
++		DRM_ERROR("Failed setting up TTM memory accounting subsystem.\n"
++			 );
++		return r;
++	}
++
++	hibmc->ttm.bo_global_ref.mem_glob =
++		hibmc->ttm.mem_global_ref.object;
++	global_ref = &hibmc->ttm.bo_global_ref.ref;
++	global_ref->global_type = DRM_GLOBAL_TTM_BO;
++	global_ref->size = sizeof(struct ttm_bo_global);
++	global_ref->init = &ttm_bo_global_init;
++	global_ref->release = &ttm_bo_global_release;
++	r = drm_global_item_ref(global_ref);
++	if (r != 0) {
++		DRM_ERROR("Failed setting up TTM BO subsystem.\n");
++		drm_global_item_unref(&hibmc->ttm.mem_global_ref);
++		return r;
++	}
++	return 0;
++}
++
++static void
++hibmc_ttm_global_release(struct hibmc_drm_device *hibmc)
++{
++	if (!hibmc->ttm.mem_global_ref.release)
 +		return;
 +
-+	control_value = readl(mmio + HIBMC_POWER_MODE_CTRL);
-+	control_value &= ~HIBMC_PW_MODE_CTL_MODE_MASK;
-+
-+	control_value |= HIBMC_PW_MODE_CTL_MODE(power_mode) &
-+			 HIBMC_PW_MODE_CTL_MODE_MASK;
-+
-+    /* Set up other fields in Power Control Register */
-+	if (power_mode == HIBMC_PW_MODE_CTL_MODE_SLEEP) {
-+		control_value &= ~HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-+		control_value |= HIBMC_PW_MODE_CTL_OSC_INPUT(0) &
-+				 HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-+	} else {
-+		control_value &= ~HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-+		control_value |= HIBMC_PW_MODE_CTL_OSC_INPUT(1) &
-+				 HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-+	}
-+	/* Program new power mode. */
-+	writel(control_value, mmio + HIBMC_POWER_MODE_CTRL);
++	drm_global_item_unref(&hibmc->ttm.bo_global_ref.ref);
++	drm_global_item_unref(&hibmc->ttm.mem_global_ref);
++	hibmc->ttm.mem_global_ref.release = NULL;
 +}
 +
-+static unsigned int hibmc_get_power_mode(struct hibmc_drm_device *hidev)
++static void hibmc_bo_ttm_destroy(struct ttm_buffer_object *tbo)
 +{
-+	void __iomem   *mmio = hidev->mmio;
++	struct hibmc_bo *bo;
 +
-+	return (readl(mmio + HIBMC_POWER_MODE_CTRL) &
-+		HIBMC_PW_MODE_CTL_MODE_MASK) >> HIBMC_PW_MODE_CTL_MODE_SHIFT;
++	bo = container_of(tbo, struct hibmc_bo, bo);
++
++	drm_gem_object_release(&bo->gem);
++	kfree(bo);
 +}
 +
-+void hibmc_set_current_gate(struct hibmc_drm_device *hidev, unsigned int gate)
++static bool hibmc_ttm_bo_is_hibmc_bo(struct ttm_buffer_object *bo)
 +{
-+	unsigned int gate_reg;
-+	unsigned int mode;
-+	void __iomem   *mmio = hidev->mmio;
++	if (bo->destroy == &hibmc_bo_ttm_destroy)
++		return true;
++	return false;
++}
 +
-+	/* Get current power mode. */
-+	mode = hibmc_get_power_mode(hidev);
-+
-+	switch (mode) {
-+	case HIBMC_PW_MODE_CTL_MODE_MODE0:
-+		gate_reg = HIBMC_MODE0_GATE;
++static int
++hibmc_bo_init_mem_type(struct ttm_bo_device *bdev, u32 type,
++		       struct ttm_mem_type_manager *man)
++{
++	switch (type) {
++	case TTM_PL_SYSTEM:
++		man->flags = TTM_MEMTYPE_FLAG_MAPPABLE;
++		man->available_caching = TTM_PL_MASK_CACHING;
++		man->default_caching = TTM_PL_FLAG_CACHED;
 +		break;
-+
-+	case HIBMC_PW_MODE_CTL_MODE_MODE1:
-+		gate_reg = HIBMC_MODE1_GATE;
++	case TTM_PL_VRAM:
++		man->func = &ttm_bo_manager_func;
++		man->flags = TTM_MEMTYPE_FLAG_FIXED |
++			TTM_MEMTYPE_FLAG_MAPPABLE;
++		man->available_caching = TTM_PL_FLAG_UNCACHED |
++			TTM_PL_FLAG_WC;
++		man->default_caching = TTM_PL_FLAG_WC;
 +		break;
-+
 +	default:
-+		gate_reg = HIBMC_MODE0_GATE;
-+		break;
++		DRM_ERROR("Unsupported memory type %u\n", type);
++		return -EINVAL;
 +	}
-+	writel(gate, mmio + gate_reg);
++	return 0;
 +}
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
-new file mode 100644
-index 0000000..e20e1aa
---- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
-@@ -0,0 +1,28 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
 +
-+#ifndef HIBMC_DRM_POWER_H
-+#define HIBMC_DRM_POWER_H
++void hibmc_ttm_placement(struct hibmc_bo *bo, int domain)
++{
++	u32 c = 0;
++	u32 i;
 +
-+#include "hibmc_drm_drv.h"
++	bo->placement.placement = bo->placements;
++	bo->placement.busy_placement = bo->placements;
++	if (domain & TTM_PL_FLAG_VRAM)
++		bo->placements[c++].flags = TTM_PL_FLAG_WC |
++		TTM_PL_FLAG_UNCACHED | TTM_PL_FLAG_VRAM;
++	if (domain & TTM_PL_FLAG_SYSTEM)
++		bo->placements[c++].flags = TTM_PL_MASK_CACHING |
++		TTM_PL_FLAG_SYSTEM;
++	if (!c)
++		bo->placements[c++].flags = TTM_PL_MASK_CACHING |
++		TTM_PL_FLAG_SYSTEM;
 +
-+void hibmc_set_power_mode(struct hibmc_drm_device *hidev,
-+			  unsigned int power_mode);
-+void hibmc_set_current_gate(struct hibmc_drm_device *hidev,
-+			    unsigned int gate);
-+#endif
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
-new file mode 100644
-index 0000000..9c804ca
---- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
-@@ -0,0 +1,212 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
++	bo->placement.num_placement = c;
++	bo->placement.num_busy_placement = c;
++	for (i = 0; i < c; ++i) {
++		bo->placements[i].fpfn = 0;
++		bo->placements[i].lpfn = 0;
++	}
++}
 +
-+#ifndef HIBMC_DRM_HW_H
-+#define HIBMC_DRM_HW_H
++static void
++hibmc_bo_evict_flags(struct ttm_buffer_object *bo, struct ttm_placement *pl)
++{
++	struct hibmc_bo *hibmcbo = hibmc_bo(bo);
 +
-+#define OFF 0
-+#define ON  1
-+#define DISABLE               0
-+#define ENABLE                1
++	if (!hibmc_ttm_bo_is_hibmc_bo(bo))
++		return;
 +
-+/* register definition */
-+#define HIBMC_MISC_CTRL				0x4
++	hibmc_ttm_placement(hibmcbo, TTM_PL_FLAG_SYSTEM);
++	*pl = hibmcbo->placement;
++}
 +
-+#define HIBMC_MSCCTL_LOCALMEM_RESET(x)		((x) << 6)
-+#define HIBMC_MSCCTL_LOCALMEM_RESET_MASK	0x40
++static int hibmc_bo_verify_access(struct ttm_buffer_object *bo,
++				  struct file *filp)
++{
++	struct hibmc_bo *hibmcbo = hibmc_bo(bo);
 +
-+#define RESET                0
-+#define NORMAL               1
++	return drm_vma_node_verify_access(&hibmcbo->gem.vma_node,
++					  filp->private_data);
++}
 +
-+#define HIBMC_CURRENT_GATE			0x000040
-+#define HIBMC_CURR_GATE_DISPLAY(x)		((x) << 2)
-+#define HIBMC_CURR_GATE_DISPLAY_MASK		0x4
++static int hibmc_ttm_io_mem_reserve(struct ttm_bo_device *bdev,
++				    struct ttm_mem_reg *mem)
++{
++	struct ttm_mem_type_manager *man = &bdev->man[mem->mem_type];
++	struct hibmc_drm_device *hibmc = hibmc_bdev(bdev);
 +
-+#define HIBMC_CURR_GATE_LOCALMEM(x)		((x) << 1)
-+#define HIBMC_CURR_GATE_LOCALMEM_MASK		0x2
++	mem->bus.addr = NULL;
++	mem->bus.offset = 0;
++	mem->bus.size = mem->num_pages << PAGE_SHIFT;
++	mem->bus.base = 0;
++	mem->bus.is_iomem = false;
++	if (!(man->flags & TTM_MEMTYPE_FLAG_MAPPABLE))
++		return -EINVAL;
++	switch (mem->mem_type) {
++	case TTM_PL_SYSTEM:
++		/* system memory */
++		return 0;
++	case TTM_PL_VRAM:
++		mem->bus.offset = mem->start << PAGE_SHIFT;
++		mem->bus.base = pci_resource_start(hibmc->dev->pdev, 0);
++		mem->bus.is_iomem = true;
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
 +
-+#define HIBMC_MODE0_GATE			0x000044
-+#define HIBMC_MODE1_GATE			0x000048
-+#define HIBMC_POWER_MODE_CTRL			0x00004C
++static void hibmc_ttm_io_mem_free(struct ttm_bo_device *bdev,
++				  struct ttm_mem_reg *mem)
++{
++}
 +
-+#define HIBMC_PW_MODE_CTL_OSC_INPUT(x)		((x) << 3)
-+#define HIBMC_PW_MODE_CTL_OSC_INPUT_MASK	0x8
++static void hibmc_ttm_backend_destroy(struct ttm_tt *tt)
++{
++	ttm_tt_fini(tt);
++	kfree(tt);
++}
 +
-+#define HIBMC_PW_MODE_CTL_MODE(x)		((x) << 0)
-+#define HIBMC_PW_MODE_CTL_MODE_MASK		0x03
-+#define HIBMC_PW_MODE_CTL_MODE_SHIFT		0
++static struct ttm_backend_func hibmc_tt_backend_func = {
++	.destroy = &hibmc_ttm_backend_destroy,
++};
 +
-+#define HIBMC_PW_MODE_CTL_MODE_MODE0		0
-+#define HIBMC_PW_MODE_CTL_MODE_MODE1		1
-+#define HIBMC_PW_MODE_CTL_MODE_SLEEP		2
++static struct ttm_tt *hibmc_ttm_tt_create(struct ttm_bo_device *bdev,
++					  unsigned long size,
++					  u32 page_flags,
++					  struct page *dummy_read_page)
++{
++	struct ttm_tt *tt;
 +
-+#define HIBMC_PANEL_PLL_CTRL			0x00005C
-+#define HIBMC_CRT_PLL_CTRL			0x000060
++	tt = kzalloc(sizeof(*tt), GFP_KERNEL);
++	if (!tt)
++		return NULL;
++	tt->func = &hibmc_tt_backend_func;
++	if (ttm_tt_init(tt, bdev, size, page_flags, dummy_read_page)) {
++		kfree(tt);
++		return NULL;
++	}
++	return tt;
++}
 +
-+#define HIBMC_PLL_CTRL_BYPASS(x)		((x) << 18)
-+#define HIBMC_PLL_CTRL_BYPASS_MASK		0x40000
++static int hibmc_ttm_tt_populate(struct ttm_tt *ttm)
++{
++	return ttm_pool_populate(ttm);
++}
 +
-+#define HIBMC_PLL_CTRL_POWER(x)			((x) << 17)
-+#define HIBMC_PLL_CTRL_POWER_MASK		0x20000
++static void hibmc_ttm_tt_unpopulate(struct ttm_tt *ttm)
++{
++	ttm_pool_unpopulate(ttm);
++}
 +
-+#define HIBMC_PLL_CTRL_INPUT(x)			((x) << 16)
-+#define HIBMC_PLL_CTRL_INPUT_MASK		0x10000
++struct ttm_bo_driver hibmc_bo_driver = {
++	.ttm_tt_create		= hibmc_ttm_tt_create,
++	.ttm_tt_populate	= hibmc_ttm_tt_populate,
++	.ttm_tt_unpopulate	= hibmc_ttm_tt_unpopulate,
++	.init_mem_type		= hibmc_bo_init_mem_type,
++	.evict_flags		= hibmc_bo_evict_flags,
++	.move			= NULL,
++	.verify_access		= hibmc_bo_verify_access,
++	.io_mem_reserve		= &hibmc_ttm_io_mem_reserve,
++	.io_mem_free		= &hibmc_ttm_io_mem_free,
++	.lru_tail		= &ttm_bo_default_lru_tail,
++	.swap_lru_tail		= &ttm_bo_default_swap_lru_tail,
++};
 +
-+#define OSC					0
-+#define TESTCLK					1
++int hibmc_mm_init(struct hibmc_drm_device *hibmc)
++{
++	int ret;
++	struct drm_device *dev = hibmc->dev;
++	struct ttm_bo_device *bdev = &hibmc->ttm.bdev;
 +
-+#define HIBMC_PLL_CTRL_POD(x)			((x) << 14)
-+#define HIBMC_PLL_CTRL_POD_MASK			0xC000
++	ret = hibmc_ttm_global_init(hibmc);
++	if (ret)
++		return ret;
 +
-+#define HIBMC_PLL_CTRL_OD(x)			((x) << 12)
-+#define HIBMC_PLL_CTRL_OD_MASK			0x3000
++	ret = ttm_bo_device_init(&hibmc->ttm.bdev,
++				 hibmc->ttm.bo_global_ref.ref.object,
++				 &hibmc_bo_driver,
++				 dev->anon_inode->i_mapping,
++				 DRM_FILE_PAGE_OFFSET,
++				 true);
++	if (ret) {
++		DRM_ERROR("Error initialising bo driver; %d\n", ret);
++		return ret;
++	}
 +
-+#define HIBMC_PLL_CTRL_N(x)			((x) << 8)
-+#define HIBMC_PLL_CTRL_N_MASK			0xF00
++	ret = ttm_bo_init_mm(bdev, TTM_PL_VRAM,
++			     hibmc->fb_size >> PAGE_SHIFT);
++	if (ret) {
++		DRM_ERROR("Failed ttm VRAM init: %d\n", ret);
++		return ret;
++	}
 +
-+#define HIBMC_PLL_CTRL_M(x)			((x) << 0)
-+#define HIBMC_PLL_CTRL_M_MASK			0xFF
++	hibmc->mm_inited = true;
++	return 0;
++}
 +
-+#define HIBMC_CRT_DISP_CTL			0x80200
++void hibmc_mm_fini(struct hibmc_drm_device *hibmc)
++{
++	if (!hibmc->mm_inited)
++		return;
 +
-+#define HIBMC_CRT_DISP_CTL_CRTSELECT(x)		((x) << 25)
-+#define HIBMC_CRT_DISP_CTL_CRTSELECT_MASK	0x2000000
++	ttm_bo_device_release(&hibmc->ttm.bdev);
 +
-+#define CRTSELECT_VGA                0
-+#define CRTSELECT_CRT                1
++	hibmc_ttm_global_release(hibmc);
++}
 +
-+#define HIBMC_CRT_DISP_CTL_CLOCK_PHASE(x)	((x) << 14)
-+#define HIBMC_CRT_DISP_CTL_CLOCK_PHASE_MASK	0x4000
++int hibmc_bo_create(struct drm_device *dev, int size, int align,
++		    u32 flags, struct hibmc_bo **phibmcbo)
++{
++	struct hibmc_drm_device *hibmc = dev->dev_private;
++	struct hibmc_bo *hibmcbo;
++	size_t acc_size;
++	int ret;
 +
-+#define PHASE_ACTIVE_HIGH      0
-+#define PHASE_ACTIVE_LOW       1
++	hibmcbo = kzalloc(sizeof(*hibmcbo), GFP_KERNEL);
++	if (!hibmcbo)
++		return -ENOMEM;
 +
-+#define HIBMC_CRT_DISP_CTL_VSYNC_PHASE(x)	((x) << 13)
-+#define HIBMC_CRT_DISP_CTL_VSYNC_PHASE_MASK	0x2000
++	ret = drm_gem_object_init(dev, &hibmcbo->gem, size);
++	if (ret) {
++		kfree(hibmcbo);
++		return ret;
++	}
 +
-+#define HIBMC_CRT_DISP_CTL_HSYNC_PHASE(x)	((x) << 12)
-+#define HIBMC_CRT_DISP_CTL_HSYNC_PHASE_MASK	0x1000
++	hibmcbo->bo.bdev = &hibmc->ttm.bdev;
 +
-+#define HIBMC_CRT_DISP_CTL_TIMING(x)		((x) << 8)
-+#define HIBMC_CRT_DISP_CTL_TIMING_MASK		0x100
++	hibmc_ttm_placement(hibmcbo, TTM_PL_FLAG_VRAM | TTM_PL_FLAG_SYSTEM);
 +
-+#define HIBMC_CRT_DISP_CTL_PLANE(x)		((x) << 2)
-+#define HIBMC_CRT_DISP_CTL_PLANE_MASK		4
++	acc_size = ttm_bo_dma_acc_size(&hibmc->ttm.bdev, size,
++				       sizeof(struct hibmc_bo));
 +
-+#define HIBMC_CRT_DISP_CTL_FORMAT(x)		((x) << 0)
-+#define HIBMC_CRT_DISP_CTL_FORMAT_MASK		0x03
++	ret = ttm_bo_init(&hibmc->ttm.bdev, &hibmcbo->bo, size,
++			  ttm_bo_type_device, &hibmcbo->placement,
++			  align >> PAGE_SHIFT, false, NULL, acc_size,
++			  NULL, NULL, hibmc_bo_ttm_destroy);
++	if (ret)
++		return ret;
 +
-+#define HIBMC_CRT_FB_ADDRESS			0x080204
++	*phibmcbo = hibmcbo;
++	return 0;
++}
 +
-+#define HIBMC_CRT_FB_WIDTH			0x080208
-+#define HIBMC_CRT_FB_WIDTH_WIDTH(x)		((x) << 16)
-+#define HIBMC_CRT_FB_WIDTH_WIDTH_MASK		0x3FFF0000
-+#define HIBMC_CRT_FB_WIDTH_OFFS(x)		((x) << 0)
-+#define HIBMC_CRT_FB_WIDTH_OFFS_MASK		0x3FFF
++static inline u64 hibmc_bo_gpu_offset(struct hibmc_bo *bo)
++{
++	return bo->bo.offset;
++}
 +
-+#define HIBMC_CRT_HORZ_TOTAL			0x08020C
-+#define HIBMC_CRT_HORZ_TOTAL_TOTAL(x)		((x) << 16)
-+#define HIBMC_CRT_HORZ_TOTAL_TOTAL_MASK		0xFFF0000
++int hibmc_bo_pin(struct hibmc_bo *bo, u32 pl_flag, u64 *gpu_addr)
++{
++	int i, ret;
 +
-+#define HIBMC_CRT_HORZ_TOTAL_DISPLAY_END(x)	((x) << 0)
-+#define HIBMC_CRT_HORZ_TOTAL_DISPLAY_END_MASK	0xFFF
++	if (bo->pin_count) {
++		bo->pin_count++;
++		if (gpu_addr)
++			*gpu_addr = hibmc_bo_gpu_offset(bo);
++	}
 +
-+#define HIBMC_CRT_HORZ_SYNC			0x080210
-+#define HIBMC_CRT_HORZ_SYNC_WIDTH(x)		((x) << 16)
-+#define HIBMC_CRT_HORZ_SYNC_WIDTH_MASK		0xFF0000
++	hibmc_ttm_placement(bo, pl_flag);
++	for (i = 0; i < bo->placement.num_placement; i++)
++		bo->placements[i].flags |= TTM_PL_FLAG_NO_EVICT;
++	ret = ttm_bo_validate(&bo->bo, &bo->placement, false, false);
++	if (ret)
++		return ret;
 +
-+#define HIBMC_CRT_HORZ_SYNC_START(x)		((x) << 0)
-+#define HIBMC_CRT_HORZ_SYNC_START_MASK		0xFFF
++	bo->pin_count = 1;
++	if (gpu_addr)
++		*gpu_addr = hibmc_bo_gpu_offset(bo);
++	return 0;
++}
 +
-+#define HIBMC_CRT_VERT_TOTAL			0x080214
-+#define HIBMC_CRT_VERT_TOTAL_TOTAL(x)		((x) << 16)
-+#define HIBMC_CRT_VERT_TOTAL_TOTAL_MASK		0x7FFF0000
++int hibmc_bo_push_sysram(struct hibmc_bo *bo)
++{
++	int i, ret;
 +
-+#define HIBMC_CRT_VERT_TOTAL_DISPLAY_END(x)	((x) << 0)
-+#define HIBMC_CRT_VERT_TOTAL_DISPLAY_END_MASK	0x7FF
++	if (!bo->pin_count) {
++		DRM_ERROR("unpin bad %p\n", bo);
++		return 0;
++	}
++	bo->pin_count--;
++	if (bo->pin_count)
++		return 0;
 +
-+#define HIBMC_CRT_VERT_SYNC			0x080218
-+#define HIBMC_CRT_VERT_SYNC_HEIGHT(x)		((x) << 16)
-+#define HIBMC_CRT_VERT_SYNC_HEIGHT_MASK		0x3F0000
++	if (bo->kmap.virtual)
++		ttm_bo_kunmap(&bo->kmap);
 +
-+#define HIBMC_CRT_VERT_SYNC_START(x)		((x) << 0)
-+#define HIBMC_CRT_VERT_SYNC_START_MASK		0x7FF
++	hibmc_ttm_placement(bo, TTM_PL_FLAG_SYSTEM);
++	for (i = 0; i < bo->placement.num_placement ; i++)
++		bo->placements[i].flags |= TTM_PL_FLAG_NO_EVICT;
 +
-+/* Auto Centering */
-+#define HIBMC_CRT_AUTO_CENTERING_TL		0x080280
-+#define HIBMC_CRT_AUTO_CENTERING_TL_TOP(x)	((x) << 16)
-+#define HIBMC_CRT_AUTO_CENTERING_TL_TOP_MSK	0x7FF0000
++	ret = ttm_bo_validate(&bo->bo, &bo->placement, false, false);
++	if (ret) {
++		DRM_ERROR("pushing to VRAM failed\n");
++		return ret;
++	}
++	return 0;
++}
 +
-+#define HIBMC_CRT_AUTO_CENTERING_TL_LEFT(x)	((x) << 0)
-+#define HIBMC_CRT_AUTO_CENTERING_TL_LEFT_MSK	0x7FF
++int hibmc_mmap(struct file *filp, struct vm_area_struct *vma)
++{
++	struct drm_file *file_priv;
++	struct hibmc_drm_device *hibmc;
 +
-+#define HIBMC_CRT_AUTO_CENTERING_BR		0x080284
-+#define HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM(x)	((x) << 16)
-+#define HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM_MASK	0x7FF0000
++	if (unlikely(vma->vm_pgoff < DRM_FILE_PAGE_OFFSET))
++		return -EINVAL;
 +
-+#define HIBMC_CRT_AUTO_CENTERING_BR_RIGHT(x)	((x) << 0)
-+#define HIBMC_CRT_AUTO_CENTERING_BR_RIGHT_MASK	0x7FF
++	file_priv = filp->private_data;
++	hibmc = file_priv->minor->dev->dev_private;
++	return ttm_bo_mmap(filp, vma, &hibmc->ttm.bdev);
++}
 +
-+/* register to control panel output */
-+#define DISPLAY_CONTROL_HISILE			0x80288
++int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
++		     struct drm_gem_object **obj)
++{
++	struct hibmc_bo *hibmcbo;
++	int ret;
 +
-+#define HIBMC_RAW_INTERRUPT			0x80290
-+#define HIBMC_RAW_INTERRUPT_VBLANK(x)		((x) << 2)
-+#define HIBMC_RAW_INTERRUPT_VBLANK_MASK		0x4
++	*obj = NULL;
 +
-+#define HIBMC_RAW_INTERRUPT_EN			0x80298
-+#define HIBMC_RAW_INTERRUPT_EN_VBLANK(x)	((x) << 2)
-+#define HIBMC_RAW_INTERRUPT_EN_VBLANK_MASK	0x4
++	size = PAGE_ALIGN(size);
++	if (size == 0)
++		return -EINVAL;
 +
-+/* register and values for PLL control */
-+#define CRT_PLL1_HS				0x802a8
-+#define CRT_PLL1_HS_25MHZ			0x23d40f02
-+#define CRT_PLL1_HS_40MHZ			0x23940801
-+#define CRT_PLL1_HS_65MHZ			0x23940d01
-+#define CRT_PLL1_HS_78MHZ			0x23540F82
-+#define CRT_PLL1_HS_74MHZ			0x23941dc2
-+#define CRT_PLL1_HS_80MHZ			0x23941001
-+#define CRT_PLL1_HS_80MHZ_1152			0x23540fc2
-+#define CRT_PLL1_HS_108MHZ			0x23b41b01
-+#define CRT_PLL1_HS_162MHZ			0x23480681
-+#define CRT_PLL1_HS_148MHZ			0x23541dc2
-+#define CRT_PLL1_HS_193MHZ			0x234807c1
++	ret = hibmc_bo_create(dev, size, 0, 0, &hibmcbo);
++	if (ret) {
++		if (ret != -ERESTARTSYS)
++			DRM_ERROR("failed to allocate GEM object\n");
++		return ret;
++	}
++	*obj = &hibmcbo->gem;
++	return 0;
++}
 +
-+#define CRT_PLL2_HS				0x802ac
-+#define CRT_PLL2_HS_25MHZ			0x206B851E
-+#define CRT_PLL2_HS_40MHZ			0x30000000
-+#define CRT_PLL2_HS_65MHZ			0x40000000
-+#define CRT_PLL2_HS_78MHZ			0x50E147AE
-+#define CRT_PLL2_HS_74MHZ			0x602B6AE7
-+#define CRT_PLL2_HS_80MHZ			0x70000000
-+#define CRT_PLL2_HS_108MHZ			0x80000000
-+#define CRT_PLL2_HS_162MHZ			0xA0000000
-+#define CRT_PLL2_HS_148MHZ			0xB0CCCCCD
-+#define CRT_PLL2_HS_193MHZ			0xC0872B02
++int hibmc_dumb_create(struct drm_file *file, struct drm_device *dev,
++		      struct drm_mode_create_dumb *args)
++{
++	struct drm_gem_object *gobj;
++	u32 handle;
++	int ret;
 +
-+/* Global macros */
-+#define RGB(r, g, b) \
-+( \
-+	(unsigned long)(((r) << 16) | ((g) << 8) | (b)) \
-+)
++	args->pitch = ALIGN(args->width * ((args->bpp + 7) / 8), 16);
++	args->size = args->pitch * args->height;
 +
-+#define PADDING(align, data) (((data) + (align) - 1) & (~((align) - 1)))
++	ret = hibmc_gem_create(dev, args->size, false,
++			       &gobj);
++	if (ret)
++		return ret;
 +
-+#define MB(x) ((x) << 20)
++	ret = drm_gem_handle_create(file, gobj, &handle);
++	drm_gem_object_unreference_unlocked(gobj);
++	if (ret)
++		return ret;
 +
-+#endif
++	args->handle = handle;
++	return 0;
++}
++
++static void hibmc_bo_unref(struct hibmc_bo **bo)
++{
++	struct ttm_buffer_object *tbo;
++
++	if ((*bo) == NULL)
++		return;
++
++	tbo = &((*bo)->bo);
++	ttm_bo_unref(&tbo);
++	*bo = NULL;
++}
++
++void hibmc_gem_free_object(struct drm_gem_object *obj)
++{
++	struct hibmc_bo *hibmcbo = gem_to_hibmc_bo(obj);
++
++	hibmc_bo_unref(&hibmcbo);
++}
++
++static u64 hibmc_bo_mmap_offset(struct hibmc_bo *bo)
++{
++	return drm_vma_node_offset_addr(&bo->bo.vma_node);
++}
++
++int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
++			   u32 handle, u64 *offset)
++{
++	struct drm_gem_object *obj;
++	struct hibmc_bo *bo;
++
++	obj = drm_gem_object_lookup(file, handle);
++	if (!obj)
++		return -ENOENT;
++
++	bo = gem_to_hibmc_bo(obj);
++	*offset = hibmc_bo_mmap_offset(bo);
++
++	drm_gem_object_unreference_unlocked(obj);
++	return 0;
++}
++
 -- 
 1.9.1
