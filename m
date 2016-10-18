@@ -1,188 +1,127 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Oct 2016 23:45:39 +0300
-Subject: [PATCH 1/3] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <1476721850-454-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1476721850-454-1-git-send-email-bgolaszewski@baylibre.com>
- <1476721850-454-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <5932848.mWNUo4iXtK@avalon>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Tue, 18 Oct 2016 18:45:38 -0200
+Subject: [PATCH v2 26/58] c8sectpfe: don't break long lines
+In-Reply-To: <cover.1476822924.git.mchehab@s-opensource.com>
+References: <cover.1476822924.git.mchehab@s-opensource.com>
+Message-ID: <4c96ee7fef4b5d93e9dd239f4925ae23dad2478c.1476822925.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Due to the 80-cols restrictions, and latter due to checkpatch
+warnings, several strings were broken into multiple lines. This
+is not considered a good practice anymore, as it makes harder
+to grep for strings at the source code.
 
-Thank you for the patch.
+As we're right now fixing other drivers due to KERN_CONT, we need
+to be able to identify what printk strings don't end with a "\n".
+It is a way easier to detect those if we don't break long lines.
 
-On Monday 17 Oct 2016 18:30:48 Bartosz Golaszewski wrote:
-> Create a new driver for the da8xx DDR2/mDDR controller and implement
-> support for writing to the Peripheral Bus Burst Priority Register.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  .../memory-controllers/ti-da8xx-ddrctl.txt         | 25 +++++++
->  drivers/memory/Kconfig                             |  8 +++
->  drivers/memory/Makefile                            |  1 +
->  drivers/memory/da8xx-ddrctl.c                      | 77 +++++++++++++++++++
->  4 files changed, 111 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> create mode 100644 drivers/memory/da8xx-ddrctl.c
-> 
-> diff --git
-> a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> new file mode 100644
-> index 0000000..e340404
-> --- /dev/null
-> +++
-> b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> @@ -0,0 +1,25 @@
-> +* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory
-> controller
-> +
-> +The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs
-> memory
-> +maps a set of registers which allow to tweak the controller's behavior.
-> +
-> +Documentation:
-> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
-> +
-> +Required properties:
-> +
-> +- compatible:		"ti,da850-ddrctl"
+So, join those continuation lines.
 
-Don't you need a reg property ?
+The patch was generated via the script below, and manually
+adjusted if needed.
 
-> +Optional properties:
-> +
-> +- ti,pr-old-count:	Priority raise old counter. Specifies the number of
-> +			memory transfers after which the DDR2/mDDR memory
-> +			controller will elevate the priority of the oldest
-> +			command in the command FIFO. Must be between 0-255.
+</script>
+use Text::Tabs;
+while (<>) {
+	if ($next ne "") {
+		$c=$_;
+		if ($c =~ /^\s+\"(.*)/) {
+			$c2=$1;
+			$next =~ s/\"\n$//;
+			$n = expand($next);
+			$funpos = index($n, '(');
+			$pos = index($c2, '",');
+			if ($funpos && $pos > 0) {
+				$s1 = substr $c2, 0, $pos + 2;
+				$s2 = ' ' x ($funpos + 1) . substr $c2, $pos + 2;
+				$s2 =~ s/^\s+//;
 
-Isn't this a system configuration more than a hardware description ?
+				$s2 = ' ' x ($funpos + 1) . $s2 if ($s2 ne "");
 
-> +Example for da850 shown below.
-> +
-> +ddrctl {
-> +	compatible = "ti,da850-ddrctl";
-> +	ti,pr-old-count = <0x20>;
-> +};
-> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-> index 4b4c0c3..ec80e35 100644
-> --- a/drivers/memory/Kconfig
-> +++ b/drivers/memory/Kconfig
-> @@ -134,6 +134,14 @@ config MTK_SMI
->  	  mainly help enable/disable iommu and control the power domain and
->  	  clocks for each local arbiter.
-> 
-> +config DA8XX_DDRCTL
-> +	bool "Texas Instruments da8xx DDR2/mDDR driver"
-> +	depends on ARCH_DAVINCI_DA8XX
-> +	help
-> +	  This driver is for the DDR2/mDDR Memory Controller present on
-> +	  Texas Instruments da8xx SoCs. It's used to tweak various memory
-> +	  controller configuration options.
-> +
->  source "drivers/memory/samsung/Kconfig"
->  source "drivers/memory/tegra/Kconfig"
-> 
-> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
-> index b20ae38..e88097fb 100644
-> --- a/drivers/memory/Makefile
-> +++ b/drivers/memory/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
->  obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
->  obj-$(CONFIG_JZ4780_NEMC)	+= jz4780-nemc.o
->  obj-$(CONFIG_MTK_SMI)		+= mtk-smi.o
-> +obj-$(CONFIG_DA8XX_DDRCTL)	+= da8xx-ddrctl.o
-> 
->  obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
->  obj-$(CONFIG_TEGRA_MC)		+= tegra/
-> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
-> new file mode 100644
-> index 0000000..dcd0a61
-> --- /dev/null
-> +++ b/drivers/memory/da8xx-ddrctl.c
-> @@ -0,0 +1,77 @@
-> +/*
-> + * TI da8xx DDR2/mDDR controller driver
-> + *
-> + * Copyright (C) 2016 BayLibre SAS
-> + *
-> + * Author:
-> + *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +
-> +#define DA8XX_DDR_CTL_BASE	0xB0000000
-> +#define DA8XX_PBBPR_OFFSET	0x00000020
-> +#define DA8XX_PBBPR_REG(p)	((p) + DA8XX_PBBPR_OFFSET)
-> +
-> +#define DA8XX_PBBPR_MAX		0xff
-> +
-> +static void da8xx_ddrctl_set_pbbpr(void __iomem *ddrctl, struct device
-> *dev) +{
-> +	struct device_node *node = dev->of_node;
-> +	u32 pr_old_count;
-> +	int ret;
-> +
-> +	ret = of_property_read_u32(node, "ti,pr-old-count", &pr_old_count);
-> +	if (ret)
-> +		return;
-> +
-> +	if (pr_old_count > DA8XX_PBBPR_MAX) {
-> +		dev_warn(dev, "priority raise old counter value too high\n");
-> +		return;
-> +	}
-> +
-> +	__raw_writel(pr_old_count, DA8XX_PBBPR_REG(ddrctl));
-> +}
-> +
-> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	void __iomem *ddrctl;
-> +
-> +	ddrctl = ioremap(DA8XX_DDR_CTL_BASE, SZ_256);
-> +	if (!ddrctl) {
-> +		dev_err(dev, "unable to map memory controller registers\n");
-> +		return -EIO;
-> +	}
-> +
-> +	da8xx_ddrctl_set_pbbpr(ddrctl, dev);
-> +
-> +	iounmap(ddrctl);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id da8xx_ddrctl_of_match[] = {
-> +	{ .compatible = "ti,da850-ddrctl", },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver da8xx_ddrctl_driver = {
-> +	.probe = da8xx_ddrctl_probe,
-> +	.driver = {
-> +		.name = "da8xx-ddrctl",
-> +		.of_match_table = da8xx_ddrctl_of_match,
-> +	},
-> +};
-> +module_platform_driver(da8xx_ddrctl_driver);
-> +
-> +MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
-> +MODULE_DESCRIPTION("TI da8xx DDR2/mDDR controller driver");
-> +MODULE_LICENSE("GPL v2");
+				print unexpand("$next$s1\n");
+				print unexpand("$s2\n") if ($s2 ne "");
+			} else {
+				print "$next$c2\n";
+			}
+			$next="";
+			next;
+		} else {
+			print $next;
+		}
+		$next="";
+	} else {
+		if (m/\"$/) {
+			if (!m/\\n\"$/) {
+				$next=$_;
+				next;
+			}
+		}
+	}
+	print $_;
+}
+</script>
 
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 16 ++++++----------
+ 1 file changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 30c148b9d65e..42b123ff2953 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -112,8 +112,7 @@ static void channel_swdemux_tsklet(unsigned long data)
+ 	buf = (u8 *) channel->back_buffer_aligned;
+ 
+ 	dev_dbg(fei->dev,
+-		"chan=%d channel=%p num_packets = %d, buf = %p, pos = 0x%x\n\t"
+-		"rp=0x%lx, wp=0x%lx\n",
++		"chan=%d channel=%p num_packets = %d, buf = %p, pos = 0x%x\n\trp=0x%lx, wp=0x%lx\n",
+ 		channel->tsin_id, channel, num_packets, buf, pos, rp, wp);
+ 
+ 	for (n = 0; n < num_packets; n++) {
+@@ -789,8 +788,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 		/* sanity check value */
+ 		if (tsin->tsin_id > fei->hw_stats.num_ib) {
+ 			dev_err(&pdev->dev,
+-				"tsin-num %d specified greater than number\n\t"
+-				"of input block hw in SoC! (%d)",
++				"tsin-num %d specified greater than number\n\tof input block hw in SoC! (%d)",
+ 				tsin->tsin_id, fei->hw_stats.num_ib);
+ 			ret = -EINVAL;
+ 			goto err_clk_disable;
+@@ -855,8 +853,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 		tsin->demux_mapping = index;
+ 
+ 		dev_dbg(fei->dev,
+-			"channel=%p n=%d tsin_num=%d, invert-ts-clk=%d\n\t"
+-			"serial-not-parallel=%d pkt-clk-valid=%d dvb-card=%d\n",
++			"channel=%p n=%d tsin_num=%d, invert-ts-clk=%d\n\tserial-not-parallel=%d pkt-clk-valid=%d dvb-card=%d\n",
+ 			fei->channel_data[index], index,
+ 			tsin->tsin_id, tsin->invert_ts_clk,
+ 			tsin->serial_not_parallel, tsin->async_not_sync,
+@@ -1045,8 +1042,8 @@ static void load_imem_segment(struct c8sectpfei *fei, Elf32_Phdr *phdr,
+ 	 */
+ 
+ 	dev_dbg(fei->dev,
+-		"Loading IMEM segment %d 0x%08x\n\t"
+-		" (0x%x bytes) -> 0x%p (0x%x bytes)\n", seg_num,
++		"Loading IMEM segment %d 0x%08x\n\t (0x%x bytes) -> 0x%p (0x%x bytes)\n",
++seg_num,
+ 		phdr->p_paddr, phdr->p_filesz,
+ 		dest, phdr->p_memsz + phdr->p_memsz / 3);
+ 
+@@ -1075,8 +1072,7 @@ static void load_dmem_segment(struct c8sectpfei *fei, Elf32_Phdr *phdr,
+ 	 */
+ 
+ 	dev_dbg(fei->dev,
+-		"Loading DMEM segment %d 0x%08x\n\t"
+-		"(0x%x bytes) -> 0x%p (0x%x bytes)\n",
++		"Loading DMEM segment %d 0x%08x\n\t(0x%x bytes) -> 0x%p (0x%x bytes)\n",
+ 		seg_num, phdr->p_paddr, phdr->p_filesz,
+ 		dst, phdr->p_memsz);
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+2.7.4
