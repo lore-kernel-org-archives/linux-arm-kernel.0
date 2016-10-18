@@ -1,87 +1,86 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 18 Oct 2016 13:57:19 -0700
-Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a provider
-Message-ID: <20161018205719.20575-1-stephen.boyd@linaro.org>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 18 Oct 2016 23:00:17 +0200
+Subject: [PATCH v2] ARM: dts: rockchip: temporarily remove emmc hs200
+ speed from rk3288-veyron-speedy.
+In-Reply-To: <12872023.2LumKfgYDl@diego>
+References: <87twd1vzc5.fsf@aikidev.net> <1476647383.3885.3.camel@paulk.fr>
+ <12872023.2LumKfgYDl@diego>
+Message-ID: <1476824417.1031.9.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These GPU drivers only depend on the RESET_CONTROLLER config
-option to fix build issues that existed when there weren't stub
-reset APIs for reset controller consumers. Given that these
-drivers aren't providing any reset controllers themselves, they
-don't actually depend on the API to build (just to function) so
-they don't need to depend on it. Remove the dependency to fix
-recursive build errors like the following:
+Hi,
 
-drivers/usb/Kconfig:39:error: recursive dependency detected!
-drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
-drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
-drivers/input/Kconfig:8:        symbol INPUT is selected by VT
-drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
-drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
-drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
-drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
-drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
-drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
-drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
-drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
-drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
-drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+Le mardi 18 octobre 2016 ? 11:21 +0200, Heiko St?bner a ?crit?:
+> Am Sonntag, 16. Oktober 2016, 21:49:43 schrieb Paul Kocialkowski:
+> > 
+> > Hi,
+> > 
+> > Le mardi 27 septembre 2016 ? 13:53 -0700, Vagrant Cascadian a ?crit :
+> > > 
+> > > This essentially mimics what was done with rk3288-veyron-minnie in
+> > > commit 984926781122f034d5bc9962815d135b6c4a8e1d.
+> > > 
+> > > The eMMC of the speedy Chromebook also appears to need the same tuning
+> > > workaround, as it frequently fails to recognize the eMMC without it.
+> > 
+> > I have a device where (without this patch) eMMC sometimes fails, with:
+> > [????3.561010] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to
+> > 175 [????3.571742] mmc2: new HS200 MMC card at address 0001
+> > [????3.571943] mmcblk2: mmc2:0001 HAG2e 14.7 GiB?
+> > [????3.572026] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
+> > [????3.572107] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
+> > [????3.572181] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
+> > [????3.685647] mmcblk2: error -110 transferring data, sector 0, nr 8, cmd
+> > response 0x900, card status 0x0
+> > 
+> > And sometimes works, with:
+> > [????3.451058] dwmmc_rockchip ff0f0000.dwmmc: Successfully tuned phase to
+> > 176 [????3.491093] mmc2: new HS200 MMC card at address 0001
+> > [????3.491277] mmcblk2: mmc2:0001 HAG2e 14.7 GiB?
+> > [????3.491345] mmcblk2boot0: mmc2:0001 HAG2e partition 1 4.00 MiB
+> > [????3.491409] mmcblk2boot1: mmc2:0001 HAG2e partition 2 4.00 MiB
+> > [????3.491474] mmcblk2rpmb: mmc2:0001 HAG2e partition 3 4.00 MiB
+> > [????3.493548]??mmcblk2: p1 p2
+> > 
+> > However, with this change, it always fails, with:
+> > [????3.322129] mmc_host mmc2: Bus speed (slot 0) = 50000000Hz (slot req
+> > 52000000Hz, actual 50000000HZ div = 0) [????3.333174] mmc2: error -110
+> > whilst initialising MMC card
+> > 
+> > I don't have so much time to investigate this issue, but it's clear that
+> > this patch doesn't fix the issue (and actually worsens it) for my device.
+> 
+> thanks for the heads up.
+> 
+> As discussed on IRC we now have varying reports of the emmc working or not?
+> working with and without that patch applied. So it's not really a bandaid fix?
+> and I've thus dropped this patch again.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: <dri-devel@lists.freedesktop.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Mark Yao <mark.yao@rock-chips.com>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
----
+Thanks for dropping it! For the record, my eMMC shows up as:
+mmcblk2: mmc2:0001 HAG2e 14.7 GiB
 
-This has come out of some USB chipidea patches I've been working on. Please see
-http://lkml.kernel.org/r/20160907213519.27340-1-stephen.boyd at linaro.org for
-more details.
+Maybe it could help to share what each tested device reports as eMMC model and
+associate that with the current behavior, in spite of getting a clearer idea of
+what issue affects what model.
 
-I'm resending with the ack from Philipp picked up.
+> Still hoping someone will find the source of the problem somewhere :-)
 
- drivers/gpu/drm/rockchip/Kconfig | 1 -
- drivers/gpu/drm/tegra/Kconfig    | 1 -
- drivers/gpu/ipu-v3/Kconfig       | 1 -
- 3 files changed, 3 deletions(-)
+I have started investigating the issue, but did not discover anything
+significant yet. I hope I'll be able to figure it out!
 
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index 3c58669a06ce..6f7f9c59f05b 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -1,7 +1,6 @@
- config DRM_ROCKCHIP
- 	tristate "DRM Support for Rockchip"
- 	depends on DRM && ROCKCHIP_IOMMU
--	depends on RESET_CONTROLLER
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_HELPER
- 	select DRM_PANEL
-diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
-index 63ebb154b9b5..bbf5a4b7e0b6 100644
---- a/drivers/gpu/drm/tegra/Kconfig
-+++ b/drivers/gpu/drm/tegra/Kconfig
-@@ -3,7 +3,6 @@ config DRM_TEGRA
- 	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
- 	depends on COMMON_CLK
- 	depends on DRM
--	depends on RESET_CONTROLLER
- 	select DRM_KMS_HELPER
- 	select DRM_MIPI_DSI
- 	select DRM_PANEL
-diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
-index aefdff95356d..08766c6e7856 100644
---- a/drivers/gpu/ipu-v3/Kconfig
-+++ b/drivers/gpu/ipu-v3/Kconfig
-@@ -1,7 +1,6 @@
- config IMX_IPUV3_CORE
- 	tristate "IPUv3 core support"
- 	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
--	depends on RESET_CONTROLLER
- 	select GENERIC_IRQ_CHIP
- 	help
- 	  Choose this if you have a i.MX5/6 system and want to use the Image
+Cheers!
+
 -- 
-2.10.0.297.gf6727b0
+Paul Kocialkowski, developer of free digital technology at the lower levels
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161018/1250804a/attachment.sig>
