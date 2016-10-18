@@ -1,51 +1,20 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 18 Oct 2016 08:50:28 +0800
-Subject: [PATCH -next] PCI: rockchip: Add missing of_node_put() in
- rockchip_pcie_init_irq_domain()
-In-Reply-To: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
-References: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <87c39739-c9d0-b307-5256-591ef7324ffa@rock-chips.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 17 Oct 2016 17:54:57 -0700
+Subject: [PATCH v2 2/2] arm64: dts: Updated NAND DT properties for NS2 SVK
+In-Reply-To: <8832e18c-cd77-9fe1-8bd8-a2d65390666a@broadcom.com>
+References: <1469051631-7896-1-git-send-email-ray.jui@broadcom.com>
+ <1469051631-7896-3-git-send-email-ray.jui@broadcom.com>
+ <8832e18c-cd77-9fe1-8bd8-a2d65390666a@broadcom.com>
+Message-ID: <9657d27d-dbfa-e629-f5d4-4f7a748d5033@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/10/17 22:57, Wei Yongjun ??:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
->
-> This node pointer is returned by of_get_next_child() with refcount
-> incremented in this function. of_node_put() on it before exitting
-> this function on error.
->
-> This is detected by Coccinelle semantic patch.
+On 10/17/2016 01:49 PM, Ray Jui wrote:
+> Hi Florian,
+> 
+> Would you be able to help to queue the following patch for v4.10? Sorry
+> I did not include you in the "To" field of the original email.
 
-Thanks for fixing this.
-
-Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
-
->
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> ---
->  drivers/pci/host/pcie-rockchip.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index e0b22da..ab88859 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -949,6 +949,7 @@ static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
->  						    &intx_domain_ops, rockchip);
->  	if (!rockchip->irq_domain) {
->  		dev_err(dev, "failed to get a INTx IRQ domain\n");
-> +		of_node_put(intc);
->  		return -EINVAL;
->  	}
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
+Applied, thanks!
 -- 
-Best Regards
-Shawn Lin
+Florian
