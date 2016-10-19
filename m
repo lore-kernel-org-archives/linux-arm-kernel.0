@@ -1,63 +1,45 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Wed, 19 Oct 2016 15:52:30 -0700
-Subject: [PATCH] arm64: Add support for additional relocations in the
- kexec purgatory code
-In-Reply-To: <1476892714-27304-1-git-send-email-catalin.marinas@arm.com>
-References: <1476892714-27304-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <15f9c4d2-34a8-fd74-05ec-0a8df41bc93a@infradead.org>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 19 Oct 2016 16:56:08 -0600
+Subject: exynos-drm: display manager fails to start without IOMMU problem
+In-Reply-To: <58079E16.50302@math.uni-bielefeld.de>
+References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
+ <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
+ <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
+ <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
+ <57B29925.4020600@samsung.com>
+ <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
+ <1b2c3b31-7127-af2f-18a2-f3a28567e28d@osg.samsung.com>
+ <2173cc13-7c77-1a38-501d-2c0f522ff5d5@osg.samsung.com>
+ <58079E16.50302@math.uni-bielefeld.de>
+Message-ID: <0a9b3996-38fb-e4f1-1e25-436f0f09f510@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On 10/19/2016 10:23 AM, Tobias Jakobi wrote:
+> Hello Shuah,
+> 
+> just a short note that more misleading comments about default allocation
+> flags can be found in libdrm.
+> 
+> https://cgit.freedesktop.org/mesa/drm/tree/exynos/exynos_drm.c
+> 
+> See e.g. the comment for exynos_bo_create().
+> 
+> In my opinion, the whole approach to _set_ a bit to get non-contigious
+> memory is messed up. It would make more sense to me to set a bit to
+> request an additional property (here "being contiguous") of the memory.
+> 
+> Anyway, clearing up this situation is highly appreciated!
+> 
+> More comments below.
+> 
+> With best wishes,
+> Tobias
+> 
 
-On 10/19/2016 08:58 AM, Catalin Marinas wrote:
-> diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-> index 2e8839a..e067a23 100644
-> --- a/kexec/arch/arm64/kexec-arm64.c
-> +++ b/kexec/arch/arm64/kexec-arm64.c
-> @@ -585,6 +598,19 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
->  		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
->  			+ (((value - address) << 3) & 0xffffe0));
->  		break;
-> +	case R_AARCH64_ADR_PREL_PG_HI21:
-> +		type = "ADR_PREL_PG_HI21";
-> +		imm = ((value & ~0xfff) - (address & ~0xfff)) >> 12;
-> +		loc32 = ptr;
-> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-> +			+ ((imm & 3) << 29) + ((imm & 0x1ffffc) << (5 - 2)));
-> +		break;
-> +	case R_AARCH64_ADD_ABS_LO12_NC:
-> +		type = "R_AARCH64_ADD_ABS_LO12_NC";
+Hi Tobias,
 
-Following with the others, this should be 'type = "ADD_ABS_LO12_NC"'.
+Thanks for the note. Yes the comments are confusing. It seems like
+some old assumptions are persisting. I will fix these as well.
 
-> +		loc32 = ptr;
-> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-> +			+ ((value & 0xfff) << 10));
-> +		break;
->  	case R_AARCH64_JUMP26:
->  		type = "JUMP26";
->  		loc32 = ptr;
-> @@ -597,6 +623,15 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
->  		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
->  			+ (((value - address) >> 2) & 0x3ffffff));
->  		break;
-> +	case R_AARCH64_LDST64_ABS_LO12_NC:
-> +		if (value & 7)
-> +			die("%s: ERROR Unaligned value: %lx\n", __func__,
-> +				value);
-> +		type = "R_AARCH64_LDST64_ABS_LO12_NC";
-
-And type = "LDST64_ABS_LO12_NC" here.
-
-> +		loc32 = ptr;
-> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-> +			+ ((value & 0xff8) << (10 - 3)));
-> +		break;
->  	default:
->  		die("%s: ERROR Unknown type: %lu\n", __func__, r_type);
->  		break;
-
-Otherwise, looks good.  Thanks for taking time to make the fix.
-
--Geoff 
+-- Shuah
