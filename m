@@ -1,106 +1,84 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 19 Oct 2016 14:40:54 +0100
-Subject: [PATCH v2] arm64: Cortex-A53 errata workaround: check for kernel
- addresses
-Message-ID: <20161019134054.20413-1-andre.przywara@arm.com>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Wed, 19 Oct 2016 22:46:08 +0900
+Subject: [PATCH] ARM: dts: sun8i: Add SPI controller node in H3
+Message-ID: <20161019134608.12850-1-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on
-errata-affected core") adds code to execute cache maintenance instructions
-in the kernel on behalf of userland on CPUs with certain ARM CPU errata.
-It turns out that the address hasn't been checked to be a valid user
-space address, allowing userland to clean cache lines in kernel space.
-Fix this by introducing an access_ok() check before executing the
-instructions on behalf of userland. We have to take care of tagged
-pointers here, since the address is not coming in via a syscall (which
-requires the tag to be 0).
+H3 supports two SPI controllers. Four pins (MOSI, MISO, SCLK, SS) are
+configured through the pinctrl subsystem. It is almost same as A31 SPI
+except buffer size, so those DT properties are reusable.
 
-Fixes: 7dd01aef0557 ("arm64: trap userspace "dc cvau" cache operation on errata-affected core")
-Reported-by: Kristina Martsenko <kristina.martsenko@arm.com>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
-Changelog v1 .. v2:
-- use PAGE_SIZE instead of cache_line_size() for access check
-- merge extra function into original macro
-- replace access_ok_tagged() with untagged_addr() macro
+ arch/arm/boot/dts/sun8i-h3.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
- arch/arm64/include/asm/uaccess.h |  8 ++++++++
- arch/arm64/kernel/traps.c        | 35 +++++++++++++++++++++++------------
- 2 files changed, 31 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index bcaf6fb..55d0adb 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -21,6 +21,7 @@
- /*
-  * User space memory access functions
-  */
-+#include <linux/bitops.h>
- #include <linux/kasan-checks.h>
- #include <linux/string.h>
- #include <linux/thread_info.h>
-@@ -102,6 +103,13 @@ static inline void set_fs(mm_segment_t fs)
- 	flag;								\
- })
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 75a8654..c38b028 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -381,6 +381,20 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
  
-+/*
-+ * When dealing with data aborts or instruction traps we may end up with
-+ * a tagged userland pointer. Clear the tag to get a sane pointer to pass
-+ * on to access_ok(), for instance.
-+ */
-+#define untagged_addr(addr)		sign_extend64(addr, 55)
++			spi0_pins: spi0 {
++				allwinner,pins = "PC0", "PC1", "PC2", "PC3";
++				allwinner,function = "spi0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- #define access_ok(type, addr, size)	__range_ok(addr, size)
- #define user_addr_max			get_fs
++			spi1_pins: spi1 {
++				allwinner,pins = "PA15", "PA16", "PA14", "PA13";
++				allwinner,function = "spi1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				allwinner,pins = "PA4", "PA5";
+ 				allwinner,function = "uart0";
+@@ -425,6 +439,38 @@
+ 			clocks = <&osc24M>;
+ 		};
  
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 5ff020f..1e81328 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -433,19 +433,30 @@ void cpu_enable_cache_maint_trap(void *__unused)
- 	config_sctlr_el1(SCTLR_EL1_UCI, 0);
- }
- 
-+/*
-+ * Technically the access_ok() check should be done on a cache line size
-+ * granularity, but it's tedious the get the right one (dcache vs. icache,
-+ * per-core vs. system wide). Since permission checks are based on pages
-+ * anyway, just use PAGE_SIZE instead.
-+ */
- #define __user_cache_maint(insn, address, res)			\
--	asm volatile (						\
--		"1:	" insn ", %1\n"				\
--		"	mov	%w0, #0\n"			\
--		"2:\n"						\
--		"	.pushsection .fixup,\"ax\"\n"		\
--		"	.align	2\n"				\
--		"3:	mov	%w0, %w2\n"			\
--		"	b	2b\n"				\
--		"	.popsection\n"				\
--		_ASM_EXTABLE(1b, 3b)				\
--		: "=r" (res)					\
--		: "r" (address), "i" (-EFAULT) )
-+	if (!access_ok(VERIFY_READ,				\
-+		       untagged_addr(address & PAGE_MASK),	\
-+	               PAGE_SIZE)) 				\
-+		res = -EFAULT;					\
-+	else							\
-+		asm volatile (					\
-+			"1:	" insn ", %1\n"			\
-+			"	mov	%w0, #0\n"		\
-+			"2:\n"					\
-+			"	.pushsection .fixup,\"ax\"\n"	\
-+			"	.align	2\n"			\
-+			"3:	mov	%w0, %w2\n"		\
-+			"	b	2b\n"			\
-+			"	.popsection\n"			\
-+			_ASM_EXTABLE(1b, 3b)			\
-+			: "=r" (res)				\
-+			: "r" (address), "i" (-EFAULT) )
- 
- static void user_cache_maint_handler(unsigned int esr, struct pt_regs *regs)
- {
++		spi0: spi at 01c68000 {
++			compatible = "allwinner,sun8i-h3-spi";
++			reg = <0x01c68000 0x1000>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma 23>, <&dma 23>;
++			dma-names = "rx", "tx";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pins>;
++			resets = <&ccu RST_BUS_SPI0>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		spi1: spi at 01c69000 {
++			compatible = "allwinner,sun8i-h3-spi";
++			reg = <0x01c69000 0x1000>;
++			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
++			clock-names = "ahb", "mod";
++			dmas = <&dma 24>, <&dma 24>;
++			dma-names = "rx", "tx";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi1_pins>;
++			resets = <&ccu RST_BUS_SPI1>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		wdt0: watchdog at 01c20ca0 {
+ 			compatible = "allwinner,sun6i-a31-wdt";
+ 			reg = <0x01c20ca0 0x20>;
 -- 
-2.9.0
+2.9.3
