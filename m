@@ -1,28 +1,30 @@
 From: lstoakes@gmail.com (Lorenzo Stoakes)
-Date: Wed, 19 Oct 2016 09:58:15 +0100
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <20161018153050.GC13117@dhcp22.suse.cz>
+Date: Wed, 19 Oct 2016 10:06:46 +0100
+Subject: [PATCH 08/10] mm: replace __access_remote_vm() write parameter
+ with gup_flags
+In-Reply-To: <20161019085204.GD7517@dhcp22.suse.cz>
 References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161018153050.GC13117@dhcp22.suse.cz>
-Message-ID: <20161019085815.GA22239@lucifer>
+ <20161013002020.3062-9-lstoakes@gmail.com>
+ <20161019075903.GP29967@quack2.suse.cz>
+ <20161019081352.GB7562@dhcp22.suse.cz>
+ <20161019084045.GA19441@lucifer>
+ <20161019085204.GD7517@dhcp22.suse.cz>
+Message-ID: <20161019090646.GA24243@lucifer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 05:30:50PM +0200, Michal Hocko wrote:
-> I am wondering whether we can go further. E.g. it is not really clear to
-> me whether we need an explicit FOLL_REMOTE when we can in fact check
-> mm != current->mm and imply that. Maybe there are some contexts which
-> wouldn't work, I haven't checked.
+On Wed, Oct 19, 2016 at 10:52:05AM +0200, Michal Hocko wrote:
+> yes this is the desirable and expected behavior.
+>
+> > wonder if this is desirable behaviour or whether this ought to be limited to
+> > ptrace system calls. Regardless, by making the flag more visible it makes it
+> > easier to see that this is happening.
+>
+> mem_open already enforces PTRACE_MODE_ATTACH
 
-This flag is set even when /proc/self/mem is used. I've not looked deeply into
-this flag but perhaps accessing your own memory this way can be considered
-'remote' since you're not accessing it directly. On the other hand, perhaps this
-is just mistaken in this case?
+Ah I missed this, that makes a lot of sense, thanks!
 
-> I guess there is more work in that area and I do not want to impose all
-> that work on you, but I couldn't resist once I saw you playing in that
-> area ;) Definitely a good start!
-
-Thanks, I am more than happy to go as far down this rabbit hole as is helpful,
-no imposition at all :)
+I still wonder whether other invocations of access_remote_vm() in fs/proc/base.c
+(the principle caller of this function) need FOLL_FORCE, for example the various
+calls that simply read data from other processes, so I think the point stands
+about keeping this explicit.
