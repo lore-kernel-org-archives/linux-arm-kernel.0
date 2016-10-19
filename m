@@ -1,79 +1,53 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Oct 2016 20:10:33 +0100
-Subject: [PATCH 09/10] arm64: assembler: introduce ldr_this_cpu
+Date: Wed, 19 Oct 2016 20:10:31 +0100
+Subject: [PATCH 07/10] arm64: smp: prepare for smp_processor_id() rework
 In-Reply-To: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
 References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1476904234-9511-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1476904234-9511-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shortly we will want to load a percpu variable in the return from
-userspace path. We can save an instruction by folding the addition of
-the percpu offset into the load instruction, and this patch adds a new
-helper to do so.
+Subsequent patches will make smp_processor_id() use a percpu variable.
+This will make smp_processor_id() dependent on the percpu offset, and
+thus we cannot use smp_processor_id() to figure out what to initialise
+the offset to.
 
-At the same time, we clean up this_cpu_ptr for consistency. As with
-{adr,ldr,str}_l, we change the template to take the destination register
-first, and name this dst. Secondly, we rename the macro to adr_this_cpu,
-following the scheme of adr_l, and matching the newly added
-ldr_this_cpu.
+Prepare for this by initialising the percpu offset based on
+current::cpu, which will work regardless of how smp_processor_id() is
+implemented. Also, make this relationship obvious by placing this code
+together at the start of secondary_start_kernel().
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 19 +++++++++++++++----
- arch/arm64/kernel/entry.S          |  2 +-
- 2 files changed, 16 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/smp.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 28bfe61..128a9ca 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -202,14 +202,25 @@
- 	.endm
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d3f151c..7af46bf 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -208,7 +208,10 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
+ asmlinkage void secondary_start_kernel(void)
+ {
+ 	struct mm_struct *mm = &init_mm;
+-	unsigned int cpu = smp_processor_id();
++	unsigned int cpu;
++
++	cpu = task_cpu(current);
++	set_my_cpu_offset(per_cpu_offset(cpu));
  
  	/*
-+	 * @dst: Result of per_cpu(sym, smp_processor_id())
- 	 * @sym: The name of the per-cpu variable
--	 * @reg: Result of per_cpu(sym, smp_processor_id())
- 	 * @tmp: scratch register
- 	 */
--	.macro this_cpu_ptr, sym, reg, tmp
--	adr_l	\reg, \sym
-+	.macro adr_this_cpu, dst, sym, tmp
-+	adr_l	\dst, \sym
- 	mrs	\tmp, tpidr_el1
--	add	\reg, \reg, \tmp
-+	add	\dst, \dst, \tmp
-+	.endm
-+
-+	/*
-+	 * @dst: Result of READ_ONCE(per_cpu(sym, smp_processor_id()))
-+	 * @sym: The name of the per-cpu variable
-+	 * @tmp: scratch register
-+	 */
-+	.macro ldr_this_cpu dst, sym, tmp
-+	adr_l	\dst, \sym
-+	mrs	\tmp, tpidr_el1
-+	ldr	\dst, [\dst, \tmp]
- 	.endm
+ 	 * All kernel threads share the same mm context; grab a
+@@ -217,8 +220,6 @@ asmlinkage void secondary_start_kernel(void)
+ 	atomic_inc(&mm->mm_count);
+ 	current->active_mm = mm;
  
- /*
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 223d54a..2d4c83b 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -200,7 +200,7 @@ alternative_else_nop_endif
- 	cmp	x25, tsk
- 	b.ne	9998f
- 
--	this_cpu_ptr irq_stack, x25, x26
-+	adr_this_cpu x25, irq_stack, x26
- 	mov	x26, #IRQ_STACK_START_SP
- 	add	x26, x25, x26
- 
+-	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+-
+ 	/*
+ 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * point to zero page to avoid speculatively fetching new entries.
 -- 
 1.9.1
