@@ -1,25 +1,28 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 19 Oct 2016 12:22:43 +0100
-Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
- config table
-In-Reply-To: <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
-References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
- <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
- <20161019110926.GG9616@leverpostej>
- <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
-Message-ID: <20161019112243.GD31476@codeblueprint.co.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Oct 2016 12:40:30 +0100
+Subject: [RFC PATCH 0/2] efi/arm64: add vmlinux link to PE/COFF debug table
+Message-ID: <1476877232-24308-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
-> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
->
-> > I think to some extent this mush be treated as an ABI, given cases like
-> > kexec.
-> >
-> 
-> Perhaps, yes. That would also allow GRUB or other EFI aware
-> bootloaders to generate the seed.
+Much like GNU debug links, PE/COFF binaries can carry the patch to the binary
+containing the debugging symbols. Since the kernel binary is loaded by UEFI
+at an a priori unknown offset in the 1:1 mapping of physical memory, having
+this information is useful for the debugger automation to find the file and
+the offset, and load the symbols automatically.
 
-If we're going to go down this route, we should try and get the GUID
-into the UEFI spec.
+So if we have debugging symbols to begin with (CONFIG_DEBUG_INFO=y), add the
+absolute path to vmlinux to the PE/COFF debug table.
+
+Ard Biesheuvel (2):
+  efi: libstub: preserve .debug sections after absolute relocation check
+  efi: arm64: add vmlinux debug link to the Image binary
+
+ arch/arm64/kernel/Makefile            |  4 +++
+ arch/arm64/kernel/head.S              | 34 +++++++++++++++++++-
+ arch/arm64/kernel/image.h             |  3 ++
+ drivers/firmware/efi/libstub/Makefile | 19 ++++++++---
+ 4 files changed, 54 insertions(+), 6 deletions(-)
+
+-- 
+2.7.4
