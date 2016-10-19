@@ -1,27 +1,42 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 19 Oct 2016 18:45:20 +0530
-Subject: [PATCH] dmaengine: st_fdma: fix uninitialized variable access
-In-Reply-To: <20161019120927.3251235-1-arnd@arndb.de>
-References: <20161019120927.3251235-1-arnd@arndb.de>
-Message-ID: <20161019131519.GK2467@localhost>
+Date: Wed, 19 Oct 2016 18:50:37 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: remove useless debugfs file removal
+In-Reply-To: <1475792489-1415-1-git-send-email-okaya@codeaurora.org>
+References: <1475792489-1415-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161019132037.GM2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 02:09:10PM +0200, Arnd Bergmann wrote:
-> The newly added st_fdma driver introduces a build warning for
-> allmodconfig when we add '-Wmaybe-uninitialized':
+On Thu, Oct 06, 2016 at 06:21:29PM -0400, Sinan Kaya wrote:
+> Since 'commit acc29fb8f792 ("debugfs: ->d_parent is never NULL or
+> negative")', HIDMA object removal is no longer working. This is due to
+> redundant debugfs remove call in hidma_debug_uninit.
 > 
-> drivers/dma/st_fdma.c: In function 'st_fdma_probe':
-> drivers/dma/st_fdma.c:777:5: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> debugfs_remove_recursive(dmadev->debugfs);
+> debugfs_remove_recursive(dmadev->stats);
 > 
-> The warning is correct, though this can't happen in practice
-> as the check is redundant (we don't get to this function if
-> the pointer is NULL). Even if the function were called with a
-> NULL of_node, the check is not needed because of_property_read_u32
-> can deal with a NULL argument by returning an error.
+> The first remove is for the directory. Second remove is for the file under
+> the directory. The directory remove makes file remove invalid.
 > 
-> Removing the unnecessary code simplifies the function and avoids
-> the condition that we get the warning for.
+> Unable to handle kernel NULL pointer dereference at virtual address
+> 
+> [<ffff00000889f480>] down_write+0x18/0x68
+> [<ffff00000831c220>] debugfs_remove_recursive+0x50/0x1c0
+> [<ffff00000848e0a8>] hidma_debug_uninit+0x20/0x30
+> [<ffff00000848c5d8>] hidma_remove+0x48/0x98
+> [<ffff000008511b6c>] platform_drv_remove+0x24/0x68
+> [<ffff00000850fac8>] __device_release_driver+0x80/0x118
+> [<ffff00000850fb84>] device_release_driver+0x24/0x38
+> [<ffff00000850e928>] unbind_store+0xe8/0x110
+> [<ffff00000850dd30>] drv_attr_store+0x20/0x30
+> [<ffff000008253a48>] sysfs_kf_write+0x48/0x58
+> [<ffff000008252dd8>] kernfs_fop_write+0xb0/0x1d8
+> [<ffff0000081dab3c>] __vfs_write+0x1c/0x110
+> [<ffff0000081db940>] vfs_write+0xa0/0x1b8
+> [<ffff0000081dcd34>] SyS_write+0x44/0xa0
+> [<ffff000008082ef0>] el0_svc_naked+0x24/0x28
+> 
+> Removing the second line.
 
 Applied, thanks
 
