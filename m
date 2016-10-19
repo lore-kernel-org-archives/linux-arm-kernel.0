@@ -1,81 +1,102 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Oct 2016 20:10:32 +0100
-Subject: [PATCH 08/10] arm64: make cpu number a percpu variable
+Date: Wed, 19 Oct 2016 20:10:29 +0100
+Subject: [PATCH 05/10] arm64: prep stack walkers for THREAD_INFO_IN_TASK
 In-Reply-To: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
 References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1476904234-9511-9-git-send-email-mark.rutland@arm.com>
+Message-ID: <1476904234-9511-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the absence of CONFIG_THREAD_INFO_IN_TASK, core code maintains
-thread_info::cpu, and low-level architecture code can access this to
-build raw_smp_processor_id(). With CONFIG_THREAD_INFO_IN_TASK, core code
-maintains task_struct::cpu, which for reasons of hte header soup is not
-accessible to low-level arch code.
+When CONFIG_THREAD_INFO_IN_TASK is selected, task stacks may be freed
+before a task is destroyed. To account for this, the stacks are
+refcounted, and when manipulating the stack of another task, it is
+necessary to get/put the stack to ensure it isn't freed and/or re-used
+while we do so.
 
-Instead, we can maintain a percpu variable containing the cpu number.
-Non-preemptible code will receive the current CPU's number, while
-preemptible code may race (as was previosuly the case), and see a stale
-value. Thus, there shouldn't be a change in observable behaviour.
-
-For both the old and new implementation of raw_smp_processor_id(), we
-read a syreg into a GPR, add an offset, and load the result. As the
-offset is now large, it probably won't be folded into the load, but
-otherwise the assembly shouldn't change much.
+This patch reworks the arm64 stack walking code to account for this.
+When CONFIG_THREAD_INFO_IN_TASK is not selected these perform no
+refcounting, and this should only be a structural change that does not
+affect behaviour.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Andy Lutomirski <luto@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/smp.h | 6 +++++-
- arch/arm64/kernel/smp.c      | 5 +++++
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/process.c    | 20 ++++++++++++++------
+ arch/arm64/kernel/stacktrace.c |  5 +++++
+ 2 files changed, 19 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 0226447..f77ac0d 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -29,11 +29,15 @@
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 27b2f13..2f39036 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -340,27 +340,35 @@ struct task_struct *__switch_to(struct task_struct *prev,
+ unsigned long get_wchan(struct task_struct *p)
+ {
+ 	struct stackframe frame;
+-	unsigned long stack_page;
++	unsigned long stack_page, ret = 0;
+ 	int count = 0;
+ 	if (!p || p == current || p->state == TASK_RUNNING)
+ 		return 0;
  
- #ifndef __ASSEMBLY__
- 
-+#include <asm/percpu.h>
++	stack_page = (unsigned long)try_get_task_stack(p);
++	if (!stack_page)
++		return 0;
 +
- #include <linux/threads.h>
- #include <linux/cpumask.h>
- #include <linux/thread_info.h>
- 
--#define raw_smp_processor_id() (current_thread_info()->cpu)
-+DECLARE_PER_CPU_READ_MOSTLY(int, cpu_number);
+ 	frame.fp = thread_saved_fp(p);
+ 	frame.sp = thread_saved_sp(p);
+ 	frame.pc = thread_saved_pc(p);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = p->curr_ret_stack;
+ #endif
+-	stack_page = (unsigned long)task_stack_page(p);
+ 	do {
+ 		if (frame.sp < stack_page ||
+ 		    frame.sp >= stack_page + THREAD_SIZE ||
+ 		    unwind_frame(p, &frame))
+-			return 0;
+-		if (!in_sched_functions(frame.pc))
+-			return frame.pc;
++			goto out;
++		if (!in_sched_functions(frame.pc)) {
++			ret = frame.pc;
++			goto out;
++		}
+ 	} while (count ++ < 16);
+-	return 0;
 +
-+#define raw_smp_processor_id() (*this_cpu_ptr(&cpu_number))
++out:
++	put_task_stack(p);
++	return ret;
+ }
  
- struct seq_file;
+ unsigned long arch_align_stack(unsigned long sp)
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 5b80068..c77e5b6 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -182,6 +182,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	struct stack_trace_data data;
+ 	struct stackframe frame;
  
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 7af46bf..2679722 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -58,6 +58,9 @@
- #define CREATE_TRACE_POINTS
- #include <trace/events/ipi.h>
- 
-+DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
-+EXPORT_PER_CPU_SYMBOL(cpu_number);
++	if (!try_get_task_stack(tsk))
++		return;
 +
- /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-  * so we need some other way of telling a new secondary core
-@@ -718,6 +721,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 	 */
- 	for_each_possible_cpu(cpu) {
+ 	data.trace = trace;
+ 	data.skip = trace->skip;
  
-+		per_cpu(cpu_number, cpu) = cpu;
+@@ -203,6 +206,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	walk_stackframe(tsk, &frame, save_trace, &data);
+ 	if (trace->nr_entries < trace->max_entries)
+ 		trace->entries[trace->nr_entries++] = ULONG_MAX;
 +
- 		if (cpu == smp_processor_id())
- 			continue;
++	put_task_stack(tsk);
+ }
  
+ void save_stack_trace(struct stack_trace *trace)
 -- 
 1.9.1
