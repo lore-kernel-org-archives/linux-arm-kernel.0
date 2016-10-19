@@ -1,292 +1,61 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 19 Oct 2016 15:33:46 -0500
-Subject: [PATCH v2 3/4] soc: ti: Add ti_sci_pm_domains driver
-In-Reply-To: <20161019203347.17893-1-d-gerlach@ti.com>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
-Message-ID: <20161019203347.17893-4-d-gerlach@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Oct 2016 21:35:00 +0100
+Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
+ config table
+In-Reply-To: <CAGXu5jKx5cvZsBwC1AJZ3Q4CCn-nxD3Jejs5irQLRan+j305Cw@mail.gmail.com>
+References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161019110926.GG9616@leverpostej>
+ <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
+ <20161019112243.GD31476@codeblueprint.co.uk>
+ <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
+ <CAKv+Gu92dC6BK7Adb2xLvPwNXv=z15A0zhss_XVNfd+r0NA0SA@mail.gmail.com>
+ <CAGXu5jKx5cvZsBwC1AJZ3Q4CCn-nxD3Jejs5irQLRan+j305Cw@mail.gmail.com>
+Message-ID: <8029158E-6144-4842-884C-918F1F916E05@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a ti_sci_pm_domains driver to act as a generic pm domain provider
-to allow each device to attach and associate it's ti-sci-id so that it can
-be controlled through the TI SCI protocol.
 
-This driver implements a simple genpd where each device node has
-a phandle to the power domain node and also must provide an index which
-represents the ID to be passed with TI SCI representing the device using a
-ti,sci-id property. Through this interface the genpd dev_ops start and
-stop hooks will use TI SCI to turn on and off each device as determined
-by pm_runtime usage.
+> On 19 Oct 2016, at 21:20, Kees Cook <keescook@chromium.org> wrote:
+> 
+> On Wed, Oct 19, 2016 at 1:18 PM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 19 October 2016 at 21:14, Kees Cook <keescook@chromium.org> wrote:
+>>>> On Wed, Oct 19, 2016 at 4:22 AM, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>>>>> On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
+>>>>>> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>>> 
+>>>>>> I think to some extent this mush be treated as an ABI, given cases like
+>>>>>> kexec.
+>>>>>> 
+>>>>> 
+>>>>> Perhaps, yes. That would also allow GRUB or other EFI aware
+>>>>> bootloaders to generate the seed.
+>>>> 
+>>>> If we're going to go down this route, we should try and get the GUID
+>>>> into the UEFI spec.
+>>> 
+>>> It seems like maybe under UEFI, both this table (which sounds like
+>>> it'll not be rotated regularly)
+>> 
+>> What do you mean 'rotated'? It is generated at boot. My 2/2 patch
+>> generates it from the stub using the EFI_RNG_PROTOCOL on ARM/arm64
+> 
+> Oh! I entirely misunderstood. I thought doing regular writes to EFI
+> variables was discouraged (since they may be stored in NVRAM that
+> would "wear out")
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- MAINTAINERS                        |   1 +
- arch/arm/mach-keystone/Kconfig     |   1 +
- drivers/soc/ti/Kconfig             |  12 +++
- drivers/soc/ti/Makefile            |   1 +
- drivers/soc/ti/ti_sci_pm_domains.c | 198 +++++++++++++++++++++++++++++++++++++
- 5 files changed, 213 insertions(+)
- create mode 100644 drivers/soc/ti/ti_sci_pm_domains.c
+Uefi config tables only live in memory. They are used to provide the os with data that the firmware generates at boot, e.g., smbios and acpi tables etc
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d894873c2bff..3eaac5ede847 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11894,6 +11894,7 @@ F:	drivers/firmware/ti_sci*
- F:	include/linux/soc/ti/ti_sci_protocol.h
- F:	Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
- F:	include/dt-bindings/genpd/k2g.h
-+F:	drivers/soc/ti/ti_sci_pm_domains.c
- 
- THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
- M:	Hans Verkuil <hverkuil@xs4all.nl>
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index 24bd64dabdfc..18d49465cafb 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_KEYSTONE
- 	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ZONE_DMA if ARM_LPAE
- 	select PINCTRL
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Support for boards based on the Texas Instruments Keystone family of
- 	  SoCs.
-diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-index 3557c5e32a93..39e152abe6b9 100644
---- a/drivers/soc/ti/Kconfig
-+++ b/drivers/soc/ti/Kconfig
-@@ -38,4 +38,16 @@ config WKUP_M3_IPC
- 	  to communicate and use the Wakeup M3 for PM features like suspend
- 	  resume and boots it using wkup_m3_rproc driver.
- 
-+config TI_SCI_PM_DOMAINS
-+	tristate "TI SCI PM Domains Driver"
-+	depends on TI_SCI_PROTOCOL
-+	depends on PM_GENERIC_DOMAINS
-+	help
-+	  Generic power domain implementation for TI device implementing
-+	  the TI SCI protocol.
-+
-+	  To compile this as a module, choose M here. The module will be
-+	  called ti_sci_pm_domains. Note this is needed early in boot before
-+	  rootfs may be available.
-+
- endif # SOC_TI
-diff --git a/drivers/soc/ti/Makefile b/drivers/soc/ti/Makefile
-index 48ff3a79634f..7d572736c86e 100644
---- a/drivers/soc/ti/Makefile
-+++ b/drivers/soc/ti/Makefile
-@@ -5,3 +5,4 @@ obj-$(CONFIG_KEYSTONE_NAVIGATOR_QMSS)	+= knav_qmss.o
- knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o
- obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
- obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
-+obj-$(CONFIG_TI_SCI_PM_DOMAINS)		+= ti_sci_pm_domains.o
-diff --git a/drivers/soc/ti/ti_sci_pm_domains.c b/drivers/soc/ti/ti_sci_pm_domains.c
-new file mode 100644
-index 000000000000..ec76215d64c7
---- /dev/null
-+++ b/drivers/soc/ti/ti_sci_pm_domains.c
-@@ -0,0 +1,198 @@
-+/*
-+ * TI SCI Generic Power Domain Driver
-+ *
-+ * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
-+ *	J Keerthy <j-keerthy@ti.com>
-+ *	Dave Gerlach <d-gerlach@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/mutex.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_domain.h>
-+#include <linux/slab.h>
-+#include <linux/soc/ti/ti_sci_protocol.h>
-+
-+/**
-+ * struct ti_sci_genpd_dev_data: holds data needed for every device attached
-+ *				 to this genpd
-+ * @idx: index of the device that identifies it with the system
-+ *	 control processor.
-+ */
-+struct ti_sci_genpd_dev_data {
-+	int idx;
-+};
-+
-+/**
-+ * struct ti_sci_pm_domain: TI specific data needed for power domain
-+ * @ti_sci: handle to TI SCI protocol driver that provides ops to
-+ *	    communicate with system control processor.
-+ * @dev: pointer to dev for the driver for devm allocs
-+ * @pd: generic_pm_domain for use with the genpd framework
-+ */
-+struct ti_sci_pm_domain {
-+	const struct ti_sci_handle *ti_sci;
-+	struct device *dev;
-+	struct generic_pm_domain pd;
-+};
-+
-+#define genpd_to_ti_sci_pd(gpd) container_of(gpd, struct ti_sci_pm_domain, pd)
-+
-+/**
-+ * ti_sci_dev_id(): get prepopulated ti_sci id from struct dev
-+ * @dev: pointer to device associated with this genpd
-+ *
-+ * Returns device_id stored from ti,sci_id property
-+ */
-+static int ti_sci_dev_id(struct device *dev)
-+{
-+	struct generic_pm_domain_data *genpd_data = dev_gpd_data(dev);
-+	struct ti_sci_genpd_dev_data *sci_dev_data = genpd_data->data;
-+
-+	return sci_dev_data->idx;
-+}
-+
-+/**
-+ * ti_sci_dev_to_sci_handle(): get pointer to ti_sci_handle
-+ * @dev: pointer to device associated with this genpd
-+ *
-+ * Returns ti_sci_handle to be used to communicate with system
-+ *	   control processor.
-+ */
-+static const struct ti_sci_handle *ti_sci_dev_to_sci_handle(struct device *dev)
-+{
-+	struct generic_pm_domain *pd = pd_to_genpd(dev->pm_domain);
-+	struct ti_sci_pm_domain *ti_sci_genpd = genpd_to_ti_sci_pd(pd);
-+
-+	return ti_sci_genpd->ti_sci;
-+}
-+
-+/**
-+ * ti_sci_dev_start(): genpd device start hook called to turn device on
-+ * @dev: pointer to device associated with this genpd to be powered on
-+ */
-+static int ti_sci_dev_start(struct device *dev)
-+{
-+	const struct ti_sci_handle *ti_sci = ti_sci_dev_to_sci_handle(dev);
-+	int idx = ti_sci_dev_id(dev);
-+
-+	return ti_sci->ops.dev_ops.get_device(ti_sci, idx);
-+}
-+
-+/**
-+ * ti_sci_dev_stop(): genpd device stop hook called to turn device off
-+ * @dev: pointer to device associated with this genpd to be powered off
-+ */
-+static int ti_sci_dev_stop(struct device *dev)
-+{
-+	const struct ti_sci_handle *ti_sci = ti_sci_dev_to_sci_handle(dev);
-+	int idx = ti_sci_dev_id(dev);
-+
-+	return ti_sci->ops.dev_ops.put_device(ti_sci, idx);
-+}
-+
-+static int ti_sci_pd_attach_dev(struct generic_pm_domain *domain,
-+				struct device *dev)
-+{
-+	struct device_node *np = dev->of_node;
-+	struct ti_sci_pm_domain *ti_sci_genpd = genpd_to_ti_sci_pd(domain);
-+	const struct ti_sci_handle *ti_sci = ti_sci_genpd->ti_sci;
-+	struct ti_sci_genpd_dev_data *sci_dev_data;
-+	struct generic_pm_domain_data *genpd_data;
-+	int idx, ret = 0;
-+
-+	ret = of_property_read_u32(np, "ti,sci-id", &idx);
-+	if (ret) {
-+		dev_err(ti_sci_genpd->dev, "Cannot find ti,sci-id for %s\n",
-+			dev_name(dev));
-+		return -ENODEV;
-+	}
-+
-+	/*
-+	 * Check the validity of the requested idx, if the index is not valid
-+	 * the PMMC will return a NAK here and we will not allocate it.
-+	 */
-+	ret = ti_sci->ops.dev_ops.is_valid(ti_sci, idx);
-+	if (ret)
-+		return -EINVAL;
-+
-+	sci_dev_data = kzalloc(sizeof(*sci_dev_data), GFP_KERNEL);
-+	if (!sci_dev_data)
-+		return -ENOMEM;
-+
-+	sci_dev_data->idx = idx;
-+
-+	genpd_data = dev_gpd_data(dev);
-+	genpd_data->data = sci_dev_data;
-+
-+	return 0;
-+}
-+
-+static void ti_sci_pd_detach_dev(struct generic_pm_domain *domain,
-+				 struct device *dev)
-+{
-+	struct generic_pm_domain_data *genpd_data = dev_gpd_data(dev);
-+	struct ti_sci_genpd_dev_data *sci_dev_data = genpd_data->data;
-+
-+	kfree(sci_dev_data);
-+	genpd_data->data = NULL;
-+}
-+
-+static const struct of_device_id ti_sci_pm_domain_matches[] = {
-+	{ .compatible = "ti,sci-pm-domain", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, ti_sci_pm_domain_matches);
-+
-+static int ti_sci_pm_domain_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct ti_sci_pm_domain *ti_sci_pd;
-+	int ret;
-+
-+	ti_sci_pd = devm_kzalloc(dev, sizeof(*ti_sci_pd), GFP_KERNEL);
-+	if (!ti_sci_pd)
-+		return -ENOMEM;
-+
-+	ti_sci_pd->ti_sci = devm_ti_sci_get_handle(dev);
-+	if (IS_ERR(ti_sci_pd->ti_sci))
-+		return PTR_ERR(ti_sci_pd->ti_sci);
-+
-+	ti_sci_pd->dev = dev;
-+
-+	ti_sci_pd->pd.attach_dev = ti_sci_pd_attach_dev;
-+	ti_sci_pd->pd.detach_dev = ti_sci_pd_detach_dev;
-+
-+	ti_sci_pd->pd.dev_ops.start = ti_sci_dev_start;
-+	ti_sci_pd->pd.dev_ops.stop = ti_sci_dev_stop;
-+
-+	pm_genpd_init(&ti_sci_pd->pd, NULL, true);
-+
-+	ret = of_genpd_add_provider_simple(np, &ti_sci_pd->pd);
-+
-+	return ret;
-+}
-+
-+static struct platform_driver ti_sci_pm_domains_driver = {
-+	.probe = ti_sci_pm_domain_probe,
-+	.driver = {
-+		.name = "ti_sci_pm_domains",
-+		.of_match_table = ti_sci_pm_domain_matches,
-+	},
-+};
-+module_platform_driver(ti_sci_pm_domains_driver);
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("TI System Control Interface (SCI) Power Domain driver");
-+MODULE_AUTHOR("Dave Gerlach");
--- 
-2.9.3
+>>> could be mixed with calls to
+>>> EFI_PROTOCOL_RNG by the kernel? (Similar to how kaslr is seeded?)
+>>> 
+>> 
+>> That is kind of the point. KASLR is different because we need the
+>> entropy before even jumping to C code, but for all other uses of early
+>> entropy, this seemed like a useful approach
+> 
+> Yup, cool. If the table changes per boot, yeah, my suggestion is pointless. :)
+> 
+
+Yes, but as Mark pointed out, we need to decide how to handle kexec, which does not go through the stub
