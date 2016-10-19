@@ -1,84 +1,51 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Wed, 19 Oct 2016 22:46:08 +0900
-Subject: [PATCH] ARM: dts: sun8i: Add SPI controller node in H3
-Message-ID: <20161019134608.12850-1-woogyom.kim@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 19 Oct 2016 19:21:17 +0530
+Subject: [PATCH v2 2/4] ARM: dts: pxa: add pxa25x cpu operating points
+In-Reply-To: <87vawp4qv0.fsf@belgarion.home>
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-3-git-send-email-robert.jarzmik@free.fr>
+ <20161018113944.GC11471@vireshk-i7> <87vawp4qv0.fsf@belgarion.home>
+Message-ID: <20161019135117.GF11471@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H3 supports two SPI controllers. Four pins (MOSI, MISO, SCLK, SS) are
-configured through the pinctrl subsystem. It is almost same as A31 SPI
-except buffer size, so those DT properties are reusable.
+On 18-10-16, 17:30, Robert Jarzmik wrote:
+> Viresh Kumar <viresh.kumar@linaro.org> writes:
+> 
+> > On 15-10-16, 21:57, Robert Jarzmik wrote:
+> >> Add the relevant data taken from the PXA 25x Electrical, Mechanical, and
+> >> Thermal Specfication. This will be input data for cpufreq-dt driver.
+> >> 
+> >> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> >> ---
+> >>  arch/arm/boot/dts/pxa25x.dtsi | 25 +++++++++++++++++++++++++
+> >>  1 file changed, 25 insertions(+)
+> >> 
+> >> diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
+> >> index 0d1e012178c4..16b4e8bad4a5 100644
+> >> --- a/arch/arm/boot/dts/pxa25x.dtsi
+> >> +++ b/arch/arm/boot/dts/pxa25x.dtsi
+> >> @@ -89,4 +89,29 @@
+> >>  		clocks = <&clktimer>;
+> >>  		status = "okay";
+> >>  	};
+> >> +
+> >> +	pxa250_opp_table: opp_table0 {
+> >> +		compatible = "operating-points-v2";
+> >> +
+> >> +		opp at 99500 {
+> >
+> > We have been keeping the values in ^^^ same as the values present
+> > below. Any specific reason for making it different here ?
+> No, that's a good comment, I'll change that.
+> 
+> I wrote this incrementaly, first the node, then the opp-hz. Then I realized that
+> the source crystal, at 3.8684 MHz didn't provide a round 99.5 MHz core clock,
+> but a 99.5328 MHz clock.
+> 
+> Anyway, I'll change that ... let's say into opp at 99533 in this case ?
 
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+Just write the whole value 99532800.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 75a8654..c38b028 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -381,6 +381,20 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
-+			spi0_pins: spi0 {
-+				allwinner,pins = "PC0", "PC1", "PC2", "PC3";
-+				allwinner,function = "spi0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			spi1_pins: spi1 {
-+				allwinner,pins = "PA15", "PA16", "PA14", "PA13";
-+				allwinner,function = "spi1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				allwinner,pins = "PA4", "PA5";
- 				allwinner,function = "uart0";
-@@ -425,6 +439,38 @@
- 			clocks = <&osc24M>;
- 		};
- 
-+		spi0: spi at 01c68000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c68000 0x1000>;
-+			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
-+			clock-names = "ahb", "mod";
-+			dmas = <&dma 23>, <&dma 23>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins>;
-+			resets = <&ccu RST_BUS_SPI0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi at 01c69000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c69000 0x1000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
-+			clock-names = "ahb", "mod";
-+			dmas = <&dma 24>, <&dma 24>;
-+			dma-names = "rx", "tx";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			resets = <&ccu RST_BUS_SPI1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		wdt0: watchdog at 01c20ca0 {
- 			compatible = "allwinner,sun6i-a31-wdt";
- 			reg = <0x01c20ca0 0x20>;
 -- 
-2.9.3
+viresh
