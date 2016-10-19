@@ -1,58 +1,49 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 19 Oct 2016 13:34:42 -0400 (EDT)
-Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
- SET_SYSTEM_SLEEP_PM_OPS
-In-Reply-To: <CANAwSgTXo_=buNVnD+UjxYXo=bHbptGj+ZXivBiQA6LK+ZjNLg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1610191331590.1778-100000@iolanthe.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 19 Oct 2016 10:37:57 -0700
+Subject: [PATCH/RESEND] clocksource/arm_arch_timer: Map frame with
+ of_io_request_and_map()
+In-Reply-To: <5807255A.8060906@arm.com>
+References: <20161018234514.6175-1-sboyd@codeaurora.org>
+ <5807255A.8060906@arm.com>
+Message-ID: <20161019173757.GX8871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Oct 2016, Anand Moon wrote:
+On 10/19, Marc Zyngier wrote:
+> On 19/10/16 00:45, Stephen Boyd wrote:
+> > Let's use the of_io_request_and_map() API so that the frame
+> > region is protected and shows up in /proc/iomem.
+> > 
+> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> >  drivers/clocksource/arm_arch_timer.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> > index 73c487da6d2a..cbfa3bc5be75 100644
+> > --- a/drivers/clocksource/arm_arch_timer.c
+> > +++ b/drivers/clocksource/arm_arch_timer.c
+> > @@ -964,7 +964,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
+> >  	}
+> >  
+> >  	ret= -ENXIO;
+> > -	base = arch_counter_base = of_iomap(best_frame, 0);
+> > +	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+> > +							 "arch_mem_timer");
+> >  	if (!base) {
+> >  		pr_err("arch_timer: Can't map frame's registers\n");
+> >  		goto out;
+> > 
+> 
+> Careful here: of_io_request_and_map() returns an ERR_PTR() on failure,
+> while of_iomap just returns NULL. You want to change the error handling
+> if you're going down that road.
+> 
 
-> I might be wrong, below is the kconfig option for PM_SLEEP
-> 
->  Symbol: PM_SLEEP [=y]
->  Type  : boolean
->     Defined at kernel/power/Kconfig
->      Depends on: SUSPEND [=y] || HIBERNATE_CALLBACKS [=n]
->      Selects: PM [=y]
-> 
-> So we cannot set CONFIG_PM_SLEEP=n and CONFIG_PM=y
+Eek! I was clearing out my pending queue and this one is
+especially old so perhaps that function signature changed. Or I
+just fail at life. Anyway, thanks!
 
-You have it backward.  We cannot set CONFIG_PM_SLEEP=y and CONFIG_PM=n.
-But you can have CONFIG_PM_SLEEP=n and CONFIG_PM=y.
-
-Alan Stern
-
-> I observed at many places were either CONFIG_PM or CONFIG_PM_SLEEP are used.
-> 
-> So I would like to use SIMPLE_DEV_PM_OPS macro to set struct
-> dev_pm_ops exynos_ohci_pm_ops to correct the code.
-> 
-> Best Regards
-> -Anand Moon
-> 
-> >
-> >>
-> >> CONFIG_PM_SLEEP=n or
-> >> # CONFIG_PM_SLEEP is not set
-> >>
-> >> > 2. What will be the output with !SUSPEND && !HIBERNATE && PM?
-> >>
-> >> #
-> >> # Power management options
-> >> #
-> >> # CONFIG_SUSPEND is not set
-> >> # CONFIG_HIBERNATION is not set
-> >> # CONFIG_PM is not set
-> >>
-> >> When CONFIG_SUSPEND and CONFIG_HIBERNATION are not set
-> >> CONFIG_PM is disabled and so is CONFIG_PM_SLEEP.
-> >
-> > In my config, the CONFIG_PM was enabled thus the code changes the
-> > functionality... Maybe this was intented but I really don't get it from
-> > the commit message or from your explanations here.
-> >
-> > Krzysztof
-> 
-> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
