@@ -1,71 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Oct 2016 13:32:28 -0700
-Subject: [PATCH v2 5/6] clk: stm32f469: Add QSPI clock
-In-Reply-To: <1476436699-21879-6-git-send-email-gabriel.fernandez@st.com>
-References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
- <1476436699-21879-6-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161019203228.GC8871@codeaurora.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 19 Oct 2016 15:33:43 -0500
+Subject: [PATCH v2 0/4] ARM: K2G: Add support for TI-SCI Generic PM Domains
+Message-ID: <20161019203347.17893-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14, gabriel.fernandez at st.com wrote:
-> @@ -532,10 +618,42 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
->  	{ 0 },
->  };
->  
-> +struct stm32f4_clk_data {
-> +	const struct stm32f4_gate_data *gates_data;
-> +	const u64 *gates_map;
-> +	int gates_num;
-> +};
-> @@ -549,6 +667,19 @@ static void __init stm32f4_rcc_init(struct device_node *np)
->  		goto fail;
->  	}
->  
-> +	match = of_match_node(stm32f4_of_match, np);
-> +	if (WARN_ON(!match))
-> +		return;
-> +
-> +	data = match->data;
-> +
-> +	clks = kmalloc_array(data->gates_num + END_PRIMARY_CLK,
-> +			sizeof(struct clk_hw *), GFP_KERNEL);
+Hi,
+This is v2 of the series to add support for TI SCI PM Domains. v1 of
+the series can be found here [1]. Several things have changed since v1:
 
-sizeof(*clks)?
+- New patch to add a void *data to struct generic_pm_domain_data to
+  allow to store per device data associated with a genpd
+- From v1, squash patch 1 and 2 to introduce docs and dt-bindings in
+  one patch based on comment from Ulf
+- Fix some grammar errors in Documentation
+- Based on comments from Ulf, rework actual genpd implementation to
+  avoid creating one genpd per device and instead use device start/stop
+  hooks provided as part of genpd to control device state based on pm_runtime
+  implementation. Also make use of new of_genpd_add_provider_simple API
+  introduced by Jon Hunter and do not provide custom of_xlate to genpd core,
+  instead registering devices as they probe through attach_dev hook provided
+  by genpd framework.
 
-> +	if (!clks)
-> +		goto fail;
-> +
-> +	stm32f4_gate_map = data->gates_map;
-> +
->  	hse_clk = of_clk_get_parent_name(np, 0);
->  
->  	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
-> @@ -581,11 +712,15 @@ static void __init stm32f4_rcc_init(struct device_node *np)
->  	clks[FCLK] = clk_hw_register_fixed_factor(NULL, "fclk", "ahb_div",
->  					       0, 1, 1);
->  
-> -	for (n = 0; n < ARRAY_SIZE(stm32f4_gates); n++) {
-> -		const struct stm32f4_gate_data *gd = &stm32f4_gates[n];
-> -		unsigned int secondary =
-> -		    8 * (gd->offset - STM32F4_RCC_AHB1ENR) + gd->bit_idx;
-> -		int idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
-> +	for (n = 0; n < data->gates_num; n++) {
-> +		const struct stm32f4_gate_data *gd;
-> +		unsigned int secondary;
-> +		int idx;
-> +
-> +		gd = (struct stm32f4_gate_data *) &data->gates_data[n];
+Most of the changes were motivated by the comments from Ulf Hannson on v1 that we
+should not use a 1-to-1 genpd to device mapping. The new approach allows us to
+create a single genpd and store information about each device as they attach to
+the genpd. Then the device start/stop hooks for that genpd leverage the
+per-device data to control power states over the TI SCI protocol.
 
-Why do we cast here? Get rid of const? Perhaps the struct
-shouldn't have const on the member instead?
+This driver makes use of the ti_sci driver sent here [2] by Nishanth Menon and
+applies on top of his series on v4.9-rc1.
 
-> +		secondary = 8 * (gd->offset - STM32F4_RCC_AHB1ENR) +
-> +			gd->bit_idx;
-> +		idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
->  
->  		if (idx < 0)
+Regards,
+Dave
+
+[1] http://www.spinics.net/lists/arm-kernel/msg525204.html
+[2] http://www.spinics.net/lists/arm-kernel/msg536851.html
+
+Dave Gerlach (4):
+  PM / Domains: Add generic data pointer to genpd data struct
+  dt-bindings: Add TI SCI PM Domains
+  soc: ti: Add ti_sci_pm_domains driver
+  ARM: keystone: Drop PM domain support for k2g
+
+ .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |  54 ++++++
+ MAINTAINERS                                        |   3 +
+ arch/arm/mach-keystone/Kconfig                     |   1 +
+ arch/arm/mach-keystone/pm_domain.c                 |   4 +-
+ drivers/soc/ti/Kconfig                             |  12 ++
+ drivers/soc/ti/Makefile                            |   1 +
+ drivers/soc/ti/ti_sci_pm_domains.c                 | 198 +++++++++++++++++++++
+ include/dt-bindings/genpd/k2g.h                    |  90 ++++++++++
+ include/linux/pm_domain.h                          |   1 +
+ 9 files changed, 363 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+ create mode 100644 drivers/soc/ti/ti_sci_pm_domains.c
+ create mode 100644 include/dt-bindings/genpd/k2g.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.9.3
