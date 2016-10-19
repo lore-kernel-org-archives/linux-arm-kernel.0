@@ -1,50 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Oct 2016 17:51:41 -0700
-Subject: [PATCH 1/2] ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
-In-Reply-To: <1476775534-4493-1-git-send-email-linus.walleij@linaro.org>
-References: <1476775534-4493-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161019005141.GT8871@codeaurora.org>
+Date: Tue, 18 Oct 2016 17:52:57 -0700
+Subject: [PATCH 2/2] ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
+In-Reply-To: <1476775542-4540-1-git-send-email-linus.walleij@linaro.org>
+References: <1476775542-4540-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161019005257.GU8871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/18, Linus Walleij wrote:
-> This adds the external bus interface EBI2 to the MSM8660 device
-> tree, albeit with status = "disabled" so that devices actually
-> using EBI2 can turn it on if needed.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v3->v4:
-> - Rebase on kernel v4.9-rc1
-> - Bindings and driver are merged so should be clear to apply.
-> ChangeLog v2->v3:
-> - Use the new #address-cells = <2> for indicating the CS in the
->   first address cell
-> - Use the ranges property properly for defining the six different
->   CS address windows
-> - Define CS3 to properly map over 128MB
-> - The EBI2 bindings are now ACKed by Rob Herring and a pull request
->   to ARM SoC for both binding and driver is pending.
-> - This should be safe to merge for v4.9
-> ---
->  arch/arm/boot/dts/qcom-msm8660.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> index 8c65e0d82559..0b6348544598 100644
-> --- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-> @@ -141,6 +141,23 @@
+> @@ -167,6 +190,41 @@
+>  					bias-pull-up;
+>  				};
 >  			};
->  		};
->  
-> +		ebi2 at 1a100000 {
+> +
+> +			dragon_ebi2_pins: ebi2 {
+> +				/*
+> +				 * Pins used by EBI2 on the Dragonboard, actually only
+> +				 * only CS2 is used by a real peripheral. CS0 is just
+> +				 * routed to a test point.
+> +				 */
+> +				mux0 {
+> +					/*
+> +					 * Pins used by EBI2 on the Dragonboard, actually only
+> +					 * only CS2 is used by a real peripheral. CS0 is just
+> +					 * routed to a test point.
+> +					 */
 
-Perhaps the node name should be more generic, like
+Same comment twice? Plus it says "only only CS2", so we probably
+want to drop one "only".
 
-external-bus at 1a100000
-
-? I know, bikeshedding...
+> +					pins =
+> +					    /* "gpio39", CS1A_N this is not good to mux */
+> +					    "gpio40", /* CS2A_N */
+> +					    "gpio134"; /* CS0_N testpoint TP29 */
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
