@@ -1,45 +1,36 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 19 Oct 2016 19:11:46 +0900
-Subject: [PATCH] extcon: qcom-spmi-misc: Sync the extcon state on interrupt
-In-Reply-To: <20161018001602.18617-1-stephen.boyd@linaro.org>
-References: <CGME20161018001726epcas1p338c9fc5887017571f8a3fd954e0ae216@epcas1p3.samsung.com>
- <20161018001602.18617-1-stephen.boyd@linaro.org>
-Message-ID: <580746E2.5080800@samsung.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 19 Oct 2016 12:08:27 +0200
+Subject: [PATCH 7/9] ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8
+In-Reply-To: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1476871709-8359-8-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Add select MESON_IRQ_GPIO in Kconfig for Amlogic's meson8 and meson8b SoC
 
-On 2016? 10? 18? 09:16, Stephen Boyd wrote:
-> The driver was changed after submission to use the new style APIs
-> like extcon_set_state(). Unfortunately, that only sets the state,
-> and doesn't notify any consumers that the cable state has
-> changed. Use extcon_set_state_sync() here instead so that we
-> notify cable consumers of the state change. This fixes USB
-> host-device role switching on the db8074 platform.
-> 
-> Fixes: 38085c987f52 ("extcon: Add support for qcom SPMI PMIC USB id detection hardware")
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/extcon/extcon-qcom-spmi-misc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
-> index ca957a5f4291..b8cde096a808 100644
-> --- a/drivers/extcon/extcon-qcom-spmi-misc.c
-> +++ b/drivers/extcon/extcon-qcom-spmi-misc.c
-> @@ -51,7 +51,7 @@ static void qcom_usb_extcon_detect_cable(struct work_struct *work)
->  	if (ret)
->  		return;
->  
-> -	extcon_set_state(info->edev, EXTCON_USB_HOST, !id);
-> +	extcon_set_state_sync(info->edev, EXTCON_USB_HOST, !id);
->  }
->  
->  static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
-> 
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ arch/arm/mach-meson/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Applied it.
-
-Best Regards,
-Chanwoo Choi
+diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
+index b6e3acc63e14..63157295cd9d 100644
+--- a/arch/arm/mach-meson/Kconfig
++++ b/arch/arm/mach-meson/Kconfig
+@@ -21,11 +21,13 @@ config MACH_MESON8
+ 	bool "Amlogic Meson8 SoCs support"
+ 	default ARCH_MESON
+ 	select MESON6_TIMER
++	select MESON_IRQ_GPIO
+ 
+ config MACH_MESON8B
+ 	bool "Amlogic Meson8b SoCs support"
+ 	default ARCH_MESON
+ 	select MESON6_TIMER
+ 	select COMMON_CLK_MESON8B
++	select MESON_IRQ_GPIO
+ 
+ endif
+-- 
+2.7.4
