@@ -1,30 +1,29 @@
-From: yegorslists@googlemail.com (yegorslists at googlemail.com)
-Date: Wed, 19 Oct 2016 09:09:03 +0200
-Subject: [PATCH] ARM: dts: am335x-baltos-ir5221: use both musb channels in
- host mode
-Message-ID: <1476860943-30994-1-git-send-email-yegorslists@googlemail.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Wed, 19 Oct 2016 15:12:39 +0800
+Subject: [PATCH 2/2] iommu/mediatek: Convert M4Uv1 to iommu_fwspec
+In-Reply-To: <a40dbcc1ff40bf09483316354d2fdcb2d432eb81.1476704508.git.robin.murphy@arm.com>
+References: <0205bf6404b16bdebe8039bfc65570a2a6f9f960.1476704508.git.robin.murphy@arm.com>
+ <a40dbcc1ff40bf09483316354d2fdcb2d432eb81.1476704508.git.robin.murphy@arm.com>
+Message-ID: <1476861159.31964.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yegor Yefremov <yegorslists@googlemail.com>
+On Mon, 2016-10-17 at 12:49 +0100, Robin Murphy wrote:
+> Our per-device data consists of the M4U instance and firmware-provided
+> list of LARB IDs, which is a perfect fit for the generic iommu_fwspec
+> machinery. Use that directly instead of the custom archdata code - while
+> we can't rely on the of_xlate() mechanism to initialise things until the
+> 32-bit ARM DMA code learns about groups and default domains, it still
+> results in a reasonable simplification overall.
+> 
+> CC: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
----
- arch/arm/boot/dts/am335x-baltos-ir5221.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks Robin.
+Tested-by: Honghui Zhang <honghui.zhang@mediatek.com>
 
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir5221.dts b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-index d0faa7b..f599350 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-@@ -114,7 +114,7 @@
- 
- &usb1 {
- 	status = "okay";
--	dr_mode = "otg";
-+	dr_mode = "host";
- };
- 
- &cpsw_emac0 {
--- 
-2.1.4
+> ---
+>  drivers/iommu/mtk_iommu.h    |  6 ---
+>  drivers/iommu/mtk_iommu_v1.c | 95 +++++++++++++++++---------------------------
+>  2 files changed, 36 insertions(+), 65 deletions(-)
+> 
