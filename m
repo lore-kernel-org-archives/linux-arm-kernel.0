@@ -1,105 +1,54 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 19 Oct 2016 09:27:19 +0200
-Subject: [PATCH] gpu: Remove depends on RESET_CONTROLLER when not a
- provider
-In-Reply-To: <20161018205719.20575-1-stephen.boyd@linaro.org>
-References: <20161018205719.20575-1-stephen.boyd@linaro.org>
-Message-ID: <20161019072719.GE20761@phenom.ffwll.local>
+From: jack@suse.cz (Jan Kara)
+Date: Wed, 19 Oct 2016 09:32:00 +0200
+Subject: [PATCH 04/10] mm: replace get_user_pages_locked() write/force
+ parameters with gup_flags
+In-Reply-To: <20161018135609.GA30025@lucifer>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+ <20161013002020.3062-5-lstoakes@gmail.com>
+ <20161018125425.GD29967@quack2.suse.cz>
+ <20161018135609.GA30025@lucifer>
+Message-ID: <20161019073200.GK29967@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 01:57:19PM -0700, Stephen Boyd wrote:
-> These GPU drivers only depend on the RESET_CONTROLLER config
-> option to fix build issues that existed when there weren't stub
-> reset APIs for reset controller consumers. Given that these
-> drivers aren't providing any reset controllers themselves, they
-> don't actually depend on the API to build (just to function) so
-> they don't need to depend on it. Remove the dependency to fix
-> recursive build errors like the following:
+On Tue 18-10-16 14:56:09, Lorenzo Stoakes wrote:
+> On Tue, Oct 18, 2016 at 02:54:25PM +0200, Jan Kara wrote:
+> > > @@ -1282,7 +1282,7 @@ long get_user_pages(unsigned long start, unsigned long nr_pages,
+> > >  			    int write, int force, struct page **pages,
+> > >  			    struct vm_area_struct **vmas);
+> > >  long get_user_pages_locked(unsigned long start, unsigned long nr_pages,
+> > > -		    int write, int force, struct page **pages, int *locked);
+> > > +		    unsigned int gup_flags, struct page **pages, int *locked);
+> >
+> > Hum, the prototype is inconsistent with e.g. __get_user_pages_unlocked()
+> > where gup_flags come after **pages argument. Actually it makes more sense
+> > to have it before **pages so that input arguments come first and output
+> > arguments second but I don't care that much. But it definitely should be
+> > consistent...
 > 
-> drivers/usb/Kconfig:39:error: recursive dependency detected!
-> drivers/usb/Kconfig:39: symbol USB is selected by MOUSE_APPLETOUCH
-> drivers/input/mouse/Kconfig:187:        symbol MOUSE_APPLETOUCH depends on INPUT
-> drivers/input/Kconfig:8:        symbol INPUT is selected by VT
-> drivers/tty/Kconfig:12: symbol VT is selected by FB_STI
-> drivers/video/fbdev/Kconfig:674:        symbol FB_STI depends on FB
-> drivers/video/fbdev/Kconfig:5:  symbol FB is selected by DRM_KMS_FB_HELPER
-> drivers/gpu/drm/Kconfig:42:     symbol DRM_KMS_FB_HELPER is selected by DRM_KMS_CMA_HELPER
-> drivers/gpu/drm/Kconfig:98:     symbol DRM_KMS_CMA_HELPER is selected by DRM_IMX
-> drivers/gpu/drm/imx/Kconfig:1:  symbol DRM_IMX depends on IMX_IPUV3_CORE
-> drivers/gpu/ipu-v3/Kconfig:1:   symbol IMX_IPUV3_CORE depends on RESET_CONTROLLER
-> drivers/reset/Kconfig:4:        symbol RESET_CONTROLLER is selected by USB_CHIPIDEA
-> drivers/usb/chipidea/Kconfig:1: symbol USB_CHIPIDEA depends on USB_EHCI_HCD
-> drivers/usb/host/Kconfig:84:    symbol USB_EHCI_HCD depends on USB
+> It was difficult to decide quite how to arrange parameters as there was
+> inconsitency with regards to parameter ordering already - for example
+> __get_user_pages() places its flags argument before pages whereas, as you note,
+> __get_user_pages_unlocked() puts them afterwards.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: <dri-devel@lists.freedesktop.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Mark Yao <mark.yao@rock-chips.com>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> I ended up compromising by trying to match the existing ordering of the function
+> as much as I could by replacing write, force pairs with gup_flags in the same
+> location (with the exception of get_user_pages_unlocked() which I felt should
+> match __get_user_pages_unlocked() in signature) or if there was already a
+> gup_flags parameter as in the case of __get_user_pages_unlocked() I simply
+> removed the write, force pair and left the flags as the last parameter.
+> 
+> I am happy to rearrange parameters as needed, however I am not sure if it'd be
+> worthwhile for me to do so (I am keen to try to avoid adding too much noise here
+> :)
+> 
+> If we were to rearrange parameters for consistency I'd suggest adjusting
+> __get_user_pages_unlocked() to put gup_flags before pages and do the same with
+> get_user_pages_unlocked(), let me know what you think.
 
-Yay for proper stubbing! Applied to drm-misc, thanks.
--Daniel
+Yeah, ok. If the inconsistency is already there, just leave it for now.
 
-> ---
-> 
-> This has come out of some USB chipidea patches I've been working on. Please see
-> http://lkml.kernel.org/r/20160907213519.27340-1-stephen.boyd at linaro.org for
-> more details.
-> 
-> I'm resending with the ack from Philipp picked up.
-> 
->  drivers/gpu/drm/rockchip/Kconfig | 1 -
->  drivers/gpu/drm/tegra/Kconfig    | 1 -
->  drivers/gpu/ipu-v3/Kconfig       | 1 -
->  3 files changed, 3 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index 3c58669a06ce..6f7f9c59f05b 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -1,7 +1,6 @@
->  config DRM_ROCKCHIP
->  	tristate "DRM Support for Rockchip"
->  	depends on DRM && ROCKCHIP_IOMMU
-> -	depends on RESET_CONTROLLER
->  	select DRM_GEM_CMA_HELPER
->  	select DRM_KMS_HELPER
->  	select DRM_PANEL
-> diff --git a/drivers/gpu/drm/tegra/Kconfig b/drivers/gpu/drm/tegra/Kconfig
-> index 63ebb154b9b5..bbf5a4b7e0b6 100644
-> --- a/drivers/gpu/drm/tegra/Kconfig
-> +++ b/drivers/gpu/drm/tegra/Kconfig
-> @@ -3,7 +3,6 @@ config DRM_TEGRA
->  	depends on ARCH_TEGRA || (ARM && COMPILE_TEST)
->  	depends on COMMON_CLK
->  	depends on DRM
-> -	depends on RESET_CONTROLLER
->  	select DRM_KMS_HELPER
->  	select DRM_MIPI_DSI
->  	select DRM_PANEL
-> diff --git a/drivers/gpu/ipu-v3/Kconfig b/drivers/gpu/ipu-v3/Kconfig
-> index aefdff95356d..08766c6e7856 100644
-> --- a/drivers/gpu/ipu-v3/Kconfig
-> +++ b/drivers/gpu/ipu-v3/Kconfig
-> @@ -1,7 +1,6 @@
->  config IMX_IPUV3_CORE
->  	tristate "IPUv3 core support"
->  	depends on SOC_IMX5 || SOC_IMX6Q || ARCH_MULTIPLATFORM
-> -	depends on RESET_CONTROLLER
->  	select GENERIC_IRQ_CHIP
->  	help
->  	  Choose this if you have a i.MX5/6 system and want to use the Image
-> -- 
-> 2.10.0.297.gf6727b0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
+								Honza
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
