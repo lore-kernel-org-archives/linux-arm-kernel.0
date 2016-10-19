@@ -1,63 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Oct 2016 10:34:41 +0200
-Subject: [PATCH v3 06/11] ARM: dts: r8a7743: add [H]SCIF{A|B} support
-In-Reply-To: <14213508.lp3q5ZvmbF@wasted.cogentembedded.com>
-References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
- <14213508.lp3q5ZvmbF@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUaCKh-WFth9q3-1fM+4_Wpi0T2kSEkexo8aZNQoe3pzw@mail.gmail.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Wed, 19 Oct 2016 10:34:38 +0200
+Subject: [PATCH v2 0/6] STM32F4 Add RTC & QSPI clocks
+In-Reply-To: <20161018235108.GP8871@codeaurora.org>
+References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
+ <20161018235108.GP8871@codeaurora.org>
+Message-ID: <d878b846-556d-180b-8ebf-2d06646efb58@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 5, 2016 at 11:41 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe [H]SCIF[AB] ports in the R8A7743 device tree.
+Hi Stephen,
+
+
+On 10/19/2016 01:51 AM, Stephen Boyd wrote:
+> On 10/14, gabriel.fernandez at st.com wrote:
+>> Gabriel Fernandez (6):
+>>    clk: stm32f4: Add LSI & LSE clocks
+>>    ARM: dts: stm32f429: add LSI and LSE clocks
+>>    arm: stmf32: Enable SYSCON
+>>    clk: stm32f4: Add RTC clock
+>>    clk: stm32f469: Add QSPI clock
+>>    ARM: dts: stm32f429: Add QSPI clock
+> Can the clk patches be picked without causing problems for
+> existing dt changes? Do you want an ack from clk maintainers
+> instead of us picking the clk patches up? The series has
+> intermingled clk and dts changes so I'm confused.
 >
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-With the modifications indicated below:
+Thanks for reviewing.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Normally DT patches will be taken by STM32 maintainer, but yes there is 
+a dependency between patch 1 & 2, so if you push the patch 1 into 
+clk-next tree you have to take also patch 2.
 
-> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-> @@ -162,6 +162,267 @@
->                         #dma-cells = <1>;
->                         dma-channels = <15>;
->                 };
-> +
-> +               scifa0: serial at e6c40000 {
-> +                       compatible = "renesas,scifa-r8a7743",
-> +                                    "renesas,rzg-scifa", "renesas,scifa";
+You have to be synchronized with Alexandre Torgue.
 
-Please use "renesas,rcar-gen2-scifa" instead of "renesas,rzg-scifa".
+Best Regards
 
-> +               scifb0: serial at e6c20000 {
-> +                       compatible = "renesas,scifb-r8a7743",
-> +                                    "renesas,rzg-scifb", "renesas,scifb";
-
-"renesas,rcar-gen2-scifb"
-
-> +               scif0: serial at e6e60000 {
-> +                       compatible = "renesas,scif-r8a7743", "renesas,rzg-scif",
-
-"renesas,rcar-gen2-scif"
-
-> +               hscif0: serial at e62c0000 {
-> +                       compatible = "renesas,hscif-r8a7743",
-> +                                    "renesas,rzg-hscif", "renesas,hscif";
-
-"renesas,rcar-gen2-hscif"
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Gabriel
