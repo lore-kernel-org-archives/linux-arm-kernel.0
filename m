@@ -1,101 +1,37 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 19 Oct 2016 22:10:12 +0200
-Subject: [PATCH v2 3/3] mtd: s3c2410: parse the device configuration
- from OF node
-In-Reply-To: <1476906725-22613-4-git-send-email-sergio.prado@e-labworks.com>
-References: <1476906725-22613-1-git-send-email-sergio.prado@e-labworks.com>
- <1476906725-22613-4-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20161019221012.5a20e7df@bbrezillon>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 19 Oct 2016 13:14:08 -0700
+Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
+ config table
+In-Reply-To: <20161019112243.GD31476@codeblueprint.co.uk>
+References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161019110926.GG9616@leverpostej>
+ <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
+ <20161019112243.GD31476@codeblueprint.co.uk>
+Message-ID: <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Oct 2016 17:52:05 -0200
-Sergio Prado <sergio.prado@e-labworks.com> wrote:
+On Wed, Oct 19, 2016 at 4:22 AM, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
+>> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> > I think to some extent this mush be treated as an ABI, given cases like
+>> > kexec.
+>> >
+>>
+>> Perhaps, yes. That would also allow GRUB or other EFI aware
+>> bootloaders to generate the seed.
+>
+> If we're going to go down this route, we should try and get the GUID
+> into the UEFI spec.
 
-> Allows configuring Samsung's s3c2410 memory controller using a
-> devicetree.
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  drivers/mtd/nand/s3c2410.c                     | 155 ++++++++++++++++++++++---
->  include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
->  2 files changed, 140 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-> index 371db0d48135..52f768f01b0d 100644
-> --- a/drivers/mtd/nand/s3c2410.c
-> +++ b/drivers/mtd/nand/s3c2410.c
-> @@ -39,6 +39,8 @@
->  #include <linux/slab.h>
->  #include <linux/clk.h>
->  #include <linux/cpufreq.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
->  
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/nand.h>
-> @@ -185,6 +187,22 @@ struct s3c2410_nand_info {
->  #endif
->  };
->  
-> +struct s3c24XX_nand_devtype_data {
-> +	enum s3c_cpu_type type;
-> +};
-> +
-> +static const struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
-> +	.type = TYPE_S3C2410,
-> +};
-> +
-> +static const struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
-> +	.type = TYPE_S3C2412,
-> +};
-> +
-> +static const struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
-> +	.type = TYPE_S3C2440,
-> +};
-> +
->  /* conversion functions */
->  
->  static struct s3c2410_nand_mtd *s3c2410_nand_mtd_toours(struct mtd_info *mtd)
-> @@ -794,6 +812,34 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
->  	return -ENODEV;
->  }
->  
-> +static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd,
-> +					     const struct nand_data_interface *conf,
-> +					     bool check_only)
-> +{
-> +	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
-> +	struct s3c2410_platform_nand *pdata = info->platform;
-> +	struct device_node *np = info->device->of_node;
-> +	const struct nand_sdr_timings *timings;
-> +	int tacls;
-> +
-> +	/* auto-detect timings when booting with a device tree */
-> +	if (np) {
+It seems like maybe under UEFI, both this table (which sounds like
+it'll not be rotated regularly) could be mixed with calls to
+EFI_PROTOCOL_RNG by the kernel? (Similar to how kaslr is seeded?)
 
-That's not really dependent on the use of DT, but I understand why you
-want to keep it unchanged for users who did not switch to DT.
+-Kees
 
-Instead of testing the np value here, I'd recommend that you
-conditionally assign chip->setup_data_interface to
-s3c2410_nand_setup_data_interface in s3c2410_nand_init_chip().
-
-Can you also explain in more details in the comment why you don't want
-to do it for non-DT configs (keep behavior unchanged for legacy boards)?
-
-> +		timings = nand_get_sdr_timings(conf);
-> +		if (IS_ERR(timings))
-> +			return -ENOTSUPP;
-> +
-> +		tacls = timings->tCLS_min - timings->tWP_min;
-> +		if (tacls < 0)
-> +			tacls = 0;
-> +
-> +		pdata->tacls  = DIV_ROUND_UP(tacls, 1000);
-> +		pdata->twrph0 = DIV_ROUND_UP(timings->tWP_min, 1000);
-> +		pdata->twrph1 = DIV_ROUND_UP(timings->tCLH_min, 1000);
-> +	}
-> +
-> +	return 0;
-> +}
+-- 
+Kees Cook
+Nexus Security
