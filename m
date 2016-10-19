@@ -1,107 +1,180 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Oct 2016 11:59:43 +0100
-Subject: [PATCH 1/2] arm64: swp emulation: bound LL/SC retries before
- rescheduling
-Message-ID: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 19 Oct 2016 11:59:44 +0100
+Subject: [PATCH 2/2] arm64: percpu: rewrite ll/sc loops in assembly
+In-Reply-To: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
+References: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1476874784-16214-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a CPU does not implement a global monitor for certain memory types,
-then userspace can attempt a kernel DoS by issuing SWP instructions
-targetting the problematic memory (for example, a framebuffer mapped
-with non-cacheable attributes).
+Writing the outer loop of an LL/SC sequence using do {...} while
+constructs potentially allows the compiler to hoist memory accesses
+between the STXR and the branch back to the LDXR. On CPUs that do not
+guarantee forward progress of LL/SC loops when faced with memory
+accesses to the same ERG (up to 2k) between the failed STXR and the
+branch back, we may end up livelocking.
 
-The SWP emulation code protects against these sorts of attacks by
-checking for pending signals and potentially rescheduling when the STXR
-instruction fails during the emulation. Whilst this is good for avoiding
-livelock, it harms emulation of legitimate SWP instructions on CPUs
-where forward progress is not guaranteed if there are memory accesses to
-the same reservation granule (up to 2k) between the failing STXR and
-the retry of the LDXR.
-
-This patch solves the problem by retrying the STXR a bounded number of
-times (4) before breaking out of the LL/SC loop and looking for
-something else to do.
+This patch avoids this issue in our percpu atomics by rewriting the
+outer loop as part of the LL/SC inline assembly block.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/armv8_deprecated.c | 36 ++++++++++++++++++++++--------------
- 1 file changed, 22 insertions(+), 14 deletions(-)
+ arch/arm64/include/asm/percpu.h | 120 +++++++++++++++++++---------------------
+ 1 file changed, 56 insertions(+), 64 deletions(-)
 
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 42ffdb54e162..b0988bb1bf64 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -280,35 +280,43 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
- /*
-  * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
-  */
--#define __user_swpX_asm(data, addr, res, temp, B)		\
-+
-+/* Arbitrary constant to ensure forward-progress of the LL/SC loop */
-+#define __SWP_LL_SC_LOOPS	4
-+
-+#define __user_swpX_asm(data, addr, res, temp, temp2, B)	\
- 	__asm__ __volatile__(					\
-+	"	mov		%w3, %w7\n"			\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
- 		    CONFIG_ARM64_PAN)				\
--	"0:	ldxr"B"		%w2, [%3]\n"			\
--	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
-+	"0:	ldxr"B"		%w2, [%4]\n"			\
-+	"1:	stxr"B"		%w0, %w1, [%4]\n"		\
- 	"	cbz		%w0, 2f\n"			\
--	"	mov		%w0, %w4\n"			\
-+	"	sub		%w3, %w3, #1\n"			\
-+	"	cbnz		%w3, 0b\n"			\
-+	"	mov		%w0, %w5\n"			\
- 	"	b		3f\n"				\
- 	"2:\n"							\
- 	"	mov		%w1, %w2\n"			\
- 	"3:\n"							\
- 	"	.pushsection	 .fixup,\"ax\"\n"		\
- 	"	.align		2\n"				\
--	"4:	mov		%w0, %w5\n"			\
-+	"4:	mov		%w0, %w6\n"			\
- 	"	b		3b\n"				\
- 	"	.popsection"					\
- 	_ASM_EXTABLE(0b, 4b)					\
- 	_ASM_EXTABLE(1b, 4b)					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
- 		CONFIG_ARM64_PAN)				\
--	: "=&r" (res), "+r" (data), "=&r" (temp)		\
--	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
-+	: "=&r" (res), "+r" (data), "=&r" (temp), "=&r" (temp2)	\
-+	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT),		\
-+	  "i" (__SWP_LL_SC_LOOPS)				\
- 	: "memory")
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 2fee2f59288c..5394c8405e66 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -44,48 +44,44 @@ static inline unsigned long __percpu_##op(void *ptr,			\
+ 									\
+ 	switch (size) {							\
+ 	case 1:								\
+-		do {							\
+-			asm ("//__per_cpu_" #op "_1\n"			\
+-			"ldxrb	  %w[ret], %[ptr]\n"			\
++		asm ("//__per_cpu_" #op "_1\n"				\
++		"1:	ldxrb	  %w[ret], %[ptr]\n"			\
+ 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
+-			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
+-			  [ptr] "+Q"(*(u8 *)ptr)			\
+-			: [val] "Ir" (val));				\
+-		} while (loop);						\
++		"	stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
++		"	cbnz	  %w[loop], 1b"				\
++		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
++		  [ptr] "+Q"(*(u8 *)ptr)				\
++		: [val] "Ir" (val));					\
+ 		break;							\
+ 	case 2:								\
+-		do {							\
+-			asm ("//__per_cpu_" #op "_2\n"			\
+-			"ldxrh	  %w[ret], %[ptr]\n"			\
++		asm ("//__per_cpu_" #op "_2\n"				\
++		"1:	ldxrh	  %w[ret], %[ptr]\n"			\
+ 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
+-			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
+-			  [ptr]  "+Q"(*(u16 *)ptr)			\
+-			: [val] "Ir" (val));				\
+-		} while (loop);						\
++		"	stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
++		"	cbnz	  %w[loop], 1b"				\
++		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
++		  [ptr]  "+Q"(*(u16 *)ptr)				\
++		: [val] "Ir" (val));					\
+ 		break;							\
+ 	case 4:								\
+-		do {							\
+-			asm ("//__per_cpu_" #op "_4\n"			\
+-			"ldxr	  %w[ret], %[ptr]\n"			\
++		asm ("//__per_cpu_" #op "_4\n"				\
++		"1:	ldxr	  %w[ret], %[ptr]\n"			\
+ 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
+-			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
+-			  [ptr] "+Q"(*(u32 *)ptr)			\
+-			: [val] "Ir" (val));				\
+-		} while (loop);						\
++		"	stxr	  %w[loop], %w[ret], %[ptr]\n"		\
++		"	cbnz	  %w[loop], 1b"				\
++		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
++		  [ptr] "+Q"(*(u32 *)ptr)				\
++		: [val] "Ir" (val));					\
+ 		break;							\
+ 	case 8:								\
+-		do {							\
+-			asm ("//__per_cpu_" #op "_8\n"			\
+-			"ldxr	  %[ret], %[ptr]\n"			\
++		asm ("//__per_cpu_" #op "_8\n"				\
++		"1:	ldxr	  %[ret], %[ptr]\n"			\
+ 			#asm_op " %[ret], %[ret], %[val]\n"		\
+-			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
+-			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
+-			  [ptr] "+Q"(*(u64 *)ptr)			\
+-			: [val] "Ir" (val));				\
+-		} while (loop);						\
++		"	stxr	  %w[loop], %[ret], %[ptr]\n"		\
++		"	cbnz	  %w[loop], 1b"				\
++		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
++		  [ptr] "+Q"(*(u64 *)ptr)				\
++		: [val] "Ir" (val));					\
+ 		break;							\
+ 	default:							\
+ 		BUILD_BUG();						\
+@@ -150,44 +146,40 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
  
--#define __user_swp_asm(data, addr, res, temp) \
--	__user_swpX_asm(data, addr, res, temp, "")
--#define __user_swpb_asm(data, addr, res, temp) \
--	__user_swpX_asm(data, addr, res, temp, "b")
-+#define __user_swp_asm(data, addr, res, temp, temp2) \
-+	__user_swpX_asm(data, addr, res, temp, temp2, "")
-+#define __user_swpb_asm(data, addr, res, temp, temp2) \
-+	__user_swpX_asm(data, addr, res, temp, temp2, "b")
- 
- /*
-  * Bit 22 of the instruction encoding distinguishes between
-@@ -328,12 +336,12 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
- 	}
- 
- 	while (1) {
--		unsigned long temp;
-+		unsigned long temp, temp2;
- 
- 		if (type == TYPE_SWPB)
--			__user_swpb_asm(*data, address, res, temp);
-+			__user_swpb_asm(*data, address, res, temp, temp2);
- 		else
--			__user_swp_asm(*data, address, res, temp);
-+			__user_swp_asm(*data, address, res, temp, temp2);
- 
- 		if (likely(res != -EAGAIN) || signal_pending(current))
- 			break;
+ 	switch (size) {
+ 	case 1:
+-		do {
+-			asm ("//__percpu_xchg_1\n"
+-			"ldxrb %w[ret], %[ptr]\n"
+-			"stxrb %w[loop], %w[val], %[ptr]\n"
+-			: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-			  [ptr] "+Q"(*(u8 *)ptr)
+-			: [val] "r" (val));
+-		} while (loop);
++		asm ("//__percpu_xchg_1\n"
++		"1:	ldxrb	%w[ret], %[ptr]\n"
++		"	stxrb	%w[loop], %w[val], %[ptr]\n"
++		"	cbnz	%w[loop], 1b"
++		: [loop] "=&r"(loop), [ret] "=&r"(ret),
++		  [ptr] "+Q"(*(u8 *)ptr)
++		: [val] "r" (val));
+ 		break;
+ 	case 2:
+-		do {
+-			asm ("//__percpu_xchg_2\n"
+-			"ldxrh %w[ret], %[ptr]\n"
+-			"stxrh %w[loop], %w[val], %[ptr]\n"
+-			: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-			  [ptr] "+Q"(*(u16 *)ptr)
+-			: [val] "r" (val));
+-		} while (loop);
++		asm ("//__percpu_xchg_2\n"
++		"1:	ldxrh	%w[ret], %[ptr]\n"
++		"	stxrh	%w[loop], %w[val], %[ptr]\n"
++		"	cbnz	%w[loop], 1b"
++		: [loop] "=&r"(loop), [ret] "=&r"(ret),
++		  [ptr] "+Q"(*(u16 *)ptr)
++		: [val] "r" (val));
+ 		break;
+ 	case 4:
+-		do {
+-			asm ("//__percpu_xchg_4\n"
+-			"ldxr %w[ret], %[ptr]\n"
+-			"stxr %w[loop], %w[val], %[ptr]\n"
+-			: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-			  [ptr] "+Q"(*(u32 *)ptr)
+-			: [val] "r" (val));
+-		} while (loop);
++		asm ("//__percpu_xchg_4\n"
++		"1:	ldxr	%w[ret], %[ptr]\n"
++		"	stxr	%w[loop], %w[val], %[ptr]\n"
++		"	cbnz	%w[loop], 1b"
++		: [loop] "=&r"(loop), [ret] "=&r"(ret),
++		  [ptr] "+Q"(*(u32 *)ptr)
++		: [val] "r" (val));
+ 		break;
+ 	case 8:
+-		do {
+-			asm ("//__percpu_xchg_8\n"
+-			"ldxr %[ret], %[ptr]\n"
+-			"stxr %w[loop], %[val], %[ptr]\n"
+-			: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-			  [ptr] "+Q"(*(u64 *)ptr)
+-			: [val] "r" (val));
+-		} while (loop);
++		asm ("//__percpu_xchg_8\n"
++		"1:	ldxr	%[ret], %[ptr]\n"
++		"	stxr	%w[loop], %[val], %[ptr]\n"
++		"	cbnz	%w[loop], 1b"
++		: [loop] "=&r"(loop), [ret] "=&r"(ret),
++		  [ptr] "+Q"(*(u64 *)ptr)
++		: [val] "r" (val));
+ 		break;
+ 	default:
+ 		BUILD_BUG();
 -- 
 2.1.4
