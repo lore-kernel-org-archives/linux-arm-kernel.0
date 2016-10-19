@@ -1,45 +1,46 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 19 Oct 2016 13:38:31 +0900
-Subject: [PATCH] i2c: uniphier[-f]: fix bool logic calculation
-Message-ID: <1476851911-21729-1-git-send-email-yamada.masahiro@socionext.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 19 Oct 2016 10:20:59 +0530
+Subject: [PATCH 4/9] regulator: lp873x: Add support for populating input
+ supply
+In-Reply-To: <20161018142743.xfgjuaw4wlssmoxq@rob-hp-laptop>
+References: <20161014130033.14172-1-lokeshvutla@ti.com>
+ <20161014130033.14172-5-lokeshvutla@ti.com>
+ <20161018142743.xfgjuaw4wlssmoxq@rob-hp-laptop>
+Message-ID: <57988545-4319-0bcf-df1a-55c78111aa5b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code is working, but it should not depend on how "bool" is
-typedef'ed, or the bit position of I2C_M_RD.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
 
- drivers/i2c/busses/i2c-uniphier-f.c | 2 +-
- drivers/i2c/busses/i2c-uniphier.c   | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Tuesday 18 October 2016 07:57 PM, Rob Herring wrote:
+> On Fri, Oct 14, 2016 at 06:30:28PM +0530, Lokesh Vutla wrote:
+>> In order to have a proper topology of regulators for a platform, each
+>> registering regulator needs to populate supply_name field for identifying
+>> its supply's name. Add supply_name field for lp873x regulators.
+>>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Cc: Keerthy <j-keerthy@ti.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
+>>  drivers/regulator/lp873x-regulator.c             | 1 +
+>>  2 files changed, 9 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/lp873x.txt b/Documentation/devicetree/bindings/mfd/lp873x.txt
+>> index 52766c2..936cba3 100644
+>> --- a/Documentation/devicetree/bindings/mfd/lp873x.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/lp873x.txt
+>> @@ -7,6 +7,9 @@ Required properties:
+>>    - #gpio-cells:	Should be two.  The first cell is the pin number and
+>>  			the second cell is used to specify flags.
+>>  			See ../gpio/gpio.txt for more information.
+>> +  - xxx-supply:		Phandle to parent supply node of each regulator
+>> +			populated under regulators node. xxx should match
+>> +			the supply_name populated in driver.
+> 
+> xxx-in-supply?
 
-diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
-index db9105e..b54448e 100644
---- a/drivers/i2c/busses/i2c-uniphier-f.c
-+++ b/drivers/i2c/busses/i2c-uniphier-f.c
-@@ -309,7 +309,7 @@ static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
- 					 struct i2c_msg *msg, bool stop)
- {
- 	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
--	bool is_read = msg->flags & I2C_M_RD;
-+	bool is_read = !!(msg->flags & I2C_M_RD);
- 	unsigned long time_left;
- 
- 	dev_dbg(&adap->dev, "%s: addr=0x%02x, len=%d, stop=%d\n",
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
-index 56e92af..cc80bb2 100644
---- a/drivers/i2c/busses/i2c-uniphier.c
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -177,7 +177,7 @@ static int uniphier_i2c_stop(struct i2c_adapter *adap)
- static int uniphier_i2c_master_xfer_one(struct i2c_adapter *adap,
- 					struct i2c_msg *msg, bool stop)
- {
--	bool is_read = msg->flags & I2C_M_RD;
-+	bool is_read = !!(msg->flags & I2C_M_RD);
- 	bool recovery = false;
- 	int ret;
- 
--- 
-1.9.1
+Oops. Right. Ill update it and repost.
+
+Thanks and regards,
+Lokesh
