@@ -1,73 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 19 Oct 2016 15:16:45 +0200
-Subject: [PATCH] mmc: sunxi: Prevent against null dereference for vmmc
-In-Reply-To: <20161019123629.14525-1-maxime.ripard@free-electrons.com>
-References: <20161019123629.14525-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFpQxexAt=NZvz4JQCxpf-Vn_C_ZjPOp=2V9GTOduRp7-Q@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 19 Oct 2016 18:56:22 +0530
+Subject: [PATCH] dmaengine: qcom_hidma: cleanup sysfs entries during remove
+In-Reply-To: <1475796189-26553-1-git-send-email-okaya@codeaurora.org>
+References: <1475796189-26553-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161019132622.GN2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2016 at 14:36, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> VMMC is an optional regulator, which means that mmc_regulator_get_supply
-> will only return an error in case of a deferred probe, but not when the
-> regulator is not set in the DT.
->
-> However, the sunxi driver assumes that VMMC is always there, and doesn't
-> check the value of the regulator pointer before using it, which obviously
-> leads to a (close to) null pointer dereference.
->
-> Add proper checks to prevent that.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu, Oct 06, 2016 at 07:23:09PM -0400, Sinan Kaya wrote:
+> The 4.8-rc8 kernel is printing duplicate file entry warnings while removing
+> the HIDMA object. This is caused by stale sysfs entries remaining from the
+> previous execution.
+> 
+> _sysfs_warn_dup+0x5c/0x78
+>  sysfs_add_file_mode_ns+0x13c/0x1c0
+>  sysfs_create_file_ns+0x2c/0x40
+>  device_create_file+0x54/0xa0
+>  hidma_probe+0x7c8/0x808
+> 
+> Create hidma_sysfs_init and hidma_sysfs_uninit functions and call them from
+> the probe and remove path. To do proper clean up, adding the attrs object
+> to the device data structure to keep it around until remove call is made.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/mmc/host/sunxi-mmc.c | 18 +++++++++++++-----
->  1 file changed, 13 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index c0a5c676d0e8..45a051e7d650 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -822,10 +822,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 break;
->
->         case MMC_POWER_UP:
-> -               host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-> -                                                    ios->vdd);
-> -               if (host->ferror)
-> -                       return;
-> +               if (!IS_ERR(mmc->supply.vmmc)) {
-> +                       host->ferror = mmc_regulator_set_ocr(mmc,
-> +                                                            mmc->supply.vmmc,
-> +                                                            ios->vdd);
-> +                       if (host->ferror) {
-> +                               dev_err(mmc_dev(mmc),
-> +                                       "failed to enable vmmc\n");
+>  drivers/dma/qcom/hidma.c | 31 +++++++++++++++++++++++++------
+>  drivers/dma/qcom/hidma.h |  3 +++
+>  2 files changed, 28 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+> index f4fe4ee..414ea12 100644
+> --- a/drivers/dma/qcom/hidma.c
+> +++ b/drivers/dma/qcom/hidma.c
+> @@ -578,8 +578,17 @@ static ssize_t hidma_show_values(struct device *dev,
+>  	return strlen(buf);
+>  }
+>  
+> -static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
+> -				    int mode)
+> +static int hidma_sysfs_uninit(struct hidma_dev *dev)
+> +{
+> +	if (!dev->chid_attrs)
+> +		return -ENOMEM;
 
-The print here is already taken care of by mmc_regulator_set_ocr()
+why is this check required? Probe would fail in init case right.
+Second returning error doesnt help as you are calling this from remove and
+return is not checked so redundant!
 
-> +                               return;
-> +                       }
-> +               }
->
->                 if (!IS_ERR(mmc->supply.vqmmc)) {
->                         host->ferror = regulator_enable(mmc->supply.vqmmc);
-> @@ -847,7 +853,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         case MMC_POWER_OFF:
->                 dev_dbg(mmc_dev(mmc), "power off!\n");
->                 sunxi_mmc_reset_host(host);
-> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +               if (!IS_ERR(mmc->supply.vmmc))
-> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +
->                 if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
->                         regulator_disable(mmc->supply.vqmmc);
->                 host->vqmmc_enabled = false;
-> --
-> 2.9.3
->
-
-Otherwise this looks good to me!
-
-Kind regards
-Uffe
+-- 
+~Vinod
