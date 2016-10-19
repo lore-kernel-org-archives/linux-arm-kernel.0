@@ -1,32 +1,40 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 19 Oct 2016 11:07:28 +0200
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <20161019085815.GA22239@lucifer>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161018153050.GC13117@dhcp22.suse.cz>
- <20161019085815.GA22239@lucifer>
-Message-ID: <20161019090727.GE7517@dhcp22.suse.cz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Oct 2016 10:15:49 +0100
+Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
+In-Reply-To: <CAKv+Gu_A1XOL=yST_isyvMZL=9wUcuiFXdfmOqw7PO5te24Ktw@mail.gmail.com>
+References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161018114932.GG10115@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9wuXnrq77a3Zk0GnHgnkpURh=EegwgP+vAwMC=rdm3qA@mail.gmail.com>
+ <20161019030333.GA1269@gondor.apana.org.au>
+ <20161019084607.GB9193@arm.com>
+ <CAKv+Gu_A1XOL=yST_isyvMZL=9wUcuiFXdfmOqw7PO5te24Ktw@mail.gmail.com>
+Message-ID: <20161019091549.GF9193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 19-10-16 09:58:15, Lorenzo Stoakes wrote:
-> On Tue, Oct 18, 2016 at 05:30:50PM +0200, Michal Hocko wrote:
-> > I am wondering whether we can go further. E.g. it is not really clear to
-> > me whether we need an explicit FOLL_REMOTE when we can in fact check
-> > mm != current->mm and imply that. Maybe there are some contexts which
-> > wouldn't work, I haven't checked.
+On Wed, Oct 19, 2016 at 09:49:46AM +0100, Ard Biesheuvel wrote:
+> On 19 October 2016 at 09:46, Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Oct 19, 2016 at 11:03:33AM +0800, Herbert Xu wrote:
+> >> I was planning merging these for 4.10.  But I'm fine with them
+> >> going through the arm tree.  Let me know what you guys want to
+> >> do.
+> >
+> > I assumed you'd take them through crypto, as per usual, so I didn't
+> > queue anything in the arm64 tree.
+> >
+> > Ard -- were you planning to get these in for 4.9?
+> >
 > 
-> This flag is set even when /proc/self/mem is used. I've not looked deeply into
-> this flag but perhaps accessing your own memory this way can be considered
-> 'remote' since you're not accessing it directly. On the other hand, perhaps this
-> is just mistaken in this case?
+> These are arguably bug fixes, but I spotted them by accident, they
+> weren't reported to me or anything. But it seems strange to add a cc
+> stable and then hold off until the next merge window.
+> 
+> In any case, I don't care deeply either way, as long as they get
+> merged in the end. I think it makes sense to keep them together (arm64
+> + ARM), so Herbert's tree is a more natural route for them to take. I
+> will leave it up to Herbert whether they are sent onward as fixes or
+> as part of v4.10
 
-My understanding of the flag is quite limited as well. All I know it is
-related to protection keys and it is needed to bypass protection check.
-See arch_vma_access_permitted. See also 1b2ee1266ea6 ("mm/core: Do not
-enforce PKEY permissions on remote mm access").
+Sounds good to me.
 
--- 
-Michal Hocko
-SUSE Labs
+Will
