@@ -1,17 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 19 Oct 2016 10:16:05 +0200
-Subject: [PATCH v3 04/11] ARM: dts: r8a7743: initial SoC device tree
-In-Reply-To: <2883940.Oo8sg10L7m@wasted.cogentembedded.com>
+Date: Wed, 19 Oct 2016 10:17:26 +0200
+Subject: [PATCH v3 11/11] ARM: dts: sk-rzg1m: add Ether support
+In-Reply-To: <1764267.cmIUehPqzi@wasted.cogentembedded.com>
 References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
- <2883940.Oo8sg10L7m@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUjqagddSnhGOTGRYUwtF=-g+j3Kydu+iJKtV23RrPKWQ@mail.gmail.com>
+ <1764267.cmIUehPqzi@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWizcwvThbOih=C=TqTMReCAhSkWsNNeYPp5c4k9ypkLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 5, 2016 at 11:38 PM, Sergei Shtylyov
+On Wed, Oct 5, 2016 at 11:48 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> The  initial R8A7743 SoC device tree including CPU cores, GIC, timer, SYSC,
-> CPG, and the required clock descriptions.
+> Define the SK-RZG1M board dependent part of the Ether device node.
+> Enable DHCP and NFS root  for the kernel booting.
 >
 > Based on the original (and large) patch by Dmitry Shifrin
 > <dmitry.shifrin@cogentembedded.com>.
