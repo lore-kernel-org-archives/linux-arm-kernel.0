@@ -1,36 +1,31 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 19 Oct 2016 09:12:37 -0700
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 19 Oct 2016 13:20:54 -0300
 Subject: [PATCH v4] MMC: meson: initial support for GX platforms
-In-Reply-To: <CAPDyKFps2QYq9N1erqDdCnmXJyUT60HLQDe8+gR7A571-F8NLg@mail.gmail.com>
- (Ulf Hansson's message of "Wed, 19 Oct 2016 09:19:43 +0200")
+In-Reply-To: <20161018195605.21145-1-khilman@baylibre.com>
 References: <20161018195605.21145-1-khilman@baylibre.com>
- <CAPDyKFps2QYq9N1erqDdCnmXJyUT60HLQDe8+gR7A571-F8NLg@mail.gmail.com>
-Message-ID: <7hvawo8gi2.fsf@baylibre.com>
+Message-ID: <CABxcv=kQBAdXtks-tX1t-CkPnvFx0SWa3JzLRYK4KWk+EGZedw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+Hello Kevin,
 
-> On 18 October 2016 at 21:56, Kevin Hilman <khilman@baylibre.com> wrote:
->> Initial support for the SD/eMMC controller in the Amlogic S905/GX*
->> family of SoCs.
->>
->> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->> Changes from v3:
->> - better handling of clock error paths
->> - rename to meson-gx to reflect support for newer SoCs
->> - has now been tested with SDIO
->>
->>  .../devicetree/bindings/mmc/amlogic,meson-gxbb.txt |  33 +
+On Tue, Oct 18, 2016 at 4:56 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Initial support for the SD/eMMC controller in the Amlogic S905/GX*
+> family of SoCs.
 >
-> Just realize this. You should split the DT doc into a separate patch,
-> such the DT maintainers can ack it.
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-OK, I separated out the binding and sent a v5.
+[snip]
 
-> Otherwise this looks good to me!
+> +
+> +MODULE_ALIAS("platform:" DRIVER_NAME);
 
-Thanks for the review!
+Why is this module alias needed? I thought that the Amlogic was a
+DT-only platform and so devices will always be registered from OF (and
+the OF modalias used).
 
-Kevin
+I've seen platform module aliases in other Meson drivers too (i.e:
+meson-rng and meson-pwm), so the same question applies to those.
+
+Best regards,
+Javier
