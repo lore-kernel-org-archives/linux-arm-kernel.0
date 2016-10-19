@@ -1,180 +1,128 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Oct 2016 11:59:44 +0100
-Subject: [PATCH 2/2] arm64: percpu: rewrite ll/sc loops in assembly
-In-Reply-To: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
-References: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1476874784-16214-2-git-send-email-will.deacon@arm.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 19 Oct 2016 12:02:14 +0100
+Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
+ config table
+In-Reply-To: <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161019110214.GB31476@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Writing the outer loop of an LL/SC sequence using do {...} while
-constructs potentially allows the compiler to hoist memory accesses
-between the STXR and the branch back to the LDXR. On CPUs that do not
-guarantee forward progress of LL/SC loops when faced with memory
-accesses to the same ERG (up to 2k) between the failed STXR and the
-branch back, we may end up livelocking.
+(CC'ing other potentially interested randomness folks)
 
-This patch avoids this issue in our percpu atomics by rewriting the
-outer loop as part of the LL/SC inline assembly block.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/percpu.h | 120 +++++++++++++++++++---------------------
- 1 file changed, 56 insertions(+), 64 deletions(-)
-
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 2fee2f59288c..5394c8405e66 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -44,48 +44,44 @@ static inline unsigned long __percpu_##op(void *ptr,			\
- 									\
- 	switch (size) {							\
- 	case 1:								\
--		do {							\
--			asm ("//__per_cpu_" #op "_1\n"			\
--			"ldxrb	  %w[ret], %[ptr]\n"			\
-+		asm ("//__per_cpu_" #op "_1\n"				\
-+		"1:	ldxrb	  %w[ret], %[ptr]\n"			\
- 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
--			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
--			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
--			  [ptr] "+Q"(*(u8 *)ptr)			\
--			: [val] "Ir" (val));				\
--		} while (loop);						\
-+		"	stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
-+		"	cbnz	  %w[loop], 1b"				\
-+		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
-+		  [ptr] "+Q"(*(u8 *)ptr)				\
-+		: [val] "Ir" (val));					\
- 		break;							\
- 	case 2:								\
--		do {							\
--			asm ("//__per_cpu_" #op "_2\n"			\
--			"ldxrh	  %w[ret], %[ptr]\n"			\
-+		asm ("//__per_cpu_" #op "_2\n"				\
-+		"1:	ldxrh	  %w[ret], %[ptr]\n"			\
- 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
--			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
--			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
--			  [ptr]  "+Q"(*(u16 *)ptr)			\
--			: [val] "Ir" (val));				\
--		} while (loop);						\
-+		"	stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
-+		"	cbnz	  %w[loop], 1b"				\
-+		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
-+		  [ptr]  "+Q"(*(u16 *)ptr)				\
-+		: [val] "Ir" (val));					\
- 		break;							\
- 	case 4:								\
--		do {							\
--			asm ("//__per_cpu_" #op "_4\n"			\
--			"ldxr	  %w[ret], %[ptr]\n"			\
-+		asm ("//__per_cpu_" #op "_4\n"				\
-+		"1:	ldxr	  %w[ret], %[ptr]\n"			\
- 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
--			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
--			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
--			  [ptr] "+Q"(*(u32 *)ptr)			\
--			: [val] "Ir" (val));				\
--		} while (loop);						\
-+		"	stxr	  %w[loop], %w[ret], %[ptr]\n"		\
-+		"	cbnz	  %w[loop], 1b"				\
-+		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
-+		  [ptr] "+Q"(*(u32 *)ptr)				\
-+		: [val] "Ir" (val));					\
- 		break;							\
- 	case 8:								\
--		do {							\
--			asm ("//__per_cpu_" #op "_8\n"			\
--			"ldxr	  %[ret], %[ptr]\n"			\
-+		asm ("//__per_cpu_" #op "_8\n"				\
-+		"1:	ldxr	  %[ret], %[ptr]\n"			\
- 			#asm_op " %[ret], %[ret], %[val]\n"		\
--			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
--			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
--			  [ptr] "+Q"(*(u64 *)ptr)			\
--			: [val] "Ir" (val));				\
--		} while (loop);						\
-+		"	stxr	  %w[loop], %[ret], %[ptr]\n"		\
-+		"	cbnz	  %w[loop], 1b"				\
-+		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
-+		  [ptr] "+Q"(*(u64 *)ptr)				\
-+		: [val] "Ir" (val));					\
- 		break;							\
- 	default:							\
- 		BUILD_BUG();						\
-@@ -150,44 +146,40 @@ static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+On Thu, 06 Oct, at 11:27:25AM, Ard Biesheuvel wrote:
+> Specify a Linux specific UEFI configuration table that carries some
+> random bits, and use the contents during early boot to seed the kernel's
+> random number generator. This allows much strong random numbers to be
+> generated early on.
+> 
+> The entropy is fed to the kernel using add_device_randomness(), which is
+> documented as being appropriate for being called very early.
+> 
+> Note that the config table could be generated by the EFI stub or by any
+> other UEFI driver or application (e.g., GRUB), but the random seed table
+> GUID and the associated functionality should be considered an internal
+> kernel interface (unless it is promoted to ABI later on)
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/efi.c | 26 ++++++++++++++++++++
+>  include/linux/efi.h        |  8 ++++++
+>  2 files changed, 34 insertions(+)
  
- 	switch (size) {
- 	case 1:
--		do {
--			asm ("//__percpu_xchg_1\n"
--			"ldxrb %w[ret], %[ptr]\n"
--			"stxrb %w[loop], %w[val], %[ptr]\n"
--			: [loop] "=&r"(loop), [ret] "=&r"(ret),
--			  [ptr] "+Q"(*(u8 *)ptr)
--			: [val] "r" (val));
--		} while (loop);
-+		asm ("//__percpu_xchg_1\n"
-+		"1:	ldxrb	%w[ret], %[ptr]\n"
-+		"	stxrb	%w[loop], %w[val], %[ptr]\n"
-+		"	cbnz	%w[loop], 1b"
-+		: [loop] "=&r"(loop), [ret] "=&r"(ret),
-+		  [ptr] "+Q"(*(u8 *)ptr)
-+		: [val] "r" (val));
- 		break;
- 	case 2:
--		do {
--			asm ("//__percpu_xchg_2\n"
--			"ldxrh %w[ret], %[ptr]\n"
--			"stxrh %w[loop], %w[val], %[ptr]\n"
--			: [loop] "=&r"(loop), [ret] "=&r"(ret),
--			  [ptr] "+Q"(*(u16 *)ptr)
--			: [val] "r" (val));
--		} while (loop);
-+		asm ("//__percpu_xchg_2\n"
-+		"1:	ldxrh	%w[ret], %[ptr]\n"
-+		"	stxrh	%w[loop], %w[val], %[ptr]\n"
-+		"	cbnz	%w[loop], 1b"
-+		: [loop] "=&r"(loop), [ret] "=&r"(ret),
-+		  [ptr] "+Q"(*(u16 *)ptr)
-+		: [val] "r" (val));
- 		break;
- 	case 4:
--		do {
--			asm ("//__percpu_xchg_4\n"
--			"ldxr %w[ret], %[ptr]\n"
--			"stxr %w[loop], %w[val], %[ptr]\n"
--			: [loop] "=&r"(loop), [ret] "=&r"(ret),
--			  [ptr] "+Q"(*(u32 *)ptr)
--			: [val] "r" (val));
--		} while (loop);
-+		asm ("//__percpu_xchg_4\n"
-+		"1:	ldxr	%w[ret], %[ptr]\n"
-+		"	stxr	%w[loop], %w[val], %[ptr]\n"
-+		"	cbnz	%w[loop], 1b"
-+		: [loop] "=&r"(loop), [ret] "=&r"(ret),
-+		  [ptr] "+Q"(*(u32 *)ptr)
-+		: [val] "r" (val));
- 		break;
- 	case 8:
--		do {
--			asm ("//__percpu_xchg_8\n"
--			"ldxr %[ret], %[ptr]\n"
--			"stxr %w[loop], %[val], %[ptr]\n"
--			: [loop] "=&r"(loop), [ret] "=&r"(ret),
--			  [ptr] "+Q"(*(u64 *)ptr)
--			: [val] "r" (val));
--		} while (loop);
-+		asm ("//__percpu_xchg_8\n"
-+		"1:	ldxr	%[ret], %[ptr]\n"
-+		"	stxr	%w[loop], %[val], %[ptr]\n"
-+		"	cbnz	%w[loop], 1b"
-+		: [loop] "=&r"(loop), [ret] "=&r"(ret),
-+		  [ptr] "+Q"(*(u64 *)ptr)
-+		: [val] "r" (val));
- 		break;
- 	default:
- 		BUILD_BUG();
--- 
-2.1.4
+This series looks fine to me. I'm leaving the patch below for the
+benefit of the Ted and Kees.
+
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index 1ac199cd75e7..c8ae40f9b674 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/of_fdt.h>
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/random.h>
+>  #include <linux/slab.h>
+>  #include <linux/acpi.h>
+>  #include <linux/ucs2_string.h>
+> @@ -48,6 +49,7 @@ struct efi __read_mostly efi = {
+>  	.esrt			= EFI_INVALID_TABLE_ADDR,
+>  	.properties_table	= EFI_INVALID_TABLE_ADDR,
+>  	.mem_attr_table		= EFI_INVALID_TABLE_ADDR,
+> +	.rng_seed		= EFI_INVALID_TABLE_ADDR,
+>  };
+>  EXPORT_SYMBOL(efi);
+>  
+> @@ -438,6 +440,7 @@ static __initdata efi_config_table_type_t common_tables[] = {
+>  	{EFI_SYSTEM_RESOURCE_TABLE_GUID, "ESRT", &efi.esrt},
+>  	{EFI_PROPERTIES_TABLE_GUID, "PROP", &efi.properties_table},
+>  	{EFI_MEMORY_ATTRIBUTES_TABLE_GUID, "MEMATTR", &efi.mem_attr_table},
+> +	{LINUX_EFI_RANDOM_SEED_TABLE_GUID, "RNG", &efi.rng_seed},
+>  	{NULL_GUID, NULL, NULL},
+>  };
+>  
+> @@ -499,6 +502,29 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
+>  	pr_cont("\n");
+>  	set_bit(EFI_CONFIG_TABLES, &efi.flags);
+>  
+> +	if (efi.rng_seed != EFI_INVALID_TABLE_ADDR) {
+> +		struct linux_efi_random_seed *seed;
+> +		u32 size = 0;
+> +
+> +		seed = early_memremap(efi.rng_seed, sizeof(*seed));
+> +		if (seed != NULL) {
+> +			size = seed->size;
+> +			early_memunmap(seed, sizeof(*seed));
+> +		} else {
+> +			pr_err("Could not map UEFI random seed!\n");
+> +		}
+> +		if (size > 0) {
+> +			seed = early_memremap(efi.rng_seed,
+> +					      sizeof(*seed) + size);
+> +			if (seed != NULL) {
+> +				add_device_randomness(seed->bits, seed->size);
+> +				early_memunmap(seed, sizeof(*seed) + size);
+> +			} else {
+> +				pr_err("Could not map UEFI random seed!\n");
+> +			}
+> +		}
+> +	}
+> +
+>  	/* Parse the EFI Properties table if it exists */
+>  	if (efi.properties_table != EFI_INVALID_TABLE_ADDR) {
+>  		efi_properties_table_t *tbl;
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index 2d089487d2da..85e28b138cdd 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -599,6 +599,7 @@ void efi_native_runtime_setup(void);
+>   */
+>  #define LINUX_EFI_ARM_SCREEN_INFO_TABLE_GUID	EFI_GUID(0xe03fc20a, 0x85dc, 0x406e,  0xb9, 0x0e, 0x4a, 0xb5, 0x02, 0x37, 0x1d, 0x95)
+>  #define LINUX_EFI_LOADER_ENTRY_GUID		EFI_GUID(0x4a67b082, 0x0a4c, 0x41cf,  0xb6, 0xc7, 0x44, 0x0b, 0x29, 0xbb, 0x8c, 0x4f)
+> +#define LINUX_EFI_RANDOM_SEED_TABLE_GUID	EFI_GUID(0x1ce1e5bc, 0x7ceb, 0x42f2,  0x81, 0xe5, 0x8a, 0xad, 0xf1, 0x80, 0xf5, 0x7b)
+>  
+>  typedef struct {
+>  	efi_guid_t guid;
+> @@ -872,6 +873,7 @@ extern struct efi {
+>  	unsigned long esrt;		/* ESRT table */
+>  	unsigned long properties_table;	/* properties table */
+>  	unsigned long mem_attr_table;	/* memory attributes table */
+> +	unsigned long rng_seed;		/* UEFI firmware random seed */
+>  	efi_get_time_t *get_time;
+>  	efi_set_time_t *set_time;
+>  	efi_get_wakeup_time_t *get_wakeup_time;
+> @@ -1493,4 +1495,10 @@ efi_status_t efi_exit_boot_services(efi_system_table_t *sys_table,
+>  				    struct efi_boot_memmap *map,
+>  				    void *priv,
+>  				    efi_exit_boot_map_processing priv_func);
+> +
+> +struct linux_efi_random_seed {
+> +	u32	size;
+> +	u8	bits[];
+> +};
+> +
+>  #endif /* _LINUX_EFI_H */
+> -- 
+> 2.7.4
+> 
