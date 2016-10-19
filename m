@@ -1,30 +1,43 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Oct 2016 13:14:21 -0700
-Subject: [PATCH] clk: uniphier: fix memory overrun bug
-In-Reply-To: <1476877779-27854-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1476877779-27854-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161019201421.GY8871@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 19 Oct 2016 21:18:04 +0100
+Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
+ config table
+In-Reply-To: <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
+References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161019110926.GG9616@leverpostej>
+ <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
+ <20161019112243.GD31476@codeblueprint.co.uk>
+ <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
+Message-ID: <CAKv+Gu92dC6BK7Adb2xLvPwNXv=z15A0zhss_XVNfd+r0NA0SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19, Masahiro Yamada wrote:
-> The first loop of this "for" statement writes memory beyond the
-> allocated clk_hw_onecell_data.
-> 
-> It should be:
->     for (clk_num--; clk_num >= 0; clk_num--)
->             ...
-> 
-> Or more simply:
->     while (--clk_num >= 0)
->             ...
-> 
-> Fixes: 734d82f4a678 ("clk: uniphier: add core support code for UniPhier clock driver")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+On 19 October 2016 at 21:14, Kees Cook <keescook@chromium.org> wrote:
+> On Wed, Oct 19, 2016 at 4:22 AM, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>> On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
+>>> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>
+>>> > I think to some extent this mush be treated as an ABI, given cases like
+>>> > kexec.
+>>> >
+>>>
+>>> Perhaps, yes. That would also allow GRUB or other EFI aware
+>>> bootloaders to generate the seed.
+>>
+>> If we're going to go down this route, we should try and get the GUID
+>> into the UEFI spec.
+>
+> It seems like maybe under UEFI, both this table (which sounds like
+> it'll not be rotated regularly)
 
-Applied to clk-fixes
+What do you mean 'rotated'? It is generated at boot. My 2/2 patch
+generates it from the stub using the EFI_RNG_PROTOCOL on ARM/arm64
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> could be mixed with calls to
+> EFI_PROTOCOL_RNG by the kernel? (Similar to how kaslr is seeded?)
+>
+
+That is kind of the point. KASLR is different because we need the
+entropy before even jumping to C code, but for all other uses of early
+entropy, this seemed like a useful approach
