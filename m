@@ -1,49 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Oct 2016 10:37:57 -0700
-Subject: [PATCH/RESEND] clocksource/arm_arch_timer: Map frame with
- of_io_request_and_map()
-In-Reply-To: <5807255A.8060906@arm.com>
-References: <20161018234514.6175-1-sboyd@codeaurora.org>
- <5807255A.8060906@arm.com>
-Message-ID: <20161019173757.GX8871@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 19 Oct 2016 10:41:11 -0700
+Subject: [PATCH V5 00/10] dmaengine: qcom_hidma: add MSI interrupt support
+In-Reply-To: <20161019133406.GO2467@localhost>
+References: <1475817915-11976-1-git-send-email-okaya@codeaurora.org>
+ <20161019133406.GO2467@localhost>
+Message-ID: <3c808abb-61a6-e4b8-0ffc-f4cbf09d177a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19, Marc Zyngier wrote:
-> On 19/10/16 00:45, Stephen Boyd wrote:
-> > Let's use the of_io_request_and_map() API so that the frame
-> > region is protected and shows up in /proc/iomem.
-> > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  drivers/clocksource/arm_arch_timer.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> > index 73c487da6d2a..cbfa3bc5be75 100644
-> > --- a/drivers/clocksource/arm_arch_timer.c
-> > +++ b/drivers/clocksource/arm_arch_timer.c
-> > @@ -964,7 +964,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
-> >  	}
-> >  
-> >  	ret= -ENXIO;
-> > -	base = arch_counter_base = of_iomap(best_frame, 0);
-> > +	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
-> > +							 "arch_mem_timer");
-> >  	if (!base) {
-> >  		pr_err("arch_timer: Can't map frame's registers\n");
-> >  		goto out;
-> > 
+Hi Vinod,
+
+On 10/19/2016 6:34 AM, Vinod Koul wrote:
+> On Fri, Oct 07, 2016 at 01:25:05AM -0400, Sinan Kaya wrote:
+>> The new version of the HW supports MSI interrupts instead of wired
+>> interrupts. The MSI interrupts are especially useful for the guest machine
+>> execution. The wired interrupts usually trap to the hypervisor and then are
+>> relayed to the actual interrupt.
+>>
+>> The MSI interrupts can be directly fed into the interrupt controller.
+>>
+>> Adding a new OF compat string (qcom,hidma-1.1) and ACPI string (QCOM8062)
+>> to distinguish newer HW from the older ones.
 > 
-> Careful here: of_io_request_and_map() returns an ERR_PTR() on failure,
-> while of_iomap just returns NULL. You want to change the error handling
-> if you're going down that road.
+> I was only able to apply 6 patches in this series. Which tree were these
+> generated against?
+> 
+> Please rebase rest..
 > 
 
-Eek! I was clearing out my pending queue and this one is
-especially old so perhaps that function signature changed. Or I
-just fail at life. Anyway, thanks!
+I'll post V6 now with the remaining 4 patches. My tree is as follows. 
+I'll also repost V2 of the "dmaengine: qcom_hidma: cleanup sysfs entries during remove"
+patch with your suggestion.
+
+b8faa2a dmaengine: qcom_hidma: add MSI support for interrupts
+54043eb dmaengine: qcom_hidma: break completion processing on error
+31c9e2c dmaengine: qcom_hidma: protect common data structures
+252ef1f dmaengine: qcom_hidma: add a common API to setup the interrupt
+4e6c5ce dmaengine: qcom_hidma: bring out interrupt cause
+784851a dmaengine: qcom_hidma: make pending_tre_count atomic
+098685b dmaengine: qcom_hidma: configure DMA and MSI for OF
+79f97f0 of: irq: make of_msi_configure accessible from modules
+81e9b3a Documentation: DT: qcom_hidma: correct spelling mistakes
+c55ceac Documentation: DT: qcom_hidma: update binding for MSI
+7f3470c dmaengine: qcom_hidma: cleanup sysfs entries during remove
+78e5299 dmaengine: qcom_hidma: remove useless debugfs file removal
+96633c0 ACPI: platform: setup MSI domain for ACPI based platform device
+851aadc irqchip: gicv3-its: platform-msi: scan MADT to create platform msi domain
+5a8622e irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare for ACPI
+ca80550 ACPI: platform-msi: retrieve dev id from IORT
+b631797 irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+1001354 Linux 4.9-rc1
+
+Sinan
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
