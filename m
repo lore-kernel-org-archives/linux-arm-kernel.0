@@ -1,45 +1,61 @@
-From: labath@google.com (Pavel Labath)
-Date: Wed, 19 Oct 2016 14:30:33 +0100
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <20161019120714.GM9193@arm.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
- <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
- <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
- <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
- <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
- <20161019120714.GM9193@arm.com>
-Message-ID: <CAJt8pk-+yzDookHbzu3kEYzKisebDBjdfjsTVTS6MOsTx3UB9w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Oct 2016 15:33:04 +0200
+Subject: [PATCH v2] mmc: sunxi: Prevent against null dereference for vmmc
+Message-ID: <20161019133304.22915-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've send the test suite update to Pratyush via github yesterday. I
-presume he will come with a v2 soon. :)
+VMMC is an optional regulator, which means that mmc_regulator_get_supply
+will only return an error in case of a deferred probe, but not when the
+regulator is not set in the DT.
 
-regards,
-pavel
+However, the sunxi driver assumes that VMMC is always there, and doesn't
+check the value of the regulator pointer before using it, which obviously
+leads to a (close to) null pointer dereference.
 
-On 19 October 2016 at 13:07, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 14, 2016 at 08:45:43AM +0530, Pratyush Anand wrote:
->>
->>
->> On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
->> >>I think, its easier to go with your implementation. So, I have taken
->> >>> your patch and updated my perf/upstream_arm64_devel branch. May be you
->> >>> can give it a test for your test cases.
->> >I've checked out the new version of your branch, and it works great.
->> >I'll write a patch with additional test cases to go on top of your
->> >branch, as the tests there do not capture the bug I was fixing.
->>
->> That would be great. We can send them all together as V2.
->
-> Did you send a v2? I've been holding off reviewing this, but I just want
-> to make sure I didn't miss the update.
->
-> Cheers,
->
-> Will
+Add proper checks to prevent that.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+---
+Changes from v1:
+  - remove redundant error message
+---
+ drivers/mmc/host/sunxi-mmc.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index c0a5c676d0e8..b1d1303389a7 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -822,10 +822,13 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		break;
+ 
+ 	case MMC_POWER_UP:
+-		host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+-						     ios->vdd);
+-		if (host->ferror)
+-			return;
++		if (!IS_ERR(mmc->supply.vmmc)) {
++			host->ferror = mmc_regulator_set_ocr(mmc,
++							     mmc->supply.vmmc,
++							     ios->vdd);
++			if (host->ferror)
++				return;
++		}
+ 
+ 		if (!IS_ERR(mmc->supply.vqmmc)) {
+ 			host->ferror = regulator_enable(mmc->supply.vqmmc);
+@@ -847,7 +850,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	case MMC_POWER_OFF:
+ 		dev_dbg(mmc_dev(mmc), "power off!\n");
+ 		sunxi_mmc_reset_host(host);
+-		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
++		if (!IS_ERR(mmc->supply.vmmc))
++			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
++
+ 		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+ 			regulator_disable(mmc->supply.vqmmc);
+ 		host->vqmmc_enabled = false;
+-- 
+2.9.3
