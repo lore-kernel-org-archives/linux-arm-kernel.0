@@ -1,76 +1,137 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Oct 2016 20:10:28 +0100
-Subject: [PATCH 04/10] arm64: traps: simplify die() and __die()
+Date: Wed, 19 Oct 2016 20:10:27 +0100
+Subject: [PATCH 03/10] arm64: factor out current_stack_pointer
 In-Reply-To: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
 References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1476904234-9511-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1476904234-9511-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In arm64's die and __die routines we pass around a thread_info, and
-subsequently use this to determine the relevant task_struct, and the end
-of the thread's stack. Subsequent patches will decouple thread_info from
-the stack, and this approach will no longer work.
+We define current_stack_pointer in <asm/thread_info.h>, though other
+files and header relying upon it do not have this necessary include, and
+are thus fragile to changes in the header soup.
 
-To figure out the end of the stack, we can use the new generic
-end_of_stack() helper. As we only call __die() from die(), and die()
-always deals with the current task, we can remove the parameter and have
-both acquire current directly, which also makes it clear that __die
-can't be called for arbitrary tasks.
+Subsequent patches will affect the header soup such that directly
+including <asm/thread_info.h> may result in a circular header include in
+some of these cases, so we can't simply include <asm/thread_info.h>.
+
+Instead, factor current_thread_info into its own header, and have all
+existing users include this explicitly.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/traps.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/percpu.h        | 2 ++
+ arch/arm64/include/asm/perf_event.h    | 2 ++
+ arch/arm64/include/asm/stack_pointer.h | 9 +++++++++
+ arch/arm64/include/asm/thread_info.h   | 6 +-----
+ arch/arm64/kernel/return_address.c     | 1 +
+ arch/arm64/kernel/stacktrace.c         | 1 +
+ arch/arm64/kernel/traps.c              | 1 +
+ 7 files changed, 17 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/include/asm/stack_pointer.h
 
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 2fee2f5..2127a41 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -16,6 +16,8 @@
+ #ifndef __ASM_PERCPU_H
+ #define __ASM_PERCPU_H
+ 
++#include <asm/stack_pointer.h>
++
+ static inline void set_my_cpu_offset(unsigned long off)
+ {
+ 	asm volatile("msr tpidr_el1, %0" :: "r" (off) : "memory");
+diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+index 2065f46..9eee2be 100644
+--- a/arch/arm64/include/asm/perf_event.h
++++ b/arch/arm64/include/asm/perf_event.h
+@@ -17,6 +17,8 @@
+ #ifndef __ASM_PERF_EVENT_H
+ #define __ASM_PERF_EVENT_H
+ 
++#include <asm/stack_pointer.h>
++
+ #define	ARMV8_PMU_MAX_COUNTERS	32
+ #define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
+ 
+diff --git a/arch/arm64/include/asm/stack_pointer.h b/arch/arm64/include/asm/stack_pointer.h
+new file mode 100644
+index 0000000..ffcdf74
+--- /dev/null
++++ b/arch/arm64/include/asm/stack_pointer.h
+@@ -0,0 +1,9 @@
++#ifndef __ASM_STACK_POINTER_H
++#define __ASM_STACK_POINTER_H
++
++/*
++ * how to get the current stack pointer from C
++ */
++register unsigned long current_stack_pointer asm ("sp");
++
++#endif /* __ASM_STACK_POINTER_H */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 76a9559..3a4f85d 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -36,6 +36,7 @@
+ 
+ struct task_struct;
+ 
++#include <asm/stack_pointer.h>
+ #include <asm/types.h>
+ 
+ typedef unsigned long mm_segment_t;
+@@ -62,11 +63,6 @@ struct thread_info {
+ #define init_stack		(init_thread_union.stack)
+ 
+ /*
+- * how to get the current stack pointer from C
+- */
+-register unsigned long current_stack_pointer asm ("sp");
+-
+-/*
+  * how to get the thread information struct from C
+  */
+ static inline struct thread_info *current_thread_info(void) __attribute_const__;
+diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
+index 1718706..12a87f2 100644
+--- a/arch/arm64/kernel/return_address.c
++++ b/arch/arm64/kernel/return_address.c
+@@ -12,6 +12,7 @@
+ #include <linux/export.h>
+ #include <linux/ftrace.h>
+ 
++#include <asm/stack_pointer.h>
+ #include <asm/stacktrace.h>
+ 
+ struct return_address_data {
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index c2efddf..5b80068 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -22,6 +22,7 @@
+ #include <linux/stacktrace.h>
+ 
+ #include <asm/irq.h>
++#include <asm/stack_pointer.h>
+ #include <asm/stacktrace.h>
+ 
+ /*
 diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 32d4bdb..1cfbe10 100644
+index 5ff020f..32d4bdb 100644
 --- a/arch/arm64/kernel/traps.c
 +++ b/arch/arm64/kernel/traps.c
-@@ -228,10 +228,9 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
- #endif
- #define S_SMP " SMP"
- 
--static int __die(const char *str, int err, struct thread_info *thread,
--		 struct pt_regs *regs)
-+static int __die(const char *str, int err, struct pt_regs *regs)
- {
--	struct task_struct *tsk = thread->task;
-+	struct task_struct *tsk = current;
- 	static int die_counter;
- 	int ret;
- 
-@@ -246,7 +245,8 @@ static int __die(const char *str, int err, struct thread_info *thread,
- 	print_modules();
- 	__show_regs(regs);
- 	pr_emerg("Process %.*s (pid: %d, stack limit = 0x%p)\n",
--		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk), thread + 1);
-+		 TASK_COMM_LEN, tsk->comm, task_pid_nr(tsk),
-+		 end_of_stack(tsk));
- 
- 	if (!user_mode(regs)) {
- 		dump_mem(KERN_EMERG, "Stack: ", regs->sp,
-@@ -265,7 +265,6 @@ static int __die(const char *str, int err, struct thread_info *thread,
-  */
- void die(const char *str, struct pt_regs *regs, int err)
- {
--	struct thread_info *thread = current_thread_info();
- 	int ret;
- 
- 	oops_enter();
-@@ -273,9 +272,9 @@ void die(const char *str, struct pt_regs *regs, int err)
- 	raw_spin_lock_irq(&die_lock);
- 	console_verbose();
- 	bust_spinlocks(1);
--	ret = __die(str, err, thread, regs);
-+	ret = __die(str, err, regs);
- 
--	if (regs && kexec_should_crash(thread->task))
-+	if (regs && kexec_should_crash(current))
- 		crash_kexec(regs);
- 
- 	bust_spinlocks(0);
+@@ -38,6 +38,7 @@
+ #include <asm/esr.h>
+ #include <asm/insn.h>
+ #include <asm/traps.h>
++#include <asm/stack_pointer.h>
+ #include <asm/stacktrace.h>
+ #include <asm/exception.h>
+ #include <asm/system_misc.h>
 -- 
 1.9.1
