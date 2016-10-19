@@ -1,110 +1,128 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 19 Oct 2016 10:28:20 +0800
-Subject: [PATCH v7,
- 1/8] dt-bindings: mt8173-xhci: support host side of dual-role mode
+Date: Wed, 19 Oct 2016 10:28:22 +0800
+Subject: [PATCH v7, 3/8] usb: xhci-mtk: make IPPC register optional
 In-Reply-To: <1476844107-31087-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1476844107-31087-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1476844107-31087-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1476844107-31087-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some resources, such as IPPC register etc, shared with device
-driver are moved into common glue layer when xHCI driver is the
-host side of dual-role mode and they should be changed as optional
-properties if they are required ones before. For clarity, add
-a new part of binding to support host side of dual-role mode.
-
-Additionally add optional properties of pinctrl for host only mode
+Make IPPC register optional to support host side of dual-role mode,
+due to it is moved into common glue layer for simplification.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/usb/mt8173-xhci.txt        |   54 +++++++++++++++++++-
- 1 file changed, 52 insertions(+), 2 deletions(-)
+ drivers/usb/host/xhci-mtk.c |   38 +++++++++++++++++++++++++++++++-------
+ drivers/usb/host/xhci-mtk.h |    1 +
+ 2 files changed, 32 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-index b3a7ffa..2a930bd 100644
---- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-@@ -2,10 +2,18 @@ MT8173 xHCI
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 79959f1..1094ebd 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
  
- The device node for Mediatek SOC USB3.0 host controller
++	if (!mtk->has_ippc)
++		return 0;
++
+ 	/* power on host ip */
+ 	value = readl(&ippc->ip_pw_ctr1);
+ 	value &= ~CTRL1_IP_HOST_PDN;
+@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
  
-+There are two scenarios: the first one only supports xHCI driver;
-+the second one supports dual-role mode, and the host is based on xHCI
-+driver. Take account of backward compatibility, we divide bindings
-+into two parts.
++	if (!mtk->has_ippc)
++		return 0;
 +
-+1st: only supports xHCI driver
-+------------------------------------------------------------------------
-+
- Required properties:
-  - compatible : should contain "mediatek,mt8173-xhci"
-- - reg : specifies physical base address and size of the registers,
--	the first one for MAC, the second for IPPC
-+ - reg : specifies physical base address and size of the registers
-+ - reg-names: should be "mac" for xHCI MAC and "ippc" for IP port control
-  - interrupts : interrupt used by the controller
-  - power-domains : a phandle to USB power domain node to control USB's
- 	mtcmos
-@@ -27,12 +35,16 @@ Optional properties:
- 	control register, it depends on "mediatek,wakeup-src".
-  - vbus-supply : reference to the VBUS regulator;
-  - usb3-lpm-capable : supports USB3.0 LPM
-+ - pinctrl-names : a pinctrl state named "default" must be defined
-+ - pinctrl-0 : pin control group
-+	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
+ 	/* power down all u3 ports */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value;
  
- Example:
- usb30: usb at 11270000 {
- 	compatible = "mediatek,mt8173-xhci";
- 	reg = <0 0x11270000 0 0x1000>,
- 	      <0 0x11280700 0 0x0100>;
-+	reg-names = "mac", "ippc";
- 	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
- 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
- 	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-@@ -49,3 +61,41 @@ usb30: usb at 11270000 {
- 	mediatek,syscon-wakeup = <&pericfg>;
- 	mediatek,wakeup-src = <1>;
- };
++	if (!mtk->has_ippc)
++		return 0;
 +
-+2nd: dual-role mode with xHCI driver
-+------------------------------------------------------------------------
+ 	/* reset whole ip */
+ 	value = readl(&ippc->ip_pw_ctr0);
+ 	value |= CTRL0_IP_SW_RST;
+@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+ 	int ret;
+ 
+@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		ret = xhci_mtk_ssusb_config(mtk);
+ 		if (ret)
+ 			return ret;
++	}
 +
-+In the case, xhci is added as subnode to mtu3. An example and the DT binding
-+details of mtu3 can be found in:
-+Documentation/devicetree/bindings/usb/mtu3.txt
++	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
++	if (ret)
++		return ret;
 +
-+Required properties:
-+ - compatible : should contain "mediatek,mt8173-xhci"
-+ - reg : specifies physical base address and size of the registers
-+ - reg-names: should be "mac" for xHCI MAC
-+ - interrupts : interrupt used by the host controller
-+ - power-domains : a phandle to USB power domain node to control USB's
-+	mtcmos
-+ - vusb33-supply : regulator of USB avdd3.3v
-+
-+ - clocks : a list of phandle + clock-specifier pairs, one for each
-+	entry in clock-names
-+ - clock-names : must be
-+	"sys_ck": for clock of xHCI MAC
-+
-+Optional properties:
-+ - vbus-supply : reference to the VBUS regulator;
-+ - usb3-lpm-capable : supports USB3.0 LPM
-+
-+Example:
-+usb30: usb at 11270000 {
-+	compatible = "mediatek,mt8173-xhci";
-+	reg = <0 0x11270000 0 0x1000>;
-+	reg-names = "mac";
-+	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+	clock-names = "sys_ck";
-+	vusb33-supply = <&mt6397_vusb_reg>;
-+	usb3-lpm-capable;
-+};
++	if (usb_hcd_is_primary_hcd(hcd)) {
++		mtk->num_u3_ports = xhci->num_usb3_ports;
++		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_mtk_quirks);
++	return ret;
+ }
+ 
+ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -586,7 +605,7 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	mtk->hcd = platform_get_drvdata(pdev);
+ 	platform_set_drvdata(pdev, mtk);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mac");
+ 	hcd->regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(hcd->regs)) {
+ 		ret = PTR_ERR(hcd->regs);
+@@ -595,11 +614,16 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(mtk->ippc_regs)) {
+-		ret = PTR_ERR(mtk->ippc_regs);
+-		goto put_usb2_hcd;
++	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
++	if (res) {	/* ippc register is optional */
++		mtk->ippc_regs = devm_ioremap_resource(dev, res);
++		if (IS_ERR(mtk->ippc_regs)) {
++			ret = PTR_ERR(mtk->ippc_regs);
++			goto put_usb2_hcd;
++		}
++		mtk->has_ippc = true;
++	} else {
++		mtk->has_ippc = false;
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+diff --git a/drivers/usb/host/xhci-mtk.h b/drivers/usb/host/xhci-mtk.h
+index 7da677c..2845c49 100644
+--- a/drivers/usb/host/xhci-mtk.h
++++ b/drivers/usb/host/xhci-mtk.h
+@@ -118,6 +118,7 @@ struct xhci_hcd_mtk {
+ 	struct usb_hcd *hcd;
+ 	struct mu3h_sch_bw_info *sch_array;
+ 	struct mu3c_ippc_regs __iomem *ippc_regs;
++	bool has_ippc;
+ 	int num_u2_ports;
+ 	int num_u3_ports;
+ 	struct regulator *vusb33;
 -- 
 1.7.9.5
