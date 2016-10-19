@@ -1,104 +1,45 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 19 Oct 2016 12:08:29 +0200
-Subject: [PATCH 9/9] ARM: dts: amlogic: enable gpio interrupt controller on
- meson8
-In-Reply-To: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
-References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1476871709-8359-10-git-send-email-jbrunet@baylibre.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 19 Oct 2016 19:11:46 +0900
+Subject: [PATCH] extcon: qcom-spmi-misc: Sync the extcon state on interrupt
+In-Reply-To: <20161018001602.18617-1-stephen.boyd@linaro.org>
+References: <CGME20161018001726epcas1p338c9fc5887017571f8a3fd954e0ae216@epcas1p3.samsung.com>
+ <20161018001602.18617-1-stephen.boyd@linaro.org>
+Message-ID: <580746E2.5080800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm/boot/dts/meson8.dtsi  | 11 +++++++++++
- arch/arm/boot/dts/meson8b.dtsi | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+Hi Stephen,
 
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index 45619f6162c5..713a22456ff1 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -43,6 +43,8 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/gpio/meson8-gpio.h>
- /include/ "meson.dtsi"
- 
-@@ -91,6 +93,13 @@
- 		clock-frequency = <141666666>;
- 	};
- 
-+	gpio_interrupt: interrupt-controller at c1109880 {
-+		compatible = "amlogic,meson8-gpio-intc";
-+		reg = <0xc1109880 0x10>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+	};
-+
- 	pinctrl_cbus: pinctrl at c1109880 {
- 		compatible = "amlogic,meson8-cbus-pinctrl";
- 		reg = <0xc1109880 0x10>;
-@@ -106,6 +115,7 @@
- 			reg-names = "mux", "pull", "pull-enable", "gpio";
- 			gpio-controller;
- 			#gpio-cells = <2>;
-+			interrupt-parent = <&gpio_interrupt>;
- 		};
- 
- 		spi_nor_pins: nor {
-@@ -148,6 +158,7 @@
- 			reg-names = "mux", "pull", "gpio";
- 			gpio-controller;
- 			#gpio-cells = <2>;
-+			interrupt-parent = <&gpio_interrupt>;
- 		};
- 
- 		uart_ao_a_pins: uart_ao_a {
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 41fd53671859..36a239a645f5 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -44,6 +44,8 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/meson8b-clkc.h>
- #include <dt-bindings/gpio/meson8b-gpio.h>
- #include <dt-bindings/reset/amlogic,meson8b-reset.h>
-@@ -183,6 +185,13 @@
- 			status = "disabled";
- 		};
- 
-+		gpio_interrupt: interrupt-controller at c1109880 {
-+			compatible = "amlogic,meson8b-gpio-intc";
-+			reg = <0xc1109880 0x10>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
- 		pinctrl_cbus: pinctrl at c1109880 {
- 			compatible = "amlogic,meson8b-cbus-pinctrl";
- 			reg = <0xc1109880 0x10>;
-@@ -198,6 +207,7 @@
- 				reg-names = "mux", "pull", "pull-enable", "gpio";
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				interrupt-parent = <&gpio_interrupt>;
- 			};
- 		};
- 
-@@ -215,6 +225,7 @@
- 				reg-names = "mux", "pull", "gpio";
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				interrupt-parent = <&gpio_interrupt>;
- 			};
- 
- 			uart_ao_a_pins: uart_ao_a {
--- 
-2.7.4
+On 2016? 10? 18? 09:16, Stephen Boyd wrote:
+> The driver was changed after submission to use the new style APIs
+> like extcon_set_state(). Unfortunately, that only sets the state,
+> and doesn't notify any consumers that the cable state has
+> changed. Use extcon_set_state_sync() here instead so that we
+> notify cable consumers of the state change. This fixes USB
+> host-device role switching on the db8074 platform.
+> 
+> Fixes: 38085c987f52 ("extcon: Add support for qcom SPMI PMIC USB id detection hardware")
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+>  drivers/extcon/extcon-qcom-spmi-misc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/extcon/extcon-qcom-spmi-misc.c b/drivers/extcon/extcon-qcom-spmi-misc.c
+> index ca957a5f4291..b8cde096a808 100644
+> --- a/drivers/extcon/extcon-qcom-spmi-misc.c
+> +++ b/drivers/extcon/extcon-qcom-spmi-misc.c
+> @@ -51,7 +51,7 @@ static void qcom_usb_extcon_detect_cable(struct work_struct *work)
+>  	if (ret)
+>  		return;
+>  
+> -	extcon_set_state(info->edev, EXTCON_USB_HOST, !id);
+> +	extcon_set_state_sync(info->edev, EXTCON_USB_HOST, !id);
+>  }
+>  
+>  static irqreturn_t qcom_usb_irq_handler(int irq, void *dev_id)
+> 
+
+Applied it.
+
+Best Regards,
+Chanwoo Choi
