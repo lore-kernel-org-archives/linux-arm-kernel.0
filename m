@@ -1,153 +1,55 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 19 Oct 2016 17:23:49 +0900
-Subject: [PATCH] reset: uniphier: rename MIO reset to SD reset for Pro5, PXs2,
- LD20 SoCs
-Message-ID: <1476865429-13143-1-git-send-email-yamada.masahiro@socionext.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 19 Oct 2016 10:26:12 +0200
+Subject: [PATCH 2/4] base: soc: Introduce soc_device_match() interface
+In-Reply-To: <1475572167-29581-3-git-send-email-geert+renesas@glider.be>
+References: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
+ <1475572167-29581-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <20161019082612.GA6199@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I made a mistake as for naming for this block.  The MIO block is not
-implemented for these 3 SoCs in the first place.  The current naming
-will be a trouble if an SoC with both MIO and SD-ctrl blocks appear
-in the future.
+On Tue, Oct 04, 2016 at 11:09:25AM +0200, Geert Uytterhoeven wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> We keep running into cases where device drivers want to know the exact
+> version of the a SoC they are currently running on. In the past, this has
+> usually been done through a vendor specific API that can be called by a
+> driver, or by directly accessing some kind of version register that is
+> not part of the device itself but that belongs to a global register area
+> of the chip.
+> 
+> Common reasons for doing this include:
+> 
+> - A machine is not using devicetree or similar for passing data about
+>   on-chip devices, but just announces their presence using boot-time
+>   platform devices, and the machine code itself does not care about the
+>   revision.
+> 
+> - There is existing firmware or boot loaders with existing DT binaries
+>   with generic compatible strings that do not identify the particular
+>   revision of each device, but the driver knows which SoC revisions
+>   include which part.
+> 
+> - A prerelease version of a chip has some quirks and we are using the same
+>   version of the bootloader and the DT blob on both the prerelease and the
+>   final version. An update of the DT binding seems inappropriate because
+>   that would involve maintaining multiple copies of the dts and/or
+>   bootloader.
+> 
+> This patch introduces the soc_device_match() interface that is meant to
+> work like of_match_node() but instead of identifying the version of a
+> device, it identifies the SoC itself using a vendor-agnostic interface.
+> 
+> Unlike of_match_node(), we do not do an exact string compare but instead
+> use glob_match() to allow wildcards in strings.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  drivers/base/Kconfig    |  1 +
+>  drivers/base/soc.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/sys_soc.h |  3 +++
+>  3 files changed, 70 insertions(+)
 
-This driver has just been merged in the previous merge window.
-Rename it before the release.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
-Philipp,
-
-If you do not mind, may I include this in my PR
-along with the "select ARCH_HAS_RESET_CONTROLLER" patches?
-
-
-
- .../devicetree/bindings/reset/uniphier-reset.txt   | 22 +++++++++++-----------
- drivers/reset/reset-uniphier.c                     | 16 ++++++++--------
- 2 files changed, 19 insertions(+), 19 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-index e6bbfcc..78cd735 100644
---- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-+++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-@@ -19,12 +19,12 @@ Required properties:
- Example:
- 
- 	sysctrl at 61840000 {
--		compatible = "socionext,uniphier-ld20-sysctrl",
-+		compatible = "socionext,uniphier-ld11-sysctrl",
- 			     "simple-mfd", "syscon";
- 		reg = <0x61840000 0x4000>;
- 
- 		reset {
--			compatible = "socionext,uniphier-ld20-reset";
-+			compatible = "socionext,uniphier-ld11-reset";
- 			#reset-cells = <1>;
- 		};
- 
-@@ -32,8 +32,8 @@ Example:
- 	};
- 
- 
--Media I/O (MIO) reset
-----------------------
-+Media I/O (MIO) reset, SD reset
-+-------------------------------
- 
- Required properties:
- - compatible: should be one of the following:
-@@ -41,21 +41,21 @@ Required properties:
-     "socionext,uniphier-ld4-mio-reset"  - for PH1-LD4 SoC.
-     "socionext,uniphier-pro4-mio-reset" - for PH1-Pro4 SoC.
-     "socionext,uniphier-sld8-mio-reset" - for PH1-sLD8 SoC.
--    "socionext,uniphier-pro5-mio-reset" - for PH1-Pro5 SoC.
--    "socionext,uniphier-pxs2-mio-reset" - for ProXstream2/PH1-LD6b SoC.
-+    "socionext,uniphier-pro5-sd-reset"  - for PH1-Pro5 SoC.
-+    "socionext,uniphier-pxs2-sd-reset"  - for ProXstream2/PH1-LD6b SoC.
-     "socionext,uniphier-ld11-mio-reset" - for PH1-LD11 SoC.
--    "socionext,uniphier-ld20-mio-reset" - for PH1-LD20 SoC.
-+    "socionext,uniphier-ld20-sd-reset"  - for PH1-LD20 SoC.
- - #reset-cells: should be 1.
- 
- Example:
- 
- 	mioctrl at 59810000 {
--		compatible = "socionext,uniphier-ld20-mioctrl",
-+		compatible = "socionext,uniphier-ld11-mioctrl",
- 			     "simple-mfd", "syscon";
- 		reg = <0x59810000 0x800>;
- 
- 		reset {
--			compatible = "socionext,uniphier-ld20-mio-reset";
-+			compatible = "socionext,uniphier-ld11-mio-reset";
- 			#reset-cells = <1>;
- 		};
- 
-@@ -80,12 +80,12 @@ Required properties:
- Example:
- 
- 	perictrl at 59820000 {
--		compatible = "socionext,uniphier-ld20-perictrl",
-+		compatible = "socionext,uniphier-ld11-perictrl",
- 			     "simple-mfd", "syscon";
- 		reg = <0x59820000 0x200>;
- 
- 		reset {
--			compatible = "socionext,uniphier-ld20-peri-reset";
-+			compatible = "socionext,uniphier-ld11-peri-reset";
- 			#reset-cells = <1>;
- 		};
- 
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 8b2558e..968c3ae 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -154,7 +154,7 @@ struct uniphier_reset_data {
- 	UNIPHIER_RESET_END,
- };
- 
--const struct uniphier_reset_data uniphier_pro5_mio_reset_data[] = {
-+const struct uniphier_reset_data uniphier_pro5_sd_reset_data[] = {
- 	UNIPHIER_MIO_RESET_SD(0, 0),
- 	UNIPHIER_MIO_RESET_SD(1, 1),
- 	UNIPHIER_MIO_RESET_EMMC_HW_RESET(6, 1),
-@@ -360,7 +360,7 @@ static int uniphier_reset_probe(struct platform_device *pdev)
- 		.compatible = "socionext,uniphier-ld20-reset",
- 		.data = uniphier_ld20_sys_reset_data,
- 	},
--	/* Media I/O reset */
-+	/* Media I/O reset, SD reset */
- 	{
- 		.compatible = "socionext,uniphier-sld3-mio-reset",
- 		.data = uniphier_sld3_mio_reset_data,
-@@ -378,20 +378,20 @@ static int uniphier_reset_probe(struct platform_device *pdev)
- 		.data = uniphier_sld3_mio_reset_data,
- 	},
- 	{
--		.compatible = "socionext,uniphier-pro5-mio-reset",
--		.data = uniphier_pro5_mio_reset_data,
-+		.compatible = "socionext,uniphier-pro5-sd-reset",
-+		.data = uniphier_pro5_sd_reset_data,
- 	},
- 	{
--		.compatible = "socionext,uniphier-pxs2-mio-reset",
--		.data = uniphier_pro5_mio_reset_data,
-+		.compatible = "socionext,uniphier-pxs2-sd-reset",
-+		.data = uniphier_pro5_sd_reset_data,
- 	},
- 	{
- 		.compatible = "socionext,uniphier-ld11-mio-reset",
- 		.data = uniphier_sld3_mio_reset_data,
- 	},
- 	{
--		.compatible = "socionext,uniphier-ld20-mio-reset",
--		.data = uniphier_pro5_mio_reset_data,
-+		.compatible = "socionext,uniphier-ld20-sd-reset",
-+		.data = uniphier_pro5_sd_reset_data,
- 	},
- 	/* Peripheral reset */
- 	{
--- 
-1.9.1
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
