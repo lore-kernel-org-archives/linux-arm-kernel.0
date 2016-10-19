@@ -1,83 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 19 Oct 2016 11:59:09 +0200
-Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
-Message-ID: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 19 Oct 2016 11:59:10 +0200
+Subject: [PATCH 1/5] cpufreq: enable the DT cpufreq driver on the Integrators
+In-Reply-To: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1476871154-32243-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the ARM Integrator/AP and Integrator/CP to use the
-Device Tree cpufreq policy with its definition of operating points
-using the generic OPP library.
+This enables the generic DT and OPP-based cpufreq driver on the
+ARM Integrator/AP and Integrator/CP.
 
-The Integrators does not need to control a regulator to switch
-frequency, only a clock. This clock and its device tree bindings
-have been defined in the device tree and merged upstream for v4.9.
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/cpufreq/cpufreq-dt-platdev.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This approach provides a little better granularity on the
-Integrator/AP where I defined a few operating points: before
-this change the Integrator would just switch between min speed
-(12 MHz) and max speed (71 MHz). Now it can switch between a
-few arbitrarily chosen OPPs as in the examples below:
-
-The following tests were made on the Integrator/AP:
-
-/sys/devices/system/cpu/cpufreq/policy0 echo ondemand > scaling_governor
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 24000000 Hz
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 24000000 Hz
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-
-The switch from 12 to 24 MHz is triggered by as little as using the
-command line with the ondemand governor. If we do this:
-
-yes > /dev/null &
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 36000000 Hz
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 36000000 Hz --> 71000000 Hz
-pkill yes
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-
-So the algorithm is indeed using all the OPPs.
-
-Also as a confirmation test to make sure performance is affected by the
-speed changes, we set the performance governor and:
-
-echo 12000 > scaling_max_freq
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-time find /sys|sort|uniq > /dev/null
-real    0m 45.51s
-user    0m 11.15s
-sys     0m 26.74s
-
-echo 71000 > scaling_max_freq
-cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 71000000 Hz
-time find /sys|sort|uniq
- > /dev/null
-real    0m 9.13s
-user    0m 2.35s
-sys     0m 5.50s
-
-So it is working.
-
-If people are happy with this approach and approve of the patches
-I'd like an ACK from the cpufreq people and then merge the whole set
-through ARM SoC.
-
-Linus Walleij (5):
-  cpufreq: enable the DT cpufreq driver on the Integrators
-  ARM: dts: Add Integrator/AP cpus node and operating points
-  ARM: dts: Add Integrator/CP cpus node and operating points
-  ARM: defconfig: turn on the DT cpufreq for Integrator
-  cpufreq: retire the Integrator cpufreq driver
-
- arch/arm/boot/dts/integratorap.dts    |  35 +++++
- arch/arm/boot/dts/integratorcp.dts    |  26 ++++
- arch/arm/configs/integrator_defconfig |   1 +
- drivers/cpufreq/Kconfig.arm           |   8 --
- drivers/cpufreq/Makefile              |   1 -
- drivers/cpufreq/cpufreq-dt-platdev.c  |   3 +
- drivers/cpufreq/integrator-cpufreq.c  | 239 ----------------------------------
- 7 files changed, 65 insertions(+), 248 deletions(-)
- delete mode 100644 drivers/cpufreq/integrator-cpufreq.c
-
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 71267626456b..142a6f615e52 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -26,6 +26,9 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "allwinner,sun8i-a83t", },
+ 	{ .compatible = "allwinner,sun8i-h3", },
+ 
++	{ .compatible = "arm,integrator-ap", },
++	{ .compatible = "arm,integrator-cp", },
++
+ 	{ .compatible = "hisilicon,hi6220", },
+ 
+ 	{ .compatible = "fsl,imx27", },
 -- 
 2.7.4
