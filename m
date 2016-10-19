@@ -1,36 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 19 Oct 2016 16:58:52 +0100
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <20161019133500.GQ9193@arm.com>
-References: <20161017183806.GG5601@arm.com>
- <CAKv+Gu869PXA_cXaL6+uokRCS4EZ8-q6x2xnj4e5DWO28B5jCw@mail.gmail.com>
- <20161019133500.GQ9193@arm.com>
-Message-ID: <20161019155852.GS1041@n2100.armlinux.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 19 Oct 2016 08:59:54 -0700
+Subject: [PATCH v5 0/5] Add support for legacy SCPI protocol
+In-Reply-To: <ff62da76-a7b9-6891-c198-f9049dfa7bb5@arm.com> (Sudeep Holla's
+ message of "Wed, 19 Oct 2016 15:44:23 +0100")
+References: <1476881472-13055-1-git-send-email-narmstrong@baylibre.com>
+ <ff62da76-a7b9-6891-c198-f9049dfa7bb5@arm.com>
+Message-ID: <7h1szc9vnp.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 02:35:00PM +0100, Will Deacon wrote:
-> Hi Ard,
-> 
-> On Mon, Oct 17, 2016 at 08:43:19PM +0100, Ard Biesheuvel wrote:
-> > If order_base_2() is not defined for input 0, it should BUG() in that
-> > case, and the associated __builtin_unreachable() should prevent the
-> > special version from being emitted. If order_base_2() is defined for input
-> > 0, it should not invoke ilog2() with that argument, and the problem should
-> > go away as well.
-> 
-> I don't necessarily think it should BUG() if it's not defined for input
-> 0;
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
-In any case, Linus will have a rant about that: Linus has already been
-concerned about the abuse of BUG().  BUG() should not be used as an
-assert() replacement, but should be used where we have absolutely
-no other option than to crash the kernel, because (eg) continuing
-would result in the users' data being corrupted.
+> On 19/10/16 13:51, Neil Armstrong wrote:
+>> This patchset aims to support the legacy SCPI firmware implementation that was
+>> delivered as early technology preview for the JUNO platform.
+>>
+>> Finally a stable, maintained and public implementation for the SCPI protocol
+>> has been upstreamed part of the JUNO support and it is the recommended way
+>> of implementing SCP communication on ARMv8 platforms.
+>>
+>> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
+>> platforms. This patchset will only add support for Amlogic GXBB SoC.
+>>
+>> This patchset add support for the legacy protocol in the arm_scpi.c file,
+>> avoiding code duplication.
+>>
+>> This patchset is rebased against scpi-updates/for-next from [2] and with
+>> already merged patches [3], [4] and [5] and ommited in this patchset.
+>>
+>> Last RFC discution thread can be found at : https://lkml.org/lkml/2016/8/9/210
+>>
+>> Changes since v4 at : http://lkml.kernel.org/r/1475652814-30619-1-git-send-email-narmstrong at baylibre.com
+>>  - Removed legacy locking scheme
+>>  - Removed cmd copy back after token insert
+>>  - Various cleanups
+>>
+>> Changes since v3 at : http://lkml.kernel.org/r/1473262477-18045-1-git-send-email-narmstrong at baylibre.com
+>>  - Changed back author to Sudeep Holla for first patch
+>>  - Merged legacy functions to scpi_send_message, tx_prepare and handle_remote_message
+>>  - Added legacy locking scheme
+>>  - Merged back legacy_scpi_sensor_get_value into scpi_sensor_get_value
+>>  - Rebased on linux-next-20161004 with patchset [1]
+>>
+>> Changes since v2 at : http://lkml.kernel.org/r/1471952816-30877-1-git-send-email-narmstrong at baylibre.com
+>>  - Added command indirection table and use it in each commands
+>>  - Added bitmap for high priority commands
+>>  - Cleaned up legacy tx_prepare/handle_message to align to standard functions
+>>  - Dropped legacy_scpi_ops
+>>
+>> Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
+>>  - Dropped vendor_send_message and rockchip vendor mechanism patches
+>>  - Merged alternate functions into main functions using is_legacy boolean
+>>  - Added DT match table to set is_legacy to true
+>>  - Kept alternate scpi_ops structure for legacy
+>>
+>> [1] http://lkml.kernel.org/r/1475595430-30075-1-git-send-email-narmstrong at baylibre.com
+>> [2] git.kernel.org/sudeep.holla/linux
+>> [3] scpi: Add cmd indirection table to prepare for legacy commands
+>> [4] scpi: grow MAX_DVFS_OPPS to 16 entries
+>> [5] dt-bindings: Add support for Amlogic GXBB SCPI Interface
+>>
+>> Neil Armstrong (5):
+>>   scpi: Add alternative legacy structures, functions and macros
+>>   scpi: Do not fail if get_capabilities is not implemented
+>>   scpi: Add support for Legacy match table for Amlogic GXBB SoC
+>>   ARM64: dts: meson-gxbb: Add SRAM node
+>>   ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
+>>
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi |  57 ++++++++
+>>  drivers/firmware/arm_scpi.c                 | 206 +++++++++++++++++++++++++---
+>>  2 files changed, 245 insertions(+), 18 deletions(-)
+>>
+>
+> Nice to see this diff stat from a whole new file legacy_scpi.c and 1000+
+> delta. Thanks for working on this. I have applied the first 3 patches in
+> this series with some subject/commit message changes to [1].
 
-So no, BUG() is not the answer here.
+Sudeep, will this be an immutable branch? (or could you put a tag at an
+immutable place on this branch?)  I'd like to include this in my amlogic
+integration branch for broader testing.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+
+Kevin
