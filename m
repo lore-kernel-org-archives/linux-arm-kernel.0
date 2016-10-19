@@ -1,37 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 19 Oct 2016 13:07:15 +0100
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
- <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
- <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
- <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
- <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
-Message-ID: <20161019120714.GM9193@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Oct 2016 14:09:10 +0200
+Subject: [PATCH] dmaengine: st_fdma: fix uninitialized variable access
+Message-ID: <20161019120927.3251235-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 08:45:43AM +0530, Pratyush Anand wrote:
-> 
-> 
-> On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
-> >>I think, its easier to go with your implementation. So, I have taken
-> >>> your patch and updated my perf/upstream_arm64_devel branch. May be you
-> >>> can give it a test for your test cases.
-> >I've checked out the new version of your branch, and it works great.
-> >I'll write a patch with additional test cases to go on top of your
-> >branch, as the tests there do not capture the bug I was fixing.
-> 
-> That would be great. We can send them all together as V2.
+The newly added st_fdma driver introduces a build warning for
+allmodconfig when we add '-Wmaybe-uninitialized':
 
-Did you send a v2? I've been holding off reviewing this, but I just want
-to make sure I didn't miss the update.
+drivers/dma/st_fdma.c: In function 'st_fdma_probe':
+drivers/dma/st_fdma.c:777:5: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-Cheers,
+The warning is correct, though this can't happen in practice
+as the check is redundant (we don't get to this function if
+the pointer is NULL). Even if the function were called with a
+NULL of_node, the check is not needed because of_property_read_u32
+can deal with a NULL argument by returning an error.
 
-Will
+Removing the unnecessary code simplifies the function and avoids
+the condition that we get the warning for.
+
+Fixes: 6b4cd727eaf1 ("dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/st_fdma.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
+index 515e1d4c43e8..232d3547a6a3 100644
+--- a/drivers/dma/st_fdma.c
++++ b/drivers/dma/st_fdma.c
+@@ -720,21 +720,11 @@ static int st_fdma_parse_dt(struct platform_device *pdev,
+ 			const struct st_fdma_driverdata *drvdata,
+ 			struct st_fdma_dev *fdev)
+ {
+-	struct device_node *np = pdev->dev.of_node;
+-	int ret;
+-
+-	if (!np)
+-		goto err;
+-
+-	ret = of_property_read_u32(np, "dma-channels", &fdev->nr_channels);
+-	if (ret)
+-		goto err;
+-
+ 	snprintf(fdev->fw_name, FW_NAME_SIZE, "fdma_%s_%d.elf",
+ 		drvdata->name, drvdata->id);
+ 
+-err:
+-	return ret;
++	return of_property_read_u32(pdev->dev.of_node, "dma-channels",
++				    &fdev->nr_channels);
+ }
+ #define FDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
+ 				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+-- 
+2.9.0
