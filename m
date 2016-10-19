@@ -1,40 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 19 Oct 2016 20:49:39 +0900
-Subject: [PATCH] clk: uniphier: fix memory overrun bug
-Message-ID: <1476877779-27854-1-git-send-email-yamada.masahiro@socionext.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Oct 2016 13:07:15 +0100
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+ <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
+ <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
+ <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
+ <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
+ <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
+ <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
+ <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
+Message-ID: <20161019120714.GM9193@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first loop of this "for" statement writes memory beyond the
-allocated clk_hw_onecell_data.
+On Fri, Oct 14, 2016 at 08:45:43AM +0530, Pratyush Anand wrote:
+> 
+> 
+> On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
+> >>I think, its easier to go with your implementation. So, I have taken
+> >>> your patch and updated my perf/upstream_arm64_devel branch. May be you
+> >>> can give it a test for your test cases.
+> >I've checked out the new version of your branch, and it works great.
+> >I'll write a patch with additional test cases to go on top of your
+> >branch, as the tests there do not capture the bug I was fixing.
+> 
+> That would be great. We can send them all together as V2.
 
-It should be:
-    for (clk_num--; clk_num >= 0; clk_num--)
-            ...
+Did you send a v2? I've been holding off reviewing this, but I just want
+to make sure I didn't miss the update.
 
-Or more simply:
-    while (--clk_num >= 0)
-            ...
+Cheers,
 
-Fixes: 734d82f4a678 ("clk: uniphier: add core support code for UniPhier clock driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/clk/uniphier/clk-uniphier-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/uniphier/clk-uniphier-core.c b/drivers/clk/uniphier/clk-uniphier-core.c
-index f4e0f6b..84bc465 100644
---- a/drivers/clk/uniphier/clk-uniphier-core.c
-+++ b/drivers/clk/uniphier/clk-uniphier-core.c
-@@ -79,7 +79,7 @@ static int uniphier_clk_probe(struct platform_device *pdev)
- 	hw_data->num = clk_num;
- 
- 	/* avoid returning NULL for unused idx */
--	for (; clk_num >= 0; clk_num--)
-+	while (--clk_num >= 0)
- 		hw_data->hws[clk_num] = ERR_PTR(-EINVAL);
- 
- 	for (p = data; p->name; p++) {
--- 
-1.9.1
+Will
