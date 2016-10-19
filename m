@@ -1,68 +1,63 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 19 Oct 2016 17:33:00 +0900
-Subject: [PATCH 2/3] arm64: dts: uniphier: add CPU clock and OPP table for
- LD11 SoC
-In-Reply-To: <20161018112548.GA11471@vireshk-i7>
-References: <1476629958-25368-1-git-send-email-yamada.masahiro@socionext.com>
- <1476629958-25368-3-git-send-email-yamada.masahiro@socionext.com>
- <20161018112548.GA11471@vireshk-i7>
-Message-ID: <CAK7LNATc2XxAZf-rvMkRjGn3q_18yB=9aycAE1j9+n0==xzaHQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 19 Oct 2016 10:34:41 +0200
+Subject: [PATCH v3 06/11] ARM: dts: r8a7743: add [H]SCIF{A|B} support
+In-Reply-To: <14213508.lp3q5ZvmbF@wasted.cogentembedded.com>
+References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+ <14213508.lp3q5ZvmbF@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUaCKh-WFth9q3-1fM+4_Wpi0T2kSEkexo8aZNQoe3pzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
-
-
-2016-10-18 20:25 GMT+09:00 Viresh Kumar <viresh.kumar@linaro.org>:
-> On 16-10-16, 23:59, Masahiro Yamada wrote:
->> +     cluster0_opp: opp_table {
->> +             compatible = "operating-points-v2";
->> +             opp-shared;
->> +
->> +             opp at 245000000 {
->> +                     opp-hz = /bits/ 64 <245000000>;
->> +                     clock-latency-ns = <300>;
->> +             };
->> +             opp at 250000000 {
->> +                     opp-hz = /bits/ 64 <250000000>;
->> +                     clock-latency-ns = <300>;
->> +             };
->> +             opp at 490000000 {
->> +                     opp-hz = /bits/ 64 <490000000>;
->> +                     clock-latency-ns = <300>;
->> +             };
->> +             opp at 500000000 {
->> +                     opp-hz = /bits/ 64 <500000000>;
->> +                     clock-latency-ns = <300>;
->> +             };
->> +             opp at 653333333 {
+On Wed, Oct 5, 2016 at 11:41 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe [H]SCIF[AB] ports in the R8A7743 device tree.
 >
-> Why isn't ^^ matching with below values ? Same in next patch as well.
+> Based on the original (and large) patch by Dmitry Shifrin
+> <dmitry.shifrin@cogentembedded.com>.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
+With the modifications indicated below:
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-When I try to update /sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq,
-it did not work as I had expected.
+> --- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+> @@ -162,6 +162,267 @@
+>                         #dma-cells = <1>;
+>                         dma-channels = <15>;
+>                 };
+> +
+> +               scifa0: serial at e6c40000 {
+> +                       compatible = "renesas,scifa-r8a7743",
+> +                                    "renesas,rzg-scifa", "renesas,scifa";
 
+Please use "renesas,rcar-gen2-scifa" instead of "renesas,rzg-scifa".
 
-scaling_max_freq is specified by kHz unit,
-on the other hand, clock frequency in the clk driver is specified by Hz.
+> +               scifb0: serial at e6c20000 {
+> +                       compatible = "renesas,scifb-r8a7743",
+> +                                    "renesas,rzg-scifb", "renesas,scifb";
 
+"renesas,rcar-gen2-scifb"
 
+> +               scif0: serial at e6e60000 {
+> +                       compatible = "renesas,scif-r8a7743", "renesas,rzg-scif",
 
-If the operating point is 653333kHz, the cpufreq requests
-the clk driver to set 653333000, but it is lower than
-the exact clock, 653333333.
-So, the next lower frequency, 500000000 is selected.
-As a result, the operating point 653333kHz is never enabled.
+"renesas,rcar-gen2-scif"
 
+> +               hscif0: serial at e62c0000 {
+> +                       compatible = "renesas,hscif-r8a7743",
+> +                                    "renesas,rzg-hscif", "renesas,hscif";
 
-So, the operating point must be equal or a little bit bigger.
+"renesas,rcar-gen2-hscif"
 
+Gr{oetje,eeting}s,
 
-Do you know a better way to solve this distortion?
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-Best Regards
-Masahiro Yamada
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
