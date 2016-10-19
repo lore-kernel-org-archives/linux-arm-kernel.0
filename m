@@ -1,37 +1,34 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 19 Oct 2016 15:33:47 -0500
-Subject: [PATCH v2 4/4] ARM: keystone: Drop PM domain support for k2g
+Date: Wed, 19 Oct 2016 15:33:44 -0500
+Subject: [PATCH v2 1/4] PM / Domains: Add generic data pointer to genpd data
+ struct
 In-Reply-To: <20161019203347.17893-1-d-gerlach@ti.com>
 References: <20161019203347.17893-1-d-gerlach@ti.com>
-Message-ID: <20161019203347.17893-5-d-gerlach@ti.com>
+Message-ID: <20161019203347.17893-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-K2G will use a different power domain driver than the rest of the
-keystone family in order to make use of the TI SCI protocol so prevent
-the standard keystone pm_domain code from registering itself in
-preparation for a new driver.
+Add a void *data pointer to struct generic_pm_domain_data. Because this
+exists for each device associated with a genpd it will allow us to
+assign per-device data if needed on a platform for control of that
+specific device.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/mach-keystone/pm_domain.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ include/linux/pm_domain.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-index 8cbb35765a19..fe57e2692629 100644
---- a/arch/arm/mach-keystone/pm_domain.c
-+++ b/arch/arm/mach-keystone/pm_domain.c
-@@ -32,7 +32,9 @@ static struct pm_clk_notifier_block platform_domain_notifier = {
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index a09fe5c009c8..9c0a897fe605 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -105,6 +105,7 @@ struct generic_pm_domain_data {
+ 	struct pm_domain_data base;
+ 	struct gpd_timing_data td;
+ 	struct notifier_block nb;
++	void *data;
  };
  
- static const struct of_device_id of_keystone_table[] = {
--	{.compatible = "ti,keystone"},
-+	{.compatible = "ti,k2hk"},
-+	{.compatible = "ti,k2e"},
-+	{.compatible = "ti,k2l"},
- 	{ /* end of list */ },
- };
- 
+ #ifdef CONFIG_PM_GENERIC_DOMAINS
 -- 
 2.9.3
