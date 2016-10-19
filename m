@@ -1,39 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 18 Oct 2016 17:52:57 -0700
-Subject: [PATCH 2/2] ARM: dts: add SMSC ethernet on the APQ8060 Dragonboard
-In-Reply-To: <1476775542-4540-1-git-send-email-linus.walleij@linaro.org>
-References: <1476775542-4540-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161019005257.GU8871@codeaurora.org>
+From: ayaka@soulik.info (Ayaka)
+Date: Wed, 19 Oct 2016 09:15:06 +0800
+Subject: [PATCH v9 2/2] ARM: dts: add TOPEET itop elite based board
+In-Reply-To: <20161018173748.GB30003@kozik-lap>
+References: <devicetree@vger.kernel.org>
+ <1476811129-4450-1-git-send-email-ayaka@soulik.info>
+ <1476811129-4450-3-git-send-email-ayaka@soulik.info>
+ <20161018173748.GB30003@kozik-lap>
+Message-ID: <58DB0A67-6C74-409B-80B2-9F02492D3A55@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18, Linus Walleij wrote:
-> @@ -167,6 +190,41 @@
->  					bias-pull-up;
->  				};
->  			};
-> +
-> +			dragon_ebi2_pins: ebi2 {
-> +				/*
-> +				 * Pins used by EBI2 on the Dragonboard, actually only
-> +				 * only CS2 is used by a real peripheral. CS0 is just
-> +				 * routed to a test point.
-> +				 */
-> +				mux0 {
-> +					/*
-> +					 * Pins used by EBI2 on the Dragonboard, actually only
-> +					 * only CS2 is used by a real peripheral. CS0 is just
-> +					 * routed to a test point.
-> +					 */
 
-Same comment twice? Plus it says "only only CS2", so we probably
-want to drop one "only".
 
-> +					pins =
-> +					    /* "gpio39", CS1A_N this is not good to mux */
-> +					    "gpio40", /* CS2A_N */
-> +					    "gpio134"; /* CS0_N testpoint TP29 */
+??? iPad ??
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Krzysztof Kozlowski <krzk@kernel.org> ? 2016?10?19? ??1:37 ???
+> 
+>> On Wed, Oct 19, 2016 at 01:18:49AM +0800, Randy Li wrote:
+>> The TOPEET itop exynos 4412 have three versions base board. The
+>> Elite version is the cheap one without too much peripheral devices
+>> on it.
+>> 
+>> Currently supported are serial console, wired networking(USB),
+>> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
+>> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
+>> enabled.
+>> 
+>> The FIMC is not used for camera currently, I enabled it just for a
+>> colorspace converter.
+>> 
+>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> Thanks, applied, with missing Rob's ack, minor changes in commit msg and
+> fix in pin function (you used macro for pull up/down instead of
+> function).
+The last time I saw the other dts have applied that, but they are not now. A header file is also missed reported by kbuild, but I didn't meet that.
+> 
+> Best regards,
+> Krzysztof
