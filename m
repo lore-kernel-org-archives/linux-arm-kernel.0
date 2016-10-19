@@ -1,44 +1,83 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Oct 2016 11:56:44 +0200
-Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6
- as parent
-In-Reply-To: <20161018054209.24546-1-wens@csie.org>
-References: <20161018054209.24546-1-wens@csie.org>
-Message-ID: <20161019095644.336urfguu6azmmy3@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 19 Oct 2016 11:59:09 +0200
+Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
+Message-ID: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 01:42:09PM +0800, Chen-Yu Tsai wrote:
-> On the A31, the DMA engine only works if AHB1 is clocked from PLL6.
-> In addition, the hstimer is clocked from AHB1, and if AHB1 is clocked
-> from the CPU clock, and cpufreq is working, we get an unstable timer.
-> 
-> Force the AHB1 clock to use PLL6 as its parent. Previously this was done
-> in the device tree with the assigned-clocks and assigned-clocks-parent
-> bindings. However with this new monolithic driver, the system critical
-> clocks aren't exported through the device tree. The alternative is to
-> force this setting in the driver before the clocks are registered.
-> 
-> This is also done in newer versions of mainline U-boot. But people still
-> using an older version, or even the vendor version, can still hit this
-> issue. Hence the need to do it in the kernel as well.
-> 
-> Reported-by: Hans de Goede <hdegoede@redhat.com>
-> Reported-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This switches the ARM Integrator/AP and Integrator/CP to use the
+Device Tree cpufreq policy with its definition of operating points
+using the generic OPP library.
 
-Applied, thanks!
-Maxime
+The Integrators does not need to control a regulator to switch
+frequency, only a clock. This clock and its device tree bindings
+have been defined in the device tree and merged upstream for v4.9.
+
+This approach provides a little better granularity on the
+Integrator/AP where I defined a few operating points: before
+this change the Integrator would just switch between min speed
+(12 MHz) and max speed (71 MHz). Now it can switch between a
+few arbitrarily chosen OPPs as in the examples below:
+
+The following tests were made on the Integrator/AP:
+
+/sys/devices/system/cpu/cpufreq/policy0 echo ondemand > scaling_governor
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 24000000 Hz
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 24000000 Hz
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
+
+The switch from 12 to 24 MHz is triggered by as little as using the
+command line with the ondemand governor. If we do this:
+
+yes > /dev/null &
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 36000000 Hz
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 36000000 Hz --> 71000000 Hz
+pkill yes
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
+
+So the algorithm is indeed using all the OPPs.
+
+Also as a confirmation test to make sure performance is affected by the
+speed changes, we set the performance governor and:
+
+echo 12000 > scaling_max_freq
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
+time find /sys|sort|uniq > /dev/null
+real    0m 45.51s
+user    0m 11.15s
+sys     0m 26.74s
+
+echo 71000 > scaling_max_freq
+cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 71000000 Hz
+time find /sys|sort|uniq
+ > /dev/null
+real    0m 9.13s
+user    0m 2.35s
+sys     0m 5.50s
+
+So it is working.
+
+If people are happy with this approach and approve of the patches
+I'd like an ACK from the cpufreq people and then merge the whole set
+through ARM SoC.
+
+Linus Walleij (5):
+  cpufreq: enable the DT cpufreq driver on the Integrators
+  ARM: dts: Add Integrator/AP cpus node and operating points
+  ARM: dts: Add Integrator/CP cpus node and operating points
+  ARM: defconfig: turn on the DT cpufreq for Integrator
+  cpufreq: retire the Integrator cpufreq driver
+
+ arch/arm/boot/dts/integratorap.dts    |  35 +++++
+ arch/arm/boot/dts/integratorcp.dts    |  26 ++++
+ arch/arm/configs/integrator_defconfig |   1 +
+ drivers/cpufreq/Kconfig.arm           |   8 --
+ drivers/cpufreq/Makefile              |   1 -
+ drivers/cpufreq/cpufreq-dt-platdev.c  |   3 +
+ drivers/cpufreq/integrator-cpufreq.c  | 239 ----------------------------------
+ 7 files changed, 65 insertions(+), 248 deletions(-)
+ delete mode 100644 drivers/cpufreq/integrator-cpufreq.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/bc1a6152/attachment-0001.sig>
+2.7.4
