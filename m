@@ -1,59 +1,45 @@
-From: daeinki@gmail.com (Inki Dae)
-Date: Wed, 19 Oct 2016 22:28:40 +0900
-Subject: [PATCH] exynos-drm: Fix error messages to print flags and size
-In-Reply-To: <57F64D0B.5050506@math.uni-bielefeld.de>
-References: <1470850236-9101-1-git-send-email-shuahkh@osg.samsung.com>
- <57F64D0B.5050506@math.uni-bielefeld.de>
-Message-ID: <CAAQKjZOTQPTf=M9RF5omDZVm2Wh+K15xHQ3xnzwBqiirvadEdg@mail.gmail.com>
+From: labath@google.com (Pavel Labath)
+Date: Wed, 19 Oct 2016 14:30:33 +0100
+Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <20161019120714.GM9193@arm.com>
+References: <1474643941-109020-1-git-send-email-labath@google.com>
+ <1474643941-109020-2-git-send-email-labath@google.com>
+ <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
+ <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
+ <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
+ <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
+ <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
+ <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
+ <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
+ <20161019120714.GM9193@arm.com>
+Message-ID: <CAJt8pk-+yzDookHbzu3kEYzKisebDBjdfjsTVTS6MOsTx3UB9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-06 22:09 GMT+09:00 Tobias Jakobi <tjakobi@math.uni-bielefeld.de>:
-> Hello,
->
-> I think this patch was never picked up. So just a short 'ping' from my side.
->
+I've send the test suite update to Pratyush via github yesterday. I
+presume he will come with a v2 soon. :)
 
-Oops. one I missed. Will pick it up soon.
+regards,
+pavel
 
-Thanks,
-Inki Dae
-
-> With best wishes,
-> Tobias
+On 19 October 2016 at 13:07, Will Deacon <will.deacon@arm.com> wrote:
+> On Fri, Oct 14, 2016 at 08:45:43AM +0530, Pratyush Anand wrote:
+>>
+>>
+>> On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
+>> >>I think, its easier to go with your implementation. So, I have taken
+>> >>> your patch and updated my perf/upstream_arm64_devel branch. May be you
+>> >>> can give it a test for your test cases.
+>> >I've checked out the new version of your branch, and it works great.
+>> >I'll write a patch with additional test cases to go on top of your
+>> >branch, as the tests there do not capture the bug I was fixing.
+>>
+>> That would be great. We can send them all together as V2.
 >
+> Did you send a v2? I've been holding off reviewing this, but I just want
+> to make sure I didn't miss the update.
 >
-> Shuah Khan wrote:
->> Fix exynos_drm_gem_create() error messages to include flags and size when
->> flags and size are invalid.
->>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>  drivers/gpu/drm/exynos/exynos_drm_gem.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
->> index cdf9f1a..4c4cb0e 100644
->> --- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
->> +++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
->> @@ -231,12 +231,12 @@ struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
->>       int ret;
->>
->>       if (flags & ~(EXYNOS_BO_MASK)) {
->> -             DRM_ERROR("invalid flags.\n");
->> +             DRM_ERROR("invalid GEM buffer flags: %u\n", flags);
->>               return ERR_PTR(-EINVAL);
->>       }
->>
->>       if (!size) {
->> -             DRM_ERROR("invalid size.\n");
->> +             DRM_ERROR("invalid GEM buffer size: %lu\n", size);
->>               return ERR_PTR(-EINVAL);
->>       }
->>
->>
+> Cheers,
 >
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> Will
