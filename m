@@ -1,90 +1,37 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 19 Oct 2016 14:51:12 +0200
-Subject: [PATCH v5 5/5] ARM64: dts: meson-gxbb: Add SCPI with cpufreq &
- sensors Nodes
-In-Reply-To: <1476881472-13055-1-git-send-email-narmstrong@baylibre.com>
-References: <1476881472-13055-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1476881472-13055-6-git-send-email-narmstrong@baylibre.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 19 Oct 2016 13:52:12 +0100
+Subject: [PATCH] dmaengine: st_fdma: fix uninitialized variable access
+In-Reply-To: <20161019120927.3251235-1-arnd@arndb.de>
+References: <20161019120927.3251235-1-arnd@arndb.de>
+Message-ID: <20161019125212.GA32299@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 48 +++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Hi Arnd,
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 28e218d..ff1975e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -74,6 +74,28 @@
- 		};
- 	};
- 
-+	scpi {
-+		compatible = "amlogic,meson-gxbb-scpi";
-+		mboxes = <&mailbox 1 &mailbox 2>;
-+		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
-+
-+		clocks {
-+			compatible = "arm,scpi-clocks";
-+
-+			scpi_dvfs: scpi_clocks at 0 {
-+				compatible = "arm,scpi-dvfs-clocks";
-+				#clock-cells = <1>;
-+				clock-indices = <0>;
-+				clock-output-names = "vcpu";
-+			};
-+		};
-+
-+		scpi_sensors: sensors {
-+			compatible = "arm,scpi-sensors";
-+			#thermal-sensor-cells = <1>;
-+		};
-+	};
-+
- 	soc {
- 		usb0_phy: phy at c0000000 {
- 			compatible = "amlogic,meson-gxbb-usb2-phy";
-@@ -101,6 +123,16 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges = <0 0x0 0xc8000000 0x14000>;
-+
-+			cpu_scp_lpri: scp-shmem at 0 {
-+				compatible = "amlogic,meson-gxbb-scp-shmem";
-+				reg = <0x13000 0x400>;
-+			};
-+
-+			cpu_scp_hpri: scp-shmem at 200 {
-+				compatible = "amlogic,meson-gxbb-scp-shmem";
-+				reg = <0x13400 0x400>;
-+			};
- 		};
- 
- 		usb0: usb at c9000000 {
-@@ -143,6 +175,22 @@
- 	};
- };
- 
-+&cpu0 {
-+	clocks = <&scpi_dvfs 0>;
-+};
-+
-+&cpu1 {
-+	clocks = <&scpi_dvfs 0>;
-+};
-+
-+&cpu2 {
-+	clocks = <&scpi_dvfs 0>;
-+};
-+
-+&cpu3 {
-+	clocks = <&scpi_dvfs 0>;
-+};
-+
- &cbus {
- 	reset: reset-controller at 4404 {
- 		compatible = "amlogic,meson-gxbb-reset";
--- 
-1.9.1
+On Wed, 19 Oct 2016, Arnd Bergmann wrote:
+
+> The newly added st_fdma driver introduces a build warning for
+> allmodconfig when we add '-Wmaybe-uninitialized':
+> 
+> drivers/dma/st_fdma.c: In function 'st_fdma_probe':
+> drivers/dma/st_fdma.c:777:5: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> The warning is correct, though this can't happen in practice
+> as the check is redundant (we don't get to this function if
+> the pointer is NULL). Even if the function were called with a
+> NULL of_node, the check is not needed because of_property_read_u32
+> can deal with a NULL argument by returning an error.
+> 
+> Removing the unnecessary code simplifies the function and avoids
+> the condition that we get the warning for.
+> 
+> Fixes: 6b4cd727eaf1 ("dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+regards,
+
+Peter.
