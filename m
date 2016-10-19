@@ -1,45 +1,133 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 19 Oct 2016 19:01:27 +0200
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <5807A427.7010200@linux.intel.com>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161018153050.GC13117@dhcp22.suse.cz>
- <20161019085815.GA22239@lucifer>
- <20161019090727.GE7517@dhcp22.suse.cz>
- <5807A427.7010200@linux.intel.com>
-Message-ID: <20161019170127.GN24393@dhcp22.suse.cz>
+From: harba@codeaurora.org (Abdulhamid, Harb)
+Date: Wed, 19 Oct 2016 13:12:50 -0400
+Subject: [PATCH V3 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <57c81498-78f1-8aac-01b1-b5445415d822@linaro.org>
+References: <1475875882-2604-1-git-send-email-tbaicar@codeaurora.org>
+ <1475875882-2604-6-git-send-email-tbaicar@codeaurora.org>
+ <57c81498-78f1-8aac-01b1-b5445415d822@linaro.org>
+Message-ID: <42126800-97c0-2b00-fafe-1ddd25a739e7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 19-10-16 09:49:43, Dave Hansen wrote:
-> On 10/19/2016 02:07 AM, Michal Hocko wrote:
-> > On Wed 19-10-16 09:58:15, Lorenzo Stoakes wrote:
-> >> On Tue, Oct 18, 2016 at 05:30:50PM +0200, Michal Hocko wrote:
-> >>> I am wondering whether we can go further. E.g. it is not really clear to
-> >>> me whether we need an explicit FOLL_REMOTE when we can in fact check
-> >>> mm != current->mm and imply that. Maybe there are some contexts which
-> >>> wouldn't work, I haven't checked.
-> >>
-> >> This flag is set even when /proc/self/mem is used. I've not looked deeply into
-> >> this flag but perhaps accessing your own memory this way can be considered
-> >> 'remote' since you're not accessing it directly. On the other hand, perhaps this
-> >> is just mistaken in this case?
-> > 
-> > My understanding of the flag is quite limited as well. All I know it is
-> > related to protection keys and it is needed to bypass protection check.
-> > See arch_vma_access_permitted. See also 1b2ee1266ea6 ("mm/core: Do not
-> > enforce PKEY permissions on remote mm access").
+On 10/18/2016 9:04 AM, Hanjun Guo wrote:
+> On 2016/10/8 5:31, Tyler Baicar wrote:
+>> ARM APEI extension proposal added SEA (Synchrounous External
+>> Abort) notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+>>
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>> ---
+>>  arch/arm64/Kconfig        |  1 +
+>>  drivers/acpi/apei/Kconfig | 15 +++++++++
+>>  drivers/acpi/apei/ghes.c  | 83
+>> +++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 99 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index b380c87..ae34349 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -53,6 +53,7 @@ config ARM64
+>>      select HANDLE_DOMAIN_IRQ
+>>      select HARDIRQS_SW_RESEND
+>>      select HAVE_ACPI_APEI if (ACPI && EFI)
+>> +    select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
+>>      select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+>>      select HAVE_ARCH_AUDITSYSCALL
+>>      select HAVE_ARCH_BITREVERSE
+>> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+>> index b0140c8..fb99c1c 100644
+>> --- a/drivers/acpi/apei/Kconfig
+>> +++ b/drivers/acpi/apei/Kconfig
+>> @@ -4,6 +4,21 @@ config HAVE_ACPI_APEI
+>>  config HAVE_ACPI_APEI_NMI
+>>      bool
+>>
+>> +config HAVE_ACPI_APEI_SEA
+>> +    bool "APEI Synchronous External Abort logging/recovering support"
+>> +    depends on ARM64
+>> +    help
+>> +      This option should be enabled if the system supports
+>> +      firmware first handling of SEA (Synchronous External Abort).
+>> +      SEA happens with certain faults of data abort or instruction
+>> +      abort synchronous exceptions on ARMv8 systems. If a system
+>> +      supports firmware first handling of SEA, the platform analyzes
+>> +      and handles hardware error notifications with SEA, and it may then
+>> +      form a HW error record for the OS to parse and handle. This
+>> +      option allows the OS to look for such HW error record, and
+>> +      take appropriate action.
 > 
-> Yeah, we need the flag to tell us when PKEYs should be applied or not.
-> The current task's PKRU (pkey rights register) should really only be
-> used to impact access to the task's memory, but has no bearing on how a
-> given task should access remote memory.
+> OK, I can see that it's firmware first handling, so it's triggered
+> by firmware to me, correct me if I'm wrong.
 
-The question I had earlier was whether this has to be an explicit FOLL
-flag used by g-u-p users or we can just use it internally when mm !=
-current->mm
+Not exactly... the exception itself is *initially* triggered by the
+processor itself (e.g. ECC error on a particular load causes a data
+abort), but then may be intercepted by firmware (e.g. EL3) to generate
+the error record and then be *replayed* back to software (e.g. jump to
+appropriate EL and vector that originally caused the exception).
 
+The reason we use the term "platform" here is because platform can be
+hardware/firmware, and this can be implemented in different ways
+depending on the preference of the platform vendor.  This is consistent
+with the language in the UEFI/ACPI spec when describing the "thing" that
+is not normal software (i.e. OS/Hypervisor).
+
+> 
+> [...]
+>>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>  /*
+>>   * printk is not safe in NMI context.  So in NMI handler, we allocate
+>> @@ -1023,6 +1083,14 @@ static int ghes_probe(struct platform_device
+>> *ghes_dev)
+>>      case ACPI_HEST_NOTIFY_EXTERNAL:
+>>      case ACPI_HEST_NOTIFY_SCI:
+>>          break;
+>> +    case ACPI_HEST_NOTIFY_SEA:
+>> +        if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
+>> +            pr_warn(GHES_PFX "Generic hardware error source: %d
+>> notified via SEA is not supported\n",
+>> +                generic->header.source_id);
+>> +            rc = -ENOTSUPP;
+>> +            goto err;
+>> +        }
+>> +        break;
+>>      case ACPI_HEST_NOTIFY_NMI:
+>>          if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>>              pr_warn(GHES_PFX "Generic hardware error source: %d
+>> notified via NMI interrupt is not supported!\n",
+>> @@ -1034,6 +1102,13 @@ static int ghes_probe(struct platform_device
+>> *ghes_dev)
+>>          pr_warning(GHES_PFX "Generic hardware error source: %d
+>> notified via local interrupt is not supported!\n",
+>>                 generic->header.source_id);
+>>          goto err;
+>> +    case ACPI_HEST_NOTIFY_GPIO:
+>> +    case ACPI_HEST_NOTIFY_SEI:
+>> +    case ACPI_HEST_NOTIFY_GSIV:
+>> +        pr_warn(GHES_PFX "Generic hardware error source: %d notified
+>> via notification type %u is not supported\n",
+>> +            generic->header.source_id, generic->header.source_id);
+> 
+> Hmm, some platform may trigger a interrupt to OS for firmware handling
+> and it's in the ACPI 6.1 spec, is it a limitation now, or we need to
+> add code later to support it?
+
+On the current platforms we know of, we only leverage "emulated SCI",
+which essentially maps to a GPIO interrupt (via ACPI event - mapped to
+particular GPIO).  We will need to add support for other options
+available in the spec (e.g. GSIV and SEI) later as platforms that use
+those notification types become available.
+
+Thanks,
+--Harb
 -- 
-Michal Hocko
-SUSE Labs
+Qualcomm Datacenter Technologies, Inc.
+as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
