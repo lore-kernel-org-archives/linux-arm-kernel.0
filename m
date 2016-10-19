@@ -1,25 +1,58 @@
-From: dave.hansen@linux.intel.com (Dave Hansen)
-Date: Wed, 19 Oct 2016 10:23:55 -0700
-Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
- pass FOLL_* flags
-In-Reply-To: <20161019170127.GN24393@dhcp22.suse.cz>
-References: <20161013002020.3062-1-lstoakes@gmail.com>
- <20161018153050.GC13117@dhcp22.suse.cz> <20161019085815.GA22239@lucifer>
- <20161019090727.GE7517@dhcp22.suse.cz> <5807A427.7010200@linux.intel.com>
- <20161019170127.GN24393@dhcp22.suse.cz>
-Message-ID: <5807AC2B.4090208@linux.intel.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 19 Oct 2016 13:34:42 -0400 (EDT)
+Subject: [PATCH 1/2] host: ehci-exynos: Convert to use the
+ SET_SYSTEM_SLEEP_PM_OPS
+In-Reply-To: <CANAwSgTXo_=buNVnD+UjxYXo=bHbptGj+ZXivBiQA6LK+ZjNLg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1610191331590.1778-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2016 10:01 AM, Michal Hocko wrote:
-> The question I had earlier was whether this has to be an explicit FOLL
-> flag used by g-u-p users or we can just use it internally when mm !=
-> current->mm
+On Wed, 19 Oct 2016, Anand Moon wrote:
 
-The reason I chose not to do that was that deferred work gets run under
-a basically random 'current'.  If we just use 'mm != current->mm', then
-the deferred work will sometimes have pkeys enforced and sometimes not,
-basically randomly.
+> I might be wrong, below is the kconfig option for PM_SLEEP
+> 
+>  Symbol: PM_SLEEP [=y]
+>  Type  : boolean
+>     Defined at kernel/power/Kconfig
+>      Depends on: SUSPEND [=y] || HIBERNATE_CALLBACKS [=n]
+>      Selects: PM [=y]
+> 
+> So we cannot set CONFIG_PM_SLEEP=n and CONFIG_PM=y
 
-We want to be consistent with whether they are enforced or not, so we
-explicitly indicate that by calling the remote variant vs. plain.
+You have it backward.  We cannot set CONFIG_PM_SLEEP=y and CONFIG_PM=n.
+But you can have CONFIG_PM_SLEEP=n and CONFIG_PM=y.
+
+Alan Stern
+
+> I observed at many places were either CONFIG_PM or CONFIG_PM_SLEEP are used.
+> 
+> So I would like to use SIMPLE_DEV_PM_OPS macro to set struct
+> dev_pm_ops exynos_ohci_pm_ops to correct the code.
+> 
+> Best Regards
+> -Anand Moon
+> 
+> >
+> >>
+> >> CONFIG_PM_SLEEP=n or
+> >> # CONFIG_PM_SLEEP is not set
+> >>
+> >> > 2. What will be the output with !SUSPEND && !HIBERNATE && PM?
+> >>
+> >> #
+> >> # Power management options
+> >> #
+> >> # CONFIG_SUSPEND is not set
+> >> # CONFIG_HIBERNATION is not set
+> >> # CONFIG_PM is not set
+> >>
+> >> When CONFIG_SUSPEND and CONFIG_HIBERNATION are not set
+> >> CONFIG_PM is disabled and so is CONFIG_PM_SLEEP.
+> >
+> > In my config, the CONFIG_PM was enabled thus the code changes the
+> > functionality... Maybe this was intented but I really don't get it from
+> > the commit message or from your explanations here.
+> >
+> > Krzysztof
+> 
+> 
