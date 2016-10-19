@@ -1,9 +1,9 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 19 Oct 2016 18:06:26 -0300
-Subject: [PATCH 3/4] PM / devfreq: rockchip-dfi: Fix module autoload
+Date: Wed, 19 Oct 2016 18:06:27 -0300
+Subject: [PATCH 4/4] PM / devfreq: exynos-ppmu: Fix module autoload
 In-Reply-To: <1476911187-11040-1-git-send-email-javier@osg.samsung.com>
 References: <1476911187-11040-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1476911187-11040-4-git-send-email-javier@osg.samsung.com>
+Message-ID: <1476911187-11040-5-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,32 +15,35 @@ Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 
 Before this patch:
 
-$ modinfo drivers/devfreq/event/rockchip-dfi.ko | grep alias
+$ modinfo drivers/devfreq/event/exynos-ppmu.ko | grep alias
 $
 
 After this patch:
 
-$ modinfo drivers/devfreq/event/rockchip-dfi.ko | grep alias
-alias:          of:N*T*Crockchip,rk3399-dfiC*
-alias:          of:N*T*Crockchip,rk3399-dfi
+$ modinfo drivers/devfreq/event/exynos-ppmu.ko | grep alias
+alias:          of:N*T*Csamsung,exynos-ppmu-v2C*
+alias:          of:N*T*Csamsung,exynos-ppmu-v2
+alias:          of:N*T*Csamsung,exynos-ppmuC*
+alias:          of:N*T*Csamsung,exynos-ppmu
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
 ---
 
- drivers/devfreq/event/rockchip-dfi.c | 1 +
+ drivers/devfreq/event/exynos-ppmu.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
-index 43fcc5a7f515..22b113363ffc 100644
---- a/drivers/devfreq/event/rockchip-dfi.c
-+++ b/drivers/devfreq/event/rockchip-dfi.c
-@@ -188,6 +188,7 @@ static const struct of_device_id rockchip_dfi_id_match[] = {
- 	{ .compatible = "rockchip,rk3399-dfi" },
- 	{ },
+diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+index f55cf0eb2a66..a112034997eb 100644
+--- a/drivers/devfreq/event/exynos-ppmu.c
++++ b/drivers/devfreq/event/exynos-ppmu.c
+@@ -351,6 +351,7 @@ static const struct of_device_id exynos_ppmu_id_match[] = {
+ 	},
+ 	{ /* sentinel */ },
  };
-+MODULE_DEVICE_TABLE(of, rockchip_dfi_id_match);
++MODULE_DEVICE_TABLE(of, exynos_ppmu_id_match);
  
- static int rockchip_dfi_probe(struct platform_device *pdev)
+ static struct devfreq_event_ops *exynos_bus_get_ops(struct device_node *np)
  {
 -- 
 2.7.4
