@@ -1,36 +1,27 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 19 Oct 2016 12:08:27 +0200
-Subject: [PATCH 7/9] ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8
-In-Reply-To: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
-References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1476871709-8359-8-git-send-email-jbrunet@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Oct 2016 12:14:24 +0200
+Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
+In-Reply-To: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <6720864.e2sjvVVhdQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add select MESON_IRQ_GPIO in Kconfig for Amlogic's meson8 and meson8b SoC
+On Wednesday, October 19, 2016 11:59:09 AM CEST Linus Walleij wrote:
+> 
+> If people are happy with this approach and approve of the patches
+> I'd like an ACK from the cpufreq people and then merge the whole set
+> through ARM SoC.
+> 
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- arch/arm/mach-meson/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I don't see any hard dependency here, so I'd suggest to merge the
+two cpufreq patches through the subsystem tree, and the ARM patches
+through arm-soc.
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index b6e3acc63e14..63157295cd9d 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -21,11 +21,13 @@ config MACH_MESON8
- 	bool "Amlogic Meson8 SoCs support"
- 	default ARCH_MESON
- 	select MESON6_TIMER
-+	select MESON_IRQ_GPIO
- 
- config MACH_MESON8B
- 	bool "Amlogic Meson8b SoCs support"
- 	default ARCH_MESON
- 	select MESON6_TIMER
- 	select COMMON_CLK_MESON8B
-+	select MESON_IRQ_GPIO
- 
- endif
--- 
-2.7.4
+The patches look fine.
+
+Removing the custom driver of course means that we break machines
+with old .dtb files, so we could consider leaving the driver in
+place, but probably there is no need for integrator.
+
+	Arnd
