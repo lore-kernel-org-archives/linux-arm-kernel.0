@@ -1,136 +1,107 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Oct 2016 12:59:01 +0200
-Subject: [PATCH/RFC 4/4] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <CAMuHMdU=iTps+YfyeUyhPQkgSYHuG1hCLMFUTVOcPsHgbiPgSw@mail.gmail.com>
-References: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
- <1560471.cOCZ4VcGTh@wuerfel>
- <CAMuHMdU=iTps+YfyeUyhPQkgSYHuG1hCLMFUTVOcPsHgbiPgSw@mail.gmail.com>
-Message-ID: <7196231.EBkNfFgrcH@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 19 Oct 2016 11:59:43 +0100
+Subject: [PATCH 1/2] arm64: swp emulation: bound LL/SC retries before
+ rescheduling
+Message-ID: <1476874784-16214-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 19, 2016 10:02:57 AM CEST Geert Uytterhoeven wrote:
-> On Mon, Oct 10, 2016 at 4:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday, October 4, 2016 11:09:27 AM CEST Geert Uytterhoeven wrote:
+If a CPU does not implement a global monitor for certain memory types,
+then userspace can attempt a kernel DoS by issuing SWP instructions
+targetting the problematic memory (for example, a framebuffer mapped
+with non-cacheable attributes).
 
-> >> +static const struct renesas_family fam_rza __initconst = {
-> >> +     .name   = "RZ/A",
-> >> +};
-> >
-> > I'm not sure about the relationship between this one and the others,
-> > maybe it should be treated in the same way as emev2 and left out from
-> > this driver?
-> 
-> While RZ/A doesn't have a version registers (AFAIK), it shares several
-> drivers with the other SoCs (SH/R-Mobile, R-Car).
-> Hence I'd like to keep it, so we can match for it in these drivers when
-> needed. It has e.g. a different variant of the serial port (SCIF), more
-> closely to the one on SH2 rather than SH4.
+The SWP emulation code protects against these sorts of attacks by
+checking for pending signals and potentially rescheduling when the STXR
+instruction fails during the emulation. Whilst this is good for avoiding
+livelock, it harms emulation of legitimate SWP instructions on CPUs
+where forward progress is not guaranteed if there are memory accesses to
+the same reservation granule (up to 2k) between the failing STXR and
+the retry of the LDXR.
 
-I'd prefer seeing a separate soc driver for that one.
+This patch solves the problem by retrying the STXR a bounded number of
+times (4) before breaking out of the LL/SC loop and looking for
+something else to do.
 
-> >> +static const struct renesas_family fam_rmobile __initconst = {
-> >> +     .name   = "R-Mobile",
-> >> +     .reg    = 0xe600101c,           /* CCCR (Common Chip Code Register) */
-> >> +};
-> >> +
-> >> +static const struct renesas_family fam_rcar_gen1 __initconst = {
-> >> +     .name   = "R-Car Gen1",
-> >> +     .reg    = 0xff000044,           /* PRR (Product Register) */
-> >> +};
-> >> +
-> >> +static const struct renesas_family fam_rcar_gen2 __initconst = {
-> >> +     .name   = "R-Car Gen2",
-> >> +     .reg    = 0xff000044,           /* PRR (Product Register) */
-> >> +};
-> >> +
-> >> +static const struct renesas_family fam_rcar_gen3 __initconst = {
-> >> +     .name   = "R-Car Gen3",
-> >> +     .reg    = 0xfff00044,           /* PRR (Product Register) */
-> >> +};
-> >> +
-> >> +static const struct renesas_family fam_rzg __initconst = {
-> >> +     .name   = "RZ/G",
-> >> +     .reg    = 0xff000044,           /* PRR (Product Register) */
-> >> +};
-> >> +
-> >> +static const struct renesas_family fam_shmobile __initconst = {
-> >> +     .name   = "SH-Mobile",
-> >> +     .reg    = 0xe600101c,           /* CCCR (Common Chip Code Register) */
-> >> +};
-> >
-> > These seem to fall into two distinct categories, maybe there is a
-> > better way to group them. What device contain the two kinds of
-> > registers (PRR, CCCR)?
-> 
-> Actually there are three (notice the extra "f" on R-Car Gen3 ;-)
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/armv8_deprecated.c | 36 ++++++++++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 14 deletions(-)
 
-I see. Hopefully this is just the same register block at a different
-location though.
-
-> Some SoCs have only CCCR, others have only PRR, some have both.
-> On some SoCs one of them can be accessed from the RealTime CPU
-> core (SH) only.
-> On some SoCs the register is not documented, but present.
-> If the PRR exists, it's a better choice, as it contains additional information
-> in the high order bits (representing the presence of each big (CA15/CA57),
-> little (CA7/CA53), and RT (CR7) CPU core). Currently we don't use that
-> information, though.
-> 
-> Grouping them in some other way means we would loose the family name,
-> which is exposed through soc_dev_attr->family.
-> The usefulness of family names is debatable though, as this is more an
-> issue of marketing business.
-
-How about having a table to look up the family name by the value
-of the PRR or CCCR then?
-
-> > Hardcoding the register address seems rather ugly here, so maybe
-> > there is a way to have two separate probe methods based on the
-> > surrounding register range, and then bind to that?
-> 
-> There's no simple relation between CCCR/PRR and other register blocks.
-> I prefer not to add these to DT, as that would add one more worm to the
-> backwards compatibility can.
-
-Hmm, I understand the concern about compatibility with existing DT files,
-but I also really hate to see hardcoded register addresses.
-
-Any reason against requiring the DT node for future chips though?
-How about this:
-
-The driver could report the hardcoded strings for the SoCs it already
-knows about (you have the table anyway) and not report the revision
-unless there is a regmap containing the CCCR or the PRR, in which
-case you use that. Future SoCs will provide the PRR (I assume
-CCCR is only used on the older ones) through a syscon regmap
-that we can use to find out the exact revision as well.
-
-The existing DT files can gain the syscon device so you can report
-the revision on those machines as well, unless you use an old DTB.
-
-> >> +static const struct of_device_id renesas_socs[] __initconst = {
-> >> +#ifdef CONFIG_ARCH_EMEV2
-> >> +     { .compatible = "renesas,emev2",        .data = &soc_emev2 },
-> >> +#endif
-> >> +#ifdef CONFIG_ARCH_R7S72100
-> >> +     { .compatible = "renesas,r7s72100",     .data = &soc_rz_a1h },
-> >> +#endif
-> >> +#ifdef CONFIG_ARCH_R8A73A4
-> >
-> > I think the #ifdefs here will result in warnings for unused symbols
-> > when the Kconfig symbols are disabled.
-> 
-> Originally I had __maybe_unused, but it didn't seem to be needed.
-> Do you know which compiler needs it, so I can check?
-
-Ah, I remember now: gcc doesn't warn for 'static const' variables
-unless we pass -Wunused-const, which should be enabled with "make W=1",
-and we might make that the default in the future (after fixing the
-handful of drivers currently relying on this).
-
-Why not just drop all the #ifdef here? There should be very little
-overhead in size, especially if all the data is __initconst.
-
-	Arnd
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 42ffdb54e162..b0988bb1bf64 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -280,35 +280,43 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
+ /*
+  * Error-checking SWP macros implemented using ldxr{b}/stxr{b}
+  */
+-#define __user_swpX_asm(data, addr, res, temp, B)		\
++
++/* Arbitrary constant to ensure forward-progress of the LL/SC loop */
++#define __SWP_LL_SC_LOOPS	4
++
++#define __user_swpX_asm(data, addr, res, temp, temp2, B)	\
+ 	__asm__ __volatile__(					\
++	"	mov		%w3, %w7\n"			\
+ 	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
+ 		    CONFIG_ARM64_PAN)				\
+-	"0:	ldxr"B"		%w2, [%3]\n"			\
+-	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
++	"0:	ldxr"B"		%w2, [%4]\n"			\
++	"1:	stxr"B"		%w0, %w1, [%4]\n"		\
+ 	"	cbz		%w0, 2f\n"			\
+-	"	mov		%w0, %w4\n"			\
++	"	sub		%w3, %w3, #1\n"			\
++	"	cbnz		%w3, 0b\n"			\
++	"	mov		%w0, %w5\n"			\
+ 	"	b		3f\n"				\
+ 	"2:\n"							\
+ 	"	mov		%w1, %w2\n"			\
+ 	"3:\n"							\
+ 	"	.pushsection	 .fixup,\"ax\"\n"		\
+ 	"	.align		2\n"				\
+-	"4:	mov		%w0, %w5\n"			\
++	"4:	mov		%w0, %w6\n"			\
+ 	"	b		3b\n"				\
+ 	"	.popsection"					\
+ 	_ASM_EXTABLE(0b, 4b)					\
+ 	_ASM_EXTABLE(1b, 4b)					\
+ 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
+ 		CONFIG_ARM64_PAN)				\
+-	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+-	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
++	: "=&r" (res), "+r" (data), "=&r" (temp), "=&r" (temp2)	\
++	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT),		\
++	  "i" (__SWP_LL_SC_LOOPS)				\
+ 	: "memory")
+ 
+-#define __user_swp_asm(data, addr, res, temp) \
+-	__user_swpX_asm(data, addr, res, temp, "")
+-#define __user_swpb_asm(data, addr, res, temp) \
+-	__user_swpX_asm(data, addr, res, temp, "b")
++#define __user_swp_asm(data, addr, res, temp, temp2) \
++	__user_swpX_asm(data, addr, res, temp, temp2, "")
++#define __user_swpb_asm(data, addr, res, temp, temp2) \
++	__user_swpX_asm(data, addr, res, temp, temp2, "b")
+ 
+ /*
+  * Bit 22 of the instruction encoding distinguishes between
+@@ -328,12 +336,12 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
+ 	}
+ 
+ 	while (1) {
+-		unsigned long temp;
++		unsigned long temp, temp2;
+ 
+ 		if (type == TYPE_SWPB)
+-			__user_swpb_asm(*data, address, res, temp);
++			__user_swpb_asm(*data, address, res, temp, temp2);
+ 		else
+-			__user_swp_asm(*data, address, res, temp);
++			__user_swp_asm(*data, address, res, temp, temp2);
+ 
+ 		if (likely(res != -EAGAIN) || signal_pending(current))
+ 			break;
+-- 
+2.1.4
