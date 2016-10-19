@@ -1,52 +1,70 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 19 Oct 2016 13:29:04 -0700
-Subject: [PATCH v2 0/6] STM32F4 Add RTC & QSPI clocks
-In-Reply-To: <d878b846-556d-180b-8ebf-2d06646efb58@st.com>
+Date: Wed, 19 Oct 2016 13:32:28 -0700
+Subject: [PATCH v2 5/6] clk: stm32f469: Add QSPI clock
+In-Reply-To: <1476436699-21879-6-git-send-email-gabriel.fernandez@st.com>
 References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
- <20161018235108.GP8871@codeaurora.org>
- <d878b846-556d-180b-8ebf-2d06646efb58@st.com>
-Message-ID: <20161019202904.GB8871@codeaurora.org>
+ <1476436699-21879-6-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20161019203228.GC8871@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19, Gabriel Fernandez wrote:
-> Hi Stephen,
-> 
-> 
-> On 10/19/2016 01:51 AM, Stephen Boyd wrote:
-> >On 10/14, gabriel.fernandez at st.com wrote:
-> >>Gabriel Fernandez (6):
-> >>   clk: stm32f4: Add LSI & LSE clocks
-> >>   ARM: dts: stm32f429: add LSI and LSE clocks
-> >>   arm: stmf32: Enable SYSCON
-> >>   clk: stm32f4: Add RTC clock
-> >>   clk: stm32f469: Add QSPI clock
-> >>   ARM: dts: stm32f429: Add QSPI clock
-> >Can the clk patches be picked without causing problems for
-> >existing dt changes? Do you want an ack from clk maintainers
-> >instead of us picking the clk patches up? The series has
-> >intermingled clk and dts changes so I'm confused.
-> >
-> 
-> Thanks for reviewing.
-> 
-> Normally DT patches will be taken by STM32 maintainer, but yes there
-> is a dependency between patch 1 & 2, so if you push the patch 1 into
-> clk-next tree you have to take also patch 2.
+On 10/14, gabriel.fernandez at st.com wrote:
+> @@ -532,10 +618,42 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+>  	{ 0 },
+>  };
+>  
+> +struct stm32f4_clk_data {
+> +	const struct stm32f4_gate_data *gates_data;
+> +	const u64 *gates_map;
+> +	int gates_num;
+> +};
+> @@ -549,6 +667,19 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+>  		goto fail;
+>  	}
+>  
+> +	match = of_match_node(stm32f4_of_match, np);
+> +	if (WARN_ON(!match))
+> +		return;
+> +
+> +	data = match->data;
+> +
+> +	clks = kmalloc_array(data->gates_num + END_PRIMARY_CLK,
+> +			sizeof(struct clk_hw *), GFP_KERNEL);
 
-Let's break the dependency by making the required property
-optional or key off a different compatible string. As it stands
-right now applying patch 1 will cause things to break until the
-second patch lands which is not great.
+sizeof(*clks)?
 
-> 
-> You have to be synchronized with Alexandre Torgue.
-> 
-> 
+> +	if (!clks)
+> +		goto fail;
+> +
+> +	stm32f4_gate_map = data->gates_map;
+> +
+>  	hse_clk = of_clk_get_parent_name(np, 0);
+>  
+>  	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
+> @@ -581,11 +712,15 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+>  	clks[FCLK] = clk_hw_register_fixed_factor(NULL, "fclk", "ahb_div",
+>  					       0, 1, 1);
+>  
+> -	for (n = 0; n < ARRAY_SIZE(stm32f4_gates); n++) {
+> -		const struct stm32f4_gate_data *gd = &stm32f4_gates[n];
+> -		unsigned int secondary =
+> -		    8 * (gd->offset - STM32F4_RCC_AHB1ENR) + gd->bit_idx;
+> -		int idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
+> +	for (n = 0; n < data->gates_num; n++) {
+> +		const struct stm32f4_gate_data *gd;
+> +		unsigned int secondary;
+> +		int idx;
+> +
+> +		gd = (struct stm32f4_gate_data *) &data->gates_data[n];
 
-I'd prefer zero synchronization. Please just send the clk patches
-the next time and leave the stuff for arm-soc out of the patch
-series. Thanks.
+Why do we cast here? Get rid of const? Perhaps the struct
+shouldn't have const on the member instead?
+
+> +		secondary = 8 * (gd->offset - STM32F4_RCC_AHB1ENR) +
+> +			gd->bit_idx;
+> +		idx = stm32f4_rcc_lookup_clk_idx(0, secondary);
+>  
+>  		if (idx < 0)
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
