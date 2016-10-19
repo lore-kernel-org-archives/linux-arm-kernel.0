@@ -1,67 +1,44 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 19 Oct 2016 11:42:27 +0200
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <20161018104539.GB15639@leverpostej>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
- <20161018100002.GA4347@xo-6d-61-c0.localdomain>
- <20161018104539.GB15639@leverpostej>
-Message-ID: <20161019094227.GB1461@amd>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 19 Oct 2016 11:56:44 +0200
+Subject: [PATCH] clk: sunxi-ng: sun6i-a31: Force AHB1 clock to use PLL6
+ as parent
+In-Reply-To: <20161018054209.24546-1-wens@csie.org>
+References: <20161018054209.24546-1-wens@csie.org>
+Message-ID: <20161019095644.336urfguu6azmmy3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-10-18 11:45:39, Mark Rutland wrote:
-> On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
-> > > >b. in arm64, if some platform has its own suspend flow,  couldn't it
-> > > >adopts arm/match-xxx to register its own global suspend method?
-> > > 
-> > > No, PSCI is highly recommended.
-> > 
-> > Relying on firmware for suspend on x86 was a great disaster, lets not repeat
-> > that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
-> > for example) -- feel free to copy that code from arm32.
+On Tue, Oct 18, 2016 at 01:42:09PM +0800, Chen-Yu Tsai wrote:
+> On the A31, the DMA engine only works if AHB1 is clocked from PLL6.
+> In addition, the hstimer is clocked from AHB1, and if AHB1 is clocked
+> from the CPU clock, and cpufreq is working, we get an unstable timer.
 > 
-> Quite frankly, copying hundreds of lines of board-specific code
-> (including assembly that won't compile) is unlikely to help.
+> Force the AHB1 clock to use PLL6 as its parent. Previously this was done
+> in the device tree with the assigned-clocks and assigned-clocks-parent
+> bindings. However with this new monolithic driver, the system critical
+> clocks aren't exported through the device tree. The alternative is to
+> force this setting in the driver before the clocks are registered.
 > 
-> So far arm64 requires well-defined, standard, reusable interfaces (e.g.
-> PSCI). That cleanly separates concerns (e.g. anyone can implement the
-> backend without mandatory changes to the kernel), and keeps things
-> maintainable.
+> This is also done in newer versions of mainline U-boot. But people still
+> using an older version, or even the vendor version, can still hit this
+> issue. Hence the need to do it in the kernel as well.
+> 
+> Reported-by: Hans de Goede <hdegoede@redhat.com>
+> Reported-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Either the lowlevel suspend code is stable and bug free, and then
-having that code is not a problem. Or the lowlevel suspend code is
-complex enough to contain some bugs, and in such case it is better to
-debug and update it with kernel.
+Applied, thanks!
+Maxime
 
-> ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
-> can use and build atop of. It's open source (three-clause BSD with DCO),
-> and accepts board ports. You can have a completely open stack,
-> regardless of whether part of that stack is firmware.
-
-If something is called "Trusted", it is not trustworthy.
-
-BSD is better than closed source, but it also means that you will not
-get the sources from your hw vendor.
-
-Being separate module means it will be never updated.
-
-Being separate module means it will be hard to debug, in area where
-debugging is already pretty hard.
-
-Can it do advanced stuff like deep powersaving on N900 idle?
-
-Just don't do it.
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/05d8de63/attachment.sig>
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/bc1a6152/attachment-0001.sig>
