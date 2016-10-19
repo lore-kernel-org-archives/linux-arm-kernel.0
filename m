@@ -1,307 +1,83 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 19 Oct 2016 17:30:38 +0200
-Subject: [PATCH] mtd: nand: Add OX820 NAND Support
-In-Reply-To: <20161019145523.6763-1-narmstrong@baylibre.com>
-References: <20161019145523.6763-1-narmstrong@baylibre.com>
-Message-ID: <12212beb-d152-9b49-3c06-227956e84207@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Oct 2016 17:30:49 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+Message-ID: <13702107.LdHY4HTXyY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2016 04:55 PM, Neil Armstrong wrote:
-> Add NAND driver to support the Oxford Semiconductor OX820 NAND Controller.
-> This is a simple memory mapped NAND controller with single chip select and
-> software ECC.
+On Tuesday, October 18, 2016 8:31:38 PM CEST Russell King wrote:
+> Convert ARM to use a similar mechanism to x86 to generate the unistd.h
+> system call numbers and the various kernel system call tables.  This
+> means that rather than having to edit three places (asm/unistd.h for
+> the total number of system calls, uapi/asm/unistd.h for the system call
+> numbers, and arch/arm/kernel/calls.S for the call table) we have only
+> one place to edit, making the process much more simple.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-
-Forgot
-Acked-by: Rob Herring <robh@kernel.org>
-
-Will add in v2 if a respin is needed.
-
-> ---
->  .../devicetree/bindings/mtd/oxnas-nand.txt         |  24 +++
->  drivers/mtd/nand/Kconfig                           |   5 +
->  drivers/mtd/nand/Makefile                          |   1 +
->  drivers/mtd/nand/oxnas_nand.c                      | 204 +++++++++++++++++++++
->  4 files changed, 234 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/oxnas-nand.txt
->  create mode 100644 drivers/mtd/nand/oxnas_nand.c
+> The scripts have knowledge of the table padding requirements, so there's
+> no need to worry about __NR_syscalls not fitting within the immediate
+> constant field of ALU instructions anymore.
 > 
-> Changes since RFC http://lkml.kernel.org/r/20161018090927.1990-1-narmstrong at baylibre.com :
->  - Avoid using chip->IO_ADDR*
->  - Use new DT structure
->  - Assign a chip for the subnode
->  - Use the nand_hw_control structure
->  - Cleanup probe
->  - Cleanup cmd_ctrl by using a context ctrl offset used in write_bytes
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/oxnas-nand.txt b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Ah, very nice!
+
+I have some vague plans to do something like this for all architectures,
+so having it done for one of the more complex examples (there are very
+few architectures with more than one table) simplifies it a lot.
+
+The next step is probably to do it for asm-generic/unistd.h, which
+covers a lot of architectures, and then we can introduce a shared
+table for all future additions so we only have to add the new calls
+in one place, and change the scripts so they can merge two input
+files into one.
+
+> diff --git a/arch/arm/tools/syscall.tbl b/arch/arm/tools/syscall.tbl
 > new file mode 100644
-> index 0000000..83b684d
+> index 000000000000..62285cbd09c0
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
-> @@ -0,0 +1,24 @@
-> +* Oxford Semiconductor OXNAS NAND Controller
-> +
-> +Please refer to nand.txt for generic information regarding MTD NAND bindings.
-> +
-> +Required properties:
-> + - compatible: "oxsemi,ox820-nand"
-> + - reg: Base address and length for NAND mapped memory.
-> +
-> +Optional Properties:
-> + - clocks: phandle to the NAND gate clock if needed.
-> + - resets: phandle to the NAND reset control if needed.
-> +
-> +Example:
-> +
-> +nand: nand at 41000000 {
-> +	compatible = "oxsemi,ox820-nand";
-> +	reg = <0x41000000 0x100000>;
-> +	nand-ecc-mode = "soft";
-> +	clocks = <&stdclk CLK_820_NAND>;
-> +	resets = <&reset RESET_NAND>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	status = "disabled";
-> +};
-> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> index 7b7a887..c023125 100644
-> --- a/drivers/mtd/nand/Kconfig
-> +++ b/drivers/mtd/nand/Kconfig
-> @@ -426,6 +426,11 @@ config MTD_NAND_ORION
->  	  No board specific support is done by this driver, each board
->  	  must advertise a platform_device for the driver to attach.
->  
-> +config MTD_NAND_OXNAS
-> +	tristate "NAND Flash support for Oxford Semiconductor SoC"
-> +	help
-> +	  This enables the NAND flash controller on Oxford Semiconductor SoCs.
-> +
->  config MTD_NAND_FSL_ELBC
->  	tristate "NAND support for Freescale eLBC controllers"
->  	depends on FSL_SOC
-> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
-> index cafde6f..05fc054 100644
-> --- a/drivers/mtd/nand/Makefile
-> +++ b/drivers/mtd/nand/Makefile
-> @@ -35,6 +35,7 @@ obj-$(CONFIG_MTD_NAND_TMIO)		+= tmio_nand.o
->  obj-$(CONFIG_MTD_NAND_PLATFORM)		+= plat_nand.o
->  obj-$(CONFIG_MTD_NAND_PASEMI)		+= pasemi_nand.o
->  obj-$(CONFIG_MTD_NAND_ORION)		+= orion_nand.o
-> +obj-$(CONFIG_MTD_NAND_OXNAS)		+= oxnas_nand.o
->  obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_elbc_nand.o
->  obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
->  obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
-> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+> +++ b/arch/arm/tools/syscall.tbl
+> @@ -0,0 +1,428 @@
+> +#
+> +# Linux system call numbers and entry vectors
+> +#
+> +# The format is:
+> +# <num>	<abi>	<name>			<entry point>			<oabi compat entry point>
+> +#
+> +# Where abi is:
+> +#  common - for system calls shared between oabi and eabi
+> +#  oabi   - for oabi-only system calls (may have compat)
+> +#  eabi   - for eabi-only system calls
+
+Why do we need all three? I would have guessed that these two are
+sufficient to cover all cases:
+
+arm	- one entry for eabi, optional second entry for oabi if different
+oabi	- only one entry for oabi, syscall is not used on eabi
+
+> +180	oabi	pread64			sys_pread64		sys_oabi_pread64
+> +180	eabi	pread64			sys_pread64
+> +181	oabi	pwrite64		sys_pwrite64		sys_oabi_pwrite64
+> +181	eabi	pwrite64		sys_pwrite64
+
+That would avoid having to list those numbers twice, which looks
+a bit odd here, and is inconsistent with how x86 handles their
+compat table for x32
+
+> diff --git a/arch/arm/tools/syscallhdr.sh b/arch/arm/tools/syscallhdr.sh
 > new file mode 100644
-> index 0000000..a9fe1ac
+> index 000000000000..72d4b2e3bdec
 > --- /dev/null
-> +++ b/drivers/mtd/nand/oxnas_nand.c
-> @@ -0,0 +1,204 @@
-> +/*
-> + * Oxford Semiconductor OXNAS NAND driver
-> +
-> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-> + * Heavily based on plat_nand.c :
-> + * Author: Vitaly Wool <vitalywool@gmail.com>
-> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
-> + * Copyright (C) 2012 John Crispin <blogic@openwrt.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/clk.h>
-> +#include <linux/reset.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/nand.h>
-> +#include <linux/mtd/partitions.h>
-> +#include <linux/of.h>
-> +
-> +/* Nand commands */
-> +#define OXNAS_NAND_CMD_ALE		BIT(18)
-> +#define OXNAS_NAND_CMD_CLE		BIT(19)
-> +
-> +#define OXNAS_NAND_MAX_CHIPS	1
-> +
-> +struct oxnas_nand {
-> +	struct nand_hw_control base;
-> +	void __iomem *io_base;
-> +	struct clk *clk;
-> +	struct nand_chip *chips[OXNAS_NAND_MAX_CHIPS];
-> +	unsigned long ctrl;
-> +};
-> +
-> +static uint8_t oxnas_nand_read_byte(struct mtd_info *mtd)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
-> +
-> +	return readb(oxnas->io_base);
-> +}
-> +
-> +static void oxnas_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
-> +
-> +	ioread8_rep(oxnas->io_base, buf, len);
-> +}
-> +
-> +static void oxnas_nand_write_buf(struct mtd_info *mtd,
-> +				 const uint8_t *buf, int len)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
-> +
-> +	iowrite8_rep(oxnas->io_base + oxnas->ctrl, buf, len);
-> +}
-> +
-> +/* Single CS command control */
-> +static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
-> +				unsigned int ctrl)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
-> +
-> +	if (ctrl & NAND_CTRL_CHANGE) {
-> +		if (ctrl & NAND_CLE)
-> +			oxnas->ctrl = OXNAS_NAND_CMD_CLE;
-> +		else if (ctrl & NAND_ALE)
-> +			oxnas->ctrl = OXNAS_NAND_CMD_ALE;
-> +		else
-> +			oxnas->ctrl = 0;
-> +	}
-> +
-> +	if (cmd != NAND_CMD_NONE)
-> +		writeb(cmd, oxnas->io_base + oxnas->ctrl);
-> +}
-> +
-> +/*
-> + * Probe for the NAND device.
-> + */
-> +static int oxnas_nand_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *nand_np;
-> +	struct oxnas_nand *oxnas;
-> +	struct nand_chip *chip;
-> +	struct mtd_info *mtd;
-> +	struct resource *res;
-> +	int nchips = 0;
-> +	int count = 0;
-> +	int err = 0;
-> +
-> +	/* Allocate memory for the device structure (and zero it) */
-> +	oxnas = devm_kzalloc(&pdev->dev, sizeof(struct nand_chip),
-> +			    GFP_KERNEL);
-> +	if (!oxnas)
-> +		return -ENOMEM;
-> +
-> +	nand_hw_control_init(&oxnas->base);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	oxnas->io_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(oxnas->io_base))
-> +		return PTR_ERR(oxnas->io_base);
-> +
-> +	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(oxnas->clk))
-> +		oxnas->clk = NULL;
-> +
-> +	/* Only a single chip node is supported */
-> +	count = of_get_child_count(np);
-> +	if (count > 1)
-> +		return -EINVAL;
-> +
-> +	clk_prepare_enable(oxnas->clk);
-> +	device_reset_optional(&pdev->dev);
-> +
-> +	for_each_child_of_node(np, nand_np) {
-> +		chip = devm_kzalloc(&pdev->dev, sizeof(struct nand_chip),
-> +				    GFP_KERNEL);
-> +		if (!chip)
-> +			return -ENOMEM;
-> +
-> +		chip->controller = &oxnas->base;
-> +
-> +		nand_set_flash_node(chip, nand_np);
-> +		nand_set_controller_data(chip, oxnas);
-> +
-> +		mtd = nand_to_mtd(chip);
-> +		mtd->dev.parent = &pdev->dev;
-> +		mtd->priv = chip;
-> +
-> +		chip->cmd_ctrl = oxnas_nand_cmd_ctrl;
-> +		chip->read_buf = oxnas_nand_read_buf;
-> +		chip->read_byte = oxnas_nand_read_byte;
-> +		chip->write_buf = oxnas_nand_write_buf;
-> +		chip->chip_delay = 30;
-> +
-> +		/* Scan to find existence of the device */
-> +		err = nand_scan(mtd, 1);
-> +		if (err)
-> +			return err;
-> +
-> +		err = mtd_device_register(mtd, NULL, 0);
-> +		if (err) {
-> +			nand_release(mtd);
-> +			return err;
-> +		}
-> +
-> +		oxnas->chips[nchips] = chip;
-> +		++nchips;
-> +	}
-> +
-> +	/* Exit if no chips found */
-> +	if (!nchips)
-> +		return -ENODEV;
-> +
-> +	platform_set_drvdata(pdev, oxnas);
-> +
-> +	return 0;
-> +}
-> +
-> +static int oxnas_nand_remove(struct platform_device *pdev)
-> +{
-> +	struct oxnas_nand *oxnas = platform_get_drvdata(pdev);
-> +
-> +	if (oxnas->chips[0])
-> +		nand_release(nand_to_mtd(oxnas->chips[0]));
-> +
-> +	clk_disable_unprepare(oxnas->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id oxnas_nand_match[] = {
-> +	{ .compatible = "oxsemi,ox820-nand" },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, oxnas_nand_match);
-> +
-> +static struct platform_driver oxnas_nand_driver = {
-> +	.probe	= oxnas_nand_probe,
-> +	.remove	= oxnas_nand_remove,
-> +	.driver	= {
-> +		.name		= "oxnas_nand",
-> +		.of_match_table = oxnas_nand_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(oxnas_nand_driver);
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
-> +MODULE_DESCRIPTION("Oxnas NAND driver");
-> +MODULE_ALIAS("platform:oxnas_nand");
-> 
+> +++ b/arch/arm/tools/syscallhdr.sh
+
+The scripts are still very similar to the x86 version. Any chance
+we can move them to a top-level scripts/syscall/ directory and make
+them work for both architectures? It would be good to avoid duplicating
+them for all the other architectures too, so starting out with a common
+version could make that easier.
+
+If necessary, I can do that once I get to the following stage of
+doing the asm-generic/unistd.h replacement.
+
+	Arnd
