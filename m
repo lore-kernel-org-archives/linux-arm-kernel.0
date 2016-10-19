@@ -1,213 +1,348 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 19 Oct 2016 11:25:06 +0200
-Subject: partial bluetooth success on n900 [was Re: bluetooth/uart timeout
- handling]
-In-Reply-To: <20161018224259.jrwbaal27irzjqyo@earth>
-References: <20161016002454.ul5rdqwubvkct4pf@earth> <20161016090959.GA377@amd>
- <20161016173911.arxynrja6vely3d5@earth> <20161017085137.GA6628@amd>
- <20161018224259.jrwbaal27irzjqyo@earth>
-Message-ID: <20161019092506.GA1461@amd>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 19 Oct 2016 11:29:59 +0200
+Subject: [RFC PATCH] mtd: nand: Add OX820 NAND Support
+In-Reply-To: <20161018221744.5e574e82@bbrezillon>
+References: <20161018090927.1990-1-narmstrong@baylibre.com>
+ <20161018221744.5e574e82@bbrezillon>
+Message-ID: <37a5b543-e564-a496-d5cf-c215e798839f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Boris,
 
-[Ccing lists.]
+On 10/18/2016 10:17 PM, Boris Brezillon wrote:
+> Hi Neil,
+> 
+> On Tue, 18 Oct 2016 11:09:27 +0200
+> Neil Armstrong <narmstrong@baylibre.com> wrote:
+> 
+>> Add NAND driver to support the Oxford Semiconductor OX820 NAND Controller.
+>> This is a simple memory mapped NAND controller with single chip select and
+>> software ECC.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  .../devicetree/bindings/mtd/oxnas-nand.txt         |  24 ++++
+>>  drivers/mtd/nand/Kconfig                           |   5 +
+>>  drivers/mtd/nand/Makefile                          |   1 +
+>>  drivers/mtd/nand/oxnas_nand.c                      | 144 +++++++++++++++++++++
+>>  4 files changed, 174 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+>>  create mode 100644 drivers/mtd/nand/oxnas_nand.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/mtd/oxnas-nand.txt b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+>> new file mode 100644
+>> index 0000000..83b684d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+>> @@ -0,0 +1,24 @@
+>> +* Oxford Semiconductor OXNAS NAND Controller
+>> +
+>> +Please refer to nand.txt for generic information regarding MTD NAND bindings.
+>> +
+>> +Required properties:
+>> + - compatible: "oxsemi,ox820-nand"
+>> + - reg: Base address and length for NAND mapped memory.
+>> +
+>> +Optional Properties:
+>> + - clocks: phandle to the NAND gate clock if needed.
+>> + - resets: phandle to the NAND reset control if needed.
+>> +
+>> +Example:
+>> +
+>> +nand: nand at 41000000 {
+>> +	compatible = "oxsemi,ox820-nand";
+>> +	reg = <0x41000000 0x100000>;
+>> +	nand-ecc-mode = "soft";
+>> +	clocks = <&stdclk CLK_820_NAND>;
+>> +	resets = <&reset RESET_NAND>;
+>> +	#address-cells = <1>;
+>> +	#size-cells = <1>;
+>> +	status = "disabled";
+>> +};
+> 
+> Can you switch to new DT representation for NAND controllers, with one
+> node for the NAND controller and NAND devices connected to this NAND
+> controller defined as sub-nodes of this NAND controller [1]?
 
-> Can you push the patch, which gets further than negotiation into
-> some git branch available to me? I tried to apply your patch to
-> my code, but it did not work for me.
+Yes, I was wondering if this existed... my bad, next time I will search further.
 
-Ok, I've pushed the branch to kernel.org:
+> 
+>> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+>> index 7b7a887..c023125 100644
+>> --- a/drivers/mtd/nand/Kconfig
+>> +++ b/drivers/mtd/nand/Kconfig
+>> @@ -426,6 +426,11 @@ config MTD_NAND_ORION
+>>  	  No board specific support is done by this driver, each board
+>>  	  must advertise a platform_device for the driver to attach.
+>>  
+>> +config MTD_NAND_OXNAS
+>> +	tristate "NAND Flash support for Oxford Semiconductor SoC"
+>> +	help
+>> +	  This enables the NAND flash controller on Oxford Semiconductor SoCs.
+>> +
+>>  config MTD_NAND_FSL_ELBC
+>>  	tristate "NAND support for Freescale eLBC controllers"
+>>  	depends on FSL_SOC
+>> diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+>> index cafde6f..05fc054 100644
+>> --- a/drivers/mtd/nand/Makefile
+>> +++ b/drivers/mtd/nand/Makefile
+>> @@ -35,6 +35,7 @@ obj-$(CONFIG_MTD_NAND_TMIO)		+= tmio_nand.o
+>>  obj-$(CONFIG_MTD_NAND_PLATFORM)		+= plat_nand.o
+>>  obj-$(CONFIG_MTD_NAND_PASEMI)		+= pasemi_nand.o
+>>  obj-$(CONFIG_MTD_NAND_ORION)		+= orion_nand.o
+>> +obj-$(CONFIG_MTD_NAND_OXNAS)		+= oxnas_nand.o
+>>  obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_elbc_nand.o
+>>  obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
+>>  obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
+>> diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+>> new file mode 100644
+>> index 0000000..ee402ab
+>> --- /dev/null
+>> +++ b/drivers/mtd/nand/oxnas_nand.c
+>> @@ -0,0 +1,144 @@
+>> +/*
+>> + * Oxford Semiconductor OXNAS NAND driver
+>> + *
+>> + * Heavily based on plat_nand.c :
+>> + * Author: Vitaly Wool <vitalywool@gmail.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/reset.h>
+>> +#include <linux/mtd/mtd.h>
+>> +#include <linux/mtd/nand.h>
+>> +#include <linux/mtd/partitions.h>
+>> +
+>> +/* nand commands */
+>> +#define NAND_CMD_ALE		BIT(18)
+>> +#define NAND_CMD_CLE		BIT(19)
+>> +#define NAND_CMD_CS		0
+> 
+> I guess this is zero here because you only support connecting a NAND to
+> CS0.
+> It's probably something like
+> 
+> OX820_NAND_CS(x)		((x) << CS_FIELD_SHIFT)
 
-git push git at gitolite.kernel.org:pub/scm/linux/kernel/git/pavel/linux-n900.git bt-2-v4.9:bt-2-v4.9
+The hardware seems to be able to drive multiple chip selects, but no implementation does this.
+We will stick to CS0 only here for test reasons.
 
-In retrospect, I did make some changes to dts, they may be neccessary,
-too.
+> 
+>> +#define NAND_CMD_RESET		0xff
+> 
+> Why do you have to redefine it? it's already defined here [2].
+> 
+>> +#define NAND_CMD		(NAND_CMD_CS | NAND_CMD_CLE)
+>> +#define NAND_ADDR		(NAND_CMD_CS | NAND_CMD_ALE)
+>> +#define NAND_DATA		(NAND_CMD_CS)
+> 
+> Please prefix those macros with OX820, has stated above, this can
+> conflict with generic definitions.
+> Also, I'm not sure you should pass the CS information here.
+> 
+>> +
+>> +struct oxnas_nand_data {
+>> +	struct nand_chip	chip;
+>> +	void __iomem		*io_base;
+>> +	struct clk		*clk;
+>> +};
+> 
+> Even if your driver does not seem to support connecting several chips
+> to the same controller, I'd like you to clearly separate the NAND
+> controller and NAND chip objects:
+> 
+> #define OXNAS_NAND_MAX_CHIPS	1
+> 
+> struct oxnas_nand_controller {
+> 	struct nand_hw_control base;
+> 	void __iomem *io_base;
+> 	struct clk *clk;
+> 	struct nand_chip *chips[OXNAS_NAND_MAX_CHIPS];
+> }
 
-If it still does not work, please try with my .config. I'm using
-modules here, using this script:
+Ok.
 
-pavel at n900:/my/modules$ cat run2
-echo removing...
-sudo killall a.out
-rmmod nokia_h4p
-#rmmod omap_serial
-#rmmod serial_core
-rmmod hci_uart.ko
-#rmmod bcm2048.ko
-echo installing...
-insmod serial_core.ko
-insmod omap-serial.ko
-insmod bcm2048.ko
-insmod hci_uart.ko
-ls -al /dev/ttyO1
-sleep 1
-stty crtscts < /dev/ttyO1
-/my/tui/ofone/a.out &
+> 
+>> +
+>> +static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+>> +				unsigned int ctrl)
+>> +{
+>> +	struct nand_chip *this = mtd->priv;
+>> +	unsigned long nandaddr = (unsigned long) this->IO_ADDR_W;
+> 
+> Please use the ->io_base field directly, and do not use ->IO_ADDR_W/R
+> (I'd like to get rid of them at some point).
 
-For the record, dmesg says:
+Yes, it seems cleaner.
 
-Good luck,
-									Pavel
+> 
+> Also, declare the nandaddr as a void __iomem *, and use the '+'
+> operator instead of '|'.
+> 
+>> +
+>> +	if (ctrl & NAND_CTRL_CHANGE) {
+>> +		nandaddr &= ~(NAND_CMD | NAND_ADDR);
+> 
+> This is not needed.
+> 
+>> +		if (ctrl & NAND_CLE)
+>> +			nandaddr |= NAND_CMD;
+>> +		else if (ctrl & NAND_ALE)
+>> +			nandaddr |= NAND_ADDR;
+>> +		this->IO_ADDR_W = (void __iomem *) nandaddr;
+> 
+> This is not needed, is it?
 
-[   30.694274] g_ether gadget: notify connect true
-[   30.714080] g_ether gadget: notify speed 425984000
-[  127.719146] ssi-protocol ssi-protocol: WAKELINES TEST OK
-[  218.542694] of_get_named_gpiod_flags: can't parse 'rts-gpio'
-property of node '/ocp at 68000000/serial at 4806c000[0]'
-[  218.546264] 4806c000.serial: ttyO1 at MMIO 0x4806c000 (irq = 89,
-base_baud = 3000000) is a OMAP UART1
-[  218.574157] of_get_named_gpiod_flags: can't parse 'rts-gpio'
-property of node '/ocp at 68000000/serial at 49020000[0]'
-[  218.574340] 49020000.serial: ttyO2 at MMIO 0x49020000 (irq = 90,
-base_baud = 3000000) is a OMAP UART2
-[  218.650115] bcm2048: probe
-[  218.650177] bcm2048 4806c000.serial:bluetooth: GPIO lookup for
-consumer reset
-[  218.650177] bcm2048 4806c000.serial:bluetooth: using device tree
-for GPIO lookup
-[  218.650360] of_get_named_gpiod_flags: parsed 'reset-gpios' property
-of node '/ocp at 68000000/serial at 4806c000/bluetooth[0]' - status (0)
-[  218.650390] bcm2048 4806c000.serial:bluetooth: GPIO lookup for
-consumer host-wakeup
-[  218.650421] bcm2048 4806c000.serial:bluetooth: using device tree
-for GPIO lookup
-[  218.650482] of_get_named_gpiod_flags: parsed 'host-wakeup-gpios'
-property of node '/ocp at 68000000/serial at 4806c000/bluetooth[0]' - status
-(0)
-[  218.650512] bcm2048 4806c000.serial:bluetooth: GPIO lookup for
-consumer bluetooth-wakeup
-[  218.650543] bcm2048 4806c000.serial:bluetooth: using device tree
-for GPIO lookup
-[  218.650604] of_get_named_gpiod_flags: parsed
-'bluetooth-wakeup-gpios' property of node
-'/ocp at 68000000/serial@4806c000/bluetooth[0]' - status (0)
-[  218.650817] bcm2048 4806c000.serial:bluetooth: parent uart: ttyO1
-[  218.650817] bcm2048 4806c000.serial:bluetooth: sysclk speed: 38400
-kHz
-[  218.650848] bcm2048 4806c000.serial:bluetooth: probe: 0
-[  218.774139] Bluetooth: HCI UART driver ver 2.3
-[  218.774169] Bluetooth: HCI UART protocol H4 registered
-[  218.774169] Bluetooth: HCI UART protocol H4+ registered
-[  218.774169] Bluetooth: HCI UART protocol BCSP registered
-[  218.774200] Bluetooth: HCI UART protocol LL registered
-[  218.774200] Bluetooth: HCI UART protocol ATH3K registered
-[  218.774200] Bluetooth: HCI UART protocol Three-wire (H5) registered
-[  219.904876] tty ttyO1: Nokia H4+ protocol initialized with
-4806c000.serial:bluetooth!
-[  219.921112] tty ttyO1: Nokia H4+ protocol setup...
-[  219.921142] h4p_reset: reset
-[  219.921142] hci_uart_init_tty
-[  219.983520] h4p_reset: flush
-[  219.983551] h4p_reset: speed
-[  219.983581] tty ttyO1: setting speed to 120000 baud
-[  219.983673] h4p_reset: safety
-[  219.986480] tty ttyO1: wakeup received: 0 -> 1
-[  220.013488] tty ttyO1: wait for cts... received!
-[  220.013519] h4p_reset: flow
-[  220.013549] tty ttyO1: Sending negotiation...
-[  220.013580] tty ttyO1: gpio state: reset=1 wakehost=1 wakebt=1
-[  220.013610] enqueue: hu c304cc80 skb cd4da000
-[  220.017425] tty ttyO1: H4P negotiation:
-[  220.017456] tty ttyO1:     baudrate = 416
-[  220.017486] tty ttyO1:     system clock = 38400
-[  220.017486] tty ttyO1:     manufacturer id = 4
-[  220.017486] tty ttyO1:     version id = 11
-[  220.017578] tty ttyO1: setting speed to 921600 baud
-[  220.043457] tty ttyO1: wait for cts... received!
-[  220.043548] tty ttyO1: Negotiation successful...
-[  220.043579] tty ttyO1: Sending alive packet...
-[  220.043579] enqueue: hu c304cc80 skb cd4dacc0
-[  220.043853] tty ttyO1: Received alive packet!
-[  220.047851] tty ttyO1: FW: Skip negotion packet!
-[  220.047882] tty ttyO1: FW: Skip alive packet!
-[  220.052185] enqueue: hu c304cc80 skb cd4da480
-[  220.055175] enqueue: hu c304cc80 skb cd4dae40
-[  220.058776] enqueue: hu c304cc80 skb cd4da6c0
-[  220.058898] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.058929] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.064605] enqueue: hu c304cc80 skb cd4daf00
-[  220.068389] enqueue: hu c304cc80 skb cd4da0c0
-[  220.068542] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.068542] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.071960] enqueue: hu c304cc80 skb cd4da840
-[  220.072082] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.072082] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.075592] enqueue: hu c304cc80 skb cd4da180
-[  220.079803] enqueue: hu c304cc80 skb cd479cc0
-[  220.084381] enqueue: hu c304cc80 skb cd479180
-[  220.087982] enqueue: hu c304cc80 skb cd4793c0
-[  220.088104] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.088134] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.091522] enqueue: hu c304cc80 skb cd479e40
-[  220.095336] enqueue: hu c304cc80 skb cd479540
-[  220.098876] enqueue: hu c304cc80 skb cd479000
-[  220.102386] enqueue: hu c304cc80 skb cd479600
-[  220.102478] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.102508] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.105987] enqueue: hu c304cc80 skb cd479780
-[  220.109527] enqueue: hu c304cc80 skb cd450cc0
-[  220.109619] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.109649] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.113098] enqueue: hu c304cc80 skb cd484600
-[  220.113220] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.113250] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.116760] enqueue: hu c304cc80 skb cd4a9b40
-[  220.120300] enqueue: hu c304cc80 skb cd77c840
-[  220.124786] enqueue: hu c304cc80 skb cd4f7900
-[  220.128387] enqueue: hu c304cc80 skb c4fb2180
-[  220.131896] enqueue: hu c304cc80 skb c4fb23c0
-[  220.135498] enqueue: hu c304cc80 skb c4fb2cc0
-[  220.139007] enqueue: hu c304cc80 skb c4fb2000
-[  220.142486] enqueue: hu c304cc80 skb cd44fcc0
-[  220.146118] enqueue: hu c304cc80 skb cd4b60c0
-[  220.149627] enqueue: hu c304cc80 skb cf1986c0
-[  220.153106] enqueue: hu c304cc80 skb cf198480
-[  220.156738] enqueue: hu c304cc80 skb cf1980c0
-[  220.160278] enqueue: hu c304cc80 skb cf198240
-[  220.164733] enqueue: hu c304cc80 skb cd49f780
-[  220.168365] enqueue: hu c304cc80 skb cd4daf00
-[  220.171844] enqueue: hu c304cc80 skb cd4da6c0
-[  220.175445] enqueue: hu c304cc80 skb cd4dab40
-[  220.175567] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.175567] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.178955] enqueue: hu c304cc80 skb cd479780
-[  220.182434] enqueue: hu c304cc80 skb cd479540
-[  220.182525] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.182556] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.186035] enqueue: hu c304cc80 skb cd4793c0
-[  220.188140] enqueue: hu c304cc80 skb cd479b40
-[  220.188537] enqueue: hu c304cc80 skb cd484600
-[  220.236480] enqueue: hu c304cc80 skb cd4a9f00
-[  220.237701] enqueue: hu c304cc80 skb cd4f7900
-[  220.238830] enqueue: hu c304cc80 skb c4fb23c0
-[  220.239959] enqueue: hu c304cc80 skb c4fb2b40
-[  220.241119] enqueue: hu c304cc80 skb c3107000
-[  220.242187] enqueue: hu c304cc80 skb cd724240
-[  220.243286] enqueue: hu c304cc80 skb cf198540
-[  220.244781] enqueue: hu c304cc80 skb cf198540
-[  220.245758] enqueue: hu c304cc80 skb cd49f780
-[  220.246612] enqueue: hu c304cc80 skb cd4daf00
-[  220.247436] enqueue: hu c304cc80 skb cd479540
-[  220.248535] tty ttyO1: Sending radio packet...
-[  220.248565] enqueue: hu c304cc80 skb cd479cc0
-[  220.248596] tty ttyO1: Radio packet sent
-[  220.249328] Bluetooth: hci0: Frame reassembly failed (-84)
-[  220.272949] tty ttyO1: wakeup received: 1 -> 0
-[  221.283477] tty ttyO1: radio packet timeout!
-[  221.283630] enqueue: hu c304cc80 skb cd4a9b40
-[  223.363372] Bluetooth: hci0 command 0xfc18 tx timeout
-pavel at n900:~$
+No more if we stick to ->io_base
 
+> 
+>> +	}
+>> +
+>> +	if (cmd != NAND_CMD_NONE)
+>> +		writeb(cmd, (void __iomem *) nandaddr);
+>> +}
+>> +
+>> +/*
+>> + * Probe for the NAND device.
+>> + */
+>> +static int oxnas_nand_probe(struct platform_device *pdev)
+>> +{
+>> +	struct oxnas_nand_data *data;
+>> +	struct mtd_info *mtd;
+>> +	struct resource *res;
+>> +	int err = 0;
+>> +
+>> +	/* Allocate memory for the device structure (and zero it) */
+>> +	data = devm_kzalloc(&pdev->dev, sizeof(struct oxnas_nand_data),
+>> +			    GFP_KERNEL);
+>> +	if (!data)
+>> +		return -ENOMEM;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	data->io_base = devm_ioremap_resource(&pdev->dev, res);
+>> +	if (IS_ERR(data->io_base))
+>> +		return PTR_ERR(data->io_base);
+>> +
+>> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+>> +	if (IS_ERR(data->clk))
+>> +		data->clk = NULL;
+>> +
+>> +	nand_set_flash_node(&data->chip, pdev->dev.of_node);
+>> +	mtd = nand_to_mtd(&data->chip);
+>> +	mtd->dev.parent = &pdev->dev;
+>> +	mtd->priv = &data->chip;
+>> +
+>> +	data->chip.IO_ADDR_R = data->io_base;
+>> +	data->chip.IO_ADDR_W = data->io_base;
+> 
+> As I said above, don't use these fields.
+> 
+>> +	data->chip.cmd_ctrl = oxnas_nand_cmd_ctrl;
+>> +	data->chip.chip_delay = 30;
+>> +	data->chip.ecc.mode = NAND_ECC_SOFT;
+>> +	data->chip.ecc.algo = NAND_ECC_HAMMING;
+> 
+> Probably a good idea to support soft ECC as well...
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/4903439f/attachment-0001.sig>
+This was taken from plat_nand.c, I was not sure if it was necessary, will remove this and rely on DT attributes.
+
+> 
+>> +
+>> +	platform_set_drvdata(pdev, data);
+>> +
+>> +	clk_prepare_enable(data->clk);
+>> +	device_reset_optional(&pdev->dev);
+>> +
+>> +	/* Scan to find existence of the device */
+>> +	if (nand_scan(mtd, 1)) {
+> 
+> Why not returning nand_scan() error code?
+
+Same, bad plat_nand.c copy/paste.
+
+> 
+>> +		err = -ENXIO;
+>> +		goto out;
+> 
+> Return directly here.
+> 
+>> +	}
+>> +
+>> +	err = mtd_device_parse_register(mtd, NULL, NULL, NULL, 0);
+> 
+> Use mtd_device_register() here.
+> 
+>> +	if (!err)
+>> +		return err;
+>> +
+>> +	nand_release(mtd);
+> 
+> Why not
+> 
+> 	if (err)
+> 		nand_release(mtd);
+> 
+>> +out:
+> 
+> Drop this label.
+
+Will refactor this error management.
+
+> 
+>> +	return err;
+>> +}
+>> +
+>> +static int oxnas_nand_remove(struct platform_device *pdev)
+>> +{
+>> +	struct oxnas_nand_data *data = platform_get_drvdata(pdev);
+>> +
+>> +	nand_release(nand_to_mtd(&data->chip));
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id oxnas_nand_match[] = {
+>> +	{ .compatible = "oxsemi,ox820-nand" },
+>> +	{},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, oxnas_nand_match);
+>> +
+>> +static struct platform_driver oxnas_nand_driver = {
+>> +	.probe	= oxnas_nand_probe,
+>> +	.remove	= oxnas_nand_remove,
+>> +	.driver	= {
+>> +		.name		= "oxnas_nand",
+>> +		.of_match_table = oxnas_nand_match,
+>> +	},
+>> +};
+>> +
+>> +module_platform_driver(oxnas_nand_driver);
+>> +
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_AUTHOR("Vitaly Wool");
+>> +MODULE_DESCRIPTION("Oxnas NAND driver");
+>> +MODULE_ALIAS("platform:oxnas_nand");
+> 
+> Thanks,
+> 
+> Boris
+
+Thanks,
+Neil
+
+> 
+> [1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/mtd/nand.txt?id=refs/tags/v4.9-rc1#n57
+> [2]http://lxr.free-electrons.com/source/include/linux/mtd/nand.h#L90
+> 
