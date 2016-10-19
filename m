@@ -1,46 +1,75 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 19 Oct 2016 08:51:24 +0300
-Subject: [PATCH v9 2/2] ARM: dts: add TOPEET itop elite based board
-In-Reply-To: <58DB0A67-6C74-409B-80B2-9F02492D3A55@soulik.info>
-References: <devicetree@vger.kernel.org>
- <1476811129-4450-1-git-send-email-ayaka@soulik.info>
- <1476811129-4450-3-git-send-email-ayaka@soulik.info>
- <20161018173748.GB30003@kozik-lap>
- <58DB0A67-6C74-409B-80B2-9F02492D3A55@soulik.info>
-Message-ID: <CAJKOXPd4xWab2esbELgses+bG=PkJbc_Q_YzQcmeiCdKNaFvzg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 19 Oct 2016 09:09:10 +0200
+Subject: [PATCH] Revert "gpio/mvebu: convert to use
+ irq_domain_add_simple()"
+In-Reply-To: <1476831396-24359-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ (Jason Gunthorpe's message of "Tue, 18 Oct 2016 16:56:36 -0600")
+References: <1476831396-24359-1-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <871szcerxl.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 4:15 AM, Ayaka <ayaka@soulik.info> wrote:
->
->
-> ??? iPad ??
->
->> Krzysztof Kozlowski <krzk@kernel.org> ? 2016?10?19? ??1:37 ???
->>
->>> On Wed, Oct 19, 2016 at 01:18:49AM +0800, Randy Li wrote:
->>> The TOPEET itop exynos 4412 have three versions base board. The
->>> Elite version is the cheap one without too much peripheral devices
->>> on it.
->>>
->>> Currently supported are serial console, wired networking(USB),
->>> USB OTG in peripheral mode, USB host, SD storage, GPIO buttons,
->>> PWM beeper, ADC and LEDs. The WM8960 analog audio codec is also
->>> enabled.
->>>
->>> The FIMC is not used for camera currently, I enabled it just for a
->>> colorspace converter.
->>>
->>> Signed-off-by: Randy Li <ayaka@soulik.info>
->>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
->>
->> Thanks, applied, with missing Rob's ack, minor changes in commit msg and
->> fix in pin function (you used macro for pull up/down instead of
->> function).
-> The last time I saw the other dts have applied that, but they are not now. A header file is also missed reported by kbuild, but I didn't meet that.
+Hi Jason,
+ 
+ On mer., oct. 19 2016, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
 
-I wonder why I didn't encounter the build error on my machine... This
-needs a follow up fix.
+> This reverts commit ce931f571b6dcf8534e8740e8cd16565cf362536.
+>
+> The only difference betwen _simple and _legacy is that _simple
+> calls irq_alloc_descs, however mvebu_gpio_probe already called
+> irq_alloc_descs a few lines above.
 
-Best regards,
-Krzysztof
+And what about removing the irq_alloc_descs ?
+
+Going back to use the _legacy version seems wrong for me.
+
+Gregory
+
+>
+> This fixes these kernel error messages from the double call
+> to irq_alloc_descs:
+>
+>  irq: Cannot allocate irq_descs @ IRQ34, assuming pre-allocated
+>  irq: Cannot allocate irq_descs @ IRQ66, assuming pre-allocated
+>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Fixes: ce931f571b6d ("gpio/mvebu: convert to use irq_domain_add_simple()")
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/gpio/gpio-mvebu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+> index cd5dc27320a2..2e0c8d8b7792 100644
+> --- a/drivers/gpio/gpio-mvebu.c
+> +++ b/drivers/gpio/gpio-mvebu.c
+> @@ -807,8 +807,8 @@ static int mvebu_gpio_probe(struct platform_device *pdev)
+>  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>  
+>  	/* Setup irq domain on top of the generic chip. */
+> -	mvchip->domain = irq_domain_add_simple(np, mvchip->chip.ngpio,
+> -					       mvchip->irqbase,
+> +	mvchip->domain = irq_domain_add_legacy(np, mvchip->chip.ngpio,
+> +					       mvchip->irqbase, 0,
+>  					       &irq_domain_simple_ops,
+>  					       mvchip);
+>  	if (!mvchip->domain) {
+> -- 
+> 2.1.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
