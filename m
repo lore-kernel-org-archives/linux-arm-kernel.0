@@ -1,76 +1,132 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 19 Oct 2016 22:15:56 +0800
-Subject: [PATCH] ARM: imx: gpc: Initialize all power domains
-In-Reply-To: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
-References: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20161019141556.GA18806@tiger>
+From: daeinki@gmail.com (Inki Dae)
+Date: Wed, 19 Oct 2016 23:16:54 +0900
+Subject: [PATCH] exynos-drm: Fix display manager failing to start without
+ IOMMU problem
+In-Reply-To: <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
+References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
+ <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
+ <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
+ <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
+ <57B29925.4020600@samsung.com>
+ <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
+Message-ID: <CAAQKjZMFOe7Aa5Hq5gbMj7=h2VfgXq5jgqbB1wqcZcYZ0ZKZxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 02:53:33PM -0300, Fabio Estevam wrote:
-> When booting a kernel built with multi_v7_defconfig the following
-> probe error is seen:
-> 
-> imx-gpc: probe of 20dc000.gpc failed with error -22
-> 
-> Later on the kernel crashes like this:
-> 
-> [    1.723358] Unable to handle kernel NULL pointer dereference at virtual address 00000040
-> [    1.731500] pgd = c0204000
-> [    1.731863] hctosys: unable to open rtc device (rtc0)
-> [    1.739301] [00000040] *pgd=00000000
-> [    1.739310] Internal error: Oops: 5 [#1] SMP ARM
-> [    1.739319] Modules linked in:
-> [    1.739328] CPU: 1 PID: 95 Comm: kworker/1:4 Not tainted 4.8.0-11897-g6b5e09a #1
-> [    1.739331] Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> [    1.739352] Workqueue: pm genpd_power_off_work_fn
-> [    1.739356] task: ee63d400 task.stack: ee70a000
-> [    1.739365] PC is at mutex_lock+0xc/0x4c
-> [    1.739374] LR is at regulator_disable+0x2c/0x60
-> [    1.739379] pc : [<c0bc0da0>]    lr : [<c06e4b10>]    psr: 60000013
-> [    1.739379] sp : ee70beb0  ip : 10624dd3  fp : ee6e6280
-> [    1.739382] r10: eefb0900  r9 : 00000000  r8 : c1309918
-> [    1.739385] r7 : 00000000  r6 : 00000040  r5 : 00000000  r4 : 00000040
-> [    1.739390] r3 : 0000004c  r2 : 7fffd540  r1 : 000001e4  r0 : 00000040
-> 
-> The gpc probe fails because of_genpd_add_provider_onecell() checks
-> if all the domains are initialized via pm_genpd_present() function
-> and it returns an error on the multi_v7_defconfig case.
+Hi Shuah,
 
-It's not clear to me why this is only with multi_v7_defconfig, not
-imx_v6_v7_defconfig.  Also, is it a regression or long-standing issue?
+2016-10-13 8:11 GMT+09:00 Shuah Khan <shuahkh@osg.samsung.com>:
+> Hi Inki,
+>
+> On 08/15/2016 10:40 PM, Inki Dae wrote:
+>
+>>>
+>>> okay the very first commit that added IOMMU support
+>>> introduced the code that rejects non-contig gem memory
+>>> type without IOMMU.
+>>>
+>>> commit 0519f9a12d0113caab78980c48a7902d2bd40c2c
+>>> Author: Inki Dae <inki.dae@samsung.com>
+>>> Date:   Sat Oct 20 07:53:42 2012 -0700
+>>>
+>>>     drm/exynos: add iommu support for exynos drm framework
+>>>
+>
+> I haven't given up on this yet. I am still seeing the following failure:
+>
+> Additional debug messages I added:
+> [   15.287403] exynos_drm_gem_create_ioctl() 1
+> [   15.287419] exynos_drm_gem_create() flags 1
+>
+> [   15.311511] [drm:exynos_drm_framebuffer_init] *ERROR* Non-contiguous GEM memory is not supported.
+>
+> Additional debug message I added:
+> [   15.318981] [drm:exynos_user_fb_create] *ERROR* failed to initialize framebuffer
+>
+> This is what happens:
+>
+> 1. exynos_drm_gem_create_ioctl() gets called with EXYNOS_BO_NONCONTIG request
+> 2. exynos_drm_gem_create(0 goes ahead and creates the GEM buffers
+> 3. exynos_user_fb_create() tries to associate GEM to fb and fails during
+>    check_fb_gem_memory_type()
+>
+> At this point, there is no recovery and lightdm fails
+>
+> xf86-video-armsoc/src/drmmode_exynos/drmmode_exynos.c assumes contiguous
+> allocations are not supported in some exynos drm versions: The following
+> commit introduced this change:
+>
+> https://git.linaro.org/arm/xorg/driver/xf86-video-armsoc.git/commitdiff/3be1f6273441fe95dd442f44064387322e16b7e9
+>
+> excerpts from the diff:-       if (create_gem->buf_type == ARMSOC_BO_SCANOUT)
+> -               create_exynos.flags = EXYNOS_BO_CONTIG;
+> -       else
+> -               create_exynos.flags = EXYNOS_BO_NONCONTIG;
+> +
+> +       /* Contiguous allocations are not supported in some exynos drm versions.
+> +        * When they are supported all allocations are effectively contiguous
+> +        * anyway, so for simplicity we always request non contiguous buffers.
+> +        */
+> +       create_exynos.flags = EXYNOS_BO_NONCONTIG;
+>
 
-Shawn
+Above comment, "Contiguous allocations are not supported in some
+exynos drm versions.", seems wrong assumption.
+The root cause, contiguous allocation is not supported, would be that
+they used Linux kernel which didn't have CMA region enough - as
+default 16MB, or didn't declare CMA region enough for the DMA device.
+So I think they should not force to flag EXYNOS_BO_NONCONTIG and they
+should manage the error case if the allocation failed.
 
-> 
-> In order to fix this error, initialize all the imx_gpc_domains, not
-> only the imx6q_pu_domain.base one.
-> 
-> Reported-by: Olof's autobooter <build@lixom.net>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/mach-imx/gpc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 0df062d..d0463e9 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -430,7 +430,8 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
->  	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
->  		return 0;
->  
-> -	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
-> +	for (i = 0; i < ARRAY_SIZE(imx_gpc_domains); i++)
-> +		pm_genpd_init(imx_gpc_domains[i], NULL, false);
->  	return of_genpd_add_provider_onecell(dev->of_node,
->  					     &imx_gpc_onecell_data);
->  
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> There might have been logic on exynos_drm that forced Contig when it coudn't
+> support NONCONTIG. At least, that is what this comment suggests. This assumption
+> doesn't appear to be a good one and not sure if this change was made to fix a bug.
+>
+> After the IOMMU support, this assumption is no longer true. Hence, with IOMMU
+> support, latest kernels have a mismatch with the installed xf86-video-armsoc
+>
+> This is what I am running into. This leads to the following question:
+>
+> 1. How do we ensure exynos_drm kernel changes don't break user-space
+>    specifically xf86-video-armsoc
+> 2. This seems to have gone undetected for a while. I see a change in
+>    exynos_drm_gem_dumb_create() that is probably addressing this type
+>    of breakage. Commit 122beea84bb90236b1ae545f08267af58591c21b adds
+>    handling for IOMMU NONCONTIG case.
+
+Seems this patch has a problem. This patch forces to flag NONCONTIG if
+iommu is enabled. The flag should be depend on the argument from
+user-space.
+I.e., if user-space requested a gem allocation with CONTIG flag, then
+Exynos drm driver should allocate contiguous memory even though iommu
+is enabled.
+
+>
+> Anyway, I am interested in getting the exynos_drm kernel side code
+> and xf86-video-armsoc in sync to resolve the issue.
+>
+> Could you recommend a going forward plan?
+
+My opinion are,
+
+1. Do not force to flag EXYNOS_BO_NONCONTIG at xf86-video-armsoc
+2. Do not force to flag NONCONTIG at Exynos drm driver even though
+iommu is enabled and flag allocation type with the argument from
+user-space.
+
+I think you could try to post above patches.
+
+Thanks,
+Inki Dae
+
+>
+> I can submit a patch to xf86-video-armsoc. I am also looking ahead to
+> see if we can avoid such breaks in the future by keeping kernel and
+> xf86-video-armsoc in sync.
+>
+> thanks,
+> -- Shuah
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
