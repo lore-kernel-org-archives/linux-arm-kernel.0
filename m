@@ -1,43 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 19 Oct 2016 21:18:04 +0100
-Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
- config table
-In-Reply-To: <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
-References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
- <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
- <20161019110926.GG9616@leverpostej>
- <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
- <20161019112243.GD31476@codeblueprint.co.uk>
- <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
-Message-ID: <CAKv+Gu92dC6BK7Adb2xLvPwNXv=z15A0zhss_XVNfd+r0NA0SA@mail.gmail.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 19 Oct 2016 15:18:42 -0500
+Subject: [PATCH 1/3] ARM: dts: socfpga: Add QSPI node for the Arria10
+Message-ID: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2016 at 21:14, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Oct 19, 2016 at 4:22 AM, Matt Fleming <matt@codeblueprint.co.uk> wrote:
->> On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
->>> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
->>>
->>> > I think to some extent this mush be treated as an ABI, given cases like
->>> > kexec.
->>> >
->>>
->>> Perhaps, yes. That would also allow GRUB or other EFI aware
->>> bootloaders to generate the seed.
->>
->> If we're going to go down this route, we should try and get the GUID
->> into the UEFI spec.
->
-> It seems like maybe under UEFI, both this table (which sounds like
-> it'll not be rotated regularly)
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-What do you mean 'rotated'? It is generated at boot. My 2/2 patch
-generates it from the stub using the EFI_RNG_PROTOCOL on ARM/arm64
+Add the QSPI device node for Arria10 SOC.
 
-> could be mixed with calls to
-> EFI_PROTOCOL_RNG by the kernel? (Similar to how kaslr is seeded?)
->
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/socfpga_arria10.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-That is kind of the point. KASLR is different because we need the
-entropy before even jumping to C code, but for all other uses of early
-entropy, this seemed like a useful approach
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index 1149216..551c636 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -675,6 +675,20 @@
+ 			};
+ 		};
+ 
++		qspi: spi at ff809000 {
++			compatible = "cdns,qspi-nor";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0xff809000 0x100>,
++			      <0xffa00000 0x100000>;
++			interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
++			cdns,fifo-depth = <128>;
++			cdns,fifo-width = <4>;
++			cdns,trigger-address = <0x00000000>;
++			clocks = <&qspi_clk>;
++			status = "disabled";
++		};
++
+ 		rst: rstmgr at ffd05000 {
+ 			#reset-cells = <1>;
+ 			compatible = "altr,rst-mgr";
+-- 
+1.7.9.5
