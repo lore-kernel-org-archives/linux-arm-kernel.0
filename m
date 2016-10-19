@@ -1,27 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 19 Oct 2016 08:54:03 -0700
-Subject: [PATCH] dmaengine: qcom_hidma: cleanup sysfs entries during remove
-In-Reply-To: <20161019132622.GN2467@localhost>
-References: <1475796189-26553-1-git-send-email-okaya@codeaurora.org>
- <20161019132622.GN2467@localhost>
-Message-ID: <e15e8c6a-35fa-5a9f-6b42-a91489716e85@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 19 Oct 2016 17:54:28 +0200
+Subject: [PATCH] mtd: nand: Add OX820 NAND Support
+In-Reply-To: <0f5398bb-52f1-d5bb-834c-dead4f708fd3@baylibre.com>
+References: <20161019145523.6763-1-narmstrong@baylibre.com>
+ <20161019173704.75592f52@bbrezillon>
+ <0f5398bb-52f1-d5bb-834c-dead4f708fd3@baylibre.com>
+Message-ID: <20161019175428.6ea3998d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2016 6:26 AM, Vinod Koul wrote:
->> -static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
->> > -				    int mode)
->> > +static int hidma_sysfs_uninit(struct hidma_dev *dev)
->> > +{
->> > +	if (!dev->chid_attrs)
->> > +		return -ENOMEM;
-> why is this check required? Probe would fail in init case right.
-> Second returning error doesnt help as you are calling this from remove and
-> return is not checked so redundant!
+On Wed, 19 Oct 2016 17:46:01 +0200
+Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-Agreed, I'll get rid of the attrs and also the return value.
+> >> +/* Single CS command control */
+> >> +static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+> >> +				unsigned int ctrl)
+> >> +{
+> >> +	struct nand_chip *chip = mtd_to_nand(mtd);
+> >> +	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
+> >> +
+> >> +	if (ctrl & NAND_CTRL_CHANGE) {
+> >> +		if (ctrl & NAND_CLE)
+> >> +			oxnas->ctrl = OXNAS_NAND_CMD_CLE;
+> >> +		else if (ctrl & NAND_ALE)
+> >> +			oxnas->ctrl = OXNAS_NAND_CMD_ALE;
+> >> +		else
+> >> +			oxnas->ctrl = 0;
+> >> +	}
+> >> +
+> >> +	if (cmd != NAND_CMD_NONE)
+> >> +		writeb(cmd, oxnas->io_base + oxnas->ctrl);  
+> > 
+> > There's no need to test the NAND_CTRL_CHANGE here, and I don't think
+> > the CLE or ALE flag is ever set when cmd == CMD_NONE. So, you can kill
+> > the ->ctrl field and simply do:
+> > 
+> > 	if (ctrl & NAND_CLE)
+> > 		writeb(cmd, oxnas->io_base + OXNAS_NAND_CMD_CLE);
+> > 	else if (ctrl & NAND_ALE)
+> > 		writeb(cmd, oxnas->io_base + OXNAS_NAND_CMD_ALE);
+> >   
+> >> +}  
+> 
+> Hmm, except it's needed back in the oxnas_nand_write_buf() call (don't ask me why)
+> so I don't see how to simplify more this function.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Are you sure? Can you add a WARN(oxnas->ctrl) in oxnas_nand_write_buf()
+to check if it's ever the case? I'm almost sure there is a call to
+->cmd_ctrl() with none of the CLE and ALE flags set before the
+->write_buf() call.
