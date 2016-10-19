@@ -1,48 +1,62 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 19 Oct 2016 04:56:57 +0200
-Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
-In-Reply-To: <20161019025154.rmw56aoh27wbrene@earth>
-References: <20161005155112.13774-1-hdegoede@redhat.com>
- <20161005155112.13774-2-hdegoede@redhat.com>
- <20161019025154.rmw56aoh27wbrene@earth>
-Message-ID: <20161019025656.564mntn7mt7ei36m@earth>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 19 Oct 2016 11:03:33 +0800
+Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
+In-Reply-To: <CAKv+Gu9wuXnrq77a3Zk0GnHgnkpURh=EegwgP+vAwMC=rdm3qA@mail.gmail.com>
+References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161018114932.GG10115@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu9wuXnrq77a3Zk0GnHgnkpURh=EegwgP+vAwMC=rdm3qA@mail.gmail.com>
+Message-ID: <20161019030333.GA1269@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Oct 19, 2016 at 04:51:55AM +0200, Sebastian Reichel wrote:
-> > diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
-> > index b1b8658..d35a5fe 100644
-> > --- a/drivers/mfd/axp20x-i2c.c
-> > +++ b/drivers/mfd/axp20x-i2c.c
-> > @@ -69,10 +69,11 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
-> >  
-> > -/*
-> > - * This is useless for OF-enabled devices, but it is needed by I2C subsystem
-> > - */
-> >  static const struct i2c_device_id axp20x_i2c_id[] = {
-> > +	{ "axp152", 0 },
-> > +	{ "axp202", 0 },
-> > +	{ "axp209", 0 },
-> > +	{ "axp221", 0 },
-> >  	{ },
-> >  };
-> >  MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+On Tue, Oct 18, 2016 at 01:14:38PM +0100, Ard Biesheuvel wrote:
+> On 18 October 2016 at 12:49, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Oct 11, 2016 at 07:15:12PM +0100, Ard Biesheuvel wrote:
+> >> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
+> >> currently work, or have ever worked correctly when built for big endian. So this
+> >> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
+> >> well, and an additional fix for XTS which escaped my attention before.
+> >>
+> >> Each of these patches carries a fixes tag, and could be backported to stable.
+> >> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
+> >> fix is compatible with, not the patch that introduced the algorithm.
+> >
+> > I think for future reference, the Fixes tag should denote the commit
+> > that introduced the issue. An explicit Cc: stable tag would state how
+> > far back it should be applied.
+> >
 > 
-> Thanks, queued.
+> OK, that sounds reasonable.
+> 
+> >> Ard Biesheuvel (8):
+> >>   crypto: arm64/aes-ce - fix for big endian
+> >>   crypto: arm64/ghash-ce - fix for big endian
+> >>   crypto: arm64/sha1-ce - fix for big endian
+> >>   crypto: arm64/sha2-ce - fix for big endian
+> >>   crypto: arm64/aes-ccm-ce: fix for big endian
+> >>   crypto: arm64/aes-neon - fix for big endian
+> >>   crypto: arm64/aes-xts-ce: fix for big endian
+> >>   crypto: arm/aes-ce - fix for big endian
+> >
+> > The changes look fine to me but I can't claim I fully understand these
+> > algorithms. FWIW:
+> >
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >
+> > (Will may pick them up for 4.9-rcX)
+> 
+> Thanks, although I was kind of expecting Herbert to pick these up,
+> given that #8 affects ARM not arm64.
+> 
+> But if you (or Will) can pick up #1 to #7, that is also fine, then I
+> can drop #8 into rmk's patch database.
 
-My mistake. It should obviously go through mfd. So take this instead:
+I was planning merging these for 4.10.  But I'm fine with them
+going through the arm tree.  Let me know what you guys want to
+do.
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/aa748c19/attachment.sig>
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
