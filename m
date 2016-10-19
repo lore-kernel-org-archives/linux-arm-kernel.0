@@ -1,64 +1,58 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 19 Oct 2016 15:18:44 -0500
-Subject: [PATCH 3/3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
-In-Reply-To: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 19 Oct 2016 13:20:36 -0700
+Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
+ config table
+In-Reply-To: <CAKv+Gu92dC6BK7Adb2xLvPwNXv=z15A0zhss_XVNfd+r0NA0SA@mail.gmail.com>
+References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20161019110926.GG9616@leverpostej>
+ <CAKv+Gu9g1W8EfnJN2Y_Xgo=QKC1gHa95rjO32Dqt4uT+amzhnQ@mail.gmail.com>
+ <20161019112243.GD31476@codeblueprint.co.uk>
+ <CAGXu5jJ-KTVJLwAp6iZ-tp5AKnAzSHz80yZkg4dh3uYDz3MsJw@mail.gmail.com>
+ <CAKv+Gu92dC6BK7Adb2xLvPwNXv=z15A0zhss_XVNfd+r0NA0SA@mail.gmail.com>
+Message-ID: <CAGXu5jKx5cvZsBwC1AJZ3Q4CCn-nxD3Jejs5irQLRan+j305Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Wed, Oct 19, 2016 at 1:18 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 19 October 2016 at 21:14, Kees Cook <keescook@chromium.org> wrote:
+>> On Wed, Oct 19, 2016 at 4:22 AM, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+>>> On Wed, 19 Oct, at 12:13:55PM, Ard Biesheuvel wrote:
+>>>> On 19 October 2016 at 12:09, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>>
+>>>> > I think to some extent this mush be treated as an ABI, given cases like
+>>>> > kexec.
+>>>> >
+>>>>
+>>>> Perhaps, yes. That would also allow GRUB or other EFI aware
+>>>> bootloaders to generate the seed.
+>>>
+>>> If we're going to go down this route, we should try and get the GUID
+>>> into the UEFI spec.
+>>
+>> It seems like maybe under UEFI, both this table (which sounds like
+>> it'll not be rotated regularly)
+>
+> What do you mean 'rotated'? It is generated at boot. My 2/2 patch
+> generates it from the stub using the EFI_RNG_PROTOCOL on ARM/arm64
 
-Enable the QSPI node and add the flash chip.
+Oh! I entirely misunderstood. I thought doing regular writes to EFI
+variables was discouraged (since they may be stored in NVRAM that
+would "wear out").
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   33 +++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+>> could be mixed with calls to
+>> EFI_PROTOCOL_RNG by the kernel? (Similar to how kaslr is seeded?)
+>>
+>
+> That is kind of the point. KASLR is different because we need the
+> entropy before even jumping to C code, but for all other uses of early
+> entropy, this seemed like a useful approach
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 02e22f5..2f75e0f 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -175,6 +175,39 @@
- 	status = "okay";
- };
- 
-+&qspi {
-+	status = "okay";
-+
-+	flash: flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "n25q256a";
-+		reg = <0>;
-+		spi-max-frequency = <100000000>;
-+
-+		m25p,fast-read;
-+		cdns,page-size = <256>;
-+		cdns,block-size = <16>;
-+		cdns,read-delay = <4>;
-+		cdns,tshsl-ns = <50>;
-+		cdns,tsd2d-ns = <50>;
-+		cdns,tchsh-ns = <4>;
-+		cdns,tslch-ns = <4>;
-+
-+		partition at qspi-boot {
-+			/* 8MB for raw data. */
-+			label = "Flash 0 Raw Data";
-+			reg = <0x0 0x800000>;
-+		};
-+
-+		partition at qspi-rootfs {
-+			/* 120MB for jffs2 data. */
-+			label = "Flash 0 jffs2 Filesystem";
-+			reg = <0x800000 0x7800000>;
-+		};
-+	};
-+};
-+
- &usb1 {
- 	status = "okay";
- };
+Yup, cool. If the table changes per boot, yeah, my suggestion is pointless. :)
+
+-Kees
+
 -- 
-1.7.9.5
+Kees Cook
+Nexus Security
