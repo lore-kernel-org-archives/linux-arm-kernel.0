@@ -1,86 +1,63 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 19 Oct 2016 17:21:11 +0200
-Subject: [PATCH v2 0/9] irqchip: meson: add support for the gpio interrupt
- controller
-Message-ID: <1476890480-8884-1-git-send-email-jbrunet@baylibre.com>
+Date: Wed, 19 Oct 2016 17:21:13 +0200
+Subject: [PATCH v2 2/9] dt-bindings: interrupt-controller: add DT binding for
+ meson GPIO interrupt controller
+In-Reply-To: <1476890480-8884-1-git-send-email-jbrunet@baylibre.com>
+References: <1476890480-8884-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1476890480-8884-3-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for the GPIO interrupt controller found
-on Amlogic's meson SoC families.
 
-Unlike what the name suggests, this controller is not part of the SoC GPIO
-subsystem. It's an indepedent controller which can watch almost all pad of
-the SoC and generate and interrupt from it. Some pins, which are not part
-of the public datasheet, don't seem to have this capability though.
+This commit adds the device tree bindings description for Amlogic's GPIO
+interrupt controller available on the meson8, meson8b and gxbb SoC families
 
-Hardware wise, the controller is a 256 to 8 multiplexer. It can take up
-to 256 input pads and route them to any of 8 GIC's interrupts. There is
-also a filter block in the middle to select the appropriate edge or level.
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+Rob, I did not include the Ack you gave for the RFC as bindings have slightly
+changed. Only the interrupt property has be removed following a discussion I
+had with Marc
 
-The number of interrupt declared by the irqchip is lowered from 256 to the
-actual number of signal routed to the controller on each SoC family. As we
-have access to only 8 GIC?s interrupts, these are allocated when an
-interrupt is requested from the controller, on a first come, first served
-basis.
-
-This series has been tested on Amlogic S905-P200 board with the front
-panel power button. Directly passing an IRQ or using gpio_to_irq both work
-with this driver.
-
-This work is derived from the previous work of Carlo Caione [1].
-
-Changes since RFC : [2]
- * Remove interrupt property in device tree: the controller cannot generate
-   interrupts on its own and is merely routing the interrupt to the GIC,
-   therefore it should not use the interrupt property. This data is now
-   stored directly in the driver, same as the pinctrl data.
-
- * Improve compatibility checking of meson pinctrl on its interrupt parent
-   to activate gpio_to_irq callback
-
- * Drop IRQ_BOTH hack. Need more work to have an acceptable solution for
-   this
-
-Changes since v1 : [3]
- * Correct mistake in patch 4 when no compatible controller is found. Sorry
-   for the inconvenience.
-
-[1] : http://lkml.kernel.org/r/1448987062-31225-1-git-send-email-carlo at caione.org
-[2] : http://lkml.kernel.org/r/1475593708-10526-1-git-send-email-jbrunet at baylibre.com
-[3] : http://lkml.kernel.org/r/1476871709-8359-1-git-send-email-jbrunet at baylibre.com
-
-Jerome Brunet (9):
-  irqchip: meson: add support for gpio interrupt controller
-  dt-bindings: interrupt-controller: add DT binding for meson GPIO
-    interrupt controller
-  pinctrl: meson: update pinctrl data with gpio irq data
-  pinctrl: meson: allow gpio to request irq
-  dt-bindings: pinctrl: meson: update gpio dt-bindings
-  ARM64: meson: enable MESON_IRQ_GPIO in Kconfig
-  ARM: meson: enable MESON_IRQ_GPIO in Kconfig for meson8
-  ARM64: dts: amlogic: enable gpio interrupt controller on gxbb
-  ARM: dts: amlogic: enable gpio interrupt controller on meson8
-
- .../amlogic,meson-gpio-intc.txt                    |  31 ++
- .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   4 +
- arch/arm/boot/dts/meson8.dtsi                      |  11 +
- arch/arm/boot/dts/meson8b.dtsi                     |  11 +
- arch/arm/mach-meson/Kconfig                        |   2 +
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   9 +
- drivers/irqchip/Kconfig                            |   9 +
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-meson-gpio.c                   | 423 +++++++++++++++++++++
- drivers/pinctrl/Kconfig                            |   2 +
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c         |  24 +-
- drivers/pinctrl/meson/pinctrl-meson.c              |  77 +++-
- drivers/pinctrl/meson/pinctrl-meson.h              |  17 +-
- drivers/pinctrl/meson/pinctrl-meson8.c             |  22 +-
- drivers/pinctrl/meson/pinctrl-meson8b.c            |  34 +-
- 16 files changed, 641 insertions(+), 37 deletions(-)
+ .../amlogic,meson-gpio-intc.txt                    | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
- create mode 100644 drivers/irqchip/irq-meson-gpio.c
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+new file mode 100644
+index 000000000000..2464d9a0865d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/amlogic,meson-gpio-intc.txt
+@@ -0,0 +1,31 @@
++Amlogic meson GPIO interrupt controller
++
++Meson SoCs contains an interrupt controller which is able watch the SoC pads
++and generate an interrupt on edges or level. The controller is essentially a
++256 pads to 8 GIC interrupt multiplexer, with a filter block to select edge
++or level and polarity. We don?t expose all 256 mux inputs because the
++documentation shows that upper part is not mapped to any pad. The actual number
++of interrupt exposed depends on the SoC.
++
++Required properties:
++
++- compatible : should be either
++   "amlogic,meson8-gpio-intc? for meson8 SoCs (AML7826MX) or
++   ?amlogic,meson8b-gpio-intc? for meson8b SoCs (S805) or
++   ?amlogic,meson-gxbb-gpio-intc? for GXBB SoCs (S905)
++- interrupt-parent : a phandle to the GIC the interrupts are routed to.
++   Usually this is provided at the root level of the device tree as it is
++   common to most of the SoC
++- reg : Specifies base physical address and size of the registers.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Specifies the number of cells needed to encode an
++   interrupt source. The value must be 2.
++
++Example:
++
++gpio_interrupt: interrupt-controller at 9880 {
++	compatible = "amlogic,meson-gxbb-gpio-intc";
++	reg = <0x0 0x9880 0x0 0x10>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++};
 -- 
 2.7.4
