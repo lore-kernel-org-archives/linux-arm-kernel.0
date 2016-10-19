@@ -1,162 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 19 Oct 2016 11:36:17 +0200
-Subject: [PATCH] reset: uniphier: rename MIO reset to SD reset for Pro5,
- PXs2, LD20 SoCs
-In-Reply-To: <1476865429-13143-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1476865429-13143-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1476869777.3054.25.camel@pengutronix.de>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 19 Oct 2016 11:42:27 +0200
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <20161018104539.GB15639@leverpostej>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <20161018100002.GA4347@xo-6d-61-c0.localdomain>
+ <20161018104539.GB15639@leverpostej>
+Message-ID: <20161019094227.GB1461@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+On Tue 2016-10-18 11:45:39, Mark Rutland wrote:
+> On Tue, Oct 18, 2016 at 12:00:02PM +0200, Pavel Machek wrote:
+> > > >b. in arm64, if some platform has its own suspend flow,  couldn't it
+> > > >adopts arm/match-xxx to register its own global suspend method?
+> > > 
+> > > No, PSCI is highly recommended.
+> > 
+> > Relying on firmware for suspend on x86 was a great disaster, lets not repeat
+> > that mistake. arm32 has better powermanagement than x86 ever will (see Nokia N900
+> > for example) -- feel free to copy that code from arm32.
+> 
+> Quite frankly, copying hundreds of lines of board-specific code
+> (including assembly that won't compile) is unlikely to help.
+> 
+> So far arm64 requires well-defined, standard, reusable interfaces (e.g.
+> PSCI). That cleanly separates concerns (e.g. anyone can implement the
+> backend without mandatory changes to the kernel), and keeps things
+> maintainable.
 
-Am Mittwoch, den 19.10.2016, 17:23 +0900 schrieb Masahiro Yamada:
-> I made a mistake as for naming for this block.  The MIO block is not
-> implemented for these 3 SoCs in the first place.  The current naming
-> will be a trouble if an SoC with both MIO and SD-ctrl blocks appear
-> in the future.
-> 
-> This driver has just been merged in the previous merge window.
-> Rename it before the release.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Philipp,
-> 
-> If you do not mind, may I include this in my PR
-> along with the "select ARCH_HAS_RESET_CONTROLLER" patches?
+Either the lowlevel suspend code is stable and bug free, and then
+having that code is not a problem. Or the lowlevel suspend code is
+complex enough to contain some bugs, and in such case it is better to
+debug and update it with kernel.
 
-Should be fine, I don't see any potential for conflicts with the reset
-tree.
+> ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
+> can use and build atop of. It's open source (three-clause BSD with DCO),
+> and accepts board ports. You can have a completely open stack,
+> regardless of whether part of that stack is firmware.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+If something is called "Trusted", it is not trustworthy.
 
-regards
-Philipp
+BSD is better than closed source, but it also means that you will not
+get the sources from your hw vendor.
 
->  .../devicetree/bindings/reset/uniphier-reset.txt   | 22 +++++++++++-----------
->  drivers/reset/reset-uniphier.c                     | 16 ++++++++--------
->  2 files changed, 19 insertions(+), 19 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> index e6bbfcc..78cd735 100644
-> --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> @@ -19,12 +19,12 @@ Required properties:
->  Example:
->  
->  	sysctrl at 61840000 {
-> -		compatible = "socionext,uniphier-ld20-sysctrl",
-> +		compatible = "socionext,uniphier-ld11-sysctrl",
->  			     "simple-mfd", "syscon";
->  		reg = <0x61840000 0x4000>;
->  
->  		reset {
-> -			compatible = "socionext,uniphier-ld20-reset";
-> +			compatible = "socionext,uniphier-ld11-reset";
->  			#reset-cells = <1>;
->  		};
->  
-> @@ -32,8 +32,8 @@ Example:
->  	};
->  
-> 
-> -Media I/O (MIO) reset
-> ----------------------
-> +Media I/O (MIO) reset, SD reset
-> +-------------------------------
->  
->  Required properties:
->  - compatible: should be one of the following:
-> @@ -41,21 +41,21 @@ Required properties:
->      "socionext,uniphier-ld4-mio-reset"  - for PH1-LD4 SoC.
->      "socionext,uniphier-pro4-mio-reset" - for PH1-Pro4 SoC.
->      "socionext,uniphier-sld8-mio-reset" - for PH1-sLD8 SoC.
-> -    "socionext,uniphier-pro5-mio-reset" - for PH1-Pro5 SoC.
-> -    "socionext,uniphier-pxs2-mio-reset" - for ProXstream2/PH1-LD6b SoC.
-> +    "socionext,uniphier-pro5-sd-reset"  - for PH1-Pro5 SoC.
-> +    "socionext,uniphier-pxs2-sd-reset"  - for ProXstream2/PH1-LD6b SoC.
->      "socionext,uniphier-ld11-mio-reset" - for PH1-LD11 SoC.
-> -    "socionext,uniphier-ld20-mio-reset" - for PH1-LD20 SoC.
-> +    "socionext,uniphier-ld20-sd-reset"  - for PH1-LD20 SoC.
->  - #reset-cells: should be 1.
->  
->  Example:
->  
->  	mioctrl at 59810000 {
-> -		compatible = "socionext,uniphier-ld20-mioctrl",
-> +		compatible = "socionext,uniphier-ld11-mioctrl",
->  			     "simple-mfd", "syscon";
->  		reg = <0x59810000 0x800>;
->  
->  		reset {
-> -			compatible = "socionext,uniphier-ld20-mio-reset";
-> +			compatible = "socionext,uniphier-ld11-mio-reset";
->  			#reset-cells = <1>;
->  		};
->  
-> @@ -80,12 +80,12 @@ Required properties:
->  Example:
->  
->  	perictrl at 59820000 {
-> -		compatible = "socionext,uniphier-ld20-perictrl",
-> +		compatible = "socionext,uniphier-ld11-perictrl",
->  			     "simple-mfd", "syscon";
->  		reg = <0x59820000 0x200>;
->  
->  		reset {
-> -			compatible = "socionext,uniphier-ld20-peri-reset";
-> +			compatible = "socionext,uniphier-ld11-peri-reset";
->  			#reset-cells = <1>;
->  		};
->  
-> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-> index 8b2558e..968c3ae 100644
-> --- a/drivers/reset/reset-uniphier.c
-> +++ b/drivers/reset/reset-uniphier.c
-> @@ -154,7 +154,7 @@ struct uniphier_reset_data {
->  	UNIPHIER_RESET_END,
->  };
->  
-> -const struct uniphier_reset_data uniphier_pro5_mio_reset_data[] = {
-> +const struct uniphier_reset_data uniphier_pro5_sd_reset_data[] = {
->  	UNIPHIER_MIO_RESET_SD(0, 0),
->  	UNIPHIER_MIO_RESET_SD(1, 1),
->  	UNIPHIER_MIO_RESET_EMMC_HW_RESET(6, 1),
-> @@ -360,7 +360,7 @@ static int uniphier_reset_probe(struct platform_device *pdev)
->  		.compatible = "socionext,uniphier-ld20-reset",
->  		.data = uniphier_ld20_sys_reset_data,
->  	},
-> -	/* Media I/O reset */
-> +	/* Media I/O reset, SD reset */
->  	{
->  		.compatible = "socionext,uniphier-sld3-mio-reset",
->  		.data = uniphier_sld3_mio_reset_data,
-> @@ -378,20 +378,20 @@ static int uniphier_reset_probe(struct platform_device *pdev)
->  		.data = uniphier_sld3_mio_reset_data,
->  	},
->  	{
-> -		.compatible = "socionext,uniphier-pro5-mio-reset",
-> -		.data = uniphier_pro5_mio_reset_data,
-> +		.compatible = "socionext,uniphier-pro5-sd-reset",
-> +		.data = uniphier_pro5_sd_reset_data,
->  	},
->  	{
-> -		.compatible = "socionext,uniphier-pxs2-mio-reset",
-> -		.data = uniphier_pro5_mio_reset_data,
-> +		.compatible = "socionext,uniphier-pxs2-sd-reset",
-> +		.data = uniphier_pro5_sd_reset_data,
->  	},
->  	{
->  		.compatible = "socionext,uniphier-ld11-mio-reset",
->  		.data = uniphier_sld3_mio_reset_data,
->  	},
->  	{
-> -		.compatible = "socionext,uniphier-ld20-mio-reset",
-> -		.data = uniphier_pro5_mio_reset_data,
-> +		.compatible = "socionext,uniphier-ld20-sd-reset",
-> +		.data = uniphier_pro5_sd_reset_data,
->  	},
->  	/* Peripheral reset */
->  	{
+Being separate module means it will be never updated.
+
+Being separate module means it will be hard to debug, in area where
+debugging is already pretty hard.
+
+Can it do advanced stuff like deep powersaving on N900 idle?
+
+Just don't do it.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161019/05d8de63/attachment.sig>
