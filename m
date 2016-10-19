@@ -1,17 +1,17 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 19 Oct 2016 12:02:14 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 19 Oct 2016 12:09:26 +0100
 Subject: [PATCH 1/2] efi: add support for seeding the RNG from a UEFI
  config table
 In-Reply-To: <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
 References: <1475749646-10844-1-git-send-email-ard.biesheuvel@linaro.org>
  <1475749646-10844-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161019110214.GB31476@codeblueprint.co.uk>
+Message-ID: <20161019110926.GG9616@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(CC'ing other potentially interested randomness folks)
+Hi Ard,
 
-On Thu, 06 Oct, at 11:27:25AM, Ard Biesheuvel wrote:
+On Thu, Oct 06, 2016 at 11:27:25AM +0100, Ard Biesheuvel wrote:
 > Specify a Linux specific UEFI configuration table that carries some
 > random bits, and use the contents during early boot to seed the kernel's
 > random number generator. This allows much strong random numbers to be
@@ -24,16 +24,22 @@ On Thu, 06 Oct, at 11:27:25AM, Ard Biesheuvel wrote:
 > other UEFI driver or application (e.g., GRUB), but the random seed table
 > GUID and the associated functionality should be considered an internal
 > kernel interface (unless it is promoted to ABI later on)
-> 
+
+What does this mean for kexec? Won't each successive kernel look for the
+table and find the same seed?
+
+I think to some extent this mush be treated as an ABI, given cases like
+kexec.
+
+Thanks,
+Mark.
+
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
 >  drivers/firmware/efi/efi.c | 26 ++++++++++++++++++++
 >  include/linux/efi.h        |  8 ++++++
 >  2 files changed, 34 insertions(+)
- 
-This series looks fine to me. I'm leaving the patch below for the
-benefit of the Ted and Kees.
-
+> 
 > diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
 > index 1ac199cd75e7..c8ae40f9b674 100644
 > --- a/drivers/firmware/efi/efi.c
@@ -125,4 +131,9 @@ benefit of the Ted and Kees.
 >  #endif /* _LINUX_EFI_H */
 > -- 
 > 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
