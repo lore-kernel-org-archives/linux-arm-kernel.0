@@ -1,60 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 19 Oct 2016 14:36:29 +0200
-Subject: [PATCH] mmc: sunxi: Prevent against null dereference for vmmc
-Message-ID: <20161019123629.14525-1-maxime.ripard@free-electrons.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 19 Oct 2016 21:39:37 +0900
+Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
+Message-ID: <1476880777-5068-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VMMC is an optional regulator, which means that mmc_regulator_get_supply
-will only return an error in case of a deferred probe, but not when the
-regulator is not set in the DT.
+The UniPhier outer cache (arch/arm/mm/cache-uniphier.c) has 128 byte
+line length and its tags are also managed per 128 byte line.  This
+is very unfortunate, but the current 64 byte alignment for kmalloc()
+causes sharing problems on DMA if used with this outer cache.
 
-However, the sunxi driver assumes that VMMC is always there, and doesn't
-check the value of the regulator pointer before using it, which obviously
-leads to a (close to) null pointer dereference.
+This commit adds ARM_L1_CACHE_SHIFT_7 to increase the DMA minimum
+alignment to 128 byte if CACHE_UNIPHIER is enabled.  There are
+several drivers that assume aligning to L1_CACHE_BYTES will be DMA
+safe, so this commit also changes the L1_CACHE_BYTES for safety.
 
-Add proper checks to prevent that.
+Having said that, I hesitate to align all the other SoCs in Multi
+platform to the UniPhier's requirement.  So, I am disabling the
+CONFIG_CACHE_UNIPHIER by default, so that multi_v7_defconfig will
+still with CONFIG_ARM_L1_CACHE_SHIFT=6.  With this, UniPhier SoCs
+become a bit slower, but it is much better than system crash.
+If desired, the outer-cache can be enabled by the merge_config or
+something.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Note:
+The UniPhier PH1-Pro5 SoC is equipped also with L3 cache with 256 byte
+line size but its tags are managed per 128 byte sub-line.
+So, ARM_L1_CACHE_SHIFT_7 should be fine for all the UniPhier SoCs.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index c0a5c676d0e8..45a051e7d650 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -822,10 +822,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		break;
+I threw a question in January this year:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400289.html
+
+After a long interval, I came back to this topic.
+
+
+ arch/arm/mm/Kconfig | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c1799dd..f68e8ec 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -991,7 +991,7 @@ config CACHE_TAUROS2
+ config CACHE_UNIPHIER
+ 	bool "Enable the UniPhier outer cache controller"
+ 	depends on ARCH_UNIPHIER
+-	default y
++	select ARM_L1_CACHE_SHIFT_7
+ 	select OUTER_CACHE
+ 	select OUTER_CACHE_SYNC
+ 	help
+@@ -1012,8 +1012,14 @@ config ARM_L1_CACHE_SHIFT_6
+ 	help
+ 	  Setting ARM L1 cache line size to 64 Bytes.
  
- 	case MMC_POWER_UP:
--		host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
--						     ios->vdd);
--		if (host->ferror)
--			return;
-+		if (!IS_ERR(mmc->supply.vmmc)) {
-+			host->ferror = mmc_regulator_set_ocr(mmc,
-+							     mmc->supply.vmmc,
-+							     ios->vdd);
-+			if (host->ferror) {
-+				dev_err(mmc_dev(mmc),
-+					"failed to enable vmmc\n");
-+				return;
-+			}
-+		}
- 
- 		if (!IS_ERR(mmc->supply.vqmmc)) {
- 			host->ferror = regulator_enable(mmc->supply.vqmmc);
-@@ -847,7 +853,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	case MMC_POWER_OFF:
- 		dev_dbg(mmc_dev(mmc), "power off!\n");
- 		sunxi_mmc_reset_host(host);
--		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-+		if (!IS_ERR(mmc->supply.vmmc))
-+			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
++config ARM_L1_CACHE_SHIFT_7
++	bool
++	help
++	  Setting ARM L1 cache line size to 128 Bytes.
 +
- 		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
- 			regulator_disable(mmc->supply.vqmmc);
- 		host->vqmmc_enabled = false;
+ config ARM_L1_CACHE_SHIFT
+ 	int
++	default 7 if ARM_L1_CACHE_SHIFT_7
+ 	default 6 if ARM_L1_CACHE_SHIFT_6
+ 	default 5
+ 
 -- 
-2.9.3
+1.9.1
