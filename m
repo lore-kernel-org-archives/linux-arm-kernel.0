@@ -1,73 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 19 Oct 2016 14:11:45 +0100
-Subject: how to enable suspend to ram for arm-64 bits
-In-Reply-To: <20161019094227.GB1461@amd>
-References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
- <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
- <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
- <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
- <20161018100002.GA4347@xo-6d-61-c0.localdomain>
- <20161018104539.GB15639@leverpostej> <20161019094227.GB1461@amd>
-Message-ID: <20161019131145.GA11036@leverpostej>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 19 Oct 2016 15:16:45 +0200
+Subject: [PATCH] mmc: sunxi: Prevent against null dereference for vmmc
+In-Reply-To: <20161019123629.14525-1-maxime.ripard@free-electrons.com>
+References: <20161019123629.14525-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAPDyKFpQxexAt=NZvz4JQCxpf-Vn_C_ZjPOp=2V9GTOduRp7-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 11:42:27AM +0200, Pavel Machek wrote:
-> On Tue 2016-10-18 11:45:39, Mark Rutland wrote:
+On 19 October 2016 at 14:36, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> VMMC is an optional regulator, which means that mmc_regulator_get_supply
+> will only return an error in case of a deferred probe, but not when the
+> regulator is not set in the DT.
+>
+> However, the sunxi driver assumes that VMMC is always there, and doesn't
+> check the value of the regulator pointer before using it, which obviously
+> leads to a (close to) null pointer dereference.
+>
+> Add proper checks to prevent that.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 18 +++++++++++++-----
+>  1 file changed, 13 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index c0a5c676d0e8..45a051e7d650 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -822,10 +822,16 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 break;
+>
+>         case MMC_POWER_UP:
+> -               host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+> -                                                    ios->vdd);
+> -               if (host->ferror)
+> -                       return;
+> +               if (!IS_ERR(mmc->supply.vmmc)) {
+> +                       host->ferror = mmc_regulator_set_ocr(mmc,
+> +                                                            mmc->supply.vmmc,
+> +                                                            ios->vdd);
+> +                       if (host->ferror) {
+> +                               dev_err(mmc_dev(mmc),
+> +                                       "failed to enable vmmc\n");
 
-> Either the lowlevel suspend code is stable and bug free, and then
-> having that code is not a problem.
+The print here is already taken care of by mmc_regulator_set_ocr()
 
-This ignores the cost of maintaining that code. Kernel APIs change over
-time, and no code is ever completely stable, even if at one point in
-time it happens to be bug-free.
+> +                               return;
+> +                       }
+> +               }
+>
+>                 if (!IS_ERR(mmc->supply.vqmmc)) {
+>                         host->ferror = regulator_enable(mmc->supply.vqmmc);
+> @@ -847,7 +853,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         case MMC_POWER_OFF:
+>                 dev_dbg(mmc_dev(mmc), "power off!\n");
+>                 sunxi_mmc_reset_host(host);
+> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +               if (!IS_ERR(mmc->supply.vmmc))
+> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +
+>                 if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+>                         regulator_disable(mmc->supply.vqmmc);
+>                 host->vqmmc_enabled = false;
+> --
+> 2.9.3
+>
 
-> Or the lowlevel suspend code is complex enough to contain some bugs,
-> and in such case it is better to debug and update it with kernel.
+Otherwise this looks good to me!
 
-It is better for that code to be debuggable and updateable. That is not
-the same as being part of the kernel.
- 
-> > ARM publishes and maintains the ARM Trusted Firmware [1], which anyone
-> > can use and build atop of. It's open source (three-clause BSD with DCO),
-> > and accepts board ports. You can have a completely open stack,
-> > regardless of whether part of that stack is firmware.
-> 
-> If something is called "Trusted", it is not trustworthy.
-
-Certainly we shouldn't blindly trust anything.
-
-I object to ATF being called "not trustworthy"; the aims of the project
-are certainly not dishonest.
-
-> BSD is better than closed source, but it also means that you will not
-> get the sources from your hw vendor.
-
-That depends on your hardware vendor, as always. There are a number of
-platform ports in the upstream ATF repo.
-
-It's also worth considering that a number of 32-bit arm parts require
-closed firmware (as far as I can tell, including the N900).
-
-> Being separate module means it will be never updated.
-
-That's certainly not true as a blanket statement. The Juno FW (including
-an open-source UEFI!) is periodically updated, and mechanisms like
-UpdateCapsule() should make this easier in future.
-
-> Being separate module means it will be hard to debug, in area where
-> debugging is already pretty hard.
-
-It can be harder, yes. There are also benefits, given the same code can
-be tested on a variety of platforms.
-
-> Can it do advanced stuff like deep powersaving on N900 idle?
-
-Sorry, I don't know precisely what you're referring to.
-
-It can do things like shutting down entire CPU clusters (and IIRC
-associated interconnect) when all relevant CPUs are idle, if that's what
-you mean.
-
-Thanks,
-Mark.
+Kind regards
+Uffe
