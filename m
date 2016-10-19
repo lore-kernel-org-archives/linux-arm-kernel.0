@@ -1,119 +1,143 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Wed, 19 Oct 2016 18:23:50 +0200
-Subject: exynos-drm: display manager fails to start without IOMMU problem
-In-Reply-To: <2173cc13-7c77-1a38-501d-2c0f522ff5d5@osg.samsung.com>
-References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
- <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
- <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
- <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
- <57B29925.4020600@samsung.com>
- <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
- <1b2c3b31-7127-af2f-18a2-f3a28567e28d@osg.samsung.com>
- <2173cc13-7c77-1a38-501d-2c0f522ff5d5@osg.samsung.com>
-Message-ID: <58079E16.50302@math.uni-bielefeld.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 20 Oct 2016 00:35:22 +0800
+Subject: [arm:for-next 7/8] warning: (ARM && ..) selects
+ GENERIC_CLOCKEVENTS_BROADCAST which has unmet direct dependencies
+ (GENERIC_CLOCKEVENTS)
+Message-ID: <201610200017.9XQc5RQ5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shuah,
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git for-next
+head:   4f3ebefbc0ed334491f0b7f1f0154b14c47c0774
+commit: e085002c23dfb35705c630b975827a69ff9aceb6 [7/8] ARM: 8620/1: Kconfig: select GENERIC_CLOCKEVENTS_BROADCAST also on UP
+config: arm-ebsa110_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout e085002c23dfb35705c630b975827a69ff9aceb6
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-just a short note that more misleading comments about default allocation
-flags can be found in libdrm.
+All error/warnings (new ones prefixed by >>):
 
-https://cgit.freedesktop.org/mesa/drm/tree/exynos/exynos_drm.c
+warning: (ARM && SOC_AM43XX && MIPS_CPS_CPUIDLE) selects GENERIC_CLOCKEVENTS_BROADCAST which has unmet direct dependencies (GENERIC_CLOCKEVENTS)
+   kernel/time/tick-broadcast.c: In function 'tick_broadcast_start_periodic':
+>> kernel/time/tick-broadcast.c:65:3: error: implicit declaration of function 'tick_setup_periodic' [-Werror=implicit-function-declaration]
+      tick_setup_periodic(bc, 1);
+      ^~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_check_broadcast_device':
+>> kernel/time/tick-broadcast.c:74:13: error: dereferencing pointer to incomplete type 'struct clock_event_device'
+     if ((newdev->features & CLOCK_EVT_FEAT_DUMMY) ||
+                ^~
+>> kernel/time/tick-broadcast.c:74:26: error: 'CLOCK_EVT_FEAT_DUMMY' undeclared (first use in this function)
+     if ((newdev->features & CLOCK_EVT_FEAT_DUMMY) ||
+                             ^~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c:74:26: note: each undeclared identifier is reported only once for each function it appears in
+>> kernel/time/tick-broadcast.c:75:26: error: 'CLOCK_EVT_FEAT_PERCPU' undeclared (first use in this function)
+         (newdev->features & CLOCK_EVT_FEAT_PERCPU) ||
+                             ^~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:76:26: error: 'CLOCK_EVT_FEAT_C3STOP' undeclared (first use in this function)
+         (newdev->features & CLOCK_EVT_FEAT_C3STOP))
+                             ^~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:80:27: error: 'CLOCK_EVT_FEAT_ONESHOT' undeclared (first use in this function)
+         !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+                              ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_install_broadcast_device':
+>> kernel/time/tick-broadcast.c:99:2: error: implicit declaration of function 'clockevents_exchange_device' [-Werror=implicit-function-declaration]
+     clockevents_exchange_device(cur, dev);
+     ^~~~~~~~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:101:24: error: 'clockevents_handle_noop' undeclared (first use in this function)
+      cur->event_handler = clockevents_handle_noop;
+                           ^~~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c:113:22: error: 'CLOCK_EVT_FEAT_ONESHOT' undeclared (first use in this function)
+     if (dev->features & CLOCK_EVT_FEAT_ONESHOT)
+                         ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_broadcast_update_freq':
+>> kernel/time/tick-broadcast.c:131:9: error: implicit declaration of function '__clockevents_update_freq' [-Werror=implicit-function-declaration]
+      ret = __clockevents_update_freq(dev, freq);
+            ^~~~~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_device_setup_broadcast_func':
+>> kernel/time/tick-broadcast.c:146:20: error: 'tick_broadcast' undeclared (first use in this function)
+      dev->broadcast = tick_broadcast;
+                       ^~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_device_uses_broadcast':
+>> kernel/time/tick-broadcast.c:172:7: error: implicit declaration of function 'tick_device_is_functional' [-Werror=implicit-function-declaration]
+     if (!tick_device_is_functional(dev)) {
+          ^~~~~~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:173:24: error: 'tick_handle_periodic' undeclared (first use in this function)
+      dev->event_handler = tick_handle_periodic;
+                           ^~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c:186:25: error: 'CLOCK_EVT_FEAT_C3STOP' undeclared (first use in this function)
+      if (!(dev->features & CLOCK_EVT_FEAT_C3STOP))
+                            ^~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:219:5: error: implicit declaration of function 'clockevents_shutdown' [-Werror=implicit-function-declaration]
+        clockevents_shutdown(bc);
+        ^~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:228:31: error: 'CLOCK_EVT_FEAT_HRTIMER' undeclared (first use in this function)
+       if (bc && !(bc->features & CLOCK_EVT_FEAT_HRTIMER))
+                                  ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_do_broadcast':
+   kernel/time/tick-broadcast.c:284:28: error: 'CLOCK_EVT_FEAT_HRTIMER' undeclared (first use in this function)
+      local = !(bc->features & CLOCK_EVT_FEAT_HRTIMER);
+                               ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_handle_periodic_broadcast':
+>> kernel/time/tick-broadcast.c:321:6: error: implicit declaration of function 'clockevent_state_shutdown' [-Werror=implicit-function-declaration]
+     if (clockevent_state_shutdown(tick_broadcast_device.evtdev)) {
+         ^~~~~~~~~~~~~~~~~~~~~~~~~
+>> kernel/time/tick-broadcast.c:328:6: error: implicit declaration of function 'clockevent_state_oneshot' [-Werror=implicit-function-declaration]
+     if (clockevent_state_oneshot(dev)) {
+         ^~~~~~~~~~~~~~~~~~~~~~~~
+   In file included from include/linux/rcupdate.h:47:0,
+                    from include/linux/idr.h:18,
+                    from include/linux/kernfs.h:14,
+                    from include/linux/sysfs.h:15,
+                    from include/linux/kobject.h:21,
+                    from include/linux/device.h:17,
+                    from include/linux/node.h:17,
+                    from include/linux/cpu.h:16,
+                    from kernel/time/tick-broadcast.c:14:
+>> kernel/time/tick-broadcast.c:329:45: error: 'tick_period' undeclared (first use in this function)
+      ktime_t next = ktime_add(dev->next_event, tick_period);
+                                                ^
+   include/linux/ktime.h:64:39: note: in definition of macro 'ktime_add'
+      ({ (ktime_t){ .tv64 = (lhs).tv64 + (rhs).tv64 }; })
+                                          ^~~
+>> kernel/time/tick-broadcast.c:331:3: error: implicit declaration of function 'clockevents_program_event' [-Werror=implicit-function-declaration]
+      clockevents_program_event(dev, next, true);
+      ^~~~~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_broadcast_control':
+   kernel/time/tick-broadcast.c:367:32: error: 'CLOCK_EVT_FEAT_C3STOP' undeclared (first use in this function)
+     if (!dev || !(dev->features & CLOCK_EVT_FEAT_C3STOP))
+                                   ^~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c:392:31: error: 'CLOCK_EVT_FEAT_HRTIMER' undeclared (first use in this function)
+       if (bc && !(bc->features & CLOCK_EVT_FEAT_HRTIMER) &&
+                                  ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_set_periodic_handler':
+   kernel/time/tick-broadcast.c:433:24: error: 'tick_handle_periodic' undeclared (first use in this function)
+      dev->event_handler = tick_handle_periodic;
+                           ^~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_resume_broadcast':
+>> kernel/time/tick-broadcast.c:502:3: error: implicit declaration of function 'clockevents_tick_resume' [-Werror=implicit-function-declaration]
+      clockevents_tick_resume(bc);
+      ^~~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function '__tick_broadcast_oneshot_control':
+   kernel/time/tick-broadcast.c:988:29: error: 'CLOCK_EVT_FEAT_HRTIMER' undeclared (first use in this function)
+     if (!bc || (bc->features & CLOCK_EVT_FEAT_HRTIMER))
+                                ^~~~~~~~~~~~~~~~~~~~~~
+   kernel/time/tick-broadcast.c: In function 'tick_check_broadcast_device':
+>> kernel/time/tick-broadcast.c:84:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
+   cc1: some warnings being treated as errors
 
-See e.g. the comment for exynos_bo_create().
-
-In my opinion, the whole approach to _set_ a bit to get non-contigious
-memory is messed up. It would make more sense to me to set a bit to
-request an additional property (here "being contiguous") of the memory.
-
-Anyway, clearing up this situation is highly appreciated!
-
-More comments below.
-
-With best wishes,
-Tobias
-
-
-
-Shuah Khan wrote:
-> Restarting the thread with a different subject line:
-> 
-> I haven't given up on this yet. I am still seeing the following failure:
-> 
-> Additional debug messages I added:
-> [   15.287403] exynos_drm_gem_create_ioctl() 1
-> [   15.287419] exynos_drm_gem_create() flags 1
-> 
-> [   15.311511] [drm:exynos_drm_framebuffer_init] *ERROR* Non-contiguous GEM memory is not supported.
-> 
-> Additional debug message I added:
-> [   15.318981] [drm:exynos_user_fb_create] *ERROR* failed to initialize framebuffer
-> 
-> This is what happens:
-> 
-> 1. exynos_drm_gem_create_ioctl() gets called with EXYNOS_BO_NONCONTIG request
-> 2. exynos_drm_gem_create(0 goes ahead and creates the GEM buffers
-> 3. exynos_user_fb_create() tries to associate GEM to fb and fails during
->    check_fb_gem_memory_type()
-> 
-> At this point, there is no recovery and lightdm fails
-> 
-> xf86-video-armsoc/src/drmmode_exynos/drmmode_exynos.c assumes contiguous
-> allocations are not supported in some exynos drm versions: The following
-> commit introduced this change:
-> 
-> https://git.linaro.org/arm/xorg/driver/xf86-video-armsoc.git/commitdiff/3be1f6273441fe95dd442f44064387322e16b7e9
-> 
-> excerpts from the diff:-       if (create_gem->buf_type == ARMSOC_BO_SCANOUT)
-> -               create_exynos.flags = EXYNOS_BO_CONTIG;
-> -       else
-> -               create_exynos.flags = EXYNOS_BO_NONCONTIG;
-> +
-> +       /* Contiguous allocations are not supported in some exynos drm versions.
-> +        * When they are supported all allocations are effectively contiguous
-> +        * anyway, so for simplicity we always request non contiguous buffers.
-> +        */
-> +       create_exynos.flags = EXYNOS_BO_NONCONTIG;
-> 
-> There might have been logic on exynos_drm that forced Contig when it coudn't
-> support NONCONTIG. At least, that is what this comment suggests. This assumption
-> doesn't appear to be a good one and not sure if this change was made to fix a bug.
-> 
-> After the IOMMU support, this assumption is no longer true. Hence, with IOMMU
-> support, latest kernels have a mismatch with the installed xf86-video-armsoc
-> 
-> This is what I am running into. This leads to the following question:
-> 
-> 1. How do we ensure exynos_drm kernel changes don't break user-space
->    specifically xf86-video-armsoc
-> 2. This seems to have gone undetected for a while. I see a change in
->    exynos_drm_gem_dumb_create() that is probably addressing this type
->    of breakage. Commit 122beea84bb90236b1ae545f08267af58591c21b adds
->    handling for IOMMU NONCONTIG case.
-I don't think that this commit is related to the issue, since it is only
-used for the generic dumb buffer ioctl, while armsoc is using an Exynos
-specific ioctl.
-
-So in particular you shouldn't see the issue with
-xf86-video-modesetting. Might be worth trying that one out?
-
-
-> 
-> Anyway, I am interested in getting the exynos_drm kernel side code
-> and xf86-video-armsoc in sync to resolve the issue.
-> 
-> Could you recommend a going forward plan?
-> 
-> I can submit a patch to xf86-video-armsoc. I am also looking ahead to
-> see if we can avoid such breaks in the future by keeping kernel and
-> xf86-video-armsoc in sync.
-> 
-> thanks,
-> -- Shuah
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 10679 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/f747e3dc/attachment.gz>
