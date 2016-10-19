@@ -1,84 +1,299 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 19 Oct 2016 15:44:23 +0100
-Subject: [PATCH v5 0/5] Add support for legacy SCPI protocol
-In-Reply-To: <1476881472-13055-1-git-send-email-narmstrong@baylibre.com>
-References: <1476881472-13055-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <ff62da76-a7b9-6891-c198-f9049dfa7bb5@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 19 Oct 2016 16:55:23 +0200
+Subject: [PATCH] mtd: nand: Add OX820 NAND Support
+Message-ID: <20161019145523.6763-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add NAND driver to support the Oxford Semiconductor OX820 NAND Controller.
+This is a simple memory mapped NAND controller with single chip select and
+software ECC.
 
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../devicetree/bindings/mtd/oxnas-nand.txt         |  24 +++
+ drivers/mtd/nand/Kconfig                           |   5 +
+ drivers/mtd/nand/Makefile                          |   1 +
+ drivers/mtd/nand/oxnas_nand.c                      | 204 +++++++++++++++++++++
+ 4 files changed, 234 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+ create mode 100644 drivers/mtd/nand/oxnas_nand.c
 
-On 19/10/16 13:51, Neil Armstrong wrote:
-> This patchset aims to support the legacy SCPI firmware implementation that was
-> delivered as early technology preview for the JUNO platform.
->
-> Finally a stable, maintained and public implementation for the SCPI protocol
-> has been upstreamed part of the JUNO support and it is the recommended way
-> of implementing SCP communication on ARMv8 platforms.
->
-> The Amlogic GXBB platform is using this legacy protocol, as the RK3368 & RK3399
-> platforms. This patchset will only add support for Amlogic GXBB SoC.
->
-> This patchset add support for the legacy protocol in the arm_scpi.c file,
-> avoiding code duplication.
->
-> This patchset is rebased against scpi-updates/for-next from [2] and with
-> already merged patches [3], [4] and [5] and ommited in this patchset.
->
-> Last RFC discution thread can be found at : https://lkml.org/lkml/2016/8/9/210
->
-> Changes since v4 at : http://lkml.kernel.org/r/1475652814-30619-1-git-send-email-narmstrong at baylibre.com
->  - Removed legacy locking scheme
->  - Removed cmd copy back after token insert
->  - Various cleanups
->
-> Changes since v3 at : http://lkml.kernel.org/r/1473262477-18045-1-git-send-email-narmstrong at baylibre.com
->  - Changed back author to Sudeep Holla for first patch
->  - Merged legacy functions to scpi_send_message, tx_prepare and handle_remote_message
->  - Added legacy locking scheme
->  - Merged back legacy_scpi_sensor_get_value into scpi_sensor_get_value
->  - Rebased on linux-next-20161004 with patchset [1]
->
-> Changes since v2 at : http://lkml.kernel.org/r/1471952816-30877-1-git-send-email-narmstrong at baylibre.com
->  - Added command indirection table and use it in each commands
->  - Added bitmap for high priority commands
->  - Cleaned up legacy tx_prepare/handle_message to align to standard functions
->  - Dropped legacy_scpi_ops
->
-> Changes since v1 at : http://lkml.kernel.org/r/1471515066-3626-1-git-send-email-narmstrong at baylibre.com
->  - Dropped vendor_send_message and rockchip vendor mechanism patches
->  - Merged alternate functions into main functions using is_legacy boolean
->  - Added DT match table to set is_legacy to true
->  - Kept alternate scpi_ops structure for legacy
->
-> [1] http://lkml.kernel.org/r/1475595430-30075-1-git-send-email-narmstrong at baylibre.com
-> [2] git.kernel.org/sudeep.holla/linux
-> [3] scpi: Add cmd indirection table to prepare for legacy commands
-> [4] scpi: grow MAX_DVFS_OPPS to 16 entries
-> [5] dt-bindings: Add support for Amlogic GXBB SCPI Interface
->
-> Neil Armstrong (5):
->   scpi: Add alternative legacy structures, functions and macros
->   scpi: Do not fail if get_capabilities is not implemented
->   scpi: Add support for Legacy match table for Amlogic GXBB SoC
->   ARM64: dts: meson-gxbb: Add SRAM node
->   ARM64: dts: meson-gxbb: Add SCPI with cpufreq & sensors Nodes
->
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi |  57 ++++++++
->  drivers/firmware/arm_scpi.c                 | 206 +++++++++++++++++++++++++---
->  2 files changed, 245 insertions(+), 18 deletions(-)
->
+Changes since RFC http://lkml.kernel.org/r/20161018090927.1990-1-narmstrong at baylibre.com :
+ - Avoid using chip->IO_ADDR*
+ - Use new DT structure
+ - Assign a chip for the subnode
+ - Use the nand_hw_control structure
+ - Cleanup probe
+ - Cleanup cmd_ctrl by using a context ctrl offset used in write_bytes
 
-Nice to see this diff stat from a whole new file legacy_scpi.c and 1000+
-delta. Thanks for working on this. I have applied the first 3 patches in
-this series with some subject/commit message changes to [1].
-
-I assume the DT changes needs to go via the corresponding platform
-maintainer.
-
+diff --git a/Documentation/devicetree/bindings/mtd/oxnas-nand.txt b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+new file mode 100644
+index 0000000..83b684d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/oxnas-nand.txt
+@@ -0,0 +1,24 @@
++* Oxford Semiconductor OXNAS NAND Controller
++
++Please refer to nand.txt for generic information regarding MTD NAND bindings.
++
++Required properties:
++ - compatible: "oxsemi,ox820-nand"
++ - reg: Base address and length for NAND mapped memory.
++
++Optional Properties:
++ - clocks: phandle to the NAND gate clock if needed.
++ - resets: phandle to the NAND reset control if needed.
++
++Example:
++
++nand: nand at 41000000 {
++	compatible = "oxsemi,ox820-nand";
++	reg = <0x41000000 0x100000>;
++	nand-ecc-mode = "soft";
++	clocks = <&stdclk CLK_820_NAND>;
++	resets = <&reset RESET_NAND>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	status = "disabled";
++};
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 7b7a887..c023125 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -426,6 +426,11 @@ config MTD_NAND_ORION
+ 	  No board specific support is done by this driver, each board
+ 	  must advertise a platform_device for the driver to attach.
+ 
++config MTD_NAND_OXNAS
++	tristate "NAND Flash support for Oxford Semiconductor SoC"
++	help
++	  This enables the NAND flash controller on Oxford Semiconductor SoCs.
++
+ config MTD_NAND_FSL_ELBC
+ 	tristate "NAND support for Freescale eLBC controllers"
+ 	depends on FSL_SOC
+diff --git a/drivers/mtd/nand/Makefile b/drivers/mtd/nand/Makefile
+index cafde6f..05fc054 100644
+--- a/drivers/mtd/nand/Makefile
++++ b/drivers/mtd/nand/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_MTD_NAND_TMIO)		+= tmio_nand.o
+ obj-$(CONFIG_MTD_NAND_PLATFORM)		+= plat_nand.o
+ obj-$(CONFIG_MTD_NAND_PASEMI)		+= pasemi_nand.o
+ obj-$(CONFIG_MTD_NAND_ORION)		+= orion_nand.o
++obj-$(CONFIG_MTD_NAND_OXNAS)		+= oxnas_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_ELBC)		+= fsl_elbc_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_IFC)		+= fsl_ifc_nand.o
+ obj-$(CONFIG_MTD_NAND_FSL_UPM)		+= fsl_upm.o
+diff --git a/drivers/mtd/nand/oxnas_nand.c b/drivers/mtd/nand/oxnas_nand.c
+new file mode 100644
+index 0000000..a9fe1ac
+--- /dev/null
++++ b/drivers/mtd/nand/oxnas_nand.c
+@@ -0,0 +1,204 @@
++/*
++ * Oxford Semiconductor OXNAS NAND driver
++
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ * Heavily based on plat_nand.c :
++ * Author: Vitaly Wool <vitalywool@gmail.com>
++ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
++ * Copyright (C) 2012 John Crispin <blogic@openwrt.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/clk.h>
++#include <linux/reset.h>
++#include <linux/mtd/mtd.h>
++#include <linux/mtd/nand.h>
++#include <linux/mtd/partitions.h>
++#include <linux/of.h>
++
++/* Nand commands */
++#define OXNAS_NAND_CMD_ALE		BIT(18)
++#define OXNAS_NAND_CMD_CLE		BIT(19)
++
++#define OXNAS_NAND_MAX_CHIPS	1
++
++struct oxnas_nand {
++	struct nand_hw_control base;
++	void __iomem *io_base;
++	struct clk *clk;
++	struct nand_chip *chips[OXNAS_NAND_MAX_CHIPS];
++	unsigned long ctrl;
++};
++
++static uint8_t oxnas_nand_read_byte(struct mtd_info *mtd)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
++
++	return readb(oxnas->io_base);
++}
++
++static void oxnas_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
++
++	ioread8_rep(oxnas->io_base, buf, len);
++}
++
++static void oxnas_nand_write_buf(struct mtd_info *mtd,
++				 const uint8_t *buf, int len)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
++
++	iowrite8_rep(oxnas->io_base + oxnas->ctrl, buf, len);
++}
++
++/* Single CS command control */
++static void oxnas_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
++				unsigned int ctrl)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct oxnas_nand *oxnas = nand_get_controller_data(chip);
++
++	if (ctrl & NAND_CTRL_CHANGE) {
++		if (ctrl & NAND_CLE)
++			oxnas->ctrl = OXNAS_NAND_CMD_CLE;
++		else if (ctrl & NAND_ALE)
++			oxnas->ctrl = OXNAS_NAND_CMD_ALE;
++		else
++			oxnas->ctrl = 0;
++	}
++
++	if (cmd != NAND_CMD_NONE)
++		writeb(cmd, oxnas->io_base + oxnas->ctrl);
++}
++
++/*
++ * Probe for the NAND device.
++ */
++static int oxnas_nand_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *nand_np;
++	struct oxnas_nand *oxnas;
++	struct nand_chip *chip;
++	struct mtd_info *mtd;
++	struct resource *res;
++	int nchips = 0;
++	int count = 0;
++	int err = 0;
++
++	/* Allocate memory for the device structure (and zero it) */
++	oxnas = devm_kzalloc(&pdev->dev, sizeof(struct nand_chip),
++			    GFP_KERNEL);
++	if (!oxnas)
++		return -ENOMEM;
++
++	nand_hw_control_init(&oxnas->base);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	oxnas->io_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(oxnas->io_base))
++		return PTR_ERR(oxnas->io_base);
++
++	oxnas->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(oxnas->clk))
++		oxnas->clk = NULL;
++
++	/* Only a single chip node is supported */
++	count = of_get_child_count(np);
++	if (count > 1)
++		return -EINVAL;
++
++	clk_prepare_enable(oxnas->clk);
++	device_reset_optional(&pdev->dev);
++
++	for_each_child_of_node(np, nand_np) {
++		chip = devm_kzalloc(&pdev->dev, sizeof(struct nand_chip),
++				    GFP_KERNEL);
++		if (!chip)
++			return -ENOMEM;
++
++		chip->controller = &oxnas->base;
++
++		nand_set_flash_node(chip, nand_np);
++		nand_set_controller_data(chip, oxnas);
++
++		mtd = nand_to_mtd(chip);
++		mtd->dev.parent = &pdev->dev;
++		mtd->priv = chip;
++
++		chip->cmd_ctrl = oxnas_nand_cmd_ctrl;
++		chip->read_buf = oxnas_nand_read_buf;
++		chip->read_byte = oxnas_nand_read_byte;
++		chip->write_buf = oxnas_nand_write_buf;
++		chip->chip_delay = 30;
++
++		/* Scan to find existence of the device */
++		err = nand_scan(mtd, 1);
++		if (err)
++			return err;
++
++		err = mtd_device_register(mtd, NULL, 0);
++		if (err) {
++			nand_release(mtd);
++			return err;
++		}
++
++		oxnas->chips[nchips] = chip;
++		++nchips;
++	}
++
++	/* Exit if no chips found */
++	if (!nchips)
++		return -ENODEV;
++
++	platform_set_drvdata(pdev, oxnas);
++
++	return 0;
++}
++
++static int oxnas_nand_remove(struct platform_device *pdev)
++{
++	struct oxnas_nand *oxnas = platform_get_drvdata(pdev);
++
++	if (oxnas->chips[0])
++		nand_release(nand_to_mtd(oxnas->chips[0]));
++
++	clk_disable_unprepare(oxnas->clk);
++
++	return 0;
++}
++
++static const struct of_device_id oxnas_nand_match[] = {
++	{ .compatible = "oxsemi,ox820-nand" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, oxnas_nand_match);
++
++static struct platform_driver oxnas_nand_driver = {
++	.probe	= oxnas_nand_probe,
++	.remove	= oxnas_nand_remove,
++	.driver	= {
++		.name		= "oxnas_nand",
++		.of_match_table = oxnas_nand_match,
++	},
++};
++
++module_platform_driver(oxnas_nand_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
++MODULE_DESCRIPTION("Oxnas NAND driver");
++MODULE_ALIAS("platform:oxnas_nand");
 -- 
-Regards,
-Sudeep
-
-[1] git.kernel.org/sudeep.holla/linux/h/scpi-updates/for-next
+2.7.0
