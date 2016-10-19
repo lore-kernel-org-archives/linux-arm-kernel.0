@@ -1,113 +1,86 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 19 Oct 2016 13:51:48 -0400
-Subject: [PATCH V6 06/10] dmaengine: qcom_hidma: bring out interrupt cause
+Date: Wed, 19 Oct 2016 13:51:49 -0400
+Subject: [PATCH V6 07/10] dmaengine: qcom_hidma: add a common API to setup the
+ interrupt
 In-Reply-To: <1476899512-20431-1-git-send-email-okaya@codeaurora.org>
 References: <1476899512-20431-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1476899512-20431-7-git-send-email-okaya@codeaurora.org>
+Message-ID: <1476899512-20431-8-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring out the interrupt cause to the top level so that MSI interrupts
-can be hooked at a later stage.
+Introducing the hidma_ll_setup_irq function to set up the interrupt
+type externally from the OS interface.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma_ll.c | 62 ++++++++++++++++++++++++---------------------
- 1 file changed, 33 insertions(+), 29 deletions(-)
+ drivers/dma/qcom/hidma.h    |  2 ++
+ drivers/dma/qcom/hidma_ll.c | 27 +++++++++++++++++++++++----
+ 2 files changed, 25 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
+index 8318de7..7b40014 100644
+--- a/drivers/dma/qcom/hidma.h
++++ b/drivers/dma/qcom/hidma.h
+@@ -46,6 +46,7 @@ struct hidma_tre {
+ };
+ 
+ struct hidma_lldev {
++	bool msi_support;		/* flag indicating MSI support    */
+ 	bool initialized;		/* initialized flag               */
+ 	u8 trch_state;			/* trch_state of the device	  */
+ 	u8 evch_state;			/* evch_state of the device	  */
+@@ -148,6 +149,7 @@ int hidma_ll_request(struct hidma_lldev *llhndl, u32 dev_id,
+ int hidma_ll_enable(struct hidma_lldev *llhndl);
+ void hidma_ll_set_transfer_params(struct hidma_lldev *llhndl, u32 tre_ch,
+ 	dma_addr_t src, dma_addr_t dest, u32 len, u32 flags);
++void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi);
+ int hidma_ll_setup(struct hidma_lldev *lldev);
+ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 max_channels,
+ 			void __iomem *trca, void __iomem *evca,
 diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 29fef4f..6bdea90 100644
+index 6bdea90..3168687 100644
 --- a/drivers/dma/qcom/hidma_ll.c
 +++ b/drivers/dma/qcom/hidma_ll.c
-@@ -411,12 +411,24 @@ static int hidma_ll_reset(struct hidma_lldev *lldev)
-  * requests traditionally to the destination, this concept does not apply
-  * here for this HW.
-  */
--irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
-+static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- {
--	struct hidma_lldev *lldev = arg;
--	u32 status;
--	u32 enable;
--	u32 cause;
-+	if (cause & HIDMA_ERR_INT_MASK) {
-+		dev_err(lldev->dev, "error 0x%x, disabling...\n",
-+				cause);
-+
-+		/* Clear out pending interrupts */
-+		writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+
-+		/* No further submissions. */
-+		hidma_ll_disable(lldev);
-+
-+		/* Driver completes the txn and intimates the client.*/
-+		hidma_cleanup_pending_tre(lldev, 0xFF,
-+					  HIDMA_EVRE_STATUS_ERROR);
-+
-+		return;
-+	}
+@@ -694,17 +694,36 @@ int hidma_ll_setup(struct hidma_lldev *lldev)
+ 	writel(HIDMA_EVRE_SIZE * nr_tres,
+ 			lldev->evca + HIDMA_EVCA_RING_LEN_REG);
  
- 	/*
- 	 * Fine tuned for this HW...
-@@ -425,35 +437,28 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
- 	 * read and write accessors are used for performance reasons due to
- 	 * interrupt delivery guarantees. Do not copy this code blindly and
- 	 * expect that to work.
-+	 *
-+	 * Try to consume as many EVREs as possible.
- 	 */
-+	hidma_handle_tre_completion(lldev);
+-	/* support IRQ only for now */
++	/* configure interrupts */
++	hidma_ll_setup_irq(lldev, lldev->msi_support);
 +
-+	/* We consumed TREs or there are pending TREs or EVREs. */
-+	writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
++	rc = hidma_ll_enable(lldev);
++	if (rc)
++		return rc;
++
++	return rc;
 +}
 +
-+irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
++void hidma_ll_setup_irq(struct hidma_lldev *lldev, bool msi)
 +{
-+	struct hidma_lldev *lldev = arg;
-+	u32 status;
-+	u32 enable;
-+	u32 cause;
++	u32 val;
 +
- 	status = readl_relaxed(lldev->evca + HIDMA_EVCA_IRQ_STAT_REG);
- 	enable = readl_relaxed(lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
- 	cause = status & enable;
++	lldev->msi_support = msi;
++
++	/* disable interrupts again after reset */
++	writel(0, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
++	writel(0, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
++
++	/* support IRQ by default */
+ 	val = readl(lldev->evca + HIDMA_EVCA_INTCTRL_REG);
+ 	val &= ~0xF;
+-	val |= 0x1;
++	if (!lldev->msi_support)
++		val = val | 0x1;
+ 	writel(val, lldev->evca + HIDMA_EVCA_INTCTRL_REG);
  
- 	while (cause) {
--		if (cause & HIDMA_ERR_INT_MASK) {
--			dev_err(lldev->dev, "error 0x%x, disabling...\n",
--					cause);
+ 	/* clear all pending interrupts and enable them */
+ 	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
+ 	writel(ENABLE_IRQS, lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
 -
--			/* Clear out pending interrupts */
--			writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
--
--			/* No further submissions. */
--			hidma_ll_disable(lldev);
--
--			/* Driver completes the txn and intimates the client.*/
--			hidma_cleanup_pending_tre(lldev, 0xFF,
--						  HIDMA_EVRE_STATUS_ERROR);
--			goto out;
--		}
--
--		/*
--		 * Try to consume as many EVREs as possible.
--		 */
--		hidma_handle_tre_completion(lldev);
--
--		/* We consumed TREs or there are pending TREs or EVREs. */
--		writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+		hidma_ll_int_handler_internal(lldev, cause);
- 
- 		/*
- 		 * Another interrupt might have arrived while we are
-@@ -464,7 +469,6 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
- 		cause = status & enable;
- 	}
- 
--out:
- 	return IRQ_HANDLED;
+-	return hidma_ll_enable(lldev);
  }
  
+ struct hidma_lldev *hidma_ll_init(struct device *dev, u32 nr_tres,
 -- 
 1.9.1
