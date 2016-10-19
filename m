@@ -1,53 +1,39 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 19 Oct 2016 11:19:39 +0200
-Subject: [PATCH v2] hwrng: meson: Fix module autoload for OF registration
-In-Reply-To: <1476733877-20275-1-git-send-email-javier@osg.samsung.com>
-References: <1476733877-20275-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <e8df64b3-79c3-2d69-97b6-ee99d052d22b@baylibre.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 19 Oct 2016 11:23:51 +0200
+Subject: [PATCH 08/10] mm: replace __access_remote_vm() write parameter
+ with gup_flags
+In-Reply-To: <20161019090646.GA24243@lucifer>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+ <20161013002020.3062-9-lstoakes@gmail.com>
+ <20161019075903.GP29967@quack2.suse.cz>
+ <20161019081352.GB7562@dhcp22.suse.cz>
+ <20161019084045.GA19441@lucifer>
+ <20161019085204.GD7517@dhcp22.suse.cz>
+ <20161019090646.GA24243@lucifer>
+Message-ID: <20161019092350.GF7517@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2016 09:51 PM, Javier Martinez Canillas wrote:
-> If the driver is built as a module, autoload won't work because the module
-> alias information is not filled. So user-space can't match the registered
-> device with the corresponding module.
+On Wed 19-10-16 10:06:46, Lorenzo Stoakes wrote:
+> On Wed, Oct 19, 2016 at 10:52:05AM +0200, Michal Hocko wrote:
+> > yes this is the desirable and expected behavior.
+> >
+> > > wonder if this is desirable behaviour or whether this ought to be limited to
+> > > ptrace system calls. Regardless, by making the flag more visible it makes it
+> > > easier to see that this is happening.
+> >
+> > mem_open already enforces PTRACE_MODE_ATTACH
 > 
-> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
+> Ah I missed this, that makes a lot of sense, thanks!
 > 
-> Before this patch:
-> 
-> $ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-> alias:          platform:meson-rng
-> 
-> After this patch:
-> 
-> $ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
-> alias:          platform:meson-rng
-> alias:          of:N*T*Camlogic,meson-rngC*
-> alias:          of:N*T*Camlogic,meson-rng
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - Remove unrelated changes added by mistake. Suggested by Jason Gunthorpe.
-> 
->  drivers/char/hw_random/meson-rng.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/char/hw_random/meson-rng.c b/drivers/char/hw_random/meson-rng.c
-> index 58bef39f7286..51864a509be7 100644
-> --- a/drivers/char/hw_random/meson-rng.c
-> +++ b/drivers/char/hw_random/meson-rng.c
-> @@ -110,6 +110,7 @@ static const struct of_device_id meson_rng_of_match[] = {
->  	{ .compatible = "amlogic,meson-rng", },
->  	{},
->  };
-> +MODULE_DEVICE_TABLE(of, meson_rng_of_match);
->  
->  static struct platform_driver meson_rng_driver = {
->  	.probe	= meson_rng_probe,
-> 
+> I still wonder whether other invocations of access_remote_vm() in fs/proc/base.c
+> (the principle caller of this function) need FOLL_FORCE, for example the various
+> calls that simply read data from other processes, so I think the point stands
+> about keeping this explicit.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+I do agree. Making them explicit will help to clean them up later,
+should there be a need.
+
+-- 
+Michal Hocko
+SUSE Labs
