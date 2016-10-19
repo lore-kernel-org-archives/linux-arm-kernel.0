@@ -1,58 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Oct 2016 14:09:10 +0200
-Subject: [PATCH] dmaengine: st_fdma: fix uninitialized variable access
-Message-ID: <20161019120927.3251235-1-arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 19 Oct 2016 14:16:13 +0200
+Subject: [PATCH v2] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
+In-Reply-To: <20161018163808.6318-1-eric@anholt.net>
+References: <20161018163808.6318-1-eric@anholt.net>
+Message-ID: <CACRpkda20M2YmTRBGA6nyv7t5GHU7_xWu3du0U4tXrnP-M63Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added st_fdma driver introduces a build warning for
-allmodconfig when we add '-Wmaybe-uninitialized':
+On Tue, Oct 18, 2016 at 6:38 PM, Eric Anholt <eric@anholt.net> wrote:
 
-drivers/dma/st_fdma.c: In function 'st_fdma_probe':
-drivers/dma/st_fdma.c:777:5: error: 'ret' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> The idea is to give useful names to GPIO lines that an implementer
+> will be using from userspace, e.g. for maker type projects.  These are
+> user-visible using tools/gpio/lsgpio.c
+>
+> v2: Major rewrite by anholt: Flatten each GPIO line to a line in the
+>     file for better diffing, prefix all expansion header pins with
+>     "P<number>" or "P5HEADER_P<number>" and drop the mostly-unused
+>     GPIO_GEN<smallnumber> names in favor of GPIO<socgpionumber>, fix
+>     extra '[]' on a couple of lines, fix locations of SD_CARD_DETECT,
+>     CAM_GPIO and STATUS_LED, fix HDMI_HPD polarities, rewrite A+ using
+>     unreleased schematics.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-The warning is correct, though this can't happen in practice
-as the check is redundant (we don't get to this function if
-the pointer is NULL). Even if the function were called with a
-NULL of_node, the check is not needed because of_property_read_u32
-can deal with a NULL argument by returning an error.
+Generally looks good!
 
-Removing the unnecessary code simplifies the function and avoids
-the condition that we get the warning for.
+I fully trust your usage of he Pnn_* prefix, I assume this
+makes a lot of sense to RPi users.
 
-Fixes: 6b4cd727eaf1 ("dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/dma/st_fdma.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+> Note: I haven't actually booted these and checked that the names line
+> up, just tried to visually review them.  Hopefully with more
+> GPIO<number> values, it's easier to spot errors.
+>
+> The only other thing here I think I would do is drop the [] around
+> names for behavior when pinmuxed.  I find it more confusing than
+> helpful.
 
-diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
-index 515e1d4c43e8..232d3547a6a3 100644
---- a/drivers/dma/st_fdma.c
-+++ b/drivers/dma/st_fdma.c
-@@ -720,21 +720,11 @@ static int st_fdma_parse_dt(struct platform_device *pdev,
- 			const struct st_fdma_driverdata *drvdata,
- 			struct st_fdma_dev *fdev)
- {
--	struct device_node *np = pdev->dev.of_node;
--	int ret;
--
--	if (!np)
--		goto err;
--
--	ret = of_property_read_u32(np, "dma-channels", &fdev->nr_channels);
--	if (ret)
--		goto err;
--
- 	snprintf(fdev->fw_name, FW_NAME_SIZE, "fdma_%s_%d.elf",
- 		drvdata->name, drvdata->id);
- 
--err:
--	return ret;
-+	return of_property_read_u32(pdev->dev.of_node, "dma-channels",
-+				    &fdev->nr_channels);
- }
- #define FDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
- 				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
--- 
-2.9.0
+I added this on the 96board HiKey instead of just leaving it blank.
+
+The idea was to distinguish somehow between GPIO proper and
+a GPIO line that is actually not used as GPIO. It is only really
+reflecting the schematic, so whatever makes sense for someone
+familiar with the schematics apply.
+
+I think it is up to the .dts file maintainer to decide. May even be
+different things that make sense on different boards.
+
+> Linus, are these names considered ABI?  Will we be locked into
+> whatever set of names we merge and release?  My assumption would be
+> "yes".
+
+It is ABI if there is a userspace making use of it. So once libs
+like libmraa (is that the name?) and similar things that do userspace
+GPIO start using it, it becomes ABI.
+
+Yours,
+Linus Walleij
