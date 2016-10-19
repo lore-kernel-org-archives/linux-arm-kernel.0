@@ -1,36 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 19 Oct 2016 09:50:31 -0700
-Subject: [PATCH v2] arm64: defconfig: enable EEPROM_AT25 config option
-In-Reply-To: <5740014.mZjAIri61F@wuerfel>
-References: <1476298306-9138-1-git-send-email-scott.branden@broadcom.com>
- <CAOesGMjLOhCBX1K_A_BB8TcMr3Ki5jagvPvxiihdJVXZ1LLmpw@mail.gmail.com>
- <c1f5e1f8-b661-9559-ca67-29386d2e992b@broadcom.com>
- <5740014.mZjAIri61F@wuerfel>
-Message-ID: <CAOesGMgoWUG+=61OzxdCCX5oujHC4XOJ-MFGfEyRkrJGq_4fAg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 19 Oct 2016 22:30:16 +0530
+Subject: [PATCH -next] dmaengine: st_fdma: Fix the error return code in
+ st_fdma_probe()
+In-Reply-To: <1476883430-11970-1-git-send-email-weiyj.lk@gmail.com>
+References: <1476883430-11970-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20161019170016.GR2467@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 1:04 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday, October 18, 2016 3:23:26 PM CEST Scott Branden wrote:
->> I have be.config and le.config that allow you to switch the defconfig
->> between big and little endian.  Does this make sense to upstream to
->> arm/configs if you have accepted dram_0x00000000.config?
->
-> Yes, they clearly fall into the same category, let's merge those as well.
->
->> Would you also accept this to arm64/configs?  We actually use
->> big and little endian on the same SoC more on arm64 platforms.  But, in
->> order to boot big endian we need to maintain this outside the kernel
->> right now.
->
-> I'm in favor of that, but let's see what the arm64 maintainers think.
+On Wed, Oct 19, 2016 at 01:23:50PM +0000, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> In case of error, the function st_slim_rproc_alloc() returns ERR_PTR()
+> and never returns NULL. The NULL test in the return value check should
+> be replaced with IS_ERR().
+> 
 
-Single-line fragments aren't really all that valuable, IMHO. Flipping
-just one option is trivial to do without fragments, or when they're
-not simple Y/N flips (i.e. like the ram base).
+Applied, thanks
 
-Fragments are mostly useful when you need to flip several options
-together to enable some set of functionality.
-
-
--Olof
+-- 
+~Vinod
