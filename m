@@ -1,114 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Oct 2016 14:13:52 +0200
-Subject: [PATCH v2 1/6] ARM: at91: Documentation: add samx7 families
-In-Reply-To: <ae042bfa-4e92-a3ac-386a-31aeb8798776@atmel.com>
-References: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
- <20161020094135.18221-2-alexandre.belloni@free-electrons.com>
- <ae042bfa-4e92-a3ac-386a-31aeb8798776@atmel.com>
-Message-ID: <20161020121352.i3djshapjlz2f77d@piout.net>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 20 Oct 2016 20:21:37 +0800
+Subject: [PATCH 2/2] arm64/numa: fix incorrect print of end_pfn
+In-Reply-To: <20161020105130.GD24914@arm.com>
+References: <1476935576-59941-1-git-send-email-guohanjun@huawei.com>
+ <1476935576-59941-2-git-send-email-guohanjun@huawei.com>
+ <20161020105130.GD24914@arm.com>
+Message-ID: <5808B6D1.809@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/2016 at 14:01:24 +0200, Nicolas Ferre wrote :
-> Le 20/10/2016 ? 11:41, Alexandre Belloni a ?crit :
-> > The Atmel sams70, samv70 and samv71 are Cortex-M7 based MCUs that can run
-> > Linux (without MMU).
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  Documentation/arm/Atmel/README | 44 +++++++++++++++++++++++++++++++++++++++---
-> >  1 file changed, 41 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-> > index 6ca78f818dbf..e403697ee9fc 100644
-> > --- a/Documentation/arm/Atmel/README
-> > +++ b/Documentation/arm/Atmel/README
-> > @@ -14,9 +14,9 @@ official Atmel product name. Anyway, files, directories, git trees,
-> >  git branches/tags and email subject always contain this "at91" sub-string.
-> >  
-> >  
-> > -AT91 SoCs
-> 
-> Nope: AT91 is our historical name within the Linux community, we will
-> keep it.
-> 
+On 2016/10/20 18:51, Will Deacon wrote:
+> On Thu, Oct 20, 2016 at 11:52:56AM +0800, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> When booting on NUMA system with memory-less node (no
+>> memory dimm on this memory controller), the print
+>> for setup_node_data() is incorrect:
+>>
+>> NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+>>
+>> It should be 0, not 0xffffffffffffffff as there is
+>> no memory on that node.
+> Wouldn't it make more sense to print something useful, like "memory-less
+> node"?
 
-Well, this is explained just on the line before, I was thinking that was
-enough but whatever, marketing stuff ;)
+in the log,
 
-> > ----------
-> > -Documentation and detailled datasheet for each product are available on
-> > +SMART SoCs
-> 
-> And I'm not sure about the naming of the product line nowadays:
-> Atmel | SMART MPUs?
-> Microchip / Atmel | SMART MPUs?
-> Microchip MPUs?
-> 
-> But SoC is definitively too generic and "SMART" not needed here: let's
-> keep the MPUs/MCUs only difference for this document.
-> 
+[    0.000000] NUMA: Initmem setup node 0 [mem 0x00000000-0x13fbffffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x13fbffe500-0x13fbffffff]
+[    0.000000] NUMA: Initmem setup node 1 [mem 0x1400000000-0x17fbffffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x17fbfec500-0x17fbfedfff]
+[    0.000000] NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x17fbfeaa00-0x17fbfec4ff]
+[    0.000000] NUMA: NODE_DATA(2) on node 1
+[    0.000000] NUMA: Initmem setup node 3 [mem 0x00000000-0xffffffffffffffff]
+[    0.000000] NUMA: NODE_DATA [mem 0x17fbfe8f00-0x17fbfea9ff]
+[    0.000000] NUMA: NODE_DATA(3) on node 1
 
-So, AT91 MPUs and SMART MCUs ?
-Or I can put everything under AT91 SoCs
+if printing "NUMA: Initmem setup node 2 [mem 0x00000000-0x00000000]",
+it will make the log consistent with others, and obvious it's a memory-less
+node as memory range 0x00000000-0x00000000, what do you think?
 
-> > +----------
-> > +Documentation and detailed datasheet for each product are available on
-> >  the Atmel website: http://www.atmel.com.
-> >  
-> >    Flavors:
-> > @@ -101,6 +101,44 @@ the Atmel website: http://www.atmel.com.
-> >          + Datasheet
-> >            http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
-> >  
-> > +SMART MCUs
-> > +----------
-> > +    * ARM Cortex-M7 MCUs
-> > +      - sams70 family
-> > +        - sams70j19
-> > +        - sams70j20
-> > +        - sams70j21
-> > +        - sams70n19
-> > +        - sams70n20
-> > +        - sams70n21
-> > +        - sams70q19
-> > +        - sams70q20
-> > +        - sams70q21
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-11242-32-bit-Cortex-M7-Microcontroller-SAM-S70Q-SAM-S70N-SAM-S70J_Datasheet.pdf
-> > +
-> > +      - samv70 family
-> > +        - samv70j19
-> > +        - samv70j20
-> > +        - samv70n19
-> > +        - samv70n20
-> > +        - samv70q19
-> > +        - samv70q20
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-11297-32-bit-Cortex-M7-Microcontroller-SAM-V70Q-SAM-V70N-SAM-V70J_Datasheet.pdf
-> > +
-> > +      - samv71 family
-> > +        - samv71j19
-> > +        - samv71j20
-> > +        - samv71j21
-> > +        - samv71n19
-> > +        - samv71n20
-> > +        - samv71n21
-> > +        - samv71q19
-> > +        - samv71q20
-> > +        - samv71q21
-> > +        + Datasheet
-> > +          http://www.atmel.com/Images/Atmel-44003-32-bit-Cortex-M7-Microcontroller-SAM-V71Q-SAM-V71N-SAM-V71J_Datasheet.pdf
-> >  
-> >  Linux kernel information
-> >  ------------------------
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks
+Hanjun
