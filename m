@@ -1,23 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Oct 2016 11:19:30 +0200
-Subject: [PATCH v7 09/11] arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
-In-Reply-To: <20160916103218.GM1411@katana>
-References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-10-git-send-email-horms+renesas@verge.net.au>
- <20160916103218.GM1411@katana>
-Message-ID: <20161020091930.GC28107@verge.net.au>
+Date: Thu, 20 Oct 2016 11:24:59 +0200
+Subject: [PATCH v3 0/11] Add R8A7743/SK-RZG1M board support
+In-Reply-To: <cea44556-a578-fb54-11b8-f21f5b991caa@cogentembedded.com>
+References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
+ <5be99d76-a082-129b-1aa6-b6f7402ae79b@cogentembedded.com>
+ <20161012080905.GD31183@verge.net.au>
+ <cea44556-a578-fb54-11b8-f21f5b991caa@cogentembedded.com>
+Message-ID: <20161020092459.GM4612@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 16, 2016 at 12:32:18PM +0200, Wolfram Sang wrote:
-> On Tue, Sep 13, 2016 at 12:57:06PM +0200, Simon Horman wrote:
-> > Enable the exposed SD card slots in the DT of the r8a7796/salvator-x.
-> > 
-> > Based on work for the r8a7795/salvator-x by Ai Kyuse.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Wed, Oct 12, 2016 at 11:29:56AM +0300, Sergei Shtylyov wrote:
+> On 10/12/2016 11:09 AM, Simon Horman wrote:
 > 
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> >>>  Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
+> >>>'renesas-devel-20161003-v4.8' tag. I'm adding the device tree support for
+> >>>the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
+> >>>seems identical to the R8A7791/Porter board. The device tree patches depend on
+> >>>the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
+> >>
+> >>   Forgot to mention that this version causes a regression with the sh_eth
+> >>driver (well, actually with phylib): since IRQC now gets a deferred probing,
+> >>PHY IRQ doesn't work anymore -- phylib falls back to polling.
+> >
+> >Is there a resolution to that problem?
+> 
+>    Geert has posted his IRQC driver patch recently. Not sure if it was
+> intended for merging but it solves the issue.
 
-Thanks, I have queued this up.
+Ok. I think it is ok to merge support for a new board even if there are
+problems as its not regressing (can't break something that previously
+didn't exist imho). But of course it would be best if things did work.
+
+Geert, do you have any comments on the relevance of your IRQC driver patch?
