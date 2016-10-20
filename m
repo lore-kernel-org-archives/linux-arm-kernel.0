@@ -1,31 +1,66 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 20 Oct 2016 17:21:26 +0200
-Subject: [PATCH 4/4] ARM: dts: stm32f429: remove Ethernet wake on Lan support
-In-Reply-To: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
-References: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1476976886-23781-5-git-send-email-alexandre.torgue@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Oct 2016 16:32:45 +0100
+Subject: [PATCH v14 3/9] clocksource/drivers/arm_arch_timer: Improve
+ printk relevant code
+In-Reply-To: <1475086637-1914-4-git-send-email-fu.wei@linaro.org>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-4-git-send-email-fu.wei@linaro.org>
+Message-ID: <20161020153244.GB27598@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes WoL (Wake on Lan) support as it is not yet
-fully supported and tested.
+On Thu, Sep 29, 2016 at 02:17:11AM +0800, fu.wei at linaro.org wrote:
+>  static void arch_timer_banner(unsigned type)
+>  {
+> -	pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+> -		     type & ARCH_CP15_TIMER ? "cp15" : "",
+> -		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+> -		     type & ARCH_MEM_TIMER ? "mmio" : "",
+> -		     (unsigned long)arch_timer_rate / 1000000,
+> -		     (unsigned long)(arch_timer_rate / 10000) % 100,
+> -		     type & ARCH_CP15_TIMER ?
+> -		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+> -			"",
+> -		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+> -		     type & ARCH_MEM_TIMER ?
+> -			arch_timer_mem_use_virtual ? "virt" : "phys" :
+> -			"");
+> +	pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
+> +		type & ARCH_CP15_TIMER ? "cp15" : "",
+> +		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
+> +		type & ARCH_MEM_TIMER ? "mmio" : "",
+> +		(unsigned long)arch_timer_rate / 1000000,
+> +		(unsigned long)(arch_timer_rate / 10000) % 100,
+> +		type & ARCH_CP15_TIMER ?
+> +		(arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+> +		"",
+Please restore the additional indent on this line...
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> +		type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+> +		type & ARCH_MEM_TIMER ?
+> +		arch_timer_mem_use_virtual ? "virt" : "phys" :
+> +		"");
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 6350117b..ad0bc6a 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -377,8 +377,8 @@
- 			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
- 			reg = <0x40028000 0x8000>;
- 			reg-names = "stmmaceth";
--			interrupts = <61>, <62>;
--			interrupt-names = "macirq", "eth_wake_irq";
-+			interrupts = <61>;
-+			interrupt-names = "macirq";
- 			clock-names = "stmmaceth", "mac-clk-tx", "mac-clk-rx";
- 			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
- 			st,syscon = <&syscfg 0x4>;
--- 
-1.9.1
+... and these two.
+
+No matter what checkpatch says, I prefer the code that way so as to keep
+the ternary clear.
+
+[...]
+
+> @@ -768,7 +769,7 @@ static int __init arch_timer_init(void)
+>  		return ret;
+>  
+>  	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
+> -	
+> +
+
+Please mention the whitespace fixup in the commit message. It's
+surprising otherwise.
+
+With all that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
