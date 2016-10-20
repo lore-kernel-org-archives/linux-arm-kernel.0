@@ -1,34 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 20 Oct 2016 21:19:42 +0200
-Subject: [PATCH] ARM: dts: armada-370-rn102: add pinmuxing for i2c0
-Message-ID: <20161020191942.30616-1-u.kleine-koenig@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Oct 2016 21:21:04 +0200
+Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
+In-Reply-To: <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
+References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+ <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
+Message-ID: <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now a working i2c bus depended on the bootloader to configure the
-pinmuxing. Make it explicit.
+On Wed, Oct 19, 2016 at 12:08 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
 
-As a side effect this change makes i2c work in barebox.
+> Add the ability for gpio to request irq from the gpio interrupt controller
+> if present. We have to specificaly that the parent interrupt controller is
+> the gpio interrupt controller because gpio on meson SoCs can't generate
+> interrupt directly on the GIC.
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+(...)
+> +       select IRQ_DOMAIN
+>         select OF_GPIO
+> +       select OF_IRQ
+(...)
+> +static int meson_gpio_to_hwirq(struct meson_bank *bank, unsigned int offset)
+> +{
+> +       unsigned int hwirq;
+> +
+> +       if (bank->irq_first < 0)
+> +               /* this bank cannot generate irqs */
+> +               return -1;
+> +
+> +       hwirq = offset - bank->first + bank->irq_first;
+> +
+> +       if (hwirq > bank->irq_last)
+> +               /* this pin cannot generate irqs */
+> +               return -1;
+> +
+> +       return hwirq;
+> +}
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/armada-370-netgear-rn102.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+This is reimplementing irqdomain.
 
-diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-index 3ca6330a1752..a9e3810aea65 100644
---- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-+++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
-@@ -121,6 +121,10 @@
- 
- 			i2c at 11000 {
- 				clock-frequency = <100000>;
-+
-+				pinctrl-0 = <&i2c0_pins>;
-+				pinctrl-names = "default";
-+
- 				status = "okay";
- 
- 				isl12057: isl12057 at 68 {
--- 
-2.9.3
+> +static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
+> +{
+(...)
+> +       hwirq = meson_gpio_to_hwirq(bank, offset);
+> +       if (hwirq < 0) {
+> +               dev_dbg(pc->dev, "no interrupt for pin %u\n", offset);
+> +               return 0;
+> +       }
+
+Isn't this usecase (also as described in the cover letter) a textbook
+example of when you should be using hierarchical irqdomain?
+
+Please check with Marc et al on hierarchical irqdomains.
+
+Yours,
+Linus Walleij
