@@ -1,182 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 19:30:53 +0200
-Subject: [PATCH v4 5/9] clk: sunxi-ng: Implement minimum for multipliers
-In-Reply-To: <CAGb2v67Mo41RHiWd=9+ggcDDmWJ2Miyo17Nni3p3mmAzoJng3w@mail.gmail.com>
-References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
- <dc2601d4f35d9921ec50ed443cdd413f699fa270.1476196031.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67Mo41RHiWd=9+ggcDDmWJ2Miyo17Nni3p3mmAzoJng3w@mail.gmail.com>
-Message-ID: <20161020173053.bz2jgy6jgy43own5@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 20 Oct 2016 18:32:24 +0100
+Subject: [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
+References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <20161020173224.GA32544@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 11:06:21PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Allow the CCU drivers to specify a multiplier for their clocks.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi-ng/ccu_mult.c |  2 +-
-> >  drivers/clk/sunxi-ng/ccu_mult.h | 13 +++++++++----
-> >  drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
-> >  drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
-> >  drivers/clk/sunxi-ng/ccu_nkmp.c |  4 ++--
-> >  drivers/clk/sunxi-ng/ccu_nm.c   |  2 +-
-> >  6 files changed, 21 insertions(+), 16 deletions(-)
-> >
-> > diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-> > index 6a02ffee5386..678b6cb49f01 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_mult.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_mult.c
-> > @@ -105,7 +105,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
-> >         ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
-> >                                                 &parent_rate);
-> >
-> > -       _cm.min = 1;
-> > +       _cm.min = cm->mult.min;
-> >         _cm.max = 1 << cm->mult.width;
-> >         ccu_mult_find_best(parent_rate, rate, &_cm);
-> >
-> > diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-> > index 113780b7558e..c1a2134bdc71 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_mult.h
-> > +++ b/drivers/clk/sunxi-ng/ccu_mult.h
-> > @@ -7,14 +7,19 @@
-> >  struct ccu_mult_internal {
-> >         u8      shift;
-> >         u8      width;
-> > +       u8      min;
-> >  };
-> >
-> > -#define _SUNXI_CCU_MULT(_shift, _width)                \
-> > -       {                                       \
-> > -               .shift  = _shift,               \
-> > -               .width  = _width,               \
-> > +#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)      \
-> > +       {                                               \
-> > +               .shift  = _shift,                       \
-> > +               .width  = _width,                       \
-> > +               .min    = _min,                         \
-> >         }
-> >
-> > +#define _SUNXI_CCU_MULT(_shift, _width)                \
-> > +       _SUNXI_CCU_MULT_MIN(_shift, _width, 1)
-> > +
-> >  struct ccu_mult {
-> >         u32                     enable;
-> >
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
-> > index a42d870ba0ef..eaf0fdf78d2b 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_nk.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_nk.c
-> > @@ -97,9 +97,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
-> >         if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> >                 rate *= nk->fixed_post_div;
-> >
-> > -       _nk.min_n = 1;
-> > +       _nk.min_n = nk->n.min;
-> >         _nk.max_n = 1 << nk->n.width;
-> > -       _nk.min_k = 1;
-> > +       _nk.min_k = nk->k.min;
-> >         _nk.max_k = 1 << nk->k.width;
-> >
-> >         ccu_nk_find_best(*parent_rate, rate, &_nk);
-> > @@ -122,9 +122,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
-> >         if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> >                 rate = rate * nk->fixed_post_div;
-> >
-> > -       _nk.min_n = 1;
-> > +       _nk.min_n = nk->n.min;
-> >         _nk.max_n = 1 << nk->n.width;
-> > -       _nk.min_k = 1;
-> > +       _nk.min_k = nk->k.min;
-> >         _nk.max_k = 1 << nk->k.width;
-> >
-> >         ccu_nk_find_best(parent_rate, rate, &_nk);
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > index b2a5fccf2f8c..715b49211ddb 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > @@ -100,9 +100,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
-> >         struct ccu_nkm *nkm = data;
-> >         struct _ccu_nkm _nkm;
-> >
-> > -       _nkm.min_n = 1;
-> > +       _nkm.min_n = nkm->n.min;
-> >         _nkm.max_n = 1 << nkm->n.width;
-> > -       _nkm.min_k = 1;
-> > +       _nkm.min_n = nkm->k.min;
-> 
-> Typo here.
-> 
-> >         _nkm.max_k = 1 << nkm->k.width;
-> >         _nkm.min_m = 1;
-> >         _nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
-> > @@ -129,9 +129,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
-> >         unsigned long flags;
-> >         u32 reg;
-> >
-> > -       _nkm.min_n = 1;
-> > +       _nkm.min_n = nkm->n.min;
-> >         _nkm.max_n = 1 << nkm->n.width;
-> > -       _nkm.min_k = 1;
-> > +       _nkm.min_n = nkm->k.min;
-> 
-> And here.
-> 
-> >         _nkm.max_k = 1 << nkm->k.width;
-> >         _nkm.min_m = 1;
-> >         _nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> > index 2c1398192e48..7968e0bac5db 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> > @@ -107,9 +107,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-> >         struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
-> >         struct _ccu_nkmp _nkmp;
-> >
-> > -       _nkmp.min_n = 1;
-> > +       _nkmp.min_n = nkmp->n.min;
-> >         _nkmp.max_n = 1 << nkmp->n.width;
-> > -       _nkmp.min_k = 1;
-> > +       _nkmp.min_n = nkmp->k.min;
-> 
-> And here.
-> 
-> >         _nkmp.max_k = 1 << nkmp->k.width;
-> >         _nkmp.min_m = 1;
-> >         _nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-> > index 2a190bc032a9..b1f3f0e8899d 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_nm.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_nm.c
-> > @@ -93,7 +93,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
-> >         struct ccu_nm *nm = hw_to_ccu_nm(hw);
-> >         struct _ccu_nm _nm;
-> >
-> > -       _nm.min_n = 1;
-> > +       _nm.min_n = nm->n.min;
-> >         _nm.max_n = 1 << nm->n.width;
-> >         _nm.min_m = 1;
-> >         _nm.max_m = nm->m.max ?: 1 << nm->m.width;
-> > --
-> > git-series 0.8.10
-> 
-> Otherwise,
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Hi Eric,
 
-Fixed and applied, thanks!
-Maxime
+Thanks for posting this.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/f586f2e1/attachment.sig>
+On Wed, Oct 12, 2016 at 01:22:08PM +0000, Eric Auger wrote:
+> This is the second respin on top of Robin's series [1], addressing Alex' comments.
+> 
+> Major changes are:
+> - MSI-doorbell API now is moved to DMA IOMMU API following Alex suggestion
+>   to put all API pieces at the same place (so eventually in the IOMMU
+>   subsystem)
+> - new iommu_domain_msi_resv struct and accessor through DOMAIN_ATTR_MSI_RESV
+>   domain with mirror VFIO capability
+> - more robustness I think in the VFIO layer
+> - added "iommu/iova: fix __alloc_and_insert_iova_range" since with the current
+>   code I failed allocating an IOVA page in a single page domain with upper part
+>   reserved
+> 
+> IOVA range exclusion will be handled in a separate series
+> 
+> The priority really is to discuss and freeze the API and especially the MSI
+> doorbell's handling. Do we agree to put that in DMA IOMMU?
+> 
+> Note: the size computation does not take into account possible page overlaps
+> between doorbells but it would add quite a lot of complexity i think.
+> 
+> Tested on AMD Overdrive (single GICv2m frame) with I350 VF assignment.
+
+Marc, Robin and I sat down and had a look at the series and, whilst it's
+certainly addressing a problem that we desperately want to see fixed, we
+think that it's slightly over-engineering in places and could probably
+be simplified in the interest of getting something upstream that can be
+used as a base, on which the ABI can be extended as concrete use-cases
+become clear.
+
+Stepping back a minute, we're trying to reserve some of the VFIO virtual
+address space so that it can be used by devices to map their MSI doorbells
+using the SMMU. With your patches, this requires that (a) the kernel
+tells userspace about the size and alignment of the doorbell region
+(MSI_RESV) and (b) userspace tells the kernel the VA-range that can be
+used (RESERVED_MSI_IOVA).
+
+However, this is all special-cased for MSI doorbells and there are
+potentially other regions of the VFIO address space that are reserved
+and need to be communicated to userspace as well. We already know of
+hardware where the PCI RC intercepts p2p accesses before they make it
+to the SMMU, and other hardware where the MSI doorbell is at a fixed
+address. This means that we need a mechanism to communicate *fixed*
+regions of virtual address space that are reserved by VFIO. I don't
+even particularly care if VFIO_MAP_DMA enforces that, but we do need
+a way to tell userspace "hey, you don't want to put memory here because
+it won't work well with devices".
+
+In that case, we end up with something like your MSI_RESV capability,
+but actually specifying a virtual address range that is simply not to
+be used by MAP_DMA -- we don't say anything about MSIs. Now, taking this
+to its logical conclusion, we no longer need to distinguish between
+remappable reserved regions and fixed reserved regions in the ABI.
+Instead, we can have the kernel allocate the virtual address space for
+the remappable reserved regions (probably somewhere in the bottom 4GB)
+and expose them via the capability. This simplifies things in the
+following ways:
+
+  * You don't need to keep track of MSI vs DMA addresses in the VFIO rbtree
+  * You don't need to try collapsing doorbells into a single region
+  * You don't need a special MAP flavour to map MSI doorbells
+  * The ABI is reusable for PCI p2p and fixed doorbells
+
+I really think it would make your patch series both generally useful and
+an awful lot smaller, whilst leaving the door open to ABI extension on
+a case-by-case basis when we determine that it's really needed.
+
+Thoughts?
+
+Will
