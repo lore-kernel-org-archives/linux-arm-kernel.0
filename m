@@ -1,40 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 20 Oct 2016 17:04:46 +0800
-Subject: [RESEND PATCH v3 2/2] ARM: dts: imx6ul: Add DTS for liteBoard
-In-Reply-To: <20160930093626.3843-2-m.niestroj@grinn-global.com>
-References: <20160930093626.3843-1-m.niestroj@grinn-global.com>
- <20160930093626.3843-2-m.niestroj@grinn-global.com>
-Message-ID: <CAJBJ56K53ua4htobTUQN2eQgvdqwtCjpmEXOWEr1YDn-BUmmSw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 20 Oct 2016 10:58:04 +0200
+Subject: [PATCH v2] ARM: shmobile: Consolidate R8A7743 and R8A779[234]
+ machine definitions
+In-Reply-To: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20161020085804.GK4612@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 5:36 PM, Marcin Niestroj
-<m.niestroj@grinn-global.com> wrote:
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               reg_usb_otg1_vbus: usb_otg1_regulator {
-> +                       compatible = "regulator-fixed";
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&pinctrl_usb_otg1_vbus>;
-> +                       regulator-name = "usb_otg1_vbus";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio2 8 GPIO_ACTIVE_LOW>;
-> +               };
-> +       };
+On Mon, Oct 17, 2016 at 04:59:04PM +0300, Laurent Pinchart wrote:
+> The four SoCs use identical machine operations, consolidate them into
+> two machine definitions in a single file.
+> 
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Changes since v1:
+> 
+> - Rebased on top of Simon's latest devel branch, thus including R8A7743
+>   consolidation
+> 
+>  arch/arm/mach-shmobile/Makefile          |  4 ----
+>  arch/arm/mach-shmobile/setup-r8a7743.c   | 34 -------------------------------
+>  arch/arm/mach-shmobile/setup-r8a7792.c   | 35 --------------------------------
+>  arch/arm/mach-shmobile/setup-r8a7793.c   | 33 ------------------------------
+>  arch/arm/mach-shmobile/setup-r8a7794.c   | 33 ------------------------------
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c | 33 ++++++++++++++++++++++++++++++
+>  6 files changed, 33 insertions(+), 139 deletions(-)
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7743.c
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
+>  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
 
-Please put it directly under root in the following naming schema to
-save that fake simple-bus container node.
-
-        reg_xxx: regulator-xxx {
-                ...
-        }
-
-Note: underscore is in label name, while hyphen is in node name.
-
-Shawn
-
-> +};
+Thanks for this Laurent, its a very nice diffstat.
+I have queued it up for v4.10.
