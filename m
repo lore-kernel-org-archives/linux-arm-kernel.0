@@ -1,96 +1,93 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Oct 2016 11:43:44 +0800
-Subject: [PATCH v2 8/8] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
+Date: Thu, 20 Oct 2016 11:43:41 +0800
+Subject: [PATCH v2 5/8] drm/sun4i: Add compatible strings for A31/A31s display
+ pipelines
 In-Reply-To: <20161020034344.14154-1-wens@csie.org>
 References: <20161020034344.14154-1-wens@csie.org>
-Message-ID: <20161020034344.14154-9-wens@csie.org>
+Message-ID: <20161020034344.14154-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hummingbird A31 board has a RGB-to-VGA bridge which converts RGB
-output from the LCD interface to VGA signals.
+The A31's display pipeline has 2 frontends, 2 backends, and 2 TCONs. It
+also has new display enhancement blocks, such as the DRC (Dynamic Range
+Controller), the DEU (Display Enhancement Unit), and the CMU (Color
+Management Unit). It supports HDMI, MIPI DSI, and 2 LCD/LVDS channels.
 
-Enable this part of the display pipeline.
+The A31s display pipeline is almost the same, just without MIPI DSI.
+Only the TCON seems to be different, due to the missing mux for MIPI
+DSI.
+
+Add compatible strings for both of them.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 56 +++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 ++++
+ drivers/gpu/drm/sun4i/sun4i_backend.c                         | 1 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                             | 3 +++
+ 3 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 9a74637f677f..05a49b2147f1 100644
---- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -63,6 +63,49 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 15fdca8909f2..b82c00449468 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -91,6 +91,7 @@ system.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun5i-a13-display-backend
++    * allwinner,sun6i-a31-display-backend
+     * allwinner,sun8i-a33-display-backend
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the frontend and backend
+@@ -121,6 +122,7 @@ deinterlacing and color space conversion.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun5i-a13-display-frontend
++    * allwinner,sun6i-a31-display-frontend
+     * allwinner,sun8i-a33-display-frontend
+   - reg: base address and size of the memory-mapped region.
+   - interrupts: interrupt associated to this IP
+@@ -146,6 +148,8 @@ extra node.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun5i-a13-display-engine
++    * allwinner,sun6i-a31-display-engine
++    * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun8i-a33-display-engine
  
-+	bridge {
-+		compatible = "dumb-vga-dac";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+
-+				vga_bridge_in: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_vga>;
-+				};
-+			};
-+
-+			port at 1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				vga_bridge_out: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vga_con_in>;
-+				};
-+			};
-+		};
-+	};
-+
-+	vga {
-+		compatible = "vga-connector";
-+
-+		port {
-+			vga_con_in: endpoint {
-+				remote-endpoint = <&vga_bridge_out>;
-+			};
-+		};
-+	};
-+
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
-@@ -245,6 +288,19 @@
- 	status = "okay";
+   - allwinner,pipelines: list of phandle to the display engine
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 32c0584e3c35..6e6c59a661b6 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -408,6 +408,7 @@ static int sun4i_backend_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id sun4i_backend_of_table[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-display-backend" },
++	{ .compatible = "allwinner,sun6i-a31-display-backend" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-backend" },
+ 	{ }
  };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index a15c231fbd59..fa6568e1822a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -201,6 +201,7 @@ static const struct component_master_ops sun4i_drv_master_ops = {
+ static bool sun4i_drv_node_is_frontend(struct device_node *node)
+ {
+ 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
++		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
+ }
  
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd0_rgb888_pins>;
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_vga: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&vga_bridge_in>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+@@ -324,6 +325,8 @@ static int sun4i_drv_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
++	{ .compatible = "allwinner,sun6i-a31-display-engine" },
++	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
+ 	{ }
+ };
 -- 
 2.9.3
