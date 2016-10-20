@@ -1,33 +1,26 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 20 Oct 2016 16:20:38 -0700
-Subject: [PATCH v5 23/23] phy: Add support for Qualcomm's USB HS phy
-In-Reply-To: <20161018015636.11701-24-stephen.boyd@linaro.org>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-24-stephen.boyd@linaro.org>
-Message-ID: <147700563857.2550.16732518381302920183@sboyd-linaro>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 20 Oct 2016 16:50:07 -0700
+Subject: [PATCH 2/2] clk: mxs: don't register a clkdev for enet_out
+In-Reply-To: <20161020075840.16406-2-u.kleine-koenig@pengutronix.de>
+References: <20161020075840.16406-1-u.kleine-koenig@pengutronix.de>
+ <20161020075840.16406-2-u.kleine-koenig@pengutronix.de>
+Message-ID: <20161020235007.GF26139@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2016-10-17 18:56:36)
-> +
-> +static int
-> +qcom_usb_hs_phy_vbus_notifier(struct notifier_block *nb, unsigned long event,
-> +                             void *ptr)
-> +{
-> +       struct qcom_usb_hs_phy *uphy;
-> +       int is_host;
-> +       u8 addr;
-> +
-> +       uphy = container_of(nb, struct qcom_usb_hs_phy, vbus_notify);
-> +       is_host = extcon_get_cable_state_(uphy->id_edev, EXTCON_USB_HOST);
+On 10/20, Uwe Kleine-K?nig wrote:
+> The last user is gone in the previous commit. So this can be removed, too.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
 
-Please don't apply this patch. This call now deadlocks on v4.9-rc1
-because of how extcon_get_cable_state_() now grabs a lock that is
-already held here when we're inside the notifier. It's not really
-required that we grab the lock in extcon there, but this has exposed a
-flaw in the logic anyway. We don't know if the id pin is going to toggle
-before or after this function is called, so we should really keep track
-of both vbus and id state in this driver and then do the same ulpi
-writes from two different notifiers for both vbus and id pin. We would
-be duplicating work sometimes, but that's pretty much the best solution
-I can come up with. Otherwise it's racy.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+I'm fine if this goes through arm-soc if you want to bunch them
+together. Otherwise just resend the patch once the ARM side
+merges into some -rc1 and we can remove it in the next next
+release.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
