@@ -1,45 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 20 Oct 2016 14:25:38 -0700
-Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
- interrupts
-In-Reply-To: <CAJZ5v0gZmNxOF5hf8oYF_UYUNHrYkFy=Y7SWGCZ+VRKGNeJmcA@mail.gmail.com>
-References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
- <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
- <20161018135912.GD18903@localhost>
- <b4a8995e-1454-3b84-0681-1491788087ec@codeaurora.org>
- <0a82f2ef-b072-d847-104a-320cf804ebd5@codeaurora.org>
- <20161019224405.GA14915@localhost>
- <a418cf9d-5eeb-a588-6653-fd00e0c2693c@codeaurora.org>
- <CAJZ5v0gZmNxOF5hf8oYF_UYUNHrYkFy=Y7SWGCZ+VRKGNeJmcA@mail.gmail.com>
-Message-ID: <7d6c7dc6-4ae5-537e-9137-ee80a76fc9bd@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 20 Oct 2016 23:39:10 +0200
+Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
+ early boot stages
+In-Reply-To: <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 2:08 PM, Rafael J. Wysocki wrote:
-> On Thu, Oct 20, 2016 at 10:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> On 10/19/2016 3:44 PM, Bjorn Helgaas wrote:
-> 
-> [cut]
-> 
->> If we want to move the ISA pieces out of this file, that can be done too.
->> We can also add support for PNPACPI. I'm not a very big fan of scratch
->> everything and start from beginning approach. This refactoring effort already
->> failed 3 times. I'd like to close the issue and move on.
-> 
-> Understood, but we have broken this for too many times already.
-> 
-> Either we have a minimum fix that is known working or we are going back.
+On Thu, Oct 20, 2016 at 12:21 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The penalty determination of ISA IRQ goes through 4 paths.
+> 1. assign PCI_USING during power up via acpi_irq_penalty_init.
+> 2. update the penalty with acpi_penalize_isa_irq function based on the
+> active parameter.
+> 3. kernel command line penalty update via acpi_irq_penalty_update function.
+> 4. increment the penalty as USING right after the IRQ is assign to PCI.
+>
+> acpi_penalize_isa_irq and acpi_irq_penalty_update functions get called
+> before the ACPI subsystem is started.
+>
+> These API need to bypass the acpi_irq_get_penalty function.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..4f37938 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -849,7 +849,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>                         continue;
+>
+>                 if (used)
+> -                       new_penalty = acpi_irq_get_penalty(irq) +
+> +                       new_penalty = acpi_isa_irq_penalty[irq] +
+>                                         PIRQ_PENALTY_ISA_USED;
+>                 else
+>                         new_penalty = 0;
+> @@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>  void acpi_penalize_isa_irq(int irq, int active)
+>  {
+>         if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+> -               acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +               acpi_isa_irq_penalty[irq] = acpi_isa_irq_penalty[irq] +
 
-Agreed. I think my V4 patch satisfies our short term goals and fixes the issue
-you are seeing. IMO, it is good enough for the moment.
+This looks slightly odd.  What about
 
-> 
-> Thanks,
-> Rafael
-> 
++               acpi_isa_irq_penalty[irq] +=
 
+>                   (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>  }
+>
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Rafael
