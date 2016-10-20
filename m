@@ -1,48 +1,135 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 15:49:04 +0200
-Subject: [PATCH v3 3/6] dt-bindings: pinctrl: Deprecate sunxi pinctrl bindings
+Date: Thu, 20 Oct 2016 15:49:02 +0200
+Subject: [PATCH v3 1/6] pinctrl: sunxi: Deal with configless pins
 In-Reply-To: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
 References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <6aec73cd3b9d3dbf1085d042ec6c23f385a300de.1476971126.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <ae812275bfb0f0ded2a73b571bfcecffcd747126.1476971126.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic pin configuration and multiplexing should be preferred now,
-even though we still support the old one.
+Even though the our binding had the assumption that the allwinner,pull and
+allwinner,drive properties were optional, the code never took that into
+account.
+
+Fix that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+), 0 deletions(-)
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 51 ++++++++++++++++++++--------
+ 1 file changed, 37 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 1685821eea41..35eef433e518 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -37,6 +37,22 @@ pins it needs, and how they should be configured, with regard to muxer
- configuration, drive strength and pullups. If one of these options is
- not set, its actual value will be unspecified.
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index c44bf1320e08..12650904bd96 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -217,20 +217,29 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+ {
+ 	unsigned long *pinconfig;
+ 	unsigned int configlen = 0, idx = 0;
++	int ret;
  
-+This driver supports the generic pin multiplexing and configuration
-+bindings. For details on each properties, you can refer to
-+./pinctrl-bindings.txt.
-+
-+Required sub-node properties:
-+  - pins
-+  - function
-+
-+Optional sub-node properties:
-+  - bias-disable
-+  - bias-pull-up
-+  - bias-pull-down
-+  - drive-strength
-+
-+*** Deprecated pin configuration and multiplexing binding
-+
- Required subnode-properties:
+ 	if (sunxi_pctrl_has_drive_prop(node))
+ 		configlen++;
+ 	if (sunxi_pctrl_has_bias_prop(node))
+ 		configlen++;
  
- - allwinner,pins: List of strings containing the pin name.
++	/*
++	 * If we don't have any configuration, bail out
++	 */
++	if (!configlen)
++		return NULL;
++
+ 	pinconfig = kzalloc(configlen * sizeof(*pinconfig), GFP_KERNEL);
+ 	if (!pinconfig)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	if (sunxi_pctrl_has_drive_prop(node)) {
+ 		int drive = sunxi_pctrl_parse_drive_prop(node);
+-		if (drive < 0)
++		if (drive < 0) {
++			ret = drive;
+ 			goto err_free;
++		}
+ 
+ 		pinconfig[idx++] = pinconf_to_config_packed(PIN_CONFIG_DRIVE_STRENGTH,
+ 							  drive);
+@@ -238,8 +247,10 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+ 
+ 	if (sunxi_pctrl_has_bias_prop(node)) {
+ 		int pull = sunxi_pctrl_parse_bias_prop(node);
+-		if (pull < 0)
++		if (pull < 0) {
++			ret = pull;
+ 			goto err_free;
++		}
+ 
+ 		pinconfig[idx++] = pinconf_to_config_packed(pull, 0);
+ 	}
+@@ -250,7 +261,7 @@ static unsigned long *sunxi_pctrl_build_pin_config(struct device_node *node,
+ 
+ err_free:
+ 	kfree(pinconfig);
+-	return NULL;
++	return ERR_PTR(ret);
+ }
+ 
+ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+@@ -284,7 +295,10 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 
+ 	/*
+ 	 * We have two maps for each pin: one for the function, one
+-	 * for the configuration (bias, strength, etc)
++	 * for the configuration (bias, strength, etc).
++	 *
++	 * We might be slightly overshooting, since we might not have
++	 * any configuration.
+ 	 */
+ 	nmaps = npins * 2;
+ 	*map = kmalloc(nmaps * sizeof(struct pinctrl_map), GFP_KERNEL);
+@@ -292,8 +306,8 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 		return -ENOMEM;
+ 
+ 	pinconfig = sunxi_pctrl_build_pin_config(node, &configlen);
+-	if (!pinconfig) {
+-		ret = -EINVAL;
++	if (IS_ERR(pinconfig)) {
++		ret = PTR_ERR(pinconfig);
+ 		goto err_free_map;
+ 	}
+ 
+@@ -320,15 +334,24 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
+ 
+ 		i++;
+ 
+-		(*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
+-		(*map)[i].data.configs.group_or_pin = group;
+-		(*map)[i].data.configs.configs = pinconfig;
+-		(*map)[i].data.configs.num_configs = configlen;
+-
+-		i++;
++		if (pinconfig) {
++			(*map)[i].type = PIN_MAP_TYPE_CONFIGS_GROUP;
++			(*map)[i].data.configs.group_or_pin = group;
++			(*map)[i].data.configs.configs = pinconfig;
++			(*map)[i].data.configs.num_configs = configlen;
++			i++;
++		}
+ 	}
+ 
+-	*num_maps = nmaps;
++	*num_maps = i;
++
++	/*
++	 * We know have the number of maps we need, we can resize our
++	 * map array
++	 */
++	*map = krealloc(*map, i * sizeof(struct pinctrl_map), GFP_KERNEL);
++	if (!map)
++		return -ENOMEM;
+ 
+ 	return 0;
+ 
 -- 
 git-series 0.8.10
