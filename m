@@ -1,43 +1,53 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 20 Oct 2016 11:23:49 +0530
-Subject: [PATCH 2/3] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <20161019120714.GM9193@arm.com>
-References: <1474643941-109020-1-git-send-email-labath@google.com>
- <1474643941-109020-2-git-send-email-labath@google.com>
- <CAHB_GupyUp_s4nWq-QVnEoCZvmkrXyCcxs-XpH3x0Yugkknpzg@mail.gmail.com>
- <CAJt8pk9WOhebSXpbahbbLscqJcY1OOqHiA_9hHC0zmHruRPxWQ@mail.gmail.com>
- <CAHB_GupR4sJtAGYdRwvCwu7891KM8TEByZCgqMCrYrdt=cJuYw@mail.gmail.com>
- <CAJt8pk-HJYFUCxRuY5EV6KnM+kNP6mVBrFgPwiGfEkMKqGyjXw@mail.gmail.com>
- <CAHB_GupRgSgnQS+YKhKxWhf8+t+GP5+7_hoigKUQaYcnhwG8NA@mail.gmail.com>
- <CAJt8pk8OOTbuNhN635kRCot89eLjXPQqd2AG2qJ_t7GComtZCw@mail.gmail.com>
- <16572d35-bf69-1680-717a-d2815b121c32@redhat.com>
- <20161019120714.GM9193@arm.com>
-Message-ID: <00a971a1-983a-b631-a982-ea29e8daa2c9@redhat.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 20 Oct 2016 08:32:34 +0200
+Subject: [PATCH] ARM: dts: berlin2q-marvell-dmp: fix typo in chosen node
+In-Reply-To: <1476924731-14975-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1476924731-14975-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161020063234.a4q7qquftwn5kvup@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hello,
 
-On Wednesday 19 October 2016 05:37 PM, Will Deacon wrote:
-> On Fri, Oct 14, 2016 at 08:45:43AM +0530, Pratyush Anand wrote:
->>
->>
->> On Thursday 13 October 2016 10:33 PM, Pavel Labath wrote:
->>>> I think, its easier to go with your implementation. So, I have taken
->>>>> your patch and updated my perf/upstream_arm64_devel branch. May be you
->>>>> can give it a test for your test cases.
->>> I've checked out the new version of your branch, and it works great.
->>> I'll write a patch with additional test cases to go on top of your
->>> branch, as the tests there do not capture the bug I was fixing.
->>
->> That would be great. We can send them all together as V2.
->
-> Did you send a v2? I've been holding off reviewing this, but I just want
-> to make sure I didn't miss the update.
+On Thu, Oct 20, 2016 at 09:52:11AM +0900, Masahiro Yamada wrote:
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-I just posted V2.
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-http://www.spinics.net/lists/arm-kernel/msg537194.html
+Thanks!
 
-~Pratyush
+Antoine
+
+> ---
+> 
+>  arch/arm/boot/dts/berlin2q-marvell-dmp.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> index f485308..d57d675 100644
+> --- a/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> +++ b/arch/arm/boot/dts/berlin2q-marvell-dmp.dts
+> @@ -48,7 +48,7 @@
+>  		reg = <0x00000000 0x80000000>;
+>  	};
+>  
+> -	choosen {
+> +	chosen {
+>  		bootargs = "earlyprintk";
+>  		stdout-path = "serial0:115200n8";
+>  	};
+> -- 
+> 1.9.1
+> 
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/8d11fa4f/attachment.sig>
