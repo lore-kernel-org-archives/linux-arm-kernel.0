@@ -1,35 +1,34 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Thu, 20 Oct 2016 17:00:32 +0000
-Subject: [PATCH -next] net: ethernet: mediatek: use dev_kfree_skb_any instead
- of dev_kfree_skb
-Message-ID: <1476982832-27932-1-git-send-email-weiyj.lk@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 20 Oct 2016 10:04:14 -0700
+Subject: [PATCH v2] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
+In-Reply-To: <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
+References: <CAPoCmYJC1TebBrspD_=mTETULSjg9or5a0Yda8p945y6ZWL99Q@mail.gmail.com>
+ <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
+Message-ID: <87eg3bvto1.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Replace dev_kfree_skb with dev_kfree_skb_any in mtk_start_xmit()
-which can be called from hard irq context (netpoll) and from
-other contexts. mtk_start_xmit() only frees skbs that it has
-dropped.
+> On Tue, Oct 18, 2016 at 10:44 PM, Gottfried Haider
+> <gottfried.haider@gmail.com wrote:
+>
+>> Regarding the proposed format using the header pin numbers: From what I've
+>> seen in terms of existing educational materials, it seems the overwhelming
+>> majority ends up using GPIO numbers instead of physical pin header
+>> numbering. (e.g. [1] [2])
+>
+> What does that number mean? If you are referring to the global
+> GPIO numberspace it is obsolete and just reflecting the fact that
+> people up until now was referring to Linux-internal GPIO numbers.
 
-This is detected by Coccinelle semantic patch.
-
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- drivers/net/ethernet/mediatek/mtk_eth_soc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-index 8f80e61..d716274 100644
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -843,7 +843,7 @@ static int mtk_start_xmit(struct sk_buff *skb, struct net_device *dev)
- drop:
- 	spin_unlock(&eth->page_lock);
- 	stats->tx_dropped++;
--	dev_kfree_skb(skb);
-+	dev_kfree_skb_any(skb);
- 	return NETDEV_TX_OK;
- }
- 
+The number within the SOC's GPIOs.  Until the 8-line expander that's
+been hung off the SOC GPIOs in the Pi3, they were the only GPIOs in the
+system.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/3bd2a4ea/attachment.sig>
