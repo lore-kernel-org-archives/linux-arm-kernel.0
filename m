@@ -1,88 +1,214 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 20 Oct 2016 16:56:37 +0800
-Subject: [PATCH v9 3/4] soc: mediatek: Add MT2701 power dt-bindings
+Date: Thu, 20 Oct 2016 16:56:38 +0800
+Subject: [PATCH v9 4/4] soc: mediatek: Add MT2701 scpsys driver
 In-Reply-To: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1476953798-23263-4-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1476953798-23263-5-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shunli Wang <shunli.wang@mediatek.com>
 
-Add power dt-bindings for MT2701.
+Add scpsys driver for MT2701.
+
+mtk-scpsys now supports MT8173 (arm64) and MT2701 (arm). So it should
+be enabled on both arm64 and arm platforms.
 
 Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 ---
- .../devicetree/bindings/soc/mediatek/scpsys.txt    | 13 +++++++----
- include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
- 2 files changed, 35 insertions(+), 5 deletions(-)
- create mode 100644 include/dt-bindings/power/mt2701-power.h
+ drivers/soc/mediatek/Kconfig      |   2 +-
+ drivers/soc/mediatek/mtk-scpsys.c | 117 +++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 117 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index e8f15e3..16fe94d 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -9,17 +9,20 @@ domain control.
+diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
+index 0a4ea80..609bb34 100644
+--- a/drivers/soc/mediatek/Kconfig
++++ b/drivers/soc/mediatek/Kconfig
+@@ -23,7 +23,7 @@ config MTK_PMIC_WRAP
+ config MTK_SCPSYS
+ 	bool "MediaTek SCPSYS Support"
+ 	depends on ARCH_MEDIATEK || COMPILE_TEST
+-	default ARM64 && ARCH_MEDIATEK
++	default ARCH_MEDIATEK
+ 	select REGMAP
+ 	select MTK_INFRACFG
+ 	select PM_GENERIC_DOMAINS if PM
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index dd7a07d..4a1c636 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -20,6 +20,7 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/soc/mediatek/infracfg.h>
  
- The driver implements the Generic PM domain bindings described in
- power/power_domain.txt. It provides the power domains defined in
--include/dt-bindings/power/mt8173-power.h.
-+include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
++#include <dt-bindings/power/mt2701-power.h>
+ #include <dt-bindings/power/mt8173-power.h>
  
- Required properties:
--- compatible: Must be "mediatek,mt8173-scpsys"
-+- compatible: Should be one of:
-+	- "mediatek,mt2701-scpsys"
-+	- "mediatek,mt8173-scpsys"
- - #power-domain-cells: Must be 1
- - reg: Address range of the SCPSYS unit
- - infracfg: must contain a phandle to the infracfg controller
- - clock, clock-names: clocks according to the common clock binding.
--                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
--		      These are the clocks which hardware needs to be enabled
--		      before enabling certain power domains.
-+                      These are clocks which hardware needs to be
-+                      enabled before enabling certain power domains.
-+	Required clocks for MT2701: "mm", "mfg", "ethif"
-+	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+ #define SPM_VDE_PWR_CON			0x0210
+@@ -27,8 +28,13 @@
+ #define SPM_VEN_PWR_CON			0x0230
+ #define SPM_ISP_PWR_CON			0x0238
+ #define SPM_DIS_PWR_CON			0x023c
++#define SPM_CONN_PWR_CON		0x0280
+ #define SPM_VEN2_PWR_CON		0x0298
+-#define SPM_AUDIO_PWR_CON		0x029c
++#define SPM_AUDIO_PWR_CON		0x029c	/* MT8173 */
++#define SPM_BDP_PWR_CON			0x029c	/* MT2701 */
++#define SPM_ETH_PWR_CON			0x02a0
++#define SPM_HIF_PWR_CON			0x02a4
++#define SPM_IFR_MSC_PWR_CON		0x02a8
+ #define SPM_MFG_2D_PWR_CON		0x02c0
+ #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+ #define SPM_USB_PWR_CON			0x02cc
+@@ -42,10 +48,15 @@
+ #define PWR_ON_2ND_BIT			BIT(3)
+ #define PWR_CLK_DIS_BIT			BIT(4)
  
- Optional properties:
- - vdec-supply: Power supply for the vdec power domain
-diff --git a/include/dt-bindings/power/mt2701-power.h b/include/dt-bindings/power/mt2701-power.h
-new file mode 100644
-index 0000000..64cc826
---- /dev/null
-+++ b/include/dt-bindings/power/mt2701-power.h
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (C) 2015 MediaTek Inc.
-+ *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++#define PWR_STATUS_CONN			BIT(1)
+ #define PWR_STATUS_DISP			BIT(3)
+ #define PWR_STATUS_MFG			BIT(4)
+ #define PWR_STATUS_ISP			BIT(5)
+ #define PWR_STATUS_VDEC			BIT(7)
++#define PWR_STATUS_BDP			BIT(14)
++#define PWR_STATUS_ETH			BIT(15)
++#define PWR_STATUS_HIF			BIT(16)
++#define PWR_STATUS_IFR_MSC		BIT(17)
+ #define PWR_STATUS_VENC_LT		BIT(20)
+ #define PWR_STATUS_VENC			BIT(21)
+ #define PWR_STATUS_MFG_2D		BIT(22)
+@@ -59,6 +70,7 @@ enum clk_id {
+ 	CLK_MFG,
+ 	CLK_VENC,
+ 	CLK_VENC_LT,
++	CLK_ETHIF,
+ 	CLK_MAX,
+ };
+ 
+@@ -68,6 +80,7 @@ enum clk_id {
+ 	"mfg",
+ 	"venc",
+ 	"venc_lt",
++	"ethif",
+ 	NULL,
+ };
+ 
+@@ -455,6 +468,105 @@ static void mtk_register_power_domains(struct platform_device *pdev,
+ }
+ 
+ /*
++ * MT2701 power domain support
 + */
 +
-+#ifndef _DT_BINDINGS_POWER_MT2701_POWER_H
-+#define _DT_BINDINGS_POWER_MT2701_POWER_H
++static const struct scp_domain_data scp_domain_data_mt2701[] = {
++	[MT2701_POWER_DOMAIN_CONN] = {
++		.name = "conn",
++		.sta_mask = PWR_STATUS_CONN,
++		.ctl_offs = SPM_CONN_PWR_CON,
++		.bus_prot_mask = 0x0104,
++		.clk_id = {CLK_NONE},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_DISP] = {
++		.name = "disp",
++		.sta_mask = PWR_STATUS_DISP,
++		.ctl_offs = SPM_DIS_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.clk_id = {CLK_MM},
++		.bus_prot_mask = 0x0002,
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_MFG] = {
++		.name = "mfg",
++		.sta_mask = PWR_STATUS_MFG,
++		.ctl_offs = SPM_MFG_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = {CLK_MFG},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_VDEC] = {
++		.name = "vdec",
++		.sta_mask = PWR_STATUS_VDEC,
++		.ctl_offs = SPM_VDE_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(12, 12),
++		.clk_id = {CLK_MM},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_ISP] = {
++		.name = "isp",
++		.sta_mask = PWR_STATUS_ISP,
++		.ctl_offs = SPM_ISP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(13, 12),
++		.clk_id = {CLK_MM},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_BDP] = {
++		.name = "bdp",
++		.sta_mask = PWR_STATUS_BDP,
++		.ctl_offs = SPM_BDP_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.clk_id = {CLK_NONE},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_ETH] = {
++		.name = "eth",
++		.sta_mask = PWR_STATUS_ETH,
++		.ctl_offs = SPM_ETH_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = {CLK_ETHIF},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_HIF] = {
++		.name = "hif",
++		.sta_mask = PWR_STATUS_HIF,
++		.ctl_offs = SPM_HIF_PWR_CON,
++		.sram_pdn_bits = GENMASK(11, 8),
++		.sram_pdn_ack_bits = GENMASK(15, 12),
++		.clk_id = {CLK_ETHIF},
++		.active_wakeup = true,
++	},
++	[MT2701_POWER_DOMAIN_IFR_MSC] = {
++		.name = "ifr_msc",
++		.sta_mask = PWR_STATUS_IFR_MSC,
++		.ctl_offs = SPM_IFR_MSC_PWR_CON,
++		.clk_id = {CLK_NONE},
++		.active_wakeup = true,
++	},
++};
 +
-+#define MT2701_POWER_DOMAIN_CONN	0
-+#define MT2701_POWER_DOMAIN_DISP	1
-+#define MT2701_POWER_DOMAIN_MFG		2
-+#define MT2701_POWER_DOMAIN_VDEC	3
-+#define MT2701_POWER_DOMAIN_ISP		4
-+#define MT2701_POWER_DOMAIN_BDP		5
-+#define MT2701_POWER_DOMAIN_ETH		6
-+#define MT2701_POWER_DOMAIN_HIF		7
-+#define MT2701_POWER_DOMAIN_IFR_MSC	8
++#define NUM_DOMAINS_MT2701	ARRAY_SIZE(scp_domain_data_mt2701)
 +
-+#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
++static int __init scpsys_probe_mt2701(struct platform_device *pdev)
++{
++	struct scp *scp;
++
++	scp = init_scp(pdev, scp_domain_data_mt2701, NUM_DOMAINS_MT2701);
++	if (IS_ERR(scp))
++		return PTR_ERR(scp);
++
++	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT2701);
++
++	return 0;
++}
++
++/*
+  * MT8173 power domain support
+  */
+ 
+@@ -583,6 +695,9 @@ static int __init scpsys_probe_mt8173(struct platform_device *pdev)
+ 
+ static const struct of_device_id of_scpsys_match_tbl[] = {
+ 	{
++		.compatible = "mediatek,mt2701-scpsys",
++		.data = scpsys_probe_mt2701,
++	}, {
+ 		.compatible = "mediatek,mt8173-scpsys",
+ 		.data = scpsys_probe_mt8173,
+ 	}, {
 -- 
 1.9.1
