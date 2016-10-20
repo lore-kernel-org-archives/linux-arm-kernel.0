@@ -1,71 +1,91 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Oct 2016 09:50:12 +0530
-Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
-In-Reply-To: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
-References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161020042012.GI11766@vireshk-i7>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 20 Oct 2016 13:44:06 +0900
+Subject: [PATCH v3 1/2] arm64: dts: uniphier: add CPU clock and OPP table for
+ LD11 SoC
+Message-ID: <1476938647-26376-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-10-16, 11:59, Linus Walleij wrote:
-> This switches the ARM Integrator/AP and Integrator/CP to use the
-> Device Tree cpufreq policy with its definition of operating points
-> using the generic OPP library.
-> 
-> The Integrators does not need to control a regulator to switch
-> frequency, only a clock. This clock and its device tree bindings
-> have been defined in the device tree and merged upstream for v4.9.
-> 
-> This approach provides a little better granularity on the
-> Integrator/AP where I defined a few operating points: before
-> this change the Integrator would just switch between min speed
-> (12 MHz) and max speed (71 MHz). Now it can switch between a
-> few arbitrarily chosen OPPs as in the examples below:
-> 
-> The following tests were made on the Integrator/AP:
-> 
-> /sys/devices/system/cpu/cpufreq/policy0 echo ondemand > scaling_governor
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 24000000 Hz
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 24000000 Hz
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-> 
-> The switch from 12 to 24 MHz is triggered by as little as using the
-> command line with the ondemand governor. If we do this:
-> 
-> yes > /dev/null &
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 36000000 Hz
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 36000000 Hz --> 71000000 Hz
-> pkill yes
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-> 
-> So the algorithm is indeed using all the OPPs.
-> 
-> Also as a confirmation test to make sure performance is affected by the
-> speed changes, we set the performance governor and:
-> 
-> echo 12000 > scaling_max_freq
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-> time find /sys|sort|uniq > /dev/null
-> real    0m 45.51s
-> user    0m 11.15s
-> sys     0m 26.74s
-> 
-> echo 71000 > scaling_max_freq
-> cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 71000000 Hz
-> time find /sys|sort|uniq
->  > /dev/null
-> real    0m 9.13s
-> user    0m 2.35s
-> sys     0m 5.50s
-> 
-> So it is working.
-> 
-> If people are happy with this approach and approve of the patches
-> I'd like an ACK from the cpufreq people and then merge the whole set
-> through ARM SoC.
+Add a CPU clock to every CPU node and a CPU OPP table to use the
+generic cpufreq driver.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Note:
+clock-latency-ns (300ns) was calculated based on the CPU-gear switch
+sequencer spec; it takes 12 clock cycles on the sequencer running
+at 50 MHz, plus a bit additional latency.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+Changes in v2:
+  - Match the node name to the opp-hz property.
+
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 38 ++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 73e0acf..bb05f0a 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -70,14 +70,18 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0 0x000>;
++			clocks = <&sys_clk 33>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0 0x001>;
++			clocks = <&sys_clk 33>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp>;
+ 		};
+ 	};
+ 
+@@ -86,6 +90,40 @@
+ 		method = "smc";
+ 	};
+ 
++	cluster0_opp: opp_table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 245000000 {
++			opp-hz = /bits/ 64 <245000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 250000000 {
++			opp-hz = /bits/ 64 <250000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 490000000 {
++			opp-hz = /bits/ 64 <490000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 653334000 {
++			opp-hz = /bits/ 64 <653334000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 666667000 {
++			opp-hz = /bits/ 64 <666667000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 980000000 {
++			opp-hz = /bits/ 64 <980000000>;
++			clock-latency-ns = <300>;
++		};
++	};
++
+ 	clocks {
+ 		refclk: ref {
+ 			compatible = "fixed-clock";
 -- 
-viresh
+1.9.1
