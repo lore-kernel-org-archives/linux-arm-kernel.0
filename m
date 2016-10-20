@@ -1,81 +1,89 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Oct 2016 11:41:30 +0200
-Subject: [PATCH v2 1/6] ARM: at91: Documentation: add samx7 families
+Date: Thu, 20 Oct 2016 11:41:33 +0200
+Subject: [PATCH v2 4/6] ARM: at91: handle CONFIG_PM for armv7m configurations
 In-Reply-To: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
 References: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161020094135.18221-2-alexandre.belloni@free-electrons.com>
+Message-ID: <20161020094135.18221-5-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Atmel sams70, samv70 and samv71 are Cortex-M7 based MCUs that can run
-Linux (without MMU).
+There is currently no PM support for samx7 but the symbol can still be
+selected. This avoids compilation issues.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- Documentation/arm/Atmel/README | 44 +++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 41 insertions(+), 3 deletions(-)
+ arch/arm/mach-at91/Kconfig  | 6 ++++++
+ arch/arm/mach-at91/Makefile | 3 +--
+ arch/arm/mach-at91/samx7.c  | 9 +++++++++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
-index 6ca78f818dbf..e403697ee9fc 100644
---- a/Documentation/arm/Atmel/README
-+++ b/Documentation/arm/Atmel/README
-@@ -14,9 +14,9 @@ official Atmel product name. Anyway, files, directories, git trees,
- git branches/tags and email subject always contain this "at91" sub-string.
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index bade64e0cb49..34fa561aa853 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -59,6 +59,7 @@ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+ 	depends on ARCH_MULTI_V4T
+ 	select ATMEL_AIC_IRQ
++	select ATMEL_PM if PM
+ 	select ATMEL_ST
+ 	select CPU_ARM920T
+ 	select HAVE_AT91_USB_CLK
+@@ -72,6 +73,7 @@ config SOC_AT91SAM9
+ 	bool "AT91SAM9"
+ 	depends on ARCH_MULTI_V5
+ 	select ATMEL_AIC_IRQ
++	select ATMEL_PM if PM
+ 	select ATMEL_SDRAMC
+ 	select CPU_ARM926T
+ 	select HAVE_AT91_SMD
+@@ -130,9 +132,13 @@ config SOC_SAM_V7
+ config SOC_SAMA5
+ 	bool
+ 	select ATMEL_AIC5_IRQ
++	select ATMEL_PM if PM
+ 	select ATMEL_SDRAMC
+ 	select MEMORY
+ 	select SOC_SAM_V7
+ 	select SRAM if PM
  
- 
--AT91 SoCs
-----------
--Documentation and detailled datasheet for each product are available on
-+SMART SoCs
-+----------
-+Documentation and detailed datasheet for each product are available on
- the Atmel website: http://www.atmel.com.
- 
-   Flavors:
-@@ -101,6 +101,44 @@ the Atmel website: http://www.atmel.com.
-         + Datasheet
-           http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
- 
-+SMART MCUs
-+----------
-+    * ARM Cortex-M7 MCUs
-+      - sams70 family
-+        - sams70j19
-+        - sams70j20
-+        - sams70j21
-+        - sams70n19
-+        - sams70n20
-+        - sams70n21
-+        - sams70q19
-+        - sams70q20
-+        - sams70q21
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-11242-32-bit-Cortex-M7-Microcontroller-SAM-S70Q-SAM-S70N-SAM-S70J_Datasheet.pdf
++config ATMEL_PM
++	bool
 +
-+      - samv70 family
-+        - samv70j19
-+        - samv70j20
-+        - samv70n19
-+        - samv70n20
-+        - samv70q19
-+        - samv70q20
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-11297-32-bit-Cortex-M7-Microcontroller-SAM-V70Q-SAM-V70N-SAM-V70J_Datasheet.pdf
-+
-+      - samv71 family
-+        - samv71j19
-+        - samv71j20
-+        - samv71j21
-+        - samv71n19
-+        - samv71n20
-+        - samv71n21
-+        - samv71q19
-+        - samv71q20
-+        - samv71q21
-+        + Datasheet
-+          http://www.atmel.com/Images/Atmel-44003-32-bit-Cortex-M7-Microcontroller-SAM-V71Q-SAM-V71N-SAM-V71J_Datasheet.pdf
+ endif
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 84956a18d604..116691714bb8 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -10,8 +10,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
+ obj-$(CONFIG_SOC_SAMX7)		+= samx7.o
  
- Linux kernel information
- ------------------------
+ # Power Management
+-obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= pm_suspend.o
++obj-$(CONFIG_ATMEL_PM)		+= pm.o pm_suspend.o
+ 
+ ifeq ($(CONFIG_CPU_V7),y)
+ AFLAGS_pm_suspend.o := -march=armv7-a
+diff --git a/arch/arm/mach-at91/samx7.c b/arch/arm/mach-at91/samx7.c
+index bd33bc56278e..5bd76cb5076c 100644
+--- a/arch/arm/mach-at91/samx7.c
++++ b/arch/arm/mach-at91/samx7.c
+@@ -16,6 +16,15 @@
+ #include "generic.h"
+ #include "soc.h"
+ 
++#ifdef CONFIG_PM
++/* This function has to be defined for various drivers that are using it */
++int at91_suspend_entering_slow_clock(void)
++{
++	return 0;
++}
++EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
++#endif
++
+ static const struct at91_soc samx7_socs[] = {
+ 	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
+ 		 "same70q21", "samx7"),
 -- 
 2.9.3
