@@ -1,30 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 19:26:47 +0200
-Subject: [PATCH v4 3/9] clk: sunxi-ng: Finish to convert to structures
- for arguments
-In-Reply-To: <CAGb2v67CWEEcC+AQ9MqsyKokTx2ZVXKqBSUFW_x7CfjHrL_JFA@mail.gmail.com>
+Date: Thu, 20 Oct 2016 19:27:47 +0200
+Subject: [PATCH v4 4/9] clk: sunxi-ng: Add minimums for all the relevant
+ structures and clocks
+In-Reply-To: <CAGb2v64itwTvMoxvtYDqOALL-XJYvhv-5daPPjPzb9DfY3o62A@mail.gmail.com>
 References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
- <67333887b86b7fd838dd9d6523dc7e3d9a9ddeb4.1476196031.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67CWEEcC+AQ9MqsyKokTx2ZVXKqBSUFW_x7CfjHrL_JFA@mail.gmail.com>
-Message-ID: <20161020172647.ngib3vf3dteoo4xn@lukather>
+ <a96b56fb7bda849e087b63a04ff76d1396c44d72.1476196031.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v64itwTvMoxvtYDqOALL-XJYvhv-5daPPjPzb9DfY3o62A@mail.gmail.com>
+Message-ID: <20161020172747.dagnsdwhhxmxvm4c@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 10:35:18PM +0800, Chen-Yu Tsai wrote:
+On Thu, Oct 20, 2016 at 11:04:18PM +0800, Chen-Yu Tsai wrote:
 > On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > Some clocks still use an explicit list of arguments, which make it a bit
-> > more tedious to add new parameters.
-> >
-> > Convert those over to a structure pointer argument to add as many
-> > arguments as possible without having to many noise in our patches, or a
-> > very long list of arguments.
+> > Modify the current clocks we have to be able to specify the minimum for
+> > each clocks we support, just like we support the max.
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
 > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> Including the bits from patch 2.
 
-Applied, thanks!
+Applied with those bits merged in this patch.
+
+Thanks!
 Maxime
 
 -- 
@@ -37,4 +37,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/de349263/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/f33ffa13/attachment.sig>
