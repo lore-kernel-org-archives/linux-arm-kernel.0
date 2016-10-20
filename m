@@ -1,36 +1,44 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 20 Oct 2016 13:30:05 +0200
-Subject: [PATCH v3 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <20161020112351.GC13708@hardcore>
-References: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
- <20161020103707.GB3175@twins.programming.kicks-ass.net>
- <20161020112351.GC13708@hardcore>
-Message-ID: <20161020113005.GV3102@twins.programming.kicks-ass.net>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 20 Oct 2016 13:35:37 +0200
+Subject: [PATCH] pinctrl: st: don't specify default interrupt trigger
+In-Reply-To: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
+References: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <729ebc94-5476-65a7-cc17-eabfba0d2404@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 01:23:51PM +0200, Jan Glauber wrote:
-> On Thu, Oct 20, 2016 at 12:37:07PM +0200, Peter Zijlstra wrote:
-> > On Thu, Oct 20, 2016 at 11:30:36AM +0200, Jan Glauber wrote:
-> > > Note:
-> > > I'm using perf_sw_context in difference to perf_invalid_context
-> > > (see WARN_ON in perf_pmu_register). Reason is that with perf_invalid_context
-> > > add() is never called and the counter results are shown as "unsupported" by
-> > > perf. With perf_sw_context everything works as expected.
-> > 
-> > What?! All the uncore PMUs use perf_invalid_context. What doesn't work
-> > for you?
+
+
+On 10/18/2016 09:16 AM, patrice.chotard at st.com wrote:
+> From: Patrice Chotard <patrice.chotard@st.com>
 > 
-> OK, so using perf_invalid_context and "-a" seems to work.
+> Thanks to 332e99d5ae4 which now alerts of default
+> trigger usage when configuring interrupts.
 > 
-> But I must say that I hate that from a user perspective. The user needs to know about
-> the type of PMU behind the event and then provide "-a" or get a "<not supported"
-> as counter value?
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> ---
+>  drivers/pinctrl/pinctrl-st.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> index 99da4cf..b7bb371 100644
+> --- a/drivers/pinctrl/pinctrl-st.c
+> +++ b/drivers/pinctrl/pinctrl-st.c
+> @@ -1512,7 +1512,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+>  	if (info->irqmux_base || gpio_irq > 0) {
+>  		err = gpiochip_irqchip_add(&bank->gpio_chip, &st_gpio_irqchip,
+>  					   0, handle_simple_irq,
+> -					   IRQ_TYPE_LEVEL_LOW);
+> +					   IRQ_TYPE_NONE);
+>  		if (err) {
+>  			gpiochip_remove(&bank->gpio_chip);
+>  			dev_info(dev, "could not add irqchip\n");
+> 
 
-This really boils down to the fact that users really had better know
-what they're on about.
+Hi Linus
 
-There's only so much you can let clueless people do.
+I forgot to mention that this patch is dedicated for v4.9-rcs 
 
-The fact is, they already _manually_ select your (uncore) PMU, so they
-had then better also know what its limitations are.
+Thanks
+
+Patrice
