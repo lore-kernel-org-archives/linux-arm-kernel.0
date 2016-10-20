@@ -1,297 +1,434 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Thu, 20 Oct 2016 19:42:46 -0200
-Subject: [PATCH v3 3/3] mtd: s3c2410: parse the device configuration from OF
- node
-In-Reply-To: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <1476999766-32526-4-git-send-email-sergio.prado@e-labworks.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 20 Oct 2016 22:50:22 +0100
+Subject: [PATCH] drm: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <CAOw6vbK=z3wJKTh8jZoU2Gj1PtTLLH_sAUUShbsxL=Qi7d+FLw@mail.gmail.com>
+References: <E1bwo6l-0005Io-Q1@rmk-PC.armlinux.org.uk>
+ <CAOw6vbK=z3wJKTh8jZoU2Gj1PtTLLH_sAUUShbsxL=Qi7d+FLw@mail.gmail.com>
+Message-ID: <20161020215022.GZ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allows configuring Samsung's s3c2410 memory controller using a
-devicetree.
+On Thu, Oct 20, 2016 at 04:39:04PM -0400, Sean Paul wrote:
+> On Wed, Oct 19, 2016 at 6:28 AM, Russell King
+> <rmk+kernel@armlinux.org.uk> wrote:
+> > Convert DT component matching to use component_match_add_release().
+> >
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > Can we please get this patch from May merged into the drm-misc or
+> > whatever trees so that we don't end up with conflicts?  I've no idea
+> > who looks after drm-misc, as they have _still_ failed to add
+> > themselves to MAINTAINERS.
+> 
+> I think Daniel explained pretty clearly why this wasn't happening in
+> the previous thread.
+> 
+> Next time you send a v2, can you please mark it as such and include a
+> "Changes in v2" section?
 
-Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
----
- drivers/mtd/nand/s3c2410.c                     | 158 ++++++++++++++++++++++---
- include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
- 2 files changed, 143 insertions(+), 16 deletions(-)
+Why - nothing's changed other than a rebase onto 4.9-rc1.  This isn't
+a "I've changed it in XYZ way, so here's a new copy".  It's being
+posted in the hope that someone will finally either comment on it or
+merge the damn thing, rather than ignoring it was done when it was
+last posted.
 
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 371db0d48135..ec170be881bc 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -39,6 +39,8 @@
- #include <linux/slab.h>
- #include <linux/clk.h>
- #include <linux/cpufreq.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/nand.h>
-@@ -185,6 +187,22 @@ struct s3c2410_nand_info {
- #endif
- };
- 
-+struct s3c24XX_nand_devtype_data {
-+	enum s3c_cpu_type type;
-+};
-+
-+static const struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
-+	.type = TYPE_S3C2410,
-+};
-+
-+static const struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
-+	.type = TYPE_S3C2412,
-+};
-+
-+static const struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
-+	.type = TYPE_S3C2440,
-+};
-+
- /* conversion functions */
- 
- static struct s3c2410_nand_mtd *s3c2410_nand_mtd_toours(struct mtd_info *mtd)
-@@ -794,6 +812,30 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
- 	return -ENODEV;
- }
- 
-+static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd,
-+					     const struct nand_data_interface *conf,
-+					     bool check_only)
-+{
-+	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
-+	struct s3c2410_platform_nand *pdata = info->platform;
-+	const struct nand_sdr_timings *timings;
-+	int tacls;
-+
-+	timings = nand_get_sdr_timings(conf);
-+	if (IS_ERR(timings))
-+		return -ENOTSUPP;
-+
-+	tacls = timings->tCLS_min - timings->tWP_min;
-+	if (tacls < 0)
-+		tacls = 0;
-+
-+	pdata->tacls  = DIV_ROUND_UP(tacls, 1000);
-+	pdata->twrph0 = DIV_ROUND_UP(timings->tWP_min, 1000);
-+	pdata->twrph1 = DIV_ROUND_UP(timings->tCLH_min, 1000);
-+
-+	return 0;
-+}
-+
- /**
-  * s3c2410_nand_init_chip - initialise a single instance of an chip
-  * @info: The base NAND controller the chip is on.
-@@ -808,9 +850,12 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
- 				   struct s3c2410_nand_mtd *nmtd,
- 				   struct s3c2410_nand_set *set)
- {
-+	struct device_node *np = info->device->of_node;
- 	struct nand_chip *chip = &nmtd->chip;
- 	void __iomem *regs = info->regs;
- 
-+	nand_set_flash_node(chip, set->of_node);
-+
- 	chip->write_buf    = s3c2410_nand_write_buf;
- 	chip->read_buf     = s3c2410_nand_read_buf;
- 	chip->select_chip  = s3c2410_nand_select_chip;
-@@ -819,6 +864,13 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
- 	chip->options	   = set->options;
- 	chip->controller   = &info->controller;
- 
-+	/*
-+	 * let's keep behavior unchanged for legacy boards booting via pdata and
-+	 * auto-detect timings only when booting with a device tree.
-+	 */
-+	if (np)
-+		chip->setup_data_interface = s3c2410_nand_setup_data_interface;
-+
- 	switch (info->cpu_type) {
- 	case TYPE_S3C2410:
- 		chip->IO_ADDR_W = regs + S3C2410_NFDATA;
-@@ -859,12 +911,9 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
- 	chip->ecc.mode = info->platform->ecc_mode;
- 
- 	/* If you use u-boot BBT creation code, specifying this flag will
--	 * let the kernel fish out the BBT from the NAND, and also skip the
--	 * full NAND scan that can take 1/2s or so. Little things... */
--	if (set->flash_bbt) {
-+	 * let the kernel fish out the BBT from the NAND */
-+	if (set->flash_bbt)
- 		chip->bbt_options |= NAND_BBT_USE_FLASH;
--		chip->options |= NAND_SKIP_BBTSCAN;
--	}
- }
- 
- /**
-@@ -943,6 +992,77 @@ static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
- 		return -EINVAL;
- 	}
- 
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->options |= NAND_SKIP_BBTSCAN;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id s3c24xx_nand_dt_ids[] = {
-+	{
-+		.compatible = "samsung,s3c2410-nand",
-+		.data = &s3c2410_nand_devtype_data,
-+	}, {
-+		.compatible = "samsung,s3c2412-nand", /* also compatible with s3c6400 */
-+		.data = &s3c2412_nand_devtype_data,
-+	}, {
-+		.compatible = "samsung,s3c2440-nand",
-+		.data = &s3c2440_nand_devtype_data,
-+	},
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, s3c24xx_nand_dt_ids);
-+
-+static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
-+{
-+	const struct s3c24XX_nand_devtype_data *devtype_data;
-+	struct s3c2410_platform_nand *pdata;
-+	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
-+	struct device_node *np = pdev->dev.of_node, *child;
-+	struct s3c2410_nand_set *sets;
-+
-+	devtype_data = of_device_get_match_data(&pdev->dev);
-+	if (!devtype_data)
-+		return -ENODEV;
-+
-+	info->cpu_type = devtype_data->type;
-+
-+	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	pdev->dev.platform_data = pdata;
-+
-+	pdata->nr_sets = of_get_child_count(np);
-+	if (!pdata->nr_sets)
-+		return 0;
-+
-+	sets = devm_kzalloc(&pdev->dev, sizeof(*sets) * pdata->nr_sets, GFP_KERNEL);
-+	if (!sets)
-+		return -ENOMEM;
-+
-+	pdata->sets = sets;
-+
-+	for_each_available_child_of_node(np, child) {
-+
-+		sets->name = (char *)child->name;
-+		sets->of_node = child;
-+		sets->nr_chips = 1;
-+
-+		of_node_get(child);
-+
-+		sets++;
-+	}
-+
-+	return 0;
-+}
-+
-+static int s3c24xx_nand_probe_pdata(struct platform_device *pdev)
-+{
-+	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
-+
-+	info->cpu_type = platform_get_device_id(pdev)->driver_data;
-+
- 	return 0;
- }
- 
-@@ -955,8 +1075,7 @@ static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
- */
- static int s3c24xx_nand_probe(struct platform_device *pdev)
- {
--	struct s3c2410_platform_nand *plat = to_nand_plat(pdev);
--	enum s3c_cpu_type cpu_type;
-+	struct s3c2410_platform_nand *plat;
- 	struct s3c2410_nand_info *info;
- 	struct s3c2410_nand_mtd *nmtd;
- 	struct s3c2410_nand_set *sets;
-@@ -966,8 +1085,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 	int nr_sets;
- 	int setno;
- 
--	cpu_type = platform_get_device_id(pdev)->driver_data;
--
- 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
- 	if (info == NULL) {
- 		err = -ENOMEM;
-@@ -989,6 +1106,16 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 
- 	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
- 
-+	if (pdev->dev.of_node)
-+		err = s3c24xx_nand_probe_dt(pdev);
-+	else
-+		err = s3c24xx_nand_probe_pdata(pdev);
-+
-+	if (err)
-+		goto exit_error;
-+
-+	plat = to_nand_plat(pdev);
-+
- 	/* allocate and map the resource */
- 
- 	/* currently we assume we have the one resource */
-@@ -997,7 +1124,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 
- 	info->device	= &pdev->dev;
- 	info->platform	= plat;
--	info->cpu_type	= cpu_type;
- 
- 	info->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(info->regs)) {
-@@ -1007,12 +1133,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 
- 	dev_dbg(&pdev->dev, "mapped registers at %p\n", info->regs);
- 
--	/* initialise the hardware */
--
--	err = s3c2410_nand_inithw(info);
--	if (err != 0)
--		goto exit_error;
--
- 	sets = (plat != NULL) ? plat->sets : NULL;
- 	nr_sets = (plat != NULL) ? plat->nr_sets : 1;
- 
-@@ -1056,6 +1176,11 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 			sets++;
- 	}
- 
-+	/* initialise the hardware */
-+	err = s3c2410_nand_inithw(info);
-+	if (err != 0)
-+		goto exit_error;
-+
- 	err = s3c2410_nand_cpufreq_register(info);
- 	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to init cpufreq support\n");
-@@ -1156,6 +1281,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
- 	.id_table	= s3c24xx_driver_ids,
- 	.driver		= {
- 		.name	= "s3c24xx-nand",
-+		.of_match_table = s3c24xx_nand_dt_ids,
- 	},
- };
- 
-diff --git a/include/linux/platform_data/mtd-nand-s3c2410.h b/include/linux/platform_data/mtd-nand-s3c2410.h
-index 729af13d1773..f01659026b26 100644
---- a/include/linux/platform_data/mtd-nand-s3c2410.h
-+++ b/include/linux/platform_data/mtd-nand-s3c2410.h
-@@ -40,6 +40,7 @@ struct s3c2410_nand_set {
- 	char			*name;
- 	int			*nr_map;
- 	struct mtd_partition	*partitions;
-+	struct device_node	*of_node;
- };
- 
- struct s3c2410_platform_nand {
+> >  drivers/gpu/drm/arm/hdlcd_drv.c                 |  3 ++-
+> >  drivers/gpu/drm/arm/malidp_drv.c                |  4 +++-
+> >  drivers/gpu/drm/armada/armada_drv.c             |  2 +-
+> >  drivers/gpu/drm/drm_of.c                        | 28 +++++++++++++++++++++++--
+> >  drivers/gpu/drm/etnaviv/etnaviv_drv.c           |  5 +++--
+> >  drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c |  7 ++++---
+> >  drivers/gpu/drm/mediatek/mtk_drm_drv.c          |  4 +++-
+> >  drivers/gpu/drm/msm/msm_drv.c                   | 12 ++++++-----
+> >  drivers/gpu/drm/rockchip/rockchip_drm_drv.c     |  6 ++++--
+> >  drivers/gpu/drm/sti/sti_drv.c                   |  5 +++--
+> >  drivers/gpu/drm/sun4i/sun4i_drv.c               |  3 ++-
+> >  drivers/gpu/drm/tilcdc/tilcdc_external.c        |  4 +++-
+> >  include/drm/drm_of.h                            | 12 +++++++++++
+> >  13 files changed, 73 insertions(+), 22 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+> > index fb6a418ce6be..6477d1a65266 100644
+> > --- a/drivers/gpu/drm/arm/hdlcd_drv.c
+> > +++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+> > @@ -453,7 +453,8 @@ static int hdlcd_probe(struct platform_device *pdev)
+> >                 return -EAGAIN;
+> >         }
+> >
+> > -       component_match_add(&pdev->dev, &match, compare_dev, port);
+> > +       drm_of_component_match_add(&pdev->dev, &match, compare_dev, port);
+> > +       of_node_put(port);
+> 
+> There's no mention in your commit message about fixing these node leaks.
+
+Isn't that kind-of the whole point of this patch?
+
+> >
+> >         return component_master_add_with_match(&pdev->dev, &hdlcd_master_ops,
+> >                                                match);
+> > diff --git a/drivers/gpu/drm/arm/malidp_drv.c b/drivers/gpu/drm/arm/malidp_drv.c
+> > index 9280358b8f15..9f4739452a25 100644
+> > --- a/drivers/gpu/drm/arm/malidp_drv.c
+> > +++ b/drivers/gpu/drm/arm/malidp_drv.c
+> > @@ -493,7 +493,9 @@ static int malidp_platform_probe(struct platform_device *pdev)
+> >                 return -EAGAIN;
+> >         }
+> >
+> > -       component_match_add(&pdev->dev, &match, malidp_compare_dev, port);
+> > +       drm_of_component_match_add(&pdev->dev, &match, malidp_compare_dev,
+> > +                                  port);
+> > +       of_node_put(port);
+> >         return component_master_add_with_match(&pdev->dev, &malidp_master_ops,
+> >                                                match);
+> >  }
+> > diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+> > index 1e0e68f608e4..94e46da9a758 100644
+> > --- a/drivers/gpu/drm/armada/armada_drv.c
+> > +++ b/drivers/gpu/drm/armada/armada_drv.c
+> > @@ -254,7 +254,7 @@ static void armada_add_endpoints(struct device *dev,
+> >                         continue;
+> >                 }
+> >
+> > -               component_match_add(dev, match, compare_of, remote);
+> > +               drm_of_component_match_add(dev, match, compare_of, remote);
+> >                 of_node_put(remote);
+> >         }
+> >  }
+> > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> > index bc98bb94264d..47848ed8ca48 100644
+> > --- a/drivers/gpu/drm/drm_of.c
+> > +++ b/drivers/gpu/drm/drm_of.c
+> > @@ -6,6 +6,11 @@
+> >  #include <drm/drm_crtc.h>
+> >  #include <drm/drm_of.h>
+> >
+> > +static void drm_release_of(struct device *dev, void *data)
+> > +{
+> > +       of_node_put(data);
+> > +}
+> > +
+> >  /**
+> >   * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
+> >   * @dev: DRM device
+> > @@ -64,6 +69,24 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> >
+> >  /**
+> > + * drm_of_component_match_add - Add a component helper OF node match rule
+> > + * @master: master device
+> > + * @matchptr: component match pointer
+> > + * @compare: compare function used for matching component
+> > + * @node: of_node
+> > + */
+> > +void drm_of_component_match_add(struct device *master,
+> > +                               struct component_match **matchptr,
+> > +                               int (*compare)(struct device *, void *),
+> > +                               struct device_node *node)
+> > +{
+> > +       of_node_get(node);
+> > +       component_match_add_release(master, matchptr, drm_release_of,
+> > +                                   compare, node);
+> > +}
+> > +EXPORT_SYMBOL_GPL(drm_of_component_match_add);
+> > +
+> > +/**
+> >   * drm_of_component_probe - Generic probe function for a component based master
+> >   * @dev: master device containing the OF node
+> >   * @compare_of: compare function used for matching components
+> > @@ -101,7 +124,7 @@ int drm_of_component_probe(struct device *dev,
+> >                         continue;
+> >                 }
+> >
+> > -               component_match_add(dev, &match, compare_of, port);
+> > +               drm_of_component_match_add(dev, &match, compare_of, port);
+> >                 of_node_put(port);
+> >         }
+> >
+> > @@ -140,7 +163,8 @@ int drm_of_component_probe(struct device *dev,
+> >                                 continue;
+> >                         }
+> >
+> > -                       component_match_add(dev, &match, compare_of, remote);
+> > +                       drm_of_component_match_add(dev, &match, compare_of,
+> > +                                                  remote);
+> >                         of_node_put(remote);
+> >                 }
+> >                 of_node_put(port);
+> > diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > index aa687669e22b..0dee6acbd880 100644
+> > --- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > +++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> > @@ -16,6 +16,7 @@
+> >
+> >  #include <linux/component.h>
+> >  #include <linux/of_platform.h>
+> > +#include <drm/drm_of.h>
+> >
+> >  #include "etnaviv_drv.h"
+> >  #include "etnaviv_gpu.h"
+> > @@ -629,8 +630,8 @@ static int etnaviv_pdev_probe(struct platform_device *pdev)
+> >                         if (!core_node)
+> >                                 break;
+> >
+> > -                       component_match_add(&pdev->dev, &match, compare_of,
+> > -                                           core_node);
+> > +                       drm_of_component_match_add(&pdev->dev, &match,
+> > +                                                  compare_of, core_node);
+> >                         of_node_put(core_node);
+> >                 }
+> >         } else if (dev->platform_data) {
+> > diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+> > index 90377a609c98..e88fde18c946 100644
+> > --- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+> > +++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+> > @@ -24,6 +24,7 @@
+> >  #include <drm/drm_fb_cma_helper.h>
+> >  #include <drm/drm_atomic_helper.h>
+> >  #include <drm/drm_crtc_helper.h>
+> > +#include <drm/drm_of.h>
+> >
+> >  #include "kirin_drm_drv.h"
+> >
+> > @@ -260,14 +261,13 @@ static struct device_node *kirin_get_remote_node(struct device_node *np)
+> >                 DRM_ERROR("no valid endpoint node\n");
+> >                 return ERR_PTR(-ENODEV);
+> >         }
+> > -       of_node_put(endpoint);
+> >
+> >         remote = of_graph_get_remote_port_parent(endpoint);
+> > +       of_node_put(endpoint);
+> 
+> Another bug that's being fixed without mention in the commit.
+> 
+> >         if (!remote) {
+> >                 DRM_ERROR("no valid remote node\n");
+> >                 return ERR_PTR(-ENODEV);
+> >         }
+> > -       of_node_put(remote);
+> >
+> >         if (!of_device_is_available(remote)) {
+> >                 DRM_ERROR("not available for remote node\n");
+> > @@ -294,7 +294,8 @@ static int kirin_drm_platform_probe(struct platform_device *pdev)
+> >         if (IS_ERR(remote))
+> >                 return PTR_ERR(remote);
+> >
+> > -       component_match_add(dev, &match, compare_of, remote);
+> > +       drm_of_component_match_add(dev, &match, compare_of, remote);
+> > +       of_node_put(remote);
+> >
+> >         return component_master_add_with_match(dev, &kirin_drm_ops, match);
+> >
+> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > index cf83f6507ec8..9c5430fb82a2 100644
+> > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+> > @@ -18,6 +18,7 @@
+> >  #include <drm/drm_crtc_helper.h>
+> >  #include <drm/drm_gem.h>
+> >  #include <drm/drm_gem_cma_helper.h>
+> > +#include <drm/drm_of.h>
+> >  #include <linux/component.h>
+> >  #include <linux/iommu.h>
+> >  #include <linux/of_address.h>
+> > @@ -415,7 +416,8 @@ static int mtk_drm_probe(struct platform_device *pdev)
+> >                     comp_type == MTK_DPI) {
+> >                         dev_info(dev, "Adding component match for %s\n",
+> >                                  node->full_name);
+> > -                       component_match_add(dev, &match, compare_of, node);
+> > +                       drm_of_component_match_add(dev, &match, compare_of,
+> > +                                                  node);
+> >                 } else {
+> >                         struct mtk_ddp_comp *comp;
+> >
+> > diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
+> > index fb5c0b0a7594..84d38eaea585 100644
+> > --- a/drivers/gpu/drm/msm/msm_drv.c
+> > +++ b/drivers/gpu/drm/msm/msm_drv.c
+> > @@ -15,6 +15,8 @@
+> >   * this program.  If not, see <http://www.gnu.org/licenses/>.
+> >   */
+> >
+> > +#include <drm/drm_of.h>
+> > +
+> >  #include "msm_drv.h"
+> >  #include "msm_debugfs.h"
+> >  #include "msm_fence.h"
+> > @@ -919,8 +921,8 @@ static int add_components_mdp(struct device *mdp_dev,
+> >                         continue;
+> >                 }
+> >
+> > -               component_match_add(master_dev, matchptr, compare_of, intf);
+> > -
+> > +               drm_of_component_match_add(master_dev, matchptr, compare_of,
+> > +                                          intf);
+> >                 of_node_put(intf);
+> >                 of_node_put(ep_node);
+> >         }
+> > @@ -962,8 +964,8 @@ static int add_display_components(struct device *dev,
+> >                 put_device(mdp_dev);
+> >
+> >                 /* add the MDP component itself */
+> > -               component_match_add(dev, matchptr, compare_of,
+> > -                                   mdp_dev->of_node);
+> > +               drm_of_component_match_add(dev, matchptr, compare_of,
+> > +                                          mdp_dev->of_node);
+> >         } else {
+> >                 /* MDP4 */
+> >                 mdp_dev = dev;
+> > @@ -996,7 +998,7 @@ static int add_gpu_components(struct device *dev,
+> >         if (!np)
+> >                 return 0;
+> >
+> > -       component_match_add(dev, matchptr, compare_of, np);
+> > +       drm_of_component_match_add(dev, matchptr, compare_of, np);
+> >
+> >         of_node_put(np);
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > index 8c8cbe837e61..6fe161192bb4 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> > @@ -20,6 +20,7 @@
+> >  #include <drm/drm_crtc_helper.h>
+> >  #include <drm/drm_fb_helper.h>
+> >  #include <drm/drm_gem_cma_helper.h>
+> > +#include <drm/drm_of.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/pm_runtime.h>
+> >  #include <linux/module.h>
+> > @@ -388,7 +389,7 @@ static void rockchip_add_endpoints(struct device *dev,
+> >                         continue;
+> >                 }
+> >
+> > -               component_match_add(dev, match, compare_of, remote);
+> > +               drm_of_component_match_add(dev, match, compare_of, remote);
+> >                 of_node_put(remote);
+> >         }
+> >  }
+> > @@ -437,7 +438,8 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+> >                 }
+> >
+> >                 of_node_put(iommu);
+> > -               component_match_add(dev, &match, compare_of, port->parent);
+> > +               drm_of_component_match_add(dev, &match, compare_of,
+> > +                                          port->parent);
+> >                 of_node_put(port);
+> >         }
+> >
+> > diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
+> > index 2784919a7366..5e819876e642 100644
+> > --- a/drivers/gpu/drm/sti/sti_drv.c
+> > +++ b/drivers/gpu/drm/sti/sti_drv.c
+> > @@ -17,6 +17,7 @@
+> >  #include <drm/drm_crtc_helper.h>
+> >  #include <drm/drm_gem_cma_helper.h>
+> >  #include <drm/drm_fb_cma_helper.h>
+> > +#include <drm/drm_of.h>
+> >
+> >  #include "sti_crtc.h"
+> >  #include "sti_drv.h"
+> > @@ -423,8 +424,8 @@ static int sti_platform_probe(struct platform_device *pdev)
+> >         child_np = of_get_next_available_child(node, NULL);
+> >
+> >         while (child_np) {
+> > -               component_match_add(dev, &match, compare_of, child_np);
+> > -               of_node_put(child_np);
+> > +               drm_of_component_match_add(dev, &match, compare_of,
+> > +                                          child_np);
+> >                 child_np = of_get_next_available_child(node, child_np);
+> >         }
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > index 0da9862ad8ed..b3c4ad605e81 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > @@ -18,6 +18,7 @@
+> >  #include <drm/drm_fb_cma_helper.h>
+> >  #include <drm/drm_gem_cma_helper.h>
+> >  #include <drm/drm_fb_helper.h>
+> > +#include <drm/drm_of.h>
+> >
+> >  #include "sun4i_crtc.h"
+> >  #include "sun4i_drv.h"
+> > @@ -239,7 +240,7 @@ static int sun4i_drv_add_endpoints(struct device *dev,
+> >                 /* Add current component */
+> >                 DRM_DEBUG_DRIVER("Adding component %s\n",
+> >                                  of_node_full_name(node));
+> > -               component_match_add(dev, match, compare_of, node);
+> > +               drm_of_component_match_add(dev, match, compare_of, node);
+> >                 count++;
+> >         }
+> >
+> > diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.c b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> > index 68e895021005..06a4c584f3cb 100644
+> > --- a/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> > +++ b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> > @@ -10,6 +10,7 @@
+> >
+> >  #include <linux/component.h>
+> >  #include <linux/of_graph.h>
+> > +#include <drm/drm_of.h>
+> >
+> >  #include "tilcdc_drv.h"
+> >  #include "tilcdc_external.h"
+> > @@ -160,7 +161,8 @@ int tilcdc_get_external_components(struct device *dev,
+> >
+> >                 dev_dbg(dev, "Subdevice node '%s' found\n", node->name);
+> >                 if (match)
+> > -                       component_match_add(dev, match, dev_match_of, node);
+> > +                       drm_of_component_match_add(dev, match, dev_match_of,
+> > +                                                  node);
+> >                 of_node_put(node);
+> >                 count++;
+> >         }
+> > diff --git a/include/drm/drm_of.h b/include/drm/drm_of.h
+> > index 3fd87b386ed7..d6b4c5587bbe 100644
+> > --- a/include/drm/drm_of.h
+> > +++ b/include/drm/drm_of.h
+> > @@ -4,6 +4,7 @@
+> >  #include <linux/of_graph.h>
+> >
+> >  struct component_master_ops;
+> > +struct component_match;
+> >  struct device;
+> >  struct drm_device;
+> >  struct drm_encoder;
+> > @@ -12,6 +13,10 @@ struct device_node;
+> >  #ifdef CONFIG_OF
+> >  extern uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >                                            struct device_node *port);
+> > +extern void drm_of_component_match_add(struct device *master,
+> > +                                      struct component_match **matchptr,
+> > +                                      int (*compare)(struct device *, void *),
+> > +                                      struct device_node *node);
+> >  extern int drm_of_component_probe(struct device *dev,
+> >                                   int (*compare_of)(struct device *, void *),
+> >                                   const struct component_master_ops *m_ops);
+> > @@ -25,6 +30,13 @@ static inline uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >         return 0;
+> >  }
+> >
+> > +static void drm_of_component_match_add(struct device *master,
+> > +                                      struct component_match **matchptr,
+> > +                                      int (*compare)(struct device *, void *),
+> > +                                      struct device_node *node)
+> > +{
+> > +}
+> > +
+> >  static inline int
+> >  drm_of_component_probe(struct device *dev,
+> >                        int (*compare_of)(struct device *, void *),
+> > --
+> > 2.1.0
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
