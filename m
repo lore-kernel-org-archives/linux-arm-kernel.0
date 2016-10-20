@@ -1,35 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Oct 2016 11:24:59 +0200
-Subject: [PATCH v3 0/11] Add R8A7743/SK-RZG1M board support
-In-Reply-To: <cea44556-a578-fb54-11b8-f21f5b991caa@cogentembedded.com>
-References: <2056698.ncAHq8vRQ3@wasted.cogentembedded.com>
- <5be99d76-a082-129b-1aa6-b6f7402ae79b@cogentembedded.com>
- <20161012080905.GD31183@verge.net.au>
- <cea44556-a578-fb54-11b8-f21f5b991caa@cogentembedded.com>
-Message-ID: <20161020092459.GM4612@verge.net.au>
+From: jglauber@cavium.com (Jan Glauber)
+Date: Thu, 20 Oct 2016 11:30:36 +0200
+Subject: [PATCH v3 0/5] Cavium ThunderX uncore PMU support
+Message-ID: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 12, 2016 at 11:29:56AM +0300, Sergei Shtylyov wrote:
-> On 10/12/2016 11:09 AM, Simon Horman wrote:
-> 
-> >>>  Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
-> >>>'renesas-devel-20161003-v4.8' tag. I'm adding the device tree support for
-> >>>the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
-> >>>seems identical to the R8A7791/Porter board. The device tree patches depend on
-> >>>the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
-> >>
-> >>   Forgot to mention that this version causes a regression with the sh_eth
-> >>driver (well, actually with phylib): since IRQC now gets a deferred probing,
-> >>PHY IRQ doesn't work anymore -- phylib falls back to polling.
-> >
-> >Is there a resolution to that problem?
-> 
->    Geert has posted his IRQC driver patch recently. Not sure if it was
-> intended for merging but it solves the issue.
+Sorry for the long time it took for re-cooking this patch set.
+The v3 should address all of Marks previous comments, things I didn't
+change are listed below.
 
-Ok. I think it is ok to merge support for a new board even if there are
-problems as its not regressing (can't break something that previously
-didn't exist imho). But of course it would be best if things did work.
+Not changed:
+- Stick to NUMA node ID to detect the socket a device belongs to but made
+  uncore depend on CONFIG_NUMA.
+- Stick to initcall for uncore framework because it is easier to do the
+  scanning for the same type of PCI devices, also I don't know if the PCI layer
+  would allow for several drivers to register for the same device ID.
 
-Geert, do you have any comments on the relevance of your IRQC driver patch?
+Note:
+I'm using perf_sw_context in difference to perf_invalid_context
+(see WARN_ON in perf_pmu_register). Reason is that with perf_invalid_context
+add() is never called and the counter results are shown as "unsupported" by
+perf. With perf_sw_context everything works as expected.
+
+Patches are against 4.9.0-rc1
+
+Changes to v2:
+- Embedded struct pmu and killed uncore->type
+- Simplified add functions
+- Unified functions where possible into a common implementation
+- Use arrays to translate non-contiguous counter addresses to event_id's
+  visible to the user
+- Sorted includes
+- Got rid of division for previous counter values
+- Removed unneeded WARN_ONs
+- Use sizeof(*ptr)
+- Use bool for event_valid return
+- Fixed HES_STOPPED logic
+- Added some design notes and improved (hopefully) comments
+- Removed pass1 counter support for now
+- Merged EVENT_ATTR and EVENT_PTR defines into one (unreadable) thing
+- Use pmu_enable|disable to start|stop the OCX TLK counter set
+- Moved cpumask into thunder_uncore struct
+- Switched to new cpuhp stuff. I still don't care about the CPU location
+  used to access an uncore device, it may cross the CCPI and
+  we'll pay a performance penalty. We might optimize this later, for now
+  I feel it is not worth the time optimizing it.
+
+------------------------
+
+Jan Glauber (5):
+  arm64: perf: Basic uncore counter support for Cavium ThunderX SOC
+  arm64: perf: Cavium ThunderX L2C TAD uncore support
+  arm64: perf: Cavium ThunderX L2C CBC uncore support
+  arm64: perf: Cavium ThunderX LMC uncore support
+  arm64: perf: Cavium ThunderX OCX TLK uncore support
+
+ drivers/perf/Kconfig                        |  13 +
+ drivers/perf/Makefile                       |   1 +
+ drivers/perf/uncore/Makefile                |   5 +
+ drivers/perf/uncore/uncore_cavium.c         | 355 ++++++++++++++++++++++++++
+ drivers/perf/uncore/uncore_cavium.h         |  75 ++++++
+ drivers/perf/uncore/uncore_cavium_l2c_cbc.c | 148 +++++++++++
+ drivers/perf/uncore/uncore_cavium_l2c_tad.c | 379 ++++++++++++++++++++++++++++
+ drivers/perf/uncore/uncore_cavium_lmc.c     | 118 +++++++++
+ drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 344 +++++++++++++++++++++++++
+ include/linux/cpuhotplug.h                  |   1 +
+ 10 files changed, 1439 insertions(+)
+ create mode 100644 drivers/perf/uncore/Makefile
+ create mode 100644 drivers/perf/uncore/uncore_cavium.c
+ create mode 100644 drivers/perf/uncore/uncore_cavium.h
+ create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_cbc.c
+ create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_tad.c
+ create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
+ create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+
+-- 
+1.9.1
