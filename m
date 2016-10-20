@@ -1,27 +1,18 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Oct 2016 14:57:57 +0200
-Subject: [PATCH v2 8/9] ARM: sunxi: Remove useless allwinner, pull property
-In-Reply-To: <b643d1e525835365a6ae63bcd065cb3650a839d6.1476200742.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
- <b643d1e525835365a6ae63bcd065cb3650a839d6.1476200742.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdbNVPobGYK5xpj9RMLS6goQo5+SHsPRNOGnsHNmWiv9ww@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 20 Oct 2016 05:59:41 -0700
+Subject: [PATCHv4 09/15] clk: ti: move omap2_init_clk_clkdm under TI
+ clock driver
+In-Reply-To: <1476805568-19264-10-git-send-email-t-kristo@ti.com>
+References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+ <1476805568-19264-10-git-send-email-t-kristo@ti.com>
+Message-ID: <20161020125941.msiqaruuefbomquo@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 5:46 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+* Tero Kristo <t-kristo@ti.com> [161018 08:47]:
+> This is not needed outside the driver, so move it inside it and remove
+> the prototype from the public header also.
 
-> The allwinner,pull property set to NO_PULL was really considered our
-> default (and wasn't even changing the default value in the code).
->
-> Remove these properties to make it obvious that we do not set anything in
-> such a case.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Looks safe to merge along with the other clock patches:
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Please merge this through the ARM SoC tree.
-
-Yours,
-Linus Walleij
+Acked-by: Tony Lindgren <tony@atomide.com>
