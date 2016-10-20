@@ -1,34 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Oct 2016 16:17:33 +0100
-Subject: [PATCH v14 0/9] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20161020145752.GC8731@red-moon>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <20161020143101.GI10234@leverpostej>
- <20161020145752.GC8731@red-moon>
-Message-ID: <20161020151655.GA27598@leverpostej>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 20 Oct 2016 23:17:53 +0800
+Subject: [linux-sunxi] [PATCH v4 9/9] arm64: dts: add Pine64 support
+In-Reply-To: <0ceb2e4d03b16b3c7edf1550ba4a79fbbfac925b.1476196031.git-series.maxime.ripard@free-electrons.com>
+References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
+ <0ceb2e4d03b16b3c7edf1550ba4a79fbbfac925b.1476196031.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64BxfJbHBL0Lrkf3hRuRsM6KrPR2PAKQsPKa+eeLnk3SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 03:57:52PM +0100, Lorenzo Pieralisi wrote:
-> On Thu, Oct 20, 2016 at 03:31:01PM +0100, Mark Rutland wrote:
-> > Hi,
-> > 
-> > On Thu, Sep 29, 2016 at 02:17:08AM +0800, fu.wei at linaro.org wrote:
-> > > From: Fu Wei <fu.wei@linaro.org>
-> > 
-> > > This patchset depends on the following patchset:
-> > > [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial support
-> > > https://lkml.org/lkml/2016/9/12/949
-> > 
-> > Is there a branch with these anywhere? I wasn't Cc'd on those and it's
-> > rather difficult to get at the series from an LKML link.
-> 
-> For the records, the dependency above has now been merged and it was
-> just a directory creation dependency (drivers/acpi/arm64, where some of
-> the code in this series will live).
+On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+>
+> The Pine64 is a cost-efficient development board based on the
+> Allwinner A64 SoC.
+> There are three models: the basic version with Fast Ethernet and
+> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
+> feature Gigabit Ethernet and additional connectors for touchscreens
+> and a camera. Or as my son put it: "Those are smaller and these are
+> missing." ;-)
+> The two Pine64+ models just differ in the amount of DRAM
+> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
+> patches the DT accordingly we just need to provide one DT for the
+> Pine64+.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> [Maxime: Removed the common DTSI and include directly the pine64 DTS]
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Ah, I see. That saves us all some trouble, then. :)
-
-Thanks,
-Mark.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
