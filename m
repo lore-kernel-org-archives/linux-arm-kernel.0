@@ -1,24 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Oct 2016 13:53:49 +0200
-Subject: [PATCH 6/8] pinctrl: aspeed-g4: Capture SuperIO pinmux dependency
-In-Reply-To: <b5f67ba76018314d08e240f95951751896687d37.1474986045.git-series.andrew@aj.id.au>
-References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
- <b5f67ba76018314d08e240f95951751896687d37.1474986045.git-series.andrew@aj.id.au>
-Message-ID: <CACRpkdYLDesENtq2cQBrWQeL6NH+mO_N5Z=e9=gsoZSCE85Jag@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Thu, 20 Oct 2016 12:56:50 +0100
+Subject: [PATCH] pinctrl: st: don't specify default interrupt trigger
+In-Reply-To: <729ebc94-5476-65a7-cc17-eabfba0d2404@st.com>
+References: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
+ <729ebc94-5476-65a7-cc17-eabfba0d2404@st.com>
+Message-ID: <20161020115650.GA8848@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 27, 2016 at 4:50 PM, Andrew Jeffery <andrew@aj.id.au> wrote:
+Hi Patrice,
 
-> Two LPC-related signals in the AST2400 depend on state in the SuperIO IP
-> block. Use the recently added infrastructure to capture this
-> relationship.
->
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+On Thu, 20 Oct 2016, Patrice Chotard wrote:
 
-Patch applied for v4.10.
-(Tell me if I'm applying patches in wrong order or something, and
-I hope this doesn't clash with the fixes.)
+> 
+> 
+> On 10/18/2016 09:16 AM, patrice.chotard at st.com wrote:
+> > From: Patrice Chotard <patrice.chotard@st.com>
+> > 
+> > Thanks to 332e99d5ae4 which now alerts of default
+> > trigger usage when configuring interrupts.
+> > 
+> > Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> > ---
+> >  drivers/pinctrl/pinctrl-st.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
+> > index 99da4cf..b7bb371 100644
+> > --- a/drivers/pinctrl/pinctrl-st.c
+> > +++ b/drivers/pinctrl/pinctrl-st.c
+> > @@ -1512,7 +1512,7 @@ static int st_gpiolib_register_bank(struct st_pinctrl *info,
+> >  	if (info->irqmux_base || gpio_irq > 0) {
+> >  		err = gpiochip_irqchip_add(&bank->gpio_chip, &st_gpio_irqchip,
+> >  					   0, handle_simple_irq,
+> > -					   IRQ_TYPE_LEVEL_LOW);
+> > +					   IRQ_TYPE_NONE);
+> >  		if (err) {
+> >  			gpiochip_remove(&bank->gpio_chip);
+> >  			dev_info(dev, "could not add irqchip\n");
+> > 
+> 
+> Hi Linus
+> 
+> I forgot to mention that this patch is dedicated for v4.9-rcs 
 
-Yours,
-Linus Walleij
+Wow, v4.9-rc is a noisy boot without this patch :)
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
