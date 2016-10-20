@@ -1,101 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 20 Oct 2016 11:43:31 +0100
-Subject: [PATCH v2] arm64: Add support for additional relocations in the kexec
- purgatory code
-Message-ID: <1476960211-25594-1-git-send-email-catalin.marinas@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Oct 2016 11:44:18 +0100
+Subject: [PATCH v3 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20161020103707.GB3175@twins.programming.kicks-ass.net>
+References: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
+ <20161020103707.GB3175@twins.programming.kicks-ass.net>
+Message-ID: <20161020104417.GD10234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When compiling the kexec-tools with gcc6, the following additional
-reolcations are generated in the purgatory.ro file:
+On Thu, Oct 20, 2016 at 12:37:07PM +0200, Peter Zijlstra wrote:
+> On Thu, Oct 20, 2016 at 11:30:36AM +0200, Jan Glauber wrote:
+> > Note:
+> > I'm using perf_sw_context in difference to perf_invalid_context
+> > (see WARN_ON in perf_pmu_register). Reason is that with perf_invalid_context
+> > add() is never called and the counter results are shown as "unsupported" by
+> > perf. With perf_sw_context everything works as expected.
+> 
+> What?! All the uncore PMUs use perf_invalid_context. What doesn't work
+> for you?
 
-R_AARCH64_ADR_PREL_PG_HI21
-R_AARCH64_ADD_ABS_LO12_NC
-R_AARCH64_LDST64_ABS_LO12_NC
+I think there's general confusion over the use of invalid context.
+Perhaps we could clear that up with:
 
-This patch modifies the arm64 machine_apply_elf_rel() function to handle
-these relocations.
+#define perf_uncore_context	perf_invalid_context
 
-Cc: Geoff Levand <geoff@infradead.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
+and
 
-Changes for v2:
-- Fixed the type string to drop the "R_AARCH64_" prefix
+s/perf_hw_context/perf_cpu_hw_context/
 
- kexec/arch/arm64/kexec-arm64.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index 2e8839a..e067a23 100644
---- a/kexec/arch/arm64/kexec-arm64.c
-+++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -550,6 +550,14 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- # define R_AARCH64_ADR_PREL_LO21 274
- #endif
- 
-+#if !defined(R_AARCH64_ADR_PREL_PG_HI21)
-+# define R_AARCH64_ADR_PREL_PG_HI21 275
-+#endif
-+
-+#if !defined(R_AARCH64_ADD_ABS_LO12_NC)
-+# define R_AARCH64_ADD_ABS_LO12_NC 277
-+#endif
-+
- #if !defined(R_AARCH64_JUMP26)
- # define R_AARCH64_JUMP26 282
- #endif
-@@ -558,10 +566,15 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- # define R_AARCH64_CALL26 283
- #endif
- 
-+#if !defined(R_AARCH64_LDST64_ABS_LO12_NC)
-+# define R_AARCH64_LDST64_ABS_LO12_NC 286
-+#endif
-+
- 	uint64_t *loc64;
- 	uint32_t *loc32;
- 	uint64_t *location = (uint64_t *)ptr;
- 	uint64_t data = *location;
-+	uint64_t imm;
- 	const char *type = NULL;
- 
- 	switch(r_type) {
-@@ -585,6 +598,19 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- 		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
- 			+ (((value - address) << 3) & 0xffffe0));
- 		break;
-+	case R_AARCH64_ADR_PREL_PG_HI21:
-+		type = "ADR_PREL_PG_HI21";
-+		imm = ((value & ~0xfff) - (address & ~0xfff)) >> 12;
-+		loc32 = ptr;
-+		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+			+ ((imm & 3) << 29) + ((imm & 0x1ffffc) << (5 - 2)));
-+		break;
-+	case R_AARCH64_ADD_ABS_LO12_NC:
-+		type = "ADD_ABS_LO12_NC";
-+		loc32 = ptr;
-+		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+			+ ((value & 0xfff) << 10));
-+		break;
- 	case R_AARCH64_JUMP26:
- 		type = "JUMP26";
- 		loc32 = ptr;
-@@ -597,6 +623,15 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- 		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
- 			+ (((value - address) >> 2) & 0x3ffffff));
- 		break;
-+	case R_AARCH64_LDST64_ABS_LO12_NC:
-+		if (value & 7)
-+			die("%s: ERROR Unaligned value: %lx\n", __func__,
-+				value);
-+		type = "LDST64_ABS_LO12_NC";
-+		loc32 = ptr;
-+		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+			+ ((value & 0xff8) << (10 - 3)));
-+		break;
- 	default:
- 		die("%s: ERROR Unknown type: %lu\n", __func__, r_type);
- 		break;
--- 
-2.10.0
+Mark.
