@@ -1,34 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Oct 2016 14:52:54 +0200
-Subject: [PATCH v2 4/9] pinctrl: sunxi: Deal with configless pins
-In-Reply-To: <20161019121614.3crr76qyexhamjiy@lukather>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
- <d707c657502b87a7f8e70c7b44492bc95939f9f6.1476200742.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v64gBi71W=+Tu2vz94xFDtuRNHUyVWK3ken8CSOWvK5t0g@mail.gmail.com>
- <20161019121614.3crr76qyexhamjiy@lukather>
-Message-ID: <CACRpkdY3+OnQ6Oo_nx+BrWebeTa=kYhHWSzirk1MxfWWJ--0Sg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 20 Oct 2016 13:55:11 +0100
+Subject: [PATCH 2/2] arm64/numa: fix incorrect print of end_pfn
+In-Reply-To: <5808B6D1.809@huawei.com>
+References: <1476935576-59941-1-git-send-email-guohanjun@huawei.com>
+ <1476935576-59941-2-git-send-email-guohanjun@huawei.com>
+ <20161020105130.GD24914@arm.com> <5808B6D1.809@huawei.com>
+Message-ID: <20161020125511.GG10234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 2:16 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Oct 18, 2016 at 03:47:03PM +0800, Chen-Yu Tsai wrote:
->> > @@ -342,6 +365,8 @@ static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
->> >                                     struct pinctrl_map *map,
->> >                                     unsigned num_maps)
->> >  {
->> > +       unsigned long *pinconfig;
->>
->> This looks out of place and context?
->
-> Yeah, sorry, it's just a leftover from the previous version. This has
-> been removed.
+On Thu, Oct 20, 2016 at 08:21:37PM +0800, Hanjun Guo wrote:
+> On 2016/10/20 18:51, Will Deacon wrote:
+> > On Thu, Oct 20, 2016 at 11:52:56AM +0800, Hanjun Guo wrote:
+> >> From: Hanjun Guo <hanjun.guo@linaro.org>
+> >>
+> >> When booting on NUMA system with memory-less node (no
+> >> memory dimm on this memory controller), the print
+> >> for setup_node_data() is incorrect:
+> >>
+> >> NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+> >>
+> >> It should be 0, not 0xffffffffffffffff as there is
+> >> no memory on that node.
+> > Wouldn't it make more sense to print something useful, like "memory-less
+> > node"?
+> 
+> in the log,
+> 
+> [    0.000000] NUMA: Initmem setup node 0 [mem 0x00000000-0x13fbffffff]
+> [    0.000000] NUMA: NODE_DATA [mem 0x13fbffe500-0x13fbffffff]
+> [    0.000000] NUMA: Initmem setup node 1 [mem 0x1400000000-0x17fbffffff]
+> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfec500-0x17fbfedfff]
+> [    0.000000] NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfeaa00-0x17fbfec4ff]
+> [    0.000000] NUMA: NODE_DATA(2) on node 1
+> [    0.000000] NUMA: Initmem setup node 3 [mem 0x00000000-0xffffffffffffffff]
+> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfe8f00-0x17fbfea9ff]
+> [    0.000000] NUMA: NODE_DATA(3) on node 1
+> 
+> if printing "NUMA: Initmem setup node 2 [mem 0x00000000-0x00000000]",
 
-Do you mean you will send a v3 of this series?
+Seeing "NUMA: Initmem setup node 2 [<memoryless node>]" would be far
+more obvious as a memoryless node, and I don't see that this would be
+inconsistent.
 
-OK stopping to apply then.
-
-But I have already applied patches 1, 2 and 3 so just resend the rest :)
-
-Yours,
-Linus Walleij
+Thanks,
+Mark.
