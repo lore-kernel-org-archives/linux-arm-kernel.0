@@ -1,43 +1,96 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Oct 2016 11:43:43 +0800
-Subject: [PATCH v2 7/8] ARM: dts: sun6i: Add A31 LCD0 RGB888 pins
+Date: Thu, 20 Oct 2016 11:43:44 +0800
+Subject: [PATCH v2 8/8] ARM: dts: sun6i: hummingbird-a31: Enable display
+ output through VGA bridge
 In-Reply-To: <20161020034344.14154-1-wens@csie.org>
 References: <20161020034344.14154-1-wens@csie.org>
-Message-ID: <20161020034344.14154-8-wens@csie.org>
+Message-ID: <20161020034344.14154-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD0 controller on the A31 can do RGB output up to 8 bits per
-channel. Add the pins for RGB888 output.
+The Hummingbird A31 board has a RGB-to-VGA bridge which converts RGB
+output from the LCD interface to VGA signals.
+
+Enable this part of the display pipeline.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 56 +++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 4d2c7786b92a..2e8bf93dcfb2 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -540,6 +540,19 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 9a74637f677f..05a49b2147f1 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -63,6 +63,49 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
  
-+			lcd0_rgb888_pins: lcd0_rgb888 {
-+				allwinner,pins = "PD0", "PD1", "PD2", "PD3",
-+						 "PD4", "PD5", "PD6", "PD7",
-+						 "PD8", "PD9", "PD10", "PD11",
-+						 "PD12", "PD13", "PD14", "PD15",
-+						 "PD16", "PD17", "PD18", "PD19",
-+						 "PD20", "PD21", "PD22", "PD23",
-+						 "PD24", "PD25", "PD26", "PD27";
-+				allwinner,function = "lcd0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	bridge {
++		compatible = "dumb-vga-dac";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				vga_bridge_in: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_vga>;
++				};
 +			};
 +
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0", "PF1", "PF2",
- 						 "PF3", "PF4", "PF5";
++			port at 1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				vga_bridge_out: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
++	vga {
++		compatible = "vga-connector";
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_bridge_out>;
++			};
++		};
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
+@@ -245,6 +288,19 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd0_rgb888_pins>;
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_vga: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&vga_bridge_in>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.9.3
