@@ -1,350 +1,291 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Oct 2016 23:50:21 +0800
-Subject: [linux-sunxi] [PATCH v4 6/9] clk: sunxi-ng: Add A64 clocks
-In-Reply-To: <cd4dd81821b8910d40626baab2dbfdabd94b1b98.1476196031.git-series.maxime.ripard@free-electrons.com>
-References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
- <cd4dd81821b8910d40626baab2dbfdabd94b1b98.1476196031.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67YnusPeJhQ-__ntW1MsVc6QMj4DY0YQn71xFteHDW3OA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 20 Oct 2016 17:54:06 +0200
+Subject: [RFC PATCH] net: stmmac: Add OXNAS Glue Driver
+Message-ID: <20161020155406.27172-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Add the A64 CCU clocks set.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi-ccu.txt |   1 +-
->  drivers/clk/sunxi-ng/Kconfig                          |  11 +-
->  drivers/clk/sunxi-ng/Makefile                         |   1 +-
->  drivers/clk/sunxi-ng/ccu-sun50i-a64.c                 | 918 +++++++++++-
->  drivers/clk/sunxi-ng/ccu-sun50i-a64.h                 |  72 +-
->  include/dt-bindings/clock/sun50i-a64-ccu.h            | 134 ++-
->  include/dt-bindings/reset/sun50i-a64-ccu.h            |  98 +-
->  7 files changed, 1235 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun50i-a64.h
->  create mode 100644 include/dt-bindings/clock/sun50i-a64-ccu.h
->  create mode 100644 include/dt-bindings/reset/sun50i-a64-ccu.h
->
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> index 3868458a5feb..74d44a4273f2 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> @@ -7,6 +7,7 @@ Required properties :
->                 - "allwinner,sun8i-a23-ccu"
->                 - "allwinner,sun8i-a33-ccu"
->                 - "allwinner,sun8i-h3-ccu"
-> +               - "allwinner,sun50i-a64-ccu"
->
->  - reg: Must contain the registers base address and length
->  - clocks: phandle to the oscillators feeding the CCU. Two are needed:
-> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-> index 1b4c55a53d7a..8454c6e3dd65 100644
-> --- a/drivers/clk/sunxi-ng/Kconfig
-> +++ b/drivers/clk/sunxi-ng/Kconfig
-> @@ -53,6 +53,17 @@ config SUNXI_CCU_MP
->
->  # SoC Drivers
->
-> +config SUN50I_A64_CCU
-> +       bool "Support for the Allwinner A64 CCU"
-> +       select SUNXI_CCU_DIV
-> +       select SUNXI_CCU_NK
-> +       select SUNXI_CCU_NKM
-> +       select SUNXI_CCU_NKMP
-> +       select SUNXI_CCU_NM
-> +       select SUNXI_CCU_MP
-> +       select SUNXI_CCU_PHASE
-> +       default ARM64 && ARCH_SUNXI
-> +
->  config SUN6I_A31_CCU
->         bool "Support for the Allwinner A31/A31s CCU"
->         select SUNXI_CCU_DIV
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index 106cba27c331..24fbc6e5deb8 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_SUNXI_CCU_NM)    += ccu_nm.o
->  obj-$(CONFIG_SUNXI_CCU_MP)     += ccu_mp.o
->
->  # SoC support
-> +obj-$(CONFIG_SUN50I_A64_CCU)   += ccu-sun50i-a64.o
->  obj-$(CONFIG_SUN6I_A31_CCU)    += ccu-sun6i-a31.o
->  obj-$(CONFIG_SUN8I_A23_CCU)    += ccu-sun8i-a23.o
->  obj-$(CONFIG_SUN8I_A33_CCU)    += ccu-sun8i-a33.o
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> new file mode 100644
-> index 000000000000..c0e96bf6d104
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> @@ -0,0 +1,918 @@
-> +/*
-> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include "ccu_common.h"
-> +#include "ccu_reset.h"
-> +
-> +#include "ccu_div.h"
-> +#include "ccu_gate.h"
-> +#include "ccu_mp.h"
-> +#include "ccu_mult.h"
-> +#include "ccu_nk.h"
-> +#include "ccu_nkm.h"
-> +#include "ccu_nkmp.h"
-> +#include "ccu_nm.h"
-> +#include "ccu_phase.h"
-> +
-> +#include "ccu-sun50i-a64.h"
-> +
-> +static struct ccu_nkmp pll_cpux_clk = {
-> +       .enable         = BIT(31),
-> +       .lock           = BIT(28),
-> +       .n              = _SUNXI_CCU_MULT(8, 5),
-> +       .k              = _SUNXI_CCU_MULT(4, 2),
-> +       .m              = _SUNXI_CCU_DIV(0, 2),
-> +       .p              = _SUNXI_CCU_DIV_MAX(16, 2, 4),
-> +       .common         = {
-> +               .reg            = 0x000,
-> +               .hw.init        = CLK_HW_INIT("pll-cpux",
-> +                                             "osc24M",
-> +                                             &ccu_nkmp_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +/*
-> + * The Audio PLL is supposed to have 4 outputs: 3 fixed factors from
-> + * the base (2x, 4x and 8x), and one variable divider (the one true
-> + * pll audio).
-> + *
-> + * We don't have any need for the variable divider for now, so we just
-> + * hardcode it to match with the clock names
-> + */
-> +#define SUN50I_A64_PLL_AUDIO_REG       0x008
-> +
-> +static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
-> +                                  "osc24M", 0x008,
-> +                                  8, 7,        /* N */
-> +                                  0, 5,        /* M */
-> +                                  BIT(31),     /* gate */
-> +                                  BIT(28),     /* lock */
-> +                                  0);
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video0_clk, "pll-video0",
-> +                                       "osc24M", 0x010,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_ve_clk, "pll-ve",
-> +                                       "osc24M", 0x018,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +static SUNXI_CCU_NKM_WITH_GATE_LOCK(pll_ddr0_clk, "pll-ddr0",
-> +                                   "osc24M", 0x020,
-> +                                   8, 5,       /* N */
-> +                                   4, 2,       /* K */
-> +                                   0, 2,       /* M */
-> +                                   BIT(31),    /* gate */
-> +                                   BIT(28),    /* lock */
-> +                                   0);
-> +
-> +static struct ccu_nk pll_periph0_clk = {
-> +       .enable         = BIT(31),
-> +       .lock           = BIT(28),
-> +       .n              = _SUNXI_CCU_MULT(8, 5),
-> +       .k              = _SUNXI_CCU_MULT_MIN(4, 2, 2),
-> +       .fixed_post_div = 2,
-> +       .common         = {
-> +               .reg            = 0x028,
-> +               .features       = CCU_FEATURE_FIXED_POSTDIV,
-> +               .hw.init        = CLK_HW_INIT("pll-periph0", "osc24M",
-> +                                             &ccu_nk_ops, 0),
-> +       },
-> +};
-> +
-> +static struct ccu_nk pll_periph1_clk = {
-> +       .enable         = BIT(31),
-> +       .lock           = BIT(28),
-> +       .n              = _SUNXI_CCU_MULT(8, 5),
-> +       .k              = _SUNXI_CCU_MULT_MIN(4, 2, 2),
-> +       .fixed_post_div = 2,
-> +       .common         = {
-> +               .reg            = 0x02c,
-> +               .features       = CCU_FEATURE_FIXED_POSTDIV,
-> +               .hw.init        = CLK_HW_INIT("pll-periph1", "osc24M",
-> +                                             &ccu_nk_ops, 0),
-> +       },
-> +};
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_video1_clk, "pll-video1",
-> +                                       "osc24M", 0x030,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_gpu_clk, "pll-gpu",
-> +                                       "osc24M", 0x038,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +/*
-> + * The output function can be changed to something more complex that
-> + * we do not handle yet.
-> + *
-> + * Hardcode the mode so that we don't fall in that case.
-> + */
-> +#define SUN50I_A64_PLL_MIPI_REG                0x040
-> +
-> +struct ccu_nkm pll_mipi_clk = {
-> +       .enable         = BIT(31),
-> +       .lock           = BIT(28),
-> +       .n              = _SUNXI_CCU_MULT(8, 4),
-> +       .k              = _SUNXI_CCU_MULT_MIN(4, 2, 2),
-> +       .m              = _SUNXI_CCU_DIV(0, 4),
-> +       .common         = {
-> +               .reg            = 0x040,
-> +               .hw.init        = CLK_HW_INIT("pll-mipi", "pll-video0",
-> +                                             &ccu_nkm_ops, 0),
-> +       },
-> +};
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_hsic_clk, "pll-hsic",
-> +                                       "osc24M", 0x044,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +static SUNXI_CCU_NM_WITH_FRAC_GATE_LOCK(pll_de_clk, "pll-de",
-> +                                       "osc24M", 0x048,
-> +                                       8, 7,           /* N */
-> +                                       0, 4,           /* M */
-> +                                       BIT(24),        /* frac enable */
-> +                                       BIT(25),        /* frac select */
-> +                                       270000000,      /* frac rate 0 */
-> +                                       297000000,      /* frac rate 1 */
-> +                                       BIT(31),        /* gate */
-> +                                       BIT(28),        /* lock */
-> +                                       0);
-> +
-> +static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_ddr1_clk, "pll-ddr1",
-> +                                  "osc24M", 0x04c,
-> +                                  8, 7,        /* N */
-> +                                  0, 2,        /* M */
-> +                                  BIT(31),     /* gate */
-> +                                  BIT(28),     /* lock */
-> +                                  0);
+Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
 
-CLK_SET_RATE_UNGATE for all the PLLs?
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 ++++++
+ drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
+ drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 173 +++++++++++++++++++++
+ 4 files changed, 229 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+ create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
 
-> +
-> +static const char * const cpux_parents[] = { "osc32k", "osc24M",
-> +                                            "pll-cpux" , "pll-cpux" };
-> +static SUNXI_CCU_MUX(cpux_clk, "cpux", cpux_parents,
-> +                    0x050, 16, 2, CLK_IS_CRITICAL);
-
-CLK_SET_RATE_PARENT.
-
-[...]
-
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(ce_clk, "ce", mmc_default_parents, 0x09c,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +
-
-Extra newline.
-
-[...]
-
-> +static const char * const dram_parents[] = { "pll-ddr0", "pll-ddr1" };
-> +static SUNXI_CCU_M_WITH_MUX(dram_clk, "dram", dram_parents,
-> +                           0x0f4, 0, 4, 20, 2, CLK_IS_CRITICAL);
-
-The divider is only 2 bits wide.
-
-> +static const char * const tcon1_parents[] = { "pll-video0", "pll-video1" };
-> +static const u8 tcon1_table[] = { 0, 2, };
-> +struct ccu_div tcon1_clk = {
-> +       .enable         = BIT(31),
-> +       .div            = _SUNXI_CCU_DIV(0, 4),
-> +       .mux            = _SUNXI_CCU_MUX_TABLE(24, 3, tcon1_table),
-
-Mux is only 2 bits wide.
-
-> +       .common         = {
-> +               .reg            = 0x11c,
-> +               .hw.init        = CLK_HW_INIT_PARENTS("tcon1",
-> +                                                     tcon1_parents,
-> +                                                     &ccu_div_ops,
-> +                                                     CLK_SET_RATE_PARENT),
-> +       },
-> +};
-> +
-
-[...]
-
-> +static const char * const dsi_dphy_parents[] = { "pll-video0", "pll-periph0" };
-> +static const u8 dsi_dphy_table[] = { 0, 2, };
-> +static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(dsi_dphy_clk, "dsi-dphy",
-> +                                      dsi_dphy_parents, dsi_dphy_table,
-> +                                      0x168, 0, 3, 24, 2, BIT(31), 0);
-
-Divider is 4 bits wide, and mux offset is 8.
-
-[...]
-
-Regards
-ChenYu
+diff --git a/Documentation/devicetree/bindings/net/oxnas-dwmac.txt b/Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+new file mode 100644
+index 0000000..5d2696c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+@@ -0,0 +1,44 @@
++* Oxford Semiconductor OXNAS DWMAC Ethernet controller
++
++The device inherits all the properties of the dwmac/stmmac devices
++described in the file stmmac.txt in the current directory with the
++following changes.
++
++Required properties on all platforms:
++
++- compatible:	Depending on the platform this should be one of:
++			- "oxsemi,ox820-dwmac"
++		Additionally "snps,dwmac" and any applicable more
++		detailed version number described in net/stmmac.txt
++		should be used.
++
++- reg:	The first register range should be the one of the DWMAC
++	controller.
++
++- clocks: Should contain phandles to the following clocks
++- clock-names:	Should contain the following:
++		- "stmmaceth" - see stmmac.txt
++		- "gmac" - peripheral gate clock
++
++- oxsemi,sys-ctrl: a phandle to the system controller syscon node
++
++Example :
++
++etha: ethernet at 40400000 {
++	compatible = "oxsemi,ox820-dwmac", "snps,dwmac";
++	reg = <0x40400000 0x2000>;
++	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++	interrupt-names = "macirq", "eth_wake_irq";
++	mac-address = [000000000000]; /* Filled in by U-Boot */
++	phy-mode = "rgmii";
++
++	clocks = <&stdclk CLK_820_ETHA>, <&gmacclk>;
++	clock-names = "gmac", "stmmaceth";
++	resets = <&reset RESET_MAC>;
++
++	/* Regmap for sys registers */
++	oxsemi,sys-ctrl = <&sys>;
++
++	status = "disabled";
++};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+index 3818c5e..27ed913 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
++++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
+@@ -62,6 +62,7 @@ config DWMAC_MESON
+ 	tristate "Amlogic Meson dwmac support"
+ 	default ARCH_MESON
+ 	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
++	select MFD_SYSCON
+ 	help
+ 	  Support for Ethernet controller on Amlogic Meson SoCs.
+ 
+@@ -69,6 +70,16 @@ config DWMAC_MESON
+ 	  the stmmac device driver. This driver is used for Meson6,
+ 	  Meson8, Meson8b and GXBB SoCs.
+ 
++config DWMAC_OXNAS
++	tristate "Oxford Semiconductor OXNAS dwmac support"
++	default ARCH_OXNAS
++	depends on OF && COMMON_CLK && (ARCH_OXNAS || COMPILE_TEST)
++	help
++	  Support for Ethernet controller on Oxford Semiconductor OXNAS SoCs.
++
++	  This selects the Oxford Semiconductor OXNASSoC glue layer support for
++	  the stmmac device driver. This driver is used for OX820.
++
+ config DWMAC_ROCKCHIP
+ 	tristate "Rockchip dwmac support"
+ 	default ARCH_ROCKCHIP
+diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
+index 5d6ece5..8f83a86 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/Makefile
++++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_STMMAC_PLATFORM)	+= stmmac-platform.o
+ obj-$(CONFIG_DWMAC_IPQ806X)	+= dwmac-ipq806x.o
+ obj-$(CONFIG_DWMAC_LPC18XX)	+= dwmac-lpc18xx.o
+ obj-$(CONFIG_DWMAC_MESON)	+= dwmac-meson.o dwmac-meson8b.o
++obj-$(CONFIG_DWMAC_OXNAS)	+= dwmac-oxnas.o
+ obj-$(CONFIG_DWMAC_ROCKCHIP)	+= dwmac-rk.o
+ obj-$(CONFIG_DWMAC_SOCFPGA)	+= dwmac-altr-socfpga.o
+ obj-$(CONFIG_DWMAC_STI)		+= dwmac-sti.o
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
+new file mode 100644
+index 0000000..c65f3a6
+--- /dev/null
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
+@@ -0,0 +1,173 @@
++/*
++ * Oxford Semiconductor OXNAS DWMAC glue layer
++ *
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ * Copyright (C) 2014 Daniel Golle <daniel@makrotopia.org>
++ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
++ * Copyright (C) 2012 John Crispin <blogic@openwrt.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include <linux/stmmac.h>
++
++#include "stmmac_platform.h"
++
++/* System Control regmap offsets */
++#define OXNAS_DWMAC_CTRL_REGOFFSET	0x78
++#define OXNAS_DWMAC_DELAY_REGOFFSET	0x100
++
++/* Control Register */
++#define DWMAC_CKEN_RX_IN        14
++#define DWMAC_CKEN_RXN_OUT      13
++#define DWMAC_CKEN_RX_OUT       12
++#define DWMAC_CKEN_TX_IN        10
++#define DWMAC_CKEN_TXN_OUT      9
++#define DWMAC_CKEN_TX_OUT       8
++#define DWMAC_RX_SOURCE         7
++#define DWMAC_TX_SOURCE         6
++#define DWMAC_LOW_TX_SOURCE     4
++#define DWMAC_AUTO_TX_SOURCE    3
++#define DWMAC_RGMII             2
++#define DWMAC_SIMPLE_MUX        1
++#define DWMAC_CKEN_GTX          0
++
++/* Delay register */
++#define DWMAC_TX_VARDELAY_SHIFT		0
++#define DWMAC_TXN_VARDELAY_SHIFT	8
++#define DWMAC_RX_VARDELAY_SHIFT		16
++#define DWMAC_RXN_VARDELAY_SHIFT	24
++#define DWMAC_TX_VARDELAY(d)		((d) << DWMAC_TX_VARDELAY_SHIFT)
++#define DWMAC_TXN_VARDELAY(d)		((d) << DWMAC_TXN_VARDELAY_SHIFT)
++#define DWMAC_RX_VARDELAY(d)		((d) << DWMAC_RX_VARDELAY_SHIFT)
++#define DWMAC_RXN_VARDELAY(d)		((d) << DWMAC_RXN_VARDELAY_SHIFT)
++
++struct oxnas_dwmac {
++	struct clk	*clk;
++	struct regmap	*regmap;
++};
++
++static int oxnas_dwmac_init(struct platform_device *pdev, void *priv)
++{
++	struct oxnas_dwmac *dwmac = priv;
++	unsigned int value;
++	int ret;
++
++	/* Reset HW here before changing the glue configuration */
++	ret = device_reset(&pdev->dev);
++	if (ret)
++		return ret;
++
++	clk_prepare_enable(dwmac->clk);
++
++	ret = regmap_read(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, &value);
++	if (ret < 0)
++		return ret;
++
++	/* Enable GMII_GTXCLK to follow GMII_REFCLK, required for gigabit PHY */
++	value |= BIT(DWMAC_CKEN_GTX);
++	/* Use simple mux for 25/125 Mhz clock switching */
++	value |= BIT(DWMAC_SIMPLE_MUX);
++	/* set auto switch tx clock source */
++	value |= BIT(DWMAC_AUTO_TX_SOURCE);
++	/* enable tx & rx vardelay */
++	value |= BIT(DWMAC_CKEN_TX_OUT);
++	value |= BIT(DWMAC_CKEN_TXN_OUT);
++	value |= BIT(DWMAC_CKEN_TX_IN);
++	value |= BIT(DWMAC_CKEN_RX_OUT);
++	value |= BIT(DWMAC_CKEN_RXN_OUT);
++	value |= BIT(DWMAC_CKEN_RX_IN);
++	regmap_write(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, value);
++
++	/* set tx & rx vardelay */
++	value = DWMAC_TX_VARDELAY(4);
++	value |= DWMAC_TXN_VARDELAY(2);
++	value |= DWMAC_RX_VARDELAY(10);
++	value |= DWMAC_RXN_VARDELAY(8);
++	regmap_write(dwmac->regmap, OXNAS_DWMAC_DELAY_REGOFFSET, value);
++
++	return 0;
++}
++
++static void oxnas_dwmac_exit(struct platform_device *pdev, void *priv)
++{
++	struct oxnas_dwmac *dwmac = priv;
++
++	clk_disable_unprepare(dwmac->clk);
++}
++
++static int oxnas_dwmac_probe(struct platform_device *pdev)
++{
++	struct plat_stmmacenet_data *plat_dat;
++	struct stmmac_resources stmmac_res;
++	struct device_node *sysctrl;
++	struct oxnas_dwmac *dwmac;
++	int ret;
++
++	sysctrl = of_parse_phandle(pdev->dev.of_node, "oxsemi,sys-ctrl", 0);
++	if (!sysctrl) {
++		dev_err(&pdev->dev, "failed to get sys-ctrl node\n");
++		return -EINVAL;
++	}
++
++	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
++	if (ret)
++		return ret;
++
++	plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
++	if (IS_ERR(plat_dat))
++		return PTR_ERR(plat_dat);
++
++	dwmac = devm_kzalloc(&pdev->dev, sizeof(*dwmac), GFP_KERNEL);
++	if (!dwmac)
++		return -ENOMEM;
++
++	dwmac->regmap = syscon_node_to_regmap(sysctrl);
++	if (IS_ERR(dwmac->regmap)) {
++		dev_err(&pdev->dev, "failed to have sysctrl regmap\n");
++		return PTR_ERR(dwmac->regmap);
++	}
++
++	dwmac->clk = devm_clk_get(&pdev->dev, "gmac");
++	if (IS_ERR(dwmac->clk))
++		return PTR_ERR(dwmac->clk);
++
++	plat_dat->bsp_priv = dwmac;
++	plat_dat->init = oxnas_dwmac_init;
++	plat_dat->exit = oxnas_dwmac_exit;
++
++	return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
++}
++
++static const struct of_device_id oxnas_dwmac_match[] = {
++	{ .compatible = "oxsemi,ox820-dwmac" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, oxnas_dwmac_match);
++
++static struct platform_driver oxnas_dwmac_driver = {
++	.probe  = oxnas_dwmac_probe,
++	.remove = stmmac_pltfr_remove,
++	.driver = {
++		.name           = "oxnas-dwmac",
++		.pm		= &stmmac_pltfr_pm_ops,
++		.of_match_table = oxnas_dwmac_match,
++	},
++};
++module_platform_driver(oxnas_dwmac_driver);
++
++MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
++MODULE_DESCRIPTION("Oxford Semiconductor OXNAS DWMAC glue layer");
++MODULE_LICENSE("GPL v2");
+-- 
+2.7.0
