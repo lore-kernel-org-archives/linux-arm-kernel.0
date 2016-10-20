@@ -1,90 +1,26 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Oct 2016 12:23:16 +0100
-Subject: [PATCH] arm64: fix show_regs fallout from KERN_CONT changes
-Message-ID: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Thu, 20 Oct 2016 13:23:51 +0200
+Subject: [PATCH v3 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20161020103707.GB3175@twins.programming.kicks-ass.net>
+References: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
+ <20161020103707.GB3175@twins.programming.kicks-ass.net>
+Message-ID: <20161020112351.GC13708@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recently in commit 4bcc595ccd80decb ("printk: reinstate KERN_CONT for
-printing continuation lines"), the behaviour of printk changed w.r.t.
-KERN_CONT. Now, KERN_CONT is mandatory to continue existing lines.
-Without this, prefixes are inserted, making output illegible, e.g.
+On Thu, Oct 20, 2016 at 12:37:07PM +0200, Peter Zijlstra wrote:
+> On Thu, Oct 20, 2016 at 11:30:36AM +0200, Jan Glauber wrote:
+> > Note:
+> > I'm using perf_sw_context in difference to perf_invalid_context
+> > (see WARN_ON in perf_pmu_register). Reason is that with perf_invalid_context
+> > add() is never called and the counter results are shown as "unsupported" by
+> > perf. With perf_sw_context everything works as expected.
+> 
+> What?! All the uncore PMUs use perf_invalid_context. What doesn't work
+> for you?
 
-[ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-[ 1007.076329] sp : ffff000008d53ec0
-[ 1007.079606] x29: ffff000008d53ec0 [ 1007.082797] x28: 0000000080c50018
-[ 1007.086160]
-[ 1007.087630] x27: ffff000008e0c7f8 [ 1007.090820] x26: ffff80097631ca00
-[ 1007.094183]
-[ 1007.095653] x25: 0000000000000001 [ 1007.098843] x24: 000000ea68b61cac
-[ 1007.102206]
+OK, so using perf_invalid_context and "-a" seems to work.
 
-... or when dumped with the userpace dmesg tool, which has slightly
-different implicit newline behaviour. e.g.
-
-[ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-[ 1007.076329] sp : ffff000008d53ec0
-[ 1007.079606] x29: ffff000008d53ec0
-[ 1007.082797] x28: 0000000080c50018
-[ 1007.086160]
-[ 1007.087630] x27: ffff000008e0c7f8
-[ 1007.090820] x26: ffff80097631ca00
-[ 1007.094183]
-[ 1007.095653] x25: 0000000000000001
-[ 1007.098843] x24: 000000ea68b61cac
-[ 1007.102206]
-
-We can't simply always use KERN_CONT for lines which may or may not be
-continuations. That causes line prefixes (e.g. timestamps) to be
-supressed, and the alignment of all but the first line will be broken.
-
-For even more fun, we can't simply insert some dummy empty-string printk
-calls, as GCC warns for an empty printk string, and even if we pass
-KERN_DEFAULT explcitly to silence the warning, the prefix gets swallowed
-unless there is an additional part to the string.
-
-Instead, we must manually iterate over pairs of registers, which gives
-us the legible output we want in either case, e.g.
-
-[  169.771790] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-[  169.779109] sp : ffff000008d53ec0
-[  169.782386] x29: ffff000008d53ec0 x28: 0000000080c50018
-[  169.787650] x27: ffff000008e0c7f8 x26: ffff80097631de00
-[  169.792913] x25: 0000000000000001 x24: 00000027827b2cf4
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/process.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index ddce61b..3f31cf93 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -187,10 +187,19 @@ void __show_regs(struct pt_regs *regs)
- 	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
- 	       regs->pc, lr, regs->pstate);
- 	printk("sp : %016llx\n", sp);
--	for (i = top_reg; i >= 0; i--) {
-+
-+	i = top_reg;
-+
-+	while (i >= 0) {
- 		printk("x%-2d: %016llx ", i, regs->regs[i]);
--		if (i % 2 == 0)
--			printk("\n");
-+		i--;
-+
-+		if (i % 2 == 0) {
-+			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-+			i--;
-+		}
-+
-+		pr_cont("\n");
- 	}
- 	printk("\n");
- }
--- 
-1.9.1
+But I must say that I hate that from a user perspective. The user needs to know about
+the type of PMU behind the event and then provide "-a" or get a "<not supported"
+as counter value?
