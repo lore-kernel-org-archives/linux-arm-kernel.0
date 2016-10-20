@@ -1,26 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2016 06:11:43 -0700
-Subject: [PATCHv4 03/15] dt-bindings: clock: add omap4 hwmod clock IDs
-In-Reply-To: <051e2a14-8fb9-fd0f-99e0-decc5c02ae75@ti.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <1476805568-19264-4-git-send-email-t-kristo@ti.com>
- <20161020124742.7b65l5lz6kcfsysl@atomide.com>
- <051e2a14-8fb9-fd0f-99e0-decc5c02ae75@ti.com>
-Message-ID: <20161020131143.5cfhl3eug2lr64oa@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 20 Oct 2016 14:00:41 +0100
+Subject: [PATCH] arm/arm64: KVM: Map the BSS at HYP
+Message-ID: <1476968441-29003-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [161020 06:00]:
-> On 20/10/16 15:47, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [161018 08:47]:
-> > > Add IDs for omap4 hwmod clocks. These are basically register offsets
-> > > from the beginning of the clockdomain address space.
-> > 
-> > Looks like you have a wrong subject for this patch?
-> 
-> What is the correct one? There seems to be multiple approaches in place.
+When used with a compiler that doesn't implement "asm goto"
+(such as the AArch64 port of GCC 4.8), jump labels generate a
+memory access to find out about the value of the key (instead
+of just patching the code). The key itself is likely to be
+stored in the BSS.
 
-Oh sorry yeah never mind, I somehow thought these defines
-we for drivers/clk, not for dt-bindings.. Sorry for the noise.
+This is perfectly fine, except that we don't map the BSS at HYP,
+leading to an exploding kernel at the first access. The obvious
+fix is simply to map the BSS there (which should have been done
+a long while ago, but hey...).
 
-Tony
+Reported-by: Eric Auger <eric.auger@redhat.com>
+Tested-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 09942f0..14adf40 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1345,6 +1345,13 @@ static int init_hyp_mode(void)
+ 		goto out_err;
+ 	}
+ 
++	err = create_hyp_mappings(kvm_ksym_ref(__bss_start),
++				  kvm_ksym_ref(__bss_stop), PAGE_HYP_RO);
++	if (err) {
++		kvm_err("Cannot map bss section\n");
++		goto out_err;
++	}
++
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
+-- 
+2.1.4
