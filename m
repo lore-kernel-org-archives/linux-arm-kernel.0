@@ -1,41 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Oct 2016 09:04:35 +0530
-Subject: [PATCH v2 1/4] cpufreq: pxa: use generic platdev driver for
- device-tree
-In-Reply-To: <87bmyg3xzh.fsf@belgarion.home>
-References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
- <1476561450-28407-2-git-send-email-robert.jarzmik@free.fr>
- <20161018113835.GB11471@vireshk-i7> <87r37d4qlw.fsf@belgarion.home>
- <20161019135208.GG11471@vireshk-i7> <87bmyg3xzh.fsf@belgarion.home>
-Message-ID: <20161020033435.GD11766@vireshk-i7>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 20 Oct 2016 11:43:38 +0800
+Subject: [PATCH v2 2/8] drm/sun4i: sun6i-drc: Support DRC on A31 and A31s
+In-Reply-To: <20161020034344.14154-1-wens@csie.org>
+References: <20161020034344.14154-1-wens@csie.org>
+Message-ID: <20161020034344.14154-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-10-16, 22:06, Robert Jarzmik wrote:
-> Viresh Kumar <viresh.kumar@linaro.org> writes:
-> 
-> >> >> +	{ .compatible = "marvell,pxa250", },
-> >> >> +	{ .compatible = "marvell,pxa270", },
-> >> >>  
-> >> >>  	{ .compatible = "samsung,exynos3250", },
-> >> >>  	{ .compatible = "samsung,exynos4210", },
-> >> >
-> >> > Isn't there a race between cpufreq-dt and the platform driver to
-> >> > register first ?
-> >> Ah, could you be more specific about the race you're talking of ?
-> >> 
-> >> My understanding was that cpufreq-dt-platdev does create the device, and
-> >> cpufreq-dt is a driver for it, so there is no race but a direct relationship
-> >> AFAIU.
-> >
-> > I mean that both the driver may try to register to the cpufreq core if
-> > they are both compiled in a single image.
-> Euh I still don't follow you. The only driver that can register to the cpufreq
-> core is cpufreq-dt.
+The A31 and A31s also have the DRC as part of the display pipeline.
+As we know virtually nothing about them, just add compatible strings
+for both SoCs to the stub driver.
 
-I was wondering on what will happen if both cpufreq-dt and your pxa2xx-cpufreq
-driver are present in the same kernel image. In that case the init routines of
-both of them will try to call cpufreq_register_driver().
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 2 ++
+ drivers/gpu/drm/sun4i/sun6i_drc.c                             | 2 ++
+ 2 files changed, 4 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index b95696d748c7..5368961cd727 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -64,6 +64,8 @@ adaptive backlight control.
+ 
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun6i-a31-drc
++    * allwinner,sun6i-a31s-drc
+     * allwinner,sun8i-a33-drc
+   - reg: base address and size of the memory-mapped region.
+   - interrupts: interrupt associated to this IP
+diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
+index bf6d846d8132..6ef707c5a719 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_drc.c
++++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
+@@ -98,6 +98,8 @@ static int sun6i_drc_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id sun6i_drc_of_table[] = {
++	{ .compatible = "allwinner,sun6i-a31-drc" },
++	{ .compatible = "allwinner,sun6i-a31s-drc" },
+ 	{ .compatible = "allwinner,sun8i-a33-drc" },
+ 	{ }
+ };
 -- 
-viresh
+2.9.3
