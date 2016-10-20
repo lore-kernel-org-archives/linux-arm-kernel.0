@@ -1,27 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 20 Oct 2016 20:57:45 +0300
-Subject: [PATCH v2 3/3] mtd: s3c2410: parse the device configuration from
- OF node
-In-Reply-To: <1476906725-22613-4-git-send-email-sergio.prado@e-labworks.com>
-References: <1476906725-22613-1-git-send-email-sergio.prado@e-labworks.com>
- <1476906725-22613-4-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20161020175745.GC7119@kozik-lap>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Oct 2016 20:00:31 +0200
+Subject: [PATCH v5 3/4] Documentation: devicetree: add vendor prefix for Pine64
+In-Reply-To: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
+References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 05:52:05PM -0200, Sergio Prado wrote:
-> Allows configuring Samsung's s3c2410 memory controller using a
-> devicetree.
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  drivers/mtd/nand/s3c2410.c                     | 155 ++++++++++++++++++++++---
->  include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
->  2 files changed, 140 insertions(+), 16 deletions(-)
->
+From: Andre Przywara <andre.przywara@arm.com>
 
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+[Maxime: Change title prefix to match the usual style]
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-
-Best regards,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index f0a48ea78659..4eefd1c3ff16 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -208,7 +208,7 @@ parade	Parade Technologies Inc.
+ pericom	Pericom Technology Inc.
+ phytec	PHYTEC Messtechnik GmbH
+ picochip	Picochip Ltd
+-pixcir  PIXCIR MICROELECTRONICS Co., Ltd
++pine64	Pine64
+ plathome	Plat'Home Co., Ltd.
+ plda	PLDA
+ powervr	PowerVR (deprecated, use img)
+-- 
+git-series 0.8.10
