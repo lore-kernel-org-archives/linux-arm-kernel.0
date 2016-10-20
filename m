@@ -1,48 +1,34 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 20 Oct 2016 08:42:01 +0200
-Subject: [PATCH 1/3] ARM: socfpga: dtsi: add qspi node
-In-Reply-To: <alpine.DEB.2.02.1610191054120.29731@linux-builds1>
-References: <20161018074304.6744-1-s.trumtrar@pengutronix.de>
- <alpine.DEB.2.02.1610191054120.29731@linux-builds1>
-Message-ID: <20161020064200.mkz4f54kuaq5liot@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Oct 2016 08:46:32 +0200
+Subject: [PATCH] video: ARM CLCD: fix Vexpress regression
+Message-ID: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 10:55:46AM -0500, Dinh Nguyen wrote:
-> On Tue, 18 Oct 2016, Steffen Trumtrar wrote:
-> 
-> > Add the qspi node to the socfpga dtsi file.
-> > 
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/socfpga.dtsi | 14 ++++++++++++++
-> >  1 file changed, 14 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-> > index 9f48141270b8..0dc96d2248a6 100644
-> > --- a/arch/arm/boot/dts/socfpga.dtsi
-> > +++ b/arch/arm/boot/dts/socfpga.dtsi
-> > @@ -705,6 +705,20 @@
-> >  			reg = <0xffff0000 0x10000>;
-> >  		};
-> >  
-> > +		qspi: spi at ff705000 {
-> > +			compatible = "cdns,qspi-nor";
-> > +                        #address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0xff705000 0x1000>,
-> > +			      <0xffa00000 0x1000>;
-> 
-> I think the QSPI data address space has a length of 0x100000. I've fixed it up locally.
-> 
+The CLCD does not come up on Versatile Express as it does not
+(currently) have a syscon node for controlling the block apart
+from the CLCD itself. Make sure the .init() function can bail
+out without an error making it probe again.
 
-Yeah, you are right. Good catch.
+Reported-by: Amit Pundir <amit.pundir@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/video/fbdev/amba-clcd-versatile.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Thanks,
-Steffen
-
+diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+index 19ad8645d93c..d909b7dda14d 100644
+--- a/drivers/video/fbdev/amba-clcd-versatile.c
++++ b/drivers/video/fbdev/amba-clcd-versatile.c
+@@ -527,7 +527,8 @@ int versatile_clcd_init_panel(struct clcd_fb *fb,
+ 					     &clcd_id);
+ 	if (!np) {
+ 		dev_err(dev, "no Versatile syscon node\n");
+-		return -ENODEV;
++		/* Vexpress does not have this */
++		return 0;
+ 	}
+ 	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
