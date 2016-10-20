@@ -1,113 +1,143 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 15:49:03 +0200
-Subject: [PATCH v3 2/6] pinctrl: sunxi: Support generic binding
-In-Reply-To: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
-References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <519ec867509f8033d9235a61f7979bd698906ab5.1476971126.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 20 Oct 2016 15:49:01 +0200
+Subject: [PATCH v3 0/6] pinctrl: sunxi: Generic bindings rework
+Message-ID: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our bindings are mostly irrelevant now that we have generic pinctrl
-bindings that cover exactly the same uses cases.
+Hi,
 
-Add support for the new ones, and obviously keep our old binding support in
-order to keep the ABI stable.
+This patch set reworks the Allwinner pinctrl driver to support the generic
+pin configuration and multiplexing bindings.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 48 ++++++++++++++++++++++++++--
- 1 file changed, 46 insertions(+), 2 deletions(-)
+In the process, we also covered some lasting issues that were found: we
+were ignoring the case where no pull-up was set, and while our binding was
+saying that the allwinner,drive and allwinner,pull properties were
+optional, the code was not able to deal with the case where they were not
+present.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 12650904bd96..ebe2c73d211e 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -149,18 +149,33 @@ static int sunxi_pctrl_get_group_pins(struct pinctrl_dev *pctldev,
- 
- static bool sunxi_pctrl_has_bias_prop(struct device_node *node)
- {
--	return of_find_property(node, "allwinner,pull", NULL);
-+	return of_find_property(node, "bias-pull-up", NULL) ||
-+		of_find_property(node, "bias-pull-down", NULL) ||
-+		of_find_property(node, "bias-disable", NULL) ||
-+		of_find_property(node, "allwinner,pull", NULL);
- }
- 
- static bool sunxi_pctrl_has_drive_prop(struct device_node *node)
- {
--	return of_find_property(node, "allwinner,drive", NULL);
-+	return of_find_property(node, "drive-strength", NULL) ||
-+		of_find_property(node, "allwinner,drive", NULL);
- }
- 
- static int sunxi_pctrl_parse_bias_prop(struct device_node *node)
- {
- 	u32 val;
- 
-+	/* Try the new style binding */
-+	if (of_find_property(node, "bias-pull-up", NULL))
-+		return PIN_CONFIG_BIAS_PULL_UP;
-+
-+	if (of_find_property(node, "bias-pull-down", NULL))
-+		return PIN_CONFIG_BIAS_PULL_DOWN;
-+
-+	if (of_find_property(node, "bias-disable", NULL))
-+		return PIN_CONFIG_BIAS_DISABLE;
-+
-+	/* And fall back to the old binding */
- 	if (of_property_read_u32(node, "allwinner,pull", &val))
- 		return -EINVAL;
- 
-@@ -180,6 +195,21 @@ static int sunxi_pctrl_parse_drive_prop(struct device_node *node)
- {
- 	u32 val;
- 
-+	/* Try the new style binding */
-+	if (!of_property_read_u32(node, "drive-strength", &val)) {
-+		/* We can't go below 10mA ... */
-+		if (val < 10)
-+			return -EINVAL;
-+
-+		/* ... and only up to 40 mA ... */
-+		if (val > 40)
-+			val = 40;
-+
-+		/* by steps of 10 mA */
-+		return rounddown(val, 10);
-+	}
-+
-+	/* And then fall back to the old binding */
- 	if (of_property_read_u32(node, "allwinner,drive", &val))
- 		return -EINVAL;
- 
-@@ -191,6 +221,12 @@ static const char *sunxi_pctrl_parse_function_prop(struct device_node *node)
- 	const char *function;
- 	int ret;
- 
-+	/* Try the generic binding */
-+	ret = of_property_read_string(node, "function", &function);
-+	if (!ret)
-+		return function;
-+
-+	/* And fall back to our legacy one */
- 	ret = of_property_read_string(node, "allwinner,function", &function);
- 	if (!ret)
- 		return function;
-@@ -203,6 +239,14 @@ static const char *sunxi_pctrl_find_pins_prop(struct device_node *node,
- {
- 	int count;
- 
-+	/* Try the generic binding */
-+	count = of_property_count_strings(node, "pins");
-+	if (count > 0) {
-+		*npins = count;
-+		return "pins";
-+	}
-+
-+	/* And fall back to our legacy one */
- 	count = of_property_count_strings(node, "allwinner,pins");
- 	if (count > 0) {
- 		*npins = count;
+Changes from v2:
+  - Added Rob, Linus and Chen-Yu's acked-by
+  - Removed unused variable
+  - Dropped the patches already applied by Linus
+
+Changes from v1:
+  - Realloced the pinctrl_map array
+  - Detailed the generic properties we support
+  - Directly return the parsing functions return code
+  - Called kfree on the pinconfig directly
+  - Added Chen-Yu Acked-by
+  - Changed the patch 2 commit log as suggested
+
+Maxime Ripard (6):
+  pinctrl: sunxi: Deal with configless pins
+  pinctrl: sunxi: Support generic binding
+  dt-bindings: pinctrl: Deprecate sunxi pinctrl bindings
+  ARM: sunxi: Remove useless allwinner,drive property
+  ARM: sunxi: Remove useless allwinner,pull property
+  ARM: sunxi: Convert pinctrl nodes to generic bindings
+
+ Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt |  16 ++++-
+ arch/arm/boot/dts/ntc-gr8-evb.dts                                     |  24 ++----
+ arch/arm/boot/dts/ntc-gr8.dtsi                                        | 104 +++++++++------------------
+ arch/arm/boot/dts/sun4i-a10-a1000.dts                                 |  12 +--
+ arch/arm/boot/dts/sun4i-a10-ba10-tvbox.dts                            |   2 +-
+ arch/arm/boot/dts/sun4i-a10-chuwi-v7-cw0825.dts                       |  14 +---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts                            |  14 +---
+ arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts                      |  38 +++-------
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts                              |   6 +--
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts                             |  12 +--
+ arch/arm/boot/dts/sun4i-a10-hyundai-a7hd.dts                          |  16 +---
+ arch/arm/boot/dts/sun4i-a10-inet1.dts                                 |  26 ++-----
+ arch/arm/boot/dts/sun4i-a10-inet97fv2.dts                             |  14 +---
+ arch/arm/boot/dts/sun4i-a10-inet9f-rev03.dts                          |  29 +++-----
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts                            |  12 +--
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts                             |  13 +--
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts                            |   2 +-
+ arch/arm/boot/dts/sun4i-a10-mk802.dts                                 |  18 +----
+ arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts                        |  27 ++-----
+ arch/arm/boot/dts/sun4i-a10-pcduino.dts                               |  19 +----
+ arch/arm/boot/dts/sun4i-a10-pcduino2.dts                              |   6 +--
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts                      |  32 +++-----
+ arch/arm/boot/dts/sun4i-a10.dtsi                                      | 169 +++++++++++++++-----------------------------
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts                          |  18 ++---
+ arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts                          |  29 +++-----
+ arch/arm/boot/dts/sun5i-a10s-mk802.dts                                |  19 +----
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts                      |  36 +++------
+ arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts                         |  20 ++---
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts                              |  21 +----
+ arch/arm/boot/dts/sun5i-a10s.dtsi                                     |  61 ++++++----------
+ arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts                |  23 ++----
+ arch/arm/boot/dts/sun5i-a13-hsg-h702.dts                              |  22 ++----
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts                       |  40 ++++------
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts                             |  36 +++------
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts                              |  17 +---
+ arch/arm/boot/dts/sun5i-a13.dtsi                                      |  24 ++----
+ arch/arm/boot/dts/sun5i-r8-chip.dts                                   |  12 +--
+ arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi                  |  33 +++------
+ arch/arm/boot/dts/sun5i.dtsi                                          |  57 +++++----------
+ arch/arm/boot/dts/sun6i-a31-app4-evb1.dts                             |   6 +--
+ arch/arm/boot/dts/sun6i-a31-colombus.dts                              |  22 ++----
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts                           |  23 ++----
+ arch/arm/boot/dts/sun6i-a31-i7.dts                                    |  19 +----
+ arch/arm/boot/dts/sun6i-a31-m9.dts                                    |  19 +----
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts                      |  19 +----
+ arch/arm/boot/dts/sun6i-a31.dtsi                                      | 136 ++++++++++++++---------------------
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts                              |  20 ++---
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts                              |  13 +--
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts                      |  29 +++-----
+ arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts              |   9 +--
+ arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi                  |  14 +---
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts                      |  27 ++-----
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts                              |  26 ++-----
+ arch/arm/boot/dts/sun7i-a20-bananapro.dts                             |  37 +++-------
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts                           |  13 +--
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts                            |  38 +++-------
+ arch/arm/boot/dts/sun7i-a20-hummingbird.dts                           |  24 ++----
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts                             |  26 ++-----
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts                            |   7 +--
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts                             |  30 +++-----
+ arch/arm/boot/dts/sun7i-a20-m3.dts                                    |   6 +--
+ arch/arm/boot/dts/sun7i-a20-mk808c.dts                                |  12 +--
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts                        |  32 +++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts                        |  27 ++-----
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts                  |   6 +--
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts                       |  33 +++------
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts                       |  28 +++----
+ arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts                         |  45 ++++--------
+ arch/arm/boot/dts/sun7i-a20-orangepi.dts                              |  38 +++-------
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts                         |  25 ++----
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts                              |  21 +----
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts                        |  25 ++----
+ arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts                      |  13 +--
+ arch/arm/boot/dts/sun7i-a20.dtsi                                      | 277 ++++++++++++++++++++++++++----------------------------------------------
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                                  |  95 ++++++++++---------------
+ arch/arm/boot/dts/sun8i-a23-evb.dts                                   |   7 +--
+ arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts                 |   8 +--
+ arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts                 |   8 +--
+ arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts                        |   9 +--
+ arch/arm/boot/dts/sun8i-a33-olinuxino.dts                             |  18 +----
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts                        |  11 +--
+ arch/arm/boot/dts/sun8i-a33.dtsi                                      |   6 +--
+ arch/arm/boot/dts/sun8i-a83t.dtsi                                     |  21 +----
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts                       |  18 +----
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts                             |  12 +--
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts                             |  26 ++-----
+ arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts                          |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-one.dts                           |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc-plus.dts                       |   4 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts                            |  18 +----
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts                          |  10 +--
+ arch/arm/boot/dts/sun8i-h3.dtsi                                       |  92 +++++++++---------------
+ arch/arm/boot/dts/sun8i-q8-common.dtsi                                |   9 +--
+ arch/arm/boot/dts/sun8i-r16-parrot.dts                                |  36 +++------
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi                  |  26 ++-----
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts                           |  15 +---
+ arch/arm/boot/dts/sun9i-a80-optimus.dts                               |  33 +++------
+ arch/arm/boot/dts/sun9i-a80.dtsi                                      |  54 +++++---------
+ arch/arm/boot/dts/sunxi-common-regulators.dtsi                        |  24 ++----
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c                                 |  99 +++++++++++++++++++++-----
+ 100 files changed, 1176 insertions(+), 1757 deletions(-)
+
 -- 
 git-series 0.8.10
