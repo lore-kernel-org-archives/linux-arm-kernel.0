@@ -1,93 +1,217 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Oct 2016 11:43:41 +0800
-Subject: [PATCH v2 5/8] drm/sun4i: Add compatible strings for A31/A31s display
- pipelines
+Date: Thu, 20 Oct 2016 11:43:42 +0800
+Subject: [PATCH v2 6/8] ARM: dts: sun6i: Add device nodes for first display
+ pipeline
 In-Reply-To: <20161020034344.14154-1-wens@csie.org>
 References: <20161020034344.14154-1-wens@csie.org>
-Message-ID: <20161020034344.14154-6-wens@csie.org>
+Message-ID: <20161020034344.14154-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31's display pipeline has 2 frontends, 2 backends, and 2 TCONs. It
-also has new display enhancement blocks, such as the DRC (Dynamic Range
-Controller), the DEU (Display Enhancement Unit), and the CMU (Color
-Management Unit). It supports HDMI, MIPI DSI, and 2 LCD/LVDS channels.
-
-The A31s display pipeline is almost the same, just without MIPI DSI.
-Only the TCON seems to be different, due to the missing mux for MIPI
-DSI.
-
-Add compatible strings for both of them.
+The A31 has 2 parallel display pipelines, which can be intermixed.
+However the driver currently only supports one of them.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 4 ++++
- drivers/gpu/drm/sun4i/sun4i_backend.c                         | 1 +
- drivers/gpu/drm/sun4i/sun4i_drv.c                             | 3 +++
- 3 files changed, 8 insertions(+)
+ arch/arm/boot/dts/sun6i-a31.dtsi  | 152 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s.dtsi |   8 ++
+ 2 files changed, 160 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 15fdca8909f2..b82c00449468 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -91,6 +91,7 @@ system.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun5i-a13-display-backend
-+    * allwinner,sun6i-a31-display-backend
-     * allwinner,sun8i-a33-display-backend
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the frontend and backend
-@@ -121,6 +122,7 @@ deinterlacing and color space conversion.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun5i-a13-display-frontend
-+    * allwinner,sun6i-a31-display-frontend
-     * allwinner,sun8i-a33-display-frontend
-   - reg: base address and size of the memory-mapped region.
-   - interrupts: interrupt associated to this IP
-@@ -146,6 +148,8 @@ extra node.
- Required properties:
-   - compatible: value must be one of:
-     * allwinner,sun5i-a13-display-engine
-+    * allwinner,sun6i-a31-display-engine
-+    * allwinner,sun6i-a31s-display-engine
-     * allwinner,sun8i-a33-display-engine
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index c1b891e75f18..4d2c7786b92a 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -231,6 +231,11 @@
+ 		};
+ 	};
  
-   - allwinner,pipelines: list of phandle to the display engine
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 32c0584e3c35..6e6c59a661b6 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -408,6 +408,7 @@ static int sun4i_backend_remove(struct platform_device *pdev)
++	de: display-engine {
++		compatible = "allwinner,sun6i-a31-display-engine";
++		allwinner,pipelines = <&fe0>;
++	};
++
+ 	soc at 01c00000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -246,6 +251,44 @@
+ 			#dma-cells = <1>;
+ 		};
  
- static const struct of_device_id sun4i_backend_of_table[] = {
- 	{ .compatible = "allwinner,sun5i-a13-display-backend" },
-+	{ .compatible = "allwinner,sun6i-a31-display-backend" },
- 	{ .compatible = "allwinner,sun8i-a33-display-backend" },
- 	{ }
++		tcon0: lcd-controller at 01c0c000 {
++			compatible = "allwinner,sun6i-a31-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ccu RST_AHB1_LCD0>;
++			reset-names = "lcd";
++			clocks = <&ccu CLK_AHB1_LCD0>,
++				 <&ccu CLK_LCD0_CH0>,
++				 <&ccu CLK_LCD0_CH1>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon0-pixel-clock";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_drc0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun7i-a20-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -799,6 +842,115 @@
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		fe0: display-frontend at 01e00000 {
++			compatible = "allwinner,sun6i-a31-display-frontend";
++			reg = <0x01e00000 0x20000>;
++			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_FE0>, <&ccu CLK_FE0>,
++				 <&ccu CLK_DRAM_FE0>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_FE0>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					fe0_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe0>;
++					};
++				};
++			};
++		};
++
++		be0: display-backend at 01e60000 {
++			compatible = "allwinner,sun6i-a31-display-backend";
++			reg = <0x01e60000 0x10000>;
++			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_BE0>, <&ccu CLK_BE0>,
++				 <&ccu CLK_DRAM_BE0>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_BE0>;
++
++			assigned-clocks = <&ccu CLK_BE0>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be0_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be0>;
++					};
++				};
++
++				be0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be0_out_drc0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&drc0_in_be0>;
++					};
++				};
++			};
++		};
++
++		drc0: drc at 01e70000 {
++			compatible = "allwinner,sun6i-a31-drc";
++			reg = <0x01e70000 0x10000>;
++			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_AHB1_DRC0>, <&ccu CLK_IEP_DRC0>,
++				 <&ccu CLK_DRAM_DRC0>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&ccu RST_AHB1_DRC0>;
++
++			assigned-clocks = <&ccu CLK_IEP_DRC0>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				drc0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					drc0_in_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_out_drc0>;
++					};
++				};
++
++				drc0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					drc0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_drc0>;
++					};
++				};
++			};
++		};
++
+ 		rtc: rtc at 01f00000 {
+ 			compatible = "allwinner,sun6i-a31-rtc";
+ 			reg = <0x01f00000 0x54>;
+diff --git a/arch/arm/boot/dts/sun6i-a31s.dtsi b/arch/arm/boot/dts/sun6i-a31s.dtsi
+index c17a32771b98..97e2c51d0aea 100644
+--- a/arch/arm/boot/dts/sun6i-a31s.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31s.dtsi
+@@ -48,6 +48,14 @@
+ 
+ #include "sun6i-a31.dtsi"
+ 
++&de {
++	compatible = "allwinner,sun6i-a31s-display-engine";
++};
++
+ &pio {
+ 	compatible = "allwinner,sun6i-a31s-pinctrl";
  };
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index a15c231fbd59..fa6568e1822a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -201,6 +201,7 @@ static const struct component_master_ops sun4i_drv_master_ops = {
- static bool sun4i_drv_node_is_frontend(struct device_node *node)
- {
- 	return of_device_is_compatible(node, "allwinner,sun5i-a13-display-frontend") ||
-+		of_device_is_compatible(node, "allwinner,sun6i-a31-display-frontend") ||
- 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
- }
- 
-@@ -324,6 +325,8 @@ static int sun4i_drv_remove(struct platform_device *pdev)
- 
- static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun5i-a13-display-engine" },
-+	{ .compatible = "allwinner,sun6i-a31-display-engine" },
-+	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
- 	{ }
- };
++
++&tcon0 {
++	compatible = "allwinner,sun6i-a31s-tcon";
++};
 -- 
 2.9.3
