@@ -1,29 +1,40 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Thu, 20 Oct 2016 18:05:15 +0200
-Subject: [PATCH v2 1/6] clk: stm32f4: Add LSI & LSE clocks
-In-Reply-To: <20161019202433.GA8871@codeaurora.org>
-References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
- <1476436699-21879-2-git-send-email-gabriel.fernandez@st.com>
- <20161019202433.GA8871@codeaurora.org>
-Message-ID: <2e6e123e-4bb8-951c-9d49-4cb5480c37fd@st.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 20 Oct 2016 09:23:03 -0700
+Subject: [PATCH] watchdog: meson: Remove unneeded platform MODULE_ALIAS
+In-Reply-To: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
+ (Javier Martinez Canillas's message of "Wed, 19 Oct 2016 16:49:42
+ -0300")
+References: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <7hd1iv7zx4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Javier Martinez Canillas <javier@osg.samsung.com> writes:
 
+> The Amlogic Meson is a DT-only platform, which means the devices are
+> registered via OF and not using the legacy platform devices support.
+>
+> So there's no need to have a MODULE_ALIAS("platform:meson-gxbb-wdt")
+> since the reported uevent MODALIAS to user-space will be the OF one.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-On 10/19/2016 10:24 PM, Stephen Boyd wrote:
-> On 10/14, gabriel.fernandez at st.com wrote:
->> @@ -292,8 +298,110 @@ static int stm32f4_rcc_lookup_clk_idx(u8 primary, u8 secondary)
->>   	return clks[i];
->>   }
->>   
->> +static struct regmap *pdrm;
-> This can't be part of the stm32_rgate structure?
-Finally i prefer not, because i need also to disable power domain write 
-protection in the patch 4 (clk: stm32f4: Add RTC clock).
-its will complicate the code.
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
-BR
-
-Gabriel
+> ---
+>
+>  drivers/watchdog/meson_gxbb_wdt.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
+> index 44d180a2c5e5..45d47664a00a 100644
+> --- a/drivers/watchdog/meson_gxbb_wdt.c
+> +++ b/drivers/watchdog/meson_gxbb_wdt.c
+> @@ -264,7 +264,6 @@ static struct platform_driver meson_gxbb_wdt_driver = {
+>  
+>  module_platform_driver(meson_gxbb_wdt_driver);
+>  
+> -MODULE_ALIAS("platform:meson-gxbb-wdt");
+>  MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+>  MODULE_DESCRIPTION("Amlogic Meson GXBB Watchdog timer driver");
+>  MODULE_LICENSE("Dual BSD/GPL");
