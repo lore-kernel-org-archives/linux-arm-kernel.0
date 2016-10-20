@@ -1,17 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 20 Oct 2016 05:47:43 -0700
-Subject: [PATCHv4 03/15] dt-bindings: clock: add omap4 hwmod clock IDs
-In-Reply-To: <1476805568-19264-4-git-send-email-t-kristo@ti.com>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <1476805568-19264-4-git-send-email-t-kristo@ti.com>
-Message-ID: <20161020124742.7b65l5lz6kcfsysl@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Oct 2016 14:47:56 +0200
+Subject: [PATCH v2 1/9] pinctrl: sunxi: Rework the pin config building code
+In-Reply-To: <709f95f6725453af12bc989ce9039df5aa252ea5.1476200742.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <709f95f6725453af12bc989ce9039df5aa252ea5.1476200742.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdZwmD=Jfss2hgEDt3KvTwVvFXCd5VzRCnn9_pn8VUvxkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [161018 08:47]:
-> Add IDs for omap4 hwmod clocks. These are basically register offsets
-> from the beginning of the clockdomain address space.
+On Tue, Oct 11, 2016 at 5:45 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-Looks like you have a wrong subject for this patch?
+> In order to support more easily the generic pinctrl properties, rework the
+> pinctrl maps configuration and split it into several sub-functions.
+>
+> One of the side-effects from that rework is that we only parse the pin
+> configuration once, since it's going to be common to every pin, instead of
+> having to parsing once for each pin.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Tony
+Patch applied.
+
+Yours,
+Linus Walleij
