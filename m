@@ -1,46 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 10:12:42 +0200
-Subject: [PATCH 1/8] mtd: nand: sunxi: fix support for 512bytes ECC chunks
-In-Reply-To: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
-References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <f1cb6efb6817c11b235f073639a137bec6ac17e5.1476951078.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 20 Oct 2016 10:12:41 +0200
+Subject: [PATCH 0/8] ARM: gr8: Add support for the CHIP Pro
+Message-ID: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hi,
 
-The driver is incorrectly assuming that the ECC block size is always 1k
-which is not always true.
+This is a serie introducing the CHIP Pro support.
 
-Also take the other cases into account.
+The most exciting thing about this is that it's the first board we'll be
+able to enable the NAND on, benefiting from the awesome work Boris did over
+the last couple of years.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/mtd/nand/sunxi_nand.c | 4 ++++
- 1 file changed, 4 insertions(+), 0 deletions(-)
+This is possible because the NAND chip is an SLC one, for which we don't
+have to wait for the current UBI / UBIFS work.
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 8b8470c4e6d0..e40482a65de6 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -145,6 +145,7 @@
- #define NFC_ECC_PIPELINE	BIT(3)
- #define NFC_ECC_EXCEPTION	BIT(4)
- #define NFC_ECC_BLOCK_SIZE_MSK	BIT(5)
-+#define NFC_ECC_BLOCK_512	BIT(5)
- #define NFC_RANDOM_EN		BIT(9)
- #define NFC_RANDOM_DIRECTION	BIT(10)
- #define NFC_ECC_MODE_MSK	GENMASK(15, 12)
-@@ -817,6 +818,9 @@ static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
- 	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION |
- 		   NFC_ECC_PIPELINE;
- 
-+	if (nand->ecc.size == 512)
-+		ecc_ctl |= NFC_ECC_BLOCK_512;
-+
- 	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
- }
- 
+Let me know what you think,
+Maxime
+
+Boris Brezillon (2):
+  mtd: nand: sunxi: fix support for 512bytes ECC chunks
+  mtd: nand: add support for the TC58NVG2S0H chip
+
+Maxime Ripard (6):
+  ARM: gr8: Add the UART3
+  ARM: gr8: Fix typo in the i2s mclk pin group
+  ARM: gr8: Add missing pwm channel 1 pin
+  ARM: gr8: Add UART2 pins
+  ARM: gr8: Add UART3 pins
+  ARM: gr8: Add CHIP Pro support
+
+ arch/arm/boot/dts/Makefile             |   1 +-
+ arch/arm/boot/dts/ntc-gr8-chip-pro.dts | 266 ++++++++++++++++++++++++++-
+ arch/arm/boot/dts/ntc-gr8.dtsi         |  47 ++++-
+ drivers/mtd/nand/nand_ids.c            |   3 +-
+ drivers/mtd/nand/sunxi_nand.c          |   4 +-
+ 5 files changed, 320 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/ntc-gr8-chip-pro.dts
+
 -- 
 git-series 0.8.10
