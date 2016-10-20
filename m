@@ -1,88 +1,39 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu, 20 Oct 2016 16:44:24 +0530
-Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA controller
- hardware v1.1
-Message-ID: <1476962064-8775-1-git-send-email-rsahu@apm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Oct 2016 12:21:23 +0100
+Subject: [PATCH v2 0/3] efi: add support for seeding the kernel RNG from UEFI
+Message-ID: <1476962486-18368-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables NCQ support for APM X-Gene SATA controller
-hardware v1.1 that was broken with hardware v1.0.
+This implements generic EFI core kernel code to seed the kernel entropy
+pool from a Linux specific UEFI configuration table containing a random seed
+supplied by the firmware. (#1)
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/ata/ahci_xgene.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+In addition, it wires it up for ARM and arm64, by invoking the EFI_RNG_PROTOCOL
+UEFI protocol from the stub, and populating such a UEFI config table using its
+output.
 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index 73b19b2..8b88be9 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -87,6 +87,7 @@
+Changes since v1:
+- Add a patch to actually build random.c for the ARM version of the stub, so
+  that the functionality that patch #3 adds is available on ARM as well as arm64
+- Handle the kexec case, by updating the seed in the configuration table on
+  reboot.
 
- enum xgene_ahci_version {
- 	XGENE_AHCI_V1 = 1,
-+	XGENE_AHCI_V1_1,
- 	XGENE_AHCI_V2,
- };
+How to wire this up for x86 is left as an exercise for the Intel developer.
 
-@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
- #ifdef CONFIG_ACPI
- static const struct acpi_device_id xgene_ahci_acpi_match[] = {
- 	{ "APMC0D0D", XGENE_AHCI_V1},
-+	{ "APMC0D67", XGENE_AHCI_V1_1},
- 	{ "APMC0D32", XGENE_AHCI_V2},
- 	{},
- };
-@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
+Ard Biesheuvel (3):
+  efi: add support for seeding the RNG from a UEFI config table
+  efi/libstub: add random.c to ARM build
+  efi/arm*: libstub: invoke EFI_RNG_PROTOCOL to seed the UEFI RNG table
 
- static const struct of_device_id xgene_ahci_of_match[] = {
- 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
-+	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
- 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
- 	{},
- };
-@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	const struct of_device_id *of_devid;
- 	enum xgene_ahci_version version = XGENE_AHCI_V1;
--	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
--					      &xgene_ahci_v2_port_info };
-+	const struct ata_port_info *ppi;
- 	int rc;
+ drivers/firmware/efi/efi.c                     | 67 ++++++++++++++++++++
+ drivers/firmware/efi/libstub/Makefile          |  4 +-
+ drivers/firmware/efi/libstub/arm-stub.c        |  2 +
+ drivers/firmware/efi/libstub/efi-stub-helper.c |  9 ---
+ drivers/firmware/efi/libstub/efistub.h         | 11 ++++
+ drivers/firmware/efi/libstub/random.c          | 48 ++++++++++++++
+ include/linux/efi.h                            |  9 +++
+ 7 files changed, 139 insertions(+), 11 deletions(-)
 
- 	hpriv = ahci_platform_get_resources(pdev);
-@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
- 					__func__);
- 				version = XGENE_AHCI_V1;
--			} else if (info->valid & ACPI_VALID_CID) {
--				version = XGENE_AHCI_V2;
- 			}
- 		}
- 	}
-@@ -858,18 +858,20 @@ skip_clk_phy:
-
- 	switch (version) {
- 	case XGENE_AHCI_V1:
-+		ppi = &xgene_ahci_v1_port_info;
- 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
- 		break;
- 	case XGENE_AHCI_V2:
-+		ppi = &xgene_ahci_v2_port_info;
- 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
- 		hpriv->irq_handler = xgene_ahci_irq_intr;
- 		break;
- 	default:
-+		ppi = &xgene_ahci_v1_port_info;
- 		break;
- 	}
-
--	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
--				     &ahci_platform_sht);
-+	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
- 	if (rc)
- 		goto disable_resources;
-
---
-1.7.1
+-- 
+2.7.4
