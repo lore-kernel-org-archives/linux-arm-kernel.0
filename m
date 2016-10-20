@@ -1,81 +1,19 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Thu, 20 Oct 2016 14:59:49 -0700
-Subject: [PATCH 3/4] arm64: dts: msm8996: Add SMEM DT nodes
-In-Reply-To: <20161020215137.GF3145@hector.attlocal.net>
-References: <1476989765-7524-1-git-send-email-spjoshi@codeaurora.org>
- <1476989765-7524-3-git-send-email-spjoshi@codeaurora.org>
- <20161020195629.GM7509@tuxbot>
- <1c7504f2-48ca-bcae-3eef-16589513d1aa@codeaurora.org>
- <20161020215137.GF3145@hector.attlocal.net>
-Message-ID: <be72dfec-b502-1888-4495-9a476f91d6b6@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 20 Oct 2016 15:28:33 -0700
+Subject: [PATCH] watchdog: meson: Remove unneeded platform MODULE_ALIAS
+In-Reply-To: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
+References: <1476906582-14241-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20161020222833.GA27421@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 02:51 PM, Andy Gross wrote:
-> On Thu, Oct 20, 2016 at 02:18:33PM -0700, Sarangdhar Joshi wrote:
->> On 10/20/2016 12:56 PM, Bjorn Andersson wrote:
->>> On Thu 20 Oct 11:56 PDT 2016, Sarangdhar Joshi wrote:
->>>
->>>> From: Bjorn Andersson <bjorn.andersson@linaro.org>
->>>>
->>>> Add SMEM and TCSR DT nodes on MSM8996.
->>>>
->>>> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
->>>> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
->>>> ---
->>>> arch/arm64/boot/dts/qcom/msm8996.dtsi | 19 +++++++++++++++++++
->>>> 1 file changed, 19 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
->>>> index 949b096..0a810f5 100644
->>>> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
->>>> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
->>>> @@ -169,12 +169,31 @@
->>>> 		method = "smc";
->>>> 	};
->>>>
->>>> +	smem {
->>>> +		compatible = "qcom,smem";
->>>> +
->>>> +		memory-region = <&smem_mem>;
->>>> +
->>>> +		hwlocks = <&tcsr_mutex 3>;
->>>> +	};
->>>> +
->>>> 	soc: soc {
->>>> 		#address-cells = <1>;
->>>> 		#size-cells = <1>;
->>>> 		ranges = <0 0 0 0xffffffff>;
->>>> 		compatible = "simple-bus";
->>>>
->>>> +		tcsr_mutex_regs: syscon at 740000 {
->>>> +			compatible = "syscon";
->>>> +			reg = <0x740000 0x20000>;
->>>> +		};
->>>> +
->>>> +		tcsr_mutex: hwlock {
->>>> +			compatible = "qcom,tcsr-mutex";
->>>> +			syscon = <&tcsr_mutex_regs 0 0x1000>;
->>>> +			#hwlock-cells = <1>;
->>>> +		};
->>>
->>> Sorry, I got this in the wrong place, the hwlock node should sit outside
->>> of soc {} - looks like we got this wrong in msm8916 as well.
->>
->> Thanks for reviewing the patch. Do you mean to move it under / {}; (i.e.
->> root)?
->
-> Yes.  Any node that doesn't have reg properties should go under the root.
->
+On Wed, Oct 19, 2016 at 04:49:42PM -0300, Javier Martinez Canillas wrote:
+> The Amlogic Meson is a DT-only platform, which means the devices are
+> registered via OF and not using the legacy platform devices support.
+> 
+> So there's no need to have a MODULE_ALIAS("platform:meson-gxbb-wdt")
+> since the reported uevent MODALIAS to user-space will be the OF one.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Got it. Will update the patch(es) and add cover letter. Thanks.
-
->
-> Andy
->
-
-Regards,
-Sarang
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
