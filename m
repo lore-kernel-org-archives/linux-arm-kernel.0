@@ -1,50 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 20 Oct 2016 17:58:17 +0100
-Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify
- ACPI support code.
-In-Reply-To: <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
-Message-ID: <20161020165747.GD27598@leverpostej>
+From: gottfried.haider@gmail.com (Gottfried Haider)
+Date: Thu, 20 Oct 2016 18:58:36 +0200
+Subject: [PATCH v2] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
+In-Reply-To: <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
+References: <CAPoCmYJC1TebBrspD_=mTETULSjg9or5a0Yda8p945y6ZWL99Q@mail.gmail.com>
+ <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
+Message-ID: <CAPoCmYKrUBEdyNXt8yRMFq_aCmb8WyK-x4a7og66zfeFYX4rQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
-> 
-> The patch update arm_arch_timer driver to use the function
-> provided by the new GTDT driver of ACPI.
-> By this way, arm_arch_timer.c can be simplified, and separate
-> all the ACPI GTDT knowledge from this timer driver.
-> 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> The old sysfs interface is not changing. However it is deprecated so once
+> you have a v4.8+ kernel, consider migrating whatever userspace you have
+> to use the chardev ABI instead.
+>
+> See:
+> commit fe95046e960b4b76e73dc1486955d93f47276134
+> "gpio: ABI: mark the sysfs ABI as obsolete"
+> commit 521a2ad6f862a28e2e43cb3e254a26bf0f9452e9
+> "gpio: add userspace ABI for GPIO line information"
+> commit d7c51b47ac11e66f547b55640405c1c474642d72
+> "gpio: userspace ABI for reading/writing GPIO lines"
+> commit 61f922db72216b00386581c851db9c9095961522
+> "gpio: userspace ABI for reading GPIO line events"
 
-This generally looks fine, but:
+Thanks for those pointers. Somewhat off topic: is it planned to add
+support for setting GENERIC_PINCONF style pull-up/pull-down resistors
+throigh the new ABI? (The bcm28xx drivers would still need to
+converted to this as well.)
 
-> +	arch_timer_ppi[PHYS_SECURE_PPI] = acpi_gtdt_map_ppi(PHYS_SECURE_PPI);
 
-As mentioned on the prior patch, I think we shouldn't bother parsing the
-secure interrupt, given the problem with the GSIV, and the fact that we
-shouldn't need it in Linux.
+>> Regarding the proposed format using the header pin numbers: From what I've
+>> seen in terms of existing educational materials, it seems the overwhelming
+>> majority ends up using GPIO numbers instead of physical pin header
+>> numbering. (e.g. [1] [2])
+>
+> What does that number mean? If you are referring to the global
+> GPIO numberspace it is obsolete and just reflecting the fact that
+> people up until now was referring to Linux-internal GPIO numbers.
 
-> +	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
-> +	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
-> +	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
-> +	/* Always-on capability */
-> +	arch_timer_c3stop = acpi_gtdt_c3stop();
+I am referring to the name of the various GPIO lines as per datasheet
+("GPIO0", "GPIO1", ...). So far, I believe those matched the global
+GPIO numberspace.
 
-... I think we should check the flag on the relevant interrupt, though
-that's worth clarifying.
 
->  
-> -	/* Always-on capability */
-> -	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
-> +	if (timer_count < 0)
-> +		pr_err("Failed to get platform timer info.\n");
+>> Would it be too confusing to try to pick GPIO 5 from an alphabetically
+>> sorted list like this "P11_GPIO17", "P12_GPIO18"? (I know, alphabetical
+>> sorting is an issue here already for a different reason. But applications
+>> might do it, I guess?)
+>
+> Any attempt to preserve the global GPIO numberspace is futile.
+> If it is the local offset number on the chip it is another thing, that
+> is kind of OK if the arch maintainer likes it.
 
-Why don't we log this in the code that would try to initialise the MMIO
-timer? We can still fail after this.
+I understand that Linux can't guarantee a certain global GPIO number -
+but I fear that the board manufacturers also might not think of the
+pin headers as something set in stone (that the can't rearrange in a
+future revision/product).
 
-Thanks,
-Mark.
+Would there be a reason against _naming_ the pin "GPIO0"? (even if it
+ends up with a different global, internal number)
+
+
+Thanks & best
+Gottfried
