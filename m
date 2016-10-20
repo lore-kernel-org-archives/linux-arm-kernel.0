@@ -1,32 +1,48 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 20 Oct 2016 17:21:22 +0200
-Subject: [PATCH 0/4] STM32F429: Add Ethernet fixes
-Message-ID: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
+Date: Thu, 20 Oct 2016 17:21:23 +0200
+Subject: [PATCH 1/4] ARM: dts: stm32f429: Align Ethernet node with new
+ bindings properties
+In-Reply-To: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
+References: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1476976886-23781-2-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds several fixes for Ethernet for stm32f429 MCU.
-First 2 patches have already been reviewed some months ago when 
-stm32 Ethernet glue has been pushed (I added in this series to keep
-history). Fixes are:
- -Change DT to be compliant to stm32 ethernet glue binding
- -Add phy-handle to correctly use mdio subnode
- -Remove WoL support
+This patch aligns clocks names and node reference according to new
+stm32-dwmac glue binding. It also renames Ethernet pinctrl phandle
+(indeed there is no need to add 0 as Ethernet instance as there is only
+one IP in SOC).
 
-Regards
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Alex
-
-
-Alexandre TORGUE (4):
-  ARM: dts: stm32f429: Align Ethernet node with new bindings properties
-  ARM: dts: stm32f429: Update Ethernet node on Eval board
-  ARM: dts: stm32f429: Fix Ethernet node on Eval Board
-  ARM: dts: stm32f429: remove Ethernet wake on Lan support
-
- arch/arm/boot/dts/stm32429i-eval.dts |  7 ++++---
- arch/arm/boot/dts/stm32f429.dtsi     | 10 +++++-----
- 2 files changed, 9 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 336ee4f..6350117b 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -313,7 +313,7 @@
+ 				};
+ 			};
+ 
+-			ethernet0_mii: mii at 0 {
++			ethernet_mii: mii at 0 {
+ 				pins {
+ 					pinmux = <STM32F429_PG13_FUNC_ETH_MII_TXD0_ETH_RMII_TXD0>,
+ 						 <STM32F429_PG14_FUNC_ETH_MII_TXD1_ETH_RMII_TXD1>,
+@@ -373,13 +373,13 @@
+ 			st,mem2mem;
+ 		};
+ 
+-		ethernet0: dwmac at 40028000 {
++		mac: ethernet at 40028000 {
+ 			compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+ 			reg = <0x40028000 0x8000>;
+ 			reg-names = "stmmaceth";
+ 			interrupts = <61>, <62>;
+ 			interrupt-names = "macirq", "eth_wake_irq";
+-			clock-names = "stmmaceth", "tx-clk", "rx-clk";
++			clock-names = "stmmaceth", "mac-clk-tx", "mac-clk-rx";
+ 			clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+ 			st,syscon = <&syscfg 0x4>;
+ 			snps,pbl = <8>;
 -- 
 1.9.1
