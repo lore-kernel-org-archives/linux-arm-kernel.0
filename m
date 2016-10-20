@@ -1,135 +1,49 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Thu, 20 Oct 2016 09:55:26 +0200
-Subject: [PATCH v2 4/6] clk: stm32f4: Add RTC clock
-In-Reply-To: <20161019204537.GD8871@codeaurora.org>
-References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
- <1476436699-21879-5-git-send-email-gabriel.fernandez@st.com>
- <20161019204537.GD8871@codeaurora.org>
-Message-ID: <b5c25849-e62b-2266-7c01-41a38dedf5eb@st.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 20 Oct 2016 09:58:39 +0200
+Subject: [PATCH 1/2] ARM: mxs: drop last board file user of enet_out
+Message-ID: <20161020075840.16406-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+The ethernet at 800f0000 node in the device tree for apx4devkit references
+the enet_out clk (inherited from imx28.dtsi). This should be good enough
+to drop its handling from the board file.
 
+As this removes the last user of enable_clk_enet_out remove this
+function, too.
 
-On 10/19/2016 10:45 PM, Stephen Boyd wrote:
-> On 10/14, gabriel.fernandez at st.com wrote:
->> @@ -310,6 +310,15 @@ static inline void enable_power_domain_write_protection(void)
->>   	regmap_update_bits(pdrm, 0x00, (1 << 8), (0 << 8));
->>   }
->>   
->> +static inline void sofware_reset_backup_domain(void)
->> +{
->> +	unsigned long val;
->> +
->> +	val = readl(base + STM32F4_RCC_BDCR);
->> +	writel(val |= (1 << 16), base + STM32F4_RCC_BDCR);
-> Interesting C style here! Why set the bit in val that will then
-> be cleared in the next function call? Please just don't do it. It
-> would be better to do writel(val | BIT(16), ...)
-To reset the backup domain, i have to generate a pulse on this bit.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-mxs/mach-mxs.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-BR
-Gabriel.
-
->
->> +	writel(val & ~(1 << 16), base + STM32F4_RCC_BDCR);
->> +}
->> +
->>   struct stm32_rgate {
->>   	struct	clk_hw hw;
->>   	struct	clk_gate gate;
->> @@ -396,6 +405,113 @@ static struct clk_hw *clk_register_rgate(struct device *dev, const char *name,
->>   	return hw;
->>   }
->>   
->> +static int cclk_gate_enable(struct clk_hw *hw)
->> +{
->> +	int ret;
->> +
->> +	disable_power_domain_write_protection();
->> +
->> +	ret = clk_gate_ops.enable(hw);
->> +
->> +	enable_power_domain_write_protection();
->> +
->> +	return ret;
->> +}
->> +
->> +static void cclk_gate_disable(struct clk_hw *hw)
->> +{
->> +	disable_power_domain_write_protection();
->> +
->> +	clk_gate_ops.disable(hw);
->> +
->> +	enable_power_domain_write_protection();
->> +}
->> +
->> +static int cclk_gate_is_enabled(struct clk_hw *hw)
->> +{
->> +	return clk_gate_ops.is_enabled(hw);
->> +}
->> +
->> +static const struct clk_ops cclk_gate_ops = {
->> +	.enable		= cclk_gate_enable,
->> +	.disable	= cclk_gate_disable,
->> +	.is_enabled	= cclk_gate_is_enabled,
->> +};
->> +
->> +static u8 cclk_mux_get_parent(struct clk_hw *hw)
->> +{
->> +	return clk_mux_ops.get_parent(hw);
->> +}
->> +
->> +
-> Weird double newline here. Please remove one.
->
->> +static int cclk_mux_set_parent(struct clk_hw *hw, u8 index)
->> +{
->> +	int ret;
->> +
->> +	disable_power_domain_write_protection();
->> +
->> +	sofware_reset_backup_domain();
->> +
->> +	ret = clk_mux_ops.set_parent(hw, index);
->> +
->> +	enable_power_domain_write_protection();
->> +
->> +	return ret;
->> +}
->> +
->> +
-> Same.
->
->> +static const struct clk_ops cclk_mux_ops = {
->> +	.get_parent = cclk_mux_get_parent,
->> +	.set_parent = cclk_mux_set_parent,
->> +};
->> +
->> +static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
->> +		const char * const *parent_names, int num_parents,
->> +		void __iomem *reg, u8 bit_idx, u8 shift, unsigned long flags,
->> +		spinlock_t *lock)
->> +{
->> +	struct clk_hw *hw;
->> +	struct clk_gate *gate;
->> +	struct clk_mux *mux;
->> +
->> +	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
-> sizeof(*gate) please.
->
->> +	if (!gate) {
->> +		hw = ERR_PTR(-EINVAL);
->> +		goto fail;
->> +	}
->> +
->> +	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
-> sizeof(*mux) please.
->
->> +	if (!mux) {
->> +		kfree(gate);
->> +		hw = ERR_PTR(-EINVAL);
->> +		goto fail;
->> +	}
->> +
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index e4f21086b42b..8f759d160828 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -233,14 +233,6 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
+ 	}
+ }
+ 
+-static inline void enable_clk_enet_out(void)
+-{
+-	struct clk *clk = clk_get_sys("enet_out", NULL);
+-
+-	if (!IS_ERR(clk))
+-		clk_prepare_enable(clk);
+-}
+-
+ static void __init imx28_evk_init(void)
+ {
+ 	update_fec_mac_prop(OUI_FSL);
+@@ -261,8 +253,6 @@ static int apx4devkit_phy_fixup(struct phy_device *phy)
+ 
+ static void __init apx4devkit_init(void)
+ {
+-	enable_clk_enet_out();
+-
+ 	if (IS_BUILTIN(CONFIG_PHYLIB))
+ 		phy_register_fixup_for_uid(PHY_ID_KSZ8051, MICREL_PHY_ID_MASK,
+ 					   apx4devkit_phy_fixup);
+-- 
+2.9.3
