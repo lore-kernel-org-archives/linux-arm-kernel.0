@@ -1,55 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 15:46:30 +0200
-Subject: [PATCH v2 4/9] pinctrl: sunxi: Deal with configless pins
-In-Reply-To: <CACRpkdY3+OnQ6Oo_nx+BrWebeTa=kYhHWSzirk1MxfWWJ--0Sg@mail.gmail.com>
-References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
- <d707c657502b87a7f8e70c7b44492bc95939f9f6.1476200742.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v64gBi71W=+Tu2vz94xFDtuRNHUyVWK3ken8CSOWvK5t0g@mail.gmail.com>
- <20161019121614.3crr76qyexhamjiy@lukather>
- <CACRpkdY3+OnQ6Oo_nx+BrWebeTa=kYhHWSzirk1MxfWWJ--0Sg@mail.gmail.com>
-Message-ID: <20161020134630.xzkqvm7rokqiecg6@lukather>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 20 Oct 2016 15:47:56 +0200
+Subject: [PATCH] ARM: dts: rockchip: add i2c-bus subnode to edp
+In-Reply-To: <7604646.6yosK0XMNL@diego>
+References: <1476950845-28242-1-git-send-email-tomeu.vizoso@collabora.com>
+ <7604646.6yosK0XMNL@diego>
+Message-ID: <6083453f-08e1-643a-9638-1db38c704aa5@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Thu, Oct 20, 2016 at 02:52:54PM +0200, Linus Walleij wrote:
-> On Wed, Oct 19, 2016 at 2:16 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Tue, Oct 18, 2016 at 03:47:03PM +0800, Chen-Yu Tsai wrote:
-> >> > @@ -342,6 +365,8 @@ static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
-> >> >                                     struct pinctrl_map *map,
-> >> >                                     unsigned num_maps)
-> >> >  {
-> >> > +       unsigned long *pinconfig;
-> >>
-> >> This looks out of place and context?
-> >
-> > Yeah, sorry, it's just a leftover from the previous version. This has
-> > been removed.
+On 10/20/2016 03:45 PM, Heiko St?bner wrote:
+> Am Donnerstag, 20. Oktober 2016, 10:07:25 schrieb Tomeu Vizoso:
+>> Add an empty 'i2c-bus' subnode to the edp node just so that the I2C core
+>> doesn't attemp to parse the 'ports' subnode as containing i2c devices.
+>>
+>> This is to avoid spurious failure messages such as:
+>>
+>> i2c i2c-6: of_i2c: modalias failure on /dp at ff970000/ports
 > 
-> Do you mean you will send a v3 of this series?
+> On the one hand, the edp really has an i2c bus - with its only client the EDID 
+> listening at 0x50 (and maybe 0x30).
+> 
+> On the other hand, adding an empty bus to the (implementation independent) 
+> devicetree just to make the Linux i2c subsystem happy sounds heavily like a 
+> implementation-specific hack, as the edp i2c bus doesn't leak into the outside 
+> world otherwise.
+> 
+> I guess this empty i2c bus not being part of the binding document points 
+> heavily into the implementation-specific corner :-) .
+> 
+> My short search on other patches touching this didn't reveal anything but 
+> maybe this was already discussed somewhere and found to be ok?
 
-Yes, I was waiting for your input to do that, but I guess you're ok
-with it :)
+Here it is:
 
-> OK stopping to apply then.
->
-> But I have already applied patches 1, 2 and 3 so just resend the rest :)
+http://www.spinics.net/lists/linux-tegra/msg27862.html
 
-Ack, I'll send it in a moment.
+Regards,
 
-Thanks!
-Maxime
+Tomeu
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/2e925f92/attachment.sig>
+> Another option could be to just make of_i2c_register_device silent if 
+> of_modalias_node returns -ENODEV?
+> 
+> 
+> Heiko
+> 
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Cc: Randy Li <randy.li@rock-chips.com>
+>> Cc: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>>  arch/arm/boot/dts/rk3288.dtsi | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+>> index 2f814ffeb605..94f4b7eecca2 100644
+>> --- a/arch/arm/boot/dts/rk3288.dtsi
+>> +++ b/arch/arm/boot/dts/rk3288.dtsi
+>> @@ -1075,6 +1075,11 @@
+>>  				};
+>>  			};
+>>  		};
+>> +
+>> +		i2c-bus {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>>  	};
+>>
+>>  	hdmi: hdmi at ff980000 {
+> 
