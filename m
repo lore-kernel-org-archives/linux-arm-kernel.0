@@ -1,76 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 20 Oct 2016 10:17:42 +0530
-Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
-In-Reply-To: <20161020042012.GI11766@vireshk-i7>
-References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
- <20161020042012.GI11766@vireshk-i7>
-Message-ID: <20161020044742.GK11766@vireshk-i7>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 20 Oct 2016 11:18:12 +0530
+Subject: [PATCH V2 0/5] ARM64: More flexible HW watchpoint
+Message-ID: <cover.1476941895.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-10-16, 09:50, Viresh Kumar wrote:
-> On 19-10-16, 11:59, Linus Walleij wrote:
-> > This switches the ARM Integrator/AP and Integrator/CP to use the
-> > Device Tree cpufreq policy with its definition of operating points
-> > using the generic OPP library.
-> > 
-> > The Integrators does not need to control a regulator to switch
-> > frequency, only a clock. This clock and its device tree bindings
-> > have been defined in the device tree and merged upstream for v4.9.
-> > 
-> > This approach provides a little better granularity on the
-> > Integrator/AP where I defined a few operating points: before
-> > this change the Integrator would just switch between min speed
-> > (12 MHz) and max speed (71 MHz). Now it can switch between a
-> > few arbitrarily chosen OPPs as in the examples below:
-> > 
-> > The following tests were made on the Integrator/AP:
-> > 
-> > /sys/devices/system/cpu/cpufreq/policy0 echo ondemand > scaling_governor
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 24000000 Hz
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 24000000 Hz
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 24000000 Hz --> 12000000 Hz
-> > 
-> > The switch from 12 to 24 MHz is triggered by as little as using the
-> > command line with the ondemand governor. If we do this:
-> > 
-> > yes > /dev/null &
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 36000000 Hz
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 36000000 Hz --> 71000000 Hz
-> > pkill yes
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-> > 
-> > So the algorithm is indeed using all the OPPs.
-> > 
-> > Also as a confirmation test to make sure performance is affected by the
-> > speed changes, we set the performance governor and:
-> > 
-> > echo 12000 > scaling_max_freq
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 71000000 Hz --> 12000000 Hz
-> > time find /sys|sort|uniq > /dev/null
-> > real    0m 45.51s
-> > user    0m 11.15s
-> > sys     0m 26.74s
-> > 
-> > echo 71000 > scaling_max_freq
-> > cpu cpu0: dev_pm_opp_set_rate: switching OPP: 12000000 Hz --> 71000000 Hz
-> > time find /sys|sort|uniq
-> >  > /dev/null
-> > real    0m 9.13s
-> > user    0m 2.35s
-> > sys     0m 5.50s
-> > 
-> > So it is working.
-> > 
-> > If people are happy with this approach and approve of the patches
-> > I'd like an ACK from the cpufreq people and then merge the whole set
-> > through ARM SoC.
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Currently, we do not support all the byte select option provided by ARM64
+specs for a HW watchpoint.
 
-Integrator is an UP, right? Otherwise you may want to use operating-points-v2
-bindings instead.
+This patch set will help user to instrument a watchpoint with all possible
+byte select options.
+
+Changes since v1:
+Introduced a new patch 3/5 where it takes care of the situation when HW
+does not report a watchpoint hit with the address that matches one of the
+watchpoints set.
+Added corresponding test case to test that functionality.
+
+Pavel Labath (1):
+  arm64: hw_breakpoint: Handle inexact watchpoint addresses
+
+Pratyush Anand (4):
+  hw_breakpoint: Allow watchpoint of length 3,5,6 and 7
+  arm64: Allow hw watchpoint at varied offset from base address
+  arm64: Allow hw watchpoint of length 3,5,6 and 7
+  selftests: arm64: add test for unaligned/inexact watchpoint handling
+
+ arch/arm64/include/asm/hw_breakpoint.h             |   6 +-
+ arch/arm64/kernel/hw_breakpoint.c                  | 149 +++++++++----
+ arch/arm64/kernel/ptrace.c                         |   5 +-
+ include/uapi/linux/hw_breakpoint.h                 |   4 +
+ tools/include/uapi/linux/hw_breakpoint.h           |   4 +
+ tools/testing/selftests/breakpoints/Makefile       |   5 +-
+ .../selftests/breakpoints/breakpoint_test_arm64.c  | 236 +++++++++++++++++++++
+ 7 files changed, 366 insertions(+), 43 deletions(-)
+ create mode 100644 tools/testing/selftests/breakpoints/breakpoint_test_arm64.c
 
 -- 
-viresh
+2.7.4
