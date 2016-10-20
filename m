@@ -1,29 +1,45 @@
 From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 20 Oct 2016 15:26:50 +0200
-Subject: [PATCH 0/2] STM32 pinctrl: remove dependency between pinctrl driver
- and device tree
-Message-ID: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
+Date: Thu, 20 Oct 2016 15:26:52 +0200
+Subject: [PATCH 2/2] pinctrl: stm32: move gpio irqs binding to optional
+In-Reply-To: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
+References: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1476970012-7838-3-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
+stm32 pinctrl driver could be probed even if no interrupt controller
+is defined to manage gpio irqs. Entries related to gpio irq management
+are moved to optional.
 
-Currently 4.9-rc1 is not booting correctly on STM32F4. 
-By adding gpios irqs support to stm32 pinctrl, a dependency has been 
-added between pinctrl stm32 and stm32f4 device tree (my mistake). 
-This series breaks this dependency and has to be taken on 4.9_rcs. 
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Regards
-Alex
-
-
-Alexandre TORGUE (2):
-  pinctrl: stm32: remove dependency with interrupt controller
-  pinctrl: stm32: move gpio irqs binding to optional
-
- Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt | 10 +++++-----
- drivers/pinctrl/stm32/pinctrl-stm32.c                          |  8 +++++---
- 2 files changed, 10 insertions(+), 8 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+index f9753c4..b24583a 100644
+--- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+@@ -14,11 +14,6 @@ Required properies:
+  - #size-cells	: The value of this property must be 1
+  - ranges	: defines mapping between pin controller node (parent) to
+    gpio-bank node (children).
+- - interrupt-parent: phandle of the interrupt parent to which the external
+-   GPIO interrupts are forwarded to.
+- - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
+-   which includes IRQ mux selection register, and the offset of the IRQ mux
+-   selection register.
+  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
+    specify pins.
+ 
+@@ -37,6 +32,11 @@ Required properties:
+ 
+ Optional properties:
+  - reset:	  : Reference to the reset controller
++ - interrupt-parent: phandle of the interrupt parent to which the external
++   GPIO interrupts are forwarded to.
++ - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
++   which includes IRQ mux selection register, and the offset of the IRQ mux
++   selection register.
+ 
+ Example:
+ #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
 -- 
 1.9.1
