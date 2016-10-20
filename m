@@ -1,31 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 20 Oct 2016 23:17:53 +0800
-Subject: [linux-sunxi] [PATCH v4 9/9] arm64: dts: add Pine64 support
-In-Reply-To: <0ceb2e4d03b16b3c7edf1550ba4a79fbbfac925b.1476196031.git-series.maxime.ripard@free-electrons.com>
-References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
- <0ceb2e4d03b16b3c7edf1550ba4a79fbbfac925b.1476196031.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64BxfJbHBL0Lrkf3hRuRsM6KrPR2PAKQsPKa+eeLnk3SQ@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Thu, 20 Oct 2016 17:20:27 +0200
+Subject: [GIT PULL] STi defconfig updates for v4.10
+Message-ID: <50be6ab2-2af8-b21e-770c-d141d6396179@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
->
-> The Pine64 is a cost-efficient development board based on the
-> Allwinner A64 SoC.
-> There are three models: the basic version with Fast Ethernet and
-> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-> feature Gigabit Ethernet and additional connectors for touchscreens
-> and a camera. Or as my son put it: "Those are smaller and these are
-> missing." ;-)
-> The two Pine64+ models just differ in the amount of DRAM
-> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-> patches the DT accordingly we just need to provide one DT for the
-> Pine64+.
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> [Maxime: Removed the common DTSI and include directly the pine64 DTS]
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Olof, Arnd and Kevin,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Please consider this first round of multi_v7_defconfig updates for v4.10 :
+
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-defconfig-for-4.10
+
+for you to fetch changes up to 620c52f4db4d47e1f33c64e641392fe575d5397f:
+
+  ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol. (2016-10-20 17:05:08 +0200)
+
+----------------------------------------------------------------
+Remove STiH415/416 specific IPs
+
+As STiH415/416 have been removed from kernel, remove IPs only found
+on these socs, remove CONFIG_PHY_MIPHY365X and CONFIG_PHY_STIH41X_USB.
+
+----------------------------------------------------------------
+Peter Griffin (2):
+      ARM: multi_v7_defconfig: Remove miphy365 phy Kconfig symbol.
+      ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol.
+
+ arch/arm/configs/multi_v7_defconfig | 2 --
+ 1 file changed, 2 deletions(-)
