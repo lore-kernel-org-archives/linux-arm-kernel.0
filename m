@@ -1,45 +1,70 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Thu, 20 Oct 2016 15:26:52 +0200
-Subject: [PATCH 2/2] pinctrl: stm32: move gpio irqs binding to optional
-In-Reply-To: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
-References: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1476970012-7838-3-git-send-email-alexandre.torgue@st.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 20 Oct 2016 21:26:53 +0800
+Subject: [PATCH 2/2] arm64/numa: fix incorrect print of end_pfn
+In-Reply-To: <20161020125511.GG10234@leverpostej>
+References: <1476935576-59941-1-git-send-email-guohanjun@huawei.com>
+ <1476935576-59941-2-git-send-email-guohanjun@huawei.com>
+ <20161020105130.GD24914@arm.com> <5808B6D1.809@huawei.com>
+ <20161020125511.GG10234@leverpostej>
+Message-ID: <5808C61D.4010101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stm32 pinctrl driver could be probed even if no interrupt controller
-is defined to manage gpio irqs. Entries related to gpio irq management
-are moved to optional.
+On 2016/10/20 20:55, Mark Rutland wrote:
+> On Thu, Oct 20, 2016 at 08:21:37PM +0800, Hanjun Guo wrote:
+>> On 2016/10/20 18:51, Will Deacon wrote:
+>>> On Thu, Oct 20, 2016 at 11:52:56AM +0800, Hanjun Guo wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> When booting on NUMA system with memory-less node (no
+>>>> memory dimm on this memory controller), the print
+>>>> for setup_node_data() is incorrect:
+>>>>
+>>>> NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+>>>>
+>>>> It should be 0, not 0xffffffffffffffff as there is
+>>>> no memory on that node.
+>>> Wouldn't it make more sense to print something useful, like "memory-less
+>>> node"?
+>> in the log,
+>>
+>> [    0.000000] NUMA: Initmem setup node 0 [mem 0x00000000-0x13fbffffff]
+>> [    0.000000] NUMA: NODE_DATA [mem 0x13fbffe500-0x13fbffffff]
+>> [    0.000000] NUMA: Initmem setup node 1 [mem 0x1400000000-0x17fbffffff]
+>> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfec500-0x17fbfedfff]
+>> [    0.000000] NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+>> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfeaa00-0x17fbfec4ff]
+>> [    0.000000] NUMA: NODE_DATA(2) on node 1
+>> [    0.000000] NUMA: Initmem setup node 3 [mem 0x00000000-0xffffffffffffffff]
+>> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfe8f00-0x17fbfea9ff]
+>> [    0.000000] NUMA: NODE_DATA(3) on node 1
+>>
+>> if printing "NUMA: Initmem setup node 2 [mem 0x00000000-0x00000000]",
+> Seeing "NUMA: Initmem setup node 2 [<memoryless node>]" would be far
+> more obvious as a memoryless node, and I don't see that this would be
+> inconsistent.
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+I misunderstood Will's intention, I though printing "NUMA: memory-less node 2".
+so do you mean code like below?
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-index f9753c4..b24583a 100644
---- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-@@ -14,11 +14,6 @@ Required properies:
-  - #size-cells	: The value of this property must be 1
-  - ranges	: defines mapping between pin controller node (parent) to
-    gpio-bank node (children).
-- - interrupt-parent: phandle of the interrupt parent to which the external
--   GPIO interrupts are forwarded to.
-- - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
--   which includes IRQ mux selection register, and the offset of the IRQ mux
--   selection register.
-  - pins-are-numbered: Specify the subnodes are using numbered pinmux to
-    specify pins.
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 34415fc..bf4e39b 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -226,8 +226,11 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+        void *nd;
+        int tnid;
  
-@@ -37,6 +32,11 @@ Required properties:
+-   pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
+-           nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
++ if ((end_pfn - start_pfn) != 0)
++         pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n", nid,
++                 start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
++ else
++         pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
  
- Optional properties:
-  - reset:	  : Reference to the reset controller
-+ - interrupt-parent: phandle of the interrupt parent to which the external
-+   GPIO interrupts are forwarded to.
-+ - st,syscfg: Should be phandle/offset pair. The phandle to the syscon node
-+   which includes IRQ mux selection register, and the offset of the IRQ mux
-+   selection register.
- 
- Example:
- #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
--- 
-1.9.1
+        nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
+        nd = __va(nd_pa);
+
+Thanks
+Hanjun
