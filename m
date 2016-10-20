@@ -1,177 +1,302 @@
-From: jglauber@cavium.com (Jan Glauber)
-Date: Thu, 20 Oct 2016 11:30:40 +0200
-Subject: [PATCH v3 4/5] arm64: perf: Cavium ThunderX LMC uncore support
-In-Reply-To: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
-References: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
-Message-ID: <1476955841-27898-5-git-send-email-jglauber@cavium.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Oct 2016 10:37:43 +0100
+Subject: [PATCH v2] modversions: treat symbol CRCs as 32 bit quantities on 64
+ bit archs
+Message-ID: <1476956263-1787-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support counters on the DRAM controllers.
+The symbol CRCs are emitted as ELF symbols, which allows us to easily
+populate the kcrctab sections by relying on the linker to associate
+each kcrctab slot with the correct value.
 
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
+This has two downsides:
+- given that the CRCs are treated as pointers, we waste 4 bytes for
+  each CRC on 64 bit architectures,
+- on architectures that support runtime relocation, a relocation entry is
+  emitted for each CRC value, which may take up 24 bytes of __init space
+  (on ELF64 systems)
+
+This comes down to a x8 overhead in [uncompressed] kernel size. In addition,
+each relocation has to be reverted before the CRC value can be used.
+
+Switching to explicit 32 bit values on 64 bit architectures fixes both
+issues, since 32 bit values are not treated as relocatable quantities on
+ELF64 systems, even if the value ultimately resolves to a linker supplied
+value.
+
+So redefine all CRC fields and variables as u32, and redefine the
+__CRC_SYMBOL() macro for 64 bit builds to emit the CRC reference using
+inline assembler (which is necessary since 64-bit C code cannot use
+32-bit types to hold memory addresses, even if they are ultimately
+resolved using values that do no exceed 0xffffffff).
+
+Also remove the special handling for PPC64, this should no longer be
+required.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/perf/uncore/Makefile            |   3 +-
- drivers/perf/uncore/uncore_cavium.c     |   1 +
- drivers/perf/uncore/uncore_cavium.h     |   1 +
- drivers/perf/uncore/uncore_cavium_lmc.c | 118 ++++++++++++++++++++++++++++++++
- 4 files changed, 122 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
+v2: drop the change to struct modversion_info: it affects the layout of the
+    __versions section, which is consumed by userland tools as well, so it is
+    effectively ABI
 
-diff --git a/drivers/perf/uncore/Makefile b/drivers/perf/uncore/Makefile
-index d5ef3db..ef04a2b9 100644
---- a/drivers/perf/uncore/Makefile
-+++ b/drivers/perf/uncore/Makefile
-@@ -1,3 +1,4 @@
- obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o		\
- 				   uncore_cavium_l2c_tad.o	\
--				   uncore_cavium_l2c_cbc.o
-+				   uncore_cavium_l2c_cbc.o	\
-+				   uncore_cavium_lmc.o
-diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
-index 051f0fa..fd9e49e 100644
---- a/drivers/perf/uncore/uncore_cavium.c
-+++ b/drivers/perf/uncore/uncore_cavium.c
-@@ -348,6 +348,7 @@ static int __init thunder_uncore_init(void)
+On an arm64 defconfig build with CONFIG_RELOCATABLE=y, this patch reduces
+the CRC footprint by 24 KB for .rodata, and by 217 KB for .init
+
+Before:
+  [ 9] __kcrctab         PROGBITS         ffff000008b992a8  00b292a8
+       0000000000009440  0000000000000000   A       0     0     8
+  [10] __kcrctab_gpl     PROGBITS         ffff000008ba26e8  00b326e8
+       0000000000008d40  0000000000000000   A       0     0     8
+  ...
+  [22] .rela             RELA             ffff000008c96e20  00c26e20
+       00000000001cc758  0000000000000018   A       0     0     8
+
+After:
+  [ 9] __kcrctab         PROGBITS         ffff000008b728a8  00b028a8
+       0000000000004a20  0000000000000000   A       0     0     1
+  [10] __kcrctab_gpl     PROGBITS         ffff000008b772c8  00b072c8
+       00000000000046a0  0000000000000000   A       0     0     1
+  ...
+  [22] .rela             RELA             ffff000008c66e20  00bf6e20
+       00000000001962d8  0000000000000018   A       0     0     8
+
+ arch/powerpc/include/asm/module.h |  4 --
+ arch/powerpc/kernel/module_64.c   |  8 ----
+ include/linux/export.h            |  8 ++++
+ include/linux/module.h            | 14 +++----
+ kernel/module.c                   | 39 +++++++-------------
+ 5 files changed, 29 insertions(+), 44 deletions(-)
+
+diff --git a/arch/powerpc/include/asm/module.h b/arch/powerpc/include/asm/module.h
+index cd4ffd86765f..94a7f7aa3ae8 100644
+--- a/arch/powerpc/include/asm/module.h
++++ b/arch/powerpc/include/asm/module.h
+@@ -94,9 +94,5 @@ struct exception_table_entry;
+ void sort_ex_table(struct exception_table_entry *start,
+ 		   struct exception_table_entry *finish);
  
- 	thunder_uncore_l2c_tad_setup();
- 	thunder_uncore_l2c_cbc_setup();
-+	thunder_uncore_lmc_setup();
- 	return 0;
+-#if defined(CONFIG_MODVERSIONS) && defined(CONFIG_PPC64)
+-#define ARCH_RELOCATES_KCRCTAB
+-#define reloc_start PHYSICAL_START
+-#endif
+ #endif /* __KERNEL__ */
+ #endif	/* _ASM_POWERPC_MODULE_H */
+diff --git a/arch/powerpc/kernel/module_64.c b/arch/powerpc/kernel/module_64.c
+index 183368e008cf..be9b2d5ff846 100644
+--- a/arch/powerpc/kernel/module_64.c
++++ b/arch/powerpc/kernel/module_64.c
+@@ -286,14 +286,6 @@ static void dedotify_versions(struct modversion_info *vers,
+ 	for (end = (void *)vers + size; vers < end; vers++)
+ 		if (vers->name[0] == '.') {
+ 			memmove(vers->name, vers->name+1, strlen(vers->name));
+-#ifdef ARCH_RELOCATES_KCRCTAB
+-			/* The TOC symbol has no CRC computed. To avoid CRC
+-			 * check failing, we must force it to the expected
+-			 * value (see CRC check in module.c).
+-			 */
+-			if (!strcmp(vers->name, "TOC."))
+-				vers->crc = -(unsigned long)reloc_start;
+-#endif
+ 		}
  }
- late_initcall(thunder_uncore_init);
-diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
-index 91d674a..3897586 100644
---- a/drivers/perf/uncore/uncore_cavium.h
-+++ b/drivers/perf/uncore/uncore_cavium.h
-@@ -71,3 +71,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
- 				  char *page);
- int thunder_uncore_l2c_tad_setup(void);
- int thunder_uncore_l2c_cbc_setup(void);
-+int thunder_uncore_lmc_setup(void);
-diff --git a/drivers/perf/uncore/uncore_cavium_lmc.c b/drivers/perf/uncore/uncore_cavium_lmc.c
-new file mode 100644
-index 0000000..c7df89b
---- /dev/null
-+++ b/drivers/perf/uncore/uncore_cavium_lmc.c
-@@ -0,0 +1,118 @@
-+/*
-+ * Cavium Thunder uncore PMU support, Local memory controller (LMC) counters.
-+ *
-+ * Copyright 2016 Cavium Inc.
-+ * Author: Jan Glauber <jan.glauber@cavium.com>
-+ */
-+
-+#include <linux/perf_event.h>
-+#include <linux/slab.h>
-+
-+#include "uncore_cavium.h"
-+
-+struct thunder_uncore *thunder_uncore_lmc;
-+
-+#define LMC_CONFIG_OFFSET		0x188
-+#define LMC_CONFIG_RESET_BIT		BIT_ULL(17)
-+
-+/* LMC event list */
-+#define LMC_EVENT_IFB_CNT		0x1d0
-+#define LMC_EVENT_OPS_CNT		0x1d8
-+#define LMC_EVENT_DCLK_CNT		0x1e0
-+#define LMC_EVENT_BANK_CONFLICT1	0x360
-+#define LMC_EVENT_BANK_CONFLICT2	0x368
-+
-+/* map counter numbers to register offsets */
-+static int lmc_events[] = {
-+	LMC_EVENT_IFB_CNT,
-+	LMC_EVENT_OPS_CNT,
-+	LMC_EVENT_DCLK_CNT,
-+	LMC_EVENT_BANK_CONFLICT1,
-+	LMC_EVENT_BANK_CONFLICT2,
-+};
-+
-+static int thunder_uncore_add_lmc(struct perf_event *event, int flags)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	return thunder_uncore_add(event, flags,
-+				  LMC_CONFIG_OFFSET,
-+				  lmc_events[get_id(hwc->config)]);
-+}
-+
-+PMU_FORMAT_ATTR(event, "config:0-2");
-+
-+static struct attribute *thunder_lmc_format_attr[] = {
-+	&format_attr_event.attr,
-+	&format_attr_node.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group thunder_lmc_format_group = {
-+	.name = "format",
-+	.attrs = thunder_lmc_format_attr,
-+};
-+
-+static struct attribute *thunder_lmc_events_attr[] = {
-+	UC_EVENT_ENTRY(ifb_cnt, 0),
-+	UC_EVENT_ENTRY(ops_cnt, 1),
-+	UC_EVENT_ENTRY(dclk_cnt, 2),
-+	UC_EVENT_ENTRY(bank_conflict1, 3),
-+	UC_EVENT_ENTRY(bank_conflict2, 4),
-+	NULL,
-+};
-+
-+static struct attribute_group thunder_lmc_events_group = {
-+	.name = "events",
-+	.attrs = thunder_lmc_events_attr,
-+};
-+
-+static const struct attribute_group *thunder_lmc_attr_groups[] = {
-+	&thunder_uncore_attr_group,
-+	&thunder_lmc_format_group,
-+	&thunder_lmc_events_group,
-+	NULL,
-+};
-+
-+struct pmu thunder_lmc_pmu = {
-+	.name		= "thunder_lmc",
-+	.task_ctx_nr    = perf_sw_context,
-+	.event_init	= thunder_uncore_event_init,
-+	.add		= thunder_uncore_add_lmc,
-+	.del		= thunder_uncore_del,
-+	.start		= thunder_uncore_start,
-+	.stop		= thunder_uncore_stop,
-+	.read		= thunder_uncore_read,
-+	.attr_groups	= thunder_lmc_attr_groups,
-+};
-+
-+static bool event_valid(u64 config)
-+{
-+	if (config < ARRAY_SIZE(lmc_events))
-+		return true;
-+
-+	return false;
-+}
-+
-+int __init thunder_uncore_lmc_setup(void)
-+{
-+	int ret = -ENOMEM;
-+
-+	thunder_uncore_lmc = kzalloc(sizeof(*thunder_uncore_lmc), GFP_KERNEL);
-+	if (!thunder_uncore_lmc)
-+		goto fail_nomem;
-+
-+	ret = thunder_uncore_setup(thunder_uncore_lmc, 0xa022,
-+				   &thunder_lmc_pmu,
-+				   ARRAY_SIZE(lmc_events));
-+	if (ret)
-+		goto fail;
-+
-+	thunder_uncore_lmc->event_valid = event_valid;
-+	return 0;
-+
-+fail:
-+	kfree(thunder_uncore_lmc);
-+fail_nomem:
-+	return ret;
-+}
+ 
+diff --git a/include/linux/export.h b/include/linux/export.h
+index 2a0f61fbc731..fa51ab2ad190 100644
+--- a/include/linux/export.h
++++ b/include/linux/export.h
+@@ -41,6 +41,7 @@ extern struct module __this_module;
+ 
+ #if defined(__KERNEL__) && !defined(__GENKSYMS__)
+ #ifdef CONFIG_MODVERSIONS
++#ifndef CONFIG_64BIT
+ /* Mark the CRC weak since genksyms apparently decides not to
+  * generate a checksums for some symbols */
+ #define __CRC_SYMBOL(sym, sec)						\
+@@ -50,6 +51,13 @@ extern struct module __this_module;
+ 	__attribute__((section("___kcrctab" sec "+" #sym), used))	\
+ 	= (unsigned long) &__crc_##sym;
+ #else
++#define __CRC_SYMBOL(sym, sec)						\
++	asm("	.section \"___kcrctab" sec "+" #sym "\", \"a\"	\n"	\
++	    "	.weak	" VMLINUX_SYMBOL_STR(__crc_##sym) "	\n"	\
++	    "	.word	" VMLINUX_SYMBOL_STR(__crc_##sym) "	\n"	\
++	    "	.previous					\n");
++#endif
++#else
+ #define __CRC_SYMBOL(sym, sec)
+ #endif
+ 
+diff --git a/include/linux/module.h b/include/linux/module.h
+index 0c3207d26ac0..e0067673f5e5 100644
+--- a/include/linux/module.h
++++ b/include/linux/module.h
+@@ -346,7 +346,7 @@ struct module {
+ 
+ 	/* Exported symbols */
+ 	const struct kernel_symbol *syms;
+-	const unsigned long *crcs;
++	const u32 *crcs;
+ 	unsigned int num_syms;
+ 
+ 	/* Kernel parameters. */
+@@ -359,18 +359,18 @@ struct module {
+ 	/* GPL-only exported symbols. */
+ 	unsigned int num_gpl_syms;
+ 	const struct kernel_symbol *gpl_syms;
+-	const unsigned long *gpl_crcs;
++	const u32 *gpl_crcs;
+ 
+ #ifdef CONFIG_UNUSED_SYMBOLS
+ 	/* unused exported symbols. */
+ 	const struct kernel_symbol *unused_syms;
+-	const unsigned long *unused_crcs;
++	const u32 *unused_crcs;
+ 	unsigned int num_unused_syms;
+ 
+ 	/* GPL-only, unused exported symbols. */
+ 	unsigned int num_unused_gpl_syms;
+ 	const struct kernel_symbol *unused_gpl_syms;
+-	const unsigned long *unused_gpl_crcs;
++	const u32 *unused_gpl_crcs;
+ #endif
+ 
+ #ifdef CONFIG_MODULE_SIG
+@@ -382,7 +382,7 @@ struct module {
+ 
+ 	/* symbols that will be GPL-only in the near future. */
+ 	const struct kernel_symbol *gpl_future_syms;
+-	const unsigned long *gpl_future_crcs;
++	const u32 *gpl_future_crcs;
+ 	unsigned int num_gpl_future_syms;
+ 
+ 	/* Exception table */
+@@ -523,7 +523,7 @@ struct module *find_module(const char *name);
+ 
+ struct symsearch {
+ 	const struct kernel_symbol *start, *stop;
+-	const unsigned long *crcs;
++	const u32 *crcs;
+ 	enum {
+ 		NOT_GPL_ONLY,
+ 		GPL_ONLY,
+@@ -539,7 +539,7 @@ struct symsearch {
+  */
+ const struct kernel_symbol *find_symbol(const char *name,
+ 					struct module **owner,
+-					const unsigned long **crc,
++					const u32 **crc,
+ 					bool gplok,
+ 					bool warn);
+ 
+diff --git a/kernel/module.c b/kernel/module.c
+index f57dd63186e6..90ecdad07e1a 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -386,16 +386,16 @@ extern const struct kernel_symbol __start___ksymtab_gpl[];
+ extern const struct kernel_symbol __stop___ksymtab_gpl[];
+ extern const struct kernel_symbol __start___ksymtab_gpl_future[];
+ extern const struct kernel_symbol __stop___ksymtab_gpl_future[];
+-extern const unsigned long __start___kcrctab[];
+-extern const unsigned long __start___kcrctab_gpl[];
+-extern const unsigned long __start___kcrctab_gpl_future[];
++extern const u32 __start___kcrctab[];
++extern const u32 __start___kcrctab_gpl[];
++extern const u32 __start___kcrctab_gpl_future[];
+ #ifdef CONFIG_UNUSED_SYMBOLS
+ extern const struct kernel_symbol __start___ksymtab_unused[];
+ extern const struct kernel_symbol __stop___ksymtab_unused[];
+ extern const struct kernel_symbol __start___ksymtab_unused_gpl[];
+ extern const struct kernel_symbol __stop___ksymtab_unused_gpl[];
+-extern const unsigned long __start___kcrctab_unused[];
+-extern const unsigned long __start___kcrctab_unused_gpl[];
++extern const u32 __start___kcrctab_unused[];
++extern const u32 __start___kcrctab_unused_gpl[];
+ #endif
+ 
+ #ifndef CONFIG_MODVERSIONS
+@@ -494,7 +494,7 @@ struct find_symbol_arg {
+ 
+ 	/* Output */
+ 	struct module *owner;
+-	const unsigned long *crc;
++	const u32 *crc;
+ 	const struct kernel_symbol *sym;
+ };
+ 
+@@ -560,7 +560,7 @@ static bool find_symbol_in_section(const struct symsearch *syms,
+  * (optional) module which owns it.  Needs preempt disabled or module_mutex. */
+ const struct kernel_symbol *find_symbol(const char *name,
+ 					struct module **owner,
+-					const unsigned long **crc,
++					const u32 **crc,
+ 					bool gplok,
+ 					bool warn)
+ {
+@@ -1257,22 +1257,11 @@ static int try_to_force_load(struct module *mod, const char *reason)
+ }
+ 
+ #ifdef CONFIG_MODVERSIONS
+-/* If the arch applies (non-zero) relocations to kernel kcrctab, unapply it. */
+-static unsigned long maybe_relocated(unsigned long crc,
+-				     const struct module *crc_owner)
+-{
+-#ifdef ARCH_RELOCATES_KCRCTAB
+-	if (crc_owner == NULL)
+-		return crc - (unsigned long)reloc_start;
+-#endif
+-	return crc;
+-}
+-
+ static int check_version(Elf_Shdr *sechdrs,
+ 			 unsigned int versindex,
+ 			 const char *symname,
+ 			 struct module *mod,
+-			 const unsigned long *crc,
++			 const u32 *crc,
+ 			 const struct module *crc_owner)
+ {
+ 	unsigned int i, num_versions;
+@@ -1294,10 +1283,10 @@ static int check_version(Elf_Shdr *sechdrs,
+ 		if (strcmp(versions[i].name, symname) != 0)
+ 			continue;
+ 
+-		if (versions[i].crc == maybe_relocated(*crc, crc_owner))
++		if (versions[i].crc == *crc)
+ 			return 1;
+-		pr_debug("Found checksum %lX vs module %lX\n",
+-		       maybe_relocated(*crc, crc_owner), versions[i].crc);
++		pr_debug("Found checksum %X vs module %lX\n",
++		       *crc, versions[i].crc);
+ 		goto bad_version;
+ 	}
+ 
+@@ -1314,7 +1303,7 @@ static inline int check_modstruct_version(Elf_Shdr *sechdrs,
+ 					  unsigned int versindex,
+ 					  struct module *mod)
+ {
+-	const unsigned long *crc;
++	const u32 *crc;
+ 
+ 	/*
+ 	 * Since this should be found in kernel (which can't be removed), no
+@@ -1347,7 +1336,7 @@ static inline int check_version(Elf_Shdr *sechdrs,
+ 				unsigned int versindex,
+ 				const char *symname,
+ 				struct module *mod,
+-				const unsigned long *crc,
++				const u32 *crc,
+ 				const struct module *crc_owner)
+ {
+ 	return 1;
+@@ -1375,7 +1364,7 @@ static const struct kernel_symbol *resolve_symbol(struct module *mod,
+ {
+ 	struct module *owner;
+ 	const struct kernel_symbol *sym;
+-	const unsigned long *crc;
++	const u32 *crc;
+ 	int err;
+ 
+ 	/*
 -- 
-1.9.1
+2.7.4
