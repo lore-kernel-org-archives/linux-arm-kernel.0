@@ -1,72 +1,88 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 20 Oct 2016 16:56:34 +0800
-Subject: [PATCH v9 0/4] Mediatek MT2701 SCPSYS power domain support 
-Message-ID: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
+Date: Thu, 20 Oct 2016 16:56:37 +0800
+Subject: [PATCH v9 3/4] soc: mediatek: Add MT2701 power dt-bindings
+In-Reply-To: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1476953798-23263-4-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on v4.9-rc1 and adds scpsys power domain support
-for Mediatek MT2701.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
-To share the code between MT2701 and MT8173, this patchset also refined
-original mtk-scpsys.c to separate common codes and platform codes, so
-that mtk-scpsys.c can support new SoCs more easily.
+Add power dt-bindings for MT2701.
 
-MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
-to see discussion details.
-
-changes since v8:
-- Rebase to v4.9-rc1.
-- Refine implementation in init_clks() and init_scp().
-
-changes since v7:
-- Add clk_id for each scp_domain_data define.
-- Minor coding style changes.
-
-changes since v6:
-- Minor changes in the dt-binding document.
-
-changes since v5:
-- Rebase to v4.6-rc1.
-- Add dependent clocks for MFG, ISP, ETH and HIF power domains.
-- Add "ethif" as a dependent clock in scpsys dt-binding document.
-
-changes since v4:
-- Rebase to v4.5-rc4.
-- Remove mtk-scpsys.h and Merge its code into mtk-scpsys.c.
-- Add names for every controlling registers and bits.
-- Include dt-bindings headers at the beginning of mtk-scpsys.c.
-- Sort compatible string in dt-binding documents.
-
-changes since v3:
-- Implement MT8173 and MT2701 scpsys drivers in a signle file.
-- Remove naming of registers that can't be shared among SoCs.
-
-changes since v2:
-- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
-- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
-- Modify scpsys dt-binding document to support MT2701.
-
-changes since v1:
-- Make MTK_SCPSYS in Kconfig invisible from users.
-- Add comments for changing scpsys init level to subsys_init.
-
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
-
-James Liao (2):
-  soc: mediatek: Refine scpsys to support multiple platform
-  soc: mediatek: Init MT8173 scpsys driver earlier
-
-Shunli Wang (2):
-  soc: mediatek: Add MT2701 power dt-bindings
-  soc: mediatek: Add MT2701 scpsys driver
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  13 +-
- drivers/soc/mediatek/Kconfig                       |   2 +-
- drivers/soc/mediatek/mtk-scpsys.c                  | 484 +++++++++++++++------
- include/dt-bindings/power/mt2701-power.h           |  27 ++
- 4 files changed, 380 insertions(+), 146 deletions(-)
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+---
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    | 13 +++++++----
+ include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 5 deletions(-)
  create mode 100644 include/dt-bindings/power/mt2701-power.h
 
---
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index e8f15e3..16fe94d 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -9,17 +9,20 @@ domain control.
+ 
+ The driver implements the Generic PM domain bindings described in
+ power/power_domain.txt. It provides the power domains defined in
+-include/dt-bindings/power/mt8173-power.h.
++include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
+ 
+ Required properties:
+-- compatible: Must be "mediatek,mt8173-scpsys"
++- compatible: Should be one of:
++	- "mediatek,mt2701-scpsys"
++	- "mediatek,mt8173-scpsys"
+ - #power-domain-cells: Must be 1
+ - reg: Address range of the SCPSYS unit
+ - infracfg: must contain a phandle to the infracfg controller
+ - clock, clock-names: clocks according to the common clock binding.
+-                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
+-		      These are the clocks which hardware needs to be enabled
+-		      before enabling certain power domains.
++                      These are clocks which hardware needs to be
++                      enabled before enabling certain power domains.
++	Required clocks for MT2701: "mm", "mfg", "ethif"
++	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+ 
+ Optional properties:
+ - vdec-supply: Power supply for the vdec power domain
+diff --git a/include/dt-bindings/power/mt2701-power.h b/include/dt-bindings/power/mt2701-power.h
+new file mode 100644
+index 0000000..64cc826
+--- /dev/null
++++ b/include/dt-bindings/power/mt2701-power.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2015 MediaTek Inc.
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_POWER_MT2701_POWER_H
++#define _DT_BINDINGS_POWER_MT2701_POWER_H
++
++#define MT2701_POWER_DOMAIN_CONN	0
++#define MT2701_POWER_DOMAIN_DISP	1
++#define MT2701_POWER_DOMAIN_MFG		2
++#define MT2701_POWER_DOMAIN_VDEC	3
++#define MT2701_POWER_DOMAIN_ISP		4
++#define MT2701_POWER_DOMAIN_BDP		5
++#define MT2701_POWER_DOMAIN_ETH		6
++#define MT2701_POWER_DOMAIN_HIF		7
++#define MT2701_POWER_DOMAIN_IFR_MSC	8
++
++#endif /* _DT_BINDINGS_POWER_MT2701_POWER_H */
+-- 
 1.9.1
