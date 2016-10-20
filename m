@@ -1,34 +1,29 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Thu, 20 Oct 2016 17:06:59 +0900
-Subject: [PATCH 1/3] ARM: dts: sun8i: Add common dtsi file for NanoPi SBCs
+Date: Thu, 20 Oct 2016 17:07:01 +0900
+Subject: [PATCH 3/3] ARM: dts: sun8i: Add dts file for NanoPi M1 SBC
 In-Reply-To: <20161020080701.15993-1-woogyom.kim@gmail.com>
 References: <20161020080701.15993-1-woogyom.kim@gmail.com>
-Message-ID: <20161020080701.15993-2-woogyom.kim@gmail.com>
+Message-ID: <20161020080701.15993-4-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides a common file for NanoPi M1 and Neo SBC.
-
-Those have common features below.
-  * UART0
-  * 2 LEDs
-  * USB host (EHCI3, OHCI3) and PHY
-  * MicroSD
-  * GPIO key switch
+NanoPi M1 is the Allwinner H3 based board.
+This patch enables UART for debug console, LEDs, GPIO key switch, 3 USB
+host ports, a micro SD slot and related power and pin controls.
 
 Cc: James Pettigrew <james@innovum.com.au>
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi.dtsi | 143 +++++++++++++++++++++++++++++++++
- 1 file changed, 143 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts | 64 ++++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
 new file mode 100644
-index 0000000..e89ca6f
+index 0000000..ec63d10
 --- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
-@@ -0,0 +1,143 @@
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1.dts
+@@ -0,0 +1,64 @@
 +/*
 + * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
 + *
@@ -71,105 +66,26 @@ index 0000000..e89ca6f
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include "sun8i-h3-nanopi.dtsi"
 +
 +/ {
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_npi>, <&leds_r_npi>;
-+
-+		status {
-+			label = "nanopi:blue:status";
-+			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		pwr {
-+			label = "nanopi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+		input-name = "k1";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_npi>;
-+
-+		k1 at 0 {
-+			label = "k1";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
++	model = "FriendlyArm NanoPi M1";
++	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
 +};
 +
-+&ehci3 {
++&ehci1 {
 +	status = "okay";
 +};
 +
-+&mmc0 {
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	status = "okay";
-+	vmmc-supply = <&reg_vcc3v3>;
-+};
-+
-+&ohci3 {
++&ehci2 {
 +	status = "okay";
 +};
 +
-+&pio {
-+	leds_npi: led_pins at 0 {
-+		allwinner,pins = "PA10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds_r_npi: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_npi: key_pins at 0 {
-+		allwinner,pins = "PL3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
++&ohci1 {
 +	status = "okay";
 +};
 +
-+&usbphy {
++&ohci2 {
 +	status = "okay";
 +};
 -- 
