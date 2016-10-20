@@ -1,70 +1,144 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 20 Oct 2016 21:26:53 +0800
-Subject: [PATCH 2/2] arm64/numa: fix incorrect print of end_pfn
-In-Reply-To: <20161020125511.GG10234@leverpostej>
-References: <1476935576-59941-1-git-send-email-guohanjun@huawei.com>
- <1476935576-59941-2-git-send-email-guohanjun@huawei.com>
- <20161020105130.GD24914@arm.com> <5808B6D1.809@huawei.com>
- <20161020125511.GG10234@leverpostej>
-Message-ID: <5808C61D.4010101@huawei.com>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Thu, 20 Oct 2016 14:38:32 +0100
+Subject: [PATCH v2] drivers: psci: PSCI checker module
+In-Reply-To: <e57565e8-bec9-0460-32d5-fb9f868cc4f8@arm.com>
+References: <20160921143905.36197-1-kevin.brodsky@arm.com>
+ <e57565e8-bec9-0460-32d5-fb9f868cc4f8@arm.com>
+Message-ID: <613e4387-0ed5-ad58-7b74-a31b648f81e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/10/20 20:55, Mark Rutland wrote:
-> On Thu, Oct 20, 2016 at 08:21:37PM +0800, Hanjun Guo wrote:
->> On 2016/10/20 18:51, Will Deacon wrote:
->>> On Thu, Oct 20, 2016 at 11:52:56AM +0800, Hanjun Guo wrote:
->>>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>>
->>>> When booting on NUMA system with memory-less node (no
->>>> memory dimm on this memory controller), the print
->>>> for setup_node_data() is incorrect:
->>>>
->>>> NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
->>>>
->>>> It should be 0, not 0xffffffffffffffff as there is
->>>> no memory on that node.
->>> Wouldn't it make more sense to print something useful, like "memory-less
->>> node"?
->> in the log,
+Hi Jean-Philippe,
+
+On 18/10/16 20:21, Jean-Philippe Brucker wrote:
+> Hi Kevin,
+>
+> On 21/09/16 15:39, Kevin Brodsky wrote:
+>> On arm and arm64, PSCI is one of the possible firmware interfaces
+>> used for power management. This includes both turning CPUs on and off,
+>> and suspending them (entering idle states).
 >>
->> [    0.000000] NUMA: Initmem setup node 0 [mem 0x00000000-0x13fbffffff]
->> [    0.000000] NUMA: NODE_DATA [mem 0x13fbffe500-0x13fbffffff]
->> [    0.000000] NUMA: Initmem setup node 1 [mem 0x1400000000-0x17fbffffff]
->> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfec500-0x17fbfedfff]
->> [    0.000000] NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
->> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfeaa00-0x17fbfec4ff]
->> [    0.000000] NUMA: NODE_DATA(2) on node 1
->> [    0.000000] NUMA: Initmem setup node 3 [mem 0x00000000-0xffffffffffffffff]
->> [    0.000000] NUMA: NODE_DATA [mem 0x17fbfe8f00-0x17fbfea9ff]
->> [    0.000000] NUMA: NODE_DATA(3) on node 1
+>> This patch adds a PSCI checker module that enables basic testing of
+>> PSCI operations during startup. There are two main tests: CPU
+>> hotplugging and suspending.
 >>
->> if printing "NUMA: Initmem setup node 2 [mem 0x00000000-0x00000000]",
-> Seeing "NUMA: Initmem setup node 2 [<memoryless node>]" would be far
-> more obvious as a memoryless node, and I don't see that this would be
-> inconsistent.
+>> In the hotplug tests, the hotplug API is used to turn off and on again
+>> all CPUs in the system, and then all CPUs in each cluster, checking
+>> the consistency of the return codes.
+>>
+>> In the suspend tests, a high-priority thread is created on each core
+>> and uses low-level cpuidle functionalities to enter suspend, in all
+>> the possible states and multiple times. This should allow a maximum
+>> number of CPUs to enter the same sleep state at the same or slightly
+>> different time.
+>>
+>> In essence, the suspend tests use a principle similar to that of the
+>> intel_powerclamp driver (drivers/thermal/intel_powerclamp.c), but the
+>> threads are only kept for the duration of the test (they are already
+>> gone when userspace is started).
+>>
+>> While in theory power management PSCI functions (CPU_{ON,OFF,SUSPEND})
+>> could be directly called, this proved too difficult as it would imply
+>> the duplication of all the logic used by the kernel to allow for a
+>> clean shutdown/bringup/suspend of the CPU (the deepest sleep states
+>> implying potentially the shutdown of the CPU).
+>>
+>> Note that this file cannot be compiled as a loadable module, since it
+>> uses a number of non-exported identifiers (essentially for
+>> PSCI-specific checks and direct use of cpuidle) and relies on the
+>> absence of userspace to avoid races when calling hotplug and cpuidle
+>> functions.
+>>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Cc: Peter Zijlstra <peterz@infradead.org>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+>> ---
+>> Changelog v1..v2:
+>> * Do not count tick_broadcast_enter() failures as errors, as they may
+>>    be unavoidable. When it happens, fall back to WFI.
+>> * Do not count unexpected sleep states as errors (currently, the only
+>>    case is when falling back to WFI). Instead, report the number of
+>>    times it happens before the suspend thread exits.
+>> * Use usecs_to_jiffies() to compute the suspend timeout. The previous
+>>    version resulted in a zero timeout if the target residency was
+>>    shorter than a jiffy.
+>> * Various cleanup.
+>>
+>> Thanks to Lorenzo for his help with improving this patch!
+>>
+>> Kevin
+> [...]
+>> +
+>> +static int suspend_tests(void)
+>> +{
+>> +    int i, cpu, err = 0;
+>> +    struct task_struct **threads;
+>> +    int nb_threads = 0;
+>> +
+>> +    threads = kmalloc_array(nb_available_cpus, sizeof(*threads),
+>> +                            GFP_KERNEL);
+>> +    if (!threads)
+>> +            return -ENOMEM;
+>> +
+>> +    for_each_online_cpu(cpu) {
+>> +            struct task_struct *thread;
+>> +            /* Check that cpuidle is available on that CPU. */
+>> +            struct cpuidle_device *dev = per_cpu(cpuidle_devices, cpu);
+>> +            struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
+>> +
+>> +            if (cpuidle_not_available(drv, dev)) {
+>> +                    pr_warn("cpuidle not available on CPU %d, ignoring\n",
+>> +                            cpu);
+>> +                    continue;
+>> +            }
+>> +
+>> +            thread = kthread_create_on_cpu(suspend_stress_thread,
+>> +                                           (void *)(long)cpu, cpu,
+>> +                                           "psci_suspend_stress");
+>> +            if (IS_ERR(thread))
+>> +                    pr_err("Failed to create kthread on CPU %d\n", cpu);
+>> +            else
+>> +                    threads[nb_threads++] = thread;
+>> +    }
+>> +    if (nb_threads < 1) {
+>> +            kfree(threads);
+>> +            return -ENODEV;
+>> +    }
+>> +
+>> +    atomic_set(&nb_active_threads, nb_threads);
+>> +
+>> +    /*
+>> +     * Stop cpuidle to prevent the idle tasks from entering a deep sleep
+>> +     * mode, as it might interfere with the suspend threads on other CPUs.
+>> +     * This does not prevent the suspend threads from using cpuidle (only
+>> +     * the idle tasks check this status).
+>> +     */
+>> +    cpuidle_pause();
+>> +
+>> +    /*
+>> +     * Unpark the suspend threads. To avoid the main thread being preempted
+>> +     * before all the threads have been unparked, the suspend threads will
+>> +     * wait for the completion of suspend_threads_started.
+>> +     */
+>> +    for (i = 0; i < nb_threads; ++i)
+>> +            kthread_unpark(threads[i]);
+> Just a heads up: this doesn't work anymore, since a65d4096
+> (kthread/smpboot: do not park in kthread_create_on_cpu()), in 4.9-rc1. I
+> think that the unpark call could be replaced by wake_up_process. The
+> comment of kthread_create_on_cpu is now misleading.
+>
+> Thanks,
+> Jean-Philippe
+>
 
-I misunderstood Will's intention, I though printing "NUMA: memory-less node 2".
-so do you mean code like below?
+Thanks for the heads-up! I'll rebase on 4.9-rc1 and see what needs to be done.
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 34415fc..bf4e39b 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -226,8 +226,11 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
-        void *nd;
-        int tnid;
- 
--   pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
--           nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-+ if ((end_pfn - start_pfn) != 0)
-+         pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n", nid,
-+                 start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-+ else
-+         pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
- 
-        nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
-        nd = __va(nd_pa);
+Thanks,
+Kevin
 
-Thanks
-Hanjun
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
