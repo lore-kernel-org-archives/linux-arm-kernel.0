@@ -1,89 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Oct 2016 11:41:33 +0200
-Subject: [PATCH v2 4/6] ARM: at91: handle CONFIG_PM for armv7m configurations
-In-Reply-To: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
-References: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161020094135.18221-5-alexandre.belloni@free-electrons.com>
+Date: Thu, 20 Oct 2016 11:41:29 +0200
+Subject: [PATCH v2 0/6] ARM: at91: initial samx7 support
+Message-ID: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently no PM support for samx7 but the symbol can still be
-selected. This avoids compilation issues.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-at91/Kconfig  | 6 ++++++
- arch/arm/mach-at91/Makefile | 3 +--
- arch/arm/mach-at91/samx7.c  | 9 +++++++++
- 3 files changed, 16 insertions(+), 2 deletions(-)
+This series adds initial support for Atmel armv7m SoCs.
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index bade64e0cb49..34fa561aa853 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -59,6 +59,7 @@ config SOC_AT91RM9200
- 	bool "AT91RM9200"
- 	depends on ARCH_MULTI_V4T
- 	select ATMEL_AIC_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_ST
- 	select CPU_ARM920T
- 	select HAVE_AT91_USB_CLK
-@@ -72,6 +73,7 @@ config SOC_AT91SAM9
- 	bool "AT91SAM9"
- 	depends on ARCH_MULTI_V5
- 	select ATMEL_AIC_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_SDRAMC
- 	select CPU_ARM926T
- 	select HAVE_AT91_SMD
-@@ -130,9 +132,13 @@ config SOC_SAM_V7
- config SOC_SAMA5
- 	bool
- 	select ATMEL_AIC5_IRQ
-+	select ATMEL_PM if PM
- 	select ATMEL_SDRAMC
- 	select MEMORY
- 	select SOC_SAM_V7
- 	select SRAM if PM
- 
-+config ATMEL_PM
-+	bool
-+
- endif
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 84956a18d604..116691714bb8 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -10,8 +10,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
- obj-$(CONFIG_SOC_SAMX7)		+= samx7.o
- 
- # Power Management
--obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_PM)		+= pm_suspend.o
-+obj-$(CONFIG_ATMEL_PM)		+= pm.o pm_suspend.o
- 
- ifeq ($(CONFIG_CPU_V7),y)
- AFLAGS_pm_suspend.o := -march=armv7-a
-diff --git a/arch/arm/mach-at91/samx7.c b/arch/arm/mach-at91/samx7.c
-index bd33bc56278e..5bd76cb5076c 100644
---- a/arch/arm/mach-at91/samx7.c
-+++ b/arch/arm/mach-at91/samx7.c
-@@ -16,6 +16,15 @@
- #include "generic.h"
- #include "soc.h"
- 
-+#ifdef CONFIG_PM
-+/* This function has to be defined for various drivers that are using it */
-+int at91_suspend_entering_slow_clock(void)
-+{
-+	return 0;
-+}
-+EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
-+#endif
-+
- static const struct at91_soc samx7_socs[] = {
- 	AT91_SOC(SAME70Q21_CIDR_MATCH, SAME70Q21_EXID_MATCH,
- 		 "same70q21", "samx7"),
+Changes in v2:
+ - fixed checkpatch issues
+ - Added documentation
+ - removed Ethernet from the dtsi until the driver change is taken
+
+
+Alexandre Belloni (3):
+  ARM: at91: Documentation: add samx7 families
+  ARM: at91: Document samx7 compatibles
+  ARM: at91: handle CONFIG_PM for armv7m configurations
+
+Szemz? Andr?s (3):
+  ARM: at91: Add armv7m support
+  ARM: dts: at91: add samx7 dtsi
+  ARM: at91: debug: add samx7 support
+
+ Documentation/arm/Atmel/README                     |   44 +-
+ .../devicetree/bindings/arm/atmel-at91.txt         |   30 +
+ arch/arm/Kconfig.debug                             |   10 +
+ arch/arm/boot/dts/samx7.dtsi                       | 1128 ++++++++++++++++++++
+ arch/arm/mach-at91/Kconfig                         |   15 +-
+ arch/arm/mach-at91/Makefile                        |    4 +-
+ arch/arm/mach-at91/Makefile.boot                   |    3 +
+ arch/arm/mach-at91/samx7.c                         |   71 ++
+ arch/arm/mach-at91/soc.h                           |   21 +
+ 9 files changed, 1320 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/samx7.dtsi
+ create mode 100644 arch/arm/mach-at91/Makefile.boot
+ create mode 100644 arch/arm/mach-at91/samx7.c
+
 -- 
 2.9.3
