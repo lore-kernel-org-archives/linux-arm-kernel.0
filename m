@@ -1,64 +1,35 @@
-From: gottfried.haider@gmail.com (Gottfried Haider)
-Date: Thu, 20 Oct 2016 18:58:36 +0200
-Subject: [PATCH v2] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
-In-Reply-To: <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
-References: <CAPoCmYJC1TebBrspD_=mTETULSjg9or5a0Yda8p945y6ZWL99Q@mail.gmail.com>
- <CACRpkdb++5Xb6a=0Zz5eZURNmrkfVyvsBR-pLK9iRiyTu1g8Rw@mail.gmail.com>
-Message-ID: <CAPoCmYKrUBEdyNXt8yRMFq_aCmb8WyK-x4a7og66zfeFYX4rQg@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 20 Oct 2016 17:00:32 +0000
+Subject: [PATCH -next] net: ethernet: mediatek: use dev_kfree_skb_any instead
+ of dev_kfree_skb
+Message-ID: <1476982832-27932-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The old sysfs interface is not changing. However it is deprecated so once
-> you have a v4.8+ kernel, consider migrating whatever userspace you have
-> to use the chardev ABI instead.
->
-> See:
-> commit fe95046e960b4b76e73dc1486955d93f47276134
-> "gpio: ABI: mark the sysfs ABI as obsolete"
-> commit 521a2ad6f862a28e2e43cb3e254a26bf0f9452e9
-> "gpio: add userspace ABI for GPIO line information"
-> commit d7c51b47ac11e66f547b55640405c1c474642d72
-> "gpio: userspace ABI for reading/writing GPIO lines"
-> commit 61f922db72216b00386581c851db9c9095961522
-> "gpio: userspace ABI for reading GPIO line events"
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Thanks for those pointers. Somewhat off topic: is it planned to add
-support for setting GENERIC_PINCONF style pull-up/pull-down resistors
-throigh the new ABI? (The bcm28xx drivers would still need to
-converted to this as well.)
+Replace dev_kfree_skb with dev_kfree_skb_any in mtk_start_xmit()
+which can be called from hard irq context (netpoll) and from
+other contexts. mtk_start_xmit() only frees skbs that it has
+dropped.
 
+This is detected by Coccinelle semantic patch.
 
->> Regarding the proposed format using the header pin numbers: From what I've
->> seen in terms of existing educational materials, it seems the overwhelming
->> majority ends up using GPIO numbers instead of physical pin header
->> numbering. (e.g. [1] [2])
->
-> What does that number mean? If you are referring to the global
-> GPIO numberspace it is obsolete and just reflecting the fact that
-> people up until now was referring to Linux-internal GPIO numbers.
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I am referring to the name of the various GPIO lines as per datasheet
-("GPIO0", "GPIO1", ...). So far, I believe those matched the global
-GPIO numberspace.
-
-
->> Would it be too confusing to try to pick GPIO 5 from an alphabetically
->> sorted list like this "P11_GPIO17", "P12_GPIO18"? (I know, alphabetical
->> sorting is an issue here already for a different reason. But applications
->> might do it, I guess?)
->
-> Any attempt to preserve the global GPIO numberspace is futile.
-> If it is the local offset number on the chip it is another thing, that
-> is kind of OK if the arch maintainer likes it.
-
-I understand that Linux can't guarantee a certain global GPIO number -
-but I fear that the board manufacturers also might not think of the
-pin headers as something set in stone (that the can't rearrange in a
-future revision/product).
-
-Would there be a reason against _naming_ the pin "GPIO0"? (even if it
-ends up with a different global, internal number)
-
-
-Thanks & best
-Gottfried
+diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+index 8f80e61..d716274 100644
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -843,7 +843,7 @@ static int mtk_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ drop:
+ 	spin_unlock(&eth->page_lock);
+ 	stats->tx_dropped++;
+-	dev_kfree_skb(skb);
++	dev_kfree_skb_any(skb);
+ 	return NETDEV_TX_OK;
+ }
+ 
