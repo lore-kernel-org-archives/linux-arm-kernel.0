@@ -1,31 +1,27 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 20 Oct 2016 14:55:45 +0200 (CEST)
-Subject: [PATCH] kernel: irq: fix build failure
-In-Reply-To: <57FBBA0B.9070500@gmail.com>
-References: <1475775403-27207-1-git-send-email-sudipm.mukherjee@gmail.com>
- <57FBBA0B.9070500@gmail.com>
-Message-ID: <alpine.DEB.2.20.1610201454410.5073@nanos>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 20 Oct 2016 14:57:57 +0200
+Subject: [PATCH v2 8/9] ARM: sunxi: Remove useless allwinner, pull property
+In-Reply-To: <b643d1e525835365a6ae63bcd065cb3650a839d6.1476200742.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7edc6c25be8a5e2efdda6a82e102dbf7ece6aa64.1476200742.git-series.maxime.ripard@free-electrons.com>
+ <b643d1e525835365a6ae63bcd065cb3650a839d6.1476200742.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdbNVPobGYK5xpj9RMLS6goQo5+SHsPRNOGnsHNmWiv9ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Oct 2016, Sudip Mukherjee wrote:
+On Tue, Oct 11, 2016 at 5:46 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-> On Thursday 06 October 2016 11:06 PM, Sudip Mukherjee wrote:
-> > The allmodconfig build of powerpc is failing with the error:
-> > ERROR: ".irq_set_parent" [drivers/mfd/tps65217.ko] undefined!
-> > 
-> > export the symbol to fix the failure.
-> 
-> Hi Thomas,
-> powerpc and arm allmodconfig builds still fails with the same error.
-> Build logs of next-20161010 are at:
-> arm at https://travis-ci.org/sudipm-mukherjee/parport/jobs/166321467
-> powerpc at https://travis-ci.org/sudipm-mukherjee/parport/jobs/166321473
+> The allwinner,pull property set to NO_PULL was really considered our
+> default (and wasn't even changing the default value in the code).
+>
+> Remove these properties to make it obvious that we do not set anything in
+> such a case.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-I know. This is under discussion with the driver folks as we are not going
-to blindly export stuff just because someone slapped a irq_set_parent()
-into the code w/o knowing why.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
+Please merge this through the ARM SoC tree.
 
-	tglx
+Yours,
+Linus Walleij
