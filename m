@@ -1,33 +1,21 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 20 Oct 2016 15:57:52 +0100
-Subject: [PATCH v14 0/9] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20161020143101.GI10234@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <20161020143101.GI10234@leverpostej>
-Message-ID: <20161020145752.GC8731@red-moon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 20 Oct 2016 23:04:18 +0800
+Subject: [PATCH v4 4/9] clk: sunxi-ng: Add minimums for all the relevant
+ structures and clocks
+In-Reply-To: <a96b56fb7bda849e087b63a04ff76d1396c44d72.1476196031.git-series.maxime.ripard@free-electrons.com>
+References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
+ <a96b56fb7bda849e087b63a04ff76d1396c44d72.1476196031.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64itwTvMoxvtYDqOALL-XJYvhv-5daPPjPzb9DfY3o62A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 03:31:01PM +0100, Mark Rutland wrote:
-> Hi,
-> 
-> On Thu, Sep 29, 2016 at 02:17:08AM +0800, fu.wei at linaro.org wrote:
-> > From: Fu Wei <fu.wei@linaro.org>
-> 
-> > This patchset depends on the following patchset:
-> > [UPDATE PATCH V11 1/8] ACPI: I/O Remapping Table (IORT) initial support
-> > https://lkml.org/lkml/2016/9/12/949
-> 
-> Is there a branch with these anywhere? I wasn't Cc'd on those and it's
-> rather difficult to get at the series from an LKML link.
+On Tue, Oct 11, 2016 at 10:28 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Modify the current clocks we have to be able to specify the minimum for
+> each clocks we support, just like we support the max.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-For the records, the dependency above has now been merged and it was
-just a directory creation dependency (drivers/acpi/arm64, where some of
-the code in this series will live). So basically this means that at
-present this series is self-contained, probably it would have been
-better to wait for -rc1 before posting it (so that dependencies were
-settled) but anyway I think it can be reviewed as-is.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Thanks for having a look,
-Lorenzo
+Including the bits from patch 2.
