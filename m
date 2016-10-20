@@ -1,120 +1,107 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 20 Oct 2016 17:38:48 +0200
-Subject: [PATCH v3 5/6] ARM: sunxi: Remove useless allwinner,pull property
-In-Reply-To: <42e249454ccf6b14e9ec266cb8d42a24f6d71d7b.1476971126.git-series.maxime.ripard@free-electrons.com>
-References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
- <42e249454ccf6b14e9ec266cb8d42a24f6d71d7b.1476971126.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20161020173848.be9cf97854f8933b3ce90d55@free.fr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Oct 2016 17:44:42 +0200
+Subject: [PATCH] ARM: dts: sun8i: Add SPI controller node in H3
+In-Reply-To: <20161019134608.12850-1-woogyom.kim@gmail.com>
+References: <20161019134608.12850-1-woogyom.kim@gmail.com>
+Message-ID: <20161020154442.m2lphzwfabjacw5t@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Oct 2016 15:49:06 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi Milo,
 
-> The allwinner,pull property set to NO_PULL was really considered our
-> default (and wasn't even changing the default value in the code).
+On Wed, Oct 19, 2016 at 10:46:08PM +0900, Milo Kim wrote:
+> H3 supports two SPI controllers. Four pins (MOSI, MISO, SCLK, SS) are
+> configured through the pinctrl subsystem. It is almost same as A31 SPI
+> except buffer size, so those DT properties are reusable.
 > 
-> Remove these properties to make it obvious that we do not set anything in
-> such a case.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+
+Ideally, this would be part of your serie to add the H3 support to the
+spi driver. This way, you make it explicit that there is a dependency
+between the two, and it's easier for us :)
+
 > ---
->  arch/arm/boot/dts/ntc-gr8-evb.dts                     |  4 +-
->  arch/arm/boot/dts/ntc-gr8.dtsi                        | 14 +-----
->  arch/arm/boot/dts/sun4i-a10-a1000.dts                 |  2 +-
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts            |  1 +-
->  arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts      |  4 +-
->  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts              |  1 +-
->  arch/arm/boot/dts/sun4i-a10-hackberry.dts             |  2 +-
->  arch/arm/boot/dts/sun4i-a10-inet1.dts                 |  2 +-
->  arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts            |  2 +-
->  arch/arm/boot/dts/sun4i-a10-marsboard.dts             |  1 +-
->  arch/arm/boot/dts/sun4i-a10-mk802.dts                 |  3 +-
->  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts        |  2 +-
->  arch/arm/boot/dts/sun4i-a10-pcduino.dts               |  2 +-
->  arch/arm/boot/dts/sun4i-a10-pcduino2.dts              |  1 +-
->  arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts      |  3 +-
->  arch/arm/boot/dts/sun4i-a10.dtsi                      | 24 +--------
->  arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts          |  1 +-
->  arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts          |  2 +-
->  arch/arm/boot/dts/sun5i-a10s-mk802.dts                |  2 +-
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts      |  2 +-
->  arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts         |  2 +-
->  arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts              |  2 +-
->  arch/arm/boot/dts/sun5i-a10s.dtsi                     |  7 +--
->  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts              |  1 +-
->  arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts       |  3 +-
->  arch/arm/boot/dts/sun5i-a13-olinuxino.dts             |  2 +-
->  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts              |  1 +-
->  arch/arm/boot/dts/sun5i-a13.dtsi                      |  3 +-
->  arch/arm/boot/dts/sun5i-r8-chip.dts                   |  2 +-
->  arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi  |  2 +-
->  arch/arm/boot/dts/sun5i.dtsi                          |  7 +--
->  arch/arm/boot/dts/sun6i-a31-app4-evb1.dts             |  1 +-
->  arch/arm/boot/dts/sun6i-a31-colombus.dts              |  1 +-
->  arch/arm/boot/dts/sun6i-a31-hummingbird.dts           |  2 +-
->  arch/arm/boot/dts/sun6i-a31-i7.dts                    |  2 +-
->  arch/arm/boot/dts/sun6i-a31-m9.dts                    |  2 +-
->  arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts      |  2 +-
->  arch/arm/boot/dts/sun6i-a31.dtsi                      | 13 +----
->  arch/arm/boot/dts/sun6i-a31s-primo81.dts              |  1 +-
->  arch/arm/boot/dts/sun6i-a31s-sina31s.dts              |  1 +-
->  arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts      |  3 +-
->  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts      |  3 +-
->  arch/arm/boot/dts/sun7i-a20-bananapi.dts              |  2 +-
->  arch/arm/boot/dts/sun7i-a20-bananapro.dts             |  5 +--
->  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts           |  1 +-
->  arch/arm/boot/dts/sun7i-a20-cubietruck.dts            |  6 +--
->  arch/arm/boot/dts/sun7i-a20-hummingbird.dts           |  4 +-
->  arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts             |  4 +-
->  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts            |  1 +-
->  arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts             |  2 +-
->  arch/arm/boot/dts/sun7i-a20-m3.dts                    |  1 +-
->  arch/arm/boot/dts/sun7i-a20-mk808c.dts                |  2 +-
->  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts        |  4 +-
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts        |  2 +-
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts  |  1 +-
->  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts       |  3 +-
->  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts       |  1 +-
->  arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts         |  4 +-
->  arch/arm/boot/dts/sun7i-a20-orangepi.dts              |  4 +-
->  arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts         |  3 +-
->  arch/arm/boot/dts/sun7i-a20-pcduino3.dts              |  2 +-
->  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts        |  3 +-
->  arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts      |  1 +-
->  arch/arm/boot/dts/sun7i-a20.dtsi                      | 37 +------------
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi                  | 10 +---
->  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts |  1 +-
->  arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts |  1 +-
->  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        |  1 +-
->  arch/arm/boot/dts/sun8i-a33-olinuxino.dts             |  3 +-
->  arch/arm/boot/dts/sun8i-a33.dtsi                      |  1 +-
->  arch/arm/boot/dts/sun8i-a83t.dtsi                     |  3 +-
->  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts       |  3 +-
->  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts             |  2 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts             |  4 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts          |  3 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts           |  3 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts            |  3 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts          |  1 +-
->  arch/arm/boot/dts/sun8i-h3.dtsi                       | 12 +----
->  arch/arm/boot/dts/sun8i-r16-parrot.dts                |  3 +-
->  arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi  |  2 +-
->  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts           |  1 +-
->  arch/arm/boot/dts/sun9i-a80-optimus.dts               |  4 +-
->  arch/arm/boot/dts/sun9i-a80.dtsi                      |  6 +--
->  arch/arm/boot/dts/sunxi-common-regulators.dtsi        |  4 +-
->  85 files changed, 0 insertions(+), 302 deletions(-)
-	[snip]
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 46 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 75a8654..c38b028 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -381,6 +381,20 @@
+>  				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>  			};
+>  
+> +			spi0_pins: spi0 {
+> +				allwinner,pins = "PC0", "PC1", "PC2", "PC3";
+> +				allwinner,function = "spi0";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
+> +			spi1_pins: spi1 {
+> +				allwinner,pins = "PA15", "PA16", "PA14", "PA13";
+> +				allwinner,function = "spi1";
+> +				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +			};
+> +
 
-Is it really usefull to change all these files while in a previous
-patch you were writing:
-> The generic pin configuration and multiplexing should be preferred now,
-> even though we still support the old one.
-?
+This needs to be in a separate patch
+
+>  			uart0_pins_a: uart0 at 0 {
+>  				allwinner,pins = "PA4", "PA5";
+>  				allwinner,function = "uart0";
+> @@ -425,6 +439,38 @@
+>  			clocks = <&osc24M>;
+>  		};
+>  
+> +		spi0: spi at 01c68000 {
+> +			compatible = "allwinner,sun8i-h3-spi";
+> +			reg = <0x01c68000 0x1000>;
+> +			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
+> +			clock-names = "ahb", "mod";
+> +			dmas = <&dma 23>, <&dma 23>;
+> +			dma-names = "rx", "tx";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&spi0_pins>;
+> +			resets = <&ccu RST_BUS_SPI0>;
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+> +		spi1: spi at 01c69000 {
+> +			compatible = "allwinner,sun8i-h3-spi";
+> +			reg = <0x01c69000 0x1000>;
+> +			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
+> +			clock-names = "ahb", "mod";
+> +			dmas = <&dma 24>, <&dma 24>;
+> +			dma-names = "rx", "tx";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&spi1_pins>;
+> +			resets = <&ccu RST_BUS_SPI1>;
+> +			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +		};
+> +
+
+Thanks!
+Maxime
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/83100724/attachment-0001.sig>
