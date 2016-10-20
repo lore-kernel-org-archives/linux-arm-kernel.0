@@ -1,39 +1,24 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 20 Oct 2016 19:34:15 +0200
-Subject: [PATCH] Revert "dmaengine: pxa_dma: add support for legacy
- transition"
-In-Reply-To: <8371252.IL4ByDpZCD@wuerfel> (Arnd Bergmann's message of "Tue, 18
- Oct 2016 10:57:14 +0200")
-References: <1476773192-23715-1-git-send-email-robert.jarzmik@free.fr>
- <8371252.IL4ByDpZCD@wuerfel>
-Message-ID: <87mvhy3ox4.fsf@belgarion.home>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 20 Oct 2016 10:34:49 -0700
+Subject: [PATCH V6 00/10] dmaengine: qcom_hidma: add MSI interrupt support
+In-Reply-To: <20161020164321.GZ2467@localhost>
+References: <1476899512-20431-1-git-send-email-okaya@codeaurora.org>
+ <20161020094838.GY2467@localhost>
+ <e3cbd6a2-7fac-98ec-74ea-0be88075663c@codeaurora.org>
+ <20161020164321.GZ2467@localhost>
+Message-ID: <a4c95bd6-d760-1f02-bbb1-89538037d41e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 10/20/2016 9:43 AM, Vinod Koul wrote:
+>> slave-dma       git://git.infradead.org/users/vkoul/slave-dma.git (fetch)
+>> > slave-dma       git://git.infradead.org/users/vkoul/slave-dma.git (push)
+> You seem to have missed topic/qcom which I pushed last night. next would have worked too!!
+> 
 
-> On Tuesday, October 18, 2016 8:46:32 AM CEST Robert Jarzmik wrote:
->> This reverts commit c91134d9194478144ba579ca6efeddf628055650.
->> 
->> The conversion of the pxa architecture is now finished for all
->> drivers, so this functions has fullfilled its purpose and can
->> now be removed.
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Nice!
->
-> That reminds me, do you have plans to work on the conversion away from
-> IORESOURCE_DMA and pxad_filter_fn towards the dma_slave_map interface?
->
-> I see that all pxa drivers already use dma_request_slave_channel_compat,
-> so this should be fairly straightforward to do, changing only the
-> driver and the arch/arm/mach-pxa/devices.c file.
-
-I didn't so far, as I wasn't aware of this interface, but I'll gladly put that
-on my todo list.
-
-Cheers.
+OK. Let me pick that up and test.
 
 -- 
-Robert
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
