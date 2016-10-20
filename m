@@ -1,58 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 20 Oct 2016 21:21:04 +0200
-Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
-In-Reply-To: <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
-References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
- <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
-Message-ID: <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 20 Oct 2016 21:26:47 +0200
+Subject: [PATCH 00/10] mm: adjust get_user_pages* functions to explicitly
+ pass FOLL_* flags
+In-Reply-To: <5807AC2B.4090208@linux.intel.com>
+References: <20161013002020.3062-1-lstoakes@gmail.com>
+ <20161018153050.GC13117@dhcp22.suse.cz>
+ <20161019085815.GA22239@lucifer>
+ <20161019090727.GE7517@dhcp22.suse.cz>
+ <5807A427.7010200@linux.intel.com>
+ <20161019170127.GN24393@dhcp22.suse.cz>
+ <5807AC2B.4090208@linux.intel.com>
+Message-ID: <20161020192646.GC27342@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 12:08 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+On Wed 19-10-16 10:23:55, Dave Hansen wrote:
+> On 10/19/2016 10:01 AM, Michal Hocko wrote:
+> > The question I had earlier was whether this has to be an explicit FOLL
+> > flag used by g-u-p users or we can just use it internally when mm !=
+> > current->mm
+> 
+> The reason I chose not to do that was that deferred work gets run under
+> a basically random 'current'.  If we just use 'mm != current->mm', then
+> the deferred work will sometimes have pkeys enforced and sometimes not,
+> basically randomly.
 
-> Add the ability for gpio to request irq from the gpio interrupt controller
-> if present. We have to specificaly that the parent interrupt controller is
-> the gpio interrupt controller because gpio on meson SoCs can't generate
-> interrupt directly on the GIC.
->
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-(...)
-> +       select IRQ_DOMAIN
->         select OF_GPIO
-> +       select OF_IRQ
-(...)
-> +static int meson_gpio_to_hwirq(struct meson_bank *bank, unsigned int offset)
-> +{
-> +       unsigned int hwirq;
-> +
-> +       if (bank->irq_first < 0)
-> +               /* this bank cannot generate irqs */
-> +               return -1;
-> +
-> +       hwirq = offset - bank->first + bank->irq_first;
-> +
-> +       if (hwirq > bank->irq_last)
-> +               /* this pin cannot generate irqs */
-> +               return -1;
-> +
-> +       return hwirq;
-> +}
+OK, I see (async_pf_execute and ksm ). It makes more sense to me. Thanks
+for the clarification.
 
-This is reimplementing irqdomain.
-
-> +static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned int offset)
-> +{
-(...)
-> +       hwirq = meson_gpio_to_hwirq(bank, offset);
-> +       if (hwirq < 0) {
-> +               dev_dbg(pc->dev, "no interrupt for pin %u\n", offset);
-> +               return 0;
-> +       }
-
-Isn't this usecase (also as described in the cover letter) a textbook
-example of when you should be using hierarchical irqdomain?
-
-Please check with Marc et al on hierarchical irqdomains.
-
-Yours,
-Linus Walleij
+-- 
+Michal Hocko
+SUSE Labs
