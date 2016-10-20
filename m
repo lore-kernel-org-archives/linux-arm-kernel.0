@@ -1,76 +1,230 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 20 Oct 2016 11:12:57 +0100
-Subject: [PATCH] arm64: kernel: force ET_DYN ELF type for CONFIG_RELOCATABLE=y
-Message-ID: <1476958377-13900-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 20 Oct 2016 11:17:58 +0100
+Subject: [PATCHv3 1/4] arm64: dump: Make ptdump debugfs a separate option
+In-Reply-To: <1476828091-17802-2-git-send-email-labbott@redhat.com>
+References: <1476828091-17802-1-git-send-email-labbott@redhat.com>
+ <1476828091-17802-2-git-send-email-labbott@redhat.com>
+Message-ID: <CAKv+Gu8SR_+zNQ7D2yHwznKAxs8f7WToBEHr7RmgkyuswhM8bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GNU ld used to set the ELF file type to ET_DYN for PIE executables, which
-is the same file type used for shared libraries. However, this was changed
-recently, and now PIE executables are emitted as ET_EXEC instead.
+On 18 October 2016 at 23:01, Laura Abbott <labbott@redhat.com> wrote:
+>
+> ptdump_register currently initializes a set of page table information and
+> registers debugfs. There are uses for the ptdump option without wanting the
+> debugfs options. Split this out to make it a separate option.
+>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Minor header guard fixup.
+>
+> Mark Rutland pointed out that this needs to be reviewed by the EFI maintainers
+> so I'm explicitly adding appropriate people/lists.
 
-The distinction is only relevant for ELF loaders, and so there is little
-reason to care about the difference when building the kernel, which is
-why the change has gone unnoticed until now.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-However, debuggers do use the ELF binary, and expect ET_EXEC type files
-to appear in memory at the exact offset described in the ELF metadata.
-This means source level debugging is no longer possible when KASLR is in
-effect or when executing the stub.
-
-So add the -shared LD option when building with CONFIG_RELOCATABLE=y. This
-forces the ELF file type to be set to ET_DYN (which is what you get when
-building with binutils 2.24 and earlier anyway), and has no other ill
-effects.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-The difference in output between ET_EXEC and ET_DYN file types for
-'readelf -a vmlinux':
-
---- /tmp/exec	2016-10-19 17:46:51.368841538 +0100
-+++ /tmp/dyn	2016-10-19 17:46:01.774879088 +0100
-@@ -5,7 +5,7 @@
-   Version:                           1 (current)
-   OS/ABI:                            UNIX - System V
-   ABI Version:                       0
--  Type:                              EXEC (Executable file)
-+  Type:                              DYN (Shared object file)
-   Machine:                           AArch64
-   Version:                           0x1
-   Entry point address:               0xffff000008080000
-@@ -239199,7 +239199,7 @@
- 108973: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS 
- 108974: ffff0000089800a0     0 OBJECT  LOCAL  DEFAULT  ABS _GLOBAL_OFFSET_TABLE_
- 108975: ffff0000081a7c70     0 NOTYPE  LOCAL  DEFAULT    2 $x
--108976: ffff0000081a7c74     8 FUNC    LOCAL  DEFAULT    2 e843419 at 001a_00000473_99c
-+108976: ffff0000081a7c74     8 FUNC    LOCAL  DEFAULT    2 e843419 at 001a_00000472_99c
- 108977: ffff0000081a7c74     0 NOTYPE  LOCAL  DEFAULT    2 $x
- 108978: ffff000008d7c118   136 FUNC    GLOBAL DEFAULT   19 __efistub_fdt_delprop
- 108979: ffff000008819db8    36 FUNC    GLOBAL DEFAULT    2 arch_timer_get_kvm_info
-@@ -269256,4 +269256,4 @@
- Displaying notes found at file offset 0x00cf5740 with length 0x00000024:
-   Owner                 Data size	Description
-   GNU                  0x00000014	NT_GNU_BUILD_ID (unique build ID bitstring)
--    Build ID: a63334609e04d620ea175bb9e88bc68989dc0402
-+    Build ID: 7f489d756b1799111b0128ffa61546c2ac1f6e2a
-
- arch/arm64/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index ab51aed6b6c1..3635b8662724 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -15,7 +15,7 @@ CPPFLAGS_vmlinux.lds = -DTEXT_OFFSET=$(TEXT_OFFSET)
- GZFLAGS		:=-9
- 
- ifneq ($(CONFIG_RELOCATABLE),)
--LDFLAGS_vmlinux		+= -pie -Bsymbolic
-+LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic
- endif
- 
- ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
--- 
-2.7.4
+> ---
+>  arch/arm64/Kconfig.debug           |  6 +++++-
+>  arch/arm64/include/asm/ptdump.h    | 15 +++++++++------
+>  arch/arm64/mm/Makefile             |  3 ++-
+>  arch/arm64/mm/dump.c               | 26 +++++---------------------
+>  arch/arm64/mm/ptdump_debugfs.c     | 31 +++++++++++++++++++++++++++++++
+>  drivers/firmware/efi/arm-runtime.c |  4 ++--
+>  6 files changed, 54 insertions(+), 31 deletions(-)
+>  create mode 100644 arch/arm64/mm/ptdump_debugfs.c
+>
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index b661fe7..21a5b74 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -2,9 +2,13 @@ menu "Kernel hacking"
+>
+>  source "lib/Kconfig.debug"
+>
+> -config ARM64_PTDUMP
+> +config ARM64_PTDUMP_CORE
+> +       def_bool n
+> +
+> +config ARM64_PTDUMP_DEBUGFS
+>         bool "Export kernel pagetable layout to userspace via debugfs"
+>         depends on DEBUG_KERNEL
+> +       select ARM64_PTDUMP_CORE
+>         select DEBUG_FS
+>          help
+>           Say Y here if you want to show the kernel pagetable layout in a
+> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
+> index 07b8ed0..16335da 100644
+> --- a/arch/arm64/include/asm/ptdump.h
+> +++ b/arch/arm64/include/asm/ptdump.h
+> @@ -16,9 +16,10 @@
+>  #ifndef __ASM_PTDUMP_H
+>  #define __ASM_PTDUMP_H
+>
+> -#ifdef CONFIG_ARM64_PTDUMP
+> +#ifdef CONFIG_ARM64_PTDUMP_CORE
+>
+>  #include <linux/mm_types.h>
+> +#include <linux/seq_file.h>
+>
+>  struct addr_marker {
+>         unsigned long start_address;
+> @@ -32,13 +33,15 @@ struct ptdump_info {
+>         unsigned long                   max_addr;
+>  };
+>
+> -int ptdump_register(struct ptdump_info *info, const char *name);
+> -
+> +void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
+> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
+>  #else
+> -static inline int ptdump_register(struct ptdump_info *info, const char *name)
+> +static inline int ptdump_debugfs_register(struct ptdump_info *info,
+> +                                       const char *name)
+>  {
+>         return 0;
+>  }
+> -#endif /* CONFIG_ARM64_PTDUMP */
+> -
+> +#endif
+> +#endif /* CONFIG_ARM64_PTDUMP_CORE */
+>  #endif /* __ASM_PTDUMP_H */
+> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+> index 54bb209..e703fb9 100644
+> --- a/arch/arm64/mm/Makefile
+> +++ b/arch/arm64/mm/Makefile
+> @@ -3,7 +3,8 @@ obj-y                           := dma-mapping.o extable.o fault.o init.o \
+>                                    ioremap.o mmap.o pgd.o mmu.o \
+>                                    context.o proc.o pageattr.o
+>  obj-$(CONFIG_HUGETLB_PAGE)     += hugetlbpage.o
+> -obj-$(CONFIG_ARM64_PTDUMP)     += dump.o
+> +obj-$(CONFIG_ARM64_PTDUMP_CORE)        += dump.o
+> +obj-$(CONFIG_ARM64_PTDUMP_DEBUGFS)     += ptdump_debugfs.o
+>  obj-$(CONFIG_NUMA)             += numa.o
+>
+>  obj-$(CONFIG_KASAN)            += kasan_init.o
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index 9c3e75d..f0f0be7 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -304,9 +304,8 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
+>         }
+>  }
+>
+> -static int ptdump_show(struct seq_file *m, void *v)
+> +void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+>  {
+> -       struct ptdump_info *info = m->private;
+>         struct pg_state st = {
+>                 .seq = m,
+>                 .marker = info->markers,
+> @@ -315,33 +314,16 @@ static int ptdump_show(struct seq_file *m, void *v)
+>         walk_pgd(&st, info->mm, info->base_addr);
+>
+>         note_page(&st, 0, 0, 0);
+> -       return 0;
+>  }
+>
+> -static int ptdump_open(struct inode *inode, struct file *file)
+> +static void ptdump_initialize(void)
+>  {
+> -       return single_open(file, ptdump_show, inode->i_private);
+> -}
+> -
+> -static const struct file_operations ptdump_fops = {
+> -       .open           = ptdump_open,
+> -       .read           = seq_read,
+> -       .llseek         = seq_lseek,
+> -       .release        = single_release,
+> -};
+> -
+> -int ptdump_register(struct ptdump_info *info, const char *name)
+> -{
+> -       struct dentry *pe;
+>         unsigned i, j;
+>
+>         for (i = 0; i < ARRAY_SIZE(pg_level); i++)
+>                 if (pg_level[i].bits)
+>                         for (j = 0; j < pg_level[i].num; j++)
+>                                 pg_level[i].mask |= pg_level[i].bits[j].mask;
+> -
+> -       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
+> -       return pe ? 0 : -ENOMEM;
+>  }
+>
+>  static struct ptdump_info kernel_ptdump_info = {
+> @@ -352,6 +334,8 @@ static struct ptdump_info kernel_ptdump_info = {
+>
+>  static int ptdump_init(void)
+>  {
+> -       return ptdump_register(&kernel_ptdump_info, "kernel_page_tables");
+> +       ptdump_initialize();
+> +       return ptdump_debugfs_register(&kernel_ptdump_info,
+> +                                       "kernel_page_tables");
+>  }
+>  device_initcall(ptdump_init);
+> diff --git a/arch/arm64/mm/ptdump_debugfs.c b/arch/arm64/mm/ptdump_debugfs.c
+> new file mode 100644
+> index 0000000..eee4d86
+> --- /dev/null
+> +++ b/arch/arm64/mm/ptdump_debugfs.c
+> @@ -0,0 +1,31 @@
+> +#include <linux/debugfs.h>
+> +#include <linux/seq_file.h>
+> +
+> +#include <asm/ptdump.h>
+> +
+> +static int ptdump_show(struct seq_file *m, void *v)
+> +{
+> +       struct ptdump_info *info = m->private;
+> +       ptdump_walk_pgd(m, info);
+> +       return 0;
+> +}
+> +
+> +static int ptdump_open(struct inode *inode, struct file *file)
+> +{
+> +       return single_open(file, ptdump_show, inode->i_private);
+> +}
+> +
+> +static const struct file_operations ptdump_fops = {
+> +       .open           = ptdump_open,
+> +       .read           = seq_read,
+> +       .llseek         = seq_lseek,
+> +       .release        = single_release,
+> +};
+> +
+> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
+> +{
+> +       struct dentry *pe;
+> +       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
+> +       return pe ? 0 : -ENOMEM;
+> +
+> +}
+> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> index 7c75a8d..349dc3e 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -39,7 +39,7 @@ static struct mm_struct efi_mm = {
+>         .mmlist                 = LIST_HEAD_INIT(efi_mm.mmlist),
+>  };
+>
+> -#ifdef CONFIG_ARM64_PTDUMP
+> +#ifdef CONFIG_ARM64_PTDUMP_DEBUGFS
+>  #include <asm/ptdump.h>
+>
+>  static struct ptdump_info efi_ptdump_info = {
+> @@ -53,7 +53,7 @@ static struct ptdump_info efi_ptdump_info = {
+>
+>  static int __init ptdump_init(void)
+>  {
+> -       return ptdump_register(&efi_ptdump_info, "efi_page_tables");
+> +       return ptdump_debugfs_register(&efi_ptdump_info, "efi_page_tables");
+>  }
+>  device_initcall(ptdump_init);
+>
+> --
+> 2.7.4
+>
