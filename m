@@ -1,59 +1,81 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 20 Oct 2016 11:41:31 +0200
-Subject: [PATCH v2 2/6] ARM: at91: Document samx7 compatibles
+Date: Thu, 20 Oct 2016 11:41:30 +0200
+Subject: [PATCH v2 1/6] ARM: at91: Documentation: add samx7 families
 In-Reply-To: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
 References: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161020094135.18221-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20161020094135.18221-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce necessary compatibles to describe the samx7 family
+The Atmel sams70, samv70 and samv71 are Cortex-M7 based MCUs that can run
+Linux (without MMU).
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- .../devicetree/bindings/arm/atmel-at91.txt         | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ Documentation/arm/Atmel/README | 44 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index e1f5ad855f14..baf9607c5f14 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -41,6 +41,36 @@ compatible: must be one of:
-        - "atmel,sama5d43"
-        - "atmel,sama5d44"
+diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
+index 6ca78f818dbf..e403697ee9fc 100644
+--- a/Documentation/arm/Atmel/README
++++ b/Documentation/arm/Atmel/README
+@@ -14,9 +14,9 @@ official Atmel product name. Anyway, files, directories, git trees,
+ git branches/tags and email subject always contain this "at91" sub-string.
  
-+ * "atmel,samx7" for MCUs using a Cortex-M7, shall be extended with the specific
-+   SoC family:
-+    o "atmel,sams70" shall be extended with the specific MCU compatible:
-+       - "atmel,sams70j19"
-+       - "atmel,sams70j20"
-+       - "atmel,sams70j21"
-+       - "atmel,sams70n19"
-+       - "atmel,sams70n20"
-+       - "atmel,sams70n21"
-+       - "atmel,sams70q19"
-+       - "atmel,sams70q20"
-+       - "atmel,sams70q21"
-+    o "atmel,samv70" shall be extended with the specific MCU compatible:
-+       - "atmel,samv70j19"
-+       - "atmel,samv70j20"
-+       - "atmel,samv70n19"
-+       - "atmel,samv70n20"
-+       - "atmel,samv70q19"
-+       - "atmel,samv70q20"
-+    o "atmel,samv71" shall be extended with the specific MCU compatible:
-+       - "atmel,samv71j19"
-+       - "atmel,samv71j20"
-+       - "atmel,samv71j21"
-+       - "atmel,samv71n19"
-+       - "atmel,samv71n20"
-+       - "atmel,samv71n21"
-+       - "atmel,samv71q19"
-+       - "atmel,samv71q20"
-+       - "atmel,samv71q21"
+ 
+-AT91 SoCs
+----------
+-Documentation and detailled datasheet for each product are available on
++SMART SoCs
++----------
++Documentation and detailed datasheet for each product are available on
+ the Atmel website: http://www.atmel.com.
+ 
+   Flavors:
+@@ -101,6 +101,44 @@ the Atmel website: http://www.atmel.com.
+         + Datasheet
+           http://www.atmel.com/Images/Atmel-11267-32-bit-Cortex-A5-Microcontroller-SAMA5D2_Datasheet.pdf
+ 
++SMART MCUs
++----------
++    * ARM Cortex-M7 MCUs
++      - sams70 family
++        - sams70j19
++        - sams70j20
++        - sams70j21
++        - sams70n19
++        - sams70n20
++        - sams70n21
++        - sams70q19
++        - sams70q20
++        - sams70q21
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-11242-32-bit-Cortex-M7-Microcontroller-SAM-S70Q-SAM-S70N-SAM-S70J_Datasheet.pdf
 +
- Chipid required properties:
- - compatible: Should be "atmel,sama5d2-chipid"
- - reg : Should contain registers location and length
++      - samv70 family
++        - samv70j19
++        - samv70j20
++        - samv70n19
++        - samv70n20
++        - samv70q19
++        - samv70q20
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-11297-32-bit-Cortex-M7-Microcontroller-SAM-V70Q-SAM-V70N-SAM-V70J_Datasheet.pdf
++
++      - samv71 family
++        - samv71j19
++        - samv71j20
++        - samv71j21
++        - samv71n19
++        - samv71n20
++        - samv71n21
++        - samv71q19
++        - samv71q20
++        - samv71q21
++        + Datasheet
++          http://www.atmel.com/Images/Atmel-44003-32-bit-Cortex-M7-Microcontroller-SAM-V71Q-SAM-V71N-SAM-V71J_Datasheet.pdf
+ 
+ Linux kernel information
+ ------------------------
 -- 
 2.9.3
