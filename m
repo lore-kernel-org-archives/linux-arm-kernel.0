@@ -1,59 +1,69 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 20 Oct 2016 23:39:10 +0200
-Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
- early boot stages
-In-Reply-To: <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Thu, 20 Oct 2016 19:42:43 -0200
+Subject: [PATCH v3 0/3] mtd: s3c2410: add device tree support
+Message-ID: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 12:21 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> The penalty determination of ISA IRQ goes through 4 paths.
-> 1. assign PCI_USING during power up via acpi_irq_penalty_init.
-> 2. update the penalty with acpi_penalize_isa_irq function based on the
-> active parameter.
-> 3. kernel command line penalty update via acpi_irq_penalty_update function.
-> 4. increment the penalty as USING right after the IRQ is assign to PCI.
->
-> acpi_penalize_isa_irq and acpi_irq_penalty_update functions get called
-> before the ACPI subsystem is started.
->
-> These API need to bypass the acpi_irq_get_penalty function.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/pci_link.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index c983bf7..4f37938 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -849,7 +849,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
->                         continue;
->
->                 if (used)
-> -                       new_penalty = acpi_irq_get_penalty(irq) +
-> +                       new_penalty = acpi_isa_irq_penalty[irq] +
->                                         PIRQ_PENALTY_ISA_USED;
->                 else
->                         new_penalty = 0;
-> @@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
->  void acpi_penalize_isa_irq(int irq, int active)
->  {
->         if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
-> -               acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
-> +               acpi_isa_irq_penalty[irq] = acpi_isa_irq_penalty[irq] +
+This series adds support for configuring Samsung's s3c2410 and
+compatible flash memory controller via devicetree.
 
-This looks slightly odd.  What about
+Tested on FriendlyARM mini2440, based on s3c2440 SoC.
 
-+               acpi_isa_irq_penalty[irq] +=
+Patch 3 depends on patch 1.
 
->                   (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
->  }
->
+Changes since v2:
+- conditionally assign chip->setup_data_interface to
+  s3c2410_nand_setup_data_interface if booting via device tree
 
-Thanks,
-Rafael
+Changes since v1:
+- automate timing selection when booting with a device tree
+- make s3c24XX_nand_devtype_data structs "static const"
+- removing samsung,s3c6400-nand compatible since it is equivalent to
+  samsung,s3c2412-nand
+
+Changes since initial version:
+- patch converted to a patch series
+- read timings from nand_sdr_timings when booting with a device tree
+- naming improvements in the device tree binding
+  (s/nand/nand-controller/, s/_/-, s/children/child)
+- dropped property samsung,ignore_unset_ecc
+- remove @0 from nand device node
+- checking pdev->dev.of_node instead of using ifdef CONFIG_OF_MTD
+- preventing from parsing device tree properties twice
+- increment the nand controller child node refcount, since we
+  maintain a reference to it and its name field
+- using of_device_get_match_data() instead of of_match_device()
+  to make the code simpler
+- remove CONFIG_MTD_NAND_S3C2410_HWECC compile option so we can
+  select ECC mode using nand-ecc-mode property in the device tree
+
+Sergio Prado (3):
+  mtd: s3c2410: make ecc mode configurable via platform data
+  dt-bindings: mtd: add DT binding for s3c2410 flash controller
+  mtd: s3c2410: parse the device configuration from OF node
+
+ .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  56 +++++
+ arch/arm/mach-s3c24xx/common-smdk.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-anubis.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-at2440evb.c             |   1 +
+ arch/arm/mach-s3c24xx/mach-bast.c                  |   1 +
+ arch/arm/mach-s3c24xx/mach-gta02.c                 |   1 +
+ arch/arm/mach-s3c24xx/mach-jive.c                  |   1 +
+ arch/arm/mach-s3c24xx/mach-mini2440.c              |   1 +
+ arch/arm/mach-s3c24xx/mach-osiris.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-qt2410.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-rx1950.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-rx3715.c                |   1 +
+ arch/arm/mach-s3c24xx/mach-vstms.c                 |   1 +
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |   1 +
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |   1 +
+ arch/arm/mach-s3c64xx/mach-real6410.c              |   1 +
+ drivers/mtd/nand/Kconfig                           |   9 -
+ drivers/mtd/nand/s3c2410.c                         | 277 +++++++++++++++------
+ include/linux/platform_data/mtd-nand-s3c2410.h     |   7 +-
+ 19 files changed, 278 insertions(+), 86 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
+
+-- 
+1.9.1
