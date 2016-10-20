@@ -1,25 +1,190 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 18:02:41 +0200
-Subject: [PATCH v2 8/8] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
-In-Reply-To: <20161020034344.14154-9-wens@csie.org>
-References: <20161020034344.14154-1-wens@csie.org>
- <20161020034344.14154-9-wens@csie.org>
-Message-ID: <20161020160241.vazi2afm47rky4fi@lukather>
+Date: Thu, 20 Oct 2016 18:04:43 +0200
+Subject: [PATCH 1/3] ARM: dts: sun8i: Add common dtsi file for NanoPi SBCs
+In-Reply-To: <20161020080701.15993-2-woogyom.kim@gmail.com>
+References: <20161020080701.15993-1-woogyom.kim@gmail.com>
+ <20161020080701.15993-2-woogyom.kim@gmail.com>
+Message-ID: <20161020160443.kbdtp626kvibgte4@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;4402;0c
-On Thu, Oct 20, 2016 at 11:43:44AM +0800, Chen-Yu Tsai wrote:
-> The Hummingbird A31 board has a RGB-to-VGA bridge which converts RGB
-> output from the LCD interface to VGA signals.
-> 
-> Enable this part of the display pipeline.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi,
 
-This one looks nice, but I'm going to wait for Archit answers before
-merging it.
+On Thu, Oct 20, 2016 at 05:06:59PM +0900, Milo Kim wrote:
+> This patch provides a common file for NanoPi M1 and Neo SBC.
+> 
+> Those have common features below.
+>   * UART0
+>   * 2 LEDs
+>   * USB host (EHCI3, OHCI3) and PHY
+>   * MicroSD
+>   * GPIO key switch
+> 
+> Cc: James Pettigrew <james@innovum.com.au>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-nanopi.dtsi | 143 +++++++++++++++++++++++++++++++++
+>  1 file changed, 143 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+> new file mode 100644
+> index 0000000..e89ca6f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi.dtsi
+> @@ -0,0 +1,143 @@
+> +/*
+> + * Copyright (C) 2016 Milo Kim <woogyom.kim@gmail.com>
+
+This looks like a copy of James' DT. Keeping him as the copyright
+holder seems like the right thing to do.
+
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun8i-h3.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&leds_npi>, <&leds_r_npi>;
+> +
+> +		status {
+> +			label = "nanopi:blue:status";
+> +			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		pwr {
+> +			label = "nanopi:green:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +	};
+> +
+> +	r_gpio_keys {
+> +		compatible = "gpio-keys";
+> +		input-name = "k1";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sw_r_npi>;
+> +
+> +		k1 at 0 {
+> +			label = "k1";
+> +			linux,code = <KEY_POWER>;
+> +			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +};
+> +
+> +&ehci3 {
+> +	status = "okay";
+> +};
+> +
+> +&mmc0 {
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> +	status = "okay";
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +};
+> +
+> +&ohci3 {
+> +	status = "okay";
+> +};
+> +
+> +&pio {
+> +	leds_npi: led_pins at 0 {
+> +		allwinner,pins = "PA10";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&r_pio {
+> +	leds_r_npi: led_pins at 0 {
+> +		allwinner,pins = "PL10";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +
+> +	sw_r_npi: key_pins at 0 {
+> +		allwinner,pins = "PL3";
+> +		allwinner,function = "gpio_in";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	status = "okay";
+> +};
+> -- 
+> 2.9.3
+> 
+
+Looks good otherwise.
 
 Thanks!
 Maxime
@@ -34,4 +199,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/ea5a402d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/d8ce2171/attachment.sig>
