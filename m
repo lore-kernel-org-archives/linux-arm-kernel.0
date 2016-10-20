@@ -1,73 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 20 Oct 2016 11:11:26 +0200
-Subject: Handling of enet_out on i.MX28
-Message-ID: <20161020091126.jdoexu6iuu3jjzsm@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Oct 2016 10:12:43 +0200
+Subject: [PATCH 2/8] mtd: nand: add support for the TC58NVG2S0H chip
+In-Reply-To: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <62d5d978da8c6bc6b47c340c86e9a5fe5f6971ef.1476951078.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-The i.MX28 reference manual specifies for HW_CLKCTRL_ENET.CLK_OUT_EN:
-"NOTE: This bit must be configured before ENET PLL is enabled.".
+Add the description of the Toshiba TC58NVG2S0H SLC nand to the nand_ids
+table so we can use the NAND ECC infos and the ONFI timings.
 
-Currently this is not implemented: ENET PLL (aka pll2) is the parent of
-enet_out and so common clk enables the PLL first and only then sets
-HW_CLKCTRL_ENET.CLK_OUT_EN.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mtd/nand/nand_ids.c | 3 +++
+ 1 file changed, 3 insertions(+), 0 deletions(-)
 
-For now this is a theoretical problem because I don't see any issues. I
-only notice the discrepancy between manual and reality.
-
-Do you think this is a problem?
-
-Apart from that I'm not happy with the handling of this clk. IMHO it
-should better be called "enet-ref" or similar (for the fec). imx28.dtsi
-specifies that the clk is in use[1] and if my machine doesn't I have to
-do:
-
-	&mac0 {
-		...
-		/* overwrite clocks and clock-names to remove enet_out */
-		clocks = <&clks 57>, <&clks 57>;
-		clock-names = "ipg", "ahb";
-		...
-	};
-
-in my board.dts. This is ugly because I have to repeat stuff that is
-already in imx28.dtsi and it's not understandable without the comment.
-
-It would be nice if dtc allowed to modify an array, then we could do:
-
-	clocks += <&clks 64>;
-	clock-names = += "enet_out";
-
-(assuming the included dtsi doesn't specify this clock).
-
-I first though it would be a good idea to specify the enet-ref clk as
-follows:
-
-	&mac0 {
-		...
-		mdio {
-			clocks = <&clks 64>;
-			clock-names = "enet-ref";
-			...
-		};
-	};
-
-but while this makes it easier for the board.dts to add (or remove) it,
-it's not really right this way because the reference clock is needed for
-data RX and TX, not the mdio bus. Technically these are two different
-buses even though the "passengers" are often the same. (Even if two
-MACs are in use, the enet-ref signal is shared.)
-
-What do you think?
-
-Best regards
-Uwe
-
-[1] clocks = <&clks 57>, <&clks 57>, <&clks 64>; clock-names = "ipg",
-    "ahb", "enet_out"; in &mac0.
-
+diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
+index 2af9869a115e..b3a332f37e14 100644
+--- a/drivers/mtd/nand/nand_ids.c
++++ b/drivers/mtd/nand/nand_ids.c
+@@ -36,6 +36,9 @@ struct nand_flash_dev nand_flash_ids[] = {
+ 	{"TC58NVG2S0F 4G 3.3V 8-bit",
+ 		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x15, 0x01, 0x08} },
+ 		  SZ_4K, SZ_512, SZ_256K, 0, 8, 224, NAND_ECC_INFO(4, SZ_512) },
++	{"TC58NVG2S0H 4G 3.3V 8-bit",
++		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x16, 0x08, 0x00} },
++		  SZ_4K, SZ_512, SZ_256K, 0, 8, 256, NAND_ECC_INFO(8, SZ_512) },
+ 	{"TC58NVG3S0F 8G 3.3V 8-bit",
+ 		{ .id = {0x98, 0xd3, 0x90, 0x26, 0x76, 0x15, 0x02, 0x08} },
+ 		  SZ_4K, SZ_1K, SZ_256K, 0, 8, 232, NAND_ECC_INFO(4, SZ_512) },
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+git-series 0.8.10
