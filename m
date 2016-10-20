@@ -1,51 +1,49 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 20 Oct 2016 13:21:47 +0300
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <6c6fcceb-c6f2-219d-492a-a8b38fd83093@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
- <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com> <4975084.EGQPv58AK6@avalon>
- <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
- <CAMpxmJXT8hcSc0-svbwAq5r_JOFsYV852gtE0vuXL8hHykXnRQ@mail.gmail.com>
- <6c6fcceb-c6f2-219d-492a-a8b38fd83093@ti.com>
-Message-ID: <bb7bac91-8eb1-fe23-ca9c-857e0fda6ecd@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 20 Oct 2016 12:26:21 +0200
+Subject: [PATCH v2 3/6] ARM: at91: Add armv7m support
+In-Reply-To: <5506721.HBUId2vnJb@wuerfel>
+References: <20161020094135.18221-1-alexandre.belloni@free-electrons.com>
+ <20161020094135.18221-4-alexandre.belloni@free-electrons.com>
+ <5506721.HBUId2vnJb@wuerfel>
+Message-ID: <20161020102621.od7kkgpndooy25kz@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/16 13:07, Sekhar Nori wrote:
+Hi,
 
-> Per me, compatible property is an ordered list precisely for the reason
-> that things should continue to "work" with as closely matched driver as
-> possible. So even if someone is running a kernel which does not
-> recognize "ti,da850-tilcdc", it should still be able to probe the driver
-> based on "ti,am33xx-tilcdc" and provide as close to full functionality
-> as possible.
+On 20/10/2016 at 11:52:20 +0200, Arnd Bergmann wrote :
+> On Thursday, October 20, 2016 11:41:32 AM CEST Alexandre Belloni wrote:
+> > +
+> > +static void __init samx7_dt_device_init(void)
+> > +{
+> > +       struct soc_device *soc;
+> > +       struct device *soc_dev = NULL;
+> > +
+> > +       soc = at91_soc_init(samx7_socs);
+> > +       if (soc)
+> > +               soc_dev = soc_device_to_device(soc);
+> > +
+> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL, soc_dev);
+> > +}
 > 
-> That said, I will not insist on keeping it around if Tomi is
-> uncomfortable. And having read the binding documentation accepted by
-> Jyri, it actually says the compatible property should be __one of__
-> "ti,am33xx-tilcdc" or "ti,da850-tilcdc".
+> This was initially the idea for the soc_device, but we've stopped
+> using it as the parent for the on-chip devices a while ago.
+> 
+> Just register the device for identification here, and use
+> of_platform_default_populate with a NULL parent as most others do.
+> 
+> We should also investigate whether we can convert the three other
+> at91 variants to do the same without breaking expectations in user space.
+> 
 
-Well, they are just not compatible as far as I know. If the LCDC on
-DA850 would be identified as AM335x LCDC, and used as such, it would not
-work at all. They have different registers, AM335x LCDC has registers
-that do not exist on DA850.
+My opinion is that we could just remove the whole at91_soc_init stuff
+but I think Nicolas still wants the two info lines to be printed for
+debugging/support purposes. I'm not sure how much this is used anyway
+and I don't find the sysfs attributes to be particularly useful.
 
-With our driver it happens to work, because the driver looks at the IP
-revision in the registers, and then decides that this IP is not AM335x
-LCDC even if the dts says so. But I see that as a driver "feature",
-nothing that the .dts can depend on.
+Also, removing soc.c is a 10% reduction of the code in mach-at91 ;)
 
-Perhaps it might work the other way around, using DA850 driver on
-AM335x, as DA850 LCDC is a kind of subset of AM335x LCDC. But I'm not
-sure even about that.
-
- Tomi
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/b0a52fc5/attachment.sig>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
