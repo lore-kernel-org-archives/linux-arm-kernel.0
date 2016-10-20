@@ -1,120 +1,211 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Oct 2016 15:59:49 +0530
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <bb7bac91-8eb1-fe23-ca9c-857e0fda6ecd@ti.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
- <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com> <4975084.EGQPv58AK6@avalon>
- <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
- <CAMpxmJXT8hcSc0-svbwAq5r_JOFsYV852gtE0vuXL8hHykXnRQ@mail.gmail.com>
- <6c6fcceb-c6f2-219d-492a-a8b38fd83093@ti.com>
- <bb7bac91-8eb1-fe23-ca9c-857e0fda6ecd@ti.com>
-Message-ID: <5b76ed89-cb1a-8ab2-bfbd-0a7bcf80de33@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 20 Oct 2016 11:32:45 +0100
+Subject: [PATCHv3 4/4] arm64: dump: Add checking for writable and
+ exectuable pages
+In-Reply-To: <1476828091-17802-5-git-send-email-labbott@redhat.com>
+References: <1476828091-17802-1-git-send-email-labbott@redhat.com>
+ <1476828091-17802-5-git-send-email-labbott@redhat.com>
+Message-ID: <CAKv+Gu-jmocWVRgRzd10VBD9+E_w33DfLm-zj_=iVGodczsnmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 20 October 2016 03:51 PM, Tomi Valkeinen wrote:
-> On 20/10/16 13:07, Sekhar Nori wrote:
-> 
->> Per me, compatible property is an ordered list precisely for the reason
->> that things should continue to "work" with as closely matched driver as
->> possible. So even if someone is running a kernel which does not
->> recognize "ti,da850-tilcdc", it should still be able to probe the driver
->> based on "ti,am33xx-tilcdc" and provide as close to full functionality
->> as possible.
->>
->> That said, I will not insist on keeping it around if Tomi is
->> uncomfortable. And having read the binding documentation accepted by
->> Jyri, it actually says the compatible property should be __one of__
->> "ti,am33xx-tilcdc" or "ti,da850-tilcdc".
-> 
-> Well, they are just not compatible as far as I know. If the LCDC on
-> DA850 would be identified as AM335x LCDC, and used as such, it would not
-> work at all. They have different registers, AM335x LCDC has registers
-> that do not exist on DA850.
-> 
-> With our driver it happens to work, because the driver looks at the IP
-> revision in the registers, and then decides that this IP is not AM335x
-> LCDC even if the dts says so. But I see that as a driver "feature",
-> nothing that the .dts can depend on.
-> 
-> Perhaps it might work the other way around, using DA850 driver on
-> AM335x, as DA850 LCDC is a kind of subset of AM335x LCDC. But I'm not
-> sure even about that.
+On 18 October 2016 at 23:01, Laura Abbott <labbott@redhat.com> wrote:
+>
+> Page mappings with full RWX permissions are a security risk. x86
+> has an option to walk the page tables and dump any bad pages.
+> (See e1a58320a38d ("x86/mm: Warn on W^X mappings")). Add a similar
+> implementation for arm64.
+>
+> Reviewed-by: Kees Cook <keescook@chromium.org>
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Rebased for header guard fixup, whitespace fixes
+> ---
+>  arch/arm64/Kconfig.debug        | 29 +++++++++++++++++++++++
+>  arch/arm64/include/asm/ptdump.h |  8 +++++++
+>  arch/arm64/mm/dump.c            | 52 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/mm/mmu.c             |  2 ++
+>  4 files changed, 91 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 21a5b74..d1ebd46 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -42,6 +42,35 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
+>           of TEXT_OFFSET and platforms must not require a specific
+>           value.
+>
+> +config DEBUG_WX
+> +       bool "Warn on W+X mappings at boot"
+> +       select ARM64_PTDUMP_CORE
+> +       ---help---
+> +         Generate a warning if any W+X mappings are found at boot.
+> +
+> +         This is useful for discovering cases where the kernel is leaving
+> +         W+X mappings after applying NX, as such mappings are a security risk.
+> +         This check also includes UXN, which should be set on all kernel
+> +         mappings.
+> +
+> +         Look for a message in dmesg output like this:
+> +
+> +           arm64/mm: Checked W+X mappings: passed, no W+X pages found.
+> +
+> +         or like this, if the check failed:
+> +
+> +           arm64/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
+> +
+> +         Note that even if the check fails, your kernel is possibly
+> +         still fine, as W+X mappings are not a security hole in
+> +         themselves, what they do is that they make the exploitation
+> +         of other unfixed kernel bugs easier.
+> +
+> +         There is no runtime or memory usage effect of this option
+> +         once the kernel has booted up - it's a one time check.
+> +
+> +         If in doubt, say "Y".
+> +
+>  config DEBUG_SET_MODULE_RONX
+>         bool "Set loadable kernel module data as NX and text as RO"
+>         depends on MODULES
+> diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
+> index f72ee69..6afd847 100644
+> --- a/arch/arm64/include/asm/ptdump.h
+> +++ b/arch/arm64/include/asm/ptdump.h
+> @@ -42,5 +42,13 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
+>         return 0;
+>  }
+>  #endif
+> +void ptdump_check_wx(void);
+>  #endif /* CONFIG_ARM64_PTDUMP_CORE */
+> +
+> +#ifdef CONFIG_DEBUG_WX
+> +#define debug_checkwx()        ptdump_check_wx()
+> +#else
+> +#define debug_checkwx()        do { } while (0)
+> +#endif
+> +
+>  #endif /* __ASM_PTDUMP_H */
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index bb36649..4913af5 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -74,6 +74,8 @@ struct pg_state {
+>         unsigned long start_address;
+>         unsigned level;
+>         u64 current_prot;
+> +       bool check_wx;
+> +       unsigned long wx_pages;
+>  };
+>
+>  struct prot_bits {
+> @@ -202,6 +204,35 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
+>         }
+>  }
+>
+> +static void note_prot_uxn(struct pg_state *st, unsigned long addr)
+> +{
+> +       if (!st->check_wx)
+> +               return;
+> +
+> +       if ((st->current_prot & PTE_UXN) == PTE_UXN)
+> +               return;
+> +
+> +       WARN_ONCE(1, "arm64/mm: Found non-UXN mapping at address %p/%pS\n",
+> +                 (void *)st->start_address, (void *)st->start_address);
+> +
+> +       st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
+> +}
+> +
+> +static void note_prot_wx(struct pg_state *st, unsigned long addr)
+> +{
+> +       if (!st->check_wx)
+> +               return;
+> +       if ((st->current_prot & PTE_RDONLY) == PTE_RDONLY)
+> +               return;
+> +       if ((st->current_prot & PTE_PXN) == PTE_PXN)
+> +               return;
+> +
+> +       WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
+> +                 (void *)st->start_address, (void *)st->start_address);
+> +
+> +       st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
+> +}
+> +
 
-Alright, thanks for the detailed explanation. I dropped the "ti,am33xx-
-tilcdc" from the list and here is the updated patch I am queuing for
-reference.
+Why are these separate functions, and why is wx_pages increased twice,
+potentially?
 
-Thanks,
-Sekhar
+Given how rare non-UXN kernel mappings should be, could we not just add
 
---8<--
-Author:     Karl Beldan <kbeldan@baylibre.com>
-AuthorDate: Wed Oct 5 15:05:32 2016 +0200
-Commit:     Sekhar Nori <nsekhar@ti.com>
-CommitDate: Thu Oct 20 15:57:21 2016 +0530
+       if ((st->current_prot & PTE_UXN) == 0)
+               WARN(xxx)
 
-    ARM: dts: da850: add a node for the LCD controller
-    
-    Add pins used by the LCD controller and a disabled LCDC node to be
-    reused in device trees including da850.dtsi.
-    
-    Signed-off-by: Karl Beldan <kbeldan@baylibre.com>
-    [Bartosz:
-      - added the commit description
-      - changed the dt node name to a generic one
-      - added a da850-specific compatible string
-      - removed the tilcdc,panel node
-      - moved the pins definitions to da850.dtsi as suggested by
-        Sekhar Nori (was in: da850-lcdk.dts)]
-    Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-    [nsekhar at ti.com: fix compatible property and remove interrupt-parent]
-    Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+(without the _ONCE) to note_prot_wx(), and drop note_prot_uxn() entirely?
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f79e1b91c680..901d5c98d5f0 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -186,6 +186,27 @@
- 					0xc 0x88888888 0xffffffff
- 				>;
- 			};
-+			lcd_pins: pinmux_lcd_pins {
-+				pinctrl-single,bits = <
-+					/*
-+					 * LCD_D[2], LCD_D[3], LCD_D[4], LCD_D[5],
-+					 * LCD_D[6], LCD_D[7]
-+					 */
-+					0x40 0x22222200 0xffffff00
-+					/*
-+					 * LCD_D[10], LCD_D[11], LCD_D[12], LCD_D[13],
-+					 * LCD_D[14], LCD_D[15], LCD_D[0], LCD_D[1]
-+					 */
-+					0x44 0x22222222 0xffffffff
-+					/* LCD_D[8], LCD_D[9] */
-+					0x48 0x00000022 0x000000ff
-+
-+					/* LCD_PCLK */
-+					0x48 0x02000000 0x0f000000
-+					/* LCD_AC_ENB_CS, LCD_VSYNC, LCD_HSYNC */
-+					0x4c 0x02000022 0x0f0000ff
-+				>;
-+			};
- 
- 		};
- 		edma0: edma at 0 {
-@@ -399,6 +420,13 @@
- 				<&edma0 0 1>;
- 			dma-names = "tx", "rx";
- 		};
-+
-+		display: display at 213000 {
-+			compatible = "ti,da850-tilcdc";
-+			reg = <0x213000 0x1000>;
-+			interrupts = <52>;
-+			status = "disabled";
-+		};
- 	};
- 	aemif: aemif at 68000000 {
- 		compatible = "ti,da850-aemif";
+
+>  static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+>                                 u64 val)
+>  {
+> @@ -219,6 +250,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+>                 unsigned long delta;
+>
+>                 if (st->current_prot) {
+> +                       note_prot_uxn(st, addr);
+> +                       note_prot_wx(st, addr);
+>                         pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+>                                    st->start_address, addr);
+>
+> @@ -344,6 +377,25 @@ static struct ptdump_info kernel_ptdump_info = {
+>         .base_addr      = VA_START,
+>  };
+>
+> +void ptdump_check_wx(void)
+> +{
+> +       struct pg_state st = {
+> +               .seq = NULL,
+> +               .marker = (struct addr_marker[]) {
+> +                       { -1, NULL},
+> +               },
+> +               .check_wx = true,
+> +       };
+> +
+> +       walk_pgd(&st, &init_mm, 0);
+> +       note_page(&st, 0, 0, 0);
+> +       if (st.wx_pages)
+> +               pr_info("Checked W+X mappings: FAILED, %lu W+X pages found\n",
+> +                       st.wx_pages);
+
+Could we upgrade this to pr_warn?
+
+> +       else
+> +               pr_info("Checked W+X mappings: passed, no W+X pages found\n");
+> +}
+> +
+>  static int ptdump_init(void)
+>  {
+>         ptdump_initialize();
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 05615a3..2cbe2fe 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -42,6 +42,7 @@
+>  #include <asm/tlb.h>
+>  #include <asm/memblock.h>
+>  #include <asm/mmu_context.h>
+> +#include <asm/ptdump.h>
+>
+>  u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
+>
+> @@ -396,6 +397,7 @@ void mark_rodata_ro(void)
+>         section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+>         create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+>                             section_size, PAGE_KERNEL_RO);
+> +       debug_checkwx();
+>  }
+>
+>  static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+> --
+> 2.7.4
+>
