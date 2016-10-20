@@ -1,39 +1,46 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 20 Oct 2016 10:07:25 +0200
-Subject: [PATCH] ARM: dts: rockchip: add i2c-bus subnode to edp
-Message-ID: <1476950845-28242-1-git-send-email-tomeu.vizoso@collabora.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 20 Oct 2016 10:12:42 +0200
+Subject: [PATCH 1/8] mtd: nand: sunxi: fix support for 512bytes ECC chunks
+In-Reply-To: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
+References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f1cb6efb6817c11b235f073639a137bec6ac17e5.1476951078.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an empty 'i2c-bus' subnode to the edp node just so that the I2C core
-doesn't attemp to parse the 'ports' subnode as containing i2c devices.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-This is to avoid spurious failure messages such as:
+The driver is incorrectly assuming that the ECC block size is always 1k
+which is not always true.
 
-i2c i2c-6: of_i2c: modalias failure on /dp at ff970000/ports
+Also take the other cases into account.
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Randy Li <randy.li@rock-chips.com>
-Cc: Jon Hunter <jonathanh@nvidia.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mtd/nand/sunxi_nand.c | 4 ++++
+ 1 file changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2f814ffeb605..94f4b7eecca2 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -1075,6 +1075,11 @@
- 				};
- 			};
- 		};
-+
-+		i2c-bus {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 8b8470c4e6d0..e40482a65de6 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -145,6 +145,7 @@
+ #define NFC_ECC_PIPELINE	BIT(3)
+ #define NFC_ECC_EXCEPTION	BIT(4)
+ #define NFC_ECC_BLOCK_SIZE_MSK	BIT(5)
++#define NFC_ECC_BLOCK_512	BIT(5)
+ #define NFC_RANDOM_EN		BIT(9)
+ #define NFC_RANDOM_DIRECTION	BIT(10)
+ #define NFC_ECC_MODE_MSK	GENMASK(15, 12)
+@@ -817,6 +818,9 @@ static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
+ 	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION |
+ 		   NFC_ECC_PIPELINE;
  
- 	hdmi: hdmi at ff980000 {
++	if (nand->ecc.size == 512)
++		ecc_ctl |= NFC_ECC_BLOCK_512;
++
+ 	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
+ }
+ 
 -- 
-2.7.4
+git-series 0.8.10
