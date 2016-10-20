@@ -1,33 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 20 Oct 2016 20:57:45 +0200 (CEST)
-Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87twczg27x.fsf@eliezer.anholt.net>
-References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
- <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
- <87twczg27x.fsf@eliezer.anholt.net>
-Message-ID: <597494624.18802.29d80fd4-97bf-46c7-b133-c253e7ed6a47.open-xchange@email.1und1.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 20 Oct 2016 21:15:27 +0200
+Subject: [PATCH] ARM: dts: armada-370-rn102: drop specification of compatible
+ for i2c0
+Message-ID: <20161020191527.27679-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The compatible string is already provided by armada-370.dtsi.
 
-> Eric Anholt <eric@anholt.net> hat am 28. September 2016 um 23:10 geschrieben:
-> 
-> 
-> kernel at martin.sperl.org writes:
-> 
-> > From: Martin Sperl <kernel@martin.sperl.org>
-> >
-> > Add basic thermal driver for bcm2835 SOC.
-> >
-> > This driver currently relies on the firmware setting up the
-> > tsense HW block and does not set it up itself.
-> >
-> > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> > Acked-by: Eric Anholt <eric@anholt.net>
-> > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> What's the status of merging this one?  I'd like to merge the other
-> patches.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-gently ping ...
+this is the same as commit 43940ce3b089962f97de544d72b783bd146ef362 that
+currently is in next, just for rn102 instead of rn104.
+
+Best regards
+Uwe
+
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+index 39181b3fa90d..3ca6330a1752 100644
+--- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
++++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+@@ -120,7 +120,6 @@
+ 			};
+ 
+ 			i2c at 11000 {
+-				compatible = "marvell,mv64xxx-i2c";
+ 				clock-frequency = <100000>;
+ 				status = "okay";
+ 
+-- 
+2.9.3
