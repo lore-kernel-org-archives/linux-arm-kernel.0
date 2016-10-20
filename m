@@ -1,154 +1,79 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 19 Oct 2016 23:55:29 -0700
-Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
- path
-In-Reply-To: <20161019080211.GA1968@b29397-desktop>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-12-stephen.boyd@linaro.org>
- <20161019011535.GC6294@b29397-desktop>
- <147684198705.24897.12451889548508263144@sboyd-linaro>
- <20161019080211.GA1968@b29397-desktop>
-Message-ID: <147694652997.28344.1048935134595924905@sboyd-linaro>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Thu, 20 Oct 2016 09:19:13 +0200
+Subject: [PATCH 3/3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+In-Reply-To: <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
+References: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
+ <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
+Message-ID: <20161020071913.rlka3or4c7fzjpyv@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-10-19 01:02:11)
-> On Tue, Oct 18, 2016 at 06:53:07PM -0700, Stephen Boyd wrote:
-> > If you're asking if I've made modifications to extcon-usb-gpio, then the
-> > answer is no. The branch on linaro.org git server from the cover-letter
-> > is the branch I've used to test this with. This patch is specifically to
-> > fix issues with that design on the db410c board that has only one pin
-> > for ID and vbus detection. It's the schematic that we've discussed in
-> > another thread.
-> > 
-> > extcon-usb-gpio sends two extcon events, EXTCON_USB_HOST (for the id
-> > pin) and EXTCON_USB (for the vbus). So afaik it does support vbus
-> > events.
-> > 
-> 
-> Hmm, in fact, your ID event is the same with vbus event, you take
-> external vbus event as ID event for extcon-usb-gpio handling. Yes,
-> it can work due to it sends EXTCON_USB_HOST event first.
-> 
-> Where you change the USB_SW_SEL_PM pin?
+Hi!
 
-Currently that is done with the mux driver I sent based on the extcon
-event. We don't know if that's before or after the controller handles
-the extcon event though, so the pin should probably be changed from the
-chipidea driver instead to be more explicit. Why do you ask though?
-
+On Wed, Oct 19, 2016 at 03:18:44PM -0500, dinguyen at opensource.altera.com wrote:
+> From: Dinh Nguyen <dinguyen@opensource.altera.com>
 > 
-> > > - When the ID from 0->1, the chipidea driver will do role switch, and
-> > >   set BSVIE, why it does not occur for your case?
-> > 
-> > Right, that happens with this line in the sequence I describe below:
-> > 
-> >   hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE, OTGSC_BSVIS | OTGSC_BSVIE);
-> > 
-> > but that happens much later than when the extcon event happens so we
-> > miss the interrupt. Technically, the driver isn't expecting the BSVIS
-> > interrupt to happen until BSVIE is set, but the extcon can come whenever
-> > it wants regardless of how the registers are configured in the
-> > controller.  So we have to do some sort of 'caching' here to remember
-> > that the vbus event happened and replay it when BSVIE is set. At least I
-> > imagine this is how the hardware would work? Or if vbus goes high before
-> > we enable the interrupt would it just be missed? It seems like polling
-> > the BSV bit and then enabling BSVIE is sort of racy there.
-> > 
-> > Plus, we poll the BSV bit when we role switch, but in my case id bit
-> > toggles and vbus goes high at exactly the same time because that is all
-> > happening from a single cable being connected, so it's not possible for
-> > BSV to go low and see it after the id pin from 0 to 1.
+> Enable the QSPI node and add the flash chip.
 > 
-> Now, I understand your case, but your changes are a little complicated.
-> Would you try if below patch can fix your issue?
-> 
-> From 8b8baf31dcaca53612d0fd91068c84fe09d66f6c Mon Sep 17 00:00:00 2001
-> From: Peter Chen <peter.chen@nxp.com>
-> Date: Wed, 19 Oct 2016 15:32:58 +0800
-> Subject: [PATCH 1/1] usb: chipidea: vbus event may exist before starting
->  gadget
-> 
-> At some situations, the vbus may already be there before starting
-> gadget. So we need to check vbus event after switch to gadget in
-> order to handle missing vbus event. The typical use cases are plugging
-> vbus cable before driver load or the vbus has already been there
-> after stopping host but before starting gadget.
-> 
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-
-Yes this should work. Light testing doesn't show any problems so far.
- 
+> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 > ---
->  drivers/usb/chipidea/core.c |  4 ----
->  drivers/usb/chipidea/otg.c  | 10 ++++++----
->  drivers/usb/chipidea/udc.c  |  2 ++
->  3 files changed, 8 insertions(+), 8 deletions(-)
+>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   33 +++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
 > 
-> diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-> index b814d91..a7d2c68 100644
-> --- a/drivers/usb/chipidea/core.c
-> +++ b/drivers/usb/chipidea/core.c
-> @@ -992,10 +992,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
->         }
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 02e22f5..2f75e0f 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> @@ -175,6 +175,39 @@
+>  	status = "okay";
+>  };
 >  
->         if (!ci_otg_is_fsm_mode(ci)) {
-> -               /* only update vbus status for peripheral */
-> -               if (ci->role == CI_ROLE_GADGET)
-> -                       ci_handle_vbus_change(ci);
-> -
->                 ret = ci_role_start(ci, ci->role);
->                 if (ret) {
->                         dev_err(dev, "can't start %s role\n",
-> diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
-> index 695f3fe..99c0709 100644
-> --- a/drivers/usb/chipidea/otg.c
-> +++ b/drivers/usb/chipidea/otg.c
-> @@ -134,9 +134,9 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
->         if (!ci->is_otg)
->                 return;
->  
-> -       if (hw_read_otgsc(ci, OTGSC_BSV))
-> +       if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
->                 usb_gadget_vbus_connect(&ci->gadget);
-> -       else
-> +       else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
->                 usb_gadget_vbus_disconnect(&ci->gadget);
->  }
->  
-> @@ -175,10 +175,12 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
->  
->                 ci_role_stop(ci);
->  
-> -               if (role == CI_ROLE_GADGET)
-> +               if (role == CI_ROLE_GADGET &&
-> +                               IS_ERR(ci->platdata->vbus_extcon.edev))
->                         /*
->                          * wait vbus lower than OTGSC_BSV before connecting
-> -                        * to host
-> +                        * to host. And if vbus's status is an external
-> +                        * connector, it doesn't need to wait here.
+> +&qspi {
+> +	status = "okay";
+> +
+> +	flash: flash at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "n25q256a";
+> +		reg = <0>;
+> +		spi-max-frequency = <100000000>;
+> +
+> +		m25p,fast-read;
+> +		cdns,page-size = <256>;
+> +		cdns,block-size = <16>;
+> +		cdns,read-delay = <4>;
+> +		cdns,tshsl-ns = <50>;
+> +		cdns,tsd2d-ns = <50>;
+> +		cdns,tchsh-ns = <4>;
+> +		cdns,tslch-ns = <4>;
+> +
+> +		partition at qspi-boot {
+> +			/* 8MB for raw data. */
+> +			label = "Flash 0 Raw Data";
+> +			reg = <0x0 0x800000>;
+> +		};
+> +
+> +		partition at qspi-rootfs {
+> +			/* 120MB for jffs2 data. */
+> +			label = "Flash 0 jffs2 Filesystem";
+> +			reg = <0x800000 0x7800000>;
+> +		};
+> +	};
+> +};
+> +
 
-because OTGSC_BSV will toggle based on the extcon state and not when the
-phy connects to the host? It would be good to explain why it's not
-needed instead of just repeating what the code is doing.
+What is the current preferred way of handling the partitions?
+This doesn't fit my Sockit configuration for example. So I would always
+have to patch the devicetree.
 
->                          */
->                         hw_wait_vbus_lower_bsv(ci);
->  
-> diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-> index 001c2fa..184ffba 100644
-> --- a/drivers/usb/chipidea/udc.c
-> +++ b/drivers/usb/chipidea/udc.c
-> @@ -1963,6 +1963,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
->                 /* Clear and enable BSV irq */
->                 hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
->                                         OTGSC_BSVIS | OTGSC_BSVIE);
-> +       /* vbus change may has already been occurred */
+On the Socrates I didn't specify the partitions, because I did not
+want to force a specific configuration.
 
-"vbus change may have already occurred"?
+Regards,
+Steffen
 
-> +       ci_handle_vbus_change(ci);
->  
->         return 0;
->  }
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
