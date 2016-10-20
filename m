@@ -1,305 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 10:12:49 +0200
-Subject: [PATCH 8/8] ARM: gr8: Add CHIP Pro support
+Date: Thu, 20 Oct 2016 10:12:48 +0200
+Subject: [PATCH 7/8] ARM: gr8: Add UART3 pins
 In-Reply-To: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d3f91b731f944fe0e23b4532f6e83a1c2fc345f0.1476951078.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cc81030de43c26dfc15ad9a9e525188ad8fb8ec9.1476951078.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CHIP Pro is a small embeddable board. It features a GR8, an AXP209
-PMIC, a 512MB SLC NAND and a WiFi/BT chip.
+The UART3 pins were missing from the DTSI. Add them.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/Makefile             |   1 +-
- arch/arm/boot/dts/ntc-gr8-chip-pro.dts | 266 ++++++++++++++++++++++++++-
- 2 files changed, 267 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/ntc-gr8-chip-pro.dts
+ arch/arm/boot/dts/ntc-gr8.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd2619902..3dab5b593158 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -745,6 +745,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
- 	sun4i-a10-pcduino2.dtb \
- 	sun4i-a10-pov-protab2-ips9.dtb
- dtb-$(CONFIG_MACH_SUN5I) += \
-+	ntc-gr8-chip-pro.dtb \
- 	ntc-gr8-evb.dtb \
- 	sun5i-a10s-auxtek-t003.dtb \
- 	sun5i-a10s-auxtek-t004.dtb \
-diff --git a/arch/arm/boot/dts/ntc-gr8-chip-pro.dts b/arch/arm/boot/dts/ntc-gr8-chip-pro.dts
-new file mode 100644
-index 000000000000..3c86f214c493
---- /dev/null
-+++ b/arch/arm/boot/dts/ntc-gr8-chip-pro.dts
-@@ -0,0 +1,266 @@
-+/*
-+ * Copyright 2016 Free Electrons
-+ * Copyright 2016 NextThing Co
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
+index 52c150592953..4480ffadc42d 100644
+--- a/arch/arm/boot/dts/ntc-gr8.dtsi
++++ b/arch/arm/boot/dts/ntc-gr8.dtsi
+@@ -895,6 +895,20 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
 +
-+/dts-v1/;
-+#include "ntc-gr8.dtsi"
-+#include "sunxi-common-regulators.dtsi"
++			uart3_pins_a: uart3 at 1 {
++				allwinner,pins = "PG9", "PG10";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	model = "NextThing C.H.I.P. Pro";
-+	compatible = "nextthing,chip-pro", "nextthing,gr8";
-+
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		status {
-+			label = "chip-pro:white:status";
-+			gpios = <&axp_gpio 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+	};
-+
-+	mmc0_pwrseq: mmc0_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_reg_on_pin_chip_pro>;
-+		reset-gpios = <&pio 1 10 GPIO_ACTIVE_LOW>; /* PB10 */
-+	};
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+
-+	axp209: pmic at 34 {
-+		reg = <0x34>;
-+
-+		/*
-+		* The interrupt is routed through the "External Fast
-+		* Interrupt Request" pin (ball G13 of the module)
-+		* directly to the main interrupt controller, without
-+		* any other controller interfering.
-+		*/
-+		interrupts = <0>;
-+	};
-+};
-+
-+#include "axp209.dtsi"
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "disabled";
-+};
-+
-+&i2s0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s0_mclk_pins_a>, <&i2s0_data_pins_a>;
-+	status = "disabled";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&mmc0_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&nfc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_pins_a &nand_cs0_pins_a &nand_rb0_pins_a>;
-+	status = "okay";
-+
-+	nand at 0 {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		reg = <0>;
-+		allwinner,rb = <0>;
-+		nand-ecc-mode = "hw";
-+	};
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&otg_sram {
-+	status = "okay";
-+};
-+
-+&pio {
-+	usb0_id_pin_chip_pro: usb0-id-pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	wifi_reg_on_pin_chip_pro: wifi-reg-on-pin at 0 {
-+		allwinner,pins = "PB10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm0_pins_a>, <&pwm1_pins_a>;
-+	status = "disabled";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1400000>;
-+	regulator-name = "vdd-cpu";
-+	regulator-always-on;
-+};
-+
-+&reg_dcdc3 {
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-sys";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo1 {
-+	regulator-name = "vdd-rtc";
-+};
-+
-+&reg_ldo2 {
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+	regulator-always-on;
-+};
-+
-+/*
-+ * Both LDO3 and LDO4 are used in parallel to power up the
-+ * WiFi/BT chip.
-+ */
-+&reg_ldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-1";
-+	regulator-always-on;
-+};
-+
-+&reg_ldo4 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-2";
-+	regulator-always-on;
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>, <&uart1_cts_rts_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>, <&uart2_cts_rts_pins_a>;
-+	status = "disabled";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>, <&uart3_cts_rts_pins_a>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	/*
-+	 * The CHIP Pro doesn't have a controllable VBUS, nor does it
-+	 * have any 5v rail on the board itself.
-+	 *
-+	 * If one wants to use it as a true OTG port, it should be
-+	 * done in the baseboard, and its DT / overlay will add it.
-+	 */
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_pin_chip_pro>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
++			uart3_cts_rts_pins_a: uart3-cts-rts at 0 {
++				allwinner,pins = "PG11", "PG12";
++				allwinner,function = "uart3";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		pwm: pwm at 01c20e00 {
 -- 
 git-series 0.8.10
