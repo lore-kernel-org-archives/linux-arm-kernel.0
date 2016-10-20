@@ -1,95 +1,143 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 20 Oct 2016 15:37:25 +0530
-Subject: [PATCH 2/2] ARM: dts: da850: add a node for the LCD controller
-In-Reply-To: <CAMpxmJXT8hcSc0-svbwAq5r_JOFsYV852gtE0vuXL8hHykXnRQ@mail.gmail.com>
-References: <1475672732-17111-1-git-send-email-bgolaszewski@baylibre.com>
- <65fde145-0820-794d-d345-621f66cdacc0@ti.com>
- <7a2ffcd0-fe1d-c887-53b7-7cb5e1e61222@ti.com> <4975084.EGQPv58AK6@avalon>
- <daf49046-ad0a-d9e2-d744-1e06085c6585@ti.com>
- <CAMpxmJXT8hcSc0-svbwAq5r_JOFsYV852gtE0vuXL8hHykXnRQ@mail.gmail.com>
-Message-ID: <6c6fcceb-c6f2-219d-492a-a8b38fd83093@ti.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 20 Oct 2016 18:10:18 +0800
+Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
+ path
+In-Reply-To: <147694652997.28344.1048935134595924905@sboyd-linaro>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-12-stephen.boyd@linaro.org>
+ <20161019011535.GC6294@b29397-desktop>
+ <147684198705.24897.12451889548508263144@sboyd-linaro>
+ <20161019080211.GA1968@b29397-desktop>
+ <147694652997.28344.1048935134595924905@sboyd-linaro>
+Message-ID: <20161020101017.GA32001@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 October 2016 07:31 PM, Bartosz Golaszewski wrote:
-> 2016-10-17 14:29 GMT+02:00 Tomi Valkeinen <tomi.valkeinen@ti.com>:
->> On 17/10/16 14:40, Laurent Pinchart wrote:
->>> Hello,
->>>
->>> On Monday 17 Oct 2016 10:33:58 Tomi Valkeinen wrote:
->>>> On 17/10/16 10:12, Sekhar Nori wrote:
->>>>> On Monday 17 October 2016 11:26 AM, Tomi Valkeinen wrote:
->>>>>> On 15/10/16 20:42, Sekhar Nori wrote:
->>>>>>>> diff --git a/arch/arm/boot/dts/da850.dtsi
->>>>>>>> b/arch/arm/boot/dts/da850.dtsi
->>>>>>>> index f79e1b9..32908ae 100644
->>>>>>>> --- a/arch/arm/boot/dts/da850.dtsi
->>>>>>>> +++ b/arch/arm/boot/dts/da850.dtsi
->>>>>>>> @@ -399,6 +420,14 @@
->>>>>>>>                                  <&edma0 0 1>;
->>>>>>>>                          dma-names = "tx", "rx";
->>>>>>>>                  };
->>>>>>>> +
->>>>>>>> +                display: display at 213000 {
->>>>>>>> +                        compatible = "ti,am33xx-tilcdc", "ti,da850-tilcdc";
->>>>>>>
->>>>>>> This should instead be:
->>>>>>>
->>>>>>> compatible = "ti,da850-tilcdc", "ti,am33xx-tilcdc";
->>>>>>>
->>>>>>> as the closest match should appear first in the list.
->>>>>>
->>>>>> Actually I don't think that's correct. The LCDC on da850 is not
->>>>>> compatible with the LCDC on AM335x. I think it should be just
->>>>>> "ti,da850-tilcdc".
->>>>>
->>>>> So if "ti,am33xx-tilcdc" is used, the display wont work at all? If thats
->>>>> the case, I wonder how the patch passed testing. Bartosz?
->>>>
->>>> AM3 has "version 2" of LCDC, whereas DA850 is v1. They are quite
->>>> similar, but different.
->>>>
->>>> The driver gets the version number from LCDC's register, and acts based
->>>> on that, so afaik the compatible string doesn't really affect the
->>>> functionality (as long as it matches).
->>>>
->>>> But even if it works with the current driver, I don't think
->>>> "ti,am33xx-tilcdc" and "ti,da850-tilcdc" are compatible in the HW level.
->>>
->>> If the hardware provides IP revision information, how about just "ti,lcdc" ?
->>
->> Maybe, and I agree that's the "correct" way, but looking at the history,
->> it's not just once or twice when we've suddenly found out some
->> difference or bug or such in an IP revision, or the integration to a
->> SoC, that can't be found based on the IP revision.
->>
->> That's why I feel it's usually safer to have the SoC revision there in
->> the compatible string.
-
-I agree with Tomi here. Lets keep the soc part number in the compatible
-string. More often than not, some undocumented, undiscovered issue pops
-up over time. Its much safer to have the SoC revision in there.
-
->>
->> That said, we have only a few different old SoCs with LCDC (compared to,
->> say, OMAP DSS) so in this case perhaps just "ti,lcdc" would be fine.
->>
->>  Tomi
->>
+On Wed, Oct 19, 2016 at 11:55:29PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-10-19 01:02:11)
+> > On Tue, Oct 18, 2016 at 06:53:07PM -0700, Stephen Boyd wrote:
+> > > If you're asking if I've made modifications to extcon-usb-gpio, then the
+> > > answer is no. The branch on linaro.org git server from the cover-letter
+> > > is the branch I've used to test this with. This patch is specifically to
+> > > fix issues with that design on the db410c board that has only one pin
+> > > for ID and vbus detection. It's the schematic that we've discussed in
+> > > another thread.
+> > > 
+> > > extcon-usb-gpio sends two extcon events, EXTCON_USB_HOST (for the id
+> > > pin) and EXTCON_USB (for the vbus). So afaik it does support vbus
+> > > events.
+> > > 
+> > 
+> > Hmm, in fact, your ID event is the same with vbus event, you take
+> > external vbus event as ID event for extcon-usb-gpio handling. Yes,
+> > it can work due to it sends EXTCON_USB_HOST event first.
+> > 
+> > Where you change the USB_SW_SEL_PM pin?
 > 
-> I Sekhar is ok with this, I'll send a follow-up patch for that.
+> Currently that is done with the mux driver I sent based on the extcon
+> event. We don't know if that's before or after the controller handles
+> the extcon event though, so the pin should probably be changed from the
+> chipidea driver instead to be more explicit. Why do you ask though?
 
-Per me, compatible property is an ordered list precisely for the reason
-that things should continue to "work" with as closely matched driver as
-possible. So even if someone is running a kernel which does not
-recognize "ti,da850-tilcdc", it should still be able to probe the driver
-based on "ti,am33xx-tilcdc" and provide as close to full functionality
-as possible.
+I was just curious how you handle it, now I am clear. From my point,
+the suitable way may be: mux driver + user app (echo role through
+debugfs). The extcon-usb-gpio is not necessary, since you have already
+known role at mux driver.
 
-That said, I will not insist on keeping it around if Tomi is
-uncomfortable. And having read the binding documentation accepted by
-Jyri, it actually says the compatible property should be __one of__
-"ti,am33xx-tilcdc" or "ti,da850-tilcdc".
+The current kernel has no framework to handle dual-role switch at kernel
+space.
 
-Thanks,
-Sekhar
+> > At some situations, the vbus may already be there before starting
+> > gadget. So we need to check vbus event after switch to gadget in
+> > order to handle missing vbus event. The typical use cases are plugging
+> > vbus cable before driver load or the vbus has already been there
+> > after stopping host but before starting gadget.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> 
+> Yes this should work. Light testing doesn't show any problems so far.
+>  
+> > ---
+> >  drivers/usb/chipidea/core.c |  4 ----
+> >  drivers/usb/chipidea/otg.c  | 10 ++++++----
+> >  drivers/usb/chipidea/udc.c  |  2 ++
+> >  3 files changed, 8 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+> > index b814d91..a7d2c68 100644
+> > --- a/drivers/usb/chipidea/core.c
+> > +++ b/drivers/usb/chipidea/core.c
+> > @@ -992,10 +992,6 @@ static int ci_hdrc_probe(struct platform_device *pdev)
+> >         }
+> >  
+> >         if (!ci_otg_is_fsm_mode(ci)) {
+> > -               /* only update vbus status for peripheral */
+> > -               if (ci->role == CI_ROLE_GADGET)
+> > -                       ci_handle_vbus_change(ci);
+> > -
+> >                 ret = ci_role_start(ci, ci->role);
+> >                 if (ret) {
+> >                         dev_err(dev, "can't start %s role\n",
+> > diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+> > index 695f3fe..99c0709 100644
+> > --- a/drivers/usb/chipidea/otg.c
+> > +++ b/drivers/usb/chipidea/otg.c
+> > @@ -134,9 +134,9 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+> >         if (!ci->is_otg)
+> >                 return;
+> >  
+> > -       if (hw_read_otgsc(ci, OTGSC_BSV))
+> > +       if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
+> >                 usb_gadget_vbus_connect(&ci->gadget);
+> > -       else
+> > +       else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
+> >                 usb_gadget_vbus_disconnect(&ci->gadget);
+> >  }
+> >  
+> > @@ -175,10 +175,12 @@ static void ci_handle_id_switch(struct ci_hdrc *ci)
+> >  
+> >                 ci_role_stop(ci);
+> >  
+> > -               if (role == CI_ROLE_GADGET)
+> > +               if (role == CI_ROLE_GADGET &&
+> > +                               IS_ERR(ci->platdata->vbus_extcon.edev))
+> >                         /*
+> >                          * wait vbus lower than OTGSC_BSV before connecting
+> > -                        * to host
+> > +                        * to host. And if vbus's status is an external
+> > +                        * connector, it doesn't need to wait here.
+> 
+> because OTGSC_BSV will toggle based on the extcon state and not when the
+> phy connects to the host? It would be good to explain why it's not
+> needed instead of just repeating what the code is doing.
+> 
+
+Thanks, will change like below
+
+"
+If connecting status is from an external connector instead of register,
+we don't need to care vbus on the board, since it will not affect external
+connector status.
+"
+
+> >                          */
+> >                         hw_wait_vbus_lower_bsv(ci);
+> >  
+> > diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+> > index 001c2fa..184ffba 100644
+> > --- a/drivers/usb/chipidea/udc.c
+> > +++ b/drivers/usb/chipidea/udc.c
+> > @@ -1963,6 +1963,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+> >                 /* Clear and enable BSV irq */
+> >                 hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+> >                                         OTGSC_BSVIS | OTGSC_BSVIE);
+> > +       /* vbus change may has already been occurred */
+> 
+> "vbus change may have already occurred"?
+
+Yes, will change.
+
+-- 
+
+Best Regards,
+Peter Chen
