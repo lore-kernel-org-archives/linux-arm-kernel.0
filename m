@@ -1,12 +1,16 @@
-From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
-Date: Thu, 20 Oct 2016 02:22:46 +0000
-Subject: =?UTF-8?B?UkU6IFtQQVRDSCAwLzRdIFBNIC8gZGV2ZnJlcTogRml4IG1v?=
- =?UTF-8?B?ZHVsZSBhdXRvbG9hZCBmb3IgcGxhdGZvcm0gZHJpdmVycw==?=
-References: <CGME20161019210645epcas1p449463edf9c3cb3681b0a4e8116ccf7f2@epcas1p4.samsung.com>
-Message-ID: <877108885.1462124.1476930166421.JavaMail.weblogic@ep1ml101a>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 20 Oct 2016 11:24:10 +0900
+Subject: [PATCH 0/4] PM / devfreq: Fix module autoload for platform drivers
+In-Reply-To: <1476911187-11040-1-git-send-email-javier@osg.samsung.com>
+References: <CGME20161019210649epcas1p4e0c178cb75709bb242da10d9c1fd77d2@epcas1p4.samsung.com>
+ <1476911187-11040-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <58082ACA.90104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Javier,
+
+On 2016? 10? 20? 06:06, Javier Martinez Canillas wrote:
 > Hello,
 > 
 > I noticed that module autoload won't be working in some of the defreq
@@ -21,16 +25,6 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >   PM / devfreq: exynos-nocp: Fix module autoload
 >   PM / devfreq: rockchip-dfi: Fix module autoload
 >   PM / devfreq: exynos-ppmu: Fix module autoload
-
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-
-All the four are not at for-4.9-rc branch.
-https://git.kernel.org/cgit/linux/kernel/git/mzx/devfreq.git/log/?h=for-4.9-rc
-
-
-Cheers,
-MyungJoo
-
 > 
 >  drivers/devfreq/event/exynos-nocp.c  | 1 +
 >  drivers/devfreq/event/exynos-ppmu.c  | 1 +
@@ -38,5 +32,11 @@ MyungJoo
 >  drivers/devfreq/rk3399_dmc.c         | 1 +
 >  4 files changed, 4 insertions(+)
 > 
-> -- 
-> 2.7.4
+
+Looks good to me of all patches.
+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+-- 
+Best Regards,
+Chanwoo Choi
