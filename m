@@ -1,37 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 20 Oct 2016 10:58:04 +0200
-Subject: [PATCH v2] ARM: shmobile: Consolidate R8A7743 and R8A779[234]
- machine definitions
-In-Reply-To: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20161020085804.GK4612@verge.net.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 20 Oct 2016 11:11:26 +0200
+Subject: Handling of enet_out on i.MX28
+Message-ID: <20161020091126.jdoexu6iuu3jjzsm@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 04:59:04PM +0300, Laurent Pinchart wrote:
-> The four SoCs use identical machine operations, consolidate them into
-> two machine definitions in a single file.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Tested-by: Simon Horman <horms+renesas@verge.net.au>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Changes since v1:
-> 
-> - Rebased on top of Simon's latest devel branch, thus including R8A7743
->   consolidation
-> 
->  arch/arm/mach-shmobile/Makefile          |  4 ----
->  arch/arm/mach-shmobile/setup-r8a7743.c   | 34 -------------------------------
->  arch/arm/mach-shmobile/setup-r8a7792.c   | 35 --------------------------------
->  arch/arm/mach-shmobile/setup-r8a7793.c   | 33 ------------------------------
->  arch/arm/mach-shmobile/setup-r8a7794.c   | 33 ------------------------------
->  arch/arm/mach-shmobile/setup-rcar-gen2.c | 33 ++++++++++++++++++++++++++++++
->  6 files changed, 33 insertions(+), 139 deletions(-)
->  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7743.c
->  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
->  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
->  delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
+Hello,
 
-Thanks for this Laurent, its a very nice diffstat.
-I have queued it up for v4.10.
+The i.MX28 reference manual specifies for HW_CLKCTRL_ENET.CLK_OUT_EN:
+"NOTE: This bit must be configured before ENET PLL is enabled.".
+
+Currently this is not implemented: ENET PLL (aka pll2) is the parent of
+enet_out and so common clk enables the PLL first and only then sets
+HW_CLKCTRL_ENET.CLK_OUT_EN.
+
+For now this is a theoretical problem because I don't see any issues. I
+only notice the discrepancy between manual and reality.
+
+Do you think this is a problem?
+
+Apart from that I'm not happy with the handling of this clk. IMHO it
+should better be called "enet-ref" or similar (for the fec). imx28.dtsi
+specifies that the clk is in use[1] and if my machine doesn't I have to
+do:
+
+	&mac0 {
+		...
+		/* overwrite clocks and clock-names to remove enet_out */
+		clocks = <&clks 57>, <&clks 57>;
+		clock-names = "ipg", "ahb";
+		...
+	};
+
+in my board.dts. This is ugly because I have to repeat stuff that is
+already in imx28.dtsi and it's not understandable without the comment.
+
+It would be nice if dtc allowed to modify an array, then we could do:
+
+	clocks += <&clks 64>;
+	clock-names = += "enet_out";
+
+(assuming the included dtsi doesn't specify this clock).
+
+I first though it would be a good idea to specify the enet-ref clk as
+follows:
+
+	&mac0 {
+		...
+		mdio {
+			clocks = <&clks 64>;
+			clock-names = "enet-ref";
+			...
+		};
+	};
+
+but while this makes it easier for the board.dts to add (or remove) it,
+it's not really right this way because the reference clock is needed for
+data RX and TX, not the mdio bus. Technically these are two different
+buses even though the "passengers" are often the same. (Even if two
+MACs are in use, the enet-ref signal is shared.)
+
+What do you think?
+
+Best regards
+Uwe
+
+[1] clocks = <&clks 57>, <&clks 57>, <&clks 64>; clock-names = "ipg",
+    "ahb", "enet_out"; in &mac0.
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
