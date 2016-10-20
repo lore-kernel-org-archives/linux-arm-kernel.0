@@ -1,110 +1,69 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 20 Oct 2016 22:11:52 +0200 (CEST)
-Subject: [PATCH] Revert "clocksource/drivers/timer_sun5i: Replace code
- by clocksource_mmio_init"
-In-Reply-To: <20161018054918.26855-1-wens@csie.org>
-References: <20161018054918.26855-1-wens@csie.org>
-Message-ID: <alpine.DEB.2.20.1610202159240.4938@nanos>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 20 Oct 2016 13:36:30 -0700
+Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
+ path
+In-Reply-To: <20161020101017.GA32001@b29397-desktop>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-12-stephen.boyd@linaro.org>
+ <20161019011535.GC6294@b29397-desktop>
+ <147684198705.24897.12451889548508263144@sboyd-linaro>
+ <20161019080211.GA1968@b29397-desktop>
+ <147694652997.28344.1048935134595924905@sboyd-linaro>
+ <20161020101017.GA32001@b29397-desktop>
+Message-ID: <147699579088.21058.4379586947317571921@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Oct 2016, Chen-Yu Tsai wrote:
-> Revert the commit for now. clocksource_mmio_init can be made to pass back
-> a pointer, but the code churn and usage of an inner struct might not be
-> worth it.
+Quoting Peter Chen (2016-10-20 03:10:18)
+> On Wed, Oct 19, 2016 at 11:55:29PM -0700, Stephen Boyd wrote:
+> > Quoting Peter Chen (2016-10-19 01:02:11)
+> > > On Tue, Oct 18, 2016 at 06:53:07PM -0700, Stephen Boyd wrote:
+> > > > If you're asking if I've made modifications to extcon-usb-gpio, then the
+> > > > answer is no. The branch on linaro.org git server from the cover-letter
+> > > > is the branch I've used to test this with. This patch is specifically to
+> > > > fix issues with that design on the db410c board that has only one pin
+> > > > for ID and vbus detection. It's the schematic that we've discussed in
+> > > > another thread.
+> > > > 
+> > > > extcon-usb-gpio sends two extcon events, EXTCON_USB_HOST (for the id
+> > > > pin) and EXTCON_USB (for the vbus). So afaik it does support vbus
+> > > > events.
+> > > > 
+> > > 
+> > > Hmm, in fact, your ID event is the same with vbus event, you take
+> > > external vbus event as ID event for extcon-usb-gpio handling. Yes,
+> > > it can work due to it sends EXTCON_USB_HOST event first.
+> > > 
+> > > Where you change the USB_SW_SEL_PM pin?
+> > 
+> > Currently that is done with the mux driver I sent based on the extcon
+> > event. We don't know if that's before or after the controller handles
+> > the extcon event though, so the pin should probably be changed from the
+> > chipidea driver instead to be more explicit. Why do you ask though?
+> 
+> I was just curious how you handle it, now I am clear. From my point,
+> the suitable way may be: mux driver + user app (echo role through
+> debugfs). The extcon-usb-gpio is not necessary, since you have already
+> known role at mux driver.
+> 
+> The current kernel has no framework to handle dual-role switch at kernel
+> space.
 
-You can avoid the churn by making clocksurce_mmio_init() a wrapper around a
-new function, which takes a pointer to a struct clocksource_mmio as
-argument so you can hand in the structure you need: Something like the
-patch below should do the trick.
+Ok. I'm planning that as future work after this set of patches is
+merged.
 
-Thanks,
+> > > @@ -1963,6 +1963,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+> > >                 /* Clear and enable BSV irq */
+> > >                 hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+> > >                                         OTGSC_BSVIS | OTGSC_BSVIE);
+> > > +       /* vbus change may has already been occurred */
+> > 
+> > "vbus change may have already occurred"?
+> 
+> Yes, will change.
+> 
 
-	tglx
-
-8<--------------------------------
---- a/drivers/clocksource/mmio.c
-+++ b/drivers/clocksource/mmio.c
-@@ -10,11 +10,6 @@
- #include <linux/init.h>
- #include <linux/slab.h>
- 
--struct clocksource_mmio {
--	void __iomem *reg;
--	struct clocksource clksrc;
--};
--
- static inline struct clocksource_mmio *to_mmio_clksrc(struct clocksource *c)
- {
- 	return container_of(c, struct clocksource_mmio, clksrc);
-@@ -41,6 +36,27 @@ cycle_t clocksource_mmio_readw_down(stru
- }
- 
- /**
-+ * FIXME: Add doc
-+ */
-+int __init clocksource_mmio_setup(struct clocksource_mmio *cs,
-+				  void __iomem *base , const char *name,
-+				  unsigned long hz , int rating, unsigned bits,
-+				  cycle_t (*read)(struct clocksource *))
-+{
-+	if (bits > 64 || bits < 16)
-+		return -EINVAL;
-+
-+	cs->reg = base;
-+	cs->clksrc.name = name;
-+	cs->clksrc.rating = rating;
-+	cs->clksrc.read = read;
-+	cs->clksrc.mask = CLOCKSOURCE_MASK(bits);
-+	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+
-+	return clocksource_register_hz(&cs->clksrc, hz);
-+}
-+
-+/**
-  * clocksource_mmio_init - Initialize a simple mmio based clocksource
-  * @base:	Virtual address of the clock readout register
-  * @name:	Name of the clocksource
-@@ -62,12 +78,5 @@ int __init clocksource_mmio_init(void __
- 	if (!cs)
- 		return -ENOMEM;
- 
--	cs->reg = base;
--	cs->clksrc.name = name;
--	cs->clksrc.rating = rating;
--	cs->clksrc.read = read;
--	cs->clksrc.mask = CLOCKSOURCE_MASK(bits);
--	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
--
--	return clocksource_register_hz(&cs->clksrc, hz);
-+	return clocksource_mmio_setup(cs, base, name, hz, rating, bits, read);
- }
---- a/include/linux/clocksource.h
-+++ b/include/linux/clocksource.h
-@@ -119,6 +119,14 @@ struct clocksource {
- /* simplify initialization of mask field */
- #define CLOCKSOURCE_MASK(bits) (cycle_t)((bits) < 64 ? ((1ULL<<(bits))-1) : -1)
- 
-+/**
-+ * FIXME: Add doc
-+ */
-+struct clocksource_mmio {
-+	void __iomem		*reg;
-+	struct clocksource	clksrc;
-+};
-+
- static inline u32 clocksource_freq2mult(u32 freq, u32 shift_constant, u64 from)
- {
- 	/*  freq = cyc/from
-@@ -241,6 +249,11 @@ extern cycle_t clocksource_mmio_readw_do
- extern int clocksource_mmio_init(void __iomem *, const char *,
- 	unsigned long, int, unsigned, cycle_t (*)(struct clocksource *));
- 
-+extern int clocksource_mmio_setup(struct clocksource_mmio *,
-+				  void __iomem *, const char *,
-+				  unsigned long, int, unsigned,
-+				  cycle_t (*)(struct clocksource *));
-+
- extern int clocksource_i8253_init(void);
- 
- #define CLOCKSOURCE_OF_DECLARE(name, compat, fn) \
+Great. Should I wait to incorporate your change into my series, or will
+you apply the usb patches and Kishon can apply the phy patches?  This
+patch #11 should be dropped, but otherwise I don't think there's
+anything left to do for this series.
