@@ -1,25 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 20 Oct 2016 19:06:21 +0200
-Subject: [PATCH 4/8] ARM: gr8: Fix typo in the i2s mclk pin group
-In-Reply-To: <CAGb2v65P6WEZCy8AXCk5mV4gWgiWuZJiDZzJnEgr+sj9qf8ORA@mail.gmail.com>
+Date: Thu, 20 Oct 2016 19:07:39 +0200
+Subject: [PATCH 5/8] ARM: gr8: Add missing pwm channel 1 pin
+In-Reply-To: <CAGb2v66w0sTzn_SWH4rrpWKOosSxALV8ot3CBQbGhwLxvX1vxw@mail.gmail.com>
 References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
- <f1c79380c34fcc2a1c1ff75ca91177de3b7380a9.1476951078.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65P6WEZCy8AXCk5mV4gWgiWuZJiDZzJnEgr+sj9qf8ORA@mail.gmail.com>
-Message-ID: <20161020170621.wlwd3hv3py2sme5s@lukather>
+ <0df42247c3348e7f6aed945e5669cec87f96f7ac.1476951078.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v66w0sTzn_SWH4rrpWKOosSxALV8ot3CBQbGhwLxvX1vxw@mail.gmail.com>
+Message-ID: <20161020170739.lgt2ywm346vm47zd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 10:07:46PM +0800, Chen-Yu Tsai wrote:
+On Thu, Oct 20, 2016 at 10:10:03PM +0800, Chen-Yu Tsai wrote:
 > On Thu, Oct 20, 2016 at 4:12 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > There was a dumb copy and paste mistake here, fix it.
+> > The PWM controller has two different channels, but only the first pin was
+> > exposed in the DTSI. Add the other one.
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
 > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> > ---
+> >  arch/arm/boot/dts/ntc-gr8.dtsi | 7 +++++++
+> >  1 file changed, 7 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
+> > index 74aff795e723..fad7381630f3 100644
+> > --- a/arch/arm/boot/dts/ntc-gr8.dtsi
+> > +++ b/arch/arm/boot/dts/ntc-gr8.dtsi
+> > @@ -854,6 +854,13 @@
+> >                                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> >                         };
+> >
+> > +                       pwm1_pins_a: pwm1 at 0 {
+> 
+> Nit: really don't need "_a" and "@0" here.
 
-Applied.
+Fixed and applied.
 
+Thanks!
 Maxime
 
 -- 
@@ -32,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/a2f2fddd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161020/8e9d5601/attachment-0001.sig>
