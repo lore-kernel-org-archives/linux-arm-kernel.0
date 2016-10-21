@@ -1,57 +1,37 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 21 Oct 2016 16:08:38 +0530
-Subject: [PATCH v2 6/9] ARM: DRA7: hwmod: Do not register RTC on DRA71
+Date: Fri, 21 Oct 2016 16:08:41 +0530
+Subject: [PATCH v2 9/9] ARM: omap2plus_defconfig: Enable LP873X support
 In-Reply-To: <20161021103841.8044-1-lokeshvutla@ti.com>
 References: <20161021103841.8044-1-lokeshvutla@ti.com>
-Message-ID: <20161021103841.8044-7-lokeshvutla@ti.com>
+Message-ID: <20161021103841.8044-10-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nishanth Menon <nm@ti.com>
-
-RTC is not available on DRA71x, so accessing any of the RTC
-register or clkctrl register will lead to a crash. So, do not
-register RTC hwmod for DRA71x.
+LP873X family of PMICs are used in dra71x-evm, So enable the same.
 
 Signed-off-by: Nishanth Menon <nm@ti.com>
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm/configs/omap2plus_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 1ab7096..7f48577 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -3845,7 +3845,6 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l3_main_1__pciess2,
- 	&dra7xx_l4_cfg__pciess2,
- 	&dra7xx_l3_main_1__qspi,
--	&dra7xx_l4_per3__rtcss,
- 	&dra7xx_l4_cfg__sata,
- 	&dra7xx_l4_cfg__smartreflex_core,
- 	&dra7xx_l4_cfg__smartreflex_mpu,
-@@ -3905,6 +3904,11 @@ static struct omap_hwmod_ocp_if *dra72x_hwmod_ocp_ifs[] __initdata = {
- 	NULL,
- };
- 
-+static struct omap_hwmod_ocp_if *dra74x_dra72x_hwmod_ocp_ifs[] __initdata = {
-+	&dra7xx_l4_per3__rtcss,
-+	NULL,
-+};
-+
- int __init dra7xx_hwmod_init(void)
- {
- 	int ret;
-@@ -3920,5 +3924,9 @@ int __init dra7xx_hwmod_init(void)
- 	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
- 		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
- 
-+	/* now for the IPs *NOT* in dra71 */
-+	if (!ret && !of_machine_is_compatible("ti,dra718"))
-+		ret = omap_hwmod_register_links(dra74x_dra72x_hwmod_ocp_ifs);
-+
- 	return ret;
- }
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 5695cff..e3fdf4d 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -267,11 +267,13 @@ CONFIG_TWL4030_WATCHDOG=m
+ CONFIG_MFD_TI_AM335X_TSCADC=m
+ CONFIG_MFD_PALMAS=y
+ CONFIG_MFD_TPS65217=y
++CONFIG_MFD_TI_LP873X=y
+ CONFIG_MFD_TPS65218=y
+ CONFIG_MFD_TPS65910=y
+ CONFIG_TWL6040_CORE=y
+ CONFIG_REGULATOR_GPIO=y
+ CONFIG_REGULATOR_LP872X=y
++CONFIG_REGULATOR_LP873X=y
+ CONFIG_REGULATOR_PALMAS=y
+ CONFIG_REGULATOR_PBIAS=y
+ CONFIG_REGULATOR_TI_ABB=y
 -- 
 2.10.1
