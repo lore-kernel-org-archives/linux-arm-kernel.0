@@ -1,52 +1,72 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 21 Oct 2016 16:13:56 +0800
-Subject: [PATCH v2 2/2] arm64/numa: fix incorrect log for memory-less node
-In-Reply-To: <1477037636-10077-1-git-send-email-guohanjun@huawei.com>
-References: <1477037636-10077-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1477037636-10077-2-git-send-email-guohanjun@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 21 Oct 2016 10:21:31 +0200
+Subject: [PATCH v2] mmc: sunxi: Prevent against null dereference for vmmc
+In-Reply-To: <20161019133304.22915-1-maxime.ripard@free-electrons.com>
+References: <20161019133304.22915-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAPDyKFpS-N-BbAgHMegB5FMAoFUbbcroXTdWTPN+EYR8BtT=cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On 19 October 2016 at 15:33, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> VMMC is an optional regulator, which means that mmc_regulator_get_supply
+> will only return an error in case of a deferred probe, but not when the
+> regulator is not set in the DT.
+>
+> However, the sunxi driver assumes that VMMC is always there, and doesn't
+> check the value of the regulator pointer before using it, which obviously
+> leads to a (close to) null pointer dereference.
+>
+> Add proper checks to prevent that.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-When booting on NUMA system with memory-less node (no
-memory dimm on this memory controller), the print
-for setup_node_data() is incorrect:
+Thanks, applied for next!
 
-NUMA: Initmem setup node 2 [mem 0x00000000-0xffffffffffffffff]
+Kind regards
+Uffe
 
-It can be fixed by printing [mem 0x00000000-0x00000000] when
-end_pfn is 0, but print <memory-less node> will be more useful.
-
-Fixes: 1a2db300348b ("arm64, numa: Add NUMA support for arm64 platforms.")
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Yisheng Xie <xieyisheng1@huawei.com>
----
- arch/arm64/mm/numa.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 9a71d06..4b32168 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -223,8 +223,11 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	void *nd;
- 	int tnid;
- 
--	pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
--		nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-+	if (start_pfn < end_pfn)
-+		pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n", nid,
-+			start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-+	else
-+		pr_info("Initmem setup node %d [<memory-less node>]\n", nid);
- 
- 	nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
- 	nd = __va(nd_pa);
--- 
-1.7.12.4
+>
+> ---
+> Changes from v1:
+>   - remove redundant error message
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index c0a5c676d0e8..b1d1303389a7 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -822,10 +822,13 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>                 break;
+>
+>         case MMC_POWER_UP:
+> -               host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
+> -                                                    ios->vdd);
+> -               if (host->ferror)
+> -                       return;
+> +               if (!IS_ERR(mmc->supply.vmmc)) {
+> +                       host->ferror = mmc_regulator_set_ocr(mmc,
+> +                                                            mmc->supply.vmmc,
+> +                                                            ios->vdd);
+> +                       if (host->ferror)
+> +                               return;
+> +               }
+>
+>                 if (!IS_ERR(mmc->supply.vqmmc)) {
+>                         host->ferror = regulator_enable(mmc->supply.vqmmc);
+> @@ -847,7 +850,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+>         case MMC_POWER_OFF:
+>                 dev_dbg(mmc_dev(mmc), "power off!\n");
+>                 sunxi_mmc_reset_host(host);
+> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +               if (!IS_ERR(mmc->supply.vmmc))
+> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+> +
+>                 if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
+>                         regulator_disable(mmc->supply.vqmmc);
+>                 host->vqmmc_enabled = false;
+> --
+> 2.9.3
+>
