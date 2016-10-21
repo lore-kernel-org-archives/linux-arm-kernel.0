@@ -1,13 +1,13 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 21 Oct 2016 23:01:01 +0900
-Subject: [PATCH 2/7] ARM: dts: tps65217: Add the charger device
+Date: Fri, 21 Oct 2016 23:01:02 +0900
+Subject: [PATCH 3/7] ARM: dts: tps65217: Add the power button device
 In-Reply-To: <20161021140106.21531-1-woogyom.kim@gmail.com>
 References: <20161021140106.21531-1-woogyom.kim@gmail.com>
-Message-ID: <20161021140106.21531-3-woogyom.kim@gmail.com>
+Message-ID: <20161021140106.21531-4-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the charger driver and disable it by default.
+Support the power button driver and disable it by default.
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
@@ -15,15 +15,15 @@ Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
  1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
-index 27935f8..8f77d0d 100644
+index 8f77d0d..02de56b 100644
 --- a/arch/arm/boot/dts/tps65217.dtsi
 +++ b/arch/arm/boot/dts/tps65217.dtsi
-@@ -16,6 +16,11 @@
- 	interrupt-controller;
- 	#interrupt-cells = <1>;
+@@ -21,6 +21,11 @@
+ 		status = "disabled";
+ 	};
  
-+	charger {
-+		compatible = "ti,tps65217-charger";
++	pwrbutton {
++		compatible = "ti,tps65217-pwrbutton";
 +		status = "disabled";
 +	};
 +
