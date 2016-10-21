@@ -1,54 +1,66 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 21 Oct 2016 14:23:46 +0200
-Subject: [PATCH] [media] c8sectpfe: Remove clk_disable_unprepare hacks
-In-Reply-To: <1477040132-31442-1-git-send-email-peter.griffin@linaro.org>
-References: <1477040132-31442-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <08965415-3573-c588-25c8-ae48fde9470f@st.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 21 Oct 2016 14:29:05 +0200
+Subject: [PATCH] PM / Domains: Restrict "samsung,
+ power-domain" checks to ARCH_EXYNOS
+In-Reply-To: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
+References: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 10:55 AM, Peter Griffin wrote:
-> Now that CLK_PROC_STFE is defined as a critical clock in
-> DT, we can remove the commented clk_disable_unprepare from
-> the c8sectpfe driver. This means we now have balanced
-> clk*enable/disable calls in the driver, but on STiH407
-> family the clock in reality will never actually be disabled.
-> 
-> This is due to a HW bug where once the IP has been configured
-> and the SLIM core is running, disabling the clock causes a
-> unrecoverable bus lockup.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+On Fri, Oct 21, 2016 at 1:34 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Currently the generic PM Domain code code checks for the presence of
+> both (generic) "power-domains" and (Samsung Exynos legacy)
+> "samsung,power-domain" properties in all device tree nodes representing
+> devices.
+>
+> There are two issues with this:
+>   1. This imposes a small boot-time penalty on all platforms using DT,
+>   2. Platform-specific checks do not really belong in core framework
+>      code.
+>
+> While moving the check from platform-agnostic code to Samsung-specific
+> code is non-trivial, the runtime overhead can be restricted to kernels
+> including support for 32-bit Samsung Exynos platforms.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 6 +-----
->  1 file changed, 1 insertion(+), 5 deletions(-)
-> 
-> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> index 30c148b..79d793b 100644
-> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> @@ -888,8 +888,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
->  	return 0;
->  
->  err_clk_disable:
-> -	/* TODO uncomment when upstream has taken a reference on this clk */
-> -	/*clk_disable_unprepare(fei->c8sectpfeclk);*/
-> +	clk_disable_unprepare(fei->c8sectpfeclk);
->  	return ret;
->  }
->  
-> @@ -924,11 +923,8 @@ static int c8sectpfe_remove(struct platform_device *pdev)
->  	if (readl(fei->io + SYS_OTHER_CLKEN))
->  		writel(0, fei->io + SYS_OTHER_CLKEN);
->  
-> -	/* TODO uncomment when upstream has taken a reference on this clk */
-> -	/*
->  	if (fei->c8sectpfeclk)
->  		clk_disable_unprepare(fei->c8sectpfeclk);
-> -	*/
->  
->  	return 0;
->  }
-> 
+> "samsung,power-domain" was only ever used in:
+>   - arch/arm/boot/dts/exynos4415.dtsi: Unused?
+>   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+>   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+>                                        exynos4212.dtsi is unused?
+>   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+>   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+> ---
+>  drivers/base/power/domain.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index e023066e421547c5..d94d6a4b9b527108 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
+>         ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+>                                         "#power-domain-cells", 0, &pd_args);
+>         if (ret < 0) {
+> -               if (ret != -ENOENT)
+> +               if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Please don't check things like CONFIG_ARCH_EXYNOS in the core.
+
+If you need to put checks like that here, there is a design problem somewhere.
+
+And imagine someone 5 years ahead from now looking at this code and
+wondering why on Earth the check is here.
+
+> +                   IS_ENABLED(CONFIG_64BIT))
+>                         return ret;
+>
+>                 /*
+> --
+
+Thanks,
+Rafael
