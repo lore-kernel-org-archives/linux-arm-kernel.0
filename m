@@ -1,53 +1,78 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 21 Oct 2016 11:16:04 +0800
-Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
-In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161021031604.GJ22979@gondor.apana.org.au>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Fri, 21 Oct 2016 11:32:20 +0800
+Subject: [PATCH v14 2/4] reset: mediatek: Add MT2701 reset driver
+In-Reply-To: <1477020742-13889-1-git-send-email-erin.lo@mediatek.com>
+References: <1477020742-13889-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1477020742-13889-3-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 11, 2016 at 07:15:12PM +0100, Ard Biesheuvel wrote:
-> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
-> currently work, or have ever worked correctly when built for big endian. So this
-> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
-> well, and an additional fix for XTS which escaped my attention before.
-> 
-> Each of these patches carries a fixes tag, and could be backported to stable.
-> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
-> fix is compatible with, not the patch that introduced the algorithm. This is due
-> to the fact that the key schedules are incompatible between generic AES and the
-> arm64 Crypto Extensions implementation (but only when building for big endian)
-> This is not a problem in practice, but it does mean that the AES-CCM and AES in
-> EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
-> one that is compatible with the generic AES key schedule generation code (which
-> it currently no longer uses)
-> 
-> In any case, please apply with cc to stable.
-> 
-> Ard Biesheuvel (8):
->   crypto: arm64/aes-ce - fix for big endian
->   crypto: arm64/ghash-ce - fix for big endian
->   crypto: arm64/sha1-ce - fix for big endian
->   crypto: arm64/sha2-ce - fix for big endian
->   crypto: arm64/aes-ccm-ce: fix for big endian
->   crypto: arm64/aes-neon - fix for big endian
->   crypto: arm64/aes-xts-ce: fix for big endian
->   crypto: arm/aes-ce - fix for big endian
-> 
->  arch/arm/crypto/aes-ce-glue.c       |  5 ++
->  arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
->  arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
->  arch/arm64/crypto/aes-ce.S          |  1 +
->  arch/arm64/crypto/aes-modes.S       |  3 +-
->  arch/arm64/crypto/aes-neon.S        | 25 +++++----
->  arch/arm64/crypto/ghash-ce-core.S   |  6 +--
->  arch/arm64/crypto/sha1-ce-core.S    |  4 +-
->  arch/arm64/crypto/sha2-ce-core.S    |  4 +-
->  9 files changed, 72 insertions(+), 54 deletions(-)
+From: Shunli Wang <shunli.wang@mediatek.com>
 
-All applied.  Thanks.
+In infrasys and perifsys, there are many reset
+control bits for kinds of modules. These bits are
+used as actual reset controllers to be registered
+into kernel's generic reset controller framework.
+
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+Tested-by: John Crispin <blogic@openwrt.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/clk/mediatek/clk-mt2701-hif.c |  6 +++++-
+ drivers/clk/mediatek/clk-mt2701.c     | 12 ++++++++++--
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/clk/mediatek/clk-mt2701-hif.c b/drivers/clk/mediatek/clk-mt2701-hif.c
+index e2b0039..4c0688f 100644
+--- a/drivers/clk/mediatek/clk-mt2701-hif.c
++++ b/drivers/clk/mediatek/clk-mt2701-hif.c
+@@ -53,8 +53,12 @@ static int mtk_hifsys_init(struct platform_device *pdev)
+ 						clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		return r;
+ 
+-	return r;
++	mtk_register_reset_controller(node, 1, 0x34);
++
++	return 0;
+ }
+ 
+ static const struct of_device_id of_match_clk_mt2701_hif[] = {
+diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
+index c225256..b2148b6 100644
+--- a/drivers/clk/mediatek/clk-mt2701.c
++++ b/drivers/clk/mediatek/clk-mt2701.c
+@@ -802,8 +802,12 @@ static int mtk_infrasys_init(struct platform_device *pdev)
+ 						infra_clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, infra_clk_data);
++	if (r)
++		return r;
+ 
+-	return r;
++	mtk_register_reset_controller(node, 2, 0x30);
++
++	return 0;
+ }
+ 
+ static const struct mtk_gate_regs peri0_cg_regs = {
+@@ -920,8 +924,12 @@ static int mtk_pericfg_init(struct platform_device *pdev)
+ 			&lock, clk_data);
+ 
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	if (r)
++		return r;
+ 
+-	return r;
++	mtk_register_reset_controller(node, 2, 0x0);
++
++	return 0;
+ }
+ 
+ #define MT8590_PLL_FMAX		(2000 * MHZ)
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
