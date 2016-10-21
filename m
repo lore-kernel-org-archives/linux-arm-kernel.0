@@ -1,103 +1,60 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 21 Oct 2016 11:48:52 -0700
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <20161019203347.17893-3-d-gerlach@ti.com> (Dave Gerlach's message
- of "Wed, 19 Oct 2016 15:33:45 -0500")
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com>
-Message-ID: <7heg39pmgb.fsf@baylibre.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Fri, 21 Oct 2016 20:51:51 +0200
+Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
+ platform data
+In-Reply-To: <20161021182710.GA17279@kozik-lap>
+References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
+ <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
+ <20161021182710.GA17279@kozik-lap>
+Message-ID: <5a626833-d4bf-a991-65ea-2849f2250dce@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On 10/21/2016 08:27 PM, Krzysztof Kozlowski wrote:
+> On Thu, Oct 20, 2016 at 07:42:44PM -0200, Sergio Prado wrote:
+>> Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
+>> field in the drivers's platform data structure so it can be selectable
+>> via platform data.
+>>
+>> Also setting this field to NAND_ECC_SOFT in all boards using this
+>> driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
+>>
+>> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+>> ---
+>>  arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
+>>  arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
+>>  arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
+>>  arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
+>>  arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
+>>  arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
+>>  arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
+>>  arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
+>>  arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
+>>  arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
+>>  drivers/mtd/nand/Kconfig                       |   9 --
+>>  drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
+>>  include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
+>>  18 files changed, 79 insertions(+), 70 deletions(-)
+>>
+> 
+> I acked this twice (v1 and v2)... and still you are ignoring them. I am
+> sorry, I am not gonna to ack this third time!
 
-> Add a generic power domain implementation, TI SCI PM Domains, that
-> will hook into the genpd framework and allow the TI SCI protocol to
-> control device power states.
->
-> Also, provide macros representing each device index as understood
-> by TI SCI to be used in the device node power-domain references.
-> These are identifiers for the K2G devices managed by the PMMC.
->
-> Signed-off-by: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
->  MAINTAINERS                                        |  2 +
->  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->  3 files changed, 146 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->  create mode 100644 include/dt-bindings/genpd/k2g.h
->
-> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> new file mode 100644
-> index 000000000000..32f38a349656
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> @@ -0,0 +1,54 @@
-> +Texas Instruments TI-SCI Generic Power Domain
-> +---------------------------------------------
-> +
-> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
-> +responsible for controlling the state of the IPs that are present.
-> +Communication between the host processor running an OS and the system
-> +controller happens through a protocol known as TI-SCI [1]. This pm domain
-> +implementation plugs into the generic pm domain framework and makes use of
-> +the TI SCI protocol power on and off each device when needed.
-> +
-> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
-> +
-> +PM Domain Node
-> +==============
-> +The PM domain node represents the global PM domain managed by the PMMC,
-> +which in this case is the single implementation as documented by the generic
-> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> +
-> +Required Properties:
-> +--------------------
-> +- compatible: should be "ti,sci-pm-domain"
-> +- #power-domain-cells: Must be 0.
-> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
->
-> +Example:
-> +--------------------
-> +k2g_pds: k2g_pds {
+Hi, um, I am kinda new to this mess, what's going on ? You ACKed
+previous patches, next revision was submitted, so you need to ACK
+the next revision too (due to the changes).
 
-should use generic name like "power-contoller", e.g. k2g_pds: power-controller
+> For v2 I acked also other patches but it it is not there as well...
+> 
+> BR,
+> Krzysztof
 
-> +        compatible = "ti,sci-pm-domain";
-> +        #power-domain-cells = <0>;
-> +        ti,sci = <&pmmc>;
-> +};
-> +
-> +PM Domain Consumers
-> +===================
-> +Hardware blocks that require SCI control over their state must provide
-> +a reference to the sci-pm-domain they are part of and a unique device
-> +specific ID that identifies the device.
-> +
-> +Required Properties:
-> +--------------------
-> +- power-domains: phandle pointing to the corresponding PM domain node.
-> +- ti,sci-id: index representing the device id to be passed oevr SCI to
-> +	     be used for device control.
 
-This ID doesn't look right.
-
-Why not use #power-domain-cells = <1> and pass the index in the DT? ...
-
-> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
-> +
-> +Example:
-> +--------------------
-> +uart0: serial at 02530c00 {
-> +	compatible = "ns16550a";
-> +	...
-> +	power-domains = <&k2g_pds>;
-> +	ti,sci-id = <K2G_DEV_UART0>;
-
-... like this:
-
-	power-domains = <&k2g_pds K2G_DEV_UART0>;
-
-Kevin
+-- 
+Best regards,
+Marek Vasut
