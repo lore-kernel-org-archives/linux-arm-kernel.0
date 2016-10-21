@@ -1,49 +1,30 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Fri, 21 Oct 2016 17:57:23 +0200
-Subject: [PATCH 5/5] irqchip: st: Remove obsolete platforms from dt binding doc
-In-Reply-To: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
-References: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1477065443-10668-6-git-send-email-patrice.chotard@st.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 21 Oct 2016 09:13:06 -0700
+Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+In-Reply-To: <20161021144535.GB877@localhost>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
+ <20161021015814.GC31044@localhost> <20161021144535.GB877@localhost>
+Message-ID: <2a824792-486a-6251-4931-c5cc6fd67978@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 10/21/2016 7:45 AM, Bjorn Helgaas wrote:
+> [1] http://marc.info/?l=linux-acpi&m=145580159209240&w=2)
+> 
+>> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Wait a minute, I still have a question here: what about other ACPI
+> arches (ia64, arm64)?  Don't they need to call acpi_penalize_sci_irq()
+> somewhere?
+> 
 
-STiH415/6 SoC support is being removed from the kernel.
-This patch updates the sti irchip and removes
-references to these obsolete platforms.
+ACPI ARM64 architecture implements reduced ACPI profile which doesn't
+have GED object. Instead, ARM64 architecture uses onchip peripherals
+for similar functionality. If there is a need to signal interrupts,
+this is done by ACPI Notify in ASL or if absolutely needed using
+ACPI Generic Event Device (GED).
 
-Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-Cc: <tglx@linutronix.de>
-Cc: <jason@lakedaemon.net>
-Cc: <marc.zyngier@arm.com>
----
- .../devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt  | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
-index ced6014..23d1e1c 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/st,sti-irq-syscfg.txt
-@@ -7,8 +7,6 @@ This driver is used to unmask them prior to use.
- 
- Required properties:
- - compatible	: Should be set to one of:
--			"st,stih415-irq-syscfg"
--			"st,stih416-irq-syscfg"
- 			"st,stih407-irq-syscfg"
- 			"st,stid127-irq-syscfg"
- - st,syscfg	: Phandle to Cortex-A9 IRQ system config registers
-@@ -25,8 +23,8 @@ Optional properties:
- Example:
- 
- irq-syscfg {
--	compatible    = "st,stih416-irq-syscfg";
--	st,syscfg     = <&syscfg_cpu>;
-+	compatible    = "st,stih407-irq-syscfg";
-+	st,syscfg     = <&syscfg_core>;
- 	st,irq-device = <ST_IRQ_SYSCFG_PMU_0>,
- 			<ST_IRQ_SYSCFG_PMU_1>;
- 	st,fiq-device = <ST_IRQ_SYSCFG_DISABLED>,
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
