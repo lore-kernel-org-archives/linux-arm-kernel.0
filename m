@@ -1,81 +1,72 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 21 Oct 2016 11:06:38 +0200
-Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
-In-Reply-To: <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
-References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
- <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
- <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
-Message-ID: <1477040798.15560.96.camel@baylibre.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 21 Oct 2016 10:08:11 +0100
+Subject: [PATCH] ARM: sti: stih407-clocks: Identify critical clocks
+Message-ID: <1477040891-31611-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-10-20 at 21:21 +0200, Linus Walleij wrote:
-> On Wed, Oct 19, 2016 at 12:08 PM, Jerome Brunet <jbrunet@baylibre.com
-> > wrote:
-> 
-> > 
-> > Add the ability for gpio to request irq from the gpio interrupt
-> > controller
-> > if present. We have to specificaly that the parent interrupt
-> > controller is
-> > the gpio interrupt controller because gpio on meson SoCs can't
-> > generate
-> > interrupt directly on the GIC.
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> (...)
-> > 
-> > +???????select IRQ_DOMAIN
-> > ????????select OF_GPIO
-> > +???????select OF_IRQ
-> (...)
-> > 
-> > +static int meson_gpio_to_hwirq(struct meson_bank *bank, unsigned
-> > int offset)
-> > +{
-> > +???????unsigned int hwirq;
-> > +
-> > +???????if (bank->irq_first < 0)
-> > +???????????????/* this bank cannot generate irqs */
-> > +???????????????return -1;
-> > +
-> > +???????hwirq = offset - bank->first + bank->irq_first;
-> > +
-> > +???????if (hwirq > bank->irq_last)
-> > +???????????????/* this pin cannot generate irqs */
-> > +???????????????return -1;
-> > +
-> > +???????return hwirq;
-> > +}
-> 
-> This is reimplementing irqdomain.
-> 
-> > 
-> > +static int meson_gpio_to_irq(struct gpio_chip *chip, unsigned int
-> > offset)
-> > +{
-> (...)
-> > 
-> > +???????hwirq = meson_gpio_to_hwirq(bank, offset);
-> > +???????if (hwirq < 0) {
-> > +???????????????dev_dbg(pc->dev, "no interrupt for pin %u\n",
-> > offset);
-> > +???????????????return 0;
-> > +???????}
-> 
-> Isn't this usecase (also as described in the cover letter) a textbook
-> example of when you should be using hierarchical irqdomain?
-> 
-> Please check with Marc et al on hierarchical irqdomains.
+Lots of platforms contain clocks which if turned off would prove fatal.
+The only way to recover is to restart the board(s).  This driver takes
+references to clocks which are required to be always-on.  The Common
+Clk Framework will then take references to them.  This way they will
+not be turned off during the clk_disabled_unused() procedure.
 
-Linus,
-Do you mean I should create a new hierarchical?irqdomains in each of
-the two pinctrl instances we have in these SoC, these domains being
-stacked on the one I just added for controller in irqchip ?
+In this patch we are identifying clocks, which if gated would render
+the STiH407 development board unserviceable.
 
-I did not understand this is what you meant when I asked you the
-question at ELCE.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/boot/dts/stih407-clock.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> 
-> Yours,
-> Linus Walleij
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index 13029c0..34c119a 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -101,6 +101,7 @@
+ 				clocks = <&clk_sysin>;
+ 
+ 				clock-output-names = "clk-s-a0-pll-ofd-0";
++				clock-critical = <0>; /* clk-s-a0-pll-ofd-0 */
+ 			};
+ 
+ 			clk_s_a0_flexgen: clk-s-a0-flexgen {
+@@ -112,6 +113,7 @@
+ 					 <&clk_sysin>;
+ 
+ 				clock-output-names = "clk-ic-lmi0";
++				clock-critical = <CLK_IC_LMI0>;
+ 			};
+ 		};
+ 
+@@ -126,6 +128,7 @@
+ 					     "clk-s-c0-fs0-ch1",
+ 					     "clk-s-c0-fs0-ch2",
+ 					     "clk-s-c0-fs0-ch3";
++			clock-critical = <0>; /* clk-s-c0-fs0-ch0 */
+ 		};
+ 
+ 		clk_s_c0: clockgen-c at 09103000 {
+@@ -139,6 +142,7 @@
+ 				clocks = <&clk_sysin>;
+ 
+ 				clock-output-names = "clk-s-c0-pll0-odf-0";
++				clock-critical = <0>; /* clk-s-c0-pll0-odf-0 */
+ 			};
+ 
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+@@ -194,6 +198,12 @@
+ 						     "clk-main-disp",
+ 						     "clk-aux-disp",
+ 						     "clk-compo-dvp";
++				clock-critical = <CLK_PROC_STFE>,
++						 <CLK_ICN_CPU>,
++						 <CLK_TX_ICN_DMU>,
++						 <CLK_EXT2F_A9>,
++						 <CLK_ICN_LMI>,
++						 <CLK_ICN_SBC>;
+ 			};
+ 		};
+ 
+-- 
+1.9.1
