@@ -1,56 +1,404 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 21 Oct 2016 16:40:25 +0200
-Subject: [RFC PATCH 00/13] ARM64: meson-gxl: Add extended support
-Message-ID: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri, 21 Oct 2016 16:40:27 +0200
+Subject: [RFC PATCH 02/13] ARM64: dts: meson-gxbb: Move common nodes to
+ meson-gx
+In-Reply-To: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1477060838-14164-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This RFC patchset provides extended peripheral support for the Amlogix GXL SoCs.
+Move common nodes between GXBB and GXL in to the common GX dtsi.
+Leave the clock attributes in the GXBB dtsi for now.
 
-The final patchs will be split among the correct subsystems.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi   | 131 +++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 155 ++++------------------------
+ 2 files changed, 149 insertions(+), 137 deletions(-)
 
-In order to support more functionalities, this patchset :
- - Moves peripheral nodes to the common Meson arm64 dtsi
- - Add i2c, mmc, sd, sdio, pinctrl and clock nodes for GXL
- - Adds correct GXL P23X boards uart pinctrl
- - Adds the GXL Internal PHY driver
- - Add a temporary workaround to select the internal PHY
- - Add Ethernet nodes for GXL and the P23X boards
- - Add SD/MMC and SDIO WiFi support support for P23X boards
-
-Neil Armstrong (13):
-  pinctrl: meson: Add GXL pinctrl definitions
-  ARM64: dts: meson-gxbb: Move common nodes to meson-gx
-  ARM64: dts: meson-gxl: Add pinctrl nodes
-  ARM64: dts: meson-gxl: Add clock nodes
-  ARM64: dts: meson-gxl: Add i2c nodes
-  ARM64: dts: meson-gxl: Add MMC/SD/SDIO nodes
-  ARM64: dts: meson-gxl-p23x: Add uart pinctrl
-  dwmac-meson8b: add support for phy selection
-  net: phy: Add Meson GXL Internal PHY driver
-  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
-  ARM64: dts: meson-gxl-p23x: Enable ethernet
-  ARM64: dts: meson-gxl-p23x: Add SD/SDIO/MMC and PWM nodes
-  ARM64: dts: meson-gxl-p23x: Enable IR receiver
-
- .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 131 +++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 155 +-----
- .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 125 +++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 238 +++++++++
- .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    |  25 +
- drivers/net/phy/Kconfig                            |   5 +
- drivers/net/phy/Makefile                           |   1 +
- drivers/net/phy/meson-gxl.c                        | 175 ++++++
- drivers/pinctrl/meson/Makefile                     |   3 +-
- drivers/pinctrl/meson/pinctrl-meson-gxl.c          | 589 +++++++++++++++++++++
- drivers/pinctrl/meson/pinctrl-meson.c              |   8 +
- drivers/pinctrl/meson/pinctrl-meson.h              |   2 +
- include/dt-bindings/gpio/meson-gxl-gpio.h          | 131 +++++
- 14 files changed, 1452 insertions(+), 138 deletions(-)
- create mode 100644 drivers/net/phy/meson-gxl.c
- create mode 100644 drivers/pinctrl/meson/pinctrl-meson-gxl.c
- create mode 100644 include/dt-bindings/gpio/meson-gxl-gpio.h
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index fd1d0de..91be4f2 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -129,6 +129,30 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	firmware {
++		sm: secure-monitor {
++			compatible = "amlogic,meson-gx-sm", "amlogic,meson-gxbb-sm";
++		};
++	};
++
++	efuse: efuse {
++		compatible = "amlogic,meson-gx-efuse", "amlogic,meson-gxbb-efuse";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		sn: sn at 14 {
++			reg = <0x14 0x10>;
++		};
++
++		eth_mac: eth_mac at 34 {
++			reg = <0x34 0x10>;
++		};
++
++		bid: bid at 46 {
++			reg = <0x46 0x30>;
++		};
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+@@ -142,6 +166,12 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc1100000 0x0 0x100000>;
+ 
++			reset: reset-controller at 4404 {
++				compatible = "amlogic,meson-gx-reset", "amlogic,meson-gxbb-reset";
++				reg = <0x0 0x04404 0x0 0x20>;
++				#reset-cells = <1>;
++			};
++
+ 			uart_A: serial at 84c0 {
+ 				compatible = "amlogic,meson-uart";
+ 				reg = <0x0 0x84c0 0x0 0x14>;
+@@ -149,6 +179,76 @@
+ 				clocks = <&xtal>;
+ 				status = "disabled";
+ 			};
++
++			uart_B: serial at 84dc {
++				compatible = "amlogic,meson-uart";
++				reg = <0x0 0x84dc 0x0 0x14>;
++				interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&xtal>;
++				status = "disabled";
++			};
++
++			i2c_A: i2c at 8500 {
++				compatible = "amlogic,meson-gxbb-i2c";
++				reg = <0x0 0x08500 0x0 0x20>;
++				interrupts = <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			pwm_ab: pwm at 8550 {
++				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08550 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_cd: pwm at 8650 {
++				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x08650 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			pwm_ef: pwm at 86c0 {
++				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
++				reg = <0x0 0x086c0 0x0 0x10>;
++				#pwm-cells = <3>;
++				status = "disabled";
++			};
++
++			uart_C: serial at 8700 {
++				compatible = "amlogic,meson-uart";
++				reg = <0x0 0x8700 0x0 0x14>;
++				interrupts = <GIC_SPI 93 IRQ_TYPE_EDGE_RISING>;
++				clocks = <&xtal>;
++				status = "disabled";
++			};
++
++			i2c_B: i2c at 87c0 {
++				compatible = "amlogic,meson-gxbb-i2c";
++				reg = <0x0 0x087c0 0x0 0x20>;
++				interrupts = <GIC_SPI 214 IRQ_TYPE_EDGE_RISING>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			i2c_C: i2c at 87e0 {
++				compatible = "amlogic,meson-gxbb-i2c";
++				reg = <0x0 0x087e0 0x0 0x20>;
++				interrupts = <GIC_SPI 215 IRQ_TYPE_EDGE_RISING>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			watchdog at 98d0 {
++				compatible = "amlogic,meson-gx-wdt", "amlogic,meson-gxbb-wdt";
++				reg = <0x0 0x098d0 0x0 0x10>;
++				clocks = <&xtal>;
++			};
+ 		};
+ 
+ 		gic: interrupt-controller at c4301000 {
+@@ -178,6 +278,13 @@
+ 				clocks = <&xtal>;
+ 				status = "disabled";
+ 			};
++
++			ir: ir at 580 {
++				compatible = "amlogic,meson-gxbb-ir";
++				reg = <0x0 0x00580 0x0 0x40>;
++				interrupts = <GIC_SPI 196 IRQ_TYPE_EDGE_RISING>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		periphs: periphs at c8834000 {
+@@ -186,6 +293,11 @@
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc8834000 0x0 0x2000>;
++
++			rng {
++				compatible = "amlogic,meson-rng";
++				reg = <0x0 0x0 0x0 0x4>;
++			};
+ 		};
+ 
+ 
+@@ -195,6 +307,25 @@
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xc883c000 0x0 0x2000>;
++
++			mailbox: mailbox at 404 {
++				compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
++				reg = <0 0x404 0 0x4c>;
++				interrupts = <0 208 IRQ_TYPE_EDGE_RISING>,
++					     <0 209 IRQ_TYPE_EDGE_RISING>,
++					     <0 210 IRQ_TYPE_EDGE_RISING>;
++				#mbox-cells = <1>;
++			};
++		};
++
++		ethmac: ethernet at c9410000 {
++			compatible = "amlogic,meson-gx-dwmac", "amlogic,meson-gxbb-dwmac", "snps,dwmac";
++			reg = <0x0 0xc9410000 0x0 0x10000
++			       0x0 0xc8834540 0x0 0x4>;
++			interrupts = <0 8 1>;
++			interrupt-names = "macirq";
++			phy-mode = "rgmii";
++			status = "disabled";
+ 		};
+ 
+ 		apb: apb at d0000000 {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 22940bb..7c5bf14 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -50,30 +50,6 @@
+ / {
+ 	compatible = "amlogic,meson-gxbb";
+ 
+-	firmware {
+-		sm: secure-monitor {
+-			compatible = "amlogic,meson-gxbb-sm";
+-		};
+-	};
+-
+-	efuse: efuse {
+-		compatible = "amlogic,meson-gxbb-efuse";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-
+-		sn: sn at 14 {
+-			reg = <0x14 0x10>;
+-		};
+-
+-		eth_mac: eth_mac at 34 {
+-			reg = <0x34 0x10>;
+-		};
+-
+-		bid: bid at 46 {
+-			reg = <0x46 0x30>;
+-		};
+-	};
+-
+ 	soc {
+ 		usb0_phy: phy at c0000000 {
+ 			compatible = "amlogic,meson-gxbb-usb2-phy";
+@@ -117,73 +93,17 @@
+ 			dr_mode = "host";
+ 			status = "disabled";
+ 		};
+-
+-		ethmac: ethernet at c9410000 {
+-			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac";
+-			reg = <0x0 0xc9410000 0x0 0x10000
+-			       0x0 0xc8834540 0x0 0x4>;
+-			interrupts = <0 8 1>;
+-			interrupt-names = "macirq";
+-			clocks = <&clkc CLKID_ETH>,
+-				 <&clkc CLKID_FCLK_DIV2>,
+-				 <&clkc CLKID_MPLL2>;
+-			clock-names = "stmmaceth", "clkin0", "clkin1";
+-			phy-mode = "rgmii";
+-			status = "disabled";
+-		};
+ 	};
+ };
+ 
+-&cbus {
+-	reset: reset-controller at 4404 {
+-		compatible = "amlogic,meson-gxbb-reset";
+-		reg = <0x0 0x04404 0x0 0x20>;
+-		#reset-cells = <1>;
+-	};
+-
+-	uart_B: serial at 84dc {
+-		compatible = "amlogic,meson-uart";
+-		reg = <0x0 0x84dc 0x0 0x14>;
+-		interrupts = <GIC_SPI 75 IRQ_TYPE_EDGE_RISING>;
+-		clocks = <&xtal>;
+-		status = "disabled";
+-	};
+-
+-	pwm_ab: pwm at 8550 {
+-		compatible = "amlogic,meson-gxbb-pwm";
+-		reg = <0x0 0x08550 0x0 0x10>;
+-		#pwm-cells = <3>;
+-		status = "disabled";
+-	};
+-
+-	pwm_cd: pwm at 8650 {
+-		compatible = "amlogic,meson-gxbb-pwm";
+-		reg = <0x0 0x08650 0x0 0x10>;
+-		#pwm-cells = <3>;
+-		status = "disabled";
+-	};
+-
+-	pwm_ef: pwm at 86c0 {
+-		compatible = "amlogic,meson-gxbb-pwm";
+-		reg = <0x0 0x086c0 0x0 0x10>;
+-		#pwm-cells = <3>;
+-		status = "disabled";
+-	};
+-
+-	uart_C: serial at 8700 {
+-		compatible = "amlogic,meson-uart";
+-		reg = <0x0 0x8700 0x0 0x14>;
+-		interrupts = <GIC_SPI 93 IRQ_TYPE_EDGE_RISING>;
+-		clocks = <&xtal>;
+-		status = "disabled";
+-	};
+-
+-	watchdog at 98d0 {
+-		compatible = "amlogic,meson-gxbb-wdt";
+-		reg = <0x0 0x098d0 0x0 0x10>;
+-		clocks = <&xtal>;
+-	};
++&ethmac {
++	clocks = <&clkc CLKID_ETH>,
++		 <&clkc CLKID_FCLK_DIV2>,
++		 <&clkc CLKID_MPLL2>;
++	clock-names = "stmmaceth", "clkin0", "clkin1";
++};
+ 
++&cbus {
+ 	spifc: spi at 8c80 {
+ 		compatible = "amlogic,meson-gxbb-spifc";
+ 		reg = <0x0 0x08c80 0x0 0x80>;
+@@ -192,36 +112,6 @@
+ 		clocks = <&clkc CLKID_SPI>;
+ 		status = "disabled";
+ 	};
+-
+-	i2c_A: i2c at 8500 {
+-		compatible = "amlogic,meson-gxbb-i2c";
+-		reg = <0x0 0x08500 0x0 0x20>;
+-		interrupts = <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>;
+-		clocks = <&clkc CLKID_I2C>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		status = "disabled";
+-	};
+-
+-	i2c_B: i2c at 87c0 {
+-		compatible = "amlogic,meson-gxbb-i2c";
+-		reg = <0x0 0x087c0 0x0 0x20>;
+-		interrupts = <GIC_SPI 214 IRQ_TYPE_EDGE_RISING>;
+-		clocks = <&clkc CLKID_I2C>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		status = "disabled";
+-	};
+-
+-	i2c_C: i2c at 87e0 {
+-		compatible = "amlogic,meson-gxbb-i2c";
+-		reg = <0x0 0x087e0 0x0 0x20>;
+-		interrupts = <GIC_SPI 215 IRQ_TYPE_EDGE_RISING>;
+-		clocks = <&clkc CLKID_I2C>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		status = "disabled";
+-	};
+ };
+ 
+ &aobus {
+@@ -298,13 +188,6 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
+-	ir: ir at 580 {
+-		compatible = "amlogic,meson-gxbb-ir";
+-		reg = <0x0 0x00580 0x0 0x40>;
+-		interrupts = <GIC_SPI 196 IRQ_TYPE_EDGE_RISING>;
+-		status = "disabled";
+-	};
+-
+ 	pwm_ab_AO: pwm at 550 {
+ 		compatible = "amlogic,meson-gxbb-pwm";
+ 		reg = <0x0 0x0550 0x0 0x10>;
+@@ -324,11 +207,6 @@
+ };
+ 
+ &periphs {
+-	rng {
+-		compatible = "amlogic,meson-rng";
+-		reg = <0x0 0x0 0x0 0x4>;
+-	};
+-
+ 	pinctrl_periphs: pinctrl at 4b0 {
+ 		compatible = "amlogic,meson-gxbb-periphs-pinctrl";
+ 		#address-cells = <2>;
+@@ -536,15 +414,18 @@
+ 		#clock-cells = <1>;
+ 		reg = <0x0 0x0 0x0 0x3db>;
+ 	};
++};
+ 
+-	mailbox: mailbox at 404 {
+-		compatible = "amlogic,meson-gxbb-mhu";
+-		reg = <0 0x404 0 0x4c>;
+-		interrupts = <0 208 IRQ_TYPE_EDGE_RISING>,
+-			     <0 209 IRQ_TYPE_EDGE_RISING>,
+-			     <0 210 IRQ_TYPE_EDGE_RISING>;
+-		#mbox-cells = <1>;
+-	};
++&i2c_A {
++	clocks = <&clkc CLKID_I2C>;
++};
++
++&i2c_B {
++	clocks = <&clkc CLKID_I2C>;
++};
++
++&i2c_C {
++	clocks = <&clkc CLKID_I2C>;
+ };
+ 
+ &sd_emmc_a {
 -- 
 1.9.1
