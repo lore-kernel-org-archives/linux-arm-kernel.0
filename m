@@ -1,32 +1,32 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Oct 2016 17:05:54 +0300
-Subject: [PATCH] dt-bindings: video: exynos7-decon: Remove obsolete samsung,
- power-domain property
-Message-ID: <1477058754-13866-1-git-send-email-krzk@kernel.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 21 Oct 2016 16:05:59 +0200
+Subject: [PATCH 0/4] ARM: boot: mxs: Add On-Chip RAM
+In-Reply-To: <20161021135343.GI30578@tiger>
+References: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
+ <20161021135343.GI30578@tiger>
+Message-ID: <9bf7c925-bdc2-d0b8-9886-70d46383d1e0@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The samsung,power-domain property is obsolete since commit 0da658704136
-("ARM: dts: convert to generic power domain bindings for exynos DT").
-Replace it with generic one.
+Am 21.10.2016 um 15:53 schrieb Shawn Guo:
+> On Tue, Sep 13, 2016 at 05:51:02PM +0000, Stefan Wahren wrote:
+>> The i.MX23 / i.MX28 have a small amount of On-Chip RAM which is also necessary
+>> for suspend to RAM and standby mode. But before we need to remove the fake reg
+>> properties of all internal bus nodes as discussed in this thread [1].
+>>
+>> This patch series requires Fabio Estevam's recent series "ARM: dts: imx23:
+>> Remove skeleton.dtsi inclusion" [2].
+>>
+>> [1] - https://marc.info/?l=devicetree&m=146139948426520&w=2
+> The page cannot be reached.  I would like to understand the
+> background for this change.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Strange, because i don't have any problems while clicking on the URL.
 
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
-index 3938caacf11c..8346fb18a358 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
-@@ -33,7 +33,7 @@ Required properties:
- - i80-if-timings: timing configuration for lcd i80 interface support.
- 
- Optional Properties:
--- samsung,power-domain: a phandle to DECON power domain node.
-+- power-domains: a phandle to DECON power domain node.
- - display-timings: timing settings for DECON, as described in document [1].
- 		Can be used in case timings cannot be provided otherwise
- 		or to override timings provided by the panel.
--- 
-2.7.4
+It's an older discussion on the devicetree / kernel newbie mailing list
+with subject "strange dtc errors after adding sram node". Arnd suggested
+in the discussion to remove the reg property from the ahb node.
+
+Please try this one: http://www.spinics.net/lists/newbies/msg57652.html
+
+Stefan
