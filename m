@@ -1,46 +1,32 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 21 Oct 2016 23:01:06 +0900
-Subject: [PATCH 7/7] mfd: tps65217: Fix mismatched interrupt number
-In-Reply-To: <20161021140106.21531-1-woogyom.kim@gmail.com>
-References: <20161021140106.21531-1-woogyom.kim@gmail.com>
-Message-ID: <20161021140106.21531-8-woogyom.kim@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Oct 2016 17:05:54 +0300
+Subject: [PATCH] dt-bindings: video: exynos7-decon: Remove obsolete samsung,
+ power-domain property
+Message-ID: <1477058754-13866-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enum value of 'tps65217_irq_type' is not matched with DT parsed hwirq
-number[*].
+The samsung,power-domain property is obsolete since commit 0da658704136
+("ARM: dts: convert to generic power domain bindings for exynos DT").
+Replace it with generic one.
 
-The MFD driver gets the IRQ data by referencing hwirq, but the value is
-different. So, irq_to_tps65217_irq() returns mismatched IRQ data.
-Eventually, the power button driver enables not PB but USB interrupt
-when it is probed.
-
-According to the TPS65217 register map[**], USB interrupt is the LSB.
-This patch synchronizes TPS65217 IRQ index.
-
-[*]  include/dt-bindings/mfd/tps65217.h
-[**] http://www.ti.com/lit/ds/symlink/tps65217.pdf
-
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- include/linux/mfd/tps65217.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/mfd/tps65217.h b/include/linux/mfd/tps65217.h
-index 4ccda89..75a3a5f 100644
---- a/include/linux/mfd/tps65217.h
-+++ b/include/linux/mfd/tps65217.h
-@@ -235,9 +235,9 @@ struct tps65217_bl_pdata {
- };
+diff --git a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
+index 3938caacf11c..8346fb18a358 100644
+--- a/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
++++ b/Documentation/devicetree/bindings/display/exynos/exynos7-decon.txt
+@@ -33,7 +33,7 @@ Required properties:
+ - i80-if-timings: timing configuration for lcd i80 interface support.
  
- enum tps65217_irq_type {
--	TPS65217_IRQ_PB,
--	TPS65217_IRQ_AC,
- 	TPS65217_IRQ_USB,
-+	TPS65217_IRQ_AC,
-+	TPS65217_IRQ_PB,
- 	TPS65217_NUM_IRQ
- };
- 
+ Optional Properties:
+-- samsung,power-domain: a phandle to DECON power domain node.
++- power-domains: a phandle to DECON power domain node.
+ - display-timings: timing settings for DECON, as described in document [1].
+ 		Can be used in case timings cannot be provided otherwise
+ 		or to override timings provided by the panel.
 -- 
-2.9.3
+2.7.4
