@@ -1,29 +1,55 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 21 Oct 2016 12:03:40 +0800
-Subject: [PATCH] clk: rockchip: add 533.25MHz to rk3399 clock rates table
-Message-ID: <1477022620-8143-1-git-send-email-zhengxing@rock-chips.com>
+From: songwenjun@huawei.com (Rick Song)
+Date: Fri, 21 Oct 2016 12:39:23 +0800
+Subject: [RFC,v1,1/2] iommu/arm-smmu: support s2 domain attribute
+Message-ID: <1477024764-79882-1-git-send-email-songwenjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to get the accurate 533.25MHz for the DP display.
+Under some condition, user want to use the
+only stage 2 translation ability, so smmu
+driver need support setting only s2 domain
+attribute.
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Signed-off-by: Rick Song <songwenjun@huawei.com>
 ---
+ drivers/iommu/arm-smmu-v3.c | 12 ++++++++++++
+ include/linux/iommu.h       |  1 +
+ 2 files changed, 13 insertions(+)
 
- drivers/clk/rockchip/clk-rk3399.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 2c7cba7..a87cb49 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -93,6 +93,7 @@ static struct rockchip_pll_rate_table rk3399_pll_rates[] = {
- 	RK3036_PLL_RATE( 676000000, 3, 169, 2, 1, 1, 0),
- 	RK3036_PLL_RATE( 600000000, 1, 75, 3, 1, 1, 0),
- 	RK3036_PLL_RATE( 594000000, 1, 99, 4, 1, 1, 0),
-+	RK3036_PLL_RATE( 533250000, 8, 711, 4, 1, 1, 0),
- 	RK3036_PLL_RATE( 504000000, 1, 63, 3, 1, 1, 0),
- 	RK3036_PLL_RATE( 500000000, 6, 250, 2, 1, 1, 0),
- 	RK3036_PLL_RATE( 408000000, 1, 68, 2, 2, 1, 0),
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 15c01c3..d3b19d2 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1854,6 +1854,18 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 	mutex_lock(&smmu_domain->init_mutex);
+ 
+ 	switch (attr) {
++	case DOMAIN_ATTR_S2:
++		if (smmu_domain->smmu) {
++			ret = -EPERM;
++			goto out_unlock;
++		}
++
++		if (*(int *)data)
++			smmu_domain->stage = ARM_SMMU_DOMAIN_S2;
++		else
++			smmu_domain->stage = ARM_SMMU_DOMAIN_S1;
++
++		break;
+ 	case DOMAIN_ATTR_NESTING:
+ 		if (smmu_domain->smmu) {
+ 			ret = -EPERM;
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 436dc21..0b5a387 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -114,6 +114,7 @@ enum iommu_attr {
+ 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
+ 	DOMAIN_ATTR_FSL_PAMUV1,
+ 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
++	DOMAIN_ATTR_S2,		/* only stage 2 translation */
+ 	DOMAIN_ATTR_MAX,
+ };
+ 
 -- 
-2.7.4
+1.9.1
