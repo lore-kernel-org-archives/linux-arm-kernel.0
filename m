@@ -1,97 +1,125 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Oct 2016 21:47:05 +0200
-Subject: Disabling an interrupt in the handler locks the system up
-In-Reply-To: <20161021201448.3f4a0a7a@arm.com>
-References: <580A4460.2090306@free.fr>
- <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
- <20161021201448.3f4a0a7a@arm.com>
-Message-ID: <580A70B9.8060507@free.fr>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 21 Oct 2016 14:49:41 -0500
+Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <7heg39pmgb.fsf@baylibre.com>
+References: <20161019203347.17893-1-d-gerlach@ti.com>
+ <20161019203347.17893-3-d-gerlach@ti.com> <7heg39pmgb.fsf@baylibre.com>
+Message-ID: <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2016 21:14, Marc Zyngier wrote:
-
-> Mason wrote:
-> 
->> On 21/10/2016 19:46, Marc Zyngier wrote:
+Hi,
+On 10/21/2016 01:48 PM, Kevin Hilman wrote:
+> Dave Gerlach <d-gerlach@ti.com> writes:
+>
+>> Add a generic power domain implementation, TI SCI PM Domains, that
+>> will hook into the genpd framework and allow the TI SCI protocol to
+>> control device power states.
 >>
->>> On 21/10/16 17:37, Mason wrote:
->>>  
->>>> On my platform, one HW block pulls the interrupt line high
->>>> as long as it remains idle, and low when it is busy.
->>>>
->>>> The device tree node is:
->>>>
->>>> 		test at 22222 {
->>>> 			compatible = "vendor,testme";
->>>> 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
->>>> 		};  
->>>
->>> I assume that this is for the sake of the discussion, and that you do
->>> not actually intend to put together such a monstrosity.  
+>> Also, provide macros representing each device index as understood
+>> by TI SCI to be used in the device node power-domain references.
+>> These are identifiers for the K2G devices managed by the PMMC.
 >>
->> It's just missing a reg properties to be a valid node, right?
-> 
-> If connecting a device that signals its interrupt as level low to an
-> input line configured as level high doesn't strike you as a major
-> issue, nothing will. At that point, you can put anything you want in
-> your DT.
-
-If I understand correctly, you are saying that I should have
-specified IRQ_TYPE_LEVEL_LOW, instead of IRQ_TYPE_LEVEL_HIGH?
-
-If the HW outputs 1 when idle, and 0 when busy, that
-is level low? (Sorry if this is obvious, I'm absolutely
-clueless in this subject matter.)
-
-
->>>> I wrote a minimal driver which registers the irq.
->>>> And in the interrupt handler, I disable said irq.
->>>>
->>>> Since the irq is IRQ_TYPE_LEVEL_HIGH, it will fire as soon as
->>>> it is registered (because the block is idle).
->>>>
->>>> Here is the code I've been running, request_irq doesn't return.  
->>>
->>> [...]
->>>   
->>>> And here's what I get when I try to load the module:
->>>> (I'm using the default CONFIG_RCU_CPU_STALL_TIMEOUT=21)  
->>>
->>> [...]
->>>   
->>>> Are we not supposed to disable the irq in the handler?  
->>>
->>> You can. It then depends on what your interrupt controller does to
->>> actually ensure that the interrupt is disabled. Only you can trace it on
->>> your HW to find out.  
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
+>>  MAINTAINERS                                        |  2 +
+>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
+>>  3 files changed, 146 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>  create mode 100644 include/dt-bindings/genpd/k2g.h
 >>
->> I'm using an upstream driver on v4.9-rc1
+>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>> new file mode 100644
+>> index 000000000000..32f38a349656
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>> @@ -0,0 +1,54 @@
+>> +Texas Instruments TI-SCI Generic Power Domain
+>> +---------------------------------------------
+>> +
+>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
+>> +responsible for controlling the state of the IPs that are present.
+>> +Communication between the host processor running an OS and the system
+>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
+>> +implementation plugs into the generic pm domain framework and makes use of
+>> +the TI SCI protocol power on and off each device when needed.
+>> +
+>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>> +
+>> +PM Domain Node
+>> +==============
+>> +The PM domain node represents the global PM domain managed by the PMMC,
+>> +which in this case is the single implementation as documented by the generic
+>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+>> +
+>> +Required Properties:
+>> +--------------------
+>> +- compatible: should be "ti,sci-pm-domain"
+>> +- #power-domain-cells: Must be 0.
+>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
 >>
->> http://lxr.free-electrons.com/source/drivers/irqchip/irq-tango.c
->>
->> Given that the system locks up, is it possible there is a bug
->> in the driver?
-> 
-> That's possible.
-> 
->> Which call-back handles enabling/disabling interrupts?
-> 
-> How about irq_unmask/irq_mask?
+>> +Example:
+>> +--------------------
+>> +k2g_pds: k2g_pds {
+>
+> should use generic name like "power-contoller", e.g. k2g_pds: power-controller
 
-I tried following the source from disable_irq_nosync()
-as far down as I could.
+Ok, that makes more sense.
 
-disable_irq_nosync ->
-__disable_irq_nosync ->
-__disable_irq ->
-irq_disable -> ??
+>
+>> +        compatible = "ti,sci-pm-domain";
+>> +        #power-domain-cells = <0>;
+>> +        ti,sci = <&pmmc>;
+>> +};
+>> +
+>> +PM Domain Consumers
+>> +===================
+>> +Hardware blocks that require SCI control over their state must provide
+>> +a reference to the sci-pm-domain they are part of and a unique device
+>> +specific ID that identifies the device.
+>> +
+>> +Required Properties:
+>> +--------------------
+>> +- power-domains: phandle pointing to the corresponding PM domain node.
+>> +- ti,sci-id: index representing the device id to be passed oevr SCI to
+>> +	     be used for device control.
+>
+> This ID doesn't look right.
+>
+> Why not use #power-domain-cells = <1> and pass the index in the DT? ...
+>
+>> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
+>> +
+>> +Example:
+>> +--------------------
+>> +uart0: serial at 02530c00 {
+>> +	compatible = "ns16550a";
+>> +	...
+>> +	power-domains = <&k2g_pds>;
+>> +	ti,sci-id = <K2G_DEV_UART0>;
+>
+> ... like this:
+>
+> 	power-domains = <&k2g_pds K2G_DEV_UART0>;
 
-http://lxr.free-electrons.com/source/kernel/irq/chip.c#L232
+That's how I did it in version one actually. I was able to define my own 
+xlate function to parse the phandle and get that index, but Ulf pointed 
+me to this series by Jon Hunter [1] that simplified genpd providers and 
+dropped the concept of adding your own xlate. This locks the onecell 
+approach to using a fixed static array of genpds that get indexed into 
+(without passing the index to the provider, just the genpd that's looked 
+up), which doesn't fit our usecase, as we don't want a 1 to 1 genpd to 
+device mapping based on the comments provided in v1. Now we just use the 
+genpd device attach/detach hooks to parse the sci-id and then use it in 
+the genpd device start/stop hooks.
 
-I don't know if desc->irq_data.chip->irq_disable is defined
-by the driver I'm using?
+Regards,
+Dave
 
-I don't know how the trail goes to irq_mask?
+[1] http://www.spinics.net/lists/arm-kernel/msg524151.html
 
-Regards.
+>
+> Kevin
+>
