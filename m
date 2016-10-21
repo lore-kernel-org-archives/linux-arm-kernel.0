@@ -1,27 +1,52 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 21 Oct 2016 16:34:10 -0400
-Subject: [PATCH V4 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1477071013-29563-10-git-send-email-tbaicar@codeaurora.org>
-References: <1477071013-29563-1-git-send-email-tbaicar@codeaurora.org>
- <1477071013-29563-10-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20161021163410.0a827eab@gandalf.local.home>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 21 Oct 2016 23:33:03 +0300
+Subject: [PATCH 04/18] arm64: ensure the kernel is compiled for LP64
+In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1477081997-4770-5-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2016 11:30:12 -0600
-Tyler Baicar <tbaicar@codeaurora.org> wrote:
+From: Andrew Pinski <apinski@cavium.com>
 
-> Currently there are trace events for the various RAS
-> errors with the exception of ARM processor type errors.
-> Add a new trace event for such errors so that the user
-> will know when they occur. These trace events are
-> consistent with the ARM processor error section type
-> defined in UEFI 2.6 spec section N.2.4.4.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+The kernel needs to be compiled as a LP64 binary for ARM64, even when
+using a compiler that defaults to code-generation for the ILP32 ABI.
+Consequently, we need to explicitly pass '-mabi=lp64' (supported on
+gcc-4.9 and newer).
 
-Tracing part looks fine to me.
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+---
+ arch/arm64/Makefile | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index ab51aed..80eb000 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -42,15 +42,20 @@ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+ KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+ KBUILD_AFLAGS	+= $(lseinstr)
+ 
++KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
++KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
++
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
+ LD		+= -EB
++LDFLAGS		+= -maarch64linuxb
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ AS		+= -EL
+ LD		+= -EL
++LDFLAGS		+= -maarch64linux
+ UTS_MACHINE	:= aarch64
+ endif
+ 
+-- 
+2.7.4
