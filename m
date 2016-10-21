@@ -1,58 +1,170 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 15:17:37 +0200
-Subject: [PATCH v4 23/23] clk: renesas: rcar-gen2: Remove obsolete
- rcar_gen2_clocks_init()
+Date: Fri, 21 Oct 2016 15:17:16 +0200
+Subject: [PATCH v4 02/23] soc: renesas: Add R-Car RST driver
 In-Reply-To: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
 References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1477055857-17936-24-git-send-email-geert+renesas@glider.be>
+Message-ID: <1477055857-17936-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The R-Car Gen2 board code no longer calls rcar_gen2_clocks_init().
+Add a driver for the Renesas R-Car Gen1 RESET/WDT and R-Car Gen2/Gen3
+and RZ/G RST module.
+
+For now this driver just provides an API to obtain the state of the mode
+pins, as latched at reset time.  As this is typically called from the
+probe function of a clock driver, which can run much earlier than any
+initcall, calling rcar_rst_read_mode_pins() just forces an early
+initialization of the driver.
+
+Despite the current simple and almost identical handling for all
+supported SoCs, the driver matches against SoC-specific compatible
+values, as the features provided by the hardware module differ a lot
+across the various SoC families and members.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 ---
 v4:
   - Add Acked-by,
+  - Remove the initcall and the rcar_rst_base check in rcar_rst_init(),
+    as rcar_rst_init() is only used as a support function for
+    rcar_rst_read_mode_pins(),
+  - Refer to rcar_rst_gen2 for R-Car Gen3 instead of providing an
+    identical copy,
+  - Add RZ/G1M and RZ/G1E,
 
 v3:
-  - Rebased,
-
-v2:
-  - No changes.
+  - New.
 ---
- drivers/clk/renesas/clk-rcar-gen2.c | 7 -------
- include/linux/clk/renesas.h         | 2 --
- 2 files changed, 9 deletions(-)
+ drivers/soc/renesas/Makefile         |  5 ++
+ drivers/soc/renesas/rcar-rst.c       | 92 ++++++++++++++++++++++++++++++++++++
+ include/linux/soc/renesas/rcar-rst.h |  6 +++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 drivers/soc/renesas/rcar-rst.c
+ create mode 100644 include/linux/soc/renesas/rcar-rst.h
 
-diff --git a/drivers/clk/renesas/clk-rcar-gen2.c b/drivers/clk/renesas/clk-rcar-gen2.c
-index 3291fd430ad4e215..f39519edc645ca87 100644
---- a/drivers/clk/renesas/clk-rcar-gen2.c
-+++ b/drivers/clk/renesas/clk-rcar-gen2.c
-@@ -445,10 +445,3 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
- }
- CLK_OF_DECLARE(rcar_gen2_cpg_clks, "renesas,rcar-gen2-cpg-clocks",
- 	       rcar_gen2_cpg_clocks_init);
--
--void __init rcar_gen2_clocks_init(u32 mode)
--{
--	cpg_mode = mode;
--
--	of_clk_init(NULL);
--}
-diff --git a/include/linux/clk/renesas.h b/include/linux/clk/renesas.h
-index 9e969941f3f62878..9ebf1f8243bb57af 100644
---- a/include/linux/clk/renesas.h
-+++ b/include/linux/clk/renesas.h
-@@ -20,8 +20,6 @@
- struct device_node;
- struct generic_pm_domain;
- 
--void rcar_gen2_clocks_init(u32 mode);
--
- void cpg_mstp_add_clk_domain(struct device_node *np);
- #ifdef CONFIG_CLK_RENESAS_CPG_MSTP
- int cpg_mstp_attach_dev(struct generic_pm_domain *unused, struct device *dev);
+diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+index 623039c3514cdc34..86cc78cd1962701a 100644
+--- a/drivers/soc/renesas/Makefile
++++ b/drivers/soc/renesas/Makefile
+@@ -1,3 +1,8 @@
++obj-$(CONFIG_ARCH_RCAR_GEN1)	+= rcar-rst.o
++obj-$(CONFIG_ARCH_RCAR_GEN2)	+= rcar-rst.o
++obj-$(CONFIG_ARCH_R8A7795)	+= rcar-rst.o
++obj-$(CONFIG_ARCH_R8A7796)	+= rcar-rst.o
++
+ obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+ obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
+diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+new file mode 100644
+index 0000000000000000..a6d1c26d31675cf3
+--- /dev/null
++++ b/drivers/soc/renesas/rcar-rst.c
+@@ -0,0 +1,92 @@
++/*
++ * R-Car Gen1 RESET/WDT, R-Car Gen2, Gen3, and RZ/G RST Driver
++ *
++ * Copyright (C) 2016 Glider bvba
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/soc/renesas/rcar-rst.h>
++
++struct rst_config {
++	unsigned int modemr;	/* Mode Monitoring Register Offset */
++};
++
++static const struct rst_config rcar_rst_gen1 __initconst = {
++	.modemr = 0x20,
++};
++
++static const struct rst_config rcar_rst_gen2 __initconst = {
++	.modemr = 0x60,
++};
++
++static const struct of_device_id rcar_rst_matches[] __initconst = {
++	/* RZ/G is handled like R-Car Gen2 */
++	{ .compatible = "renesas,r8a7743-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7745-rst", .data = &rcar_rst_gen2 },
++	/* R-Car Gen1 */
++	{ .compatible = "renesas,r8a7778-reset-wdt", .data = &rcar_rst_gen1 },
++	{ .compatible = "renesas,r8a7779-reset-wdt", .data = &rcar_rst_gen1 },
++	/* R-Car Gen2 */
++	{ .compatible = "renesas,r8a7790-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7791-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
++	/* R-Car Gen3 is handled like R-Car Gen2 */
++	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen2 },
++	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen2 },
++	{ /* sentinel */ }
++};
++
++static void __iomem *rcar_rst_base __initdata;
++static u32 saved_mode __initdata;
++
++static int __init rcar_rst_init(void)
++{
++	const struct of_device_id *match;
++	const struct rst_config *cfg;
++	struct device_node *np;
++	void __iomem *base;
++	int error = 0;
++
++	np = of_find_matching_node_and_match(NULL, rcar_rst_matches, &match);
++	if (!np)
++		return -ENODEV;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_warn("%s: Cannot map regs\n", np->full_name);
++		error = -ENOMEM;
++		goto out_put;
++	}
++
++	rcar_rst_base = base;
++	cfg = match->data;
++	saved_mode = ioread32(base + cfg->modemr);
++
++	pr_debug("%s: MODE = 0x%08x\n", np->full_name, saved_mode);
++
++out_put:
++	of_node_put(np);
++	return error;
++}
++
++int __init rcar_rst_read_mode_pins(u32 *mode)
++{
++	int error;
++
++	if (!rcar_rst_base) {
++		error = rcar_rst_init();
++		if (error)
++			return error;
++	}
++
++	*mode = saved_mode;
++	return 0;
++}
+diff --git a/include/linux/soc/renesas/rcar-rst.h b/include/linux/soc/renesas/rcar-rst.h
+new file mode 100644
+index 0000000000000000..a18e0783946b66ec
+--- /dev/null
++++ b/include/linux/soc/renesas/rcar-rst.h
+@@ -0,0 +1,6 @@
++#ifndef __LINUX_SOC_RENESAS_RCAR_RST_H__
++#define __LINUX_SOC_RENESAS_RCAR_RST_H__
++
++int rcar_rst_read_mode_pins(u32 *mode);
++
++#endif /* __LINUX_SOC_RENESAS_RCAR_RST_H__ */
 -- 
 1.9.1
