@@ -1,86 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Oct 2016 15:48:07 +0100
-Subject: [RFC,v1,2/2] vfio/iommu-type1: set only stage 2 translation
-In-Reply-To: <20161021082703.4890c419@t450s.home>
-References: <1477024764-79882-1-git-send-email-songwenjun@huawei.com>
- <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
- <20161021082703.4890c419@t450s.home>
-Message-ID: <1522b473-5979-0fa1-073f-be0fe7e1aa2c@arm.com>
+From: seanpaul@google.com (Sean Paul)
+Date: Fri, 21 Oct 2016 10:53:27 -0400
+Subject: [PATCH] drm/virtio: kconfig: Fixup white space.
+In-Reply-To: <1475913318-12275-1-git-send-email-peter.griffin@linaro.org>
+References: <1475913318-12275-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CAOw6vbLjxghzxVdNYADTSPSfJq51YHJQHQ5VMJEmtHqVKmu+kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/16 15:27, Alex Williamson wrote:
-> On Fri, 21 Oct 2016 12:39:24 +0800
-> Rick Song <songwenjun@huawei.com> wrote:
-> 
->> Normally, VFIO should use only stage 2 translation of
->> iommu, to create the address mapping. If nesting translation
->> is disabled from VFIO core, enable iommu domain only stage 2
->> attribute, otherwise, enable iommu domain nesting attribute.
->>
->> Signed-off-by: Rick Song <songwenjun@huawei.com>
->> ---
->>  drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++---
->>  1 file changed, 12 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index 2ba1942..c0265fe 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -741,7 +741,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>  	struct vfio_group *group, *g;
->>  	struct vfio_domain *domain, *d;
->>  	struct bus_type *bus = NULL;
->> -	int ret;
->> +	int attr, ret;
->>  
->>  	mutex_lock(&iommu->lock);
->>  
->> @@ -775,13 +775,22 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>  		goto out_free;
->>  	}
->>  
->> +	/*
->> +	 * Set iommu nesting domain attribute if nesting translation
->> +	 * is enabled from iommu vfio, otherwise set iommu only stage
->> +	 * 2 domain attribute.
->> +	 */
->> +	attr = 1;
->>  	if (iommu->nesting) {
->> -		int attr = 1;
->> -
->>  		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_NESTING,
->>  					    &attr);
->>  		if (ret)
->>  			goto out_domain;
->> +	} else {
->> +		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_S2,
->> +					    &attr);
->> +		if (ret)
->> +			goto out_domain;
->>  	}
-> 
-> This attribute is not relevant to the majority of current users, why
-> would we assume that we need to call it for all non-nesting cases?  Why
-> do we need to set the attribute at all, what benefit does it provide?
-> If this is the normal case for an IOMMU API domain, why is there an
-> option for it at all?  Maybe this should be the default and S1
-> (whatever that means) should be the alternate option.  Thanks,
+On Sat, Oct 8, 2016 at 3:55 AM, Peter Griffin <peter.griffin@linaro.org> wrote:
+> Use tabs instead of spaces.
+>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Indeed, it should be fairly straightforward to make
-arm_smmu_domain_finalise() prefer stage 1/stage 2 based on domain->type
-in the case that both stages are implemented. That would be preferable
-to changing core VFIO code for something that really is SMMU-specific.
+Applied to drm-misc, thanks
 
-To echo Alex, though, what's the motivation for this? Could it be
-addressed by simply implementing a force_stage parameter like the SMMUv2
-driver has?
-
-Robin.
-
-> 
-> Alex
-> 
->>  
->>  	ret = iommu_attach_group(domain->domain, iommu_group);
-> 
+> ---
+>  drivers/gpu/drm/virtio/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/virtio/Kconfig b/drivers/gpu/drm/virtio/Kconfig
+> index e1afc3d..81d1807 100644
+> --- a/drivers/gpu/drm/virtio/Kconfig
+> +++ b/drivers/gpu/drm/virtio/Kconfig
+> @@ -1,10 +1,10 @@
+>  config DRM_VIRTIO_GPU
+>         tristate "Virtio GPU driver"
+>         depends on DRM && VIRTIO
+> -        select DRM_KMS_HELPER
+> -        select DRM_TTM
+> +       select DRM_KMS_HELPER
+> +       select DRM_TTM
+>         help
+>            This is the virtual GPU driver for virtio.  It can be used with
+> -           QEMU based VMMs (like KVM or Xen).
+> +          QEMU based VMMs (like KVM or Xen).
+>
+>            If unsure say M.
+> --
+> 1.9.1
+>
