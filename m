@@ -1,166 +1,171 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 21 Oct 2016 16:43:59 +0200
-Subject: [PATCH] net: stmmac: Add OXNAS Glue Driver
-In-Reply-To: <474261f0-1cb7-5932-4c9f-0cbcc705fa61@st.com>
-References: <20161021084445.24989-1-narmstrong@baylibre.com>
- <CAGhQ9Vxe8fe8kfF_WY40xdh6YX9TuxQ3-Dd6pBG=AHpLtrHnMA@mail.gmail.com>
- <474261f0-1cb7-5932-4c9f-0cbcc705fa61@st.com>
-Message-ID: <a225a5a1-df9d-3929-a445-59a56b53d384@baylibre.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 21 Oct 2016 09:45:35 -0500
+Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+In-Reply-To: <20161021015814.GC31044@localhost>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
+ <20161021015814.GC31044@localhost>
+Message-ID: <20161021144535.GB877@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 01:53 PM, Giuseppe CAVALLARO wrote:
-> Hello
+On Thu, Oct 20, 2016 at 08:58:14PM -0500, Bjorn Helgaas wrote:
+> On Wed, Oct 19, 2016 at 06:21:03PM -0400, Sinan Kaya wrote:
+> > The SCI penalize function was removed in two steps (first refactor
+> > and then remove) and these changes are reverted here in one go.
+> > 
+> > The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
+> > refactored the original code so that SCI penalty is calculated dynamically
+> > by the time get_penalty function is called. That change is partially
+> > reverted here, specifically for the SCI IRQ alone.
+> > 
+> > The SCI penalize function was finally dropped by commit 9e5ed6d1fb87
+> > ("ACPI,PCI,IRQ: remove SCI penalize function") that replaced the old SCI
+> > penalty API with penalty calculation carried out dynamically and based
+> > on the acpi_gbl_FADT.sci_interrupt value.
+> > 
+> > However, that new algorithm relies on the accurate setting of IRQ
+> > types and that doesn't happen early enough on some platforms which
+> > leads to incorrect penalty assignments for PCI IRQs.  In those cases,
+> > irq_get_trigger_type() returns incorrect values for the IRQs in
+> > question, because they have not been registered yet by the time the
+> > penalties are calculated.
+> > 
+> > To fix this problem, we only need to fix the penalty for the SCI interrupt.
+> > It seems better to add a single "sci_penalty" variable, set it to
+> > PIRQ_PENALTY_PCI_USING if it's level/low or PIRQ_PENALTY_ISA_ALWAYS
+> > otherwise, and add "sci_penalty" in when appropriate.  That should fix it
+> > for *any* SCI IRQ, not just those less than 256, and we don't have to add
+> > these extra penalty table entries that are all unused (except possibly for
+> > one entry if we have an SCI in the 16-255 range).
+> > 
+> > For this reason, revert commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI
+> > penalize function") completely to restore the correct behavior.
 > 
-> some my minor cents below
+> I like this patch fine, except for the changelog.  I don't think it's
+> useful to describe this as a revert and give all the historical
+> details.  I think the important part is something like this:
 > 
-> On 10/21/2016 12:20 PM, Joachim Eastwood wrote:
->> Hi Neil,
->>
->> On 21 October 2016 at 10:44, Neil Armstrong <narmstrong@baylibre.com> wrote:
->>> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 +++++
->>>  drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
->>>  drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
->>>  drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 219 +++++++++++++++++++++
->>>  4 files changed, 275 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
->>>  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
->>>
->>> Changes since RFC at https://patchwork.kernel.org/patch/9387257 :
->>>  - Drop init/exit callbacks
->>>  - Implement proper remove and PM callback
->>>  - Call init from probe
->>>  - Disable/Unprepare clock if stmmac probe fails
->>
->> <snip>
->>
->>> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
->>> @@ -0,0 +1,219 @@
->>> +/*
->>> + * Oxford Semiconductor OXNAS DWMAC glue layer
->>> + *
->>> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
->>> + * Copyright (C) 2014 Daniel Golle <daniel@makrotopia.org>
->>> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
->>> + * Copyright (C) 2012 John Crispin <blogic@openwrt.org>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/device.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/regmap.h>
->>> +#include <linux/mfd/syscon.h>
->>> +#include <linux/stmmac.h>
->>> +
->>> +#include "stmmac_platform.h"
->>> +
->>> +/* System Control regmap offsets */
->>> +#define OXNAS_DWMAC_CTRL_REGOFFSET     0x78
->>> +#define OXNAS_DWMAC_DELAY_REGOFFSET    0x100
->>> +
->>> +/* Control Register */
->>> +#define DWMAC_CKEN_RX_IN        14
->>> +#define DWMAC_CKEN_RXN_OUT      13
->>> +#define DWMAC_CKEN_RX_OUT       12
->>> +#define DWMAC_CKEN_TX_IN        10
->>> +#define DWMAC_CKEN_TXN_OUT      9
->>> +#define DWMAC_CKEN_TX_OUT       8
->>> +#define DWMAC_RX_SOURCE         7
->>> +#define DWMAC_TX_SOURCE         6
->>> +#define DWMAC_LOW_TX_SOURCE     4
->>> +#define DWMAC_AUTO_TX_SOURCE    3
->>> +#define DWMAC_RGMII             2
->>> +#define DWMAC_SIMPLE_MUX        1
->>> +#define DWMAC_CKEN_GTX          0
->>> +
->>> +/* Delay register */
->>> +#define DWMAC_TX_VARDELAY_SHIFT                0
->>> +#define DWMAC_TXN_VARDELAY_SHIFT       8
->>> +#define DWMAC_RX_VARDELAY_SHIFT                16
->>> +#define DWMAC_RXN_VARDELAY_SHIFT       24
->>> +#define DWMAC_TX_VARDELAY(d)           ((d) << DWMAC_TX_VARDELAY_SHIFT)
->>> +#define DWMAC_TXN_VARDELAY(d)          ((d) << DWMAC_TXN_VARDELAY_SHIFT)
->>> +#define DWMAC_RX_VARDELAY(d)           ((d) << DWMAC_RX_VARDELAY_SHIFT)
->>> +#define DWMAC_RXN_VARDELAY(d)          ((d) << DWMAC_RXN_VARDELAY_SHIFT)
->>> +
->>> +struct oxnas_dwmac {
->>> +       struct device   *dev;
->>> +       struct clk      *clk;
->>> +       struct regmap   *regmap;
->>> +};
->>> +
->>> +static int oxnas_dwmac_init(struct oxnas_dwmac *dwmac)
->>> +{
->>> +       unsigned int value;
->>> +       int ret;
->>> +
->>> +       /* Reset HW here before changing the glue configuration */
->>> +       ret = device_reset(dwmac->dev);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       clk_prepare_enable(dwmac->clk);
->>
->> You might want to check the return value from clk_prepare_enable() as well.
->>
->>> +
->>> +       ret = regmap_read(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, &value);
->>> +       if (ret < 0)
->>> +               return ret;
->>> +
->>> +       /* Enable GMII_GTXCLK to follow GMII_REFCLK, required for gigabit PHY */
->>> +       value |= BIT(DWMAC_CKEN_GTX);
->>> +       /* Use simple mux for 25/125 Mhz clock switching */
->>> +       value |= BIT(DWMAC_SIMPLE_MUX);
->>> +       /* set auto switch tx clock source */
->>> +       value |= BIT(DWMAC_AUTO_TX_SOURCE);
->>> +       /* enable tx & rx vardelay */
->>> +       value |= BIT(DWMAC_CKEN_TX_OUT);
->>> +       value |= BIT(DWMAC_CKEN_TXN_OUT);
->>> +       value |= BIT(DWMAC_CKEN_TX_IN);
->>> +       value |= BIT(DWMAC_CKEN_RX_OUT);
->>> +       value |= BIT(DWMAC_CKEN_RXN_OUT);
->>> +       value |= BIT(DWMAC_CKEN_RX_IN);
->>> +       regmap_write(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, value);
->>> +
->>> +       /* set tx & rx vardelay */
->>> +       value = DWMAC_TX_VARDELAY(4);
->>> +       value |= DWMAC_TXN_VARDELAY(2);
->>> +       value |= DWMAC_RX_VARDELAY(10);
->>> +       value |= DWMAC_RXN_VARDELAY(8);
->>> +       regmap_write(dwmac->regmap, OXNAS_DWMAC_DELAY_REGOFFSET, value);
-> 
-> 
-> there is no if condition so, I can suggest you, to hardwire
-> value with macros instead of computing at runtime:
-> 
-> e.g.
-> 
-> var = DWMAC_VARDELAY where
->  #define DWMAC_VARDELAY (DWMAC_TX_VARDELAY(4) | ...)
-> 
-> ... same for OXNAS_DWMAC_CTRL_REGOFFSET where
-> BIT(DWMAC_CKEN_ ... ) should be re-organized as macros,
-> I mean:
-> #define DWMAC_CKEN_..     BIT(xxx)
+>   We previously used irq_get_trigger_type(irq) to help compute the
+>   penalty for the SCI, but that depends on the SCI having been
+>   registered already.  Add acpi_penalize_sci_irq() so platforms can
+>   tell us the SCI IRQ, trigger, and polarity so we can compute the
+>   penalty even before the SCI has been registered.
 
-I will think about something similar for v2,
+Thanks for the pointer [1] to the issues around
+acpi_penalize_sci_irq() being called before kmalloc() is available.
+That begs the question of exactly *why* we need
+acpi_penalize_sci_irq() so early -- I doubt we actually need to handle
+SCIs that early, and obviously we don't need to look up penalties that
+early (because we only look them up when enabling interrupt links,
+which happens much later).
 
-Thanks,
+[1] http://marc.info/?l=linux-acpi&m=145580159209240&w=2)
 
-Neil
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-[...]
+Wait a minute, I still have a question here: what about other ACPI
+arches (ia64, arm64)?  Don't they need to call acpi_penalize_sci_irq()
+somewhere?
+
+> > ---
+> >  arch/x86/kernel/acpi/boot.c |  1 +
+> >  drivers/acpi/pci_link.c     | 30 +++++++++++++++---------------
+> >  include/linux/acpi.h        |  1 +
+> >  3 files changed, 17 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
+> > index 90d84c3..0ffd26e 100644
+> > --- a/arch/x86/kernel/acpi/boot.c
+> > +++ b/arch/x86/kernel/acpi/boot.c
+> > @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
+> >  		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
+> >  
+> >  	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
+> > +	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
+> >  
+> >  	/*
+> >  	 * stash over-ride to indicate we've been here
+> > diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> > index 4f37938..294b190 100644
+> > --- a/drivers/acpi/pci_link.c
+> > +++ b/drivers/acpi/pci_link.c
+> > @@ -87,6 +87,7 @@ struct acpi_pci_link {
+> >  
+> >  static LIST_HEAD(acpi_link_list);
+> >  static DEFINE_MUTEX(acpi_link_lock);
+> > +static int sci_irq = -1, sci_penalty;
+> >  
+> >  /* --------------------------------------------------------------------------
+> >                              PCI Link Device Management
+> > @@ -496,25 +497,13 @@ static int acpi_irq_get_penalty(int irq)
+> >  {
+> >  	int penalty = 0;
+> >  
+> > -	/*
+> > -	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
+> > -	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
+> > -	* use for PCI IRQs.
+> > -	*/
+> > -	if (irq == acpi_gbl_FADT.sci_interrupt) {
+> > -		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
+> > -
+> > -		if (type != IRQ_TYPE_LEVEL_LOW)
+> > -			penalty += PIRQ_PENALTY_ISA_ALWAYS;
+> > -		else
+> > -			penalty += PIRQ_PENALTY_PCI_USING;
+> > -	}
+> > +	if (irq == sci_irq)
+> > +		penalty += sci_penalty;
+> >  
+> >  	if (irq < ACPI_MAX_ISA_IRQS)
+> >  		return penalty + acpi_isa_irq_penalty[irq];
+> >  
+> > -	penalty += acpi_irq_pci_sharing_penalty(irq);
+> > -	return penalty;
+> > +	return penalty + acpi_irq_pci_sharing_penalty(irq);
+> >  }
+> >  
+> >  int __init acpi_irq_penalty_init(void)
+> > @@ -881,6 +870,17 @@ bool acpi_isa_irq_available(int irq)
+> >  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
+> >  }
+> >  
+> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
+> > +{
+> > +	sci_irq = irq;
+> > +
+> > +	if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
+> > +	    polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
+> > +		sci_penalty = PIRQ_PENALTY_PCI_USING;
+> > +	else
+> > +		sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
+> > +}
+> > +
+> >  /*
+> >   * Over-ride default table to reserve additional IRQs for use by ISA
+> >   * e.g. acpi_irq_isa=5
+> > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> > index c5eaf2f..67d1d3e 100644
+> > --- a/include/linux/acpi.h
+> > +++ b/include/linux/acpi.h
+> > @@ -318,6 +318,7 @@ struct pci_dev;
+> >  int acpi_pci_irq_enable (struct pci_dev *dev);
+> >  void acpi_penalize_isa_irq(int irq, int active);
+> >  bool acpi_isa_irq_available(int irq);
+> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
+> >  void acpi_pci_irq_disable (struct pci_dev *dev);
+> >  
+> >  extern int ec_read(u8 addr, u8 *val);
+> > -- 
+> > 1.9.1
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
