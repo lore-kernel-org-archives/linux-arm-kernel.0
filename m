@@ -1,60 +1,49 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 21 Oct 2016 20:39:41 +0200
-Subject: Disabling an interrupt in the handler locks the system up
-In-Reply-To: <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com>
-References: <580A4460.2090306@free.fr>
- <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com>
-Message-ID: <580A60ED.3030307@free.fr>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Oct 2016 21:27:10 +0300
+Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
+ platform data
+In-Reply-To: <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
+ <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20161021182710.GA17279@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2016 19:46, Marc Zyngier wrote:
-
-> On 21/10/16 17:37, Mason wrote:
+On Thu, Oct 20, 2016 at 07:42:44PM -0200, Sergio Prado wrote:
+> Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
+> field in the drivers's platform data structure so it can be selectable
+> via platform data.
+> 
+> Also setting this field to NAND_ECC_SOFT in all boards using this
+> driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
+>  arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
+>  arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
+>  arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
+>  arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
+>  arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
+>  arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
+>  arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
+>  arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
+>  arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
+>  drivers/mtd/nand/Kconfig                       |   9 --
+>  drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
+>  include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
+>  18 files changed, 79 insertions(+), 70 deletions(-)
 >
->> On my platform, one HW block pulls the interrupt line high
->> as long as it remains idle, and low when it is busy.
->>
->> The device tree node is:
->>
->> 		test at 22222 {
->> 			compatible = "vendor,testme";
->> 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
->> 		};
-> 
-> I assume that this is for the sake of the discussion, and that you do
-> not actually intend to put together such a monstrosity.
 
-It's just missing a reg properties to be a valid node, right?
+I acked this twice (v1 and v2)... and still you are ignoring them. I am
+sorry, I am not gonna to ack this third time!
 
->> I wrote a minimal driver which registers the irq.
->> And in the interrupt handler, I disable said irq.
->>
->> Since the irq is IRQ_TYPE_LEVEL_HIGH, it will fire as soon as
->> it is registered (because the block is idle).
->>
->> Here is the code I've been running, request_irq doesn't return.
-> 
-> [...]
-> 
->> And here's what I get when I try to load the module:
->> (I'm using the default CONFIG_RCU_CPU_STALL_TIMEOUT=21)
-> 
-> [...]
-> 
->> Are we not supposed to disable the irq in the handler?
-> 
-> You can. It then depends on what your interrupt controller does to
-> actually ensure that the interrupt is disabled. Only you can trace it on
-> your HW to find out.
+For v2 I acked also other patches but it it is not there as well...
 
-I'm using an upstream driver on v4.9-rc1
-
-http://lxr.free-electrons.com/source/drivers/irqchip/irq-tango.c
-
-Given that the system locks up, is it possible there is a bug
-in the driver?
-
-Which call-back handles enabling/disabling interrupts?
-
-Regards.
+BR,
+Krzysztof
