@@ -1,22 +1,20 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 21 Oct 2016 19:55:06 +0200
-Subject: [PATCH 1/8] mtd: nand: sunxi: fix support for 512bytes ECC chunks
-In-Reply-To: <f1cb6efb6817c11b235f073639a137bec6ac17e5.1476951078.git-series.maxime.ripard@free-electrons.com>
+Date: Fri, 21 Oct 2016 19:55:18 +0200
+Subject: [PATCH 2/8] mtd: nand: add support for the TC58NVG2S0H chip
+In-Reply-To: <62d5d978da8c6bc6b47c340c86e9a5fe5f6971ef.1476951078.git-series.maxime.ripard@free-electrons.com>
 References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
- <f1cb6efb6817c11b235f073639a137bec6ac17e5.1476951078.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20161021195506.10d32e81@bbrezillon>
+ <62d5d978da8c6bc6b47c340c86e9a5fe5f6971ef.1476951078.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20161021195518.020a3c19@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 20 Oct 2016 10:12:42 +0200
+On Thu, 20 Oct 2016 10:12:43 +0200
 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
 > From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> The driver is incorrectly assuming that the ECC block size is always 1k
-> which is not always true.
-> 
-> Also take the other cases into account.
+> Add the description of the Toshiba TC58NVG2S0H SLC nand to the nand_ids
+> table so we can use the NAND ECC infos and the ONFI timings.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -24,28 +22,20 @@ Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 Applied.
 
 > ---
->  drivers/mtd/nand/sunxi_nand.c | 4 ++++
->  1 file changed, 4 insertions(+), 0 deletions(-)
+>  drivers/mtd/nand/nand_ids.c | 3 +++
+>  1 file changed, 3 insertions(+), 0 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-> index 8b8470c4e6d0..e40482a65de6 100644
-> --- a/drivers/mtd/nand/sunxi_nand.c
-> +++ b/drivers/mtd/nand/sunxi_nand.c
-> @@ -145,6 +145,7 @@
->  #define NFC_ECC_PIPELINE	BIT(3)
->  #define NFC_ECC_EXCEPTION	BIT(4)
->  #define NFC_ECC_BLOCK_SIZE_MSK	BIT(5)
-> +#define NFC_ECC_BLOCK_512	BIT(5)
->  #define NFC_RANDOM_EN		BIT(9)
->  #define NFC_RANDOM_DIRECTION	BIT(10)
->  #define NFC_ECC_MODE_MSK	GENMASK(15, 12)
-> @@ -817,6 +818,9 @@ static void sunxi_nfc_hw_ecc_enable(struct mtd_info *mtd)
->  	ecc_ctl |= NFC_ECC_EN | NFC_ECC_MODE(data->mode) | NFC_ECC_EXCEPTION |
->  		   NFC_ECC_PIPELINE;
->  
-> +	if (nand->ecc.size == 512)
-> +		ecc_ctl |= NFC_ECC_BLOCK_512;
-> +
->  	writel(ecc_ctl, nfc->regs + NFC_REG_ECC_CTL);
->  }
->  
+> diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
+> index 2af9869a115e..b3a332f37e14 100644
+> --- a/drivers/mtd/nand/nand_ids.c
+> +++ b/drivers/mtd/nand/nand_ids.c
+> @@ -36,6 +36,9 @@ struct nand_flash_dev nand_flash_ids[] = {
+>  	{"TC58NVG2S0F 4G 3.3V 8-bit",
+>  		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x15, 0x01, 0x08} },
+>  		  SZ_4K, SZ_512, SZ_256K, 0, 8, 224, NAND_ECC_INFO(4, SZ_512) },
+> +	{"TC58NVG2S0H 4G 3.3V 8-bit",
+> +		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x16, 0x08, 0x00} },
+> +		  SZ_4K, SZ_512, SZ_256K, 0, 8, 256, NAND_ECC_INFO(8, SZ_512) },
+>  	{"TC58NVG3S0F 8G 3.3V 8-bit",
+>  		{ .id = {0x98, 0xd3, 0x90, 0x26, 0x76, 0x15, 0x02, 0x08} },
+>  		  SZ_4K, SZ_1K, SZ_256K, 0, 8, 232, NAND_ECC_INFO(4, SZ_512) },
