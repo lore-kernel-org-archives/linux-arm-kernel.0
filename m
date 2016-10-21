@@ -1,91 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Oct 2016 23:47:48 +0300
-Subject: [PATCH v4 6/7] ARM: dts: sk-rzg1m: initial device tree
-In-Reply-To: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
-References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
-Message-ID: <6067818.PNWHquUYTU@wasted.cogentembedded.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Fri, 21 Oct 2016 15:47:58 -0500
+Subject: [PATCH 5/7] ARM: dts: am335x: Add the charger interrupt
+In-Reply-To: <20161021140106.21531-6-woogyom.kim@gmail.com>
+References: <20161021140106.21531-1-woogyom.kim@gmail.com>
+ <20161021140106.21531-6-woogyom.kim@gmail.com>
+Message-ID: <CAOCHtYgBTq0a1FAMQJb5VoLPWBHYkF3rH_Km6U9u6ep=8ApZuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
-The board has one debug serial port (SCIF0); include support for it, so
-that  the serial  console  can work.
+On Fri, Oct 21, 2016 at 9:01 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
+> This enables the charger driver gets corresponding IRQ number by using
+> platform_get_irq_byname() helper.
+>
+> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone-common.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index 25303d9..cec9d91 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -6,6 +6,8 @@
+>   * published by the Free Software Foundation.
+>   */
+>
+> +#include <dt-bindings/mfd/tps65217.h>
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+^ this hasn't been posted nor pushed to mainline yet.. ;)
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> +
+>  / {
+>         cpus {
+>                 cpu at 0 {
+> @@ -316,6 +318,12 @@
+>
+>         ti,pmic-shutdown-controller;
+>
+> +       charger {
+> +               interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
+> +               interrupts-names = "AC", "USB";
+> +               status = "okay";
+> +       };
+> +
+>         regulators {
+>                 dcdc1_reg: regulator at 0 {
+>                         regulator-name = "vdds_dpr";
+> --
+> 2.9.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
----
-Changes in version 4:
-- refreshed the patch.
 
-Changes in version 3:
-- added Geert's tag.
 
- arch/arm/boot/dts/Makefile             |    1 
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   44 +++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -677,6 +677,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r7s72100-rskrza1.dtb \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
-+	r8a7743-sk-rzg1m.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for the SK-RZG1M board
-+ *
-+ * Copyright (C) 2016 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2. This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7743.dtsi"
-+
-+/ {
-+	model = "SK-RZG1M";
-+	compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
-+
-+	aliases {
-+		serial0 = &scif0;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+
-+	memory at 200000000 {
-+		device_type = "memory";
-+		reg = <2 0x00000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif0 {
-+	status = "okay";
-+};
+-- 
+Robert Nelson
+https://rcn-ee.com/
