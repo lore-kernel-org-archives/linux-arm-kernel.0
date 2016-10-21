@@ -1,119 +1,35 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 21 Oct 2016 12:17:17 +0200
-Subject: [PATCH v2 1/9] irqchip: meson: add support for gpio interrupt
- controller
-In-Reply-To: <20161021101029.GD15372@leverpostej>
-References: <1476890480-8884-1-git-send-email-jbrunet@baylibre.com>
- <1476890480-8884-2-git-send-email-jbrunet@baylibre.com>
- <ec297647-1ab7-7e6b-5945-be8360f92421@arm.com>
- <1477039751.15560.88.camel@baylibre.com>
- <20161021101029.GD15372@leverpostej>
-Message-ID: <1477045037.15560.99.camel@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 21 Oct 2016 11:18:55 +0100
+Subject: [PATCH] arm64: mm: fix __page_to_voff definition
+In-Reply-To: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
+References: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
+Message-ID: <CAKv+Gu9gQnaxhPx16v6WiS6Qdcdu8VJraKskMxhF97A4uGhSrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-10-21 at 11:10 +0100, Mark Rutland wrote:
-> On Fri, Oct 21, 2016 at 10:49:11AM +0200, Jerome Brunet wrote:
-> > 
-> > On Thu, 2016-10-20 at 17:33 +0100, Marc Zyngier wrote:
-> > > 
-> > > On 19/10/16 16:21, Jerome Brunet wrote:
-> > > > 
-> > > > +struct meson_gpio_irq_chip_data {
-> > > > +	void __iomem *base;
-> > > > +	int index;
-> > > > +};
-> > > > +
-> > > > +static irq_hw_number_t meson_parent_hwirqs[] = {
-> > > > +	64, 65, 66, 67, 68, 69, 70, 71,
-> > > > +};
-> > > 
-> > > If that a guarantee that these numbers will always represent the
-> > > parent interrupt?
-> > 
-> > At the moment, the 3 supported SoC use these parent interrupts, but
-> > we
-> > have absolutely no idea (or guarantee) that is will remain the
-> > same, or
-> > even contiguous, in the upcoming SoC (like the GXM or GXL)
-> > 
-> > I reckon, it is likely that manufacturer will keep on using these
-> > parent irqs for a while but I would prefer not make an assumption
-> > about
-> > it in the driver.
-> > 
-> > If a SoC get a different set of interrupts I would have added a new
-> > table like this and passed it to the appropriate params :
-> > 
-> > static irq_hw_number_t meson_new_parent_hwirqs[] = {
-> > 	143, 144, 150, 151, 152, 173, 178, 179,
-> > };
-> > 
-> > > 
-> > > It feels a bit odd not to get that information directly from
-> > > the device tree, in the form of a device specific property.
-> > > Something
-> > > like:
-> > > 
-> > > 	upstream-interrupts = <64 65 66 ... >;
-> > > 
-> > 
-> > I wondered about putting this information in DT or in the driver
-> > for a
-> > while. Maybe DT would be a more suitable place holder for these
-> > data
-> > (parent irq and number of provided hwirq) but I was under the
-> > understanding that we should now put these information in the
-> > driver
-> > and use the compatible property to get the appropriate parameters.
-> > 
-> > I'd love to get the view of the DT guys on this.
-> 
-> Please describe inter-device relationships in DT when you are aware
-> of
-> them. The SoC-specific compatible string is more of a future-proofing
-> thing / last restort for things we realise too late.
-> 
-> To be clear, we should *also* have an soc-specific compatible string,
-> but for differences we already know about, we should use DT
-> properties.
-> 
-> > 
-> > > 
-> > > > 
-> > > > +static const struct meson_gpio_irq_params meson8b_params = {
-> > > > +	.nhwirq??= 119,
-> > > > +	.source??= meson_parent_hwirqs,
-> > > > +	.nsource = ARRAY_SIZE(meson_parent_hwirqs),
-> > > > +};
-> > > > +
-> > > > +static const struct meson_gpio_irq_params meson_gxbb_params =
-> > > > {
-> > > > +	.nhwirq??= 133,
-> > > > +	.source??= meson_parent_hwirqs,
-> > > > +	.nsource = ARRAY_SIZE(meson_parent_hwirqs),
-> > > > +};
-> > > 
-> > > Same thing. How big is the variability of these structures? Are
-> > > we
-> > > going to see more of those? or is that now set into stone?
-> > 
-> > The number of pad mapped to the controller seems to change with
-> > every
-> > SoC version. The parent irqs have not changed so far, but as
-> > explained
-> > above, there is no guarantee it will keep on being this way.
-> > 
-> > So i'd say probably more of those ...
-> > 
-> > > 
-> > > +Mark: what's the policy to describe this kind of things?
-> 
-> Generally, I'd prefer that we describe this in DT rather than
-> accumulating a set of string -> number mappings in the driver.
+On 21 October 2016 at 09:58, Neeraj Upadhyay <neeraju@codeaurora.org> wrote:
+> Fix parameter name for __page_to_voff, to match its definition.
+> At present, we don't see any issue, as page_to_virt's caller
+> declares 'page'.
+>
+> Fixes: 9f2875912dac ("arm64: mm: restrict virt_to_page() to the linear mapping")
+> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/memory.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index ba62df8..b71086d 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -217,7 +217,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define _virt_addr_valid(kaddr)        pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>  #else
+>  #define __virt_to_pgoff(kaddr) (((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+> -#define __page_to_voff(kaddr)  (((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+> +#define __page_to_voff(page)   (((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+>
+>  #define page_to_virt(page)     ((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+>  #define virt_to_page(vaddr)    ((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
 
-Thx Marc. I will change it.
-
-> 
-> Thanks,
-> Mark.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
