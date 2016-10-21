@@ -1,105 +1,26 @@
-From: jteki@openedev.com (Jagan Teki)
-Date: Fri, 21 Oct 2016 13:35:53 +0530
-Subject: [PATCH v8 3/3] ARM: dts: imx6qdl-icore: Add FEC support
-In-Reply-To: <1477037153-20484-1-git-send-email-jteki@openedev.com>
-References: <1477037153-20484-1-git-send-email-jteki@openedev.com>
-Message-ID: <1477037153-20484-4-git-send-email-jteki@openedev.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 21 Oct 2016 10:07:41 +0200 (CEST)
+Subject: [PATCH] kernel: irq: fix build failure
+In-Reply-To: <20161021120020.52b3fa35@canb.auug.org.au>
+References: <1475775403-27207-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <57FBBA0B.9070500@gmail.com> <alpine.DEB.2.20.1610201454410.5073@nanos>
+ <20161021120020.52b3fa35@canb.auug.org.au>
+Message-ID: <alpine.DEB.2.20.1610211006370.4797@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jagan Teki <jagan@amarulasolutions.com>
+On Fri, 21 Oct 2016, Stephen Rothwell wrote:
+> On Thu, 20 Oct 2016 14:55:45 +0200 (CEST) Thomas Gleixner <tglx@linutronix.de> wrote:
+> > I know. This is under discussion with the driver folks as we are not going
+> > to blindly export stuff just because someone slapped a irq_set_parent()
+> > into the code w/o knowing why.
+> 
+> Do we have any idea if a resolution is close.  This was first reported
+> in linux-next in September 14/15.  :-(
 
-Add FEC support for Engicam i.CoreM6 dql modules.
+Grr. Yes. As much as I hate it, I'll go and export it for now. Should be
+able to get it into rc2.
 
-Observed similar 'eth0: link is not ready' issue which was
-discussed in [1] due rmii mode with external ref_clk, so added
-clock node along with the properties mentioned by Shawn in [2]
+Thanks,
 
-FEC link log:
-------------
-$ ifconfig eth0 up
-[   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
-               [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-[   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-
-[1] https://patchwork.kernel.org/patch/3491061/
-[2] https://patchwork.kernel.org/patch/3490511/
-
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v8:
-        - s/117/IMX6QDL_CLK_ENET in &fec/clocks
-	- Add rmii_clk fixed-clock node instead of adding container node like clock
-Changes for v7:
-        - none
-Changes for v6:
-        - none
-Changes for v5:
-        - new patch
-
- arch/arm/boot/dts/imx6qdl-icore.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-index 0a1b60a..023839a 100644
---- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-@@ -74,6 +74,12 @@
- 		regulator-boot-on;
- 		regulator-always-on;
- 	};
-+
-+	rmii_clk: clock-rmii-clk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <25000000>;  /* 25MHz for example */
-+	};
- };
- 
- &can1 {
-@@ -93,6 +99,15 @@
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
- };
- 
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+	clocks = <&clks IMX6QDL_CLK_ENET>, <&clks IMX6QDL_CLK_ENET>, <&rmii_clk>;
-+	phy-mode = "rmii";
-+	status = "okay";
-+};
-+
- &gpmi {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_gpmi_nand>;
-@@ -150,6 +165,22 @@
- };
- 
- &iomuxc {
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_flexcan1: flexcan1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
--- 
-2.7.4
+	tglx
