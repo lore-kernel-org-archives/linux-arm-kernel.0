@@ -1,34 +1,35 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 21 Oct 2016 23:01:02 +0900
-Subject: [PATCH 3/7] ARM: dts: tps65217: Add the power button device
+Date: Fri, 21 Oct 2016 23:01:03 +0900
+Subject: [PATCH 4/7] ARM: dts: am335x: Support the PMIC interrupt
 In-Reply-To: <20161021140106.21531-1-woogyom.kim@gmail.com>
 References: <20161021140106.21531-1-woogyom.kim@gmail.com>
-Message-ID: <20161021140106.21531-4-woogyom.kim@gmail.com>
+Message-ID: <20161021140106.21531-5-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the power button driver and disable it by default.
+AM335x bone based boards have the PMIC interrupt named NMI which is
+connected to TPS65217 device. AM335x main interrupt controller provides it
+and the number is 7.
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- arch/arm/boot/dts/tps65217.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
-index 8f77d0d..02de56b 100644
---- a/arch/arm/boot/dts/tps65217.dtsi
-+++ b/arch/arm/boot/dts/tps65217.dtsi
-@@ -21,6 +21,11 @@
- 		status = "disabled";
- 	};
- 
-+	pwrbutton {
-+		compatible = "ti,tps65217-pwrbutton";
-+		status = "disabled";
-+	};
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 007b5e5..25303d9 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -310,6 +310,10 @@
+ 	 * by the hardware problems. (Tip: double-check by performing a current
+ 	 * measurement after shutdown: it should be less than 1 mA.)
+ 	 */
 +
++	interrupts = <7>; /* NMI */
++	interrupt-parent = <&intc>;
++
+ 	ti,pmic-shutdown-controller;
+ 
  	regulators {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
 -- 
 2.9.3
