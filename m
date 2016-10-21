@@ -1,60 +1,39 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Fri, 21 Oct 2016 20:51:51 +0200
-Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
- platform data
-In-Reply-To: <20161021182710.GA17279@kozik-lap>
-References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
- <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
- <20161021182710.GA17279@kozik-lap>
-Message-ID: <5a626833-d4bf-a991-65ea-2849f2250dce@gmail.com>
+From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
+Date: Fri, 21 Oct 2016 14:45:33 -0400
+Subject: [PATCH 0/5] Support for LEGO MINDSTORTMS EV3
+In-Reply-To: <1477075018-20176-1-git-send-email-david@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+Message-ID: <20161021184533.GA20430@csclub.uwaterloo.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 08:27 PM, Krzysztof Kozlowski wrote:
-> On Thu, Oct 20, 2016 at 07:42:44PM -0200, Sergio Prado wrote:
->> Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
->> field in the drivers's platform data structure so it can be selectable
->> via platform data.
->>
->> Also setting this field to NAND_ECC_SOFT in all boards using this
->> driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
->>
->> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
->> ---
->>  arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
->>  arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
->>  arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
->>  arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
->>  arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
->>  arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
->>  arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
->>  arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
->>  arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
->>  arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
->>  drivers/mtd/nand/Kconfig                       |   9 --
->>  drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
->>  include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
->>  18 files changed, 79 insertions(+), 70 deletions(-)
->>
+On Fri, Oct 21, 2016 at 01:36:52PM -0500, David Lechner wrote:
+> This patch series adds support for LEGO MINDSTORTMS EV3[1]. This is a TI AM1808
+> based board.
 > 
-> I acked this twice (v1 and v2)... and still you are ignoring them. I am
-> sorry, I am not gonna to ack this third time!
-
-Hi, um, I am kinda new to this mess, what's going on ? You ACKed
-previous patches, next revision was submitted, so you need to ACK
-the next revision too (due to the changes).
-
-> For v2 I acked also other patches but it it is not there as well...
+> This patch series has been tested working (along with some hacks to fix the
+> GPIOs) on an EV3.
 > 
-> BR,
-> Krzysztof
+> There are still quite a few additional new drivers that need to be submitted
+> to get everything working. This patch series just adds support for the parts
+> that already have mainline kernel drivers.
+> 
+> I have a plan/driver in progress for many of the components[2], but I could use
+> some advice on a few particulars.
+> 
+> Bluetooth: This needs a driver to sequence a GPIO to take the Bluetooth chip
+> out of shutdown *after* the Bluetooth clock has been configured and started.
+> Is there a generic driver that can do this sort of thing? Or, if not, which
+> subsystem should the new driver go in?
+> 
+> Input and output ports: These ports are capable of hotplugging various devices,
+> such as sensors and motors. I have written a driver for these that can detect
+> most devices. I created a new subsystem for this called `lego-port`. However,
+> I am wondering if the existing phy or extcon subsystems might be a good fit for
+> this sort of thing.
 
+Both this cover and patch 5/5 has MINDSTORTMS instead of MINDSTORMS in
+a few places (including the subject line).
 
 -- 
-Best regards,
-Marek Vasut
+Len Sorensen
