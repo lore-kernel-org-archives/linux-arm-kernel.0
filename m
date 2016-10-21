@@ -1,39 +1,39 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Fri, 21 Oct 2016 17:05:10 -0200
-Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
- platform data
-In-Reply-To: <20161021182710.GA17279@kozik-lap>
-References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
- <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
- <20161021182710.GA17279@kozik-lap>
-Message-ID: <20161021190510.GA10729@sprado-desktop>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 21 Oct 2016 22:11:41 +0300
+Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
+References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
+ <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 09:27:10PM +0300, Krzysztof Kozlowski wrote:
-> 
-> I acked this twice (v1 and v2)... and still you are ignoring them. I am
-> sorry, I am not gonna to ack this third time!
-> 
-> For v2 I acked also other patches but it it is not there as well...
-> 
-> BR,
-> Krzysztof
+On Fri, Oct 21, 2016 at 7:37 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The interrupts can now be delivered as platform MSI interrupts on newer
+> platforms. The code looks for a new OF and ACPI strings in order to enable
+> the functionality.
 
-I'm really sorry Krzysztof. This is my first patch series and I didn't
-know I should add the acked-by tag to the patches (I thought it would be
-done by the maintainer when the patches are accepted/applied).
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> +static void hidma_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
+> +{
+> +       struct device *dev = msi_desc_to_dev(desc);
+> +       struct hidma_dev *dmadev = dev_get_drvdata(dev);
+> +
+> +       if (!desc->platform.msi_index) {
+> +               writel(msg->address_lo, dmadev->dev_evca + 0x118);
+> +               writel(msg->address_hi, dmadev->dev_evca + 0x11C);
+> +               writel(msg->data, dmadev->dev_evca + 0x120);
+> +       }
+> +}
+> +#endif
+> +
+> +static void hidma_free_msis(struct hidma_dev *dmadev)
+> +{
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
 
-I'll make sure to do it right next time.
-
-Thanks for taking your time to reviewing and acking my patches.
-
-Best regards,
-
-Sergio Prado
+Perhaps one #ifdef and two definitions of functions?
 
 -- 
-Sergio Prado
-Embedded Labworks
-Office: +55 11 2628-3461
-Mobile: +55 11 97123-3420
+With Best Regards,
+Andy Shevchenko
