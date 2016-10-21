@@ -1,56 +1,78 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 21 Oct 2016 12:13:48 -0700
-Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
-In-Reply-To: <1477075018-20176-6-git-send-email-david@lechnology.com> (David
- Lechner's message of "Fri, 21 Oct 2016 13:36:57 -0500")
-References: <1477075018-20176-1-git-send-email-david@lechnology.com>
- <1477075018-20176-6-git-send-email-david@lechnology.com>
-Message-ID: <7htwc51pn7.fsf@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 21 Oct 2016 20:14:48 +0100
+Subject: Disabling an interrupt in the handler locks the system up
+In-Reply-To: <580A60ED.3030307@free.fr>
+References: <580A4460.2090306@free.fr>
+ <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com>
+ <580A60ED.3030307@free.fr>
+Message-ID: <20161021201448.3f4a0a7a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Lechner <david@lechnology.com> writes:
+On Fri, 21 Oct 2016 20:39:41 +0200
+Mason <slash.tmp@free.fr> wrote:
 
-> This adds a device tree definition file for LEGO MINDSTORMS EV3.
->
-> What is working:
->
-> * Pin muxing
-> * MicroSD card reader
-> * UART on input port 1
->
-> What is partially working:
->
-> * Buttons - working after GPIO fix
-> * LEDs - working after GPIO fix
-> * Poweroff/reset - working after GPIO fix
-> * Flash memory - driver loads but can't read the block devices - this is
->   probably due to the fact that we are not able to configure the SPI to
->   use DMA via device tree
-> * EEPROM - there seems to be a hardware bug that causes the first byte
->   read to be corrupted - this can be worked around by adding an I2C stop
->   between writing the register and reading the data, but the at24 driver
->   does not have an option to do this
->
-> What is not working/to be added later:
->
-> * Display - waiting for "tiny DRM" to be mainlined
-> * Speaker - needs new PWM sound driver
-> * USB - waiting for OHCI and MUSB device tree support to be mainlined
-> * ADC - needs new iio driver
-> * GPIOs - broken because of recent changes to core gpio driver
-> * Bluetooth - needs new driver for sequencing power/enable/clock
-> * Input and output ports - need some sort of new phy or extcon driver
-> * Battery - needs new power supply driver (depends on ADC iio driver)
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->  arch/arm/boot/dts/Makefile     |   3 +-
->  arch/arm/boot/dts/lego-ev3.dts | 454 +++++++++++++++++++++++++++++++++++++++++
+> On 21/10/2016 19:46, Marc Zyngier wrote:
+> 
+> > On 21/10/16 17:37, Mason wrote:
+> >  
+> >> On my platform, one HW block pulls the interrupt line high
+> >> as long as it remains idle, and low when it is busy.
+> >>
+> >> The device tree node is:
+> >>
+> >> 		test at 22222 {
+> >> 			compatible = "vendor,testme";
+> >> 			interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
+> >> 		};  
+> > 
+> > I assume that this is for the sake of the discussion, and that you do
+> > not actually intend to put together such a monstrosity.  
+> 
+> It's just missing a reg properties to be a valid node, right?
 
-nit: can you name this da850-lego-ev3.dts
+If connecting a device that signals its interrupt as level low to an
+input line configured as level high doesn't strike you as a major
+issue, nothing will. At that point, you can put anything you want in
+your DT.
 
-Though it's not very strictly enforced, we *try* to use the form
-<soc>-<board>.dts.
+> 
+> >> I wrote a minimal driver which registers the irq.
+> >> And in the interrupt handler, I disable said irq.
+> >>
+> >> Since the irq is IRQ_TYPE_LEVEL_HIGH, it will fire as soon as
+> >> it is registered (because the block is idle).
+> >>
+> >> Here is the code I've been running, request_irq doesn't return.  
+> > 
+> > [...]
+> >   
+> >> And here's what I get when I try to load the module:
+> >> (I'm using the default CONFIG_RCU_CPU_STALL_TIMEOUT=21)  
+> > 
+> > [...]
+> >   
+> >> Are we not supposed to disable the irq in the handler?  
+> > 
+> > You can. It then depends on what your interrupt controller does to
+> > actually ensure that the interrupt is disabled. Only you can trace it on
+> > your HW to find out.  
+> 
+> I'm using an upstream driver on v4.9-rc1
+> 
+> http://lxr.free-electrons.com/source/drivers/irqchip/irq-tango.c
+> 
+> Given that the system locks up, is it possible there is a bug
+> in the driver?
 
-Kevin
+That's possible.
+
+> Which call-back handles enabling/disabling interrupts?
+
+How about irq_unmask/irq_mask?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
