@@ -1,37 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Oct 2016 12:21:20 +0100
-Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify
- ACPI support code.
-In-Reply-To: <20161021111352.GA16630@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
- <20161020165747.GD27598@leverpostej>
- <20161021111352.GA16630@leverpostej>
-Message-ID: <20161021112120.GC16630@leverpostej>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 21 Oct 2016 12:22:55 +0100
+Subject: [PATCH v4 0/3] arm64/mm: use the contiguous attribute for kernel
+ mappings
+Message-ID: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 12:14:01PM +0100, Mark Rutland wrote:
-> On Thu, Oct 20, 2016 at 05:58:17PM +0100, Mark Rutland wrote:
-> > On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
-> > > +	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
-> > > +	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
-> > > +	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
-> > > +	/* Always-on capability */
-> > > +	arch_timer_c3stop = acpi_gtdt_c3stop();
-> > 
-> > ... I think we should check the flag on the relevant interrupt, though
-> > that's worth clarifying.
-> 
-> I see I misread the spec; this is part of the common flags.
-> 
-> Please ignore this point; sorry for the noise.
+Back to a 3-piece series.
 
-Actually, I misread the spec this time around; the flag *can* differ per
-interrupt for the sysreg/cp15 timer, but not for the MMIO timers where
-the flag is in a common field.
+Changes in v4:
+- dropped handling of contiguous PUDs and folded PMDs, given that the hardware
+  is likely to ignore the contiguous bit at this level anyway
+- factor out the pte/pmd/pgd attribute BUG check (#1)
 
-So please *do* consider the above.
+Changes in v3 [0]:
+- add support for contiguous PMDs for all granule sizes (not just 16k)
+- add a separate patch to deal with contiguous PUDs (4k granule only), and
+  contiguous PMDs for 2 levels of translation (which requires special handling)
+- avoid pmd_none/pud_none in the BUG() statements in patch #1, since they
+  may resolve in unexpected ways with folded PMDs/PUDs
 
-Thanks,
-Mark.
+Version v2 [1] addressed the following issues:
+- the contiguous attribute is also useful for contigous PMD mappings on 16k
+  granule kernels (i.e., 1 GB blocks)
+- the function parameter 'block_mappings_allowed' does not clearly convey
+  whether contiguous page mappings should be used, so it is renamed to
+  'page_mappings_only', and its meaning inverted
+- instead of BUGging on changes in the PTE_CONT attribute in PMD or PTE entries
+  that have been populated already, BUG on any modification except for
+  permission attributes, which don't require break-before-make when changed.
+
+[0] http://marc.info/?l=linux-arm-kernel&m=147627155206982
+[1] http://marc.info/?l=linux-arm-kernel&m=147618975314593
+
+Ard Biesheuvel (3):
+  arm64: mm: BUG on unsupported manipulations of live kernel mappings
+  arm64: mm: replace 'block_mappings_allowed' with 'page_mappings_only'
+  arm64: mm: set the contiguous bit for kernel mappings where
+    appropriate
+
+ arch/arm64/include/asm/mmu.h |   2 +-
+ arch/arm64/kernel/efi.c      |   8 +-
+ arch/arm64/mm/mmu.c          | 134 +++++++++++++-------
+ 3 files changed, 93 insertions(+), 51 deletions(-)
+
+-- 
+2.7.4
