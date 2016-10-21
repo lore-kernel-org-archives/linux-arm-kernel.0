@@ -1,42 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 21 Oct 2016 15:11:37 +0200
-Subject: [PATCH 1/2] gpio: mxs: use enable/disable regs to (un)mask irqs
-In-Reply-To: <20161021131138.10467-1-s.hauer@pengutronix.de>
-References: <20161021131138.10467-1-s.hauer@pengutronix.de>
-Message-ID: <20161021131138.10467-2-s.hauer@pengutronix.de>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 21 Oct 2016 15:17:24 +0200
+Subject: [PATCH v4 10/23] arm64: renesas: r8a7795 dtsi: Add device node for
+ RST module
+In-Reply-To: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1477055857-17936-11-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs gpio controller does not only have a mask register to mask
-interrupts, but also enable/disable registers. Use the enable/disable
-registers rather than the mask register. This does not have any
-advantage for now, but makes the next patch simpler.
+Add a device node for the RST module, which provides a.o. reset control
+and mode pin monitoring.
 
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 ---
- drivers/gpio/gpio-mxs.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+v4:
+  - Add Acked-by,
 
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index b9daa0b..1cf579f 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -211,12 +211,13 @@ static int __init mxs_gpio_init_gc(struct mxs_gpio_port *port, int irq_base)
+v3:
+  - Use "renesas,<soctype>-rst" instead of "renesas,rst-<soctype>",
+  - Drop "syscon" compatible value,
+
+v2:
+  - New.
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 8c15040f2540d63a..625dda713548da78 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -321,6 +321,11 @@
+ 			#power-domain-cells = <0>;
+ 		};
  
- 	ct = gc->chip_types;
- 	ct->chip.irq_ack = irq_gc_ack_set_bit;
--	ct->chip.irq_mask = irq_gc_mask_clr_bit;
--	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+	ct->chip.irq_mask = irq_gc_mask_disable_reg;
-+	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
- 	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
- 	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq;
- 	ct->regs.ack = PINCTRL_IRQSTAT(port) + MXS_CLR;
--	ct->regs.mask = PINCTRL_IRQEN(port);
-+	ct->regs.enable = PINCTRL_IRQEN(port) + MXS_SET;
-+	ct->regs.disable = PINCTRL_IRQEN(port) + MXS_CLR;
- 
- 	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_NESTED_LOCK,
- 			       IRQ_NOREQUEST, 0);
++		rst: reset-controller at e6160000 {
++			compatible = "renesas,r8a7795-rst";
++			reg = <0 0xe6160000 0 0x0200>;
++		};
++
+ 		sysc: system-controller at e6180000 {
+ 			compatible = "renesas,r8a7795-sysc";
+ 			reg = <0 0xe6180000 0 0x0400>;
 -- 
-2.9.3
+1.9.1
