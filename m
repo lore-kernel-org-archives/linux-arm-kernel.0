@@ -1,74 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Oct 2016 17:20:43 +0100
-Subject: [PATCH 1/2] iommu/arm-smmu: Don't inadvertently reject multiple
- SMMUv3s
-In-Reply-To: <20161019124932.GP9193@arm.com>
-References: <5cf1acbf9c42cc99e5cc0dacb50b7a92c3bd0feb.1476702234.git.robin.murphy@arm.com>
- <20161019124932.GP9193@arm.com>
-Message-ID: <7aff47c3-c794-5291-4b2a-44493f398828@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Oct 2016 17:20:25 +0100
+Subject: [PATCH 10/10] arm64: split thread_info from task stack
+In-Reply-To: <580A2B3A.7000300@arm.com>
+References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
+ <1476904234-9511-11-git-send-email-mark.rutland@arm.com>
+ <580A2B3A.7000300@arm.com>
+Message-ID: <20161021161959.GB17287@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/16 13:49, Will Deacon wrote:
-> On Mon, Oct 17, 2016 at 12:06:20PM +0100, Robin Murphy wrote:
->> We now delay installing our per-bus iommu_ops until we know an SMMU has
->> successfully probed, as they don't serve much purpose beforehand, and
->> doing so also avoids fights between multiple IOMMU drivers in a single
->> kernel. However, the upshot of passing the return value of bus_set_iommu()
->> back from our probe function is that if there happens to be more than
->> one SMMUv3 device in a system, the second and subsequent probes will
->> wind up returning -EBUSY to the driver core and getting torn down again.
->>
->> There are essentially 3 cases in which bus_set_iommu() returns nonzero:
->> 1. The bus already has iommu_ops installed
->> 2. One of the add_device callbacks from the initial notifier failed
->> 3. Allocating or installing the notifier itself failed
->>
->> The first two are down to devices other than the SMMU in question, so
->> shouldn't abort an otherwise-successful SMMU probe, whilst the third is
->> indicative of the kind of catastrophic system failure which isn't going
->> to get much further anyway. Consequently, there is little harm in
->> ignoring the return value either way.
->>
->> CC: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 11 ++++-------
->>  1 file changed, 4 insertions(+), 7 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 15c01c3cd540..74fbef384deb 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -2637,16 +2637,13 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->>  	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
->>  #ifdef CONFIG_PCI
->>  	pci_request_acs();
->> -	ret = bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->> -	if (ret)
->> -		return ret;
->> +	bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->>  #endif
->>  #ifdef CONFIG_ARM_AMBA
->> -	ret = bus_set_iommu(&amba_bustype, &arm_smmu_ops);
->> -	if (ret)
->> -		return ret;
->> +	bus_set_iommu(&amba_bustype, &arm_smmu_ops);
->>  #endif
->> -	return bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
->> +	bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
->> +	return 0;
+On Fri, Oct 21, 2016 at 03:50:34PM +0100, James Morse wrote:
+> Hi Mark,
 > 
-> In which case, we should probably add an iommu_present check, like we
-> have for the v2 driver.
-
-As touched upon in the commit message, the first thing bus_set_iommu()
-does is perform that same check and return immediately if any ops are
-already set. Do you really want redundant checks added, or shall I spin
-that cleanup patch removing them from v2 that I proposed to Lorenzo?
-
-Robin.
-
+> This looks great, we should definitely do this.
+> There are a few things missing from entry.S below:
 > 
-> Will
+> On 19/10/16 20:10, Mark Rutland wrote:
+> > This patch moves arm64's struct thread_info from the task stack into
+> > task_struct. This protects thread_info from corruption in the case of
+> > stack overflows, and makes its address harder to determine if stack
+> > addresses are leaked, making a number of attacks more difficult. Precise
+> > detection and handling of overflow is left for subsequent patches.
+> > 
+> > Largely, this involves changing code to store the task_struct in sp_el0,
+> > and acquire the thread_info from the task struct (which is the opposite
+> > way around to the current code). Both secondary entry and idle are
+> > updated to stash the sp and task pointer separately.
+> > 
+> > Userspace clobbers sp_el0, and we can no longer restore this from the
+> > stack. Instead, the current task is cached in a per-cpu variable that we
+> > can safely access from early assembly as interrupts are disabled (and we
 > 
+> >  arch/arm64/Kconfig                   |  1 +
+> >  arch/arm64/include/asm/Kbuild        |  1 -
+> >  arch/arm64/include/asm/current.h     | 22 ++++++++++++++++++++++
+> >  arch/arm64/include/asm/smp.h         |  1 +
+> >  arch/arm64/include/asm/thread_info.h | 24 ------------------------
+> >  arch/arm64/kernel/asm-offsets.c      |  1 +
+> 
+> >  arch/arm64/kernel/entry.S            |  4 ++--
+> 
+> 4? That was too easy...
+
+Far to easy; just looking at kernel_entry there' a glaring error:
+
+	.if     \el == 0
+	mrs     x21, sp_el0
+	mov     tsk, sp
+	and     tsk, tsk, #~(THREAD_SIZE - 1)   // Ensure MDSCR_EL1.SS is clear,
+	ldr     x19, [tsk, #TI_FLAGS]           // since we can unmask debug
+	disable_step_tsk x19, x20               // exceptions when scheduling.
+
+...it's amazing how broken a kernel will boot quite happily.
+
+I've fixed that up locally.
+
+Thanks,
+Mark.
