@@ -1,70 +1,29 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 21 Oct 2016 11:35:01 -0700
-Subject: [PATCH v3 0/8] PM / Domains: DT support for domain idle states &
- atomic PM domains
-In-Reply-To: <CAPDyKFpQwOkXUk8wT6sZ-Ad4XpTnyodK5m24fYJ3P+1QtS0XOA@mail.gmail.com>
- (Ulf Hansson's message of "Mon, 17 Oct 2016 09:30:53 +0200")
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFpQwOkXUk8wT6sZ-Ad4XpTnyodK5m24fYJ3P+1QtS0XOA@mail.gmail.com>
-Message-ID: <7hmvhxpn3e.fsf@baylibre.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 21 Oct 2016 13:36:54 -0500
+Subject: [PATCH 2/5] ARM: davinci: Don't append git rev to local version
+In-Reply-To: <1477075018-20176-1-git-send-email-david@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+Message-ID: <1477075018-20176-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+In the davinci default configuration, don't append the git revision to
+the local kernel version by. This seems like the more desirable default
+value.
 
-> On 14 October 2016 at 19:47, Lina Iyer <lina.iyer@linaro.org> wrote:
->> Hi all,
->>
->> Changes since v2 [3] -
->> - Addressed review comments from v2.
->>         - domain-idle-states documentation updated
->>         - fixed compiler issues with imx driver
->>         - minor code change in pm_domains.c
->> - The series is available at [4].
->>
->> Changes since v1 [2] -
->> - Addressed review comments from v1.
->>         - Fixes around dynamic allocation of genpd states
->>         - Used OF method for iterating phandles
->>         - Updated documentation, examples
->>         - Rename state variable (provider -> fwnode)
->> - The series is available at [3].
->>
->> The changes from [1] are -
->> - Allocating memory for domain idle states dynamically
->> - Conform to naming conventions for internal and exported genpd functions
->> - DT binding example for domain-idle-state
->> - Use fwnode instead of of_node
->> - Handle atomic case for removal of PM Domain
->> - Rebase on top of Rafael's pm/genpd tree
->>
->> Thanks,
->> Lina
->>
->> Lina Iyer (8):
->>   PM / Domains: Make genpd state allocation dynamic
->>   PM / Domain: Add residency property to genpd states
->>   PM / Domains: Allow domain power states to be read from DT
->>   PM / Domains: Save the fwnode in genpd_power_state
->>   dt/bindings: Update binding for PM domain idle states
->>   PM / Domains: Abstract genpd locking
->>   PM / Domains: Support IRQ safe PM domains
->>   PM / doc: Update device documentation for devices in IRQ safe PM
->>     domains
->>
->>  .../devicetree/bindings/power/power_domain.txt     |  43 +++
->>  Documentation/power/devices.txt                    |   9 +-
->>  arch/arm/mach-imx/gpc.c                            |  17 +-
->>  drivers/base/power/domain.c                        | 358 +++++++++++++++++----
->>  include/linux/pm_domain.h                          |  28 +-
->>  5 files changed, 383 insertions(+), 72 deletions(-)
->>
->
-> Rafael, Lina,
->
-> This looks good to me! Unless any other objections, I suggest to apply
-> this to get it tested in linux-next.
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Looks like it might be a little late now, but anyways
-
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index a2f89a3..9254609 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -1,3 +1,4 @@
++# CONFIG_LOCALVERSION_AUTO is not set
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+-- 
+2.7.4
