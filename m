@@ -1,52 +1,147 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 21 Oct 2016 23:33:03 +0300
-Subject: [PATCH 04/18] arm64: ensure the kernel is compiled for LP64
+Date: Fri, 21 Oct 2016 23:33:05 +0300
+Subject: [PATCH 06/18] thread: move thread bits accessors to separated file
 In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1477081997-4770-5-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1477081997-4770-7-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+They may be accessed from low-level code, so isolating is a measure to
+avoid circular dependencies in header files.
 
-The kernel needs to be compiled as a LP64 binary for ARM64, even when
-using a compiler that defaults to code-generation for the ILP32 ABI.
-Consequently, we need to explicitly pass '-mabi=lp64' (supported on
-gcc-4.9 and newer).
+The exact reason for circular dependency is WARN_ON() macro added
+in patch [edd63a27] "set_restore_sigmask() is never called without
+SIGPENDING (and never should be)"
 
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/Makefile | 5 +++++
- 1 file changed, 5 insertions(+)
+ include/linux/thread_bits.h | 54 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/thread_info.h | 44 +-----------------------------------
+ 2 files changed, 55 insertions(+), 43 deletions(-)
+ create mode 100644 include/linux/thread_bits.h
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index ab51aed..80eb000 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -42,15 +42,20 @@ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
- KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
- KBUILD_AFLAGS	+= $(lseinstr)
- 
-+KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
-+KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
+new file mode 100644
+index 0000000..ed788b0
+--- /dev/null
++++ b/include/linux/thread_bits.h
+@@ -0,0 +1,54 @@
 +
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- AS		+= -EB
- LD		+= -EB
-+LDFLAGS		+= -maarch64linuxb
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- AS		+= -EL
- LD		+= -EL
-+LDFLAGS		+= -maarch64linux
- UTS_MACHINE	:= aarch64
- endif
++/* thread_bits.h: common low-level thread bits accessors */
++
++#ifndef _LINUX_THREAD_BITS_H
++#define _LINUX_THREAD_BITS_H
++
++#ifndef __ASSEMBLY__
++
++#include <linux/bitops.h>
++#include <asm/thread_info.h>
++
++/*
++ * flag set/clear/test wrappers
++ * - pass TIF_xxxx constants to these functions
++ */
++
++static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	set_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	clear_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
++}
++
++static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
++{
++	return test_bit(flag, (unsigned long *)&ti->flags);
++}
++
++#define set_thread_flag(flag) \
++	set_ti_thread_flag(current_thread_info(), flag)
++#define clear_thread_flag(flag) \
++	clear_ti_thread_flag(current_thread_info(), flag)
++#define test_and_set_thread_flag(flag) \
++	test_and_set_ti_thread_flag(current_thread_info(), flag)
++#define test_and_clear_thread_flag(flag) \
++	test_and_clear_ti_thread_flag(current_thread_info(), flag)
++#define test_thread_flag(flag) \
++	test_ti_thread_flag(current_thread_info(), flag)
++
++#endif /* !__ASSEMBLY__ */
++#endif /* _LINUX_THREAD_BITS_H */
+diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+index 45f004e..f6e3239 100644
+--- a/include/linux/thread_info.h
++++ b/include/linux/thread_info.h
+@@ -65,8 +65,7 @@ struct restart_block {
  
+ extern long do_no_restart_syscall(struct restart_block *parm);
+ 
+-#include <linux/bitops.h>
+-#include <asm/thread_info.h>
++#include <linux/thread_bits.h>
+ 
+ #ifdef __KERNEL__
+ 
+@@ -77,47 +76,6 @@ extern long do_no_restart_syscall(struct restart_block *parm);
+ # define THREADINFO_GFP		(GFP_KERNEL_ACCOUNT | __GFP_NOTRACK)
+ #endif
+ 
+-/*
+- * flag set/clear/test wrappers
+- * - pass TIF_xxxx constants to these functions
+- */
+-
+-static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	set_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	clear_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
+-{
+-	return test_bit(flag, (unsigned long *)&ti->flags);
+-}
+-
+-#define set_thread_flag(flag) \
+-	set_ti_thread_flag(current_thread_info(), flag)
+-#define clear_thread_flag(flag) \
+-	clear_ti_thread_flag(current_thread_info(), flag)
+-#define test_and_set_thread_flag(flag) \
+-	test_and_set_ti_thread_flag(current_thread_info(), flag)
+-#define test_and_clear_thread_flag(flag) \
+-	test_and_clear_ti_thread_flag(current_thread_info(), flag)
+-#define test_thread_flag(flag) \
+-	test_ti_thread_flag(current_thread_info(), flag)
+-
+ #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
+ 
+ #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
 -- 
 2.7.4
