@@ -1,63 +1,48 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Oct 2016 23:06:25 +0300
-Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
- platform data
-In-Reply-To: <5a626833-d4bf-a991-65ea-2849f2250dce@gmail.com>
-References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
- <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
- <20161021182710.GA17279@kozik-lap>
- <5a626833-d4bf-a991-65ea-2849f2250dce@gmail.com>
-Message-ID: <20161021200625.GA20847@kozik-lap>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 21 Oct 2016 22:27:23 +0200
+Subject: Disabling an interrupt in the handler locks the system up
+In-Reply-To: <alpine.DEB.2.20.1610212147420.4855@nanos>
+References: <580A4460.2090306@free.fr>
+ <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
+ <20161021201448.3f4a0a7a@arm.com> <580A70B9.8060507@free.fr>
+ <alpine.DEB.2.20.1610212147420.4855@nanos>
+Message-ID: <580A7A2B.5000702@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 08:51:51PM +0200, Marek Vasut wrote:
-> On 10/21/2016 08:27 PM, Krzysztof Kozlowski wrote:
-> > On Thu, Oct 20, 2016 at 07:42:44PM -0200, Sergio Prado wrote:
-> >> Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
-> >> field in the drivers's platform data structure so it can be selectable
-> >> via platform data.
-> >>
-> >> Also setting this field to NAND_ECC_SOFT in all boards using this
-> >> driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
-> >>
-> >> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> >> ---
-> >>  arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
-> >>  arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
-> >>  arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
-> >>  arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
-> >>  arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
-> >>  drivers/mtd/nand/Kconfig                       |   9 --
-> >>  drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
-> >>  include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
-> >>  18 files changed, 79 insertions(+), 70 deletions(-)
-> >>
-> > 
-> > I acked this twice (v1 and v2)... and still you are ignoring them. I am
-> > sorry, I am not gonna to ack this third time!
+On 21/10/2016 21:49, Thomas Gleixner wrote:
+> On Fri, 21 Oct 2016, Mason wrote:
+>> On 21/10/2016 21:14, Marc Zyngier wrote:
+>>> If connecting a device that signals its interrupt as level low to an
+>>> input line configured as level high doesn't strike you as a major
+>>> issue, nothing will. At that point, you can put anything you want in
+>>> your DT.
+>>
+>> If I understand correctly, you are saying that I should have
+>> specified IRQ_TYPE_LEVEL_LOW, instead of IRQ_TYPE_LEVEL_HIGH?
+>>
+>> If the HW outputs 1 when idle, and 0 when busy, that
+>> is level low? (Sorry if this is obvious, I'm absolutely
+>> clueless in this subject matter.)
 > 
-> Hi, um, I am kinda new to this mess, what's going on ? You ACKed
-> previous patches, next revision was submitted, so you need to ACK
-> the next revision too (due to the changes).
->
+> We describe the level which is raising the interrupt. So in your case the
+> line goes to 0 when the interrupt is active, so the level is LOW.
 
-Some of the patches (1/3 and 2/3) were not changed. The resubmission of
-a patch should contain the ack. Otherwise one would have to ack
-indefinitely...
+I see. I'll try that on Monday.
 
-The changes in 2/3 were quite irrelevant to my ack, so the ack could
-stay.
+In my mental picture of interrupts (which is obviously so
+incomplete as to be wrong) interrupts are a way for hardware
+to tell the CPU that they urgently need the CPU's attention.
 
-BR,
-Krzysztof
+Obviously, the hardware being idle (line high) is not an urgent
+matter which interests the CPU. Likewise, I'm not sure the CPU
+cares that the hardware is busy (line low). It seems to me the
+interesting event from the CPU's perspective is when the
+hardware completes a "task" (transition from low to high).
+
+So I had originally configured the interrupt as IRQ_TYPE_EDGE_RISING.
+(There is an edge detection block in the irqchip, but the HW designer
+warned me that at low frequencies, it is possible to "miss" some edges,
+and we should prefer level triggers if possible.)
+
+Regards.
