@@ -1,82 +1,54 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Fri, 21 Oct 2016 14:17:27 +0200
-Subject: [PATCH] ARM: sti: stih407-clocks: Identify critical clocks
-In-Reply-To: <1477040891-31611-1-git-send-email-peter.griffin@linaro.org>
-References: <1477040891-31611-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <96d20fa1-c070-f36d-58ea-cba7ef2cae95@st.com>
+Date: Fri, 21 Oct 2016 14:23:46 +0200
+Subject: [PATCH] [media] c8sectpfe: Remove clk_disable_unprepare hacks
+In-Reply-To: <1477040132-31442-1-git-send-email-peter.griffin@linaro.org>
+References: <1477040132-31442-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <08965415-3573-c588-25c8-ae48fde9470f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 11:08 AM, Peter Griffin wrote:
-> Lots of platforms contain clocks which if turned off would prove fatal.
-> The only way to recover is to restart the board(s).  This driver takes
-> references to clocks which are required to be always-on.  The Common
-> Clk Framework will then take references to them.  This way they will
-> not be turned off during the clk_disabled_unused() procedure.
+On 10/21/2016 10:55 AM, Peter Griffin wrote:
+> Now that CLK_PROC_STFE is defined as a critical clock in
+> DT, we can remove the commented clk_disable_unprepare from
+> the c8sectpfe driver. This means we now have balanced
+> clk*enable/disable calls in the driver, but on STiH407
+> family the clock in reality will never actually be disabled.
 > 
-> In this patch we are identifying clocks, which if gated would render
-> the STiH407 development board unserviceable.
+> This is due to a HW bug where once the IP has been configured
+> and the SLIM core is running, disabling the clock causes a
+> unrecoverable bus lockup.
 > 
 > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 > ---
->  arch/arm/boot/dts/stih407-clock.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 6 +-----
+>  1 file changed, 1 insertion(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
-> index 13029c0..34c119a 100644
-> --- a/arch/arm/boot/dts/stih407-clock.dtsi
-> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
-> @@ -101,6 +101,7 @@
->  				clocks = <&clk_sysin>;
+> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> index 30c148b..79d793b 100644
+> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> @@ -888,8 +888,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+>  	return 0;
 >  
->  				clock-output-names = "clk-s-a0-pll-ofd-0";
-> +				clock-critical = <0>; /* clk-s-a0-pll-ofd-0 */
->  			};
+>  err_clk_disable:
+> -	/* TODO uncomment when upstream has taken a reference on this clk */
+> -	/*clk_disable_unprepare(fei->c8sectpfeclk);*/
+> +	clk_disable_unprepare(fei->c8sectpfeclk);
+>  	return ret;
+>  }
 >  
->  			clk_s_a0_flexgen: clk-s-a0-flexgen {
-> @@ -112,6 +113,7 @@
->  					 <&clk_sysin>;
+> @@ -924,11 +923,8 @@ static int c8sectpfe_remove(struct platform_device *pdev)
+>  	if (readl(fei->io + SYS_OTHER_CLKEN))
+>  		writel(0, fei->io + SYS_OTHER_CLKEN);
 >  
->  				clock-output-names = "clk-ic-lmi0";
-> +				clock-critical = <CLK_IC_LMI0>;
->  			};
->  		};
+> -	/* TODO uncomment when upstream has taken a reference on this clk */
+> -	/*
+>  	if (fei->c8sectpfeclk)
+>  		clk_disable_unprepare(fei->c8sectpfeclk);
+> -	*/
 >  
-> @@ -126,6 +128,7 @@
->  					     "clk-s-c0-fs0-ch1",
->  					     "clk-s-c0-fs0-ch2",
->  					     "clk-s-c0-fs0-ch3";
-> +			clock-critical = <0>; /* clk-s-c0-fs0-ch0 */
->  		};
->  
->  		clk_s_c0: clockgen-c at 09103000 {
-> @@ -139,6 +142,7 @@
->  				clocks = <&clk_sysin>;
->  
->  				clock-output-names = "clk-s-c0-pll0-odf-0";
-> +				clock-critical = <0>; /* clk-s-c0-pll0-odf-0 */
->  			};
->  
->  			clk_s_c0_pll1: clk-s-c0-pll1 {
-> @@ -194,6 +198,12 @@
->  						     "clk-main-disp",
->  						     "clk-aux-disp",
->  						     "clk-compo-dvp";
-> +				clock-critical = <CLK_PROC_STFE>,
-> +						 <CLK_ICN_CPU>,
-> +						 <CLK_TX_ICN_DMU>,
-> +						 <CLK_EXT2F_A9>,
-> +						 <CLK_ICN_LMI>,
-> +						 <CLK_ICN_SBC>;
->  			};
->  		};
->  
+>  	return 0;
+>  }
 > 
 
 Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-And applied !
-
-Effectively, the job was done for STiH410 but i forgot to apply the same for STiH407
-
-Thanks Peter  ;-)
