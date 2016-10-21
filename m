@@ -1,106 +1,123 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 10:36:33 +0100
-Subject: [RFC PATCH 0/8] Support GICv3 ITS and vITS in 32-bit mode
-Message-ID: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+Date: Fri, 21 Oct 2016 10:36:36 +0100
+Subject: [RFC PATCH 3/8] irqchip/gicv3-its: specialise flush_dcache operation
+In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1477042601-15227-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It'd be better to switch to CMA... but before that done redirect
+flush_dcache operation, so 32-bit implementation could be wired
+latter.
 
-This series introduces GICv3 ITS and vITS to 32-bit world. The first
-six patches make it possible to use ITS in a 32-bit guest with vITS on
-64-bit host. The last two patches extend vITS to 32-bit host.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm64/include/asm/arch_gicv3.h |    3 +++
+ drivers/irqchip/irq-gic-v3-its.c    |   17 ++++++++---------
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
-I used Andrea's its/v8 branch at [1] for testing with the following
-diff on top
-
-diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
-index 27a8e17..16bba55 100644
---- a/arm/aarch32/arm-cpu.c
-+++ b/arm/aarch32/arm-cpu.c
-@@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm)
- {
- 	int timer_interrupts[4] = {13, 14, 11, 10};
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index f8ae6d6..4f0402a 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -79,6 +79,7 @@
  
--	gic__generate_fdt_nodes(fdt, IRQCHIP_GICV2);
-+	gic__generate_fdt_nodes(fdt, kvm->cfg.arch.irqchip);
- 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
+ #include <linux/stringify.h>
+ #include <asm/barrier.h>
++#include <asm/cacheflush.h>
+ 
+ #define read_gicreg(r)							\
+ 	({								\
+@@ -187,5 +188,7 @@ static inline void gic_write_bpr1(u32 val)
+ #define gic_read_typer(c)		readq_relaxed(c)
+ #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
+ 
++#define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e992b01..86efa6e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -37,7 +37,6 @@
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+-#include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
+ 
+@@ -433,7 +432,7 @@ static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
+ 	 * the ITS.
+ 	 */
+ 	if (its->flags & ITS_FLAGS_CMDQ_NEEDS_FLUSHING)
+-		__flush_dcache_area(cmd, sizeof(*cmd));
++		gic_flush_dcache_to_poc(cmd, sizeof(*cmd));
+ 	else
+ 		dsb(ishst);
  }
+@@ -602,7 +601,7 @@ static void lpi_set_config(struct irq_data *d, bool enable)
+ 	 * Humpf...
+ 	 */
+ 	if (gic_rdists->flags & RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING)
+-		__flush_dcache_area(cfg, sizeof(*cfg));
++		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
+ 	else
+ 		dsb(ishst);
+ 	its_send_inv(its_dev, id);
+@@ -817,7 +816,7 @@ static int __init its_alloc_lpi_tables(void)
+ 	       LPI_PROPBASE_SZ);
  
-diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
-index 1632e3c..99231f6 100644
---- a/arm/aarch32/include/kvm/kvm-arch.h
-+++ b/arm/aarch32/include/kvm/kvm-arch.h
-@@ -1,8 +1,8 @@
- #ifndef KVM__KVM_ARCH_H
- #define KVM__KVM_ARCH_H
+ 	/* Make sure the GIC will observe the written configuration */
+-	__flush_dcache_area(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
++	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
  
--#define ARM_GIC_DIST_SIZE	0x1000
--#define ARM_GIC_CPUI_SIZE	0x2000
-+#define ARM_GIC_DIST_SIZE	0x100000
-+#define ARM_GIC_CPUI_SIZE	0x200000
+ 	return 0;
+ }
+@@ -910,7 +909,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+ 		if (!shr) {
+ 			cache = GITS_BASER_nC;
+-			__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
++			gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+ 		}
+ 		goto retry_baser;
+ 	}
+@@ -1102,7 +1101,7 @@ static void its_cpu_init_lpis(void)
+ 		}
  
- #define ARM_KERN_OFFSET(...)	0x8000
+ 		/* Make sure the GIC will observe the zero-ed page */
+-		__flush_dcache_area(page_address(pend_page), LPI_PENDBASE_SZ);
++		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
  
-
-After passing --irqchip=gicv3-its --force-pci to kvmtool I can see
-that MSI is used:
-
-# cat /proc/interrupts
-           CPU0       
- 18:       1251     GICv3  27 Level     arch_timer
- 28:          0   ITS-MSI 49152 Edge      virtio3-config
- 29:          0   ITS-MSI 49153 Edge      virtio3-input
- 30:          0   ITS-MSI 49154 Edge      virtio3-output
- 31:          0   ITS-MSI 32768 Edge      virtio2-config
- 32:          2   ITS-MSI 32769 Edge      virtio2-input.0
- 33:          1   ITS-MSI 32770 Edge      virtio2-output.0
- 34:          0   ITS-MSI   0 Edge      virtio0-config
- 35:        303   ITS-MSI   1 Edge      virtio0-requests
- 36:          0   ITS-MSI 16384 Edge      virtio1-config
- 37:        218   ITS-MSI 16385 Edge      virtio1-requests
-IPI0:          0  CPU wakeup interrupts
-IPI1:          0  Timer broadcast interrupts
-IPI2:          0  Rescheduling interrupts
-IPI3:          0  Function call interrupts
-IPI4:          0  CPU stop interrupts
-IPI5:          0  IRQ work interrupts
-IPI6:          0  completion interrupts
-Err:          0
-
-Patches are aginst v4.9-rc1.
-
-[1] git://www.linux-arm.org/kvmtool.git
-
-Thanks!
-
-Vladimir Murzin (8):
-  irqchip/gic-v3-its: Change unsigned types for AArch32 compatibility
-  irqchip/gic-v3-its: narrow down Entry Size when used as a divider
-  irqchip/gicv3-its: specialise flush_dcache operation
-  irqchip/gicv3-its: specialise readq and writeq accesses
-  ARM: gic-v3-its: Add 32bit support to GICv3 ITS
-  ARM: virt: select ARM_GIC_V3_ITS
-  KVM: arm64: vgic-its: fix compatability with 32-bit
-  ARM: KVM: Support vGICv3 ITS
-
- Documentation/virtual/kvm/api.txt   |    2 +-
- arch/arm/Kconfig                    |    1 +
- arch/arm/include/asm/arch_gicv3.h   |   59 ++++++++++++++++++++++---
- arch/arm/include/uapi/asm/kvm.h     |    2 +
- arch/arm/kvm/Kconfig                |    1 +
- arch/arm/kvm/Makefile               |    1 +
- arch/arm/kvm/arm.c                  |    6 +++
- arch/arm64/include/asm/arch_gicv3.h |   19 ++++++++
- arch/arm64/kvm/Kconfig              |    4 --
- arch/arm64/kvm/reset.c              |    6 ---
- drivers/irqchip/irq-gic-v3-its.c    |   81 +++++++++++++++++------------------
- include/linux/irqchip/arm-gic-v3.h  |   12 +++---
- virt/kvm/arm/vgic/vgic-its.c        |   11 ++---
- virt/kvm/arm/vgic/vgic-kvm-device.c |    2 -
- virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 -
- virt/kvm/arm/vgic/vgic.h            |   26 -----------
- 16 files changed, 135 insertions(+), 100 deletions(-)
-
+ 		paddr = page_to_phys(pend_page);
+ 		pr_info("CPU%d: using LPI pending table @%pa\n",
+@@ -1287,13 +1286,13 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+ 
+ 		/* Flush Lvl2 table to PoC if hw doesn't support coherency */
+ 		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+-			__flush_dcache_area(page_address(page), baser->psz);
++			gic_flush_dcache_to_poc(page_address(page), baser->psz);
+ 
+ 		table[idx] = cpu_to_le64(page_to_phys(page) | GITS_BASER_VALID);
+ 
+ 		/* Flush Lvl1 entry to PoC if hw doesn't support coherency */
+ 		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+-			__flush_dcache_area(table + idx, GITS_LVL1_ENTRY_SIZE);
++			gic_flush_dcache_to_poc(table + idx, GITS_LVL1_ENTRY_SIZE);
+ 
+ 		/* Ensure updated table contents are visible to ITS hardware */
+ 		dsb(sy);
+@@ -1340,7 +1339,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 		return NULL;
+ 	}
+ 
+-	__flush_dcache_area(itt, sz);
++	gic_flush_dcache_to_poc(itt, sz);
+ 
+ 	dev->its = its;
+ 	dev->itt = itt;
 -- 
 1.7.9.5
