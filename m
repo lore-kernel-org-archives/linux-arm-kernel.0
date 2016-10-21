@@ -1,79 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Oct 2016 15:37:12 +0100
-Subject: [PATCH 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
-In-Reply-To: <20161019140252.GR9193@arm.com>
-References: <b6c78e6c18d98069b0fdfa219da51d2aed129aed.1476705500.git.robin.murphy@arm.com>
- <20161019140252.GR9193@arm.com>
-Message-ID: <fb5d86eb-d634-176e-4887-04721f55fbc3@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 21 Oct 2016 16:39:19 +0200
+Subject: [PATCH] PM / Domains: Restrict "samsung,
+ power-domain" checks to ARCH_EXYNOS
+In-Reply-To: <cb15013d-9694-b27c-dd5e-8c916c2e9fb7@osg.samsung.com>
+References: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
+ <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
+ <CGME20161021135818eucas1p265318ff4b1c4c83b52162ee5e59e40a3@eucas1p2.samsung.com>
+ <20161021135803.GB3289@kozik-lap>
+ <96efd5b7-5f62-8146-13de-44b5ff7dd496@samsung.com>
+ <cb15013d-9694-b27c-dd5e-8c916c2e9fb7@osg.samsung.com>
+Message-ID: <CAMuHMdU5OoQtSKw3xCgWMEFa2wJpfwMpd3oFq3=j8zcpbxOhHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/16 15:02, Will Deacon wrote:
-> On Mon, Oct 17, 2016 at 01:05:29PM +0100, Robin Murphy wrote:
->> With the new dma_{map,unmap}_resource() functions added to the DMA API
->> for the benefit of cases like slave DMA, add suitable implementations to
->> the arsenal of our generic layer. Since cache maintenance should not be
->> a concern, these can both be standalone versions without the need for
->> architecture-specific wrappers.
+Hi Javier,
+
+On Fri, Oct 21, 2016 at 4:18 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> On 10/21/2016 11:14 AM, Sylwester Nawrocki wrote:
+>> On 10/21/2016 03:58 PM, Krzysztof Kozlowski wrote:
+>>> The samsung,power-domain was made deprecated (although not explicitly)
+>>> in January 2015 (0da658704136 ("ARM: dts: convert to generic power
+>>> domain bindings for exynos DT")) so how about:
+>>> 1. Printing a dev_warn() about usage of deprecated bindings.
+>>> 2. Complete removal in January 2017?
 >>
->> CC: Joerg Roedel <joro@8bytes.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
+>> I doubt anyone will ever use new mainline kernel with older dts/dtb
+>> so IMHO it makes sense to queue a patch removing support for the
+>> deprecated compatible just now and don't bother with a warning.
 >>
->> Since patch 2 has a build dependency on this one, they should probably
->> go together through either the arm64 tree or the iommu tree, but I can't
->> make up my mind which one seems more appropriate...
-> 
-> I can take it via the smmu tree, if you like. However, comment below.
+>
+> FWIW I agree with you. I don't know of any Exynos machine that ships a DT
+> as read-only. Even consumer devices like the Exynos Chromebooks use a FIT
+> image (kernel + FDT bundled), so the DT can always be updated.
+>
+> Removing the support for the deprecated property sound sensible to me.
 
-I'm surprised that didn't occur to me - makes sense, thanks.
+I'm happy to hear that!
 
->>  drivers/iommu/dma-iommu.c | 13 +++++++++++++
->>  include/linux/dma-iommu.h |  4 ++++
->>  2 files changed, 17 insertions(+)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index c5ab8667e6f2..50acd71915db 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -624,6 +624,19 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
->>  	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), sg_dma_address(sg));
->>  }
->>  
->> +dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
->> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
->> +{
->> +	return iommu_dma_map_page(dev, phys_to_page(phys), offset_in_page(phys),
->> +			size, dma_direction_to_prot(dir, false) | IOMMU_MMIO);
->> +}
->>
->> +void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
->> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
->> +{
->> +	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle);
->> +}
-> 
-> I think it's better to call iommu_dma_unmap_page instead. That said, are
-> you sure it's safe to ignore the "size" parameter here? Is it permitted
-> to unmap part of a region? If not, why does that parameter exist?
+Thanks!
 
-Actually, "#define iommu_dma_unmap_resource iommu_dma_unmap_page" in the
-header would make life even simpler. Or is that too evil?
+Gr{oetje,eeting}s,
 
-Glossing over the size parameter is a detail of this particular
-implementation. Equivalently to iommu_dma_unmap_page(), it's there
-(along with dir and attrs) to match the signature of
-dma_unmap_resource(), so that arch code doesn't need yet another wrapper
-for its .unmap_resource callback in dma_ops (see patch 2). As it
-happens, ignoring the size is effectively extra-safe in the sense that
-we're enforcing the API and not even trusting the caller - since we have
-to look up the iova to free it, and that iova records the size
-originally mapped, we simply unmap that original size because it makes
-for simpler code and can't be wrong. See the __iommu_dma_unmap()
-implementation itself.
+                        Geert
 
-Robin.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> 
-> Will
-> 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
