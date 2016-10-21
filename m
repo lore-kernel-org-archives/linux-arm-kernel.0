@@ -1,44 +1,96 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 21 Oct 2016 09:35:46 +0800
-Subject: [PATCH v7 0/5] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
-In-Reply-To: <CAD6G_RQyLtgJw=djPTmY5t7UVwzuZpj0xM0HjchLQjq7P5hMOg@mail.gmail.com>
-References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
- <CAD6G_RQyLtgJw=djPTmY5t7UVwzuZpj0xM0HjchLQjq7P5hMOg@mail.gmail.com>
-Message-ID: <20161021013546.GF30578@tiger>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 20 Oct 2016 20:39:30 -0500
+Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
+ early boot stages
+In-Reply-To: <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161021013930.GB31044@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 05:30:28PM +0530, Jagan Teki wrote:
-> Hi Shawn,
+On Wed, Oct 19, 2016 at 06:21:02PM -0400, Sinan Kaya wrote:
+> The penalty determination of ISA IRQ goes through 4 paths.
+> 1. assign PCI_USING during power up via acpi_irq_penalty_init.
+> 2. update the penalty with acpi_penalize_isa_irq function based on the
+> active parameter.
+> 3. kernel command line penalty update via acpi_irq_penalty_update function.
+> 4. increment the penalty as USING right after the IRQ is assign to PCI.
 > 
-> On Fri, Oct 14, 2016 at 2:57 PM, Jagan Teki <jteki@openedev.com> wrote:
-> > This is series add dts support for Engicam I.Core M6 qdl modules. just
-> > rebased on top of linux-next of previous set[1].
-> >
-> > [1] http://www.spinics.net/lists/kernel/msg2358233.html
-> >
-> > Jagan Teki (5):
-> >   ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
-> >   ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
-> >   ARM: dts: imx6qdl-icore: Add usbhost support
-> >   ARM: dts: imx6qdl-icore: Add usbotg support
-> >   ARM: dts: imx6qdl-icore: Add FEC support
-> >
-> >  arch/arm/boot/dts/Makefile           |   2 +
-> >  arch/arm/boot/dts/imx6dl-icore.dts   |  59 ++++++++
-> >  arch/arm/boot/dts/imx6q-icore.dts    |  59 ++++++++
-> >  arch/arm/boot/dts/imx6qdl-icore.dtsi | 271 +++++++++++++++++++++++++++++++++++
-> >  4 files changed, 391 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
-> >  create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
+> acpi_penalize_isa_irq and acpi_irq_penalty_update functions get called
+> before the ACPI subsystem is started.
 > 
-> Can you pick this series?
+> These API need to bypass the acpi_irq_get_penalty function.
 
-Sorry for the delay.  The first two patches look good, and I had a
-couple of small comments on the other 3.  Also, for the initial board
-support submission like this, you do not need to split it per device
-support.  That said, please squash the series into one patch when
-resending.
+I don't mind this patch, but the changelog doesn't tell me what's
+broken and why we need this fix.  Apparently acpi_irq_get_penalty()
+doesn't work before ACPI is initialized, but I don't see *why* it
+wouldn't work.
 
-Shawn
+However, I see one bug it *does* fix: we do not store the SCI penalty
+in the acpi_isa_irq_penalty[] table because acpi_isa_irq_penalty[]
+only holds ISA IRQ penalties, and there's no guarantee that the SCI is
+an ISA IRQ.  But prior to this patch, we added in the SCI penalty to
+the acpi_isa_irq_penalty[] entry when the SCI was an ISA IRQ, which
+makes acpi_irq_get_penalty() return the wrong thing.  Consider:
+
+  Initially     acpi_isa_irq_penalty[9] = 0.
+  Assume        sci_interrupt = 9.
+  Then          acpi_irq_get_penalty(9) returns X.
+  If we call    acpi_penalize_isa_irq(9, 1),
+  it sets       acpi_isa_irq_penalty[9] = X,
+  and now       acpi_irq_get_penalty(9) returns X + X.
+
+I'd propose a changelog like this:
+
+  We do not want to store the SCI penalty in the acpi_isa_irq_penalty[]
+  table because acpi_isa_irq_penalty[] only holds ISA IRQ penalties and
+  there's no guarantee that the SCI is an ISA IRQ.  We add in the SCI
+  penalty as a special case in acpi_irq_get_penalty().
+
+  But if we called acpi_penalize_isa_irq() or acpi_irq_penalty_update()
+  for an SCI that happened to be an ISA IRQ, they stored the SCI
+  penalty (part of the acpi_irq_get_penalty() return value) in
+  acpi_isa_irq_penalty[].  Subsequent calls to acpi_irq_get_penalty()
+  returned a penalty that included *two* SCI penalties.
+
+If this actually fixes a worse problem related to ACPI initialization,
+of course you should detail that.
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..4f37938 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -849,7 +849,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>  			continue;
+>  
+>  		if (used)
+> -			new_penalty = acpi_irq_get_penalty(irq) +
+> +			new_penalty = acpi_isa_irq_penalty[irq] +
+>  					PIRQ_PENALTY_ISA_USED;
+>  		else
+>  			new_penalty = 0;
+> @@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>  void acpi_penalize_isa_irq(int irq, int active)
+>  {
+>  	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+> -		acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+> +		acpi_isa_irq_penalty[irq] = acpi_isa_irq_penalty[irq] +
+>  		  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
