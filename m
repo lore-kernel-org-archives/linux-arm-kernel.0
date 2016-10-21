@@ -1,18 +1,18 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Oct 2016 10:49:58 +0800
-Subject: [PATCH 3/6] ARM: sun5i: Rename A10s pins
-In-Reply-To: <926093bcce58496cdb5cea55aaa65e958d36cb76.1476704881.git-series.maxime.ripard@free-electrons.com>
+Date: Fri, 21 Oct 2016 10:51:09 +0800
+Subject: [PATCH 1/6] ARM: sun5i: chip: Enable Wi-Fi SDIO chip
+In-Reply-To: <468cbaad185a2bde92f1015a1c286f1e1ef55850.1476704881.git-series.maxime.ripard@free-electrons.com>
 References: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
- <926093bcce58496cdb5cea55aaa65e958d36cb76.1476704881.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64CLRf-Stqt7mJMM3h_aCMpD2bVB=Zi6fwsJ_8y5K9VhQ@mail.gmail.com>
+ <468cbaad185a2bde92f1015a1c286f1e1ef55850.1476704881.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66H22eM6MP2t+Ntuj6UX9TcLSMzH0DHcLnBq5DqqKoXHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 7:49 PM, Maxime Ripard
+On Mon, Oct 17, 2016 at 7:48 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> The SPI2 pins on the sun5i PB bank are only available on the A10s. Rename
-> the A10s only bank so that it doesn't confuse people on the other SoCs
-> whose indexing would start at b.
+> The WiFi chip is powered through a GPIO and two regulators in parallel.
+> Since that case is not supported yet, just set them as always on before we
+> rework the regulator framework to deal with those.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
