@@ -1,18 +1,14 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 15:17:33 +0200
-Subject: [PATCH v4 19/23] ARM: shmobile: r8a7779: Stop passing mode pins state
- to clock driver
+Date: Fri, 21 Oct 2016 15:17:37 +0200
+Subject: [PATCH v4 23/23] clk: renesas: rcar-gen2: Remove obsolete
+ rcar_gen2_clocks_init()
 In-Reply-To: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
 References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1477055857-17936-20-git-send-email-geert+renesas@glider.be>
+Message-ID: <1477055857-17936-24-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the R-Car H1 CPG clock driver obtains the state of the mode pins
-from the R-Car RST driver, there's no longer a need to pass this state
-explicitly. Hence we can just remove the .init_time() callback, the
-generic ARM code will take care of calling of_clk_init() and
-clocksource_probe().
+The R-Car Gen2 board code no longer calls rcar_gen2_clocks_init().
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
@@ -21,62 +17,42 @@ v4:
   - Add Acked-by,
 
 v3:
-  - New.
----
- arch/arm/mach-shmobile/setup-r8a7779.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+  - Rebased,
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 0007ff51d180379f..0686112f243525b6 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -14,8 +14,6 @@
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-  */
--#include <linux/clk/renesas.h>
--#include <linux/clocksource.h>
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/irqchip.h>
-@@ -76,30 +74,6 @@ static void __init r8a7779_init_irq_dt(void)
- 	__raw_writel(0x003fee3f, INT2SMSKCR4);
+v2:
+  - No changes.
+---
+ drivers/clk/renesas/clk-rcar-gen2.c | 7 -------
+ include/linux/clk/renesas.h         | 2 --
+ 2 files changed, 9 deletions(-)
+
+diff --git a/drivers/clk/renesas/clk-rcar-gen2.c b/drivers/clk/renesas/clk-rcar-gen2.c
+index 3291fd430ad4e215..f39519edc645ca87 100644
+--- a/drivers/clk/renesas/clk-rcar-gen2.c
++++ b/drivers/clk/renesas/clk-rcar-gen2.c
+@@ -445,10 +445,3 @@ static void __init rcar_gen2_cpg_clocks_init(struct device_node *np)
  }
+ CLK_OF_DECLARE(rcar_gen2_cpg_clks, "renesas,rcar-gen2-cpg-clocks",
+ 	       rcar_gen2_cpg_clocks_init);
+-
+-void __init rcar_gen2_clocks_init(u32 mode)
+-{
+-	cpg_mode = mode;
+-
+-	of_clk_init(NULL);
+-}
+diff --git a/include/linux/clk/renesas.h b/include/linux/clk/renesas.h
+index 9e969941f3f62878..9ebf1f8243bb57af 100644
+--- a/include/linux/clk/renesas.h
++++ b/include/linux/clk/renesas.h
+@@ -20,8 +20,6 @@
+ struct device_node;
+ struct generic_pm_domain;
  
--#define MODEMR		0xffcc0020
+-void rcar_gen2_clocks_init(u32 mode);
 -
--static u32 __init r8a7779_read_mode_pins(void)
--{
--	static u32 mode;
--	static bool mode_valid;
--
--	if (!mode_valid) {
--		void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
--		BUG_ON(!modemr);
--		mode = ioread32(modemr);
--		iounmap(modemr);
--		mode_valid = true;
--	}
--
--	return mode;
--}
--
--static void __init r8a7779_init_time(void)
--{
--	r8a7779_clocks_init(r8a7779_read_mode_pins());
--	clocksource_probe();
--}
--
- static const char *const r8a7779_compat_dt[] __initconst = {
- 	"renesas,r8a7779",
- 	NULL,
-@@ -109,7 +83,6 @@ static void __init r8a7779_init_time(void)
- 	.smp		= smp_ops(r8a7779_smp_ops),
- 	.map_io		= r8a7779_map_io,
- 	.init_early	= shmobile_init_delay,
--	.init_time	= r8a7779_init_time,
- 	.init_irq	= r8a7779_init_irq_dt,
- 	.init_late	= shmobile_init_late,
- 	.dt_compat	= r8a7779_compat_dt,
+ void cpg_mstp_add_clk_domain(struct device_node *np);
+ #ifdef CONFIG_CLK_RENESAS_CPG_MSTP
+ int cpg_mstp_attach_dev(struct generic_pm_domain *unused, struct device *dev);
 -- 
 1.9.1
