@@ -1,52 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 16:39:19 +0200
-Subject: [PATCH] PM / Domains: Restrict "samsung,
- power-domain" checks to ARCH_EXYNOS
-In-Reply-To: <cb15013d-9694-b27c-dd5e-8c916c2e9fb7@osg.samsung.com>
-References: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
- <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
- <CGME20161021135818eucas1p265318ff4b1c4c83b52162ee5e59e40a3@eucas1p2.samsung.com>
- <20161021135803.GB3289@kozik-lap>
- <96efd5b7-5f62-8146-13de-44b5ff7dd496@samsung.com>
- <cb15013d-9694-b27c-dd5e-8c916c2e9fb7@osg.samsung.com>
-Message-ID: <CAMuHMdU5OoQtSKw3xCgWMEFa2wJpfwMpd3oFq3=j8zcpbxOhHw@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 21 Oct 2016 16:40:25 +0200
+Subject: [RFC PATCH 00/13] ARM64: meson-gxl: Add extended support
+Message-ID: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+This RFC patchset provides extended peripheral support for the Amlogix GXL SoCs.
 
-On Fri, Oct 21, 2016 at 4:18 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> On 10/21/2016 11:14 AM, Sylwester Nawrocki wrote:
->> On 10/21/2016 03:58 PM, Krzysztof Kozlowski wrote:
->>> The samsung,power-domain was made deprecated (although not explicitly)
->>> in January 2015 (0da658704136 ("ARM: dts: convert to generic power
->>> domain bindings for exynos DT")) so how about:
->>> 1. Printing a dev_warn() about usage of deprecated bindings.
->>> 2. Complete removal in January 2017?
->>
->> I doubt anyone will ever use new mainline kernel with older dts/dtb
->> so IMHO it makes sense to queue a patch removing support for the
->> deprecated compatible just now and don't bother with a warning.
->>
->
-> FWIW I agree with you. I don't know of any Exynos machine that ships a DT
-> as read-only. Even consumer devices like the Exynos Chromebooks use a FIT
-> image (kernel + FDT bundled), so the DT can always be updated.
->
-> Removing the support for the deprecated property sound sensible to me.
+The final patchs will be split among the correct subsystems.
 
-I'm happy to hear that!
+In order to support more functionalities, this patchset :
+ - Moves peripheral nodes to the common Meson arm64 dtsi
+ - Add i2c, mmc, sd, sdio, pinctrl and clock nodes for GXL
+ - Adds correct GXL P23X boards uart pinctrl
+ - Adds the GXL Internal PHY driver
+ - Add a temporary workaround to select the internal PHY
+ - Add Ethernet nodes for GXL and the P23X boards
+ - Add SD/MMC and SDIO WiFi support support for P23X boards
 
-Thanks!
+Neil Armstrong (13):
+  pinctrl: meson: Add GXL pinctrl definitions
+  ARM64: dts: meson-gxbb: Move common nodes to meson-gx
+  ARM64: dts: meson-gxl: Add pinctrl nodes
+  ARM64: dts: meson-gxl: Add clock nodes
+  ARM64: dts: meson-gxl: Add i2c nodes
+  ARM64: dts: meson-gxl: Add MMC/SD/SDIO nodes
+  ARM64: dts: meson-gxl-p23x: Add uart pinctrl
+  dwmac-meson8b: add support for phy selection
+  net: phy: Add Meson GXL Internal PHY driver
+  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
+  ARM64: dts: meson-gxl-p23x: Enable ethernet
+  ARM64: dts: meson-gxl-p23x: Add SD/SDIO/MMC and PWM nodes
+  ARM64: dts: meson-gxl-p23x: Enable IR receiver
 
-Gr{oetje,eeting}s,
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 131 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 155 +-----
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 125 +++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 238 +++++++++
+ .../net/ethernet/stmicro/stmmac/dwmac-meson8b.c    |  25 +
+ drivers/net/phy/Kconfig                            |   5 +
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/meson-gxl.c                        | 175 ++++++
+ drivers/pinctrl/meson/Makefile                     |   3 +-
+ drivers/pinctrl/meson/pinctrl-meson-gxl.c          | 589 +++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.c              |   8 +
+ drivers/pinctrl/meson/pinctrl-meson.h              |   2 +
+ include/dt-bindings/gpio/meson-gxl-gpio.h          | 131 +++++
+ 14 files changed, 1452 insertions(+), 138 deletions(-)
+ create mode 100644 drivers/net/phy/meson-gxl.c
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-gxl.c
+ create mode 100644 include/dt-bindings/gpio/meson-gxl-gpio.h
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+1.9.1
