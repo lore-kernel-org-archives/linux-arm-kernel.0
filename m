@@ -1,58 +1,37 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 21 Oct 2016 09:07:59 -0500
-Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
- early boot stages
-In-Reply-To: <20161021013930.GB31044@localhost>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
- <20161021013930.GB31044@localhost>
-Message-ID: <20161021140759.GA877@localhost>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 21 Oct 2016 16:11:28 +0200
+Subject: [PATCH] hwrng: meson: Remove unneeded platform MODULE_ALIAS
+In-Reply-To: <1476906618-14455-1-git-send-email-javier@osg.samsung.com>
+References: <1476906618-14455-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <29086305-c8a7-ba17-5e99-3a779b9dd410@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 08:39:30PM -0500, Bjorn Helgaas wrote:
-> On Wed, Oct 19, 2016 at 06:21:02PM -0400, Sinan Kaya wrote:
-> > The penalty determination of ISA IRQ goes through 4 paths.
-> > 1. assign PCI_USING during power up via acpi_irq_penalty_init.
-> > 2. update the penalty with acpi_penalize_isa_irq function based on the
-> > active parameter.
-> > 3. kernel command line penalty update via acpi_irq_penalty_update function.
-> > 4. increment the penalty as USING right after the IRQ is assign to PCI.
-> > 
-> > acpi_penalize_isa_irq and acpi_irq_penalty_update functions get called
-> > before the ACPI subsystem is started.
-> > 
-> > These API need to bypass the acpi_irq_get_penalty function.
+On 10/19/2016 09:50 PM, Javier Martinez Canillas wrote:
+> The Amlogic Meson is a DT-only platform, which means the devices are
+> registered via OF and not using the legacy platform devices support.
 > 
-> I don't mind this patch, but the changelog doesn't tell me what's
-> broken and why we need this fix.  Apparently acpi_irq_get_penalty()
-> doesn't work before ACPI is initialized, but I don't see *why* it
-> wouldn't work.
+> So there's no need to have a MODULE_ALIAS("platform:meson-rng") since
+> the reported uevent MODALIAS to user-space will always be the OF one.
 > 
-> However, I see one bug it *does* fix: we do not store the SCI penalty
-> in the acpi_isa_irq_penalty[] table because acpi_isa_irq_penalty[]
-> only holds ISA IRQ penalties, and there's no guarantee that the SCI is
-> an ISA IRQ.  But prior to this patch, we added in the SCI penalty to
-> the acpi_isa_irq_penalty[] entry when the SCI was an ISA IRQ, which
-> makes acpi_irq_get_penalty() return the wrong thing.  Consider:
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
 > 
->   Initially     acpi_isa_irq_penalty[9] = 0.
->   Assume        sci_interrupt = 9.
->   Then          acpi_irq_get_penalty(9) returns X.
->   If we call    acpi_penalize_isa_irq(9, 1),
->   it sets       acpi_isa_irq_penalty[9] = X,
->   and now       acpi_irq_get_penalty(9) returns X + X.
+>  drivers/char/hw_random/meson-rng.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/char/hw_random/meson-rng.c b/drivers/char/hw_random/meson-rng.c
+> index 51864a509be7..119d698439ae 100644
+> --- a/drivers/char/hw_random/meson-rng.c
+> +++ b/drivers/char/hw_random/meson-rng.c
+> @@ -122,7 +122,6 @@ static struct platform_driver meson_rng_driver = {
+>  
+>  module_platform_driver(meson_rng_driver);
+>  
+> -MODULE_ALIAS("platform:meson-rng");
+>  MODULE_DESCRIPTION("Meson H/W Random Number Generator driver");
+>  MODULE_AUTHOR("Lawrence Mok <lawrence.mok@amlogic.com>");
+>  MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+> 
 
-Oops, I forgot the penalty we *intended* to add with
-acpi_penalize_isa_irq().  It's really like this, where X is the SCI
-penalty and Y is the part added by acpi_penalize_isa_irq():
-
-  Initially     acpi_isa_irq_penalty[9] = 0.
-  Assume        sci_interrupt = 9.
-  Then          acpi_irq_get_penalty(9) returns X.
-  If we call    acpi_penalize_isa_irq(9, 1),
-  it sets       acpi_isa_irq_penalty[9] = X + Y,
-  and now       acpi_irq_get_penalty(9) returns X + X + Y.
-
-At the end, acpi_irq_get_penalty(9) *should* return X + Y, but instead
-it returns X + X + Y, i.e., the SCI penalty is included twice.
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
