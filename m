@@ -1,28 +1,55 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 21 Oct 2016 17:39:15 -0500
-Subject: [PATCH 1/2] pinctrl: pm8994: add pad voltage regulator defines
-In-Reply-To: <CACRpkdZYYawHAOyu09vVxkTFQdrPmHsX28C7sjrWQ57MzfR4JQ@mail.gmail.com>
-References: <1474047681-6821-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1474047681-6821-2-git-send-email-srinivas.kandagatla@linaro.org>
- <CACRpkdZYYawHAOyu09vVxkTFQdrPmHsX28C7sjrWQ57MzfR4JQ@mail.gmail.com>
-Message-ID: <20161021223915.GH3145@hector.attlocal.net>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 21 Oct 2016 15:52:55 -0700
+Subject: [PATCH v3 [fix]] PM / doc: Update device documentation for devices in
+ IRQ safe PM domains
+In-Reply-To: <20161021152313.GC72940@linaro.org>
+References: <20161021152313.GC72940@linaro.org>
+Message-ID: <1477090375-13814-1-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 01:38:30PM +0200, Linus Walleij wrote:
-> On Fri, Sep 16, 2016 at 7:41 PM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
-> 
-> > This patch adds defines for internal voltage regulators used
-> > to switch voltage levels on gpio/mpp pads.
-> >
-> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Andy can merge this with the rest of the stuff to the Qualcomm SoC tree.
+Update documentation to reflect the changes made to support IRQ safe PM
+domains.
 
-Yup.  Picked it up.  Thanks!
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+Changes since v3:
+- Moved para to the end of the section
+- Added clause for all IRQ safe devices in a domain
+- Cleanup explanation of nested domains
+---
+ Documentation/power/devices.txt | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-
-Andy
+diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+index 8ba6625..9218ce6 100644
+--- a/Documentation/power/devices.txt
++++ b/Documentation/power/devices.txt
+@@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
+ into a low-power state together at the same time by turning off the shared
+ power resource.  Of course, they also need to be put into the full-power state
+ together, by turning the shared power resource on.  A set of devices with this
+-property is often referred to as a power domain.
++property is often referred to as a power domain. A power domain may also be
++nested inside another power domain. The nested domain is referred to as the
++sub-domain of the parent domain.
+ 
+ Support for power domains is provided through the pm_domain field of struct
+ device.  This field is a pointer to an object of type struct dev_pm_domain,
+@@ -629,6 +631,13 @@ support for power domains into subsystem-level callbacks, for example by
+ modifying the platform bus type.  Other platforms need not implement it or take
+ it into account in any way.
+ 
++Devices and PM domains may be defined as IRQ-safe, if they can be powered
++on/off even when the IRQs are disabled. An IRQ-safe device in a domain will
++disallow power management on the domain, unless the domain is also defined as
++IRQ-safe. In other words, a domain containing all IRQ-safe devices must also
++be defined as IRQ-safe. Another restriction this framework imposes on the
++parent domain of an IRQ-safe domain is that the parent domain must also be
++defined as IRQ-safe.
+ 
+ Device Low Power (suspend) States
+ ---------------------------------
+-- 
+2.7.4
