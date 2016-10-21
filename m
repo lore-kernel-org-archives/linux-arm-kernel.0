@@ -1,71 +1,24 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 21 Oct 2016 08:27:03 -0600
-Subject: [RFC,v1,2/2] vfio/iommu-type1: set only stage 2 translation
-In-Reply-To: <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
-References: <1477024764-79882-1-git-send-email-songwenjun@huawei.com>
- <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
-Message-ID: <20161021082703.4890c419@t450s.home>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 21 Oct 2016 16:33:52 +0200
+Subject: [RFC] ARM: dts: exynos: Remove exynos4415.dtsi
+In-Reply-To: <1477059331-14586-1-git-send-email-krzk@kernel.org>
+References: <CGME20161021141653eucas1p11801729a8cea77169d2639bbae6f0d6c@eucas1p1.samsung.com>
+ <1477059331-14586-1-git-send-email-krzk@kernel.org>
+Message-ID: <c8576159-347c-42df-6a8d-8620ba4be8a1@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2016 12:39:24 +0800
-Rick Song <songwenjun@huawei.com> wrote:
-
-> Normally, VFIO should use only stage 2 translation of
-> iommu, to create the address mapping. If nesting translation
-> is disabled from VFIO core, enable iommu domain only stage 2
-> attribute, otherwise, enable iommu domain nesting attribute.
+On 10/21/2016 04:15 PM, Krzysztof Kozlowski wrote:
+> There are no boards in mainline using exynos4415.dtsi.  This is DTS
+> was not tested for long.  I am also not aware of any popular out-of-tree
+> boards using this (except consumer devices released by Samsung but those
+> cannot use mainline).
 > 
-> Signed-off-by: Rick Song <songwenjun@huawei.com>
-> ---
->  drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
+> Keeping Exynos4415 costs some useless effort so remove it.
 > 
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index 2ba1942..c0265fe 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -741,7 +741,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  	struct vfio_group *group, *g;
->  	struct vfio_domain *domain, *d;
->  	struct bus_type *bus = NULL;
-> -	int ret;
-> +	int attr, ret;
->  
->  	mutex_lock(&iommu->lock);
->  
-> @@ -775,13 +775,22 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  		goto out_free;
->  	}
->  
-> +	/*
-> +	 * Set iommu nesting domain attribute if nesting translation
-> +	 * is enabled from iommu vfio, otherwise set iommu only stage
-> +	 * 2 domain attribute.
-> +	 */
-> +	attr = 1;
->  	if (iommu->nesting) {
-> -		int attr = 1;
-> -
->  		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_NESTING,
->  					    &attr);
->  		if (ret)
->  			goto out_domain;
-> +	} else {
-> +		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_S2,
-> +					    &attr);
-> +		if (ret)
-> +			goto out_domain;
->  	}
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-This attribute is not relevant to the majority of current users, why
-would we assume that we need to call it for all non-nesting cases?  Why
-do we need to set the attribute at all, what benefit does it provide?
-If this is the normal case for an IOMMU API domain, why is there an
-option for it at all?  Maybe this should be the default and S1
-(whatever that means) should be the alternate option.  Thanks,
+It seems a sane thing to do, I don't know of any active platform that
+uses Exynos4415.
 
-Alex
-
->  
->  	ret = iommu_attach_group(domain->domain, iommu_group);
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
