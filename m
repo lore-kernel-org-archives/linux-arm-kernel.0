@@ -1,48 +1,170 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 21 Oct 2016 12:22:55 +0100
-Subject: [PATCH v4 0/3] arm64/mm: use the contiguous attribute for kernel
- mappings
-Message-ID: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Fri, 21 Oct 2016 12:22:56 +0100
+Subject: [PATCH v4 1/3] arm64: mm: BUG on unsupported manipulations of live
+ kernel mappings
+In-Reply-To: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1477048978-4140-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back to a 3-piece series.
+Now that we take care not manipulate the live kernel page tables in a
+way that may lead to TLB conflicts, the case where a table mapping is
+replaced by a block mapping can no longer occur. So remove the handling
+of this at the PUD and PMD levels, and instead, BUG() on any occurrence
+of live kernel page table manipulations that modify anything other than
+the permission bits.
 
-Changes in v4:
-- dropped handling of contiguous PUDs and folded PMDs, given that the hardware
-  is likely to ignore the contiguous bit at this level anyway
-- factor out the pte/pmd/pgd attribute BUG check (#1)
+Since mark_rodata_ro() is the only caller where the kernel mappings that
+are being manipulated are actually live, drop the various conditional
+flush_tlb_all() invocations, and add a single call to mark_rodata_ro()
+instead.
 
-Changes in v3 [0]:
-- add support for contiguous PMDs for all granule sizes (not just 16k)
-- add a separate patch to deal with contiguous PUDs (4k granule only), and
-  contiguous PMDs for 2 levels of translation (which requires special handling)
-- avoid pmd_none/pud_none in the BUG() statements in patch #1, since they
-  may resolve in unexpected ways with folded PMDs/PUDs
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/mmu.c | 70 ++++++++++++--------
+ 1 file changed, 43 insertions(+), 27 deletions(-)
 
-Version v2 [1] addressed the following issues:
-- the contiguous attribute is also useful for contigous PMD mappings on 16k
-  granule kernels (i.e., 1 GB blocks)
-- the function parameter 'block_mappings_allowed' does not clearly convey
-  whether contiguous page mappings should be used, so it is renamed to
-  'page_mappings_only', and its meaning inverted
-- instead of BUGging on changes in the PTE_CONT attribute in PMD or PTE entries
-  that have been populated already, BUG on any modification except for
-  permission attributes, which don't require break-before-make when changed.
-
-[0] http://marc.info/?l=linux-arm-kernel&m=147627155206982
-[1] http://marc.info/?l=linux-arm-kernel&m=147618975314593
-
-Ard Biesheuvel (3):
-  arm64: mm: BUG on unsupported manipulations of live kernel mappings
-  arm64: mm: replace 'block_mappings_allowed' with 'page_mappings_only'
-  arm64: mm: set the contiguous bit for kernel mappings where
-    appropriate
-
- arch/arm64/include/asm/mmu.h |   2 +-
- arch/arm64/kernel/efi.c      |   8 +-
- arch/arm64/mm/mmu.c          | 134 +++++++++++++-------
- 3 files changed, 93 insertions(+), 51 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 05615a3fdc6f..27dc0e5012a8 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -28,8 +28,6 @@
+ #include <linux/memblock.h>
+ #include <linux/fs.h>
+ #include <linux/io.h>
+-#include <linux/slab.h>
+-#include <linux/stop_machine.h>
+ 
+ #include <asm/barrier.h>
+ #include <asm/cputype.h>
+@@ -95,6 +93,17 @@ static phys_addr_t __init early_pgtable_alloc(void)
+ 	return phys;
+ }
+ 
++static bool pgattr_change_is_safe(u64 old, u64 new)
++{
++	/*
++	 * The following mapping attributes may be updated in live
++	 * kernel mappings without the need for break-before-make.
++	 */
++	static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
++
++	return old  == 0 || new  == 0 || ((old ^ new) & ~mask) == 0;
++}
++
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  pgprot_t prot,
+@@ -115,8 +124,17 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 
+ 	pte = pte_set_fixmap_offset(pmd, addr);
+ 	do {
++		pte_t old_pte = *pte;
++
+ 		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
++
++		/*
++		 * After the PTE entry has been populated once, we
++		 * only allow updates to the permission attributes.
++		 */
++		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
++
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+ 
+ 	pte_clear_fixmap();
+@@ -146,27 +164,27 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 
+ 	pmd = pmd_set_fixmap_offset(pud, addr);
+ 	do {
++		pmd_t old_pmd = *pmd;
++
+ 		next = pmd_addr_end(addr, end);
++
+ 		/* try section mapping first */
+ 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+ 		      allow_block_mappings) {
+-			pmd_t old_pmd =*pmd;
+ 			pmd_set_huge(pmd, phys, prot);
++
+ 			/*
+-			 * Check for previous table entries created during
+-			 * boot (__create_page_tables) and flush them.
++			 * After the PMD entry has been populated once, we
++			 * only allow updates to the permission attributes.
+ 			 */
+-			if (!pmd_none(old_pmd)) {
+-				flush_tlb_all();
+-				if (pmd_table(old_pmd)) {
+-					phys_addr_t table = pmd_page_paddr(old_pmd);
+-					if (!WARN_ON_ONCE(slab_is_available()))
+-						memblock_free(table, PAGE_SIZE);
+-				}
+-			}
++			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
++						      pmd_val(*pmd)));
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+ 				       prot, pgtable_alloc);
++
++			BUG_ON(pmd_val(old_pmd) != 0 &&
++			       pmd_val(old_pmd) != pmd_val(*pmd));
+ 		}
+ 		phys += next - addr;
+ 	} while (pmd++, addr = next, addr != end);
+@@ -204,33 +222,28 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 
+ 	pud = pud_set_fixmap_offset(pgd, addr);
+ 	do {
++		pud_t old_pud = *pud;
++
+ 		next = pud_addr_end(addr, end);
+ 
+ 		/*
+ 		 * For 4K granule only, attempt to put down a 1GB block
+ 		 */
+ 		if (use_1G_block(addr, next, phys) && allow_block_mappings) {
+-			pud_t old_pud = *pud;
+ 			pud_set_huge(pud, phys, prot);
+ 
+ 			/*
+-			 * If we have an old value for a pud, it will
+-			 * be pointing to a pmd table that we no longer
+-			 * need (from swapper_pg_dir).
+-			 *
+-			 * Look up the old pmd table and free it.
++			 * After the PUD entry has been populated once, we
++			 * only allow updates to the permission attributes.
+ 			 */
+-			if (!pud_none(old_pud)) {
+-				flush_tlb_all();
+-				if (pud_table(old_pud)) {
+-					phys_addr_t table = pud_page_paddr(old_pud);
+-					if (!WARN_ON_ONCE(slab_is_available()))
+-						memblock_free(table, PAGE_SIZE);
+-				}
+-			}
++			BUG_ON(!pgattr_change_is_safe(pud_val(old_pud),
++						      pud_val(*pud)));
+ 		} else {
+ 			alloc_init_pmd(pud, addr, next, phys, prot,
+ 				       pgtable_alloc, allow_block_mappings);
++
++			BUG_ON(pud_val(old_pud) != 0 &&
++			       pud_val(old_pud) != pud_val(*pud));
+ 		}
+ 		phys += next - addr;
+ 	} while (pud++, addr = next, addr != end);
+@@ -396,6 +409,9 @@ void mark_rodata_ro(void)
+ 	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+ 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
+ 			    section_size, PAGE_KERNEL_RO);
++
++	/* flush the TLBs after updating live kernel mappings */
++	flush_tlb_all();
+ }
+ 
+ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
 -- 
 2.7.4
