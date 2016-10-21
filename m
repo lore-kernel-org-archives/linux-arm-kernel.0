@@ -1,171 +1,86 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 21 Oct 2016 09:45:35 -0500
-Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <20161021015814.GC31044@localhost>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
- <20161021015814.GC31044@localhost>
-Message-ID: <20161021144535.GB877@localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 21 Oct 2016 15:48:07 +0100
+Subject: [RFC,v1,2/2] vfio/iommu-type1: set only stage 2 translation
+In-Reply-To: <20161021082703.4890c419@t450s.home>
+References: <1477024764-79882-1-git-send-email-songwenjun@huawei.com>
+ <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
+ <20161021082703.4890c419@t450s.home>
+Message-ID: <1522b473-5979-0fa1-073f-be0fe7e1aa2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 08:58:14PM -0500, Bjorn Helgaas wrote:
-> On Wed, Oct 19, 2016 at 06:21:03PM -0400, Sinan Kaya wrote:
-> > The SCI penalize function was removed in two steps (first refactor
-> > and then remove) and these changes are reverted here in one go.
-> > 
-> > The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> > refactored the original code so that SCI penalty is calculated dynamically
-> > by the time get_penalty function is called. That change is partially
-> > reverted here, specifically for the SCI IRQ alone.
-> > 
-> > The SCI penalize function was finally dropped by commit 9e5ed6d1fb87
-> > ("ACPI,PCI,IRQ: remove SCI penalize function") that replaced the old SCI
-> > penalty API with penalty calculation carried out dynamically and based
-> > on the acpi_gbl_FADT.sci_interrupt value.
-> > 
-> > However, that new algorithm relies on the accurate setting of IRQ
-> > types and that doesn't happen early enough on some platforms which
-> > leads to incorrect penalty assignments for PCI IRQs.  In those cases,
-> > irq_get_trigger_type() returns incorrect values for the IRQs in
-> > question, because they have not been registered yet by the time the
-> > penalties are calculated.
-> > 
-> > To fix this problem, we only need to fix the penalty for the SCI interrupt.
-> > It seems better to add a single "sci_penalty" variable, set it to
-> > PIRQ_PENALTY_PCI_USING if it's level/low or PIRQ_PENALTY_ISA_ALWAYS
-> > otherwise, and add "sci_penalty" in when appropriate.  That should fix it
-> > for *any* SCI IRQ, not just those less than 256, and we don't have to add
-> > these extra penalty table entries that are all unused (except possibly for
-> > one entry if we have an SCI in the 16-255 range).
-> > 
-> > For this reason, revert commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI
-> > penalize function") completely to restore the correct behavior.
+On 21/10/16 15:27, Alex Williamson wrote:
+> On Fri, 21 Oct 2016 12:39:24 +0800
+> Rick Song <songwenjun@huawei.com> wrote:
 > 
-> I like this patch fine, except for the changelog.  I don't think it's
-> useful to describe this as a revert and give all the historical
-> details.  I think the important part is something like this:
+>> Normally, VFIO should use only stage 2 translation of
+>> iommu, to create the address mapping. If nesting translation
+>> is disabled from VFIO core, enable iommu domain only stage 2
+>> attribute, otherwise, enable iommu domain nesting attribute.
+>>
+>> Signed-off-by: Rick Song <songwenjun@huawei.com>
+>> ---
+>>  drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++---
+>>  1 file changed, 12 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>> index 2ba1942..c0265fe 100644
+>> --- a/drivers/vfio/vfio_iommu_type1.c
+>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>> @@ -741,7 +741,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>  	struct vfio_group *group, *g;
+>>  	struct vfio_domain *domain, *d;
+>>  	struct bus_type *bus = NULL;
+>> -	int ret;
+>> +	int attr, ret;
+>>  
+>>  	mutex_lock(&iommu->lock);
+>>  
+>> @@ -775,13 +775,22 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>  		goto out_free;
+>>  	}
+>>  
+>> +	/*
+>> +	 * Set iommu nesting domain attribute if nesting translation
+>> +	 * is enabled from iommu vfio, otherwise set iommu only stage
+>> +	 * 2 domain attribute.
+>> +	 */
+>> +	attr = 1;
+>>  	if (iommu->nesting) {
+>> -		int attr = 1;
+>> -
+>>  		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_NESTING,
+>>  					    &attr);
+>>  		if (ret)
+>>  			goto out_domain;
+>> +	} else {
+>> +		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_S2,
+>> +					    &attr);
+>> +		if (ret)
+>> +			goto out_domain;
+>>  	}
 > 
->   We previously used irq_get_trigger_type(irq) to help compute the
->   penalty for the SCI, but that depends on the SCI having been
->   registered already.  Add acpi_penalize_sci_irq() so platforms can
->   tell us the SCI IRQ, trigger, and polarity so we can compute the
->   penalty even before the SCI has been registered.
+> This attribute is not relevant to the majority of current users, why
+> would we assume that we need to call it for all non-nesting cases?  Why
+> do we need to set the attribute at all, what benefit does it provide?
+> If this is the normal case for an IOMMU API domain, why is there an
+> option for it at all?  Maybe this should be the default and S1
+> (whatever that means) should be the alternate option.  Thanks,
 
-Thanks for the pointer [1] to the issues around
-acpi_penalize_sci_irq() being called before kmalloc() is available.
-That begs the question of exactly *why* we need
-acpi_penalize_sci_irq() so early -- I doubt we actually need to handle
-SCIs that early, and obviously we don't need to look up penalties that
-early (because we only look them up when enabling interrupt links,
-which happens much later).
+Indeed, it should be fairly straightforward to make
+arm_smmu_domain_finalise() prefer stage 1/stage 2 based on domain->type
+in the case that both stages are implemented. That would be preferable
+to changing core VFIO code for something that really is SMMU-specific.
 
-[1] http://marc.info/?l=linux-acpi&m=145580159209240&w=2)
+To echo Alex, though, what's the motivation for this? Could it be
+addressed by simply implementing a force_stage parameter like the SMMUv2
+driver has?
 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Robin.
 
-Wait a minute, I still have a question here: what about other ACPI
-arches (ia64, arm64)?  Don't they need to call acpi_penalize_sci_irq()
-somewhere?
-
-> > ---
-> >  arch/x86/kernel/acpi/boot.c |  1 +
-> >  drivers/acpi/pci_link.c     | 30 +++++++++++++++---------------
-> >  include/linux/acpi.h        |  1 +
-> >  3 files changed, 17 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-> > index 90d84c3..0ffd26e 100644
-> > --- a/arch/x86/kernel/acpi/boot.c
-> > +++ b/arch/x86/kernel/acpi/boot.c
-> > @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
-> >  		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
-> >  
-> >  	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
-> > +	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
-> >  
-> >  	/*
-> >  	 * stash over-ride to indicate we've been here
-> > diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> > index 4f37938..294b190 100644
-> > --- a/drivers/acpi/pci_link.c
-> > +++ b/drivers/acpi/pci_link.c
-> > @@ -87,6 +87,7 @@ struct acpi_pci_link {
-> >  
-> >  static LIST_HEAD(acpi_link_list);
-> >  static DEFINE_MUTEX(acpi_link_lock);
-> > +static int sci_irq = -1, sci_penalty;
-> >  
-> >  /* --------------------------------------------------------------------------
-> >                              PCI Link Device Management
-> > @@ -496,25 +497,13 @@ static int acpi_irq_get_penalty(int irq)
-> >  {
-> >  	int penalty = 0;
-> >  
-> > -	/*
-> > -	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
-> > -	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-> > -	* use for PCI IRQs.
-> > -	*/
-> > -	if (irq == acpi_gbl_FADT.sci_interrupt) {
-> > -		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
-> > -
-> > -		if (type != IRQ_TYPE_LEVEL_LOW)
-> > -			penalty += PIRQ_PENALTY_ISA_ALWAYS;
-> > -		else
-> > -			penalty += PIRQ_PENALTY_PCI_USING;
-> > -	}
-> > +	if (irq == sci_irq)
-> > +		penalty += sci_penalty;
-> >  
-> >  	if (irq < ACPI_MAX_ISA_IRQS)
-> >  		return penalty + acpi_isa_irq_penalty[irq];
-> >  
-> > -	penalty += acpi_irq_pci_sharing_penalty(irq);
-> > -	return penalty;
-> > +	return penalty + acpi_irq_pci_sharing_penalty(irq);
-> >  }
-> >  
-> >  int __init acpi_irq_penalty_init(void)
-> > @@ -881,6 +870,17 @@ bool acpi_isa_irq_available(int irq)
-> >  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
-> >  }
-> >  
-> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-> > +{
-> > +	sci_irq = irq;
-> > +
-> > +	if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
-> > +	    polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
-> > +		sci_penalty = PIRQ_PENALTY_PCI_USING;
-> > +	else
-> > +		sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
-> > +}
-> > +
-> >  /*
-> >   * Over-ride default table to reserve additional IRQs for use by ISA
-> >   * e.g. acpi_irq_isa=5
-> > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> > index c5eaf2f..67d1d3e 100644
-> > --- a/include/linux/acpi.h
-> > +++ b/include/linux/acpi.h
-> > @@ -318,6 +318,7 @@ struct pci_dev;
-> >  int acpi_pci_irq_enable (struct pci_dev *dev);
-> >  void acpi_penalize_isa_irq(int irq, int active);
-> >  bool acpi_isa_irq_available(int irq);
-> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
-> >  void acpi_pci_irq_disable (struct pci_dev *dev);
-> >  
-> >  extern int ec_read(u8 addr, u8 *val);
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> Alex
+> 
+>>  
+>>  	ret = iommu_attach_group(domain->domain, iommu_group);
+> 
