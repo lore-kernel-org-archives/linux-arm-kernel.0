@@ -1,64 +1,80 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Oct 2016 23:11:33 -0200
-Subject: [PATCH] ARM: imx: gpc: Initialize all power domains
-In-Reply-To: <CAOMZO5CORjf_86-XBy+STd4sEhcus8y1G4B-n58h3KNyuVyEew@mail.gmail.com>
-References: <1476208413-11286-1-git-send-email-fabio.estevam@nxp.com>
- <20161019141556.GA18806@tiger>
- <CAOMZO5CORjf_86-XBy+STd4sEhcus8y1G4B-n58h3KNyuVyEew@mail.gmail.com>
-Message-ID: <CAOMZO5Dusa0TdVtv4CrXcYe=80zhkFZRp9Y2d9PZTARq_3=1+w@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 21 Oct 2016 09:21:37 +0800
+Subject: [PATCH v7 3/5] ARM: dts: imx6qdl-icore: Add usbhost support
+In-Reply-To: <1476437243-13297-4-git-send-email-jteki@openedev.com>
+References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
+ <1476437243-13297-4-git-send-email-jteki@openedev.com>
+Message-ID: <20161021012137.GC30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 3:29 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Shawn,
->
-> On Wed, Oct 19, 2016 at 12:15 PM, Shawn Guo <shawnguo@kernel.org> wrote:
->
->> It's not clear to me why this is only with multi_v7_defconfig, not
->> imx_v6_v7_defconfig.  Also, is it a regression or long-standing issue?
->
-> Investigated this a bit further and the problem seems to be in the
-> power domain driver.
->
-> The change below fixes the problem on mx6:
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index e023066..461d03c 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1572,8 +1572,6 @@ int of_genpd_add_provider_onecell(struct device_node *np,
->         for (i = 0; i < data->num_domains; i++) {
->                 if (!data->domains[i])
->                         continue;
-> -               if (!pm_genpd_present(data->domains[i]))
-> -                       goto error;
->
->                 data->domains[i]->provider = &np->fwnode;
->                 data->domains[i]->has_provider = true;
->
-> , will submit this to the power domain folks.
+On Fri, Oct 14, 2016 at 02:57:21PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Add usbhost support for Engicam i.CoreM6 dql modules.
+> 
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v7:
+>         - none
+> Changes for v6:
+>         - none
+> Changes for v5:
+>         - none
+> Changes for v4:
+>         - new patch
+> 
+>  arch/arm/boot/dts/imx6qdl-icore.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> index f424cd5..ffec879 100644
+> --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> @@ -56,6 +56,15 @@
+>  		regulator-boot-on;
+>  		regulator-always-on;
+>  	};
+> +
+> +	reg_usb_h1_vbus: usb_h1_vbus {
 
-Actually the above change would go against:
+Hyphen instead of underscore should be used in node name.  Also please
+name fixed regulator in the following schema:
 
-Author: Jon Hunter <jonathanh@nvidia.com>
-Date:   Mon Sep 12 12:01:10 2016 +0100
+        reg_xxx: regulator-xxx {
+                ...
+        };
 
-    PM / Domains: Verify the PM domain is present when adding a provider
+Shawn
 
-    When a PM domain provider is added, there is currently no way to tell if
-    any PM domains associated with the provider are present. Naturally, the
-    PM domain provider should not be registered if the PM domains have not
-    been added. Nonetheless, verify that the PM domain(s) associated with a
-    provider are present when registering the PM domain provider.
-
-    This change adds a dependency on the function pm_genpd_present() when
-    CONFIG_PM_GENERIC_DOMAINS_OF is enabled and so ensure this function is
-    available when CONFIG_PM_GENERIC_DOMAINS_OF selected.
-
-    Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-    Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-    Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-,so it seems the original patch in this thread is correct.
-
-I will update the commit log and submit a v2.
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_h1_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-boot-on;
+> +		regulator-always-on;
+> +	};
+>  };
+>  
+>  &can1 {
+> @@ -109,6 +118,12 @@
+>  	status = "okay";
+>  };
+>  
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+>  &usdhc1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc1>;
+> -- 
+> 2.7.4
+> 
