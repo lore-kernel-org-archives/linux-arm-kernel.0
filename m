@@ -1,54 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 20 Oct 2016 17:04:08 -0700
-Subject: [PATCH v2 3/4] arm64: dts: msm8996: Add SMEM DT nodes
-In-Reply-To: <1477005139-15564-4-git-send-email-spjoshi@codeaurora.org>
-References: <1477005139-15564-1-git-send-email-spjoshi@codeaurora.org>
- <1477005139-15564-4-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <20161021000408.GI26139@codeaurora.org>
+From: net147@gmail.com (Jonathan Liu)
+Date: Fri, 21 Oct 2016 11:30:01 +1100
+Subject: [linux-sunxi] [PATCH v5 3/4] Documentation: devicetree: add
+ vendor prefix for Pine64
+In-Reply-To: <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
+References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
+ <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20, Sarangdhar Joshi wrote:
-> From: Bjorn Andersson <bjorn.andersson@linaro.org>
-> 
-> Add SMEM and TCSR DT nodes on MSM8996.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+On 21 October 2016 at 05:00, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> [Maxime: Change title prefix to match the usual style]
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  arch/arm64/boot/dts/qcom/msm8996.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> index 949b096..abc1089 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-> @@ -164,17 +164,36 @@
->  
->  	};
->  
-> +	tcsr_mutex: hwlock {
-> +		compatible = "qcom,tcsr-mutex";
-> +		syscon = <&tcsr_mutex_regs 0 0x1000>;
-> +		#hwlock-cells = <1>;
-> +	};
-> +
->  	psci {
->  		compatible = "arm,psci-1.0";
->  		method = "smc";
->  	};
->  
-> +	smem {
-> +		compatible = "qcom,smem";
-> +
-> +		memory-region = <&smem_mem>;
-> +
-> +		hwlocks = <&tcsr_mutex 3>;
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index f0a48ea78659..4eefd1c3ff16 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -208,7 +208,7 @@ parade      Parade Technologies Inc.
+>  pericom        Pericom Technology Inc.
+>  phytec PHYTEC Messtechnik GmbH
+>  picochip       Picochip Ltd
+> -pixcir  PIXCIR MICROELECTRONICS Co., Ltd
 
-Super nitpick: Is there a reason we have newlines between
-everything in this node? This node is the only one that isn't
-consistent.
+Why is "pixcir  PIXCIR MICROELECTRONICS Co., Ltd" removed?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> +pine64 Pine64
+>  plathome       Plat'Home Co., Ltd.
+>  plda   PLDA
+>  powervr        PowerVR (deprecated, use img)
+> --
+> git-series 0.8.10
+
+Regards,
+Jonathan
