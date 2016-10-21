@@ -1,143 +1,227 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 21 Oct 2016 12:40:08 +0200
-Subject: [PATCH v3 5/6] ARM: sunxi: Remove useless allwinner, pull property
-In-Reply-To: <20161020173848.be9cf97854f8933b3ce90d55@free.fr>
-References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
- <42e249454ccf6b14e9ec266cb8d42a24f6d71d7b.1476971126.git-series.maxime.ripard@free-electrons.com>
- <20161020173848.be9cf97854f8933b3ce90d55@free.fr>
-Message-ID: <20161021104008.lsonnfjcpjlxgsff@lukather>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 21 Oct 2016 12:02:45 +0100
+Subject: [RFC PATCH 8/8] ARM: KVM: Support vGICv3 ITS
+In-Reply-To: <1477042601-15227-9-git-send-email-vladimir.murzin@arm.com>
+References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+ <1477042601-15227-9-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <857fb7fd-b8eb-7a44-2a6c-be2ec41927ec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Oct 20, 2016 at 05:38:48PM +0200, Jean-Francois Moine wrote:
-> On Thu, 20 Oct 2016 15:49:06 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 21/10/16 10:36, Vladimir Murzin wrote:
+> This patch allows to build and use vGICv3 ITS in 32-bit mode.
+
+Ah, what a relief to see that config option go. Thanks for that!
+
+I quickly booted an ITS guest on a (64-bit) model and couldn't spot any
+regressions.
+
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Cheers,
+Andre.
+
+> ---
+>  Documentation/virtual/kvm/api.txt   |    2 +-
+>  arch/arm/include/uapi/asm/kvm.h     |    2 ++
+>  arch/arm/kvm/Kconfig                |    1 +
+>  arch/arm/kvm/Makefile               |    1 +
+>  arch/arm/kvm/arm.c                  |    6 ++++++
+>  arch/arm64/kvm/Kconfig              |    4 ----
+>  arch/arm64/kvm/reset.c              |    6 ------
+>  virt/kvm/arm/vgic/vgic-kvm-device.c |    2 --
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 --
+>  virt/kvm/arm/vgic/vgic.h            |   26 --------------------------
+>  10 files changed, 11 insertions(+), 41 deletions(-)
 > 
-> > The allwinner,pull property set to NO_PULL was really considered our
-> > default (and wasn't even changing the default value in the code).
-> > 
-> > Remove these properties to make it obvious that we do not set anything in
-> > such a case.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/ntc-gr8-evb.dts                     |  4 +-
-> >  arch/arm/boot/dts/ntc-gr8.dtsi                        | 14 +-----
-> >  arch/arm/boot/dts/sun4i-a10-a1000.dts                 |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-cubieboard.dts            |  1 +-
-> >  arch/arm/boot/dts/sun4i-a10-dserve-dsrv9703c.dts      |  4 +-
-> >  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts              |  1 +-
-> >  arch/arm/boot/dts/sun4i-a10-hackberry.dts             |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-inet1.dts                 |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts            |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-marsboard.dts             |  1 +-
-> >  arch/arm/boot/dts/sun4i-a10-mk802.dts                 |  3 +-
-> >  arch/arm/boot/dts/sun4i-a10-olinuxino-lime.dts        |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-pcduino.dts               |  2 +-
-> >  arch/arm/boot/dts/sun4i-a10-pcduino2.dts              |  1 +-
-> >  arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts      |  3 +-
-> >  arch/arm/boot/dts/sun4i-a10.dtsi                      | 24 +--------
-> >  arch/arm/boot/dts/sun5i-a10s-auxtek-t003.dts          |  1 +-
-> >  arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts          |  2 +-
-> >  arch/arm/boot/dts/sun5i-a10s-mk802.dts                |  2 +-
-> >  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts      |  2 +-
-> >  arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts         |  2 +-
-> >  arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts              |  2 +-
-> >  arch/arm/boot/dts/sun5i-a10s.dtsi                     |  7 +--
-> >  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts              |  1 +-
-> >  arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts       |  3 +-
-> >  arch/arm/boot/dts/sun5i-a13-olinuxino.dts             |  2 +-
-> >  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts              |  1 +-
-> >  arch/arm/boot/dts/sun5i-a13.dtsi                      |  3 +-
-> >  arch/arm/boot/dts/sun5i-r8-chip.dts                   |  2 +-
-> >  arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi  |  2 +-
-> >  arch/arm/boot/dts/sun5i.dtsi                          |  7 +--
-> >  arch/arm/boot/dts/sun6i-a31-app4-evb1.dts             |  1 +-
-> >  arch/arm/boot/dts/sun6i-a31-colombus.dts              |  1 +-
-> >  arch/arm/boot/dts/sun6i-a31-hummingbird.dts           |  2 +-
-> >  arch/arm/boot/dts/sun6i-a31-i7.dts                    |  2 +-
-> >  arch/arm/boot/dts/sun6i-a31-m9.dts                    |  2 +-
-> >  arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts      |  2 +-
-> >  arch/arm/boot/dts/sun6i-a31.dtsi                      | 13 +----
-> >  arch/arm/boot/dts/sun6i-a31s-primo81.dts              |  1 +-
-> >  arch/arm/boot/dts/sun6i-a31s-sina31s.dts              |  1 +-
-> >  arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts      |  3 +-
-> >  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts      |  3 +-
-> >  arch/arm/boot/dts/sun7i-a20-bananapi.dts              |  2 +-
-> >  arch/arm/boot/dts/sun7i-a20-bananapro.dts             |  5 +--
-> >  arch/arm/boot/dts/sun7i-a20-cubieboard2.dts           |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20-cubietruck.dts            |  6 +--
-> >  arch/arm/boot/dts/sun7i-a20-hummingbird.dts           |  4 +-
-> >  arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts             |  4 +-
-> >  arch/arm/boot/dts/sun7i-a20-itead-ibox.dts            |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts             |  2 +-
-> >  arch/arm/boot/dts/sun7i-a20-m3.dts                    |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20-mk808c.dts                |  2 +-
-> >  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts        |  4 +-
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts        |  2 +-
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts  |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts       |  3 +-
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts       |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20-orangepi-mini.dts         |  4 +-
-> >  arch/arm/boot/dts/sun7i-a20-orangepi.dts              |  4 +-
-> >  arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts         |  3 +-
-> >  arch/arm/boot/dts/sun7i-a20-pcduino3.dts              |  2 +-
-> >  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts        |  3 +-
-> >  arch/arm/boot/dts/sun7i-a20-wits-pro-a20-dkt.dts      |  1 +-
-> >  arch/arm/boot/dts/sun7i-a20.dtsi                      | 37 +------------
-> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi                  | 10 +---
-> >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts |  1 +-
-> >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts |  1 +-
-> >  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        |  1 +-
-> >  arch/arm/boot/dts/sun8i-a33-olinuxino.dts             |  3 +-
-> >  arch/arm/boot/dts/sun8i-a33.dtsi                      |  1 +-
-> >  arch/arm/boot/dts/sun8i-a83t.dtsi                     |  3 +-
-> >  arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts       |  3 +-
-> >  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts             |  2 +-
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts             |  4 +-
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-lite.dts          |  3 +-
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts           |  3 +-
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts            |  3 +-
-> >  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts          |  1 +-
-> >  arch/arm/boot/dts/sun8i-h3.dtsi                       | 12 +----
-> >  arch/arm/boot/dts/sun8i-r16-parrot.dts                |  3 +-
-> >  arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi  |  2 +-
-> >  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts           |  1 +-
-> >  arch/arm/boot/dts/sun9i-a80-optimus.dts               |  4 +-
-> >  arch/arm/boot/dts/sun9i-a80.dtsi                      |  6 +--
-> >  arch/arm/boot/dts/sunxi-common-regulators.dtsi        |  4 +-
-> >  85 files changed, 0 insertions(+), 302 deletions(-)
-> 	[snip]
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 739db9a..2feeae6 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2198,7 +2198,7 @@ after pausing the vcpu, but before it is resumed.
+>  4.71 KVM_SIGNAL_MSI
+>  
+>  Capability: KVM_CAP_SIGNAL_MSI
+> -Architectures: x86 arm64
+> +Architectures: x86 arm arm64
+>  Type: vm ioctl
+>  Parameters: struct kvm_msi (in)
+>  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index b38c10c..af05f8e 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -87,9 +87,11 @@ struct kvm_regs {
+>  /* Supported VGICv3 address types  */
+>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+> +#define KVM_VGIC_ITS_ADDR_TYPE		4
+>  
+>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+> +#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
+>  
+>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>  #define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 3e1cd04..90d0176 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -34,6 +34,7 @@ config KVM
+>  	select HAVE_KVM_IRQFD
+>  	select HAVE_KVM_IRQCHIP
+>  	select HAVE_KVM_IRQ_ROUTING
+> +	select HAVE_KVM_MSI
+>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index f19842e..d571243 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -32,5 +32,6 @@ obj-y += $(KVM)/arm/vgic/vgic-mmio.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>  obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
+> +obj-y += $(KVM)/arm/vgic/vgic-its.o
+>  obj-y += $(KVM)/irqchip.o
+>  obj-y += $(KVM)/arm/arch_timer.o
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 03e9273..8b13448 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -209,6 +209,12 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_MAX_VCPUS:
+>  		r = KVM_MAX_VCPUS;
+>  		break;
+> +	case KVM_CAP_MSI_DEVID:
+> +		if (!kvm)
+> +			r = -EINVAL;
+> +		else
+> +			r = kvm->arch.vgic.msis_require_devid;
+> +		break;
+>  	default:
+>  		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
+>  		break;
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index 6eaf12c..52cb7ad 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -16,9 +16,6 @@ menuconfig VIRTUALIZATION
+>  
+>  if VIRTUALIZATION
+>  
+> -config KVM_ARM_VGIC_V3_ITS
+> -	bool
+> -
+>  config KVM
+>  	bool "Kernel-based Virtual Machine (KVM) support"
+>  	depends on OF
+> @@ -34,7 +31,6 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> -	select KVM_ARM_VGIC_V3_ITS
+>  	select KVM_ARM_PMU if HW_PERF_EVENTS
+>  	select HAVE_KVM_MSI
+>  	select HAVE_KVM_IRQCHIP
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 5bc4608..e95d4f6 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -86,12 +86,6 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>  		r = 1;
+>  		break;
+> -	case KVM_CAP_MSI_DEVID:
+> -		if (!kvm)
+> -			r = -EINVAL;
+> -		else
+> -			r = kvm->arch.vgic.msis_require_devid;
+> -		break;
+>  	default:
+>  		r = 0;
+>  	}
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index ce1f4ed..fbe87a6 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -221,11 +221,9 @@ int kvm_register_vgic_device(unsigned long type)
+>  		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+>  					      KVM_DEV_TYPE_ARM_VGIC_V3);
+>  
+> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>  		if (ret)
+>  			break;
+>  		ret = kvm_vgic_register_its_device();
+> -#endif
+>  		break;
+>  	}
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 0d3c76a..50f42f0 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -42,7 +42,6 @@ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+>  	return reg | ((u64)val << lower);
+>  }
+>  
+> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>  bool vgic_has_its(struct kvm *kvm)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+> @@ -52,7 +51,6 @@ bool vgic_has_its(struct kvm *kvm)
+>  
+>  	return dist->has_its;
+>  }
+> -#endif
+>  
+>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>  					    gpa_t addr, unsigned int len)
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 9d9e014..859f65c 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -84,37 +84,11 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+>  int vgic_v3_map_resources(struct kvm *kvm);
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>  
+> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>  int vgic_register_its_iodevs(struct kvm *kvm);
+>  bool vgic_has_its(struct kvm *kvm);
+>  int kvm_vgic_register_its_device(void);
+>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
+> -#else
+> -static inline int vgic_register_its_iodevs(struct kvm *kvm)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline bool vgic_has_its(struct kvm *kvm)
+> -{
+> -	return false;
+> -}
+> -
+> -static inline int kvm_vgic_register_its_device(void)
+> -{
+> -	return -ENODEV;
+> -}
+> -
+> -static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> -{
+> -}
+> -
+> -static inline int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+> -{
+> -	return -ENODEV;
+> -}
+> -#endif
+>  
+>  int kvm_register_vgic_device(unsigned long type);
+>  int vgic_lazy_init(struct kvm *kvm);
 > 
-> Is it really usefull to change all these files while in a previous
-> patch you were writing:
-> > The generic pin configuration and multiplexing should be preferred now,
-> > even though we still support the old one.
-> ?
-
-I assume you wanted to comment on the sixth patch.
-
-Yes, it's useful, because that way we avoid using a deprecated
-binding, that we would have to mix the newer binding which would be
-completely inconsistent, and that way we use the generic binding that
-everyone uses everywhere.
-
-The backward compatibility is just here to avoid breaking the ABI.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161021/b625a715/attachment.sig>
