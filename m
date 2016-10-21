@@ -1,20 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 21 Oct 2016 17:54:08 +0200
-Subject: [RFC PATCH 08/13] dwmac-meson8b: add support for phy selection
-In-Reply-To: <1477060838-14164-9-git-send-email-narmstrong@baylibre.com>
-References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
- <1477060838-14164-9-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20161021155408.GR16974@lunn.ch>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 21 Oct 2016 08:56:26 -0700
+Subject: [PATCH V6 00/10] dmaengine: qcom_hidma: add MSI interrupt support
+In-Reply-To: <20161021065723.GA2467@localhost>
+References: <1476899512-20431-1-git-send-email-okaya@codeaurora.org>
+ <20161020094838.GY2467@localhost>
+ <e3cbd6a2-7fac-98ec-74ea-0be88075663c@codeaurora.org>
+ <20161020164321.GZ2467@localhost>
+ <a4c95bd6-d760-1f02-bbb1-89538037d41e@codeaurora.org>
+ <37baf7db-1e14-4027-9397-70649e8fa946@codeaurora.org>
+ <20161021065723.GA2467@localhost>
+Message-ID: <90b882fa-8a10-089a-eb2d-c7deaa611526@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 04:40:33PM +0200, Neil Armstrong wrote:
-> The Meson GXL dwmac Glue Layer also provides switching between an external PHY
-> and an internal RMII 10/100 PHY.
-> Add a way to setup the correct PHY switching from a device tree attribute.
+On 10/20/2016 11:57 PM, Vinod Koul wrote:
+>> It looks like patches were applied out of order.
+> When applying, if I get a conflict I try to skip them. Typically subsequent
+> patches fail, sometimes they apply. I think couple of them did in this case
+> 
+> It built for me, 0day also gave me success report, so unless we have bisect
+> regression, I would like rest of the patches on top of this please..
+> 
 
-Humm, actually. Maybe PHY_IS_INTERNAL in the phydrv->flags is the
-better solution. The MAC can then use phy_is_internal(ndev->phydev) to
-decide if this register needs programming.
+OK. Let me work on it.
 
-       Andrew
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
