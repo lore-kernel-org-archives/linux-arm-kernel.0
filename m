@@ -1,45 +1,41 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 11:16:07 +0200
-Subject: [PATCH 2/5] ARM: dts: r8a7778: Remove skeleton.dtsi inclusion
-In-Reply-To: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
-References: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1477041370-22778-3-git-send-email-geert+renesas@glider.be>
+Date: Fri, 21 Oct 2016 11:20:29 +0200
+Subject: [PATCH] dt/bindings: arm-boards: Remove skeleton.dtsi inclusion from
+ example
+Message-ID: <1477041629-23341-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
 as deprecated"), including skeleton.dtsi is deprecated.
-
-This fixes the following warning with W=1:
-
-    Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Hence remove it from the example.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/arm-boards | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index e571d66ea0fe1721..f3ffe1d315443e7e 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -14,8 +14,6 @@
-  * kind, whether express or implied.
-  */
+diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+index ab318a56fca2194f..e667ecbcf226dfe3 100644
+--- a/Documentation/devicetree/bindings/arm/arm-boards
++++ b/Documentation/devicetree/bindings/arm/arm-boards
+@@ -148,15 +148,14 @@ Example:
  
--/include/ "skeleton.dtsi"
--
- #include <dt-bindings/clock/r8a7778-clock.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+ /dts-v1/;
  #include <dt-bindings/interrupt-controller/irq.h>
-@@ -23,6 +21,8 @@
+-#include "skeleton.dtsi"
+ 
  / {
- 	compatible = "renesas,r8a7778";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
+ 	model = "ARM RealView PB1176 with device tree";
+ 	compatible = "arm,realview-pb1176";
++	#address-cells = <0>;
 +	#size-cells = <1>;
  
- 	cpus {
- 		#address-cells = <1>;
+ 	soc {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+ 		compatible = "arm,realview-pb1176-soc", "simple-bus";
+ 		ranges;
+ 
 -- 
 1.9.1
