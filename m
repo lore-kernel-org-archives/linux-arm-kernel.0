@@ -1,40 +1,53 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 21 Oct 2016 10:57:45 -0700
-Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
- path
-In-Reply-To: <20161021021450.GA16461@b29397-desktop>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-12-stephen.boyd@linaro.org>
- <20161019011535.GC6294@b29397-desktop>
- <147684198705.24897.12451889548508263144@sboyd-linaro>
- <20161019080211.GA1968@b29397-desktop>
- <147694652997.28344.1048935134595924905@sboyd-linaro>
- <20161020101017.GA32001@b29397-desktop>
- <147699579088.21058.4379586947317571921@sboyd-linaro>
- <20161021021450.GA16461@b29397-desktop>
-Message-ID: <147707266552.25233.4203897094706565540@sboyd-linaro>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 21 Oct 2016 19:36:49 +0200
+Subject: [PATCH 1/2] gpio: mxs: use enable/disable regs to (un)mask irqs
+In-Reply-To: <20161021131138.10467-2-s.hauer@pengutronix.de>
+References: <20161021131138.10467-1-s.hauer@pengutronix.de>
+ <20161021131138.10467-2-s.hauer@pengutronix.de>
+Message-ID: <05028208-b4c5-7a5e-6983-5e8b353bfdc1@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-10-20 19:14:50)
+On 10/21/2016 03:11 PM, Sascha Hauer wrote:
+> The mxs gpio controller does not only have a mask register to mask
+> interrupts, but also enable/disable registers. Use the enable/disable
+> registers rather than the mask register. This does not have any
+> advantage for now, but makes the next patch simpler.
 > 
-> I tested my patch, it works well at my side, if it is ok for you, please
-> ack it, I will apply it as well as your chipidea series after your
-> gpu fix patch at greg's usb-next tree.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Feel free to add my:
+Reviewed-by: Marek Vasut <marex@denx.de>
 
-Tested-by: Stephen Boyd <stephen.boyd@linaro.org>
-Reported-by: Stephen Boyd <stephen.boyd@linaro.org>
+Thanks
 
-tags to the patch.
-
+> ---
+>  drivers/gpio/gpio-mxs.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> Is it ok for you?
+> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> index b9daa0b..1cf579f 100644
+> --- a/drivers/gpio/gpio-mxs.c
+> +++ b/drivers/gpio/gpio-mxs.c
+> @@ -211,12 +211,13 @@ static int __init mxs_gpio_init_gc(struct mxs_gpio_port *port, int irq_base)
+>  
+>  	ct = gc->chip_types;
+>  	ct->chip.irq_ack = irq_gc_ack_set_bit;
+> -	ct->chip.irq_mask = irq_gc_mask_clr_bit;
+> -	ct->chip.irq_unmask = irq_gc_mask_set_bit;
+> +	ct->chip.irq_mask = irq_gc_mask_disable_reg;
+> +	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
+>  	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
+>  	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq;
+>  	ct->regs.ack = PINCTRL_IRQSTAT(port) + MXS_CLR;
+> -	ct->regs.mask = PINCTRL_IRQEN(port);
+> +	ct->regs.enable = PINCTRL_IRQEN(port) + MXS_SET;
+> +	ct->regs.disable = PINCTRL_IRQEN(port) + MXS_CLR;
+>  
+>  	irq_setup_generic_chip(gc, IRQ_MSK(32), IRQ_GC_INIT_NESTED_LOCK,
+>  			       IRQ_NOREQUEST, 0);
 > 
 
-Ok sounds good. The GPU patch has been picked up into drm-misc now, but
-I'm not sure if it's going to be merged into -rc2 or not but it sounds
-like you'll figure that part out.
 
-I'll resend the phy drivers to Kishon now. Thanks.
+-- 
+Best regards,
+Marek Vasut
