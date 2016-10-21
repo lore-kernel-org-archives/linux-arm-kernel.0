@@ -1,83 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Oct 2016 14:48:55 +0100
-Subject: [PATCH] arm64: fix show_regs fallout from KERN_CONT changes
-In-Reply-To: <20161021125439.GE16630@leverpostej>
-References: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
- <3a8485da-3f7d-07f8-95db-281e0115494d@arm.com>
- <20161021125439.GE16630@leverpostej>
-Message-ID: <00e54ff9-e4da-c96f-47dd-f7930ac12a40@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 21 Oct 2016 21:53:43 +0800
+Subject: [PATCH 0/4] ARM: boot: mxs: Add On-Chip RAM
+In-Reply-To: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
+References: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20161021135343.GI30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/16 13:54, Mark Rutland wrote:
-> Hi,
+On Tue, Sep 13, 2016 at 05:51:02PM +0000, Stefan Wahren wrote:
+> The i.MX23 / i.MX28 have a small amount of On-Chip RAM which is also necessary
+> for suspend to RAM and standby mode. But before we need to remove the fake reg
+> properties of all internal bus nodes as discussed in this thread [1].
 > 
-> On Fri, Oct 21, 2016 at 12:34:11PM +0100, Robin Murphy wrote:
->>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
->>> index ddce61b..3f31cf93 100644
->>> --- a/arch/arm64/kernel/process.c
->>> +++ b/arch/arm64/kernel/process.c
->>> @@ -187,10 +187,19 @@ void __show_regs(struct pt_regs *regs)
->>>  	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
->>>  	       regs->pc, lr, regs->pstate);
->>>  	printk("sp : %016llx\n", sp);
->>> -	for (i = top_reg; i >= 0; i--) {
->>> +
->>> +	i = top_reg;
->>> +
->>> +	while (i >= 0) {
->>>  		printk("x%-2d: %016llx ", i, regs->regs[i]);
->>> -		if (i % 2 == 0)
->>> -			printk("\n");
->>> +		i--;
->>> +
->>> +		if (i % 2 == 0) {
->>> +			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
->>> +			i--;
->>> +		}
->>> +
->>> +		pr_cont("\n");
->>>  	}
->>
->> Might it be nicer to simply do this (or thereabouts)?
+> This patch series requires Fabio Estevam's recent series "ARM: dts: imx23:
+> Remove skeleton.dtsi inclusion" [2].
 > 
-> I don't think so; top_reg is either 12 (for compat), or 29 (for native),
-> so for the compat case, with the existing code the first line should be
-> one register (r12), with r1; r0 on the final line.
+> [1] - https://marc.info/?l=devicetree&m=146139948426520&w=2
 
-Heh, the "or thereabouts" was intended to acknowledge the act of
-copy-pasting patch context around in an email client without even
-looking at the original code (or how it's called) ;)
+The page cannot be reached.  I would like to understand the
+background for this change.
 
-The main idea was that it looks feasible to avoid pr_cont() and the
-yucky floating "\n"s altogether.
+Shawn
 
->> 	for (i = top_reg; i > 1; i -= 2)
->> 		printk("x%-2d: %016llx x%-2d: %016llx\n", i-1,
->> 			regs->regs[i-1], i, regs->regs[i]);
+> [2] - http://www.spinics.net/lists/arm-kernel/msg528974.html
 > 
-> ... whereas here the first line would be two (r12 and r11) ... 
+> Stefan Wahren (4):
+>   ARM: dts: imx23: Remove fake "reg" properties from bus nodes
+>   ARM: dts: imx28: Remove fake "reg" properties from bus nodes
+>   ARM: dts: imx23: add On-Chip RAM
+>   ARM: dts: imx28: add On-Chip RAM
 > 
->> 	if (i > 0)
->> 		printk("x%-2d: %016llx\n", i-1, regs->regs[i-1]);
+>  arch/arm/boot/dts/imx23-evk.dts           |    8 ++++----
+>  arch/arm/boot/dts/imx23-olinuxino.dts     |    8 ++++----
+>  arch/arm/boot/dts/imx23-sansa.dts         |    8 ++++----
+>  arch/arm/boot/dts/imx23-stmp378x_devb.dts |    6 +++---
+>  arch/arm/boot/dts/imx23-xfi3.dts          |    8 ++++----
+>  arch/arm/boot/dts/imx23.dtsi              |   15 +++++++++------
+>  arch/arm/boot/dts/imx28-apf28.dts         |    8 ++++----
+>  arch/arm/boot/dts/imx28-apf28dev.dts      |    8 ++++----
+>  arch/arm/boot/dts/imx28-apx4devkit.dts    |    8 ++++----
+>  arch/arm/boot/dts/imx28-cfa10036.dts      |    8 ++++----
+>  arch/arm/boot/dts/imx28-cfa10037.dts      |    8 ++++----
+>  arch/arm/boot/dts/imx28-cfa10049.dts      |   10 +++++-----
+>  arch/arm/boot/dts/imx28-cfa10055.dts      |    6 +++---
+>  arch/arm/boot/dts/imx28-cfa10056.dts      |    4 ++--
+>  arch/arm/boot/dts/imx28-cfa10057.dts      |   10 +++++-----
+>  arch/arm/boot/dts/imx28-cfa10058.dts      |   10 +++++-----
+>  arch/arm/boot/dts/imx28-duckbill.dts      |    8 ++++----
+>  arch/arm/boot/dts/imx28-evk.dts           |    8 ++++----
+>  arch/arm/boot/dts/imx28-m28.dtsi          |    6 +++---
+>  arch/arm/boot/dts/imx28-m28cu3.dts        |    8 ++++----
+>  arch/arm/boot/dts/imx28-m28evk.dts        |    8 ++++----
+>  arch/arm/boot/dts/imx28-sps1.dts          |    8 ++++----
+>  arch/arm/boot/dts/imx28.dtsi              |   17 +++++++++--------
+>  23 files changed, 100 insertions(+), 96 deletions(-)
 > 
-> ... and then r0 on its own.
+> -- 
+> 1.7.9.5
 > 
-> Perhaps that's fine, but it would differ from the existing behaviour,
-> and make native and compat noticeably different.
->
-> We could try fixing up the first line prior to the loop, but that still
-> requires duplicating the format string thrice, manipulation of i, etc.
 > 
-> It looks like Will's taken my patch as-is, but if we can clean this up
-> further it would certainly be nice.
-
-Sure, getting it un-broken for 4.9 is the important thing. I'll take a
-proper look into the refactoring idea next time I get bored.
-
-Robin.
-
-> 
-> Thanks,
-> Mark.
-> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
