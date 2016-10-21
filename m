@@ -1,50 +1,34 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 21 Oct 2016 09:55:32 +0100
-Subject: [PATCH] [media] c8sectpfe: Remove clk_disable_unprepare hacks
-Message-ID: <1477040132-31442-1-git-send-email-peter.griffin@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 21 Oct 2016 10:58:46 +0200
+Subject: [PATCH v2 0/2] ARM: oxnas: Add SMP support for OX820
+Message-ID: <20161021085848.1754-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that CLK_PROC_STFE is defined as a critical clock in
-DT, we can remove the commented clk_disable_unprepare from
-the c8sectpfe driver. This means we now have balanced
-clk*enable/disable calls in the driver, but on STiH407
-family the clock in reality will never actually be disabled.
+In order to support the SMP feature of the Oxford Semiconductor OX820 SoC,
+add the necessary code to handle the wake-up, hotplug and cpu entry.
 
-This is due to a HW bug where once the IP has been configured
-and the SLIM core is running, disabling the clock causes a
-unrecoverable bus lockup.
+The OX820 has an ARM11MPCORE cluster with 2 cores and has proper hardware
+support for secondary core booting.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+Changes since v1 at http://lkml.kernel.org/r/20161017084303.20078-1-narmstrong at baylibre.com
+ - Remove useless holding pen loops and spinlock in boot_secondary
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 30c148b..79d793b 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -888,8 +888,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_clk_disable:
--	/* TODO uncomment when upstream has taken a reference on this clk */
--	/*clk_disable_unprepare(fei->c8sectpfeclk);*/
-+	clk_disable_unprepare(fei->c8sectpfeclk);
- 	return ret;
- }
- 
-@@ -924,11 +923,8 @@ static int c8sectpfe_remove(struct platform_device *pdev)
- 	if (readl(fei->io + SYS_OTHER_CLKEN))
- 		writel(0, fei->io + SYS_OTHER_CLKEN);
- 
--	/* TODO uncomment when upstream has taken a reference on this clk */
--	/*
- 	if (fei->c8sectpfeclk)
- 		clk_disable_unprepare(fei->c8sectpfeclk);
--	*/
- 
- 	return 0;
- }
+Neil Armstrong (2):
+  ARM: oxnas: Add OX820 SMP support
+  ARM: oxnas: Add OX820 config and makefile entry
+
+ arch/arm/Makefile             |   1 +
+ arch/arm/mach-oxnas/Kconfig   |  30 ++++++++----
+ arch/arm/mach-oxnas/Makefile  |   2 +
+ arch/arm/mach-oxnas/headsmp.S |  28 +++++++++++
+ arch/arm/mach-oxnas/hotplug.c | 111 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-oxnas/platsmp.c | 104 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 267 insertions(+), 9 deletions(-)
+ create mode 100644 arch/arm/mach-oxnas/Makefile
+ create mode 100644 arch/arm/mach-oxnas/headsmp.S
+ create mode 100644 arch/arm/mach-oxnas/hotplug.c
+ create mode 100644 arch/arm/mach-oxnas/platsmp.c
+
 -- 
-1.9.1
+2.7.0
