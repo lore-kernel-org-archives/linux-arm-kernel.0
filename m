@@ -1,79 +1,71 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 21 Oct 2016 17:06:57 +0300
-Subject: [PATCH] PM / Domains: Restrict "samsung,power-domain" checks to
- ARCH_EXYNOS
-In-Reply-To: <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
-References: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
- <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
-Message-ID: <20161021140657.GC3289@kozik-lap>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 21 Oct 2016 08:27:03 -0600
+Subject: [RFC,v1,2/2] vfio/iommu-type1: set only stage 2 translation
+In-Reply-To: <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
+References: <1477024764-79882-1-git-send-email-songwenjun@huawei.com>
+ <1477024764-79882-2-git-send-email-songwenjun@huawei.com>
+Message-ID: <20161021082703.4890c419@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 02:29:05PM +0200, Rafael J. Wysocki wrote:
-> On Fri, Oct 21, 2016 at 1:34 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> > Currently the generic PM Domain code code checks for the presence of
-> > both (generic) "power-domains" and (Samsung Exynos legacy)
-> > "samsung,power-domain" properties in all device tree nodes representing
-> > devices.
-> >
-> > There are two issues with this:
-> >   1. This imposes a small boot-time penalty on all platforms using DT,
-> >   2. Platform-specific checks do not really belong in core framework
-> >      code.
-> >
-> > While moving the check from platform-agnostic code to Samsung-specific
-> > code is non-trivial, the runtime overhead can be restricted to kernels
-> > including support for 32-bit Samsung Exynos platforms.
-> >
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > "samsung,power-domain" was only ever used in:
-> >   - arch/arm/boot/dts/exynos4415.dtsi: Unused?
-> >   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
-> >   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
-> >   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
-> >                                        exynos4212.dtsi is unused?
-> >   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
-> >   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
-> > ---
-> >  drivers/base/power/domain.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> > index e023066e421547c5..d94d6a4b9b527108 100644
-> > --- a/drivers/base/power/domain.c
-> > +++ b/drivers/base/power/domain.c
-> > @@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
-> >         ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
-> >                                         "#power-domain-cells", 0, &pd_args);
-> >         if (ret < 0) {
-> > -               if (ret != -ENOENT)
-> > +               if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
+On Fri, 21 Oct 2016 12:39:24 +0800
+Rick Song <songwenjun@huawei.com> wrote:
+
+> Normally, VFIO should use only stage 2 translation of
+> iommu, to create the address mapping. If nesting translation
+> is disabled from VFIO core, enable iommu domain only stage 2
+> attribute, otherwise, enable iommu domain nesting attribute.
 > 
-> Please don't check things like CONFIG_ARCH_EXYNOS in the core.
+> Signed-off-by: Rick Song <songwenjun@huawei.com>
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
 > 
-> If you need to put checks like that here, there is a design problem somewhere.
-> 
-> And imagine someone 5 years ahead from now looking at this code and
-> wondering why on Earth the check is here.
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 2ba1942..c0265fe 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -741,7 +741,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  	struct vfio_group *group, *g;
+>  	struct vfio_domain *domain, *d;
+>  	struct bus_type *bus = NULL;
+> -	int ret;
+> +	int attr, ret;
+>  
+>  	mutex_lock(&iommu->lock);
+>  
+> @@ -775,13 +775,22 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  		goto out_free;
+>  	}
+>  
+> +	/*
+> +	 * Set iommu nesting domain attribute if nesting translation
+> +	 * is enabled from iommu vfio, otherwise set iommu only stage
+> +	 * 2 domain attribute.
+> +	 */
+> +	attr = 1;
+>  	if (iommu->nesting) {
+> -		int attr = 1;
+> -
+>  		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_NESTING,
+>  					    &attr);
+>  		if (ret)
+>  			goto out_domain;
+> +	} else {
+> +		ret = iommu_domain_set_attr(domain->domain, DOMAIN_ATTR_S2,
+> +					    &attr);
+> +		if (ret)
+> +			goto out_domain;
+>  	}
 
-Sorry for the noise, sending once again without bogus recipient added by
-mistake:
+This attribute is not relevant to the majority of current users, why
+would we assume that we need to call it for all non-nesting cases?  Why
+do we need to set the attribute at all, what benefit does it provide?
+If this is the normal case for an IOMMU API domain, why is there an
+option for it at all?  Maybe this should be the default and S1
+(whatever that means) should be the alternate option.  Thanks,
 
-I don't find the argument of performance penalty such important but for
-the sake of design, the samsung-specific code could be moved to
-drivers/soc/samsung/pm_domains.c, called "legacy_pm_parse" and exported
-through a header. Thus with !ARCH_EXYNOS that would be 'static inline
-{}'.  However that is not a nice solution - there will be still
-direct call to platform-specific code in the core. I am not sure if it
-is worth the effort.
+Alex
 
-The samsung,power-domain was made deprecated (although not explicitly)
-in January 2015 (0da658704136 ("ARM: dts: convert to generic power
-domain bindings for exynos DT")) so how about:
-1. Printing a dev_warn() about usage of deprecated bindings.
-2. Complete removal in January 2017?
-
-Best regards,
-Krzysztof
+>  
+>  	ret = iommu_attach_group(domain->domain, iommu_group);
