@@ -1,275 +1,277 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Fri, 21 Oct 2016 13:53:21 +0200
-Subject: [PATCH] net: stmmac: Add OXNAS Glue Driver
-In-Reply-To: <CAGhQ9Vxe8fe8kfF_WY40xdh6YX9TuxQ3-Dd6pBG=AHpLtrHnMA@mail.gmail.com>
-References: <20161021084445.24989-1-narmstrong@baylibre.com>
- <CAGhQ9Vxe8fe8kfF_WY40xdh6YX9TuxQ3-Dd6pBG=AHpLtrHnMA@mail.gmail.com>
-Message-ID: <474261f0-1cb7-5932-4c9f-0cbcc705fa61@st.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Fri, 21 Oct 2016 20:13:13 +0800
+Subject: [PATCH V7 1/3] tracing: add a possibility of exporting function
+ trace to other places instead of ring buffer only
+In-Reply-To: <20161018114418.3445c390@gandalf.local.home>
+References: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
+ <1476778140-10319-2-git-send-email-zhang.chunyan@linaro.org>
+ <20161018114418.3445c390@gandalf.local.home>
+Message-ID: <CAG2=9p_SKF4TAbbqF6L4u=y9-_m73vZJ3tOAbRKHCT0MOsLwGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
-
-some my minor cents below
-
-On 10/21/2016 12:20 PM, Joachim Eastwood wrote:
-> Hi Neil,
+On 18 October 2016 at 23:44, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Tue, 18 Oct 2016 16:08:58 +0800
+> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
 >
-> On 21 October 2016 at 10:44, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
+>> Currently Function traces can be only exported to ring buffer, this
+>> patch added trace_export concept which can process traces and export
+>> them to a registered destination as an addition to the current only
+>> one output of Ftrace - i.e. ring buffer.
 >>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> In this way, if we want Function traces to be sent to other destination
+>> rather than ring buffer only, we just need to register a new trace_export
+>> and implement its own .write() function for writing traces to storage.
+>>
+>> With this patch, only Function trace (trace type is TRACE_FN)
+>> is supported.
+>
+> This is getting better, but I still have some nits.
+>
+
+Thanks.
+
+>>
+>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
 >> ---
->>  .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 +++++
->>  drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
->>  drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
->>  drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 219 +++++++++++++++++++++
->>  4 files changed, 275 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
->>  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
+>>  include/linux/trace.h |  28 +++++++++++
+>>  kernel/trace/trace.c  | 132 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>>  2 files changed, 159 insertions(+), 1 deletion(-)
+>>  create mode 100644 include/linux/trace.h
 >>
->> Changes since RFC at https://patchwork.kernel.org/patch/9387257 :
->>  - Drop init/exit callbacks
->>  - Implement proper remove and PM callback
->>  - Call init from probe
->>  - Disable/Unprepare clock if stmmac probe fails
->
-> <snip>
->
->> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
->> @@ -0,0 +1,219 @@
+>> diff --git a/include/linux/trace.h b/include/linux/trace.h
+>> new file mode 100644
+>> index 0000000..eb1c5b8
+>> --- /dev/null
+>> +++ b/include/linux/trace.h
+>> @@ -0,0 +1,28 @@
+>> +#ifndef _LINUX_TRACE_H
+>> +#define _LINUX_TRACE_H
+>> +
+>> +#ifdef CONFIG_TRACING
 >> +/*
->> + * Oxford Semiconductor OXNAS DWMAC glue layer
+>> + * The trace export - an export of Ftrace output. The trace_export
+>> + * can process traces and export them to a registered destination as
+>> + * an addition to the current only output of Ftrace - i.e. ring buffer.
 >> + *
->> + * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
->> + * Copyright (C) 2014 Daniel Golle <daniel@makrotopia.org>
->> + * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
->> + * Copyright (C) 2012 John Crispin <blogic@openwrt.org>
+>> + * If you want traces to be sent to some other place rather than ring
+>> + * buffer only, just need to register a new trace_export and implement
+>> + * its own .write() function for writing traces to the storage.
 >> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+>> + * next              - pointer to the next trace_export
+>> + * write     - copy traces which have been delt with ->commit() to
+>> + *             the destination
 >> + */
->> +
->> +#include <linux/device.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/stmmac.h>
->> +
->> +#include "stmmac_platform.h"
->> +
->> +/* System Control regmap offsets */
->> +#define OXNAS_DWMAC_CTRL_REGOFFSET     0x78
->> +#define OXNAS_DWMAC_DELAY_REGOFFSET    0x100
->> +
->> +/* Control Register */
->> +#define DWMAC_CKEN_RX_IN        14
->> +#define DWMAC_CKEN_RXN_OUT      13
->> +#define DWMAC_CKEN_RX_OUT       12
->> +#define DWMAC_CKEN_TX_IN        10
->> +#define DWMAC_CKEN_TXN_OUT      9
->> +#define DWMAC_CKEN_TX_OUT       8
->> +#define DWMAC_RX_SOURCE         7
->> +#define DWMAC_TX_SOURCE         6
->> +#define DWMAC_LOW_TX_SOURCE     4
->> +#define DWMAC_AUTO_TX_SOURCE    3
->> +#define DWMAC_RGMII             2
->> +#define DWMAC_SIMPLE_MUX        1
->> +#define DWMAC_CKEN_GTX          0
->> +
->> +/* Delay register */
->> +#define DWMAC_TX_VARDELAY_SHIFT                0
->> +#define DWMAC_TXN_VARDELAY_SHIFT       8
->> +#define DWMAC_RX_VARDELAY_SHIFT                16
->> +#define DWMAC_RXN_VARDELAY_SHIFT       24
->> +#define DWMAC_TX_VARDELAY(d)           ((d) << DWMAC_TX_VARDELAY_SHIFT)
->> +#define DWMAC_TXN_VARDELAY(d)          ((d) << DWMAC_TXN_VARDELAY_SHIFT)
->> +#define DWMAC_RX_VARDELAY(d)           ((d) << DWMAC_RX_VARDELAY_SHIFT)
->> +#define DWMAC_RXN_VARDELAY(d)          ((d) << DWMAC_RXN_VARDELAY_SHIFT)
->> +
->> +struct oxnas_dwmac {
->> +       struct device   *dev;
->> +       struct clk      *clk;
->> +       struct regmap   *regmap;
+>> +struct trace_export {
+>> +     struct trace_export __rcu       *next;
+>> +     void (*write)(const char *, unsigned int);
+>
+> Why const char*? Why not const void *? This will never be a string.
+>
+
+Will revise this.
+
+>
 >> +};
 >> +
->> +static int oxnas_dwmac_init(struct oxnas_dwmac *dwmac)
+>> +int register_ftrace_export(struct trace_export *export);
+>> +int unregister_ftrace_export(struct trace_export *export);
+>> +
+>> +#endif       /* CONFIG_TRACING */
+>> +
+>> +#endif       /* _LINUX_TRACE_H */
+>> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
+>> index 8696ce6..db94ec1 100644
+>> --- a/kernel/trace/trace.c
+>> +++ b/kernel/trace/trace.c
+>> @@ -40,6 +40,7 @@
+>>  #include <linux/poll.h>
+>>  #include <linux/nmi.h>
+>>  #include <linux/fs.h>
+>> +#include <linux/trace.h>
+>>  #include <linux/sched/rt.h>
+>>
+>>  #include "trace.h"
+>> @@ -2128,6 +2129,132 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
+>>       ftrace_trace_userstack(buffer, flags, pc);
+>>  }
+>>
+>> +static void
+>> +trace_process_export(struct trace_export *export,
+>> +            struct ring_buffer_event *event)
 >> +{
->> +       unsigned int value;
->> +       int ret;
+>> +     struct trace_entry *entry;
+>> +     unsigned int size = 0;
 >> +
->> +       /* Reset HW here before changing the glue configuration */
->> +       ret = device_reset(dwmac->dev);
->> +       if (ret)
->> +               return ret;
+>> +     entry = ring_buffer_event_data(event);
 >> +
->> +       clk_prepare_enable(dwmac->clk);
+>> +     size = ring_buffer_event_length(event);
+>> +
+>> +     if (export->write)
+>> +             export->write((char *)entry, size);
 >
-> You might want to check the return value from clk_prepare_enable() as well.
+> Is there ever going to be a time where export->write wont be set?
+
+There hasn't been since only one trace_export (i.e. stm_ftrace) was
+added in this patch-set , I just wanted to make sure the write() has
+been set before registering trace_export like what I added in 2/3 of
+this series.
+
 >
->> +
->> +       ret = regmap_read(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, &value);
->> +       if (ret < 0)
->> +               return ret;
->> +
->> +       /* Enable GMII_GTXCLK to follow GMII_REFCLK, required for gigabit PHY */
->> +       value |= BIT(DWMAC_CKEN_GTX);
->> +       /* Use simple mux for 25/125 Mhz clock switching */
->> +       value |= BIT(DWMAC_SIMPLE_MUX);
->> +       /* set auto switch tx clock source */
->> +       value |= BIT(DWMAC_AUTO_TX_SOURCE);
->> +       /* enable tx & rx vardelay */
->> +       value |= BIT(DWMAC_CKEN_TX_OUT);
->> +       value |= BIT(DWMAC_CKEN_TXN_OUT);
->> +       value |= BIT(DWMAC_CKEN_TX_IN);
->> +       value |= BIT(DWMAC_CKEN_RX_OUT);
->> +       value |= BIT(DWMAC_CKEN_RXN_OUT);
->> +       value |= BIT(DWMAC_CKEN_RX_IN);
->> +       regmap_write(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, value);
->> +
->> +       /* set tx & rx vardelay */
->> +       value = DWMAC_TX_VARDELAY(4);
->> +       value |= DWMAC_TXN_VARDELAY(2);
->> +       value |= DWMAC_RX_VARDELAY(10);
->> +       value |= DWMAC_RXN_VARDELAY(8);
->> +       regmap_write(dwmac->regmap, OXNAS_DWMAC_DELAY_REGOFFSET, value);
+> And if there is, this can be racy. As in
+>
+>
+>         CPU 0:                  CPU 1:
+>         ------                  ------
+>         if (export->write)
+>
+>                                 export->write = NULL;
+
+Is there going to be this kind of use case? Why some one needs to
+change export->write() rather than register a new trace_export?
+
+I probably haven't understood your point thoroughly, please correct me
+if my guess was wrong.
 
 
-there is no if condition so, I can suggest you, to hardwire
-value with macros instead of computing at runtime:
+Thanks for the review,
+Chunyan
 
-e.g.
-
-var = DWMAC_VARDELAY where
-  #define DWMAC_VARDELAY (DWMAC_TX_VARDELAY(4) | ...)
-
-... same for OXNAS_DWMAC_CTRL_REGOFFSET where
-BIT(DWMAC_CKEN_ ... ) should be re-organized as macros,
-I mean:
-#define DWMAC_CKEN_.. 	BIT(xxx)
-
->> +
->> +       return 0;
+>
+>         export->write(entry, size);
+>
+>         BOOM!
+>
+>
+> -- Steve
+>
 >> +}
 >> +
->> +static int oxnas_dwmac_probe(struct platform_device *pdev)
+>> +static DEFINE_MUTEX(ftrace_export_lock);
+>> +
+>> +static struct trace_export __rcu *ftrace_exports_list __read_mostly;
+>> +
+>> +static DEFINE_STATIC_KEY_FALSE(ftrace_exports_enabled);
+>> +
+>> +static inline void ftrace_exports_enable(void)
 >> +{
->> +       struct plat_stmmacenet_data *plat_dat;
->> +       struct stmmac_resources stmmac_res;
->> +       struct device_node *sysctrl;
->> +       struct oxnas_dwmac *dwmac;
->> +       int ret;
->> +
->> +       sysctrl = of_parse_phandle(pdev->dev.of_node, "oxsemi,sys-ctrl", 0);
->> +       if (!sysctrl) {
->> +               dev_err(&pdev->dev, "failed to get sys-ctrl node\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       ret = stmmac_get_platform_resources(pdev, &stmmac_res);
->> +       if (ret)
->> +               return ret;
->> +
->> +       plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
->> +       if (IS_ERR(plat_dat))
->> +               return PTR_ERR(plat_dat);
->> +
->> +       dwmac = devm_kzalloc(&pdev->dev, sizeof(*dwmac), GFP_KERNEL);
->> +       if (!dwmac)
->> +               return -ENOMEM;
->> +
->> +       dwmac->dev = &pdev->dev;
->> +       plat_dat->bsp_priv = dwmac;
->> +
->> +       dwmac->regmap = syscon_node_to_regmap(sysctrl);
->> +       if (IS_ERR(dwmac->regmap)) {
->> +               dev_err(&pdev->dev, "failed to have sysctrl regmap\n");
->> +               return PTR_ERR(dwmac->regmap);
->> +       }
->> +
->> +       dwmac->clk = devm_clk_get(&pdev->dev, "gmac");
->> +       if (IS_ERR(dwmac->clk))
->> +               return PTR_ERR(dwmac->clk);
->> +
->> +       ret = oxnas_dwmac_init(dwmac);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
->> +       if (ret)
->> +               clk_disable_unprepare(dwmac->clk);
->> +
->> +       return ret;
+>> +     static_branch_enable(&ftrace_exports_enabled);
 >> +}
 >> +
->> +static int oxnas_dwmac_remove(struct platform_device *pdev)
+>> +static inline void ftrace_exports_disable(void)
 >> +{
->> +       struct net_device *ndev = platform_get_drvdata(pdev);
->> +       struct stmmac_priv *priv = netdev_priv(ndev);
->> +       struct oxnas_dwmac *dwmac = priv->plat->bsp_priv;
->
-> Instead of this long dance of variables use the get_stmmac_bsp_priv()-helper.
->
-> You can take a look at dwmac-meson8b.c for reference.
->
->
->> +       int ret = stmmac_dvr_remove(&pdev->dev);
->> +
->> +       clk_disable_unprepare(dwmac->clk);
->> +
->> +       return ret;
+>> +     static_branch_disable(&ftrace_exports_enabled);
 >> +}
 >> +
->> +#ifdef CONFIG_PM_SLEEP
->> +static int oxnas_dwmac_suspend(struct device *dev)
+>> +void ftrace_exports(struct ring_buffer_event *event)
 >> +{
->> +       struct net_device *ndev = dev_get_drvdata(dev);
->> +       struct stmmac_priv *priv = netdev_priv(ndev);
->> +       struct oxnas_dwmac *dwmac = priv->plat->bsp_priv;
->
-> get_stmmac_bsp_priv()
->
->
->> +       int ret;
+>> +     struct trace_export *export;
 >> +
->> +       ret = stmmac_suspend(dev);
->> +       clk_disable_unprepare(dwmac->clk);
+>> +     preempt_disable_notrace();
 >> +
->> +       return ret;
+>> +     export = rcu_dereference_raw_notrace(ftrace_exports_list);
+>> +     while (export) {
+>> +             trace_process_export(export, event);
+>> +             export = rcu_dereference_raw_notrace(export->next);
+>> +     }
+>> +
+>> +     preempt_enable_notrace();
 >> +}
 >> +
->> +static int oxnas_dwmac_resume(struct device *dev)
+>> +static inline void
+>> +add_trace_export(struct trace_export **list, struct trace_export *export)
 >> +{
->> +       struct net_device *ndev = dev_get_drvdata(dev);
->> +       struct stmmac_priv *priv = netdev_priv(ndev);
->> +       struct oxnas_dwmac *dwmac = priv->plat->bsp_priv;
->
-> get_stmmac_bsp_priv()
->
->
->> +       int ret;
->> +
->> +       ret = oxnas_dwmac_init(dwmac);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = stmmac_resume(dev);
->> +
->> +       return ret;
+>> +     rcu_assign_pointer(export->next, *list);
+>> +     /*
+>> +      * We are entering export into the list but another
+>> +      * CPU might be walking that list. We need to make sure
+>> +      * the export->next pointer is valid before another CPU sees
+>> +      * the export pointer included into the list.
+>> +      */
+>> +     rcu_assign_pointer(*list, export);
 >> +}
->> +#endif /* CONFIG_PM_SLEEP */
->
-> With these changes:
-> Acked-by: Joachim Eastwood <manabian@gmail.com>
->
->
-> best regards,
-> Joachim Eastwood
+>> +
+>> +static inline int
+>> +rm_trace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     struct trace_export **p;
+>> +
+>> +     for (p = list; *p != NULL; p = &(*p)->next)
+>> +             if (*p == export)
+>> +                     break;
+>> +
+>> +     if (*p != export)
+>> +             return -1;
+>> +
+>> +     rcu_assign_pointer(*p, (*p)->next);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static inline void
+>> +add_ftrace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     if (*list == NULL)
+>> +             ftrace_exports_enable();
+>> +
+>> +     add_trace_export(list, export);
+>> +}
+>> +
+>> +static inline int
+>> +rm_ftrace_export(struct trace_export **list, struct trace_export *export)
+>> +{
+>> +     int ret;
+>> +
+>> +     ret = rm_trace_export(list, export);
+>> +     if (*list == NULL)
+>> +             ftrace_exports_disable();
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +int register_ftrace_export(struct trace_export *export)
+>> +{
+>> +     if (WARN_ON_ONCE(!export->write))
+>> +             return -1;
+>> +
+>> +     mutex_lock(&ftrace_export_lock);
+>> +
+>> +     add_ftrace_export(&ftrace_exports_list, export);
+>> +
+>> +     mutex_unlock(&ftrace_export_lock);
+>> +
+>> +     return 0;
+>> +}
+>> +EXPORT_SYMBOL_GPL(register_ftrace_export);
+>> +
+>> +int unregister_ftrace_export(struct trace_export *export)
+>> +{
+>> +     int ret;
+>> +
+>> +     mutex_lock(&ftrace_export_lock);
+>> +
+>> +     ret = rm_ftrace_export(&ftrace_exports_list, export);
+>> +
+>> +     mutex_unlock(&ftrace_export_lock);
+>> +
+>> +     return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(unregister_ftrace_export);
+>> +
+>>  void
+>>  trace_function(struct trace_array *tr,
+>>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
+>> @@ -2146,8 +2273,11 @@ trace_function(struct trace_array *tr,
+>>       entry->ip                       = ip;
+>>       entry->parent_ip                = parent_ip;
+>>
+>> -     if (!call_filter_check_discard(call, entry, buffer, event))
+>> +     if (!call_filter_check_discard(call, entry, buffer, event)) {
+>> +             if (static_branch_unlikely(&ftrace_exports_enabled))
+>> +                     ftrace_exports(event);
+>>               __buffer_unlock_commit(buffer, event);
+>> +     }
+>>  }
+>>
+>>  #ifdef CONFIG_STACKTRACE
 >
