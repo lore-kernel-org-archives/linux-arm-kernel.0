@@ -1,100 +1,105 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Oct 2016 12:32:13 +0100
-Subject: [PATCH v14 7/9] clocksource/drivers/arm_arch_timer: Refactor the
- timer init code to prepare for GTDT
-In-Reply-To: <1475086637-1914-8-git-send-email-fu.wei@linaro.org>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-8-git-send-email-fu.wei@linaro.org>
-Message-ID: <20161021113213.GD16630@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 21 Oct 2016 12:34:11 +0100
+Subject: [PATCH] arm64: fix show_regs fallout from KERN_CONT changes
+In-Reply-To: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
+References: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <3a8485da-3f7d-07f8-95db-281e0115494d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 02:17:15AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+Hi Mark,
+
+On 20/10/16 12:23, Mark Rutland wrote:
+> Recently in commit 4bcc595ccd80decb ("printk: reinstate KERN_CONT for
+> printing continuation lines"), the behaviour of printk changed w.r.t.
+> KERN_CONT. Now, KERN_CONT is mandatory to continue existing lines.
+> Without this, prefixes are inserted, making output illegible, e.g.
 > 
-> The patch refactor original memory-mapped timer init code:
-> (1) extract some subfunction for reusing some common code
->     a. get_cnttidr
->     b. is_best_frame
-> (2) move base address and irq code for arch_timer_mem to
-> arch_timer_mem_register
+> [ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
+> [ 1007.076329] sp : ffff000008d53ec0
+> [ 1007.079606] x29: ffff000008d53ec0 [ 1007.082797] x28: 0000000080c50018
+> [ 1007.086160]
+> [ 1007.087630] x27: ffff000008e0c7f8 [ 1007.090820] x26: ffff80097631ca00
+> [ 1007.094183]
+> [ 1007.095653] x25: 0000000000000001 [ 1007.098843] x24: 000000ea68b61cac
+> [ 1007.102206]
 > 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ... or when dumped with the userpace dmesg tool, which has slightly
+> different implicit newline behaviour. e.g.
+> 
+> [ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
+> [ 1007.076329] sp : ffff000008d53ec0
+> [ 1007.079606] x29: ffff000008d53ec0
+> [ 1007.082797] x28: 0000000080c50018
+> [ 1007.086160]
+> [ 1007.087630] x27: ffff000008e0c7f8
+> [ 1007.090820] x26: ffff80097631ca00
+> [ 1007.094183]
+> [ 1007.095653] x25: 0000000000000001
+> [ 1007.098843] x24: 000000ea68b61cac
+> [ 1007.102206]
+> 
+> We can't simply always use KERN_CONT for lines which may or may not be
+> continuations. That causes line prefixes (e.g. timestamps) to be
+> supressed, and the alignment of all but the first line will be broken.
+> 
+> For even more fun, we can't simply insert some dummy empty-string printk
+> calls, as GCC warns for an empty printk string, and even if we pass
+> KERN_DEFAULT explcitly to silence the warning, the prefix gets swallowed
+> unless there is an additional part to the string.
+> 
+> Instead, we must manually iterate over pairs of registers, which gives
+> us the legible output we want in either case, e.g.
+> 
+> [  169.771790] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
+> [  169.779109] sp : ffff000008d53ec0
+> [  169.782386] x29: ffff000008d53ec0 x28: 0000000080c50018
+> [  169.787650] x27: ffff000008e0c7f8 x26: ffff80097631de00
+> [  169.792913] x25: 0000000000000001 x24: 00000027827b2cf4
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/clocksource/arm_arch_timer.c | 159 +++++++++++++++++++++--------------
->  1 file changed, 96 insertions(+), 63 deletions(-)
+>  arch/arm64/kernel/process.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index c7b0040..e78095f 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -57,6 +57,7 @@
->  static unsigned arch_timers_present __initdata;
->  
->  static void __iomem *arch_counter_base;
-> +static void __iomem *cntctlbase __initdata;
->  
->  struct arch_timer {
->  	void __iomem *base;
-> @@ -656,15 +657,49 @@ out:
->  	return err;
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index ddce61b..3f31cf93 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -187,10 +187,19 @@ void __show_regs(struct pt_regs *regs)
+>  	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
+>  	       regs->pc, lr, regs->pstate);
+>  	printk("sp : %016llx\n", sp);
+> -	for (i = top_reg; i >= 0; i--) {
+> +
+> +	i = top_reg;
+> +
+> +	while (i >= 0) {
+>  		printk("x%-2d: %016llx ", i, regs->regs[i]);
+> -		if (i % 2 == 0)
+> -			printk("\n");
+> +		i--;
+> +
+> +		if (i % 2 == 0) {
+> +			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
+> +			i--;
+> +		}
+> +
+> +		pr_cont("\n");
+>  	}
+
+Might it be nicer to simply do this (or thereabouts)?
+
+	for (i = top_reg; i > 1; i -= 2)
+		printk("x%-2d: %016llx x%-2d: %016llx\n", i-1,
+			regs->regs[i-1], i, regs->regs[i]);
+	if (i > 0)
+		printk("x%-2d: %016llx\n", i-1, regs->regs[i-1]);
+
+Robin.
+
+>  	printk("\n");
 >  }
->  
-> -static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
-> +static int __init arch_timer_mem_register(struct device_node *np, void *frame)
->  {
-> -	int ret;
-> -	irq_handler_t func;
-> +	struct device_node *frame_node = NULL;
->  	struct arch_timer *t;
-> +	void __iomem *base;
-> +	irq_handler_t func;
-> +	unsigned int irq;
-> +	int ret;
-> +
-> +	if (!frame)
-> +		return -EINVAL;
-
-Why would we call this without a frame?
-
-> +
-> +	if (np) {
-
-... or without a node?
-
-> +		frame_node = (struct device_node *)frame;
-> +		base = of_iomap(frame_node, 0);
-> +		arch_timer_detect_rate(base, np);
-
-... BANG! (we check base too late, below).
-
-Please as Marc requested several versions ago: split the FW parsing
-(ACPI and DT) so that happens first, *then* once we have the data in a
-common format, use that to drive poking the HW, requesting IRQs, etc,
-completely independent of the source.
-
-In patches, do this by:
-
-(1) adding the data structures
-(2) splitting the existing DT probing to use them
-(3) Adding ACPI functionality atop
-
-> -static int __init arch_timer_mem_init(struct device_node *np)
-> +static int __init get_cnttidr(struct device_node *np, u32 *cnttidr)
->  {
-> -	struct device_node *frame, *best_frame = NULL;
-> -	void __iomem *cntctlbase, *base;
-> -	unsigned int irq, ret = -EINVAL;
-> -	u32 cnttidr;
-> +	if (!cnttidr)
-> +		return -EINVAL;
-> +
-> +	if (np)
-> +		cntctlbase = of_iomap(np, 0);
-> +	else
-> +		return -EINVAL;
-
-We want to check this for ACPI too, no?
-
-Thanks,
-Mark.
+> 
