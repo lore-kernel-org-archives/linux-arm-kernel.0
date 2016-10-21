@@ -1,133 +1,106 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 10:36:34 +0100
-Subject: [RFC PATCH 1/8] irqchip/gic-v3-its: Change unsigned types for AArch32
- compatibility
-In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1477042601-15227-2-git-send-email-vladimir.murzin@arm.com>
+Date: Fri, 21 Oct 2016 10:36:33 +0100
+Subject: [RFC PATCH 0/8] Support GICv3 ITS and vITS in 32-bit mode
+Message-ID: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that constants which are supposed to be applied on 64-bit
-data is actually unsigned long long, so they won't be truncated when
-used in 32-bit mode.
+Hi,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c   |   28 ++++++++++++++--------------
- include/linux/irqchip/arm-gic-v3.h |    4 ++--
- 2 files changed, 16 insertions(+), 16 deletions(-)
+This series introduces GICv3 ITS and vITS to 32-bit world. The first
+six patches make it possible to use ITS in a 32-bit guest with vITS on
+64-bit host. The last two patches extend vITS to 32-bit host.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 003495d..dcc8c76 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -196,7 +196,7 @@ struct its_cmd_block {
- 
- static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
+I used Andrea's its/v8 branch at [1] for testing with the following
+diff on top
+
+diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
+index 27a8e17..16bba55 100644
+--- a/arm/aarch32/arm-cpu.c
++++ b/arm/aarch32/arm-cpu.c
+@@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm)
  {
--	cmd->raw_cmd[0] &= ~0xffUL;
-+	cmd->raw_cmd[0] &= ~0xffULL;
- 	cmd->raw_cmd[0] |= cmd_nr;
+ 	int timer_interrupts[4] = {13, 14, 11, 10};
+ 
+-	gic__generate_fdt_nodes(fdt, IRQCHIP_GICV2);
++	gic__generate_fdt_nodes(fdt, kvm->cfg.arch.irqchip);
+ 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
  }
  
-@@ -208,43 +208,43 @@ static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
+diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
+index 1632e3c..99231f6 100644
+--- a/arm/aarch32/include/kvm/kvm-arch.h
++++ b/arm/aarch32/include/kvm/kvm-arch.h
+@@ -1,8 +1,8 @@
+ #ifndef KVM__KVM_ARCH_H
+ #define KVM__KVM_ARCH_H
  
- static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
- {
--	cmd->raw_cmd[1] &= ~0xffffffffUL;
-+	cmd->raw_cmd[1] &= ~0xffffffffULL;
- 	cmd->raw_cmd[1] |= id;
- }
+-#define ARM_GIC_DIST_SIZE	0x1000
+-#define ARM_GIC_CPUI_SIZE	0x2000
++#define ARM_GIC_DIST_SIZE	0x100000
++#define ARM_GIC_CPUI_SIZE	0x200000
  
- static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
- {
--	cmd->raw_cmd[1] &= 0xffffffffUL;
-+	cmd->raw_cmd[1] &= 0xffffffffULL;
- 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
- }
+ #define ARM_KERN_OFFSET(...)	0x8000
  
- static void its_encode_size(struct its_cmd_block *cmd, u8 size)
- {
--	cmd->raw_cmd[1] &= ~0x1fUL;
-+	cmd->raw_cmd[1] &= ~0x1fULL;
- 	cmd->raw_cmd[1] |= size & 0x1f;
- }
- 
- static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
- {
--	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
--	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
-+	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
-+	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
- }
- 
- static void its_encode_valid(struct its_cmd_block *cmd, int valid)
- {
--	cmd->raw_cmd[2] &= ~(1UL << 63);
-+	cmd->raw_cmd[2] &= ~(1ULL << 63);
- 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
- }
- 
- static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
- {
--	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
--	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
-+	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
-+	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
- }
- 
- static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
- {
--	cmd->raw_cmd[2] &= ~0xffffUL;
-+	cmd->raw_cmd[2] &= ~0xffffULL;
- 	cmd->raw_cmd[2] |= col;
- }
- 
-@@ -657,8 +657,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	its = its_dev->its;
- 	addr = its->phys_base + GITS_TRANSLATER;
- 
--	msg->address_lo		= addr & ((1UL << 32) - 1);
--	msg->address_hi		= addr >> 32;
-+	msg->address_lo		= lower_32_bits(addr);
-+	msg->address_hi		= upper_32_bits(addr);
- 	msg->data		= its_get_event_id(d);
- 
- 	iommu_dma_map_msi_msg(d->irq, msg);
-@@ -935,9 +935,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	}
- 
- 	if (val != tmp) {
--		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
-+		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
- 		       &its->phys_base, its_base_type_string[type],
--		       (unsigned long) val, (unsigned long) tmp);
-+		       val, tmp);
- 		free_pages((unsigned long)base, order);
- 		return -ENXIO;
- 	}
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index b7e3431..5118d3a 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -239,7 +239,7 @@
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
- 
--#define GITS_CBASER_VALID			(1UL << 63)
-+#define GITS_CBASER_VALID			(1ULL << 63)
- #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
- #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
- #define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
-@@ -265,7 +265,7 @@
- 
- #define GITS_BASER_NR_REGS		8
- 
--#define GITS_BASER_VALID			(1UL << 63)
-+#define GITS_BASER_VALID			(1ULL << 63)
- #define GITS_BASER_INDIRECT			(1ULL << 62)
- 
- #define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
+
+After passing --irqchip=gicv3-its --force-pci to kvmtool I can see
+that MSI is used:
+
+# cat /proc/interrupts
+           CPU0       
+ 18:       1251     GICv3  27 Level     arch_timer
+ 28:          0   ITS-MSI 49152 Edge      virtio3-config
+ 29:          0   ITS-MSI 49153 Edge      virtio3-input
+ 30:          0   ITS-MSI 49154 Edge      virtio3-output
+ 31:          0   ITS-MSI 32768 Edge      virtio2-config
+ 32:          2   ITS-MSI 32769 Edge      virtio2-input.0
+ 33:          1   ITS-MSI 32770 Edge      virtio2-output.0
+ 34:          0   ITS-MSI   0 Edge      virtio0-config
+ 35:        303   ITS-MSI   1 Edge      virtio0-requests
+ 36:          0   ITS-MSI 16384 Edge      virtio1-config
+ 37:        218   ITS-MSI 16385 Edge      virtio1-requests
+IPI0:          0  CPU wakeup interrupts
+IPI1:          0  Timer broadcast interrupts
+IPI2:          0  Rescheduling interrupts
+IPI3:          0  Function call interrupts
+IPI4:          0  CPU stop interrupts
+IPI5:          0  IRQ work interrupts
+IPI6:          0  completion interrupts
+Err:          0
+
+Patches are aginst v4.9-rc1.
+
+[1] git://www.linux-arm.org/kvmtool.git
+
+Thanks!
+
+Vladimir Murzin (8):
+  irqchip/gic-v3-its: Change unsigned types for AArch32 compatibility
+  irqchip/gic-v3-its: narrow down Entry Size when used as a divider
+  irqchip/gicv3-its: specialise flush_dcache operation
+  irqchip/gicv3-its: specialise readq and writeq accesses
+  ARM: gic-v3-its: Add 32bit support to GICv3 ITS
+  ARM: virt: select ARM_GIC_V3_ITS
+  KVM: arm64: vgic-its: fix compatability with 32-bit
+  ARM: KVM: Support vGICv3 ITS
+
+ Documentation/virtual/kvm/api.txt   |    2 +-
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/include/asm/arch_gicv3.h   |   59 ++++++++++++++++++++++---
+ arch/arm/include/uapi/asm/kvm.h     |    2 +
+ arch/arm/kvm/Kconfig                |    1 +
+ arch/arm/kvm/Makefile               |    1 +
+ arch/arm/kvm/arm.c                  |    6 +++
+ arch/arm64/include/asm/arch_gicv3.h |   19 ++++++++
+ arch/arm64/kvm/Kconfig              |    4 --
+ arch/arm64/kvm/reset.c              |    6 ---
+ drivers/irqchip/irq-gic-v3-its.c    |   81 +++++++++++++++++------------------
+ include/linux/irqchip/arm-gic-v3.h  |   12 +++---
+ virt/kvm/arm/vgic/vgic-its.c        |   11 ++---
+ virt/kvm/arm/vgic/vgic-kvm-device.c |    2 -
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 -
+ virt/kvm/arm/vgic/vgic.h            |   26 -----------
+ 16 files changed, 135 insertions(+), 100 deletions(-)
+
 -- 
 1.7.9.5
