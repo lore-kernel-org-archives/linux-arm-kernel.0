@@ -1,32 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 21 Oct 2016 09:13:01 +0200
-Subject: [PATCH] pwm: meson: Remove unneeded platform MODULE_ALIAS
-In-Reply-To: <1476906599-14350-1-git-send-email-javier@osg.samsung.com>
-References: <1476906599-14350-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20161021071301.GC2670@ulmo.ba.sec>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 21 Oct 2016 09:14:31 +0200
+Subject: [PATCH v2] ARM: shmobile: Consolidate R8A7743 and R8A779[234]
+ machine definitions
+In-Reply-To: <4b407584-21d4-5dc7-6866-6feff12f302f@cogentembedded.com>
+References: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20161020085804.GK4612@verge.net.au>
+ <4b407584-21d4-5dc7-6866-6feff12f302f@cogentembedded.com>
+Message-ID: <20161021071431.GA11736@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 04:49:59PM -0300, Javier Martinez Canillas wrote:
-> The Amlogic Meson is a DT-only platform, which means the devices are
-> registered via OF and not using the legacy platform devices support.
+On Thu, Oct 20, 2016 at 09:44:56PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> So there's no need to have a MODULE_ALIAS("platform:meson-pwm") since
-> the reported uevent MODALIAS to user-space will always be the OF one.
+> On 10/20/2016 11:58 AM, Simon Horman wrote:
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
+> >>The four SoCs use identical machine operations, consolidate them into
+> >>two machine definitions in a single file.
+> >>
+> >>Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >>Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> >>Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>---
+> >>Changes since v1:
+> >>
+> >>- Rebased on top of Simon's latest devel branch, thus including R8A7743
+> >>  consolidation
+> >>
+> >> arch/arm/mach-shmobile/Makefile          |  4 ----
+> >> arch/arm/mach-shmobile/setup-r8a7743.c   | 34 -------------------------------
+> >> arch/arm/mach-shmobile/setup-r8a7792.c   | 35 --------------------------------
+> >> arch/arm/mach-shmobile/setup-r8a7793.c   | 33 ------------------------------
+> >> arch/arm/mach-shmobile/setup-r8a7794.c   | 33 ------------------------------
+> >> arch/arm/mach-shmobile/setup-rcar-gen2.c | 33 ++++++++++++++++++++++++++++++
+> >> 6 files changed, 33 insertions(+), 139 deletions(-)
+> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7743.c
+> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
+> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
+> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
+> >
+> >Thanks for this Laurent, its a very nice diffstat.
+> >I have queued it up for v4.10.
 > 
->  drivers/pwm/pwm-meson.c | 1 -
->  1 file changed, 1 deletion(-)
+>    I'm not seeing a new devel tag when fetching... :-(
 
-Applied, thanks.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161021/6e99fd32/attachment-0001.sig>
+Sorry about that. It should be there now.
