@@ -1,65 +1,76 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 21 Oct 2016 21:53:43 +0800
-Subject: [PATCH 0/4] ARM: boot: mxs: Add On-Chip RAM
-In-Reply-To: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
-References: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20161021135343.GI30578@tiger>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 21 Oct 2016 16:58:03 +0300
+Subject: [PATCH] PM / Domains: Restrict "samsung,power-domain" checks to
+ ARCH_EXYNOS
+In-Reply-To: <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
+References: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
+ <CAJZ5v0iOQyCwCuMBVcJjX1mMHFb=NkfXFf6yBNdswRw1HMYC=Q@mail.gmail.com>
+Message-ID: <20161021135803.GB3289@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 13, 2016 at 05:51:02PM +0000, Stefan Wahren wrote:
-> The i.MX23 / i.MX28 have a small amount of On-Chip RAM which is also necessary
-> for suspend to RAM and standby mode. But before we need to remove the fake reg
-> properties of all internal bus nodes as discussed in this thread [1].
+On Fri, Oct 21, 2016 at 02:29:05PM +0200, Rafael J. Wysocki wrote:
+> On Fri, Oct 21, 2016 at 1:34 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+> > Currently the generic PM Domain code code checks for the presence of
+> > both (generic) "power-domains" and (Samsung Exynos legacy)
+> > "samsung,power-domain" properties in all device tree nodes representing
+> > devices.
+> >
+> > There are two issues with this:
+> >   1. This imposes a small boot-time penalty on all platforms using DT,
+> >   2. Platform-specific checks do not really belong in core framework
+> >      code.
+> >
+> > While moving the check from platform-agnostic code to Samsung-specific
+> > code is non-trivial, the runtime overhead can be restricted to kernels
+> > including support for 32-bit Samsung Exynos platforms.
+> >
+> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > ---
+> > "samsung,power-domain" was only ever used in:
+> >   - arch/arm/boot/dts/exynos4415.dtsi: Unused?
+> >   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+> >   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+> >   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+> >                                        exynos4212.dtsi is unused?
+> >   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+> >   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+> > ---
+> >  drivers/base/power/domain.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> > index e023066e421547c5..d94d6a4b9b527108 100644
+> > --- a/drivers/base/power/domain.c
+> > +++ b/drivers/base/power/domain.c
+> > @@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
+> >         ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+> >                                         "#power-domain-cells", 0, &pd_args);
+> >         if (ret < 0) {
+> > -               if (ret != -ENOENT)
+> > +               if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
 > 
-> This patch series requires Fabio Estevam's recent series "ARM: dts: imx23:
-> Remove skeleton.dtsi inclusion" [2].
+> Please don't check things like CONFIG_ARCH_EXYNOS in the core.
 > 
-> [1] - https://marc.info/?l=devicetree&m=146139948426520&w=2
+> If you need to put checks like that here, there is a design problem somewhere.
+> 
+> And imagine someone 5 years ahead from now looking at this code and
+> wondering why on Earth the check is here.
 
-The page cannot be reached.  I would like to understand the
-background for this change.
+I don't find the argument of performance penalty such important but for
+the sake of design, the samsung-specific code could be moved to
+drivers/soc/samsung/pm_domains.c, called "legacy_pm_parse" and exported
+through a header. Thus with !ARCH_EXYNOS that would be 'static inline
+{}'.  However that is not a nice solution - there will be still
+direct call to platform-specific code in the core. I am not sure if it
+is worth the effort.
 
-Shawn
+The samsung,power-domain was made deprecated (although not explicitly)
+in January 2015 (0da658704136 ("ARM: dts: convert to generic power
+domain bindings for exynos DT")) so how about:
+1. Printing a dev_warn() about usage of deprecated bindings.
+2. Complete removal in January 2017?
 
-> [2] - http://www.spinics.net/lists/arm-kernel/msg528974.html
-> 
-> Stefan Wahren (4):
->   ARM: dts: imx23: Remove fake "reg" properties from bus nodes
->   ARM: dts: imx28: Remove fake "reg" properties from bus nodes
->   ARM: dts: imx23: add On-Chip RAM
->   ARM: dts: imx28: add On-Chip RAM
-> 
->  arch/arm/boot/dts/imx23-evk.dts           |    8 ++++----
->  arch/arm/boot/dts/imx23-olinuxino.dts     |    8 ++++----
->  arch/arm/boot/dts/imx23-sansa.dts         |    8 ++++----
->  arch/arm/boot/dts/imx23-stmp378x_devb.dts |    6 +++---
->  arch/arm/boot/dts/imx23-xfi3.dts          |    8 ++++----
->  arch/arm/boot/dts/imx23.dtsi              |   15 +++++++++------
->  arch/arm/boot/dts/imx28-apf28.dts         |    8 ++++----
->  arch/arm/boot/dts/imx28-apf28dev.dts      |    8 ++++----
->  arch/arm/boot/dts/imx28-apx4devkit.dts    |    8 ++++----
->  arch/arm/boot/dts/imx28-cfa10036.dts      |    8 ++++----
->  arch/arm/boot/dts/imx28-cfa10037.dts      |    8 ++++----
->  arch/arm/boot/dts/imx28-cfa10049.dts      |   10 +++++-----
->  arch/arm/boot/dts/imx28-cfa10055.dts      |    6 +++---
->  arch/arm/boot/dts/imx28-cfa10056.dts      |    4 ++--
->  arch/arm/boot/dts/imx28-cfa10057.dts      |   10 +++++-----
->  arch/arm/boot/dts/imx28-cfa10058.dts      |   10 +++++-----
->  arch/arm/boot/dts/imx28-duckbill.dts      |    8 ++++----
->  arch/arm/boot/dts/imx28-evk.dts           |    8 ++++----
->  arch/arm/boot/dts/imx28-m28.dtsi          |    6 +++---
->  arch/arm/boot/dts/imx28-m28cu3.dts        |    8 ++++----
->  arch/arm/boot/dts/imx28-m28evk.dts        |    8 ++++----
->  arch/arm/boot/dts/imx28-sps1.dts          |    8 ++++----
->  arch/arm/boot/dts/imx28.dtsi              |   17 +++++++++--------
->  23 files changed, 100 insertions(+), 96 deletions(-)
-> 
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards,
+Krzysztof
