@@ -1,68 +1,51 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 21 Oct 2016 17:10:36 +0200
-Subject: [PATCH 2/3] ARM: dts: OX810: Update with dt-bindings includes
-In-Reply-To: <20161021151037.20112-1-narmstrong@baylibre.com>
-References: <20161021151037.20112-1-narmstrong@baylibre.com>
-Message-ID: <20161021151037.20112-3-narmstrong@baylibre.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 21 Oct 2016 17:17:49 +0200
+Subject: [PATCH v2 1/4] cpufreq: pxa: use generic platdev driver for
+ device-tree
+In-Reply-To: <20161020033435.GD11766@vireshk-i7> (Viresh Kumar's message of
+ "Thu, 20 Oct 2016 09:04:35 +0530")
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-2-git-send-email-robert.jarzmik@free.fr>
+ <20161018113835.GB11471@vireshk-i7> <87r37d4qlw.fsf@belgarion.home>
+ <20161019135208.GG11471@vireshk-i7> <87bmyg3xzh.fsf@belgarion.home>
+ <20161020033435.GD11766@vireshk-i7>
+Message-ID: <87insl3f4y.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OX810SE dt-bindings includes files for clocks and resets, replace
-resets numbers by human readable defines.
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/ox810se.dtsi | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+> On 19-10-16, 22:06, Robert Jarzmik wrote:
+>> Viresh Kumar <viresh.kumar@linaro.org> writes:
+>> 
+>> >> >> +	{ .compatible = "marvell,pxa250", },
+>> >> >> +	{ .compatible = "marvell,pxa270", },
+>> >> >>  
+>> >> >>  	{ .compatible = "samsung,exynos3250", },
+>> >> >>  	{ .compatible = "samsung,exynos4210", },
+>> >> >
+>> >> > Isn't there a race between cpufreq-dt and the platform driver to
+>> >> > register first ?
+>> >> Ah, could you be more specific about the race you're talking of ?
+>> >> 
+>> >> My understanding was that cpufreq-dt-platdev does create the device, and
+>> >> cpufreq-dt is a driver for it, so there is no race but a direct relationship
+>> >> AFAIU.
+>> >
+>> > I mean that both the driver may try to register to the cpufreq core if
+>> > they are both compiled in a single image.
+>> Euh I still don't follow you. The only driver that can register to the cpufreq
+>> core is cpufreq-dt.
+>
+> I was wondering on what will happen if both cpufreq-dt and your pxa2xx-cpufreq
+> driver are present in the same kernel image. In that case the init routines of
+> both of them will try to call cpufreq_register_driver().
+Right.
 
-diff --git a/arch/arm/boot/dts/ox810se.dtsi b/arch/arm/boot/dts/ox810se.dtsi
-index ce13705..46aa6db 100644
---- a/arch/arm/boot/dts/ox810se.dtsi
-+++ b/arch/arm/boot/dts/ox810se.dtsi
-@@ -7,6 +7,8 @@
-  */
- 
- /include/ "skeleton.dtsi"
-+#include <dt-bindings/clock/oxsemi,ox810se.h>
-+#include <dt-bindings/reset/oxsemi,ox810se.h>
- 
- / {
- 	compatible = "oxsemi,ox810se";
-@@ -242,7 +244,7 @@
- 			       current-speed = <115200>;
- 			       no-loopback-test;
- 			       status = "disabled";
--			       resets = <&reset 17>;
-+			       resets = <&reset RESET_UART1>;
- 			};
- 
- 			uart1: serial at 300000 {
-@@ -256,7 +258,7 @@
- 			       current-speed = <115200>;
- 			       no-loopback-test;
- 			       status = "disabled";
--			       resets = <&reset 18>;
-+			       resets = <&reset RESET_UART2>;
- 			};
- 
- 			uart2: serial at 900000 {
-@@ -270,7 +272,7 @@
- 			       current-speed = <115200>;
- 			       no-loopback-test;
- 			       status = "disabled";
--			       resets = <&reset 22>;
-+			       resets = <&reset RESET_UART3>;
- 			};
- 
- 			uart3: serial at a00000 {
-@@ -284,7 +286,7 @@
- 			       current-speed = <115200>;
- 			       no-loopback-test;
- 			       status = "disabled";
--			       resets = <&reset 23>;
-+			       resets = <&reset RESET_UART4>;
- 			};
- 		};
- 
+In my case, cpufreq-dt comes first, and wins.
+pxa_cpu_init() calls cpufreq_register_driver() and returns -EEXIST.
+
+Cheers.
+
 -- 
-2.7.0
+Robert
