@@ -1,164 +1,133 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 10:36:37 +0100
-Subject: [RFC PATCH 4/8] irqchip/gicv3-its: specialise readq and writeq
- accesses
+Date: Fri, 21 Oct 2016 10:36:34 +0100
+Subject: [RFC PATCH 1/8] irqchip/gic-v3-its: Change unsigned types for AArch32
+ compatibility
 In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
 References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1477042601-15227-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1477042601-15227-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-readq and writeq type of assessors are not supported in AArch32, so we
-need to specialise them and glue later with series of 32-bit accesses
-on AArch32 side.
+Make sure that constants which are supposed to be applied on 64-bit
+data is actually unsigned long long, so they won't be truncated when
+used in 32-bit mode.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm64/include/asm/arch_gicv3.h |   16 ++++++++++++++++
- drivers/irqchip/irq-gic-v3-its.c    |   30 +++++++++++++++---------------
- 2 files changed, 31 insertions(+), 15 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c   |   28 ++++++++++++++--------------
+ include/linux/irqchip/arm-gic-v3.h |    4 ++--
+ 2 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 4f0402a..e0ada98 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -190,5 +190,21 @@ static inline void gic_write_bpr1(u32 val)
- 
- #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
- 
-+#define gits_read_typer(c)		readq_relaxed(c)
-+
-+#define gits_read_baser(c)		readq_relaxed(c)
-+#define gits_write_baser(v, c)		writeq_relaxed(v, c)
-+
-+#define gits_read_cbaser(c)		readq_relaxed(c)
-+#define gits_write_cbaser(v, c)		writeq_relaxed(v, c)
-+
-+#define gits_write_cwriter(v, c)	writeq_relaxed(v, c)
-+
-+#define gicr_read_propbaser(c)		readq_relaxed(c)
-+#define gicr_write_propbaser(v, c)	writeq_relaxed(v, c)
-+
-+#define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
-+#define gicr_read_pendbaser(c)		readq_relaxed(c)
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 86efa6e..9f74abc 100644
+index 003495d..dcc8c76 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -835,7 +835,7 @@ static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
- {
- 	u32 idx = baser - its->tables;
+@@ -196,7 +196,7 @@ struct its_cmd_block {
  
--	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
-+	return gits_read_baser(its->base + GITS_BASER + (idx << 3));
+ static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
+ {
+-	cmd->raw_cmd[0] &= ~0xffUL;
++	cmd->raw_cmd[0] &= ~0xffULL;
+ 	cmd->raw_cmd[0] |= cmd_nr;
  }
  
- static void its_write_baser(struct its_node *its, struct its_baser *baser,
-@@ -843,7 +843,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
- {
- 	u32 idx = baser - its->tables;
+@@ -208,43 +208,43 @@ static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
  
--	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
-+	gits_write_baser(val, its->base + GITS_BASER + (idx << 3));
- 	baser->val = its_read_baser(its, baser);
+ static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
+ {
+-	cmd->raw_cmd[1] &= ~0xffffffffUL;
++	cmd->raw_cmd[1] &= ~0xffffffffULL;
+ 	cmd->raw_cmd[1] |= id;
  }
  
-@@ -1022,7 +1022,7 @@ static void its_free_tables(struct its_node *its)
- 
- static int its_alloc_tables(struct its_node *its)
+ static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
  {
--	u64 typer = readq_relaxed(its->base + GITS_TYPER);
-+	u64 typer = gits_read_typer(its->base + GITS_TYPER);
- 	u32 ids = GITS_TYPER_DEVBITS(typer);
- 	u64 shr = GITS_BASER_InnerShareable;
- 	u64 cache = GITS_BASER_WaWb;
-@@ -1125,8 +1125,8 @@ static void its_cpu_init_lpis(void)
- 	       GICR_PROPBASER_WaWb |
- 	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
+-	cmd->raw_cmd[1] &= 0xffffffffUL;
++	cmd->raw_cmd[1] &= 0xffffffffULL;
+ 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
+ }
  
--	writeq_relaxed(val, rbase + GICR_PROPBASER);
--	tmp = readq_relaxed(rbase + GICR_PROPBASER);
-+	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
-+	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
+ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
+ {
+-	cmd->raw_cmd[1] &= ~0x1fUL;
++	cmd->raw_cmd[1] &= ~0x1fULL;
+ 	cmd->raw_cmd[1] |= size & 0x1f;
+ }
  
- 	if ((tmp ^ val) & GICR_PROPBASER_SHAREABILITY_MASK) {
- 		if (!(tmp & GICR_PROPBASER_SHAREABILITY_MASK)) {
-@@ -1138,7 +1138,7 @@ static void its_cpu_init_lpis(void)
- 			val &= ~(GICR_PROPBASER_SHAREABILITY_MASK |
- 				 GICR_PROPBASER_CACHEABILITY_MASK);
- 			val |= GICR_PROPBASER_nC;
--			writeq_relaxed(val, rbase + GICR_PROPBASER);
-+			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
- 		}
- 		pr_info_once("GIC: using cache flushing for LPI property table\n");
- 		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
-@@ -1149,8 +1149,8 @@ static void its_cpu_init_lpis(void)
- 	       GICR_PENDBASER_InnerShareable |
- 	       GICR_PENDBASER_WaWb);
+ static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+ {
+-	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
+-	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
++	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
++	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
+ }
  
--	writeq_relaxed(val, rbase + GICR_PENDBASER);
--	tmp = readq_relaxed(rbase + GICR_PENDBASER);
-+	gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
-+	tmp = gicr_read_pendbaser(rbase + GICR_PENDBASER);
+ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+ {
+-	cmd->raw_cmd[2] &= ~(1UL << 63);
++	cmd->raw_cmd[2] &= ~(1ULL << 63);
+ 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
+ }
  
- 	if (!(tmp & GICR_PENDBASER_SHAREABILITY_MASK)) {
- 		/*
-@@ -1160,7 +1160,7 @@ static void its_cpu_init_lpis(void)
- 		val &= ~(GICR_PENDBASER_SHAREABILITY_MASK |
- 			 GICR_PENDBASER_CACHEABILITY_MASK);
- 		val |= GICR_PENDBASER_nC;
--		writeq_relaxed(val, rbase + GICR_PENDBASER);
-+		gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
+ static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+ {
+-	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
+-	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
++	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
++	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
+ }
+ 
+ static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+ {
+-	cmd->raw_cmd[2] &= ~0xffffUL;
++	cmd->raw_cmd[2] &= ~0xffffULL;
+ 	cmd->raw_cmd[2] |= col;
+ }
+ 
+@@ -657,8 +657,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	its = its_dev->its;
+ 	addr = its->phys_base + GITS_TRANSLATER;
+ 
+-	msg->address_lo		= addr & ((1UL << 32) - 1);
+-	msg->address_hi		= addr >> 32;
++	msg->address_lo		= lower_32_bits(addr);
++	msg->address_hi		= upper_32_bits(addr);
+ 	msg->data		= its_get_event_id(d);
+ 
+ 	iommu_dma_map_msi_msg(d->irq, msg);
+@@ -935,9 +935,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
  	}
  
- 	/* Enable LPIs */
-@@ -1197,7 +1197,7 @@ static void its_cpu_init_collection(void)
- 		 * We now have to bind each collection to its target
- 		 * redistributor.
- 		 */
--		if (readq_relaxed(its->base + GITS_TYPER) & GITS_TYPER_PTA) {
-+		if (gits_read_typer(its->base + GITS_TYPER) & GITS_TYPER_PTA) {
- 			/*
- 			 * This ITS wants the physical address of the
- 			 * redistributor.
-@@ -1207,7 +1207,7 @@ static void its_cpu_init_collection(void)
- 			/*
- 			 * This ITS wants a linear CPU number.
- 			 */
--			target = readq_relaxed(gic_data_rdist_rd_base() + GICR_TYPER);
-+			target = gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER);
- 			target = GICR_TYPER_CPU_NUMBER(target) << 16;
- 		}
- 
-@@ -1716,8 +1716,8 @@ static int __init its_probe_one(struct resource *res,
- 		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
- 		 GITS_CBASER_VALID);
- 
--	writeq_relaxed(baser, its->base + GITS_CBASER);
--	tmp = readq_relaxed(its->base + GITS_CBASER);
-+	gits_write_cbaser(baser, its->base + GITS_CBASER);
-+	tmp = gits_read_cbaser(its->base + GITS_CBASER);
- 
- 	if ((tmp ^ baser) & GITS_CBASER_SHAREABILITY_MASK) {
- 		if (!(tmp & GITS_CBASER_SHAREABILITY_MASK)) {
-@@ -1729,13 +1729,13 @@ static int __init its_probe_one(struct resource *res,
- 			baser &= ~(GITS_CBASER_SHAREABILITY_MASK |
- 				   GITS_CBASER_CACHEABILITY_MASK);
- 			baser |= GITS_CBASER_nC;
--			writeq_relaxed(baser, its->base + GITS_CBASER);
-+			gits_write_cbaser(baser, its->base + GITS_CBASER);
- 		}
- 		pr_info("ITS: using cache flushing for cmd queue\n");
- 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
+ 	if (val != tmp) {
+-		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
++		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+ 		       &its->phys_base, its_base_type_string[type],
+-		       (unsigned long) val, (unsigned long) tmp);
++		       val, tmp);
+ 		free_pages((unsigned long)base, order);
+ 		return -ENXIO;
  	}
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index b7e3431..5118d3a 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -239,7 +239,7 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
+ #define GITS_TYPER_HWCOLLCNT_SHIFT	24
  
--	writeq_relaxed(0, its->base + GITS_CWRITER);
-+	gits_write_cwriter(0, its->base + GITS_CWRITER);
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+-#define GITS_CBASER_VALID			(1UL << 63)
++#define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
+ #define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
+@@ -265,7 +265,7 @@
  
- 	err = its_init_domain(handle, its);
+ #define GITS_BASER_NR_REGS		8
+ 
+-#define GITS_BASER_VALID			(1UL << 63)
++#define GITS_BASER_VALID			(1ULL << 63)
+ #define GITS_BASER_INDIRECT			(1ULL << 62)
+ 
+ #define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
 -- 
 1.7.9.5
