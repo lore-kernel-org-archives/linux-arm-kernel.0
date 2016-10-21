@@ -1,84 +1,89 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 21 Oct 2016 10:25:29 +0200
-Subject: [PATCH] ARM: dts: rockchip: add i2c-bus subnode to edp
-In-Reply-To: <6083453f-08e1-643a-9638-1db38c704aa5@collabora.com>
-References: <1476950845-28242-1-git-send-email-tomeu.vizoso@collabora.com>
- <7604646.6yosK0XMNL@diego>
- <6083453f-08e1-643a-9638-1db38c704aa5@collabora.com>
-Message-ID: <1681294.eoXpQL8f8l@phil>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 21 Oct 2016 10:28:23 +0200
+Subject: [RFC PATCH] net: stmmac: Add OXNAS Glue Driver
+In-Reply-To: <CAGhQ9VxJ-gQTX1xjMOJ4spiL_RnhryyQ0=gUEQCHm3sHecTVuA@mail.gmail.com>
+References: <20161020155406.27172-1-narmstrong@baylibre.com>
+ <CAGhQ9VxJ-gQTX1xjMOJ4spiL_RnhryyQ0=gUEQCHm3sHecTVuA@mail.gmail.com>
+Message-ID: <872a84c9-6ec3-695b-0c37-c58719e0a034@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 20. Oktober 2016, 15:47:56 CEST schrieb Tomeu Vizoso:
-> On 10/20/2016 03:45 PM, Heiko St?bner wrote:
-> > Am Donnerstag, 20. Oktober 2016, 10:07:25 schrieb Tomeu Vizoso:
-> >> Add an empty 'i2c-bus' subnode to the edp node just so that the I2C core
-> >> doesn't attemp to parse the 'ports' subnode as containing i2c devices.
-> >> 
-> >> This is to avoid spurious failure messages such as:
-> >> 
-> >> i2c i2c-6: of_i2c: modalias failure on /dp at ff970000/ports
-> > 
-> > On the one hand, the edp really has an i2c bus - with its only client the
-> > EDID listening at 0x50 (and maybe 0x30).
-> > 
-> > On the other hand, adding an empty bus to the (implementation independent)
-> > devicetree just to make the Linux i2c subsystem happy sounds heavily like
-> > a
-> > implementation-specific hack, as the edp i2c bus doesn't leak into the
-> > outside world otherwise.
-> > 
-> > I guess this empty i2c bus not being part of the binding document points
-> > heavily into the implementation-specific corner :-) .
-> > 
-> > My short search on other patches touching this didn't reveal anything but
-> > maybe this was already discussed somewhere and found to be ok?
+On 10/20/2016 06:26 PM, Joachim Eastwood wrote:
+> Hi Neil,
 > 
-> Here it is:
+> On 20 October 2016 at 17:54, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 ++++++
+>>  drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
+>>  drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+>>  drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 173 +++++++++++++++++++++
+>>  4 files changed, 229 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+>>  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
+> <snip>
+>> +
+>> +static int oxnas_dwmac_probe(struct platform_device *pdev)
+>> +{
+>> +       struct plat_stmmacenet_data *plat_dat;
+>> +       struct stmmac_resources stmmac_res;
+>> +       struct device_node *sysctrl;
+>> +       struct oxnas_dwmac *dwmac;
+>> +       int ret;
+>> +
+>> +       sysctrl = of_parse_phandle(pdev->dev.of_node, "oxsemi,sys-ctrl", 0);
+>> +       if (!sysctrl) {
+>> +               dev_err(&pdev->dev, "failed to get sys-ctrl node\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       ret = stmmac_get_platform_resources(pdev, &stmmac_res);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
+>> +       if (IS_ERR(plat_dat))
+>> +               return PTR_ERR(plat_dat);
+>> +
+>> +       dwmac = devm_kzalloc(&pdev->dev, sizeof(*dwmac), GFP_KERNEL);
+>> +       if (!dwmac)
+>> +               return -ENOMEM;
+>> +
+>> +       dwmac->regmap = syscon_node_to_regmap(sysctrl);
+>> +       if (IS_ERR(dwmac->regmap)) {
+>> +               dev_err(&pdev->dev, "failed to have sysctrl regmap\n");
+>> +               return PTR_ERR(dwmac->regmap);
+>> +       }
+>> +
+>> +       dwmac->clk = devm_clk_get(&pdev->dev, "gmac");
+>> +       if (IS_ERR(dwmac->clk))
+>> +               return PTR_ERR(dwmac->clk);
+>> +
+>> +       plat_dat->bsp_priv = dwmac;
+>> +       plat_dat->init = oxnas_dwmac_init;
+>> +       plat_dat->exit = oxnas_dwmac_exit;
 > 
-> http://www.spinics.net/lists/linux-tegra/msg27862.html
+> Please do not use the init/exit callbacks. Implement proper driver
+> callbacks instead. I.e: PM resume/suspend and driver remove.
+> 
+> Shouldn't you call oxnas_dwmac_init() from probe as well?
+> As it is now it will only be called during PM resume and that can't be right.
+> 
+> 
+>> +
+>> +       return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
+> 
+> If stmmac_dvr_probe() fails you should disable your clocks.
+> 
+> 
+> regards,
+> Joachim Eastwood
+> 
 
-thanks ... I'm still not sure about the placeholder though, aka needing an 
-undocumented subnode to make a Linux error message silent.
+Hi Joachim,
 
-In the thread you pointed to I also did not see any dt-maintainer involvement 
-pointing one way or another, but spinics is often not easy to navigate 
-threads, so I may have missed that.
+Thanks for the hints, stm32 glue does that and I will sync on it.
 
-
-> > Another option could be to just make of_i2c_register_device silent if
-> > of_modalias_node returns -ENODEV?
-
-
-Heiko
-
-> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> >> Cc: Randy Li <randy.li@rock-chips.com>
-> >> Cc: Jon Hunter <jonathanh@nvidia.com>
-> >> ---
-> >> 
-> >>  arch/arm/boot/dts/rk3288.dtsi | 5 +++++
-> >>  1 file changed, 5 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/boot/dts/rk3288.dtsi
-> >> b/arch/arm/boot/dts/rk3288.dtsi
-> >> index 2f814ffeb605..94f4b7eecca2 100644
-> >> --- a/arch/arm/boot/dts/rk3288.dtsi
-> >> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> >> @@ -1075,6 +1075,11 @@
-> >> 
-> >>  				};
-> >>  			
-> >>  			};
-> >>  		
-> >>  		};
-> >> 
-> >> +
-> >> +		i2c-bus {
-> >> +			#address-cells = <1>;
-> >> +			#size-cells = <0>;
-> >> +		};
-> >> 
-> >>  	};
-> >>  	
-> >>  	hdmi: hdmi at ff980000 {
+Neil
