@@ -1,54 +1,78 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 21 Oct 2016 10:37:01 -0500
-Subject: [PATCH] PCI: layerscape: Fix kernel panic on accessing NULL
- pointer
-In-Reply-To: <1476740647-11155-1-git-send-email-leoyang.li@nxp.com>
-References: <1476740647-11155-1-git-send-email-leoyang.li@nxp.com>
-Message-ID: <20161021153701.GC9007@localhost>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 21 Oct 2016 17:45:30 +0200
+Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for
+ obtaining mode pin state
+In-Reply-To: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1477064730.2508.24.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 04:44:06PM -0500, Li Yang wrote:
-> Commit fefe6733e added reference to the pcie->drvdata before it is
-> initialized which causes a kernel panic.  Fix the problem by
-> initializing the pcie->drvdata earlier before it is used.
-> 
-> Reported-by: Stuart Yoder <stuart.yoder@nxp.com>
-> Signed-off-by: Li Yang <leoyang.li@nxp.com>
+     A. Hi Geert,
 
-I applied Marc Zyngier's identical patch to for-linus for v4.9.  I don't
-know which was posted first, but I saw Marc's first.  Sorry I didn't at
-least credit you when I applied it.
+Am Freitag, den 21.10.2016, 15:17 +0200 schrieb Geert Uytterhoeven:
+>         Hi Philipp, Mike, Stephen, Simon, Magnus,
+> 	(see questions *** below!)
+> 
+> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
+> state of the mode pins either by a call from the platform code, or
+> directly by using a hardcoded register access. This is a bit messy, and
+> creates a dependency between driver and platform code.
+> 
+> This patch series converts the various Renesas R-Car clock drivers
+> and support code from reading the mode pin states using a hardcoded
+> register access to using a new minimalistic R-Car RST driver.
+> 
+> All R-Car clock drivers will rely on the presence in DT of a device node
+> for the RST module.  Backwards compatibility with old DTBs is retained
+> only for R-Car Gen2, which has fallback code using its own private copy
+> of rcar_gen2_read_mode_pins().
 
-> ---
->  drivers/pci/host/pci-layerscape.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+I think you should add a binding doc even though the DT bindings are
+still trivial.
+
+> After this, there is still one remaining user of
+> rcar_gen2_read_mode_pins() left in platform code. A patch series to
+> remove that user has already been posted, though ("[PATCH/RFT 0/4] ARM:
+> shmobile: R-Car Gen2: Allow booting secondary CPU cores in debug mode").
+> Since v3, the other user has been removed in commit 9f5ce39ddb8f68b3
+> ("ARM: shmobile: rcar-gen2: Obtain extal frequency from DT").
 > 
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 2cb7315..958187f 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -245,6 +245,7 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
->  	if (!pcie)
->  		return -ENOMEM;
->  
-> +	pcie->drvdata = match->data;
->  	pp = &pcie->pp;
->  	pp->dev = dev;
->  	pp->ops = pcie->drvdata->ops;
-> @@ -256,7 +257,6 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
->  		return PTR_ERR(pcie->pp.dbi_base);
->  	}
->  
-> -	pcie->drvdata = match->data;
->  	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
->  
->  	if (!ls_pcie_is_bridge(pcie))
-> -- 
-> 1.9.0
+> This series consists of 5 parts:
+>   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
+>      driver,
+>   B. Patches 3-11 add device nodes for the RST modules to the R-Car DTS
+>      files,
+>   C. Patches 12-17 convert the clock drivers to call into the new R-Car
+>      RST driver,
+>   D. Patches 18-20 remove passing mode pin state to the clock drivers
+>      from the platform code,
+>   E. Patches 21-23 remove dead code from the clock drivers.
 > 
+> As is usually the case with moving functionality from platform code to
+> DT, there are lots of hard dependencies:
+>   - The DT updates in Part B can be merged as soon as the DT bindings in
+>     Part A have been approved,
+>   - The clock driver updates in Part C depend functionally on the driver
+>     code in Part A, and on the DT updates in Part B,
+>   - The board code cleanups in Part D depend on the clock driver updates
+>     in Part C,
+>   - The block driver cleanups in part E depend on the board code
+>     cleanups in part D.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Hence to maintain the required lockstep between SoC driver, clock
+> drivers, shmobile platform code, and shmobile DT, I propose to queue up
+> all patches in a single branch against v4.9-rc1, and send pull requests
+> to both Mike/Stephen (clock) and Simon (rest).
+> 
+> ***
+> 
+>   - Philip: While this is a driver for a reset-controller, currently it
+>     doesn't provide any reset-controller functionality. Hence I added it
+>     to drivers/soc/renesas/. Is that OK for you?
+
+Absolutely, as long as the driver isn't even a reset controller
+provider, this is the right place.
+
+regards
+Philipp
