@@ -1,97 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Oct 2016 11:15:32 +0800
-Subject: [PATCH] drm/sun4i: Add a few formats
-In-Reply-To: <20161018084614.2443-1-maxime.ripard@free-electrons.com>
-References: <20161018084614.2443-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65uZFQnRme9LrRykze=a4d_7=HS=Gvu6E_eBG5tSw8nTw@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 21 Oct 2016 11:16:04 +0800
+Subject: [PATCH v2 0/8] crypto: ARM/arm64 - big endian fixes
+In-Reply-To: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476209720-21114-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20161021031604.GJ22979@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 4:46 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The planes can do more than what was previously exposed. Add support for
-> them.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 ++++++
->  2 files changed, 26 insertions(+)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> index afb7ddf660ef..b184a476a480 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-> @@ -96,6 +96,22 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
->                 *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB8888;
->                 break;
->
-> +       case DRM_FORMAT_ARGB4444:
-> +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB4444;
-> +               break;
-> +
-> +       case DRM_FORMAT_ARGB1555:
-> +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB1555;
-> +               break;
-> +
-> +       case DRM_FORMAT_RGBA5551:
-> +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA5551;
-> +               break;
-> +
-> +       case DRM_FORMAT_RGBA4444:
-> +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA4444;
+On Tue, Oct 11, 2016 at 07:15:12PM +0100, Ard Biesheuvel wrote:
+> As it turns out, none of the accelerated crypto routines under arch/arm64/crypto
+> currently work, or have ever worked correctly when built for big endian. So this
+> series fixes all of them. This v2 now includes a similar fix for 32-bit ARM as
+> well, and an additional fix for XTS which escaped my attention before.
+> 
+> Each of these patches carries a fixes tag, and could be backported to stable.
+> However, for patches #1 and #5, the fixes tag denotes the oldest commit that the
+> fix is compatible with, not the patch that introduced the algorithm. This is due
+> to the fact that the key schedules are incompatible between generic AES and the
+> arm64 Crypto Extensions implementation (but only when building for big endian)
+> This is not a problem in practice, but it does mean that the AES-CCM and AES in
+> EBC/CBC/CTR/XTS mode implementations before v3.19 require a different fix, i.e.,
+> one that is compatible with the generic AES key schedule generation code (which
+> it currently no longer uses)
+> 
+> In any case, please apply with cc to stable.
+> 
+> Ard Biesheuvel (8):
+>   crypto: arm64/aes-ce - fix for big endian
+>   crypto: arm64/ghash-ce - fix for big endian
+>   crypto: arm64/sha1-ce - fix for big endian
+>   crypto: arm64/sha2-ce - fix for big endian
+>   crypto: arm64/aes-ccm-ce: fix for big endian
+>   crypto: arm64/aes-neon - fix for big endian
+>   crypto: arm64/aes-xts-ce: fix for big endian
+>   crypto: arm/aes-ce - fix for big endian
+> 
+>  arch/arm/crypto/aes-ce-glue.c       |  5 ++
+>  arch/arm64/crypto/aes-ce-ccm-core.S | 53 ++++++++++----------
+>  arch/arm64/crypto/aes-ce-cipher.c   | 25 +++++----
+>  arch/arm64/crypto/aes-ce.S          |  1 +
+>  arch/arm64/crypto/aes-modes.S       |  3 +-
+>  arch/arm64/crypto/aes-neon.S        | 25 +++++----
+>  arch/arm64/crypto/ghash-ce-core.S   |  6 +--
+>  arch/arm64/crypto/sha1-ce-core.S    |  4 +-
+>  arch/arm64/crypto/sha2-ce-core.S    |  4 +-
+>  9 files changed, 72 insertions(+), 54 deletions(-)
 
-The A20 manual only lists ARGB4444, not RGBA4444. There might be
-some discrepancy here. We can deal with them
-
-Also there are some more formats missing from the list, could you
-add them as well?
-
-> +               break;
-> +
->         case DRM_FORMAT_XRGB8888:
->                 *mode = SUN4I_BACKEND_LAY_FBFMT_XRGB8888;
->                 break;
-> @@ -104,6 +120,10 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
->                 *mode = SUN4I_BACKEND_LAY_FBFMT_RGB888;
->                 break;
->
-> +       case DRM_FORMAT_RGB565:
-> +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGB565;
-> +               break;
-> +
->         default:
->                 return -EINVAL;
->         }
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index f0035bf5efea..5d53c977bca5 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -73,12 +73,18 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
->  static const uint32_t sun4i_backend_layer_formats_primary[] = {
->         DRM_FORMAT_ARGB8888,
->         DRM_FORMAT_RGB888,
-> +       DRM_FORMAT_RGB565,
->         DRM_FORMAT_XRGB8888,
->  };
->
->  static const uint32_t sun4i_backend_layer_formats_overlay[] = {
->         DRM_FORMAT_ARGB8888,
-> +       DRM_FORMAT_ARGB4444,
-> +       DRM_FORMAT_ARGB1555,
-> +       DRM_FORMAT_RGBA5551,
-> +       DRM_FORMAT_RGBA4444,
->         DRM_FORMAT_RGB888,
-> +       DRM_FORMAT_RGB565,
->         DRM_FORMAT_XRGB8888,
-
-Could you explain in the commit log why these 2 aren't the same?
-
-Thanks
-ChenYu
-
->  };
->
-> --
-> 2.9.3
->
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
