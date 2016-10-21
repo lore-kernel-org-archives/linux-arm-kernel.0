@@ -1,120 +1,318 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 21 Oct 2016 22:35:53 +0200
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <20161021154856.GC1041@n2100.armlinux.org.uk>
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <4337157.Eff9E2riVH@wuerfel> <20161021154856.GC1041@n2100.armlinux.org.uk>
-Message-ID: <24632117.YsmPs86ri6@wuerfel>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 21 Oct 2016 23:33:14 +0300
+Subject: [PATCH 15/18] arm64: ilp32: introduce ilp32-specific handlers for
+ sigframe and ucontext
+In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1477081997-4770-16-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
-> On Fri, Oct 21, 2016 at 05:18:30PM +0200, Arnd Bergmann wrote:
-> > On Friday, October 21, 2016 2:37:08 PM CEST Russell King - ARM Linux wrote:
-> > > On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
-> > 
-> > > > If we hit this case, why not just use the wrapper on both EABI
-> > > > and OABI for simplicity? It's not like we care a lot about
-> > > > micro-optimizing OABI any more.
-> > > 
-> > > I'd still like to retain the ability to only add to EABI in the future.
-> > 
-> > Do you mean to add an EABI specific workaround for a specific syscall
-> > if necessary, or to stop adding OABI syscalls altogether?
-> 
-> To stop adding OABI syscalls altogether.  I'm sure that there will
-> come a point (if it hasn't already) that glibc no longer supports
-> OABI, and at that point it probably becomes rather silly to keep
-> adding OABI syscalls.
+From: Andrew Pinski <apinski@cavium.com>
 
-Ok. While uClibc still supports OABI, it seems rather unlikely that
-there are active users of OABI uClibc that need any of the future
-syscalls.
+ILP32 uses AARCH32 compat structures and syscall handlers for signals.
+But ILP32 struct rt_sigframe  and ucontext differs from both LP64 and
+AARCH32. So some specific mechanism is needed to take care of it.
 
-> > > > That brings up an interesting issue: it would be nice to use the
-> > > > same input file for arch/arm/ and the compat mode of arch/arm64,
-> > > > like x86 does. If we handle both oabi and arm64-compat in the same
-> > > > file, we end up with a superset of what x86 does, and we could
-> > > > use a single script again, and generate all four tables for
-> > > > ARM (native OABI, OABI-on-EABI, native EABI, EABI-on-arm64).
-> > > 
-> > > OABI-compat != ARM64-EABI-compat though.  They're two completely
-> > > different things.
-> > 
-> > For the purpose of generating the tables, I don't see much
-> > difference: we either use the fourth column only in native
-> > mode, or we use the fifth column to override values from
-> > the fourth one when emulating the ABI on the "other" kernel.
-> 
-> The table generation method can be shared, but I've no idea about the
-> feasibility of sharing the table between ARM64 and ARM - I don't know
-> enough about ARM64 to know whether things like an "long" argument to
-> a syscall (which would be 64-bit on ARM64) would be or would not be a
-> problem if called from a 32-bit user application.
-> 
-> I've zero knowledge of the whole 32-bit application on 64-bit CPUs
-> thing, so it's pointless trying to discuss this aspect with me.  Even
-> for x86, all I care there is that it works, I've no knowledge of how
-> it works.
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/signal_ilp32.h |  38 ++++++++
+ arch/arm64/kernel/Makefile            |   3 +-
+ arch/arm64/kernel/entry_ilp32.S       |  22 +++++
+ arch/arm64/kernel/signal.c            |   3 +
+ arch/arm64/kernel/signal_ilp32.c      | 174 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 239 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
 
-Ok. I'm sure it works, but we can definitely leave that for the
-time when I or someone else gets around to do the same conversion
-for ARM64 that you are doing for ARM32. From all I can tell, it's
-a natural extension of the file you already have.
-
-> > That's similar to x86, 32-bit syscalls use the traditional numbers
-> > with an optionally different entry point for compat mode, while
-> > 64-bit syscalls use a somewhat reduced table that now has support
-> > for both native 64-bit and "x32" mode. x86-64 and x32 share a
-> > syscall table but not the unistd.h list, all three generated
-> > from syscall_64.tbl.
-> 
-> What's the point of the x32 mode?
-
-On x86, the motivation is faster code for most use cases that
-don't need a lot of memory, as the 64-bit opcodes have 16 registers
-rather than 8 in 32-bit mode but 32-bit pointers have lower
-cache footprint than 64-bit pointers. 
-
-Interestingly, while ARM64 is doing basically the same thing now,
-the motivation is almost entirely different: going from around 16
-to around 32 registers has a much lower impact on performance
-than starting out with 8, but there are ARMv8 implementations that
-lack aarch32 mode but still want to run legacy 32-bit code that
-is too time-consuming to get 64-bit clean.
-
-> > ARM64 has a separate list of syscalls for compat mode in 
-> > arch/arm64/include/asm/unistd32.h, this list has the same format
-> > as include/asm-generic/uapi/unistd.h and must be updated manually
-> > to match the arch/arm/ table today.
-> 
-> Looking through it, sort-of.  It could have re-used the numbering
-> from the arch/arm include file, but because ARM64 wanted to be an
-> entirely separate architecture, it duplicates a lot from 32-bit ARM.
-> I pointed that out at the time, and was shouted down (which is why
-> today I have absolutely nothing to do with ARM64, and as a result
-> have very little knowledge about ARM64 - I lost interest in it as
-> a result of the responses I got to my comments.)
-> 
-> So... if you don't mind, this isn't an issue I care one iota about.
-> 
-> In order for something to work like what you're alluding to, ARM64
-> would have to ferret around in arch/arm to pull out the bits it
-> wants, and I see zero reason for that to be acceptable on either
-> side of the ARM64 vs ARM divide - it will make my job harder because
-> I'm then into the position where I need acks from ARM64 people to
-> change ARM code, and that doesn't interest me at all.  I'm not going
-> to put myself into a position where I'm at the mercy of ARM64 folk.
-
-Well, if we don't need to worry about OABI any more, using a shared
-file for all architectures to add new syscalls (with their compat
-handlers) would also mean that you don't have to worry about the
-compat handler either, since that gets added in the shared file
-along with the syscall.
-
-Then again, if we move the a shared file for new syscalls, we also
-don't need to worry about synchronizing the syscall tables for
-ARM and compat ARM64, since the files would not get changed any
-more.
-
-	Arnd
+diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
+new file mode 100644
+index 0000000..d3210d8
+--- /dev/null
++++ b/arch/arm64/include/asm/signal_ilp32.h
+@@ -0,0 +1,38 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <asm/signal32_common.h>
++#include <asm/signal_common.h>
++
++#ifndef __ASM_SIGNAL_ILP32_H
++#define __ASM_SIGNAL_ILP32_H
++
++#ifdef CONFIG_ARM64_ILP32
++
++#include <linux/compat.h>
++
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs);
++
++#else
++
++static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
++					sigset_t *set, struct pt_regs *regs)
++{
++	return -ENOSYS;
++}
++
++#endif /* CONFIG_ARM64_ILP32 */
++
++#endif /* __ASM_SIGNAL_ILP32_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index fdc0052..af400fb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -29,7 +29,8 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
+-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o 		\
++					   signal_ilp32.o entry_ilp32.o
+ arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+diff --git a/arch/arm64/kernel/entry_ilp32.S b/arch/arm64/kernel/entry_ilp32.S
+new file mode 100644
+index 0000000..a8bb94b
+--- /dev/null
++++ b/arch/arm64/kernel/entry_ilp32.S
+@@ -0,0 +1,22 @@
++/*
++ * ILP32 system call wrappers
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/linkage.h>
++
++ENTRY(ilp32_sys_rt_sigreturn_wrapper)
++	mov	x0, sp
++	b	ilp32_sys_rt_sigreturn
++ENDPROC(ilp32_sys_rt_sigreturn_wrapper)
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 478d6c5..1b130f4 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -35,6 +35,7 @@
+ #include <asm/signal32.h>
+ #include <asm/vdso.h>
+ #include <asm/signal_common.h>
++#include <asm/signal_ilp32.h>
+ 
+ #define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
+ 			+ offsetof(struct sigframe, fp))
+@@ -325,6 +326,8 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
+ 		else
+ 			ret = compat_setup_frame(usig, ksig, oldset, regs);
++	} else if (is_ilp32_compat_task()) {
++		ret = ilp32_setup_rt_frame(usig, ksig, oldset, regs);
+ 	} else {
+ 		ret = setup_rt_frame(usig, ksig, oldset, regs);
+ 	}
+diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+new file mode 100644
+index 0000000..6f9b7aa
+--- /dev/null
++++ b/arch/arm64/kernel/signal_ilp32.c
+@@ -0,0 +1,174 @@
++/*
++ * Based on arch/arm/kernel/signal.c
++ *
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2016 Cavium Networks.
++ * Yury Norov <ynorov@caviumnetworks.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/compat.h>
++#include <linux/signal.h>
++#include <linux/syscalls.h>
++#include <linux/ratelimit.h>
++
++#include <asm/esr.h>
++#include <asm/fpsimd.h>
++#include <asm/signal_ilp32.h>
++#include <asm/uaccess.h>
++#include <asm/unistd.h>
++#include <asm/ucontext.h>
++
++
++#define ILP32_RT_SIGFRAME_FP_POS (offsetof(struct ilp32_rt_sigframe, sig)	\
++			+ offsetof(struct ilp32_sigframe, fp))
++
++struct ilp32_ucontext {
++	u32		uc_flags;
++	u32		uc_link;
++	compat_stack_t  uc_stack;
++	compat_sigset_t uc_sigmask;
++	/* glibc uses a 1024-bit sigset_t */
++	__u8		unused[1024 / 8 - sizeof(compat_sigset_t)];
++	/* last for future expansion */
++	struct sigcontext uc_mcontext;
++};
++
++struct ilp32_sigframe {
++	struct ilp32_ucontext uc;
++	u64 fp;
++	u64 lr;
++};
++
++struct ilp32_rt_sigframe {
++	struct compat_siginfo info;
++	struct ilp32_sigframe sig;
++};
++
++static int restore_ilp32_sigframe(struct pt_regs *regs,
++			struct ilp32_sigframe __user *sf)
++{
++	int err;
++	sigset_t set;
++
++	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
++	if (err == 0)
++		set_current_blocked(&set);
++	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
++	return err;
++}
++
++static int setup_ilp32_sigframe(struct ilp32_sigframe __user *sf,
++				struct pt_regs *regs, sigset_t *set)
++{
++	int err = 0;
++
++	/* set up the stack frame for unwinding */
++	__put_user_error(regs->regs[29], &sf->fp, err);
++	__put_user_error(regs->regs[30], &sf->lr, err);
++
++	err |= put_sigset_t(&sf->uc.uc_sigmask, set);
++	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
++	return err;
++}
++
++asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
++{
++	struct ilp32_rt_sigframe __user *frame;
++
++	/* Always make any pending restarted system calls return -EINTR */
++	current->restart_block.fn = do_no_restart_syscall;
++
++	/*
++	 * Since we stacked the signal on a 128-bit boundary,
++	 * then 'sp' should be word aligned here.  If it's
++	 * not, then the user is trying to mess with us.
++	 */
++	if (regs->sp & 15)
++		goto badframe;
++
++	frame = (struct ilp32_rt_sigframe __user *) regs->sp;
++
++	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
++		goto badframe;
++
++	if (restore_ilp32_sigframe(regs, &frame->sig))
++		goto badframe;
++
++	if (compat_restore_altstack(&frame->sig.uc.uc_stack))
++		goto badframe;
++
++	return regs->regs[0];
++
++badframe:
++	if (show_unhandled_signals)
++		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
++				    current->comm, task_pid_nr(current),
++				    __func__, regs->pc, regs->sp);
++	force_sig(SIGSEGV, current);
++
++	return 0;
++}
++
++static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
++						struct pt_regs *regs)
++{
++	unsigned long sp, sp_top;
++	struct ilp32_rt_sigframe __user *frame;
++
++	sp = sp_top = sigsp(regs->sp, ksig);
++
++	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
++	frame = (struct ilp32_rt_sigframe __user *)sp;
++
++	/*
++	 * Check that we can actually write to the signal frame.
++	 */
++	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
++		frame = NULL;
++
++	return frame;
++}
++
++/*
++ * ILP32 signal handling routines called from signal.c
++ */
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
++			  sigset_t *set, struct pt_regs *regs)
++{
++	struct ilp32_rt_sigframe __user *frame;
++	int err = 0;
++
++	frame = ilp32_get_sigframe(ksig, regs);
++
++	if (!frame)
++		return 1;
++
++	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
++
++	__put_user_error(0, &frame->sig.uc.uc_flags, err);
++	__put_user_error(0, &frame->sig.uc.uc_link, err);
++
++	err |= __compat_save_altstack(&frame->sig.uc.uc_stack, regs->sp);
++	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
++	if (err == 0) {
++		setup_return(regs, &ksig->ka,
++				frame, ILP32_RT_SIGFRAME_FP_POS, usig);
++		regs->regs[1] = (unsigned long)&frame->info;
++		regs->regs[2] = (unsigned long)&frame->sig.uc;
++	}
++
++	return err;
++}
+-- 
+2.7.4
