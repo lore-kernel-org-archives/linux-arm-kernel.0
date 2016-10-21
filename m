@@ -1,245 +1,120 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 21 Oct 2016 23:33:12 +0300
-Subject: [PATCH 13/18] arm64: signal: share lp64 signal routines to ilp32
-In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1477081997-4770-14-git-send-email-ynorov@caviumnetworks.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Oct 2016 22:35:53 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <20161021154856.GC1041@n2100.armlinux.org.uk>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <4337157.Eff9E2riVH@wuerfel> <20161021154856.GC1041@n2100.armlinux.org.uk>
+Message-ID: <24632117.YsmPs86ri6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After that, it will be possible to reuse it in ilp32.
+On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
+> On Fri, Oct 21, 2016 at 05:18:30PM +0200, Arnd Bergmann wrote:
+> > On Friday, October 21, 2016 2:37:08 PM CEST Russell King - ARM Linux wrote:
+> > > On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
+> > 
+> > > > If we hit this case, why not just use the wrapper on both EABI
+> > > > and OABI for simplicity? It's not like we care a lot about
+> > > > micro-optimizing OABI any more.
+> > > 
+> > > I'd still like to retain the ability to only add to EABI in the future.
+> > 
+> > Do you mean to add an EABI specific workaround for a specific syscall
+> > if necessary, or to stop adding OABI syscalls altogether?
+> 
+> To stop adding OABI syscalls altogether.  I'm sure that there will
+> come a point (if it hasn't already) that glibc no longer supports
+> OABI, and at that point it probably becomes rather silly to keep
+> adding OABI syscalls.
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Bamvor Zhang Jian <bamvor.zhangjian@linaro.org>
----
- arch/arm64/include/asm/signal_common.h | 33 ++++++++++++
- arch/arm64/kernel/signal.c             | 93 +++++++++++++++++++++-------------
- 2 files changed, 92 insertions(+), 34 deletions(-)
- create mode 100644 arch/arm64/include/asm/signal_common.h
+Ok. While uClibc still supports OABI, it seems rather unlikely that
+there are active users of OABI uClibc that need any of the future
+syscalls.
 
-diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
-new file mode 100644
-index 0000000..756ed2c
---- /dev/null
-+++ b/arch/arm64/include/asm/signal_common.h
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 1995-2009 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2016 Cavium Networks.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ASM_SIGNAL_COMMON_H
-+#define __ASM_SIGNAL_COMMON_H
-+
-+#include <linux/uaccess.h>
-+#include <asm/ucontext.h>
-+#include <asm/fpsimd.h>
-+
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx);
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx);
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext, struct pt_regs *regs);
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			void __user *frame, off_t sigframe_off, int usig);
-+
-+#endif /* __ASM_SIGNAL_COMMON_H */
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index f90cdf5..478d6c5 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -34,18 +34,26 @@
- #include <asm/fpsimd.h>
- #include <asm/signal32.h>
- #include <asm/vdso.h>
-+#include <asm/signal_common.h>
-+
-+#define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
-+			+ offsetof(struct sigframe, fp))
-+
-+struct sigframe {
-+	struct ucontext uc;
-+	u64 fp;
-+	u64 lr;
-+};
- 
- /*
-  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
-  */
- struct rt_sigframe {
- 	struct siginfo info;
--	struct ucontext uc;
--	u64 fp;
--	u64 lr;
-+	struct sigframe sig;
- };
- 
--static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
-+int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
- 	int err;
-@@ -65,7 +73,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
- 	return err ? -EFAULT : 0;
- }
- 
--static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
-+int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- {
- 	struct fpsimd_state fpsimd;
- 	__u32 magic, size;
-@@ -93,22 +101,30 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
- }
- 
- static int restore_sigframe(struct pt_regs *regs,
--			    struct rt_sigframe __user *sf)
-+			    struct sigframe __user *sf)
- {
- 	sigset_t set;
--	int i, err;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--
-+	int err;
- 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
- 	if (err == 0)
- 		set_current_blocked(&set);
- 
-+	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
-+	return err;
-+}
-+
-+
-+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *uc_mcontext)
-+{
-+	int i, err = 0;
-+	void *aux = uc_mcontext->__reserved;
-+
- 	for (i = 0; i < 31; i++)
--		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__get_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
-+	__get_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__get_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__get_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
- 	/*
- 	 * Avoid sys_rt_sigreturn() restarting.
-@@ -145,10 +161,10 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
- 		goto badframe;
- 
--	if (restore_sigframe(regs, frame))
-+	if (restore_sigframe(regs, &frame->sig))
- 		goto badframe;
- 
--	if (restore_altstack(&frame->uc.uc_stack))
-+	if (restore_altstack(&frame->sig.uc.uc_stack))
- 		goto badframe;
- 
- 	return regs->regs[0];
-@@ -162,27 +178,36 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
- 	return 0;
- }
- 
--static int setup_sigframe(struct rt_sigframe __user *sf,
-+static int setup_sigframe(struct sigframe __user *sf,
- 			  struct pt_regs *regs, sigset_t *set)
- {
--	int i, err = 0;
--	void *aux = sf->uc.uc_mcontext.__reserved;
--	struct _aarch64_ctx *end;
-+	int err = 0;
- 
- 	/* set up the stack frame for unwinding */
- 	__put_user_error(regs->regs[29], &sf->fp, err);
- 	__put_user_error(regs->regs[30], &sf->lr, err);
-+	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
-+
-+	return err;
-+}
-+
-+int setup_sigcontext(struct sigcontext __user *uc_mcontext,
-+			struct pt_regs *regs)
-+{
-+	void *aux = uc_mcontext->__reserved;
-+	struct _aarch64_ctx *end;
-+	int i, err = 0;
- 
- 	for (i = 0; i < 31; i++)
--		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
-+		__put_user_error(regs->regs[i], &uc_mcontext->regs[i],
- 				 err);
--	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
--	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
--	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
- 
--	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
-+	__put_user_error(regs->sp, &uc_mcontext->sp, err);
-+	__put_user_error(regs->pc, &uc_mcontext->pc, err);
-+	__put_user_error(regs->pstate, &uc_mcontext->pstate, err);
- 
--	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
-+	__put_user_error(current->thread.fault_address, &uc_mcontext->fault_address, err);
- 
- 	if (err == 0) {
- 		struct fpsimd_context *fpsimd_ctx =
-@@ -229,14 +254,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
- 	return frame;
- }
- 
--static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			 void __user *frame, int usig)
-+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-+			 void __user *frame, off_t fp_pos, int usig)
- {
- 	__sigrestore_t sigtramp;
- 
- 	regs->regs[0] = usig;
- 	regs->sp = (unsigned long)frame;
--	regs->regs[29] = regs->sp + offsetof(struct rt_sigframe, fp);
-+	regs->regs[29] = regs->sp + fp_pos;
- 	regs->pc = (unsigned long)ka->sa.sa_handler;
- 
- 	if (ka->sa.sa_flags & SA_RESTORER)
-@@ -257,17 +282,17 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 	if (!frame)
- 		return 1;
- 
--	__put_user_error(0, &frame->uc.uc_flags, err);
--	__put_user_error(NULL, &frame->uc.uc_link, err);
-+	__put_user_error(0, &frame->sig.uc.uc_flags, err);
-+	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
- 
--	err |= __save_altstack(&frame->uc.uc_stack, regs->sp);
--	err |= setup_sigframe(frame, regs, set);
-+	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->sp);
-+	err |= setup_sigframe(&frame->sig, regs, set);
- 	if (err == 0) {
--		setup_return(regs, &ksig->ka, frame, usig);
-+		setup_return(regs, &ksig->ka, frame, RT_SIGFRAME_FP_POS, usig);
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
- 			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
- 			regs->regs[1] = (unsigned long)&frame->info;
--			regs->regs[2] = (unsigned long)&frame->uc;
-+			regs->regs[2] = (unsigned long)&frame->sig.uc;
- 		}
- 	}
- 
--- 
-2.7.4
+> > > > That brings up an interesting issue: it would be nice to use the
+> > > > same input file for arch/arm/ and the compat mode of arch/arm64,
+> > > > like x86 does. If we handle both oabi and arm64-compat in the same
+> > > > file, we end up with a superset of what x86 does, and we could
+> > > > use a single script again, and generate all four tables for
+> > > > ARM (native OABI, OABI-on-EABI, native EABI, EABI-on-arm64).
+> > > 
+> > > OABI-compat != ARM64-EABI-compat though.  They're two completely
+> > > different things.
+> > 
+> > For the purpose of generating the tables, I don't see much
+> > difference: we either use the fourth column only in native
+> > mode, or we use the fifth column to override values from
+> > the fourth one when emulating the ABI on the "other" kernel.
+> 
+> The table generation method can be shared, but I've no idea about the
+> feasibility of sharing the table between ARM64 and ARM - I don't know
+> enough about ARM64 to know whether things like an "long" argument to
+> a syscall (which would be 64-bit on ARM64) would be or would not be a
+> problem if called from a 32-bit user application.
+> 
+> I've zero knowledge of the whole 32-bit application on 64-bit CPUs
+> thing, so it's pointless trying to discuss this aspect with me.  Even
+> for x86, all I care there is that it works, I've no knowledge of how
+> it works.
+
+Ok. I'm sure it works, but we can definitely leave that for the
+time when I or someone else gets around to do the same conversion
+for ARM64 that you are doing for ARM32. From all I can tell, it's
+a natural extension of the file you already have.
+
+> > That's similar to x86, 32-bit syscalls use the traditional numbers
+> > with an optionally different entry point for compat mode, while
+> > 64-bit syscalls use a somewhat reduced table that now has support
+> > for both native 64-bit and "x32" mode. x86-64 and x32 share a
+> > syscall table but not the unistd.h list, all three generated
+> > from syscall_64.tbl.
+> 
+> What's the point of the x32 mode?
+
+On x86, the motivation is faster code for most use cases that
+don't need a lot of memory, as the 64-bit opcodes have 16 registers
+rather than 8 in 32-bit mode but 32-bit pointers have lower
+cache footprint than 64-bit pointers. 
+
+Interestingly, while ARM64 is doing basically the same thing now,
+the motivation is almost entirely different: going from around 16
+to around 32 registers has a much lower impact on performance
+than starting out with 8, but there are ARMv8 implementations that
+lack aarch32 mode but still want to run legacy 32-bit code that
+is too time-consuming to get 64-bit clean.
+
+> > ARM64 has a separate list of syscalls for compat mode in 
+> > arch/arm64/include/asm/unistd32.h, this list has the same format
+> > as include/asm-generic/uapi/unistd.h and must be updated manually
+> > to match the arch/arm/ table today.
+> 
+> Looking through it, sort-of.  It could have re-used the numbering
+> from the arch/arm include file, but because ARM64 wanted to be an
+> entirely separate architecture, it duplicates a lot from 32-bit ARM.
+> I pointed that out at the time, and was shouted down (which is why
+> today I have absolutely nothing to do with ARM64, and as a result
+> have very little knowledge about ARM64 - I lost interest in it as
+> a result of the responses I got to my comments.)
+> 
+> So... if you don't mind, this isn't an issue I care one iota about.
+> 
+> In order for something to work like what you're alluding to, ARM64
+> would have to ferret around in arch/arm to pull out the bits it
+> wants, and I see zero reason for that to be acceptable on either
+> side of the ARM64 vs ARM divide - it will make my job harder because
+> I'm then into the position where I need acks from ARM64 people to
+> change ARM code, and that doesn't interest me at all.  I'm not going
+> to put myself into a position where I'm at the mercy of ARM64 folk.
+
+Well, if we don't need to worry about OABI any more, using a shared
+file for all architectures to add new syscalls (with their compat
+handlers) would also mean that you don't have to worry about the
+compat handler either, since that gets added in the shared file
+along with the syscall.
+
+Then again, if we move the a shared file for new syscalls, we also
+don't need to worry about synchronizing the syscall tables for
+ARM and compat ARM64, since the files would not get changed any
+more.
+
+	Arnd
