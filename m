@@ -1,178 +1,82 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Fri, 21 Oct 2016 20:13:54 +0800
-Subject: [PATCH V7 2/3] stm class: ftrace: Add ftrace-export-over-stm
- driver
-In-Reply-To: <20161018122928.0c9449a4@gandalf.local.home>
-References: <1476778140-10319-1-git-send-email-zhang.chunyan@linaro.org>
- <1476778140-10319-3-git-send-email-zhang.chunyan@linaro.org>
- <20161018122928.0c9449a4@gandalf.local.home>
-Message-ID: <CAG2=9p887oYaUhAgg23dO+DZDGYVQ1bef3TZ1jh-xF38=hrHJQ@mail.gmail.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 21 Oct 2016 14:17:27 +0200
+Subject: [PATCH] ARM: sti: stih407-clocks: Identify critical clocks
+In-Reply-To: <1477040891-31611-1-git-send-email-peter.griffin@linaro.org>
+References: <1477040891-31611-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <96d20fa1-c070-f36d-58ea-cba7ef2cae95@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2016 at 00:29, Steven Rostedt <rostedt@goodmis.org> wrote:
-> On Tue, 18 Oct 2016 16:08:59 +0800
-> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
->
->> This patch adds a driver that models itself as an stm_source called
->> stm_ftrace. Once the stm device and stm_ftrace have been linked via
->> sysfs, the driver registers itself as a trace_export and everything
->> passed to the interface from Ftrace subsystem will end up in the STM
->> trace engine.
->>
->> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->> ---
->>  drivers/hwtracing/stm/Kconfig  | 11 ++++++
->>  drivers/hwtracing/stm/Makefile |  2 +
->>  drivers/hwtracing/stm/ftrace.c | 88 ++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 101 insertions(+)
->>  create mode 100644 drivers/hwtracing/stm/ftrace.c
->>
->> diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
->> index 847a39b..b34ea96 100644
->> --- a/drivers/hwtracing/stm/Kconfig
->> +++ b/drivers/hwtracing/stm/Kconfig
->> @@ -39,4 +39,15 @@ config STM_SOURCE_HEARTBEAT
->>         If you want to send heartbeat messages over STM devices,
->>         say Y.
->>
->> +config STM_SOURCE_FTRACE
->> +     tristate "Copy the output from kernel Ftrace to STM engine"
->> +     depends on TRACING
->
-> I think it should depend on FUNCTION_TRACER
+On 10/21/2016 11:08 AM, Peter Griffin wrote:
+> Lots of platforms contain clocks which if turned off would prove fatal.
+> The only way to recover is to restart the board(s).  This driver takes
+> references to clocks which are required to be always-on.  The Common
+> Clk Framework will then take references to them.  This way they will
+> not be turned off during the clk_disabled_unused() procedure.
+> 
+> In this patch we are identifying clocks, which if gated would render
+> the STiH407 development board unserviceable.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-clock.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+> index 13029c0..34c119a 100644
+> --- a/arch/arm/boot/dts/stih407-clock.dtsi
+> +++ b/arch/arm/boot/dts/stih407-clock.dtsi
+> @@ -101,6 +101,7 @@
+>  				clocks = <&clk_sysin>;
+>  
+>  				clock-output-names = "clk-s-a0-pll-ofd-0";
+> +				clock-critical = <0>; /* clk-s-a0-pll-ofd-0 */
+>  			};
+>  
+>  			clk_s_a0_flexgen: clk-s-a0-flexgen {
+> @@ -112,6 +113,7 @@
+>  					 <&clk_sysin>;
+>  
+>  				clock-output-names = "clk-ic-lmi0";
+> +				clock-critical = <CLK_IC_LMI0>;
+>  			};
+>  		};
+>  
+> @@ -126,6 +128,7 @@
+>  					     "clk-s-c0-fs0-ch1",
+>  					     "clk-s-c0-fs0-ch2",
+>  					     "clk-s-c0-fs0-ch3";
+> +			clock-critical = <0>; /* clk-s-c0-fs0-ch0 */
+>  		};
+>  
+>  		clk_s_c0: clockgen-c at 09103000 {
+> @@ -139,6 +142,7 @@
+>  				clocks = <&clk_sysin>;
+>  
+>  				clock-output-names = "clk-s-c0-pll0-odf-0";
+> +				clock-critical = <0>; /* clk-s-c0-pll0-odf-0 */
+>  			};
+>  
+>  			clk_s_c0_pll1: clk-s-c0-pll1 {
+> @@ -194,6 +198,12 @@
+>  						     "clk-main-disp",
+>  						     "clk-aux-disp",
+>  						     "clk-compo-dvp";
+> +				clock-critical = <CLK_PROC_STFE>,
+> +						 <CLK_ICN_CPU>,
+> +						 <CLK_TX_ICN_DMU>,
+> +						 <CLK_EXT2F_A9>,
+> +						 <CLK_ICN_LMI>,
+> +						 <CLK_ICN_SBC>;
+>  			};
+>  		};
+>  
+> 
 
-I think we should support other type of tracer in the future, but
-you're right it only should depend on FUNCTION_TRACER for now, I will
-revise this.
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
->
->> +     help
->> +       This option can be used to copy the output from kernel Ftrace
->> +       to STM engine. Enabling this option will introduce a slight
->> +       timing effect.
->> +
->> +       If you want to send kernel Ftrace messages over STM devices,
->> +       say Y.
->> +
->>  endif
->> diff --git a/drivers/hwtracing/stm/Makefile b/drivers/hwtracing/stm/Makefile
->> index a9ce3d4..3abd84c 100644
->> --- a/drivers/hwtracing/stm/Makefile
->> +++ b/drivers/hwtracing/stm/Makefile
->> @@ -6,6 +6,8 @@ obj-$(CONFIG_STM_DUMMY)       += dummy_stm.o
->>
->>  obj-$(CONFIG_STM_SOURCE_CONSOLE)     += stm_console.o
->>  obj-$(CONFIG_STM_SOURCE_HEARTBEAT)   += stm_heartbeat.o
->> +obj-$(CONFIG_STM_SOURCE_FTRACE)              += stm_ftrace.o
->>
->>  stm_console-y                := console.o
->>  stm_heartbeat-y              := heartbeat.o
->> +stm_ftrace-y         := ftrace.o
->> diff --git a/drivers/hwtracing/stm/ftrace.c b/drivers/hwtracing/stm/ftrace.c
->> new file mode 100644
->> index 0000000..1a114c8f
->> --- /dev/null
->> +++ b/drivers/hwtracing/stm/ftrace.c
->> @@ -0,0 +1,88 @@
->> +/*
->> + * Simple kernel driver to link kernel Ftrace and an STM device
->> + * Copyright (c) 2016, Linaro Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope it will be useful, but WITHOUT
->> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->> + * more details.
->> + *
->> + * STM Ftrace will be registered as a trace_export.
->> + */
->> +
->> +#include <linux/module.h>
->> +#include <linux/stm.h>
->> +#include <linux/trace.h>
->> +
->> +#define STM_FTRACE_NR_CHANNELS 1
->> +#define STM_FTRACE_CHAN 0
->> +
->> +static int stm_ftrace_link(struct stm_source_data *data);
->> +static void stm_ftrace_unlink(struct stm_source_data *data);
->> +
->> +static struct stm_ftrace {
->> +     struct stm_source_data  data;
->> +     struct trace_export     ftrace;
->> +} stm_ftrace = {
->> +     .data   = {
->> +             .name           = "ftrace",
->> +             .nr_chans       = STM_FTRACE_NR_CHANNELS,
->> +             .link           = stm_ftrace_link,
->> +             .unlink         = stm_ftrace_unlink,
->> +     },
->> +};
->> +
->> +/**
->> + * stm_ftrace_write() - write data to STM via 'stm_ftrace' source
->> + * @buf:     buffer containing the data packet
->> + * @len:     length of the data packet
->> + */
->> +static void notrace
->> +stm_ftrace_write(const char *buf, unsigned int len)
->> +{
->> +     stm_source_write(&stm_ftrace.data, STM_FTRACE_CHAN, buf, len);
->> +}
->> +
->> +static int stm_ftrace_link(struct stm_source_data *data)
->> +{
->> +     struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
->> +
->> +     sf->ftrace.write = stm_ftrace_write;
->> +     sf->ftrace.next = NULL;
->
-> Why setting this to NULL? register_ftrace_export() should not require
-> nor depend on that.
+And applied !
 
-Right, it's not required indeed, will remove it.
+Effectively, the job was done for STiH410 but i forgot to apply the same for STiH407
 
-Thanks,
-Chunyan
-
->
-> -- Steve
->
->> +
->> +     return register_ftrace_export(&sf->ftrace);
->> +}
->> +
->> +static void stm_ftrace_unlink(struct stm_source_data *data)
->> +{
->> +     struct stm_ftrace *sf = container_of(data, struct stm_ftrace, data);
->> +
->> +     unregister_ftrace_export(&sf->ftrace);
->> +}
->> +
->> +static int __init stm_ftrace_init(void)
->> +{
->> +     int ret;
->> +
->> +     ret = stm_source_register_device(NULL, &stm_ftrace.data);
->> +     if (ret)
->> +             pr_err("Failed to register stm_source - ftrace.\n");
->> +
->> +     return ret;
->> +}
->> +
->> +static void __exit stm_ftrace_exit(void)
->> +{
->> +     stm_source_unregister_device(&stm_ftrace.data);
->> +}
->> +
->> +module_init(stm_ftrace_init);
->> +module_exit(stm_ftrace_exit);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_DESCRIPTION("stm_ftrace driver");
->> +MODULE_AUTHOR("Chunyan Zhang <zhang.chunyan@linaro.org>");
->
+Thanks Peter  ;-)
