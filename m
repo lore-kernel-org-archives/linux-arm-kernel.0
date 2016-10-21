@@ -1,43 +1,23 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 21 Oct 2016 11:02:23 +0800
-Subject: [PATCH 0/6] ARM: sun5i: chip: Misc improvements
-In-Reply-To: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
-References: <cover.92d041a0a6fe40f1c8839cabb70247445eaffdfb.1476704881.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65L=Cf1EWgZ1YPyFA_g7aiqAGwNkC-e0vs3OM8BJ2OEbA@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 21 Oct 2016 11:09:45 +0800
+Subject: [PATCH 1/1] crypto: atmel-aes: fix compiler error when
+ VERBOSE_DEBUG is defined
+In-Reply-To: <605a4f64ee501aeaffbd43b7b45fd9b3d997bd7b.1475167206.git.cyrille.pitchen@atmel.com>
+References: <605a4f64ee501aeaffbd43b7b45fd9b3d997bd7b.1475167206.git.cyrille.pitchen@atmel.com>
+Message-ID: <20161021030945.GB22979@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 7:48 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> This is a bunch of patches I gathered for the CHIP, that enables a few
-> things, like the WiFi regulators (and its associated power sequence), a few
-> optional buses, etc.
+On Thu, Sep 29, 2016 at 06:46:57PM +0200, Cyrille Pitchen wrote:
+> This patch fixes a compiler error when VERBOSE_DEBUG is defined. Indeed,
+> in atmel_aes_write(), the 3rd argument of atmel_aes_reg_name() was
+> missing.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Reported-by: Levent Demir <levent.demir@inria.fr>
 
-FYI this series makes more sense if you mention the Pocket CHIP DT overlays.
-
-ChenYu
-
->
-> Let me know what you think,
-> Maxime
->
-> Antoine Tenart (1):
->   ARM: sun5i: chip: add a node for the w1 gpio controller
->
-> Maxime Ripard (5):
->   ARM: sun5i: chip: Enable Wi-Fi SDIO chip
->   ARM: sun5i: Rename A10s pins
->   ARM: sun5i: Add SPI2 pins
->   ARM: sun5i: Add RGB 565 LCD pins
->   ARM: sun5i: chip: Add optional buses
->
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  4 +-
->  arch/arm/boot/dts/sun5i-a10s.dtsi                |  4 +-
->  arch/arm/boot/dts/sun5i-r8-chip.dts              | 69 +++++++++++++++++-
->  arch/arm/boot/dts/sun5i.dtsi                     | 24 ++++++-
->  4 files changed, 97 insertions(+), 4 deletions(-)
->
-> --
-> git-series 0.8.10
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
