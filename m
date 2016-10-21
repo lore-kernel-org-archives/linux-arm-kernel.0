@@ -1,108 +1,84 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 10:36:38 +0100
-Subject: [RFC PATCH 5/8] ARM: gic-v3-its: Add 32bit support to GICv3 ITS
+Date: Fri, 21 Oct 2016 10:36:40 +0100
+Subject: [RFC PATCH 7/8] KVM: arm64: vgic-its: fix compatability with 32-bit
 In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
 References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1477042601-15227-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire-up flush_dcache, readq- and writeq-like gic-v3-its assessors, so
-GICv3 ITS gets all it needs to be built and run.
+Evaluate GITS_BASER_ENTRY_SIZE once as an int data (GITS_BASER<n>'s
+Entry Size is 5-bit wide only), so when used as divider no reference
+to __aeabi_uldivmod is generated when build for AArch32.
+
+Use unsigned long long for GITS_BASER_PAGE_SIZE_* since they are
+used in conjunction with 64-bit data.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h |   59 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 52 insertions(+), 7 deletions(-)
+ include/linux/irqchip/arm-gic-v3.h |    8 ++++----
+ virt/kvm/arm/vgic/vgic-its.c       |   11 ++++++-----
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index a808829..35a1e35 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -22,6 +22,7 @@
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 5118d3a..e808f8a 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -295,10 +295,10 @@
+ #define GITS_BASER_InnerShareable					\
+ 	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+ #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
+-#define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
+-#define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+-#define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+-#define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGE_SIZE_4K		(0ULL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGE_SIZE_16K	(1ULL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGE_SIZE_64K	(2ULL << GITS_BASER_PAGE_SIZE_SHIFT)
++#define GITS_BASER_PAGE_SIZE_MASK	(3ULL << GITS_BASER_PAGE_SIZE_SHIFT)
+ #define GITS_BASER_PAGES_MAX		256
+ #define GITS_BASER_PAGES_SHIFT		(0)
+ #define GITS_BASER_NR_PAGES(r)		(((r) & 0xff) + 1)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 4660a7d..8c2b3cd 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -632,21 +632,22 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+ 	int index;
+ 	u64 indirect_ptr;
+ 	gfn_t gfn;
++	int esz = GITS_BASER_ENTRY_SIZE(baser);
  
- #include <linux/io.h>
- #include <asm/barrier.h>
-+#include <asm/cacheflush.h>
- #include <asm/cp15.h>
+ 	if (!(baser & GITS_BASER_INDIRECT)) {
+ 		phys_addr_t addr;
  
- #define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
-@@ -230,19 +231,14 @@ static inline void gic_write_bpr1(u32 val)
-  * AArch32, since the syndrome register doesn't provide any information for
-  * them.
-  * Consequently, the following IO helpers use 32bit accesses.
-- *
-- * There are only two registers that need 64bit accesses in this driver:
-- * - GICD_IROUTERn, contain the affinity values associated to each interrupt.
-- *   The upper-word (aff3) will always be 0, so there is no need for a lock.
-- * - GICR_TYPER is an ID register and doesn't need atomicity.
-  */
--static inline void gic_write_irouter(u64 val, volatile void __iomem *addr)
-+static inline void __gic_writeq_nonatomic(u64 val, volatile void __iomem *addr)
- {
- 	writel_relaxed((u32)val, addr);
- 	writel_relaxed((u32)(val >> 32), addr + 4);
- }
+-		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
++		if (id >= (l1_tbl_size / esz))
+ 			return false;
  
--static inline u64 gic_read_typer(const volatile void __iomem *addr)
-+static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
- {
- 	u64 val;
+-		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
++		addr = BASER_ADDRESS(baser) + id * esz;
+ 		gfn = addr >> PAGE_SHIFT;
  
-@@ -251,5 +247,54 @@ static inline u64 gic_read_typer(const volatile void __iomem *addr)
- 	return val;
- }
+ 		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+ 	}
  
-+#define gic_flush_dcache_to_poc(a,l)    __cpuc_flush_dcache_area((a), (l))
-+
-+/*
-+ *  GICD_IROUTERn, contain the affinity values associated to each interrupt.
-+ *  The upper-word (aff3) will always be 0, so there is no need for a lock.
-+ */
-+#define gic_write_irouter(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GICR_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gic_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_BASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_baser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_baser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gits_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GICR_PENDBASER and GICR_PROPBASE are changed with LPIs disabled, so they
-+ * won't be being used during any updates and can be changed non-atomically
-+ */
-+#define gicr_read_propbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_propbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+#define gicr_read_pendbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_pendbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gits_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_CBASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_cbaser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_cbaser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_CWRITER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
-+
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
+ 	/* calculate and check the index into the 1st level */
+-	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
++	index = id / (SZ_64K / esz);
+ 	if (index >= (l1_tbl_size / sizeof(u64)))
+ 		return false;
+ 
+@@ -670,8 +671,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+ 	indirect_ptr &= GENMASK_ULL(51, 16);
+ 
+ 	/* Find the address of the actual entry */
+-	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
+-	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
++	index = id % (SZ_64K / esz);
++	indirect_ptr += index * esz;
+ 	gfn = indirect_ptr >> PAGE_SHIFT;
+ 
+ 	return kvm_is_visible_gfn(its->dev->kvm, gfn);
 -- 
 1.7.9.5
