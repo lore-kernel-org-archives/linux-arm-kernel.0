@@ -1,30 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 21 Oct 2016 08:56:26 -0700
-Subject: [PATCH V6 00/10] dmaengine: qcom_hidma: add MSI interrupt support
-In-Reply-To: <20161021065723.GA2467@localhost>
-References: <1476899512-20431-1-git-send-email-okaya@codeaurora.org>
- <20161020094838.GY2467@localhost>
- <e3cbd6a2-7fac-98ec-74ea-0be88075663c@codeaurora.org>
- <20161020164321.GZ2467@localhost>
- <a4c95bd6-d760-1f02-bbb1-89538037d41e@codeaurora.org>
- <37baf7db-1e14-4027-9397-70649e8fa946@codeaurora.org>
- <20161021065723.GA2467@localhost>
-Message-ID: <90b882fa-8a10-089a-eb2d-c7deaa611526@codeaurora.org>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Fri, 21 Oct 2016 17:57:18 +0200
+Subject: [PATCH 0/5] Remove STiH415/416 SoC platform support remaining parts
+Message-ID: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 11:57 PM, Vinod Koul wrote:
->> It looks like patches were applied out of order.
-> When applying, if I get a conflict I try to skip them. Typically subsequent
-> patches fail, sometimes they apply. I think couple of them did in this case
-> 
-> It built for me, 0day also gave me success report, so unless we have bisect
-> regression, I would like rest of the patches on top of this please..
-> 
+From: Patrice Chotard <patrice.chotard@st.com>
 
-OK. Let me work on it.
+ST have sent patches which remove clock support for these SoCs [1]
+which once applied mean the platform will no longer boot.
+
+This series cleans up remaining STi drivers which have
+support for these SoC's, by removing code, and updating the DT
+documentation accordingly. Some drivers such as st_thermal_syscfg
+can be removed completely because the IP is only found on these 
+legacy SoC's.
+
+Patrice Chotard (5):
+  thermal: st_thermal_syscfg: Remove obsolete STiH415/416 platform
+    support.
+  ARM: multi_v7_defconfig: Remove ST_THERMAL_SYSCFG Kconfig symbol
+  ARM: multi_v7_defconfig: Remove CONFIG_ST_THERMAL_MEMMAP Kconfig
+    symbol
+  irqchip: st: remove STiH415/416 irqchip support
+  irqchip: st: Remove obsolete platforms from dt binding doc
+
+ .../interrupt-controller/st,sti-irq-syscfg.txt     |   6 +-
+ arch/arm/configs/multi_v7_defconfig                |   2 -
+ drivers/irqchip/irq-st.c                           |  10 --
+ drivers/thermal/st/Kconfig                         |   4 -
+ drivers/thermal/st/Makefile                        |   1 -
+ drivers/thermal/st/st_thermal_syscfg.c             | 178 ---------------------
+ 6 files changed, 2 insertions(+), 199 deletions(-)
+ delete mode 100644 drivers/thermal/st/st_thermal_syscfg.c
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
