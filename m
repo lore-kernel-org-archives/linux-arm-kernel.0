@@ -1,163 +1,82 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 20 Oct 2016 20:58:14 -0500
-Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20161021015814.GC31044@localhost>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 21 Oct 2016 10:14:50 +0800
+Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
+ path
+In-Reply-To: <147699579088.21058.4379586947317571921@sboyd-linaro>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-12-stephen.boyd@linaro.org>
+ <20161019011535.GC6294@b29397-desktop>
+ <147684198705.24897.12451889548508263144@sboyd-linaro>
+ <20161019080211.GA1968@b29397-desktop>
+ <147694652997.28344.1048935134595924905@sboyd-linaro>
+ <20161020101017.GA32001@b29397-desktop>
+ <147699579088.21058.4379586947317571921@sboyd-linaro>
+Message-ID: <20161021021450.GA16461@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 06:21:03PM -0400, Sinan Kaya wrote:
-> The SCI penalize function was removed in two steps (first refactor
-> and then remove) and these changes are reverted here in one go.
+On Thu, Oct 20, 2016 at 01:36:30PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-10-20 03:10:18)
+> > On Wed, Oct 19, 2016 at 11:55:29PM -0700, Stephen Boyd wrote:
+> > > Quoting Peter Chen (2016-10-19 01:02:11)
+> > > > On Tue, Oct 18, 2016 at 06:53:07PM -0700, Stephen Boyd wrote:
+> > > > > If you're asking if I've made modifications to extcon-usb-gpio, then the
+> > > > > answer is no. The branch on linaro.org git server from the cover-letter
+> > > > > is the branch I've used to test this with. This patch is specifically to
+> > > > > fix issues with that design on the db410c board that has only one pin
+> > > > > for ID and vbus detection. It's the schematic that we've discussed in
+> > > > > another thread.
+> > > > > 
+> > > > > extcon-usb-gpio sends two extcon events, EXTCON_USB_HOST (for the id
+> > > > > pin) and EXTCON_USB (for the vbus). So afaik it does support vbus
+> > > > > events.
+> > > > > 
+> > > > 
+> > > > Hmm, in fact, your ID event is the same with vbus event, you take
+> > > > external vbus event as ID event for extcon-usb-gpio handling. Yes,
+> > > > it can work due to it sends EXTCON_USB_HOST event first.
+> > > > 
+> > > > Where you change the USB_SW_SEL_PM pin?
+> > > 
+> > > Currently that is done with the mux driver I sent based on the extcon
+> > > event. We don't know if that's before or after the controller handles
+> > > the extcon event though, so the pin should probably be changed from the
+> > > chipidea driver instead to be more explicit. Why do you ask though?
+> > 
+> > I was just curious how you handle it, now I am clear. From my point,
+> > the suitable way may be: mux driver + user app (echo role through
+> > debugfs). The extcon-usb-gpio is not necessary, since you have already
+> > known role at mux driver.
+> > 
+> > The current kernel has no framework to handle dual-role switch at kernel
+> > space.
 > 
-> The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> refactored the original code so that SCI penalty is calculated dynamically
-> by the time get_penalty function is called. That change is partially
-> reverted here, specifically for the SCI IRQ alone.
+> Ok. I'm planning that as future work after this set of patches is
+> merged.
 > 
-> The SCI penalize function was finally dropped by commit 9e5ed6d1fb87
-> ("ACPI,PCI,IRQ: remove SCI penalize function") that replaced the old SCI
-> penalty API with penalty calculation carried out dynamically and based
-> on the acpi_gbl_FADT.sci_interrupt value.
+> > > > @@ -1963,6 +1963,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
+> > > >                 /* Clear and enable BSV irq */
+> > > >                 hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
+> > > >                                         OTGSC_BSVIS | OTGSC_BSVIE);
+> > > > +       /* vbus change may has already been occurred */
+> > > 
+> > > "vbus change may have already occurred"?
+> > 
+> > Yes, will change.
+> > 
 > 
-> However, that new algorithm relies on the accurate setting of IRQ
-> types and that doesn't happen early enough on some platforms which
-> leads to incorrect penalty assignments for PCI IRQs.  In those cases,
-> irq_get_trigger_type() returns incorrect values for the IRQs in
-> question, because they have not been registered yet by the time the
-> penalties are calculated.
-> 
-> To fix this problem, we only need to fix the penalty for the SCI interrupt.
-> It seems better to add a single "sci_penalty" variable, set it to
-> PIRQ_PENALTY_PCI_USING if it's level/low or PIRQ_PENALTY_ISA_ALWAYS
-> otherwise, and add "sci_penalty" in when appropriate.  That should fix it
-> for *any* SCI IRQ, not just those less than 256, and we don't have to add
-> these extra penalty table entries that are all unused (except possibly for
-> one entry if we have an SCI in the 16-255 range).
-> 
-> For this reason, revert commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI
-> penalize function") completely to restore the correct behavior.
+> Great. Should I wait to incorporate your change into my series, or will
+> you apply the usb patches and Kishon can apply the phy patches?  This
+> patch #11 should be dropped, but otherwise I don't think there's
+> anything left to do for this series.
 
-I like this patch fine, except for the changelog.  I don't think it's
-useful to describe this as a revert and give all the historical
-details.  I think the important part is something like this:
+I tested my patch, it works well at my side, if it is ok for you, please
+ack it, I will apply it as well as your chipidea series after your
+gpu fix patch at greg's usb-next tree.
 
-  We previously used irq_get_trigger_type(irq) to help compute the
-  penalty for the SCI, but that depends on the SCI having been
-  registered already.  Add acpi_penalize_sci_irq() so platforms can
-  tell us the SCI IRQ, trigger, and polarity so we can compute the
-  penalty even before the SCI has been registered.
+Is it ok for you?
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+-- 
 
-> Link: https://lkml.org/lkml/2016/10/4/283
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Fixes: commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> Fixes: commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize function")
-
-"commit" is redundant; it's sufficient to say:
-
-  Fixes: 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-
-In fact, I don't think you really need to include "commit" in the
-reference to 9e5ed6d1fb87 above either.
-
-> ---
->  arch/x86/kernel/acpi/boot.c |  1 +
->  drivers/acpi/pci_link.c     | 30 +++++++++++++++---------------
->  include/linux/acpi.h        |  1 +
->  3 files changed, 17 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-> index 90d84c3..0ffd26e 100644
-> --- a/arch/x86/kernel/acpi/boot.c
-> +++ b/arch/x86/kernel/acpi/boot.c
-> @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
->  		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
->  
->  	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
-> +	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
->  
->  	/*
->  	 * stash over-ride to indicate we've been here
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 4f37938..294b190 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -87,6 +87,7 @@ struct acpi_pci_link {
->  
->  static LIST_HEAD(acpi_link_list);
->  static DEFINE_MUTEX(acpi_link_lock);
-> +static int sci_irq = -1, sci_penalty;
->  
->  /* --------------------------------------------------------------------------
->                              PCI Link Device Management
-> @@ -496,25 +497,13 @@ static int acpi_irq_get_penalty(int irq)
->  {
->  	int penalty = 0;
->  
-> -	/*
-> -	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
-> -	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-> -	* use for PCI IRQs.
-> -	*/
-> -	if (irq == acpi_gbl_FADT.sci_interrupt) {
-> -		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
-> -
-> -		if (type != IRQ_TYPE_LEVEL_LOW)
-> -			penalty += PIRQ_PENALTY_ISA_ALWAYS;
-> -		else
-> -			penalty += PIRQ_PENALTY_PCI_USING;
-> -	}
-> +	if (irq == sci_irq)
-> +		penalty += sci_penalty;
->  
->  	if (irq < ACPI_MAX_ISA_IRQS)
->  		return penalty + acpi_isa_irq_penalty[irq];
->  
-> -	penalty += acpi_irq_pci_sharing_penalty(irq);
-> -	return penalty;
-> +	return penalty + acpi_irq_pci_sharing_penalty(irq);
->  }
->  
->  int __init acpi_irq_penalty_init(void)
-> @@ -881,6 +870,17 @@ bool acpi_isa_irq_available(int irq)
->  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
->  }
->  
-> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-> +{
-> +	sci_irq = irq;
-> +
-> +	if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
-> +	    polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
-> +		sci_penalty = PIRQ_PENALTY_PCI_USING;
-> +	else
-> +		sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
-> +}
-> +
->  /*
->   * Over-ride default table to reserve additional IRQs for use by ISA
->   * e.g. acpi_irq_isa=5
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index c5eaf2f..67d1d3e 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -318,6 +318,7 @@ struct pci_dev;
->  int acpi_pci_irq_enable (struct pci_dev *dev);
->  void acpi_penalize_isa_irq(int irq, int active);
->  bool acpi_isa_irq_available(int irq);
-> +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
->  void acpi_pci_irq_disable (struct pci_dev *dev);
->  
->  extern int ec_read(u8 addr, u8 *val);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards,
+Peter Chen
