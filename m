@@ -1,26 +1,29 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Fri, 21 Oct 2016 08:11:59 -0300
-Subject: [PATCH v2] dt/bindings: arm-boards: Remove skeleton.dtsi
- inclusion from example
-In-Reply-To: <1477045693-6820-1-git-send-email-geert+renesas@glider.be>
-References: <1477045693-6820-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CABxcv=m3HOA9F=WmjzaDbDyvTsjZEEuQDeCnBa2dy4RaCDmcbw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Oct 2016 12:14:01 +0100
+Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify
+ ACPI support code.
+In-Reply-To: <20161020165747.GD27598@leverpostej>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
+ <20161020165747.GD27598@leverpostej>
+Message-ID: <20161021111352.GA16630@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+On Thu, Oct 20, 2016 at 05:58:17PM +0100, Mark Rutland wrote:
+> On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
+> > +	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
+> > +	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
+> > +	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
+> > +	/* Always-on capability */
+> > +	arch_timer_c3stop = acpi_gtdt_c3stop();
+> 
+> ... I think we should check the flag on the relevant interrupt, though
+> that's worth clarifying.
 
-On Fri, Oct 21, 2016 at 7:28 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
-> as deprecated"), including skeleton.dtsi is deprecated.
-> Hence remove it from the example.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> ---
+I see I misread the spec; this is part of the common flags.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Please ignore this point; sorry for the noise.
 
-Best regards,
-Javier
+Thanks,
+Mark.
