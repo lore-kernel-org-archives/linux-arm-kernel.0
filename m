@@ -1,52 +1,25 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 21 Oct 2016 23:33:17 +0300
-Subject: [PATCH 18/18] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1477081997-4770-19-git-send-email-ynorov@caviumnetworks.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 21 Oct 2016 23:39:14 +0300
+Subject: [PATCH v4 0/7] Add R8A7743/SK-RZG1M board support
+Message-ID: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+Hello.
 
-This patch adds the config option for ILP32.
+   Here's the set of 8 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20161021-v4.9-rc1' tag. I'm adding the device tree support for
+the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
+seems identical to the R8A7791/Porter board. The device tree patches depend on
+the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
+Already merged patches from this series won't be re-posted.
 
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
----
- arch/arm64/Kconfig | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+[1/7] ARM: dts: r8a7743: initial SoC device tree
+[2/7] ARM: dts: r8a7743: add SYS-DMAC support
+[3/7] ARM: dts: r8a7743: add [H]SCIF{A|B} support
+[4/7] ARM: dts: r8a7743: add Ether support
+[5/7] ARM: dts: r8a7743: add IRQC support
+[6/7] ARM: dts: sk-rzg1m: initial device tree
+[7/7] ARM: dts: sk-rzg1m: add Ether support
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9efa86a..07e177f 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -996,7 +996,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 
- config AARCH32_EL0
- 	bool "Kernel support for 32-bit EL0"
-@@ -1018,6 +1018,14 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	select COMPAT
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
--- 
-2.7.4
+WBR, Sergei
