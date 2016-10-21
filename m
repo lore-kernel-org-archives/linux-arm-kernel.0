@@ -1,23 +1,39 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 21 Oct 2016 12:02:15 -0700
-Subject: [PATCH v2 3/4] soc: ti: Add ti_sci_pm_domains driver
-In-Reply-To: <7h4m45plxr.fsf@baylibre.com>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-4-d-gerlach@ti.com> <7h4m45plxr.fsf@baylibre.com>
-Message-ID: <e13cd925-a62d-457d-cc99-fadd4d123256@oracle.com>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Fri, 21 Oct 2016 17:05:10 -0200
+Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
+ platform data
+In-Reply-To: <20161021182710.GA17279@kozik-lap>
+References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
+ <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
+ <20161021182710.GA17279@kozik-lap>
+Message-ID: <20161021190510.GA10729@sprado-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 12:00 PM, Kevin Hilman wrote:
-> Dave Gerlach <d-gerlach@ti.com> writes:
->
-[...]
+On Fri, Oct 21, 2016 at 09:27:10PM +0300, Krzysztof Kozlowski wrote:
+> 
+> I acked this twice (v1 and v2)... and still you are ignoring them. I am
+> sorry, I am not gonna to ack this third time!
+> 
+> For v2 I acked also other patches but it it is not there as well...
+> 
+> BR,
+> Krzysztof
 
->
-> BTW, what is the the status of the TI-SCI protocol drivers themselves?
-> This can't be merged until that is or this won't even compile.
->
-I was just about to ask the same question.
+I'm really sorry Krzysztof. This is my first patch series and I didn't
+know I should add the acked-by tag to the patches (I thought it would be
+done by the maintainer when the patches are accepted/applied).
 
-Regards,
-Santosh
+I'll make sure to do it right next time.
+
+Thanks for taking your time to reviewing and acking my patches.
+
+Best regards,
+
+Sergio Prado
+
+-- 
+Sergio Prado
+Embedded Labworks
+Office: +55 11 2628-3461
+Mobile: +55 11 97123-3420
