@@ -1,25 +1,55 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Oct 2016 23:39:14 +0300
-Subject: [PATCH v4 0/7] Add R8A7743/SK-RZG1M board support
-Message-ID: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+Date: Fri, 21 Oct 2016 23:45:36 +0300
+Subject: [PATCH v4 4/7] ARM: dts: r8a7743: add Ether support
+In-Reply-To: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+Message-ID: <3177118.XYEgMqnqG8@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Define the generic R8A7743 part of the Ether device node.
 
-   Here's the set of 8 patches against Simon Horman's 'renesas.git' repo's
-'renesas-devel-20161021-v4.9-rc1' tag. I'm adding the device tree support for
-the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
-seems identical to the R8A7791/Porter board. The device tree patches depend on
-the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
-Already merged patches from this series won't be re-posted.
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-[1/7] ARM: dts: r8a7743: initial SoC device tree
-[2/7] ARM: dts: r8a7743: add SYS-DMAC support
-[3/7] ARM: dts: r8a7743: add [H]SCIF{A|B} support
-[4/7] ARM: dts: r8a7743: add Ether support
-[5/7] ARM: dts: r8a7743: add IRQC support
-[6/7] ARM: dts: sk-rzg1m: initial device tree
-[7/7] ARM: dts: sk-rzg1m: add Ether support
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-WBR, Sergei
+---
+Changes in version 4:
+- refreshed the patch;
+- added Geert's tag.
+
+Changes in version 3:
+- resolved a reject;
+- updated the "clocks" property for the CPG/MSSR driver.
+
+Changes in version 2:
+- new patch.
+
+ arch/arm/boot/dts/r8a7743.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
++++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+@@ -413,6 +413,18 @@
+ 			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
++
++		ether: ethernet at ee700000 {
++			compatible = "renesas,ether-r8a7743";
++			reg = <0 0xee700000 0 0x400>;
++			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 813>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			phy-mode = "rmii";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	/* External root clock */
