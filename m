@@ -1,45 +1,50 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Fri, 21 Oct 2016 11:30:01 +1100
-Subject: [linux-sunxi] [PATCH v5 3/4] Documentation: devicetree: add
- vendor prefix for Pine64
-In-Reply-To: <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
-References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
- <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Fri, 21 Oct 2016 11:03:31 +1030
+Subject: [PATCH 6/8] pinctrl: aspeed-g4: Capture SuperIO pinmux dependency
+In-Reply-To: <CACRpkdYLDesENtq2cQBrWQeL6NH+mO_N5Z=e9=gsoZSCE85Jag@mail.gmail.com>
+References: <cover.115463f791b69859c5ce9dafd61a5755ea039f4b.1474986045.git-series.andrew@aj.id.au>
+ <b5f67ba76018314d08e240f95951751896687d37.1474986045.git-series.andrew@aj.id.au>
+ <CACRpkdYLDesENtq2cQBrWQeL6NH+mO_N5Z=e9=gsoZSCE85Jag@mail.gmail.com>
+Message-ID: <1477010011.8917.20.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 October 2016 at 05:00, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
->
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> [Maxime: Change title prefix to match the usual style]
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index f0a48ea78659..4eefd1c3ff16 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -208,7 +208,7 @@ parade      Parade Technologies Inc.
->  pericom        Pericom Technology Inc.
->  phytec PHYTEC Messtechnik GmbH
->  picochip       Picochip Ltd
-> -pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+Hi Linus,
 
-Why is "pixcir  PIXCIR MICROELECTRONICS Co., Ltd" removed?
+On Thu, 2016-10-20 at 13:53 +0200, Linus Walleij wrote:
+> On Tue, Sep 27, 2016 at 4:50 PM, Andrew Jeffery <andrew@aj.id.au>
+> wrote:
+> 
+> > 
+> > Two LPC-related signals in the AST2400 depend on state in the
+> > SuperIO IP
+> > block. Use the recently added infrastructure to capture this
+> > relationship.
+> > 
+> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Patch applied for v4.10.
+> (Tell me if I'm applying patches in wrong order or something, and
+> I hope this doesn't clash with the fixes.)
 
-> +pine64 Pine64
->  plathome       Plat'Home Co., Ltd.
->  plda   PLDA
->  powervr        PowerVR (deprecated, use img)
-> --
-> git-series 0.8.10
+Both this patch and 8/8 functionally depend on 5/8. I fetched the
+pinctrl tree to poke around but this patch didn't appear in any of the
+updated branches, so I'm not sure whether we have the right ordering.
+Without it we should hit build failures from missing macro definitions.
 
-Regards,
-Jonathan
+Have you had a chance to look over patch 5/8? Joel wasn't keen on its
+current form, so I would appreciate your input.
+
+Cheers,
+
+Andrew
+
+> 
+> Yours,
+> Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161021/07de7adc/attachment.sig>
