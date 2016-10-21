@@ -1,51 +1,121 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 20 Oct 2016 23:28:29 -0200
-Subject: [PATCH v2] ARM: imx: gpc: Initialize all power domains
-Message-ID: <1477013309-2808-1-git-send-email-festevam@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 21 Oct 2016 09:31:28 +0800
+Subject: [PATCH v7 5/5] ARM: dts: imx6qdl-icore: Add FEC support
+In-Reply-To: <1476437243-13297-6-git-send-email-jteki@openedev.com>
+References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
+ <1476437243-13297-6-git-send-email-jteki@openedev.com>
+Message-ID: <20161021013128.GE30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Fri, Oct 14, 2016 at 02:57:23PM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+> 
+> Add FEC support for Engicam i.CoreM6 dql modules.
+> 
+> Observed similar 'eth0: link is not ready' issue which was
+> discussed in [1] due rmii mode with external ref_clk, so added
+> clock node along with the properties mentioned by Shawn in [2]
+> 
+> FEC link log:
+> ------------
+> $ ifconfig eth0 up
+> [   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
+>                [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
+> [   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+> 
+> [1] https://patchwork.kernel.org/patch/3491061/
+> [2] https://patchwork.kernel.org/patch/3490511/
+> 
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Changes for v7:
+>         - none
+> Changes for v6:
+>         - none
+> Changes for v5:
+>         - new patch
+> 
+>  arch/arm/boot/dts/imx6qdl-icore.dtsi | 37 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> index 4e79858..972f48f 100644
+> --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+> @@ -48,6 +48,18 @@
+>  		reg = <0x10000000 0x80000000>;
+>  	};
+>  
+> +	clocks {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-Since commit 0159ec670763dd ("PM / Domains: Verify the PM domain is present
-when adding a provider") the following regression is observed on imx6:
+DT maintainers do not like this container node.  So please, just like
+fix regulator node, put the fixed clock directly under root and give the
+node an unique name like clock-xxx.
 
-imx-gpc: probe of 20dc000.gpc failed with error -22
+> +
+> +		rmii_clk: clock at 0 {
+> +			compatible = "fixed-clock";
+> +			reg = <0>;
+> +			#clock-cells = <0>;
+> +			clock-frequency = <25000000>;  /* 25MHz for example */
+> +		};
+> +	};
+> +
+>  	reg_3p3v: regulator-3p3v {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "3P3V";
+> @@ -93,6 +105,15 @@
+>  	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
+>  };
+>  
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
+> +	clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
 
-The imx-gpc driver probe failure causes several issues such as:
+s/117/IMX6QDL_CLK_ENET
 
-- When booting a kernel built with multi_v7_defconfig a kernel crash is
-seen.
+Shawn
 
-- When booting a kernel built with imx_v6_v7_defconfig the Etnaviv GPU
-driver is not loaded due to the lack of power domains.
-
-The gpc probe fails because of_genpd_add_provider_onecell() now checks
-if all the domains are initialized via pm_genpd_present() function
-and it fails because not all the power domains are initialized.
-
-In order to fix this error, initialize all the power domains from
-imx_gpc_domains[], not only the imx6q_pu_domain.base one.
-
-Reported-by: Olof's autobooter <build@lixom.net>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/mach-imx/gpc.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 0df062d..d0463e9 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -430,7 +430,8 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
- 	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
- 		return 0;
- 
--	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
-+	for (i = 0; i < ARRAY_SIZE(imx_gpc_domains); i++)
-+		pm_genpd_init(imx_gpc_domains[i], NULL, false);
- 	return of_genpd_add_provider_onecell(dev->of_node,
- 					     &imx_gpc_onecell_data);
- 
--- 
-2.7.4
+> +	phy-mode = "rmii";
+> +	status = "okay";
+> +};
+> +
+>  &gpmi {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_gpmi_nand>;
+> @@ -150,6 +171,22 @@
+>  };
+>  
+>  &iomuxc {
+> +	pinctrl_enet: enetgrp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
+> +			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
+> +			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
+> +			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
+> +			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
+> +			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
+> +			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
+> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+> +			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
+> +			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
+> +		>;
+> +	};
+> +
+>  	pinctrl_flexcan1: flexcan1grp {
+>  		fsl,pins = <
+>  			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
+> -- 
+> 2.7.4
+> 
