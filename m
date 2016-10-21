@@ -1,170 +1,208 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 21 Oct 2016 12:22:56 +0100
-Subject: [PATCH v4 1/3] arm64: mm: BUG on unsupported manipulations of live
- kernel mappings
+Date: Fri, 21 Oct 2016 12:22:57 +0100
+Subject: [PATCH v4 2/3] arm64: mm: replace 'block_mappings_allowed' with
+ 'page_mappings_only'
 In-Reply-To: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1477048978-4140-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1477048978-4140-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we take care not manipulate the live kernel page tables in a
-way that may lead to TLB conflicts, the case where a table mapping is
-replaced by a block mapping can no longer occur. So remove the handling
-of this at the PUD and PMD levels, and instead, BUG() on any occurrence
-of live kernel page table manipulations that modify anything other than
-the permission bits.
+In preparation of adding support for contiguous PTE and PMD mappings,
+let's replace 'block_mappings_allowed' with 'page_mappings_only', which
+will be a more accurate description of the nature of the setting once we
+add such contiguous mappings into the mix.
 
-Since mark_rodata_ro() is the only caller where the kernel mappings that
-are being manipulated are actually live, drop the various conditional
-flush_tlb_all() invocations, and add a single call to mark_rodata_ro()
-instead.
-
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 70 ++++++++++++--------
- 1 file changed, 43 insertions(+), 27 deletions(-)
+ arch/arm64/include/asm/mmu.h |  2 +-
+ arch/arm64/kernel/efi.c      |  8 ++---
+ arch/arm64/mm/mmu.c          | 32 ++++++++++----------
+ 3 files changed, 21 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 05615a3fdc6f..27dc0e5012a8 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -28,8 +28,6 @@
- #include <linux/memblock.h>
- #include <linux/fs.h>
- #include <linux/io.h>
--#include <linux/slab.h>
--#include <linux/stop_machine.h>
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 8d9fce037b2f..a81454ad5455 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -34,7 +34,7 @@ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+ extern void init_mem_pgprot(void);
+ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+-			       pgprot_t prot, bool allow_block_mappings);
++			       pgprot_t prot, bool page_mappings_only);
+ extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
  
- #include <asm/barrier.h>
- #include <asm/cputype.h>
-@@ -95,6 +93,17 @@ static phys_addr_t __init early_pgtable_alloc(void)
- 	return phys;
+ #endif
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index ba9bee389fd5..5d17f377d905 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -62,8 +62,8 @@ struct screen_info screen_info __section(.data);
+ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+ {
+ 	pteval_t prot_val = create_mapping_protection(md);
+-	bool allow_block_mappings = (md->type != EFI_RUNTIME_SERVICES_CODE &&
+-				     md->type != EFI_RUNTIME_SERVICES_DATA);
++	bool page_mappings_only = (md->type == EFI_RUNTIME_SERVICES_CODE ||
++				   md->type == EFI_RUNTIME_SERVICES_DATA);
+ 
+ 	if (!PAGE_ALIGNED(md->phys_addr) ||
+ 	    !PAGE_ALIGNED(md->num_pages << EFI_PAGE_SHIFT)) {
+@@ -76,12 +76,12 @@ int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+ 		 * from the MMU routines. So avoid block mappings altogether in
+ 		 * that case.
+ 		 */
+-		allow_block_mappings = false;
++		page_mappings_only = true;
+ 	}
+ 
+ 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+ 			   md->num_pages << EFI_PAGE_SHIFT,
+-			   __pgprot(prot_val | PTE_NG), allow_block_mappings);
++			   __pgprot(prot_val | PTE_NG), page_mappings_only);
+ 	return 0;
  }
  
-+static bool pgattr_change_is_safe(u64 old, u64 new)
-+{
-+	/*
-+	 * The following mapping attributes may be updated in live
-+	 * kernel mappings without the need for break-before-make.
-+	 */
-+	static const pteval_t mask = PTE_PXN | PTE_RDONLY | PTE_WRITE;
-+
-+	return old  == 0 || new  == 0 || ((old ^ new) & ~mask) == 0;
-+}
-+
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
-@@ -115,8 +124,17 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 27dc0e5012a8..7b0dd07212ae 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -143,7 +143,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void),
+-				  bool allow_block_mappings)
++				  bool page_mappings_only)
+ {
+ 	pmd_t *pmd;
+ 	unsigned long next;
+@@ -170,7 +170,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
  
- 	pte = pte_set_fixmap_offset(pmd, addr);
- 	do {
-+		pte_t old_pte = *pte;
-+
- 		set_pte(pte, pfn_pte(pfn, prot));
- 		pfn++;
-+
-+		/*
-+		 * After the PTE entry has been populated once, we
-+		 * only allow updates to the permission attributes.
-+		 */
-+		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
-+
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- 
- 	pte_clear_fixmap();
-@@ -146,27 +164,27 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 
- 	pmd = pmd_set_fixmap_offset(pud, addr);
- 	do {
-+		pmd_t old_pmd = *pmd;
-+
- 		next = pmd_addr_end(addr, end);
-+
  		/* try section mapping first */
  		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
- 		      allow_block_mappings) {
--			pmd_t old_pmd =*pmd;
+-		      allow_block_mappings) {
++		      !page_mappings_only) {
  			pmd_set_huge(pmd, phys, prot);
-+
+ 
  			/*
--			 * Check for previous table entries created during
--			 * boot (__create_page_tables) and flush them.
-+			 * After the PMD entry has been populated once, we
-+			 * only allow updates to the permission attributes.
- 			 */
--			if (!pmd_none(old_pmd)) {
--				flush_tlb_all();
--				if (pmd_table(old_pmd)) {
--					phys_addr_t table = pmd_page_paddr(old_pmd);
--					if (!WARN_ON_ONCE(slab_is_available()))
--						memblock_free(table, PAGE_SIZE);
--				}
--			}
-+			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
-+						      pmd_val(*pmd)));
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
- 				       prot, pgtable_alloc);
-+
-+			BUG_ON(pmd_val(old_pmd) != 0 &&
-+			       pmd_val(old_pmd) != pmd_val(*pmd));
- 		}
- 		phys += next - addr;
- 	} while (pmd++, addr = next, addr != end);
-@@ -204,33 +222,28 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 
- 	pud = pud_set_fixmap_offset(pgd, addr);
- 	do {
-+		pud_t old_pud = *pud;
-+
- 		next = pud_addr_end(addr, end);
- 
+@@ -207,7 +207,7 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 				  phys_addr_t phys, pgprot_t prot,
+ 				  phys_addr_t (*pgtable_alloc)(void),
+-				  bool allow_block_mappings)
++				  bool page_mappings_only)
+ {
+ 	pud_t *pud;
+ 	unsigned long next;
+@@ -229,7 +229,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
  		/*
  		 * For 4K granule only, attempt to put down a 1GB block
  		 */
- 		if (use_1G_block(addr, next, phys) && allow_block_mappings) {
--			pud_t old_pud = *pud;
+-		if (use_1G_block(addr, next, phys) && allow_block_mappings) {
++		if (use_1G_block(addr, next, phys) && !page_mappings_only) {
  			pud_set_huge(pud, phys, prot);
  
  			/*
--			 * If we have an old value for a pud, it will
--			 * be pointing to a pmd table that we no longer
--			 * need (from swapper_pg_dir).
--			 *
--			 * Look up the old pmd table and free it.
-+			 * After the PUD entry has been populated once, we
-+			 * only allow updates to the permission attributes.
- 			 */
--			if (!pud_none(old_pud)) {
--				flush_tlb_all();
--				if (pud_table(old_pud)) {
--					phys_addr_t table = pud_page_paddr(old_pud);
--					if (!WARN_ON_ONCE(slab_is_available()))
--						memblock_free(table, PAGE_SIZE);
--				}
--			}
-+			BUG_ON(!pgattr_change_is_safe(pud_val(old_pud),
-+						      pud_val(*pud)));
+@@ -240,7 +240,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 						      pud_val(*pud)));
  		} else {
  			alloc_init_pmd(pud, addr, next, phys, prot,
- 				       pgtable_alloc, allow_block_mappings);
-+
-+			BUG_ON(pud_val(old_pud) != 0 &&
-+			       pud_val(old_pud) != pud_val(*pud));
- 		}
+-				       pgtable_alloc, allow_block_mappings);
++				       pgtable_alloc, page_mappings_only);
+ 
+ 			BUG_ON(pud_val(old_pud) != 0 &&
+ 			       pud_val(old_pud) != pud_val(*pud));
+@@ -255,7 +255,7 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+ 				 unsigned long virt, phys_addr_t size,
+ 				 pgprot_t prot,
+ 				 phys_addr_t (*pgtable_alloc)(void),
+-				 bool allow_block_mappings)
++				 bool page_mappings_only)
+ {
+ 	unsigned long addr, length, end, next;
+ 	pgd_t *pgd = pgd_offset_raw(pgdir, virt);
+@@ -275,7 +275,7 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+ 	do {
+ 		next = pgd_addr_end(addr, end);
+ 		alloc_init_pud(pgd, addr, next, phys, prot, pgtable_alloc,
+-			       allow_block_mappings);
++			       page_mappings_only);
  		phys += next - addr;
- 	} while (pud++, addr = next, addr != end);
-@@ -396,6 +409,9 @@ void mark_rodata_ro(void)
- 	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
- 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
- 			    section_size, PAGE_KERNEL_RO);
-+
-+	/* flush the TLBs after updating live kernel mappings */
-+	flush_tlb_all();
+ 	} while (pgd++, addr = next, addr != end);
+ }
+@@ -304,17 +304,17 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
+ 			&phys, virt);
+ 		return;
+ 	}
+-	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, true);
++	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
  }
  
- static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+-			       pgprot_t prot, bool allow_block_mappings)
++			       pgprot_t prot, bool page_mappings_only)
+ {
+ 	BUG_ON(mm == &init_mm);
+ 
+ 	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
+-			     pgd_pgtable_alloc, allow_block_mappings);
++			     pgd_pgtable_alloc, page_mappings_only);
+ }
+ 
+ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+@@ -327,7 +327,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 	}
+ 
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot,
+-			     NULL, !debug_pagealloc_enabled());
++			     NULL, debug_pagealloc_enabled());
+ }
+ 
+ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+@@ -345,7 +345,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 		__create_pgd_mapping(pgd, start, __phys_to_virt(start),
+ 				     end - start, PAGE_KERNEL,
+ 				     early_pgtable_alloc,
+-				     !debug_pagealloc_enabled());
++				     debug_pagealloc_enabled());
+ 		return;
+ 	}
+ 
+@@ -358,13 +358,13 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 				     __phys_to_virt(start),
+ 				     kernel_start - start, PAGE_KERNEL,
+ 				     early_pgtable_alloc,
+-				     !debug_pagealloc_enabled());
++				     debug_pagealloc_enabled());
+ 	if (kernel_end < end)
+ 		__create_pgd_mapping(pgd, kernel_end,
+ 				     __phys_to_virt(kernel_end),
+ 				     end - kernel_end, PAGE_KERNEL,
+ 				     early_pgtable_alloc,
+-				     !debug_pagealloc_enabled());
++				     debug_pagealloc_enabled());
+ 
+ 	/*
+ 	 * Map the linear alias of the [_text, __init_begin) interval as
+@@ -374,7 +374,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
+ 	 */
+ 	__create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
+ 			     kernel_end - kernel_start, PAGE_KERNEL_RO,
+-			     early_pgtable_alloc, !debug_pagealloc_enabled());
++			     early_pgtable_alloc, debug_pagealloc_enabled());
+ }
+ 
+ static void __init map_mem(pgd_t *pgd)
+@@ -424,7 +424,7 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ 	BUG_ON(!PAGE_ALIGNED(size));
+ 
+ 	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
+-			     early_pgtable_alloc, !debug_pagealloc_enabled());
++			     early_pgtable_alloc, debug_pagealloc_enabled());
+ 
+ 	vma->addr	= va_start;
+ 	vma->phys_addr	= pa_start;
 -- 
 2.7.4
