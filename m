@@ -1,111 +1,100 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 21 Oct 2016 12:22:58 +0100
-Subject: [PATCH v4 3/3] arm64: mm: set the contiguous bit for kernel mappings
- where appropriate
-In-Reply-To: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1477048978-4140-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1477048978-4140-4-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Oct 2016 12:32:13 +0100
+Subject: [PATCH v14 7/9] clocksource/drivers/arm_arch_timer: Refactor the
+ timer init code to prepare for GTDT
+In-Reply-To: <1475086637-1914-8-git-send-email-fu.wei@linaro.org>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-8-git-send-email-fu.wei@linaro.org>
+Message-ID: <20161021113213.GD16630@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we no longer allow live kernel PMDs to be split, it is safe to
-start using the contiguous bit for kernel mappings. So set the contiguous
-bit in the kernel page mappings for regions whose size and alignment are
-suitable for this.
+On Thu, Sep 29, 2016 at 02:17:15AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> The patch refactor original memory-mapped timer init code:
+> (1) extract some subfunction for reusing some common code
+>     a. get_cnttidr
+>     b. is_best_frame
+> (2) move base address and irq code for arch_timer_mem to
+> arch_timer_mem_register
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 159 +++++++++++++++++++++--------------
+>  1 file changed, 96 insertions(+), 63 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index c7b0040..e78095f 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -57,6 +57,7 @@
+>  static unsigned arch_timers_present __initdata;
+>  
+>  static void __iomem *arch_counter_base;
+> +static void __iomem *cntctlbase __initdata;
+>  
+>  struct arch_timer {
+>  	void __iomem *base;
+> @@ -656,15 +657,49 @@ out:
+>  	return err;
+>  }
+>  
+> -static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
+> +static int __init arch_timer_mem_register(struct device_node *np, void *frame)
+>  {
+> -	int ret;
+> -	irq_handler_t func;
+> +	struct device_node *frame_node = NULL;
+>  	struct arch_timer *t;
+> +	void __iomem *base;
+> +	irq_handler_t func;
+> +	unsigned int irq;
+> +	int ret;
+> +
+> +	if (!frame)
+> +		return -EINVAL;
 
-This enables the following contiguous range sizes for the virtual mapping
-of the kernel image, and for the linear mapping:
+Why would we call this without a frame?
 
-          granule size |  cont PTE  |  cont PMD  |
-          -------------+------------+------------+
-               4 KB    |    64 KB   |   32 MB    |
-              16 KB    |     2 MB   |    1 GB*   |
-              64 KB    |     2 MB   |   16 GB*   |
+> +
+> +	if (np) {
 
-* Only when built for 3 or more levels of translation. This is due to the
-  fact that a 2 level configuration only consists of PGDs and PTEs, and the
-  added complexity of dealing with folded PMDs is not justified considering
-  that 16 GB contiguous ranges are likely to be ignored by the hardware (and
-  16k/2 levels is a niche configuration)
+... or without a node?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/mm/mmu.c | 34 +++++++++++++++++---
- 1 file changed, 30 insertions(+), 4 deletions(-)
+> +		frame_node = (struct device_node *)frame;
+> +		base = of_iomap(frame_node, 0);
+> +		arch_timer_detect_rate(base, np);
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 7b0dd07212ae..dd5f12d0959e 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -107,8 +107,10 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 				  unsigned long end, unsigned long pfn,
- 				  pgprot_t prot,
--				  phys_addr_t (*pgtable_alloc)(void))
-+				  phys_addr_t (*pgtable_alloc)(void),
-+				  bool page_mappings_only)
- {
-+	pgprot_t __prot = prot;
- 	pte_t *pte;
- 
- 	BUG_ON(pmd_sect(*pmd));
-@@ -126,7 +128,18 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	do {
- 		pte_t old_pte = *pte;
- 
--		set_pte(pte, pfn_pte(pfn, prot));
-+		/*
-+		 * Set the contiguous bit for the subsequent group of PTEs if
-+		 * its size and alignment are appropriate.
-+		 */
-+		if (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0) {
-+			if (end - addr >= CONT_PTE_SIZE && !page_mappings_only)
-+				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
-+			else
-+				__prot = prot;
-+		}
-+
-+		set_pte(pte, pfn_pte(pfn, __prot));
- 		pfn++;
- 
- 		/*
-@@ -145,6 +158,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 				  phys_addr_t (*pgtable_alloc)(void),
- 				  bool page_mappings_only)
- {
-+	pgprot_t __prot = prot;
- 	pmd_t *pmd;
- 	unsigned long next;
- 
-@@ -171,7 +185,18 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 		/* try section mapping first */
- 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
- 		      !page_mappings_only) {
--			pmd_set_huge(pmd, phys, prot);
-+			/*
-+			 * Set the contiguous bit for the subsequent group of
-+			 * PMDs if its size and alignment are appropriate.
-+			 */
-+			if (((addr | phys) & ~CONT_PMD_MASK) == 0) {
-+				if (end - addr >= CONT_PMD_SIZE)
-+					__prot = __pgprot(pgprot_val(prot) |
-+							  PTE_CONT);
-+				else
-+					__prot = prot;
-+			}
-+			pmd_set_huge(pmd, phys, __prot);
- 
- 			/*
- 			 * After the PMD entry has been populated once, we
-@@ -181,7 +206,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 						      pmd_val(*pmd)));
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
--				       prot, pgtable_alloc);
-+				       prot, pgtable_alloc,
-+				       page_mappings_only);
- 
- 			BUG_ON(pmd_val(old_pmd) != 0 &&
- 			       pmd_val(old_pmd) != pmd_val(*pmd));
--- 
-2.7.4
+... BANG! (we check base too late, below).
+
+Please as Marc requested several versions ago: split the FW parsing
+(ACPI and DT) so that happens first, *then* once we have the data in a
+common format, use that to drive poking the HW, requesting IRQs, etc,
+completely independent of the source.
+
+In patches, do this by:
+
+(1) adding the data structures
+(2) splitting the existing DT probing to use them
+(3) Adding ACPI functionality atop
+
+> -static int __init arch_timer_mem_init(struct device_node *np)
+> +static int __init get_cnttidr(struct device_node *np, u32 *cnttidr)
+>  {
+> -	struct device_node *frame, *best_frame = NULL;
+> -	void __iomem *cntctlbase, *base;
+> -	unsigned int irq, ret = -EINVAL;
+> -	u32 cnttidr;
+> +	if (!cnttidr)
+> +		return -EINVAL;
+> +
+> +	if (np)
+> +		cntctlbase = of_iomap(np, 0);
+> +	else
+> +		return -EINVAL;
+
+We want to check this for ACPI too, no?
+
+Thanks,
+Mark.
