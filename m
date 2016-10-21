@@ -1,121 +1,87 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 21 Oct 2016 09:31:28 +0800
-Subject: [PATCH v7 5/5] ARM: dts: imx6qdl-icore: Add FEC support
-In-Reply-To: <1476437243-13297-6-git-send-email-jteki@openedev.com>
-References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
- <1476437243-13297-6-git-send-email-jteki@openedev.com>
-Message-ID: <20161021013128.GE30578@tiger>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Thu, 20 Oct 2016 19:33:26 -0600
+Subject: [PATCH v3 0/8] PM / Domains: DT support for domain idle states &
+ atomic PM domains
+In-Reply-To: <CAJZ5v0iKuSWr8xVha7HZ764z+Xk_urP1XFVV-VZ5+JQTuSj-bw@mail.gmail.com>
+References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
+ <CAPDyKFpQwOkXUk8wT6sZ-Ad4XpTnyodK5m24fYJ3P+1QtS0XOA@mail.gmail.com>
+ <20161020224432.GB72940@linaro.org>
+ <CAJZ5v0iKuSWr8xVha7HZ764z+Xk_urP1XFVV-VZ5+JQTuSj-bw@mail.gmail.com>
+Message-ID: <20161021013326.GA50423@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 02:57:23PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> Add FEC support for Engicam i.CoreM6 dql modules.
-> 
-> Observed similar 'eth0: link is not ready' issue which was
-> discussed in [1] due rmii mode with external ref_clk, so added
-> clock node along with the properties mentioned by Shawn in [2]
-> 
-> FEC link log:
-> ------------
-> $ ifconfig eth0 up
-> [   27.905187] SMSC LAN8710/LAN8720 2188000.ethernet:00: attached PHY driver
->                [SMSC LAN8710/LAN8720] (mii_bus:phy_addr=2188000.ethernet:00, irq=-1)
-> [   27.918982] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
-> 
-> [1] https://patchwork.kernel.org/patch/3491061/
-> [2] https://patchwork.kernel.org/patch/3490511/
-> 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v7:
->         - none
-> Changes for v6:
->         - none
-> Changes for v5:
->         - new patch
-> 
->  arch/arm/boot/dts/imx6qdl-icore.dtsi | 37 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> index 4e79858..972f48f 100644
-> --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> @@ -48,6 +48,18 @@
->  		reg = <0x10000000 0x80000000>;
->  	};
->  
-> +	clocks {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+On Fri, Oct 21 2016 at 16:48 -0600, Rafael J. Wysocki wrote:
+>On Fri, Oct 21, 2016 at 12:44 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>> On Mon, Oct 17 2016 at 01:30 -0600, Ulf Hansson wrote:
+>>>
+>>> On 14 October 2016 at 19:47, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>>
+>>>> Hi all,
+>>>>
+>>>> Changes since v2 [3] -
+>>>> - Addressed review comments from v2.
+>>>>         - domain-idle-states documentation updated
+>>>>         - fixed compiler issues with imx driver
+>>>>         - minor code change in pm_domains.c
+>>>> - The series is available at [4].
+>>>>
+>>>> Changes since v1 [2] -
+>>>> - Addressed review comments from v1.
+>>>>         - Fixes around dynamic allocation of genpd states
+>>>>         - Used OF method for iterating phandles
+>>>>         - Updated documentation, examples
+>>>>         - Rename state variable (provider -> fwnode)
+>>>> - The series is available at [3].
+>>>>
+>>>> The changes from [1] are -
+>>>> - Allocating memory for domain idle states dynamically
+>>>> - Conform to naming conventions for internal and exported genpd functions
+>>>> - DT binding example for domain-idle-state
+>>>> - Use fwnode instead of of_node
+>>>> - Handle atomic case for removal of PM Domain
+>>>> - Rebase on top of Rafael's pm/genpd tree
+>>>>
+>>>> Thanks,
+>>>> Lina
+>>>>
+>>>> Lina Iyer (8):
+>>>>   PM / Domains: Make genpd state allocation dynamic
+>>>>   PM / Domain: Add residency property to genpd states
+>>>>   PM / Domains: Allow domain power states to be read from DT
+>>>>   PM / Domains: Save the fwnode in genpd_power_state
+>>>>   dt/bindings: Update binding for PM domain idle states
+>>>>   PM / Domains: Abstract genpd locking
+>>>>   PM / Domains: Support IRQ safe PM domains
+>>>>   PM / doc: Update device documentation for devices in IRQ safe PM
+>>>>     domains
+>>>>
+>>>>  .../devicetree/bindings/power/power_domain.txt     |  43 +++
+>>>>  Documentation/power/devices.txt                    |   9 +-
+>>>>  arch/arm/mach-imx/gpc.c                            |  17 +-
+>>>>  drivers/base/power/domain.c                        | 358
+>>>> +++++++++++++++++----
+>>>>  include/linux/pm_domain.h                          |  28 +-
+>>>>  5 files changed, 383 insertions(+), 72 deletions(-)
+>>>>
+>>>
+>>> Rafael, Lina,
+>>>
+>>> This looks good to me! Unless any other objections, I suggest to apply
+>>> this to get it tested in linux-next.
+>>>
+>>> Kind regards
+>>> Uffe
+>>>
+>> Rafael,
+>>
+>> If there are no objections, could you pick this patch for linux-next?
+>
+>It is in my queue, but not at the top yet.
+>
+Thank you Rafael.
 
-DT maintainers do not like this container node.  So please, just like
-fix regulator node, put the fixed clock directly under root and give the
-node an unique name like clock-xxx.
+-- Lina
 
-> +
-> +		rmii_clk: clock at 0 {
-> +			compatible = "fixed-clock";
-> +			reg = <0>;
-> +			#clock-cells = <0>;
-> +			clock-frequency = <25000000>;  /* 25MHz for example */
-> +		};
-> +	};
-> +
->  	reg_3p3v: regulator-3p3v {
->  		compatible = "regulator-fixed";
->  		regulator-name = "3P3V";
-> @@ -93,6 +105,15 @@
->  	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
->  };
->  
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-> +	clocks = <&clks 117>, <&clks 117>, <&rmii_clk>;
-
-s/117/IMX6QDL_CLK_ENET
-
-Shawn
-
-> +	phy-mode = "rmii";
-> +	status = "okay";
-> +};
-> +
->  &gpmi {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_gpmi_nand>;
-> @@ -150,6 +171,22 @@
->  };
->  
->  &iomuxc {
-> +	pinctrl_enet: enetgrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-> +			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1b0b1
-> +			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-> +			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-> +			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-> +			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-> +			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +			MX6QDL_PAD_ENET_REF_CLK__GPIO1_IO23	0x1b0b0
-> +			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b0b0
-> +		>;
-> +	};
-> +
->  	pinctrl_flexcan1: flexcan1grp {
->  		fsl,pins = <
->  			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX 0x1b020
-> -- 
-> 2.7.4
-> 
+>Thanks,
+>Rafael
