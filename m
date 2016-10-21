@@ -1,48 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 10:30:47 +0200
-Subject: mbox-name vs. mbox-names (was: Re: [PATCH v4 1/5] mailbox: dt: Supply
- bindings for ST's Mailbox IP)
-Message-ID: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 21 Oct 2016 09:44:25 +0100
+Subject: [PATCH] dmaengine: st_fdma: Update st_fdma to 'depends on REMOTEPROC'.
+Message-ID: <1477039465-31121-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 9:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  .../devicetree/bindings/mailbox/sti-mailbox.txt    | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-> new file mode 100644
-> index 0000000..b61eec9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-> @@ -0,0 +1,51 @@
-> +ST Microelectronics Mailbox Driver
-> +
-> +Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
-> +are passed between Application and Remote processors using shared memory.
-> +
-> +Controller
-> +----------
-> +
-> +Required properties:
-> +- compatible           : Should be "st,stih407-mailbox"
-> +- reg                  : Offset and length of the device's register set
-> +- mbox-name            : Name of the mailbox
+During randconfig builds you can get the following warning
+"warning: (ST_FDMA) selects ST_SLIM_REMOTEPROC which has unmet direct
+ dependencies (REMOTEPROC)"
 
-All other mailbox drivers use "mbox-names". Oops, it's in v4.9-rc1...
+randconfig builds should always build without any warnings so
+update fdma to depend on REMOTEPROC so this can not happen.
 
-Can we still fix that?
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/dma/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index 661f217..6b96710 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -438,6 +438,7 @@ config STE_DMA40
+ config ST_FDMA
+ 	tristate "ST FDMA dmaengine support"
+ 	depends on ARCH_STI
++	depends on REMOTEPROC
+ 	select ST_SLIM_REMOTEPROC
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+-- 
+1.9.1
