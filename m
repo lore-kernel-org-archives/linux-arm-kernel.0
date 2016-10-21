@@ -1,30 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 21 Oct 2016 09:13:06 -0700
-Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <20161021144535.GB877@localhost>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
- <20161021015814.GC31044@localhost> <20161021144535.GB877@localhost>
-Message-ID: <2a824792-486a-6251-4931-c5cc6fd67978@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 21 Oct 2016 18:18:10 +0200
+Subject: [PATCH v3 0/2] Add MK808 RK3066 device
+In-Reply-To: <cover.1475957884.git.paweljarosz3691@gmail.com>
+References: <cover.1475957884.git.paweljarosz3691@gmail.com>
+Message-ID: <1671843.4nkAJvukGm@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 7:45 AM, Bjorn Helgaas wrote:
-> [1] http://marc.info/?l=linux-acpi&m=145580159209240&w=2)
+Am Samstag, 8. Oktober 2016, 22:21:47 CEST schrieb Pawe? Jarosz:
+> Add MK808 RK3066 device
 > 
->> > Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> Wait a minute, I still have a question here: what about other ACPI
-> arches (ia64, arm64)?  Don't they need to call acpi_penalize_sci_irq()
-> somewhere?
+> This patchset adds support for Rikomagic MK808 v1 device with RK901 wifi.
 > 
+> It is hdmi stick with two usb ports(host and otg), sdmmc, wifi and uart
+> onboard.
+> 
+> It is RK3066 based.
+> 
+> Pawe? Jarosz (2):
+>   devicetree: Add vendor prefix for Rikomagic
+>   ARM: dts: rockchip: Add rk3066 MK808 board
 
-ACPI ARM64 architecture implements reduced ACPI profile which doesn't
-have GED object. Instead, ARM64 architecture uses onchip peripherals
-for similar functionality. If there is a need to signal interrupts,
-this is done by ACPI Notify in ASL or if absolutely needed using
-ACPI Generic Event Device (GED).
+applied both patches with received tags for 4.10.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+If you have time could try to do a followup patch, adding (and testing) the 
+usbphy supplies please?
+
+Should be like
+
+&usbphy0 {
+	phy-supply = <&vcc_otg>;
+};
+
+&usbphy1 {
+	phy-supply = <&vcc_host>;
+};
+
+That way we can drop the regulator-always-on property from those two supplies.
+
+
+Thanks
+Heiko
