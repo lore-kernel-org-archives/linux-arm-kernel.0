@@ -1,80 +1,70 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 21 Oct 2016 16:01:09 -0500
-Subject: [PATCH 5/7] ARM: dts: am335x: Add the charger interrupt
-In-Reply-To: <CAOCHtYgBTq0a1FAMQJb5VoLPWBHYkF3rH_Km6U9u6ep=8ApZuQ@mail.gmail.com>
-References: <20161021140106.21531-1-woogyom.kim@gmail.com>
- <20161021140106.21531-6-woogyom.kim@gmail.com>
- <CAOCHtYgBTq0a1FAMQJb5VoLPWBHYkF3rH_Km6U9u6ep=8ApZuQ@mail.gmail.com>
-Message-ID: <CAOCHtYhQ6_Ttr6j-JD6tHZNfs+amAs2qqKPYE_9DnuC_0v5ptg@mail.gmail.com>
+From: corbet@lwn.net (Jonathan Corbet)
+Date: Fri, 21 Oct 2016 15:09:16 -0600
+Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
+ dma_set_mask_and_coherent
+In-Reply-To: <20161017152623.7649-1-punit.agrawal@arm.com>
+References: <20161017152623.7649-1-punit.agrawal@arm.com>
+Message-ID: <20161021150916.0d274e9f@lwn.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 3:47 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> On Fri, Oct 21, 2016 at 9:01 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
->> This enables the charger driver gets corresponding IRQ number by using
->> platform_get_irq_byname() helper.
->>
->> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
->> ---
->>  arch/arm/boot/dts/am335x-bone-common.dtsi | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
->> index 25303d9..cec9d91 100644
->> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
->> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
->> @@ -6,6 +6,8 @@
->>   * published by the Free Software Foundation.
->>   */
->>
->> +#include <dt-bindings/mfd/tps65217.h>
->
-> ^ this hasn't been posted nor pushed to mainline yet.. ;)
+On Mon, 17 Oct 2016 16:26:23 +0100
+Punit Agrawal <punit.agrawal@arm.com> wrote:
 
-So, with this patchset + Keerthy's [RESEND PATCH v8 0/5] mfd:
-tps65218: Clean ups:
+> The dma mapping api howto gives the impression that using the
+> dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
+> to check all the components in the path from the device to memory for
+> addressing restrictions. In systems with address translations between
+> the device and memory (e.g., when using IOMMU), this implies that a
+> successful call to set set dma mask has checked the addressing
+> constraints of the intermediaries as well.
+> 
+> For the IOMMU drivers in the tree, the check is actually performed while
+> allocating the DMA buffer rather than when the DMA mask is
+> configured. For MMUs that do not support the full device addressing
+> capability, the allocations are made from a reduced address space.
+> 
+> Update the documentation to clarify that even though the call to
+> dma_set_mask_and_coherent succeeds, it may not be possible to use the
+> full addressing capability of the device.
 
-https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1250918.html
+OK, so I guess I can buy this.  But...
 
-and this patch, as systemd is looking for "tps65217_pwr_but"..
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> ---
+>  Documentation/DMA-API-HOWTO.txt | 39 +++++++++++++++++++++++----------------
+>  1 file changed, 23 insertions(+), 16 deletions(-)
+> 
+> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
+> index 979228b..240d1ee 100644
+> --- a/Documentation/DMA-API-HOWTO.txt
+> +++ b/Documentation/DMA-API-HOWTO.txt
+> @@ -159,39 +159,46 @@ support 64-bit addressing (DAC) for all transactions.  And at least
+>  one platform (SGI SN2) requires 64-bit consistent allocations to
+>  operate correctly when the IO bus is in PCI-X mode.
+>  
+> -For correct operation, you must interrogate the kernel in your device
+> -probe routine to see if the DMA controller on the machine can properly
+> -support the DMA addressing limitation your device has.  It is good
+> +For correct operation, you must inform the kernel in your device probe
+> +routine to see if the DMA controller on the machine can properly
+> +support the DMA addressing capabilities your device has.  It is good
 
-https://github.com/systemd/systemd/blob/master/src/login/70-power-switch.rules#L13
+Here it's still saying "to see if the DMA controller on the machine can
+properly support the DMA addressing capabilities your device has".  So
+you've not really changed the sense of this sentence here.
 
-Shutdown is working on my BBB/BBG/BBGW/BBBW's...
+If I understand things correctly, the calls in question are storing the
+device's limitations; they will only fail if the kernel is entirely
+unable to work within the indicated range, right?  I don't think there's
+ever been any guarantee that the system as a whole could use the entire
+range that is addressable by the device.  I have no objection to making
+that more clear, but let's actually make it more clear by saying what the
+functions are actually doing.
 
-diff --git a/drivers/input/misc/tps65218-pwrbutton.c
-b/drivers/input/misc/tps65218-pwrbutton.c
-index cc74a41..f7e5492 100644
---- a/drivers/input/misc/tps65218-pwrbutton.c
-+++ b/drivers/input/misc/tps65218-pwrbutton.c
-@@ -36,7 +36,7 @@ struct tps6521x_data {
- static const struct tps6521x_data tps65217_data = {
-  .reg_status = TPS65217_REG_STATUS,
-  .pb_mask = TPS65217_STATUS_PB,
-- .name = "tps65217_pwrbutton",
-+ .name = "tps65217_pwr_but",
- };
+Make sense, or am I missing something here?
 
- static const struct tps6521x_data tps65218_data = {
-diff --git a/include/dt-bindings/mfd/tps65217.h
-b/include/dt-bindings/mfd/tps65217.h
-new file mode 100644
-index 0000000..26b2ba8
---- /dev/null
-+++ b/include/dt-bindings/mfd/tps65217.h
-@@ -0,0 +1,9 @@
-+#ifndef __DT_BINDINGS_TPS65217_H
-+#define __DT_BINDINGS_TPS65217_H
-+
-+#define TPS65217_IRQ_USB 0
-+#define TPS65217_IRQ_AC 1
-+#define TPS65217_IRQ_PB 2
-+#define TPS65217_NUM_IRQ 3
-+
-+#endif /* __DT_BINDINGS_TPS65217_H */
+Thanks,
 
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+jon
