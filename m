@@ -1,52 +1,28 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 13:34:16 +0200
-Subject: [PATCH] PM / Domains: Restrict "samsung,
- power-domain" checks to ARCH_EXYNOS
-Message-ID: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Fri, 21 Oct 2016 13:37:38 +0200
+Subject: [STLinux Kernel] [PATCH v2 1/6] ARM: dts: STiH407: DT fix
+ s/interrupts-names/interrupt-names/
+In-Reply-To: <20161021101156.GA32234@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1477039877-20227-1-git-send-email-geert+renesas@glider.be>
+ <1477039877-20227-2-git-send-email-geert+renesas@glider.be>
+ <20161021101156.GA32234@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <1f897a1f-5b67-c563-1e04-9ab85a819a62@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the generic PM Domain code code checks for the presence of
-both (generic) "power-domains" and (Samsung Exynos legacy)
-"samsung,power-domain" properties in all device tree nodes representing
-devices.
+On 10/21/2016 12:11 PM, Peter Griffin wrote:
+> On Fri, 21 Oct 2016, Geert Uytterhoeven wrote:
+> 
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>> v2:
+>>   - Add Acked-by.
+>> ---
+> 
+> Acked-by: Peter Griffin <peter.griffin@linaro.org>
+> 
 
-There are two issues with this:
-  1. This imposes a small boot-time penalty on all platforms using DT,
-  2. Platform-specific checks do not really belong in core framework
-     code.
+applied with Peter Acked-by
 
-While moving the check from platform-agnostic code to Samsung-specific
-code is non-trivial, the runtime overhead can be restricted to kernels
-including support for 32-bit Samsung Exynos platforms.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-"samsung,power-domain" was only ever used in:
-  - arch/arm/boot/dts/exynos4415.dtsi: Unused?
-  - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
-  - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
-  - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
-				       exynos4212.dtsi is unused?
-  - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
-  - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
----
- drivers/base/power/domain.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index e023066e421547c5..d94d6a4b9b527108 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
- 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
- 					"#power-domain-cells", 0, &pd_args);
- 	if (ret < 0) {
--		if (ret != -ENOENT)
-+		if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
-+		    IS_ENABLED(CONFIG_64BIT))
- 			return ret;
- 
- 		/*
--- 
-1.9.1
+Thanks Geert
