@@ -1,80 +1,43 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 21 Oct 2016 10:14:50 +0800
-Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
- path
-In-Reply-To: <147699579088.21058.4379586947317571921@sboyd-linaro>
+Date: Fri, 21 Oct 2016 10:20:30 +0800
+Subject: [PATCH v5 23/23] phy: Add support for Qualcomm's USB HS phy
+In-Reply-To: <147700563857.2550.16732518381302920183@sboyd-linaro>
 References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-12-stephen.boyd@linaro.org>
- <20161019011535.GC6294@b29397-desktop>
- <147684198705.24897.12451889548508263144@sboyd-linaro>
- <20161019080211.GA1968@b29397-desktop>
- <147694652997.28344.1048935134595924905@sboyd-linaro>
- <20161020101017.GA32001@b29397-desktop>
- <147699579088.21058.4379586947317571921@sboyd-linaro>
-Message-ID: <20161021021450.GA16461@b29397-desktop>
+ <20161018015636.11701-24-stephen.boyd@linaro.org>
+ <147700563857.2550.16732518381302920183@sboyd-linaro>
+Message-ID: <20161021022030.GB16461@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 01:36:30PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-10-20 03:10:18)
-> > On Wed, Oct 19, 2016 at 11:55:29PM -0700, Stephen Boyd wrote:
-> > > Quoting Peter Chen (2016-10-19 01:02:11)
-> > > > On Tue, Oct 18, 2016 at 06:53:07PM -0700, Stephen Boyd wrote:
-> > > > > If you're asking if I've made modifications to extcon-usb-gpio, then the
-> > > > > answer is no. The branch on linaro.org git server from the cover-letter
-> > > > > is the branch I've used to test this with. This patch is specifically to
-> > > > > fix issues with that design on the db410c board that has only one pin
-> > > > > for ID and vbus detection. It's the schematic that we've discussed in
-> > > > > another thread.
-> > > > > 
-> > > > > extcon-usb-gpio sends two extcon events, EXTCON_USB_HOST (for the id
-> > > > > pin) and EXTCON_USB (for the vbus). So afaik it does support vbus
-> > > > > events.
-> > > > > 
-> > > > 
-> > > > Hmm, in fact, your ID event is the same with vbus event, you take
-> > > > external vbus event as ID event for extcon-usb-gpio handling. Yes,
-> > > > it can work due to it sends EXTCON_USB_HOST event first.
-> > > > 
-> > > > Where you change the USB_SW_SEL_PM pin?
-> > > 
-> > > Currently that is done with the mux driver I sent based on the extcon
-> > > event. We don't know if that's before or after the controller handles
-> > > the extcon event though, so the pin should probably be changed from the
-> > > chipidea driver instead to be more explicit. Why do you ask though?
-> > 
-> > I was just curious how you handle it, now I am clear. From my point,
-> > the suitable way may be: mux driver + user app (echo role through
-> > debugfs). The extcon-usb-gpio is not necessary, since you have already
-> > known role at mux driver.
-> > 
-> > The current kernel has no framework to handle dual-role switch at kernel
-> > space.
+On Thu, Oct 20, 2016 at 04:20:38PM -0700, Stephen Boyd wrote:
+> Quoting Stephen Boyd (2016-10-17 18:56:36)
+> > +
+> > +static int
+> > +qcom_usb_hs_phy_vbus_notifier(struct notifier_block *nb, unsigned long event,
+> > +                             void *ptr)
+> > +{
+> > +       struct qcom_usb_hs_phy *uphy;
+> > +       int is_host;
+> > +       u8 addr;
+> > +
+> > +       uphy = container_of(nb, struct qcom_usb_hs_phy, vbus_notify);
+> > +       is_host = extcon_get_cable_state_(uphy->id_edev, EXTCON_USB_HOST);
 > 
-> Ok. I'm planning that as future work after this set of patches is
-> merged.
+> Please don't apply this patch. This call now deadlocks on v4.9-rc1
+> because of how extcon_get_cable_state_() now grabs a lock that is
+> already held here when we're inside the notifier. It's not really
+> required that we grab the lock in extcon there, but this has exposed a
+> flaw in the logic anyway. We don't know if the id pin is going to toggle
+> before or after this function is called, so we should really keep track
+> of both vbus and id state in this driver and then do the same ulpi
+> writes from two different notifiers for both vbus and id pin. We would
+> be duplicating work sometimes, but that's pretty much the best solution
+> I can come up with. Otherwise it's racy.
 > 
-> > > > @@ -1963,6 +1963,8 @@ static int udc_id_switch_for_device(struct ci_hdrc *ci)
-> > > >                 /* Clear and enable BSV irq */
-> > > >                 hw_write_otgsc(ci, OTGSC_BSVIS | OTGSC_BSVIE,
-> > > >                                         OTGSC_BSVIS | OTGSC_BSVIE);
-> > > > +       /* vbus change may has already been occurred */
-> > > 
-> > > "vbus change may have already occurred"?
-> > 
-> > Yes, will change.
-> > 
-> 
-> Great. Should I wait to incorporate your change into my series, or will
-> you apply the usb patches and Kishon can apply the phy patches?  This
-> patch #11 should be dropped, but otherwise I don't think there's
-> anything left to do for this series.
 
-I tested my patch, it works well at my side, if it is ok for you, please
-ack it, I will apply it as well as your chipidea series after your
-gpu fix patch at greg's usb-next tree.
-
-Is it ok for you?
+Why you need to care id status? If EXTCON_USB event has happened, and
+event is true, you can set, otherwise, it is clear operation, that's
+to say you may not need have id extcon phandle, do you think so?
 
 -- 
 
