@@ -1,61 +1,58 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Fri, 21 Oct 2016 15:47:58 -0500
-Subject: [PATCH 5/7] ARM: dts: am335x: Add the charger interrupt
-In-Reply-To: <20161021140106.21531-6-woogyom.kim@gmail.com>
-References: <20161021140106.21531-1-woogyom.kim@gmail.com>
- <20161021140106.21531-6-woogyom.kim@gmail.com>
-Message-ID: <CAOCHtYgBTq0a1FAMQJb5VoLPWBHYkF3rH_Km6U9u6ep=8ApZuQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 21 Oct 2016 23:48:58 +0300
+Subject: [PATCH v4 7/7] ARM: dts: sk-rzg1m: add Ether support
+In-Reply-To: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+Message-ID: <1646335.vYatMAFDPt@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 9:01 AM, Milo Kim <woogyom.kim@gmail.com> wrote:
-> This enables the charger driver gets corresponding IRQ number by using
-> platform_get_irq_byname() helper.
->
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  arch/arm/boot/dts/am335x-bone-common.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> index 25303d9..cec9d91 100644
-> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-> @@ -6,6 +6,8 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <dt-bindings/mfd/tps65217.h>
+Define the SK-RZG1M board dependent part of the Ether device node.
+Enable DHCP and NFS root  for the kernel booting.
 
-^ this hasn't been posted nor pushed to mainline yet.. ;)
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-> +
->  / {
->         cpus {
->                 cpu at 0 {
-> @@ -316,6 +318,12 @@
->
->         ti,pmic-shutdown-controller;
->
-> +       charger {
-> +               interrupts = <TPS65217_IRQ_AC>, <TPS65217_IRQ_USB>;
-> +               interrupts-names = "AC", "USB";
-> +               status = "okay";
-> +       };
-> +
->         regulators {
->                 dcdc1_reg: regulator at 0 {
->                         regulator-name = "vdds_dpr";
-> --
-> 2.9.3
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+---
+Changes in version 4:
+- added Geert's tag.
 
+Changes in version 2:
+- new patch.
 
--- 
-Robert Nelson
-https://rcn-ee.com/
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
++++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+@@ -20,7 +20,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -42,3 +42,16 @@
+ &scif0 {
+ 	status = "okay";
+ };
++
++&ether {
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
++};
