@@ -1,87 +1,44 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu, 20 Oct 2016 19:33:26 -0600
-Subject: [PATCH v3 0/8] PM / Domains: DT support for domain idle states &
- atomic PM domains
-In-Reply-To: <CAJZ5v0iKuSWr8xVha7HZ764z+Xk_urP1XFVV-VZ5+JQTuSj-bw@mail.gmail.com>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFpQwOkXUk8wT6sZ-Ad4XpTnyodK5m24fYJ3P+1QtS0XOA@mail.gmail.com>
- <20161020224432.GB72940@linaro.org>
- <CAJZ5v0iKuSWr8xVha7HZ764z+Xk_urP1XFVV-VZ5+JQTuSj-bw@mail.gmail.com>
-Message-ID: <20161021013326.GA50423@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 21 Oct 2016 09:35:46 +0800
+Subject: [PATCH v7 0/5] ARM: dts: imx6q: Add Engicam i.CoreM6 dts
+In-Reply-To: <CAD6G_RQyLtgJw=djPTmY5t7UVwzuZpj0xM0HjchLQjq7P5hMOg@mail.gmail.com>
+References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
+ <CAD6G_RQyLtgJw=djPTmY5t7UVwzuZpj0xM0HjchLQjq7P5hMOg@mail.gmail.com>
+Message-ID: <20161021013546.GF30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21 2016 at 16:48 -0600, Rafael J. Wysocki wrote:
->On Fri, Oct 21, 2016 at 12:44 AM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> On Mon, Oct 17 2016 at 01:30 -0600, Ulf Hansson wrote:
->>>
->>> On 14 October 2016 at 19:47, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>>
->>>> Hi all,
->>>>
->>>> Changes since v2 [3] -
->>>> - Addressed review comments from v2.
->>>>         - domain-idle-states documentation updated
->>>>         - fixed compiler issues with imx driver
->>>>         - minor code change in pm_domains.c
->>>> - The series is available at [4].
->>>>
->>>> Changes since v1 [2] -
->>>> - Addressed review comments from v1.
->>>>         - Fixes around dynamic allocation of genpd states
->>>>         - Used OF method for iterating phandles
->>>>         - Updated documentation, examples
->>>>         - Rename state variable (provider -> fwnode)
->>>> - The series is available at [3].
->>>>
->>>> The changes from [1] are -
->>>> - Allocating memory for domain idle states dynamically
->>>> - Conform to naming conventions for internal and exported genpd functions
->>>> - DT binding example for domain-idle-state
->>>> - Use fwnode instead of of_node
->>>> - Handle atomic case for removal of PM Domain
->>>> - Rebase on top of Rafael's pm/genpd tree
->>>>
->>>> Thanks,
->>>> Lina
->>>>
->>>> Lina Iyer (8):
->>>>   PM / Domains: Make genpd state allocation dynamic
->>>>   PM / Domain: Add residency property to genpd states
->>>>   PM / Domains: Allow domain power states to be read from DT
->>>>   PM / Domains: Save the fwnode in genpd_power_state
->>>>   dt/bindings: Update binding for PM domain idle states
->>>>   PM / Domains: Abstract genpd locking
->>>>   PM / Domains: Support IRQ safe PM domains
->>>>   PM / doc: Update device documentation for devices in IRQ safe PM
->>>>     domains
->>>>
->>>>  .../devicetree/bindings/power/power_domain.txt     |  43 +++
->>>>  Documentation/power/devices.txt                    |   9 +-
->>>>  arch/arm/mach-imx/gpc.c                            |  17 +-
->>>>  drivers/base/power/domain.c                        | 358
->>>> +++++++++++++++++----
->>>>  include/linux/pm_domain.h                          |  28 +-
->>>>  5 files changed, 383 insertions(+), 72 deletions(-)
->>>>
->>>
->>> Rafael, Lina,
->>>
->>> This looks good to me! Unless any other objections, I suggest to apply
->>> this to get it tested in linux-next.
->>>
->>> Kind regards
->>> Uffe
->>>
->> Rafael,
->>
->> If there are no objections, could you pick this patch for linux-next?
->
->It is in my queue, but not at the top yet.
->
-Thank you Rafael.
+On Tue, Oct 18, 2016 at 05:30:28PM +0530, Jagan Teki wrote:
+> Hi Shawn,
+> 
+> On Fri, Oct 14, 2016 at 2:57 PM, Jagan Teki <jteki@openedev.com> wrote:
+> > This is series add dts support for Engicam I.Core M6 qdl modules. just
+> > rebased on top of linux-next of previous set[1].
+> >
+> > [1] http://www.spinics.net/lists/kernel/msg2358233.html
+> >
+> > Jagan Teki (5):
+> >   ARM: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual initial support
+> >   ARM: dts: imx6q: Add Engicam i.CoreM6 DualLite/Solo initial support
+> >   ARM: dts: imx6qdl-icore: Add usbhost support
+> >   ARM: dts: imx6qdl-icore: Add usbotg support
+> >   ARM: dts: imx6qdl-icore: Add FEC support
+> >
+> >  arch/arm/boot/dts/Makefile           |   2 +
+> >  arch/arm/boot/dts/imx6dl-icore.dts   |  59 ++++++++
+> >  arch/arm/boot/dts/imx6q-icore.dts    |  59 ++++++++
+> >  arch/arm/boot/dts/imx6qdl-icore.dtsi | 271 +++++++++++++++++++++++++++++++++++
+> >  4 files changed, 391 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx6dl-icore.dts
+> >  create mode 100644 arch/arm/boot/dts/imx6q-icore.dts
+> >  create mode 100644 arch/arm/boot/dts/imx6qdl-icore.dtsi
+> 
+> Can you pick this series?
 
--- Lina
+Sorry for the delay.  The first two patches look good, and I had a
+couple of small comments on the other 3.  Also, for the initial board
+support submission like this, you do not need to split it per device
+support.  That said, please squash the series into one patch when
+resending.
 
->Thanks,
->Rafael
+Shawn
