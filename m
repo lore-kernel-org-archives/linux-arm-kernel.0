@@ -1,17 +1,105 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 21 Oct 2016 14:59:18 +0200
-Subject: [PATCH] ahci: use pci_alloc_irq_vectors
-In-Reply-To: <20161020154722.GH22012@rric.localdomain>
-References: <1473088905-27670-1-git-send-email-hch@lst.de>
- <1473088905-27670-2-git-send-email-hch@lst.de>
- <20160906163946.GB24268@htj.duckdns.org>
- <20161020154722.GH22012@rric.localdomain>
-Message-ID: <20161021125918.GA18082@lst.de>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 21 Oct 2016 11:01:04 -0200
+Subject: [PATCH v5 3/9] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <1472818800-22558-4-git-send-email-tiffany.lin@mediatek.com>
+References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-2-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-3-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-4-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20161021110104.5733240e@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Em Fri, 2 Sep 2016 20:19:54 +0800
+Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 
-can you try the latest fixed in the libata tree:
+> Add v4l2 layer decoder driver for MT8173
+> 
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 
-https://git.kernel.org/cgit/linux/kernel/git/tj/libata.git/log/?h=for-4.9-fixes
+> +int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+> +{
+> +	int ret = 0;
+> +
+> +	switch (fourcc) {
+> +	case V4L2_PIX_FMT_H264:
+> +	case V4L2_PIX_FMT_VP8:
+> +	default:
+> +		return -EINVAL;
+> +	}
+
+Did you ever test this driver? The above code will *always* return
+-EINVAL, with will cause vidioc_vdec_s_fmt() to always fail!
+
+I suspect that what you wanted to do, instead, is:
+
+	switch (fourcc) {
+	case V4L2_PIX_FMT_H264:
+	case V4L2_PIX_FMT_VP8:
+		break;
+	default:
+		return -EINVAL;
+
+Btw, this patch series has also several issues that were pointed by
+checkpatch. Please *always* run checkpatch when submitting your work.
+
+You should take a look at the Kernel documentation about how to
+submit patches, at:
+	https://mchehab.fedorapeople.org/kernel_docs/process/index.html
+
+PS.: this time, I fixed the checkpatch issues for you. So, let me know
+if the patch below is OK, and I'll merge it at media upstream,
+assuming that the other patches in this series are ok.
+
+-- 
+Thanks,
+Mauro
+
+[PATCH] mtk-vcodec: fix some smatch warnings
+
+Fix this bug:
+	drivers/media/platform/mtk-vcodec/vdec_drv_if.c:38 vdec_if_init() info: ignoring unreachable code.
+
+With is indeed a real problem that prevents the driver to work!
+
+While here, also remove an used var, as reported by smatch:
+
+	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_init_dec_pm':
+	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:29:17: warning: variable 'dev' set but not used [-Wunused-but-set-variable]
+	  struct device *dev;
+	                 ^~~
+
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
+index 18182f5676d8..79ca03ac449c 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
+@@ -26,14 +26,12 @@ int mtk_vcodec_init_dec_pm(struct mtk_vcodec_dev *mtkdev)
+ {
+ 	struct device_node *node;
+ 	struct platform_device *pdev;
+-	struct device *dev;
+ 	struct mtk_vcodec_pm *pm;
+ 	int ret = 0;
+ 
+ 	pdev = mtkdev->plat_dev;
+ 	pm = &mtkdev->pm;
+ 	pm->mtkdev = mtkdev;
+-	dev = &pdev->dev;
+ 	node = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
+ 	if (!node) {
+ 		mtk_v4l2_err("of_parse_phandle mediatek,larb fail!");
+diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
+index 3cb04ef45144..9813b2ffd5fa 100644
+--- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
++++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
+@@ -31,6 +31,7 @@ int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ 	switch (fourcc) {
+ 	case V4L2_PIX_FMT_H264:
+ 	case V4L2_PIX_FMT_VP8:
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
