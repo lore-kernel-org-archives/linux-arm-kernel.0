@@ -1,224 +1,239 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Oct 2016 12:19:27 +0100
-Subject: [PATCH v14 6/9] acpi/arm64: Add memory-mapped timer support in
- GTDT driver
-In-Reply-To: <1475086637-1914-7-git-send-email-fu.wei@linaro.org>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-7-git-send-email-fu.wei@linaro.org>
-Message-ID: <20161021111927.GB16630@leverpostej>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 21 Oct 2016 12:20:43 +0100
+Subject: [RFC PATCH 8/8] ARM: KVM: Support vGICv3 ITS
+In-Reply-To: <857fb7fd-b8eb-7a44-2a6c-be2ec41927ec@arm.com>
+References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+ <1477042601-15227-9-git-send-email-vladimir.murzin@arm.com>
+ <857fb7fd-b8eb-7a44-2a6c-be2ec41927ec@arm.com>
+Message-ID: <5809FA0B.8010007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 29, 2016 at 02:17:14AM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+On 21/10/16 12:02, Andre Przywara wrote:
+> Hi,
 > 
-> On platforms booting with ACPI, architected memory-mapped timers'
-> configuration data is provided by firmware through the ACPI GTDT
-> static table.
+> On 21/10/16 10:36, Vladimir Murzin wrote:
+>> This patch allows to build and use vGICv3 ITS in 32-bit mode.
 > 
-> The clocksource architected timer kernel driver requires a firmware
-> interface to collect timer configuration and configure its driver.
-> this infrastructure is present for device tree systems, but it is
-> missing on systems booting with ACPI.
+> Ah, what a relief to see that config option go. Thanks for that!
 > 
-> Implement the kernel infrastructure required to parse the static
-> ACPI GTDT table so that the architected timer clocksource driver can
-> make use of it on systems booting with ACPI, therefore enabling
-> the corresponding timers configuration.
+> I quickly booted an ITS guest on a (64-bit) model and couldn't spot any
+> regressions.
+
+Awesome!
+
 > 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/arm64/gtdt.c            | 70 ++++++++++++++++++++++++++++++++++++
->  include/clocksource/arm_arch_timer.h | 15 ++++++++
->  include/linux/acpi.h                 |  1 +
->  3 files changed, 86 insertions(+)
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 > 
-> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-> index b24844d..b6021db 100644
-> --- a/drivers/acpi/arm64/gtdt.c
-> +++ b/drivers/acpi/arm64/gtdt.c
-> @@ -150,3 +150,73 @@ int __init acpi_gtdt_init(struct acpi_table_header *table)
->  
->  	return gtdt->platform_timer_count;
->  }
-> +
-> +static int __init gtdt_parse_gt_block(struct acpi_gtdt_timer_block *block,
-> +				      struct gt_block_data *data)
-> +{
-> +	struct acpi_gtdt_timer_entry *frame;
-> +	int i;
-> +
-> +	if (!block || !data)
-> +		return -EINVAL;
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-As far as I can see, the !block case cannot happen; if it can, we'd
-already have derferenced it with the is_timer_block() check in
-gtdt_arch_timer_mem_init().
+Thanks for your time!
 
-Why do we not handle the !data check in gtdt_arch_timer_mem_init()? It
-seems fragile, given we add an index there...
+Cheers
+Vladimir
 
-> +
-> +	if (!block->block_address || !block->timer_count)
-> +		return -EINVAL;
-
-Looking at Table 5-120 in the ACPI 6.1 spec, zero is not called out as
-an invalid physical address for the block...
-
-Surely if you don't have an MMIO timer, you don't have a GT Block
-Structure, rather than an invalid one!?
-
-The block->timer_count check should be more thorough, e.g.
-
-	if (!block->timer_count) {
-		pr_warn("GTDT present, but frame count is zero");
-		return -ENODEV:
-	}
-
-	if (block->timer_count > 8) {
-		pr_warn(FW_BUG "GTDT lists %d frames, ACPI spec only allows 8\n",
-			block->timer_count);
-	}
-
-... note that without the latter we could go off the end of the array...
-
-
-> +	data->cntctlbase_phy = (phys_addr_t)block->block_address;
-> +	data->timer_count = block->timer_count;
-> +
-> +	frame = (void *)block + block->timer_offset;
-> +	if (frame + block->timer_count != (void *)block + block->header.length)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Get the GT timer Frame data for every GT Block Timer
-> +	 */
-> +	for (i = 0; i < block->timer_count; i++, frame++) {
-> +		if (!frame->base_address || !frame->timer_interrupt)
-> +			return -EINVAL;
-> +
-> +		data->timer[i].irq = map_gt_gsi(frame->timer_interrupt,
-> +						frame->timer_flags);
-> +		if (data->timer[i].irq <= 0)
-> +			return -EINVAL;
-
-Can we please print something describing the failure, e.g.
-
-	pr_warn("failed to map GTDT frame %d, physical timer interrupt\n",
-		i);
-
-> +
-> +		if (frame->virtual_timer_interrupt) {
-
-Same comment as previously about GSIV zero being valid; this is arguably
-a spec bug that should be reported...
-
-> +			data->timer[i].virtual_irq =
-> +				map_gt_gsi(frame->virtual_timer_interrupt,
-> +					   frame->virtual_timer_flags);
-> +			if (data->timer[i].virtual_irq <= 0)
-> +				return -EINVAL;
-
-Likewise, a message here would be useful, e.g.
-
-	pr_warn("failed to map GTDT frame %d, virtual timer interrupt\n",
-		i);
-
-> +		}
-> +
-> +		data->timer[i].frame_nr = frame->frame_number;
-> +		data->timer[i].cntbase_phy = frame->base_address;
-
-What about CntEL0BaseX?
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Get the GT block info for memory-mapped timer from GTDT table.
-> + */
-> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
-> +{
-> +	void *platform_timer;
-> +	int index = 0;
-> +	int ret;
-> +
-> +	for_each_platform_timer(platform_timer) {
-> +		if (!is_timer_block(platform_timer))
-> +			continue;
-> +		ret = gtdt_parse_gt_block(platform_timer, data + index);
-> +		if (ret)
-> +			return ret;
-> +		index++;
-> +	}
-> +
-> +	if (index)
-> +		pr_info("found %d memory-mapped timer block(s).\n", index);
-> +
-> +	return index;
-> +}
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 16dcd10..94a5d14 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -56,6 +56,8 @@ enum spi_nr {
->  #define ARCH_TIMER_MEM_PHYS_ACCESS	2
->  #define ARCH_TIMER_MEM_VIRT_ACCESS	3
->  
-> +#define ARCH_TIMER_MEM_MAX_FRAME	8
-
-Nit: please call this ARCH_TIMER_MEM_MAX_FRAMES, so it's clear that the
-maximum index is 7.
-
->  #define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
->  #define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
->  #define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-> @@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
->  	int virtual_irq;
->  };
->  
-> +struct gt_timer_data {
-
-s/gt_timer_data/arch_timer_mem_frame/
-
-> +	int frame_nr;
-> +	phys_addr_t cntbase_phy;
-
-Please get rid of the '_phy' suffix; it clashes with other terminology,
-'phys' is generally preferable, and given the name and type it's obvious
-that it's a physical address anyhow.
-
-Just call this 'cntbase'.
-
-> +	int irq;
-> +	int virtual_irq;
-
-Call these phys_irq and virt_irq.
-
-> +};
-> +
-> +struct gt_block_data {
-
-s/gt_block_data/arch_timer_mem/
-
-> +	phys_addr_t cntctlbase_phy;
-
-Same comment w.r.t. the '_phy' suffix. Likewise, just call this
-'cntctlbase_phy'
-
-> +	int timer_count;
-
-s/timer_count/num_frames/
-
-> +	struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
-> +};
-
-Please split this part out into a patch which moves the existing driver
-over to this new abstraction, *then* introduce the ACPI parser for it in
-a subsequent patch.
-
-Thanks,
-Mark.
+> 
+> Cheers,
+> Andre.
+> 
+>> ---
+>>  Documentation/virtual/kvm/api.txt   |    2 +-
+>>  arch/arm/include/uapi/asm/kvm.h     |    2 ++
+>>  arch/arm/kvm/Kconfig                |    1 +
+>>  arch/arm/kvm/Makefile               |    1 +
+>>  arch/arm/kvm/arm.c                  |    6 ++++++
+>>  arch/arm64/kvm/Kconfig              |    4 ----
+>>  arch/arm64/kvm/reset.c              |    6 ------
+>>  virt/kvm/arm/vgic/vgic-kvm-device.c |    2 --
+>>  virt/kvm/arm/vgic/vgic-mmio-v3.c    |    2 --
+>>  virt/kvm/arm/vgic/vgic.h            |   26 --------------------------
+>>  10 files changed, 11 insertions(+), 41 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index 739db9a..2feeae6 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2198,7 +2198,7 @@ after pausing the vcpu, but before it is resumed.
+>>  4.71 KVM_SIGNAL_MSI
+>>  
+>>  Capability: KVM_CAP_SIGNAL_MSI
+>> -Architectures: x86 arm64
+>> +Architectures: x86 arm arm64
+>>  Type: vm ioctl
+>>  Parameters: struct kvm_msi (in)
+>>  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
+>> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+>> index b38c10c..af05f8e 100644
+>> --- a/arch/arm/include/uapi/asm/kvm.h
+>> +++ b/arch/arm/include/uapi/asm/kvm.h
+>> @@ -87,9 +87,11 @@ struct kvm_regs {
+>>  /* Supported VGICv3 address types  */
+>>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+>> +#define KVM_VGIC_ITS_ADDR_TYPE		4
+>>  
+>>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+>> +#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
+>>  
+>>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>>  #define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+>> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+>> index 3e1cd04..90d0176 100644
+>> --- a/arch/arm/kvm/Kconfig
+>> +++ b/arch/arm/kvm/Kconfig
+>> @@ -34,6 +34,7 @@ config KVM
+>>  	select HAVE_KVM_IRQFD
+>>  	select HAVE_KVM_IRQCHIP
+>>  	select HAVE_KVM_IRQ_ROUTING
+>> +	select HAVE_KVM_MSI
+>>  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+>>  	---help---
+>>  	  Support hosting virtualized guest machines.
+>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>> index f19842e..d571243 100644
+>> --- a/arch/arm/kvm/Makefile
+>> +++ b/arch/arm/kvm/Makefile
+>> @@ -32,5 +32,6 @@ obj-y += $(KVM)/arm/vgic/vgic-mmio.o
+>>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>>  obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
+>> +obj-y += $(KVM)/arm/vgic/vgic-its.o
+>>  obj-y += $(KVM)/irqchip.o
+>>  obj-y += $(KVM)/arm/arch_timer.o
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 03e9273..8b13448 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -209,6 +209,12 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_MAX_VCPUS:
+>>  		r = KVM_MAX_VCPUS;
+>>  		break;
+>> +	case KVM_CAP_MSI_DEVID:
+>> +		if (!kvm)
+>> +			r = -EINVAL;
+>> +		else
+>> +			r = kvm->arch.vgic.msis_require_devid;
+>> +		break;
+>>  	default:
+>>  		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
+>>  		break;
+>> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+>> index 6eaf12c..52cb7ad 100644
+>> --- a/arch/arm64/kvm/Kconfig
+>> +++ b/arch/arm64/kvm/Kconfig
+>> @@ -16,9 +16,6 @@ menuconfig VIRTUALIZATION
+>>  
+>>  if VIRTUALIZATION
+>>  
+>> -config KVM_ARM_VGIC_V3_ITS
+>> -	bool
+>> -
+>>  config KVM
+>>  	bool "Kernel-based Virtual Machine (KVM) support"
+>>  	depends on OF
+>> @@ -34,7 +31,6 @@ config KVM
+>>  	select KVM_VFIO
+>>  	select HAVE_KVM_EVENTFD
+>>  	select HAVE_KVM_IRQFD
+>> -	select KVM_ARM_VGIC_V3_ITS
+>>  	select KVM_ARM_PMU if HW_PERF_EVENTS
+>>  	select HAVE_KVM_MSI
+>>  	select HAVE_KVM_IRQCHIP
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index 5bc4608..e95d4f6 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -86,12 +86,6 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>>  		r = 1;
+>>  		break;
+>> -	case KVM_CAP_MSI_DEVID:
+>> -		if (!kvm)
+>> -			r = -EINVAL;
+>> -		else
+>> -			r = kvm->arch.vgic.msis_require_devid;
+>> -		break;
+>>  	default:
+>>  		r = 0;
+>>  	}
+>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> index ce1f4ed..fbe87a6 100644
+>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>> @@ -221,11 +221,9 @@ int kvm_register_vgic_device(unsigned long type)
+>>  		ret = kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
+>>  					      KVM_DEV_TYPE_ARM_VGIC_V3);
+>>  
+>> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>>  		if (ret)
+>>  			break;
+>>  		ret = kvm_vgic_register_its_device();
+>> -#endif
+>>  		break;
+>>  	}
+>>  
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> index 0d3c76a..50f42f0 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+>> @@ -42,7 +42,6 @@ u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+>>  	return reg | ((u64)val << lower);
+>>  }
+>>  
+>> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>>  bool vgic_has_its(struct kvm *kvm)
+>>  {
+>>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>> @@ -52,7 +51,6 @@ bool vgic_has_its(struct kvm *kvm)
+>>  
+>>  	return dist->has_its;
+>>  }
+>> -#endif
+>>  
+>>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>>  					    gpa_t addr, unsigned int len)
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 9d9e014..859f65c 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -84,37 +84,11 @@ static inline void vgic_get_irq_kref(struct vgic_irq *irq)
+>>  int vgic_v3_map_resources(struct kvm *kvm);
+>>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+>>  
+>> -#ifdef CONFIG_KVM_ARM_VGIC_V3_ITS
+>>  int vgic_register_its_iodevs(struct kvm *kvm);
+>>  bool vgic_has_its(struct kvm *kvm);
+>>  int kvm_vgic_register_its_device(void);
+>>  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>>  int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
+>> -#else
+>> -static inline int vgic_register_its_iodevs(struct kvm *kvm)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline bool vgic_has_its(struct kvm *kvm)
+>> -{
+>> -	return false;
+>> -}
+>> -
+>> -static inline int kvm_vgic_register_its_device(void)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -
+>> -static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+>> -{
+>> -}
+>> -
+>> -static inline int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>> -{
+>> -	return -ENODEV;
+>> -}
+>> -#endif
+>>  
+>>  int kvm_register_vgic_device(unsigned long type);
+>>  int vgic_lazy_init(struct kvm *kvm);
+>>
+> 
