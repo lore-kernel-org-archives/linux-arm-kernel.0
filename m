@@ -1,32 +1,58 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 21 Oct 2016 16:05:59 +0200
-Subject: [PATCH 0/4] ARM: boot: mxs: Add On-Chip RAM
-In-Reply-To: <20161021135343.GI30578@tiger>
-References: <1473789066-8955-1-git-send-email-stefan.wahren@i2se.com>
- <20161021135343.GI30578@tiger>
-Message-ID: <9bf7c925-bdc2-d0b8-9886-70d46383d1e0@i2se.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 21 Oct 2016 09:07:59 -0500
+Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
+ early boot stages
+In-Reply-To: <20161021013930.GB31044@localhost>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+ <20161021013930.GB31044@localhost>
+Message-ID: <20161021140759.GA877@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.10.2016 um 15:53 schrieb Shawn Guo:
-> On Tue, Sep 13, 2016 at 05:51:02PM +0000, Stefan Wahren wrote:
->> The i.MX23 / i.MX28 have a small amount of On-Chip RAM which is also necessary
->> for suspend to RAM and standby mode. But before we need to remove the fake reg
->> properties of all internal bus nodes as discussed in this thread [1].
->>
->> This patch series requires Fabio Estevam's recent series "ARM: dts: imx23:
->> Remove skeleton.dtsi inclusion" [2].
->>
->> [1] - https://marc.info/?l=devicetree&m=146139948426520&w=2
-> The page cannot be reached.  I would like to understand the
-> background for this change.
+On Thu, Oct 20, 2016 at 08:39:30PM -0500, Bjorn Helgaas wrote:
+> On Wed, Oct 19, 2016 at 06:21:02PM -0400, Sinan Kaya wrote:
+> > The penalty determination of ISA IRQ goes through 4 paths.
+> > 1. assign PCI_USING during power up via acpi_irq_penalty_init.
+> > 2. update the penalty with acpi_penalize_isa_irq function based on the
+> > active parameter.
+> > 3. kernel command line penalty update via acpi_irq_penalty_update function.
+> > 4. increment the penalty as USING right after the IRQ is assign to PCI.
+> > 
+> > acpi_penalize_isa_irq and acpi_irq_penalty_update functions get called
+> > before the ACPI subsystem is started.
+> > 
+> > These API need to bypass the acpi_irq_get_penalty function.
+> 
+> I don't mind this patch, but the changelog doesn't tell me what's
+> broken and why we need this fix.  Apparently acpi_irq_get_penalty()
+> doesn't work before ACPI is initialized, but I don't see *why* it
+> wouldn't work.
+> 
+> However, I see one bug it *does* fix: we do not store the SCI penalty
+> in the acpi_isa_irq_penalty[] table because acpi_isa_irq_penalty[]
+> only holds ISA IRQ penalties, and there's no guarantee that the SCI is
+> an ISA IRQ.  But prior to this patch, we added in the SCI penalty to
+> the acpi_isa_irq_penalty[] entry when the SCI was an ISA IRQ, which
+> makes acpi_irq_get_penalty() return the wrong thing.  Consider:
+> 
+>   Initially     acpi_isa_irq_penalty[9] = 0.
+>   Assume        sci_interrupt = 9.
+>   Then          acpi_irq_get_penalty(9) returns X.
+>   If we call    acpi_penalize_isa_irq(9, 1),
+>   it sets       acpi_isa_irq_penalty[9] = X,
+>   and now       acpi_irq_get_penalty(9) returns X + X.
 
-Strange, because i don't have any problems while clicking on the URL.
+Oops, I forgot the penalty we *intended* to add with
+acpi_penalize_isa_irq().  It's really like this, where X is the SCI
+penalty and Y is the part added by acpi_penalize_isa_irq():
 
-It's an older discussion on the devicetree / kernel newbie mailing list
-with subject "strange dtc errors after adding sram node". Arnd suggested
-in the discussion to remove the reg property from the ahb node.
+  Initially     acpi_isa_irq_penalty[9] = 0.
+  Assume        sci_interrupt = 9.
+  Then          acpi_irq_get_penalty(9) returns X.
+  If we call    acpi_penalize_isa_irq(9, 1),
+  it sets       acpi_isa_irq_penalty[9] = X + Y,
+  and now       acpi_irq_get_penalty(9) returns X + X + Y.
 
-Please try this one: http://www.spinics.net/lists/newbies/msg57652.html
-
-Stefan
+At the end, acpi_irq_get_penalty(9) *should* return X + Y, but instead
+it returns X + X + Y, i.e., the SCI penalty is included twice.
