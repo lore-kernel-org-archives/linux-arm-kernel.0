@@ -1,72 +1,55 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 21 Oct 2016 10:21:31 +0200
-Subject: [PATCH v2] mmc: sunxi: Prevent against null dereference for vmmc
-In-Reply-To: <20161019133304.22915-1-maxime.ripard@free-electrons.com>
-References: <20161019133304.22915-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFpS-N-BbAgHMegB5FMAoFUbbcroXTdWTPN+EYR8BtT=cA@mail.gmail.com>
+Date: Fri, 21 Oct 2016 10:22:28 +0200
+Subject: [PATCH 1/2] mmc: mediatek: Fix module autoload
+In-Reply-To: <1476720825-30442-1-git-send-email-javier@osg.samsung.com>
+References: <1476720825-30442-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <CAPDyKFpNPdcQnWs59MiVGnv5FMYjfgR9F4OCiCWhnmkh7EcyCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 October 2016 at 15:33, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> VMMC is an optional regulator, which means that mmc_regulator_get_supply
-> will only return an error in case of a deferred probe, but not when the
-> regulator is not set in the DT.
+On 17 October 2016 at 18:13, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> If the driver is built as a module, autoload won't work because the module
+> alias information is not filled. So user-space can't match the registered
+> device with the corresponding module.
 >
-> However, the sunxi driver assumes that VMMC is always there, and doesn't
-> check the value of the regulator pointer before using it, which obviously
-> leads to a (close to) null pointer dereference.
+> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 >
-> Add proper checks to prevent that.
+> Before this patch:
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> $ modinfo drivers/mmc/host/mtk-sd.ko | grep alias
+> $
+>
+> After this patch:
+>
+> $ modinfo drivers/mmc/host/mtk-sd.ko | grep alias
+> alias:          of:N*T*Cmediatek,mt8135-mmcC*
+> alias:          of:N*T*Cmediatek,mt8135-mmc
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 Thanks, applied for next!
 
 Kind regards
 Uffe
 
->
 > ---
-> Changes from v1:
->   - remove redundant error message
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
 >
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index c0a5c676d0e8..b1d1303389a7 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -822,10 +822,13 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->                 break;
+>  drivers/mmc/host/mtk-sd.c | 1 +
+>  1 file changed, 1 insertion(+)
 >
->         case MMC_POWER_UP:
-> -               host->ferror = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc,
-> -                                                    ios->vdd);
-> -               if (host->ferror)
-> -                       return;
-> +               if (!IS_ERR(mmc->supply.vmmc)) {
-> +                       host->ferror = mmc_regulator_set_ocr(mmc,
-> +                                                            mmc->supply.vmmc,
-> +                                                            ios->vdd);
-> +                       if (host->ferror)
-> +                               return;
-> +               }
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 84e9afcb5c09..86af0b199a54 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -1713,6 +1713,7 @@ static const struct of_device_id msdc_of_ids[] = {
+>         {   .compatible = "mediatek,mt8135-mmc", },
+>         {}
+>  };
+> +MODULE_DEVICE_TABLE(of, msdc_of_ids);
 >
->                 if (!IS_ERR(mmc->supply.vqmmc)) {
->                         host->ferror = regulator_enable(mmc->supply.vqmmc);
-> @@ -847,7 +850,9 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->         case MMC_POWER_OFF:
->                 dev_dbg(mmc_dev(mmc), "power off!\n");
->                 sunxi_mmc_reset_host(host);
-> -               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +               if (!IS_ERR(mmc->supply.vmmc))
-> +                       mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-> +
->                 if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled)
->                         regulator_disable(mmc->supply.vqmmc);
->                 host->vqmmc_enabled = false;
+>  static struct platform_driver mt_msdc_driver = {
+>         .probe = msdc_drv_probe,
 > --
-> 2.9.3
+> 2.7.4
 >
