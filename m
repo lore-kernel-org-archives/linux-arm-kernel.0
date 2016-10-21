@@ -1,39 +1,56 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 21 Oct 2016 22:11:41 +0300
-Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
- interrupts
-In-Reply-To: <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
-References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
- <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 21 Oct 2016 12:13:48 -0700
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <1477075018-20176-6-git-send-email-david@lechnology.com> (David
+ Lechner's message of "Fri, 21 Oct 2016 13:36:57 -0500")
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+Message-ID: <7htwc51pn7.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 7:37 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> The interrupts can now be delivered as platform MSI interrupts on newer
-> platforms. The code looks for a new OF and ACPI strings in order to enable
-> the functionality.
+David Lechner <david@lechnology.com> writes:
 
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> +static void hidma_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
-> +{
-> +       struct device *dev = msi_desc_to_dev(desc);
-> +       struct hidma_dev *dmadev = dev_get_drvdata(dev);
-> +
-> +       if (!desc->platform.msi_index) {
-> +               writel(msg->address_lo, dmadev->dev_evca + 0x118);
-> +               writel(msg->address_hi, dmadev->dev_evca + 0x11C);
-> +               writel(msg->data, dmadev->dev_evca + 0x120);
-> +       }
-> +}
-> +#endif
-> +
-> +static void hidma_free_msis(struct hidma_dev *dmadev)
-> +{
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> This adds a device tree definition file for LEGO MINDSTORMS EV3.
+>
+> What is working:
+>
+> * Pin muxing
+> * MicroSD card reader
+> * UART on input port 1
+>
+> What is partially working:
+>
+> * Buttons - working after GPIO fix
+> * LEDs - working after GPIO fix
+> * Poweroff/reset - working after GPIO fix
+> * Flash memory - driver loads but can't read the block devices - this is
+>   probably due to the fact that we are not able to configure the SPI to
+>   use DMA via device tree
+> * EEPROM - there seems to be a hardware bug that causes the first byte
+>   read to be corrupted - this can be worked around by adding an I2C stop
+>   between writing the register and reading the data, but the at24 driver
+>   does not have an option to do this
+>
+> What is not working/to be added later:
+>
+> * Display - waiting for "tiny DRM" to be mainlined
+> * Speaker - needs new PWM sound driver
+> * USB - waiting for OHCI and MUSB device tree support to be mainlined
+> * ADC - needs new iio driver
+> * GPIOs - broken because of recent changes to core gpio driver
+> * Bluetooth - needs new driver for sequencing power/enable/clock
+> * Input and output ports - need some sort of new phy or extcon driver
+> * Battery - needs new power supply driver (depends on ADC iio driver)
+>
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+>  arch/arm/boot/dts/Makefile     |   3 +-
+>  arch/arm/boot/dts/lego-ev3.dts | 454 +++++++++++++++++++++++++++++++++++++++++
 
-Perhaps one #ifdef and two definitions of functions?
+nit: can you name this da850-lego-ev3.dts
 
--- 
-With Best Regards,
-Andy Shevchenko
+Though it's not very strictly enforced, we *try* to use the form
+<soc>-<board>.dts.
+
+Kevin
