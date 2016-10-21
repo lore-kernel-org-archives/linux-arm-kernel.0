@@ -1,113 +1,137 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 21 Oct 2016 12:37:57 -0400
-Subject: [PATCH V7 2/4] dmaengine: qcom_hidma: bring out interrupt cause
+Date: Fri, 21 Oct 2016 12:37:58 -0400
+Subject: [PATCH V7 3/4] dmaengine: qcom_hidma: protect common data structures
 In-Reply-To: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
 References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1477067879-23750-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1477067879-23750-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring out the interrupt cause to the top level so that MSI interrupts
-can be hooked at a later stage.
+When MSI interrupts are supported, error and the transfer interrupt can
+come from multiple processor contexts.
+
+Each error interrupt is an MSI interrupt. If the channel is disabled by
+the first error interrupt, the remaining error interrupts will gracefully
+return in the interrupt handler.
+
+If an error is observed while servicing the completions in success case,
+the posting of the completions will be aborted as soon as channel disabled
+state is observed. The error interrupt handler will take it from there and
+finish the remaining completions. We don't want to create multiple success
+and error messages to be delivered to the client in mixed order.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma_ll.c | 62 ++++++++++++++++++++++++---------------------
- 1 file changed, 33 insertions(+), 29 deletions(-)
+ drivers/dma/qcom/hidma_ll.c | 44 +++++++++++---------------------------------
+ 1 file changed, 11 insertions(+), 33 deletions(-)
 
 diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 114409e..9193f46 100644
+index 9193f46..7fe43af 100644
 --- a/drivers/dma/qcom/hidma_ll.c
 +++ b/drivers/dma/qcom/hidma_ll.c
-@@ -418,12 +418,24 @@ static int hidma_ll_reset(struct hidma_lldev *lldev)
-  * requests traditionally to the destination, this concept does not apply
-  * here for this HW.
-  */
--irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
-+static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- {
--	struct hidma_lldev *lldev = arg;
--	u32 status;
--	u32 enable;
--	u32 cause;
-+	if (cause & HIDMA_ERR_INT_MASK) {
-+		dev_err(lldev->dev, "error 0x%x, disabling...\n",
-+				cause);
-+
-+		/* Clear out pending interrupts */
-+		writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+
-+		/* No further submissions. */
-+		hidma_ll_disable(lldev);
-+
-+		/* Driver completes the txn and intimates the client.*/
-+		hidma_cleanup_pending_tre(lldev, 0xFF,
-+					  HIDMA_EVRE_STATUS_ERROR);
-+
-+		return;
-+	}
- 
- 	/*
- 	 * Fine tuned for this HW...
-@@ -432,35 +444,28 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
- 	 * read and write accessors are used for performance reasons due to
- 	 * interrupt delivery guarantees. Do not copy this code blindly and
- 	 * expect that to work.
-+	 *
-+	 * Try to consume as many EVREs as possible.
- 	 */
-+	hidma_handle_tre_completion(lldev);
-+
-+	/* We consumed TREs or there are pending TREs or EVREs. */
-+	writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+}
-+
-+irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
-+{
-+	struct hidma_lldev *lldev = arg;
-+	u32 status;
-+	u32 enable;
-+	u32 cause;
-+
- 	status = readl_relaxed(lldev->evca + HIDMA_EVCA_IRQ_STAT_REG);
- 	enable = readl_relaxed(lldev->evca + HIDMA_EVCA_IRQ_EN_REG);
- 	cause = status & enable;
- 
- 	while (cause) {
--		if (cause & HIDMA_ERR_INT_MASK) {
--			dev_err(lldev->dev, "error 0x%x, disabling...\n",
--					cause);
--
--			/* Clear out pending interrupts */
--			writel(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
--
--			/* No further submissions. */
--			hidma_ll_disable(lldev);
--
--			/* Driver completes the txn and intimates the client.*/
--			hidma_cleanup_pending_tre(lldev, 0xFF,
--						  HIDMA_EVRE_STATUS_ERROR);
--			goto out;
--		}
--
--		/*
--		 * Try to consume as many EVREs as possible.
--		 */
--		hidma_handle_tre_completion(lldev);
--
--		/* We consumed TREs or there are pending TREs or EVREs. */
--		writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+		hidma_ll_int_handler_internal(lldev, cause);
- 
- 		/*
- 		 * Another interrupt might have arrived while we are
-@@ -471,7 +476,6 @@ irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
- 		cause = status & enable;
+@@ -198,13 +198,16 @@ static void hidma_ll_tre_complete(unsigned long arg)
  	}
- 
--out:
- 	return IRQ_HANDLED;
  }
  
+-static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
+-				u8 err_info, u8 err_code)
++static int hidma_post_completed(struct hidma_lldev *lldev, u8 err_info,
++				u8 err_code)
+ {
+ 	struct hidma_tre *tre;
+ 	unsigned long flags;
++	u32 tre_iterator;
+ 
+ 	spin_lock_irqsave(&lldev->lock, flags);
++
++	tre_iterator = lldev->tre_processed_off;
+ 	tre = lldev->pending_tre_list[tre_iterator / HIDMA_TRE_SIZE];
+ 	if (!tre) {
+ 		spin_unlock_irqrestore(&lldev->lock, flags);
+@@ -223,6 +226,9 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
+ 		atomic_set(&lldev->pending_tre_count, 0);
+ 	}
+ 
++	HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
++				 lldev->tre_ring_size);
++	lldev->tre_processed_off = tre_iterator;
+ 	spin_unlock_irqrestore(&lldev->lock, flags);
+ 
+ 	tre->err_info = err_info;
+@@ -244,13 +250,11 @@ static int hidma_post_completed(struct hidma_lldev *lldev, int tre_iterator,
+ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+ {
+ 	u32 evre_ring_size = lldev->evre_ring_size;
+-	u32 tre_ring_size = lldev->tre_ring_size;
+ 	u32 err_info, err_code, evre_write_off;
+-	u32 tre_iterator, evre_iterator;
++	u32 evre_iterator;
+ 	u32 num_completed = 0;
+ 
+ 	evre_write_off = readl_relaxed(lldev->evca + HIDMA_EVCA_WRITE_PTR_REG);
+-	tre_iterator = lldev->tre_processed_off;
+ 	evre_iterator = lldev->evre_processed_off;
+ 
+ 	if ((evre_write_off > evre_ring_size) ||
+@@ -273,12 +277,9 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+ 		err_code =
+ 		    (cfg >> HIDMA_EVRE_CODE_BIT_POS) & HIDMA_EVRE_CODE_MASK;
+ 
+-		if (hidma_post_completed(lldev, tre_iterator, err_info,
+-					 err_code))
++		if (hidma_post_completed(lldev, err_info, err_code))
+ 			break;
+ 
+-		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
+-					 tre_ring_size);
+ 		HIDMA_INCREMENT_ITERATOR(evre_iterator, HIDMA_EVRE_SIZE,
+ 					 evre_ring_size);
+ 
+@@ -302,16 +303,10 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+ 	if (num_completed) {
+ 		u32 evre_read_off = (lldev->evre_processed_off +
+ 				     HIDMA_EVRE_SIZE * num_completed);
+-		u32 tre_read_off = (lldev->tre_processed_off +
+-				    HIDMA_TRE_SIZE * num_completed);
+-
+ 		evre_read_off = evre_read_off % evre_ring_size;
+-		tre_read_off = tre_read_off % tre_ring_size;
+-
+ 		writel(evre_read_off, lldev->evca + HIDMA_EVCA_DOORBELL_REG);
+ 
+ 		/* record the last processed tre offset */
+-		lldev->tre_processed_off = tre_read_off;
+ 		lldev->evre_processed_off = evre_read_off;
+ 	}
+ 
+@@ -321,27 +316,10 @@ static int hidma_handle_tre_completion(struct hidma_lldev *lldev)
+ void hidma_cleanup_pending_tre(struct hidma_lldev *lldev, u8 err_info,
+ 			       u8 err_code)
+ {
+-	u32 tre_iterator;
+-	u32 tre_ring_size = lldev->tre_ring_size;
+-	int num_completed = 0;
+-	u32 tre_read_off;
+-
+-	tre_iterator = lldev->tre_processed_off;
+ 	while (atomic_read(&lldev->pending_tre_count)) {
+-		if (hidma_post_completed(lldev, tre_iterator, err_info,
+-					 err_code))
++		if (hidma_post_completed(lldev, err_info, err_code))
+ 			break;
+-		HIDMA_INCREMENT_ITERATOR(tre_iterator, HIDMA_TRE_SIZE,
+-					 tre_ring_size);
+-		num_completed++;
+ 	}
+-	tre_read_off = (lldev->tre_processed_off +
+-			HIDMA_TRE_SIZE * num_completed);
+-
+-	tre_read_off = tre_read_off % tre_ring_size;
+-
+-	/* record the last processed tre offset */
+-	lldev->tre_processed_off = tre_read_off;
+ }
+ 
+ static int hidma_ll_reset(struct hidma_lldev *lldev)
 -- 
 1.9.1
