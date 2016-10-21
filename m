@@ -1,96 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 21 Oct 2016 10:49:33 +0100
-Subject: [RFC PATCH 7/8] KVM: arm64: vgic-its: fix compatability with
- 32-bit
-In-Reply-To: <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
-References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
- <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <5ea0ecc0-edb1-f770-16f3-7c48dbdb5c29@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Oct 2016 10:50:08 +0100
+Subject: [PATCH] dt/bindings: arm-boards: Remove skeleton.dtsi inclusion
+ from example
+In-Reply-To: <1477041629-23341-1-git-send-email-geert+renesas@glider.be>
+References: <1477041629-23341-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20161021094938.GB15372@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 21/10/16 10:36, Vladimir Murzin wrote:
-> Evaluate GITS_BASER_ENTRY_SIZE once as an int data (GITS_BASER<n>'s
-> Entry Size is 5-bit wide only), so when used as divider no reference
-> to __aeabi_uldivmod is generated when build for AArch32.
+On Fri, Oct 21, 2016 at 11:20:29AM +0200, Geert Uytterhoeven wrote:
+> As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
+> as deprecated"), including skeleton.dtsi is deprecated.
+> Hence remove it from the example.
 > 
-> Use unsigned long long for GITS_BASER_PAGE_SIZE_* since they are
-> used in conjunction with 64-bit data.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-
-Looks good to me, thanks for fixing this!
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
-
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  include/linux/irqchip/arm-gic-v3.h |    8 ++++----
->  virt/kvm/arm/vgic/vgic-its.c       |   11 ++++++-----
->  2 files changed, 10 insertions(+), 9 deletions(-)
+>  Documentation/devicetree/bindings/arm/arm-boards | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 5118d3a..e808f8a 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -295,10 +295,10 @@
->  #define GITS_BASER_InnerShareable					\
->  	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
->  #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
-> -#define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> -#define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> -#define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> -#define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_4K		(0ULL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_16K	(1ULL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_64K	(2ULL << GITS_BASER_PAGE_SIZE_SHIFT)
-> +#define GITS_BASER_PAGE_SIZE_MASK	(3ULL << GITS_BASER_PAGE_SIZE_SHIFT)
->  #define GITS_BASER_PAGES_MAX		256
->  #define GITS_BASER_PAGES_SHIFT		(0)
->  #define GITS_BASER_NR_PAGES(r)		(((r) & 0xff) + 1)
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 4660a7d..8c2b3cd 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -632,21 +632,22 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->  	int index;
->  	u64 indirect_ptr;
->  	gfn_t gfn;
-> +	int esz = GITS_BASER_ENTRY_SIZE(baser);
+> diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+> index ab318a56fca2194f..e667ecbcf226dfe3 100644
+> --- a/Documentation/devicetree/bindings/arm/arm-boards
+> +++ b/Documentation/devicetree/bindings/arm/arm-boards
+> @@ -148,15 +148,14 @@ Example:
 >  
->  	if (!(baser & GITS_BASER_INDIRECT)) {
->  		phys_addr_t addr;
+>  /dts-v1/;
+>  #include <dt-bindings/interrupt-controller/irq.h>
+> -#include "skeleton.dtsi"
 >  
-> -		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
-> +		if (id >= (l1_tbl_size / esz))
->  			return false;
+>  / {
+>  	model = "ARM RealView PB1176 with device tree";
+>  	compatible = "arm,realview-pb1176";
+> +	#address-cells = <0>;
+> +	#size-cells = <1>;
 >  
-> -		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
-> +		addr = BASER_ADDRESS(baser) + id * esz;
->  		gfn = addr >> PAGE_SHIFT;
+>  	soc {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+
+Strictly speaking, these two are still necessary for the ranges
+property. They're *not* inherited per the spec, no matter what Linux
+happens to do today.
+
+With those restored:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+>  		compatible = "arm,realview-pb1176-soc", "simple-bus";
+>  		ranges;
 >  
->  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
->  	}
->  
->  	/* calculate and check the index into the 1st level */
-> -	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
-> +	index = id / (SZ_64K / esz);
->  	if (index >= (l1_tbl_size / sizeof(u64)))
->  		return false;
->  
-> @@ -670,8 +671,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->  	indirect_ptr &= GENMASK_ULL(51, 16);
->  
->  	/* Find the address of the actual entry */
-> -	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
-> -	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
-> +	index = id % (SZ_64K / esz);
-> +	indirect_ptr += index * esz;
->  	gfn = indirect_ptr >> PAGE_SHIFT;
->  
->  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
+> -- 
+> 1.9.1
 > 
