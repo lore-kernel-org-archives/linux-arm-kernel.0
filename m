@@ -1,14 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 21 Oct 2016 23:48:58 +0300
-Subject: [PATCH v4 7/7] ARM: dts: sk-rzg1m: add Ether support
+Date: Fri, 21 Oct 2016 23:41:46 +0300
+Subject: [PATCH v4 2/7] ARM: dts: r8a7743: add SYS-DMAC support
 In-Reply-To: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
 References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
-Message-ID: <1646335.vYatMAFDPt@wasted.cogentembedded.com>
+Message-ID: <1879203.QtE76WFv9N@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SK-RZG1M board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+Describe SYS-DMAC0/1 in the R8A7743 device tree.
 
 Based on the original (and large) patch by Dmitry Shifrin
 <dmitry.shifrin@cogentembedded.com>.
@@ -18,41 +17,90 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 4:
-- added Geert's tag.
+- refreshed the patch.
+
+Changes in version 3:
+- resolved a reject;
+- updated the "clocks" properties for the CPG/MSSR driver.
 
 Changes in version 2:
-- new patch.
+- added Geert's tag.
 
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7743.dtsi |   64 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -20,7 +20,7 @@
+--- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
++++ renesas/arch/arm/boot/dts/r8a7743.dtsi
+@@ -88,6 +88,70 @@
+ 			reg = <0 0xe6180000 0 0x0200>;
+ 			#power-domain-cells = <1>;
+ 		};
++
++		dmac0: dma-controller at e6700000 {
++			compatible = "renesas,dmac-r8a7743",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe6700000 0 0x20000>;
++			interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 200 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 201 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 203 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 204 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 205 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 211 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 212 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 213 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 214 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14";
++			clocks = <&cpg CPG_MOD 219>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			#dma-cells = <1>;
++			dma-channels = <15>;
++		};
++
++		dmac1: dma-controller at e6720000 {
++			compatible = "renesas,dmac-r8a7743",
++				     "renesas,rcar-dmac";
++			reg = <0 0xe6720000 0 0x20000>;
++			interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 216 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 217 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 218 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 219 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 308 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 309 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 310 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 311 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 312 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 313 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 314 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 315 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 316 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 317 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 318 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "error",
++					"ch0", "ch1", "ch2", "ch3",
++					"ch4", "ch5", "ch6", "ch7",
++					"ch8", "ch9", "ch10", "ch11",
++					"ch12", "ch13", "ch14";
++			clocks = <&cpg CPG_MOD 218>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			#dma-cells = <1>;
++			dma-channels = <15>;
++		};
  	};
  
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -42,3 +42,16 @@
- &scif0 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+ 	/* External root clock */
