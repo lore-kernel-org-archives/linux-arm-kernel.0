@@ -1,9 +1,9 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 11:16:08 +0200
-Subject: [PATCH 3/5] ARM: dts: r8a7779: Remove skeleton.dtsi inclusion
+Date: Fri, 21 Oct 2016 11:16:07 +0200
+Subject: [PATCH 2/5] ARM: dts: r8a7778: Remove skeleton.dtsi inclusion
 In-Reply-To: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
 References: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1477041370-22778-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <1477041370-22778-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,25 +16,25 @@ This fixes the following warning with W=1:
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 4 ++--
+ arch/arm/boot/dts/r8a7778.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index b9bbcce69dfbd5b9..cd8c52d5cb850766 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -9,8 +9,6 @@
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index e571d66ea0fe1721..f3ffe1d315443e7e 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -14,8 +14,6 @@
   * kind, whether express or implied.
   */
  
 -/include/ "skeleton.dtsi"
 -
- #include <dt-bindings/clock/r8a7779-clock.h>
+ #include <dt-bindings/clock/r8a7778-clock.h>
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  #include <dt-bindings/interrupt-controller/irq.h>
-@@ -19,6 +17,8 @@
+@@ -23,6 +21,8 @@
  / {
- 	compatible = "renesas,r8a7779";
+ 	compatible = "renesas,r8a7778";
  	interrupt-parent = <&gic>;
 +	#address-cells = <1>;
 +	#size-cells = <1>;
