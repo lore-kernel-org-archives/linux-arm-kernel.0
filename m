@@ -1,89 +1,48 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 21 Oct 2016 10:28:23 +0200
-Subject: [RFC PATCH] net: stmmac: Add OXNAS Glue Driver
-In-Reply-To: <CAGhQ9VxJ-gQTX1xjMOJ4spiL_RnhryyQ0=gUEQCHm3sHecTVuA@mail.gmail.com>
-References: <20161020155406.27172-1-narmstrong@baylibre.com>
- <CAGhQ9VxJ-gQTX1xjMOJ4spiL_RnhryyQ0=gUEQCHm3sHecTVuA@mail.gmail.com>
-Message-ID: <872a84c9-6ec3-695b-0c37-c58719e0a034@baylibre.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 21 Oct 2016 10:30:47 +0200
+Subject: mbox-name vs. mbox-names (was: Re: [PATCH v4 1/5] mailbox: dt: Supply
+ bindings for ST's Mailbox IP)
+Message-ID: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 06:26 PM, Joachim Eastwood wrote:
-> Hi Neil,
-> 
-> On 20 October 2016 at 17:54, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 ++++++
->>  drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
->>  drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
->>  drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 173 +++++++++++++++++++++
->>  4 files changed, 229 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
->>  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
-> <snip>
->> +
->> +static int oxnas_dwmac_probe(struct platform_device *pdev)
->> +{
->> +       struct plat_stmmacenet_data *plat_dat;
->> +       struct stmmac_resources stmmac_res;
->> +       struct device_node *sysctrl;
->> +       struct oxnas_dwmac *dwmac;
->> +       int ret;
->> +
->> +       sysctrl = of_parse_phandle(pdev->dev.of_node, "oxsemi,sys-ctrl", 0);
->> +       if (!sysctrl) {
->> +               dev_err(&pdev->dev, "failed to get sys-ctrl node\n");
->> +               return -EINVAL;
->> +       }
->> +
->> +       ret = stmmac_get_platform_resources(pdev, &stmmac_res);
->> +       if (ret)
->> +               return ret;
->> +
->> +       plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
->> +       if (IS_ERR(plat_dat))
->> +               return PTR_ERR(plat_dat);
->> +
->> +       dwmac = devm_kzalloc(&pdev->dev, sizeof(*dwmac), GFP_KERNEL);
->> +       if (!dwmac)
->> +               return -ENOMEM;
->> +
->> +       dwmac->regmap = syscon_node_to_regmap(sysctrl);
->> +       if (IS_ERR(dwmac->regmap)) {
->> +               dev_err(&pdev->dev, "failed to have sysctrl regmap\n");
->> +               return PTR_ERR(dwmac->regmap);
->> +       }
->> +
->> +       dwmac->clk = devm_clk_get(&pdev->dev, "gmac");
->> +       if (IS_ERR(dwmac->clk))
->> +               return PTR_ERR(dwmac->clk);
->> +
->> +       plat_dat->bsp_priv = dwmac;
->> +       plat_dat->init = oxnas_dwmac_init;
->> +       plat_dat->exit = oxnas_dwmac_exit;
-> 
-> Please do not use the init/exit callbacks. Implement proper driver
-> callbacks instead. I.e: PM resume/suspend and driver remove.
-> 
-> Shouldn't you call oxnas_dwmac_init() from probe as well?
-> As it is now it will only be called during PM resume and that can't be right.
-> 
-> 
->> +
->> +       return stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
-> 
-> If stmmac_dvr_probe() fails you should disable your clocks.
-> 
-> 
-> regards,
-> Joachim Eastwood
-> 
+On Fri, Oct 16, 2015 at 9:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../devicetree/bindings/mailbox/sti-mailbox.txt    | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> new file mode 100644
+> index 0000000..b61eec9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> @@ -0,0 +1,51 @@
+> +ST Microelectronics Mailbox Driver
+> +
+> +Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
+> +are passed between Application and Remote processors using shared memory.
+> +
+> +Controller
+> +----------
+> +
+> +Required properties:
+> +- compatible           : Should be "st,stih407-mailbox"
+> +- reg                  : Offset and length of the device's register set
+> +- mbox-name            : Name of the mailbox
 
-Hi Joachim,
+All other mailbox drivers use "mbox-names". Oops, it's in v4.9-rc1...
 
-Thanks for the hints, stm32 glue does that and I will sync on it.
+Can we still fix that?
 
-Neil
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
