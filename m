@@ -1,42 +1,118 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 21 Oct 2016 22:44:26 +0530
-Subject: [PATCH 4/4] iommu/arm-smmu: Add the device_link between masters and
- smmu
+Date: Fri, 21 Oct 2016 22:44:25 +0530
+Subject: [PATCH 3/4] iommu/arm-smmu: Add context save restore support
 In-Reply-To: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
 References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1477070066-15044-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device link between master and its smmu is added so that
-the smmu gets runtime enabled/disabled when the master needs it.
-This is done from add_device callback which gets called once
-when the master is added to the smmu group.
+The smes registers and the context bank registers are
+the ones that are needs to be saved and restored.
+Fortunately the smes are already stored as a part
+of the smmu device structure. So just write that
+back. The data required to configure the context banks
+are the master's domain data and pgtable cfgs.
+So store them as a part of the context banks info
+and just reconfigure the context banks on the restore
+path.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/iommu/arm-smmu.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/iommu/arm-smmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 51 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 578cdc2..71ce4b6 100644
+index 45f2762..578cdc2 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -1470,6 +1470,15 @@ static int arm_smmu_add_device(struct device *dev)
- 		goto out_free;
- 	pm_runtime_put_sync(smmu->dev);
+@@ -328,6 +328,11 @@ struct arm_smmu_master_cfg {
+ #define for_each_cfg_sme(fw, i, idx) \
+ 	for (i = 0; idx = __fwspec_cfg(fw)->smendx[i], i < fw->num_ids; ++i)
  
-+	/*
-+	 * Establish the link between smmu and master, so that the
-+	 * smmu gets runtime enabled/disabled as per the master's
-+	 * needs.
-+	 */
++struct cbinfo {
++	struct arm_smmu_domain		*domain;
++	struct io_pgtable_cfg		pgtbl_cfg;
++};
 +
-+	device_link_add(dev, smmu->dev, DEVICE_LINK_AVAILABLE,
-+			DEVICE_LINK_PM_RUNTIME);
-+
- 	return 0;
+ struct arm_smmu_device {
+ 	struct device			*dev;
  
- out_free:
+@@ -378,6 +383,9 @@ struct arm_smmu_device {
+ 	struct clk                      **clocks;
+ 
+ 	u32				cavium_id_base; /* Specific to Cavium */
++
++	/* For save/restore of context bank registers */
++	struct cbinfo                   *cb_saved_ctx;
+ };
+ 
+ enum arm_smmu_context_fmt {
+@@ -972,6 +980,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 
+ 	/* Initialise the context bank with our page table cfg */
+ 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
++	smmu->cb_saved_ctx[cfg->cbndx].domain = smmu_domain;
++	smmu->cb_saved_ctx[cfg->cbndx].pgtbl_cfg = pgtbl_cfg;
+ 
+ 	/*
+ 	 * Request context fault interrupt. Do this last to avoid the
+@@ -1861,6 +1871,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 	}
+ 	dev_notice(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+ 		   smmu->num_context_banks, smmu->num_s2_context_banks);
++
++	smmu->cb_saved_ctx = devm_kzalloc(smmu->dev,
++			     sizeof(struct cbinfo) * smmu->num_context_banks,
++			     GFP_KERNEL);
+ 	/*
+ 	 * Cavium CN88xx erratum #27704.
+ 	 * Ensure ASID and VMID allocation is unique across all SMMUs in
+@@ -2115,8 +2129,44 @@ static int arm_smmu_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
++	struct arm_smmu_domain *domain = NULL;
++	struct io_pgtable_cfg *pgtbl_cfg = NULL;
++	struct arm_smmu_smr *smrs = smmu->smrs;
++	int i = 0, idx, cb, ret, pcb = 0;
++
++	ret = arm_smmu_enable_clocks(smmu);
++	if (ret)
++		return ret;
++
++	arm_smmu_device_reset(smmu);
+ 
+-	return arm_smmu_enable_clocks(smmu);
++	/* Restore the smes and the context banks */
++	for (idx = 0; idx < smmu->num_mapping_groups; ++idx) {
++		mutex_lock(&smmu->stream_map_mutex);
++		if (!smrs[idx].valid) {
++			mutex_unlock(&smmu->stream_map_mutex);
++			continue;
++		}
++
++		arm_smmu_write_sme(smmu, idx);
++		cb = smmu->s2crs[idx].cbndx;
++		mutex_unlock(&smmu->stream_map_mutex);
++
++		if (!i || (cb != pcb)) {
++			domain = smmu->cb_saved_ctx[cb].domain;
++			pgtbl_cfg = &smmu->cb_saved_ctx[cb].pgtbl_cfg;
++
++			if (domain) {
++				mutex_lock(&domain->init_mutex);
++				arm_smmu_init_context_bank(domain, pgtbl_cfg);
++				mutex_unlock(&domain->init_mutex);
++			}
++		}
++		pcb = cb;
++		i++;
++	}
++
++	return 0;
+ }
+ 
+ static int arm_smmu_suspend(struct device *dev)
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
