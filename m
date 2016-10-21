@@ -1,105 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 21 Oct 2016 12:34:11 +0100
-Subject: [PATCH] arm64: fix show_regs fallout from KERN_CONT changes
-In-Reply-To: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
-References: <1476962596-21046-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <3a8485da-3f7d-07f8-95db-281e0115494d@arm.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 21 Oct 2016 13:34:16 +0200
+Subject: [PATCH] PM / Domains: Restrict "samsung,
+ power-domain" checks to ARCH_EXYNOS
+Message-ID: <1477049656-27535-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Currently the generic PM Domain code code checks for the presence of
+both (generic) "power-domains" and (Samsung Exynos legacy)
+"samsung,power-domain" properties in all device tree nodes representing
+devices.
 
-On 20/10/16 12:23, Mark Rutland wrote:
-> Recently in commit 4bcc595ccd80decb ("printk: reinstate KERN_CONT for
-> printing continuation lines"), the behaviour of printk changed w.r.t.
-> KERN_CONT. Now, KERN_CONT is mandatory to continue existing lines.
-> Without this, prefixes are inserted, making output illegible, e.g.
-> 
-> [ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-> [ 1007.076329] sp : ffff000008d53ec0
-> [ 1007.079606] x29: ffff000008d53ec0 [ 1007.082797] x28: 0000000080c50018
-> [ 1007.086160]
-> [ 1007.087630] x27: ffff000008e0c7f8 [ 1007.090820] x26: ffff80097631ca00
-> [ 1007.094183]
-> [ 1007.095653] x25: 0000000000000001 [ 1007.098843] x24: 000000ea68b61cac
-> [ 1007.102206]
-> 
-> ... or when dumped with the userpace dmesg tool, which has slightly
-> different implicit newline behaviour. e.g.
-> 
-> [ 1007.069010] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-> [ 1007.076329] sp : ffff000008d53ec0
-> [ 1007.079606] x29: ffff000008d53ec0
-> [ 1007.082797] x28: 0000000080c50018
-> [ 1007.086160]
-> [ 1007.087630] x27: ffff000008e0c7f8
-> [ 1007.090820] x26: ffff80097631ca00
-> [ 1007.094183]
-> [ 1007.095653] x25: 0000000000000001
-> [ 1007.098843] x24: 000000ea68b61cac
-> [ 1007.102206]
-> 
-> We can't simply always use KERN_CONT for lines which may or may not be
-> continuations. That causes line prefixes (e.g. timestamps) to be
-> supressed, and the alignment of all but the first line will be broken.
-> 
-> For even more fun, we can't simply insert some dummy empty-string printk
-> calls, as GCC warns for an empty printk string, and even if we pass
-> KERN_DEFAULT explcitly to silence the warning, the prefix gets swallowed
-> unless there is an additional part to the string.
-> 
-> Instead, we must manually iterate over pairs of registers, which gives
-> us the legible output we want in either case, e.g.
-> 
-> [  169.771790] pc : [<ffff00000871898c>] lr : [<ffff000008718948>] pstate: 40000145
-> [  169.779109] sp : ffff000008d53ec0
-> [  169.782386] x29: ffff000008d53ec0 x28: 0000000080c50018
-> [  169.787650] x27: ffff000008e0c7f8 x26: ffff80097631de00
-> [  169.792913] x25: 0000000000000001 x24: 00000027827b2cf4
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/process.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index ddce61b..3f31cf93 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -187,10 +187,19 @@ void __show_regs(struct pt_regs *regs)
->  	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
->  	       regs->pc, lr, regs->pstate);
->  	printk("sp : %016llx\n", sp);
-> -	for (i = top_reg; i >= 0; i--) {
-> +
-> +	i = top_reg;
-> +
-> +	while (i >= 0) {
->  		printk("x%-2d: %016llx ", i, regs->regs[i]);
-> -		if (i % 2 == 0)
-> -			printk("\n");
-> +		i--;
-> +
-> +		if (i % 2 == 0) {
-> +			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-> +			i--;
-> +		}
-> +
-> +		pr_cont("\n");
->  	}
+There are two issues with this:
+  1. This imposes a small boot-time penalty on all platforms using DT,
+  2. Platform-specific checks do not really belong in core framework
+     code.
 
-Might it be nicer to simply do this (or thereabouts)?
+While moving the check from platform-agnostic code to Samsung-specific
+code is non-trivial, the runtime overhead can be restricted to kernels
+including support for 32-bit Samsung Exynos platforms.
 
-	for (i = top_reg; i > 1; i -= 2)
-		printk("x%-2d: %016llx x%-2d: %016llx\n", i-1,
-			regs->regs[i-1], i, regs->regs[i]);
-	if (i > 0)
-		printk("x%-2d: %016llx\n", i-1, regs->regs[i-1]);
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+"samsung,power-domain" was only ever used in:
+  - arch/arm/boot/dts/exynos4415.dtsi: Unused?
+  - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+  - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+  - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+				       exynos4212.dtsi is unused?
+  - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+  - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+---
+ drivers/base/power/domain.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Robin.
-
->  	printk("\n");
->  }
-> 
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index e023066e421547c5..d94d6a4b9b527108 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1853,7 +1853,8 @@ int genpd_dev_pm_attach(struct device *dev)
+ 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+ 					"#power-domain-cells", 0, &pd_args);
+ 	if (ret < 0) {
+-		if (ret != -ENOENT)
++		if (ret != -ENOENT || !IS_ENABLED(CONFIG_ARCH_EXYNOS) ||
++		    IS_ENABLED(CONFIG_64BIT))
+ 			return ret;
+ 
+ 		/*
+-- 
+1.9.1
