@@ -1,94 +1,92 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 21 Oct 2016 17:48:40 +0200
-Subject: [PATCH v4 01/23] reset: Add renesas,rst DT bindings
-In-Reply-To: <1477055857-17936-2-git-send-email-geert+renesas@glider.be>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
- <1477055857-17936-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <1477064920.2508.27.camel@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 21 Oct 2016 16:48:56 +0100
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <4337157.Eff9E2riVH@wuerfel>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <3851270.xZRcP9hae0@wuerfel>
+ <20161021133708.GA1041@n2100.armlinux.org.uk>
+ <4337157.Eff9E2riVH@wuerfel>
+Message-ID: <20161021154856.GC1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 21.10.2016, 15:17 +0200 schrieb Geert Uytterhoeven:
-> Add DT bindings for the Renesas R-Car Reset Controller (R-Car Gen1
-> RESET/WDT and R-Car Gen2/Gen3 and RZ/G RST).
+On Fri, Oct 21, 2016 at 05:18:30PM +0200, Arnd Bergmann wrote:
+> On Friday, October 21, 2016 2:37:08 PM CEST Russell King - ARM Linux wrote:
+> > On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
 > 
-> As the features provided by the hardware module differ a lot across the
-> various SoC families and members, only SoC-specific compatible values
-> are defined.
+> > > If we hit this case, why not just use the wrapper on both EABI
+> > > and OABI for simplicity? It's not like we care a lot about
+> > > micro-optimizing OABI any more.
+> > 
+> > I'd still like to retain the ability to only add to EABI in the future.
 > 
-> For now we use the RST only for providing access to the state of the
-> mode pins, which is needed by the clock driver.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Magnus Damm <damm+renesas@opensource.se>
-> Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
-> v4:
->   - Add Acked-by,
->   - Fix comma and period in list,
->   - Add RZ/G1M and RZ/G1E,
-> 
-> v3:
->   - Clarify current usage,
->   - Use "renesas,<soctype>-rst" instead of "renesas,rst-<soctype>",
->   - Drop "syscon" compatible value,
->   - Add R-Car M3-W,
->   - Add R-Car Gen1,
-> 
-> v2:
->   - Add Acked-by.
-> ---
->  .../devicetree/bindings/reset/renesas,rst.txt      | 37 ++++++++++++++++++++++
->  1 file changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/renesas,rst.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt b/Documentation/devicetree/bindings/reset/renesas,rst.txt
-> new file mode 100644
-> index 0000000000000000..fe5e0f37b3c93579
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
-> @@ -0,0 +1,37 @@
-> +DT bindings for the Renesas R-Car and RZ/G Reset Controllers
-> +
-> +The R-Car and RZ/G Reset Controllers provide reset control, and implement the
-> +following functions:
-> +  - Latching of the levels on mode pins when PRESET# is negated,
-> +  - Mode monitoring register,
-> +  - Reset control of peripheral devices (on R-Car Gen1),
-> +  - Watchdog timer (on R-Car Gen1),
-> +  - Register-based reset control and boot address registers for the various CPU
-> +    cores (on R-Car Gen2 and Gen3, and on RZ/G).
-> +
-> +
-> +Required properties:
-> +  - compatible: Should be
-> +		  - "renesas,<soctype>-reset-wdt" for R-Car Gen1,
-> +		  - "renesas,<soctype>-rst" for R-Car Gen2 and Gen3, and RZ/G
-> +		Examples with soctypes are:
-> +		  - "renesas,r8a7743-rst" (RZ/G1M)
-> +		  - "renesas,r8a7745-rst" (RZ/G1E)
-> +		  - "renesas,r8a7778-reset-wdt" (R-Car M1A)
-> +		  - "renesas,r8a7779-reset-wdt" (R-Car H1)
-> +		  - "renesas,r8a7790-rst" (R-Car H2)
-> +		  - "renesas,r8a7791-rst" (R-Car M2-W)
-> +		  - "renesas,r8a7792-rst" (R-Car V2H
-> +		  - "renesas,r8a7793-rst" (R-Car M2-N)
-> +		  - "renesas,r8a7794-rst" (R-Car E2)
-> +		  - "renesas,r8a7795-rst" (R-Car H3)
-> +		  - "renesas,r8a7796-rst" (R-Car M3-W)
-> +  - reg: Address start and address range for the device.
-> +
-> +
-> +Example:
-> +
-> +	rst: reset-controller at e6160000 {
-> +		compatible = "renesas,r8a7795-rst";
-> +		reg = <0 0xe6160000 0 0x0200>;
-> +	};
+> Do you mean to add an EABI specific workaround for a specific syscall
+> if necessary, or to stop adding OABI syscalls altogether?
 
+To stop adding OABI syscalls altogether.  I'm sure that there will
+come a point (if it hasn't already) that glibc no longer supports
+OABI, and at that point it probably becomes rather silly to keep
+adding OABI syscalls.
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > > That brings up an interesting issue: it would be nice to use the
+> > > same input file for arch/arm/ and the compat mode of arch/arm64,
+> > > like x86 does. If we handle both oabi and arm64-compat in the same
+> > > file, we end up with a superset of what x86 does, and we could
+> > > use a single script again, and generate all four tables for
+> > > ARM (native OABI, OABI-on-EABI, native EABI, EABI-on-arm64).
+> > 
+> > OABI-compat != ARM64-EABI-compat though.  They're two completely
+> > different things.
+> 
+> For the purpose of generating the tables, I don't see much
+> difference: we either use the fourth column only in native
+> mode, or we use the fifth column to override values from
+> the fourth one when emulating the ABI on the "other" kernel.
 
-regards
-Philipp
+The table generation method can be shared, but I've no idea about the
+feasibility of sharing the table between ARM64 and ARM - I don't know
+enough about ARM64 to know whether things like an "long" argument to
+a syscall (which would be 64-bit on ARM64) would be or would not be a
+problem if called from a 32-bit user application.
+
+I've zero knowledge of the whole 32-bit application on 64-bit CPUs
+thing, so it's pointless trying to discuss this aspect with me.  Even
+for x86, all I care there is that it works, I've no knowledge of how
+it works.
+
+> That's similar to x86, 32-bit syscalls use the traditional numbers
+> with an optionally different entry point for compat mode, while
+> 64-bit syscalls use a somewhat reduced table that now has support
+> for both native 64-bit and "x32" mode. x86-64 and x32 share a
+> syscall table but not the unistd.h list, all three generated
+> from syscall_64.tbl.
+
+What's the point of the x32 mode?
+
+> ARM64 has a separate list of syscalls for compat mode in 
+> arch/arm64/include/asm/unistd32.h, this list has the same format
+> as include/asm-generic/uapi/unistd.h and must be updated manually
+> to match the arch/arm/ table today.
+
+Looking through it, sort-of.  It could have re-used the numbering
+from the arch/arm include file, but because ARM64 wanted to be an
+entirely separate architecture, it duplicates a lot from 32-bit ARM.
+I pointed that out at the time, and was shouted down (which is why
+today I have absolutely nothing to do with ARM64, and as a result
+have very little knowledge about ARM64 - I lost interest in it as
+a result of the responses I got to my comments.)
+
+So... if you don't mind, this isn't an issue I care one iota about.
+
+In order for something to work like what you're alluding to, ARM64
+would have to ferret around in arch/arm to pull out the bits it
+wants, and I see zero reason for that to be acceptable on either
+side of the ARM64 vs ARM divide - it will make my job harder because
+I'm then into the position where I need acks from ARM64 people to
+change ARM code, and that doesn't interest me at all.  I'm not going
+to put myself into a position where I'm at the mercy of ARM64 folk.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
