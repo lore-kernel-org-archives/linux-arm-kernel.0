@@ -1,43 +1,96 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Oct 2016 10:45:03 +0100
-Subject: [PATCH] arm64: mm: fix __page_to_voff definition
-In-Reply-To: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
-References: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
-Message-ID: <20161021093836.GA15372@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 21 Oct 2016 10:49:33 +0100
+Subject: [RFC PATCH 7/8] KVM: arm64: vgic-its: fix compatability with
+ 32-bit
+In-Reply-To: <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
+References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+ <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <5ea0ecc0-edb1-f770-16f3-7c48dbdb5c29@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 02:28:46PM +0530, Neeraj Upadhyay wrote:
-> Fix parameter name for __page_to_voff, to match its definition.
-> At present, we don't see any issue, as page_to_virt's caller
-> declares 'page'.
+Hi,
+
+On 21/10/16 10:36, Vladimir Murzin wrote:
+> Evaluate GITS_BASER_ENTRY_SIZE once as an int data (GITS_BASER<n>'s
+> Entry Size is 5-bit wide only), so when used as divider no reference
+> to __aeabi_uldivmod is generated when build for AArch32.
 > 
-> Fixes: 9f2875912dac ("arm64: mm: restrict virt_to_page() to the linear mapping")
-> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
+> Use unsigned long long for GITS_BASER_PAGE_SIZE_* since they are
+> used in conjunction with 64-bit data.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Looks good to me, thanks for fixing this!
 
-Thanks,
-Mark.
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Cheers,
+Andre.
 
 > ---
->  arch/arm64/include/asm/memory.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  include/linux/irqchip/arm-gic-v3.h |    8 ++++----
+>  virt/kvm/arm/vgic/vgic-its.c       |   11 ++++++-----
+>  2 files changed, 10 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index ba62df8..b71086d 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -217,7 +217,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->  #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
->  #else
->  #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
-> -#define __page_to_voff(kaddr)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-> +#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 5118d3a..e808f8a 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -295,10 +295,10 @@
+>  #define GITS_BASER_InnerShareable					\
+>  	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
+>  #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
+> -#define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
+> -#define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
+> -#define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
+> -#define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
+> +#define GITS_BASER_PAGE_SIZE_4K		(0ULL << GITS_BASER_PAGE_SIZE_SHIFT)
+> +#define GITS_BASER_PAGE_SIZE_16K	(1ULL << GITS_BASER_PAGE_SIZE_SHIFT)
+> +#define GITS_BASER_PAGE_SIZE_64K	(2ULL << GITS_BASER_PAGE_SIZE_SHIFT)
+> +#define GITS_BASER_PAGE_SIZE_MASK	(3ULL << GITS_BASER_PAGE_SIZE_SHIFT)
+>  #define GITS_BASER_PAGES_MAX		256
+>  #define GITS_BASER_PAGES_SHIFT		(0)
+>  #define GITS_BASER_NR_PAGES(r)		(((r) & 0xff) + 1)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 4660a7d..8c2b3cd 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -632,21 +632,22 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>  	int index;
+>  	u64 indirect_ptr;
+>  	gfn_t gfn;
+> +	int esz = GITS_BASER_ENTRY_SIZE(baser);
 >  
->  #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
->  #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-> member of the Code Aurora Forum, hosted by The Linux Foundation
+>  	if (!(baser & GITS_BASER_INDIRECT)) {
+>  		phys_addr_t addr;
+>  
+> -		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
+> +		if (id >= (l1_tbl_size / esz))
+>  			return false;
+>  
+> -		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
+> +		addr = BASER_ADDRESS(baser) + id * esz;
+>  		gfn = addr >> PAGE_SHIFT;
+>  
+>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
+>  	}
+>  
+>  	/* calculate and check the index into the 1st level */
+> -	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
+> +	index = id / (SZ_64K / esz);
+>  	if (index >= (l1_tbl_size / sizeof(u64)))
+>  		return false;
+>  
+> @@ -670,8 +671,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
+>  	indirect_ptr &= GENMASK_ULL(51, 16);
+>  
+>  	/* Find the address of the actual entry */
+> -	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
+> -	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
+> +	index = id % (SZ_64K / esz);
+> +	indirect_ptr += index * esz;
+>  	gfn = indirect_ptr >> PAGE_SHIFT;
+>  
+>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
 > 
