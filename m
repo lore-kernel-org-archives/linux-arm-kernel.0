@@ -1,35 +1,35 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 21 Oct 2016 23:01:03 +0900
-Subject: [PATCH 4/7] ARM: dts: am335x: Support the PMIC interrupt
+Date: Fri, 21 Oct 2016 23:01:05 +0900
+Subject: [PATCH 6/7] ARM: dts: am335x: Add the power button interrupt
 In-Reply-To: <20161021140106.21531-1-woogyom.kim@gmail.com>
 References: <20161021140106.21531-1-woogyom.kim@gmail.com>
-Message-ID: <20161021140106.21531-5-woogyom.kim@gmail.com>
+Message-ID: <20161021140106.21531-7-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM335x bone based boards have the PMIC interrupt named NMI which is
-connected to TPS65217 device. AM335x main interrupt controller provides it
-and the number is 7.
+This enables the power button driver gets corresponding IRQ number by
+using platform_get_irq().
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- arch/arm/boot/dts/am335x-bone-common.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 007b5e5..25303d9 100644
+index cec9d91..0c0a90c 100644
 --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
 +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -310,6 +310,10 @@
- 	 * by the hardware problems. (Tip: double-check by performing a current
- 	 * measurement after shutdown: it should be less than 1 mA.)
- 	 */
-+
-+	interrupts = <7>; /* NMI */
-+	interrupt-parent = <&intc>;
-+
- 	ti,pmic-shutdown-controller;
+@@ -324,6 +324,11 @@
+ 		status = "okay";
+ 	};
  
++	pwrbutton {
++		interrupts = <TPS65217_IRQ_PB>;
++		status = "okay";
++	};
++
  	regulators {
+ 		dcdc1_reg: regulator at 0 {
+ 			regulator-name = "vdds_dpr";
 -- 
 2.9.3
