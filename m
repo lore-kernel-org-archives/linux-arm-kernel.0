@@ -1,47 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 21 Oct 2016 09:14:31 +0200
-Subject: [PATCH v2] ARM: shmobile: Consolidate R8A7743 and R8A779[234]
- machine definitions
-In-Reply-To: <4b407584-21d4-5dc7-6866-6feff12f302f@cogentembedded.com>
-References: <1476712744-32619-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20161020085804.GK4612@verge.net.au>
- <4b407584-21d4-5dc7-6866-6feff12f302f@cogentembedded.com>
-Message-ID: <20161021071431.GA11736@verge.net.au>
+From: octavian.purdila@nxp.com (Octavian Purdila)
+Date: Fri, 21 Oct 2016 10:18:19 +0300
+Subject: [PATCH 0/2] ARM: imx: init MAC address for ocotp
+Message-ID: <1477034301-26579-1-git-send-email-octavian.purdila@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 09:44:56PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 10/20/2016 11:58 AM, Simon Horman wrote:
-> 
-> >>The four SoCs use identical machine operations, consolidate them into
-> >>two machine definitions in a single file.
-> >>
-> >>Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >>Tested-by: Simon Horman <horms+renesas@verge.net.au>
-> >>Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>---
-> >>Changes since v1:
-> >>
-> >>- Rebased on top of Simon's latest devel branch, thus including R8A7743
-> >>  consolidation
-> >>
-> >> arch/arm/mach-shmobile/Makefile          |  4 ----
-> >> arch/arm/mach-shmobile/setup-r8a7743.c   | 34 -------------------------------
-> >> arch/arm/mach-shmobile/setup-r8a7792.c   | 35 --------------------------------
-> >> arch/arm/mach-shmobile/setup-r8a7793.c   | 33 ------------------------------
-> >> arch/arm/mach-shmobile/setup-r8a7794.c   | 33 ------------------------------
-> >> arch/arm/mach-shmobile/setup-rcar-gen2.c | 33 ++++++++++++++++++++++++++++++
-> >> 6 files changed, 33 insertions(+), 139 deletions(-)
-> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7743.c
-> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7792.c
-> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7793.c
-> >> delete mode 100644 arch/arm/mach-shmobile/setup-r8a7794.c
-> >
-> >Thanks for this Laurent, its a very nice diffstat.
-> >I have queued it up for v4.10.
-> 
->    I'm not seeing a new devel tag when fetching... :-(
+This patch series adds support for initializing the ethernet MAC
+address for the OCOTP fuse configuration.
 
-Sorry about that. It should be there now.
+Fugang Duan (1):
+  ARM: imx: init enet MAC address from ocotp
+
+Octavian Purdila (1):
+  ARM: imx: add ocotp support in machine code
+
+ arch/arm/mach-imx/Kconfig       |   5 ++
+ arch/arm/mach-imx/Makefile      |   1 +
+ arch/arm/mach-imx/common.h      |   3 ++
+ arch/arm/mach-imx/mach-imx6q.c  |  32 ++++--------
+ arch/arm/mach-imx/mach-imx6sl.c |  12 +++--
+ arch/arm/mach-imx/mach-imx6sx.c |   2 +
+ arch/arm/mach-imx/mach-imx7d.c  |   2 +
+ arch/arm/mach-imx/ocotp.c       | 113 ++++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 146 insertions(+), 24 deletions(-)
+ create mode 100644 arch/arm/mach-imx/ocotp.c
+
+-- 
+2.7.4
