@@ -1,54 +1,164 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 10:36:35 +0100
-Subject: [RFC PATCH 2/8] irqchip/gic-v3-its: narrow down Entry Size when used
- as a divider
+Date: Fri, 21 Oct 2016 10:36:37 +0100
+Subject: [RFC PATCH 4/8] irqchip/gicv3-its: specialise readq and writeq
+ accesses
 In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
 References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1477042601-15227-3-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1477042601-15227-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GITS_BASER<n>'s Entry Size is much smaller than 64-bit, but when it
-used as a divider it forces compiler to generate __aeabi_uldivmod if
-build in 32-bit mode. So, casting it to int (like it is done in other
-places) where used as a divider would give a hint to compiler that
-32-bit division can be used.
+readq and writeq type of assessors are not supported in AArch32, so we
+need to specialise them and glue later with series of 32-bit accesses
+on AArch32 side.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/arch_gicv3.h |   16 ++++++++++++++++
+ drivers/irqchip/irq-gic-v3-its.c    |   30 +++++++++++++++---------------
+ 2 files changed, 31 insertions(+), 15 deletions(-)
 
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 4f0402a..e0ada98 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -190,5 +190,21 @@ static inline void gic_write_bpr1(u32 val)
+ 
+ #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
++#define gits_read_typer(c)		readq_relaxed(c)
++
++#define gits_read_baser(c)		readq_relaxed(c)
++#define gits_write_baser(v, c)		writeq_relaxed(v, c)
++
++#define gits_read_cbaser(c)		readq_relaxed(c)
++#define gits_write_cbaser(v, c)		writeq_relaxed(v, c)
++
++#define gits_write_cwriter(v, c)	writeq_relaxed(v, c)
++
++#define gicr_read_propbaser(c)		readq_relaxed(c)
++#define gicr_write_propbaser(v, c)	writeq_relaxed(v, c)
++
++#define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
++#define gicr_read_pendbaser(c)		readq_relaxed(c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index dcc8c76..e992b01 100644
+index 86efa6e..9f74abc 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -948,7 +948,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+@@ -835,7 +835,7 @@ static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
+ {
+ 	u32 idx = baser - its->tables;
  
- 	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
--		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / tmp),
-+		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
- 		its_base_type_string[type],
- 		(unsigned long)virt_to_phys(base),
- 		indirect ? "indirect" : "flat", (int)esz,
-@@ -983,7 +983,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 			 * which is reported by ITS hardware times lvl1 table
- 			 * entry size.
- 			 */
--			ids -= ilog2(psz / esz);
-+			ids -= ilog2(psz / (int)esz);
- 			esz = GITS_LVL1_ENTRY_SIZE;
+-	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
++	return gits_read_baser(its->base + GITS_BASER + (idx << 3));
+ }
+ 
+ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+@@ -843,7 +843,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+ {
+ 	u32 idx = baser - its->tables;
+ 
+-	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
++	gits_write_baser(val, its->base + GITS_BASER + (idx << 3));
+ 	baser->val = its_read_baser(its, baser);
+ }
+ 
+@@ -1022,7 +1022,7 @@ static void its_free_tables(struct its_node *its)
+ 
+ static int its_alloc_tables(struct its_node *its)
+ {
+-	u64 typer = readq_relaxed(its->base + GITS_TYPER);
++	u64 typer = gits_read_typer(its->base + GITS_TYPER);
+ 	u32 ids = GITS_TYPER_DEVBITS(typer);
+ 	u64 shr = GITS_BASER_InnerShareable;
+ 	u64 cache = GITS_BASER_WaWb;
+@@ -1125,8 +1125,8 @@ static void its_cpu_init_lpis(void)
+ 	       GICR_PROPBASER_WaWb |
+ 	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
+ 
+-	writeq_relaxed(val, rbase + GICR_PROPBASER);
+-	tmp = readq_relaxed(rbase + GICR_PROPBASER);
++	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
++	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
+ 
+ 	if ((tmp ^ val) & GICR_PROPBASER_SHAREABILITY_MASK) {
+ 		if (!(tmp & GICR_PROPBASER_SHAREABILITY_MASK)) {
+@@ -1138,7 +1138,7 @@ static void its_cpu_init_lpis(void)
+ 			val &= ~(GICR_PROPBASER_SHAREABILITY_MASK |
+ 				 GICR_PROPBASER_CACHEABILITY_MASK);
+ 			val |= GICR_PROPBASER_nC;
+-			writeq_relaxed(val, rbase + GICR_PROPBASER);
++			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
  		}
+ 		pr_info_once("GIC: using cache flushing for LPI property table\n");
+ 		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
+@@ -1149,8 +1149,8 @@ static void its_cpu_init_lpis(void)
+ 	       GICR_PENDBASER_InnerShareable |
+ 	       GICR_PENDBASER_WaWb);
+ 
+-	writeq_relaxed(val, rbase + GICR_PENDBASER);
+-	tmp = readq_relaxed(rbase + GICR_PENDBASER);
++	gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
++	tmp = gicr_read_pendbaser(rbase + GICR_PENDBASER);
+ 
+ 	if (!(tmp & GICR_PENDBASER_SHAREABILITY_MASK)) {
+ 		/*
+@@ -1160,7 +1160,7 @@ static void its_cpu_init_lpis(void)
+ 		val &= ~(GICR_PENDBASER_SHAREABILITY_MASK |
+ 			 GICR_PENDBASER_CACHEABILITY_MASK);
+ 		val |= GICR_PENDBASER_nC;
+-		writeq_relaxed(val, rbase + GICR_PENDBASER);
++		gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
  	}
-@@ -998,7 +998,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 	new_order = max_t(u32, get_order(esz << ids), new_order);
- 	if (new_order >= MAX_ORDER) {
- 		new_order = MAX_ORDER - 1;
--		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / esz);
-+		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
- 		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
- 			&its->phys_base, its->device_ids, ids);
+ 
+ 	/* Enable LPIs */
+@@ -1197,7 +1197,7 @@ static void its_cpu_init_collection(void)
+ 		 * We now have to bind each collection to its target
+ 		 * redistributor.
+ 		 */
+-		if (readq_relaxed(its->base + GITS_TYPER) & GITS_TYPER_PTA) {
++		if (gits_read_typer(its->base + GITS_TYPER) & GITS_TYPER_PTA) {
+ 			/*
+ 			 * This ITS wants the physical address of the
+ 			 * redistributor.
+@@ -1207,7 +1207,7 @@ static void its_cpu_init_collection(void)
+ 			/*
+ 			 * This ITS wants a linear CPU number.
+ 			 */
+-			target = readq_relaxed(gic_data_rdist_rd_base() + GICR_TYPER);
++			target = gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER);
+ 			target = GICR_TYPER_CPU_NUMBER(target) << 16;
+ 		}
+ 
+@@ -1716,8 +1716,8 @@ static int __init its_probe_one(struct resource *res,
+ 		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
+ 		 GITS_CBASER_VALID);
+ 
+-	writeq_relaxed(baser, its->base + GITS_CBASER);
+-	tmp = readq_relaxed(its->base + GITS_CBASER);
++	gits_write_cbaser(baser, its->base + GITS_CBASER);
++	tmp = gits_read_cbaser(its->base + GITS_CBASER);
+ 
+ 	if ((tmp ^ baser) & GITS_CBASER_SHAREABILITY_MASK) {
+ 		if (!(tmp & GITS_CBASER_SHAREABILITY_MASK)) {
+@@ -1729,13 +1729,13 @@ static int __init its_probe_one(struct resource *res,
+ 			baser &= ~(GITS_CBASER_SHAREABILITY_MASK |
+ 				   GITS_CBASER_CACHEABILITY_MASK);
+ 			baser |= GITS_CBASER_nC;
+-			writeq_relaxed(baser, its->base + GITS_CBASER);
++			gits_write_cbaser(baser, its->base + GITS_CBASER);
+ 		}
+ 		pr_info("ITS: using cache flushing for cmd queue\n");
+ 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
  	}
+ 
+-	writeq_relaxed(0, its->base + GITS_CWRITER);
++	gits_write_cwriter(0, its->base + GITS_CWRITER);
+ 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+ 
+ 	err = its_init_domain(handle, its);
 -- 
 1.7.9.5
