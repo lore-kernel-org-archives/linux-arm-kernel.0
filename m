@@ -1,147 +1,47 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 21 Oct 2016 23:33:05 +0300
-Subject: [PATCH 06/18] thread: move thread bits accessors to separated file
+Date: Fri, 21 Oct 2016 23:33:04 +0300
+Subject: [PATCH 05/18] arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and
+ LP64
 In-Reply-To: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1477081997-4770-7-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1477081997-4770-6-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They may be accessed from low-level code, so isolating is a measure to
-avoid circular dependencies in header files.
+From: Andrew Pinski <apinski@cavium.com>
 
-The exact reason for circular dependency is WARN_ON() macro added
-in patch [edd63a27] "set_restore_sigmask() is never called without
-SIGPENDING (and never should be)"
+Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
+__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
+determine the appropriate type definitions for the system call interface.
 
+Signed-off-by: Andrew Pinski <apinski@cavium.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- include/linux/thread_bits.h | 54 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/thread_info.h | 44 +-----------------------------------
- 2 files changed, 55 insertions(+), 43 deletions(-)
- create mode 100644 include/linux/thread_bits.h
+ arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
-new file mode 100644
-index 0000000..ed788b0
---- /dev/null
-+++ b/include/linux/thread_bits.h
-@@ -0,0 +1,54 @@
-+
-+/* thread_bits.h: common low-level thread bits accessors */
-+
-+#ifndef _LINUX_THREAD_BITS_H
-+#define _LINUX_THREAD_BITS_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/bitops.h>
-+#include <asm/thread_info.h>
-+
-+/*
-+ * flag set/clear/test wrappers
-+ * - pass TIF_xxxx constants to these functions
-+ */
-+
-+static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	set_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+#define set_thread_flag(flag) \
-+	set_ti_thread_flag(current_thread_info(), flag)
-+#define clear_thread_flag(flag) \
-+	clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_set_thread_flag(flag) \
-+	test_and_set_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_clear_thread_flag(flag) \
-+	test_and_clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_thread_flag(flag) \
-+	test_ti_thread_flag(current_thread_info(), flag)
-+
-+#endif /* !__ASSEMBLY__ */
-+#endif /* _LINUX_THREAD_BITS_H */
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index 45f004e..f6e3239 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -65,8 +65,7 @@ struct restart_block {
+diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
+index fce9c29..ab61d68 100644
+--- a/arch/arm64/include/uapi/asm/bitsperlong.h
++++ b/arch/arm64/include/uapi/asm/bitsperlong.h
+@@ -16,7 +16,14 @@
+ #ifndef __ASM_BITSPERLONG_H
+ #define __ASM_BITSPERLONG_H
  
- extern long do_no_restart_syscall(struct restart_block *parm);
+-#define __BITS_PER_LONG 64
++#if defined(__LP64__)
++/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
++# define __BITS_PER_LONG 64
++#elif defined(__ILP32__)
++# define __BITS_PER_LONG 32
++#else
++# error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
++#endif
  
--#include <linux/bitops.h>
--#include <asm/thread_info.h>
-+#include <linux/thread_bits.h>
+ #include <asm-generic/bitsperlong.h>
  
- #ifdef __KERNEL__
- 
-@@ -77,47 +76,6 @@ extern long do_no_restart_syscall(struct restart_block *parm);
- # define THREADINFO_GFP		(GFP_KERNEL_ACCOUNT | __GFP_NOTRACK)
- #endif
- 
--/*
-- * flag set/clear/test wrappers
-- * - pass TIF_xxxx constants to these functions
-- */
--
--static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_bit(flag, (unsigned long *)&ti->flags);
--}
--
--#define set_thread_flag(flag) \
--	set_ti_thread_flag(current_thread_info(), flag)
--#define clear_thread_flag(flag) \
--	clear_ti_thread_flag(current_thread_info(), flag)
--#define test_and_set_thread_flag(flag) \
--	test_and_set_ti_thread_flag(current_thread_info(), flag)
--#define test_and_clear_thread_flag(flag) \
--	test_and_clear_ti_thread_flag(current_thread_info(), flag)
--#define test_thread_flag(flag) \
--	test_ti_thread_flag(current_thread_info(), flag)
--
- #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
- 
- #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
 -- 
 2.7.4
