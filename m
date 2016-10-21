@@ -1,29 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 21 Oct 2016 12:14:01 +0100
-Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify
- ACPI support code.
-In-Reply-To: <20161020165747.GD27598@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
- <20161020165747.GD27598@leverpostej>
-Message-ID: <20161021111352.GA16630@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 21 Oct 2016 13:15:13 +0200
+Subject: [PATCH v2 0/2] ARM: oxnas: Add SMP support for OX820
+In-Reply-To: <20161021085848.1754-1-narmstrong@baylibre.com>
+References: <20161021085848.1754-1-narmstrong@baylibre.com>
+Message-ID: <3451192.la7YkVR9rV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 05:58:17PM +0100, Mark Rutland wrote:
-> On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
-> > +	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
-> > +	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
-> > +	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
-> > +	/* Always-on capability */
-> > +	arch_timer_c3stop = acpi_gtdt_c3stop();
+On Friday, October 21, 2016 10:58:46 AM CEST Neil Armstrong wrote:
+> In order to support the SMP feature of the Oxford Semiconductor OX820 SoC,
+> add the necessary code to handle the wake-up, hotplug and cpu entry.
 > 
-> ... I think we should check the flag on the relevant interrupt, though
-> that's worth clarifying.
+> The OX820 has an ARM11MPCORE cluster with 2 cores and has proper hardware
+> support for secondary core booting.
+> 
+> Changes since v1 at http://lkml.kernel.org/r/20161017084303.20078-1-narmstrong at baylibre.com
+>  - Remove useless holding pen loops and spinlock in boot_secondary
+> 
 
-I see I misread the spec; this is part of the common flags.
+Thanks for the update, much nicer!
 
-Please ignore this point; sorry for the noise.
-
-Thanks,
-Mark.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
