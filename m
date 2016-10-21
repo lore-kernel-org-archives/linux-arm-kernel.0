@@ -1,61 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 21 Oct 2016 09:02:38 +0200
-Subject: [PATCH v3] clkdev: Detect errors in clk_hw_register_clkdev() for mass
- registration
-Message-ID: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 21 Oct 2016 09:11:28 +0200
+Subject: [PATCH -next] pwm: meson: Fix missing spin_lock_init()
+In-Reply-To: <57D41083.3060109@baylibre.com>
+References: <1473489518-17981-1-git-send-email-weiyj.lk@gmail.com>
+ <57D41083.3060109@baylibre.com>
+Message-ID: <20161021071128.GA2670@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike clk_register_clkdev(), clk_hw_register_clkdev() doesn't check for
-passed error objects from a previous registration call. Hence the caller
-of clk_hw_register_*() has to check for errors before calling
-clk_hw_register_clkdev*().
+On Sat, Sep 10, 2016 at 03:54:11PM +0200, Neil Armstrong wrote:
+> Le 10/09/2016 08:38, Wei Yongjun a ?crit :
+> > From: Wei Yongjun <weiyongjun1@huawei.com>
+> > 
+> > The driver allocates the spinlock but not initialize it.
+> > Use spin_lock_init() on it to initialize it correctly.
+> > 
+> > This is detected by Coccinelle semantic patch.
+> > 
+> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> > ---
+> >  drivers/pwm/pwm-meson.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
+> > index bfbbe7f..778d088 100644
+> > --- a/drivers/pwm/pwm-meson.c
+> > +++ b/drivers/pwm/pwm-meson.c
+> > @@ -465,6 +465,7 @@ static int meson_pwm_probe(struct platform_device *pdev)
+> >  	if (IS_ERR(meson->base))
+> >  		return PTR_ERR(meson->base);
+> >  
+> > +	spin_lock_init(&meson->lock);
+> >  	meson->chip.dev = &pdev->dev;
+> >  	meson->chip.ops = &meson_pwm_ops;
+> >  	meson->chip.base = -1;
+> > 
+> 
+> Thanks for the fix, but it was already posted earlier by Axel Lin <axel.lin@ingics.com>
+> 
+> Thierry will decide which one to merge.
+> 
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Make clk_hw_register_clkdev() more similar to clk_register_clkdev() by
-adding this error check, removing the burden from callers that do mass
-registration.
+I've applied Axel's patch.
 
-Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
-Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
-Fixes: 44ce9a9ae977736f ("MIPS: TXx9: Convert to Common Clock Framework")
-Fixes: f48d947a162dfa9d ("clk: clps711x: Migrate to clk_hw based OF and registration APIs")
-Fixes: b4626a7f489238a5 ("CLK: Add Loongson1C clock support")
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
-v3:
-  - Add more Fixes tags for drivers not checking errors in v4.9-rc1,
-
-v2:
-  - Correct wrong function references
-    s/clkdev_{,hw_}create/clk_{,hw_}register_clkdev/
----
- drivers/clk/clkdev.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 97ae60fa15849954..bb8a77a5985f8627 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -448,12 +448,20 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
-  *
-  * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-  * clkdev.
-+ *
-+ * To make things easier for mass registration, we detect error clk_hws
-+ * from a previous clk_hw_register_*() call, and return the error code for
-+ * those.  This is to permit this function to be called immediately
-+ * after clk_hw_register_*().
-  */
- int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
- 	const char *dev_id)
- {
- 	struct clk_lookup *cl;
- 
-+	if (IS_ERR(hw))
-+		return PTR_ERR(hw);
-+
- 	/*
- 	 * Since dev_id can be NULL, and NULL is handled specially, we must
- 	 * pass it as either a NULL format string, or with "%s".
--- 
-1.9.1
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161021/c8c0227d/attachment.sig>
