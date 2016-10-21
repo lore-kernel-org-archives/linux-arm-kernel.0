@@ -1,70 +1,62 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Fri, 21 Oct 2016 15:09:16 -0600
-Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
- dma_set_mask_and_coherent
-In-Reply-To: <20161017152623.7649-1-punit.agrawal@arm.com>
-References: <20161017152623.7649-1-punit.agrawal@arm.com>
-Message-ID: <20161021150916.0d274e9f@lwn.net>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Fri, 21 Oct 2016 14:10:41 -0700
+Subject: [PATCH v2 3/4] arm64: dts: msm8996: Add SMEM DT nodes
+In-Reply-To: <20161021000408.GI26139@codeaurora.org>
+References: <1477005139-15564-1-git-send-email-spjoshi@codeaurora.org>
+ <1477005139-15564-4-git-send-email-spjoshi@codeaurora.org>
+ <20161021000408.GI26139@codeaurora.org>
+Message-ID: <52a996ef-a97c-3d6c-0a95-f9e3ebbd2790@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Oct 2016 16:26:23 +0100
-Punit Agrawal <punit.agrawal@arm.com> wrote:
+On 10/20/2016 05:04 PM, Stephen Boyd wrote:
+> On 10/20, Sarangdhar Joshi wrote:
+>> From: Bjorn Andersson <bjorn.andersson@linaro.org>
+>>
+>> Add SMEM and TCSR DT nodes on MSM8996.
+>>
+>> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/msm8996.dtsi | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> index 949b096..abc1089 100644
+>> --- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+>> @@ -164,17 +164,36 @@
+>>
+>>  	};
+>>
+>> +	tcsr_mutex: hwlock {
+>> +		compatible = "qcom,tcsr-mutex";
+>> +		syscon = <&tcsr_mutex_regs 0 0x1000>;
+>> +		#hwlock-cells = <1>;
+>> +	};
+>> +
+>>  	psci {
+>>  		compatible = "arm,psci-1.0";
+>>  		method = "smc";
+>>  	};
+>>
+>> +	smem {
+>> +		compatible = "qcom,smem";
+>> +
+>> +		memory-region = <&smem_mem>;
+>> +
+>> +		hwlocks = <&tcsr_mutex 3>;
+>
+> Super nitpick: Is there a reason we have newlines between
+> everything in this node? This node is the only one that isn't
+> consistent.
 
-> The dma mapping api howto gives the impression that using the
-> dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
-> to check all the components in the path from the device to memory for
-> addressing restrictions. In systems with address translations between
-> the device and memory (e.g., when using IOMMU), this implies that a
-> successful call to set set dma mask has checked the addressing
-> constraints of the intermediaries as well.
-> 
-> For the IOMMU drivers in the tree, the check is actually performed while
-> allocating the DMA buffer rather than when the DMA mask is
-> configured. For MMUs that do not support the full device addressing
-> capability, the allocations are made from a reduced address space.
-> 
-> Update the documentation to clarify that even though the call to
-> dma_set_mask_and_coherent succeeds, it may not be possible to use the
-> full addressing capability of the device.
+Thanks, will do that. I think I just missed updating this node from 
+original patchset.
 
-OK, so I guess I can buy this.  But...
+>
 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> ---
->  Documentation/DMA-API-HOWTO.txt | 39 +++++++++++++++++++++++----------------
->  1 file changed, 23 insertions(+), 16 deletions(-)
-> 
-> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
-> index 979228b..240d1ee 100644
-> --- a/Documentation/DMA-API-HOWTO.txt
-> +++ b/Documentation/DMA-API-HOWTO.txt
-> @@ -159,39 +159,46 @@ support 64-bit addressing (DAC) for all transactions.  And at least
->  one platform (SGI SN2) requires 64-bit consistent allocations to
->  operate correctly when the IO bus is in PCI-X mode.
->  
-> -For correct operation, you must interrogate the kernel in your device
-> -probe routine to see if the DMA controller on the machine can properly
-> -support the DMA addressing limitation your device has.  It is good
-> +For correct operation, you must inform the kernel in your device probe
-> +routine to see if the DMA controller on the machine can properly
-> +support the DMA addressing capabilities your device has.  It is good
 
-Here it's still saying "to see if the DMA controller on the machine can
-properly support the DMA addressing capabilities your device has".  So
-you've not really changed the sense of this sentence here.
-
-If I understand things correctly, the calls in question are storing the
-device's limitations; they will only fail if the kernel is entirely
-unable to work within the indicated range, right?  I don't think there's
-ever been any guarantee that the system as a whole could use the entire
-range that is addressable by the device.  I have no objection to making
-that more clear, but let's actually make it more clear by saying what the
-functions are actually doing.
-
-Make sense, or am I missing something here?
-
-Thanks,
-
-jon
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
