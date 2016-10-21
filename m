@@ -1,35 +1,40 @@
-From: michael.scott@linaro.org (Michael Scott)
-Date: Fri, 21 Oct 2016 10:56:08 -0700
-Subject: [PATCH] arm64: qcom: enable GPIOLIB in Kconfig
-Message-ID: <20161021175608.19073-1-michael.scott@linaro.org>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri, 21 Oct 2016 10:57:45 -0700
+Subject: [PATCH v5 11/23] usb: chipidea: Emulate OTGSC interrupt enable
+ path
+In-Reply-To: <20161021021450.GA16461@b29397-desktop>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-12-stephen.boyd@linaro.org>
+ <20161019011535.GC6294@b29397-desktop>
+ <147684198705.24897.12451889548508263144@sboyd-linaro>
+ <20161019080211.GA1968@b29397-desktop>
+ <147694652997.28344.1048935134595924905@sboyd-linaro>
+ <20161020101017.GA32001@b29397-desktop>
+ <147699579088.21058.4379586947317571921@sboyd-linaro>
+ <20161021021450.GA16461@b29397-desktop>
+Message-ID: <147707266552.25233.4203897094706565540@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While debugging a kernel image size issue, I discovered that if all
-non ARCH_QCOM configs in the ARM64 defconfig are disabled, the QCOM
-pinctrl drivers will not be built.
+Quoting Peter Chen (2016-10-20 19:14:50)
+> 
+> I tested my patch, it works well at my side, if it is ok for you, please
+> ack it, I will apply it as well as your chipidea series after your
+> gpu fix patch at greg's usb-next tree.
 
-The QCOM pinctrl drivers have a dependency on GPIOLIB which was being
-selected when other ARCH configs were enabled, but ARCH_QCOM doesn't
-select GPIOLIB directly.  Let's select GPIOLIB here to ensure the pinctrl
-drivers are built for QCOM platforms.
+Feel free to add my:
 
-Signed-off-by: Michael Scott <michael.scott@linaro.org>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+Tested-by: Stephen Boyd <stephen.boyd@linaro.org>
+Reported-by: Stephen Boyd <stephen.boyd@linaro.org>
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index cfbdf02..e9fc226 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -113,6 +113,7 @@ config ARCH_MVEBU
- 
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
-+	select GPIOLIB
- 	select PINCTRL
- 	help
- 	  This enables support for the ARMv8 based Qualcomm chipsets.
--- 
-2.9.3
+tags to the patch.
+
+> 
+> Is it ok for you?
+> 
+
+Ok sounds good. The GPU patch has been picked up into drm-misc now, but
+I'm not sure if it's going to be merged into -rc2 or not but it sounds
+like you'll figure that part out.
+
+I'll resend the phy drivers to Kishon now. Thanks.
