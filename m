@@ -1,90 +1,51 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 21 Oct 2016 09:25:31 +0800
-Subject: [PATCH v7 4/5] ARM: dts: imx6qdl-icore: Add usbotg support
-In-Reply-To: <1476437243-13297-5-git-send-email-jteki@openedev.com>
-References: <1476437243-13297-1-git-send-email-jteki@openedev.com>
- <1476437243-13297-5-git-send-email-jteki@openedev.com>
-Message-ID: <20161021012531.GD30578@tiger>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 20 Oct 2016 23:28:29 -0200
+Subject: [PATCH v2] ARM: imx: gpc: Initialize all power domains
+Message-ID: <1477013309-2808-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 02:57:22PM +0530, Jagan Teki wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
-> 
-> Add usbotg support for Engicam i.CoreM6 dql modules.
-> 
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Matteo Lisi <matteo.lisi@engicam.com>
-> Cc: Michael Trimarchi <michael@amarulasolutions.com>
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v7:
->         - none
-> Changes for v6:
->         - none
-> Changes for v5:
->         - none
-> Changes for v4:
->         - new patch
-> 
->  arch/arm/boot/dts/imx6qdl-icore.dtsi | 23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> index ffec879..4e79858 100644
-> --- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
-> @@ -65,6 +65,15 @@
->  		regulator-boot-on;
->  		regulator-always-on;
->  	};
-> +
-> +	reg_usb_otg_vbus: usb_otg_vbus {
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Same as host patch, please fix the node name.
+Since commit 0159ec670763dd ("PM / Domains: Verify the PM domain is present
+when adding a provider") the following regression is observed on imx6:
 
-Shawn
+imx-gpc: probe of 20dc000.gpc failed with error -22
 
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_otg_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +		regulator-always-on;
-> +	};
->  };
->  
->  &can1 {
-> @@ -124,6 +133,14 @@
->  	status = "okay";
->  };
->  
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
->  &usdhc1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usdhc1>;
-> @@ -198,6 +215,12 @@
->  		>;
->  	};
->  
-> +	pinctrl_usbotg: usbotggrp {
-> +		fsl,pins = <
-> +			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
-> +		>;
-> +	};
-> +
->  	pinctrl_usdhc1: usdhc1grp {
->  		fsl,pins = <
->  			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17070
-> -- 
-> 2.7.4
-> 
+The imx-gpc driver probe failure causes several issues such as:
+
+- When booting a kernel built with multi_v7_defconfig a kernel crash is
+seen.
+
+- When booting a kernel built with imx_v6_v7_defconfig the Etnaviv GPU
+driver is not loaded due to the lack of power domains.
+
+The gpc probe fails because of_genpd_add_provider_onecell() now checks
+if all the domains are initialized via pm_genpd_present() function
+and it fails because not all the power domains are initialized.
+
+In order to fix this error, initialize all the power domains from
+imx_gpc_domains[], not only the imx6q_pu_domain.base one.
+
+Reported-by: Olof's autobooter <build@lixom.net>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/mach-imx/gpc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 0df062d..d0463e9 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -430,7 +430,8 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+ 	if (!IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS))
+ 		return 0;
+ 
+-	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
++	for (i = 0; i < ARRAY_SIZE(imx_gpc_domains); i++)
++		pm_genpd_init(imx_gpc_domains[i], NULL, false);
+ 	return of_genpd_add_provider_onecell(dev->of_node,
+ 					     &imx_gpc_onecell_data);
+ 
+-- 
+2.7.4
