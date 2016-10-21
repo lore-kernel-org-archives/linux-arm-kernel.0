@@ -1,104 +1,224 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Fri, 21 Oct 2016 12:19:31 +0100
-Subject: [RFC PATCH 7/8] KVM: arm64: vgic-its: fix compatability with
- 32-bit
-In-Reply-To: <5ea0ecc0-edb1-f770-16f3-7c48dbdb5c29@arm.com>
-References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
- <1477042601-15227-8-git-send-email-vladimir.murzin@arm.com>
- <5ea0ecc0-edb1-f770-16f3-7c48dbdb5c29@arm.com>
-Message-ID: <5809F9C3.7020309@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 21 Oct 2016 12:19:27 +0100
+Subject: [PATCH v14 6/9] acpi/arm64: Add memory-mapped timer support in
+ GTDT driver
+In-Reply-To: <1475086637-1914-7-git-send-email-fu.wei@linaro.org>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-7-git-send-email-fu.wei@linaro.org>
+Message-ID: <20161021111927.GB16630@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/16 10:49, Andre Przywara wrote:
-> Hi,
+On Thu, Sep 29, 2016 at 02:17:14AM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> On 21/10/16 10:36, Vladimir Murzin wrote:
->> Evaluate GITS_BASER_ENTRY_SIZE once as an int data (GITS_BASER<n>'s
->> Entry Size is 5-bit wide only), so when used as divider no reference
->> to __aeabi_uldivmod is generated when build for AArch32.
->>
->> Use unsigned long long for GITS_BASER_PAGE_SIZE_* since they are
->> used in conjunction with 64-bit data.
->>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> On platforms booting with ACPI, architected memory-mapped timers'
+> configuration data is provided by firmware through the ACPI GTDT
+> static table.
 > 
-> Looks good to me, thanks for fixing this!
+> The clocksource architected timer kernel driver requires a firmware
+> interface to collect timer configuration and configure its driver.
+> this infrastructure is present for device tree systems, but it is
+> missing on systems booting with ACPI.
 > 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Implement the kernel infrastructure required to parse the static
+> ACPI GTDT table so that the architected timer clocksource driver can
+> make use of it on systems booting with ACPI, therefore enabling
+> the corresponding timers configuration.
+> 
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/acpi/arm64/gtdt.c            | 70 ++++++++++++++++++++++++++++++++++++
+>  include/clocksource/arm_arch_timer.h | 15 ++++++++
+>  include/linux/acpi.h                 |  1 +
+>  3 files changed, 86 insertions(+)
+> 
+> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+> index b24844d..b6021db 100644
+> --- a/drivers/acpi/arm64/gtdt.c
+> +++ b/drivers/acpi/arm64/gtdt.c
+> @@ -150,3 +150,73 @@ int __init acpi_gtdt_init(struct acpi_table_header *table)
+>  
+>  	return gtdt->platform_timer_count;
+>  }
+> +
+> +static int __init gtdt_parse_gt_block(struct acpi_gtdt_timer_block *block,
+> +				      struct gt_block_data *data)
+> +{
+> +	struct acpi_gtdt_timer_entry *frame;
+> +	int i;
+> +
+> +	if (!block || !data)
+> +		return -EINVAL;
 
-Thanks!
+As far as I can see, the !block case cannot happen; if it can, we'd
+already have derferenced it with the is_timer_block() check in
+gtdt_arch_timer_mem_init().
 
-Vladimir
+Why do we not handle the !data check in gtdt_arch_timer_mem_init()? It
+seems fragile, given we add an index there...
 
-> 
-> Cheers,
-> Andre.
-> 
->> ---
->>  include/linux/irqchip/arm-gic-v3.h |    8 ++++----
->>  virt/kvm/arm/vgic/vgic-its.c       |   11 ++++++-----
->>  2 files changed, 10 insertions(+), 9 deletions(-)
->>
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index 5118d3a..e808f8a 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -295,10 +295,10 @@
->>  #define GITS_BASER_InnerShareable					\
->>  	GIC_BASER_SHAREABILITY(GITS_BASER, InnerShareable)
->>  #define GITS_BASER_PAGE_SIZE_SHIFT	(8)
->> -#define GITS_BASER_PAGE_SIZE_4K		(0UL << GITS_BASER_PAGE_SIZE_SHIFT)
->> -#define GITS_BASER_PAGE_SIZE_16K	(1UL << GITS_BASER_PAGE_SIZE_SHIFT)
->> -#define GITS_BASER_PAGE_SIZE_64K	(2UL << GITS_BASER_PAGE_SIZE_SHIFT)
->> -#define GITS_BASER_PAGE_SIZE_MASK	(3UL << GITS_BASER_PAGE_SIZE_SHIFT)
->> +#define GITS_BASER_PAGE_SIZE_4K		(0ULL << GITS_BASER_PAGE_SIZE_SHIFT)
->> +#define GITS_BASER_PAGE_SIZE_16K	(1ULL << GITS_BASER_PAGE_SIZE_SHIFT)
->> +#define GITS_BASER_PAGE_SIZE_64K	(2ULL << GITS_BASER_PAGE_SIZE_SHIFT)
->> +#define GITS_BASER_PAGE_SIZE_MASK	(3ULL << GITS_BASER_PAGE_SIZE_SHIFT)
->>  #define GITS_BASER_PAGES_MAX		256
->>  #define GITS_BASER_PAGES_SHIFT		(0)
->>  #define GITS_BASER_NR_PAGES(r)		(((r) & 0xff) + 1)
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 4660a7d..8c2b3cd 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -632,21 +632,22 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  	int index;
->>  	u64 indirect_ptr;
->>  	gfn_t gfn;
->> +	int esz = GITS_BASER_ENTRY_SIZE(baser);
->>  
->>  	if (!(baser & GITS_BASER_INDIRECT)) {
->>  		phys_addr_t addr;
->>  
->> -		if (id >= (l1_tbl_size / GITS_BASER_ENTRY_SIZE(baser)))
->> +		if (id >= (l1_tbl_size / esz))
->>  			return false;
->>  
->> -		addr = BASER_ADDRESS(baser) + id * GITS_BASER_ENTRY_SIZE(baser);
->> +		addr = BASER_ADDRESS(baser) + id * esz;
->>  		gfn = addr >> PAGE_SHIFT;
->>  
->>  		return kvm_is_visible_gfn(its->dev->kvm, gfn);
->>  	}
->>  
->>  	/* calculate and check the index into the 1st level */
->> -	index = id / (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
->> +	index = id / (SZ_64K / esz);
->>  	if (index >= (l1_tbl_size / sizeof(u64)))
->>  		return false;
->>  
->> @@ -670,8 +671,8 @@ static bool vgic_its_check_id(struct vgic_its *its, u64 baser, int id)
->>  	indirect_ptr &= GENMASK_ULL(51, 16);
->>  
->>  	/* Find the address of the actual entry */
->> -	index = id % (SZ_64K / GITS_BASER_ENTRY_SIZE(baser));
->> -	indirect_ptr += index * GITS_BASER_ENTRY_SIZE(baser);
->> +	index = id % (SZ_64K / esz);
->> +	indirect_ptr += index * esz;
->>  	gfn = indirect_ptr >> PAGE_SHIFT;
->>  
->>  	return kvm_is_visible_gfn(its->dev->kvm, gfn);
->>
-> 
+> +
+> +	if (!block->block_address || !block->timer_count)
+> +		return -EINVAL;
+
+Looking at Table 5-120 in the ACPI 6.1 spec, zero is not called out as
+an invalid physical address for the block...
+
+Surely if you don't have an MMIO timer, you don't have a GT Block
+Structure, rather than an invalid one!?
+
+The block->timer_count check should be more thorough, e.g.
+
+	if (!block->timer_count) {
+		pr_warn("GTDT present, but frame count is zero");
+		return -ENODEV:
+	}
+
+	if (block->timer_count > 8) {
+		pr_warn(FW_BUG "GTDT lists %d frames, ACPI spec only allows 8\n",
+			block->timer_count);
+	}
+
+... note that without the latter we could go off the end of the array...
+
+
+> +	data->cntctlbase_phy = (phys_addr_t)block->block_address;
+> +	data->timer_count = block->timer_count;
+> +
+> +	frame = (void *)block + block->timer_offset;
+> +	if (frame + block->timer_count != (void *)block + block->header.length)
+> +		return -EINVAL;
+> +
+> +	/*
+> +	 * Get the GT timer Frame data for every GT Block Timer
+> +	 */
+> +	for (i = 0; i < block->timer_count; i++, frame++) {
+> +		if (!frame->base_address || !frame->timer_interrupt)
+> +			return -EINVAL;
+> +
+> +		data->timer[i].irq = map_gt_gsi(frame->timer_interrupt,
+> +						frame->timer_flags);
+> +		if (data->timer[i].irq <= 0)
+> +			return -EINVAL;
+
+Can we please print something describing the failure, e.g.
+
+	pr_warn("failed to map GTDT frame %d, physical timer interrupt\n",
+		i);
+
+> +
+> +		if (frame->virtual_timer_interrupt) {
+
+Same comment as previously about GSIV zero being valid; this is arguably
+a spec bug that should be reported...
+
+> +			data->timer[i].virtual_irq =
+> +				map_gt_gsi(frame->virtual_timer_interrupt,
+> +					   frame->virtual_timer_flags);
+> +			if (data->timer[i].virtual_irq <= 0)
+> +				return -EINVAL;
+
+Likewise, a message here would be useful, e.g.
+
+	pr_warn("failed to map GTDT frame %d, virtual timer interrupt\n",
+		i);
+
+> +		}
+> +
+> +		data->timer[i].frame_nr = frame->frame_number;
+> +		data->timer[i].cntbase_phy = frame->base_address;
+
+What about CntEL0BaseX?
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Get the GT block info for memory-mapped timer from GTDT table.
+> + */
+> +int __init gtdt_arch_timer_mem_init(struct gt_block_data *data)
+> +{
+> +	void *platform_timer;
+> +	int index = 0;
+> +	int ret;
+> +
+> +	for_each_platform_timer(platform_timer) {
+> +		if (!is_timer_block(platform_timer))
+> +			continue;
+> +		ret = gtdt_parse_gt_block(platform_timer, data + index);
+> +		if (ret)
+> +			return ret;
+> +		index++;
+> +	}
+> +
+> +	if (index)
+> +		pr_info("found %d memory-mapped timer block(s).\n", index);
+> +
+> +	return index;
+> +}
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index 16dcd10..94a5d14 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -56,6 +56,8 @@ enum spi_nr {
+>  #define ARCH_TIMER_MEM_PHYS_ACCESS	2
+>  #define ARCH_TIMER_MEM_VIRT_ACCESS	3
+>  
+> +#define ARCH_TIMER_MEM_MAX_FRAME	8
+
+Nit: please call this ARCH_TIMER_MEM_MAX_FRAMES, so it's clear that the
+maximum index is 7.
+
+>  #define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
+>  #define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
+>  #define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
+> @@ -71,6 +73,19 @@ struct arch_timer_kvm_info {
+>  	int virtual_irq;
+>  };
+>  
+> +struct gt_timer_data {
+
+s/gt_timer_data/arch_timer_mem_frame/
+
+> +	int frame_nr;
+> +	phys_addr_t cntbase_phy;
+
+Please get rid of the '_phy' suffix; it clashes with other terminology,
+'phys' is generally preferable, and given the name and type it's obvious
+that it's a physical address anyhow.
+
+Just call this 'cntbase'.
+
+> +	int irq;
+> +	int virtual_irq;
+
+Call these phys_irq and virt_irq.
+
+> +};
+> +
+> +struct gt_block_data {
+
+s/gt_block_data/arch_timer_mem/
+
+> +	phys_addr_t cntctlbase_phy;
+
+Same comment w.r.t. the '_phy' suffix. Likewise, just call this
+'cntctlbase_phy'
+
+> +	int timer_count;
+
+s/timer_count/num_frames/
+
+> +	struct gt_timer_data timer[ARCH_TIMER_MEM_MAX_FRAME];
+> +};
+
+Please split this part out into a patch which moves the existing driver
+over to this new abstraction, *then* introduce the ACPI parser for it in
+a subsequent patch.
+
+Thanks,
+Mark.
