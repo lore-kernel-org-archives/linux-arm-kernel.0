@@ -1,317 +1,85 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 22 Oct 2016 18:47:41 +0100
-Subject: [PATCH v3 2/4] drivers: iio: ti_am335x_adc: add dma support
-In-Reply-To: <d7dd9a21-51d9-e8f5-a6fe-34653afc9240@ti.com>
-References: <20161005090443.24576-1-mugunthanvnm@ti.com>
- <20161005090443.24576-3-mugunthanvnm@ti.com>
- <d0105217-a8ee-cd8e-221d-34c19257765e@kernel.org>
- <d7dd9a21-51d9-e8f5-a6fe-34653afc9240@ti.com>
-Message-ID: <28c29f63-d7ef-0ef2-7af1-cf6d631136fc@kernel.org>
+From: ayaka@soulik.info (Randy Li)
+Date: Sun, 23 Oct 2016 03:18:53 +0800
+Subject: [PATCH] drm/rockchip: analogix_dp: add supports for regulators in edp
+ IP
+Message-ID: <1477163933-13140-1-git-send-email-ayaka@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/16 09:52, Mugunthan V N wrote:
-> On Sunday 09 October 2016 02:00 PM, Jonathan Cameron wrote:
->> On 05/10/16 10:04, Mugunthan V N wrote:
->>> This patch adds the required pieces to ti_am335x_adc driver for
->>> DMA support
->>>
->>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->> Hi,
->>
->> Just the one question inline.  I'll also need an Ack from Lee as
->> this touches code in mfd (as does the previous patch).
->> We have obviously missed this merge window, so no particular rush.
-Question answered below.  So just need that Ack from Lee.
+I found if eDP_AVDD_1V0 and eDP_AVDD_1V8 are not been power at
+RK3288, once trying to enable the pclk clock, the kernel would dead.
+This patch would try to enable them first. The eDP_AVDD_1V8 more
+likely to be applied to eDP phy, but I have no time to confirmed
+it yet.
 
+Signed-off-by: Randy Li <ayaka@soulik.info>
+---
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
->>
->> Otherwise, looking very nice indeed.  Got to get my BBB out and play
->> with this now ;)
->>
->> Jonathan
->>> ---
->>>  drivers/iio/adc/ti_am335x_adc.c      | 148 ++++++++++++++++++++++++++++++++++-
->>>  include/linux/mfd/ti_am335x_tscadc.h |   7 ++
->>>  2 files changed, 152 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/iio/adc/ti_am335x_adc.c b/drivers/iio/adc/ti_am335x_adc.c
->>> index c3cfacca..ad9dec3 100644
->>> --- a/drivers/iio/adc/ti_am335x_adc.c
->>> +++ b/drivers/iio/adc/ti_am335x_adc.c
->>> @@ -30,10 +30,28 @@
->>>  #include <linux/iio/buffer.h>
->>>  #include <linux/iio/kfifo_buf.h>
->>>  
->>> +#include <linux/dmaengine.h>
->>> +#include <linux/dma-mapping.h>
->>> +
->>> +#define DMA_BUFFER_SIZE		SZ_2K
->>> +
->>> +struct tiadc_dma {
->>> +	struct dma_slave_config	conf;
->>> +	struct dma_chan		*chan;
->>> +	dma_addr_t		addr;
->>> +	dma_cookie_t		cookie;
->>> +	u8			*buf;
->>> +	int			current_period;
->>> +	int			period_size;
->>> +	u8			fifo_thresh;
->>> +};
->>> +
->>>  struct tiadc_device {
->>>  	struct ti_tscadc_dev *mfd_tscadc;
->>> +	struct tiadc_dma dma;
->>>  	struct mutex fifo1_lock; /* to protect fifo access */
->>>  	int channels;
->>> +	int total_ch_enabled;
->>>  	u8 channel_line[8];
->>>  	u8 channel_step[8];
->>>  	int buffer_en_ch_steps;
->>> @@ -198,6 +216,67 @@ static irqreturn_t tiadc_worker_h(int irq, void *private)
->>>  	return IRQ_HANDLED;
->>>  }
->>>  
->>> +static void tiadc_dma_rx_complete(void *param)
->>> +{
->>> +	struct iio_dev *indio_dev = param;
->>> +	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> +	struct tiadc_dma *dma = &adc_dev->dma;
->>> +	u8 *data;
->>> +	int i;
->>> +
->>> +	data = dma->buf + dma->current_period * dma->period_size;
->>> +	dma->current_period = 1 - dma->current_period; /* swap the buffer ID */
->>> +
->>> +	for (i = 0; i < dma->period_size; i += indio_dev->scan_bytes) {
->>> +		iio_push_to_buffers(indio_dev, data);
->>> +		data += indio_dev->scan_bytes;
->>> +	}
->> Hmm. Another case for the mooted iio_push_to_buffers_multi. Guess
->> we should move on with that one ;)
->>> +}
->>> +
->>> +static int tiadc_start_dma(struct iio_dev *indio_dev)
->>> +{
->>> +	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> +	struct tiadc_dma *dma = &adc_dev->dma;
->>> +	struct dma_async_tx_descriptor *desc;
->>> +
->>> +	dma->current_period = 0; /* We start to fill period 0 */
->>> +	/*
->>> +	 * Make the fifo thresh as the multiple of total number of
->>> +	 * channels enabled, so make sure that cyclic DMA period
->>> +	 * length is also a multiple of total number of channels
->>> +	 * enabled. This ensures that no invalid data is reported
->>> +	 * to the stack via iio_push_to_buffers().
->>> +	 */
->>> +	dma->fifo_thresh = rounddown(FIFO1_THRESHOLD + 1,
->>> +				     adc_dev->total_ch_enabled) - 1;
->>> +	/* Make sure that period length is multiple of fifo thresh level */
->>> +	dma->period_size = rounddown(DMA_BUFFER_SIZE / 2,
->>> +				    (dma->fifo_thresh + 1) * sizeof(u16));
->>> +
->>> +	dma->conf.src_maxburst = dma->fifo_thresh + 1;
->>> +	dmaengine_slave_config(dma->chan, &dma->conf);
->>> +
->>> +	desc = dmaengine_prep_dma_cyclic(dma->chan, dma->addr,
->>> +					 dma->period_size * 2,
->>> +					 dma->period_size, DMA_DEV_TO_MEM,
->>> +					 DMA_PREP_INTERRUPT);
->>> +	if (!desc)
->>> +		return -EBUSY;
->>> +
->>> +	desc->callback = tiadc_dma_rx_complete;
->>> +	desc->callback_param = indio_dev;
->>> +
->>> +	dma->cookie = dmaengine_submit(desc);
->>> +
->>> +	dma_async_issue_pending(dma->chan);
->>> +
->>> +	tiadc_writel(adc_dev, REG_FIFO1THR, dma->fifo_thresh);
->>> +	tiadc_writel(adc_dev, REG_DMA1REQ, dma->fifo_thresh);
->>> +	tiadc_writel(adc_dev, REG_DMAENABLE_SET, DMA_FIFO1);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>>  static int tiadc_buffer_preenable(struct iio_dev *indio_dev)
->>>  {
->>>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> @@ -218,20 +297,30 @@ static int tiadc_buffer_preenable(struct iio_dev *indio_dev)
->>>  static int tiadc_buffer_postenable(struct iio_dev *indio_dev)
->>>  {
->>>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> +	struct tiadc_dma *dma = &adc_dev->dma;
->>> +	unsigned int irq_enable;
->>>  	unsigned int enb = 0;
->>>  	u8 bit;
->>>  
->>>  	tiadc_step_config(indio_dev);
->>> -	for_each_set_bit(bit, indio_dev->active_scan_mask, adc_dev->channels)
->>> +	for_each_set_bit(bit, indio_dev->active_scan_mask, adc_dev->channels) {
->>>  		enb |= (get_adc_step_bit(adc_dev, bit) << 1);
->>> +		adc_dev->total_ch_enabled++;
->>> +	}
->>>  	adc_dev->buffer_en_ch_steps = enb;
->>>  
->>> +	if (dma->chan)
->>> +		tiadc_start_dma(indio_dev);
->>> +
->>>  	am335x_tsc_se_set_cache(adc_dev->mfd_tscadc, enb);
->>>  
->>>  	tiadc_writel(adc_dev,  REG_IRQSTATUS, IRQENB_FIFO1THRES
->>>  				| IRQENB_FIFO1OVRRUN | IRQENB_FIFO1UNDRFLW);
->>> -	tiadc_writel(adc_dev,  REG_IRQENABLE, IRQENB_FIFO1THRES
->>> -				| IRQENB_FIFO1OVRRUN);
->>> +
->>> +	irq_enable = IRQENB_FIFO1OVRRUN;
->>> +	if (!dma->chan)
->>> +		irq_enable |= IRQENB_FIFO1THRES;
->> This changes the non dma behaviour as we no longer set IRQENB_FIFO1THRES.
->> Why?  Was it wrong before?
-> 
-> In non DMA case, dms->chan will be NULL and IRQENB_FIFO1THRES interrupt
-> will be enabled to pop the ADC samples.
-> 
-oops.  Thanks for pointing out how I'd misread this!
-So just after the ack from Lee now.
-Jonathan
-> Regards
-> Mugunthan V N
-> 
->>> +	tiadc_writel(adc_dev,  REG_IRQENABLE, irq_enable);
->>>  
->>>  	return 0;
->>>  }
->>> @@ -239,12 +328,18 @@ static int tiadc_buffer_postenable(struct iio_dev *indio_dev)
->>>  static int tiadc_buffer_predisable(struct iio_dev *indio_dev)
->>>  {
->>>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> +	struct tiadc_dma *dma = &adc_dev->dma;
->>>  	int fifo1count, i, read;
->>>  
->>>  	tiadc_writel(adc_dev, REG_IRQCLR, (IRQENB_FIFO1THRES |
->>>  				IRQENB_FIFO1OVRRUN | IRQENB_FIFO1UNDRFLW));
->>>  	am335x_tsc_se_clr(adc_dev->mfd_tscadc, adc_dev->buffer_en_ch_steps);
->>>  	adc_dev->buffer_en_ch_steps = 0;
->>> +	adc_dev->total_ch_enabled = 0;
->>> +	if (dma->chan) {
->>> +		tiadc_writel(adc_dev, REG_DMAENABLE_CLEAR, 0x2);
->>> +		dmaengine_terminate_async(dma->chan);
->>> +	}
->>>  
->>>  	/* Flush FIFO of leftover data in the time it takes to disable adc */
->>>  	fifo1count = tiadc_readl(adc_dev, REG_FIFO1CNT);
->>> @@ -430,6 +525,41 @@ static const struct iio_info tiadc_info = {
->>>  	.driver_module = THIS_MODULE,
->>>  };
->>>  
->>> +static int tiadc_request_dma(struct platform_device *pdev,
->>> +			     struct tiadc_device *adc_dev)
->>> +{
->>> +	struct tiadc_dma	*dma = &adc_dev->dma;
->>> +	dma_cap_mask_t		mask;
->>> +
->>> +	/* Default slave configuration parameters */
->>> +	dma->conf.direction = DMA_DEV_TO_MEM;
->>> +	dma->conf.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->>> +	dma->conf.src_addr = adc_dev->mfd_tscadc->tscadc_phys_base + REG_FIFO1;
->>> +
->>> +	dma_cap_zero(mask);
->>> +	dma_cap_set(DMA_CYCLIC, mask);
->>> +
->>> +	/* Get a channel for RX */
->>> +	dma->chan = dma_request_chan(adc_dev->mfd_tscadc->dev, "fifo1");
->>> +	if (IS_ERR(dma->chan)) {
->>> +		int ret = PTR_ERR(dma->chan);
->>> +
->>> +		dma->chan = NULL;
->>> +		return ret;
->>> +	}
->>> +
->>> +	/* RX buffer */
->>> +	dma->buf = dma_alloc_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
->>> +				      &dma->addr, GFP_KERNEL);
->>> +	if (!dma->buf)
->>> +		goto err;
->>> +
->>> +	return 0;
->>> +err:
->>> +	dma_release_channel(dma->chan);
->>> +	return -ENOMEM;
->>> +}
->>> +
->>>  static int tiadc_parse_dt(struct platform_device *pdev,
->>>  			  struct tiadc_device *adc_dev)
->>>  {
->>> @@ -512,8 +642,14 @@ static int tiadc_probe(struct platform_device *pdev)
->>>  
->>>  	platform_set_drvdata(pdev, indio_dev);
->>>  
->>> +	err = tiadc_request_dma(pdev, adc_dev);
->>> +	if (err && err == -EPROBE_DEFER)
->>> +		goto err_dma;
->>> +
->>>  	return 0;
->>>  
->>> +err_dma:
->>> +	iio_device_unregister(indio_dev);
->>>  err_buffer_unregister:
->>>  	tiadc_iio_buffered_hardware_remove(indio_dev);
->>>  err_free_channels:
->>> @@ -525,8 +661,14 @@ static int tiadc_remove(struct platform_device *pdev)
->>>  {
->>>  	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>>  	struct tiadc_device *adc_dev = iio_priv(indio_dev);
->>> +	struct tiadc_dma *dma = &adc_dev->dma;
->>>  	u32 step_en;
->>>  
->>> +	if (dma->chan) {
->>> +		dma_free_coherent(dma->chan->device->dev, DMA_BUFFER_SIZE,
->>> +				  dma->buf, dma->addr);
->>> +		dma_release_channel(dma->chan);
->>> +	}
->>>  	iio_device_unregister(indio_dev);
->>>  	tiadc_iio_buffered_hardware_remove(indio_dev);
->>>  	tiadc_channels_remove(indio_dev);
->>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>> index e45a208..b9a53e0 100644
->>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>> @@ -23,6 +23,8 @@
->>>  #define REG_IRQENABLE		0x02C
->>>  #define REG_IRQCLR		0x030
->>>  #define REG_IRQWAKEUP		0x034
->>> +#define REG_DMAENABLE_SET	0x038
->>> +#define REG_DMAENABLE_CLEAR	0x03c
->>>  #define REG_CTRL		0x040
->>>  #define REG_ADCFSM		0x044
->>>  #define REG_CLKDIV		0x04C
->>> @@ -36,6 +38,7 @@
->>>  #define REG_FIFO0THR		0xE8
->>>  #define REG_FIFO1CNT		0xF0
->>>  #define REG_FIFO1THR		0xF4
->>> +#define REG_DMA1REQ		0xF8
->>>  #define REG_FIFO0		0x100
->>>  #define REG_FIFO1		0x200
->>>  
->>> @@ -126,6 +129,10 @@
->>>  #define FIFOREAD_DATA_MASK (0xfff << 0)
->>>  #define FIFOREAD_CHNLID_MASK (0xf << 16)
->>>  
->>> +/* DMA ENABLE/CLEAR Register */
->>> +#define DMA_FIFO0		BIT(0)
->>> +#define DMA_FIFO1		BIT(1)
->>> +
->>>  /* Sequencer Status */
->>>  #define SEQ_STATUS BIT(5)
->>>  #define CHARGE_STEP		0x11
->>>
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 8548e82..6bf0441 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/regmap.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
+ #include <linux/clk.h>
+ 
+@@ -70,6 +71,7 @@ struct rockchip_dp_device {
+ 	struct clk               *grfclk;
+ 	struct regmap            *grf;
+ 	struct reset_control     *rst;
++	struct regulator_bulk_data supplies[2];
+ 
+ 	struct work_struct	 psr_work;
+ 	spinlock_t		 psr_lock;
+@@ -146,6 +148,13 @@ static int rockchip_dp_poweron(struct analogix_dp_plat_data *plat_data)
+ 
+ 	cancel_work_sync(&dp->psr_work);
+ 
++	ret = regulator_bulk_enable(ARRAY_SIZE(dp->supplies),
++			dp->supplies);
++	if (ret) {
++		dev_err(dp->dev, "failed to enable vdd supply %d\n", ret);
++		return ret;
++	}
++
+ 	ret = clk_prepare_enable(dp->pclk);
+ 	if (ret < 0) {
+ 		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
+@@ -168,6 +177,9 @@ static int rockchip_dp_powerdown(struct analogix_dp_plat_data *plat_data)
+ 
+ 	clk_disable_unprepare(dp->pclk);
+ 
++	regulator_bulk_disable(ARRAY_SIZE(dp->supplies),
++			dp->supplies);
++
+ 	return 0;
+ }
+ 
+@@ -323,6 +335,19 @@ static int rockchip_dp_init(struct rockchip_dp_device *dp)
+ 		return PTR_ERR(dp->rst);
+ 	}
+ 
++	dp->supplies[0].supply = "vcc";
++	dp->supplies[1].supply = "vccio";
++	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(dp->supplies),
++			dp->supplies);
++	if (ret < 0) {
++		dev_err(dev, "failed to get regulators: %d\n", ret);
++	}
++	ret = regulator_bulk_enable(ARRAY_SIZE(dp->supplies),
++			dp->supplies);
++	if (ret < 0) {
++		dev_err(dev, "failed to enable regulators: %d\n", ret);
++	}
++
+ 	ret = clk_prepare_enable(dp->pclk);
+ 	if (ret < 0) {
+ 		dev_err(dp->dev, "failed to enable pclk %d\n", ret);
+-- 
+2.7.4
