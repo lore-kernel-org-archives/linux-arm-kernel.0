@@ -1,66 +1,95 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 22 Oct 2016 18:32:08 +0300
-Subject: [PATCH v3 1/3] mtd: s3c2410: make ecc mode configurable via
- platform data
-In-Reply-To: <20161022142907.08a3eedf@bbrezillon>
-References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
- <1476999766-32526-2-git-send-email-sergio.prado@e-labworks.com>
- <20161021182710.GA17279@kozik-lap>
- <20161022142907.08a3eedf@bbrezillon>
-Message-ID: <20161022153208.GA3830@kozik-lap>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 22 Oct 2016 16:43:49 +0100
+Subject: [RFC PATCH 4/8] irqchip/gicv3-its: specialise readq and writeq
+ accesses
+In-Reply-To: <1477042601-15227-5-git-send-email-vladimir.murzin@arm.com>
+References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
+ <1477042601-15227-5-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20161022164349.18fe5d5a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 22, 2016 at 02:29:07PM +0200, Boris Brezillon wrote:
-> Hi Krzysztof,
-> 
-> On Fri, 21 Oct 2016 21:27:10 +0300
-> Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> 
-> > On Thu, Oct 20, 2016 at 07:42:44PM -0200, Sergio Prado wrote:
-> > > Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
-> > > field in the drivers's platform data structure so it can be selectable
-> > > via platform data.
-> > > 
-> > > Also setting this field to NAND_ECC_SOFT in all boards using this
-> > > driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
-> > > 
-> > > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> > > ---
-> > >  arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
-> > >  arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
-> > >  arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
-> > >  arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
-> > >  arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
-> > >  drivers/mtd/nand/Kconfig                       |   9 --
-> > >  drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
-> > >  include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
-> > >  18 files changed, 79 insertions(+), 70 deletions(-)
-> > >  
-> > 
-> > I acked this twice (v1 and v2)... and still you are ignoring them. I am
-> > sorry, I am not gonna to ack this third time!
-> > 
-> > For v2 I acked also other patches but it it is not there as well...
-> 
-> I'll collect your acks (and Rob ones) when applying the patches. BTW,
-> how should I proceed with patch 1? Do you want an topic branch
-> containing this patch?
+On Fri, 21 Oct 2016 10:36:37 +0100
+Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 
-I don't expect much work around these files so the risk of conflicts is
-rather small. You could put it on a topic branch just in case (so I
-could pull in if needed) but I am fine with applying these to your tree
-as is.
+Hi Vladimir,
 
-Best regards,
-Krzysztof
+> readq and writeq type of assessors are not supported in AArch32, so we
+> need to specialise them and glue later with series of 32-bit accesses
+> on AArch32 side.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_gicv3.h |   16 ++++++++++++++++
+>  drivers/irqchip/irq-gic-v3-its.c    |   30 +++++++++++++++---------------
+>  2 files changed, 31 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+> index 4f0402a..e0ada98 100644
+> --- a/arch/arm64/include/asm/arch_gicv3.h
+> +++ b/arch/arm64/include/asm/arch_gicv3.h
+> @@ -190,5 +190,21 @@ static inline void gic_write_bpr1(u32 val)
+>  
+>  #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+>  
+> +#define gits_read_typer(c)		readq_relaxed(c)
+> +
+> +#define gits_read_baser(c)		readq_relaxed(c)
+> +#define gits_write_baser(v, c)		writeq_relaxed(v, c)
+> +
+> +#define gits_read_cbaser(c)		readq_relaxed(c)
+> +#define gits_write_cbaser(v, c)		writeq_relaxed(v, c)
+> +
+> +#define gits_write_cwriter(v, c)	writeq_relaxed(v, c)
+> +
+> +#define gicr_read_propbaser(c)		readq_relaxed(c)
+> +#define gicr_write_propbaser(v, c)	writeq_relaxed(v, c)
+> +
+> +#define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
+> +#define gicr_read_pendbaser(c)		readq_relaxed(c)
+> +
+>  #endif /* __ASSEMBLY__ */
+>  #endif /* __ASM_ARCH_GICV3_H */
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 86efa6e..9f74abc 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -835,7 +835,7 @@ static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
+>  {
+>  	u32 idx = baser - its->tables;
+>  
+> -	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
+> +	return gits_read_baser(its->base + GITS_BASER + (idx << 3));
+>  }
+>  
+>  static void its_write_baser(struct its_node *its, struct its_baser *baser,
+> @@ -843,7 +843,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+>  {
+>  	u32 idx = baser - its->tables;
+>  
+> -	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
+> +	gits_write_baser(val, its->base + GITS_BASER + (idx << 3));
+>  	baser->val = its_read_baser(its, baser);
+>  }
+>  
+> @@ -1022,7 +1022,7 @@ static void its_free_tables(struct its_node *its)
+>  
+>  static int its_alloc_tables(struct its_node *its)
+>  {
+> -	u64 typer = readq_relaxed(its->base + GITS_TYPER);
+> +	u64 typer = gits_read_typer(its->base + GITS_TYPER);
+
+This is going to conflict with the irq/irq-fixes-4.9 branch, which is
+already on its way to mainline (and will hopefully hit -rc2) Could you
+please rebase it once these patches are in mainline?
+
+You'll notice that I didn't bother distinguishing between the various
+GI*_TYPER registers, as they all have the same behaviour.
+
+Otherwise looks good to me.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
