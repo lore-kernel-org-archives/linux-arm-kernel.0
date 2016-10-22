@@ -1,42 +1,34 @@
-From: gakula@caviumnetworks.com (Geetha sowjanya)
-Date: Sat, 22 Oct 2016 10:32:04 +0530
-Subject: [PATCH] iommu: arm-smmu-v2: Enable 16 bit ASID
-Message-ID: <1477112524-13023-1-git-send-email-gakula@caviumnetworks.com>
+From: jason.hui.liu@nxp.com (Jason Liu)
+Date: Sat, 22 Oct 2016 22:57:09 +0800
+Subject: [PATCH 1/1] arm: dts: imx6ul: 14x14-evk: add the optee node
+Message-ID: <1477148229-6940-1-git-send-email-jason.hui.liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Support up to 16 bit ASID. This patch enables
- 16 bit ASID when supported.
+This patch adds the optee node for the i.MX6UL 14x14 evk board
 
-Signed-off-by: Geetha sowjanya <gakula@cavium.com>
-Acked-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+Signed-off-by: Jason Liu <jason.hui.liu@nxp.com>
 ---
- drivers/iommu/arm-smmu.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c841eb7..9740846 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -258,6 +258,9 @@ enum arm_smmu_s2cr_privcfg {
- #define TTBCR2_SEP_SHIFT		15
- #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index e281d50..e68dc19 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -30,6 +30,13 @@
+ 		status = "okay";
+ 	};
  
-+#define TTBCR2_AS_SHIFT			4
-+#define TTBCR2_AS_ENABLE		(1 << TTBCR2_AS_SHIFT)
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
 +
- #define TTBRn_ASID_SHIFT		48
- 
- #define FSR_MULTI			(1 << 31)
-@@ -773,6 +776,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
- 			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
- 			reg2 |= TTBCR2_SEP_UPSTREAM;
-+		/* Enable 16 bit ASID if 16 bit VMID is supported */
-+			if (smmu->features & ARM_SMMU_FEAT_VMID16)
-+				reg |= TTBCR2_AS_ENABLE;
- 		}
- 		if (smmu->version > ARM_SMMU_V1)
- 			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
 -- 
-1.7.1
+1.9.1
