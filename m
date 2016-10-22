@@ -1,45 +1,112 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 22 Oct 2016 23:37:09 +0200
-Subject: [PATCH v2 4/4] cpufreq: pxa: convert to clock API
-In-Reply-To: <20161018114025.GD11471@vireshk-i7> (Viresh Kumar's message of
- "Tue, 18 Oct 2016 17:10:25 +0530")
-References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
- <1476561450-28407-5-git-send-email-robert.jarzmik@free.fr>
- <20161018114025.GD11471@vireshk-i7>
-Message-ID: <877f902hh6.fsf@belgarion.home>
+From: slash.tmp@free.fr (Mason)
+Date: Sun, 23 Oct 2016 01:10:12 +0200
+Subject: Disabling an interrupt in the handler locks the system up
+In-Reply-To: <20161022123713.6dc788b3@arm.com>
+References: <580A4460.2090306@free.fr>
+ <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
+ <20161021201448.3f4a0a7a@arm.com> <580A70B9.8060507@free.fr>
+ <alpine.DEB.2.20.1610212147420.4855@nanos> <580A7A2B.5000702@free.fr>
+ <20161022123713.6dc788b3@arm.com>
+Message-ID: <580BF1D4.2030509@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
+On 22/10/2016 13:37, Marc Zyngier wrote:
 
-> On 15-10-16, 21:57, Robert Jarzmik wrote:
->> As the clock settings have been introduced into the clock pxa drivers,
->> which are now available to change the CPU clock by themselves, remove
->> the clock handling from this driver, and rely on pxa clock drivers.
->> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> ---
->> Since v1: added !OF Kconfig dependency
->> ---
->>  drivers/cpufreq/Kconfig.arm      |   2 +-
->>  drivers/cpufreq/pxa2xx-cpufreq.c | 191 ++++++++-------------------------------
->>  2 files changed, 40 insertions(+), 153 deletions(-)
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Mason wrote:
+> 
+>> In my mental picture of interrupts (which is obviously so
+>> incomplete as to be wrong) interrupts are a way for hardware
+>> to tell the CPU that they urgently need the CPU's attention.
+> 
+> That's how the CPU interprets it, but this is even more basic than
+> that, see below.
+> 
+>> Obviously, the hardware being idle (line high) is not an urgent
+>> matter which interests the CPU. Likewise, I'm not sure the CPU
+>> cares that the hardware is busy (line low). It seems to me the
+>> interesting event from the CPU's perspective is when the
+>> hardware completes a "task" (transition from low to high).
+> 
+> There is no such thing as "busy" when it comes to interrupts. An
+> interrupt signals the CPU that some device-specific condition has been
+> satisfied. It could be "I've received a packet" or "Battery is about to
+> explode", depending if the device is a network controller or a
+> temperature sensor. The interrupt doesn't describe the process that
+> leads to that condition (packet being received or temperature rising),
+> but the condition itself.
+> 
+> In your cases, as the device seems to do some form of processing
+> (you're talking about task completion), then the interrupt seems to
+> describe exactly this ("I'm done").
 
-Okay, after some more testing, I'd like to remove the !OF for next iteration.
-The reason is that I have a usecase where I have a single kernel image with
-devictree support (ie CONFIG_OF=y), but with support for both devicetree and
-legacy platforms. In this case, a platform such as lubbock can boot :
- - with devicetree
- - with legacy arch/arm/mach-pxa/lubbock.c
+The device is a graphics engine, which can be programmed to perform
+some operation on one or several frame buffers stored in memory.
+It outputs its state (idle vs busy) on interrupt line 23.
 
-In this kernel, the !OF Kconfig prevents the legacy version from working, as
-pxa2xx-cpufreq is descarded even if it is needed in the legacy version.
+>> So I had originally configured the interrupt as IRQ_TYPE_EDGE_RISING.
+>> (There is an edge detection block in the irqchip, but the HW designer
+>> warned me that at low frequencies, it is possible to "miss" some edges,
+>> and we should prefer level triggers if possible.)
+> 
+> Level and edge are not interchangeable. They do describe very different
+> thing:
+> 
+> - Level indicates a persistent state, which implies that the device
+>   needs to be serviced so that this condition can be cleared (the UART
+>   has received a character, and won't be able to received another until
+>   it has been read by the CPU). Once the device has been serviced and
+>   that condition cleared, it will lower its interrupt line.
 
-Therefore, I'd like to respin without this !OF.
+With this graphics engine, there is nothing the CPU can do to
+change what the engine outputs on the interrupt line:
 
-Cheers.
+When the graphics engine is idle, the line remains high, forever.
+When the graphics engine is busy, the line remains low, until
+all operations have been performed (engine idle).
 
--- 
-Robert
+All the CPU can do is mask the interrupt line at the interrupt
+controller, as far as I understand.
+
+> - Edge is indicative of an event having occurred ("I'm done") that
+>   doesn't require any action from the CPU. Because the device can
+>   continue its life without being poked by the CPU, it can continue
+>   delivering interrupts even if the first one hasn't been serviced.
+>   Being edge triggered, the signals get coalesced into a single
+>   interrupt. For example, the temperature sensor will say "Temperature
+>   rising" multiple times before the battery explodes, and it is the
+>   CPU's job to go and read the sensor to find out by how much it has
+>   risen.
+> 
+> If your device only sends a pulse, then it is edge triggered, and it
+> should be treated as such, no matter what your HW guy is saying. This
+> usually involves looking at the device to find out how many times the
+> interrupt has been generated (assuming the device is some kind of
+> processing element). Of course, this is racy (interrupts can still be
+> generated whilst you're processing them), and you should design your
+> interrupt handler to take care of the possible race.
+
+It is clear that the block does not send a pulse on the
+interrupt line.
+
+For reasons I don't understand, Linux didn't hang when I set
+the IRQ type to IRQ_TYPE_EDGE_RISING, so it seemed better
+than locking up the system.
+
+I'm also fuzzy on what purpose the edge detector is supposed
+to serve... I had the impression is what supposed to "capture"
+an edge, to turn it into a level?
+
+> So, to make it short: find out how your device works, and configure
+> your interrupt controller in a similar way. Write your device driver
+> with the interrupt policy in mind (state vs event). Keep it simple.
+
+Thomas said "We describe the level which is raising the interrupt".
+But I'm not sure I want the state "engine is busy" to raise an
+interrupt. "engine is idle" makes more sense. But you said it's
+stupid to set IRQ_TYPE_LEVEL_HIGH... /me confused
+
+Maybe the fact that disable_irq locks the system up is an orthogonal
+issue that needs to be fixed anyway.
+
+Regards.
