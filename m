@@ -1,207 +1,28 @@
 From: mhei@heimpold.de (Michael Heimpold)
-Date: Sat, 22 Oct 2016 21:22:29 +0200
-Subject: [PATCH 6/7] ARM: dts: add support for remaining members of Duckbill
- series
+Date: Sat, 22 Oct 2016 21:22:27 +0200
+Subject: [PATCH 4/7] ARM: dts: add I2SE Duckbill common definitions
 In-Reply-To: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
 References: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
-Message-ID: <1477164150-13553-7-git-send-email-mhei@heimpold.de>
+Message-ID: <1477164150-13553-5-git-send-email-mhei@heimpold.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 ---
- arch/arm/boot/dts/Makefile                   |  3 +
- arch/arm/boot/dts/imx28-duckbill-485.dts     | 60 +++++++++++++++++++
- arch/arm/boot/dts/imx28-duckbill-enocean.dts | 90 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx28-duckbill-spi.dts     | 64 ++++++++++++++++++++
- 4 files changed, 217 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-485.dts
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-enocean.dts
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-spi.dts
+ arch/arm/boot/dts/imx28-duckbill-2-common.dtsi | 110 +++++++++++++++++++++++++
+ arch/arm/boot/dts/imx28-duckbill-base.dtsi     |  88 ++++++++++++++++++++
+ arch/arm/boot/dts/imx28-duckbill-common.dtsi   |  80 ++++++++++++++++++
+ 3 files changed, 278 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-common.dtsi
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-base.dtsi
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-common.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..5a366c4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -459,7 +459,10 @@ dtb-$(CONFIG_ARCH_MXS) += \
- 	imx28-cfa10056.dtb \
- 	imx28-cfa10057.dtb \
- 	imx28-cfa10058.dtb \
-+	imx28-duckbill-485.dtb \
- 	imx28-duckbill.dtb \
-+	imx28-duckbill-enocean.dtb \
-+	imx28-duckbill-spi.dtb \
- 	imx28-eukrea-mbmx283lc.dtb \
- 	imx28-eukrea-mbmx287lc.dtb \
- 	imx28-evk.dtb \
-diff --git a/arch/arm/boot/dts/imx28-duckbill-485.dts b/arch/arm/boot/dts/imx28-duckbill-485.dts
+diff --git a/arch/arm/boot/dts/imx28-duckbill-2-common.dtsi b/arch/arm/boot/dts/imx28-duckbill-2-common.dtsi
 new file mode 100644
-index 0000000..a60d78a
+index 0000000..3354f8f
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-485.dts
-@@ -0,0 +1,60 @@
-+/*
-+ * Copyright (C) 2015 I2SE GmbH <info@i2se.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
-+#include "imx28-duckbill-common.dtsi"
-+
-+/ {
-+	model = "I2SE Duckbill 485";
-+	compatible = "i2se,duckbill", "fsl,imx28";
-+
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			pinctrl at 80018000 {
-+				rs485_led_pins: rs485_led_pins at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_SSP2_SCK__GPIO_2_16
-+						MX28_PAD_SSP2_MISO__GPIO_2_18
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+			};
-+		};
-+
-+		apbx at 80040000 {
-+			auart0: serial at 8006a000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&auart0_2pins_a>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	rs485_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&rs485_led_pins>;
-+
-+		rs485_red {
-+			label = "duckbill:red:rs485";
-+			gpios = <&gpio2 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		rs485_green {
-+			label = "duckbill:green:rs485";
-+			gpios = <&gpio2 18 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx28-duckbill-enocean.dts b/arch/arm/boot/dts/imx28-duckbill-enocean.dts
-new file mode 100644
-index 0000000..4602d13
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-enocean.dts
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright (C) 2015 I2SE GmbH <info@i2se.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include "imx28-duckbill-common.dtsi"
-+
-+/ {
-+	model = "I2SE Duckbill EnOcean";
-+	compatible = "i2se,duckbill", "fsl,imx28";
-+
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			pinctrl at 80018000 {
-+				enocean_led_pins: enocean_led_pins at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_SSP2_SCK__GPIO_2_16
-+						MX28_PAD_SSP2_MISO__GPIO_2_18
-+						MX28_PAD_SSP2_SS0__GPIO_2_19
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+
-+				enocean_button: enocean_button at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_SSP2_SS2__GPIO_2_21
-+					>;
-+					fsl,drive-strength = <MXS_DRIVE_4mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_DISABLE>;
-+				};
-+			};
-+		};
-+
-+		apbx at 80040000 {
-+			auart0: serial at 8006a000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&auart0_2pins_a>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	enocean_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&enocean_led_pins>;
-+
-+		enocean_blue {
-+			label = "duckbill:blue:enocean";
-+			gpios = <&gpio2 16 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		enocean_red {
-+			label = "duckbill:red:enocean";
-+			gpios = <&gpio2 18 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		enocean_green {
-+			label = "duckbill:green:enocean";
-+			gpios = <&gpio2 19 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&enocean_button>;
-+
-+		enocean {
-+			label = "EnOcean";
-+			linux,code = <KEY_NEW>;
-+			gpios = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/imx28-duckbill-spi.dts b/arch/arm/boot/dts/imx28-duckbill-spi.dts
-new file mode 100644
-index 0000000..5248d84
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-spi.dts
-@@ -0,0 +1,64 @@
++++ b/arch/arm/boot/dts/imx28-duckbill-2-common.dtsi
+@@ -0,0 +1,110 @@
 +/*
 + * Copyright (C) 2013-2014 Michael Heimpold <mhei@heimpold.de>
 + * Copyright (C) 2015 I2SE GmbH <info@i2se.com>
@@ -214,55 +35,281 @@ index 0000000..5248d84
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+/dts-v1/;
 +#include <dt-bindings/interrupt-controller/irq.h>
-+#include "imx28-duckbill-common.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include "imx28-duckbill-base.dtsi"
 +
 +/ {
-+	model = "I2SE Duckbill SPI";
++	model = "I2SE Duckbill 2";
 +	compatible = "i2se,duckbill", "fsl,imx28";
-+
-+	aliases {
-+		ethernet1 = &qca7000;
-+	};
 +
 +	apb at 80000000 {
 +		apbh at 80000000 {
-+			ssp2: ssp at 80014000 {
-+				compatible = "fsl,imx28-spi";
++			ssp0: ssp at 80010000 {
++				compatible = "fsl,imx28-mmc";
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&spi2_pins_a>;
++				pinctrl-0 = <&mmc0_8bit_pins_a
++					&mmc0_cd_cfg &mmc0_sck_cfg>;
++				bus-width = <8>;
++				vmmc-supply = <&reg_3p3v>;
 +				status = "okay";
-+
-+				qca7000: ethernet at 0 {
-+					compatible = "qca,qca7000";
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&qca7000_pins>;
-+					reg = <0>;
-+					interrupt-parent = <&gpio3>;
-+					interrupts = <3 IRQ_TYPE_EDGE_RISING>;
-+					spi-cpha;
-+					spi-cpol;
-+					spi-max-frequency = <8000000>;
-+				};
++				non-removable;
 +			};
 +
 +			pinctrl at 80018000 {
-+				qca7000_pins: qca7000-pins at 0 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				mac0_phy_reset_pin: mac0_phy_reset_pin at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
-+						MX28_PAD_AUART0_RTS__GPIO_3_3    /* Interrupt */
-+						MX28_PAD_LCD_D13__GPIO_1_13      /* QCA7K reset */
-+						MX28_PAD_LCD_D14__GPIO_1_14      /* GPIO 0 */
-+						MX28_PAD_LCD_D15__GPIO_1_15      /* GPIO 1 */
-+						MX28_PAD_LCD_D18__GPIO_1_18      /* GPIO 2 */
-+						MX28_PAD_LCD_D21__GPIO_1_21      /* GPIO 3 */
++						MX28_PAD_GPMI_ALE__GPIO_0_26    /* PHY Reset */
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				mac0_phy_int_pin: mac0_phy_int_pin at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_GPMI_D07__GPIO_0_7    /* PHY Interrupt */
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				status_led_pins: status_led_pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_SAIF0_MCLK__GPIO_3_20
++						MX28_PAD_SAIF0_LRCLK__GPIO_3_21
 +					>;
 +					fsl,drive-strength = <MXS_DRIVE_4mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
 +					fsl,pull-up = <MXS_PULL_DISABLE>;
 +				};
 +			};
++		};
++	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-reset-gpios = <&gpio0 26 GPIO_ACTIVE_LOW>;
++			phy-handle = <&ethphy>;
++			mdio {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				ethphy: ethernet-phy at 0 {
++						compatible = "ethernet-phy-ieee802.3-c22";
++						reg = <0>;
++						pinctrl-names = "default";
++						pinctrl-0 = <&mac0_phy_int_pin>;
++						interrupt-parent = <&gpio0>;
++						interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
++						max-speed = <100>;
++				};
++			};
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&status_led_pins>;
++
++		status_red {
++			label = "duckbill:red:status";
++			gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		status_green {
++			label = "duckbill:green:status";
++			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx28-duckbill-base.dtsi b/arch/arm/boot/dts/imx28-duckbill-base.dtsi
+new file mode 100644
+index 0000000..b64efd5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-duckbill-base.dtsi
+@@ -0,0 +1,88 @@
++/*
++ * Copyright (C) 2013-2014 Michael Heimpold <mhei@heimpold.de>
++ * Copyright (C) 2015 I2SE GmbH <info@i2se.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include "imx28.dtsi"
++
++/ {
++	model = "I2SE Duckbill";
++	compatible = "i2se,duckbill", "fsl,imx28";
++
++	memory {
++		reg = <0x40000000 0x08000000>;
++	};
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			pinctrl at 80018000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&hog_pins_a>;
++
++				hog_pins_a: hog_pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_LCD_D17__GPIO_1_17    /* Revision detection */
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++			};
++		};
++
++		apbx at 80040000 {
++			lradc at 80050000 {
++				status = "okay";
++			};
++
++			duart: serial at 80074000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&duart_pins_a>;
++				status = "okay";
++			};
++
++			usbphy0: usbphy at 8007c000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			status = "okay";
++			dr_mode = "peripheral";
++		};
++
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>, <&mac0_phy_reset_pin>;
++			phy-supply = <&reg_3p3v>;
++			phy-reset-duration = <25>;
++			status = "okay";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p3v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/imx28-duckbill-common.dtsi b/arch/arm/boot/dts/imx28-duckbill-common.dtsi
+new file mode 100644
+index 0000000..167b53f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-duckbill-common.dtsi
+@@ -0,0 +1,80 @@
++/*
++ * Copyright (C) 2013-2014 Michael Heimpold <mhei@heimpold.de>
++ * Copyright (C) 2015 I2SE GmbH <info@i2se.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include "imx28-duckbill-base.dtsi"
++
++/ {
++	model = "I2SE Duckbill";
++	compatible = "i2se,duckbill", "fsl,imx28";
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			ssp0: ssp at 80010000 {
++				compatible = "fsl,imx28-mmc";
++				pinctrl-names = "default";
++				pinctrl-0 = <&mmc0_4bit_pins_a
++					&mmc0_cd_cfg &mmc0_sck_cfg>;
++				bus-width = <4>;
++				vmmc-supply = <&reg_3p3v>;
++				status = "okay";
++			};
++
++			pinctrl at 80018000 {
++				mac0_phy_reset_pin: mac0_phy_reset_pin at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_SSP0_DATA7__GPIO_2_7    /* PHY Reset */
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				status_led_pins: status_led_pins at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART1_RX__GPIO_3_4
++						MX28_PAD_AUART1_TX__GPIO_3_5
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-reset-gpios = <&gpio2 7 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&status_led_pins>;
++
++		status_red {
++			label = "duckbill:red:status";
++			gpios = <&gpio3 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
++
++		status_green {
++			label = "duckbill:green:status";
++			gpios = <&gpio3 5 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
 +		};
 +	};
 +};
