@@ -1,97 +1,226 @@
-From: ayaka@soulik.info (ayaka)
-Date: Sat, 22 Oct 2016 11:52:45 +0800
-Subject: [PATCH] ARM: dts: rockchip: add i2c-bus subnode to edp
-In-Reply-To: <1681294.eoXpQL8f8l@phil>
-References: <1476950845-28242-1-git-send-email-tomeu.vizoso@collabora.com>
- <7604646.6yosK0XMNL@diego>
- <6083453f-08e1-643a-9638-1db38c704aa5@collabora.com>
- <1681294.eoXpQL8f8l@phil>
-Message-ID: <1026cfe7-836f-7e78-af71-54c858b6a95e@soulik.info>
+From: gakula@caviumnetworks.com (Geetha sowjanya)
+Date: Sat, 22 Oct 2016 10:24:21 +0530
+Subject: [PATCH] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum 28168
+In-Reply-To: <1>
+References: <1>
+Message-ID: <1477112061-12868-1-git-send-email-gakula@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
 
-On 10/21/2016 04:25 PM, Heiko Stuebner wrote:
-> Am Donnerstag, 20. Oktober 2016, 15:47:56 CEST schrieb Tomeu Vizoso:
->> On 10/20/2016 03:45 PM, Heiko St?bner wrote:
->>> Am Donnerstag, 20. Oktober 2016, 10:07:25 schrieb Tomeu Vizoso:
->>>> Add an empty 'i2c-bus' subnode to the edp node just so that the I2C core
->>>> doesn't attemp to parse the 'ports' subnode as containing i2c devices.
->>>>
->>>> This is to avoid spurious failure messages such as:
->>>>
->>>> i2c i2c-6: of_i2c: modalias failure on /dp at ff970000/ports
->>> On the one hand, the edp really has an i2c bus - with its only client the
->>> EDID listening at 0x50 (and maybe 0x30).
->>>
->>> On the other hand, adding an empty bus to the (implementation independent)
->>> devicetree just to make the Linux i2c subsystem happy sounds heavily like
->>> a
->>> implementation-specific hack, as the edp i2c bus doesn't leak into the
->>> outside world otherwise.
->>>
->>> I guess this empty i2c bus not being part of the binding document points
->>> heavily into the implementation-specific corner :-) .
->>>
->>> My short search on other patches touching this didn't reveal anything but
->>> maybe this was already discussed somewhere and found to be ok?
->> Here it is:
->>
->> http://www.spinics.net/lists/linux-tegra/msg27862.html
-> thanks ... I'm still not sure about the placeholder though, aka needing an
-> undocumented subnode to make a Linux error message silent.
-Sorry, I report the error result, it would work.
+  This patch implements Cavium ThunderX erratum 28168.
 
-And about the problem at this thread beginning, I found I have to use 
-something like Xserver to access DRM or the panel would not be power on. 
-The legacy fbdev won't help.
-But there is still problem to be solved, so the eDP panel for firefly is 
-not ready yet.
->
-> In the thread you pointed to I also did not see any dt-maintainer involvement
-> pointing one way or another, but spinics is often not easy to navigate
-> threads, so I may have missed that.
->
->
->>> Another option could be to just make of_i2c_register_device silent if
->>> of_modalias_node returns -ENODEV?
->
-> Heiko
->
->>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>> Cc: Randy Li <randy.li@rock-chips.com>
->>>> Cc: Jon Hunter <jonathanh@nvidia.com>
->>>> ---
->>>>
->>>>   arch/arm/boot/dts/rk3288.dtsi | 5 +++++
->>>>   1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/rk3288.dtsi
->>>> b/arch/arm/boot/dts/rk3288.dtsi
->>>> index 2f814ffeb605..94f4b7eecca2 100644
->>>> --- a/arch/arm/boot/dts/rk3288.dtsi
->>>> +++ b/arch/arm/boot/dts/rk3288.dtsi
->>>> @@ -1075,6 +1075,11 @@
->>>>
->>>>   				};
->>>>   			
->>>>   			};
->>>>   		
->>>>   		};
->>>>
->>>> +
->>>> +		i2c-bus {
->>>> +			#address-cells = <1>;
->>>> +			#size-cells = <0>;
->>>> +		};
->>>>
->>>>   	};
->>>>   	
->>>>   	hdmi: hdmi at ff980000 {
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
+  PCI requires stores complete in order. Due to erratum #28168
+  PCI-inbound MSI-X store to the interrupt controller are delivered
+  to the interrupt controller before older PCI-inbound memory stores
+  are committed.
+  Doing a sync on SMMU will make sure all prior transactions are
+  completed.
+
+Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+---
+ arch/arm64/Kconfig               |   11 +++++++++++
+ drivers/iommu/arm-smmu.c         |   38 ++++++++++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-common.h |    1 +
+ drivers/irqchip/irq-gic-v3-its.c |   22 ++++++++++++++++++++++
+ kernel/irq/chip.c                |    4 ++++
+ 5 files changed, 76 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 30398db..57f5c9b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -474,6 +474,17 @@ config CAVIUM_ERRATUM_27456
+ 
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_28168
++	bool "Cavium erratum 28168: Make sure ITS and SMMU TLB are in sync"
++	default y
++	help
++	 Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
++	 controller are delivered to the interrupt controller before older
++	 PCI-inbound memory stores are committed. Doing a sync on SMMU
++	 will make sure all prior transactions are completed.
++
++	 If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9740846..20a61c6 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -378,6 +378,7 @@ struct arm_smmu_device {
+ 	unsigned int			*irqs;
+ 
+ 	u32				cavium_id_base; /* Specific to Cavium */
++	spinlock_t			tlb_lock;
+ };
+ 
+ enum arm_smmu_context_fmt {
+@@ -576,9 +577,39 @@ static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
+ static void arm_smmu_tlb_sync(void *cookie)
+ {
+ 	struct arm_smmu_domain *smmu_domain = cookie;
++	struct arm_smmu_device *smmu = smmu_domain->smmu;
++	unsigned long flags;
++
++	spin_lock_irqsave(&smmu->tlb_lock, flags);
+ 	__arm_smmu_tlb_sync(smmu_domain->smmu);
++	spin_unlock_irqrestore(&smmu->tlb_lock, flags)
+ }
+ 
++/*
++ * Cavium ThunderX erratum 28168
++ *
++ * Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
++ * controller are delivered to the interrupt controller before older
++ * PCI-inbound memory stores are committed. Doing a sync on SMMU
++ * will make sure all prior transactions are completed.
++ *
++ */
++void cavium_smmu_tlb_sync(struct device *dev)
++{
++	struct arm_smmu_device *smmu;
++	struct arm_smmu_master_cfg *cfg;
++	unsigned long flags;
++
++	smmu = find_smmu_for_device(dev);
++	if (!smmu)
++		return;
++
++	spin_lock_irqsave(&smmu->tlb_lock, flags);
++	 __arm_smmu_tlb_sync(smmu);
++	spin_unlock_irqrestore(&smmu->tlb_lock, flags)
++}
++EXPORT_SYMBOL(cavium_smmu_tlb_sync);
++
+ static void arm_smmu_tlb_inv_context(void *cookie)
+ {
+ 	struct arm_smmu_domain *smmu_domain = cookie;
+@@ -586,6 +617,7 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	bool stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
+ 	void __iomem *base;
++	unsigned long flags;
+ 
+ 	if (stage1) {
+ 		base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+@@ -597,7 +629,9 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+ 			       base + ARM_SMMU_GR0_TLBIVMID);
+ 	}
+ 
++	spin_lock_irqsave(&smmu->tlb_lock, flags);
+ 	__arm_smmu_tlb_sync(smmu);
++	spin_unlock_irqrestore(&smmu->tlb_lock, flags)
+ }
+ 
+ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+@@ -1562,6 +1596,7 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 	void __iomem *cb_base;
+ 	int i;
++	unsigned long flags;
+ 	u32 reg, major;
+ 
+ 	/* clear global FSR */
+@@ -1633,7 +1668,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 		reg |= sCR0_VMID16EN;
+ 
+ 	/* Push the button */
++	spin_lock_irqsave(&smmu->tlb_lock, flags)
+ 	__arm_smmu_tlb_sync(smmu);
++	spin_unlock_irqrestore(&smmu->tlb_lock, flags)
+ 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+ }
+ 
+@@ -2001,6 +2038,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	spin_lock_init(&smmu->tlb_lock);
+ 	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
+ 	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
+diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+index 205e5fd..0228ba0 100644
+--- a/drivers/irqchip/irq-gic-common.h
++++ b/drivers/irqchip/irq-gic-common.h
+@@ -38,4 +38,5 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+ 
+ void gic_set_kvm_info(const struct gic_kvm_info *info);
+ 
++void cavium_smmu_tlb_sync(void *iommu);
+ #endif /* _IRQ_GIC_COMMON_H */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 003495d..88e9958 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -112,6 +112,7 @@ struct its_device {
+ 	struct its_node		*its;
+ 	struct event_lpi_map	event_map;
+ 	void			*itt;
++	struct device           *dev;
+ 	u32			nr_ites;
+ 	u32			device_id;
+ };
+@@ -664,10 +665,29 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	iommu_dma_map_msi_msg(d->irq, msg);
+ }
+ 
++/**
++ * Due to erratum in ThunderX,
++ * we need to make sure SMMU is in sync with ITS translations.
++ **/
++static void its_ack_irq(struct irq_data *d)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	struct pci_dev *pdev;
++
++		if (!dev_is_pci(its_dev->dev))
++			return;
++
++		pdev = to_pci_dev(its_dev->dev);
++		if (pdev->vendor != 0x177d)
++			cavium_smmu_tlb_sync(its_dev->dev);
++
++}
++
+ static struct irq_chip its_irq_chip = {
+ 	.name			= "ITS",
+ 	.irq_mask		= its_mask_irq,
+ 	.irq_unmask		= its_unmask_irq,
++	.irq_ack                = its_ack_irq,
+ 	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_set_affinity	= its_set_affinity,
+ 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+@@ -1422,6 +1442,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+ 	if (!its_dev)
+ 		return -ENOMEM;
+ 
++	its_dev->dev = dev;
++
+ 	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
+ out:
+ 	info->scratchpad[0].ptr = its_dev;
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index be3c34e..6add8da 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -585,6 +585,10 @@ void handle_fasteoi_irq(struct irq_desc *desc)
+ 		goto out;
+ 	}
+ 
++#ifdef CONFIG_CAVIUM_ERRATUM_28168
++	if (chip->irq_ack)
++		chip->irq_ack(&desc->irq_data);
++#endif
+ 	kstat_incr_irqs_this_cpu(desc);
+ 	if (desc->istate & IRQS_ONESHOT)
+ 		mask_irq(desc);
+-- 
+1.7.1
