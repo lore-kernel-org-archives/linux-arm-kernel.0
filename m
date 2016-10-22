@@ -1,33 +1,45 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 22 Oct 2016 22:23:54 +0200
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <24632117.YsmPs86ri6@wuerfel> (Arnd Bergmann's message of "Fri,
- 21 Oct 2016 22:35:53 +0200")
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <4337157.Eff9E2riVH@wuerfel>
- <20161021154856.GC1041@n2100.armlinux.org.uk>
- <24632117.YsmPs86ri6@wuerfel>
-Message-ID: <87eg382kv9.fsf@belgarion.home>
+Date: Sat, 22 Oct 2016 23:37:09 +0200
+Subject: [PATCH v2 4/4] cpufreq: pxa: convert to clock API
+In-Reply-To: <20161018114025.GD11471@vireshk-i7> (Viresh Kumar's message of
+ "Tue, 18 Oct 2016 17:10:25 +0530")
+References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
+ <1476561450-28407-5-git-send-email-robert.jarzmik@free.fr>
+ <20161018114025.GD11471@vireshk-i7>
+Message-ID: <877f902hh6.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Viresh Kumar <viresh.kumar@linaro.org> writes:
 
-> On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
->> What's the point of the x32 mode?
+> On 15-10-16, 21:57, Robert Jarzmik wrote:
+>> As the clock settings have been introduced into the clock pxa drivers,
+>> which are now available to change the CPU clock by themselves, remove
+>> the clock handling from this driver, and rely on pxa clock drivers.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>> Since v1: added !OF Kconfig dependency
+>> ---
+>>  drivers/cpufreq/Kconfig.arm      |   2 +-
+>>  drivers/cpufreq/pxa2xx-cpufreq.c | 191 ++++++++-------------------------------
+>>  2 files changed, 40 insertions(+), 153 deletions(-)
 >
-> On x86, the motivation is faster code for most use cases that
-> don't need a lot of memory, as the 64-bit opcodes have 16 registers
-> rather than 8 in 32-bit mode but 32-bit pointers have lower
-> cache footprint than 64-bit pointers.
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-For completness, the second point of x32 AFAIU is the IP-relative addressing
-which is not available in standard 32 bit mode, which improves PIC code. For
-simple not algorithmic code (think Android HAL for example) with many shared
-libraries, it's better in the Hardware Abstraction Layer Libraries, instead of
-the push-to-stack and pop register.
+Okay, after some more testing, I'd like to remove the !OF for next iteration.
+The reason is that I have a usecase where I have a single kernel image with
+devictree support (ie CONFIG_OF=y), but with support for both devicetree and
+legacy platforms. In this case, a platform such as lubbock can boot :
+ - with devicetree
+ - with legacy arch/arm/mach-pxa/lubbock.c
+
+In this kernel, the !OF Kconfig prevents the legacy version from working, as
+pxa2xx-cpufreq is descarded even if it is needed in the legacy version.
+
+Therefore, I'd like to respin without this !OF.
 
 Cheers.
 
---
+-- 
 Robert
