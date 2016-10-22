@@ -1,18 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 22 Oct 2016 11:32:41 +0800
-Subject: [PATCH v2 3/3] ARM: dts: imx6qdl-apalis: Use enable-gpios
- property for backlight
-In-Reply-To: <2206aa18153f33a2b6763e2bc6c87bf83eadb674.1474260360.git.maitysanchayan@gmail.com>
-References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
- <2206aa18153f33a2b6763e2bc6c87bf83eadb674.1474260360.git.maitysanchayan@gmail.com>
-Message-ID: <20161022033241.GN30578@tiger>
+From: amit.pundir@linaro.org (Amit Pundir)
+Date: Sat, 22 Oct 2016 11:44:31 +0800
+Subject: [PATCH] video: ARM CLCD: fix Vexpress regression
+In-Reply-To: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+References: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CAMi1Hd0VfDKW363+XMd+mwWT1xcaWX_y+b=+9yHdsZB3LaJbgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 10:41:53AM +0530, Sanchayan Maity wrote:
-> Use enable-gpios property of PWM backlight driver for backlight
-> control.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+On 20 October 2016 at 14:46, Linus Walleij <linus.walleij@linaro.org> wrote:
+> The CLCD does not come up on Versatile Express as it does not
+> (currently) have a syscon node for controlling the block apart
+> from the CLCD itself. Make sure the .init() function can bail
+> out without an error making it probe again.
+>
+> Reported-by: Amit Pundir <amit.pundir@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/video/fbdev/amba-clcd-versatile.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+> index 19ad8645d93c..d909b7dda14d 100644
+> --- a/drivers/video/fbdev/amba-clcd-versatile.c
+> +++ b/drivers/video/fbdev/amba-clcd-versatile.c
+> @@ -527,7 +527,8 @@ int versatile_clcd_init_panel(struct clcd_fb *fb,
+>                                              &clcd_id);
+>         if (!np) {
+>                 dev_err(dev, "no Versatile syscon node\n");
+> -               return -ENODEV;
+> +               /* Vexpress does not have this */
+> +               return 0;
+>         }
+>         versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
 
-Applied, thanks.
+Thanks. Works on my Qemu + Android setup.
+
+Tested-by: Amit Pundir <amit.pundir@linaro.org>
+
+>
+> --
+> 2.7.4
+>
