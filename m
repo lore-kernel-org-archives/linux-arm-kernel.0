@@ -1,76 +1,32 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sat, 22 Oct 2016 15:53:28 +0200
-Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
- randomness
-Message-ID: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sat, 22 Oct 2016 16:11:23 +0200
+Subject: [PATCH] ahci: use pci_alloc_irq_vectors
+In-Reply-To: <20161021140106.GU25086@rric.localdomain>
+References: <1473088905-27670-1-git-send-email-hch@lst.de>
+ <1473088905-27670-2-git-send-email-hch@lst.de>
+ <20160906163946.GB24268@htj.duckdns.org>
+ <20161020154722.GH22012@rric.localdomain> <20161021125918.GA18082@lst.de>
+ <20161021140106.GU25086@rric.localdomain>
+Message-ID: <20161022141123.GA25500@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since SID's content is constant over reboot, it must not be used
-as source of randomness.
+Hi Robert,
 
-This patch remove the use of SID content as source of randomness.
+is this a controller that's using MSI-X?
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/nvmem/sunxi_sid.c | 21 ---------------------
- 1 file changed, 21 deletions(-)
+If so can you try the patch below?
 
-diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-index 1567ccc..c82d5d1 100644
---- a/drivers/nvmem/sunxi_sid.c
-+++ b/drivers/nvmem/sunxi_sid.c
-@@ -21,8 +21,6 @@
- #include <linux/nvmem-provider.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
--#include <linux/slab.h>
--#include <linux/random.h>
+diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+index ba5f11c..5fe852d 100644
+--- a/drivers/ata/ahci.c
++++ b/drivers/ata/ahci.c
+@@ -1617,7 +1617,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		/* legacy intx interrupts */
+ 		pci_intx(pdev, 1);
+ 	}
+-	hpriv->irq = pdev->irq;
++	hpriv->irq = pci_irq_vector(pdev, 0);
  
- static struct nvmem_config econfig = {
- 	.name = "sunxi-sid",
-@@ -70,8 +68,6 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	struct nvmem_device *nvmem;
- 	struct sunxi_sid *sid;
--	int ret, i, size;
--	char *randomness;
- 
- 	sid = devm_kzalloc(dev, sizeof(*sid), GFP_KERNEL);
- 	if (!sid)
-@@ -82,7 +78,6 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 	if (IS_ERR(sid->base))
- 		return PTR_ERR(sid->base);
- 
--	size = resource_size(res) - 1;
- 	econfig.size = resource_size(res);
- 	econfig.dev = dev;
- 	econfig.reg_read = sunxi_sid_read;
-@@ -91,25 +86,9 @@ static int sunxi_sid_probe(struct platform_device *pdev)
- 	if (IS_ERR(nvmem))
- 		return PTR_ERR(nvmem);
- 
--	randomness = kzalloc(sizeof(u8) * (size), GFP_KERNEL);
--	if (!randomness) {
--		ret = -EINVAL;
--		goto err_unreg_nvmem;
--	}
--
--	for (i = 0; i < size; i++)
--		randomness[i] = sunxi_sid_read_byte(sid, i);
--
--	add_device_randomness(randomness, size);
--	kfree(randomness);
--
- 	platform_set_drvdata(pdev, nvmem);
- 
- 	return 0;
--
--err_unreg_nvmem:
--	nvmem_unregister(nvmem);
--	return ret;
- }
- 
- static int sunxi_sid_remove(struct platform_device *pdev)
--- 
-2.7.3
+ 	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
+ 		host->flags |= ATA_HOST_PARALLEL_SCAN;
