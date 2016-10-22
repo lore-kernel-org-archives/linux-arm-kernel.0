@@ -1,98 +1,98 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 22 Oct 2016 16:55:51 +0100
-Subject: [RFC PATCH 0/8] Support GICv3 ITS and vITS in 32-bit mode
-In-Reply-To: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-References: <1477042601-15227-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <20161022165551.07680200@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 22 Oct 2016 15:28:54 +0200
+Subject: [PATCH v5 0/7] ARM: ASoC: drm: sun8i: Add DE2 HDMI audio and video
+Message-ID: <cover.1477142934.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2016 10:36:33 +0100
-Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+This patchset series adds HDMI audio and video support to the Allwinner
+sun8i SoCs which include the display engine 2 (DE2).
 
-Hi Vladimir,
+A first submission in January for video on the H3 could not enter into
+the mainline kernel due to the lack of license headers in Allwinner's
+sources.
 
-> Hi,
-> 
-> This series introduces GICv3 ITS and vITS to 32-bit world. The first
-> six patches make it possible to use ITS in a 32-bit guest with vITS on
-> 64-bit host. The last two patches extend vITS to 32-bit host.
+Recently, an announce about Tina OS for the R series
+	https://www.youtube.com/watch?v=h7KD-6HblAU
+was followed by the upload of a new linux-3.4 source tree
+	https://github.com/tinalinux/linux-3.4
+with files containing GPL headers.
 
-I quite like this series, mostly because it deletes a bit of code and
-fixes a number of shortcomings. My only gripes are than it doesn't
-apply to my current tree (see my comment on patch 4), and that this
-should effectively be split in two series: one enabling the ITS on
-32bit, and the other switching on ITS emulation for 32bit KVM.
-Effectively, these series are completely independent.
+Well, I don't know if these sources are really from Allwinner, but
+anyway, this is the opportunity to propose a new version of my DRM
+HDMI driver.
 
-It also makes it easier for me to merge things as I don't have to
-coordinate the merging strategy with... myself. ;-)
+v5:
+	- add overlay plane
+	- add audio support
+	- add support for the A83T
+	- add back the HDMI driver
+	- many bug fixes
+v4: 
+	- drivers/clk/sunxi/Makefile was missing (Emil Velikov)
+v3:
+	- add the hardware cursor
+	- simplify and fix the DE2 init sequences
+	- generation for all SUNXI SoCs (Andre Przywara)
+v2:
+	- remove the HDMI driver
+	- remarks from Chen-Yu Tsai and Russell King
+	- DT documentation added
 
-Please repost this once the GIC fixes have reached mainline, and this
-should be in good shape for a quick merge.
+Jean-Francois Moine (7):
+  drm: sunxi: Add a basic DRM driver for Allwinner DE2
+  ASoC: sunxi: Add a simple HDMI CODEC
+  drm: sunxi: add DE2 HDMI support
+  ASoC: sunxi: Add sun8i I2S driver
+  ARM: dts: sun8i-h3: add HDMI audio and video nodes
+  ARM: dts: sun8i-h3: Add HDMI audio and video to the Banana Pi M2+
+  ARM: dts: sun8i-h3: Add HDMI audio and video to the Orange PI 2
 
-> I used Andrea's its/v8 branch at [1] for testing with the following
-> diff on top
-> 
-> diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
-> index 27a8e17..16bba55 100644
-> --- a/arm/aarch32/arm-cpu.c
-> +++ b/arm/aarch32/arm-cpu.c
-> @@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm)
->  {
->  	int timer_interrupts[4] = {13, 14, 11, 10};
->  
-> -	gic__generate_fdt_nodes(fdt, IRQCHIP_GICV2);
-> +	gic__generate_fdt_nodes(fdt, kvm->cfg.arch.irqchip);
->  	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
->  }
->  
-> diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
-> index 1632e3c..99231f6 100644
-> --- a/arm/aarch32/include/kvm/kvm-arch.h
-> +++ b/arm/aarch32/include/kvm/kvm-arch.h
-> @@ -1,8 +1,8 @@
->  #ifndef KVM__KVM_ARCH_H
->  #define KVM__KVM_ARCH_H
->  
-> -#define ARM_GIC_DIST_SIZE	0x1000
-> -#define ARM_GIC_CPUI_SIZE	0x2000
-> +#define ARM_GIC_DIST_SIZE	0x100000
-> +#define ARM_GIC_CPUI_SIZE	0x200000
->  
->  #define ARM_KERN_OFFSET(...)	0x8000
->  
-> 
-> After passing --irqchip=gicv3-its --force-pci to kvmtool I can see
-> that MSI is used:
-> 
-> # cat /proc/interrupts
->            CPU0       
->  18:       1251     GICv3  27 Level     arch_timer
->  28:          0   ITS-MSI 49152 Edge      virtio3-config
->  29:          0   ITS-MSI 49153 Edge      virtio3-input
->  30:          0   ITS-MSI 49154 Edge      virtio3-output
->  31:          0   ITS-MSI 32768 Edge      virtio2-config
->  32:          2   ITS-MSI 32769 Edge      virtio2-input.0
->  33:          1   ITS-MSI 32770 Edge      virtio2-output.0
->  34:          0   ITS-MSI   0 Edge      virtio0-config
->  35:        303   ITS-MSI   1 Edge      virtio0-requests
->  36:          0   ITS-MSI 16384 Edge      virtio1-config
->  37:        218   ITS-MSI 16385 Edge      virtio1-requests
-> IPI0:          0  CPU wakeup interrupts
-> IPI1:          0  Timer broadcast interrupts
-> IPI2:          0  Rescheduling interrupts
-> IPI3:          0  Function call interrupts
-> IPI4:          0  CPU stop interrupts
-> IPI5:          0  IRQ work interrupts
-> IPI6:          0  completion interrupts
-> Err:          0
+ .../devicetree/bindings/display/sunxi/hdmi.txt     |  52 ++
+ .../bindings/display/sunxi/sunxi-de2.txt           |  83 ++
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |  38 +-
+ arch/arm/boot/dts/sun8i-h3-bananapi-m2-plus.dts    |  17 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts          |  17 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  67 ++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/sunxi/Kconfig                      |  29 +
+ drivers/gpu/drm/sunxi/Makefile                     |   9 +
+ drivers/gpu/drm/sunxi/de2_crtc.c                   | 475 +++++++++++
+ drivers/gpu/drm/sunxi/de2_crtc.h                   |  63 ++
+ drivers/gpu/drm/sunxi/de2_de.c                     | 591 +++++++++++++
+ drivers/gpu/drm/sunxi/de2_drm.h                    |  47 ++
+ drivers/gpu/drm/sunxi/de2_drv.c                    | 378 +++++++++
+ drivers/gpu/drm/sunxi/de2_hdmi.c                   | 396 +++++++++
+ drivers/gpu/drm/sunxi/de2_hdmi.h                   |  40 +
+ drivers/gpu/drm/sunxi/de2_hdmi_io.c                | 927 +++++++++++++++++++++
+ drivers/gpu/drm/sunxi/de2_hdmi_io.h                |  25 +
+ drivers/gpu/drm/sunxi/de2_plane.c                  | 119 +++
+ include/sound/sunxi_hdmi.h                         |  23 +
+ sound/soc/codecs/Kconfig                           |   9 +
+ sound/soc/codecs/Makefile                          |   2 +
+ sound/soc/codecs/sunxi-hdmi.c                      | 106 +++
+ sound/soc/sunxi/Kconfig                            |   8 +
+ sound/soc/sunxi/Makefile                           |   3 +
+ sound/soc/sunxi/sun8i-i2s.c                        | 700 ++++++++++++++++
+ 27 files changed, 4222 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/hdmi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/sunxi/sunxi-de2.txt
+ create mode 100644 drivers/gpu/drm/sunxi/Kconfig
+ create mode 100644 drivers/gpu/drm/sunxi/Makefile
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_crtc.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_de.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drm.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_drv.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_hdmi.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_hdmi.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_hdmi_io.c
+ create mode 100644 drivers/gpu/drm/sunxi/de2_hdmi_io.h
+ create mode 100644 drivers/gpu/drm/sunxi/de2_plane.c
+ create mode 100644 include/sound/sunxi_hdmi.h
+ create mode 100644 sound/soc/codecs/sunxi-hdmi.c
+ create mode 100644 sound/soc/sunxi/sun8i-i2s.c
 
-Please also post these patches (I may try it in a model if I feel brave
-enough...)!
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+2.10.1
