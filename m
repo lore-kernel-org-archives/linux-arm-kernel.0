@@ -1,218 +1,81 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 22 Oct 2016 18:28:53 -0500
-Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
-In-Reply-To: <20161021015814.GC31044@localhost>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
- <20161021015814.GC31044@localhost>
-Message-ID: <20161022232852.GA25453@localhost>
+Date: Sat, 22 Oct 2016 18:58:37 -0500
+Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
+ interrupts
+In-Reply-To: <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20161022235837.GA1668@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 08:58:14PM -0500, Bjorn Helgaas wrote:
-> On Wed, Oct 19, 2016 at 06:21:03PM -0400, Sinan Kaya wrote:
-> > The SCI penalize function was removed in two steps (first refactor
-> > and then remove) and these changes are reverted here in one go.
-> > 
-> > The commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> > refactored the original code so that SCI penalty is calculated dynamically
-> > by the time get_penalty function is called. That change is partially
-> > reverted here, specifically for the SCI IRQ alone.
-> > 
-> > The SCI penalize function was finally dropped by commit 9e5ed6d1fb87
-> > ("ACPI,PCI,IRQ: remove SCI penalize function") that replaced the old SCI
-> > penalty API with penalty calculation carried out dynamically and based
-> > on the acpi_gbl_FADT.sci_interrupt value.
-> > 
-> > However, that new algorithm relies on the accurate setting of IRQ
-> > types and that doesn't happen early enough on some platforms which
-> > leads to incorrect penalty assignments for PCI IRQs.  In those cases,
-> > irq_get_trigger_type() returns incorrect values for the IRQs in
-> > question, because they have not been registered yet by the time the
-> > penalties are calculated.
-> > 
-> > To fix this problem, we only need to fix the penalty for the SCI interrupt.
-> > It seems better to add a single "sci_penalty" variable, set it to
-> > PIRQ_PENALTY_PCI_USING if it's level/low or PIRQ_PENALTY_ISA_ALWAYS
-> > otherwise, and add "sci_penalty" in when appropriate.  That should fix it
-> > for *any* SCI IRQ, not just those less than 256, and we don't have to add
-> > these extra penalty table entries that are all unused (except possibly for
-> > one entry if we have an SCI in the 16-255 range).
-> > 
-> > For this reason, revert commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI
-> > penalize function") completely to restore the correct behavior.
+On Sat, Oct 15, 2016 at 12:31:05AM -0400, Sinan Kaya wrote:
+> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+> resource requirements") removed PCI_USING penalty from
+> acpi_pci_link_allocate function as there is no longer a fixed size penalty
+> array for both PCI interrupts greater than 16.
 > 
-> I like this patch fine, except for the changelog.  I don't think it's
-> useful to describe this as a revert and give all the historical
-> details.  I think the important part is something like this:
+> The array size has been reduced to 16 and array name got prefixed as ISA
+> since it only is accountable for the ISA interrupts.
 > 
->   We previously used irq_get_trigger_type(irq) to help compute the
->   penalty for the SCI, but that depends on the SCI having been
->   registered already.  Add acpi_penalize_sci_irq() so platforms can
->   tell us the SCI IRQ, trigger, and polarity so we can compute the
->   penalty even before the SCI has been registered.
-
-I think this is actually the critical patch that fixes the regression
-reported by Ondrej, so the changelog really should include details
-about the regression, e.g., something like this:
-
-  ACPI: pci_link: Penalize SCI correctly
-
-  Ondrej reported that IRQs stopped working in v4.7 on several
-  platforms.  A typical scenario, from Ondrej's VT82C694X/694X, is:
-
-    ACPI: Using PIC for interrupt routing
-    ACPI: PCI Interrupt Link [LNKA] (IRQs 1 3 4 5 6 7 10 *11 12 14 15)
-    ACPI: No IRQ available for PCI Interrupt Link [LNKA]
-    8139too 0000:00:0f.0: PCI INT A: no GSI
-
-  We're using PIC routing, so acpi_irq_balance == 0, and LNKA is already
-  active at IRQ 11.  In that case, acpi_pci_link_allocate() only tries
-  to use the active IRQ (IRQ 11) which also happens to be the SCI.
-
-  We should penalize the SCI by PIRQ_PENALTY_PCI_USING, but
-  irq_get_trigger_type(11) returns something other than
-  IRQ_TYPE_LEVEL_LOW, so we penalize it by PIRQ_PENALTY_ISA_ALWAYS
-  instead, which makes acpi_pci_link_allocate() assume the IRQ isn't
-  available and give up.
-
-  Add acpi_penalize_sci_irq() so platforms can tell us the SCI IRQ,
-  trigger, and polarity directly and we don't have to depend on
-  irq_get_trigger_type().
-
-  Link: http://lkml.kernel.org/r/201609251512.05657.linux at rainbow-software.org
-  Reported-by: Ondrej Zary <linux@rainbow-software.org>
-
-I don't understand what's broken about using irq_get_trigger_type().
-The SCI is registered in the following path, which is certainly before
-we try to enable LNKA for the 8139too device:
-
-  acpi_init                                           # subsys_initcall
-    acpi_bus_init
-      acpi_enable_subsystem
-	acpi_ev_install_xrupt_handlers
-	  acpi_ev_install_sci_handler
-	    acpi_os_install_interrupt_handler(sci_interrupt, ...)
-	      acpi_gsi_to_irq
-		acpi_register_gsi
-		  irq_create_fwspec_mapping
-		    irqd_set_trigger_type
-
-In any event, I think this patch to add acpi_penalize_sci_irq() is
-fine.
-
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> The original change in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+> resource requirements") removed penalty assignment in the code for PCI
+> thinking that we will add the penalty later in acpi_irq_pci_sharing_penalty
+> function.
 > 
-> > Link: https://lkml.org/lkml/2016/10/4/283
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > Fixes: commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> > Fixes: commit 9e5ed6d1fb87 ("ACPI,PCI,IRQ: remove SCI penalize function")
+> However, this function only gets called if the IRQ number is greater than
+> 16 and acpi_irq_get_penalty function gets called before ACPI start in
+> acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
+> on iterating the link list.
 > 
-> "commit" is redundant; it's sufficient to say:
+> We need to add the PCI_USING penalty for ISA interrupts too if the link is
+> in use and matches our ISA IRQ number.
+
+I think the history about the array size is more than is necessary for this
+changelog.  I think the useful part is something like this:
+
+  ACPI: pci_link: Include PIRQ_PENALTY_PCI_USING for ISA IRQs
+
+  103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements") replaced
+  the addition of PIRQ_PENALTY_PCI_USING in acpi_pci_link_allocate()
+  with an addition in acpi_irq_pci_sharing_penalty(), but f7eca374f000
+  ("ACPI,PCI,IRQ: separate ISA penalty calculation") removed the use
+  of acpi_irq_pci_sharing_penalty() for ISA IRQs.
+
+  Therefore, PIRQ_PENALTY_PCI_USING is missing from ISA IRQs used by
+  interrupt links.  Include that penalty by adding it in the
+  acpi_pci_link_allocate() path.
+
+  Fixes: f7eca374f000 ("ACPI,PCI,IRQ: separate ISA penalty calculation")
+  
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+> ---
+>  drivers/acpi/pci_link.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
->   Fixes: 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index c983bf7..a212709 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -619,6 +619,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>  			    acpi_device_bid(link->device));
+>  		return -ENODEV;
+>  	} else {
+> +		if (link->irq.active < ACPI_MAX_ISA_IRQS)
+> +			acpi_isa_irq_penalty[link->irq.active] +=
+> +				PIRQ_PENALTY_PCI_USING;
+> +
+>  		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+>  		       acpi_device_name(link->device),
+>  		       acpi_device_bid(link->device), link->irq.active);
+> -- 
+> 1.9.1
 > 
-> In fact, I don't think you really need to include "commit" in the
-> reference to 9e5ed6d1fb87 above either.
 > 
-> > ---
-> >  arch/x86/kernel/acpi/boot.c |  1 +
-> >  drivers/acpi/pci_link.c     | 30 +++++++++++++++---------------
-> >  include/linux/acpi.h        |  1 +
-> >  3 files changed, 17 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-> > index 90d84c3..0ffd26e 100644
-> > --- a/arch/x86/kernel/acpi/boot.c
-> > +++ b/arch/x86/kernel/acpi/boot.c
-> > @@ -453,6 +453,7 @@ static void __init acpi_sci_ioapic_setup(u8 bus_irq, u16 polarity, u16 trigger,
-> >  		polarity = acpi_sci_flags & ACPI_MADT_POLARITY_MASK;
-> >  
-> >  	mp_override_legacy_irq(bus_irq, polarity, trigger, gsi);
-> > +	acpi_penalize_sci_irq(bus_irq, trigger, polarity);
-> >  
-> >  	/*
-> >  	 * stash over-ride to indicate we've been here
-> > diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> > index 4f37938..294b190 100644
-> > --- a/drivers/acpi/pci_link.c
-> > +++ b/drivers/acpi/pci_link.c
-> > @@ -87,6 +87,7 @@ struct acpi_pci_link {
-> >  
-> >  static LIST_HEAD(acpi_link_list);
-> >  static DEFINE_MUTEX(acpi_link_lock);
-> > +static int sci_irq = -1, sci_penalty;
-> >  
-> >  /* --------------------------------------------------------------------------
-> >                              PCI Link Device Management
-> > @@ -496,25 +497,13 @@ static int acpi_irq_get_penalty(int irq)
-> >  {
-> >  	int penalty = 0;
-> >  
-> > -	/*
-> > -	* Penalize IRQ used by ACPI SCI. If ACPI SCI pin attributes conflict
-> > -	* with PCI IRQ attributes, mark ACPI SCI as ISA_ALWAYS so it won't be
-> > -	* use for PCI IRQs.
-> > -	*/
-> > -	if (irq == acpi_gbl_FADT.sci_interrupt) {
-> > -		u32 type = irq_get_trigger_type(irq) & IRQ_TYPE_SENSE_MASK;
-> > -
-> > -		if (type != IRQ_TYPE_LEVEL_LOW)
-> > -			penalty += PIRQ_PENALTY_ISA_ALWAYS;
-> > -		else
-> > -			penalty += PIRQ_PENALTY_PCI_USING;
-> > -	}
-> > +	if (irq == sci_irq)
-> > +		penalty += sci_penalty;
-> >  
-> >  	if (irq < ACPI_MAX_ISA_IRQS)
-> >  		return penalty + acpi_isa_irq_penalty[irq];
-> >  
-> > -	penalty += acpi_irq_pci_sharing_penalty(irq);
-> > -	return penalty;
-> > +	return penalty + acpi_irq_pci_sharing_penalty(irq);
-> >  }
-> >  
-> >  int __init acpi_irq_penalty_init(void)
-> > @@ -881,6 +870,17 @@ bool acpi_isa_irq_available(int irq)
-> >  		    acpi_irq_get_penalty(irq) < PIRQ_PENALTY_ISA_ALWAYS);
-> >  }
-> >  
-> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity)
-> > +{
-> > +	sci_irq = irq;
-> > +
-> > +	if (trigger == ACPI_MADT_TRIGGER_LEVEL &&
-> > +	    polarity == ACPI_MADT_POLARITY_ACTIVE_LOW)
-> > +		sci_penalty = PIRQ_PENALTY_PCI_USING;
-> > +	else
-> > +		sci_penalty = PIRQ_PENALTY_ISA_ALWAYS;
-> > +}
-> > +
-> >  /*
-> >   * Over-ride default table to reserve additional IRQs for use by ISA
-> >   * e.g. acpi_irq_isa=5
-> > diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> > index c5eaf2f..67d1d3e 100644
-> > --- a/include/linux/acpi.h
-> > +++ b/include/linux/acpi.h
-> > @@ -318,6 +318,7 @@ struct pci_dev;
-> >  int acpi_pci_irq_enable (struct pci_dev *dev);
-> >  void acpi_penalize_isa_irq(int irq, int active);
-> >  bool acpi_isa_irq_available(int irq);
-> > +void acpi_penalize_sci_irq(int irq, int trigger, int polarity);
-> >  void acpi_pci_irq_disable (struct pci_dev *dev);
-> >  
-> >  extern int ec_read(u8 addr, u8 *val);
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
