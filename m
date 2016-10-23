@@ -1,39 +1,70 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 23 Oct 2016 09:45:03 +0200
-Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
-In-Reply-To: <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
-References: <cover.1477142934.git.moinejf@free.fr>
- <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
- <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
-Message-ID: <20161023094503.fbb22dd0701e3f2785828609@free.fr>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Sun, 23 Oct 2016 10:26:31 +0200
+Subject: [PATCH] ARM: dt: sun8i-h3: Add sunxi-sid to dts for sun8i-h3
+In-Reply-To: <20161020203654.2erph2mr73yzksla@lukather>
+References: <1475660904-7959-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161005122130.8cc229ff5d4990149956b49c@free.fr>
+ <20161019074016.GA31440@Red>
+ <20161020203654.2erph2mr73yzksla@lukather>
+Message-ID: <20161023082631.GA28485@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Oct 2016 09:33:16 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
-
-> > Note: This driver is closed to the sun4i-i2s except that:
-> > - it handles the H3
+On Thu, Oct 20, 2016 at 10:36:54PM +0200, Maxime Ripard wrote:
+> On Wed, Oct 19, 2016 at 09:40:16AM +0200, LABBE Corentin wrote:
+> > On Wed, Oct 05, 2016 at 12:21:30PM +0200, Jean-Francois Moine wrote:
+> > > On Wed,  5 Oct 2016 11:48:24 +0200
+> > > Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+> > > 
+> > > > This patch add support for the sunxi-sid driver to the device tree for sun8i-h3.
+> > > > 
+> > > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
+> > > >  1 file changed, 5 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > > index 9f58bb4..abfd29c 100644
+> > > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > > @@ -211,6 +211,11 @@
+> > > >  			#size-cells = <0>;
+> > > >  		};
+> > > >  
+> > > > +		sid: eeprom at 01c14200 {
+> > > > +			compatible = "allwinner,sun7i-a20-sid";
+> > > > +			reg = <0x01c14200 0x200>;
+> > > 
+> > > The datasheet says 1Kb starting at 0x01c14000.
+> > > Is there any reason to reduce the area and to shift the offset?
+> > > 
+> > 
+> > According to http://linux-sunxi.org/SID_Register_Guide "For
+> > Allwinner A83T and H3 the SID address space starts at 0x01c14000,
+> > and the e-fuses are at offset 0x200".
+> >
+> > So I use this offset, since the sunxi_sid driver need the base
+> > address of e-fuses.
+> > 
+> > The easiest solution is to use 0x01c14200 since the other part of
+> > sid is not used and not known (A83T/H3 user manual doesnt give any
+> > information on all sid space, worse for A64 which reference SID only
+> > in memory map).
+> > 
+> > So probably for H3/A64/A83T, there will never any usage of the rest
+> > of the SID address space.
 > 
-> If it's close to sun4i-i2s, you should probably rework that one to support
-> the newer SoCs.
+> And since we can't know that, and we have to maintain the DT ABI,
+> using the whole address map and an offset, with a new compatible, is
+> definetely the safest thing to do.
 > 
-> > - it creates the sound card (with sun4i-i2s, the sound card is created
-> >   by the CODECs)
-> 
-> I think this is wrong. I2S is only the DAI. You typically have a separate
-> platform driver for the whole card, or just use simple-card.
 
-An other device is not needed. The layout is simple:
-	I2S_controller (CPU DAI) <-> HDMI_CODEC (CODEC DAI)
-The HDMI CODEC is supported by the HDMI video driver (only one device),
-so, it cannot be the card device.
-ASoC does not use the CPU DAI device (I2S_controller), so, it is
-natural to use it to handle the card.
-Otherwise, the simple-card asks for a node definition in the DT and
-this node is a pure Linux software entity. On the other side, the
-simple-graph-card from Kuninori is not useful for this simple case.
+I have two way of doing it, which one do you prefer ?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+- Adding two optionnal properties: efuses-offset and efuses-size defaulting to 0 and resourcesize.
+- Adding a subnode called efuses with its own reg=<>
+
+The first one is easy and didnt need any work on previous DT entries.
+
+Regards
+Corentin Labbe
