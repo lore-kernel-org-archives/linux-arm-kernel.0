@@ -1,35 +1,52 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 23 Oct 2016 11:42:57 +0000
-Subject: [PATCH -next] ARM: mediatek: add terminate entry for of_device_id
- tables
-Message-ID: <1477222977-1336-1-git-send-email-weiyj.lk@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 23 Oct 2016 20:04:23 +0800
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+Message-ID: <20161023120423.GO30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
+> This erratum describes a bug in logic outside the core, so MIDR can't be
+> used to identify its presence, and reading an SoC-specific revision
+> register from common arch timer code would be awkward.  So, describe it
+> in the device tree.
+> 
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> index ef5fbe9..26bc837 100644
+> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
+>    This also affects writes to the tval register, due to the implicit
+>    counter read.
+> 
+> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
+> +  QorIQ erratum 161201, which says that reading the counter is
 
-Make sure of_device_id tables are NULL terminated.
+QorIQ is a Freescale/NXP specific name, and shouldn't be there.
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- arch/arm/mach-mediatek/platsmp.c | 2 ++
- 1 file changed, 2 insertions(+)
+Shawn
 
-diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
-index b821e34..e6cffc7 100644
---- a/arch/arm/mach-mediatek/platsmp.c
-+++ b/arch/arm/mach-mediatek/platsmp.c
-@@ -54,11 +54,13 @@ static const struct of_device_id mtk_tz_smp_boot_infos[] __initconst = {
- 	{ .compatible   = "mediatek,mt8135", .data = &mtk_mt8135_tz_boot },
- 	{ .compatible   = "mediatek,mt8127", .data = &mtk_mt8135_tz_boot },
- 	{ .compatible   = "mediatek,mt2701", .data = &mtk_mt8135_tz_boot },
-+	{ },
- };
- 
- static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
- 	{ .compatible   = "mediatek,mt6589", .data = &mtk_mt6589_boot },
- 	{ .compatible   = "mediatek,mt7623", .data = &mtk_mt7623_boot },
-+	{ },
- };
- 
- static void __iomem *mtk_smp_base;
+> +  unreliable unless the small range of value is returned by back-to-back reads.
+> +  This also affects writes to the tval register, due to the implicit
+> +  counter read.
+> +
+>  ** Optional properties:
+> 
+>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+> -- 
+> 1.9.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
