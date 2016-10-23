@@ -1,64 +1,75 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 23 Oct 2016 20:11:10 +0100
-Subject: [PATCH RFC 09/10] drm/i2c: tda998x: remove complexity from
- tda998x_audio_get_eld()
+Date: Sun, 23 Oct 2016 20:11:15 +0100
+Subject: [PATCH RFC 10/10] drm/i2c: tda998x: switch to boolean is_on
 In-Reply-To: <20161023191002.GJ1041@n2100.armlinux.org.uk>
 References: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <E1byOAn-0005zM-WF@rmk-PC.armlinux.org.uk>
+Message-ID: <E1byOAt-0005zS-3i@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tda998x_audio_get_eld() is needlessly complex - the connector associated
-with the encoder is always our own priv->connector.  Remove this
-complexity, but ensure that there are no races when copying out the ELD.
+Rather than storing the DPMS mode (which will always be on or off) use a
+boolean to store this instead.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 23 +++++++++--------------
- 1 file changed, 9 insertions(+), 14 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 6a7095b66a69..547cf99ac32d 100644
+index 547cf99ac32d..1f9a25fe17f3 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -911,21 +911,13 @@ static int tda998x_audio_get_eld(struct device *dev, void *data,
- 				 uint8_t *buf, size_t len)
+@@ -42,7 +42,7 @@ struct tda998x_priv {
+ 	struct mutex mutex;
+ 	u16 rev;
+ 	u8 current_page;
+-	int dpms;
++	bool is_on;
+ 	bool is_hdmi_sink;
+ 	bool is_hdmi_config;
+ 	u8 vip_cntrl_0;
+@@ -1150,16 +1150,15 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
+ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
  {
- 	struct tda998x_priv *priv = dev_get_drvdata(dev);
--	struct drm_mode_config *config = &priv->encoder.dev->mode_config;
--	struct drm_connector *connector;
--	int ret = -ENODEV;
--
--	mutex_lock(&config->mutex);
--	list_for_each_entry(connector, &config->connector_list, head) {
--		if (&priv->encoder == connector->encoder) {
--			memcpy(buf, connector->eld,
--			       min(sizeof(connector->eld), len));
--			ret = 0;
--		}
--	}
--	mutex_unlock(&config->mutex);
+ 	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
++	bool on;
  
--	return ret;
-+	mutex_lock(&priv->audio_mutex);
-+	memcpy(buf, priv->connector.eld,
-+	       min(sizeof(priv->connector.eld), len));
-+	mutex_unlock(&priv->audio_mutex);
+ 	/* we only care about on or off: */
+-	if (mode != DRM_MODE_DPMS_ON)
+-		mode = DRM_MODE_DPMS_OFF;
++	on = mode == DRM_MODE_DPMS_ON;
+ 
+-	if (mode == priv->dpms)
++	if (on == priv->is_on)
+ 		return;
+ 
+-	switch (mode) {
+-	case DRM_MODE_DPMS_ON:
++	if (on) {
+ 		/* enable video ports, audio will be enabled later */
+ 		reg_write(priv, REG_ENA_VP_0, 0xff);
+ 		reg_write(priv, REG_ENA_VP_1, 0xff);
+@@ -1168,16 +1167,16 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+ 		reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
+ 		reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
+ 		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+-		break;
+-	case DRM_MODE_DPMS_OFF:
 +
-+	return 0;
++		priv->is_on = true;
++	} else {
+ 		/* disable video ports */
+ 		reg_write(priv, REG_ENA_VP_0, 0x00);
+ 		reg_write(priv, REG_ENA_VP_1, 0x00);
+ 		reg_write(priv, REG_ENA_VP_2, 0x00);
+-		break;
+-	}
+ 
+-	priv->dpms = mode;
++		priv->is_on = false;
++	}
  }
  
- static const struct hdmi_codec_ops audio_codec_ops = {
-@@ -1082,7 +1074,10 @@ static int tda998x_connector_get_modes(struct drm_connector *connector)
- 	drm_mode_connector_update_edid_property(connector, edid);
- 	n = drm_add_edid_modes(connector, edid);
- 	priv->is_hdmi_sink = drm_detect_hdmi_monitor(edid);
-+
-+	mutex_lock(&priv->audio_mutex);
- 	drm_edid_to_eld(connector, edid);
-+	mutex_unlock(&priv->audio_mutex);
- 
- 	kfree(edid);
- 
+ static void
 -- 
 2.1.0
