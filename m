@@ -1,80 +1,85 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 23 Oct 2016 20:10:34 +0100
-Subject: [PATCH RFC 02/10] drm/i2c: tda998x: avoid configuring audio for DVI
- mode
+Date: Sun, 23 Oct 2016 20:10:39 +0100
+Subject: [PATCH RFC 03/10] drm/i2c: tda998x: avoid racy access to mode clock
 In-Reply-To: <20161023191002.GJ1041@n2100.armlinux.org.uk>
 References: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <E1byOAE-0005yY-2W@rmk-PC.armlinux.org.uk>
+Message-ID: <E1byOAJ-0005yk-5w@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We must not configure the audio path when the sink is a DVI device, as
-DVI has no capability to receive HDMI audio.  HDMI audio is a HDMI only
-feature, requiring HDMI infoframes.
-
-There's a question concerning how to handle a DVI connected device when
-the audio device is opened - we save the audio configuration, so that if
-a HDMI device is hotplugged, audio will then work.  This seems a
-reasonable expectation.
+Avoid a racy access to the mode clock by storing the current mode clock
+during a mode set under the audio mutex.  This allows us to access it
+from the audio path in a safe way.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d72bc30a3bce..495ee3fed661 100644
+index 495ee3fed661..858237f7f4d6 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -44,6 +44,7 @@ struct tda998x_priv {
- 	u8 current_page;
- 	int dpms;
- 	bool is_hdmi_sink;
-+	bool is_hdmi_config;
+@@ -48,6 +48,7 @@ struct tda998x_priv {
  	u8 vip_cntrl_0;
  	u8 vip_cntrl_1;
  	u8 vip_cntrl_2;
-@@ -971,6 +972,8 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 			div = 3;
- 	}
++	unsigned long tdms_clock;
+ 	struct tda998x_audio_params audio_params;
  
-+	mutex_lock(&priv->audio_mutex);
-+
- 	/* mute the audio FIFO: */
- 	reg_set(priv, REG_AIP_CNTRL_0, AIP_CNTRL_0_RST_FIFO);
+ 	struct platform_device *audio_pdev;
+@@ -714,8 +715,7 @@ static void tda998x_audio_mute(struct tda998x_priv *priv, bool on)
  
-@@ -1074,13 +1077,14 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ static int
+ tda998x_configure_audio(struct tda998x_priv *priv,
+-			struct tda998x_audio_params *params,
+-			unsigned mode_clock)
++			struct tda998x_audio_params *params)
+ {
+ 	u8 buf[6], clksel_aip, clksel_fs, cts_n, adiv;
+ 	u32 n;
+@@ -772,7 +772,7 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 	 * assume 100MHz requires larger divider.
+ 	 */
+ 	adiv = AUDIO_DIV_SERCLK_8;
+-	if (mode_clock > 100000)
++	if (priv->tdms_clock > 100000)
+ 		adiv++;			/* AUDIO_DIV_SERCLK_16 */
+ 
+ 	/* S/PDIF asks for a larger divider */
+@@ -1077,10 +1077,10 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
  
  		tda998x_write_avi(priv, adjusted_mode);
  
--		mutex_lock(&priv->audio_mutex);
- 		if (priv->audio_params.format != AFMT_UNUSED)
- 			tda998x_configure_audio(priv,
- 						&priv->audio_params,
- 						adjusted_mode->clock);
--		mutex_unlock(&priv->audio_mutex);
- 	}
++		priv->tdms_clock = adjusted_mode->clock;
 +
-+	priv->is_hdmi_config = priv->is_hdmi_sink;
-+	mutex_unlock(&priv->audio_mutex);
- }
- 
- static enum drm_connector_status
-@@ -1264,9 +1268,12 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
+ 		if (priv->audio_params.format != AFMT_UNUSED)
+-			tda998x_configure_audio(priv,
+-						&priv->audio_params,
+-						adjusted_mode->clock);
++			tda998x_configure_audio(priv, &priv->audio_params);
  	}
  
- 	mutex_lock(&priv->audio_mutex);
--	ret = tda998x_configure_audio(priv,
--				      &audio,
--				      priv->encoder.crtc->hwmode.clock);
-+	/* We must not program the TDA998x for audio if the sink is DVI. */
-+	if (priv->is_hdmi_config)
-+		ret = tda998x_configure_audio(priv, &audio,
-+					      priv->encoder.crtc->hwmode.clock);
-+	else
-+		ret = 0;
+ 	priv->is_hdmi_config = priv->is_hdmi_sink;
+@@ -1230,9 +1230,6 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
+ 		.cea = params->cea,
+ 	};
  
- 	if (ret == 0)
- 		priv->audio_params = audio;
+-	if (!priv->encoder.crtc)
+-		return -ENODEV;
+-
+ 	memcpy(audio.status, params->iec.status,
+ 	       min(sizeof(audio.status), sizeof(params->iec.status)));
+ 
+@@ -1270,8 +1267,7 @@ static int tda998x_audio_hw_params(struct device *dev, void *data,
+ 	mutex_lock(&priv->audio_mutex);
+ 	/* We must not program the TDA998x for audio if the sink is DVI. */
+ 	if (priv->is_hdmi_config)
+-		ret = tda998x_configure_audio(priv, &audio,
+-					      priv->encoder.crtc->hwmode.clock);
++		ret = tda998x_configure_audio(priv, &audio);
+ 	else
+ 		ret = 0;
+ 
 -- 
 2.1.0
