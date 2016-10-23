@@ -1,19 +1,19 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2016 01:55:23 +0200
-Subject: [PATCH 1/2] pinctrl: stm32: remove dependency with interrupt
- controller
-In-Reply-To: <1476970012-7838-2-git-send-email-alexandre.torgue@st.com>
+Date: Mon, 24 Oct 2016 01:56:25 +0200
+Subject: [PATCH 2/2] pinctrl: stm32: move gpio irqs binding to optional
+In-Reply-To: <1476970012-7838-3-git-send-email-alexandre.torgue@st.com>
 References: <1476970012-7838-1-git-send-email-alexandre.torgue@st.com>
- <1476970012-7838-2-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CACRpkdZVDod=FVnNa1+Kqre8QdrmPwM8mM2YcioSgJDR5AT=Ng@mail.gmail.com>
+ <1476970012-7838-3-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkdYne7Kjk_Bw-j6E6SPvx4z7G_5AzfHwYJi70F=DvguAxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Oct 20, 2016 at 3:26 PM, Alexandre TORGUE
 <alexandre.torgue@st.com> wrote:
 
-> This patch allows to probe stm32 pinctrl driver even if no interrupt
-> controller is defined to manage gpio irqs.
+> stm32 pinctrl driver could be probed even if no interrupt controller
+> is defined to manage gpio irqs. Entries related to gpio irq management
+> are moved to optional.
 >
 > Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
