@@ -1,271 +1,30 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 23 Oct 2016 20:11:04 +0100
-Subject: [PATCH RFC 08/10] drm/i2c: tda998x: group audio functions together
+Date: Sun, 23 Oct 2016 20:11:10 +0100
+Subject: [PATCH RFC 09/10] drm/i2c: tda998x: remove complexity from
+ tda998x_audio_get_eld()
 In-Reply-To: <20161023191002.GJ1041@n2100.armlinux.org.uk>
 References: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <E1byOAi-0005zG-Rb@rmk-PC.armlinux.org.uk>
+Message-ID: <E1byOAn-0005zM-WF@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Group the TDA998x audio functions together rather than split between
-two different locations in the file, keeping like code together.
+tda998x_audio_get_eld() is needlessly complex - the connector associated
+with the encoder is always our own priv->connector.  Remove this
+complexity, but ensure that there are no races when copying out the ELD.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 278 +++++++++++++++++++-------------------
- 1 file changed, 140 insertions(+), 138 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 23 +++++++++--------------
+ 1 file changed, 9 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 4379c6aa1c48..6a7095b66a69 100644
+index 6a7095b66a69..547cf99ac32d 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -702,6 +702,8 @@ tda998x_write_avi(struct tda998x_priv *priv, struct drm_display_mode *mode)
- 	tda998x_write_if(priv, DIP_IF_FLAGS_IF2, REG_IF2_HB0, &frame);
- }
- 
-+/* Audio support */
-+
- static void tda998x_audio_mute(struct tda998x_priv *priv, bool on)
+@@ -911,21 +911,13 @@ static int tda998x_audio_get_eld(struct device *dev, void *data,
+ 				 uint8_t *buf, size_t len)
  {
- 	if (on) {
-@@ -820,6 +822,144 @@ tda998x_configure_audio(struct tda998x_priv *priv,
- 	return tda998x_write_aif(priv, &params->cea);
- }
- 
-+static int tda998x_audio_hw_params(struct device *dev, void *data,
-+				   struct hdmi_codec_daifmt *daifmt,
-+				   struct hdmi_codec_params *params)
-+{
-+	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	int i, ret;
-+	struct tda998x_audio_params audio = {
-+		.sample_width = params->sample_width,
-+		.sample_rate = params->sample_rate,
-+		.cea = params->cea,
-+	};
-+
-+	memcpy(audio.status, params->iec.status,
-+	       min(sizeof(audio.status), sizeof(params->iec.status)));
-+
-+	switch (daifmt->fmt) {
-+	case HDMI_I2S:
-+		if (daifmt->bit_clk_inv || daifmt->frame_clk_inv ||
-+		    daifmt->bit_clk_master || daifmt->frame_clk_master) {
-+			dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
-+				daifmt->bit_clk_inv, daifmt->frame_clk_inv,
-+				daifmt->bit_clk_master,
-+				daifmt->frame_clk_master);
-+			return -EINVAL;
-+		}
-+		for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++)
-+			if (priv->audio_port[i].format == AFMT_I2S)
-+				audio.config = priv->audio_port[i].config;
-+		audio.format = AFMT_I2S;
-+		break;
-+	case HDMI_SPDIF:
-+		for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++)
-+			if (priv->audio_port[i].format == AFMT_SPDIF)
-+				audio.config = priv->audio_port[i].config;
-+		audio.format = AFMT_SPDIF;
-+		break;
-+	default:
-+		dev_err(dev, "%s: Invalid format %d\n", __func__, daifmt->fmt);
-+		return -EINVAL;
-+	}
-+
-+	if (audio.config == 0) {
-+		dev_err(dev, "%s: No audio configutation found\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	mutex_lock(&priv->audio_mutex);
-+	/* We must not program the TDA998x for audio if the sink is DVI. */
-+	if (priv->is_hdmi_config)
-+		ret = tda998x_configure_audio(priv, &audio);
-+	else
-+		ret = 0;
-+
-+	if (ret == 0)
-+		priv->audio_params = audio;
-+	mutex_unlock(&priv->audio_mutex);
-+
-+	return ret;
-+}
-+
-+static void tda998x_audio_shutdown(struct device *dev, void *data)
-+{
-+	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+
-+	mutex_lock(&priv->audio_mutex);
-+
-+	reg_write(priv, REG_ENA_AP, 0);
-+
-+	priv->audio_params.format = AFMT_UNUSED;
-+
-+	mutex_unlock(&priv->audio_mutex);
-+}
-+
-+int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
-+{
-+	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+
-+	mutex_lock(&priv->audio_mutex);
-+
-+	tda998x_audio_mute(priv, enable);
-+
-+	mutex_unlock(&priv->audio_mutex);
-+	return 0;
-+}
-+
-+static int tda998x_audio_get_eld(struct device *dev, void *data,
-+				 uint8_t *buf, size_t len)
-+{
-+	struct tda998x_priv *priv = dev_get_drvdata(dev);
-+	struct drm_mode_config *config = &priv->encoder.dev->mode_config;
-+	struct drm_connector *connector;
-+	int ret = -ENODEV;
-+
-+	mutex_lock(&config->mutex);
-+	list_for_each_entry(connector, &config->connector_list, head) {
-+		if (&priv->encoder == connector->encoder) {
-+			memcpy(buf, connector->eld,
-+			       min(sizeof(connector->eld), len));
-+			ret = 0;
-+		}
-+	}
-+	mutex_unlock(&config->mutex);
-+
-+	return ret;
-+}
-+
-+static const struct hdmi_codec_ops audio_codec_ops = {
-+	.hw_params = tda998x_audio_hw_params,
-+	.audio_shutdown = tda998x_audio_shutdown,
-+	.digital_mute = tda998x_audio_digital_mute,
-+	.get_eld = tda998x_audio_get_eld,
-+};
-+
-+static int tda998x_audio_codec_init(struct tda998x_priv *priv,
-+				    struct device *dev)
-+{
-+	struct hdmi_codec_pdata codec_data = {
-+		.ops = &audio_codec_ops,
-+		.max_i2s_channels = 2,
-+	};
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++) {
-+		if (priv->audio_port[i].format == AFMT_I2S &&
-+		    priv->audio_port[i].config != 0)
-+			codec_data.i2s = 1;
-+		if (priv->audio_port[i].format == AFMT_SPDIF &&
-+		    priv->audio_port[i].config != 0)
-+			codec_data.spdif = 1;
-+	}
-+
-+	priv->audio_pdev = platform_device_register_data(
-+		dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
-+		&codec_data, sizeof(codec_data));
-+
-+	return PTR_ERR_OR_ZERO(priv->audio_pdev);
-+}
-+
- /* DRM connector functions */
- 
- static int tda998x_connector_dpms(struct drm_connector *connector, int mode)
-@@ -1261,144 +1401,6 @@ static void tda998x_destroy(struct tda998x_priv *priv)
- 	i2c_unregister_device(priv->cec);
- }
- 
--static int tda998x_audio_hw_params(struct device *dev, void *data,
--				   struct hdmi_codec_daifmt *daifmt,
--				   struct hdmi_codec_params *params)
--{
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
--	int i, ret;
--	struct tda998x_audio_params audio = {
--		.sample_width = params->sample_width,
--		.sample_rate = params->sample_rate,
--		.cea = params->cea,
--	};
--
--	memcpy(audio.status, params->iec.status,
--	       min(sizeof(audio.status), sizeof(params->iec.status)));
--
--	switch (daifmt->fmt) {
--	case HDMI_I2S:
--		if (daifmt->bit_clk_inv || daifmt->frame_clk_inv ||
--		    daifmt->bit_clk_master || daifmt->frame_clk_master) {
--			dev_err(dev, "%s: Bad flags %d %d %d %d\n", __func__,
--				daifmt->bit_clk_inv, daifmt->frame_clk_inv,
--				daifmt->bit_clk_master,
--				daifmt->frame_clk_master);
--			return -EINVAL;
--		}
--		for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++)
--			if (priv->audio_port[i].format == AFMT_I2S)
--				audio.config = priv->audio_port[i].config;
--		audio.format = AFMT_I2S;
--		break;
--	case HDMI_SPDIF:
--		for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++)
--			if (priv->audio_port[i].format == AFMT_SPDIF)
--				audio.config = priv->audio_port[i].config;
--		audio.format = AFMT_SPDIF;
--		break;
--	default:
--		dev_err(dev, "%s: Invalid format %d\n", __func__, daifmt->fmt);
--		return -EINVAL;
--	}
--
--	if (audio.config == 0) {
--		dev_err(dev, "%s: No audio configutation found\n", __func__);
--		return -EINVAL;
--	}
--
--	mutex_lock(&priv->audio_mutex);
--	/* We must not program the TDA998x for audio if the sink is DVI. */
--	if (priv->is_hdmi_config)
--		ret = tda998x_configure_audio(priv, &audio);
--	else
--		ret = 0;
--
--	if (ret == 0)
--		priv->audio_params = audio;
--	mutex_unlock(&priv->audio_mutex);
--
--	return ret;
--}
--
--static void tda998x_audio_shutdown(struct device *dev, void *data)
--{
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
--
--	mutex_lock(&priv->audio_mutex);
--
--	reg_write(priv, REG_ENA_AP, 0);
--
--	priv->audio_params.format = AFMT_UNUSED;
--
--	mutex_unlock(&priv->audio_mutex);
--}
--
--int tda998x_audio_digital_mute(struct device *dev, void *data, bool enable)
--{
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
--
--	mutex_lock(&priv->audio_mutex);
--
--	tda998x_audio_mute(priv, enable);
--
--	mutex_unlock(&priv->audio_mutex);
--	return 0;
--}
--
--static int tda998x_audio_get_eld(struct device *dev, void *data,
--				 uint8_t *buf, size_t len)
--{
--	struct tda998x_priv *priv = dev_get_drvdata(dev);
+ 	struct tda998x_priv *priv = dev_get_drvdata(dev);
 -	struct drm_mode_config *config = &priv->encoder.dev->mode_config;
 -	struct drm_connector *connector;
 -	int ret = -ENODEV;
@@ -279,44 +38,27 @@ index 4379c6aa1c48..6a7095b66a69 100644
 -		}
 -	}
 -	mutex_unlock(&config->mutex);
--
--	return ret;
--}
--
--static const struct hdmi_codec_ops audio_codec_ops = {
--	.hw_params = tda998x_audio_hw_params,
--	.audio_shutdown = tda998x_audio_shutdown,
--	.digital_mute = tda998x_audio_digital_mute,
--	.get_eld = tda998x_audio_get_eld,
--};
--
--static int tda998x_audio_codec_init(struct tda998x_priv *priv,
--				    struct device *dev)
--{
--	struct hdmi_codec_pdata codec_data = {
--		.ops = &audio_codec_ops,
--		.max_i2s_channels = 2,
--	};
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(priv->audio_port); i++) {
--		if (priv->audio_port[i].format == AFMT_I2S &&
--		    priv->audio_port[i].config != 0)
--			codec_data.i2s = 1;
--		if (priv->audio_port[i].format == AFMT_SPDIF &&
--		    priv->audio_port[i].config != 0)
--			codec_data.spdif = 1;
--	}
--
--	priv->audio_pdev = platform_device_register_data(
--		dev, HDMI_CODEC_DRV_NAME, PLATFORM_DEVID_AUTO,
--		&codec_data, sizeof(codec_data));
--
--	return PTR_ERR_OR_ZERO(priv->audio_pdev);
--}
--
- /* I2C driver functions */
  
- static int tda998x_get_audio_ports(struct tda998x_priv *priv,
+-	return ret;
++	mutex_lock(&priv->audio_mutex);
++	memcpy(buf, priv->connector.eld,
++	       min(sizeof(priv->connector.eld), len));
++	mutex_unlock(&priv->audio_mutex);
++
++	return 0;
+ }
+ 
+ static const struct hdmi_codec_ops audio_codec_ops = {
+@@ -1082,7 +1074,10 @@ static int tda998x_connector_get_modes(struct drm_connector *connector)
+ 	drm_mode_connector_update_edid_property(connector, edid);
+ 	n = drm_add_edid_modes(connector, edid);
+ 	priv->is_hdmi_sink = drm_detect_hdmi_monitor(edid);
++
++	mutex_lock(&priv->audio_mutex);
+ 	drm_edid_to_eld(connector, edid);
++	mutex_unlock(&priv->audio_mutex);
+ 
+ 	kfree(edid);
+ 
 -- 
 2.1.0
