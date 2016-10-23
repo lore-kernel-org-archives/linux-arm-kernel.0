@@ -1,18 +1,19 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 23 Oct 2016 20:11:07 +0800
-Subject: [PATCH] ARM: dts: imx: b650v3: Calibrate USB PHY to pass eye
- diagram test
-In-Reply-To: <1473887689-10792-1-git-send-email-jaret.cantu@timesys.com>
-References: <1473887689-10792-1-git-send-email-jaret.cantu@timesys.com>
-Message-ID: <20161023121107.GP30578@tiger>
+Date: Sun, 23 Oct 2016 20:16:05 +0800
+Subject: [PATCH v2 0/3] ARM: dts: imx6qdl cleanups
+In-Reply-To: <1476437970-15800-1-git-send-email-jteki@openedev.com>
+References: <1476437970-15800-1-git-send-email-jteki@openedev.com>
+Message-ID: <20161023121605.GQ30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 14, 2016 at 05:14:49PM -0400, Jaret Cantu wrote:
-> Calibrate the USB PHY TX settings to pass the eye diagram signal
-> integrity test.  The settings are taken from the i.MX6 reference
-> manual's recommended configuration for USB certification (66.2.6).
+On Fri, Oct 14, 2016 at 03:09:27PM +0530, Jagan Teki wrote:
+> Patchset for imx6qdl devicetree files cleanups.
 > 
-> Signed-off-by: Jaret Cantu <jaret.cantu@timesys.com>
+> Jagan Teki (3):
+>   arm: dts: imx6qdl: Fix "WARNING: please, no space before tabs"
+>   arm: dts: imx6qdl: Fix "ERROR: code indent should use tabs where
+>     possible"
+>   arm: dts: imx6qdl-wandboard-revb: Fix "ERROR: trailing whitespace"
 
 Applied, thanks.
