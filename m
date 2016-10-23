@@ -1,49 +1,38 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 23 Oct 2016 09:35:15 +0200
-Subject: [linux-sunxi] [PATCH v5 0/7] ARM: ASoC: drm: sun8i: Add DE2
- HDMI audio and video
-In-Reply-To: <CAGb2v64fgJShfyEHnjm6ryg00WhHkmnPj+FdjHcXBa6HQbyTuA@mail.gmail.com>
+Date: Sun, 23 Oct 2016 09:45:03 +0200
+Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
+In-Reply-To: <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
 References: <cover.1477142934.git.moinejf@free.fr>
- <CAGb2v64fgJShfyEHnjm6ryg00WhHkmnPj+FdjHcXBa6HQbyTuA@mail.gmail.com>
-Message-ID: <20161023093515.960c394d78b84e0480640075@free.fr>
+ <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
+ <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
+Message-ID: <20161023094503.fbb22dd0701e3f2785828609@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 23 Oct 2016 09:38:04 +0800
+On Sun, 23 Oct 2016 09:33:16 +0800
 Chen-Yu Tsai <wens@csie.org> wrote:
 
-> > Recently, an announce about Tina OS for the R series
-> >         https://www.youtube.com/watch?v=h7KD-6HblAU
-> > was followed by the upload of a new linux-3.4 source tree
-> >         https://github.com/tinalinux/linux-3.4
-> > with files containing GPL headers.
-> >
-> > Well, I don't know if these sources are really from Allwinner, but
-> > anyway, this is the opportunity to propose a new version of my DRM
-> > HDMI driver.
+> > Note: This driver is closed to the sun4i-i2s except that:
+> > - it handles the H3
 > 
-> Could you clarify about this bit? Did you just clean up Allwinner's
-> existing drivers? Or just use them as reference? Either way I think
-> this deserves some mention in all your copyright headers.
+> If it's close to sun4i-i2s, you should probably rework that one to support
+> the newer SoCs.
 > 
-> Otherwise what difference does the new release make?
+> > - it creates the sound card (with sun4i-i2s, the sound card is created
+> >   by the CODECs)
+> 
+> I think this is wrong. I2S is only the DAI. You typically have a separate
+> platform driver for the whole card, or just use simple-card.
 
-- Allwinner's video driver is not DRM.
-- their driver has no hardware cursor nor video overlay.
-- I wrote the video DRM driver from the document
-	Allwinner_H3_Datasheet_V1.2.pdf
-  and the structures defined in
-linux-3.4/drivers/video/sunxi/disp2/disp/de/lowlevel_sun8iw7/de_rtmx.h
-  Reading Allwinner's code helped me to understand how the DE2
-  is working.
-- my lowlevel HDMI is just a cleanup of theirs with explanations
-  about the registers. Magic constants remain due to the lack of
-  knowledge about the PHYs.
-- the mention of Allwinner in the copyright headers is needed to
-  indicate the source of the structures (DE2) and code (HDMI).
-
-The main difference is the DRM interface and the use of the EDID,
-permitting dynamic video resolution change with xrandr.
+An other device is not needed. The layout is simple:
+	I2S_controller (CPU DAI) <-> HDMI_CODEC (CODEC DAI)
+The HDMI CODEC is supported by the HDMI video driver (only one device),
+so, it cannot be the card device.
+ASoC does not use the CPU DAI device (I2S_controller), so, it is
+natural to use it to handle the card.
+Otherwise, the simple-card asks for a node definition in the DT and
+this node is a pure Linux software entity. On the other side, the
+simple-graph-card from Kuninori is not useful for this simple case.
 
 -- 
 Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
