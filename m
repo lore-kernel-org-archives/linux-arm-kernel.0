@@ -1,25 +1,50 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Sun, 23 Oct 2016 00:26:59 -0700
-Subject: Question about arm64 earlycon
-Message-ID: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 23 Oct 2016 09:35:15 +0200
+Subject: [linux-sunxi] [PATCH v5 0/7] ARM: ASoC: drm: sun8i: Add DE2
+ HDMI audio and video
+In-Reply-To: <CAGb2v64fgJShfyEHnjm6ryg00WhHkmnPj+FdjHcXBa6HQbyTuA@mail.gmail.com>
+References: <cover.1477142934.git.moinejf@free.fr>
+ <CAGb2v64fgJShfyEHnjm6ryg00WhHkmnPj+FdjHcXBa6HQbyTuA@mail.gmail.com>
+Message-ID: <20161023093515.960c394d78b84e0480640075@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, Marc, Mark, Arnd,
+On Sun, 23 Oct 2016 09:38:04 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-I am testing with 3.12 kernel with earlyprintk enabled and I see some
-garbage characters in the console log right before the message
-indicating that the real console device is initialized:
+> > Recently, an announce about Tina OS for the R series
+> >         https://www.youtube.com/watch?v=h7KD-6HblAU
+> > was followed by the upload of a new linux-3.4 source tree
+> >         https://github.com/tinalinux/linux-3.4
+> > with files containing GPL headers.
+> >
+> > Well, I don't know if these sources are really from Allwinner, but
+> > anyway, this is the opportunity to propose a new version of my DRM
+> > HDMI driver.
+> 
+> Could you clarify about this bit? Did you just clean up Allwinner's
+> existing drivers? Or just use them as reference? Either way I think
+> this deserves some mention in all your copyright headers.
+> 
+> Otherwise what difference does the new release make?
 
-<some garbage characters here>01c020000.serial: ttyS0 at MMIO
-0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
-console [ttyS0] enabled, bootconsole disabled
+- Allwinner's video driver is not DRM.
+- their driver has no hardware cursor nor video overlay.
+- I wrote the video DRM driver from the document
+	Allwinner_H3_Datasheet_V1.2.pdf
+  and the structures defined in
+linux-3.4/drivers/video/sunxi/disp2/disp/de/lowlevel_sun8iw7/de_rtmx.h
+  Reading Allwinner's code helped me to understand how the DE2
+  is working.
+- my lowlevel HDMI is just a cleanup of theirs with explanations
+  about the registers. Magic constants remain due to the lack of
+  knowledge about the PHYs.
+- the mention of Allwinner in the copyright headers is needed to
+  indicate the source of the structures (DE2) and code (HDMI).
 
-I looked through early_prink.c file and printk.c file and it looks
-like there is case that some early boot code can touch the UART
-hardware via ealy console driver while the 'real' console driver is
-setting up the same UART port? Please let me know if I missed some
-important piece of code that can prevent this.
+The main difference is the DRM interface and the use of the EDID,
+permitting dynamic video resolution change with xrandr.
 
-Regards,
-Duc Dang.
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
