@@ -1,56 +1,111 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 22 Oct 2016 18:59:18 -0500
-Subject: [PATCH V4 3/3] Revert "ACPI, PCI, IRQ: separate ISA penalty
- calculation"
-In-Reply-To: <8dcd59ac-815b-da71-a3f2-ba533c4182c9@codeaurora.org>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-4-git-send-email-okaya@codeaurora.org>
- <20161021023109.GD31044@localhost>
- <8dcd59ac-815b-da71-a3f2-ba533c4182c9@codeaurora.org>
-Message-ID: <20161022235918.GJ9007@localhost>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 23 Oct 2016 09:33:16 +0800
+Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
+In-Reply-To: <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
+References: <cover.1477142934.git.moinejf@free.fr>
+ <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
+Message-ID: <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 07:58:57PM -0700, Sinan Kaya wrote:
-> On 10/20/2016 7:31 PM, Bjorn Helgaas wrote:
-> ...
-> > And I don't think it fixes a user-visible problem, so it doesn't need
-> > to be applied immediately.  I'm not sure this is worth doing by
-> > itself; maybe it should wait until we can do more cleanup and think
-> > about all these issues together?
-> 
-> It does fix the PCI_USING penalty assignment. 
-> 
->                 if (link->irq.active && link->irq.active == irq)
->                          penalty += PIRQ_PENALTY_PCI_USING;
-> 
-> 
-> If we drop this patch, then we need
-> [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA interrupts
-> 
-> http://www.gossamer-threads.com/lists/linux/kernel/2547605
-> 
-> as somebody needs to increment the penalty with PCI_USING when IRQ is assigned
-> for a given ISA IRQ.
-> 
-> We might as well take [PATCH V4 1/3], [PATCH V4 2/3] and [PATCH V3 1/3]
-> for this regression.
+Hi,
 
-It sounds like either V3 1/3 or V4 3/3 will fix the regression.  The
-V3 1/3 patch is much smaller and essentially makes this piece look
-like it did in v4.6.
+On Fri, Oct 21, 2016 at 4:36 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> This patch adds I2S support to sun8i SoCs as the A83T and H3.
+>
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> ---
+> Note: This driver is closed to the sun4i-i2s except that:
+> - it handles the H3
 
-The V4 3/3 patch removes acpi_irq_penalty_init() and compensates by
-using acpi_irq_pci_sharing_penalty() for ISA IRQs again.  But
-acpi_irq_penalty_init() added PIRQ_PENALTY_PCI_POSSIBLE for _CRS, and
-only if there was no _PRS, while acpi_irq_pci_sharing_penalty() always
-adds PIRQ_PENALTY_PCI_USING for _CRS, regardless of whether _PRS
-exists.
+If it's close to sun4i-i2s, you should probably rework that one to support
+the newer SoCs.
 
-Since V4 3/3 is so much bigger and makes this quite subtle change in
-how _CRS is handled, I like V3 1/3 better.
+> - it creates the sound card (with sun4i-i2s, the sound card is created
+>   by the CODECs)
 
-Are we all set to go now?  I think I've acked the patches you
-mentioned.
+I think this is wrong. I2S is only the DAI. You typically have a separate
+platform driver for the whole card, or just use simple-card.
 
-Bjorn
+> ---
+>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  38 +-
+>  sound/soc/sunxi/Kconfig                            |   8 +
+>  sound/soc/sunxi/Makefile                           |   3 +
+>  sound/soc/sunxi/sun8i-i2s.c                        | 700 +++++++++++++++++++++
+>  4 files changed, 744 insertions(+), 5 deletions(-)
+>  create mode 100644 sound/soc/sunxi/sun8i-i2s.c
+>
+> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> index 7b526ec..2fb0a7a 100644
+> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> @@ -1,4 +1,4 @@
+> -* Allwinner A10 I2S controller
+> +* Allwinner A10/A38T/H3 I2S controller
+>
+>  The I2S bus (Inter-IC sound bus) is a serial link for digital
+>  audio data transfer between devices in the system.
+> @@ -6,20 +6,30 @@ audio data transfer between devices in the system.
+>  Required properties:
+>
+>  - compatible: should be one of the followings
+> -   - "allwinner,sun4i-a10-i2s"
+> +  - "allwinner,sun4i-a10-i2s"
+> +       "allwinner,sun8i-a83t-i2s"
+> +       "allwinner,sun8i-h3-i2s"
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+> -- interrupts: should contain the I2S interrupt.
+>  - dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
+>         Documentation/devicetree/bindings/dma/dma.txt
+> -- dma-names: should include "tx" and "rx".
+> +- dma-names: must include "tx" and/or "rx".
+>  - clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
+>  - clock-names: should contain followings:
+>     - "apb" : clock for the I2S bus interface
+>     - "mod" : module clock for the I2S controller
+>  - #sound-dai-cells : Must be equal to 0
+>
+> -Example:
+> +Optional properties:
+> +
+> +- interrupts: I2S interrupt
+> +- resets: phandle to the reset of the device
+> +
+> +Required nodes:
+> +
+> + - port: link to the associated CODEC (DAC, HDMI...)
+
+Note here you are changing an existing binding, adding a required node.
+If it were truely different, you probably should've started a new binding.
+
+Regards
+ChenYu
+
+> +
+> +Example 1:
+>
+>  i2s0: i2s at 01c22400 {
+>         #sound-dai-cells = <0>;
+> @@ -32,3 +42,21 @@ i2s0: i2s at 01c22400 {
+>                <&dma SUN4I_DMA_NORMAL 3>;
+>         dma-names = "rx", "tx";
+>  };
+> +
+> +Example 2:
+> +
+> +i2s2: i2s at 1c22800 {
+> +       compatible = "allwinner,sun8i-a83t-i2s";
+> +       reg = <0x01c22800 0x60>;
+> +       clocks = <&ccu CLK_BUS_I2S2>, <&ccu CLK_I2S2>;
+> +       clock-names = "apb", "mod";
+> +       resets = <&ccu RST_I2S2>;
+> +       dmas = <&dma 27>;
+> +       dma-names = "tx";
+> +       status = "disabled";
+> +       port {
+> +               i2s2_hdmi: endpoint {
+> +                       remote-endpoint = <&hdmi_i2s2>;
+> +               };
+> +       };
+> +};
