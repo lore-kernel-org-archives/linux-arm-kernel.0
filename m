@@ -1,47 +1,35 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 23 Oct 2016 20:28:44 +0800
-Subject: [PATCH v2 0/4] ARM: imx31: clock initialization fixes
-In-Reply-To: <1474848223-19728-1-git-send-email-vz@mleia.com>
-References: <1474848223-19728-1-git-send-email-vz@mleia.com>
-Message-ID: <20161023122844.GR30578@tiger>
+Date: Sun, 23 Oct 2016 20:41:50 +0800
+Subject: [PATCH 1/1 v8] ARM: imx: Added perf functionality to mmdc driver
+In-Reply-To: <1474307849-7341-1-git-send-email-Frank.Li@nxp.com>
+References: <1474307849-7341-1-git-send-email-Frank.Li@nxp.com>
+Message-ID: <20161023124149.GS30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2016 at 03:03:39AM +0300, Vladimir Zapolskiy wrote:
-> The change is tested on qemu kzm target and mx31lite board, while both
-> targets don't have DTS in upstream, I had to write simple DTS files for
-> them, because the proposed change is for i.MX31 targets with OF support.
+On Mon, Sep 19, 2016 at 12:57:29PM -0500, Frank Li wrote:
+> From: Zhengyu Shen <zhengyu.shen@nxp.com>
 > 
-> i.MX31/OF/clock initialization seems to be broken currently, if
-> the series is not applied I can not get a working clock source during
-> early boot stage on a board with DTB supplied.
+> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+> MMDC provides registers for performance counters which read via this
+> driver to help debug memory throughput and similar issues.
 > 
-> Changes from v1 to v2, thanks to Uwe and Stephen for review:
-> * added one more new fix in imx31.dtsi which moves CCM device node
->   to AIPS2 bus,
-> * included to the series a fix of CCM interrupts in imx31.dtsi,
->   the change was sent as a separate patch, the change is included
->   to avoid a patch application dependency,
-> * as suggested by Uwe reworded one of the commits removing "stack
->   corruption" mentioning, the overwritten value is passed in a register,
-> * as suggested by Uwe squashed clk-imx31.c and imx31-dt.c changes
->   to avoid a runtime problem if only one of two patches are applied
+> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
 > 
-> Vladimir Zapolskiy (4):
->   ARM: dts: imx31: fix clock control module interrupts description
->   ARM: dts: imx31: move CCM device node to AIPS2 bus devices
->   clk: imx31: fix rewritten input argument of mx31_clocks_init()
->   ARM: clk: imx31: properly init clocks for machines with DT
+>          898021787      mmdc/busy-cycles/
+>           14819600      mmdc/read-accesses/
+>             471.30 MB   mmdc/read-bytes/
+>         2815419216      mmdc/total-cycles/
+>           13367354      mmdc/write-accesses/
+>             427.76 MB   mmdc/write-bytes/
 > 
->  .../devicetree/bindings/clock/imx31-clock.txt      |  2 +-
->  arch/arm/boot/dts/imx31.dtsi                       | 14 +++---
->  arch/arm/mach-imx/common.h                         |  1 -
->  arch/arm/mach-imx/imx31-dt.c                       |  6 ---
->  drivers/clk/imx/clk-imx31.c                        | 52 +++++++++++-----------
+>        5.334757334 seconds time elapsed
+> 
+> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+> Signed-off-by: Frank Li <frank.li@nxp.com>
 
-Hi Stephen,
-
-Can I have you ACK on the clk file, so that we can merge the series from
-arm-soc tree?  Thanks.
-
-Shawn
+Applied, thanks.
