@@ -1,54 +1,27 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 23 Oct 2016 13:40:49 -0700
-Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
-Message-ID: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
+From: vgupta@synopsys.com (Vineet Gupta)
+Date: Sun, 23 Oct 2016 13:57:27 -0700
+Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
+ default list
+In-Reply-To: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <4e1a4e68-5c84-ce9d-73df-b7da312cc884@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
-corrected the KERN_CONT fallout from commit 4bcc595ccd80
-("printk: reinstate KERN_CONT for printing continuation lines"), but
-the code still has unnecessary KERN_CONT uses.  Remove them.
+On 10/22/2016 05:14 AM, Yury Norov wrote:
+> The newer prlimit64 syscall provides all the functionality provided by
+> the getrlimit and setrlimit syscalls and adds the pid of target process,
+> so future architectures won't need to include getrlimit and setrlimit.
+>
+> Therefore drop getrlimit and setrlimit syscalls from the generic syscall
+> list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the architecture's
+> unistd.h prior to including asm-generic/unistd.h, and adjust all
+> architectures using the generic syscall list to define it so that no
+> in-tree architectures are affected.
+>
+> Cc: Vineet Gupta <vgupta@synopsys.com>
 
-Miscellanea:
+Acked-by: Vineet Gupta <vgupta@synopsys.com> #arch/arc bits
 
-o Remove unnecessary trailing blank from the output too.
-
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm64/kernel/process.c | 18 ++++++++----------
- 1 file changed, 8 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 01753cd7d3f0..2278e7197a8e 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -190,18 +190,16 @@ void __show_regs(struct pt_regs *regs)
- 
- 	i = top_reg;
- 
--	while (i >= 0) {
--		printk("x%-2d: %016llx ", i, regs->regs[i]);
-+	if (i >= 0 && !(i % 2)) {
-+		printk("x%-2d: %016llx\n", i, regs->regs[i]);
- 		i--;
--
--		if (i % 2 == 0) {
--			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
--			i--;
--		}
--
--		pr_cont("\n");
- 	}
--	printk("\n");
-+	while (i > 0) {
-+		printk("x%-2d: %016llx x%-2d: %016llx\n",
-+		       i, regs->regs[i],
-+		       i - 1, regs->regs[i - 1]);
-+		i -= 2;
-+	}
- }
- 
- void show_regs(struct pt_regs * regs)
--- 
-2.10.0.rc2.1.g053435c
+Thx,
+-Vineet
