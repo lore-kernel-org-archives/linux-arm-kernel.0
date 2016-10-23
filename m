@@ -1,48 +1,54 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 23 Oct 2016 20:10:28 +0100
-Subject: [PATCH RFC 01/10] drm/i2c: tda998x: avoid race in
- tda998x_encoder_mode_set()
-In-Reply-To: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-References: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <E1byOA8-0005yS-TQ@rmk-PC.armlinux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 23 Oct 2016 13:40:49 -0700
+Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
+Message-ID: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As priv->audio_params can now be changed at run time, we need to be more
-careful about how we deal with a mode set.  We must take the audio lock
-while checking if there's a valid audio configuration.
+commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
+corrected the KERN_CONT fallout from commit 4bcc595ccd80
+("printk: reinstate KERN_CONT for printing continuation lines"), but
+the code still has unnecessary KERN_CONT uses.  Remove them.
 
-However, it's slightly worse than that - during mode set, we mute the
-audio, and it must not be unmuted until we have finished the mode set.
-It is possible that the audio side may start while a mode set is in
-progress, so take the audio_mutex lock around the whole mode setting
-procedure.
+Miscellanea:
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+o Remove unnecessary trailing blank from the output too.
+
+Signed-off-by: Joe Perches <joe@perches.com>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm64/kernel/process.c | 18 ++++++++----------
+ 1 file changed, 8 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 9798d400d817..d72bc30a3bce 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -1074,13 +1074,12 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 01753cd7d3f0..2278e7197a8e 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -190,18 +190,16 @@ void __show_regs(struct pt_regs *regs)
  
- 		tda998x_write_avi(priv, adjusted_mode);
+ 	i = top_reg;
  
--		if (priv->audio_params.format != AFMT_UNUSED) {
--			mutex_lock(&priv->audio_mutex);
-+		mutex_lock(&priv->audio_mutex);
-+		if (priv->audio_params.format != AFMT_UNUSED)
- 			tda998x_configure_audio(priv,
- 						&priv->audio_params,
- 						adjusted_mode->clock);
--			mutex_unlock(&priv->audio_mutex);
+-	while (i >= 0) {
+-		printk("x%-2d: %016llx ", i, regs->regs[i]);
++	if (i >= 0 && !(i % 2)) {
++		printk("x%-2d: %016llx\n", i, regs->regs[i]);
+ 		i--;
+-
+-		if (i % 2 == 0) {
+-			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
+-			i--;
 -		}
-+		mutex_unlock(&priv->audio_mutex);
+-
+-		pr_cont("\n");
  	}
+-	printk("\n");
++	while (i > 0) {
++		printk("x%-2d: %016llx x%-2d: %016llx\n",
++		       i, regs->regs[i],
++		       i - 1, regs->regs[i - 1]);
++		i -= 2;
++	}
  }
  
+ void show_regs(struct pt_regs * regs)
 -- 
-2.1.0
+2.10.0.rc2.1.g053435c
