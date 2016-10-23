@@ -1,46 +1,18 @@
-From: roszenrami@gmail.com (Rami Rosen)
-Date: Sun, 23 Oct 2016 15:08:56 +0300
-Subject: [PATCH v4 01/10] ethernet: add sun8i-emac driver
-In-Reply-To: <1475828757-926-2-git-send-email-clabbe.montjoie@gmail.com>
-References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
- <1475828757-926-2-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <CAKoUAr=HmzYHq53i1bAzgOYd8RNzO_xBi30HW41KVZ=W4-Pdvg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 23 Oct 2016 20:11:07 +0800
+Subject: [PATCH] ARM: dts: imx: b650v3: Calibrate USB PHY to pass eye
+ diagram test
+In-Reply-To: <1473887689-10792-1-git-send-email-jaret.cantu@timesys.com>
+References: <1473887689-10792-1-git-send-email-jaret.cantu@timesys.com>
+Message-ID: <20161023121107.GP30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin,
+On Wed, Sep 14, 2016 at 05:14:49PM -0400, Jaret Cantu wrote:
+> Calibrate the USB PHY TX settings to pass the eye diagram signal
+> integrity test.  The settings are taken from the i.MX6 reference
+> manual's recommended configuration for USB certification (66.2.6).
+> 
+> Signed-off-by: Jaret Cantu <jaret.cantu@timesys.com>
 
-
-Trivial comment: rx_saf_fai and rx_daf_fail are not used. This implies that also
-rx_saf_error and rx_daf_error should be removed:
-
-> +static const char const estats_str[][ETH_GSTRING_LEN] = {
-...
-> +       "rx_header_error",
-> +       "rx_overflow_error",
-> +       "rx_saf_error",
-> +       "rx_daf_error",
-> +       "rx_buf_error",
-...
-
-> +
-> +struct sun8i_emac_stats {
-> +       u64 rx_payload_error;
-...
-> +       u64 rx_overflow_error;
-> +       u64 rx_saf_fail;
-> +       u64 rx_daf_fail;
-
-> +       u64 tx_used_desc;
-> +       u64 napi_schedule;
-> +       u64 napi_underflow;
-> +};
-> +
-
-Trivial: typo, should be: can transfer
-
-> +/* The datasheet said that each descriptor can transfers up to 4096bytes
-> + * But latter, a register documentation reduce that value to 2048
-
-Regards,
-Rami Rosen
+Applied, thanks.
