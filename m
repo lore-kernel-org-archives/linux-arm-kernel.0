@@ -1,122 +1,56 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Sun, 23 Oct 2016 14:49:27 +1100
-Subject: [V4,3/3] Revert "ACPI,PCI,IRQ: separate ISA penalty calculation"
-In-Reply-To: <1476915664-27231-4-git-send-email-okaya@codeaurora.org>
-References: <1476915664-27231-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <CANwerB1LDgFFKDVBVf1eAo5713niEDchqQDHHxet-SuAPNPq7Q@mail.gmail.com>
+From: l.majewski@majess.pl (Lukasz Majewski)
+Date: Sun, 23 Oct 2016 08:40:27 +0200
+Subject: [PATCH v3 3/6] pwm: imx: support output polarity inversion
+In-Reply-To: <20161022140118.7a6cb583@bbrezillon>
+References: <20161007151129.6043-1-bhuvanchandra.dv@toradex.com>
+ <20161007151129.6043-4-bhuvanchandra.dv@toradex.com>
+ <5325a332099473a2d8382530f79c5a8e@agner.ch>
+ <20161013001540.7f759158@jawa>
+ <ff9ba34df2729204c617685dd26ea625@agner.ch>
+ <20161013065812.0da91859@jawa> <20161020103018.44fb94ea@jawa>
+ <1b72dcbc9a021e6fa3aef62f63bbf93f@agner.ch>
+ <20161021234939.1a4f51f4@jawa> <20161022140118.7a6cb583@bbrezillon>
+Message-ID: <20161023084027.4a2aae51@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2016 at 09:21, Sinan Kaya <okaya@codeaurora.org> wrote:
-> This reverts commit f7eca374f000 ("ACPI,PCI,IRQ: separate ISA penalty
-> calculation") and commit 487cf917ed0d ("revert "ACPI, PCI, IRQ: remove
-> redundant code in acpi_irq_penalty_init()"").
->
-> Now that we understand the real issue (SCI and ISA penalty getting
-> calculated before ACPI start), there is no need for special handling
-> for ISA interrupts.
->
-> Let's try to simplify the code one more time to share code.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  arch/x86/pci/acpi.c         |  1 -
->  drivers/acpi/pci_link.c     | 44 +++++---------------------------------------
->  include/acpi/acpi_drivers.h |  1 -
->  3 files changed, 5 insertions(+), 41 deletions(-)
->
-> diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-> index 3cd6983..b2a4e2a 100644
-> --- a/arch/x86/pci/acpi.c
-> +++ b/arch/x86/pci/acpi.c
-> @@ -396,7 +396,6 @@ int __init pci_acpi_init(void)
->                 return -ENODEV;
->
->         printk(KERN_INFO "PCI: Using ACPI for IRQ routing\n");
-> -       acpi_irq_penalty_init();
->         pcibios_enable_irq = acpi_pci_irq_enable;
->         pcibios_disable_irq = acpi_pci_irq_disable;
->         x86_init.pci.init_irq = x86_init_noop;
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 294b190..dd14d78 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -478,7 +478,8 @@ static int acpi_irq_pci_sharing_penalty(int irq)
->                  * If a link is active, penalize its IRQ heavily
->                  * so we try to choose a different IRQ.
->                  */
-> -               if (link->irq.active && link->irq.active == irq)
-> +               if ((link->irq.active && link->irq.active == irq) &&
-> +                               (link->irq.initialized == 1))
->                         penalty += PIRQ_PENALTY_PCI_USING;
->
->                 /*
-> @@ -501,45 +502,10 @@ static int acpi_irq_get_penalty(int irq)
->                 penalty += sci_penalty;
->
->         if (irq < ACPI_MAX_ISA_IRQS)
-> -               return penalty + acpi_isa_irq_penalty[irq];
-> +               penalty += acpi_isa_irq_penalty[irq];
->
-> -       return penalty + acpi_irq_pci_sharing_penalty(irq);
-> -}
-> -
-> -int __init acpi_irq_penalty_init(void)
-> -{
-> -       struct acpi_pci_link *link;
-> -       int i;
-> -
-> -       /*
-> -        * Update penalties to facilitate IRQ balancing.
-> -        */
-> -       list_for_each_entry(link, &acpi_link_list, list) {
-> -
-> -               /*
-> -                * reflect the possible and active irqs in the penalty table --
-> -                * useful for breaking ties.
-> -                */
-> -               if (link->irq.possible_count) {
-> -                       int penalty =
-> -                           PIRQ_PENALTY_PCI_POSSIBLE /
-> -                           link->irq.possible_count;
-> -
-> -                       for (i = 0; i < link->irq.possible_count; i++) {
-> -                               if (link->irq.possible[i] < ACPI_MAX_ISA_IRQS)
-> -                                       acpi_isa_irq_penalty[link->irq.
-> -                                                        possible[i]] +=
-> -                                           penalty;
-> -                       }
-> -
-> -               } else if (link->irq.active &&
-> -                               (link->irq.active < ACPI_MAX_ISA_IRQS)) {
-> -                       acpi_isa_irq_penalty[link->irq.active] +=
-> -                           PIRQ_PENALTY_PCI_POSSIBLE;
-> -               }
-> -       }
-> -
-> -       return 0;
-> +       penalty += acpi_irq_pci_sharing_penalty(irq);
-> +       return penalty;
->  }
->
->  static int acpi_irq_balance = -1;      /* 0: static, 1: balance */
-> diff --git a/include/acpi/acpi_drivers.h b/include/acpi/acpi_drivers.h
-> index 29c6912..797ae2e 100644
-> --- a/include/acpi/acpi_drivers.h
-> +++ b/include/acpi/acpi_drivers.h
-> @@ -78,7 +78,6 @@
->
->  /* ACPI PCI Interrupt Link (pci_link.c) */
->
-> -int acpi_irq_penalty_init(void);
->  int acpi_pci_link_allocate_irq(acpi_handle handle, int index, int *triggering,
->                                int *polarity, char **name);
->  int acpi_pci_link_free_irq(acpi_handle handle);
+Hi Boris,
 
-This series fixes one or more network adapters not working in Linux
-32-bit x86 guest running inside VirtualBox if I have 4 network
-adapters enabled. The following message no longer appears in the
-kernel log:
-ACPI: No IRQ available for PCI Interrupt Link [LNKD]. Try pci=noacpi or acpi=off
+> > 
+> > Could you be more specific here? 
+> > 
+> > As I mentioned before, the problem is not with the lack of
+> > "atomic" API.  
+> 
+> Below is a quick and dirty I made on top of this patch to show you how
+> atomic update can be implemented in this driver. 
 
-Tested-by: Jonathan Liu <net147@gmail.com>
+Thank you for example patch.
+
+I will implement the ->apply() callback and post patches very soon :-).
+
+I had two issues with the ->apply() implementation:
+
+- Do my work on top of this patch (https://lkml.org/lkml/2016/10/7/454
+  as you did) to avoid rewriting work already done.
+
+- In the example ->apply() implementation for rockchip
+  (https://patchwork.kernel.org/patch/7228221/) the ->config() callback
+  was not removed when ->apply() was implemented. I was confused with
+  such approach, but as you explained in this mail, the solely ->apply()
+  is enough.
+
+> It's not tested, and
+> probably not working, but it should give you a better idea of what is
+> expected.
+
+Thanks for explanation,
+
+?ukasz Majewski
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161023/a40e15be/attachment.sig>
