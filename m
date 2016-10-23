@@ -1,38 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2016 01:30:13 +0200
-Subject: [PATCH] pinctrl: st: don't specify default interrupt trigger
-In-Reply-To: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
-References: <1476774988-13484-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <CACRpkdbZq0O4jr_vO5Eet5vqpR+XuTrM7qALehiRqo1Ra1m3rg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 23 Oct 2016 16:50:34 -0700
+Subject: [GIT PULL 4/4] Broadcom defconfig-arm64 changes for 4.9 (part 2)
+In-Reply-To: <62d5c9b0-9073-c8e3-6a9f-390f381d4d9d@gmail.com>
+References: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
+ <1475263395-27653-4-git-send-email-f.fainelli@gmail.com>
+ <62d5c9b0-9073-c8e3-6a9f-390f381d4d9d@gmail.com>
+Message-ID: <CAOesGMjJ3_rPUke8B5yW_6Q4NyP1sb-wqY5jfcs1_+UhGQK9_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 9:16 AM,  <patrice.chotard@st.com> wrote:
-
-> From: Patrice Chotard <patrice.chotard@st.com>
+On Sun, Oct 23, 2016 at 2:55 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 09/30/2016 12:23 PM, Florian Fainelli wrote:
+>> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+>>
+>>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/defconfig-arm64
+>>
+>> for you to fetch changes up to 51e3fb1d3f514cd336faf185df73b25fca194773:
+>>
+>>   Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next (2016-09-30 12:02:29 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains Broadcom ARM64-based SoCs defconfig changes for 4.9,
+>> please pull the following changes:
+>>
+>> - Eric updates the ARMv8 defconfig to contain everything that is needed to run
+>>   a 64-bit kernel on the Raspberry Pi 3
+>>
+>> ----------------------------------------------------------------
+>> Eric Anholt (1):
+>>       arm64: Add BCM2835 (Raspberry Pi 3) support to the defconfig
+>>
+>> Florian Fainelli (1):
+>>       Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next
+>>
+>>  arch/arm64/configs/defconfig | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
 >
-> Thanks to 332e99d5ae4 which now alerts of default
-> trigger usage when configuring interrupts.
+> Arnd, Kevin, Olof,
 >
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Following Olof's response here:
+>
+> https://www.spinics.net/lists/arm-kernel/msg534687.html
+>
+> do you think we could merge these for 4.9-rcX? Let me know if I should
+> send a fresh pull request for that.
 
-Patch applied with Peter's ACK.
+Main reason to respin would be if you need to rebase due to other
+changes that have gone in, or if you expect to have other material
+that should be based on a 4.9-rc base.
 
-Pls also look into the following: __gpio_irq_handler seems to be
-doing some stuff per-IRQ that only pertains to edge-triggered IRQs.
-Normally that should be handled by:
 
-- Setting default handler to handle_bad_irq()
-- Setting handler to handle_edge_irq() or handle_level_irq() in .set_type()
-- Implement .irq_ack() on the irqchip and handle the edge-specific ACKing
-  there.
-
-See for example drivers/gpio/gpio-pl061.c.
-
-I am not *sure* this applies to pinctrl-st.c but please check if it provides
-more elegant code. Notmally the .irq_ack() is for edge detection hardware
-that allows ACKing the ege IRQ in a separate register and after that we
-can raise another edge IRQ while the current IRQ is being handled.
-
-Yours,
-Linus Walleij
+-Olof
