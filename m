@@ -1,52 +1,46 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 23 Oct 2016 20:04:23 +0800
-Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
- hisilicon-161x01 erratum
-In-Reply-To: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
-References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
-Message-ID: <20161023120423.GO30578@tiger>
+From: roszenrami@gmail.com (Rami Rosen)
+Date: Sun, 23 Oct 2016 15:08:56 +0300
+Subject: [PATCH v4 01/10] ethernet: add sun8i-emac driver
+In-Reply-To: <1475828757-926-2-git-send-email-clabbe.montjoie@gmail.com>
+References: <1475828757-926-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1475828757-926-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <CAKoUAr=HmzYHq53i1bAzgOYd8RNzO_xBi30HW41KVZ=W4-Pdvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
-> This erratum describes a bug in logic outside the core, so MIDR can't be
-> used to identify its presence, and reading an SoC-specific revision
-> register from common arch timer code would be awkward.  So, describe it
-> in the device tree.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index ef5fbe9..26bc837 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
->    This also affects writes to the tval register, due to the implicit
->    counter read.
-> 
-> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
-> +  QorIQ erratum 161201, which says that reading the counter is
+Hi Corentin,
 
-QorIQ is a Freescale/NXP specific name, and shouldn't be there.
 
-Shawn
+Trivial comment: rx_saf_fai and rx_daf_fail are not used. This implies that also
+rx_saf_error and rx_daf_error should be removed:
 
-> +  unreliable unless the small range of value is returned by back-to-back reads.
-> +  This also affects writes to the tval register, due to the implicit
-> +  counter read.
+> +static const char const estats_str[][ETH_GSTRING_LEN] = {
+...
+> +       "rx_header_error",
+> +       "rx_overflow_error",
+> +       "rx_saf_error",
+> +       "rx_daf_error",
+> +       "rx_buf_error",
+...
+
 > +
->  ** Optional properties:
-> 
->  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
-> -- 
-> 1.9.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +struct sun8i_emac_stats {
+> +       u64 rx_payload_error;
+...
+> +       u64 rx_overflow_error;
+> +       u64 rx_saf_fail;
+> +       u64 rx_daf_fail;
+
+> +       u64 tx_used_desc;
+> +       u64 napi_schedule;
+> +       u64 napi_underflow;
+> +};
+> +
+
+Trivial: typo, should be: can transfer
+
+> +/* The datasheet said that each descriptor can transfers up to 4096bytes
+> + * But latter, a register documentation reduce that value to 2048
+
+Regards,
+Rami Rosen
