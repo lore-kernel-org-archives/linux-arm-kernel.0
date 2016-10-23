@@ -1,75 +1,48 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Sun, 23 Oct 2016 20:11:15 +0100
-Subject: [PATCH RFC 10/10] drm/i2c: tda998x: switch to boolean is_on
+Date: Sun, 23 Oct 2016 20:10:28 +0100
+Subject: [PATCH RFC 01/10] drm/i2c: tda998x: avoid race in
+ tda998x_encoder_mode_set()
 In-Reply-To: <20161023191002.GJ1041@n2100.armlinux.org.uk>
 References: <20161023191002.GJ1041@n2100.armlinux.org.uk>
-Message-ID: <E1byOAt-0005zS-3i@rmk-PC.armlinux.org.uk>
+Message-ID: <E1byOA8-0005yS-TQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than storing the DPMS mode (which will always be on or off) use a
-boolean to store this instead.
+As priv->audio_params can now be changed at run time, we need to be more
+careful about how we deal with a mode set.  We must take the audio lock
+while checking if there's a valid audio configuration.
+
+However, it's slightly worse than that - during mode set, we mute the
+audio, and it must not be unmuted until we have finished the mode set.
+It is possible that the audio side may start while a mode set is in
+progress, so take the audio_mutex lock around the whole mode setting
+procedure.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 547cf99ac32d..1f9a25fe17f3 100644
+index 9798d400d817..d72bc30a3bce 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -42,7 +42,7 @@ struct tda998x_priv {
- 	struct mutex mutex;
- 	u16 rev;
- 	u8 current_page;
--	int dpms;
-+	bool is_on;
- 	bool is_hdmi_sink;
- 	bool is_hdmi_config;
- 	u8 vip_cntrl_0;
-@@ -1150,16 +1150,15 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
- {
- 	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
-+	bool on;
+@@ -1074,13 +1074,12 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
  
- 	/* we only care about on or off: */
--	if (mode != DRM_MODE_DPMS_ON)
--		mode = DRM_MODE_DPMS_OFF;
-+	on = mode == DRM_MODE_DPMS_ON;
+ 		tda998x_write_avi(priv, adjusted_mode);
  
--	if (mode == priv->dpms)
-+	if (on == priv->is_on)
- 		return;
- 
--	switch (mode) {
--	case DRM_MODE_DPMS_ON:
-+	if (on) {
- 		/* enable video ports, audio will be enabled later */
- 		reg_write(priv, REG_ENA_VP_0, 0xff);
- 		reg_write(priv, REG_ENA_VP_1, 0xff);
-@@ -1168,16 +1167,16 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
- 		reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
- 		reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
- 		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
--		break;
--	case DRM_MODE_DPMS_OFF:
-+
-+		priv->is_on = true;
-+	} else {
- 		/* disable video ports */
- 		reg_write(priv, REG_ENA_VP_0, 0x00);
- 		reg_write(priv, REG_ENA_VP_1, 0x00);
- 		reg_write(priv, REG_ENA_VP_2, 0x00);
--		break;
--	}
- 
--	priv->dpms = mode;
-+		priv->is_on = false;
-+	}
+-		if (priv->audio_params.format != AFMT_UNUSED) {
+-			mutex_lock(&priv->audio_mutex);
++		mutex_lock(&priv->audio_mutex);
++		if (priv->audio_params.format != AFMT_UNUSED)
+ 			tda998x_configure_audio(priv,
+ 						&priv->audio_params,
+ 						adjusted_mode->clock);
+-			mutex_unlock(&priv->audio_mutex);
+-		}
++		mutex_unlock(&priv->audio_mutex);
+ 	}
  }
  
- static void
 -- 
 2.1.0
