@@ -1,53 +1,62 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 15:21:08 -0700
-Subject: [PATCH v4 9/9] PM / doc: Update device documentation for devices in
- IRQ safe PM domains
-In-Reply-To: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
-References: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1477347668-41901-10-git-send-email-lina.iyer@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 25 Oct 2016 00:22:12 +0200
+Subject: [PATCH 1/2 v5] ARM: dts: add EBI2 to the Qualcomm MSM8660 DTSI
+Message-ID: <1477347732-10385-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update documentation to reflect the changes made to support IRQ safe PM
-domains.
+This adds the external bus interface EBI2 to the MSM8660 device
+tree, albeit with status = "disabled" so that devices actually
+using EBI2 can turn it on if needed.
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Rafael J. Wysocki <rjw@rjwysocki.net>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/power/devices.txt | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ChangeLog v4->v5:
+- Rename "ebi2@" to "external-bus@"
+- Can we apply this now?
+ChangeLog v3->v4:
+- Rebase on kernel v4.9-rc1
+- Bindings and driver are merged so should be clear to apply.
+ChangeLog v2->v3:
+- Use the new #address-cells = <2> for indicating the CS in the
+  first address cell
+- Use the ranges property properly for defining the six different
+  CS address windows
+- Define CS3 to properly map over 128MB
+- The EBI2 bindings are now ACKed by Rob Herring and a pull request
+  to ARM SoC for both binding and driver is pending.
+- This should be safe to merge for v4.9
+---
+ arch/arm/boot/dts/qcom-msm8660.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-index 8ba6625..73ddea3 100644
---- a/Documentation/power/devices.txt
-+++ b/Documentation/power/devices.txt
-@@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
- into a low-power state together at the same time by turning off the shared
- power resource.  Of course, they also need to be put into the full-power state
- together, by turning the shared power resource on.  A set of devices with this
--property is often referred to as a power domain.
-+property is often referred to as a power domain. A power domain may also be
-+nested inside another power domain. The nested domain is referred to as the
-+sub-domain of the parent domain.
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 8c65e0d82559..4d828f810746 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -141,6 +141,23 @@
+ 			};
+ 		};
  
- Support for power domains is provided through the pm_domain field of struct
- device.  This field is a pointer to an object of type struct dev_pm_domain,
-@@ -629,6 +631,16 @@ support for power domains into subsystem-level callbacks, for example by
- modifying the platform bus type.  Other platforms need not implement it or take
- it into account in any way.
- 
-+Devices may be defined as IRQ-safe which indicates to the PM core that their
-+runtime PM callbacks may be invoked with disabled interrupts (see
-+Documentation/power/runtime_pm.txt for more information).  If an IRQ-safe
-+device belongs to a PM domain, the runtime PM of the domain will be
-+disallowed, unless the domain itself is defined as IRQ-safe. However, it
-+makes sense to define a PM domain as IRQ-safe only if all the devices in it
-+are IRQ-safe. Moreover, if an IRQ-safe domain has a parent domain, the runtime
-+PM of the parent is only allowed if the parent itself is IRQ-safe too with the
-+additional restriction that all child domains of an IRQ-safe parent must also
-+be IRQ-safe.
- 
- Device Low Power (suspend) States
- ---------------------------------
++		external-bus at 1a100000 {
++			compatible = "qcom,msm8660-ebi2";
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges = <0 0x0 0x1a800000 0x00800000>,
++				 <1 0x0 0x1b000000 0x00800000>,
++				 <2 0x0 0x1b800000 0x00800000>,
++				 <3 0x0 0x1d000000 0x08000000>,
++				 <4 0x0 0x1c800000 0x00800000>,
++				 <5 0x0 0x1c000000 0x00800000>;
++			reg = <0x1a100000 0x1000>, <0x1a110000 0x1000>;
++			reg-names = "ebi2", "xmem";
++			clocks = <&gcc EBI2_2X_CLK>, <&gcc EBI2_CLK>;
++			clock-names = "ebi2x", "ebi2";
++			status = "disabled";
++		};
++
+ 		qcom,ssbi at 500000 {
+ 			compatible = "qcom,ssbi";
+ 			reg = <0x500000 0x1000>;
 -- 
 2.7.4
