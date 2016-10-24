@@ -1,37 +1,50 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 24 Oct 2016 16:31:30 +0800
-Subject: [PATCH 3/3] ARM: dts: hisi-x5hd2: Remove skeleton.dtsi inclusion
-In-Reply-To: <1477297890-34899-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1477297890-34899-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1477297890-34899-3-git-send-email-wangkefeng.wang@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Oct 2016 09:41:07 +0100
+Subject: mbox-name vs. mbox-names (was: Re: [PATCH v4 1/5] mailbox: dt:
+ Supply bindings for ST's Mailbox IP)
+In-Reply-To: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
+References: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
+Message-ID: <20161024084107.GD14477@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
-as deprecated"), remove deprecated skeleton.dtsi.
+On Fri, 21 Oct 2016, Geert Uytterhoeven wrote:
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm/boot/dts/hisi-x5hd2.dtsi | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+> On Fri, Oct 16, 2015 at 9:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/mailbox/sti-mailbox.txt    | 51 ++++++++++++++++++++++
+> >  1 file changed, 51 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > new file mode 100644
+> > index 0000000..b61eec9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+> > @@ -0,0 +1,51 @@
+> > +ST Microelectronics Mailbox Driver
+> > +
+> > +Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
+> > +are passed between Application and Remote processors using shared memory.
+> > +
+> > +Controller
+> > +----------
+> > +
+> > +Required properties:
+> > +- compatible           : Should be "st,stih407-mailbox"
+> > +- reg                  : Offset and length of the device's register set
+> > +- mbox-name            : Name of the mailbox
+> 
+> All other mailbox drivers use "mbox-names". Oops, it's in v4.9-rc1...
+> 
+> Can we still fix that?
 
-diff --git a/arch/arm/boot/dts/hisi-x5hd2.dtsi b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-index fdcc23d..506fdc1 100644
---- a/arch/arm/boot/dts/hisi-x5hd2.dtsi
-+++ b/arch/arm/boot/dts/hisi-x5hd2.dtsi
-@@ -7,10 +7,12 @@
-  * publishhed by the Free Software Foundation.
-  */
- 
--#include "skeleton.dtsi"
- #include <dt-bindings/clock/hix5hd2-clock.h>
- 
- / {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
- 	aliases {
- 		serial0 = &uart0;
- 	};
+So long as all the fixes; changes to the driver and DT are merged in a
+single kernel release, we can change it.
+
 -- 
-1.7.12.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
