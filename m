@@ -1,184 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Oct 2016 14:44:35 +0100
-Subject: [PATCH] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
- 28168
-In-Reply-To: <1477112061-12868-1-git-send-email-gakula@caviumnetworks.com>
-References: <1> <1477112061-12868-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <fbc51a32-aaba-0ee6-c0bd-07a02fb2a6b4@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 24 Oct 2016 22:06:22 +0800
+Subject: [GIT PULL] i.MX fixes for 4.9
+Message-ID: <20161024140622.GM30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geetha,
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-On 22/10/16 05:54, Geetha sowjanya wrote:
-> From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-> 
->   This patch implements Cavium ThunderX erratum 28168.
-> 
->   PCI requires stores complete in order. Due to erratum #28168
->   PCI-inbound MSI-X store to the interrupt controller are delivered
->   to the interrupt controller before older PCI-inbound memory stores
->   are committed.
->   Doing a sync on SMMU will make sure all prior transactions are
->   completed.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
-> ---
->  arch/arm64/Kconfig               |   11 +++++++++++
->  drivers/iommu/arm-smmu.c         |   38 ++++++++++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-gic-common.h |    1 +
->  drivers/irqchip/irq-gic-v3-its.c |   22 ++++++++++++++++++++++
->  kernel/irq/chip.c                |    4 ++++
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-Thanks Robin for looping me in. Geetha, please use get_maintainers.pl to
-keep the relevant people on CC, specially as you're touching some of the
-core infrastructure.
+are available in the git repository at:
 
->  5 files changed, 76 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 30398db..57f5c9b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -474,6 +474,17 @@ config CAVIUM_ERRATUM_27456
->  
->  	  If unsure, say Y.
->  
-> +config CAVIUM_ERRATUM_28168
-> +	bool "Cavium erratum 28168: Make sure ITS and SMMU TLB are in sync"
-> +	default y
-> +	help
-> +	 Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
-> +	 controller are delivered to the interrupt controller before older
-> +	 PCI-inbound memory stores are committed. Doing a sync on SMMU
-> +	 will make sure all prior transactions are completed.
-> +
-> +	 If unsure, say Y.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.9
 
-Please add an entry to Documentation/arm64/silicon-errata.txt.
+for you to fetch changes up to 4edd601c5a9c5094daa714e65063e623826f3bcc:
 
-> +
->  endmenu
->  
->  
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 9740846..20a61c6 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
+  ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031 (2016-10-24 21:26:01 +0800)
 
-I'll skip the SMMU code on which Robin has commented already, and move
-to the irq part, which is equally entertaining.
+----------------------------------------------------------------
+The i.MX fixes for 4.9:
+ - A couple of patches from Fabio to fix the GPC power domain regression
+   which is caused by PM Domain core change 0159ec670763dd
+   ("PM / Domains: Verify the PM domain is present when adding a
+   provider"), and a related kernel crash seen with multi_v7_defconfig
+   build.
+ - Correct the PHY ID mask for AR8031 to match phy driver code.
+ - Apply new added timer erratum A008585 for LS1043A and LS2080A SoC.
+ - Correct vf610 global timer IRQ flag to avoid warning from gic driver
+   after commit 992345a58e0c ("irqchip/gic: WARN if setting the
+   interrupt type for a PPI fails").
 
-[...]
+----------------------------------------------------------------
+Fabio Estevam (3):
+      ARM: imx: gpc: Initialize all power domains
+      ARM: imx: gpc: Fix the imx_gpc_genpd_init() error path
+      ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031
 
-> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-> index 205e5fd..0228ba0 100644
-> --- a/drivers/irqchip/irq-gic-common.h
-> +++ b/drivers/irqchip/irq-gic-common.h
-> @@ -38,4 +38,5 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->  
->  void gic_set_kvm_info(const struct gic_kvm_info *info);
->  
-> +void cavium_smmu_tlb_sync(void *iommu);
->  #endif /* _IRQ_GIC_COMMON_H */
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 003495d..88e9958 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -112,6 +112,7 @@ struct its_device {
->  	struct its_node		*its;
->  	struct event_lpi_map	event_map;
->  	void			*itt;
-> +	struct device           *dev;
+Scott Wood (1):
+      arm64: dts: Add timer erratum property for LS2080A and LS1043A
 
-This doesn't work in the presence of anything that will multiplex
-multiple RequesterIDs onto a single DeviceID (non transparent PCI
-bridge, for example).
+Stefan Agner (1):
+      ARM: dts: vf610: fix IRQ flag of global timer
 
->  	u32			nr_ites;
->  	u32			device_id;
->  };
-> @@ -664,10 +665,29 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
->  	iommu_dma_map_msi_msg(d->irq, msg);
->  }
->  
-> +/**
-> + * Due to erratum in ThunderX,
-> + * we need to make sure SMMU is in sync with ITS translations.
-> + **/
-> +static void its_ack_irq(struct irq_data *d)
-> +{
-> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-> +	struct pci_dev *pdev;
-> +
-> +		if (!dev_is_pci(its_dev->dev))
-> +			return;
-
-How about non PCI devices?
-
-> +
-> +		pdev = to_pci_dev(its_dev->dev);
-> +		if (pdev->vendor != 0x177d)
-> +			cavium_smmu_tlb_sync(its_dev->dev);
-
-What makes Cavium devices so special that they do not need to respect
-the PCI memory ordering with respect to MSI delivery?
-
-> +
-> +}
-> +
->  static struct irq_chip its_irq_chip = {
->  	.name			= "ITS",
->  	.irq_mask		= its_mask_irq,
->  	.irq_unmask		= its_unmask_irq,
-> +	.irq_ack                = its_ack_irq,
-
-Nice try, but no, thank you. If you really want to go down that road,
-have a look at CONFIG_IRQ_PREFLOW_FASTEOI, and make this workaround a
-per interrupt thing. At least, you won't pollute the core code with
-another hack.
-
-Also, it would be good to find a way for that hack to be confined to the
-SMMU driver, since that's where the oddity is being handled. Something
-that would occur when the device is mapping memory is probably on good spot.
-
->  	.irq_eoi		= irq_chip_eoi_parent,
->  	.irq_set_affinity	= its_set_affinity,
->  	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
-> @@ -1422,6 +1442,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
->  	if (!its_dev)
->  		return -ENOMEM;
->  
-> +	its_dev->dev = dev;
-> +
->  	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
->  out:
->  	info->scratchpad[0].ptr = its_dev;
-> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-> index be3c34e..6add8da 100644
-> --- a/kernel/irq/chip.c
-> +++ b/kernel/irq/chip.c
-> @@ -585,6 +585,10 @@ void handle_fasteoi_irq(struct irq_desc *desc)
->  		goto out;
->  	}
->  
-> +#ifdef CONFIG_CAVIUM_ERRATUM_28168
-> +	if (chip->irq_ack)
-> +		chip->irq_ack(&desc->irq_data);
-> +#endif
->  	kstat_incr_irqs_this_cpu(desc);
->  	if (desc->istate & IRQS_ONESHOT)
->  		mask_irq(desc);
-> 
-
-Overall, this workaround is not acceptable as it is. You need to find
-ways to make it less invasive, and hopefully the above pointers will
-help. Please keep the current distribution list posted once you update
-this patch.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+ arch/arm/boot/dts/vf500.dtsi                   |  2 +-
+ arch/arm/mach-imx/gpc.c                        | 15 ++++++++++++---
+ arch/arm/mach-imx/mach-imx6q.c                 |  2 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  1 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |  1 +
+ 5 files changed, 16 insertions(+), 5 deletions(-)
