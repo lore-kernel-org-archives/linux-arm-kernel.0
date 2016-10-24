@@ -1,86 +1,125 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 10:16:05 -0600
-Subject: [PATCH v3 [fix]] PM / doc: Update device documentation for
- devices in IRQ safe PM domains
-In-Reply-To: <1900178.E2KGyKAlTm@vostro.rjw.lan>
-References: <20161021152313.GC72940@linaro.org>
- <1477090375-13814-1-git-send-email-lina.iyer@linaro.org>
- <1900178.E2KGyKAlTm@vostro.rjw.lan>
-Message-ID: <20161024161605.GD72940@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Oct 2016 17:16:56 +0100
+Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
+ multiplexing vcpus on a single CPU
+In-Reply-To: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
+References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20161024161656.GM15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 22 2016 at 18:19 -0600, Rafael J. Wysocki wrote:
->On Friday, October 21, 2016 03:52:55 PM Lina Iyer wrote:
->> Update documentation to reflect the changes made to support IRQ safe PM
->> domains.
->>
->> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->> Changes since v3:
->> - Moved para to the end of the section
->> - Added clause for all IRQ safe devices in a domain
->> - Cleanup explanation of nested domains
->> ---
->>  Documentation/power/devices.txt | 11 ++++++++++-
->>  1 file changed, 10 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
->> index 8ba6625..9218ce6 100644
->> --- a/Documentation/power/devices.txt
->> +++ b/Documentation/power/devices.txt
->> @@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
->>  into a low-power state together at the same time by turning off the shared
->>  power resource.  Of course, they also need to be put into the full-power state
->>  together, by turning the shared power resource on.  A set of devices with this
->> -property is often referred to as a power domain.
->> +property is often referred to as a power domain. A power domain may also be
->> +nested inside another power domain. The nested domain is referred to as the
->> +sub-domain of the parent domain.
->>
->>  Support for power domains is provided through the pm_domain field of struct
->>  device.  This field is a pointer to an object of type struct dev_pm_domain,
->> @@ -629,6 +631,13 @@ support for power domains into subsystem-level callbacks, for example by
->>  modifying the platform bus type.  Other platforms need not implement it or take
->>  it into account in any way.
->>
->> +Devices and PM domains may be defined as IRQ-safe, if they can be powered
->> +on/off even when the IRQs are disabled.
->
->What IRQ-safe means for devices is that their runtime PM callbacks may be
->invoked with interrupts disabled on the local CPU.  I guess the meaning of
->IRQ-safe for PM domains is analogous, but the above isn't precise enough to me.
->
->> An IRQ-safe device in a domain will
->> +disallow power management on the domain, unless the domain is also defined as
->> +IRQ-safe. In other words, a domain containing all IRQ-safe devices must also
->> +be defined as IRQ-safe. Another restriction this framework imposes on the
->> +parent domain of an IRQ-safe domain is that the parent domain must also be
->> +defined as IRQ-safe.
->
->What about this:
->
->"Devices may be defined as IRQ-safe which indicates to the PM core that their
->runtime PM callbacks may be invoked with disabled interrupts (see
->Documentation/power/runtime_pm.txt for more information).  If an IRQ-safe
->device belongs to a PM domain, the runtime PM of the domain will be disallowed,
->unless the domain itself is defined as IRQ-safe.  However, a PM domain can only
->be defined as IRQ-safe if all of the devices in it are IRQ-safe. 
->
-This is correct. But the last line may need a bit of modification. If
-all devices in a PM domain are IRQ-safe and the domain is NOT, then it
-it is a valid combination just that the domain would never do runtime
-PM.
+Hi Marc,
 
-> Moreover, if
->an IRQ-safe domain has a parent domain, the runtime PM of the parent is only
->allowed if the parent itself is IRQ-safe too with the additional restriction
->that all child domains of an IRQ-safe parent must also be IRQ-safe."
->
->Does it actually reflect what the code does?
->
-Yes, this precisely reflects the code.
+On Mon, Oct 24, 2016 at 04:31:28PM +0100, Marc Zyngier wrote:
+> Architecturally, TLBs are private to the (physical) CPU they're
+> associated with. But when multiple vcpus from the same VM are
+> being multiplexed on the same CPU, the TLBs are not private
+> to the vcpus (and are actually shared across the VMID).
+> 
+> Let's consider the following scenario:
+> 
+> - vcpu-0 maps PA to VA
+> - vcpu-1 maps PA' to VA
+> 
+> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
+> by vcpu-0 accesses, and access the wrong physical page.
+
+It might be worth noting that this could also lead to TLB conflicts and
+other such fun usually associated with missing TLB maintenance,
+depending on the two mappings (or the intermediate stages thereof).
+
+> The solution to this is to keep a per-VM map of which vcpu ran last
+> on each given physical CPU, and invalidate local TLBs when switching
+> to a different vcpu from the same VM.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Modulo my comment on preemptiblity of kvm_arch_sched_in, everything
+below is a nit. Assuming that's not preemptible, this looks right to me.
+
+FWIW, with or without the other comments considered:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  5 +++++
+>  arch/arm/include/asm/kvm_hyp.h    |  1 +
+>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++++-
+>  arch/arm/kvm/hyp/switch.c         |  9 +++++++++
+>  arch/arm64/include/asm/kvm_host.h |  6 +++++-
+>  arch/arm64/kvm/hyp/switch.c       |  8 ++++++++
+>  6 files changed, 62 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 2d19e02..035e744 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -57,6 +57,8 @@ struct kvm_arch {
+>  	/* VTTBR value associated with below pgd and vmid */
+>  	u64    vttbr;
+>  
+> +	int __percpu *last_vcpu_ran;
+> +
+>  	/* Timer */
+>  	struct arch_timer_kvm	timer;
+>  
+> @@ -174,6 +176,9 @@ struct kvm_vcpu_arch {
+>  	/* vcpu power-off state */
+>  	bool power_off;
+>  
+> +	/* TLBI required */
+> +	bool requires_tlbi;
+
+A bit of a nit, but it's not clear which class of TLBI is required, or
+why. It's probably worth a comment (and perhaps a bikeshed), like:
+
+	/*
+	 * Local TLBs potentially contain conflicting entries from
+	 * another vCPU within this VMID. All entries for this VMID must
+	 * be invalidated from (local) TLBs before we run this vCPU.
+	 */
+	bool tlb_vmid_stale;
+
+[...]
+
+> +void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
+> +{
+> +	int *last_ran;
+> +
+> +	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
+> +
+> +	/*
+> +	 * If we're very unlucky and get preempted before having ran
+> +	 * this vcpu for real, we'll end-up in a situation where any
+> +	 * vcpu that gets scheduled will perform an invalidation (this
+> +	 * vcpu explicitely requires it, and all the others will have
+> +	 * a different vcpu_id).
+> +	 */
+
+Nit: s/explicitely/explicitly/
+
+To bikeshed a little further, perhaps:
+
+	/*
+	 * We might get preempted before the vCPU actually runs, but
+	 * this is fine. Our TLBI stays pending until we actually make
+	 * it to __activate_vm, so we won't miss a TLBI. If another vCPU
+	 * gets scheduled, it will see our vcpu_id in last_ran, and pend
+	 * a TLBI for itself.
+	 */
+
+> +	if (*last_ran != vcpu->vcpu_id) {
+> +		if (*last_ran != -1)
+> +			vcpu->arch.requires_tlbi = true;
+> +
+> +		*last_ran = vcpu->vcpu_id;
+> +	}
+> +}
+
+I take it this function is run in some non-preemptible context; if so,
+this looks correct to me.
+
+If this is preemptible, then this looks racy.
 
 Thanks,
-Lina
+Mark.
