@@ -1,31 +1,26 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 23 Oct 2016 19:55:29 -0700
-Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
- interrupts
-In-Reply-To: <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
-References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
- <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
- <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
-Message-ID: <36163853-ac4a-e146-0c1b-eaf42e8b234d@codeaurora.org>
+Date: Sun, 23 Oct 2016 23:22:02 -0400
+Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
+ early boot stages
+In-Reply-To: <20161021013930.GB31044@localhost>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+ <20161021013930.GB31044@localhost>
+Message-ID: <98bb7d24-94db-b585-918e-04f3a64d93f0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 12:11 PM, Andy Shevchenko wrote:
->> +static void hidma_free_msis(struct hidma_dev *dmadev)
->> > +{
->> > +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> Perhaps one #ifdef and two definitions of functions?
+On 10/20/2016 9:39 PM, Bjorn Helgaas wrote:
+>> These API need to bypass the acpi_irq_get_penalty function.
+> I don't mind this patch, but the changelog doesn't tell me what's
+> broken and why we need this fix.  Apparently acpi_irq_get_penalty()
+> doesn't work before ACPI is initialized, but I don't see *why* it
+> wouldn't work.
 
-I don't think it will make a difference. I'll have to move
-#ifdef around the caller of hidma_free_msis instead which
-I think is uglier.
-
-The hidma_write_msi_msg function gets called only when 
-CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. If I don't put 
-this around the function definition, I get unused function
-warning from the compiler. This is the reason why preprocessor
-definition is outside of the function definition.
-
+I'll update the commit message as you suggested. The code doesn't work
+if we apply PATCH V4 2/3 + PATCH V4 3/3 without PATCH V4 1/3 since
+the caller is going to end up calling get_penalty function while ACPI
+is not initialized. This happened during the debug of this regression.
 
 -- 
 Sinan Kaya
