@@ -1,34 +1,76 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 24 Oct 2016 11:21:21 -0600
-Subject: [PATCH V4 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <20161021163410.0a827eab@gandalf.local.home>
-References: <1477071013-29563-1-git-send-email-tbaicar@codeaurora.org>
- <1477071013-29563-10-git-send-email-tbaicar@codeaurora.org>
- <20161021163410.0a827eab@gandalf.local.home>
-Message-ID: <7a8c62a7-c2f4-0cae-ce0a-24cbf827bd4f@codeaurora.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 24 Oct 2016 10:24:19 -0700
+Subject: Question about arm64 earlycon
+In-Reply-To: <20161024110904.GF15620@leverpostej>
+References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
+ <4966376.bRx4fgSjbT@wuerfel> <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
+ <20161024110904.GF15620@leverpostej>
+Message-ID: <CADaLNDk2pYMXQ-EYVw_vM23rsazFAHe_5qcjTajii13tRMD5Ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 2:34 PM, Steven Rostedt wrote:
-> On Fri, 21 Oct 2016 11:30:12 -0600
-> Tyler Baicar <tbaicar@codeaurora.org> wrote:
+On Mon, Oct 24, 2016 at 4:09 AM, Mark Rutland <mark.rutland@arm.com> wrote:
 >
->> Currently there are trace events for the various RAS
->> errors with the exception of ARM processor type errors.
->> Add a new trace event for such errors so that the user
->> will know when they occur. These trace events are
->> consistent with the ARM processor error section type
->> defined in UEFI 2.6 spec section N.2.4.4.
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Tracing part looks fine to me.
+> On Mon, Oct 24, 2016 at 11:17:36AM +0100, Marc Zyngier wrote:
+> > On 24/10/16 11:06, Arnd Bergmann wrote:
+> > > On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
+> > >> Hi Catalin, Marc, Mark, Arnd,
+> > >>
+> > >> I am testing with 3.12 kernel with earlyprintk enabled and I see some
+> > >> garbage characters in the console log right before the message
+> > >> indicating that the real console device is initialized:
 >
-> Acked-by: Steven Rostedt <rostedt@goodmis.org>
->
-> -- Steve
-Thank you Steve!
+> What exactly are you passing on the command line?
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+This is what I have:
+earlyprintk=uart8250-32bit,0x1c020000
+
+I should be more specific: the early console prints characters just
+fine (I see all the early boot log). Only at the moment before
+switching to the real console, I occasionally see some garbage
+characters.
+>
+> > >> <some garbage characters here>01c020000.serial: ttyS0 at MMIO
+> > >> 0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
+> > >> console [ttyS0] enabled, bootconsole disabled
+>
+> Was the UART already configured by FW? Had the firmware output anything
+> at this point?
+
+Yes, UART was already configured by FW (U-Boot) and at this point,
+U-Boot is already gone.
+
+>
+> Did the firmware's UART rate match that of the kernel? If not, the issue
+> might just be that the rate doesn't match; earlycon/earlyprintk won't
+> configure that, while the real console will.
+
+The baud-rate does not change between U-Boot and kernel.
+
+>
+> Or perhaps we race with some clock configuration...
+>
+> > >> I looked through early_prink.c file and printk.c file and it looks
+> > >> like there is case that some early boot code can touch the UART
+> > >> hardware via ealy console driver while the 'real' console driver is
+> > >> setting up the same UART port? Please let me know if I missed some
+> > >> important piece of code that can prevent this.
+> > >
+> > > I don't think we every supported earlyprintk on arm64, and
+> > > earlycon support may have been added later.
+> >
+> > We did support some form of earlyprintk for a while (though not in the
+> > same way as 32bit ARM does), until Rob introduced earlycon.
+>
+> Our earlyprintk up until that point was effectively a less general
+> earlycon (coming up at a similar time). In fact, in v3.12 we were
+> already using earlycon structures in arch/arm64/kernel/early_printk.c.
+
+Yes, early_printk.c for arm64 is supported until Rob removed it and
+replaced by earlycon at kernel v3.16
+
+>
+> Thanks,
+> Mark.
+Regards,
+Duc Dang.
