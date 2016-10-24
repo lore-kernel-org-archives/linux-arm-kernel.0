@@ -1,111 +1,106 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 24 Oct 2016 23:22:50 +0200
-Subject: [RFC] shutdown machine when li-ion battery goes below 3V
-Message-ID: <20161024212250.GA31336@amd>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Oct 2016 14:27:36 -0700
+Subject: [PATCH v1 0/3] Add support for Broadcom OTP controller
+In-Reply-To: <CA+55aFwAZPJ+o0qkYjJziHofYvvsocHuWr1YUmVnzj6VTv_sgA@mail.gmail.com>
+References: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
+ <CAADWXX-43-k2K2T1V5MQMd0z0V502wf1syNHERPfvNstOJw-3A@mail.gmail.com>
+ <e34f01b6-a059-9988-0f93-e5adb82a5436@gmail.com>
+ <CA+55aFwAZPJ+o0qkYjJziHofYvvsocHuWr1YUmVnzj6VTv_sgA@mail.gmail.com>
+Message-ID: <82ad10b1-32ab-3962-d5ab-e787e2c70130@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 10/24/2016 01:14 PM, Linus Torvalds wrote:
+> On Mon, Oct 24, 2016 at 12:54 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>
+>> The older setup was using smtphost.broadcom.com which we have now
+>> documented as being invalid, here Jonathan used gmail directly (since
+>> that's our mail provider now):
+>>
+>> Received: from lbrmn-lnxub108.corp.ad.broadcom.com ([216.31.219.19])
+>>         by smtp.gmail.com with ESMTPSA id
+>> s89sm8325746qkl.44.2016.10.24.12.12.00
+>>         (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+>>         Mon, 24 Oct 2016 12:12:03 -0700 (PDT)
+> 
+> Hmm. I get that too, so if that's the right thing for a broadcom.com
+> address, it's not the smtp server issue.
+> 
+> We had a few cases of the kernel mailing list itself messing up emails
+> sufficiently to fail dkim, but that shouldn't be an issue for the
+> relaxed/relaxed model that broadcom uses (the vger mailing list
+> software screws up whitespace, which "relaxed" ignores).
+> 
+>> Is there something else we need to check? Here is what I read for the
+>> cover-letter:
+>>
+>> Authentication-Results: mx.google.com;
+>>        dkim=pass header.i=@broadcom.com;
+>>        spf=pass (google.com: domain of ...
+> 
+> Hmm. I get:
+> 
+>   Authentication-Results: mx.google.com;
+>          dkim=fail header.i=@broadcom.com;
+> 
+> with the actual dkim signature looking like this:
+> 
+>   DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+>         d=broadcom.com; s=google;
+>         h=from:to:cc:subject:date:message-id;
+>         bh=9zStGnsZQDQqP6cm1CHPk7EYVtLvDsm2wN5qy5Mgx7M=;
+>         b=Z/1QD+FwJogJY9D8Qd197Q+VJt7Tr9+WoHFeKYRL00yhvxrMg0P8jKj1FbucJTluvM
+>          agC2eq9qCpZcNAfridjExDRDCuUPAIJIXTr9Npkpqlk6gEMq2FysrGer2D9Z4HQ/atTX
+>          67VirFsQK0gK7impYMn9kW5Q9BIIw5bOg7OdI=
+> 
+> and those fields that it protects look like this:
+> 
+>   From: Jonathan Richardson <jonathan.richardson@broadcom.com>
+>   To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>, Maxime
+> Ripard <maxime.ripard@free-electrons.com>
+>   Cc: linux-arm-kernel at lists.infradead.org,
+> linux-kernel at vger.kernel.org, devicetree at vger.kernel.org, Mark Rutland
+> <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>, Scott
+> Branden <sbranden@broadcom.com>, Ray Jui <rjui@broadcom.com>,
+> bcm-kernel-feedback-list at broadcom.com, Jonathan Richardson
+> <jonathan.richardson@broadcom.com>
+>   Subject: [PATCH v1 0/3] Add support for Broadcom OTP controller
+>   Date: Mon, 24 Oct 2016 12:12:01 -0700
+>   Message-Id: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
+> 
+> and I don't see anything obviously wrong anywhere - except for that
+> "dkim=fail" thing, and the email being in my spam folder.
 
-What about something like this? N900 will drain the battery down to
-system crash, which is quite uncool.
+Should we compare the headers added by lists.infradead.org and see what
+could possibly go wrong here? I can see that by being delivered to
+lists.infradead.org and then back to my personal gmail.com (not my other
+broadcom.com account), there are a bunch of extra headers:
 
-									Pavel
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3
+X-CRM114-CacheID: sfid-20161024_121226_013940_81319C20
+X-CRM114-Status: GOOD (  13.05  )
+X-Spam-Score: -2.7 (--)
+X-Spam-Report: SpamAssassin version 3.4.0 on bombadil.infradead.org summary:
+ Content analysis details:   (-2.7 points)
+ pts rule name              description
+ ---- ----------------------
+--------------------------------------------------
+ -0.7 RCVD_IN_DNSWL_LOW      RBL: Sender listed at
+http://www.dnswl.org/, low
+ trust [2607:f8b0:400d:c09:0:0:0:22f listed in] [list.dnswl.org]
+ -0.0 SPF_PASS               SPF: sender matches SPF record
+ -1.9 BAYES_00               BODY: Bayes spam probability is 0 to 1%
+ [score: 0.0000]
+ -0.1 DKIM_VALID Message has at least one valid DKIM or DK signature
+ -0.1 DKIM_VALID_AU Message has a valid DKIM or DK signature from author's
+ domain
+ 0.1 DKIM_SIGNED            Message has a DKIM or DK signature,
+ not necessarily valid
+X-BeenThere: linux-arm-kernel at lists.infradead.org
+X-Mailman-Version: 2.1.20
+Precedence: list
 
-
-diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
-index 0fe278b..8eb2f8f 100644
---- a/drivers/power/supply/bq27xxx_battery.c
-+++ b/drivers/power/supply/bq27xxx_battery.c
-@@ -46,6 +46,7 @@
- #include <linux/delay.h>
- #include <linux/platform_device.h>
- #include <linux/power_supply.h>
-+#include <linux/reboot.h>
- #include <linux/slab.h>
- #include <linux/of.h>
- 
-@@ -740,6 +741,9 @@ void bq27xxx_battery_update(struct bq27xxx_device_info *di)
- }
- EXPORT_SYMBOL_GPL(bq27xxx_battery_update);
- 
-+static int bq27xxx_battery_protect(struct bq27xxx_device_info *di);
-+
-+
- static void bq27xxx_battery_poll(struct work_struct *work)
- {
- 	struct bq27xxx_device_info *di =
-@@ -747,6 +751,7 @@ static void bq27xxx_battery_poll(struct work_struct *work)
- 				     work.work);
- 
- 	bq27xxx_battery_update(di);
-+	bq27xxx_battery_protect(di);
- 
- 	if (poll_interval > 0)
- 		schedule_delayed_work(&di->work, poll_interval * HZ);
-@@ -958,6 +963,41 @@ static int bq27xxx_battery_get_property(struct power_supply *psy,
- 	return ret;
- }
- 
-+static int bq27xxx_battery_protect(struct bq27xxx_device_info *di)
-+{
-+	union power_supply_propval val;
-+	int mV, mA, mOhm = 430, mVadj;
-+	int res;
-+
-+	printk(KERN_INFO "Main battery check\n");
-+
-+	res = bq27xxx_battery_voltage(di, &val);
-+	if (res)
-+		return res;
-+
-+	mV = val.intval / 1000;
-+	
-+	if (mV < 2950) {
-+		printk(KERN_ALERT "Main battery below 2.95V, forcing shutdown.\n");
-+		orderly_poweroff(true);
-+	}
-+
-+	res = bq27xxx_battery_current(di, &val);
-+	if (res)
-+		return res;
-+	
-+	mA = val.intval / 1000;
-+	mVadj = mV + (mA * mOhm) / 1000;
-+
-+	if (mVadj < 3150) {
-+		printk(KERN_ALERT "Main battery internal voltage below 3.15, shutdown.\n");
-+		orderly_poweroff(true);
-+	}
-+	printk(KERN_INFO "Main battery %d mV, internal voltage %d mV\n",
-+	       mV, mVadj);
-+	return 0;
-+}
-+
- static void bq27xxx_external_power_changed(struct power_supply *psy)
- {
- 	struct bq27xxx_device_info *di = power_supply_get_drvdata(psy);
-diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
-index 226b0b4ac..bcdc1f8 100644
---- a/drivers/thermal/thermal_core.c
-+++ b/drivers/thermal/thermal_core.c
-@@ -444,7 +444,7 @@ static void handle_critical_trips(struct thermal_zone_device *tz,
- 
- 	if (trip_type == THERMAL_TRIP_CRITICAL) {
- 		dev_emerg(&tz->device,
--			  "critical temperature reached(%d C),shutting down\n",
-+			  "critical temperature reached(%d C), shutting down\n",
- 			  tz->temperature / 1000);
- 		orderly_poweroff(true);
- 	}
-
+Would those be used by your mail client to put this mail in spam, or was
+that done by the linux-foundation.org (also gmail?) mail upon reception?
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/5e57183f/attachment.sig>
+Florian
