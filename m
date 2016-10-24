@@ -1,49 +1,45 @@
-From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Mon, 24 Oct 2016 12:36:27 -0400
-Subject: [PATCH 02/18] arm64: ilp32: add documentation on the ILP32 ABI
- for ARM64
-In-Reply-To: <1477081997-4770-3-git-send-email-ynorov@caviumnetworks.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <1477081997-4770-3-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <352ff60e-3975-8421-3274-3a904c0ac642@mellanox.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 24 Oct 2016 09:38:59 -0700
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+ <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+Message-ID: <87eg35snvg.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 4:33 PM, Yury Norov wrote:
-> Based on Andrew Pinski's patch-series.
+Stefan Wahren <stefan.wahren@i2se.com> writes:
+
+> Hi Martin,
 >
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> ---
->   Documentation/arm64/ilp32.txt | 46 +++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 46 insertions(+)
->   create mode 100644 Documentation/arm64/ilp32.txt
+> Am 28.09.2016 um 23:10 schrieb Eric Anholt:
+>> kernel at martin.sperl.org writes:
+>>
+>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>
+>>> Add basic thermal driver for bcm2835 SOC.
+>>>
+>>> This driver currently relies on the firmware setting up the
+>>> tsense HW block and does not set it up itself.
+>>>
+>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> What's the status of merging this one?  I'd like to merge the other
+>> patches.
 >
-> diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-> new file mode 100644
-> index 0000000..b96c18f
-> --- /dev/null
-> +++ b/Documentation/arm64/ilp32.txt
-> @@ -0,0 +1,46 @@
-> +ILP32 AARCH64 SYSCALL ABI
-> +=========================
-> +
-> +This document describes the ILP32 syscall ABI and where it differs
-> +from the generic compat linux syscall interface.
-> +
-> +AARCH64/ILP32 userspace can potentially access top halves of registers that
-> +are passed as syscall arguments, so such registers (w0-w7) are deloused.
+> i think it's necessary to rebase the whole series. Maybe we could get it
+> into 4.10.
 
-I'm not sure what "potentially access" here means: I think what you want to say
-is that userspace can pass garbage in the top half, but you should be clearer about
-what you mean here.  Also, you shouldn't use "deloused" here, since it's not a term
-that's defined elsewhere in the kernel, even though it's been used colloquially on LKML.
-Provide an actual implementation definition, like "have their top 32 bits zeroed".
-
-> +AARCH64/ILP32 provides next types turned to 64-bit (comparing to AARCH32):
-
-What does "turned" mean here?  And I "next types" isn't standard English; you want
-to say something like "the following types".  Likewise later with "next syscalls".
-
--- 
-Chris Metcalf, Mellanox Technologies
-http://www.mellanox.com
+Why would it need to be rebased?  The status, as far as I know, is that
+we're still waiting for the subsystem maintainer to respond.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/5f37774f/attachment.sig>
