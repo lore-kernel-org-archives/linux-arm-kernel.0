@@ -1,80 +1,51 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 24 Oct 2016 08:34:21 +0200
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-In-Reply-To: <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
-References: <CGME20161004170414eucas1p141bebe16e1bf241862833e7ad0270c72@eucas1p1.samsung.com>
- <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
- <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
-Message-ID: <b9e4e81f-3b3e-951f-df62-d640275aae71@samsung.com>
+From: megi@xff.cz (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Mon, 24 Oct 2016 08:45:55 +0200
+Subject: [linux-sunxi] [PATCH 1/3] phy: sun4i: check PHY id when poking
+ unknown bit of pmu
+In-Reply-To: <20161024035930.20274-1-icenowy@aosc.xyz>
+References: <20161024035930.20274-1-icenowy@aosc.xyz>
+Message-ID: <f40264d4-fc06-ad8a-e53a-94b4bc033f92@xff.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+Dne 24.10.2016 v 05:59 Icenowy Zheng napsal(a):
+> Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
+> The code that poke some unknown bit of PMU for H3/A64 didn't check
+> the PHY, and will cause kernel oops when PHY 0 is used.
+> 
+> Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index b9342a2..ff8e9dd 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -264,7 +264,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  		return ret;
+>  	}
+>  
+> -	if (data->cfg->enable_pmu_unk1) {
+> +	if (phy->index != 0 && data->cfg->enable_pmu_unk1) {
+
+It might be better to check for phy->pmu directly.
+
+regards,
+  o.
+>  		val = readl(phy->pmu + REG_PMU_UNK1);
+>  		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
+>  	}
+> 
 
 
-On 2016-10-12 08:24, Sricharan wrote:
-> On 2016-10-04 19:03, Sricharan R wrote:
->>> Initial post from Laurent Pinchart[1]. This is
->>> series calls the dma ops configuration for the devices
->>> at a generic place so that it works for all busses.
->>> The dma_configure_ops for a device is now called during
->>> the device_attach callback just before the probe of the
->>> bus/driver is called. Similarly dma_deconfigure is called during
->>> device/driver_detach path.
->>>
->>>
->>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>>          |                         |
->>> pci_bus_add_device     (device_add/driver_register)
->>>          |                         |
->>> device_attach           device_initial_probe
->>>          |                         |
->>> __device_attach_driver    __device_attach_driver
->>>          |
->>> driver_probe_device
->>>          |
->>> really_probe
->>>          |
->>> dma_configure
->>>
->>>    Similarly on the device/driver_unregister path __device_release_driver is
->>>    called which inturn calls dma_deconfigure.
->>>
->>>    If the ACPI bus code follows the same, we can add acpi_dma_configure
->>>    at the same place as of_dma_configure.
->>>
->>>    This series is based on the recently merged Generic DT bindings for
->>>    PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
->>>
->>>    This time tested this with platform and pci device for probe deferral
->>>    and reprobe on arm64 based platform. There is an issue on the cleanup
->>>    path for arm64 though, where there is WARN_ON if the dma_ops is reset while
->>>    device is attached to an domain in arch_teardown_dma_ops.
->>>    But with iommu_groups created from the iommu driver, the device is always
->>>    attached to a domain/default_domain. So so the WARN has to be removed/handled
->>>    probably.
->> Thanks for continuing work on this feature! Your can add my:
->>
->> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>
->    Thanks for testing this. So the for the below fix, the remove_device callback
->    gets called on the dma_ops cleanup path, so would it be easy to remove the
->    data for the device there ?
 
-I assumed that IOMMU driver cannot be removed reliably, so all 
-structures that it
-creates are permanent. I didn't use device_add()/device_remove() 
-callbacks, because
-in current implementation device_add() is called too late (after 
-dma-mapping glue
-triggers device_attach_iommu()).
-
-Maybe once your patchset is merged, I will move creation and management 
-of the all
-IOMMU related structures to device_add/remove callbacks.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 821 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/d6dd79ef/attachment.sig>
