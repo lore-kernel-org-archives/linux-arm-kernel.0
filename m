@@ -1,48 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2016 02:58:59 +0200
-Subject: [PATCH 2/2] gpio: mxs: fix duplicate level interrupts
-In-Reply-To: <20161021131138.10467-3-s.hauer@pengutronix.de>
-References: <20161021131138.10467-1-s.hauer@pengutronix.de>
- <20161021131138.10467-3-s.hauer@pengutronix.de>
-Message-ID: <CACRpkdad+ePnYJfpdKKSbzBPtkcf0YYzpB+59ba5R2vC7QjobA@mail.gmail.com>
+Date: Mon, 24 Oct 2016 03:03:27 +0200
+Subject: [RFC PATCH 01/13] pinctrl: meson: Add GXL pinctrl definitions
+In-Reply-To: <1477060838-14164-2-git-send-email-narmstrong@baylibre.com>
+References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+ <1477060838-14164-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdZ5VG2NGRh5CmYcYzwCp0LYSsgxHogCFa+6W7BDDBXOYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 3:11 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+On Fri, Oct 21, 2016 at 4:40 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-> According to the reference manual level interrupts can't be acked
-> using the IRQSTAT registers. The effect is that when a level interrupt
-> triggers the following ack is a no-op and the same interrupt triggers
-> again right after it has been unmasked after running the interrupt
-> handler.
+> Add support for the Amlogic Meson GXL SoC, this is a partially complete
+> definition only based on the Amlogic Vendor tree.
 >
-> The reference manual says:
+> This definition differs a lot from the GXBB and needs a separate entry.
 >
-> Status bits for pins configured as level sensitive interrupts cannot be
-> cleared unless either the actual pin is in the non-interrupting state, or
-> the pin has been disabled as an interrupt source by clearing its bit in
-> HW_PINCTRL_PIN2IRQ.
->
-> To work around the duplicated interrupts we can use the PIN2IRQ
-> rather than the IRQEN registers to mask the interrupts. This
-> probably does not work for the edge interrupts, so we have to split up
-> the irq chip into two chip types, one for the level interrupts and
-> one for the edge interrupts. We now make use of two different enable
-> registers, so we have to take care to always enable the right one,
-> especially during switching of the interrupt type. An easy way
-> to accomplish this is to use the IRQCHIP_SET_TYPE_MASKED which
-> makes sure that set_irq_type is called with masked interrupts. With this
-> the flow to change the irq type is like:
->
-> - core masks interrupt (using the current chip type)
-> - mxs_gpio_set_irq_type() changes chip type if necessary
-> - mxs_gpio_set_irq_type() unconditionally sets the enable bit in the
->   now unused enable register
-> - core eventually unmasks the interrupt (using the new chip type)
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Patch applied with Marek's review tag.
+Looks good to me. Tell me when I may apply it, it looks orthogonal
+to the rest of the patches.
 
 Yours,
 Linus Walleij
