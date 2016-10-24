@@ -1,36 +1,51 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 24 Oct 2016 15:21:45 +1100
-Subject: [V4, 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during early
- boot stages
-In-Reply-To: <fae460e4-d838-22c0-8984-52d6d2b6c099@codeaurora.org>
-References: <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
- <CANwerB0UzXPL3a4wu=0XfUtzBw93qdurSaMcYBOvxEyiCjLh6Q@mail.gmail.com>
- <fae460e4-d838-22c0-8984-52d6d2b6c099@codeaurora.org>
-Message-ID: <CANwerB0GO_-Z4DRxt=xJ1SmrS6jDajxkfDZdVV1b=hjL4NreqQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 24 Oct 2016 00:31:30 -0400
+Subject: [PATCH V5 1/3] ACPI, PCI,
+ IRQ: assign ISA IRQ directly during early boot stages
+In-Reply-To: <1477283492-26657-1-git-send-email-okaya@codeaurora.org>
+References: <1477283492-26657-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1477283492-26657-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2016 at 15:17, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Thanks,
->
-> On 10/22/2016 11:48 PM, Jonathan Liu wrote:
->> This series fixes one or more network adapters not working in Linux
->> 32-bit x86 guest running inside VirtualBox if I have 4 network
->> adapters enabled. The following message no longer appears in the
->> kernel log:
->> ACPI: No IRQ available for PCI Interrupt Link [LNKD]. Try pci=noacpi or acpi=off
->>
->> Tested-by: Jonathan Liu <net147@gmail.com>
->
-> I'm hoping that you can retest V5 so that Rafael can pull in your tested-by into
-> the commit message.
->
-> --
-> Sinan Kaya
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+We do not want to store the SCI penalty in the acpi_isa_irq_penalty[]
+table because acpi_isa_irq_penalty[] only holds ISA IRQ penalties and
+there's no guarantee that the SCI is an ISA IRQ.  We add in the SCI
+penalty as a special case in acpi_irq_get_penalty().
 
-Sure. Please CC me when you submit V5.
+But if we called acpi_penalize_isa_irq() or acpi_irq_penalty_update()
+for an SCI that happened to be an ISA IRQ, they stored the SCI
+penalty (part of the acpi_irq_get_penalty() return value) in
+acpi_isa_irq_penalty[].  Subsequent calls to acpi_irq_get_penalty()
+returned a penalty that included *two* SCI penalties.
 
-Regards,
-Jonathan
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ drivers/acpi/pci_link.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+index c983bf7..6229b02 100644
+--- a/drivers/acpi/pci_link.c
++++ b/drivers/acpi/pci_link.c
+@@ -849,7 +849,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+ 			continue;
+ 
+ 		if (used)
+-			new_penalty = acpi_irq_get_penalty(irq) +
++			new_penalty = acpi_isa_irq_penalty[irq] +
+ 					PIRQ_PENALTY_ISA_USED;
+ 		else
+ 			new_penalty = 0;
+@@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+ void acpi_penalize_isa_irq(int irq, int active)
+ {
+ 	if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+-		acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
++		acpi_isa_irq_penalty[irq] +=
+ 		  (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+ }
+ 
+-- 
+1.9.1
