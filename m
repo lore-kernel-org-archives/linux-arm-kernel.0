@@ -1,64 +1,36 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 24 Oct 2016 16:43:25 +0800
-Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
- hisilicon-161x01 erratum
-In-Reply-To: <3a29c03a-2da1-7bfe-28ff-21dada50ee8d@arm.com>
-References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
- <3a29c03a-2da1-7bfe-28ff-21dada50ee8d@arm.com>
-Message-ID: <6697f1a4-3c22-d0ef-e2c2-41f0ff36fbf0@huawei.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Oct 2016 11:29:28 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <3851270.xZRcP9hae0@wuerfel>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <13702107.LdHY4HTXyY@wuerfel>
+ <20161019155325.GR1041@n2100.armlinux.org.uk> <3851270.xZRcP9hae0@wuerfel>
+Message-ID: <CAMuHMdWjBFRm2rvCC8LBVG0CLk7MtmMLZJ7Ca72v6Nm=b5aD9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
+On Fri, Oct 21, 2016 at 3:06 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> - a lot of the less common architectures just don't get updated
+>   in time, out of 22 architectures that don't use asm-generic/unistd.h,
+>   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
 
-On 2016/10/24 16:36, Marc Zyngier wrote:
-> On 23/10/16 04:21, Ding Tianhong wrote:
->> This erratum describes a bug in logic outside the core, so MIDR can't be
->> used to identify its presence, and reading an SoC-specific revision
->> register from common arch timer code would be awkward.  So, describe it
->> in the device tree.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> index ef5fbe9..26bc837 100644
->> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
->> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
->>    This also affects writes to the tval register, due to the implicit
->>    counter read.
->>
->> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
->> +  QorIQ erratum 161201, which says that reading the counter is
-> 
-> Other than the copy/paste of the FSL erratum, please document the actual
-> erratum number. Is that 161x01 or 161201?
-> 
+Should everybody implement pkey_mprotect?
 
-Sorry for the lazy behavior.
+"x86, pkeys: remove cruft from never-merged syscalls" and
 
->> +  unreliable unless the small range of value is returned by back-to-back reads.
-> 
-> That's a detail that doesn't belong in the DT, but that would be much
-> better next to the code doing the actual handling.
-> 
-Got it.
+arch/powerpc/include/asm/unistd.h:#define __IGNORE_pkey_mprotect
 
-Thanks
-Ding
+aren't that reassuring...
 
->> +  This also affects writes to the tval register, due to the implicit
->> +  counter read.
->> +
->>  ** Optional properties:
->>
->>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
