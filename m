@@ -1,32 +1,47 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Oct 2016 19:19:37 +0100
-Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
-In-Reply-To: <CAKXjFTNZhWTZSXtLZo8EieBtAPn_J-MM+-g8yCRJiV6UBspB9Q@mail.gmail.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-10-ahaslam@baylibre.com>
- <20161024175320.GO17252@sirena.org.uk>
- <CAKXjFTNZhWTZSXtLZo8EieBtAPn_J-MM+-g8yCRJiV6UBspB9Q@mail.gmail.com>
-Message-ID: <20161024181937.GP17252@sirena.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 24 Oct 2016 20:25:56 +0200 (CEST)
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <87eg35snvg.fsf@eliezer.anholt.net>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+ <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+ <87eg35snvg.fsf@eliezer.anholt.net>
+Message-ID: <1190898538.120930.02d69662-0b1a-447d-9c29-782aec7a1189.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 08:11:40PM +0200, Axel Haslam wrote:
-> On Mon, Oct 24, 2016 at 7:53 PM, Mark Brown <broonie@kernel.org> wrote:
+> Eric Anholt <eric@anholt.net> hat am 24. Oktober 2016 um 18:38 geschrieben:
+> 
+> 
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+> 
+> > Hi Martin,
+> >
+> > Am 28.09.2016 um 23:10 schrieb Eric Anholt:
+> >> kernel at martin.sperl.org writes:
+> >>
+> >>> From: Martin Sperl <kernel@martin.sperl.org>
+> >>>
+> >>> Add basic thermal driver for bcm2835 SOC.
+> >>>
+> >>> This driver currently relies on the firmware setting up the
+> >>> tsense HW block and does not set it up itself.
+> >>>
+> >>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> >>> Acked-by: Eric Anholt <eric@anholt.net>
+> >>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> >> What's the status of merging this one?  I'd like to merge the other
+> >> patches.
+> >
+> > i think it's necessary to rebase the whole series. Maybe we could get it
+> > into 4.10.
+> 
+> Why would it need to be rebased?  The status, as far as I know, is that
+> we're still waiting for the subsystem maintainer to respond.
 
-> > does it make sense to report this as a mode, we don't report other error
-> > conditions as modes but instead use REGULATOR_STATUS_ with the
-> > get_status() operation?
+Since at least this patch won't apply anymore, but feedback from maintainer is
+still good :-)
 
-> I used mode, because when the regulator toggles the overcurrent
-> line, it means that it has entered a current limited mode, at least the
-> regulator im looking at. ill change to STATUS
-
-That's not what regulator modes are - please look at the documentation
-for the defines here.  They're about the quality of regulation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/e50d7f07/attachment.sig>
+Sorry for this impatience, but i'm afraid that we possibly miss 4.10.
