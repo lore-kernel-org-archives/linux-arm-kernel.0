@@ -1,21 +1,23 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Mon, 24 Oct 2016 14:27:25 -0500
-Subject: [PATCH/RESEND] thermal: qcom-spmi: Treat reg property as a
- single cell
-In-Reply-To: <20161018234019.5489-1-sboyd@codeaurora.org>
-References: <20161018234019.5489-1-sboyd@codeaurora.org>
-Message-ID: <20161024192725.GI3145@hector.attlocal.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2016 21:28:19 +0200
+Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
+In-Reply-To: <6720864.e2sjvVVhdQ@wuerfel>
+References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
+ <6720864.e2sjvVVhdQ@wuerfel>
+Message-ID: <CACRpkdZvUh0Z0kxu+WmvwqH3kuaOxaP1Cgxv0WUE2PT-eLs62w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 04:40:19PM -0700, Stephen Boyd wrote:
-> We only read the first element of the reg property to figure out
-> the offset of the temperature sensor inside the PMIC.
-> Furthermore, we want to remove the second element in DT, so just
-> don't read the second element so that probe keeps working if we
-> change the DT in the future.
-> 
-> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, Oct 19, 2016 at 12:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> I don't see any hard dependency here, so I'd suggest to merge the
+> two cpufreq patches through the subsystem tree, and the ARM patches
+> through arm-soc.
+
+That's right, Viresh can you merge patches 1 and 5 to the
+cpufreq tree please?
+
+I will funnel patches 2, 3 and 4 to ARM SoC.
+
+Yours,
+Linus Walleij
