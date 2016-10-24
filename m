@@ -1,32 +1,49 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 24 Oct 2016 12:17:00 +0200
-Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
-In-Reply-To: <20161024100938.GI14477@dell>
-References: <20161005155112.13774-1-hdegoede@redhat.com>
- <20161005155112.13774-2-hdegoede@redhat.com>
- <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
- <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
- <20161024100938.GI14477@dell>
-Message-ID: <20161024101659.GA1440@katana>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Oct 2016 11:17:36 +0100
+Subject: Question about arm64 earlycon
+In-Reply-To: <4966376.bRx4fgSjbT@wuerfel>
+References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
+ <4966376.bRx4fgSjbT@wuerfel>
+Message-ID: <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24/10/16 11:06, Arnd Bergmann wrote:
+> On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
+>> Hi Catalin, Marc, Mark, Arnd,
+>>
+>> I am testing with 3.12 kernel with earlyprintk enabled and I see some
+>> garbage characters in the console log right before the message
+>> indicating that the real console device is initialized:
+>>
+>> <some garbage characters here>01c020000.serial: ttyS0 at MMIO
+>> 0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
+>> console [ttyS0] enabled, bootconsole disabled
 
-> > > Even though axp20x-i2c seems to be the only "DT only" i2c client,
-> > > would it make sense to add DT-based module autoloading to the i2c
-> > > core?
-> > 
-> > If it is not too invasive, then yes that would be a sensible addition IMHO.
+Well, you get two independent, unsynchronized bits of code writing to
+the same peripheral. Things are bound to go badly. Unless you're trying
+to debug things, do not use earlyprintk in production.
+
+>>
+>> I looked through early_prink.c file and printk.c file and it looks
+>> like there is case that some early boot code can touch the UART
+>> hardware via ealy console driver while the 'real' console driver is
+>> setting up the same UART port? Please let me know if I missed some
+>> important piece of code that can prevent this.
 > 
-> If I understand you correctly, I already have a patch-set on the ML
-> that does this.
+> I don't think we every supported earlyprintk on arm64, and
+> earlycon support may have been added later.
 
-Incomplete, though. But we will see if Kieran finds time somewhen...
+We did support some form of earlyprintk for a while (though not in the
+same way as 32bit ARM does), until Rob introduced earlycon.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/f6b74cf4/attachment.sig>
+> If you can't use a modern kernel, try backporting all the
+> relevant earlycon changes.
+
+Agreed. That's the most sensible course of action.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
