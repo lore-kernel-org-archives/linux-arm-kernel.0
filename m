@@ -1,93 +1,52 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 15:17:05 -0600
-Subject: [PATCH v3 [fix]] PM / doc: Update device documentation for
- devices in IRQ safe PM domains
-In-Reply-To: <3700155.5AlzjeyN5H@vostro.rjw.lan>
-References: <20161021152313.GC72940@linaro.org>
- <1900178.E2KGyKAlTm@vostro.rjw.lan>
- <20161024161605.GD72940@linaro.org>
- <3700155.5AlzjeyN5H@vostro.rjw.lan>
-Message-ID: <20161024211705.GG72940@linaro.org>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 16:20:59 -0500
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <b6cd3c47-0df8-266a-2b8d-13c82062b647@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+ <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
+ <b6cd3c47-0df8-266a-2b8d-13c82062b647@lechnology.com>
+Message-ID: <84648cb0-f1fa-d88b-bac2-79208af01ca6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24 2016 at 15:15 -0600, Rafael J. Wysocki wrote:
->On Monday, October 24, 2016 10:16:05 AM Lina Iyer wrote:
->> On Sat, Oct 22 2016 at 18:19 -0600, Rafael J. Wysocki wrote:
->> >On Friday, October 21, 2016 03:52:55 PM Lina Iyer wrote:
->> >> Update documentation to reflect the changes made to support IRQ safe PM
->> >> domains.
->> >>
->> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->> >> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->> >> ---
->> >> Changes since v3:
->> >> - Moved para to the end of the section
->> >> - Added clause for all IRQ safe devices in a domain
->> >> - Cleanup explanation of nested domains
->> >> ---
->> >>  Documentation/power/devices.txt | 11 ++++++++++-
->> >>  1 file changed, 10 insertions(+), 1 deletion(-)
->> >>
->> >> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
->> >> index 8ba6625..9218ce6 100644
->> >> --- a/Documentation/power/devices.txt
->> >> +++ b/Documentation/power/devices.txt
->> >> @@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
->> >>  into a low-power state together at the same time by turning off the shared
->> >>  power resource.  Of course, they also need to be put into the full-power state
->> >>  together, by turning the shared power resource on.  A set of devices with this
->> >> -property is often referred to as a power domain.
->> >> +property is often referred to as a power domain. A power domain may also be
->> >> +nested inside another power domain. The nested domain is referred to as the
->> >> +sub-domain of the parent domain.
->> >>
->> >>  Support for power domains is provided through the pm_domain field of struct
->> >>  device.  This field is a pointer to an object of type struct dev_pm_domain,
->> >> @@ -629,6 +631,13 @@ support for power domains into subsystem-level callbacks, for example by
->> >>  modifying the platform bus type.  Other platforms need not implement it or take
->> >>  it into account in any way.
->> >>
->> >> +Devices and PM domains may be defined as IRQ-safe, if they can be powered
->> >> +on/off even when the IRQs are disabled.
->> >
->> >What IRQ-safe means for devices is that their runtime PM callbacks may be
->> >invoked with interrupts disabled on the local CPU.  I guess the meaning of
->> >IRQ-safe for PM domains is analogous, but the above isn't precise enough to me.
->> >
->> >> An IRQ-safe device in a domain will
->> >> +disallow power management on the domain, unless the domain is also defined as
->> >> +IRQ-safe. In other words, a domain containing all IRQ-safe devices must also
->> >> +be defined as IRQ-safe. Another restriction this framework imposes on the
->> >> +parent domain of an IRQ-safe domain is that the parent domain must also be
->> >> +defined as IRQ-safe.
->> >
->> >What about this:
->> >
->> >"Devices may be defined as IRQ-safe which indicates to the PM core that their
->> >runtime PM callbacks may be invoked with disabled interrupts (see
->> >Documentation/power/runtime_pm.txt for more information).  If an IRQ-safe
->> >device belongs to a PM domain, the runtime PM of the domain will be disallowed,
->> >unless the domain itself is defined as IRQ-safe.  However, a PM domain can only
->> >be defined as IRQ-safe if all of the devices in it are IRQ-safe.
->> >
->> This is correct. But the last line may need a bit of modification. If
->> all devices in a PM domain are IRQ-safe and the domain is NOT, then it
->> it is a valid combination just that the domain would never do runtime
->> PM.
+On 10/24/2016 02:50 PM, David Lechner wrote:
+> On 10/24/2016 10:50 AM, David Lechner wrote:
+>> On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+>>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>>>
+>>>> +&ehrpwm1 {
+>>>> +    status = "disabled";
+>>>
+>>> Hmm, disabled? Can you add this node when you actually use it?
+>>
+>> Not sure why I have this disabled. Like the gpios, the pwms can be used
+>> via sysfs, so I would like to leave them.
+>>
 >
->That doesn't contradict the last sentence of mine above.  I guess what you mean
->is that having a non-IRQ-safe device in an IRQ-safe domain is a valid
->configuration.  I wonder how it works then. :-)
+> Now I remember why these are disabled. The clock matching is broken.
+> Only the first ehrpwm and the first ecap get clocks. The others fail.
 >
->In any case, what about changing that sentence to something like:
+> I can change these to "okay". It will just result in a kernel error
+> message until the clocks are fixed.
 >
->"However, it only makes sense to define a PM domain as IRQ-safe if all devices
->in it are IRQ-safe."
->
-That's precise. I will add your para instead of mine to the
-documentation.
 
-Thanks,
-Lina
->
+correction: it is not the clocks that are broken. it is the device names.
+
+In  arch/arm/mach-davinci/da8xx-dt.c, we have...
+
+
+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
+
+
+Which causes each device to have the same device node name. This causes 
+sysfs errors because it is trying to register a second device at the 
+same sysfs path.
+
+If you change the names here, then the device do not work because the 
+clock lookup fails.
