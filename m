@@ -1,54 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 18:48:40 +0100
-Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
-In-Reply-To: <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
-References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
- <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
-Message-ID: <20161024174840.GR15620@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Oct 2016 18:53:20 +0100
+Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
+In-Reply-To: <20161024164634.4330-10-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-10-ahaslam@baylibre.com>
+Message-ID: <20161024175320.GO17252@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:38:59AM -0700, Laura Abbott wrote:
-> On 10/19/2016 12:10 PM, Mark Rutland wrote:
-> >Hi all,
-> >
-> >Building atop of Andy's work on x86 and generic code, these patches move
-> >arm64's thread_info off of the stack and into task_struct. This protects
-> >thread_info from corruption in the face of stack overflow, and serves as
-> >a step towards fully robust stack overflow handling, which will be
-> >addressed by subsequent patches.
-> >
-> >These patches are based atop of a preparatory series [1] (itself based
-> >on v4.9-rc1) that's also necessary for s390. I've placed those patches
-> >in a branch [2] on my kernel.org repo, along with this series [3]. I'm
-> >hoping that the prep work will be able to become a stable branch/tag
-> >soon.
-> >
-> >I've given the series some light testing on a couple of SMP arm64
-> >platforms, but this has yet to see a thorough beating; please do try to
-> >make this fall over!
-> >
-> >Since RFC [4]:
-> >* Rely on prior patches to make thread_info arch-specific
-> >* Make smp_processor_id() use a per-cpu variable
-> >* Split out current_stack_pointer
-> >* Make SMP actually work
-> >
-> >[1] http://lkml.kernel.org/r/1476901693-8492-1-git-send-email-mark.rutland at arm.com
-> >[2] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=core/ti-stack-split
-> >[3] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/ti-stack-split
-> >[4] http://lkml.kernel.org/r/1473947349-14521-1-git-send-email-mark.rutland at arm.com
+On Mon, Oct 24, 2016 at 06:46:26PM +0200, ahaslam at baylibre.com wrote:
 
-> I pulled the arm64/ti-stack-split branch on top of a Fedora
-> tree and ran back-to-back kernel RPM builds for a long weekend.
-> It's still going as of this morning so you can take that as a
-> 
-> Tested-by: Laura Abbott <labbott@redhat.com>
+> +		if (ret) {
+> +			pr_err("Failed to request irq: %d\n", ret);
 
-Thanks! That's much appreciated!
+dev_err()
 
-Just to check, did you grab the version with entry.S fixes rolled in
-(where the head is 657f54256c427fec)?
+> +++ b/include/linux/regulator/consumer.h
+> @@ -74,6 +74,10 @@
+>   *             the most noisy and may not be able to handle fast load
+>   *             switching.
+>   *
+> + * OVERCURRENT Regulator has detected an overcurrent condition, and
+> + *             may be limiting the supply output.
+> + *
+> + *
+>   * NOTE: Most regulators will only support a subset of these modes. Some
+>   * will only just support NORMAL.
+>   *
+> @@ -84,6 +88,7 @@
+>  #define REGULATOR_MODE_NORMAL			0x2
+>  #define REGULATOR_MODE_IDLE			0x4
+>  #define REGULATOR_MODE_STANDBY			0x8
+> +#define REGULATOR_MODE_OVERCURRENT		0x10
 
-Thanks,
-Mark.
+This is adding a new core feature with a new mode and should have been
+split out of the driver specific change with a spearate changelog.  Why
+does it make sense to report this as a mode, we don't report other error
+conditions as modes but instead use REGULATOR_STATUS_ with the
+get_status() operation?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/f2f48bdd/attachment.sig>
