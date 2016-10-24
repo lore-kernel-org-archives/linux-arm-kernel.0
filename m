@@ -1,60 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Oct 2016 09:52:59 -0700
-Subject: [GIT PULL 4/4] Broadcom defconfig-arm64 changes for 4.9 (part 2)
-In-Reply-To: <CAOesGMjJ3_rPUke8B5yW_6Q4NyP1sb-wqY5jfcs1_+UhGQK9_g@mail.gmail.com>
-References: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
- <1475263395-27653-4-git-send-email-f.fainelli@gmail.com>
- <62d5c9b0-9073-c8e3-6a9f-390f381d4d9d@gmail.com>
- <CAOesGMjJ3_rPUke8B5yW_6Q4NyP1sb-wqY5jfcs1_+UhGQK9_g@mail.gmail.com>
-Message-ID: <a8e6638c-95a1-6847-dc75-368b69b7a87c@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 24 Oct 2016 18:55:22 +0200 (CEST)
+Subject: Disabling an interrupt in the handler locks the system up
+In-Reply-To: <580E3308.4050507@free.fr>
+References: <580A4460.2090306@free.fr>
+ <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
+ <20161021201448.3f4a0a7a@arm.com> <580A70B9.8060507@free.fr>
+ <alpine.DEB.2.20.1610212147420.4855@nanos> <580A7A2B.5000702@free.fr>
+ <20161022123713.6dc788b3@arm.com> <580BF1D4.2030509@free.fr>
+ <580E3308.4050507@free.fr>
+Message-ID: <alpine.DEB.2.20.1610241847580.5002@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2016 04:50 PM, Olof Johansson wrote:
-> On Sun, Oct 23, 2016 at 2:55 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 09/30/2016 12:23 PM, Florian Fainelli wrote:
->>> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
->>>
->>>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/defconfig-arm64
->>>
->>> for you to fetch changes up to 51e3fb1d3f514cd336faf185df73b25fca194773:
->>>
->>>   Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next (2016-09-30 12:02:29 -0700)
->>>
->>> ----------------------------------------------------------------
->>> This pull request contains Broadcom ARM64-based SoCs defconfig changes for 4.9,
->>> please pull the following changes:
->>>
->>> - Eric updates the ARMv8 defconfig to contain everything that is needed to run
->>>   a 64-bit kernel on the Raspberry Pi 3
->>>
->>> ----------------------------------------------------------------
->>> Eric Anholt (1):
->>>       arm64: Add BCM2835 (Raspberry Pi 3) support to the defconfig
->>>
->>> Florian Fainelli (1):
->>>       Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next
->>>
->>>  arch/arm64/configs/defconfig | 16 ++++++++++++++++
->>>  1 file changed, 16 insertions(+)
->>
->> Arnd, Kevin, Olof,
->>
->> Following Olof's response here:
->>
->> https://www.spinics.net/lists/arm-kernel/msg534687.html
->>
->> do you think we could merge these for 4.9-rcX? Let me know if I should
->> send a fresh pull request for that.
+On Mon, 24 Oct 2016, Mason wrote:
 > 
-> Main reason to respin would be if you need to rebase due to other
-> changes that have gone in, or if you expect to have other material
-> that should be based on a 4.9-rc base.
+> For the record, setting the IRQ_DISABLE_UNLAZY flag for this device
+> makes the system lock-up disappear.
 
-No dependencies, this should apply cleanly to 4.9-rc. Thanks!
--- 
-Florian
+The way how lazy irq disabling works is:
+
+1) Interrupt is marked disabled in software, but the hardware is not masked
+
+2) If the interrupt fires befor the interrupt is reenabled, then it's
+   masked at the hardware level in the low level interrupt flow handler.
+
+I have no idea why that does not work on your hardware. You might
+instrument handle_level_irq() to see what effect that has.
+
+Thanks,
+
+	tglx
