@@ -1,36 +1,62 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 24 Oct 2016 18:41:00 +0100
-Subject: [PATCH v3 3/8] PM / Domains: Allow domain power states to be read
- from DT
-In-Reply-To: <20161024164846.GE72940@linaro.org>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
- <1476467276-75094-4-git-send-email-lina.iyer@linaro.org>
- <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
- <20161024164846.GE72940@linaro.org>
-Message-ID: <cfcee5ef-3845-d5e4-424b-dc635bab5a2f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Oct 2016 18:42:49 +0100
+Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <7hd1ipzm3h.fsf@baylibre.com>
+References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
+ <20161024170035.GO15620@leverpostej> <7hd1ipzm3h.fsf@baylibre.com>
+Message-ID: <20161024174249.GQ15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 24, 2016 at 10:35:30AM -0700, Kevin Hilman wrote:
+> Hi Mark,
+> 
+> Mark Rutland <mark.rutland@arm.com> writes:
+> > On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
+> >> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
+> >> +{
+> >> +	const struct da8xx_ddrctl_config_knob *knob;
+> >> +	const struct da8xx_ddrctl_setting *setting;
+> >> +	u32 regprop[2], base, memsize, reg;
+> >> +	struct device_node *node, *parent;
+> >> +	void __iomem *ddrctl;
+> >> +	const char *board;
+> >> +	struct device *dev;
+> >> +	int ret;
+> >> +
+> >> +	dev = &pdev->dev;
+> >> +	node = dev->of_node;
+> >> +
+> >> +	/* Find the board name. */
+> >> +	for (parent = node;
+> >> +	     !of_node_is_root(parent);
+> >> +	     parent = of_get_parent(parent));
+> >> +
+> >> +	ret = of_property_read_string(parent, "compatible", &board);
+> >> +	if (ret) {
+> >> +		dev_err(dev, "unable to read the soc model\n");
+> >> +		return ret;
+> >> +	}
+> >
+> > I can see that you want to expose sysfs knobs for this, but is it really
+> > necessary to match boards like this? It's very fragile, and commits us
+> > to maintaining a database of board data (i.e. a board file).
+> >
+> > I am very much not keen on that.
+> 
+> The original proposal[1] was to create DT properties reflecting the
+> various knobs in the DDR Controller, but that was frowned upon since
+> that was more HW configuration than hardware description.
+> 
+> That resulted in this approach which keeps the HW configuration values
+> in the driver, and selectable based on DT compatible.
+> 
+> IMO, neither aproach is pretty.  From a DT maintainer perspective, can
+> you comment on your preference?
 
+>From my PoV, it really depends on *why* we need this. What does the
+tuning gain us, and is it specific to a given use-case?
 
-On 24/10/16 17:48, Lina Iyer wrote:
-> Hi Sudeep,
-
-[..]
-
->
-> I was able to find the original thread, where we discussed this [1].
->
-> [1]. http://www.serverphorums.com/read.php?12,1303996
->
-
-I went through the discussion and that's valid discussion and I agree.
-But what am looking for is backward compatibility and not exactly same
-as the discussion and I agree that can be solved in different way.
-
-I just feel that's one easily way to solve such issues. I am open to
-suggestions.
-
--- 
-Regards,
-Sudeep
+Thanks,
+Mark.
