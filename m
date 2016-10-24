@@ -1,64 +1,63 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 24 Oct 2016 13:46:33 +0800
-Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
- hisilicon-161x01 erratum
-In-Reply-To: <20161023120423.GO30578@tiger>
-References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
- <20161023120423.GO30578@tiger>
-Message-ID: <f1d3b4bb-e3ba-3cdf-69d5-46c8487a5a7f@huawei.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Mon, 24 Oct 2016 11:32:26 +0530
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
+ 24MHz
+Message-ID: <20161024060226.4170-1-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Increase ADC reference clock from 3MHz to 24MHz so that the
+sampling rates goes up from 100K samples per second to 800K
+samples per second on AM335x and AM437x SoC.
 
+Also increase opendelay for touchscreen configuration to
+equalize the increase in ADC reference clock frequency,
+which results in the same amount touch events reported via
+evtest on AM335x GP EVM.
 
-On 2016/10/23 20:04, Shawn Guo wrote:
-> On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
->> This erratum describes a bug in logic outside the core, so MIDR can't be
->> used to identify its presence, and reading an SoC-specific revision
->> register from common arch timer code would be awkward.  So, describe it
->> in the device tree.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> index ef5fbe9..26bc837 100644
->> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
->> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
->>    This also affects writes to the tval register, due to the implicit
->>    counter read.
->>
->> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
->> +  QorIQ erratum 161201, which says that reading the counter is
-> 
-> QorIQ is a Freescale/NXP specific name, and shouldn't be there.
-> 
-> Shawn
-> 
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
 
-Got it, will wait other feedback and fix them together, thanks.
+This patch depends on ADC DMA patch series [1]
 
-Ding
+Without DMA support, when ADC ref clock is set at 24MHz, I am
+seeing fifo overflow as CPU is not able to pull the ADC samples.
+This answers that DMA support is must for ADC to consume the
+samples generated at 24MHz with no open, step delay or
+averaging with patch [2].
 
->> +  unreliable unless the small range of value is returned by back-to-back reads.
->> +  This also affects writes to the tval register, due to the implicit
->> +  counter read.
->> +
->>  ** Optional properties:
->>
->>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
->> -- 
->> 1.9.0
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+Measured the performance with the iio_generic_buffer with the
+patch [3] applied
+
+[1] - http://www.spinics.net/lists/devicetree/msg145045.html
+[2] - http://pastebin.ubuntu.com/23357935/
+[3] - http://pastebin.ubuntu.com/23357939/
+
+---
+ include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+index b9a53e0..96c4207 100644
+--- a/include/linux/mfd/ti_am335x_tscadc.h
++++ b/include/linux/mfd/ti_am335x_tscadc.h
+@@ -90,7 +90,7 @@
+ /* Delay register */
+ #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
+ #define STEPDELAY_OPEN(val)	((val) << 0)
+-#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
++#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x500)
+ #define STEPDELAY_SAMPLE_MASK	(0xFF << 24)
+ #define STEPDELAY_SAMPLE(val)	((val) << 24)
+ #define STEPCONFIG_SAMPLEDLY	STEPDELAY_SAMPLE(0)
+@@ -137,7 +137,7 @@
+ #define SEQ_STATUS BIT(5)
+ #define CHARGE_STEP		0x11
+ 
+-#define ADC_CLK			3000000
++#define ADC_CLK			24000000
+ #define TOTAL_STEPS		16
+ #define TOTAL_CHANNELS		8
+ #define FIFO1_THRESHOLD		19
+-- 
+2.10.1.502.g6598894
