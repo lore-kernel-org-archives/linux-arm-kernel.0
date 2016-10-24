@@ -1,44 +1,58 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Oct 2016 17:58:44 +0200
-Subject: [linux-sunxi] [PATCH v5 3/4] Documentation: devicetree: add
- vendor prefix for Pine64
-In-Reply-To: <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
-References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
- <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
- <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
-Message-ID: <20161024155844.biwcobiuxqmcpqk2@lukather>
+Date: Mon, 24 Oct 2016 17:05:42 +0200
+Subject: [PATCH v4 6/9] clk: sunxi-ng: Add A64 clocks
+In-Reply-To: <20161020184601.GB26139@codeaurora.org>
+References: <cover.024e1b023e41efe548dc6a004f7a946408d5c9a2.1476196031.git-series.maxime.ripard@free-electrons.com>
+ <cd4dd81821b8910d40626baab2dbfdabd94b1b98.1476196031.git-series.maxime.ripard@free-electrons.com>
+ <20161020184601.GB26139@codeaurora.org>
+Message-ID: <20161024150542.cle7iw2l7c5ybbrr@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi Stephen,
 
-On Fri, Oct 21, 2016 at 11:30:01AM +1100, Jonathan Liu wrote:
-> On 21 October 2016 at 05:00, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > From: Andre Przywara <andre.przywara@arm.com>
-> >
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > [Maxime: Change title prefix to match the usual style]
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > index f0a48ea78659..4eefd1c3ff16 100644
-> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> > @@ -208,7 +208,7 @@ parade      Parade Technologies Inc.
-> >  pericom        Pericom Technology Inc.
-> >  phytec PHYTEC Messtechnik GmbH
-> >  picochip       Picochip Ltd
-> > -pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+On Thu, Oct 20, 2016 at 11:46:01AM -0700, Stephen Boyd wrote:
+> On 10/11, Maxime Ripard wrote:
+> > diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > new file mode 100644
+> > index 000000000000..c0e96bf6d104
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> > +
+> > +static int sun50i_a64_ccu_probe(struct platform_device *pdev)
+> > +{
+> > +	struct resource *res;
+> > +	void __iomem *reg;
+> > +	u32 val;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	reg = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(reg)) {
+> > +		dev_err(&pdev->dev, "Could not map the clock registers\n");
 > 
-> Why is "pixcir  PIXCIR MICROELECTRONICS Co., Ltd" removed?
+> devm_ioremap_resource() should already spit out an error.
+> 
+> > +		return PTR_ERR(reg);
+> > +	}
+> > +
+> > +	/* Force the PLL-Audio-1x divider to 4 */
+> > +	val = readl(reg + SUN50I_A64_PLL_AUDIO_REG);
+> > +	val &= ~GENMASK(19, 16);
+> > +	writel(val | (3 << 16), reg + SUN50I_A64_PLL_AUDIO_REG);
+> > +
+> > +	writel(0x515, reg + SUN50I_A64_PLL_MIPI_REG);
+> > +
+> > +	return sunxi_ccu_probe(pdev->dev.of_node, reg, &sun50i_a64_ccu_desc);
+> > +}
+> > +
+> > +static const struct of_device_id sun50i_a64_ccu_ids[] = {
+> > +	{ .compatible = "allwinner,sun50i-a64-ccu" },
+> > +	{ },
+> 
+> Nitpick: drop the comma
 
-Probably a poor rebase on my side. Good catch, thanks!
+Thanks for your comments, it's fixed.
+
 Maxime
 
 -- 
@@ -51,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/66edcd0a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/962b7cf5/attachment.sig>
