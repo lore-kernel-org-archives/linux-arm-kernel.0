@@ -1,38 +1,34 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Mon, 24 Oct 2016 13:20:57 -0300
-Subject: [PATCH 37/37] perf coresight: Removing miscellaneous debug output
-In-Reply-To: <1477326057-24080-1-git-send-email-acme@kernel.org>
-References: <1477326057-24080-1-git-send-email-acme@kernel.org>
-Message-ID: <1477326057-24080-38-git-send-email-acme@kernel.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 24 Oct 2016 18:21:17 +0200
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <87twczg27x.fsf@eliezer.anholt.net>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+Message-ID: <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Hi Martin,
 
-Printing the full path of the selected link is obviously not needed,
-hence removing.
+Am 28.09.2016 um 23:10 schrieb Eric Anholt:
+> kernel at martin.sperl.org writes:
+>
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>>
+>> Add basic thermal driver for bcm2835 SOC.
+>>
+>> This driver currently relies on the firmware setting up the
+>> tsense HW block and does not set it up itself.
+>>
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> Acked-by: Eric Anholt <eric@anholt.net>
+>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> What's the status of merging this one?  I'd like to merge the other
+> patches.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1476913323-6836-1-git-send-email-mathieu.poirier at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
----
- tools/perf/arch/arm/util/cs-etm.c | 2 --
- 1 file changed, 2 deletions(-)
+i think it's necessary to rebase the whole series. Maybe we could get it
+into 4.10.
 
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 47d584da5819..dfea6b635525 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -575,8 +575,6 @@ static FILE *cs_device__open_file(const char *name)
- 	snprintf(path, PATH_MAX,
- 		 "%s" CS_BUS_DEVICE_PATH "%s", sysfs, name);
- 
--	printf("path: %s\n", path);
--
- 	if (stat(path, &st) < 0)
- 		return NULL;
- 
--- 
-2.7.4
+Stefan
