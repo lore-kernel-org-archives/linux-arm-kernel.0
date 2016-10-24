@@ -1,76 +1,40 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 24 Oct 2016 16:03:28 +0800
-Subject: [PATCH v1] char: hw_random: atmel-rng: disable TRNG during suspend
-Message-ID: <1477296208-28335-1-git-send-email-wenyou.yang@atmel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Oct 2016 10:09:56 +0200
+Subject: [PATCH v2] drivers: psci: PSCI checker module
+In-Reply-To: <2e2dedf4-192f-8657-10b1-24b426af5f00@arm.com>
+References: <20160921143905.36197-1-kevin.brodsky@arm.com>
+ <e57565e8-bec9-0460-32d5-fb9f868cc4f8@arm.com>
+ <613e4387-0ed5-ad58-7b74-a31b648f81e7@arm.com>
+ <2e2dedf4-192f-8657-10b1-24b426af5f00@arm.com>
+Message-ID: <CAMuHMdVgccJ0A2d_-uU+8r0h-NBeet3eGkKq14eaFo34ydqtzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To fix the over consumption on the VDDCore due to the TRNG enabled,
-disable the TRNG during suspend, not only disable the user interface
-clock (which is controlled by PMC). Because the user interface clock
-is independent from any clock that may be used in the entropy source
-logic circuitry.
+On Thu, Oct 20, 2016 at 4:21 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 20/10/16 14:38, Kevin Brodsky wrote:
+>
+> [...]
+>
+>>
+>> Thanks for the heads-up! I'll rebase on 4.9-rc1 and see what needs to be
+>> done.
+>>
+>
+> Just be aware that v4.9-rc1 doesn't have commit 9cfb38a7ba5a
+> ("sched/fair: Fix sched domains NULL dereference in
+> select_idle_sibling()") which fixes the cpuhotplug issue you would
+> observe.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Good to know. I saw that issue during resume from s2ram on r8a7795/Salvator-X
+once, but couldn't reproduce it.
 
- drivers/char/hw_random/atmel-rng.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+Gr{oetje,eeting}s,
 
-diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-index 0fcc9e6..2e2d09a 100644
---- a/drivers/char/hw_random/atmel-rng.c
-+++ b/drivers/char/hw_random/atmel-rng.c
-@@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
- 		return 0;
- }
- 
-+static void atmel_trng_enable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+}
-+
-+static void atmel_trng_disable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY, trng->base + TRNG_CR);
-+}
-+
- static int atmel_trng_probe(struct platform_device *pdev)
- {
- 	struct atmel_trng *trng;
-@@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+	atmel_trng_enable(trng);
- 	trng->rng.name = pdev->name;
- 	trng->rng.read = atmel_trng_read;
- 
-@@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
- 
- 	hwrng_unregister(&trng->rng);
- 
--	writel(TRNG_KEY, trng->base + TRNG_CR);
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
- 
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -114,6 +125,7 @@ static int atmel_trng_resume(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
- 
-+	atmel_trng_enable(trng);
- 	return clk_prepare_enable(trng->clk);
- }
- 
--- 
-2.7.4
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
