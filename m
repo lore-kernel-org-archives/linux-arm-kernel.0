@@ -1,30 +1,25 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 23 Oct 2016 23:48:32 -0400
-Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
- early boot stages
-In-Reply-To: <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
+Date: Sun, 23 Oct 2016 23:48:40 -0400
+Subject: [PATCH V4 2/3] Revert "ACPI,PCI,IRQ: remove SCI penalize function"
+In-Reply-To: <2a824792-486a-6251-4931-c5cc6fd67978@codeaurora.org>
 References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
-Message-ID: <22ad2e6b-e4da-1eba-0d2c-b7b86b2a4dbc@codeaurora.org>
+ <1476915664-27231-3-git-send-email-okaya@codeaurora.org>
+ <20161021015814.GC31044@localhost> <20161021144535.GB877@localhost>
+ <2a824792-486a-6251-4931-c5cc6fd67978@codeaurora.org>
+Message-ID: <6fb06d82-13aa-555b-72fc-06e670f9fd28@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 5:39 PM, Rafael J. Wysocki wrote:
->> @@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
->> >  void acpi_penalize_isa_irq(int irq, int active)
->> >  {
->> >         if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
->> > -               acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
->> > +               acpi_isa_irq_penalty[irq] = acpi_isa_irq_penalty[irq] +
-> This looks slightly odd.  What about
-> 
-> +               acpi_isa_irq_penalty[irq] +=
-> 
->> >                   (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
->> >  }
+On 10/21/2016 12:13 PM, Sinan Kaya wrote:
+>> Wait a minute, I still have a question here: what about other ACPI
+>> > arches (ia64, arm64)?  Don't they need to call acpi_penalize_sci_irq()
+>> > somewhere?
+>> > 
+> ACPI ARM64 architecture implements reduced ACPI profile which doesn't
+> have GED object.
 
-Makes sense.
+I actually wanted to mean that ARM64 architecture doesn't have *GPE* object
+implemented on ACPI reduced profile.
 
 -- 
 Sinan Kaya
