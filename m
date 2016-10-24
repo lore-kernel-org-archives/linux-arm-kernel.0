@@ -1,60 +1,71 @@
-From: ahaslam@baylibre.com (ahaslam at baylibre.com)
-Date: Mon, 24 Oct 2016 18:46:34 +0200
-Subject: [PATCH/RFT v2 17/17] ARM: dts: da850: add usb device node
-In-Reply-To: <20161024164634.4330-1-ahaslam@baylibre.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
-Message-ID: <20161024164634.4330-18-ahaslam@baylibre.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 24 Oct 2016 10:48:46 -0600
+Subject: [PATCH v3 3/8] PM / Domains: Allow domain power states to be
+ read from DT
+In-Reply-To: <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
+References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
+ <1476467276-75094-4-git-send-email-lina.iyer@linaro.org>
+ <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
+Message-ID: <20161024164846.GE72940@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam@baylibre.com>
+Hi Sudeep,
 
-This adds the usb (ohci) device node for the da850 soc.
-Also it enables it for the lcdk board
+On Mon, Oct 24 2016 at 07:39 -0600, Sudeep Holla wrote:
+>
+>
+>On 14/10/16 18:47, Lina Iyer wrote:
+>>This patch allows domains to define idle states in the DT. SoC's can
+>>define domain idle states in DT using the "domain-idle-states" property
+>>of the domain provider. Add API to read the idle states from DT that can
+>>be set in the genpd object.
+>>
+>>This patch is based on the original patch by Marc Titinger.
+>>
+>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>---
+>> drivers/base/power/domain.c | 94 +++++++++++++++++++++++++++++++++++++++++++++
+>> include/linux/pm_domain.h   |  8 ++++
+>> 2 files changed, 102 insertions(+)
+>>
+>>diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>index 37ab7f1..9af75ba 100644
+>>--- a/drivers/base/power/domain.c
+>>+++ b/drivers/base/power/domain.c
+>>@@ -1916,6 +1916,100 @@ out:
+>> 	return ret ? -EPROBE_DEFER : 0;
+>> }
+>> EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>>+
+>>+static const struct of_device_id idle_state_match[] = {
+>>+	{ .compatible = "arm,idle-state", },
+>>+	{ }
+>>+};
+>>+
+>
+>I still think it's better to have another compatible to serve this
+>purpose. We don't want to end up creating genpd domains just because
+>they are "arm,idle-state" compatible IMO ?
+>
+>I agree you can prevent it checking for OSC mode support in the
+>firmware. But I want to understand if you have any strong reasons for
+>avoiding that approach.
+>
+Why are you still held up with OSI/PC PSCI modes? I repeat again this
+series is not about any of that, it is just about PM domains. PM domains
+have idle states and the idle-state description is similar in definition
+to arm,idle-state and therefore uses the same compatible. There is no
+point re-defining something that already exists in the kernel.
 
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
- arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
- 2 files changed, 16 insertions(+)
+I was able to find the original thread, where we discussed this [1].
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21..fa91339 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -86,6 +86,14 @@
- 	};
- };
- 
-+&usb_phy {
-+	status = "okay";
-+};
-+
-+&usb {
-+	status = "okay";
-+};
-+
- &serial2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&serial2_rxtx_pins>;
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 33fcdce..ec2cec3 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -381,6 +381,14 @@
- 			#phy-cells = <1>;
- 			status = "disabled";
- 		};
-+		usb: usb at 0225000 {
-+			compatible = "ti,da830-ohci";
-+			reg = <0x225000 0x1000>;
-+			interrupts = <59>;
-+			phys = <&usb_phy 1>;
-+			phy-names = "usb-phy";
-+			status = "disabled";
-+		};
- 		gpio: gpio at 226000 {
- 			compatible = "ti,dm6441-gpio";
- 			gpio-controller;
--- 
-1.9.1
+I suggest, you read about PM domains and its idle states and understand
+this series in the context of PM domains.
+
+Thanks,
+Lina
+
+[1]. http://www.serverphorums.com/read.php?12,1303996
