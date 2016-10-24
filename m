@@ -1,50 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 24 Oct 2016 09:41:07 +0100
-Subject: mbox-name vs. mbox-names (was: Re: [PATCH v4 1/5] mailbox: dt:
- Supply bindings for ST's Mailbox IP)
-In-Reply-To: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
-References: <CAMuHMdXqOZ=eKJ=SkY4TM=fu8qnZ2gLmh-2iH0jB2pAu_v2vNg@mail.gmail.com>
-Message-ID: <20161024084107.GD14477@dell>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Mon, 24 Oct 2016 10:40:03 +0200
+Subject: [PATCH v2 0/3] STM32F429: Add Ethernet fixes
+Message-ID: <1477298406-22805-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2016, Geert Uytterhoeven wrote:
+This v2 to avoid build issue when only patch 1 (of first series) 
+was build. 
 
-> On Fri, Oct 16, 2015 at 9:21 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  .../devicetree/bindings/mailbox/sti-mailbox.txt    | 51 ++++++++++++++++++++++
-> >  1 file changed, 51 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-> > new file mode 100644
-> > index 0000000..b61eec9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
-> > @@ -0,0 +1,51 @@
-> > +ST Microelectronics Mailbox Driver
-> > +
-> > +Each ST Mailbox IP currently consists of 4 instances of 32 channels.  Messages
-> > +are passed between Application and Remote processors using shared memory.
-> > +
-> > +Controller
-> > +----------
-> > +
-> > +Required properties:
-> > +- compatible           : Should be "st,stih407-mailbox"
-> > +- reg                  : Offset and length of the device's register set
-> > +- mbox-name            : Name of the mailbox
-> 
-> All other mailbox drivers use "mbox-names". Oops, it's in v4.9-rc1...
-> 
-> Can we still fix that?
+This series adds several fixes for Ethernet for stm32f429 MCU.
+First patch has already been reviewed some months ago when 
+stm32 Ethernet glue has been pushed (I added in this series to keep
+history). Fixes are:
+ -Change DT to be compliant to stm32 ethernet glue binding
+ -Add phy-handle to correctly use mdio subnode
+ -Remove WoL support
 
-So long as all the fixes; changes to the driver and DT are merged in a
-single kernel release, we can change it.
+changes since v1:
+ -squash patch1 and patch2. 
+
+Regards
+
+Alex
+
+Alexandre TORGUE (3):
+  ARM: dts: stm32f429: Align Ethernet node with new bindings properties
+  ARM: dts: stm32f429: Fix Ethernet node on Eval Board
+  ARM: dts: stm32f429: remove Ethernet wake on Lan support
+
+ arch/arm/boot/dts/stm32429i-eval.dts |  7 ++++---
+ arch/arm/boot/dts/stm32f429.dtsi     | 10 +++++-----
+ 2 files changed, 9 insertions(+), 8 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
