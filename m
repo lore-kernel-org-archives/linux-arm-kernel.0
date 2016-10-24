@@ -1,94 +1,43 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 24 Oct 2016 12:51:29 +0100
-Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
- dma_set_mask_and_coherent
-In-Reply-To: <20161021150916.0d274e9f@lwn.net> (Jonathan Corbet's message of
- "Fri, 21 Oct 2016 15:09:16 -0600")
-References: <20161017152623.7649-1-punit.agrawal@arm.com>
- <20161021150916.0d274e9f@lwn.net>
-Message-ID: <87eg366k3i.fsf@e105922-lin.cambridge.arm.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 24 Oct 2016 19:55:32 +0800
+Subject: [PATCH] i2c: rk3x: Give the tuning value 0 during
+ rk3x_i2c_v0_calc_timings
+In-Reply-To: <1477125822-30644-1-git-send-email-david.wu@rock-chips.com>
+References: <1477125822-30644-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <e2972b59-b648-88ed-ca0a-acd827b63c2b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jonathan Corbet <corbet@lwn.net> writes:
+Hi:
 
-> On Mon, 17 Oct 2016 16:26:23 +0100
-> Punit Agrawal <punit.agrawal@arm.com> wrote:
+
+On 2016?10?22? 16:43, David Wu wrote:
+> We found a bug that i2c transfer sometimes failed on 3066a board with
+> stabel-4.8, the con register would be updated by uninitialized tuning
+> value, it made the i2c transfer failed.
 >
->> The dma mapping api howto gives the impression that using the
->> dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
->> to check all the components in the path from the device to memory for
->> addressing restrictions. In systems with address translations between
->> the device and memory (e.g., when using IOMMU), this implies that a
->> successful call to set set dma mask has checked the addressing
->> constraints of the intermediaries as well.
->> 
->> For the IOMMU drivers in the tree, the check is actually performed while
->> allocating the DMA buffer rather than when the DMA mask is
->> configured. For MMUs that do not support the full device addressing
->> capability, the allocations are made from a reduced address space.
->> 
->> Update the documentation to clarify that even though the call to
->> dma_set_mask_and_coherent succeeds, it may not be possible to use the
->> full addressing capability of the device.
+> So give the tuning value to be zero during rk3x_i2c_v0_calc_timings.
 >
-> OK, so I guess I can buy this.  But...
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>   drivers/i2c/busses/i2c-rk3x.c | 2 ++
+>   1 file changed, 2 insertions(+)
 >
->> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->> Cc: Jonathan Corbet <corbet@lwn.net>
->> ---
->>  Documentation/DMA-API-HOWTO.txt | 39 +++++++++++++++++++++++----------------
->>  1 file changed, 23 insertions(+), 16 deletions(-)
->> 
->> diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
->> index 979228b..240d1ee 100644
->> --- a/Documentation/DMA-API-HOWTO.txt
->> +++ b/Documentation/DMA-API-HOWTO.txt
->> @@ -159,39 +159,46 @@ support 64-bit addressing (DAC) for all transactions.  And at least
->>  one platform (SGI SN2) requires 64-bit consistent allocations to
->>  operate correctly when the IO bus is in PCI-X mode.
->>  
->> -For correct operation, you must interrogate the kernel in your device
->> -probe routine to see if the DMA controller on the machine can properly
->> -support the DMA addressing limitation your device has.  It is good
->> +For correct operation, you must inform the kernel in your device probe
->> +routine to see if the DMA controller on the machine can properly
->> +support the DMA addressing capabilities your device has.  It is good
->
-> Here it's still saying "to see if the DMA controller on the machine can
-> properly support the DMA addressing capabilities your device has".  So
-> you've not really changed the sense of this sentence here.
+> diff --git a/drivers/i2c/busses/i2c-rk3x.c b/drivers/i2c/busses/i2c-rk3x.c
+> index 50702c7..df22066 100644
+> --- a/drivers/i2c/busses/i2c-rk3x.c
+> +++ b/drivers/i2c/busses/i2c-rk3x.c
+> @@ -694,6 +694,8 @@ static int rk3x_i2c_v0_calc_timings(unsigned long clk_rate,
+>   	t_calc->div_low--;
+>   	t_calc->div_high--;
+>   
+> +	/* Give the tuning value 0, that would not update con register */
+> +	t_calc->tuning = 0;
+>   	/* Maximum divider supported by hw is 0xffff */
+>   	if (t_calc->div_low > 0xffff) {
+>   		t_calc->div_low = 0xffff;
 
-You're right - the changes don't go far enough.
+rk3066a based board can't boot up(with endless i2c irq messages print 
+out) from linux-4.8 without this fix.
 
-How about dropping the bit so that it now reads -
-
-"For correct operation, in your device probe routine, you must inform
-the DMA addressing capabilities of your device to the kernel."
-
->
-> If I understand things correctly, the calls in question are storing the
-> device's limitations; they will only fail if the kernel is entirely
-> unable to work within the indicated range, right?  I don't think there's
-> ever been any guarantee that the system as a whole could use the entire
-> range that is addressable by the device.
-
-That matches my understanding as well. I was just trying to make it more
-explicit with this patch.
-
-> I have no objection to making
-> that more clear, but let's actually make it more clear by saying what the
-> functions are actually doing.
->
-> Make sense, or am I missing something here?
-
-Let me know if the change I suggest is an improvement and I'll send out
-a v2.
-
-Thanks,
-Punit
-
->
-> Thanks,
->
-> jon
+Tested-by: Andy Yan <andy.yan@rock-chips.com>
