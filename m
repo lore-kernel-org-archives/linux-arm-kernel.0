@@ -1,55 +1,35 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Mon, 24 Oct 2016 07:07:19 -0400
-Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
- interrupts
-In-Reply-To: <CAHp75VettN=-S+iqKQbqixRe2BM=AiS26VGM+8yLophbkc+Z8g@mail.gmail.com>
-References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
- <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
- <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
- <36163853-ac4a-e146-0c1b-eaf42e8b234d@codeaurora.org>
- <CAHp75VettN=-S+iqKQbqixRe2BM=AiS26VGM+8yLophbkc+Z8g@mail.gmail.com>
-Message-ID: <12f6cc8ec2b83237b61965f8576cface@codeaurora.org>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 24 Oct 2016 13:08:19 +0200
+Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
+ dma_set_mask_and_coherent
+In-Reply-To: <20161021150916.0d274e9f@lwn.net>
+References: <20161017152623.7649-1-punit.agrawal@arm.com>
+ <20161021150916.0d274e9f@lwn.net>
+Message-ID: <20161024110819.GO3541@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-10-24 03:30, Andy Shevchenko wrote:
-> On Mon, Oct 24, 2016 at 5:55 AM, Sinan Kaya <okaya@codeaurora.org> 
-> wrote:
->> On 10/21/2016 12:11 PM, Andy Shevchenko wrote:
->>>> +static void hidma_free_msis(struct hidma_dev *dmadev)
->>>> > +{
->>>> > +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
->>> Perhaps one #ifdef and two definitions of functions?
->> 
->> I don't think it will make a difference. I'll have to move
->> #ifdef around the caller of hidma_free_msis instead which
->> I think is uglier.
->> 
->> The hidma_write_msi_msg function gets called only when
->> CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. If I don't put
->> this around the function definition, I get unused function
->> warning from the compiler. This is the reason why preprocessor
->> definition is outside of the function definition.
+On Fri, Oct 21, 2016 at 03:09:16PM -0600, Jonathan Corbet wrote:
+> On Mon, 17 Oct 2016 16:26:23 +0100
+> Punit Agrawal <punit.agrawal@arm.com> wrote:
 > 
-> I am talking about something like below:
-> 
-> #ifdef UGLY_DEFINE
-> myfunc_a()
-> {
-> }
-> 
-> myfunc_b()
-> {
-> }
-> #else
-> static inline myfunc_a() {}
-> static inline myfunc_b() {}
-> #endif
-> 
-> 
-> There is another way as well, namely use of IS_ENABLED(), IS_BUILTIN()
-> macros (I don't remember how exactly second one is spelt).
+> > The dma mapping api howto gives the impression that using the
+> > dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
+> > to check all the components in the path from the device to memory for
+> > addressing restrictions. In systems with address translations between
+> > the device and memory (e.g., when using IOMMU), this implies that a
+> > successful call to set set dma mask has checked the addressing
+> > constraints of the intermediaries as well.
+
+This is basically true when you have DMA controllers in the path from
+device to memory. But it is not true for IOMMUs, because IOMMU drivers
+are consumers of the dma-masks, they don't really restrict them. An
+IOMMU driver knows the limitations of IOMMU hardware and counts that in
+when allocating an address for a dma-buffer.
+
+So long story short: Any IOMMU restrictions in address space size don't
+need to be represented in the dma-mask for a device.
 
 
-This was my initial approach. I was asked to remove the stub functions. 
-So, I did it.
+
+	Joerg
