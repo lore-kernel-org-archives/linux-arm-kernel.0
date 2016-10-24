@@ -1,39 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 19:09:42 +0100
-Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
-In-Reply-To: <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
-References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
- <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
- <20161024174840.GR15620@leverpostej>
- <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
-Message-ID: <20161024180941.GT15620@leverpostej>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Mon, 24 Oct 2016 20:11:40 +0200
+Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
+In-Reply-To: <20161024175320.GO17252@sirena.org.uk>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-10-ahaslam@baylibre.com>
+ <20161024175320.GO17252@sirena.org.uk>
+Message-ID: <CAKXjFTNZhWTZSXtLZo8EieBtAPn_J-MM+-g8yCRJiV6UBspB9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:58:10AM -0700, Laura Abbott wrote:
-> On 10/24/2016 10:48 AM, Mark Rutland wrote:
-> >On Mon, Oct 24, 2016 at 10:38:59AM -0700, Laura Abbott wrote:
-> >>On 10/19/2016 12:10 PM, Mark Rutland wrote:
-> >>>[3] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/ti-stack-split
-> >
-> >>I pulled the arm64/ti-stack-split branch on top of a Fedora
-> >>tree and ran back-to-back kernel RPM builds for a long weekend.
-> >>It's still going as of this morning so you can take that as a
-> >>
-> >>Tested-by: Laura Abbott <labbott@redhat.com>
-> >
-> >Thanks! That's much appreciated!
-> >
-> >Just to check, did you grab the version with entry.S fixes rolled in
-> >(where the head is 657f54256c427fec)?
-> 
-> Ah I did not. That came in after I started the test. I'll start
-> another run with the new version.
+On Mon, Oct 24, 2016 at 7:53 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Oct 24, 2016 at 06:46:26PM +0200, ahaslam at baylibre.com wrote:
+>
+>> +             if (ret) {
+>> +                     pr_err("Failed to request irq: %d\n", ret);
+>
+> dev_err()
+>
+>> +++ b/include/linux/regulator/consumer.h
+>> @@ -74,6 +74,10 @@
+>>   *             the most noisy and may not be able to handle fast load
+>>   *             switching.
+>>   *
+>> + * OVERCURRENT Regulator has detected an overcurrent condition, and
+>> + *             may be limiting the supply output.
+>> + *
+>> + *
+>>   * NOTE: Most regulators will only support a subset of these modes. Some
+>>   * will only just support NORMAL.
+>>   *
+>> @@ -84,6 +88,7 @@
+>>  #define REGULATOR_MODE_NORMAL                        0x2
+>>  #define REGULATOR_MODE_IDLE                  0x4
+>>  #define REGULATOR_MODE_STANDBY                       0x8
+>> +#define REGULATOR_MODE_OVERCURRENT           0x10
+>
+> This is adding a new core feature with a new mode and should have been
+> split out of the driver specific change with a spearate changelog.  Why
 
-Sorry about that; thanks for respinning!
+Ok, will do.
 
-It's really crazy how broken a kernel can be yet still "work"; clearly
-we better tests are needed. :/
+> does it make sense to report this as a mode, we don't report other error
+> conditions as modes but instead use REGULATOR_STATUS_ with the
+> get_status() operation?
 
-Thanks,
-Mark.
+I used mode, because when the regulator toggles the overcurrent
+line, it means that it has entered a current limited mode, at least the
+regulator im looking at. ill change to STATUS
+
+Regards
+Axel
