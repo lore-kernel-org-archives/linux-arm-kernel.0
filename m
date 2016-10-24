@@ -1,50 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Oct 2016 21:49:17 +0200
-Subject: [PATCH v3 3/6] dt-bindings: pinctrl: Deprecate sunxi pinctrl
- bindings
-In-Reply-To: <CACRpkdb7zs7Nhs3i1o=WUt787vJCuePre3Tj3wLu++qwpO0atQ@mail.gmail.com>
-References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
- <6aec73cd3b9d3dbf1085d042ec6c23f385a300de.1476971126.git-series.maxime.ripard@free-electrons.com>
- <CACRpkdb7zs7Nhs3i1o=WUt787vJCuePre3Tj3wLu++qwpO0atQ@mail.gmail.com>
-Message-ID: <20161024194917.g5oezqc4uacsyt24@lukather>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 14:50:39 -0500
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+ <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
+Message-ID: <b6cd3c47-0df8-266a-2b8d-13c82062b647@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 10/24/2016 10:50 AM, David Lechner wrote:
+> On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>>
+>>> +&ehrpwm1 {
+>>> +    status = "disabled";
+>>
+>> Hmm, disabled? Can you add this node when you actually use it?
+>
+> Not sure why I have this disabled. Like the gpios, the pwms can be used
+> via sysfs, so I would like to leave them.
+>
 
-On Mon, Oct 24, 2016 at 02:03:59AM +0200, Linus Walleij wrote:
-> On Thu, Oct 20, 2016 at 3:49 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> > The generic pin configuration and multiplexing should be preferred now,
-> > even though we still support the old one.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Acked-by: Chen-Yu Tsai <wens@csie.org>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> 
-> Patch applied.
+Now I remember why these are disabled. The clock matching is broken. 
+Only the first ehrpwm and the first ecap get clocks. The others fail.
 
-Thanks a lot.
-
-However, it looks like the first patch from this serie is missing from
-your tree, is there a reason for that?
-
-Also, in order to preserve bisectability, could you create an
-immutable branch for those sunxi patches so that I can merge the DT
-bits?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/b378beb9/attachment.sig>
+I can change these to "okay". It will just result in a kernel error 
+message until the clocks are fixed.
