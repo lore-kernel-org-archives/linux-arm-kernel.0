@@ -1,64 +1,128 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 24 Oct 2016 09:16:54 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.10, part 1
-Message-ID: <20161024141654.19832-1-dinguyen@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 24 Oct 2016 16:21:24 +0200
+Subject: [PATCH 1/3] mmc: mmci: clean up header defines
+Message-ID: <1477318886-24851-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof:
+There was some confusion in the CPSM (Command Path State Machine)
+and DPSM (Data Path State Machine) regarding the naming of the
+registers, clarify the meaning of this acronym so the naming is
+understandable, and consistently use BIT() to define these fields.
 
-Please pull in these DTS updates for SoCFPGA for v4.10.
+Include new definitions for a few bits found in a patch from
+Srinivas Kandagatla.
 
-Thanks,
-Dinh
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.c |  2 +-
+ drivers/mmc/host/mmci.h | 69 +++++++++++++++++++++++++++----------------------
+ 2 files changed, 39 insertions(+), 32 deletions(-)
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.10_part_1
-
-for you to fetch changes up to c96f5919e6b0d132aa9afe9f1adc872fc107d5bb:
-
-  ARM: dts: socfpga: socrates: enable qspi (2016-10-18 22:18:14 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS update for v4.10, part 1
-- Add a Macnica sodia board
-- Add support for the Arria10 System resource device
-- Add support for the Arria10 LEDs
-- Add QSPI to the socrates board
-- Update L2 cache settings, enabling arm,shared-override
-
-----------------------------------------------------------------
-Dinh Nguyen (1):
-      ARM: dts: socfpga: enable arm,shared-override in the pl310
-
-Marek Vasut (1):
-      ARM: dts: socfpga: Add new MCVEVK manufacturer compat
-
-Nobuhiro Iwamatsu (1):
-      ARM: dts: socfpga: Add Macnica sodia board
-
-Steffen Trumtrar (2):
-      ARM: dts: socfpga: add qspi node
-      ARM: dts: socfpga: socrates: enable qspi
-
-Thor Thayer (4):
-      ARM: dts: socfpga: Add SPI Master1 for Arria10 SR chip
-      ARM: dts: socfpga: Add Devkit A10-SR fields for Arria10
-      ARM: dts: socfpga: Enable GPIO parent for Arria10 SR chip
-      ARM: dts: socfpga: Add LED framework to A10-SR GPIO
-
- arch/arm/boot/dts/Makefile                      |   1 +
- arch/arm/boot/dts/socfpga.dtsi                  |  15 +++
- arch/arm/boot/dts/socfpga_arria10.dtsi          |  18 ++++
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi    |  49 ++++++++++
- arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi     |   2 +-
- arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts   |   2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts |  19 ++++
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts    | 123 ++++++++++++++++++++++++
- 8 files changed, 227 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index df990bb8c873..79b135752d3d 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -210,7 +210,7 @@ static struct variant_data variant_qcom = {
+ 				  MCI_QCOM_CLK_SELECT_IN_FBCLK,
+ 	.clkreg_8bit_bus_enable = MCI_QCOM_CLK_WIDEBUS_8,
+ 	.datactrl_mask_ddrmode	= MCI_QCOM_CLK_SELECT_IN_DDR_MODE,
+-	.data_cmd_enable	= MCI_QCOM_CSPM_DATCMD,
++	.data_cmd_enable	= MCI_CPSM_QCOM_DATCMD,
+ 	.blksz_datactrl4	= true,
+ 	.datalength_bits	= 24,
+ 	.pwrreg_powerup		= MCI_PWR_UP,
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index a1f5e4f49e2a..8952285196cd 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -51,25 +51,27 @@
+ #define MCI_QCOM_CLK_SELECT_IN_DDR_MODE	(BIT(14) | BIT(15))
+ 
+ #define MMCIARGUMENT		0x008
+-#define MMCICOMMAND		0x00c
+-#define MCI_CPSM_RESPONSE	(1 << 6)
+-#define MCI_CPSM_LONGRSP	(1 << 7)
+-#define MCI_CPSM_INTERRUPT	(1 << 8)
+-#define MCI_CPSM_PENDING	(1 << 9)
+-#define MCI_CPSM_ENABLE		(1 << 10)
+-/* Argument flag extenstions in the ST Micro versions */
+-#define MCI_ST_SDIO_SUSP	(1 << 11)
+-#define MCI_ST_ENCMD_COMPL	(1 << 12)
+-#define MCI_ST_NIEN		(1 << 13)
+-#define MCI_ST_CE_ATACMD	(1 << 14)
+ 
+-/* Modified on Qualcomm Integrations */
+-#define MCI_QCOM_CSPM_DATCMD		BIT(12)
+-#define MCI_QCOM_CSPM_MCIABORT		BIT(13)
+-#define MCI_QCOM_CSPM_CCSENABLE		BIT(14)
+-#define MCI_QCOM_CSPM_CCSDISABLE	BIT(15)
+-#define MCI_QCOM_CSPM_AUTO_CMD19	BIT(16)
+-#define MCI_QCOM_CSPM_AUTO_CMD21	BIT(21)
++/* The command register controls the Command Path State Machine (CPSM) */
++#define MMCICOMMAND		0x00c
++#define MCI_CPSM_RESPONSE	BIT(6)
++#define MCI_CPSM_LONGRSP	BIT(7)
++#define MCI_CPSM_INTERRUPT	BIT(8)
++#define MCI_CPSM_PENDING	BIT(9)
++#define MCI_CPSM_ENABLE		BIT(10)
++/* Command register flag extenstions in the ST Micro versions */
++#define MCI_CPSM_ST_SDIO_SUSP		BIT(11)
++#define MCI_CPSM_ST_ENCMD_COMPL		BIT(12)
++#define MCI_CPSM_ST_NIEN		BIT(13)
++#define MCI_CPSM_ST_CE_ATACMD		BIT(14)
++/* Command register flag extensions in the Qualcomm versions */
++#define MCI_CPSM_QCOM_PROGENA		BIT(11)
++#define MCI_CPSM_QCOM_DATCMD		BIT(12)
++#define MCI_CPSM_QCOM_MCIABORT		BIT(13)
++#define MCI_CPSM_QCOM_CCSENABLE		BIT(14)
++#define MCI_CPSM_QCOM_CCSDISABLE	BIT(15)
++#define MCI_CPSM_QCOM_AUTO_CMD19	BIT(16)
++#define MCI_CPSM_QCOM_AUTO_CMD21	BIT(21)
+ 
+ #define MMCIRESPCMD		0x010
+ #define MMCIRESPONSE0		0x014
+@@ -78,22 +80,27 @@
+ #define MMCIRESPONSE3		0x020
+ #define MMCIDATATIMER		0x024
+ #define MMCIDATALENGTH		0x028
++
++/* The data control register controls the Data Path State Machine (DPSM) */
+ #define MMCIDATACTRL		0x02c
+-#define MCI_DPSM_ENABLE		(1 << 0)
+-#define MCI_DPSM_DIRECTION	(1 << 1)
+-#define MCI_DPSM_MODE		(1 << 2)
+-#define MCI_DPSM_DMAENABLE	(1 << 3)
+-#define MCI_DPSM_BLOCKSIZE	(1 << 4)
++#define MCI_DPSM_ENABLE		BIT(0)
++#define MCI_DPSM_DIRECTION	BIT(1)
++#define MCI_DPSM_MODE		BIT(2)
++#define MCI_DPSM_DMAENABLE	BIT(3)
++#define MCI_DPSM_BLOCKSIZE	BIT(4)
+ /* Control register extensions in the ST Micro U300 and Ux500 versions */
+-#define MCI_ST_DPSM_RWSTART	(1 << 8)
+-#define MCI_ST_DPSM_RWSTOP	(1 << 9)
+-#define MCI_ST_DPSM_RWMOD	(1 << 10)
+-#define MCI_ST_DPSM_SDIOEN	(1 << 11)
++#define MCI_ST_DPSM_RWSTART	BIT(8)
++#define MCI_ST_DPSM_RWSTOP	BIT(9)
++#define MCI_ST_DPSM_RWMOD	BIT(10)
++#define MCI_ST_DPSM_SDIOEN	BIT(11)
+ /* Control register extensions in the ST Micro Ux500 versions */
+-#define MCI_ST_DPSM_DMAREQCTL	(1 << 12)
+-#define MCI_ST_DPSM_DBOOTMODEEN	(1 << 13)
+-#define MCI_ST_DPSM_BUSYMODE	(1 << 14)
+-#define MCI_ST_DPSM_DDRMODE	(1 << 15)
++#define MCI_ST_DPSM_DMAREQCTL	BIT(12)
++#define MCI_ST_DPSM_DBOOTMODEEN	BIT(13)
++#define MCI_ST_DPSM_BUSYMODE	BIT(14)
++#define MCI_ST_DPSM_DDRMODE	BIT(15)
++/* Control register extensions in the Qualcomm versions */
++#define MCI_QCOM_DPSM_DATA_PEND	BIT(17)
++#define MCI_QCOM_DPSM_RX_DATA_PEND BIT(20)
+ 
+ #define MMCIDATACNT		0x030
+ #define MMCISTATUS		0x034
+-- 
+2.7.4
