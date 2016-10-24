@@ -1,65 +1,32 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 24 Oct 2016 11:40:28 +0800
-Subject: [PATCH] arm64: dts: hip06: Fix no reg property warning
-In-Reply-To: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1477280428-30558-1-git-send-email-wangkefeng.wang@huawei.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 23 Oct 2016 23:48:32 -0400
+Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
+ early boot stages
+In-Reply-To: <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
+References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
+ <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jm-n8hbS_GFUY4EVKHiRaNPrkNcWDY+6c3SRxWhy4VAg@mail.gmail.com>
+Message-ID: <22ad2e6b-e4da-1eba-0d2c-b7b86b2a4dbc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warning (unit_address_vs_reg): Node /soc/ethernet at 4 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /soc/ethernet at 5 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /soc/ethernet at 0 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /soc/ethernet at 1 has a unit name, but no reg property
+On 10/20/2016 5:39 PM, Rafael J. Wysocki wrote:
+>> @@ -871,7 +871,7 @@ static int __init acpi_irq_penalty_update(char *str, int used)
+>> >  void acpi_penalize_isa_irq(int irq, int active)
+>> >  {
+>> >         if ((irq >= 0) && (irq < ARRAY_SIZE(acpi_isa_irq_penalty)))
+>> > -               acpi_isa_irq_penalty[irq] = acpi_irq_get_penalty(irq) +
+>> > +               acpi_isa_irq_penalty[irq] = acpi_isa_irq_penalty[irq] +
+> This looks slightly odd.  What about
+> 
+> +               acpi_isa_irq_penalty[irq] +=
+> 
+>> >                   (active ? PIRQ_PENALTY_ISA_USED : PIRQ_PENALTY_PCI_USING);
+>> >  }
 
-Fix warning when build with W=1.
+Makes sense.
 
-Cc: Kejian Yan <yankejian@huawei.com>
-Cc: Yisen Zhuang <yisen.zhuang@huawei.com>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index b548763..f66c51b 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -508,7 +508,7 @@
- 			};
- 		};
- 
--		eth0: ethernet at 4{
-+		eth0: ethernet-4{
- 			compatible = "hisilicon,hns-nic-v2";
- 			ae-handle = <&dsaf0>;
- 			port-idx-in-ae = <4>;
-@@ -517,7 +517,7 @@
- 			dma-coherent;
- 		};
- 
--		eth1: ethernet at 5{
-+		eth1: ethernet-5{
- 			compatible = "hisilicon,hns-nic-v2";
- 			ae-handle = <&dsaf0>;
- 			port-idx-in-ae = <5>;
-@@ -526,7 +526,7 @@
- 			dma-coherent;
- 		};
- 
--		eth2: ethernet at 0{
-+		eth2: ethernet-0{
- 			compatible = "hisilicon,hns-nic-v2";
- 			ae-handle = <&dsaf0>;
- 			port-idx-in-ae = <0>;
-@@ -535,7 +535,7 @@
- 			dma-coherent;
- 		};
- 
--		eth3: ethernet at 1{
-+		eth3: ethernet-1{
- 			compatible = "hisilicon,hns-nic-v2";
- 			ae-handle = <&dsaf0>;
- 			port-idx-in-ae = <1>;
 -- 
-1.7.12.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
