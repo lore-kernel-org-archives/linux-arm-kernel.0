@@ -1,130 +1,51 @@
-From: mhei@heimpold.de (Michael Heimpold)
-Date: Mon, 24 Oct 2016 21:45:56 +0200
-Subject: [PATCH 0/7] ARM: dts: support I2SE Duckbill device
-In-Reply-To: <20161024131209.GK30578@tiger>
-References: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
- <20161024131209.GK30578@tiger>
-Message-ID: <2694949.M3JJFNG6Xz@kerker>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 24 Oct 2016 12:48:24 -0700
+Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-3-stephen.boyd@linaro.org>
+ <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+Message-ID: <147733850401.29612.2343965740004706258@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 24. Oktober 2016, 21:12:09 CEST schrieb Shawn Guo:
-> On Sat, Oct 22, 2016 at 09:22:23PM +0200, Michael Heimpold wrote:
-> > This series updates/adds Device Tree support for I2SE's Duckbill
-> > device family.
-> > 
-> > The Duckbill devices are small, pen-drive sized boards based on
-> > NXP's i.MX28 SoC. While the initial variants (Duckbill series) were
-> > equipped with a micro SD card slot only, the latest generation
-> > (Duckbill 2 series) have an additional internal eMMC onboard.
-> > 
-> > Both device generations consists of four "family members":
-> > 
-> > - Duckbill/Duckbill 2: generic board, intented to be used as
-> > 
-> >   baseboard for custom designs and/or as development board
-> > 
-> > - Duckbill EnOcean/Duckbill 2 EnOcean: come with an EnOcean
-> > 
-> >   daugther board equipped with the popular TCM310 module
-> > 
-> > - Duckbill 485/Duckbill 2 485: as the name implies, these
-> > 
-> >   devices are intended to be used as Ethernet - RS485 converters
-> > 
-> > - Duckbill SPI/Duckbill 2 SPI: not sold separately, but used
-> > 
-> >   in I2SE's development kits for Green PHY HomePlug Powerline
-> >   communication
+Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
+> Hi,
 > 
-> So we basically need to maintain 8 dts/dtb files for imx28-duckbill
-> board.  This is not pleasant.  Can you please investigate if Device Tree
-> overlay is going to help here?
-
-First, thank you very much for your quick feedback.
-
-Actually it would even be 11 files for 8 boards, thats right.
-There is no mechanism (no EEPROM, GPIO...) to automatically probe for the 
-device variants, and the "variant-forming daugther boards" are
-not switchable like the expansion boards e.g. for Raspberry Pi.
-Another point is, that this would really require to use U-Boot to apply
-the overlay (or another DT capable bootloader with this functionality).
-For booting very fast, the good old Freescale bootlets are still
-an option, which could not handle the overlays - at least at the moment...
-However, it still an option to have a second look...
-
-To reduce the number of files, I see the following other approaches:
-- don't use the three "common" files which are included: -3 files (8 total)
-- don't mainline Duckbill EnOcean, Duckbill 485 and Duckbill SPI:
-  they are EOL, only Duckbill 2 variants are still sold;
-  however, since Duckbill (without 2) is/was already mainlined, we
-  should keep this, leaving 4 new variants + 1 old variant: -3 files (5 total)
-- only mainline Duckbill 2 (generic board) and maintain all other variants
-  in a private Github repo (this is what we are doing now): -3 files (2 total)
-
-So, I'll discuss this again internally. Do you have any preference?
-
-I was also told off-list, that there should be an additional file in
-Documentation/devicetree/bindings/arm to document the imx28-duckbill
-binding.
-And DT maintainers don't like the simple-bus stuff around the regulators.
-
-So, I've already material to fix for v2 :-)
-
-Michael
-
+> On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > The ULPI bus can be built as a module, and it will soon be
+> > calling these functions when it supports probing devices from DT.
+> > Export them so they can be used by the ULPI module.
+> >
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Cc: <devicetree@vger.kernel.org>
+> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > ---
+> >  drivers/of/device.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/drivers/of/device.c b/drivers/of/device.c
+> > index 8a22a253a830..6719ab35b62e 100644
+> > --- a/drivers/of/device.c
+> > +++ b/drivers/of/device.c
+> > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+> >
+> >         return tsize;
+> >  }
+> > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
+> >
+> >  int of_device_request_module(struct device *dev)
+> >  {
+> > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+> >         }
+> >         mutex_unlock(&of_mutex);
+> >  }
+> > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
 > 
-> Shawn
+> This is trailing the wrong function.
 > 
-> [1] http://free-electrons.com/blog/dt-overlay-uboot-libfdt/
-> 
-> > Since all devices are very similar and only differ in few
-> > aspects, the following patch series introduces first common
-> > device tree snippets which are then included by the real
-> > devices. For better understanding, I tried to illustrate the
-> > hierarchy:
-> > 
-> > ...
-> > [removed brocken ASCII art]
-> > ...
 
-> > 
-> > Michael Heimpold (7):
-> >   ARM: dts: imx28: add alternative pinmuxing for mmc2
-> >   ARM: dts: imx28: rename mmc2_sck_cfg to prepare for an alternative
-> >   
-> >     muxing setup
-> >   
-> >   ARM: dts: imx28: add alternative muxing for mmc2_sck_cfg
-> >   ARM: dts: add I2SE Duckbill common definitions
-> >   ARM: dts: duckbill: simplify DT and use common definitions
-> >   ARM: dts: add support for remaining members of Duckbill series
-> >   ARM: dts: add support for Duckbill 2 series devices
-> >  
-> >  arch/arm/boot/dts/Makefile                     |   7 ++
-> >  arch/arm/boot/dts/imx28-duckbill-2-485.dts     |  70 ++++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-2-common.dtsi | 110
-> >  +++++++++++++++++++++++++ arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
-> >  | 100 ++++++++++++++++++++++ arch/arm/boot/dts/imx28-duckbill-2-spi.dts 
-> >     |  63 ++++++++++++++ arch/arm/boot/dts/imx28-duckbill-2.dts         |
-> >   46 +++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-485.dts       |  60 ++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-base.dtsi     |  88 ++++++++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-common.dtsi   |  80 ++++++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-enocean.dts   |  90 ++++++++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill-spi.dts       |  64 ++++++++++++++
-> >  arch/arm/boot/dts/imx28-duckbill.dts           |  99
-> >  +++-------------------
-> >  arch/arm/boot/dts/imx28-m28cu3.dts             |   2 +-
-> >  arch/arm/boot/dts/imx28.dtsi                   |  28 ++++++-
-> >  14 files changed, 817 insertions(+), 90 deletions(-)
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-485.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-common.dtsi
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-spi.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-2.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-485.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-base.dtsi
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-common.dtsi
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-enocean.dts
-> >  create mode 100644 arch/arm/boot/dts/imx28-duckbill-spi.dts
+Good catch. Must have been some bad rebase.
+
+Peter, can you fix it while applying or should I resend this patch?
