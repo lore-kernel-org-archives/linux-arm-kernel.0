@@ -1,52 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 24 Oct 2016 11:14:21 +0100
-Subject: [PATCH 3/3] arm64: arch timer: Add timer erratum property for
- Hip05-d02 and Hip06-d03
-In-Reply-To: <bf391642-82f7-2a3e-3118-1a8384a133e5@huawei.com>
-References: <bf391642-82f7-2a3e-3118-1a8384a133e5@huawei.com>
-Message-ID: <7b7687c0-b1b1-074e-a7c7-de377c43c855@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 24 Oct 2016 12:17:00 +0200
+Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
+In-Reply-To: <20161024100938.GI14477@dell>
+References: <20161005155112.13774-1-hdegoede@redhat.com>
+ <20161005155112.13774-2-hdegoede@redhat.com>
+ <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
+ <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
+ <20161024100938.GI14477@dell>
+Message-ID: <20161024101659.GA1440@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please write a proper commit message, no matter how trivial the patch is.
 
-Thanks,
-
-	M.
-
-On 23/10/16 04:21, Ding Tianhong wrote:
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
->  arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
->  2 files changed, 2 insertions(+)
+> > > Even though axp20x-i2c seems to be the only "DT only" i2c client,
+> > > would it make sense to add DT-based module autoloading to the i2c
+> > > core?
+> > 
+> > If it is not too invasive, then yes that would be a sensible addition IMHO.
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> index bf322ed..9d18875 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-> @@ -281,6 +281,7 @@
->  			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> +		hisilicon,erratum-161x01;
->  	};
-> 
->  	pmu {
-> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> index 5927bc4..c38c658 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-> @@ -260,6 +260,7 @@
->  			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
->  			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-> +		hisilicon,erratum-161x01;
->  	};
-> 
->  	pmu {
-> 
+> If I understand you correctly, I already have a patch-set on the ML
+> that does this.
 
+Incomplete, though. But we will see if Kieran finds time somewhen...
 
--- 
-Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/f6b74cf4/attachment.sig>
