@@ -1,48 +1,52 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 24 Oct 2016 11:14:08 +0100
-Subject: [PATCH 3/5] ARM: multi_v7_defconfig: Remove
- CONFIG_ST_THERMAL_MEMMAP Kconfig symbol
-In-Reply-To: <1477065443-10668-4-git-send-email-patrice.chotard@st.com>
-References: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
- <1477065443-10668-4-git-send-email-patrice.chotard@st.com>
-Message-ID: <20161024101408.GA10440@griffinp-ThinkPad-X1-Carbon-2nd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Oct 2016 11:14:21 +0100
+Subject: [PATCH 3/3] arm64: arch timer: Add timer erratum property for
+ Hip05-d02 and Hip06-d03
+In-Reply-To: <bf391642-82f7-2a3e-3118-1a8384a133e5@huawei.com>
+References: <bf391642-82f7-2a3e-3118-1a8384a133e5@huawei.com>
+Message-ID: <7b7687c0-b1b1-074e-a7c7-de377c43c855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
+Please write a proper commit message, no matter how trivial the patch is.
 
-On Fri, 21 Oct 2016, patrice.chotard at st.com wrote:
+Thanks,
 
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> Driver code has been already removed, see
-> http://www.spinics.net/lists/devicetree/msg143322.html
-> Remove the multi_v7_defconfig part
-> 
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> Cc: <rui.zhang@intel.com>
-> Cc: <edubezval@gmail.com>
+	M.
+
+On 23/10/16 04:21, Ding Tianhong wrote:
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 -
->  1 file changed, 1 deletion(-)
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 15b2f99..45e252b 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -450,7 +450,6 @@ CONFIG_RCAR_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
->  CONFIG_DAVINCI_WATCHDOG=m
->  CONFIG_EXYNOS_THERMAL=m
-> -CONFIG_ST_THERMAL_MEMMAP=y
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> index bf322ed..9d18875 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+> @@ -281,6 +281,7 @@
+>  			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+>  			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+>  			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> +		hisilicon,erratum-161x01;
+>  	};
+> 
+>  	pmu {
+> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> index 5927bc4..c38c658 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+> @@ -260,6 +260,7 @@
+>  			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+>  			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+>  			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
+> +		hisilicon,erratum-161x01;
+>  	};
+> 
+>  	pmu {
+> 
 
-Are you sure you want to remove this?
 
-This Kconfig symbol is still used for the stih407 family
-thermal parts in drivers/thermal/st/st_thermal_memmap.c?
-
-My patch only removed the stih415/6 parts from the driver.
-
-regards,
-
-Peter.
+-- 
+Jazz is not dead. It just smells funny...
