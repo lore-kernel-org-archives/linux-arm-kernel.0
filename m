@@ -1,57 +1,57 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Mon, 24 Oct 2016 12:37:56 +0100
-Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
- dma_set_mask_and_coherent
-In-Reply-To: <20161024110819.GO3541@8bytes.org> (Joerg Roedel's message of
- "Mon, 24 Oct 2016 13:08:19 +0200")
-References: <20161017152623.7649-1-punit.agrawal@arm.com>
- <20161021150916.0d274e9f@lwn.net> <20161024110819.GO3541@8bytes.org>
-Message-ID: <87k2cy6kq3.fsf@e105922-lin.cambridge.arm.com>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Mon, 24 Oct 2016 19:47:31 +0800
+Subject: [SPAM][PATCH 3/4] mtk_mdp_m2m: remove an unused struct
+In-Reply-To: <624b0ea4550b90318ec2293d80b1caa5bafd2a35.1477058332.git.mchehab@s-opensource.com>
+References: <cd14afdb178cf490e257368bc899c7a0c690d140.1477058332.git.mchehab@s-opensource.com>
+ <624b0ea4550b90318ec2293d80b1caa5bafd2a35.1477058332.git.mchehab@s-opensource.com>
+Message-ID: <1477309651.29543.22.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Joerg Roedel <joro@8bytes.org> writes:
+On Fri, 2016-10-21 at 11:59 -0200, Mauro Carvalho Chehab wrote:
+> drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c:48:33: warning: ?mtk_mdp_size_align? defined but not used [-Wunused-variable]
+>  static struct mtk_mdp_pix_align mtk_mdp_size_align = {
+>                                  ^~~~~~~~~~~~~~~~~~
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+> ---
+>  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> index 065502757133..33124a6c9951 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> @@ -45,13 +45,6 @@ struct mtk_mdp_pix_limit {
+>  	u16 target_rot_en_h;
+>  };
+>  
+> -static struct mtk_mdp_pix_align mtk_mdp_size_align = {
+> -	.org_w			= 16,
+> -	.org_h			= 16,
+> -	.target_w		= 2,
+> -	.target_h		= 2,
+> -};
+> -
 
-> On Fri, Oct 21, 2016 at 03:09:16PM -0600, Jonathan Corbet wrote:
->> On Mon, 17 Oct 2016 16:26:23 +0100
->> Punit Agrawal <punit.agrawal@arm.com> wrote:
->> 
->> > The dma mapping api howto gives the impression that using the
->> > dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
->> > to check all the components in the path from the device to memory for
->> > addressing restrictions. In systems with address translations between
->> > the device and memory (e.g., when using IOMMU), this implies that a
->> > successful call to set set dma mask has checked the addressing
->> > constraints of the intermediaries as well.
->
-> This is basically true when you have DMA controllers in the path from
-> device to memory. But it is not true for IOMMUs, because IOMMU drivers
-> are consumers of the dma-masks, they don't really restrict them. An
-> IOMMU driver knows the limitations of IOMMU hardware and counts that in
-> when allocating an address for a dma-buffer.
+Hi Mauro,
 
-Yes, that's what I'd found looking at the IOMMU drivers in the tree.
+The structure is used for the format V4L2_PIX_FMT_MT21C which is added
+in the later patch.
+"[media] media: mtk-mdp: support pixelformat V4L2_PIX_FMT_MT21C"
 
->
-> So long story short: Any IOMMU restrictions in address space size don't
-> need to be represented in the dma-mask for a device.
+I just know checkpatch should be run patch by patch, so this warning
+message will be generated without the MT21C patch.
 
-That was another rabbit hole I'd spend some time in - whether IOMMU
-restrictions need to be factored into the dma_mask for devices.
+I found all mtk-mdp patches have been merged in media tree, so is this
+patch still needed?
 
-As size(dma_mask) > size(iommu supported address size) still works, I
-came to the conclusion that the documentation can maybe help clarify
-this.
+If yes, remove 'mtk_mdp_size_align' in this patch, and re-added it in
+the MT21C patch. 
 
-This patch is an attempt to update the documentation to inform the user
-that even if the dma_set_mask call succeeds, the system may still not
-use the entire device address space.
 
-Thanks for clarifying a few of my doubts.
+minghsiu
 
-Punit
-
->
->
->
-> 	Joerg
+>  static const struct mtk_mdp_fmt mtk_mdp_formats[] = {
+>  	{
+>  		.pixelformat	= V4L2_PIX_FMT_NV12M,
