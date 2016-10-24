@@ -1,143 +1,245 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 24 Oct 2016 16:33:53 +0100
-Subject: [PATCH 1/3] mmc: mmci: clean up header defines
-In-Reply-To: <1477318886-24851-1-git-send-email-linus.walleij@linaro.org>
-References: <1477318886-24851-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <51235848-4aae-30e0-6e36-fe984921b749@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 10:50:21 -0500
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+Message-ID: <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>> This adds a device tree definition file for LEGO MINDSTORMS EV3.
+>
+> Thanks for the patch!
+>
+>>
+>> What is working:
+>>
+>> * Pin muxing
+>> * MicroSD card reader
+>> * UART on input port 1
+>>
+>> What is partially working:
+>>
+>> * Buttons - working after GPIO fix
+>> * LEDs - working after GPIO fix
+>> * Poweroff/reset - working after GPIO fix
+>
+> Is the GPIO fix something that will go in v4.9-rc cycle ?
 
-One tiny nit which stands out from a cleanup perspective...
+Not sure. This is still being discussed.
 
-On 24/10/16 15:21, Linus Walleij wrote:
-> There was some confusion in the CPSM (Command Path State Machine)
-> and DPSM (Data Path State Machine) regarding the naming of the
-> registers, clarify the meaning of this acronym so the naming is
-> understandable, and consistently use BIT() to define these fields.
-> 
-> Include new definitions for a few bits found in a patch from
-> Srinivas Kandagatla.
-> 
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/mmc/host/mmci.c |  2 +-
->  drivers/mmc/host/mmci.h | 69 +++++++++++++++++++++++++++----------------------
->  2 files changed, 39 insertions(+), 32 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index df990bb8c873..79b135752d3d 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -210,7 +210,7 @@ static struct variant_data variant_qcom = {
->  				  MCI_QCOM_CLK_SELECT_IN_FBCLK,
->  	.clkreg_8bit_bus_enable = MCI_QCOM_CLK_WIDEBUS_8,
->  	.datactrl_mask_ddrmode	= MCI_QCOM_CLK_SELECT_IN_DDR_MODE,
-> -	.data_cmd_enable	= MCI_QCOM_CSPM_DATCMD,
-> +	.data_cmd_enable	= MCI_CPSM_QCOM_DATCMD,
->  	.blksz_datactrl4	= true,
->  	.datalength_bits	= 24,
->  	.pwrreg_powerup		= MCI_PWR_UP,
-> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-> index a1f5e4f49e2a..8952285196cd 100644
-> --- a/drivers/mmc/host/mmci.h
-> +++ b/drivers/mmc/host/mmci.h
-> @@ -51,25 +51,27 @@
->  #define MCI_QCOM_CLK_SELECT_IN_DDR_MODE	(BIT(14) | BIT(15))
->  
->  #define MMCIARGUMENT		0x008
-> -#define MMCICOMMAND		0x00c
-> -#define MCI_CPSM_RESPONSE	(1 << 6)
-> -#define MCI_CPSM_LONGRSP	(1 << 7)
-> -#define MCI_CPSM_INTERRUPT	(1 << 8)
-> -#define MCI_CPSM_PENDING	(1 << 9)
-> -#define MCI_CPSM_ENABLE		(1 << 10)
-> -/* Argument flag extenstions in the ST Micro versions */
-> -#define MCI_ST_SDIO_SUSP	(1 << 11)
-> -#define MCI_ST_ENCMD_COMPL	(1 << 12)
-> -#define MCI_ST_NIEN		(1 << 13)
-> -#define MCI_ST_CE_ATACMD	(1 << 14)
->  
-> -/* Modified on Qualcomm Integrations */
-> -#define MCI_QCOM_CSPM_DATCMD		BIT(12)
-> -#define MCI_QCOM_CSPM_MCIABORT		BIT(13)
-> -#define MCI_QCOM_CSPM_CCSENABLE		BIT(14)
-> -#define MCI_QCOM_CSPM_CCSDISABLE	BIT(15)
-> -#define MCI_QCOM_CSPM_AUTO_CMD19	BIT(16)
-> -#define MCI_QCOM_CSPM_AUTO_CMD21	BIT(21)
-> +/* The command register controls the Command Path State Machine (CPSM) */
-> +#define MMCICOMMAND		0x00c
-> +#define MCI_CPSM_RESPONSE	BIT(6)
-> +#define MCI_CPSM_LONGRSP	BIT(7)
-> +#define MCI_CPSM_INTERRUPT	BIT(8)
-> +#define MCI_CPSM_PENDING	BIT(9)
-> +#define MCI_CPSM_ENABLE		BIT(10)
-> +/* Command register flag extenstions in the ST Micro versions */
-> +#define MCI_CPSM_ST_SDIO_SUSP		BIT(11)
-> +#define MCI_CPSM_ST_ENCMD_COMPL		BIT(12)
-> +#define MCI_CPSM_ST_NIEN		BIT(13)
-> +#define MCI_CPSM_ST_CE_ATACMD		BIT(14)
-> +/* Command register flag extensions in the Qualcomm versions */
-> +#define MCI_CPSM_QCOM_PROGENA		BIT(11)
-> +#define MCI_CPSM_QCOM_DATCMD		BIT(12)
-> +#define MCI_CPSM_QCOM_MCIABORT		BIT(13)
-> +#define MCI_CPSM_QCOM_CCSENABLE		BIT(14)
-> +#define MCI_CPSM_QCOM_CCSDISABLE	BIT(15)
-> +#define MCI_CPSM_QCOM_AUTO_CMD19	BIT(16)
-> +#define MCI_CPSM_QCOM_AUTO_CMD21	BIT(21)
+http://www.gossamer-threads.com/lists/linux/kernel/2550178
 
-These definitions take the format of MCI_register_{vendor_}field...
+>
+>> * Flash memory - driver loads but can't read the block devices - this is
+>>   probably due to the fact that we are not able to configure the SPI to
+>>   use DMA via device tree
+>
+> Hmm, I would not have expected PIO mode to be so inefficient that you
+> are unable to even read the block device.
 
->  #define MMCIRESPCMD		0x010
->  #define MMCIRESPONSE0		0x014
-> @@ -78,22 +80,27 @@
->  #define MMCIRESPONSE3		0x020
->  #define MMCIDATATIMER		0x024
->  #define MMCIDATALENGTH		0x028
-> +
-> +/* The data control register controls the Data Path State Machine (DPSM) */
->  #define MMCIDATACTRL		0x02c
-> -#define MCI_DPSM_ENABLE		(1 << 0)
-> -#define MCI_DPSM_DIRECTION	(1 << 1)
-> -#define MCI_DPSM_MODE		(1 << 2)
-> -#define MCI_DPSM_DMAENABLE	(1 << 3)
-> -#define MCI_DPSM_BLOCKSIZE	(1 << 4)
-> +#define MCI_DPSM_ENABLE		BIT(0)
-> +#define MCI_DPSM_DIRECTION	BIT(1)
-> +#define MCI_DPSM_MODE		BIT(2)
-> +#define MCI_DPSM_DMAENABLE	BIT(3)
-> +#define MCI_DPSM_BLOCKSIZE	BIT(4)
->  /* Control register extensions in the ST Micro U300 and Ux500 versions */
-> -#define MCI_ST_DPSM_RWSTART	(1 << 8)
-> -#define MCI_ST_DPSM_RWSTOP	(1 << 9)
-> -#define MCI_ST_DPSM_RWMOD	(1 << 10)
-> -#define MCI_ST_DPSM_SDIOEN	(1 << 11)
-> +#define MCI_ST_DPSM_RWSTART	BIT(8)
-> +#define MCI_ST_DPSM_RWSTOP	BIT(9)
-> +#define MCI_ST_DPSM_RWMOD	BIT(10)
-> +#define MCI_ST_DPSM_SDIOEN	BIT(11)
->  /* Control register extensions in the ST Micro Ux500 versions */
-> -#define MCI_ST_DPSM_DMAREQCTL	(1 << 12)
-> -#define MCI_ST_DPSM_DBOOTMODEEN	(1 << 13)
-> -#define MCI_ST_DPSM_BUSYMODE	(1 << 14)
-> -#define MCI_ST_DPSM_DDRMODE	(1 << 15)
-> +#define MCI_ST_DPSM_DMAREQCTL	BIT(12)
-> +#define MCI_ST_DPSM_DBOOTMODEEN	BIT(13)
-> +#define MCI_ST_DPSM_BUSYMODE	BIT(14)
-> +#define MCI_ST_DPSM_DDRMODE	BIT(15)
-> +/* Control register extensions in the Qualcomm versions */
-> +#define MCI_QCOM_DPSM_DATA_PEND	BIT(17)
-> +#define MCI_QCOM_DPSM_RX_DATA_PEND BIT(20)
+I am getting a -EIO error. I haven't been able to trace down exactly 
+what is causing it yet though.
 
-...but these retain the previous MCI_{vendor_}register_field format - it
-seems like a needless inconsistency, but if there is some good reason
-then fair enough (I only have the vaguest familiarity with this IP/driver).
+>
+...
+>> +/ {
+>> +	compatible = "lego,ev3", "ti,da850";
+>> +	model = "LEGO MINDSTORMS EV3";
+>> +
+>> +	soc at 1c00000 {
+>> +		/*
+>> +		 * (ab)using pinctrl-single to disable all internal pullups/
+>> +		 * pulldowns on I/O.
+>> +		 */
+>> +		pinmux at 22c00c {
+>> +			compatible = "pinctrl-single";
+>> +			reg = <0x22c00c 0x4>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			pinctrl-single,bit-per-mux;
+>> +			pinctrl-single,register-width = <32>;
+>> +			pinctrl-single,function-mask = <0xf>;
+>> +			/*
+>> +			 * There is a bug in pinctrl-single that prevents us
+>> +			 * from setting function-mask to 1, so doing things
+>> +			 * in groups of 4. Doesn't really matter since we are
+>> +			 * disabling all at once anyway.
+>> +			 */
+>> +
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pupu_disable>;
+>> +
+>> +			pupu_disable: pinmux_all_pins {
+>> +				pinctrl-single,bits = <
+>> +					0x0 0x00000000 0xffffffff
+>> +				>;
+>> +			};
+>
+> Sigh. This is quite an abuse :)
+>
+> I know we don't have a good way to configure this in kernel today. And I
+> am surprised we never had to care about disabling pullups so far. Can
+> you clarify why you need it? I assume there is some contention you want
+> to avoid, but on which interface?
 
-Robin.
+The EV3 was designed with external pullup/pulldown everywhere. I know 
+for certain that it breaks one of the buttons if you do not disable the 
+internal ones. I imagine that it would have subtle effects elsewhere if 
+they are not disabled.
 
->  
->  #define MMCIDATACNT		0x030
->  #define MMCISTATUS		0x034
-> 
+I have not gone through each pullup/pulldown bank individually, but it 
+would not surprise me at all if there was at least one thing on most of 
+them that would be adversely affected.
+
+>
+> I dont think this can be done this way using pinctrl-single. A small
+> driver to handle pullup/down control for da850 may have to be added to
+> drivers/pinctrl. It will be better to check with Linus Walleij on his
+> thoughts using a new thread ccing the pinctrl subsystem list as well.
+
+I will be glad to try to make a driver, but when I ran into this problem 
+I could not find much information on how to handle banks of 
+pullup/pulldown. Most of what I saw was for ones that can be 
+individually controlled. If anyone knows something like this already 
+that I could look at, it would be helpful to me.
+
+
+> [...]
+>
+>> +	in1_pins: pinmux_in1_pins {
+>> +		pinctrl-single,bits = <
+>> +			/* GP0[15] */
+>> +			0x0 0x00000008 0x0000000f
+>> +			/* GP0[2] */
+>> +			0x4 0x00800000 0x00f00000
+>> +			/* GP2[2] */
+>> +			0x18 0x00800000 0x00f00000
+>> +			/* GP8[10], GP8[11] */
+>> +			0x48 0x88000000 0xff000000
+>> +		>;
+>> +	};
+>
+> I see that this is not really used. Can you add these when you actually
+> use them. Looks like that applies to some other definitions like this below.
+
+It will be possible to uses these gpios via sysfs (until a proper driver 
+for input and output ports is merged). So how about I attach these to 
+the gpio node for now?
+
+>
+>> +&ehrpwm1 {
+>> +	status = "disabled";
+>
+> Hmm, disabled? Can you add this node when you actually use it?
+
+Not sure why I have this disabled. Like the gpios, the pwms can be used 
+via sysfs, so I would like to leave them.
+
+>
+>> +	pinctrl-names = "default";
+>> +	/* MBPWM, MAPWM */
+>> +	pinctrl-0 = <&ehrpwm1a_pins>, <&ehrpwm1b_pins>;
+>> +};
+>> +
+>> +&ecap1 {
+>> +	status = "disabled";
+>
+> same here and other places below.
+>
+>> +	pinctrl-names = "default";
+>> +	/* MDPWM */
+>> +	pinctrl-0 = <&ecap1_pins>;
+>> +};
+>> +
+>> +&spi0 {
+>> +	status = "okay";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&spi0_pins>, <&spi0_cs0_pin>, <&spi0_cs3_pin>;
+>> +	dmas = <&edma0 14 0>, <&edma0 15 0>;
+>> +	dma-names = "rx", "tx";
+>> +
+>> +	spi-flash at 0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		compatible = "n25q128a13", "jedec,spi-nor";
+>> +		reg = <0>;
+>> +		spi-max-frequency = <50000000>;
+>> +		ti,spi-wdelay = <8>;
+>> +
+>> +		partition at 0 {
+>> +			label = "U-Boot";
+>> +			reg = <0 0x40000>;
+>
+> Thats 256KB for U-Boot and MLO (I assume in concatenated AIS image). Is
+> that sufficient for future too? Moving partitions later is tough ask
+> because that means users will lose data when they upgrade the kernel
+> because of partitions moving around. Just a suggestion to keep future
+> U-Boot bloat in mind and not use a "just fits" number.
+
+The MLO is on an EEPROM in the EV3, so the U-Boot partition is just 
+U-boot. The SoC boots from I2C, which then runs whatever is as 0x0 on 
+the flash memory.
+
+This partition table matches the partition scheme used on the official 
+LEGO firmware that ships with the devices. Most people running their own 
+kernel will probably be loading it from a microSD card, leaving the 
+official firmware intact and therefore will always have this partition 
+table.
+
+My thinking is that if someone does want to use a different partitioning 
+scheme, they can build their own U-Boot and configure it to modify the 
+device tree with a new partition table.
+
+The way the LEGO firmware flashing utility works, it wipes out the 
+entire flash memory each time you flash the firmware. So, data loss is 
+not a concern - you will loose your data anyway.
+
+>
+>> +		};
+>> +
+>> +		partition at 40000 {
+>> +			label = "U-Boot Env";
+>> +			reg = <0x40000 0x10000>;
+>> +		};
+>> +
+>> +		partition at 50000 {
+>> +			label = "Kernel";
+>> +			reg = <0x50000 0x200000>;
+>> +		};
+>> +
+>> +		partition at 250000 {
+>> +			label = "Filesystem";
+>> +			reg = <0x250000 0xa50000>;
+>> +		};
+>> +
+>> +		partition at cb0000 {
+>> +			label = "Storage";
+>> +			reg = <0xcb0000 0x2f0000>;
+>> +		};
+>> +	};
+>> +
+>> +	/* TODO: ADC goes here */
+>
+> I would drop this comment.
+
+ack
+
+>
+>> +};
+>> +
+>> +&spi1 {
+>> +	status = "okay";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&spi1_pins>, <&spi1_cs0_pin>;
+>> +
+>> +	/* TODO: LCD Display goes here */
+>
+> Add this node when you actually have display working.
+
+What if we set this up as a spidev node instead? This way the display 
+could be used from userspace without a driver.
