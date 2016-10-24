@@ -1,39 +1,24 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 24 Oct 2016 23:48:47 +0200
-Subject: [RFC] shutdown machine when li-ion battery goes below 3V
-In-Reply-To: <20161024214152.GA32310@amd>
-References: <20161024212250.GA31336@amd>
- <20161024212932.uhjz752z2cy5hohl@atomide.com> <20161024214152.GA32310@amd>
-Message-ID: <201610242348.47484@pali>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Mon, 24 Oct 2016 14:52:06 -0700
+Subject: [PATCH v1 0/3] Add support for Broadcom OTP controller
+In-Reply-To: <82ad10b1-32ab-3962-d5ab-e787e2c70130@gmail.com>
+References: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
+ <CAADWXX-43-k2K2T1V5MQMd0z0V502wf1syNHERPfvNstOJw-3A@mail.gmail.com>
+ <e34f01b6-a059-9988-0f93-e5adb82a5436@gmail.com>
+ <CA+55aFwAZPJ+o0qkYjJziHofYvvsocHuWr1YUmVnzj6VTv_sgA@mail.gmail.com>
+ <82ad10b1-32ab-3962-d5ab-e787e2c70130@gmail.com>
+Message-ID: <CA+55aFxeu9YKb=zAba8MVRgxmJoQJ8W6u3NNJv7rP6mwxj+nVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 24 October 2016 23:41:52 Pavel Machek wrote:
-> On Mon 2016-10-24 14:29:33, Tony Lindgren wrote:
-> > Also, the shutdown voltage can depend on external devices
-> > connected. It could be for example 3.3V depending on eMMC on some
-> > devices while devices with no eMMC could have it at 3.0V.
-> 
-> Actually, I'd like to shutdown at 3.3V or more (like 3.5V), because
-> going below that is pretty mean to the battery. But if I set
-> threshold too high, GSM activity will push it below that for a very
-> short while, and I'll shutdown too soon.
-> 
-> Ideas welcome...
+On Mon, Oct 24, 2016 at 2:27 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>
+> Should we compare the headers added by lists.infradead.org
 
-bq27x00 has EDVF flag which means that battery is empty. Maemo with 
-bq27x00 driver is configured to issue system shutdown when EDVF is set.
+So for me, it didn't go through infraded.org, but I got it through the
+kernel mailing list.
 
-Maybe kernel should issue emergency shutdown e.g. after minute or two 
-after EDVF flag is set?
+I'll send you the raw email data in private, you can compare it
+against your good one.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/80b0cce7/attachment.sig>
+                 Linus
