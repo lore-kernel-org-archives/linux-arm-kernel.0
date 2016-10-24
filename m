@@ -1,47 +1,65 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 24 Oct 2016 09:03:41 +0530
-Subject: [PATCH v2 4/4] cpufreq: pxa: convert to clock API
-In-Reply-To: <877f902hh6.fsf@belgarion.home>
-References: <1476561450-28407-1-git-send-email-robert.jarzmik@free.fr>
- <1476561450-28407-5-git-send-email-robert.jarzmik@free.fr>
- <20161018114025.GD11471@vireshk-i7> <877f902hh6.fsf@belgarion.home>
-Message-ID: <20161024033341.GA24749@vireshk-i7>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 24 Oct 2016 11:40:28 +0800
+Subject: [PATCH] arm64: dts: hip06: Fix no reg property warning
+In-Reply-To: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
+References: <1474708465-38958-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1477280428-30558-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-10-16, 23:37, Robert Jarzmik wrote:
-> Viresh Kumar <viresh.kumar@linaro.org> writes:
-> 
-> > On 15-10-16, 21:57, Robert Jarzmik wrote:
-> >> As the clock settings have been introduced into the clock pxa drivers,
-> >> which are now available to change the CPU clock by themselves, remove
-> >> the clock handling from this driver, and rely on pxa clock drivers.
-> >> 
-> >> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >> ---
-> >> Since v1: added !OF Kconfig dependency
-> >> ---
-> >>  drivers/cpufreq/Kconfig.arm      |   2 +-
-> >>  drivers/cpufreq/pxa2xx-cpufreq.c | 191 ++++++++-------------------------------
-> >>  2 files changed, 40 insertions(+), 153 deletions(-)
-> >
-> > Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
-> Okay, after some more testing, I'd like to remove the !OF for next iteration.
-> The reason is that I have a usecase where I have a single kernel image with
-> devictree support (ie CONFIG_OF=y), but with support for both devicetree and
-> legacy platforms. In this case, a platform such as lubbock can boot :
->  - with devicetree
->  - with legacy arch/arm/mach-pxa/lubbock.c
-> 
-> In this kernel, the !OF Kconfig prevents the legacy version from working, as
-> pxa2xx-cpufreq is descarded even if it is needed in the legacy version.
-> 
-> Therefore, I'd like to respin without this !OF.
+Warning (unit_address_vs_reg): Node /soc/ethernet at 4 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/ethernet at 5 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/ethernet at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/ethernet at 1 has a unit name, but no reg property
 
-I imagined this case last week as well :)
+Fix warning when build with W=1.
 
-No issues.
+Cc: Kejian Yan <yankejian@huawei.com>
+Cc: Yisen Zhuang <yisen.zhuang@huawei.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+index b548763..f66c51b 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+@@ -508,7 +508,7 @@
+ 			};
+ 		};
+ 
+-		eth0: ethernet at 4{
++		eth0: ethernet-4{
+ 			compatible = "hisilicon,hns-nic-v2";
+ 			ae-handle = <&dsaf0>;
+ 			port-idx-in-ae = <4>;
+@@ -517,7 +517,7 @@
+ 			dma-coherent;
+ 		};
+ 
+-		eth1: ethernet at 5{
++		eth1: ethernet-5{
+ 			compatible = "hisilicon,hns-nic-v2";
+ 			ae-handle = <&dsaf0>;
+ 			port-idx-in-ae = <5>;
+@@ -526,7 +526,7 @@
+ 			dma-coherent;
+ 		};
+ 
+-		eth2: ethernet at 0{
++		eth2: ethernet-0{
+ 			compatible = "hisilicon,hns-nic-v2";
+ 			ae-handle = <&dsaf0>;
+ 			port-idx-in-ae = <0>;
+@@ -535,7 +535,7 @@
+ 			dma-coherent;
+ 		};
+ 
+-		eth3: ethernet at 1{
++		eth3: ethernet-1{
+ 			compatible = "hisilicon,hns-nic-v2";
+ 			ae-handle = <&dsaf0>;
+ 			port-idx-in-ae = <1>;
 -- 
-viresh
+1.7.12.4
