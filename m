@@ -1,33 +1,85 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Mon, 24 Oct 2016 11:59:30 +0800
-Subject: [PATCH 1/3] phy: sun4i: check PHY id when poking unknown bit of pmu
-Message-ID: <20161024035930.20274-1-icenowy@aosc.xyz>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 24 Oct 2016 11:59:20 +0800
+Subject: [PATCH 5/5] tty: amba-pl011: Add earlycon support for SBSA UART
+In-Reply-To: <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
+References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1474708465-38958-6-git-send-email-wangkefeng.wang@huawei.com>
+ <20160927105748.GA3847@kroah.com>
+ <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
+Message-ID: <7edb183d-2376-0f09-a3ea-3bf78971609d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
-The code that poke some unknown bit of PMU for H3/A64 didn't check
-the PHY, and will cause kernel oops when PHY 0 is used.
+Hi Greg, any more comments, thanks.
 
-Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- drivers/phy/phy-sun4i-usb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index b9342a2..ff8e9dd 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -264,7 +264,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
- 
--	if (data->cfg->enable_pmu_unk1) {
-+	if (phy->index != 0 && data->cfg->enable_pmu_unk1) {
- 		val = readl(phy->pmu + REG_PMU_UNK1);
- 		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
- 	}
--- 
-2.10.1
+On 2016/9/27 21:15, Kefeng Wang wrote:
+> 
+> 
+> On 2016/9/27 18:57, Greg Kroah-Hartman wrote:
+>> On Sat, Sep 24, 2016 at 05:14:25PM +0800, Kefeng Wang wrote:
+>>> Declare an OF early console for SBSA UART so that the early console device
+>>> can be specified via the "stdout-path" property in device-tree.
+>>>
+>>> Cc: Russell King <linux@armlinux.org.uk>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>> ---
+>>>  drivers/tty/serial/amba-pl011.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>>> index 7d9b291..3688d3b 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>>> @@ -2330,6 +2330,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+>>>  	return 0;
+>>>  }
+>>>  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+>>> +OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
+>>
+>> Why do you need another option for the same thing?
+> 
+> 
+> It is used to support earlycon(without option) for sbsa-uart in bootargs.
+> 
+> 	chosen {
+> 		stdout-path = "serial0:115200n8";
+> 		bootargs = "earlycon"
+> 	};
+> 
+> 	uart0: uart at 602b0000 {
+> 		compatible = "arm,sbsa-uart";
+> 		reg = <0x0 0x602b0000 0x0 0x1000>;
+> 		...
+> 	};
+> 
+> We setup a unique struct with compatible name by OF_EARLYCON_DECLARE,
+> #define OF_EARLYCON_DECLARE(_name, compat, fn)				\
+> 	static const struct earlycon_id __UNIQUE_ID(__earlycon_##_name)	\
+> 	     __used __section(__earlycon_table)				\
+> 		= { .name = __stringify(_name),				\
+> 		    .compatible = compat,				\
+> 		    .setup = fn  }
+> 
+> if without this patch(see drivers/of/fdt.c),
+> 
+> early_init_dt_scan_chosen_serial()
+>  - for (match = __earlycon_table; match < __earlycon_table_end; match++)
+>   -- if (fdt_node_check_compatible(fdt, offset, match->compatible))
+> 	countinue;
+>   -- of_setup_earlycon(match, offset, options); // will never touch here.
+> 
+> Thanks,
+> Kefeng
+> 
+>>
+>> confused,
+>>
+>> greg k-h
+>>
+>> .
+>>
+> 
+> 
+> .
+> 
