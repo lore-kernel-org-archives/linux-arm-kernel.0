@@ -1,64 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Oct 2016 19:04:34 +0100
-Subject: Applied "ASoC: davinci-mcbsp: DT fix
- s/interrupts-names/interrupt-names/" to the asoc tree
-In-Reply-To: <1477039877-20227-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <E1byjbu-0001Tg-U9@debutante>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Oct 2016 19:09:42 +0100
+Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
+In-Reply-To: <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
+References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
+ <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
+ <20161024174840.GR15620@leverpostej>
+ <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
+Message-ID: <20161024180941.GT15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Mon, Oct 24, 2016 at 10:58:10AM -0700, Laura Abbott wrote:
+> On 10/24/2016 10:48 AM, Mark Rutland wrote:
+> >On Mon, Oct 24, 2016 at 10:38:59AM -0700, Laura Abbott wrote:
+> >>On 10/19/2016 12:10 PM, Mark Rutland wrote:
+> >>>[3] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/ti-stack-split
+> >
+> >>I pulled the arm64/ti-stack-split branch on top of a Fedora
+> >>tree and ran back-to-back kernel RPM builds for a long weekend.
+> >>It's still going as of this morning so you can take that as a
+> >>
+> >>Tested-by: Laura Abbott <labbott@redhat.com>
+> >
+> >Thanks! That's much appreciated!
+> >
+> >Just to check, did you grab the version with entry.S fixes rolled in
+> >(where the head is 657f54256c427fec)?
+> 
+> Ah I did not. That came in after I started the test. I'll start
+> another run with the new version.
 
-   ASoC: davinci-mcbsp: DT fix s/interrupts-names/interrupt-names/
+Sorry about that; thanks for respinning!
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+It's really crazy how broken a kernel can be yet still "work"; clearly
+we better tests are needed. :/
 
 Thanks,
-Mark
-
->From a545f5d859c7988ab61850395a4565bfe507dc0a Mon Sep 17 00:00:00 2001
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Fri, 21 Oct 2016 10:51:15 +0200
-Subject: [PATCH] ASoC: davinci-mcbsp: DT fix
- s/interrupts-names/interrupt-names/
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-index 55b53e1fd72c..e0b6165c9cfc 100644
---- a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-+++ b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
-@@ -43,7 +43,7 @@ mcbsp0: mcbsp at 1d10000 {
- 		<0x00310000 0x1000>;
- 	reg-names = "mpu", "dat";
- 	interrupts = <97 98>;
--	interrupts-names = "rx", "tx";
-+	interrupt-names = "rx", "tx";
- 	dmas = <&edma0 3 1
- 		&edma0 2 1>;
- 	dma-names = "tx", "rx";
--- 
-2.8.1
+Mark.
