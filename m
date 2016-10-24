@@ -1,51 +1,50 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Mon, 24 Oct 2016 12:48:24 -0700
-Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
-In-Reply-To: <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-3-stephen.boyd@linaro.org>
- <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
-Message-ID: <147733850401.29612.2343965740004706258@sboyd-linaro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Oct 2016 21:49:17 +0200
+Subject: [PATCH v3 3/6] dt-bindings: pinctrl: Deprecate sunxi pinctrl
+ bindings
+In-Reply-To: <CACRpkdb7zs7Nhs3i1o=WUt787vJCuePre3Tj3wLu++qwpO0atQ@mail.gmail.com>
+References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
+ <6aec73cd3b9d3dbf1085d042ec6c23f385a300de.1476971126.git-series.maxime.ripard@free-electrons.com>
+ <CACRpkdb7zs7Nhs3i1o=WUt787vJCuePre3Tj3wLu++qwpO0atQ@mail.gmail.com>
+Message-ID: <20161024194917.g5oezqc4uacsyt24@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
-> Hi,
+Hi Linus,
+
+On Mon, Oct 24, 2016 at 02:03:59AM +0200, Linus Walleij wrote:
+> On Thu, Oct 20, 2016 at 3:49 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> > The ULPI bus can be built as a module, and it will soon be
-> > calling these functions when it supports probing devices from DT.
-> > Export them so they can be used by the ULPI module.
+> > The generic pin configuration and multiplexing should be preferred now,
+> > even though we still support the old one.
 > >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
 > > Acked-by: Rob Herring <robh@kernel.org>
-> > Cc: <devicetree@vger.kernel.org>
-> > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > ---
-> >  drivers/of/device.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/of/device.c b/drivers/of/device.c
-> > index 8a22a253a830..6719ab35b62e 100644
-> > --- a/drivers/of/device.c
-> > +++ b/drivers/of/device.c
-> > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
-> >
-> >         return tsize;
-> >  }
-> > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
-> >
-> >  int of_device_request_module(struct device *dev)
-> >  {
-> > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
-> >         }
-> >         mutex_unlock(&of_mutex);
-> >  }
-> > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
 > 
-> This is trailing the wrong function.
-> 
+> Patch applied.
 
-Good catch. Must have been some bad rebase.
+Thanks a lot.
 
-Peter, can you fix it while applying or should I resend this patch?
+However, it looks like the first patch from this serie is missing from
+your tree, is there a reason for that?
+
+Also, in order to preserve bisectability, could you create an
+immutable branch for those sunxi patches so that I can merge the DT
+bits?
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/b378beb9/attachment.sig>
