@@ -1,51 +1,44 @@
-From: megi@xff.cz (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Mon, 24 Oct 2016 08:45:55 +0200
-Subject: [linux-sunxi] [PATCH 1/3] phy: sun4i: check PHY id when poking
- unknown bit of pmu
-In-Reply-To: <20161024035930.20274-1-icenowy@aosc.xyz>
-References: <20161024035930.20274-1-icenowy@aosc.xyz>
-Message-ID: <f40264d4-fc06-ad8a-e53a-94b4bc033f92@xff.cz>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 24 Oct 2016 14:50:02 +0800
+Subject: [PATCH 1/4] ARM: dts: mxs: Add new M28EVK manufacturer compat
+In-Reply-To: <3ec3e368-c8f1-3bee-7b7b-6de5cef72325@denx.de>
+References: <20160919214044.9615-1-marex@denx.de>
+ <20161023130143.GT30578@tiger>
+ <3ec3e368-c8f1-3bee-7b7b-6de5cef72325@denx.de>
+Message-ID: <20161024065002.GX30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 24.10.2016 v 05:59 Icenowy Zheng napsal(a):
-> Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
-> The code that poke some unknown bit of PMU for H3/A64 didn't check
-> the PHY, and will cause kernel oops when PHY 0 is used.
+On Sun, Oct 23, 2016 at 03:30:32PM +0200, Marek Vasut wrote:
+> On 10/23/2016 03:01 PM, Shawn Guo wrote:
+> > On Mon, Sep 19, 2016 at 11:40:41PM +0200, Marek Vasut wrote:
+> >> The board is now manufactured by Aries Embedded GmbH, update compat string.
+> >>
+> >> Signed-off-by: Marek Vasut <marex@denx.de>
+> >> Cc: Shawn Guo <shawnguo@kernel.org>
+> >> ---
+> >>  arch/arm/boot/dts/imx28-m28.dtsi   | 4 ++--
+> >>  arch/arm/boot/dts/imx28-m28evk.dts | 4 ++--
+> >>  2 files changed, 4 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
+> >> index 214bb15..a69856e 100644
+> >> --- a/arch/arm/boot/dts/imx28-m28.dtsi
+> >> +++ b/arch/arm/boot/dts/imx28-m28.dtsi
+> >> @@ -12,8 +12,8 @@
+> >>  #include "imx28.dtsi"
+> >>  
+> >>  / {
+> >> -	model = "DENX M28";
+> >> -	compatible = "denx,m28", "fsl,imx28";
+> >> +	model = "Aries/DENX M28";
+> >> +	compatible = "aries,m28", "denx,m28", "fsl,imx28";
+> > 
+> > Do we have an entry for Aries Embedded GmbH in vendor-prefixes.txt?
 > 
-> Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  drivers/phy/phy-sun4i-usb.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index b9342a2..ff8e9dd 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -264,7 +264,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		return ret;
->  	}
->  
-> -	if (data->cfg->enable_pmu_unk1) {
-> +	if (phy->index != 0 && data->cfg->enable_pmu_unk1) {
+> The patch was submitted, not yet applied though:
+> http://www.spinics.net/lists/arm-kernel/msg533000.html
 
-It might be better to check for phy->pmu directly.
+Okay.  Ping me when it gets applied.
 
-regards,
-  o.
->  		val = readl(phy->pmu + REG_PMU_UNK1);
->  		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
->  	}
-> 
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 821 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/d6dd79ef/attachment.sig>
+Shawn
