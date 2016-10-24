@@ -1,53 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 19:03:54 +0100
-Subject: Question about arm64 earlycon
-In-Reply-To: <CADaLNDk2pYMXQ-EYVw_vM23rsazFAHe_5qcjTajii13tRMD5Ew@mail.gmail.com>
-References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
- <4966376.bRx4fgSjbT@wuerfel>
- <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
- <20161024110904.GF15620@leverpostej>
- <CADaLNDk2pYMXQ-EYVw_vM23rsazFAHe_5qcjTajii13tRMD5Ew@mail.gmail.com>
-Message-ID: <20161024180353.GS15620@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Oct 2016 19:04:34 +0100
+Subject: Applied "ASoC: davinci-mcbsp: DT fix
+ s/interrupts-names/interrupt-names/" to the asoc tree
+In-Reply-To: <1477039877-20227-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <E1byjbu-0001Tg-U9@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:24:19AM -0700, Duc Dang wrote:
-> On Mon, Oct 24, 2016 at 4:09 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >
-> > On Mon, Oct 24, 2016 at 11:17:36AM +0100, Marc Zyngier wrote:
-> > > On 24/10/16 11:06, Arnd Bergmann wrote:
-> > > > On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
-> > > >> Hi Catalin, Marc, Mark, Arnd,
-> > > >>
-> > > >> I am testing with 3.12 kernel with earlyprintk enabled and I see some
-> > > >> garbage characters in the console log right before the message
-> > > >> indicating that the real console device is initialized:
-> >
-> > What exactly are you passing on the command line?
-> 
-> This is what I have:
-> earlyprintk=uart8250-32bit,0x1c020000
-> 
-> I should be more specific: the early console prints characters just
-> fine (I see all the early boot log). Only at the moment before
-> switching to the real console, I occasionally see some garbage
-> characters.
+The patch
 
-Sorry, I managed to miss that previously. Sorry for the noise.
+   ASoC: davinci-mcbsp: DT fix s/interrupts-names/interrupt-names/
 
-As Marc said, it sounds like the problem is the lack of synchronisation
-between the drivers at hand-over time. Perhaps there's a FIFO still
-draining, or the "real" driver doesn't put the UART in a quiescent state
-before reinitialising it.
+has been applied to the asoc tree at
 
-Generally earlycon/earlyprintk is there to debug early boot issues, and
-is not there just to get UART output earlier. If you don't need to debug
-an issue, turning it off will avoid problems.
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-If there's a simple change to the "real" driver init sequence to avoid
-the temporary glitching, that would be great, but not many people are
-going to care. We'd rather keep the earlycon code simple so as to ensure
-we can use it to debug early boot failures.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Mark.
+Mark
+
+>From a545f5d859c7988ab61850395a4565bfe507dc0a Mon Sep 17 00:00:00 2001
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Date: Fri, 21 Oct 2016 10:51:15 +0200
+Subject: [PATCH] ASoC: davinci-mcbsp: DT fix
+ s/interrupts-names/interrupt-names/
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/davinci-mcbsp.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
+index 55b53e1fd72c..e0b6165c9cfc 100644
+--- a/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
++++ b/Documentation/devicetree/bindings/sound/davinci-mcbsp.txt
+@@ -43,7 +43,7 @@ mcbsp0: mcbsp at 1d10000 {
+ 		<0x00310000 0x1000>;
+ 	reg-names = "mpu", "dat";
+ 	interrupts = <97 98>;
+-	interrupts-names = "rx", "tx";
++	interrupt-names = "rx", "tx";
+ 	dmas = <&edma0 3 1
+ 		&edma0 2 1>;
+ 	dma-names = "tx", "rx";
+-- 
+2.8.1
