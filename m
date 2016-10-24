@@ -1,49 +1,128 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 25 Oct 2016 01:08:31 +0800
-Subject: [PATCH] ARM: dts: sun8i: fix the pinmux for UART1
-Message-ID: <20161024170831.38819-1-icenowy@aosc.xyz>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 24 Oct 2016 10:00:10 -0700
+Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com> (Dave Gerlach's
+ message of "Fri, 21 Oct 2016 14:49:41 -0500")
+References: <20161019203347.17893-1-d-gerlach@ti.com>
+ <20161019203347.17893-3-d-gerlach@ti.com>
+ <7heg39pmgb.fsf@baylibre.com>
+ <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com>
+Message-ID: <7h1sz51y3p.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the patch is applied, the allwinner,driver and allwinner,pull
-properties are removed.
+Dave Gerlach <d-gerlach@ti.com> writes:
 
-Although they're described to be optional in the devicetree binding,
-without them, the pinmux cannot be initialized, and the uart cannot
-be used.
+> Hi,
+> On 10/21/2016 01:48 PM, Kevin Hilman wrote:
+>> Dave Gerlach <d-gerlach@ti.com> writes:
+>>
+>>> Add a generic power domain implementation, TI SCI PM Domains, that
+>>> will hook into the genpd framework and allow the TI SCI protocol to
+>>> control device power states.
+>>>
+>>> Also, provide macros representing each device index as understood
+>>> by TI SCI to be used in the device node power-domain references.
+>>> These are identifiers for the K2G devices managed by the PMMC.
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
+>>>  MAINTAINERS                                        |  2 +
+>>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
+>>>  3 files changed, 146 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>>  create mode 100644 include/dt-bindings/genpd/k2g.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>> new file mode 100644
+>>> index 000000000000..32f38a349656
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>> @@ -0,0 +1,54 @@
+>>> +Texas Instruments TI-SCI Generic Power Domain
+>>> +---------------------------------------------
+>>> +
+>>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
+>>> +responsible for controlling the state of the IPs that are present.
+>>> +Communication between the host processor running an OS and the system
+>>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
+>>> +implementation plugs into the generic pm domain framework and makes use of
+>>> +the TI SCI protocol power on and off each device when needed.
+>>> +
+>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>> +
+>>> +PM Domain Node
+>>> +==============
+>>> +The PM domain node represents the global PM domain managed by the PMMC,
+>>> +which in this case is the single implementation as documented by the generic
+>>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+>>> +
+>>> +Required Properties:
+>>> +--------------------
+>>> +- compatible: should be "ti,sci-pm-domain"
+>>> +- #power-domain-cells: Must be 0.
+>>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
+>>>
+>>> +Example:
+>>> +--------------------
+>>> +k2g_pds: k2g_pds {
+>>
+>> should use generic name like "power-contoller", e.g. k2g_pds: power-controller
+>
+> Ok, that makes more sense.
+>
+>>
+>>> +        compatible = "ti,sci-pm-domain";
+>>> +        #power-domain-cells = <0>;
+>>> +        ti,sci = <&pmmc>;
+>>> +};
+>>> +
+>>> +PM Domain Consumers
+>>> +===================
+>>> +Hardware blocks that require SCI control over their state must provide
+>>> +a reference to the sci-pm-domain they are part of and a unique device
+>>> +specific ID that identifies the device.
+>>> +
+>>> +Required Properties:
+>>> +--------------------
+>>> +- power-domains: phandle pointing to the corresponding PM domain node.
+>>> +- ti,sci-id: index representing the device id to be passed oevr SCI to
+>>> +	     be used for device control.
+>>
+>> This ID doesn't look right.
+>>
+>> Why not use #power-domain-cells = <1> and pass the index in the DT? ...
+>>
+>>> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
+>>> +
+>>> +Example:
+>>> +--------------------
+>>> +uart0: serial at 02530c00 {
+>>> +	compatible = "ns16550a";
+>>> +	...
+>>> +	power-domains = <&k2g_pds>;
+>>> +	ti,sci-id = <K2G_DEV_UART0>;
+>>
+>> ... like this:
+>>
+>> 	power-domains = <&k2g_pds K2G_DEV_UART0>;
+>
+> That's how I did it in version one actually. I was able to define my
+> own xlate function to parse the phandle and get that index, but Ulf
+> pointed me to this series by Jon Hunter [1] that simplified genpd
+> providers and dropped the concept of adding your own xlate. This locks
+> the onecell approach to using a fixed static array of genpds that get
+> indexed into (without passing the index to the provider, just the
+> genpd that's looked up), which doesn't fit our usecase, as we don't
+> want a 1 to 1 genpd to device mapping based on the comments provided
+> in v1. Now we just use the genpd device attach/detach hooks to parse
+> the sci-id and then use it in the genpd device start/stop hooks.
 
-Add them back to fix the problem, and makes the bluetooth on iNet D978
-Rev2 board work.
+Ah, right.  I remember now.  This approach allows you to use a single
+genpd as discussed earlier.
 
-Fixes: 82eec384249f (ARM: dts: sun8i: add pinmux for UART1 at PG)
+Makes sense now, suggestion retracted.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-
-This patch is targeted on 4.9.
-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 48fc24f..300a1bd 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -282,11 +282,15 @@
- 			uart1_pins_a: uart1 at 0 {
- 				allwinner,pins = "PG6", "PG7";
- 				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			uart1_pins_cts_rts_a: uart1-cts-rts at 0 {
- 				allwinner,pins = "PG8", "PG9";
- 				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
--- 
-2.10.1
+Kevin
