@@ -1,83 +1,137 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 17:42:55 +0100
-Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
-In-Reply-To: <1477326477.1984.2.camel@perches.com>
-References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
- <20161024113131.GH15620@leverpostej>
- <1477326477.1984.2.camel@perches.com>
-Message-ID: <20161024164255.GN15620@leverpostej>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 24 Oct 2016 10:45:09 -0600
+Subject: [PATCH 3/4] iommu/arm-smmu: Add context save restore support
+In-Reply-To: <1477070066-15044-4-git-send-email-sricharan@codeaurora.org>
+References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
+ <1477070066-15044-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <CANLsYkxumkKodObeH9N4KGecsWYpwEo1DfR1WrBctzRY-ESFrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 09:27:57AM -0700, Joe Perches wrote:
-> On Mon, 2016-10-24 at 12:31 +0100, Mark Rutland wrote:
-> > On Sun, Oct 23, 2016 at 01:40:49PM -0700, Joe Perches wrote:
-> > > commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
-> > > corrected the KERN_CONT fallout from commit 4bcc595ccd80
-> > > ("printk: reinstate KERN_CONT for printing continuation lines"), but
-> > > the code still has unnecessary KERN_CONT uses.  Remove them.
-> > 
-> > Why are these unnecessary KERN_CONTs a larger problem than duplicating
-> > the format string for a third time? Having to duplicate it at all was
-> > annoying enough.
-> 
-> Not printing partial lines is the best solution to avoiding
-> message output interleaving.
+On 21 October 2016 at 11:14, Sricharan R <sricharan@codeaurora.org> wrote:
+> The smes registers and the context bank registers are
+> the ones that are needs to be saved and restored.
+> Fortunately the smes are already stored as a part
+> of the smmu device structure. So just write that
+> back. The data required to configure the context banks
+> are the master's domain data and pgtable cfgs.
+> So store them as a part of the context banks info
+> and just reconfigure the context banks on the restore
+> path.
+>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  drivers/iommu/arm-smmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 51 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 45f2762..578cdc2 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -328,6 +328,11 @@ struct arm_smmu_master_cfg {
+>  #define for_each_cfg_sme(fw, i, idx) \
+>         for (i = 0; idx = __fwspec_cfg(fw)->smendx[i], i < fw->num_ids; ++i)
+>
+> +struct cbinfo {
+> +       struct arm_smmu_domain          *domain;
+> +       struct io_pgtable_cfg           pgtbl_cfg;
+> +};
+> +
+>  struct arm_smmu_device {
+>         struct device                   *dev;
+>
+> @@ -378,6 +383,9 @@ struct arm_smmu_device {
+>         struct clk                      **clocks;
+>
+>         u32                             cavium_id_base; /* Specific to Cavium */
+> +
+> +       /* For save/restore of context bank registers */
+> +       struct cbinfo                   *cb_saved_ctx;
 
-Would you mind mentioning that explicitly in the commit message? That
-makes it obvious what the benefit of avoiding KERN_CONT is.
+It's not that clear to me this will become an array - better
+documentation would help reviewing the code.
 
-> > Overall, to avoid messing with the KERN_CONT mess it'd be nicer to
-> > format this all into a buffer (with the format string only existing the
-> > once) and subsequently print it with one printk call
-> 
-> A single printk call would get one timestamp which would
-> make for ragged/staggered reading.
+>  };
+>
+>  enum arm_smmu_context_fmt {
+> @@ -972,6 +980,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>
+>         /* Initialise the context bank with our page table cfg */
+>         arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+> +       smmu->cb_saved_ctx[cfg->cbndx].domain = smmu_domain;
+> +       smmu->cb_saved_ctx[cfg->cbndx].pgtbl_cfg = pgtbl_cfg;
+>
+>         /*
+>          * Request context fault interrupt. Do this last to avoid the
+> @@ -1861,6 +1871,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>         }
+>         dev_notice(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+>                    smmu->num_context_banks, smmu->num_s2_context_banks);
+> +
+> +       smmu->cb_saved_ctx = devm_kzalloc(smmu->dev,
+> +                            sizeof(struct cbinfo) * smmu->num_context_banks,
+> +                            GFP_KERNEL);
+>         /*
+>          * Cavium CN88xx erratum #27704.
+>          * Ensure ASID and VMID allocation is unique across all SMMUs in
+> @@ -2115,8 +2129,44 @@ static int arm_smmu_resume(struct device *dev)
+>  {
+>         struct platform_device *pdev = to_platform_device(dev);
+>         struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+> +       struct arm_smmu_domain *domain = NULL;
+> +       struct io_pgtable_cfg *pgtbl_cfg = NULL;
+> +       struct arm_smmu_smr *smrs = smmu->smrs;
+> +       int i = 0, idx, cb, ret, pcb = 0;
+> +
+> +       ret = arm_smmu_enable_clocks(smmu);
+> +       if (ret)
+> +               return ret;
+> +
+> +       arm_smmu_device_reset(smmu);
+>
+> -       return arm_smmu_enable_clocks(smmu);
+> +       /* Restore the smes and the context banks */
+> +       for (idx = 0; idx < smmu->num_mapping_groups; ++idx) {
+> +               mutex_lock(&smmu->stream_map_mutex);
+> +               if (!smrs[idx].valid) {
+> +                       mutex_unlock(&smmu->stream_map_mutex);
+> +                       continue;
+> +               }
+> +
+> +               arm_smmu_write_sme(smmu, idx);
+> +               cb = smmu->s2crs[idx].cbndx;
+> +               mutex_unlock(&smmu->stream_map_mutex);
+> +
+> +               if (!i || (cb != pcb)) {
+> +                       domain = smmu->cb_saved_ctx[cb].domain;
+> +                       pgtbl_cfg = &smmu->cb_saved_ctx[cb].pgtbl_cfg;
+> +
+> +                       if (domain) {
+> +                               mutex_lock(&domain->init_mutex);
+> +                               arm_smmu_init_context_bank(domain, pgtbl_cfg);
+> +                               mutex_unlock(&domain->init_mutex);
+> +                       }
+> +               }
+> +               pcb = cb;
+> +               i++;
 
-That does not appear to be the case; as fr as I can tell the core prints a
-timestamp per line as required. If I run:
-
-	printk("TEST\nLINE1\nLINE2\nLINE3\nLINE4\n");
-
-... with "printk.time=1", over the UART:
-
-	[   41.201864] TEST
-	[   41.201864] LINE1
-	[   41.201864] LINE2
-	[   41.201864] LINE3
-	[   41.201864] LINE4
-
-... with "printk.time=1", via the $(dmesg):
-
-	[   41.201864] TEST
-	[   41.201864] LINE1
-	[   41.201864] LINE2
-	[   41.201864] LINE3
-	[   41.201864] LINE4
-
-... with "printk.time=0", over the UART:
-
-	TEST
-	LINE1
-	LINE2
-	LINE3
-	LINE4
-
-... with "printk.time=0", via the $(dmesg):
-
-	TEST
-	LINE1
-	LINE2
-	LINE3
-	LINE4
-
-... with "printk.time=0", via $(dmesg -T):
-
-	[Mon Oct 24 17:38:37 2016] TEST
-	[Mon Oct 24 17:38:37 2016] LINE1
-	[Mon Oct 24 17:38:37 2016] LINE2
-	[Mon Oct 24 17:38:37 2016] LINE3
-	[Mon Oct 24 17:38:37 2016] LINE4
+What are you doing with variable 'i'?  Again, some comments would
+greatly help with reviewing.
 
 Thanks,
-Mark.
+Mathieu
+
+> +       }
+> +
+> +       return 0;
+>  }
+>
+>  static int arm_smmu_suspend(struct device *dev)
+> --
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
