@@ -1,35 +1,66 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 24 Oct 2016 18:46:35 +0200
-Subject: [RFC] da850: DDR2/mDDR memory controller driver
-Message-ID: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
+From: ahaslam@baylibre.com (ahaslam at baylibre.com)
+Date: Mon, 24 Oct 2016 18:46:24 +0200
+Subject: [PATCH/RFT v2 07/17] ARM: davinci: da8xx: Enable the usb20 "per" clk
+ on phy_clk_enable
+In-Reply-To: <20161024164634.4330-1-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+Message-ID: <20161024164634.4330-8-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up for the series[1] adding new bus and memory drivers
-to better support the TI LCD controller on the da850-lcdk board.
+From: Axel Haslam <ahaslam@baylibre.com>
 
-The general consensus of the discussion that followed was that DT is
-not the right tool for this kind of SoC performance tweaks.
+While probing ochi phy with usb20 phy as a parent clock for usb11_phy,
+the usb20_phy clock enable would time out. This is because the usb20
+module clock needs to enabled while trying to lock the usb20_phy PLL.
 
-In order to avoid committing to stable DT bindings, we only introduce
-two common properties (compatible and reg) while the configuration
-register values are hard-coded for each board (currently only lcdk).
+Call clk enable and get for the usb20 peripheral before trying to
+enable the phy PLL.
 
-I'm sending a single patch this time as RFC to get some reviews and
-see it the approach is viewed as correct.
+Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+---
+ arch/arm/mach-davinci/usb-da8xx.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-[1] https://lkml.org/lkml/2016/10/17/613
-
-Bartosz Golaszewski (1):
-  ARM: memory: da8xx-ddrctl: new driver
-
- .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
- drivers/memory/Kconfig                             |   8 +
- drivers/memory/Makefile                            |   1 +
- drivers/memory/da8xx-ddrctl.c                      | 187 +++++++++++++++++++++
- 4 files changed, 216 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
- create mode 100644 drivers/memory/da8xx-ddrctl.c
-
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index 9e41a7f..982e105 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -53,11 +53,19 @@ int __init da8xx_register_usb_refclkin(int rate)
+ 
+ static void usb20_phy_clk_enable(struct clk *clk)
+ {
++	struct clk *usb20_clk;
+ 	u32 val;
+ 	u32 timeout = 500000; /* 500 msec */
+ 
+ 	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 
++	usb20_clk = clk_get(NULL, "usb20");
++	if (IS_ERR(usb20_clk)) {
++		pr_err("could not get usb20 clk\n");
++		return;
++	}
++
++	clk_prepare_enable(usb20_clk);
+ 	/*
+ 	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
+ 	 * host may use the PLL clock without USB 2.0 OTG being used.
+@@ -70,11 +78,14 @@ static void usb20_phy_clk_enable(struct clk *clk)
+ 	while (--timeout) {
+ 		val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+ 		if (val & CFGCHIP2_PHYCLKGD)
+-			return;
++			goto done;
+ 		udelay(1);
+ 	}
+ 
+ 	pr_err("Timeout waiting for USB 2.0 PHY clock good.\n");
++done:
++	clk_disable_unprepare(usb20_clk);
++	clk_put(usb20_clk);
+ }
+ 
+ static void usb20_phy_clk_disable(struct clk *clk)
 -- 
-2.9.3
+1.9.1
