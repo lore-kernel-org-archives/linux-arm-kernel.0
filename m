@@ -1,53 +1,54 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 24 Oct 2016 11:57:46 -0700
-Subject: [PATCH] ahci: use pci_alloc_irq_vectors
-In-Reply-To: <20161022141123.GA25500@lst.de>
-References: <1473088905-27670-1-git-send-email-hch@lst.de>
- <1473088905-27670-2-git-send-email-hch@lst.de>
- <20160906163946.GB24268@htj.duckdns.org>
- <20161020154722.GH22012@rric.localdomain> <20161021125918.GA18082@lst.de>
- <20161021140106.GU25086@rric.localdomain> <20161022141123.GA25500@lst.de>
-Message-ID: <580E59AA.60107@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 24 Oct 2016 17:58:44 +0200
+Subject: [linux-sunxi] [PATCH v5 3/4] Documentation: devicetree: add
+ vendor prefix for Pine64
+In-Reply-To: <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
+References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
+ <73852fb92ac0aeec294dc9883cf235d9fa74a07b.1476986335.git-series.maxime.ripard@free-electrons.com>
+ <CANwerB36N8q7ppKqocRs9m62h65+vrJFn37ncc-oh+Yozz_vFQ@mail.gmail.com>
+Message-ID: <20161024155844.biwcobiuxqmcpqk2@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+Hi Jonathan,
 
-I can answer these...
+On Fri, Oct 21, 2016 at 11:30:01AM +1100, Jonathan Liu wrote:
+> On 21 October 2016 at 05:00, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > From: Andre Przywara <andre.przywara@arm.com>
+> >
+> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> > [Maxime: Change title prefix to match the usual style]
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > index f0a48ea78659..4eefd1c3ff16 100644
+> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > @@ -208,7 +208,7 @@ parade      Parade Technologies Inc.
+> >  pericom        Pericom Technology Inc.
+> >  phytec PHYTEC Messtechnik GmbH
+> >  picochip       Picochip Ltd
+> > -pixcir  PIXCIR MICROELECTRONICS Co., Ltd
+> 
+> Why is "pixcir  PIXCIR MICROELECTRONICS Co., Ltd" removed?
 
-On 10/22/2016 07:11 AM, Christoph Hellwig wrote:
-> Hi Robert,
->
-> is this a controller that's using MSI-X?
+Probably a poor rebase on my side. Good catch, thanks!
+Maxime
 
-Yes.  This is a ThunderX SoC with on-chip AHCI that use MSI-X
-
->
-> If so can you try the patch below?
-
-I applied it to v4.9-rc1 (really commit 
-6f33d6458e35d6ba53c2635ee4b8a3177cbd912d), and this didn't seem to make 
-it work.
-
-
-
->
-> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-> index ba5f11c..5fe852d 100644
-> --- a/drivers/ata/ahci.c
-> +++ b/drivers/ata/ahci.c
-> @@ -1617,7 +1617,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->   		/* legacy intx interrupts */
->   		pci_intx(pdev, 1);
->   	}
-> -	hpriv->irq = pdev->irq;
-> +	hpriv->irq = pci_irq_vector(pdev, 0);
->
->   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
->   		host->flags |= ATA_HOST_PARALLEL_SCAN;
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/66edcd0a/attachment.sig>
