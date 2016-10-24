@@ -1,43 +1,35 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 15:21:03 -0700
-Subject: [PATCH v4 4/9] dt-bindings: add domain-idle-state compatible to arm,
- idle-state
+Date: Mon, 24 Oct 2016 15:21:01 -0700
+Subject: [PATCH v4 2/9] PM / Domain: Add residency property to genpd states
 In-Reply-To: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
 References: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1477347668-41901-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1477347668-41901-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU's idle states are defined by the arm,idle-state compatible flag. See
-[1]. PM domains that can contains devices and other domains also has
-similar definition for its idle state. Reuse the definition of
-arm,idle-state for PM domains by allowing an addition compatible string
-("domain-idle-state") to denote idle states that are specific to PM
-Domains.
+Residency of a domain's idle state indicates that the minimum idle time
+for the domain's idle state to be beneficial for power. Add the
+parameter to the state node. Future patches, will use the residency
+value in the genpd governor to determine if it is worth while to enter
+an idle state.
 
-[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-
-Cc: <devicetree@vger.kernel.org>
-Cc: Rob Herring <robh@kernel.org>
-Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/idle-states.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ include/linux/pm_domain.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/idle-states.txt b/Documentation/devicetree/bindings/arm/idle-states.txt
-index b8e41c1..4b0ff59 100644
---- a/Documentation/devicetree/bindings/arm/idle-states.txt
-+++ b/Documentation/devicetree/bindings/arm/idle-states.txt
-@@ -271,6 +271,9 @@ follows:
- 		Usage: Required
- 		Value type: <stringlist>
- 		Definition: Must be "arm,idle-state".
-+			    Additionally, nodes that are used to describe a
-+			    idle-state of PM domain must also define
-+			    "domain-idle-state" as compatible string.
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index de1d8f3..f4492eb 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -38,6 +38,7 @@ struct gpd_dev_ops {
+ struct genpd_power_state {
+ 	s64 power_off_latency_ns;
+ 	s64 power_on_latency_ns;
++	s64 residency_ns;
+ };
  
- 	- local-timer-stop
- 		Usage: See definition
+ struct generic_pm_domain {
 -- 
 2.7.4
