@@ -1,27 +1,17 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 24 Oct 2016 09:30:52 +0200
-Subject: [PATCH 0/4] STM32F429: Add Ethernet fixes
-In-Reply-To: <20161020.144140.1794871934594140769.davem@davemloft.net>
-References: <1476976886-23781-1-git-send-email-alexandre.torgue@st.com>
- <20161020.144140.1794871934594140769.davem@davemloft.net>
-Message-ID: <81886512-4fb9-8a4d-f469-521a76410943@st.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 24 Oct 2016 15:34:28 +0800
+Subject: [PATCH v3 0/2] clk: imx: fix AV PLL rate setting
+In-Reply-To: <cover.1476267249.git.emil@limesaudio.com>
+References: <cover.1476267249.git.emil@limesaudio.com>
+Message-ID: <20161024073428.GA30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Wed, Oct 12, 2016 at 12:31:39PM +0200, Emil Lundmark wrote:
+> Emil Lundmark (2):
+>   clk: imx: fix integer overflow in AV PLL round rate
+>   clk: imx: improve precision of AV PLL to 1 Hz
 
-On 10/20/2016 08:41 PM, David Miller wrote:
-> From: Alexandre TORGUE <alexandre.torgue@st.com>
-> Date: Thu, 20 Oct 2016 17:21:22 +0200
->
->> This series adds several fixes for Ethernet for stm32f429 MCU.
->> First 2 patches have already been reviewed some months ago when
->> stm32 Ethernet glue has been pushed (I added in this series to keep
->> history). Fixes are:
->>  -Change DT to be compliant to stm32 ethernet glue binding
->>  -Add phy-handle to correctly use mdio subnode
->>  -Remove WoL support
->
-> I'm assuming this will be merged via the ARM tree.
+For both,
 
-Yes, I will take it in my next pull request (if no issues).
+Acked-by: Shawn Guo <shawnguo@kernel.org>
