@@ -1,23 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 24 Oct 2016 09:03:53 +0200
-Subject: [PATCH 0/5] ARM: dts: renesas: Remove skeleton.dtsi inclusion
-In-Reply-To: <20161021095319.GC15372@leverpostej>
-References: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
- <20161021095319.GC15372@leverpostej>
-Message-ID: <20161024070350.GA13933@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 24 Oct 2016 15:14:39 +0800
+Subject: [PATCH v3 1/2] ARM: imx: gpc: Initialize all power domains
+In-Reply-To: <1477138856-31696-1-git-send-email-festevam@gmail.com>
+References: <1477138856-31696-1-git-send-email-festevam@gmail.com>
+Message-ID: <20161024071436.GY30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 10:53:19AM +0100, Mark Rutland wrote:
-> On Fri, Oct 21, 2016 at 11:16:05AM +0200, Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
-> > as deprecated"), including skeleton.dtsi is deprecated.
-> > Hence this series removes its use for all Renesas 32-bit ARM SoCs.
+On Sat, Oct 22, 2016 at 10:20:55AM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Thanks for doing this! FWIW, for the series:
+> Since commit 0159ec670763dd ("PM / Domains: Verify the PM domain is present
+> when adding a provider") the following regression is observed on imx6:
 > 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> imx-gpc: probe of 20dc000.gpc failed with error -22
+> 
+> The gpc probe fails because of_genpd_add_provider_onecell() now checks
+> if all the domains are initialized via pm_genpd_present() function
+> and it fails because not all the power domains are initialized.
+> 
+> In order to fix this error, initialize all the power domains from
+> imx_gpc_domains[], not only the imx6q_pu_domain.base one.
+> 
+> Reported-by: Olof's autobooter <build@lixom.net>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Thanks, I have queued these up.
+Applied both, thanks.
