@@ -1,44 +1,23 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 24 Oct 2016 14:50:02 +0800
-Subject: [PATCH 1/4] ARM: dts: mxs: Add new M28EVK manufacturer compat
-In-Reply-To: <3ec3e368-c8f1-3bee-7b7b-6de5cef72325@denx.de>
-References: <20160919214044.9615-1-marex@denx.de>
- <20161023130143.GT30578@tiger>
- <3ec3e368-c8f1-3bee-7b7b-6de5cef72325@denx.de>
-Message-ID: <20161024065002.GX30578@tiger>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 24 Oct 2016 09:03:53 +0200
+Subject: [PATCH 0/5] ARM: dts: renesas: Remove skeleton.dtsi inclusion
+In-Reply-To: <20161021095319.GC15372@leverpostej>
+References: <1477041370-22778-1-git-send-email-geert+renesas@glider.be>
+ <20161021095319.GC15372@leverpostej>
+Message-ID: <20161024070350.GA13933@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2016 at 03:30:32PM +0200, Marek Vasut wrote:
-> On 10/23/2016 03:01 PM, Shawn Guo wrote:
-> > On Mon, Sep 19, 2016 at 11:40:41PM +0200, Marek Vasut wrote:
-> >> The board is now manufactured by Aries Embedded GmbH, update compat string.
-> >>
-> >> Signed-off-by: Marek Vasut <marex@denx.de>
-> >> Cc: Shawn Guo <shawnguo@kernel.org>
-> >> ---
-> >>  arch/arm/boot/dts/imx28-m28.dtsi   | 4 ++--
-> >>  arch/arm/boot/dts/imx28-m28evk.dts | 4 ++--
-> >>  2 files changed, 4 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
-> >> index 214bb15..a69856e 100644
-> >> --- a/arch/arm/boot/dts/imx28-m28.dtsi
-> >> +++ b/arch/arm/boot/dts/imx28-m28.dtsi
-> >> @@ -12,8 +12,8 @@
-> >>  #include "imx28.dtsi"
-> >>  
-> >>  / {
-> >> -	model = "DENX M28";
-> >> -	compatible = "denx,m28", "fsl,imx28";
-> >> +	model = "Aries/DENX M28";
-> >> +	compatible = "aries,m28", "denx,m28", "fsl,imx28";
+On Fri, Oct 21, 2016 at 10:53:19AM +0100, Mark Rutland wrote:
+> On Fri, Oct 21, 2016 at 11:16:05AM +0200, Geert Uytterhoeven wrote:
+> > 	Hi Simon, Magnus,
 > > 
-> > Do we have an entry for Aries Embedded GmbH in vendor-prefixes.txt?
+> > As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
+> > as deprecated"), including skeleton.dtsi is deprecated.
+> > Hence this series removes its use for all Renesas 32-bit ARM SoCs.
 > 
-> The patch was submitted, not yet applied though:
-> http://www.spinics.net/lists/arm-kernel/msg533000.html
+> Thanks for doing this! FWIW, for the series:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Okay.  Ping me when it gets applied.
-
-Shawn
+Thanks, I have queued these up.
