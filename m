@@ -1,56 +1,90 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Oct 2016 11:01:21 +0200
-Subject: [PATCH v2] drivers: psci: PSCI checker module
-In-Reply-To: <80506636-d4a1-9a1b-4169-d153326b54aa@arm.com>
-References: <20160921143905.36197-1-kevin.brodsky@arm.com>
- <e57565e8-bec9-0460-32d5-fb9f868cc4f8@arm.com>
- <613e4387-0ed5-ad58-7b74-a31b648f81e7@arm.com>
- <2e2dedf4-192f-8657-10b1-24b426af5f00@arm.com>
- <CAMuHMdVgccJ0A2d_-uU+8r0h-NBeet3eGkKq14eaFo34ydqtzQ@mail.gmail.com>
- <80506636-d4a1-9a1b-4169-d153326b54aa@arm.com>
-Message-ID: <CAMuHMdWqyskdsUw8pXdyt6HgoXOzPbDQc=3+vTAbxz4-zHpg4Q@mail.gmail.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Mon, 24 Oct 2016 07:05:42 -0200
+Subject: [PATCH v5 3/9] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <1477279328.10501.10.camel@mtksdaap41>
+References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-2-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-3-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-4-git-send-email-tiffany.lin@mediatek.com>
+ <20161021110104.5733240e@vento.lan>
+ <1477279328.10501.10.camel@mtksdaap41>
+Message-ID: <20161024070542.65e11e37@vento.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Em Mon, 24 Oct 2016 11:22:08 +0800
+Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 
-On Mon, Oct 24, 2016 at 10:57 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 24/10/16 09:09, Geert Uytterhoeven wrote:
->> On Thu, Oct 20, 2016 at 4:21 PM, Sudeep Holla <sudeep.holla@arm.com>
->> wrote:
->>> On 20/10/16 14:38, Kevin Brodsky wrote:
->>>
->>> [...]
->>>
->>>>
->>>> Thanks for the heads-up! I'll rebase on 4.9-rc1 and see what needs to be
->>>> done.
->>>>
->>>
->>> Just be aware that v4.9-rc1 doesn't have commit 9cfb38a7ba5a
->>> ("sched/fair: Fix sched domains NULL dereference in
->>> select_idle_sibling()") which fixes the cpuhotplug issue you would
->>> observe.
->>
->>
->> Good to know. I saw that issue during resume from s2ram on
->> r8a7795/Salvator-X
->> once, but couldn't reproduce it.
->>
->
-> Did you try v4.9-rc1 itself ? The above commit is present post -rc1 and
-> must be in -rc2. I can consistently see the crash without the commit.
+> Hi Mauro,
+> 
+> On Fri, 2016-10-21 at 11:01 -0200, Mauro Carvalho Chehab wrote:
+> > Em Fri, 2 Sep 2016 20:19:54 +0800
+> > Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
+> >   
+> > > Add v4l2 layer decoder driver for MT8173
+> > > 
+> > > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>  
+> >   
+> > > +int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+> > > +{
+> > > +	int ret = 0;
+> > > +
+> > > +	switch (fourcc) {
+> > > +	case V4L2_PIX_FMT_H264:
+> > > +	case V4L2_PIX_FMT_VP8:
+> > > +	default:
+> > > +		return -EINVAL;
+> > > +	}  
+> > 
+> > Did you ever test this driver? The above code will *always* return
+> > -EINVAL, with will cause vidioc_vdec_s_fmt() to always fail!
+> > 
+> > I suspect that what you wanted to do, instead, is:
+> > 
+> > 	switch (fourcc) {
+> > 	case V4L2_PIX_FMT_H264:
+> > 	case V4L2_PIX_FMT_VP8:
+> > 		break;
+> > 	default:
+> > 		return -EINVAL;
+> >   
+> 
+> The original idea here is that vp8 and h264 are added in later patches.
+> If get this patch without later patches, it should return -EINVAL.
 
-I used a tree based on v4.9-rc1, not including commit 9cfb38a7ba5a.
-Will try v4.9-rc2 shortly...
+I noticed your idea, but next time, don't add dead code like that.
+Reviewers check patch by patch at the order they're present at the
+patch series.
 
-Gr{oetje,eeting}s,
+So, don't add something broken by purpose, assuming that it would
+be fixed later.
 
-                        Geert
+> 
+> 
+> > Btw, this patch series has also several issues that were pointed by
+> > checkpatch. Please *always* run checkpatch when submitting your work.
+> > 
+> > You should take a look at the Kernel documentation about how to
+> > submit patches, at:
+> > 	https://mchehab.fedorapeople.org/kernel_docs/process/index.html
+> > 
+> > PS.: this time, I fixed the checkpatch issues for you. So, let me know
+> > if the patch below is OK, and I'll merge it at media upstream,
+> > assuming that the other patches in this series are ok.
+> >   
+> 
+> I did run checkpatch, but I don't know why these issues missed.
+> probably I run checkpatch for all files not for patches.
+> I will take a look at the documentation and keep this in mind for future
+> upstream.
+> Appreciated for your help.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Checkpatch should be run patch by patch, as we expect that all patches
+will follow the coding style and will compile fine, without introducing
+warnings.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I do compile the Kernel for every single patch I merge.
+
+Regards,
+Mauro
