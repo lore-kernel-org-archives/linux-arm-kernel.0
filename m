@@ -1,127 +1,96 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 24 Oct 2016 16:21:26 +0200
-Subject: [PATCH 3/3] RFC: mmc: mmci: add qcom specific program end support
-In-Reply-To: <1477318886-24851-1-git-send-email-linus.walleij@linaro.org>
-References: <1477318886-24851-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1477318886-24851-3-git-send-email-linus.walleij@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 24 Oct 2016 16:44:06 +0200
+Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
+ dma_set_mask_and_coherent
+In-Reply-To: <20161021150916.0d274e9f@lwn.net>
+References: <20161017152623.7649-1-punit.agrawal@arm.com>
+ <20161021150916.0d274e9f@lwn.net>
+Message-ID: <41835351.zyFxfDAMp5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Friday, October 21, 2016 3:09:16 PM CEST Jonathan Corbet wrote:
+> On Mon, 17 Oct 2016 16:26:23 +0100
+> Punit Agrawal <punit.agrawal@arm.com> wrote:
+> 
+> > The dma mapping api howto gives the impression that using the
+> > dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
+> > to check all the components in the path from the device to memory for
+> > addressing restrictions. In systems with address translations between
+> > the device and memory (e.g., when using IOMMU), this implies that a
+> > successful call to set set dma mask has checked the addressing
+> > constraints of the intermediaries as well.
+> > 
+> > For the IOMMU drivers in the tree, the check is actually performed while
+> > allocating the DMA buffer rather than when the DMA mask is
+> > configured. For MMUs that do not support the full device addressing
+> > capability, the allocations are made from a reduced address space.
+> > 
+> > Update the documentation to clarify that even though the call to
+> > dma_set_mask_and_coherent succeeds, it may not be possible to use the
+> > full addressing capability of the device.
+> 
+> OK, so I guess I can buy this.  But...
+> 
+> > Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> > Cc: Jonathan Corbet <corbet@lwn.net>
+> > ---
+> >  Documentation/DMA-API-HOWTO.txt | 39 +++++++++++++++++++++++----------------
+> >  1 file changed, 23 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/Documentation/DMA-API-HOWTO.txt b/Documentation/DMA-API-HOWTO.txt
+> > index 979228b..240d1ee 100644
+> > --- a/Documentation/DMA-API-HOWTO.txt
+> > +++ b/Documentation/DMA-API-HOWTO.txt
+> > @@ -159,39 +159,46 @@ support 64-bit addressing (DAC) for all transactions.  And at least
+> >  one platform (SGI SN2) requires 64-bit consistent allocations to
+> >  operate correctly when the IO bus is in PCI-X mode.
+> >  
+> > -For correct operation, you must interrogate the kernel in your device
+> > -probe routine to see if the DMA controller on the machine can properly
+> > -support the DMA addressing limitation your device has.  It is good
+> > +For correct operation, you must inform the kernel in your device probe
+> > +routine to see if the DMA controller on the machine can properly
+> > +support the DMA addressing capabilities your device has.  It is good
+> 
+> Here it's still saying "to see if the DMA controller on the machine can
+> properly support the DMA addressing capabilities your device has".  So
+> you've not really changed the sense of this sentence here.
+> 
+> If I understand things correctly, the calls in question are storing the
+> device's limitations; they will only fail if the kernel is entirely
+> unable to work within the indicated range, right?  I don't think there's
+> ever been any guarantee that the system as a whole could use the entire
+> range that is addressable by the device.  I have no objection to making
+> that more clear, but let's actually make it more clear by saying what the
+> functions are actually doing.
+> 
+> Make sense, or am I missing something here?
 
-This patch adds support to programend interrupt which is very
-specific to QCOM integration. This interrupt is use as busy signal
-when a command forces the card to enter into programming state
-like CMD6 writing to ext_csd registers.
+The call is a two-way interface, and the existing text tries to convey
+that already: The device tells the kernel whether it is limited (< 32
+bit mask) or if it can support extended addresses (> 32 bit mask),
+or just handles the default 32bit mask, and the kernel should come
+back saying whether that mask allows a correct operation of the device
+on the given platform, as well as set it up correctly that way.
 
-Hopefully, this also fixes the __mmc_switch timeout issue reproted
-with latest versions of the eMMC used on DB600c board.
+What exactly happens in dma_set_mask() and the related interfaces
+is highly platform specific, including:
 
-This patch is based on a WIP patch from Srinivas Kandagatla and
-augmented by Linus Walleij for another approach.
+- if the mask is smaller than the smallest memory zone and the
+  swiotlb bounce buffers (if any) don't fit inside it, it has to
+  fail
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Srinivas: please test to see if this fixes your problems. Sadly
-it does *NOT* solve my APQ8060 issues, but it would be nice if
-the common code path works for the busy detection on your
-DB600c.
----
- drivers/mmc/host/mmci.c | 21 +++++++++++++++++++--
- drivers/mmc/host/mmci.h |  6 ++++++
- 2 files changed, 25 insertions(+), 2 deletions(-)
+- if the device claims to support larger mask, but the bus it
+  connects to does not (e.g. a 32-bit PCI host), it may
+  also fail (or succeed if there is no RAM outside of the
+  intersection of the two masks)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 06e19d8359e0..c0380713df34 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -72,7 +72,10 @@ static unsigned int fmax = 515633;
-  * @signal_direction: input/out direction of bus signals can be indicated
-  * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
-  * @busy_detect: true if the variant supports busy detection on DAT0.
-- * @busy_dpsm_flag: bitmask enabling busy detection in the DPSM
-+ * @busy_cpsm_flag: bitmask enabling busy detection in the CPSM (command
-+ *		    path state machine)
-+ * @busy_dpsm_flag: bitmask enabling busy detection in the DPSM (data path
-+ *		    state machine)
-  * @busy_detect_flag: bitmask identifying the bit in the MMCISTATUS register
-  * 	 	      indicating that the card is busy
-  * @busy_detect_mask: bitmask identifying the bit in the MMCIMASK0 to mask for
-@@ -103,6 +106,7 @@ struct variant_data {
- 	bool			signal_direction;
- 	bool			pwrreg_clkgate;
- 	bool			busy_detect;
-+	u32			busy_cpsm_flag;
- 	u32			busy_dpsm_flag;
- 	u32			busy_detect_flag;
- 	u32			busy_detect_mask;
-@@ -229,6 +233,10 @@ static struct variant_data variant_qcom = {
- 	.datalength_bits	= 24,
- 	.pwrreg_powerup		= MCI_PWR_UP,
- 	.f_max			= 208000000,
-+	.busy_detect		= true,
-+	.busy_cpsm_flag		= MCI_CPSM_QCOM_PROGENA,
-+	.busy_detect_flag	= MCI_QCOM_PROGDONE,
-+	.busy_detect_mask	= MCI_QCOM_PROGDONEMASK,
- 	.explicit_mclk_control	= true,
- 	.qcom_fifo		= true,
- 	.qcom_dml		= true,
-@@ -903,6 +911,15 @@ mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
- 	if (/*interrupt*/0)
- 		c |= MCI_CPSM_INTERRUPT;
- 
-+	/*
-+	 * Enable the program end interrupt for specific commands
-+	 * used for busy detection.
-+	 */
-+	if (host->variant->busy_detect &&
-+	    (cmd->flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
-+		c |= host->variant->busy_cpsm_flag;
-+	}
-+
- 	if (mmc_cmd_type(cmd) == MMC_CMD_ADTC)
- 		c |= host->variant->data_cmd_enable;
- 
-@@ -1005,7 +1022,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
- 		return;
- 
- 	/*
--	 * ST Micro variant: handle busy detection.
-+	 * ST Micro and Qualcomm variants: handle busy detection.
- 	 */
- 	if (host->variant->busy_detect) {
- 		bool busy_resp = !!(cmd->flags & MMC_RSP_BUSY);
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 38f6f1365ec4..99abf02f560e 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -130,6 +130,8 @@
- #define MCI_ST_SDIOIT		(1 << 22)
- #define MCI_ST_CEATAEND		(1 << 23)
- #define MCI_ST_CARDBUSY		(1 << 24)
-+/* Extended status bits for the QCOM variants */
-+#define MCI_QCOM_PROGDONE	(1 << 23)
- 
- #define MMCICLEAR		0x038
- #define MCI_CMDCRCFAILCLR	(1 << 0)
-@@ -147,6 +149,8 @@
- #define MCI_ST_SDIOITC		(1 << 22)
- #define MCI_ST_CEATAENDC	(1 << 23)
- #define MCI_ST_BUSYENDC		(1 << 24)
-+/* Extended status bits for the QCOM variants */
-+#define MCI_QCOM_PROGDONECLR	(1 << 23)
- 
- #define MMCIMASK0		0x03c
- #define MCI_CMDCRCFAILMASK	(1 << 0)
-@@ -175,6 +179,8 @@
- #define MCI_ST_SDIOITMASK	(1 << 22)
- #define MCI_ST_CEATAENDMASK	(1 << 23)
- #define MCI_ST_BUSYENDMASK	(1 << 24)
-+/* Extended status bits for the Qualcomm variants */
-+#define MCI_QCOM_PROGDONEMASK	(1 << 23)
- 
- #define MMCIMASK1		0x040
- #define MMCIFIFOCNT		0x048
--- 
-2.7.4
+- if the mask is large enough to cover all RAM, we can bypass
+  the IOMMU and use a direct mapping
+
+- if swiotlb is enabled or an IOMMU is present, any mask that
+  includes the bounce buffer area (or the virtual address space
+  of the IOMMU) should succeed.
+
+	Arnd
