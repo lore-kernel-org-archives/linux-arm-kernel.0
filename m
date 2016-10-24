@@ -1,47 +1,25 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 24 Oct 2016 20:25:56 +0200 (CEST)
-Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87eg35snvg.fsf@eliezer.anholt.net>
-References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
- <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
- <87twczg27x.fsf@eliezer.anholt.net>
- <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
- <87eg35snvg.fsf@eliezer.anholt.net>
-Message-ID: <1190898538.120930.02d69662-0b1a-447d-9c29-782aec7a1189.open-xchange@email.1und1.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 24 Oct 2016 11:29:54 -0700
+Subject: [PATCH] i2c: rk3x: Give the tuning value 0 during
+ rk3x_i2c_v0_calc_timings
+In-Reply-To: <1477125822-30644-1-git-send-email-david.wu@rock-chips.com>
+References: <1477125822-30644-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <CAD=FV=VKJhaZtfT7CZBN1UE0-aHpJrMPYUDicO6vAcNUvfOP5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Eric Anholt <eric@anholt.net> hat am 24. Oktober 2016 um 18:38 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > Hi Martin,
-> >
-> > Am 28.09.2016 um 23:10 schrieb Eric Anholt:
-> >> kernel at martin.sperl.org writes:
-> >>
-> >>> From: Martin Sperl <kernel@martin.sperl.org>
-> >>>
-> >>> Add basic thermal driver for bcm2835 SOC.
-> >>>
-> >>> This driver currently relies on the firmware setting up the
-> >>> tsense HW block and does not set it up itself.
-> >>>
-> >>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> >>> Acked-by: Eric Anholt <eric@anholt.net>
-> >>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> What's the status of merging this one?  I'd like to merge the other
-> >> patches.
-> >
-> > i think it's necessary to rebase the whole series. Maybe we could get it
-> > into 4.10.
-> 
-> Why would it need to be rebased?  The status, as far as I know, is that
-> we're still waiting for the subsystem maintainer to respond.
+Hi,
 
-Since at least this patch won't apply anymore, but feedback from maintainer is
-still good :-)
+On Sat, Oct 22, 2016 at 1:43 AM, David Wu <david.wu@rock-chips.com> wrote:
+> We found a bug that i2c transfer sometimes failed on 3066a board with
+> stabel-4.8, the con register would be updated by uninitialized tuning
+> value, it made the i2c transfer failed.
+>
+> So give the tuning value to be zero during rk3x_i2c_v0_calc_timings.
+>
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  drivers/i2c/busses/i2c-rk3x.c | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Sorry for this impatience, but i'm afraid that we possibly miss 4.10.
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
