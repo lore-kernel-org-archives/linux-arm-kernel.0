@@ -1,108 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 18:00:36 +0100
-Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
- <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <20161024170035.GO15620@leverpostej>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 25 Oct 2016 01:08:31 +0800
+Subject: [PATCH] ARM: dts: sun8i: fix the pinmux for UART1
+Message-ID: <20161024170831.38819-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
-> Create a new driver for the da8xx DDR2/mDDR controller and implement
-> support for writing to the Peripheral Bus Burst Priority Register.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
->  drivers/memory/Kconfig                             |   8 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/da8xx-ddrctl.c                      | 187 +++++++++++++++++++++
->  4 files changed, 216 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
->  create mode 100644 drivers/memory/da8xx-ddrctl.c
-> 
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> new file mode 100644
-> index 0000000..f0eda59
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> @@ -0,0 +1,20 @@
-> +* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory controller
-> +
-> +The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs memory
-> +maps a set of registers which allow to tweak the controller's behavior.
+When the patch is applied, the allwinner,driver and allwinner,pull
+properties are removed.
 
-This is a description of the *driver*. The device itself doesn't map
-some registers, it features them. Please descrive the *device*.
+Although they're described to be optional in the devicetree binding,
+without them, the pinmux cannot be initialized, and the uart cannot
+be used.
 
-> +
-> +Documentation:
-> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
-> +
-> +Required properties:
-> +
-> +- compatible:		"ti,da850-ddrctl" - for da850 SoC based boards
+Add them back to fix the problem, and makes the bluetooth on iNet D978
+Rev2 board work.
 
-Perhaps:
+Fixes: 82eec384249f (ARM: dts: sun8i: add pinmux for UART1 at PG)
 
-	"ti,da850-ddr-controller"
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
 
-> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
-> +{
-> +	const struct da8xx_ddrctl_config_knob *knob;
-> +	const struct da8xx_ddrctl_setting *setting;
-> +	u32 regprop[2], base, memsize, reg;
-> +	struct device_node *node, *parent;
-> +	void __iomem *ddrctl;
-> +	const char *board;
-> +	struct device *dev;
-> +	int ret;
-> +
-> +	dev = &pdev->dev;
-> +	node = dev->of_node;
-> +
-> +	/* Find the board name. */
-> +	for (parent = node;
-> +	     !of_node_is_root(parent);
-> +	     parent = of_get_parent(parent));
-> +
-> +	ret = of_property_read_string(parent, "compatible", &board);
-> +	if (ret) {
-> +		dev_err(dev, "unable to read the soc model\n");
-> +		return ret;
-> +	}
+This patch is targeted on 4.9.
 
-I can see that you want to expose sysfs knobs for this, but is it really
-necessary to match boards like this? It's very fragile, and commits us
-to maintaining a database of board data (i.e. a board file).
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-I am very much not keen on that.
-
-> +
-> +	/* Check if we have settings for this board. */
-> +	setting = da8xx_ddrctl_match_board(board);
-> +	if (!setting) {
-> +		dev_err(dev, "no settings for board '%s'\n", board);
-> +		return -EINVAL;
-> +	}
-
-What's wrong with of_machine_is_compatible?
-
-> +
-> +	/* Figure out how to map the memory for the controller. */
-> +	ret = of_property_read_u32_array(node, "reg", regprop, 2);
-> +	if (ret) {
-> +		dev_err(dev, "unable to parse 'reg' property\n");
-> +		return ret;
-> +	}
-> +
-> +	base = regprop[0];
-> +	memsize = regprop[1];
-> +
-> +	ddrctl = ioremap(base, memsize);
-
-NAK. Use the proper accessors for handling reg entries.
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 48fc24f..300a1bd 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -282,11 +282,15 @@
+ 			uart1_pins_a: uart1 at 0 {
+ 				allwinner,pins = "PG6", "PG7";
+ 				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			uart1_pins_cts_rts_a: uart1-cts-rts at 0 {
+ 				allwinner,pins = "PG8", "PG9";
+ 				allwinner,function = "uart1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
+ 			mmc0_pins_a: mmc0 at 0 {
+-- 
+2.10.1
