@@ -1,34 +1,42 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 24 Oct 2016 10:32:12 -0200
-Subject: [PATCH] ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031
-Message-ID: <1477312332-2027-1-git-send-email-festevam@gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 24 Oct 2016 20:40:01 +0800
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <20161024111608.GG15620@leverpostej>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+ <20161024111608.GG15620@leverpostej>
+Message-ID: <7e839df8-f8f7-3b16-8321-4ff45b6c5884@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
 
-AR8031 and AR8035 have the same PHY ID mask of 0xffffffef.
 
-So fix it and make it match with the PHY ID mask definition
-at drivers/net/phy/at803x.c.
+On 2016/10/24 19:16, Mark Rutland wrote:
+> On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
+>> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
+>> +  QorIQ erratum 161201, which says that reading the counter is
+>> +  unreliable unless the small range of value is returned by back-to-back reads.
+>> +  This also affects writes to the tval register, due to the implicit
+>> +  counter read.
+> 
+> Is "161x01" the *exact* erratum number, or is the 'x' a wildcard? Please
+> use the *exact* erratum number, even if that means we have to list
+> several.
+> 
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/mach-imx/mach-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Mark:
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 97fd251..45801b2 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -173,7 +173,7 @@ static void __init imx6q_enet_phy_init(void)
- 				ksz9021rn_phy_fixup);
- 		phy_register_fixup_for_uid(PHY_ID_KSZ9031, MICREL_PHY_ID_MASK,
- 				ksz9031rn_phy_fixup);
--		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffff,
-+		phy_register_fixup_for_uid(PHY_ID_AR8031, 0xffffffef,
- 				ar8031_phy_fixup);
- 		phy_register_fixup_for_uid(PHY_ID_AR8035, 0xffffffef,
- 				ar8035_phy_fixup);
--- 
-2.7.4
+The 'x' is a wildcard, it will cover 161001 to 161601 several numbers, I will discuss to
+the chip develop and get a exact erratum number.
+
+Thanks.
+Ding
+
+> Is "161x01" an *erratum* number, or the *part* number of affected
+> devices?
+> 
+> Thanks,
+> Mark.
+> 
+> .
+> 
