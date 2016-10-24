@@ -1,48 +1,44 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Oct 2016 18:26:33 +0200
-Subject: [PATCH v5 2/4] arm64: dts: add Allwinner A64 SoC .dtsi
-In-Reply-To: <a0b71433-8302-8ac2-a695-60ac813b380f@arm.com>
-References: <cover.f18c0f482ef4459b5c8f6eb5828fcb6762440974.1476986335.git-series.maxime.ripard@free-electrons.com>
- <eb11a71c58cd85551d9d793437db1792abd5077c.1476986335.git-series.maxime.ripard@free-electrons.com>
- <a0b71433-8302-8ac2-a695-60ac813b380f@arm.com>
-Message-ID: <20161024162633.olqhftj5tdsp6qwb@lukather>
+Date: Mon, 24 Oct 2016 14:34:49 +0200
+Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
+In-Reply-To: <20161023094503.fbb22dd0701e3f2785828609@free.fr>
+References: <cover.1477142934.git.moinejf@free.fr>
+ <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
+ <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
+ <20161023094503.fbb22dd0701e3f2785828609@free.fr>
+Message-ID: <20161024123449.npo4grdlbrj4tcsj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andr?,
+Hi,
 
-On Mon, Oct 24, 2016 at 12:57:04AM +0100, Andr? Przywara wrote:
-> > +		pio: pinctrl at 1c20800 {
-> > +			compatible = "allwinner,sun50i-a64-pinctrl";
-> > +			reg = <0x01c20800 0x400>;
-> > +			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
-> > +				     <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-> > +			clocks = <&ccu CLK_BUS_PIO>;
-> > +			gpio-controller;
-> > +			#gpio-cells = <3>;
-> > +			interrupt-controller;
-> > +			#interrupt-cells = <3>;
-> > +
-> > +			i2c1_pins: i2c1_pins {
-> > +				allwinner,pins = "PH2", "PH3";
-> > +				allwinner,function = "i2c1";
+On Sun, Oct 23, 2016 at 09:45:03AM +0200, Jean-Francois Moine wrote:
+> On Sun, 23 Oct 2016 09:33:16 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
 > 
-> So as Icenowy pointed out, we are missing the drive and pull properties
-> here, at least as long as we don't have your patch (series) in place to
-> cope with that.
+> > > Note: This driver is closed to the sun4i-i2s except that:
+> > > - it handles the H3
+> > 
+> > If it's close to sun4i-i2s, you should probably rework that one to support
+> > the newer SoCs.
+> > 
+> > > - it creates the sound card (with sun4i-i2s, the sound card is created
+> > >   by the CODECs)
+> > 
+> > I think this is wrong. I2S is only the DAI. You typically have a separate
+> > platform driver for the whole card, or just use simple-card.
+> 
+> An other device is not needed. The layout is simple:
+> 	I2S_controller (CPU DAI) <-> HDMI_CODEC (CODEC DAI)
+> The HDMI CODEC is supported by the HDMI video driver (only one device),
+> so, it cannot be the card device.
+> ASoC does not use the CPU DAI device (I2S_controller), so, it is
+> natural to use it to handle the card.
 
-Yeah sorry, we noticed first with Chen-Yu that the binding should not
-need it, and then we realised that the driver was making the
-assumption that they were... Sorry :/
+Still, duplicating the driver is not the solution. I agree with
+Chen-Yu that we want to leverage the driver that is already there.
 
-> But if we rely on this series (which seems OK to me), shouldn't we then
-> use the generic properties for pins and function here as well?
-
-Definitely. I'll update this.
-
-Thanks!
-Maxime 
+Maxime
 
 -- 
 Maxime Ripard, Free Electrons
@@ -54,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/2b6d6f3f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/953e2f06/attachment.sig>
