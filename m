@@ -1,36 +1,35 @@
-From: ahaslam@baylibre.com (ahaslam at baylibre.com)
-Date: Mon, 24 Oct 2016 18:46:21 +0200
-Subject: [PATCH/RFT v2 04/17] ARM: DTS: da850: Add cfgchip syscon node
-In-Reply-To: <20161024164634.4330-1-ahaslam@baylibre.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
-Message-ID: <20161024164634.4330-5-ahaslam@baylibre.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 24 Oct 2016 18:46:35 +0200
+Subject: [RFC] da850: DDR2/mDDR memory controller driver
+Message-ID: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Lechner <david@lechnology.com>
+This is a follow-up for the series[1] adding new bus and memory drivers
+to better support the TI LCD controller on the da850-lcdk board.
 
-Add a syscon node for the SoC CFGCHIPn registers. This is needed for
-the new usb phy driver.
+The general consensus of the discussion that followed was that DT is
+not the right tool for this kind of SoC performance tweaks.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/boot/dts/da850.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+In order to avoid committing to stable DT bindings, we only introduce
+two common properties (compatible and reg) while the configuration
+register values are hard-coded for each board (currently only lcdk).
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f79e1b9..6bbf20d 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -188,6 +188,10 @@
- 			};
- 
- 		};
-+		cfgchip: cfgchip at 1417c {
-+			compatible = "ti,da830-cfgchip", "syscon";
-+			reg = <0x1417c 0x14>;
-+		};
- 		edma0: edma at 0 {
- 			compatible = "ti,edma3-tpcc";
- 			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
+I'm sending a single patch this time as RFC to get some reviews and
+see it the approach is viewed as correct.
+
+[1] https://lkml.org/lkml/2016/10/17/613
+
+Bartosz Golaszewski (1):
+  ARM: memory: da8xx-ddrctl: new driver
+
+ .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/da8xx-ddrctl.c                      | 187 +++++++++++++++++++++
+ 4 files changed, 216 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+ create mode 100644 drivers/memory/da8xx-ddrctl.c
+
 -- 
-1.9.1
+2.9.3
