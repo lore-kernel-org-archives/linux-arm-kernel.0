@@ -1,83 +1,53 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 24 Oct 2016 11:52:39 -0700
-Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <7hfunly4hn.fsf@baylibre.com>
-References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
- <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
- <20161024170035.GO15620@leverpostej> <7hd1ipzm3h.fsf@baylibre.com>
- <20161024174249.GQ15620@leverpostej> <7hfunly4hn.fsf@baylibre.com>
-Message-ID: <CAOi56cXePjssk0AzMz27A_dOdLdJCWGMc86DH9nih5SHe-Eo=g@mail.gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 24 Oct 2016 11:57:46 -0700
+Subject: [PATCH] ahci: use pci_alloc_irq_vectors
+In-Reply-To: <20161022141123.GA25500@lst.de>
+References: <1473088905-27670-1-git-send-email-hch@lst.de>
+ <1473088905-27670-2-git-send-email-hch@lst.de>
+ <20160906163946.GB24268@htj.duckdns.org>
+ <20161020154722.GH22012@rric.localdomain> <20161021125918.GA18082@lst.de>
+ <20161021140106.GU25086@rric.localdomain> <20161022141123.GA25500@lst.de>
+Message-ID: <580E59AA.60107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 11:41 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Mark Rutland <mark.rutland@arm.com> writes:
+Hi Christoph,
+
+I can answer these...
+
+On 10/22/2016 07:11 AM, Christoph Hellwig wrote:
+> Hi Robert,
 >
->> On Mon, Oct 24, 2016 at 10:35:30AM -0700, Kevin Hilman wrote:
->>> Hi Mark,
->>>
->>> Mark Rutland <mark.rutland@arm.com> writes:
->>> > On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
->>> >> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
->>> >> +{
->>> >> + const struct da8xx_ddrctl_config_knob *knob;
->>> >> + const struct da8xx_ddrctl_setting *setting;
->>> >> + u32 regprop[2], base, memsize, reg;
->>> >> + struct device_node *node, *parent;
->>> >> + void __iomem *ddrctl;
->>> >> + const char *board;
->>> >> + struct device *dev;
->>> >> + int ret;
->>> >> +
->>> >> + dev = &pdev->dev;
->>> >> + node = dev->of_node;
->>> >> +
->>> >> + /* Find the board name. */
->>> >> + for (parent = node;
->>> >> +      !of_node_is_root(parent);
->>> >> +      parent = of_get_parent(parent));
->>> >> +
->>> >> + ret = of_property_read_string(parent, "compatible", &board);
->>> >> + if (ret) {
->>> >> +         dev_err(dev, "unable to read the soc model\n");
->>> >> +         return ret;
->>> >> + }
->>> >
->>> > I can see that you want to expose sysfs knobs for this, but is it really
->>> > necessary to match boards like this? It's very fragile, and commits us
->>> > to maintaining a database of board data (i.e. a board file).
->>> >
->>> > I am very much not keen on that.
->>>
->>> The original proposal[1] was to create DT properties reflecting the
->>> various knobs in the DDR Controller, but that was frowned upon since
->>> that was more HW configuration than hardware description.
->>>
->>> That resulted in this approach which keeps the HW configuration values
->>> in the driver, and selectable based on DT compatible.
->>>
->>> IMO, neither aproach is pretty.  From a DT maintainer perspective, can
->>> you comment on your preference?
->>
->> From my PoV, it really depends on *why* we need this. What does the
->> tuning gain us, and is it specific to a given use-case?
+> is this a controller that's using MSI-X?
+
+Yes.  This is a ThunderX SoC with on-chip AHCI that use MSI-X
+
 >
-> This is essentially a bus controller which allows you to set relative
-> priorities of the various bus masters (CPU data, CPU instructions, DMA
-> channels, ethernet MAC, SATA, display controller, etc. etc.)
+> If so can you try the patch below?
 
-Scratch that... I got this one confused with a different drivers/bus
-driver Bartosz is also working on. :(
+I applied it to v4.9-rc1 (really commit 
+6f33d6458e35d6ba53c2635ee4b8a3177cbd912d), and this didn't seem to make 
+it work.
 
-This one is just for the mechanism that controls how long old
-(low-priority) xfers in the DDR command FIFO are allowed to sit around
-before they will be flushed.
 
-The use-case is the same though.  The display controller doesn't work
-at higher resolutions without tweaking this setting.
 
-The question remains though: as a system-wide setting, should this be
-configured via DT (either by a DT property, or based on a compatible
-string in the driver) or should the driver provide an API to tweak it.
-
-Kevin
+>
+> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+> index ba5f11c..5fe852d 100644
+> --- a/drivers/ata/ahci.c
+> +++ b/drivers/ata/ahci.c
+> @@ -1617,7 +1617,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>   		/* legacy intx interrupts */
+>   		pci_intx(pdev, 1);
+>   	}
+> -	hpriv->irq = pdev->irq;
+> +	hpriv->irq = pci_irq_vector(pdev, 0);
+>
+>   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
+>   		host->flags |= ATA_HOST_PARALLEL_SCAN;
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
