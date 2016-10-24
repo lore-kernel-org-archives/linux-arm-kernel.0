@@ -1,66 +1,33 @@
-From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Mon, 24 Oct 2016 11:49:35 +0800
-Subject: FW: [PATCH] mtk-vcodec: fix some smatch warnings
-In-Reply-To: <6D1A1B40F9E1B64689A7C1952F8B336792FED2F0@mtkmbs08n1>
-References: <066110a3574ef835ba47a0996343474288da72cc.1477058315.git.mchehab@s-opensource.com>
- <6D1A1B40F9E1B64689A7C1952F8B336792FED2F0@mtkmbs08n1>
-Message-ID: <1477280975.10501.16.camel@mtksdaap41>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 24 Oct 2016 11:59:30 +0800
+Subject: [PATCH 1/3] phy: sun4i: check PHY id when poking unknown bit of pmu
+Message-ID: <20161024035930.20274-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
+The code that poke some unknown bit of PMU for H3/A64 didn't check
+the PHY, and will cause kernel oops when PHY 0 is used.
 
+Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
 
-> Fix this bug:
-> 	drivers/media/platform/mtk-vcodec/vdec_drv_if.c:38 vdec_if_init() info: ignoring unreachable code.
-> 
-> With is indeed a real problem that prevents the driver to work!
-> 
-> While here, also remove an used var, as reported by smatch:
-> 
-> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c: In function 'mtk_vcodec_init_dec_pm':
-> 	drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c:29:17: warning: variable 'dev' set but not used [-Wunused-but-set-variable]
-> 	  struct device *dev;
-> 	                 ^~~
-> 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ drivers/phy/phy-sun4i-usb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c | 2 --
->  drivers/media/platform/mtk-vcodec/vdec_drv_if.c       | 1 +
->  2 files changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
-> index 18182f5676d8..79ca03ac449c 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
-> @@ -26,14 +26,12 @@ int mtk_vcodec_init_dec_pm(struct mtk_vcodec_dev *mtkdev)  {
->  	struct device_node *node;
->  	struct platform_device *pdev;
-> -	struct device *dev;
->  	struct mtk_vcodec_pm *pm;
->  	int ret = 0;
->  
->  	pdev = mtkdev->plat_dev;
->  	pm = &mtkdev->pm;
->  	pm->mtkdev = mtkdev;
-> -	dev = &pdev->dev;
->  	node = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
->  	if (!node) {
->  		mtk_v4l2_err("of_parse_phandle mediatek,larb fail!"); diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
-> index 3cb04ef45144..9813b2ffd5fa 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
-> @@ -31,6 +31,7 @@ int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
->  	switch (fourcc) {
->  	case V4L2_PIX_FMT_H264:
->  	case V4L2_PIX_FMT_VP8:
-> +		break;
->  	default:
->  		return -EINVAL;
->  	}
-> --
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in the body of a message to majordomo at vger.kernel.org More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index b9342a2..ff8e9dd 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -264,7 +264,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		return ret;
+ 	}
+ 
+-	if (data->cfg->enable_pmu_unk1) {
++	if (phy->index != 0 && data->cfg->enable_pmu_unk1) {
+ 		val = readl(phy->pmu + REG_PMU_UNK1);
+ 		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
+ 	}
+-- 
+2.10.1
