@@ -1,50 +1,38 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 24 Oct 2016 17:00:30 +0900
-Subject: [PATCH 4/4] serial: 8250_uniphier: avoid locking for FCR register
- write
+Date: Mon, 24 Oct 2016 17:00:27 +0900
+Subject: [PATCH 1/4] serial: 8250_uniphier: fix more unterminated string
 In-Reply-To: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1477296030-7517-5-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1477296030-7517-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The hardware book says, the FCR is combined with a register called
-CHAR (it will trigger interrupt when a specific character is
-received).  At first, I used lock/read/modify/write/unlock dance for
-the FCR to not affect the upper bits, but the CHAR is actually never
-used.  It should not hurt to always clear the CHAR and to handle the
-FCR as a normal case.  It can save the costly locking.
+From: Denys Vlasenko <dvlasenk@redhat.com>
 
+Commit 1681d2116c96 ("serial: 8250_uniphier: add "\n" at the end of
+error log") missed this.
+
+Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
+[masahiro: add commit log]
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Suggested-by: Denys Vlasenko <dvlasenk@redhat.com>
+
 ---
 
- drivers/tty/serial/8250/8250_uniphier.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/8250/8250_uniphier.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 92e7bb7..746680e 100644
+index b8d9c8c..a8babb0 100644
 --- a/drivers/tty/serial/8250/8250_uniphier.c
 +++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -101,7 +101,7 @@ static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
- static void uniphier_serial_out(struct uart_port *p, int offset, int value)
- {
- 	unsigned int valshift = 0;
--	bool normal = false;
-+	bool normal = true;
+@@ -199,7 +199,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
  
- 	switch (offset) {
- 	case UART_FCR:
-@@ -114,9 +114,9 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
- 		/* fall through */
- 	case UART_MCR:
- 		offset = UNIPHIER_UART_LCR_MCR;
-+		normal = false;
- 		break;
- 	default:
--		normal = true;
- 		offset <<= UNIPHIER_UART_REGSHIFT;
- 		break;
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs) {
+-		dev_err(dev, "failed to get memory resource");
++		dev_err(dev, "failed to get memory resource\n");
+ 		return -EINVAL;
  	}
+ 
 -- 
 1.9.1
