@@ -1,71 +1,60 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 10:48:46 -0600
-Subject: [PATCH v3 3/8] PM / Domains: Allow domain power states to be
- read from DT
-In-Reply-To: <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
- <1476467276-75094-4-git-send-email-lina.iyer@linaro.org>
- <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
-Message-ID: <20161024164846.GE72940@linaro.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 24 Oct 2016 09:52:59 -0700
+Subject: [GIT PULL 4/4] Broadcom defconfig-arm64 changes for 4.9 (part 2)
+In-Reply-To: <CAOesGMjJ3_rPUke8B5yW_6Q4NyP1sb-wqY5jfcs1_+UhGQK9_g@mail.gmail.com>
+References: <1475263395-27653-1-git-send-email-f.fainelli@gmail.com>
+ <1475263395-27653-4-git-send-email-f.fainelli@gmail.com>
+ <62d5c9b0-9073-c8e3-6a9f-390f381d4d9d@gmail.com>
+ <CAOesGMjJ3_rPUke8B5yW_6Q4NyP1sb-wqY5jfcs1_+UhGQK9_g@mail.gmail.com>
+Message-ID: <a8e6638c-95a1-6847-dc75-368b69b7a87c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-On Mon, Oct 24 2016 at 07:39 -0600, Sudeep Holla wrote:
->
->
->On 14/10/16 18:47, Lina Iyer wrote:
->>This patch allows domains to define idle states in the DT. SoC's can
->>define domain idle states in DT using the "domain-idle-states" property
->>of the domain provider. Add API to read the idle states from DT that can
->>be set in the genpd object.
+On 10/23/2016 04:50 PM, Olof Johansson wrote:
+> On Sun, Oct 23, 2016 at 2:55 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 09/30/2016 12:23 PM, Florian Fainelli wrote:
+>>> The following changes since commit 29b4817d4018df78086157ea3a55c1d9424a7cfc:
+>>>
+>>>   Linux 4.8-rc1 (2016-08-07 18:18:00 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/defconfig-arm64
+>>>
+>>> for you to fetch changes up to 51e3fb1d3f514cd336faf185df73b25fca194773:
+>>>
+>>>   Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next (2016-09-30 12:02:29 -0700)
+>>>
+>>> ----------------------------------------------------------------
+>>> This pull request contains Broadcom ARM64-based SoCs defconfig changes for 4.9,
+>>> please pull the following changes:
+>>>
+>>> - Eric updates the ARMv8 defconfig to contain everything that is needed to run
+>>>   a 64-bit kernel on the Raspberry Pi 3
+>>>
+>>> ----------------------------------------------------------------
+>>> Eric Anholt (1):
+>>>       arm64: Add BCM2835 (Raspberry Pi 3) support to the defconfig
+>>>
+>>> Florian Fainelli (1):
+>>>       Merge tag 'bcm2835-defconfig-64-next-2016-09-22' into defconfig-arm64/next
+>>>
+>>>  arch/arm64/configs/defconfig | 16 ++++++++++++++++
+>>>  1 file changed, 16 insertions(+)
 >>
->>This patch is based on the original patch by Marc Titinger.
+>> Arnd, Kevin, Olof,
 >>
->>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>---
->> drivers/base/power/domain.c | 94 +++++++++++++++++++++++++++++++++++++++++++++
->> include/linux/pm_domain.h   |  8 ++++
->> 2 files changed, 102 insertions(+)
+>> Following Olof's response here:
 >>
->>diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->>index 37ab7f1..9af75ba 100644
->>--- a/drivers/base/power/domain.c
->>+++ b/drivers/base/power/domain.c
->>@@ -1916,6 +1916,100 @@ out:
->> 	return ret ? -EPROBE_DEFER : 0;
->> }
->> EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->>+
->>+static const struct of_device_id idle_state_match[] = {
->>+	{ .compatible = "arm,idle-state", },
->>+	{ }
->>+};
->>+
->
->I still think it's better to have another compatible to serve this
->purpose. We don't want to end up creating genpd domains just because
->they are "arm,idle-state" compatible IMO ?
->
->I agree you can prevent it checking for OSC mode support in the
->firmware. But I want to understand if you have any strong reasons for
->avoiding that approach.
->
-Why are you still held up with OSI/PC PSCI modes? I repeat again this
-series is not about any of that, it is just about PM domains. PM domains
-have idle states and the idle-state description is similar in definition
-to arm,idle-state and therefore uses the same compatible. There is no
-point re-defining something that already exists in the kernel.
+>> https://www.spinics.net/lists/arm-kernel/msg534687.html
+>>
+>> do you think we could merge these for 4.9-rcX? Let me know if I should
+>> send a fresh pull request for that.
+> 
+> Main reason to respin would be if you need to rebase due to other
+> changes that have gone in, or if you expect to have other material
+> that should be based on a 4.9-rc base.
 
-I was able to find the original thread, where we discussed this [1].
-
-I suggest, you read about PM domains and its idle states and understand
-this series in the context of PM domains.
-
-Thanks,
-Lina
-
-[1]. http://www.serverphorums.com/read.php?12,1303996
+No dependencies, this should apply cleanly to 4.9-rc. Thanks!
+-- 
+Florian
