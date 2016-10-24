@@ -1,74 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 12:31:31 +0100
-Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
-In-Reply-To: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
-References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
-Message-ID: <20161024113131.GH15620@leverpostej>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 24 Oct 2016 22:32:31 +1100
+Subject: [PATCH] kernel: irq: fix build failure
+In-Reply-To: <20161024102215.GN14477@dell>
+References: <1475775403-27207-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <57FBBA0B.9070500@gmail.com>
+ <alpine.DEB.2.20.1610201454410.5073@nanos>
+ <20161021120020.52b3fa35@canb.auug.org.au>
+ <alpine.DEB.2.20.1610211006370.4797@nanos>
+ <20161024102215.GN14477@dell>
+Message-ID: <20161024223231.5cdbb2ac@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 23, 2016 at 01:40:49PM -0700, Joe Perches wrote:
-> commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
-> corrected the KERN_CONT fallout from commit 4bcc595ccd80
-> ("printk: reinstate KERN_CONT for printing continuation lines"), but
-> the code still has unnecessary KERN_CONT uses.  Remove them.
+Hi Lee,
 
-Why are these unnecessary KERN_CONTs a larger problem than duplicating
-the format string for a third time? Having to duplicate it at all was
-annoying enough.
-
-Overall, to avoid messing with the KERN_CONT mess it'd be nicer to
-format this all into a buffer (with the format string only existing the
-once) and subsequently print it with one printk call.
-
-> Miscellanea:
+On Mon, 24 Oct 2016 11:22:15 +0100 Lee Jones <lee.jones@linaro.org> wrote:
+>
+> On Fri, 21 Oct 2016, Thomas Gleixner wrote:
 > 
-> o Remove unnecessary trailing blank from the output too.
+> > On Fri, 21 Oct 2016, Stephen Rothwell wrote:  
+> > > On Thu, 20 Oct 2016 14:55:45 +0200 (CEST) Thomas Gleixner <tglx@linutronix.de> wrote:  
+> > > > I know. This is under discussion with the driver folks as we are not going
+> > > > to blindly export stuff just because someone slapped a irq_set_parent()
+> > > > into the code w/o knowing why.  
+> > > 
+> > > Do we have any idea if a resolution is close.  This was first reported
+> > > in linux-next in September 14/15.  :-(  
+> > 
+> > Grr. Yes. As much as I hate it, I'll go and export it for now. Should be
+> > able to get it into rc2.  
 > 
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm64/kernel/process.c | 18 ++++++++----------
->  1 file changed, 8 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 01753cd7d3f0..2278e7197a8e 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -190,18 +190,16 @@ void __show_regs(struct pt_regs *regs)
->  
->  	i = top_reg;
->  
-> -	while (i >= 0) {
-> -		printk("x%-2d: %016llx ", i, regs->regs[i]);
-> +	if (i >= 0 && !(i % 2)) {
+> Did this get in?  I still have people complaining about it.
 
-This is difficult to read. Given we know that in either case i >= 0, and
-to retain the style of existing code, this would be better as:
+It is in -rc2.  Commit 3118dac501bc.
 
-	if (i % 2 == 0) {
-
-> +		printk("x%-2d: %016llx\n", i, regs->regs[i]);
->  		i--;
-> -
-> -		if (i % 2 == 0) {
-> -			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-> -			i--;
-> -		}
-> -
-> -		pr_cont("\n");
->  	}
-> -	printk("\n");
-
-This should be retained. It's meant to be there *in addition* to the
-newline on the final reg line.
-
-> +	while (i > 0) {
-> +		printk("x%-2d: %016llx x%-2d: %016llx\n",
-> +		       i, regs->regs[i],
-> +		       i - 1, regs->regs[i - 1]);
-> +		i -= 2;
-> +	}
->  }
-
-Thanks,
-Mark.
+-- 
+Cheers,
+Stephen Rothwell
