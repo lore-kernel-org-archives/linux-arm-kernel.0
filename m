@@ -1,34 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 24 Oct 2016 22:10:20 +0200
-Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
- randomness
-In-Reply-To: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20161024201020.h6akyqad2o42xkhq@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 24 Oct 2016 22:14:43 +0200
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
+ property query
+In-Reply-To: <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
+References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
+ <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
+ <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
+Message-ID: <20161024201443.GB5989@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
-> Since SID's content is constant over reboot,
+On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
+> Pavel + Sebastian this is the patchset that need I some input on :)
 
-That's not true, at least not across all the Allwinner SoCs, and
-especially not on the A10 and A20 that this driver supports.
+Better then previous one.
 
-> it must not be used as source of randomness.
+But my version of bq27xxx_battery.c already contains this:
 
-And I don't think that's true either. A constant entropy provider will
-not add any entropy, but will not remove any, would it?
+static const struct kernel_param_ops param_ops_poll_interval = {
+        .get = param_get_uint,
+        .set = poll_interval_param_set,
+};
 
-Maxime
+...so it should be possible to set poll interval already.
 
+									Pavel
+									
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/1739c38f/attachment.sig>
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/31406715/attachment.sig>
