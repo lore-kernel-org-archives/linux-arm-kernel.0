@@ -1,53 +1,26 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 24 Oct 2016 12:09:04 +0100
-Subject: Question about arm64 earlycon
-In-Reply-To: <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
-References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
- <4966376.bRx4fgSjbT@wuerfel>
- <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
-Message-ID: <20161024110904.GF15620@leverpostej>
+Date: Mon, 24 Oct 2016 12:16:08 +0100
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+Message-ID: <20161024111608.GG15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 11:17:36AM +0100, Marc Zyngier wrote:
-> On 24/10/16 11:06, Arnd Bergmann wrote:
-> > On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
-> >> Hi Catalin, Marc, Mark, Arnd,
-> >>
-> >> I am testing with 3.12 kernel with earlyprintk enabled and I see some
-> >> garbage characters in the console log right before the message
-> >> indicating that the real console device is initialized:
+On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
+> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
+> +  QorIQ erratum 161201, which says that reading the counter is
+> +  unreliable unless the small range of value is returned by back-to-back reads.
+> +  This also affects writes to the tval register, due to the implicit
+> +  counter read.
 
-What exactly are you passing on the command line?
+Is "161x01" the *exact* erratum number, or is the 'x' a wildcard? Please
+use the *exact* erratum number, even if that means we have to list
+several.
 
-> >> <some garbage characters here>01c020000.serial: ttyS0 at MMIO
-> >> 0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
-> >> console [ttyS0] enabled, bootconsole disabled
-
-Was the UART already configured by FW? Had the firmware output anything
-at this point?
-
-Did the firmware's UART rate match that of the kernel? If not, the issue
-might just be that the rate doesn't match; earlycon/earlyprintk won't
-configure that, while the real console will.
-
-Or perhaps we race with some clock configuration...
-
-> >> I looked through early_prink.c file and printk.c file and it looks
-> >> like there is case that some early boot code can touch the UART
-> >> hardware via ealy console driver while the 'real' console driver is
-> >> setting up the same UART port? Please let me know if I missed some
-> >> important piece of code that can prevent this.
-> > 
-> > I don't think we every supported earlyprintk on arm64, and
-> > earlycon support may have been added later.
-> 
-> We did support some form of earlyprintk for a while (though not in the
-> same way as 32bit ARM does), until Rob introduced earlycon.
-
-Our earlyprintk up until that point was effectively a less general
-earlycon (coming up at a similar time). In fact, in v3.12 we were
-already using earlycon structures in arch/arm64/kernel/early_printk.c.
+Is "161x01" an *erratum* number, or the *part* number of affected
+devices?
 
 Thanks,
 Mark.
