@@ -1,18 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 24 Oct 2016 15:23:36 +0800
-Subject: [PATCH v1 1/2] ARM: dts: vfxxx: Enable DMA for DSPI on Vybrid
-In-Reply-To: <63fc108e2df00d2297a9b7014955f203bc802f34.1475498805.git.maitysanchayan@gmail.com>
-References: <63fc108e2df00d2297a9b7014955f203bc802f34.1475498805.git.maitysanchayan@gmail.com>
-Message-ID: <20161024072336.GZ30578@tiger>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 24 Oct 2016 10:30:12 +0300
+Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <36163853-ac4a-e146-0c1b-eaf42e8b234d@codeaurora.org>
+References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
+ <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
+ <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
+ <36163853-ac4a-e146-0c1b-eaf42e8b234d@codeaurora.org>
+Message-ID: <CAHp75VettN=-S+iqKQbqixRe2BM=AiS26VGM+8yLophbkc+Z8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2016 at 06:20:37PM +0530, Sanchayan Maity wrote:
-> Enable DMA for DSPI on Vybrid.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+On Mon, Oct 24, 2016 at 5:55 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 10/21/2016 12:11 PM, Andy Shevchenko wrote:
+>>> +static void hidma_free_msis(struct hidma_dev *dmadev)
+>>> > +{
+>>> > +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> Perhaps one #ifdef and two definitions of functions?
+>
+> I don't think it will make a difference. I'll have to move
+> #ifdef around the caller of hidma_free_msis instead which
+> I think is uglier.
+>
+> The hidma_write_msi_msg function gets called only when
+> CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. If I don't put
+> this around the function definition, I get unused function
+> warning from the compiler. This is the reason why preprocessor
+> definition is outside of the function definition.
 
-This is a hardware description which looks correct, regardless of the
-DSPI driver readiness.  So I applied it.
+I am talking about something like below:
 
-Shawn
+#ifdef UGLY_DEFINE
+myfunc_a()
+{
+}
+
+myfunc_b()
+{
+}
+#else
+static inline myfunc_a() {}
+static inline myfunc_b() {}
+#endif
+
+
+There is another way as well, namely use of IS_ENABLED(), IS_BUILTIN()
+macros (I don't remember how exactly second one is spelt).
+
+-- 
+With Best Regards,
+Andy Shevchenko
