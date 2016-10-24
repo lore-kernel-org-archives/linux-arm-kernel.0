@@ -1,32 +1,108 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 24 Oct 2016 18:55:22 +0200 (CEST)
-Subject: Disabling an interrupt in the handler locks the system up
-In-Reply-To: <580E3308.4050507@free.fr>
-References: <580A4460.2090306@free.fr>
- <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
- <20161021201448.3f4a0a7a@arm.com> <580A70B9.8060507@free.fr>
- <alpine.DEB.2.20.1610212147420.4855@nanos> <580A7A2B.5000702@free.fr>
- <20161022123713.6dc788b3@arm.com> <580BF1D4.2030509@free.fr>
- <580E3308.4050507@free.fr>
-Message-ID: <alpine.DEB.2.20.1610241847580.5002@nanos>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Oct 2016 18:00:36 +0100
+Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20161024170035.GO15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Oct 2016, Mason wrote:
+On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
+> Create a new driver for the da8xx DDR2/mDDR controller and implement
+> support for writing to the Peripheral Bus Burst Priority Register.
 > 
-> For the record, setting the IRQ_DISABLE_UNLAZY flag for this device
-> makes the system lock-up disappear.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
+>  drivers/memory/Kconfig                             |   8 +
+>  drivers/memory/Makefile                            |   1 +
+>  drivers/memory/da8xx-ddrctl.c                      | 187 +++++++++++++++++++++
+>  4 files changed, 216 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+>  create mode 100644 drivers/memory/da8xx-ddrctl.c
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+> new file mode 100644
+> index 0000000..f0eda59
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+> @@ -0,0 +1,20 @@
+> +* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory controller
+> +
+> +The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs memory
+> +maps a set of registers which allow to tweak the controller's behavior.
 
-The way how lazy irq disabling works is:
+This is a description of the *driver*. The device itself doesn't map
+some registers, it features them. Please descrive the *device*.
 
-1) Interrupt is marked disabled in software, but the hardware is not masked
+> +
+> +Documentation:
+> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
+> +
+> +Required properties:
+> +
+> +- compatible:		"ti,da850-ddrctl" - for da850 SoC based boards
 
-2) If the interrupt fires befor the interrupt is reenabled, then it's
-   masked at the hardware level in the low level interrupt flow handler.
+Perhaps:
 
-I have no idea why that does not work on your hardware. You might
-instrument handle_level_irq() to see what effect that has.
+	"ti,da850-ddr-controller"
+
+> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
+> +{
+> +	const struct da8xx_ddrctl_config_knob *knob;
+> +	const struct da8xx_ddrctl_setting *setting;
+> +	u32 regprop[2], base, memsize, reg;
+> +	struct device_node *node, *parent;
+> +	void __iomem *ddrctl;
+> +	const char *board;
+> +	struct device *dev;
+> +	int ret;
+> +
+> +	dev = &pdev->dev;
+> +	node = dev->of_node;
+> +
+> +	/* Find the board name. */
+> +	for (parent = node;
+> +	     !of_node_is_root(parent);
+> +	     parent = of_get_parent(parent));
+> +
+> +	ret = of_property_read_string(parent, "compatible", &board);
+> +	if (ret) {
+> +		dev_err(dev, "unable to read the soc model\n");
+> +		return ret;
+> +	}
+
+I can see that you want to expose sysfs knobs for this, but is it really
+necessary to match boards like this? It's very fragile, and commits us
+to maintaining a database of board data (i.e. a board file).
+
+I am very much not keen on that.
+
+> +
+> +	/* Check if we have settings for this board. */
+> +	setting = da8xx_ddrctl_match_board(board);
+> +	if (!setting) {
+> +		dev_err(dev, "no settings for board '%s'\n", board);
+> +		return -EINVAL;
+> +	}
+
+What's wrong with of_machine_is_compatible?
+
+> +
+> +	/* Figure out how to map the memory for the controller. */
+> +	ret = of_property_read_u32_array(node, "reg", regprop, 2);
+> +	if (ret) {
+> +		dev_err(dev, "unable to parse 'reg' property\n");
+> +		return ret;
+> +	}
+> +
+> +	base = regprop[0];
+> +	memsize = regprop[1];
+> +
+> +	ddrctl = ioremap(base, memsize);
+
+NAK. Use the proper accessors for handling reg entries.
 
 Thanks,
-
-	tglx
+Mark.
