@@ -1,60 +1,78 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 24 Oct 2016 16:36:55 +0800
-Subject: [PATCH V2 1/5] powerpc/mpc85xx: Update TMU device tree node for
- T1040/T1042
-In-Reply-To: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
-References: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
-Message-ID: <20161024083654.GB30578@tiger>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Oct 2016 10:53:12 +0200
+Subject: Build regressions/improvements in v4.9-rc2
+In-Reply-To: <1477298556-1522-1-git-send-email-geert@linux-m68k.org>
+References: <1477298556-1522-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdU8bgMR2U-mdjkyqXnUxbYMqfUUSNRoGc8+Mk5tZVDF4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 09, 2016 at 02:47:02PM +0800, Jia Hongtao wrote:
-> From: Hongtao Jia <hongtao.jia@nxp.com>
-> 
-> SoC compatible string and endianness property are added according to the
-> new bindings.
+On Mon, Oct 24, 2016 at 10:42 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.9-rc2[1] to v4.9-rc1[3], the summaries are:
+>   - build errors: +10/-21
 
-The commit log doesn't seem to match the actual changes.  Same for patch
-2/5.
+  + /home/kisskb/slave/src/arch/arm/include/asm/dma-mapping.h: error:
+invalid suffix "xUL" on integer constant:  => 84:1
+  + /home/kisskb/slave/src/include/linux/dma-mapping.h: error: invalid
+suffix "xUL" on integer constant:  => 190:1, 193:1
+  + /home/kisskb/slave/src/include/linux/mm.h: error: invalid suffix
+"xUL" on integer constant:  => 555:1
+  + /home/kisskb/slave/src/include/linux/scatterlist.h: error: invalid
+suffix "xUL" on integer constant:  => 142:1
 
-Shawn
+arm-randconfig
 
-> 
-> Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
-> ---
-> Changes for V2:
-> * Rebase on latest linux-next tree (next-20161006).
-> 
->  arch/powerpc/boot/dts/fsl/t1040si-post.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> index 44e399b..145c7f4 100644
-> --- a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> +++ b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> @@ -526,7 +526,7 @@
->  
->  				       0x00030000 0x00000012
->  				       0x00030001 0x0000001d>;
-> -		#thermal-sensor-cells = <0>;
-> +		#thermal-sensor-cells = <1>;
->  	};
->  
->  	thermal-zones {
-> @@ -534,7 +534,7 @@
->  			polling-delay-passive = <1000>;
->  			polling-delay = <5000>;
->  
-> -			thermal-sensors = <&tmu>;
-> +			thermal-sensors = <&tmu 2>;
->  
->  			trips {
->  				cpu_alert: cpu-alert {
-> -- 
-> 2.1.0.27.g96db324
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Not a new problem. Real issue is "CONFIG_PAGE_OFFSET=" in .config,
+leading to:
+
+    ./include/generated/autoconf.h:1113:28: error: invalid suffix
+"xUL" on integer constant
+     #define CONFIG_PAGE_OFFSET 0x
+
+Why is CONFIG_PAGE_OFFSET empty?
+
+    scripts/kconfig/conf  --oldconfig Kconfig
+    .config:316:warning: symbol value '' invalid for PAGE_OFFSET
+
+config PAGE_OFFSET
+        hex
+        default PHYS_OFFSET if !MMU
+
+# CONFIG_MMU is not set
+but CONFIG_PHYS_OFFSET does not exist in .config??
+
+config PHYS_OFFSET
+        hex "Physical address of main memory" if MMU
+        depends on !ARM_PATCH_PHYS_VIRT
+        default DRAM_BASE if !MMU
+        default 0x00000000 if ARCH_EBSA110 || \
+                        ARCH_FOOTBRIDGE || \
+                        ARCH_INTEGRATOR || \
+                        ARCH_IOP13XX || \
+                        ARCH_KS8695 || \
+                        ARCH_REALVIEW
+        default 0x10000000 if ARCH_OMAP1 || ARCH_RPC
+        default 0x20000000 if ARCH_S5PV210
+        default 0xc0000000 if ARCH_SA1100
+        help
+          Please provide the physical address corresponding to the
+          location of main memory in your system.
+
+CONFIG_DRAM_BASE=0x00800000
+
+Aha, CONFIG_ARM_PATCH_PHYS_VIRT=y
+
+> [1] http://kisskb.ellerman.id.au/kisskb/head/11104/ (all 262 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/11053/ (all 262 configs)
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
