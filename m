@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Oct 2016 19:03:33 +0100
-Subject: Applied "ASoC: PXA: Brownstone needs I2C" to the asoc tree
-In-Reply-To: <20161018151912.2742738-1-arnd@arndb.de>
-Message-ID: <E1byjav-000114-DL@debutante>
+Date: Mon, 24 Oct 2016 19:03:36 +0100
+Subject: Applied "ASoC: rk3399_gru_sound: Fix non static symbol warning" to
+ the asoc tree
+In-Reply-To: <1476717318-12684-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <E1byjay-000129-Lg@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: PXA: Brownstone needs I2C
+   ASoC: rk3399_gru_sound: Fix non static symbol warning
 
 has been applied to the asoc tree at
 
@@ -33,39 +34,34 @@ to this mail.
 Thanks,
 Mark
 
->From 5229f1f4a4585f503a0683575bf38d9a1d2c1982 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 18 Oct 2016 17:18:58 +0200
-Subject: [PATCH] ASoC: PXA: Brownstone needs I2C
+>From 818f76831992198121c8949789c71a1adb02e329 Mon Sep 17 00:00:00 2001
+From: Wei Yongjun <weiyongjun1@huawei.com>
+Date: Mon, 17 Oct 2016 15:15:18 +0000
+Subject: [PATCH] ASoC: rk3399_gru_sound: Fix non static symbol warning
 
-I rand into a new build error with SND_MMP_SOC_BROWNSTONE:
+Fixes the following sparse warning:
 
-warning: (SND_MMP_SOC_BROWNSTONE && SND_SOC_SAMSUNG_SMDK_WM8994 && SND_SOC_SMDK_WM8994_PCM && SND_SOC_LITTLEMILL) selects MFD_WM8994 which has unmet direct dependencies (HAS_IOMEM && I2C)
-drivers/mfd/wm8994-core.c:688:1: error: data definition has no type or storage class [-Werror]
-drivers/mfd/wm8994-core.c:688:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
+sound/soc/rockchip/rk3399_gru_sound.c:41:14: warning:
+ symbol 'rt5514_dmic_delay' was not declared. Should it be static?
 
-I don't see why this never showed up before, as the dependency seems to
-have been missing since the symbol was first introduced several years
-ago. This adds a dependency like the other drivers have.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/pxa/Kconfig | 2 +-
+ sound/soc/rockchip/rk3399_gru_sound.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index f2bf8661dd21..823b5a236d8d 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -208,7 +208,7 @@ config SND_PXA2XX_SOC_IMOTE2
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 9ed735a6cf49..0cbd23555ba4 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -38,7 +38,7 @@
  
- config SND_MMP_SOC_BROWNSTONE
- 	tristate "SoC Audio support for Marvell Brownstone"
--	depends on SND_MMP_SOC && MACH_BROWNSTONE
-+	depends on SND_MMP_SOC && MACH_BROWNSTONE && I2C
- 	select SND_MMP_SOC_SSPA
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
+ #define SOUND_FS	256
+ 
+-unsigned int rt5514_dmic_delay;
++static unsigned int rt5514_dmic_delay;
+ 
+ static struct snd_soc_jack rockchip_sound_jack;
+ 
 -- 
 2.8.1
