@@ -1,229 +1,41 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 24 Oct 2016 10:09:31 +0100
-Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
- default list
-In-Reply-To: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20161024090931.GR7370@jhogan-linux.le.imgtec.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 24 Oct 2016 11:25:03 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <87eg382kv9.fsf@belgarion.home>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <4337157.Eff9E2riVH@wuerfel>
+ <20161021154856.GC1041@n2100.armlinux.org.uk> <24632117.YsmPs86ri6@wuerfel>
+ <87eg382kv9.fsf@belgarion.home>
+Message-ID: <CAMuHMdVy_h6Uss9bwVK5hGD42bXeEBcBsBDwCpx_eYnT9r+=Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 22, 2016 at 03:14:04PM +0300, Yury Norov wrote:
-> The newer prlimit64 syscall provides all the functionality provided by
-> the getrlimit and setrlimit syscalls and adds the pid of target process,
-> so future architectures won't need to include getrlimit and setrlimit.
-> 
-> Therefore drop getrlimit and setrlimit syscalls from the generic syscall
-> list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the architecture's
-> unistd.h prior to including asm-generic/unistd.h, and adjust all
-> architectures using the generic syscall list to define it so that no
-> in-tree architectures are affected.
-> 
-> Cc: Vineet Gupta <vgupta@synopsys.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
-> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
-> Cc: Richard Kuo <rkuo@codeaurora.org>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Ley Foon Tan <lftan@altera.com>
-> Cc: Jonas Bonn <jonas@southpole.se>
-> Cc: Chen Liqin <liqin.linux@gmail.com>
-> Cc: Lennox Wu <lennox.wu@gmail.com>
-> Cc: Chris Metcalf <cmetcalf@mellanox.com>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andrew Pinski <Andrew.Pinski@cavium.com>
-> Cc: linux-snps-arc at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-c6x-dev at linux-c6x.org
-> Cc: uclinux-h8-devel at lists.sourceforge.jp
-> Cc: linux-hexagon at vger.kernel.org
-> Cc: linux-metag at vger.kernel.org
-> Cc: nios2-dev at lists.rocketboards.org
-> Cc: linux-arch at vger.kernel.or
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> 
-> ---
->  arch/arc/include/uapi/asm/unistd.h       | 1 +
->  arch/arm64/include/uapi/asm/unistd.h     | 1 +
->  arch/c6x/include/uapi/asm/unistd.h       | 1 +
->  arch/h8300/include/uapi/asm/unistd.h     | 1 +
->  arch/hexagon/include/uapi/asm/unistd.h   | 1 +
->  arch/metag/include/uapi/asm/unistd.h     | 1 +
+On Sat, Oct 22, 2016 at 10:23 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
+>>> What's the point of the x32 mode?
+>>
+>> On x86, the motivation is faster code for most use cases that
+>> don't need a lot of memory, as the 64-bit opcodes have 16 registers
+>> rather than 8 in 32-bit mode but 32-bit pointers have lower
+>> cache footprint than 64-bit pointers.
+>
+> For completness, the second point of x32 AFAIU is the IP-relative addressing
+> which is not available in standard 32 bit mode, which improves PIC code. For
+> simple not algorithmic code (think Android HAL for example) with many shared
+> libraries, it's better in the Hardware Abstraction Layer Libraries, instead of
+> the push-to-stack and pop register.
 
-Acked-by: James Hogan <james.hogan@imgtec.com> [metag]
+But that's not an advantage compared to full am64 mode, right?
 
-Cheers
-James
+Gr{oetje,eeting}s,
 
->  arch/nios2/include/uapi/asm/unistd.h     | 1 +
->  arch/openrisc/include/uapi/asm/unistd.h  | 1 +
->  arch/score/include/uapi/asm/unistd.h     | 1 +
->  arch/tile/include/uapi/asm/unistd.h      | 1 +
->  arch/unicore32/include/uapi/asm/unistd.h | 1 +
->  include/uapi/asm-generic/unistd.h        | 5 +++++
->  12 files changed, 16 insertions(+)
-> 
-> diff --git a/arch/arc/include/uapi/asm/unistd.h b/arch/arc/include/uapi/asm/unistd.h
-> index 41fa2ec..928546d 100644
-> --- a/arch/arc/include/uapi/asm/unistd.h
-> +++ b/arch/arc/include/uapi/asm/unistd.h
-> @@ -16,6 +16,7 @@
->  #define _UAPI_ASM_ARC_UNISTD_H
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #define __ARCH_WANT_SYS_EXECVE
->  #define __ARCH_WANT_SYS_CLONE
->  #define __ARCH_WANT_SYS_VFORK
-> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
-> index 043d17a..48355a6 100644
-> --- a/arch/arm64/include/uapi/asm/unistd.h
-> +++ b/arch/arm64/include/uapi/asm/unistd.h
-> @@ -15,5 +15,6 @@
->   */
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  
->  #include <asm-generic/unistd.h>
-> diff --git a/arch/c6x/include/uapi/asm/unistd.h b/arch/c6x/include/uapi/asm/unistd.h
-> index 12d73d9..f676231 100644
-> --- a/arch/c6x/include/uapi/asm/unistd.h
-> +++ b/arch/c6x/include/uapi/asm/unistd.h
-> @@ -15,6 +15,7 @@
->   */
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #define __ARCH_WANT_SYS_CLONE
->  
->  /* Use the standard ABI for syscalls. */
-> diff --git a/arch/h8300/include/uapi/asm/unistd.h b/arch/h8300/include/uapi/asm/unistd.h
-> index 7dd20ef..2f98394 100644
-> --- a/arch/h8300/include/uapi/asm/unistd.h
-> +++ b/arch/h8300/include/uapi/asm/unistd.h
-> @@ -1,5 +1,6 @@
->  #define __ARCH_NOMMU
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  
->  #include <asm-generic/unistd.h>
-> diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
-> index 2151760..52d585c 100644
-> --- a/arch/hexagon/include/uapi/asm/unistd.h
-> +++ b/arch/hexagon/include/uapi/asm/unistd.h
-> @@ -28,6 +28,7 @@
->  
->  #define sys_mmap2 sys_mmap_pgoff
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #define __ARCH_WANT_SYS_EXECVE
->  #define __ARCH_WANT_SYS_CLONE
->  #define __ARCH_WANT_SYS_VFORK
-> diff --git a/arch/metag/include/uapi/asm/unistd.h b/arch/metag/include/uapi/asm/unistd.h
-> index 459b6ec..16b5cb3 100644
-> --- a/arch/metag/include/uapi/asm/unistd.h
-> +++ b/arch/metag/include/uapi/asm/unistd.h
-> @@ -8,6 +8,7 @@
->   */
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  
->  /* Use the standard ABI for syscalls. */
->  #include <asm-generic/unistd.h>
-> diff --git a/arch/nios2/include/uapi/asm/unistd.h b/arch/nios2/include/uapi/asm/unistd.h
-> index 51a32c7..b0dda4d 100644
-> --- a/arch/nios2/include/uapi/asm/unistd.h
-> +++ b/arch/nios2/include/uapi/asm/unistd.h
-> @@ -18,6 +18,7 @@
->   #define sys_mmap2 sys_mmap_pgoff
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  
->  /* Use the standard ABI for syscalls */
->  #include <asm-generic/unistd.h>
-> diff --git a/arch/openrisc/include/uapi/asm/unistd.h b/arch/openrisc/include/uapi/asm/unistd.h
-> index 471905b..6812d81 100644
-> --- a/arch/openrisc/include/uapi/asm/unistd.h
-> +++ b/arch/openrisc/include/uapi/asm/unistd.h
-> @@ -21,6 +21,7 @@
->  #define sys_mmap2 sys_mmap_pgoff
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #define __ARCH_WANT_SYS_FORK
->  #define __ARCH_WANT_SYS_CLONE
->  
-> diff --git a/arch/score/include/uapi/asm/unistd.h b/arch/score/include/uapi/asm/unistd.h
-> index d4008c3..7ad1bdc 100644
-> --- a/arch/score/include/uapi/asm/unistd.h
-> +++ b/arch/score/include/uapi/asm/unistd.h
-> @@ -1,6 +1,7 @@
->  #define __ARCH_HAVE_MMU
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #define __ARCH_WANT_SYSCALL_NO_AT
->  #define __ARCH_WANT_SYSCALL_NO_FLAGS
->  #define __ARCH_WANT_SYSCALL_OFF_T
-> diff --git a/arch/tile/include/uapi/asm/unistd.h b/arch/tile/include/uapi/asm/unistd.h
-> index 24e9187..cf0505f 100644
-> --- a/arch/tile/include/uapi/asm/unistd.h
-> +++ b/arch/tile/include/uapi/asm/unistd.h
-> @@ -13,6 +13,7 @@
->   */
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  #if !defined(__LP64__) || defined(__SYSCALL_COMPAT)
->  /* Use the flavor of this syscall that matches the 32-bit API better. */
->  #define __ARCH_WANT_SYNC_FILE_RANGE2
-> diff --git a/arch/unicore32/include/uapi/asm/unistd.h b/arch/unicore32/include/uapi/asm/unistd.h
-> index 1f63c47..ef25aec 100644
-> --- a/arch/unicore32/include/uapi/asm/unistd.h
-> +++ b/arch/unicore32/include/uapi/asm/unistd.h
-> @@ -11,6 +11,7 @@
->   */
->  
->  #define __ARCH_WANT_RENAMEAT
-> +#define __ARCH_WANT_SET_GET_RLIMIT
->  
->  /* Use the standard ABI for syscalls. */
->  #include <asm-generic/unistd.h>
-> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-> index 9b1462e..bbaeac0 100644
-> --- a/include/uapi/asm-generic/unistd.h
-> +++ b/include/uapi/asm-generic/unistd.h
-> @@ -465,10 +465,15 @@ __SYSCALL(__NR_uname, sys_newuname)
->  __SYSCALL(__NR_sethostname, sys_sethostname)
->  #define __NR_setdomainname 162
->  __SYSCALL(__NR_setdomainname, sys_setdomainname)
-> +
-> +#ifdef __ARCH_WANT_SET_GET_RLIMIT
-> +/* getrlimit and setrlimit are superseded with prlimit64 */
->  #define __NR_getrlimit 163
->  __SC_COMP(__NR_getrlimit, sys_getrlimit, compat_sys_getrlimit)
->  #define __NR_setrlimit 164
->  __SC_COMP(__NR_setrlimit, sys_setrlimit, compat_sys_setrlimit)
-> +#endif
-> +
->  #define __NR_getrusage 165
->  __SC_COMP(__NR_getrusage, sys_getrusage, compat_sys_getrusage)
->  #define __NR_umask 166
-> -- 
-> 2.7.4
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/43e985fd/attachment-0001.sig>
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
