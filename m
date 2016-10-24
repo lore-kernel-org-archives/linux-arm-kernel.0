@@ -1,63 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 24 Oct 2016 12:01:50 +0100
-Subject: [PATCH] iommu: arm-smmu-v2: Enable 16 bit ASID
-In-Reply-To: <1477112524-13023-1-git-send-email-gakula@caviumnetworks.com>
-References: <1477112524-13023-1-git-send-email-gakula@caviumnetworks.com>
-Message-ID: <565784ce-a740-315d-e4db-5fdbb5a0316e@arm.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Mon, 24 Oct 2016 07:07:19 -0400
+Subject: [PATCH V7 4/4] dmaengine: qcom_hidma: add MSI support for
+ interrupts
+In-Reply-To: <CAHp75VettN=-S+iqKQbqixRe2BM=AiS26VGM+8yLophbkc+Z8g@mail.gmail.com>
+References: <1477067879-23750-1-git-send-email-okaya@codeaurora.org>
+ <1477067879-23750-5-git-send-email-okaya@codeaurora.org>
+ <CAHp75Vd+u5va3kyqcapeF9JATUfv5gBnoEM_W+frDmMXs5f2Uw@mail.gmail.com>
+ <36163853-ac4a-e146-0c1b-eaf42e8b234d@codeaurora.org>
+ <CAHp75VettN=-S+iqKQbqixRe2BM=AiS26VGM+8yLophbkc+Z8g@mail.gmail.com>
+Message-ID: <12f6cc8ec2b83237b61965f8576cface@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geetha,
-
-On 22/10/16 06:02, Geetha sowjanya wrote:
->  Support up to 16 bit ASID. This patch enables
->  16 bit ASID when supported.
-
-Why? "Because we can" is not a compelling rationale. I assume this is
-actually related to the globally-unique ASID workaround for the TLB
-sharing erratum, but if so that should be called out explicitly -
-describe the problem being fixed.
-
-> Signed-off-by: Geetha sowjanya <gakula@cavium.com>
-> Acked-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
-> ---
->  drivers/iommu/arm-smmu.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
+On 2016-10-24 03:30, Andy Shevchenko wrote:
+> On Mon, Oct 24, 2016 at 5:55 AM, Sinan Kaya <okaya@codeaurora.org> 
+> wrote:
+>> On 10/21/2016 12:11 PM, Andy Shevchenko wrote:
+>>>> +static void hidma_free_msis(struct hidma_dev *dmadev)
+>>>> > +{
+>>>> > +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>>> Perhaps one #ifdef and two definitions of functions?
+>> 
+>> I don't think it will make a difference. I'll have to move
+>> #ifdef around the caller of hidma_free_msis instead which
+>> I think is uglier.
+>> 
+>> The hidma_write_msi_msg function gets called only when
+>> CONFIG_GENERIC_MSI_IRQ_DOMAIN is defined. If I don't put
+>> this around the function definition, I get unused function
+>> warning from the compiler. This is the reason why preprocessor
+>> definition is outside of the function definition.
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index c841eb7..9740846 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -258,6 +258,9 @@ enum arm_smmu_s2cr_privcfg {
->  #define TTBCR2_SEP_SHIFT		15
->  #define TTBCR2_SEP_UPSTREAM		(0x7 << TTBCR2_SEP_SHIFT)
->  
-> +#define TTBCR2_AS_SHIFT			4
-> +#define TTBCR2_AS_ENABLE		(1 << TTBCR2_AS_SHIFT)
-> +
-
-The style here for single-bit fields is simply:
-
-#define TTBCR2_AS			(1 << 4)
-
->  #define TTBRn_ASID_SHIFT		48
->  
->  #define FSR_MULTI			(1 << 31)
-> @@ -773,6 +776,9 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->  			reg = pgtbl_cfg->arm_lpae_s1_cfg.tcr;
->  			reg2 = pgtbl_cfg->arm_lpae_s1_cfg.tcr >> 32;
->  			reg2 |= TTBCR2_SEP_UPSTREAM;
-> +		/* Enable 16 bit ASID if 16 bit VMID is supported */
-> +			if (smmu->features & ARM_SMMU_FEAT_VMID16)
-
-This should be a check for AArch64 context format - VMID16 has nothing
-to do with it. 16-bit ASID support for stage 1 AArch64 contexts is
-already implied by SMMUv2 (TCR2.AS is not optional).
-
-Robin.
-
-> +				reg |= TTBCR2_AS_ENABLE;
->  		}
->  		if (smmu->version > ARM_SMMU_V1)
->  			writel_relaxed(reg2, cb_base + ARM_SMMU_CB_TTBCR2);
+> I am talking about something like below:
 > 
+> #ifdef UGLY_DEFINE
+> myfunc_a()
+> {
+> }
+> 
+> myfunc_b()
+> {
+> }
+> #else
+> static inline myfunc_a() {}
+> static inline myfunc_b() {}
+> #endif
+> 
+> 
+> There is another way as well, namely use of IS_ENABLED(), IS_BUILTIN()
+> macros (I don't remember how exactly second one is spelt).
+
+
+This was my initial approach. I was asked to remove the stub functions. 
+So, I did it.
