@@ -1,90 +1,49 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 24 Oct 2016 11:41:08 -0700
-Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <20161024174249.GQ15620@leverpostej> (Mark Rutland's message of
- "Mon, 24 Oct 2016 18:42:49 +0100")
-References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
- <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
- <20161024170035.GO15620@leverpostej> <7hd1ipzm3h.fsf@baylibre.com>
- <20161024174249.GQ15620@leverpostej>
-Message-ID: <7hfunly4hn.fsf@baylibre.com>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Mon, 24 Oct 2016 16:47:38 -0200
+Subject: [PATCH v3 3/3] mtd: s3c2410: parse the device configuration from
+ OF node
+In-Reply-To: <20161024150201.01952f67@bbrezillon>
+References: <1476999766-32526-1-git-send-email-sergio.prado@e-labworks.com>
+ <1476999766-32526-4-git-send-email-sergio.prado@e-labworks.com>
+ <20161024150201.01952f67@bbrezillon>
+Message-ID: <20161024184738.GA26671@sprado-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
+On Mon, Oct 24, 2016 at 03:02:01PM +0200, Boris Brezillon wrote:
+> > +static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd,
+> > +					     const struct nand_data_interface *conf,
+> > +					     bool check_only)
+> > +{
+> > +	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
+> > +	struct s3c2410_platform_nand *pdata = info->platform;
+> > +	const struct nand_sdr_timings *timings;
+> > +	int tacls;
+> > +
+> > +	timings = nand_get_sdr_timings(conf);
+> > +	if (IS_ERR(timings))
+> > +		return -ENOTSUPP;
+> > +
+> > +	tacls = timings->tCLS_min - timings->tWP_min;
+> > +	if (tacls < 0)
+> > +		tacls = 0;
+> > +
+> > +	pdata->tacls  = DIV_ROUND_UP(tacls, 1000);
+> > +	pdata->twrph0 = DIV_ROUND_UP(timings->tWP_min, 1000);
+> > +	pdata->twrph1 = DIV_ROUND_UP(timings->tCLH_min, 1000);
+> 
+> You seem to only apply the timings in s3c2410_nand_setrate(), which is
+> only called at probe time or on a cpufreq even, but the core can change
+> timings at runtime (this is what happens each time you reset the chip).
+> 
+> To support that you have 2 options:
+>  - apply the timings in ->select_chip()
+>  - apply the timings here
 
-> On Mon, Oct 24, 2016 at 10:35:30AM -0700, Kevin Hilman wrote:
->> Hi Mark,
->> 
->> Mark Rutland <mark.rutland@arm.com> writes:
->> > On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
->> >> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
->> >> +{
->> >> +	const struct da8xx_ddrctl_config_knob *knob;
->> >> +	const struct da8xx_ddrctl_setting *setting;
->> >> +	u32 regprop[2], base, memsize, reg;
->> >> +	struct device_node *node, *parent;
->> >> +	void __iomem *ddrctl;
->> >> +	const char *board;
->> >> +	struct device *dev;
->> >> +	int ret;
->> >> +
->> >> +	dev = &pdev->dev;
->> >> +	node = dev->of_node;
->> >> +
->> >> +	/* Find the board name. */
->> >> +	for (parent = node;
->> >> +	     !of_node_is_root(parent);
->> >> +	     parent = of_get_parent(parent));
->> >> +
->> >> +	ret = of_property_read_string(parent, "compatible", &board);
->> >> +	if (ret) {
->> >> +		dev_err(dev, "unable to read the soc model\n");
->> >> +		return ret;
->> >> +	}
->> >
->> > I can see that you want to expose sysfs knobs for this, but is it really
->> > necessary to match boards like this? It's very fragile, and commits us
->> > to maintaining a database of board data (i.e. a board file).
->> >
->> > I am very much not keen on that.
->> 
->> The original proposal[1] was to create DT properties reflecting the
->> various knobs in the DDR Controller, but that was frowned upon since
->> that was more HW configuration than hardware description.
->> 
->> That resulted in this approach which keeps the HW configuration values
->> in the driver, and selectable based on DT compatible.
->> 
->> IMO, neither aproach is pretty.  From a DT maintainer perspective, can
->> you comment on your preference?
->
-> From my PoV, it really depends on *why* we need this. What does the
-> tuning gain us, and is it specific to a given use-case?
+Right. As far as I understood, ->setup_data_interface() will be called
+when MTD core change timings at runtime, so it is enough to apply the
+timings in the end of ->setup_data_interface()?
 
-This is essentially a bus controller which allows you to set relative
-priorities of the various bus masters (CPU data, CPU instructions, DMA
-channels, ethernet MAC, SATA, display controller, etc. etc.)
+Thanks,
 
-The reason behind this work in the first place is a specific
-use-case. Namely, a display controller on this SoC needs its bus
-priority to be adjusted in order to work reliably at certain
-resolutions
-
-The vendor BSPs for this chip just setup hard-coded values in the board
-files (davinci, still hasn't fully migrated to DT) but we're trying to
-figure out a better way.
-
-The first approach was exposing DT knobs for all the priorities.  The
-second approach was the other extermem allowing SoC or board-specific
-hard-coded values.
-
-Another possible approach would be getting rid of the hard-coded values
-and exporting an API from the driver to set the priorities of the
-available masters at run-time.  I'm not awarye any current need of
-changing things at run-time, but it seems potentially useful as well.
-
-Based on all this discussion, I'm starting to lean towards the runtime
-API approach, but am hoping for some suggestions.
-
-Kevin
+Sergio Prado
