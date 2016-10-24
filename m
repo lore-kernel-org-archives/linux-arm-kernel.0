@@ -1,38 +1,30 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 24 Oct 2016 17:00:27 +0900
-Subject: [PATCH 1/4] serial: 8250_uniphier: fix more unterminated string
-In-Reply-To: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1477296030-7517-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 24 Oct 2016 17:00:26 +0900
+Subject: [PATCH 0/4] serial: 8250_uniphier: some fixes and optimization
+Message-ID: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Denys Vlasenko <dvlasenk@redhat.com>
+This series is mostly based on excellent observant comments
+from Denys Vlasenko.
 
-Commit 1681d2116c96 ("serial: 8250_uniphier: add "\n" at the end of
-error log") missed this.
+ - Add '\n' to a printk message
+ - Fix a minor bug
+ - Memory access optimization
+ - Locking optimization
 
-Signed-off-by: Denys Vlasenko <dvlasenk@redhat.com>
-[masahiro: add commit log]
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
----
 
- drivers/tty/serial/8250/8250_uniphier.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Denys Vlasenko (1):
+  serial: 8250_uniphier: fix more unterminated string
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index b8d9c8c..a8babb0 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -199,7 +199,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs) {
--		dev_err(dev, "failed to get memory resource");
-+		dev_err(dev, "failed to get memory resource\n");
- 		return -EINVAL;
- 	}
- 
+Masahiro Yamada (3):
+  serial: 8250_uniphier: fix clearing divisor latch access bit
+  serial: 8250_uniphier: hardcode regshift to avoid unneeded memory read
+  serial: 8250_uniphier: avoid locking for FCR register write
+
+ drivers/tty/serial/8250/8250_uniphier.c | 50 ++++++++++++++++++---------------
+ 1 file changed, 28 insertions(+), 22 deletions(-)
+
 -- 
 1.9.1
