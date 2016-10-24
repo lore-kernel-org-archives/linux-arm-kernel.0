@@ -1,35 +1,53 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 24 Oct 2016 13:08:19 +0200
-Subject: [PATCH] Documentation: DMA-API: Clarify semantics of
- dma_set_mask_and_coherent
-In-Reply-To: <20161021150916.0d274e9f@lwn.net>
-References: <20161017152623.7649-1-punit.agrawal@arm.com>
- <20161021150916.0d274e9f@lwn.net>
-Message-ID: <20161024110819.GO3541@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 24 Oct 2016 12:09:04 +0100
+Subject: Question about arm64 earlycon
+In-Reply-To: <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
+References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
+ <4966376.bRx4fgSjbT@wuerfel>
+ <1f1eeb4a-925a-9fac-d442-fbee503deb0a@arm.com>
+Message-ID: <20161024110904.GF15620@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 03:09:16PM -0600, Jonathan Corbet wrote:
-> On Mon, 17 Oct 2016 16:26:23 +0100
-> Punit Agrawal <punit.agrawal@arm.com> wrote:
+On Mon, Oct 24, 2016 at 11:17:36AM +0100, Marc Zyngier wrote:
+> On 24/10/16 11:06, Arnd Bergmann wrote:
+> > On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
+> >> Hi Catalin, Marc, Mark, Arnd,
+> >>
+> >> I am testing with 3.12 kernel with earlyprintk enabled and I see some
+> >> garbage characters in the console log right before the message
+> >> indicating that the real console device is initialized:
+
+What exactly are you passing on the command line?
+
+> >> <some garbage characters here>01c020000.serial: ttyS0 at MMIO
+> >> 0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
+> >> console [ttyS0] enabled, bootconsole disabled
+
+Was the UART already configured by FW? Had the firmware output anything
+at this point?
+
+Did the firmware's UART rate match that of the kernel? If not, the issue
+might just be that the rate doesn't match; earlycon/earlyprintk won't
+configure that, while the real console will.
+
+Or perhaps we race with some clock configuration...
+
+> >> I looked through early_prink.c file and printk.c file and it looks
+> >> like there is case that some early boot code can touch the UART
+> >> hardware via ealy console driver while the 'real' console driver is
+> >> setting up the same UART port? Please let me know if I missed some
+> >> important piece of code that can prevent this.
+> > 
+> > I don't think we every supported earlyprintk on arm64, and
+> > earlycon support may have been added later.
 > 
-> > The dma mapping api howto gives the impression that using the
-> > dma_set_mask_and_coherent (and related DMA APIs) will cause the kernel
-> > to check all the components in the path from the device to memory for
-> > addressing restrictions. In systems with address translations between
-> > the device and memory (e.g., when using IOMMU), this implies that a
-> > successful call to set set dma mask has checked the addressing
-> > constraints of the intermediaries as well.
+> We did support some form of earlyprintk for a while (though not in the
+> same way as 32bit ARM does), until Rob introduced earlycon.
 
-This is basically true when you have DMA controllers in the path from
-device to memory. But it is not true for IOMMUs, because IOMMU drivers
-are consumers of the dma-masks, they don't really restrict them. An
-IOMMU driver knows the limitations of IOMMU hardware and counts that in
-when allocating an address for a dma-buffer.
+Our earlyprintk up until that point was effectively a less general
+earlycon (coming up at a similar time). In fact, in v3.12 we were
+already using earlycon structures in arch/arm64/kernel/early_printk.c.
 
-So long story short: Any IOMMU restrictions in address space size don't
-need to be represented in the dma-mask for a device.
-
-
-
-	Joerg
+Thanks,
+Mark.
