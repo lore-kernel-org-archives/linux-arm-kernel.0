@@ -1,32 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 24 Oct 2016 10:43:25 -0700
-Subject: [GIT PULL] Broadcom ARM64 Device Tree fixes for 4.9
-Message-ID: <1477331005-32163-1-git-send-email-f.fainelli@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Oct 2016 18:43:22 +0100
+Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
+In-Reply-To: <20161024164634.4330-10-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-10-ahaslam@baylibre.com>
+Message-ID: <20161024174322.GN17252@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+On Mon, Oct 24, 2016 at 06:46:26PM +0200, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+> 
+> Some regulator supplies have an over-current pin that is
+> activated when the hw detects an over current condition.
+> When this happens, the hardware enters a current limited
+> mode.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/devicetree-arm64-fixes
-
-for you to fetch changes up to 963d790468a2f581abf039b45edac79af5e16e55:
-
-  arm64: dts: Updated NAND DT properties for NS2 SVK (2016-10-23 14:50:20 -0700)
-
-----------------------------------------------------------------
-This pull request contains a single fix for Broadcom ARM64-based SoCs:
-
-- Ray adds the required bus width and OOB sector size properties to the
-  Northstar 2 SVK reference board in order for the NAND controller to work
-  properly
-
-----------------------------------------------------------------
-Ray Jui (1):
-      arm64: dts: Updated NAND DT properties for NS2 SVK
-
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Please don't mix random enhancements like this into bigger system
+specific RFC serieses, send them separately so they're easier to spot
+and there's no confusion with dependencies and then reference them from
+the system specific series when you post that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/3b2c6d6b/attachment.sig>
