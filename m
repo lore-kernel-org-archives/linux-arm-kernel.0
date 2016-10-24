@@ -1,210 +1,274 @@
-From: ahaslam@baylibre.com (ahaslam at baylibre.com)
-Date: Mon, 24 Oct 2016 18:46:27 +0200
-Subject: [PATCH/RFT v2 10/17] USB: da8xx: use flag instead of bitmask for over
- current change
-In-Reply-To: <20161024164634.4330-1-ahaslam@baylibre.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
-Message-ID: <20161024164634.4330-11-ahaslam@baylibre.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 24 Oct 2016 18:46:36 +0200
+Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam@baylibre.com>
+Create a new driver for the da8xx DDR2/mDDR controller and implement
+support for writing to the Peripheral Bus Burst Priority Register.
 
-The da8xx ohci has only one port connected. In hub_control we
-check that the port is 1, or else we bail out early. There is no point
-in passing as argument the port number, if we know, and check that it
-will always be 1.
-
-Simplify functions and callbacks, by removing the port parameter, and
-converting the over current indicatior change form a mask to a flag.
-
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da830-evm.c     |  8 ++++----
- arch/arm/mach-davinci/board-omapl138-hawk.c |  8 ++++----
- drivers/usb/host/ohci-da8xx.c               | 29 ++++++++++++++---------------
- include/linux/platform_data/usb-davinci.h   |  9 ++++-----
- 4 files changed, 26 insertions(+), 28 deletions(-)
+ .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/da8xx-ddrctl.c                      | 187 +++++++++++++++++++++
+ 4 files changed, 216 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+ create mode 100644 drivers/memory/da8xx-ddrctl.c
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index b33fc6b..d12fcf5 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -50,18 +50,18 @@
+diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+new file mode 100644
+index 0000000..f0eda59
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+@@ -0,0 +1,20 @@
++* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory controller
++
++The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs memory
++maps a set of registers which allow to tweak the controller's behavior.
++
++Documentation:
++OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
++
++Required properties:
++
++- compatible:		"ti,da850-ddrctl" - for da850 SoC based boards
++- reg:			a tuple containing the base address of the memory
++			controller and the size of the memory area to map
++
++Example for da850 shown below.
++
++ddrctl {
++	compatible = "ti,da850-ddrctl";
++	reg = <0xB0000000 0x100>;
++};
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 4b4c0c3..ec80e35 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -134,6 +134,14 @@ config MTK_SMI
+ 	  mainly help enable/disable iommu and control the power domain and
+ 	  clocks for each local arbiter.
  
- static da8xx_ocic_handler_t da830_evm_usb_ocic_handler;
++config DA8XX_DDRCTL
++	bool "Texas Instruments da8xx DDR2/mDDR driver"
++	depends on ARCH_DAVINCI_DA8XX
++	help
++	  This driver is for the DDR2/mDDR Memory Controller present on
++	  Texas Instruments da8xx SoCs. It's used to tweak various memory
++	  controller configuration options.
++
+ source "drivers/memory/samsung/Kconfig"
+ source "drivers/memory/tegra/Kconfig"
  
--static int da830_evm_usb_set_power(unsigned port, int on)
-+static int da830_evm_usb_set_power(int on)
- {
- 	gpio_set_value(ON_BD_USB_DRV, on);
- 	return 0;
- }
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index b20ae38..e88097fb 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -17,6 +17,7 @@ obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+ obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+ obj-$(CONFIG_JZ4780_NEMC)	+= jz4780-nemc.o
+ obj-$(CONFIG_MTK_SMI)		+= mtk-smi.o
++obj-$(CONFIG_DA8XX_DDRCTL)	+= da8xx-ddrctl.o
  
--static int da830_evm_usb_get_power(unsigned port)
-+static int da830_evm_usb_get_power(void)
- {
- 	return gpio_get_value(ON_BD_USB_DRV);
- }
- 
--static int da830_evm_usb_get_oci(unsigned port)
-+static int da830_evm_usb_get_oci(void)
- {
- 	return !gpio_get_value(ON_BD_USB_OVC);
- }
-@@ -100,7 +100,7 @@ static int da830_evm_usb_ocic_notify(da8xx_ocic_handler_t handler)
- 
- static irqreturn_t da830_evm_usb_ocic_irq(int irq, void *dev_id)
- {
--	da830_evm_usb_ocic_handler(&da830_evm_usb11_pdata, 1);
-+	da830_evm_usb_ocic_handler(&da830_evm_usb11_pdata);
- 	return IRQ_HANDLED;
- }
- 
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index c3ab7ea..1d31f45 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -189,18 +189,18 @@ static __init void omapl138_hawk_mmc_init(void)
- 	-1
- };
- 
--static int hawk_usb_set_power(unsigned port, int on)
-+static int hawk_usb_set_power(int on)
- {
- 	gpio_set_value(DA850_USB1_VBUS_PIN, on);
- 	return 0;
- }
- 
--static int hawk_usb_get_power(unsigned port)
-+static int hawk_usb_get_power(void)
- {
- 	return gpio_get_value(DA850_USB1_VBUS_PIN);
- }
- 
--static int hawk_usb_get_oci(unsigned port)
-+static int hawk_usb_get_oci(void)
- {
- 	return !gpio_get_value(DA850_USB1_OC_PIN);
- }
-@@ -237,7 +237,7 @@ static int hawk_usb_ocic_notify(da8xx_ocic_handler_t handler)
- 
- static irqreturn_t omapl138_hawk_usb_ocic_irq(int irq, void *dev_id)
- {
--	hawk_usb_ocic_handler(&omapl138_hawk_usb11_pdata, 1);
-+	hawk_usb_ocic_handler(&omapl138_hawk_usb11_pdata);
- 	return IRQ_HANDLED;
- }
- 
-diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-index 3656d7c..e98066d 100644
---- a/drivers/usb/host/ohci-da8xx.c
-+++ b/drivers/usb/host/ohci-da8xx.c
-@@ -25,8 +25,8 @@
- static struct clk *usb11_clk;
- static struct phy *usb11_phy;
- 
--/* Over-current indicator change bitmask */
--static volatile u16 ocic_mask;
-+/* Over-current indicator change flag */
-+static int ocic_flag;
- 
- static int ohci_da8xx_enable(void)
- {
-@@ -64,14 +64,13 @@ static void ohci_da8xx_disable(void)
- /*
-  * Handle the port over-current indicator change.
-  */
--static void ohci_da8xx_ocic_handler(struct da8xx_ohci_root_hub *hub,
--				    unsigned port)
-+static void ohci_da8xx_ocic_handler(struct da8xx_ohci_root_hub *hub)
- {
--	ocic_mask |= 1 << port;
-+	ocic_flag = 1;
- 
- 	/* Once over-current is detected, the port needs to be powered down */
--	if (hub->get_oci(port) > 0)
--		hub->set_power(port, 0);
-+	if (hub->get_oci() > 0)
-+		hub->set_power(0);
- }
- 
- static int ohci_da8xx_init(struct usb_hcd *hcd)
-@@ -147,8 +146,8 @@ static int ohci_da8xx_hub_status_data(struct usb_hcd *hcd, char *buf)
- {
- 	int length		= ohci_hub_status_data(hcd, buf);
- 
--	/* See if we have OCIC bit set on port 1 */
--	if (ocic_mask & (1 << 1)) {
-+	/* See if we have OCIC flag set */
-+	if (ocic_flag) {
- 		dev_dbg(hcd->self.controller, "over-current indicator change "
- 			"on port 1\n");
- 
-@@ -181,15 +180,15 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 		temp = roothub_portstatus(hcd_to_ohci(hcd), wIndex - 1);
- 
- 		/* The port power status (PPS) bit defaults to 1 */
--		if (hub->get_power && hub->get_power(wIndex) == 0)
-+		if (hub->get_power && hub->get_power() == 0)
- 			temp &= ~RH_PS_PPS;
- 
- 		/* The port over-current indicator (POCI) bit is always 0 */
--		if (hub->get_oci && hub->get_oci(wIndex) > 0)
-+		if (hub->get_oci && hub->get_oci() > 0)
- 			temp |=  RH_PS_POCI;
- 
- 		/* The over-current indicator change (OCIC) bit is 0 too */
--		if (ocic_mask & (1 << wIndex))
-+		if (ocic_flag)
- 			temp |=  RH_PS_OCIC;
- 
- 		put_unaligned(cpu_to_le32(temp), (__le32 *)buf);
-@@ -213,16 +212,16 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 			if (!hub->set_power)
- 				return -EPIPE;
- 
--			return hub->set_power(wIndex, temp) ? -EPIPE : 0;
-+			return hub->set_power(temp) ? -EPIPE : 0;
- 		case USB_PORT_FEAT_C_OVER_CURRENT:
- 			dev_dbg(dev, "%sPortFeature(%u): %s\n",
- 				temp ? "Set" : "Clear", wIndex,
- 				"C_OVER_CURRENT");
- 
- 			if (temp)
--				ocic_mask |= 1 << wIndex;
-+				ocic_flag = 1;
- 			else
--				ocic_mask &= ~(1 << wIndex);
-+				ocic_flag = 0;
- 			return 0;
- 		}
- 	}
-diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
-index 0926e99..3217fbe 100644
---- a/include/linux/platform_data/usb-davinci.h
-+++ b/include/linux/platform_data/usb-davinci.h
-@@ -13,17 +13,16 @@
- 
- struct	da8xx_ohci_root_hub;
- 
--typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub,
--				     unsigned port);
-+typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub);
- 
- /* Passed as the platform data to the OHCI driver */
- struct	da8xx_ohci_root_hub {
- 	/* Switch the port power on/off */
--	int	(*set_power)(unsigned port, int on);
-+	int	(*set_power)(int on);
- 	/* Read the port power status */
--	int	(*get_power)(unsigned port);
-+	int	(*get_power)(void);
- 	/* Read the port over-current indicator */
--	int	(*get_oci)(unsigned port);
-+	int	(*get_oci)(void);
- 	/* Over-current indicator change notification (pass NULL to disable) */
- 	int	(*ocic_notify)(da8xx_ocic_handler_t handler);
- 
+ obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
+ obj-$(CONFIG_TEGRA_MC)		+= tegra/
+diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+new file mode 100644
+index 0000000..756a6f3
+--- /dev/null
++++ b/drivers/memory/da8xx-ddrctl.c
+@@ -0,0 +1,187 @@
++/*
++ * TI da8xx DDR2/mDDR controller driver
++ *
++ * Copyright (C) 2016 BayLibre SAS
++ *
++ * Author:
++ *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++
++struct da8xx_ddrctl_config_knob {
++	const char *name;
++	u32 reg;
++	u32 mask;
++	u32 offset;
++};
++
++static const struct da8xx_ddrctl_config_knob da8xx_ddrctl_knobs[] = {
++	{
++		.name = "da850-pbbpr",
++		.reg = 0x20,
++		.mask = 0xffffff00,
++		.offset = 0,
++	},
++};
++
++struct da8xx_ddrctl_setting {
++	const char *name;
++	u32 val;
++};
++
++struct da8xx_ddrctl_board_settings {
++	const char *board;
++	const struct da8xx_ddrctl_setting *settings;
++};
++
++static const struct da8xx_ddrctl_setting da850_lcdk_ddrctl_settings[] = {
++	{
++		.name = "da850-pbbpr",
++		.val = 0x20,
++	},
++	{ }
++};
++
++static const struct da8xx_ddrctl_board_settings da8xx_ddrctl_board_confs[] = {
++	{
++		.board = "ti,da850-lcdk",
++		.settings = da850_lcdk_ddrctl_settings,
++	},
++};
++
++static const struct da8xx_ddrctl_config_knob *
++da8xx_ddrctl_match_knob(const struct da8xx_ddrctl_setting *setting)
++{
++	const struct da8xx_ddrctl_config_knob *knob;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_knobs); i++) {
++		knob = &da8xx_ddrctl_knobs[i];
++
++		if (strcmp(knob->name, setting->name) == 0) {
++			return knob;
++		}
++	}
++
++	return NULL;
++}
++
++static const struct da8xx_ddrctl_setting *
++da8xx_ddrctl_match_board(const char *board)
++{
++	const struct da8xx_ddrctl_board_settings *board_settings;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_board_confs); i++) {
++		board_settings = &da8xx_ddrctl_board_confs[0];
++
++		if (strcmp(board, board_settings->board) == 0)
++			return board_settings->settings;
++	}
++
++	return NULL;
++}
++
++static int da8xx_ddrctl_probe(struct platform_device *pdev)
++{
++	const struct da8xx_ddrctl_config_knob *knob;
++	const struct da8xx_ddrctl_setting *setting;
++	u32 regprop[2], base, memsize, reg;
++	struct device_node *node, *parent;
++	void __iomem *ddrctl;
++	const char *board;
++	struct device *dev;
++	int ret;
++
++	dev = &pdev->dev;
++	node = dev->of_node;
++
++	/* Find the board name. */
++	for (parent = node;
++	     !of_node_is_root(parent);
++	     parent = of_get_parent(parent));
++
++	ret = of_property_read_string(parent, "compatible", &board);
++	if (ret) {
++		dev_err(dev, "unable to read the soc model\n");
++		return ret;
++	}
++
++	/* Check if we have settings for this board. */
++	setting = da8xx_ddrctl_match_board(board);
++	if (!setting) {
++		dev_err(dev, "no settings for board '%s'\n", board);
++		return -EINVAL;
++	}
++
++	/* Figure out how to map the memory for the controller. */
++	ret = of_property_read_u32_array(node, "reg", regprop, 2);
++	if (ret) {
++		dev_err(dev, "unable to parse 'reg' property\n");
++		return ret;
++	}
++
++	base = regprop[0];
++	memsize = regprop[1];
++
++	ddrctl = ioremap(base, memsize);
++	if (!ddrctl) {
++		dev_err(dev, "unable to map memory controller registers\n");
++		return -EIO;
++	}
++
++	for (; setting->name; setting++) {
++		knob = da8xx_ddrctl_match_knob(setting);
++		if (!knob) {
++			dev_warn(dev,
++				 "no such config option: %s\n", setting->name);
++			continue;
++		}
++
++		if (knob->reg > (memsize - sizeof(u32))) {
++			dev_warn(dev,
++				 "register offset of '%s' exceeds mapped memory size\n",
++				 knob->name);
++			continue;
++		}
++
++		reg = __raw_readl(ddrctl + knob->reg);
++		reg &= knob->mask;
++		reg |= setting->val << knob->offset;
++
++		dev_dbg(dev, "writing 0x%08x to %s\n", reg, setting->name);
++
++		__raw_writel(reg, ddrctl + knob->reg);
++	}
++
++	iounmap(ddrctl);
++
++	return 0;
++}
++
++static const struct of_device_id da8xx_ddrctl_of_match[] = {
++	{ .compatible = "ti,da850-ddrctl", },
++	{ },
++};
++
++static struct platform_driver da8xx_ddrctl_driver = {
++	.probe = da8xx_ddrctl_probe,
++	.driver = {
++		.name = "da8xx-ddrctl",
++		.of_match_table = da8xx_ddrctl_of_match,
++	},
++};
++module_platform_driver(da8xx_ddrctl_driver);
++
++MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
++MODULE_DESCRIPTION("TI da8xx DDR2/mDDR controller driver");
++MODULE_LICENSE("GPL v2");
 -- 
-1.9.1
+2.9.3
