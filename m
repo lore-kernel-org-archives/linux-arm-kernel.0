@@ -1,55 +1,64 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 24 Oct 2016 15:46:45 +1100
-Subject: [PATCH V5 3/3] ACPI: pci_link: Include PIRQ_PENALTY_PCI_USING for
- ISA IRQs
-In-Reply-To: <1477283492-26657-4-git-send-email-okaya@codeaurora.org>
-References: <1477283492-26657-1-git-send-email-okaya@codeaurora.org>
- <1477283492-26657-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <CANwerB2KywvUKAv84kvoyAV2YkqtOL9LbFOqSTLgZ=dCk-Z5xA@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 24 Oct 2016 13:46:33 +0800
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <20161023120423.GO30578@tiger>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+ <20161023120423.GO30578@tiger>
+Message-ID: <f1d3b4bb-e3ba-3cdf-69d5-46c8487a5a7f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2016 at 15:31, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Commit 103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements")
-> replaced the addition of PIRQ_PENALTY_PCI_USING in acpi_pci_link_allocate()
-> with an addition in acpi_irq_pci_sharing_penalty(), but f7eca374f000
-> ("ACPI,PCI,IRQ: separate ISA penalty calculation") removed the use
-> of acpi_irq_pci_sharing_penalty() for ISA IRQs.
->
-> Therefore, PIRQ_PENALTY_PCI_USING is missing from ISA IRQs used by
-> interrupt links.  Include that penalty by adding it in the
-> acpi_pci_link_allocate() path.
->
-> Fixes: f7eca374f000 ("ACPI,PCI,IRQ: separate ISA penalty calculation")
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/acpi/pci_link.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 74bf96e..bc3d914 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -608,6 +608,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
->                             acpi_device_bid(link->device));
->                 return -ENODEV;
->         } else {
-> +               if (link->irq.active < ACPI_MAX_ISA_IRQS)
-> +                       acpi_isa_irq_penalty[link->irq.active] +=
-> +                               PIRQ_PENALTY_PCI_USING;
-> +
->                 printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
->                        acpi_device_name(link->device),
->                        acpi_device_bid(link->device), link->irq.active);
-> --
-> 1.9.1
->
 
-This series fixes one or more network adapters not working in Linux
-32-bit x86 guest running inside VirtualBox if I have 4 network
-adapters enabled.
-The following message no longer appears in the kernel log:
-ACPI: No IRQ available for PCI Interrupt Link [LNKD]. Try pci=noacpi or acpi=off
 
-Tested-by: Jonathan Liu <net147@gmail.com>
+On 2016/10/23 20:04, Shawn Guo wrote:
+> On Sun, Oct 23, 2016 at 11:21:10AM +0800, Ding Tianhong wrote:
+>> This erratum describes a bug in logic outside the core, so MIDR can't be
+>> used to identify its presence, and reading an SoC-specific revision
+>> register from common arch timer code would be awkward.  So, describe it
+>> in the device tree.
+>>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> index ef5fbe9..26bc837 100644
+>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
+>>    This also affects writes to the tval register, due to the implicit
+>>    counter read.
+>>
+>> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
+>> +  QorIQ erratum 161201, which says that reading the counter is
+> 
+> QorIQ is a Freescale/NXP specific name, and shouldn't be there.
+> 
+> Shawn
+> 
+
+Got it, will wait other feedback and fix them together, thanks.
+
+Ding
+
+>> +  unreliable unless the small range of value is returned by back-to-back reads.
+>> +  This also affects writes to the tval register, due to the implicit
+>> +  counter read.
+>> +
+>>  ** Optional properties:
+>>
+>>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+>> -- 
+>> 1.9.0
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> .
+> 
