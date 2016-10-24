@@ -1,135 +1,76 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 24 Oct 2016 17:00:29 +0900
-Subject: [PATCH 3/4] serial: 8250_uniphier: hardcode regshift to avoid
- unneeded memory read
-In-Reply-To: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1477296030-7517-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1477296030-7517-4-git-send-email-yamada.masahiro@socionext.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 24 Oct 2016 16:03:28 +0800
+Subject: [PATCH v1] char: hw_random: atmel-rng: disable TRNG during suspend
+Message-ID: <1477296208-28335-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For this driver, uart_port::regshift is always 2.  Hardcode the
-shift value instead of reading ->regshift to get an already known
-value.  (pointed out by Denys Vlasenko)
+To fix the over consumption on the VDDCore due to the TRNG enabled,
+disable the TRNG during suspend, not only disable the user interface
+clock (which is controlled by PMC). Because the user interface clock
+is independent from any clock that may be used in the entropy source
+logic circuitry.
 
-Furthermore, I am using register macros that are already shifted,
-which will save code a bit.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
- drivers/tty/serial/8250/8250_uniphier.c | 42 +++++++++++++++++++--------------
- 1 file changed, 24 insertions(+), 18 deletions(-)
+ drivers/char/hw_random/atmel-rng.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 417d9e7..92e7bb7 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -24,10 +24,22 @@
- /* Most (but not all) of UniPhier UART devices have 64-depth FIFO. */
- #define UNIPHIER_UART_DEFAULT_FIFO_SIZE	64
- 
--#define UNIPHIER_UART_CHAR_FCR	3	/* Character / FIFO Control Register */
--#define UNIPHIER_UART_LCR_MCR	4	/* Line/Modem Control Register */
--#define   UNIPHIER_UART_LCR_SHIFT	8
--#define UNIPHIER_UART_DLR	9	/* Divisor Latch Register */
-+/*
-+ * This hardware is similar to 8250, but its register map is a bit different:
-+ *   - MMIO32 (regshift = 2)
-+ *   - FCR is not at 2, but 3
-+ *   - LCR and MCR are not at 3 and 4, they share 4
-+ *   - Divisor latch at 9, no divisor latch access bit
-+ */
-+
-+#define UNIPHIER_UART_REGSHIFT		2
-+
-+/* bit[15:8] = CHAR (not used), bit[7:0] = FCR */
-+#define UNIPHIER_UART_CHAR_FCR		(3 << (UNIPHIER_UART_REGSHIFT))
-+/* bit[15:8] = LCR, bit[7:0] = MCR */
-+#define UNIPHIER_UART_LCR_MCR		(4 << (UNIPHIER_UART_REGSHIFT))
-+/* Divisor Latch Register */
-+#define UNIPHIER_UART_DLR		(9 << (UNIPHIER_UART_REGSHIFT))
- 
- struct uniphier8250_priv {
- 	int line;
-@@ -44,7 +56,7 @@ static int __init uniphier_early_console_setup(struct earlycon_device *device,
- 
- 	/* This hardware always expects MMIO32 register interface. */
- 	device->port.iotype = UPIO_MEM32;
--	device->port.regshift = 2;
-+	device->port.regshift = UNIPHIER_UART_REGSHIFT;
- 
- 	/*
- 	 * Do not touch the divisor register in early_serial8250_setup();
-@@ -68,17 +80,16 @@ static unsigned int uniphier_serial_in(struct uart_port *p, int offset)
- 
- 	switch (offset) {
- 	case UART_LCR:
--		valshift = UNIPHIER_UART_LCR_SHIFT;
-+		valshift = 8;
- 		/* fall through */
- 	case UART_MCR:
- 		offset = UNIPHIER_UART_LCR_MCR;
- 		break;
- 	default:
-+		offset <<= UNIPHIER_UART_REGSHIFT;
- 		break;
- 	}
- 
--	offset <<= p->regshift;
--
- 	/*
- 	 * The return value must be masked with 0xff because LCR and MCR reside
- 	 * in the same register that must be accessed by 32-bit write/read.
-@@ -97,7 +108,7 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
- 		offset = UNIPHIER_UART_CHAR_FCR;
- 		break;
- 	case UART_LCR:
--		valshift = UNIPHIER_UART_LCR_SHIFT;
-+		valshift = 8;
- 		/* Divisor latch access bit does not exist. */
- 		value &= ~UART_LCR_DLAB;
- 		/* fall through */
-@@ -106,11 +117,10 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
- 		break;
- 	default:
- 		normal = true;
-+		offset <<= UNIPHIER_UART_REGSHIFT;
- 		break;
- 	}
- 
--	offset <<= p->regshift;
--
- 	if (normal) {
- 		writel(value, p->membase + offset);
- 	} else {
-@@ -139,16 +149,12 @@ static void uniphier_serial_out(struct uart_port *p, int offset, int value)
-  */
- static int uniphier_serial_dl_read(struct uart_8250_port *up)
- {
--	int offset = UNIPHIER_UART_DLR << up->port.regshift;
--
--	return readl(up->port.membase + offset);
-+	return readl(up->port.membase + UNIPHIER_UART_DLR);
+diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
+index 0fcc9e6..2e2d09a 100644
+--- a/drivers/char/hw_random/atmel-rng.c
++++ b/drivers/char/hw_random/atmel-rng.c
+@@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
+ 		return 0;
  }
  
- static void uniphier_serial_dl_write(struct uart_8250_port *up, int value)
++static void atmel_trng_enable(struct atmel_trng *trng)
++{
++	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
++}
++
++static void atmel_trng_disable(struct atmel_trng *trng)
++{
++	writel(TRNG_KEY, trng->base + TRNG_CR);
++}
++
+ static int atmel_trng_probe(struct platform_device *pdev)
  {
--	int offset = UNIPHIER_UART_DLR << up->port.regshift;
--
--	writel(value, up->port.membase + offset);
-+	writel(value, up->port.membase + UNIPHIER_UART_DLR);
+ 	struct atmel_trng *trng;
+@@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
+-	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
++	atmel_trng_enable(trng);
+ 	trng->rng.name = pdev->name;
+ 	trng->rng.read = atmel_trng_read;
+ 
+@@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
+ 
+ 	hwrng_unregister(&trng->rng);
+ 
+-	writel(TRNG_KEY, trng->base + TRNG_CR);
++	atmel_trng_disable(trng);
+ 	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+@@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
++	atmel_trng_disable(trng);
+ 	clk_disable_unprepare(trng->clk);
+ 
+ 	return 0;
+@@ -114,6 +125,7 @@ static int atmel_trng_resume(struct device *dev)
+ {
+ 	struct atmel_trng *trng = dev_get_drvdata(dev);
+ 
++	atmel_trng_enable(trng);
+ 	return clk_prepare_enable(trng->clk);
  }
- 
- static int uniphier_of_serial_setup(struct device *dev, struct uart_port *port,
-@@ -234,7 +240,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
- 
- 	up.port.type = PORT_16550A;
- 	up.port.iotype = UPIO_MEM32;
--	up.port.regshift = 2;
-+	up.port.regshift = UNIPHIER_UART_REGSHIFT;
- 	up.port.flags = UPF_FIXED_PORT | UPF_FIXED_TYPE;
- 	up.capabilities = UART_CAP_FIFO;
  
 -- 
-1.9.1
+2.7.4
