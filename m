@@ -1,77 +1,126 @@
-From: john3909@gmail.com (John Syne)
-Date: Mon, 24 Oct 2016 13:58:55 -0700
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <20161024060226.4170-1-mugunthanvnm@ti.com>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
-Message-ID: <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 24 Oct 2016 15:00:35 -0600
+Subject: [PATCH v3 3/8] PM / Domains: Allow domain power states to be
+ read from DT
+In-Reply-To: <12435f67-bcb6-33b5-4399-f4f628f70be8@arm.com>
+References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
+ <1476467276-75094-4-git-send-email-lina.iyer@linaro.org>
+ <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
+ <20161024164846.GE72940@linaro.org>
+ <12435f67-bcb6-33b5-4399-f4f628f70be8@arm.com>
+Message-ID: <20161024210035.GF72940@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Oct 24 2016 at 11:27 -0600, Sudeep Holla wrote:
+>
+>
+>On 24/10/16 17:48, Lina Iyer wrote:
+>>Hi Sudeep,
+>>
+>>On Mon, Oct 24 2016 at 07:39 -0600, Sudeep Holla wrote:
+>>>
+>>>
+>>>On 14/10/16 18:47, Lina Iyer wrote:
+>>>>This patch allows domains to define idle states in the DT. SoC's can
+>>>>define domain idle states in DT using the "domain-idle-states" property
+>>>>of the domain provider. Add API to read the idle states from DT that can
+>>>>be set in the genpd object.
+>>>>
+>>>>This patch is based on the original patch by Marc Titinger.
+>>>>
+>>>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
+>>>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>>>---
+>>>>drivers/base/power/domain.c | 94
+>>>>+++++++++++++++++++++++++++++++++++++++++++++
+>>>>include/linux/pm_domain.h   |  8 ++++
+>>>>2 files changed, 102 insertions(+)
+>>>>
+>>>>diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+>>>>index 37ab7f1..9af75ba 100644
+>>>>--- a/drivers/base/power/domain.c
+>>>>+++ b/drivers/base/power/domain.c
+>>>>@@ -1916,6 +1916,100 @@ out:
+>>>>    return ret ? -EPROBE_DEFER : 0;
+>>>>}
+>>>>EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
+>>>>+
+>>>>+static const struct of_device_id idle_state_match[] = {
+>>>>+    { .compatible = "arm,idle-state", },
+>>>>+    { }
+>>>>+};
+>>>>+
+>>>
+>>>I still think it's better to have another compatible to serve this
+>>>purpose. We don't want to end up creating genpd domains just because
+>>>they are "arm,idle-state" compatible IMO ?
+>>>
+>>>I agree you can prevent it checking for OSC mode support in the
+>>>firmware. But I want to understand if you have any strong reasons for
+>>>avoiding that approach.
+>>>
+>>Why are you still held up with OSI/PC PSCI modes?
+>
+>I am just pointing that out to make sure you are not defining these
+>DT bindings with just QCOM platform and OSC in consideration.
+>
+>I am thinking about how can it be used/extended in other use-cases.
+>
+>>I repeat again this
+>>series is not about any of that, it is just about PM domains.
+>
+>I completely understand that, no argument on that. What I worry is that
+>if a system(in future) represents this power domains and domain idles
+>states and doesn't want to create a genpd, do we have to handle it
+>differently or even the way your CPUidle series would do or can we say
+>those states need to specify that they are compatible with the new
+>feature(the one being added in this series) with a new compatible.
+>I prefer the latter than the former to avoid all possible workarounds
+>in future.
+>
+>>PM domains
+>>have idle states and the idle-state description is similar in definition
+>>to arm,idle-state and therefore uses the same compatible. There is no
+>>point re-defining something that already exists in the kernel.
+>>
+>
+>Yes I understand that but "arm,idle-states" were not defined with this
+>feature in mind and hence I am bit worried if it could cause any issue
+>especially if deprecate cpu-idle-states and move to this model
+>completely. I really don't like this mix and hence I am raising the
+>concern here. I am trying to ease that migration.
+>
+>>I was able to find the original thread, where we discussed this [1].
+>>
+>>I suggest, you read about PM domains and its idle states and understand
+>>this series in the context of PM domains.
+>>
+>
+>Sure, will do that. Thanks for pointing that out. But the concern I am
+>raising is entirely different. I am asking if this re-use will cause any
+>issue in future as pointed out above.
+>
+>I re-iterate that I understand this series is independent of the CPUIdle
+>and hence asking why not make it completely independent by just adding
+>the new compatible.
+>
+>I am *not asking to redefine something completely*. What I am saying is
+>*just* to add new compatible that may(for cpu devices)/may not(for
+>other/non-CPU devices) be used along with "arm,idle-state".
+>
+I am fine with that, as long as the compatible string is an alternate
+for "arm,idle-state" it shouldn't be a problem.
 
-> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
-> 
-> Increase ADC reference clock from 3MHz to 24MHz so that the
-> sampling rates goes up from 100K samples per second to 800K
-> samples per second on AM335x and AM437x SoC.
-> 
-> Also increase opendelay for touchscreen configuration to
-> equalize the increase in ADC reference clock frequency,
-> which results in the same amount touch events reported via
-> evtest on AM335x GP EVM.
-> 
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> ---
-> 
-> This patch depends on ADC DMA patch series [1]
-> 
-> Without DMA support, when ADC ref clock is set at 24MHz, I am
-> seeing fifo overflow as CPU is not able to pull the ADC samples.
-> This answers that DMA support is must for ADC to consume the
-> samples generated at 24MHz with no open, step delay or
-> averaging with patch [2].
-> 
-> Measured the performance with the iio_generic_buffer with the
-> patch [3] applied
-> 
-> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
-> [2] - http://pastebin.ubuntu.com/23357935/
-> [3] - http://pastebin.ubuntu.com/23357939/
-> 
-> ---
-> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
-> 1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-> index b9a53e0..96c4207 100644
-> --- a/include/linux/mfd/ti_am335x_tscadc.h
-> +++ b/include/linux/mfd/ti_am335x_tscadc.h
-> @@ -90,7 +90,7 @@
-> /* Delay register */
-> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
-> #define STEPDELAY_OPEN(val)	((val) << 0)
-> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
-Wouldn?t this be better to add this to the devicetree?
+Any recommendations?
 
-	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
-	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
-	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+Thanks,
+Lina
 
-Regards,
-John
-> +#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x500)
-> #define STEPDELAY_SAMPLE_MASK	(0xFF << 24)
-> #define STEPDELAY_SAMPLE(val)	((val) << 24)
-> #define STEPCONFIG_SAMPLEDLY	STEPDELAY_SAMPLE(0)
-> @@ -137,7 +137,7 @@
-> #define SEQ_STATUS BIT(5)
-> #define CHARGE_STEP		0x11
-> 
-> -#define ADC_CLK			3000000
-> +#define ADC_CLK			24000000
-> #define TOTAL_STEPS		16
-> #define TOTAL_CHANNELS		8
-> #define FIFO1_THRESHOLD		19
-> -- 
-> 2.10.1.502.g6598894
-> 
+>I may be too paranoid here but I think that's safer. It helps to skip
+>creating of genpd if required for some domains as I had explained before.
+>
+>-- 
+>Regards,
+>Sudeep
