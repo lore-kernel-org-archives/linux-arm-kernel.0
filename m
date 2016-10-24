@@ -1,99 +1,49 @@
 From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Mon, 24 Oct 2016 19:26:02 +0800
-Subject: [PATCH 1/4] mtk_mdp_vpu: fix build with COMPILE_TEST for 32 bits
-In-Reply-To: <cd14afdb178cf490e257368bc899c7a0c690d140.1477058332.git.mchehab@s-opensource.com>
+Date: Mon, 24 Oct 2016 19:27:30 +0800
+Subject: [PATCH 4/4] mtk-mdp: fix compilation warnings if !DEBUG
+In-Reply-To: <5a24855fda4d91a58f119c2d70177017e06fc6f0.1477058332.git.mchehab@s-opensource.com>
 References: <cd14afdb178cf490e257368bc899c7a0c690d140.1477058332.git.mchehab@s-opensource.com>
-Message-ID: <1477308362.29543.7.camel@mtksdaap41>
+ <5a24855fda4d91a58f119c2d70177017e06fc6f0.1477058332.git.mchehab@s-opensource.com>
+Message-ID: <1477308450.29543.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mauro,
-
-This issue has been fixed by the patch below and merged in media tree,
-and also signed by you.
-
-Is it duplicate?
-
-commit 37bf7e34ecc817ce6b8278588aeb22aab5635e1c
-Author: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-Date:   Mon Sep 19 03:34:42 2016 -0300
-
-    [media] media: mtk-mdp: fix build warning in arch x86
-
-    This patch fix build warning in arch x86
-
-    Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-    Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
-    Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-
-
-
 On Fri, 2016-10-21 at 11:59 -0200, Mauro Carvalho Chehab wrote:
-> When building on i386 in 32 bits, several new warnings appear:
+> The mtk_mdp_dbg() is empty if !DEBUG. This causes the following
+> warnings:
 > 
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c: In function 'mtk_mdp_vpu_handle_init_ack':
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c:28:28: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->   struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)msg->ap_inst;
->                             ^
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c: In function 'mtk_mdp_vpu_ipi_handler':
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c:40:28: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->   struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)msg->ap_inst;
->                             ^
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c: In function 'mtk_mdp_vpu_send_ap_ipi':
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c:111:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->   msg.ap_inst = (uint64_t)vpu;
->                 ^
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c: In function 'mtk_mdp_vpu_init':
-> drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c:129:16: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->   msg.ap_inst = (uint64_t)vpu;
->                 ^
+> 	drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c: In function ?mtk_mdp_try_fmt_mplane?:
+> 	drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c:231:52: warning: suggest braces around empty body in an ?if? statement [-Wempty-body]
+> 	        org_w, org_h, pix_mp->width, pix_mp->height);
+>                                                     ^
+> 	drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c: In function ?mtk_mdp_m2m_start_streaming?:
+> 	drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c:414:21: warning: suggest braces around empty body in an ?if? statement [-Wempty-body]
+> 	        ctx->id, ret);
+> 	                     ^
 > 
-> That's because the driver assumes that it will be built only on
-> 64 bits. As we don't want extra warnings when building with 32
-> bits, we need to double-cast.
+> With could actually make the code to do something wrong. So,
+> add an empty block to make it be parsed ok.
 > 
 > Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 > ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  drivers/media/platform/mtk-mdp/mtk_mdp_core.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c b/drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
-> index fb07bf3dbd8b..b38d29e99f7a 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_vpu.c
-> @@ -25,7 +25,7 @@ static inline struct mtk_mdp_ctx *vpu_to_ctx(struct mtk_mdp_vpu *vpu)
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> index 2e979f97d1df..848569d4ab90 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> @@ -250,7 +250,7 @@ extern int mtk_mdp_dbg_level;
 >  
->  static void mtk_mdp_vpu_handle_init_ack(struct mdp_ipi_comm_ack *msg)
->  {
-> -	struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)msg->ap_inst;
-> +	struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)(long)msg->ap_inst;
+>  #else
 >  
->  	/* mapping VPU address to kernel virtual address */
->  	vpu->vsi = (struct mdp_process_vsi *)
-> @@ -37,7 +37,7 @@ static void mtk_mdp_vpu_ipi_handler(void *data, unsigned int len, void *priv)
->  {
->  	unsigned int msg_id = *(unsigned int *)data;
->  	struct mdp_ipi_comm_ack *msg = (struct mdp_ipi_comm_ack *)data;
-> -	struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)msg->ap_inst;
-> +	struct mtk_mdp_vpu *vpu = (struct mtk_mdp_vpu *)(long)msg->ap_inst;
->  	struct mtk_mdp_ctx *ctx;
+> -#define mtk_mdp_dbg(level, fmt, args...)
+> +#define mtk_mdp_dbg(level, fmt, args...) {}
 >  
->  	vpu->failure = msg->status;
-> @@ -108,7 +108,7 @@ static int mtk_mdp_vpu_send_ap_ipi(struct mtk_mdp_vpu *vpu, uint32_t msg_id)
->  	msg.msg_id = msg_id;
->  	msg.ipi_id = IPI_MDP;
->  	msg.vpu_inst_addr = vpu->inst_addr;
-> -	msg.ap_inst = (uint64_t)vpu;
-> +	msg.ap_inst = (uint64_t)(long)vpu;
->  	err = mtk_mdp_vpu_send_msg((void *)&msg, sizeof(msg), vpu, IPI_MDP);
->  	if (!err && vpu->failure)
->  		err = -EINVAL;
-> @@ -126,7 +126,7 @@ int mtk_mdp_vpu_init(struct mtk_mdp_vpu *vpu)
->  
->  	msg.msg_id = AP_MDP_INIT;
->  	msg.ipi_id = IPI_MDP;
-> -	msg.ap_inst = (uint64_t)vpu;
-> +	msg.ap_inst = (uint64_t)(long)vpu;
->  	err = mtk_mdp_vpu_send_msg((void *)&msg, sizeof(msg), vpu, IPI_MDP);
->  	if (!err && vpu->failure)
->  		err = -EINVAL;
+
+Acked-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+
+
+> #define mtk_mdp_err(fmt, args...)
+>  #define mtk_mdp_dbg_enter()
+>  #define mtk_mdp_dbg_leave()
