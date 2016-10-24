@@ -1,126 +1,86 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 15:00:35 -0600
-Subject: [PATCH v3 3/8] PM / Domains: Allow domain power states to be
- read from DT
-In-Reply-To: <12435f67-bcb6-33b5-4399-f4f628f70be8@arm.com>
-References: <1476467276-75094-1-git-send-email-lina.iyer@linaro.org>
- <1476467276-75094-4-git-send-email-lina.iyer@linaro.org>
- <6ed96121-5040-474d-2d71-7927e8567c50@arm.com>
- <20161024164846.GE72940@linaro.org>
- <12435f67-bcb6-33b5-4399-f4f628f70be8@arm.com>
-Message-ID: <20161024210035.GF72940@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 24 Oct 2016 23:22:46 +0200
+Subject: [PATCH v3 [fix]] PM / doc: Update device documentation for
+ devices in IRQ safe PM domains
+In-Reply-To: <20161024161605.GD72940@linaro.org>
+References: <20161021152313.GC72940@linaro.org>
+ <1900178.E2KGyKAlTm@vostro.rjw.lan> <20161024161605.GD72940@linaro.org>
+Message-ID: <3700155.5AlzjeyN5H@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24 2016 at 11:27 -0600, Sudeep Holla wrote:
->
->
->On 24/10/16 17:48, Lina Iyer wrote:
->>Hi Sudeep,
->>
->>On Mon, Oct 24 2016 at 07:39 -0600, Sudeep Holla wrote:
->>>
->>>
->>>On 14/10/16 18:47, Lina Iyer wrote:
->>>>This patch allows domains to define idle states in the DT. SoC's can
->>>>define domain idle states in DT using the "domain-idle-states" property
->>>>of the domain provider. Add API to read the idle states from DT that can
->>>>be set in the genpd object.
->>>>
->>>>This patch is based on the original patch by Marc Titinger.
->>>>
->>>>Signed-off-by: Marc Titinger <mtitinger+renesas@baylibre.com>
->>>>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->>>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
->>>>---
->>>>drivers/base/power/domain.c | 94
->>>>+++++++++++++++++++++++++++++++++++++++++++++
->>>>include/linux/pm_domain.h   |  8 ++++
->>>>2 files changed, 102 insertions(+)
->>>>
->>>>diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->>>>index 37ab7f1..9af75ba 100644
->>>>--- a/drivers/base/power/domain.c
->>>>+++ b/drivers/base/power/domain.c
->>>>@@ -1916,6 +1916,100 @@ out:
->>>>    return ret ? -EPROBE_DEFER : 0;
->>>>}
->>>>EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->>>>+
->>>>+static const struct of_device_id idle_state_match[] = {
->>>>+    { .compatible = "arm,idle-state", },
->>>>+    { }
->>>>+};
->>>>+
->>>
->>>I still think it's better to have another compatible to serve this
->>>purpose. We don't want to end up creating genpd domains just because
->>>they are "arm,idle-state" compatible IMO ?
->>>
->>>I agree you can prevent it checking for OSC mode support in the
->>>firmware. But I want to understand if you have any strong reasons for
->>>avoiding that approach.
->>>
->>Why are you still held up with OSI/PC PSCI modes?
->
->I am just pointing that out to make sure you are not defining these
->DT bindings with just QCOM platform and OSC in consideration.
->
->I am thinking about how can it be used/extended in other use-cases.
->
->>I repeat again this
->>series is not about any of that, it is just about PM domains.
->
->I completely understand that, no argument on that. What I worry is that
->if a system(in future) represents this power domains and domain idles
->states and doesn't want to create a genpd, do we have to handle it
->differently or even the way your CPUidle series would do or can we say
->those states need to specify that they are compatible with the new
->feature(the one being added in this series) with a new compatible.
->I prefer the latter than the former to avoid all possible workarounds
->in future.
->
->>PM domains
->>have idle states and the idle-state description is similar in definition
->>to arm,idle-state and therefore uses the same compatible. There is no
->>point re-defining something that already exists in the kernel.
->>
->
->Yes I understand that but "arm,idle-states" were not defined with this
->feature in mind and hence I am bit worried if it could cause any issue
->especially if deprecate cpu-idle-states and move to this model
->completely. I really don't like this mix and hence I am raising the
->concern here. I am trying to ease that migration.
->
->>I was able to find the original thread, where we discussed this [1].
->>
->>I suggest, you read about PM domains and its idle states and understand
->>this series in the context of PM domains.
->>
->
->Sure, will do that. Thanks for pointing that out. But the concern I am
->raising is entirely different. I am asking if this re-use will cause any
->issue in future as pointed out above.
->
->I re-iterate that I understand this series is independent of the CPUIdle
->and hence asking why not make it completely independent by just adding
->the new compatible.
->
->I am *not asking to redefine something completely*. What I am saying is
->*just* to add new compatible that may(for cpu devices)/may not(for
->other/non-CPU devices) be used along with "arm,idle-state".
->
-I am fine with that, as long as the compatible string is an alternate
-for "arm,idle-state" it shouldn't be a problem.
+On Monday, October 24, 2016 10:16:05 AM Lina Iyer wrote:
+> On Sat, Oct 22 2016 at 18:19 -0600, Rafael J. Wysocki wrote:
+> >On Friday, October 21, 2016 03:52:55 PM Lina Iyer wrote:
+> >> Update documentation to reflect the changes made to support IRQ safe PM
+> >> domains.
+> >>
+> >> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> >> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >> ---
+> >> Changes since v3:
+> >> - Moved para to the end of the section
+> >> - Added clause for all IRQ safe devices in a domain
+> >> - Cleanup explanation of nested domains
+> >> ---
+> >>  Documentation/power/devices.txt | 11 ++++++++++-
+> >>  1 file changed, 10 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
+> >> index 8ba6625..9218ce6 100644
+> >> --- a/Documentation/power/devices.txt
+> >> +++ b/Documentation/power/devices.txt
+> >> @@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
+> >>  into a low-power state together at the same time by turning off the shared
+> >>  power resource.  Of course, they also need to be put into the full-power state
+> >>  together, by turning the shared power resource on.  A set of devices with this
+> >> -property is often referred to as a power domain.
+> >> +property is often referred to as a power domain. A power domain may also be
+> >> +nested inside another power domain. The nested domain is referred to as the
+> >> +sub-domain of the parent domain.
+> >>
+> >>  Support for power domains is provided through the pm_domain field of struct
+> >>  device.  This field is a pointer to an object of type struct dev_pm_domain,
+> >> @@ -629,6 +631,13 @@ support for power domains into subsystem-level callbacks, for example by
+> >>  modifying the platform bus type.  Other platforms need not implement it or take
+> >>  it into account in any way.
+> >>
+> >> +Devices and PM domains may be defined as IRQ-safe, if they can be powered
+> >> +on/off even when the IRQs are disabled.
+> >
+> >What IRQ-safe means for devices is that their runtime PM callbacks may be
+> >invoked with interrupts disabled on the local CPU.  I guess the meaning of
+> >IRQ-safe for PM domains is analogous, but the above isn't precise enough to me.
+> >
+> >> An IRQ-safe device in a domain will
+> >> +disallow power management on the domain, unless the domain is also defined as
+> >> +IRQ-safe. In other words, a domain containing all IRQ-safe devices must also
+> >> +be defined as IRQ-safe. Another restriction this framework imposes on the
+> >> +parent domain of an IRQ-safe domain is that the parent domain must also be
+> >> +defined as IRQ-safe.
+> >
+> >What about this:
+> >
+> >"Devices may be defined as IRQ-safe which indicates to the PM core that their
+> >runtime PM callbacks may be invoked with disabled interrupts (see
+> >Documentation/power/runtime_pm.txt for more information).  If an IRQ-safe
+> >device belongs to a PM domain, the runtime PM of the domain will be disallowed,
+> >unless the domain itself is defined as IRQ-safe.  However, a PM domain can only
+> >be defined as IRQ-safe if all of the devices in it are IRQ-safe. 
+> >
+> This is correct. But the last line may need a bit of modification. If
+> all devices in a PM domain are IRQ-safe and the domain is NOT, then it
+> it is a valid combination just that the domain would never do runtime
+> PM.
 
-Any recommendations?
+That doesn't contradict the last sentence of mine above.  I guess what you mean
+is that having a non-IRQ-safe device in an IRQ-safe domain is a valid
+configuration.  I wonder how it works then. :-)
+
+In any case, what about changing that sentence to something like:
+
+"However, it only makes sense to define a PM domain as IRQ-safe if all devices
+in it are IRQ-safe."
 
 Thanks,
-Lina
-
->I may be too paranoid here but I think that's safer. It helps to skip
->creating of genpd if required for some domains as I had explained before.
->
->-- 
->Regards,
->Sudeep
+Rafael
