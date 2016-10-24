@@ -1,128 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 24 Oct 2016 10:00:10 -0700
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com> (Dave Gerlach's
- message of "Fri, 21 Oct 2016 14:49:41 -0500")
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com>
- <7heg39pmgb.fsf@baylibre.com>
- <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com>
-Message-ID: <7h1sz51y3p.fsf@baylibre.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Mon, 24 Oct 2016 11:21:21 -0600
+Subject: [PATCH V4 09/10] trace, ras: add ARM processor error trace event
+In-Reply-To: <20161021163410.0a827eab@gandalf.local.home>
+References: <1477071013-29563-1-git-send-email-tbaicar@codeaurora.org>
+ <1477071013-29563-10-git-send-email-tbaicar@codeaurora.org>
+ <20161021163410.0a827eab@gandalf.local.home>
+Message-ID: <7a8c62a7-c2f4-0cae-ce0a-24cbf827bd4f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
-
-> Hi,
-> On 10/21/2016 01:48 PM, Kevin Hilman wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->>> Add a generic power domain implementation, TI SCI PM Domains, that
->>> will hook into the genpd framework and allow the TI SCI protocol to
->>> control device power states.
->>>
->>> Also, provide macros representing each device index as understood
->>> by TI SCI to be used in the device node power-domain references.
->>> These are identifiers for the K2G devices managed by the PMMC.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>> ---
->>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
->>>  MAINTAINERS                                        |  2 +
->>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->>>  3 files changed, 146 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> new file mode 100644
->>> index 000000000000..32f38a349656
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> @@ -0,0 +1,54 @@
->>> +Texas Instruments TI-SCI Generic Power Domain
->>> +---------------------------------------------
->>> +
->>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->>> +responsible for controlling the state of the IPs that are present.
->>> +Communication between the host processor running an OS and the system
->>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
->>> +implementation plugs into the generic pm domain framework and makes use of
->>> +the TI SCI protocol power on and off each device when needed.
->>> +
->>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>> +
->>> +PM Domain Node
->>> +==============
->>> +The PM domain node represents the global PM domain managed by the PMMC,
->>> +which in this case is the single implementation as documented by the generic
->>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
->>> +
->>> +Required Properties:
->>> +--------------------
->>> +- compatible: should be "ti,sci-pm-domain"
->>> +- #power-domain-cells: Must be 0.
->>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
->>>
->>> +Example:
->>> +--------------------
->>> +k2g_pds: k2g_pds {
->>
->> should use generic name like "power-contoller", e.g. k2g_pds: power-controller
+On 10/21/2016 2:34 PM, Steven Rostedt wrote:
+> On Fri, 21 Oct 2016 11:30:12 -0600
+> Tyler Baicar <tbaicar@codeaurora.org> wrote:
 >
-> Ok, that makes more sense.
+>> Currently there are trace events for the various RAS
+>> errors with the exception of ARM processor type errors.
+>> Add a new trace event for such errors so that the user
+>> will know when they occur. These trace events are
+>> consistent with the ARM processor error section type
+>> defined in UEFI 2.6 spec section N.2.4.4.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Tracing part looks fine to me.
 >
->>
->>> +        compatible = "ti,sci-pm-domain";
->>> +        #power-domain-cells = <0>;
->>> +        ti,sci = <&pmmc>;
->>> +};
->>> +
->>> +PM Domain Consumers
->>> +===================
->>> +Hardware blocks that require SCI control over their state must provide
->>> +a reference to the sci-pm-domain they are part of and a unique device
->>> +specific ID that identifies the device.
->>> +
->>> +Required Properties:
->>> +--------------------
->>> +- power-domains: phandle pointing to the corresponding PM domain node.
->>> +- ti,sci-id: index representing the device id to be passed oevr SCI to
->>> +	     be used for device control.
->>
->> This ID doesn't look right.
->>
->> Why not use #power-domain-cells = <1> and pass the index in the DT? ...
->>
->>> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
->>> +
->>> +Example:
->>> +--------------------
->>> +uart0: serial at 02530c00 {
->>> +	compatible = "ns16550a";
->>> +	...
->>> +	power-domains = <&k2g_pds>;
->>> +	ti,sci-id = <K2G_DEV_UART0>;
->>
->> ... like this:
->>
->> 	power-domains = <&k2g_pds K2G_DEV_UART0>;
+> Acked-by: Steven Rostedt <rostedt@goodmis.org>
 >
-> That's how I did it in version one actually. I was able to define my
-> own xlate function to parse the phandle and get that index, but Ulf
-> pointed me to this series by Jon Hunter [1] that simplified genpd
-> providers and dropped the concept of adding your own xlate. This locks
-> the onecell approach to using a fixed static array of genpds that get
-> indexed into (without passing the index to the provider, just the
-> genpd that's looked up), which doesn't fit our usecase, as we don't
-> want a 1 to 1 genpd to device mapping based on the comments provided
-> in v1. Now we just use the genpd device attach/detach hooks to parse
-> the sci-id and then use it in the genpd device start/stop hooks.
+> -- Steve
+Thank you Steve!
 
-Ah, right.  I remember now.  This approach allows you to use a single
-genpd as discussed earlier.
-
-Makes sense now, suggestion retracted.
-
-Kevin
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
