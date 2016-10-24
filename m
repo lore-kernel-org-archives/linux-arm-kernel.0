@@ -1,58 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 24 Oct 2016 20:19:05 +0800
-Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
-In-Reply-To: <20161018015636.11701-3-stephen.boyd@linaro.org>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-3-stephen.boyd@linaro.org>
-Message-ID: <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 24 Oct 2016 14:23:01 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: fix endpoint name
+In-Reply-To: <935cce30-cf9d-4605-1f3e-ac8e934993e6@atmel.com>
+References: <20160915150722.13103-1-alexandre.belloni@free-electrons.com>
+ <c90099af-2537-cc41-2775-dd2ca41dc070@atmel.com>
+ <331f5819-1f65-980d-486d-732342877f2c@atmel.com>
+ <20160923150323.GB13744@kroah.com> <874m535dti.fsf@linux.intel.com>
+ <935cce30-cf9d-4605-1f3e-ac8e934993e6@atmel.com>
+Message-ID: <20161024122301.5432zefxbxiwv6uv@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 24/10/2016 at 13:59:47 +0200, Nicolas Ferre wrote :
+> > Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+> > 
+> > If you prefer to pick it up as a pull request, I already have the patch
+> > in my 'fixes' branch, just need to tag it and send it to you.
+> 
+> Felipe,
+> 
+> We agreed to delay this patch after the merge window is closed. But I
+> feel that it's beginning to be urgent to make this patch go forward:
+> actual users of our kernel are facing the issue:
+> 
+> https://lkml.org/lkml/2016/10/17/493
+> 
+> We're already at -rc2 and I don't see USB-fixes included...
+> 
 
-On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> The ULPI bus can be built as a module, and it will soon be
-> calling these functions when it supports probing devices from DT.
-> Export them so they can be used by the ULPI module.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
->  drivers/of/device.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 8a22a253a830..6719ab35b62e 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
->
->         return tsize;
->  }
-> +EXPORT_SYMBOL_GPL(of_device_get_modalias);
->
->  int of_device_request_module(struct device *dev)
->  {
-> @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
->         }
->         mutex_unlock(&of_mutex);
->  }
-> +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+It is in Greg's branch:
+http://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/log/?h=usb-linus
 
-This is trailing the wrong function.
-
-ChenYu
-
->
->  int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
->  {
-> --
-> 2.10.0.297.gf6727b0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
