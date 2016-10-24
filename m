@@ -1,28 +1,32 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 24 Oct 2016 11:18:35 -0700
-Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
-In-Reply-To: <20161024181548.GA8275@leverpostej>
-References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
- <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
- <20161024174840.GR15620@leverpostej>
- <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
- <20161024180941.GT15620@leverpostej>
- <20161024181548.GA8275@leverpostej>
-Message-ID: <CAGXu5jKXoo5KWqq0dsWRFvW0Y3dXXs+-ab=ymVUnzcmovUsOkg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 24 Oct 2016 19:19:37 +0100
+Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
+In-Reply-To: <CAKXjFTNZhWTZSXtLZo8EieBtAPn_J-MM+-g8yCRJiV6UBspB9Q@mail.gmail.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-10-ahaslam@baylibre.com>
+ <20161024175320.GO17252@sirena.org.uk>
+ <CAKXjFTNZhWTZSXtLZo8EieBtAPn_J-MM+-g8yCRJiV6UBspB9Q@mail.gmail.com>
+Message-ID: <20161024181937.GP17252@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 11:15 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Oct 24, 2016 at 07:09:42PM +0100, Mark Rutland wrote:
->> It's really crazy how broken a kernel can be yet still "work"; clearly
->> we better tests are needed. :/
->
-> Clearly we better grammar need too. :(
+On Mon, Oct 24, 2016 at 08:11:40PM +0200, Axel Haslam wrote:
+> On Mon, Oct 24, 2016 at 7:53 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Out of curiosity, what workflow would have tripped over the entry.S bug?
+> > does it make sense to report this as a mode, we don't report other error
+> > conditions as modes but instead use REGULATOR_STATUS_ with the
+> > get_status() operation?
 
--Kees
+> I used mode, because when the regulator toggles the overcurrent
+> line, it means that it has entered a current limited mode, at least the
+> regulator im looking at. ill change to STATUS
 
--- 
-Kees Cook
-Nexus Security
+That's not what regulator modes are - please look at the documentation
+for the defines here.  They're about the quality of regulation.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161024/e50d7f07/attachment.sig>
