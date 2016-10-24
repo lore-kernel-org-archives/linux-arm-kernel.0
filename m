@@ -1,33 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 24 Oct 2016 12:06:29 +0200
-Subject: Question about arm64 earlycon
-In-Reply-To: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
-References: <CADaLNDnB3QBjODYNTndBsexGQfnL1rj6DAUPcf1nT9+aJaqCtw@mail.gmail.com>
-Message-ID: <4966376.bRx4fgSjbT@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 24 Oct 2016 11:09:38 +0100
+Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
+In-Reply-To: <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
+References: <20161005155112.13774-1-hdegoede@redhat.com>
+ <20161005155112.13774-2-hdegoede@redhat.com>
+ <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
+ <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
+Message-ID: <20161024100938.GI14477@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, October 23, 2016 12:26:59 AM CEST Duc Dang wrote:
-> Hi Catalin, Marc, Mark, Arnd,
+On Tue, 18 Oct 2016, Hans de Goede wrote:
+> On 18-10-16 07:25, Chen-Yu Tsai wrote:
+> > On Wed, Oct 5, 2016 at 11:51 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> > > The i2c subsys does not load modules by compatible, only by
+> > > i2c-id, with e.g. a modalias of: "i2c:axp209".
+> > > 
+> > > Populate the axp20x_i2c_id[] table with supported ids, so that
+> > > module auto-loading will work.
+> > > 
+> > > Reported-by: Dennis Gilmore <dennis@ausil.us>
+> > > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> > 
+> > Acked-by: Chen-Yu Tsai <wens@csie.org>
+> > 
+> > Even though axp20x-i2c seems to be the only "DT only" i2c client,
+> > would it make sense to add DT-based module autoloading to the i2c
+> > core?
 > 
-> I am testing with 3.12 kernel with earlyprintk enabled and I see some
-> garbage characters in the console log right before the message
-> indicating that the real console device is initialized:
-> 
-> <some garbage characters here>01c020000.serial: ttyS0 at MMIO
-> 0x1c020000 (irq = 108, base_baud = 3125000) is a U6_16550A
-> console [ttyS0] enabled, bootconsole disabled
-> 
-> I looked through early_prink.c file and printk.c file and it looks
-> like there is case that some early boot code can touch the UART
-> hardware via ealy console driver while the 'real' console driver is
-> setting up the same UART port? Please let me know if I missed some
-> important piece of code that can prevent this.
+> If it is not too invasive, then yes that would be a sensible addition IMHO.
 
-I don't think we every supported earlyprintk on arm64, and
-earlycon support may have been added later.
+If I understand you correctly, I already have a patch-set on the ML
+that does this.
 
-If you can't use a modern kernel, try backporting all the
-relevant earlycon changes.
-
-	Arnd
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
