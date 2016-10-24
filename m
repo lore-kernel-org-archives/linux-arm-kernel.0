@@ -1,56 +1,272 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 24 Oct 2016 13:29:45 -0700
-Subject: [PATCH] ahci: use pci_alloc_irq_vectors
-In-Reply-To: <20161022141123.GA25500@lst.de>
-References: <1473088905-27670-1-git-send-email-hch@lst.de>
- <1473088905-27670-2-git-send-email-hch@lst.de>
- <20160906163946.GB24268@htj.duckdns.org>
- <20161020154722.GH22012@rric.localdomain> <20161021125918.GA18082@lst.de>
- <20161021140106.GU25086@rric.localdomain> <20161022141123.GA25500@lst.de>
-Message-ID: <580E6F39.5020207@caviumnetworks.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Mon, 24 Oct 2016 14:33:54 -0600
+Subject: [PATCH V4 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <da257bb4-48f3-b187-1d43-c68669427cef@arm.com>
+References: <1477071013-29563-1-git-send-email-tbaicar@codeaurora.org>
+ <1477071013-29563-3-git-send-email-tbaicar@codeaurora.org>
+ <da257bb4-48f3-b187-1d43-c68669427cef@arm.com>
+Message-ID: <2422a0c6-ebe4-7f51-2b8d-c42b9bb468b1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2016 07:11 AM, Christoph Hellwig wrote:
-> Hi Robert,
+On 10/24/2016 3:50 AM, Suzuki K Poulose wrote:
+> On 21/10/16 18:30, Tyler Baicar wrote:
+>> Currently when a RAS error is reported it is not timestamped.
+>> The ACPI 6.1 spec adds the timestamp field to the generic error
+>> data entry v3 structure. The timestamp of when the firmware
+>> generated the error is now being reported.
+>>
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>> ---
+>>  drivers/acpi/apei/ghes.c    | 14 +++++++---
+>>  drivers/firmware/efi/cper.c | 67 
+>> +++++++++++++++++++++++++++++++++++++--------
+>>  include/acpi/ghes.h         | 10 +++++++
+>>  include/linux/cper.h        | 12 ++++++++
+>>  4 files changed, 88 insertions(+), 15 deletions(-)
+>>
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 7d020b0..7610f08 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -419,7 +419,8 @@ static void ghes_handle_memory_failure(struct 
+>> acpi_hest_generic_data *gdata, int
+>>      int flags = -1;
+>>      int sec_sev = ghes_severity(gdata->error_severity);
+>>      struct cper_sec_mem_err *mem_err;
+>> -    mem_err = (struct cper_sec_mem_err *)(gdata + 1);
+>> +
+>> +    mem_err = acpi_hest_generic_data_payload(gdata);
+>>
+>>      if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
+>>          return;
+>> @@ -449,14 +450,18 @@ static void ghes_do_proc(struct ghes *ghes,
+>>  {
+>>      int sev, sec_sev;
+>>      struct acpi_hest_generic_data *gdata;
+>> +    uuid_le sec_type;
+>>
+>>      sev = ghes_severity(estatus->error_severity);
+>>      apei_estatus_for_each_section(estatus, gdata) {
+>>          sec_sev = ghes_severity(gdata->error_severity);
+>> -        if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>> +        sec_type = *(uuid_le *)gdata->section_type;
+>> +
+>> +        if (!uuid_le_cmp(sec_type,
+>>                   CPER_SEC_PLATFORM_MEM)) {
+>>              struct cper_sec_mem_err *mem_err;
+>> -            mem_err = (struct cper_sec_mem_err *)(gdata+1);
+>> +
+>> +            mem_err = acpi_hest_generic_data_payload(gdata);
+>>              ghes_edac_report_mem_error(ghes, sev, mem_err);
+>>
+>>              arch_apei_report_mem_error(sev, mem_err);
+>> @@ -466,7 +471,8 @@ static void ghes_do_proc(struct ghes *ghes,
+>>          else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>>                        CPER_SEC_PCIE)) {
+>>              struct cper_sec_pcie *pcie_err;
+>> -            pcie_err = (struct cper_sec_pcie *)(gdata+1);
+>> +
+>> +            pcie_err = acpi_hest_generic_data_payload(gdata);
+>>              if (sev == GHES_SEV_RECOVERABLE &&
+>>                  sec_sev == GHES_SEV_RECOVERABLE &&
+>>                  pcie_err->validation_bits & 
+>> CPER_PCIE_VALID_DEVICE_ID &&
+>> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+>> index d425374..af7e1e9 100644
+>> --- a/drivers/firmware/efi/cper.c
+>> +++ b/drivers/firmware/efi/cper.c
+>> @@ -32,6 +32,9 @@
+>>  #include <linux/acpi.h>
+>>  #include <linux/pci.h>
+>>  #include <linux/aer.h>
+>> +#include <linux/printk.h>
+>> +#include <linux/bcd.h>
+>> +#include <acpi/ghes.h>
+>>
+>>  #define INDENT_SP    " "
+>>
+>> @@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx, 
+>> const struct cper_sec_pcie *pcie,
+>>      pfx, pcie->bridge.secondary_status, pcie->bridge.control);
+>>  }
+>>
+>> +static void cper_estatus_print_section_v300(const char *pfx,
+>> +    const struct acpi_hest_generic_data_v300 *gdata)
+>> +{
+>> +    __u8 hour, min, sec, day, mon, year, century, *timestamp;
+>> +
+>> +    if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+>> +        timestamp = (__u8 *)&(gdata->time_stamp);
+>> +        sec = bcd2bin(timestamp[0]);
+>> +        min = bcd2bin(timestamp[1]);
+>> +        hour = bcd2bin(timestamp[2]);
+>> +        day = bcd2bin(timestamp[4]);
+>> +        mon = bcd2bin(timestamp[5]);
+>> +        year = bcd2bin(timestamp[6]);
+>> +        century = bcd2bin(timestamp[7]);
+>> +        printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
+>> +            0x01 & *(timestamp + 3) ? "precise" : "", century,
+>> +            year, mon, day, hour, min, sec);
+>> +    }
+>> +}
+>> +
+>>  static void cper_estatus_print_section(
+>> -    const char *pfx, const struct acpi_hest_generic_data *gdata, int 
+>> sec_no)
+>> +    const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
+>>  {
+>>      uuid_le *sec_type = (uuid_le *)gdata->section_type;
+>>      __u16 severity;
+>>      char newpfx[64];
+>>
+>> +    if (acpi_hest_generic_data_version(gdata))
+>> +        cper_estatus_print_section_v300(pfx,
+>> +            (const struct acpi_hest_generic_data_v300 *)gdata);
+>> +
+>>      severity = gdata->error_severity;
+>>      printk("%s""Error %d, type: %s\n", pfx, sec_no,
+>>             cper_severity_str(severity));
+>> @@ -403,14 +430,18 @@ static void cper_estatus_print_section(
+>>
+>>      snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>>      if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
+>> -        struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
+>> +        struct cper_sec_proc_generic *proc_err;
+>> +
+>> +        proc_err = acpi_hest_generic_data_payload(gdata);
+>>          printk("%s""section_type: general processor error\n", newpfx);
+>>          if (gdata->error_data_length >= sizeof(*proc_err))
+>>              cper_print_proc_generic(newpfx, proc_err);
+>>          else
+>>              goto err_section_too_small;
+>>      } else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
+>> -        struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
+>> +        struct cper_sec_mem_err *mem_err;
+>> +
+>> +        mem_err = acpi_hest_generic_data_payload(gdata);
+>>          printk("%s""section_type: memory error\n", newpfx);
+>>          if (gdata->error_data_length >=
+>>              sizeof(struct cper_sec_mem_err_old))
+>> @@ -419,7 +450,9 @@ static void cper_estatus_print_section(
+>>          else
+>>              goto err_section_too_small;
+>>      } else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
+>> -        struct cper_sec_pcie *pcie = (void *)(gdata + 1);
+>> +        struct cper_sec_pcie *pcie;
+>> +
+>> +        pcie = acpi_hest_generic_data_payload(gdata);
+>>          printk("%s""section_type: PCIe error\n", newpfx);
+>>          if (gdata->error_data_length >= sizeof(*pcie))
+>>              cper_print_pcie(newpfx, pcie, gdata);
+>> @@ -438,6 +471,7 @@ void cper_estatus_print(const char *pfx,
+>>              const struct acpi_hest_generic_status *estatus)
+>>  {
+>>      struct acpi_hest_generic_data *gdata;
+>> +    struct acpi_hest_generic_data_v300 *gdata_v3 = NULL;
+>>      unsigned int data_len, gedata_len;
+>>      int sec_no = 0;
+>>      char newpfx[64];
+>> @@ -451,12 +485,22 @@ void cper_estatus_print(const char *pfx,
+>>      printk("%s""event severity: %s\n", pfx, 
+>> cper_severity_str(severity));
+>>      data_len = estatus->data_length;
+>>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>> +    if (acpi_hest_generic_data_version(gdata))
+>> +        gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
 >
-> is this a controller that's using MSI-X?
+> I think the acpi_hest_generic_data_version() doesn't check if the 
+> version is
+> V3 or higher ?
+Oops :) I need to make sure that returns 3.
 >
-> If so can you try the patch below?
+>> +
+>>      snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>> +
+>>      while (data_len >= sizeof(*gdata)) {
+>>          gedata_len = gdata->error_data_length;
+>>          cper_estatus_print_section(newpfx, gdata, sec_no);
+>> -        data_len -= gedata_len + sizeof(*gdata);
+>> -        gdata = (void *)(gdata + 1) + gedata_len;
+>> +        if(gdata_v3) {
+>> +            data_len -= gedata_len + sizeof(*gdata_v3);
+>> +            gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
+>> +            gdata = (struct acpi_hest_generic_data *)gdata_v3;
+>> +        } else {
+>> +            data_len -= gedata_len + sizeof(*gdata);
+>> +            gdata = (void *)(gdata + 1) + gedata_len;
+>> +        }
 >
-
-After better understanding your request, I applied this against:
-
-http://git.kernel.org/cgit/linux/kernel/git/tj/libata.git/log/?h=for-4.9-fixes 
-(commit a478b097474cd9f2268ab1beaca74ff09e652b9b)
-
-This is now working on my ThunderX CRB-2S system.
-
-You can add:
-
-Tested-by: David Daney <david.daney@cavium.com>
-
-
-Thanks for taking the time to work through this.
-
-
-
-> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-> index ba5f11c..5fe852d 100644
-> --- a/drivers/ata/ahci.c
-> +++ b/drivers/ata/ahci.c
-> @@ -1617,7 +1617,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->   		/* legacy intx interrupts */
->   		pci_intx(pdev, 1);
->   	}
-> -	hpriv->irq = pdev->irq;
-> +	hpriv->irq = pci_irq_vector(pdev, 0);
+> Could we not use the helpers we define below to unify the code here 
+> and avoid the
+> switch ?
 >
->   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
->   		host->flags |= ATA_HOST_PARALLEL_SCAN;
+Yes, those helpers should be able to reduce the code here, I'll update this.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>          sec_no++;
+>>      }
+>>  }
+>> @@ -486,12 +530,13 @@ int cper_estatus_check(const struct 
+>> acpi_hest_generic_status *estatus)
+>>          return rc;
+>>      data_len = estatus->data_length;
+>>      gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+>> -    while (data_len >= sizeof(*gdata)) {
+>> -        gedata_len = gdata->error_data_length;
+>> -        if (gedata_len > data_len - sizeof(*gdata))
+>> +
+>> +    while (data_len >= acpi_hest_generic_data_size(gdata)) {
+>> +        gedata_len = acpi_hest_generic_data_error_length(gdata);
+>> +        if (gedata_len > data_len - acpi_hest_generic_data_size(gdata))
+>>              return -EINVAL;
+>> -        data_len -= gedata_len + sizeof(*gdata);
+>> -        gdata = (void *)(gdata + 1) + gedata_len;
+>> +        data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
+>> +        gdata = acpi_hest_generic_data_next(gdata);
+>>      }
+>>      if (data_len)
+>>          return -EINVAL;
+>> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+>> index 68f088a..56b9679 100644
+>> --- a/include/acpi/ghes.h
+>> +++ b/include/acpi/ghes.h
+>> @@ -73,3 +73,13 @@ static inline void ghes_edac_unregister(struct 
+>> ghes *ghes)
+>>  {
+>>  }
+>>  #endif
+>> +
+>> +#define acpi_hest_generic_data_version(gdata)            \
+>> +    (gdata->revision >> 8)
+>> +
 >
+>
+>>
+>> +#define acpi_hest_generic_data_error_length(gdata)    \
+>> +    (((struct acpi_hest_generic_data *)(gdata))->error_data_length)
+>> +#define acpi_hest_generic_data_size(gdata)        \
+>> +    ((acpi_hest_generic_data_version(gdata) >= 3) ?    \
+>> +    sizeof(struct acpi_hest_generic_data_v300) :    \
+>> +    sizeof(struct acpi_hest_generic_data))
+>> +#define acpi_hest_generic_data_record_size(gdata)    \
+>> +    (acpi_hest_generic_data_size(gdata) +        \
+>> +    acpi_hest_generic_data_error_length(gdata))
+>> +#define acpi_hest_generic_data_next(gdata)        \
+>> +    ((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
+>> +
+>
+> Rest looks good
+>
+> Cheers
+> Suzuki
+Thanks,
+Tyler
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
