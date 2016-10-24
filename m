@@ -1,78 +1,184 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 24 Oct 2016 14:44:16 +0100
-Subject: [PATCH] ARM: sti: stih410-clocks: Add PROC_STFE as a critical
- clock
-In-Reply-To: <20161024085304.GE14477@dell>
-References: <1476804957-24000-1-git-send-email-peter.griffin@linaro.org>
- <20161024085304.GE14477@dell>
-Message-ID: <20161024134416.GB10440@griffinp-ThinkPad-X1-Carbon-2nd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 24 Oct 2016 14:44:35 +0100
+Subject: [PATCH] arm64: SMMU-v2: Workaround for Cavium ThunderX erratum
+ 28168
+In-Reply-To: <1477112061-12868-1-git-send-email-gakula@caviumnetworks.com>
+References: <1> <1477112061-12868-1-git-send-email-gakula@caviumnetworks.com>
+Message-ID: <fbc51a32-aaba-0ee6-c0bd-07a02fb2a6b4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Geetha,
 
-On Mon, 24 Oct 2016, Lee Jones wrote:
-
-> On Tue, 18 Oct 2016, Peter Griffin wrote:
+On 22/10/16 05:54, Geetha sowjanya wrote:
+> From: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
 > 
-> > Once the ST frontend demux HW IP has been enabled, the clock can't
-> > be disabled otherwise the system will hang and the board will
-> > be unserviceable.
-> > 
-> > To allow balanced clock enable/disable calls in the driver we use
-> > the critical clock infrastructure to take an extra reference on the
-> > clock so the clock will never actually be disabled.
+>   This patch implements Cavium ThunderX erratum 28168.
 > 
-> This is an abuse of the critical-clocks framework, and is exactly the
-> type of hack I promised the clk guys I'd try to prevent.
-
-I expect the best way to do this would be to write some documentation on the
-clock-critical DT binding and/or CRITICAL_CLK flag. The only documentation I can
-find currently is with the initial patch series [1] and the comment in
-clk-provider.h of
-
- #define CLK_IS_CRITICAL         BIT(11) /* do not gate, ever */
-
-Or the patch decription
-
-"Critical clocks are those which must not be gated, else undefined
-or catastrophic failure would occur.  Here we have chosen to
-ensure the prepare/enable counts are correctly incremented, so as
-not to confuse users with enabled clocks with no visible users."
-
-Which is the functionality I want for this clock.
-
-> If this, or
-> any other IP has some quirks (i.e. once enabled, if this clock is
-> subsequently disabled it will have a catastrophic effect on the
-> platform), then they should be worked around in the driver.
+>   PCI requires stores complete in order. Due to erratum #28168
+>   PCI-inbound MSI-X store to the interrupt controller are delivered
+>   to the interrupt controller before older PCI-inbound memory stores
+>   are committed.
+>   Doing a sync on SMMU will make sure all prior transactions are
+>   completed.
 > 
-> The correct thing to do here is craft a clk-keep-on flag and ensure it
-> is set to true for the effected platform(s)' platform data.
+> Signed-off-by: Tirumalesh Chalamarla <Tirumalesh.Chalamarla@cavium.com>
+> Signed-off-by: Geetha sowjanya <gakula@caviumnetworks.com>
+> ---
+>  arch/arm64/Kconfig               |   11 +++++++++++
+>  drivers/iommu/arm-smmu.c         |   38 ++++++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-common.h |    1 +
+>  drivers/irqchip/irq-gic-v3-its.c |   22 ++++++++++++++++++++++
+>  kernel/irq/chip.c                |    4 ++++
 
-I'm always wary of creating a driver specific flag, especially when its
-purpose is to do the same thing as an existing mechanism provided by the
-subsystem of not gating the clock.
+Thanks Robin for looping me in. Geetha, please use get_maintainers.pl to
+keep the relevant people on CC, specially as you're touching some of the
+core infrastructure.
 
-I can see a couple of problems with what you propose:
+>  5 files changed, 76 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 30398db..57f5c9b 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -474,6 +474,17 @@ config CAVIUM_ERRATUM_27456
+>  
+>  	  If unsure, say Y.
+>  
+> +config CAVIUM_ERRATUM_28168
+> +	bool "Cavium erratum 28168: Make sure ITS and SMMU TLB are in sync"
+> +	default y
+> +	help
+> +	 Due to erratum #28168 PCI-inbound MSI-X store to the interrupt
+> +	 controller are delivered to the interrupt controller before older
+> +	 PCI-inbound memory stores are committed. Doing a sync on SMMU
+> +	 will make sure all prior transactions are completed.
+> +
+> +	 If unsure, say Y.
 
-1) You have to put the clk-keep-on flag in every driver which consumes the
-clock. IMO it is much better to have this knowledge in the SoC's
-clock driver so every consumer of the clock automatically benefits.
+Please add an entry to Documentation/arm64/silicon-errata.txt.
 
-2) You don't benefit from the CLK_IS_CRITICAL reference counting logic in
-clk.c. So then each driver has to also work around that to get sensible reference
-counts. e.g.
+> +
+>  endmenu
+>  
+>  
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 9740846..20a61c6 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
 
-if (!__clk_is_enabled(clk) && pdata->clk-keep-on)
-   clk_enable(clk)
+I'll skip the SMMU code on which Robin has commented already, and move
+to the irq part, which is equally entertaining.
 
-Which seems to me to be fighting against the subsystem. Given that the only use of
- _clk_is_enabled() outside drivers/clk is in an old arch/arm/mach-omap2/pm24xx.c
-driver I suspect its use is frowned upon, and it shouldn't really be an EXPORTED_SYMBOL.
+[...]
 
-regards,
+> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+> index 205e5fd..0228ba0 100644
+> --- a/drivers/irqchip/irq-gic-common.h
+> +++ b/drivers/irqchip/irq-gic-common.h
+> @@ -38,4 +38,5 @@ void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
+>  
+>  void gic_set_kvm_info(const struct gic_kvm_info *info);
+>  
+> +void cavium_smmu_tlb_sync(void *iommu);
+>  #endif /* _IRQ_GIC_COMMON_H */
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 003495d..88e9958 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -112,6 +112,7 @@ struct its_device {
+>  	struct its_node		*its;
+>  	struct event_lpi_map	event_map;
+>  	void			*itt;
+> +	struct device           *dev;
 
-Peter.
+This doesn't work in the presence of anything that will multiplex
+multiple RequesterIDs onto a single DeviceID (non transparent PCI
+bridge, for example).
 
-[1] https://lkml.org/lkml/2016/1/18/272
+>  	u32			nr_ites;
+>  	u32			device_id;
+>  };
+> @@ -664,10 +665,29 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+>  	iommu_dma_map_msi_msg(d->irq, msg);
+>  }
+>  
+> +/**
+> + * Due to erratum in ThunderX,
+> + * we need to make sure SMMU is in sync with ITS translations.
+> + **/
+> +static void its_ack_irq(struct irq_data *d)
+> +{
+> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+> +	struct pci_dev *pdev;
+> +
+> +		if (!dev_is_pci(its_dev->dev))
+> +			return;
+
+How about non PCI devices?
+
+> +
+> +		pdev = to_pci_dev(its_dev->dev);
+> +		if (pdev->vendor != 0x177d)
+> +			cavium_smmu_tlb_sync(its_dev->dev);
+
+What makes Cavium devices so special that they do not need to respect
+the PCI memory ordering with respect to MSI delivery?
+
+> +
+> +}
+> +
+>  static struct irq_chip its_irq_chip = {
+>  	.name			= "ITS",
+>  	.irq_mask		= its_mask_irq,
+>  	.irq_unmask		= its_unmask_irq,
+> +	.irq_ack                = its_ack_irq,
+
+Nice try, but no, thank you. If you really want to go down that road,
+have a look at CONFIG_IRQ_PREFLOW_FASTEOI, and make this workaround a
+per interrupt thing. At least, you won't pollute the core code with
+another hack.
+
+Also, it would be good to find a way for that hack to be confined to the
+SMMU driver, since that's where the oddity is being handled. Something
+that would occur when the device is mapping memory is probably on good spot.
+
+>  	.irq_eoi		= irq_chip_eoi_parent,
+>  	.irq_set_affinity	= its_set_affinity,
+>  	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+> @@ -1422,6 +1442,8 @@ static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+>  	if (!its_dev)
+>  		return -ENOMEM;
+>  
+> +	its_dev->dev = dev;
+> +
+>  	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
+>  out:
+>  	info->scratchpad[0].ptr = its_dev;
+> diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+> index be3c34e..6add8da 100644
+> --- a/kernel/irq/chip.c
+> +++ b/kernel/irq/chip.c
+> @@ -585,6 +585,10 @@ void handle_fasteoi_irq(struct irq_desc *desc)
+>  		goto out;
+>  	}
+>  
+> +#ifdef CONFIG_CAVIUM_ERRATUM_28168
+> +	if (chip->irq_ack)
+> +		chip->irq_ack(&desc->irq_data);
+> +#endif
+>  	kstat_incr_irqs_this_cpu(desc);
+>  	if (desc->istate & IRQS_ONESHOT)
+>  		mask_irq(desc);
+> 
+
+Overall, this workaround is not acceptable as it is. You need to find
+ways to make it less invasive, and hopefully the above pointers will
+help. Please keep the current distribution list posted once you update
+this patch.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
