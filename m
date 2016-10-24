@@ -1,85 +1,93 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 24 Oct 2016 11:59:20 +0800
-Subject: [PATCH 5/5] tty: amba-pl011: Add earlycon support for SBSA UART
-In-Reply-To: <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
-References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
- <1474708465-38958-6-git-send-email-wangkefeng.wang@huawei.com>
- <20160927105748.GA3847@kroah.com>
- <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
-Message-ID: <7edb183d-2376-0f09-a3ea-3bf78971609d@huawei.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 24 Oct 2016 00:16:04 -0400
+Subject: [PATCH V3 1/3] ACPI, PCI IRQ: add PCI_USING penalty for ISA
+ interrupts
+In-Reply-To: <20161022235837.GA1668@localhost>
+References: <1476505867-24599-1-git-send-email-okaya@codeaurora.org>
+ <1476505867-24599-2-git-send-email-okaya@codeaurora.org>
+ <20161022235837.GA1668@localhost>
+Message-ID: <5299d939-5d7d-05b7-bd5a-df1fe213fb21@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg, any more comments, thanks.
+On 10/22/2016 7:58 PM, Bjorn Helgaas wrote:
+> On Sat, Oct 15, 2016 at 12:31:05AM -0400, Sinan Kaya wrote:
+>> The change introduced in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+>> resource requirements") removed PCI_USING penalty from
+>> acpi_pci_link_allocate function as there is no longer a fixed size penalty
+>> array for both PCI interrupts greater than 16.
+>>
+>> The array size has been reduced to 16 and array name got prefixed as ISA
+>> since it only is accountable for the ISA interrupts.
+>>
+>> The original change in commit 103544d86976 ("ACPI,PCI,IRQ: reduce
+>> resource requirements") removed penalty assignment in the code for PCI
+>> thinking that we will add the penalty later in acpi_irq_pci_sharing_penalty
+>> function.
+>>
+>> However, this function only gets called if the IRQ number is greater than
+>> 16 and acpi_irq_get_penalty function gets called before ACPI start in
+>> acpi_isa_irq_available and acpi_penalize_isa_irq functions. We can't rely
+>> on iterating the link list.
+>>
+>> We need to add the PCI_USING penalty for ISA interrupts too if the link is
+>> in use and matches our ISA IRQ number.
+> 
+> I think the history about the array size is more than is necessary for this
+> changelog.  I think the useful part is something like this:
+> 
+>   ACPI: pci_link: Include PIRQ_PENALTY_PCI_USING for ISA IRQs
+> 
+>   103544d86976 ("ACPI,PCI,IRQ: reduce resource requirements") replaced
+>   the addition of PIRQ_PENALTY_PCI_USING in acpi_pci_link_allocate()
+>   with an addition in acpi_irq_pci_sharing_penalty(), but f7eca374f000
+>   ("ACPI,PCI,IRQ: separate ISA penalty calculation") removed the use
+>   of acpi_irq_pci_sharing_penalty() for ISA IRQs.
+> 
+>   Therefore, PIRQ_PENALTY_PCI_USING is missing from ISA IRQs used by
+>   interrupt links.  Include that penalty by adding it in the
+>   acpi_pci_link_allocate() path.
+> 
+>   Fixes: f7eca374f000 ("ACPI,PCI,IRQ: separate ISA penalty calculation")
+>   
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> 
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-On 2016/9/27 21:15, Kefeng Wang wrote:
+OK. Updated as suggested.
+
 > 
-> 
-> On 2016/9/27 18:57, Greg Kroah-Hartman wrote:
->> On Sat, Sep 24, 2016 at 05:14:25PM +0800, Kefeng Wang wrote:
->>> Declare an OF early console for SBSA UART so that the early console device
->>> can be specified via the "stdout-path" property in device-tree.
->>>
->>> Cc: Russell King <linux@armlinux.org.uk>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>> ---
->>>  drivers/tty/serial/amba-pl011.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
->>> index 7d9b291..3688d3b 100644
->>> --- a/drivers/tty/serial/amba-pl011.c
->>> +++ b/drivers/tty/serial/amba-pl011.c
->>> @@ -2330,6 +2330,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
->>>  	return 0;
->>>  }
->>>  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
->>> +OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
+>> ---
+>>  drivers/acpi/pci_link.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
 >>
->> Why do you need another option for the same thing?
-> 
-> 
-> It is used to support earlycon(without option) for sbsa-uart in bootargs.
-> 
-> 	chosen {
-> 		stdout-path = "serial0:115200n8";
-> 		bootargs = "earlycon"
-> 	};
-> 
-> 	uart0: uart at 602b0000 {
-> 		compatible = "arm,sbsa-uart";
-> 		reg = <0x0 0x602b0000 0x0 0x1000>;
-> 		...
-> 	};
-> 
-> We setup a unique struct with compatible name by OF_EARLYCON_DECLARE,
-> #define OF_EARLYCON_DECLARE(_name, compat, fn)				\
-> 	static const struct earlycon_id __UNIQUE_ID(__earlycon_##_name)	\
-> 	     __used __section(__earlycon_table)				\
-> 		= { .name = __stringify(_name),				\
-> 		    .compatible = compat,				\
-> 		    .setup = fn  }
-> 
-> if without this patch(see drivers/of/fdt.c),
-> 
-> early_init_dt_scan_chosen_serial()
->  - for (match = __earlycon_table; match < __earlycon_table_end; match++)
->   -- if (fdt_node_check_compatible(fdt, offset, match->compatible))
-> 	countinue;
->   -- of_setup_earlycon(match, offset, options); // will never touch here.
-> 
-> Thanks,
-> Kefeng
-> 
+>> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+>> index c983bf7..a212709 100644
+>> --- a/drivers/acpi/pci_link.c
+>> +++ b/drivers/acpi/pci_link.c
+>> @@ -619,6 +619,10 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>>  			    acpi_device_bid(link->device));
+>>  		return -ENODEV;
+>>  	} else {
+>> +		if (link->irq.active < ACPI_MAX_ISA_IRQS)
+>> +			acpi_isa_irq_penalty[link->irq.active] +=
+>> +				PIRQ_PENALTY_PCI_USING;
+>> +
+>>  		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+>>  		       acpi_device_name(link->device),
+>>  		       acpi_device_bid(link->device), link->irq.active);
+>> -- 
+>> 1.9.1
 >>
->> confused,
 >>
->> greg k-h
->>
->> .
->>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> 
-> .
-> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
