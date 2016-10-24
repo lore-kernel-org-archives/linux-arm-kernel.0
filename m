@@ -1,41 +1,64 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 24 Oct 2016 11:25:03 +0200
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <87eg382kv9.fsf@belgarion.home>
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <4337157.Eff9E2riVH@wuerfel>
- <20161021154856.GC1041@n2100.armlinux.org.uk> <24632117.YsmPs86ri6@wuerfel>
- <87eg382kv9.fsf@belgarion.home>
-Message-ID: <CAMuHMdVy_h6Uss9bwVK5hGD42bXeEBcBsBDwCpx_eYnT9r+=Lw@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 24 Oct 2016 16:43:25 +0800
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <3a29c03a-2da1-7bfe-28ff-21dada50ee8d@arm.com>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+ <3a29c03a-2da1-7bfe-28ff-21dada50ee8d@arm.com>
+Message-ID: <6697f1a4-3c22-d0ef-e2c2-41f0ff36fbf0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 22, 2016 at 10:23 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
->
->> On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
->>> What's the point of the x32 mode?
+
+
+On 2016/10/24 16:36, Marc Zyngier wrote:
+> On 23/10/16 04:21, Ding Tianhong wrote:
+>> This erratum describes a bug in logic outside the core, so MIDR can't be
+>> used to identify its presence, and reading an SoC-specific revision
+>> register from common arch timer code would be awkward.  So, describe it
+>> in the device tree.
 >>
->> On x86, the motivation is faster code for most use cases that
->> don't need a lot of memory, as the 64-bit opcodes have 16 registers
->> rather than 8 in 32-bit mode but 32-bit pointers have lower
->> cache footprint than 64-bit pointers.
->
-> For completness, the second point of x32 AFAIU is the IP-relative addressing
-> which is not available in standard 32 bit mode, which improves PIC code. For
-> simple not algorithmic code (think Android HAL for example) with many shared
-> libraries, it's better in the Hardware Abstraction Layer Libraries, instead of
-> the push-to-stack and pop register.
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arch_timer.txt | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> index ef5fbe9..26bc837 100644
+>> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+>> @@ -31,6 +31,12 @@ to deliver its interrupts via SPIs.
+>>    This also affects writes to the tval register, due to the implicit
+>>    counter read.
+>>
+>> +- hisilicon,erratum-161x01 : A boolean property. Indicates the presence of
+>> +  QorIQ erratum 161201, which says that reading the counter is
+> 
+> Other than the copy/paste of the FSL erratum, please document the actual
+> erratum number. Is that 161x01 or 161201?
+> 
 
-But that's not an advantage compared to full am64 mode, right?
+Sorry for the lazy behavior.
 
-Gr{oetje,eeting}s,
+>> +  unreliable unless the small range of value is returned by back-to-back reads.
+> 
+> That's a detail that doesn't belong in the DT, but that would be much
+> better next to the code doing the actual handling.
+> 
+Got it.
 
-                        Geert
+Thanks
+Ding
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> +  This also affects writes to the tval register, due to the implicit
+>> +  counter read.
+>> +
+>>  ** Optional properties:
+>>
+>>  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
