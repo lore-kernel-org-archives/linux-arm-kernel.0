@@ -1,46 +1,21 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Mon, 24 Oct 2016 12:12:02 -0700
-Subject: [PATCH v1 1/3] dt-bindings: Document Broadcom OTP controller driver
-In-Reply-To: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
-References: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
-Message-ID: <1477336324-10543-2-git-send-email-jonathan.richardson@broadcom.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Mon, 24 Oct 2016 14:27:25 -0500
+Subject: [PATCH/RESEND] thermal: qcom-spmi: Treat reg property as a
+ single cell
+In-Reply-To: <20161018234019.5489-1-sboyd@codeaurora.org>
+References: <20161018234019.5489-1-sboyd@codeaurora.org>
+Message-ID: <20161024192725.GI3145@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jonathan Richardson <jonathar@broadcom.com>
+On Tue, Oct 18, 2016 at 04:40:19PM -0700, Stephen Boyd wrote:
+> We only read the first element of the reg property to figure out
+> the offset of the temperature sensor inside the PMIC.
+> Furthermore, we want to remove the second element in DT, so just
+> don't read the second element so that probe keeps working if we
+> change the DT in the future.
+> 
+> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
-Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-Signed-off-by: Oza Pawandeep <oza@broadcom.com>
-Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
----
- Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
-
-diff --git a/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
-new file mode 100644
-index 0000000..6462e12
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
-@@ -0,0 +1,17 @@
-+Broadcom OTP memory controller
-+
-+Required Properties:
-+- compatible: "brcm,ocotp" for the first generation Broadcom OTPC which is used
-+  in Cygnus and supports 32 bit read/write. Use "brcm,ocotp-v2" for the second
-+  generation Broadcom OTPC which is used in SoC's such as Stingray and supports
-+  64-bit read/write.
-+- reg: Base address of the OTP controller.
-+- brcm,ocotp-size: Amount of memory available, in 32 bit words
-+
-+Example:
-+
-+otp: otp at 0301c800 {
-+	compatible = "brcm,ocotp";
-+	reg = <0x0301c800 0x2c>;
-+	brcm,ocotp-size = <2048>;
-+};
--- 
-1.9.1
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
