@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 24 Oct 2016 19:01:32 +0100
-Subject: Applied "ASoC: rockchip: constify snd_soc_ops structures" to the asoc
- tree
-In-Reply-To: <1476543351-17858-4-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <E1byjYy-0000sp-Cx@debutante>
+Date: Mon, 24 Oct 2016 19:03:33 +0100
+Subject: Applied "ASoC: PXA: Brownstone needs I2C" to the asoc tree
+In-Reply-To: <20161018151912.2742738-1-arnd@arndb.de>
+Message-ID: <E1byjav-000114-DL@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: constify snd_soc_ops structures
+   ASoC: PXA: Brownstone needs I2C
 
 has been applied to the asoc tree at
 
@@ -34,124 +33,39 @@ to this mail.
 Thanks,
 Mark
 
->From 705e9994a437bbdaf655612f3526e3567db56bdd Mon Sep 17 00:00:00 2001
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-Date: Sat, 15 Oct 2016 16:55:47 +0200
-Subject: [PATCH] ASoC: rockchip: constify snd_soc_ops structures
+>From 5229f1f4a4585f503a0683575bf38d9a1d2c1982 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 18 Oct 2016 17:18:58 +0200
+Subject: [PATCH] ASoC: PXA: Brownstone needs I2C
 
-Check for snd_soc_ops structures that are only stored in the ops field of a
-snd_soc_dai_link structure.  This field is declared const, so snd_soc_ops
-structures that have this property can be declared as const also.
+I rand into a new build error with SND_MMP_SOC_BROWNSTONE:
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
+warning: (SND_MMP_SOC_BROWNSTONE && SND_SOC_SAMSUNG_SMDK_WM8994 && SND_SOC_SMDK_WM8994_PCM && SND_SOC_LITTLEMILL) selects MFD_WM8994 which has unmet direct dependencies (HAS_IOMEM && I2C)
+drivers/mfd/wm8994-core.c:688:1: error: data definition has no type or storage class [-Werror]
+drivers/mfd/wm8994-core.c:688:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
 
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct snd_soc_ops i at p = { ... };
+I don't see why this never showed up before, as the dependency seems to
+have been missing since the symbol was first introduced several years
+ago. This adds a dependency like the other drivers have.
 
-@ok1@
-identifier r.i;
-struct snd_soc_dai_link e;
-position p;
-@@
-e.ops = &i at p;
-
-@ok2@
-identifier r.i, e;
-position p;
-@@
-struct snd_soc_dai_link e[] = { ..., { .ops = &i at p, }, ..., };
-
-@bad@
-position p != {r.p,ok1.p,ok2.p};
-identifier r.i;
-struct snd_soc_ops e;
-@@
-e at i@p
-
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct snd_soc_ops i = { ... };
-// </smpl>
-
-The effect on the layout of the .o files is shown by the following output
-of the size command, first before then after the transformation:
-
-   text    data     bss     dec     hex filename
-   5027    2488     416    7931    1efb sound/soc/rockchip/rk3399_gru_sound.o
-   5219    2312     416    7947    1f0b sound/soc/rockchip/rk3399_gru_sound.o
-
-   text    data     bss     dec     hex filename
-   3499    1648     384    5531    159b sound/soc/rockchip/rockchip_max98090.o
-   3563    1584     384    5531    159b sound/soc/rockchip/rockchip_max98090.o
-
-   text    data     bss     dec     hex filename
-   3455    1536     384    5375    14ff sound/soc/rockchip/rockchip_rt5645.o
-   3519    1480     384    5383    1507 sound/soc/rockchip/rockchip_rt5645.o
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rk3399_gru_sound.c  | 6 +++---
- sound/soc/rockchip/rockchip_max98090.c | 2 +-
- sound/soc/rockchip/rockchip_rt5645.c   | 2 +-
- 3 files changed, 5 insertions(+), 5 deletions(-)
+ sound/soc/pxa/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 0cbd23555ba4..3475c61a5fa0 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -228,15 +228,15 @@ static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
- 	return 0;
- }
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index f2bf8661dd21..823b5a236d8d 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -208,7 +208,7 @@ config SND_PXA2XX_SOC_IMOTE2
  
--static struct snd_soc_ops rockchip_sound_max98357a_ops = {
-+static const struct snd_soc_ops rockchip_sound_max98357a_ops = {
- 	.hw_params = rockchip_sound_max98357a_hw_params,
- };
- 
--static struct snd_soc_ops rockchip_sound_rt5514_ops = {
-+static const struct snd_soc_ops rockchip_sound_rt5514_ops = {
- 	.hw_params = rockchip_sound_rt5514_hw_params,
- };
- 
--static struct snd_soc_ops rockchip_sound_da7219_ops = {
-+static const struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
-diff --git a/sound/soc/rockchip/rockchip_max98090.c b/sound/soc/rockchip/rockchip_max98090.c
-index e70ffad07184..789d6f1e2b5f 100644
---- a/sound/soc/rockchip/rockchip_max98090.c
-+++ b/sound/soc/rockchip/rockchip_max98090.c
-@@ -119,7 +119,7 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
- 	return ret;
- }
- 
--static struct snd_soc_ops rk_aif1_ops = {
-+static const struct snd_soc_ops rk_aif1_ops = {
- 	.hw_params = rk_aif1_hw_params,
- };
- 
-diff --git a/sound/soc/rockchip/rockchip_rt5645.c b/sound/soc/rockchip/rockchip_rt5645.c
-index 440a8026346a..9e0c17805807 100644
---- a/sound/soc/rockchip/rockchip_rt5645.c
-+++ b/sound/soc/rockchip/rockchip_rt5645.c
-@@ -135,7 +135,7 @@ static int rk_init(struct snd_soc_pcm_runtime *runtime)
- 				     &headset_jack);
- }
- 
--static struct snd_soc_ops rk_aif1_ops = {
-+static const struct snd_soc_ops rk_aif1_ops = {
- 	.hw_params = rk_aif1_hw_params,
- };
- 
+ config SND_MMP_SOC_BROWNSTONE
+ 	tristate "SoC Audio support for Marvell Brownstone"
+-	depends on SND_MMP_SOC && MACH_BROWNSTONE
++	depends on SND_MMP_SOC && MACH_BROWNSTONE && I2C
+ 	select SND_MMP_SOC_SSPA
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
 -- 
 2.8.1
