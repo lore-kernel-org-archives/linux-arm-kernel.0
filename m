@@ -1,28 +1,73 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 23 Oct 2016 23:22:02 -0400
-Subject: [PATCH V4 1/3] ACPI, PCI, IRQ: assign ISA IRQ directly during
- early boot stages
-In-Reply-To: <20161021013930.GB31044@localhost>
-References: <1476915664-27231-1-git-send-email-okaya@codeaurora.org>
- <1476915664-27231-2-git-send-email-okaya@codeaurora.org>
- <20161021013930.GB31044@localhost>
-Message-ID: <98bb7d24-94db-b585-918e-04f3a64d93f0@codeaurora.org>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Mon, 24 Oct 2016 11:22:08 +0800
+Subject: [PATCH v5 3/9] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <20161021110104.5733240e@vento.lan>
+References: <1472818800-22558-1-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-2-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-3-git-send-email-tiffany.lin@mediatek.com>
+ <1472818800-22558-4-git-send-email-tiffany.lin@mediatek.com>
+ <20161021110104.5733240e@vento.lan>
+Message-ID: <1477279328.10501.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 9:39 PM, Bjorn Helgaas wrote:
->> These API need to bypass the acpi_irq_get_penalty function.
-> I don't mind this patch, but the changelog doesn't tell me what's
-> broken and why we need this fix.  Apparently acpi_irq_get_penalty()
-> doesn't work before ACPI is initialized, but I don't see *why* it
-> wouldn't work.
+Hi Mauro,
 
-I'll update the commit message as you suggested. The code doesn't work
-if we apply PATCH V4 2/3 + PATCH V4 3/3 without PATCH V4 1/3 since
-the caller is going to end up calling get_penalty function while ACPI
-is not initialized. This happened during the debug of this regression.
+On Fri, 2016-10-21 at 11:01 -0200, Mauro Carvalho Chehab wrote:
+> Em Fri, 2 Sep 2016 20:19:54 +0800
+> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
+> 
+> > Add v4l2 layer decoder driver for MT8173
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> 
+> > +int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	switch (fourcc) {
+> > +	case V4L2_PIX_FMT_H264:
+> > +	case V4L2_PIX_FMT_VP8:
+> > +	default:
+> > +		return -EINVAL;
+> > +	}
+> 
+> Did you ever test this driver? The above code will *always* return
+> -EINVAL, with will cause vidioc_vdec_s_fmt() to always fail!
+> 
+> I suspect that what you wanted to do, instead, is:
+> 
+> 	switch (fourcc) {
+> 	case V4L2_PIX_FMT_H264:
+> 	case V4L2_PIX_FMT_VP8:
+> 		break;
+> 	default:
+> 		return -EINVAL;
+> 
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+The original idea here is that vp8 and h264 are added in later patches.
+If get this patch without later patches, it should return -EINVAL.
+
+
+> Btw, this patch series has also several issues that were pointed by
+> checkpatch. Please *always* run checkpatch when submitting your work.
+> 
+> You should take a look at the Kernel documentation about how to
+> submit patches, at:
+> 	https://mchehab.fedorapeople.org/kernel_docs/process/index.html
+> 
+> PS.: this time, I fixed the checkpatch issues for you. So, let me know
+> if the patch below is OK, and I'll merge it at media upstream,
+> assuming that the other patches in this series are ok.
+> 
+
+I did run checkpatch, but I don't know why these issues missed.
+probably I run checkpatch for all files not for patches.
+I will take a look at the documentation and keep this in mind for future
+upstream.
+Appreciated for your help.
+
+
+best regards,
+Tiffany
