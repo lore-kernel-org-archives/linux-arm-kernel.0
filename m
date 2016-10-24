@@ -1,63 +1,80 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Mon, 24 Oct 2016 11:32:26 +0530
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-Message-ID: <20161024060226.4170-1-mugunthanvnm@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 24 Oct 2016 08:34:21 +0200
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+In-Reply-To: <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
+References: <CGME20161004170414eucas1p141bebe16e1bf241862833e7ad0270c72@eucas1p1.samsung.com>
+ <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <12cfb59f-f7ca-d4df-eb7f-42348e357979@samsung.com>
+ <000601d22451$5eb46fc0$1c1d4f40$@codeaurora.org>
+Message-ID: <b9e4e81f-3b3e-951f-df62-d640275aae71@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Increase ADC reference clock from 3MHz to 24MHz so that the
-sampling rates goes up from 100K samples per second to 800K
-samples per second on AM335x and AM437x SoC.
+Hi Sricharan,
 
-Also increase opendelay for touchscreen configuration to
-equalize the increase in ADC reference clock frequency,
-which results in the same amount touch events reported via
-evtest on AM335x GP EVM.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
+On 2016-10-12 08:24, Sricharan wrote:
+> On 2016-10-04 19:03, Sricharan R wrote:
+>>> Initial post from Laurent Pinchart[1]. This is
+>>> series calls the dma ops configuration for the devices
+>>> at a generic place so that it works for all busses.
+>>> The dma_configure_ops for a device is now called during
+>>> the device_attach callback just before the probe of the
+>>> bus/driver is called. Similarly dma_deconfigure is called during
+>>> device/driver_detach path.
+>>>
+>>>
+>>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>>>          |                         |
+>>> pci_bus_add_device     (device_add/driver_register)
+>>>          |                         |
+>>> device_attach           device_initial_probe
+>>>          |                         |
+>>> __device_attach_driver    __device_attach_driver
+>>>          |
+>>> driver_probe_device
+>>>          |
+>>> really_probe
+>>>          |
+>>> dma_configure
+>>>
+>>>    Similarly on the device/driver_unregister path __device_release_driver is
+>>>    called which inturn calls dma_deconfigure.
+>>>
+>>>    If the ACPI bus code follows the same, we can add acpi_dma_configure
+>>>    at the same place as of_dma_configure.
+>>>
+>>>    This series is based on the recently merged Generic DT bindings for
+>>>    PCI IOMMUs and ARM SMMU from Robin Murphy robin.murphy at arm.com [2]
+>>>
+>>>    This time tested this with platform and pci device for probe deferral
+>>>    and reprobe on arm64 based platform. There is an issue on the cleanup
+>>>    path for arm64 though, where there is WARN_ON if the dma_ops is reset while
+>>>    device is attached to an domain in arch_teardown_dma_ops.
+>>>    But with iommu_groups created from the iommu driver, the device is always
+>>>    attached to a domain/default_domain. So so the WARN has to be removed/handled
+>>>    probably.
+>> Thanks for continuing work on this feature! Your can add my:
+>>
+>> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>
+>    Thanks for testing this. So the for the below fix, the remove_device callback
+>    gets called on the dma_ops cleanup path, so would it be easy to remove the
+>    data for the device there ?
 
-This patch depends on ADC DMA patch series [1]
+I assumed that IOMMU driver cannot be removed reliably, so all 
+structures that it
+creates are permanent. I didn't use device_add()/device_remove() 
+callbacks, because
+in current implementation device_add() is called too late (after 
+dma-mapping glue
+triggers device_attach_iommu()).
 
-Without DMA support, when ADC ref clock is set at 24MHz, I am
-seeing fifo overflow as CPU is not able to pull the ADC samples.
-This answers that DMA support is must for ADC to consume the
-samples generated at 24MHz with no open, step delay or
-averaging with patch [2].
+Maybe once your patchset is merged, I will move creation and management 
+of the all
+IOMMU related structures to device_add/remove callbacks.
 
-Measured the performance with the iio_generic_buffer with the
-patch [3] applied
-
-[1] - http://www.spinics.net/lists/devicetree/msg145045.html
-[2] - http://pastebin.ubuntu.com/23357935/
-[3] - http://pastebin.ubuntu.com/23357939/
-
----
- include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
-index b9a53e0..96c4207 100644
---- a/include/linux/mfd/ti_am335x_tscadc.h
-+++ b/include/linux/mfd/ti_am335x_tscadc.h
-@@ -90,7 +90,7 @@
- /* Delay register */
- #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
- #define STEPDELAY_OPEN(val)	((val) << 0)
--#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
-+#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x500)
- #define STEPDELAY_SAMPLE_MASK	(0xFF << 24)
- #define STEPDELAY_SAMPLE(val)	((val) << 24)
- #define STEPCONFIG_SAMPLEDLY	STEPDELAY_SAMPLE(0)
-@@ -137,7 +137,7 @@
- #define SEQ_STATUS BIT(5)
- #define CHARGE_STEP		0x11
- 
--#define ADC_CLK			3000000
-+#define ADC_CLK			24000000
- #define TOTAL_STEPS		16
- #define TOTAL_CHANNELS		8
- #define FIFO1_THRESHOLD		19
+Best regards
 -- 
-2.10.1.502.g6598894
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
