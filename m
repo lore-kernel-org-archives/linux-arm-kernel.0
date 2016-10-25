@@ -1,36 +1,42 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 25 Oct 2016 23:09:27 +0800
-Subject: [PATCH v3 12/14] irqchip: mbigen: drop module owner
+Date: Tue, 25 Oct 2016 23:09:23 +0800
+Subject: [PATCH v3 08/14] ACPI: ARM64: IORT: rework iort_node_get_id()
 In-Reply-To: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
 References: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1477408169-22217-13-git-send-email-guohanjun@huawei.com>
+Message-ID: <1477408169-22217-9-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Module owner will be set by driver core, so drop it.
+iort_node_get_id() has two output, one is the mapped ids,
+the other is the referenced parent node which is returned
+from the function.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+For now we need a API just return its parent node for
+single mapping, so just update this function slightly then
+reuse it later.
+
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ma Jun <majun258@huawei.com>
 ---
- drivers/irqchip/irq-mbigen.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/acpi/arm64/iort.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 03b79b0..c01ab41 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -293,7 +293,6 @@ static int mbigen_device_probe(struct platform_device *pdev)
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
--		.owner		= THIS_MODULE,
- 		.of_match_table	= mbigen_of_match,
- 	},
- 	.probe			= mbigen_device_probe,
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 7d543aa..2881108 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -347,7 +347,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+ 	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+ 		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+-			*id_out = map[index].output_base;
++			if (id_out)
++				*id_out = map[index].output_base;
+ 			return parent;
+ 		}
+ 	}
 -- 
 1.7.12.4
