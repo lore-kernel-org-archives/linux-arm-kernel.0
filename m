@@ -1,82 +1,131 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 25 Oct 2016 10:59:18 +0800
-Subject: [PATCH 2/2] arm64/numa: support HAVE_MEMORYLESS_NODES
+Date: Tue, 25 Oct 2016 10:59:17 +0800
+Subject: [PATCH 1/2] mm/memblock: prepare a capability to support memblock
+ near alloc
 In-Reply-To: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1477364358-10620-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some numa nodes may have no memory. For example:
-1) a node has no memory bank plugged.
-2) a node has no memory bank slots.
+If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+actually exist. The percpu variable areas and numa control blocks of that
+memoryless numa nodes need to be allocated from the nearest available
+node to improve performance.
 
-To ensure percpu variable areas and numa control blocks of the
-memoryless numa nodes to be allocated from the nearest available node to
-improve performance, defined node_distance_ready. And make its value to be
-true immediately after node distances have been initialized.
+Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
+specified nid at the first time, but if that allocation failed it will
+directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
+the second time.
+
+To compatible the above old scene, I use a marco node_distance_ready to
+control it. By default, the marco node_distance_ready is not defined in
+any platforms, the above mentioned functions will work as normal as
+before. Otherwise, they will try the nearest node first.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- arch/arm64/Kconfig            | 4 ++++
- arch/arm64/include/asm/numa.h | 3 +++
- arch/arm64/mm/numa.c          | 6 +++++-
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ mm/memblock.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 65 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 30398db..648dd13 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -609,6 +609,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
- 	def_bool y
- 	depends on NUMA
+diff --git a/mm/memblock.c b/mm/memblock.c
+index 7608bc3..556bbd2 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -1213,9 +1213,71 @@ phys_addr_t __init memblock_alloc(phys_addr_t size, phys_addr_t align)
+ 	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
+ }
 
-+config HAVE_MEMORYLESS_NODES
-+	def_bool y
-+	depends on NUMA
++#ifndef node_distance_ready
++#define node_distance_ready()		0
++#endif
 +
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
-
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index 600887e..9d068bf 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -13,6 +13,9 @@
- int __node_distance(int from, int to);
- #define node_distance(a, b) __node_distance(a, b)
-
-+extern int __initdata arch_node_distance_ready;
-+#define node_distance_ready()	arch_node_distance_ready
++static phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size,
++					phys_addr_t align, phys_addr_t start,
++					phys_addr_t end, int nid, ulong flags,
++					int alloc_func_type)
++{
++	int nnid, round = 0;
++	u64 pa;
++	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
 +
- extern nodemask_t numa_nodes_parsed __initdata;
-
- /* Mappings between node number and cpus on that node. */
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 9a71d06..5db9765 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -36,6 +36,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
- static int numa_distance_cnt;
- static u8 *numa_distance;
- static bool numa_off;
-+int __initdata arch_node_distance_ready;
-
- static __init int numa_parse_early_param(char *opt)
- {
-@@ -395,9 +396,12 @@ static int __init numa_init(int (*init_func)(void))
- 		return -EINVAL;
- 	}
-
-+	arch_node_distance_ready = 1;
- 	ret = numa_register_nodes();
--	if (ret < 0)
-+	if (ret < 0) {
-+		arch_node_distance_ready = 0;
- 		return ret;
++	bitmap_zero(nodes_map, MAX_NUMNODES);
++
++again:
++	/*
++	 * There are total 4 cases:
++	 * <nid == NUMA_NO_NODE>
++	 *   1)2) node_distance_ready || !node_distance_ready
++	 *	Round 1, nnid = nid = NUMA_NO_NODE;
++	 * <nid != NUMA_NO_NODE>
++	 *   3) !node_distance_ready
++	 *	Round 1, nnid = nid;
++	 *    ::Round 2, currently only applicable for alloc_func_type = <0>
++	 *	Round 2, nnid = NUMA_NO_NODE;
++	 *   4) node_distance_ready
++	 *	Round 1, LOCAL_DISTANCE, nnid = nid;
++	 *	Round ?, nnid = nearest nid;
++	 */
++	if (!node_distance_ready() || (nid == NUMA_NO_NODE)) {
++		nnid = (++round == 1) ? nid : NUMA_NO_NODE;
++	} else {
++		int i, distance = INT_MAX;
++
++		for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
++			if (node_distance(nid, i) < distance) {
++				nnid = i;
++				distance = node_distance(nid, i);
++			}
 +	}
++
++	switch (alloc_func_type) {
++	case 0:
++		pa = memblock_find_in_range_node(size, align, start, end, nnid, flags);
++		break;
++
++	case 1:
++	default:
++		pa = memblock_alloc_nid(size, align, nnid);
++		if (!node_distance_ready())
++			return pa;
++	}
++
++	if (!pa && (nnid != NUMA_NO_NODE)) {
++		bitmap_set(nodes_map, nnid, 1);
++		goto again;
++	}
++
++	return pa;
++}
++
+ phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
+ {
+-	phys_addr_t res = memblock_alloc_nid(size, align, nid);
++	phys_addr_t res = memblock_alloc_near_nid(size, align, 0, 0, nid, 0, 1);
 
- 	setup_node_to_cpumask_map();
+ 	if (res)
+ 		return res;
+@@ -1276,19 +1338,11 @@ static void * __init memblock_virt_alloc_internal(
+ 		max_addr = memblock.current_limit;
 
+ again:
+-	alloc = memblock_find_in_range_node(size, align, min_addr, max_addr,
+-					    nid, flags);
++	alloc = memblock_alloc_near_nid(size, align, min_addr, max_addr,
++					    nid, flags, 0);
+ 	if (alloc)
+ 		goto done;
+
+-	if (nid != NUMA_NO_NODE) {
+-		alloc = memblock_find_in_range_node(size, align, min_addr,
+-						    max_addr, NUMA_NO_NODE,
+-						    flags);
+-		if (alloc)
+-			goto done;
+-	}
+-
+ 	if (min_addr) {
+ 		min_addr = 0;
+ 		goto again;
 --
 2.5.0
