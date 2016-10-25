@@ -1,67 +1,92 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 25 Oct 2016 23:09:16 +0800
-Subject: [PATCH v3 01/14] ACPI: ARM64: IORT: minor cleanup for
- iort_match_node_callback()
+Date: Tue, 25 Oct 2016 23:09:21 +0800
+Subject: [PATCH v3 06/14] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
 In-Reply-To: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
 References: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1477408169-22217-2-git-send-email-guohanjun@huawei.com>
+Message-ID: <1477408169-22217-7-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Cleanup iort_match_node_callback() a little bit to reduce
-some lines of code, aslo fix the indentation in iort_scan_node().
+Introduce its_pmsi_init_one() to refactor the code to isolate
+ACPI&DT common code to prepare for ACPI later.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/acpi/arm64/iort.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 5741bfd..ee68cfc 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -225,7 +225,7 @@ static struct acpi_iort_node *iort_scan_node(enum acpi_iort_node_type type,
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index 16587a9..ff72704 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -84,34 +84,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 	{},
+ };
  
- 		if (iort_node->type == type &&
- 		    ACPI_SUCCESS(callback(iort_node, context)))
--				return iort_node;
-+			return iort_node;
- 
- 		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
- 					 iort_node->length);
-@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 					    void *context)
+-static int __init its_pmsi_init(void)
++static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
++				const char *name)
  {
- 	struct device *dev = context;
--	acpi_status status;
-+	acpi_status status = AE_NOT_FOUND;
+-	struct device_node *np;
+ 	struct irq_domain *parent;
  
- 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
- 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
- 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
- 		struct acpi_iort_named_component *ncomp;
++	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
++	if (!parent || !msi_get_domain_info(parent)) {
++		pr_err("%s: unable to locate ITS domain\n", name);
++		return -ENXIO;
++	}
++
++	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
++					    parent)) {
++		pr_err("%s: unable to create platform domain\n", name);
++		return -ENXIO;
++	}
++
++	pr_info("Platform MSI: %s domain created\n", name);
++	return 0;
++}
++
++static void __init its_pmsi_of_init(void)
++{
++	struct device_node *np;
++
+ 	for (np = of_find_matching_node(NULL, its_device_id); np;
+ 	     np = of_find_matching_node(np, its_device_id)) {
+ 		if (!of_property_read_bool(np, "msi-controller"))
+ 			continue;
  
--		if (!adev) {
--			status = AE_NOT_FOUND;
-+		if (!adev)
- 			goto out;
+-		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+-		if (!parent || !msi_get_domain_info(parent)) {
+-			pr_err("%s: unable to locate ITS domain\n",
+-			       np->full_name);
+-			continue;
 -		}
- 
- 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
- 		if (ACPI_FAILURE(status)) {
-@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
- 		 */
- 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
- 							AE_OK : AE_NOT_FOUND;
--	} else {
--		status = AE_NOT_FOUND;
+-
+-		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
+-						    &its_pmsi_domain_info,
+-						    parent)) {
+-			pr_err("%s: unable to create platform domain\n",
+-			       np->full_name);
+-			continue;
+-		}
+-
+-		pr_info("Platform MSI: %s domain created\n", np->full_name);
++		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
  	}
- out:
- 	return status;
++}
+ 
++static int __init its_pmsi_init(void)
++{
++	its_pmsi_of_init();
+ 	return 0;
+ }
+ early_initcall(its_pmsi_init);
 -- 
 1.7.12.4
