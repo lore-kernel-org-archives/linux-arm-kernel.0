@@ -1,32 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Oct 2016 09:16:31 +0200
-Subject: [PATCH 0/5] Switch to the DT cpufreq policy on the Integrator
-In-Reply-To: <CAJZ5v0gb8XTTrSgQzT==7=tLiAyy3RemmVnDYfm-kNULw0_uZQ@mail.gmail.com>
-References: <1476871154-32243-1-git-send-email-linus.walleij@linaro.org>
- <6720864.e2sjvVVhdQ@wuerfel>
- <CACRpkdZvUh0Z0kxu+WmvwqH3kuaOxaP1Cgxv0WUE2PT-eLs62w@mail.gmail.com>
- <CAJZ5v0gb8XTTrSgQzT==7=tLiAyy3RemmVnDYfm-kNULw0_uZQ@mail.gmail.com>
-Message-ID: <CACRpkdZ9F-gCJ_8_jdE9iEn-Kibt-oo90ieeaHdUi=mdBxHTSg@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 25 Oct 2016 09:06:34 +0200
+Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
+ randomness
+In-Reply-To: <20161025053855.GA901@Red>
+References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161024201020.h6akyqad2o42xkhq@lukather>
+ <20161025053855.GA901@Red>
+Message-ID: <20161025090634.3dae9ad52ae8382dde6af4c8@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:15 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Mon, Oct 24, 2016 at 9:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Wed, Oct 19, 2016 at 12:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->>> I don't see any hard dependency here, so I'd suggest to merge the
->>> two cpufreq patches through the subsystem tree, and the ARM patches
->>> through arm-soc.
->>
->> That's right, Viresh can you merge patches 1 and 5 to the
->> cpufreq tree please?
->
-> Well, that would be me.
->
-> Can you please resend the two as a separate series, with all tags
-> collected so far if any?
+On Tue, 25 Oct 2016 07:38:55 +0200
+LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
 
-Sure no problem.
+> > On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
+> > > Since SID's content is constant over reboot,
+> > 
+> > That's not true, at least not across all the Allwinner SoCs, and
+> > especially not on the A10 and A20 that this driver supports.
+> > 
+> 
+> On my cubieboard2 (A20)
+> hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
+> 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> *
+> 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> *
+> 00000200
+> cubiedev ~ # reboot
+> cubiedev ~ # hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
+> 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> *
+> 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> *
+> 00000200
+> 
+> So clearly for me its constant.
 
-Yours,
-Linus Walleij
+Even after power off/power on?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
