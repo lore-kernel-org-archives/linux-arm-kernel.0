@@ -1,32 +1,24 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 24 Oct 2016 17:05:02 -0600
-Subject: [PATCH v4 0/9] PM / Domains: DT support for domain idle states &
- atomic PM domains
-In-Reply-To: <2068597.AeryDFjO6y@vostro.rjw.lan>
-References: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
- <2068597.AeryDFjO6y@vostro.rjw.lan>
-Message-ID: <20161024230502.GH72940@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 24 Oct 2016 19:14:59 -0500
+Subject: [PATCH] of: Add vendor prefix for Aries Embedded GmbH
+In-Reply-To: <ae228088-b8bc-7445-f621-52d20850d49e@denx.de>
+References: <20160919213800.9498-1-marex@denx.de>
+ <ae228088-b8bc-7445-f621-52d20850d49e@denx.de>
+Message-ID: <CAL_JsqL4NUoonJ+Lw0tbhyKk0xM4ke65BNQ1VNndfUrqLZsgLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25 2016 at 16:23 -0600, Rafael J. Wysocki wrote:
->On Monday, October 24, 2016 03:20:59 PM Lina Iyer wrote:
->> Hi all,
+On Mon, Oct 24, 2016 at 6:38 AM, Marek Vasut <marex@denx.de> wrote:
+> On 09/19/2016 11:38 PM, Marek Vasut wrote:
+>> Add vendor prefix for Aries Embedded GmbH
+>> http://www.aries-embedded.de/
 >>
->> Changes since v3 [5] -
->> - Added "domain-idle-state" compatible to arm/idle-states.txt
->> - Updated documentation for defining PM domain idle states
->> - Updated documentation for devices and PM domains.
->> - Updated code to look for "domain-idle-state" instead of "arm,idle-state" compatible.
->> - The series is available at [6].
+>> Signed-off-by: Marek Vasut <marex@denx.de>
+>> Cc: Rob Herring <robh@kernel.org>
 >
->Is this the series I've already queued up?
->
-Yes. It is the update to the series that you already queued up.
+> Hi, bump ?
 
->If so, can you please send a delta patch only with a proper changelog?
->
-Sure. Will do that.
+Looks fine, but please resend to the DT list so that patchwork picks
+this up and it will be in my queue.
 
-Thanks,
-Lina
+Rob
