@@ -1,51 +1,289 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 25 Oct 2016 10:55:45 -0700
-Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
-In-Reply-To: <CA+55aFwFQSass91gdGsjo4BkkAYmoFSn-Cpm6yF+SygF_tRp1g@mail.gmail.com>
-References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
- <20161024113131.GH15620@leverpostej> <1477326477.1984.2.camel@perches.com>
- <20161024164255.GN15620@leverpostej>
- <CA+55aFwFQSass91gdGsjo4BkkAYmoFSn-Cpm6yF+SygF_tRp1g@mail.gmail.com>
-Message-ID: <CA+55aFw4EP_qxZ8tcRUV=PcLx_XbwXXOU_yp3cJHVjazof_0MA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 25 Oct 2016 10:57:37 -0700
+Subject: [RFC v2] ARM: memory: da8xx-ddrctl: new driver
+In-Reply-To: <1477402876-22472-2-git-send-email-bgolaszewski@baylibre.com>
+ (Bartosz Golaszewski's message of "Tue, 25 Oct 2016 15:41:16 +0200")
+References: <1477402876-22472-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477402876-22472-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <7hy41ctipa.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 10:38 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Mon, Oct 24, 2016 at 9:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> That does not appear to be the case; as fr as I can tell the core prints a
->> timestamp per line as required. If I run:
->>
->>         printk("TEST\nLINE1\nLINE2\nLINE3\nLINE4\n");
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
+
+> Create a new driver for the da8xx DDR2/mDDR controller and implement
+> support for writing to the Peripheral Bus Burst Priority Register.
 >
-> Please don't do this.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
+>  drivers/memory/Kconfig                             |   8 +
+>  drivers/memory/Makefile                            |   1 +
+>  drivers/memory/da8xx-ddrctl.c                      | 175 +++++++++++++++++++++
+>  4 files changed, 204 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+>  create mode 100644 drivers/memory/da8xx-ddrctl.c
+>
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+> new file mode 100644
+> index 0000000..7e271dd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+> @@ -0,0 +1,20 @@
+> +* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory controller
+> +
+> +The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs features
+> +a set of registers which allow to tweak the controller's behavior.
+> +
+> +Documentation:
+> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
+> +
+> +Required properties:
+> +
+> +- compatible:		"ti,da850-ddr-controller" - for da850 SoC based boards
+> +- reg:			a tuple containing the base address of the memory
+> +			controller and the size of the memory area to map
+> +
+> +Example for da850 shown below.
+> +
+> +ddrctl {
+> +	compatible = "ti,da850-ddr-controller";
+> +	reg = <0xB0000000 0x100>;
+> +};
 
-Side note: even with my patch, the above kind of stuff hits other special cases.
+Axel's series for the USB PHY reminded me that the PHY also has some
+config registers in this same area, and his series creates a syscon for
+a similar range of registers.
 
-In particular, the "extended header" that is printed to special
-consoles (really just the network console) will only print one header
-for each record. So you'll end up with the "normal" logs having time
-appended to each line, but the extended logs that use
-"msg_print_ext_body()" will have just a header for each record, and
-then within the record the newlines will be escaped as "\0a", I think.
+Could you create a syscon for the SYSCFG0 registers, which would then
+be used by ths driver and your other drivers/bus driver?  Then the
+binding  would just reference the sysconf via phandle, and your driver
+can use syscon_regmap_lookup_by_phandle()
 
-We could fix that too, but basically newlines in the middle of a
-string has never really worked reliably. I think historically (long
-long ago) they were just printed as-is, and did not have the loglevel
-or the timestamp, for example. Now those should work for normal
-logging, but there clearly are still cases where it breaks down.
+> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+> index 4b4c0c3..ec80e35 100644
+> --- a/drivers/memory/Kconfig
+> +++ b/drivers/memory/Kconfig
+> @@ -134,6 +134,14 @@ config MTK_SMI
+>  	  mainly help enable/disable iommu and control the power domain and
+>  	  clocks for each local arbiter.
+>  
+> +config DA8XX_DDRCTL
+> +	bool "Texas Instruments da8xx DDR2/mDDR driver"
+> +	depends on ARCH_DAVINCI_DA8XX
+> +	help
+> +	  This driver is for the DDR2/mDDR Memory Controller present on
+> +	  Texas Instruments da8xx SoCs. It's used to tweak various memory
+> +	  controller configuration options.
+> +
+>  source "drivers/memory/samsung/Kconfig"
+>  source "drivers/memory/tegra/Kconfig"
+>  
+> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+> index b20ae38..e88097fb 100644
+> --- a/drivers/memory/Makefile
+> +++ b/drivers/memory/Makefile
+> @@ -17,6 +17,7 @@ obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
+>  obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+>  obj-$(CONFIG_JZ4780_NEMC)	+= jz4780-nemc.o
+>  obj-$(CONFIG_MTK_SMI)		+= mtk-smi.o
+> +obj-$(CONFIG_DA8XX_DDRCTL)	+= da8xx-ddrctl.o
+>  
+>  obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
+>  obj-$(CONFIG_TEGRA_MC)		+= tegra/
+> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
+> new file mode 100644
+> index 0000000..66022df
+> --- /dev/null
+> +++ b/drivers/memory/da8xx-ddrctl.c
+> @@ -0,0 +1,175 @@
+> +/*
+> + * TI da8xx DDR2/mDDR controller driver
+> + *
+> + * Copyright (C) 2016 BayLibre SAS
+> + *
+> + * Author:
+> + *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/io.h>
+> +
+> +/*
+> + * REVISIT: Linux doesn't have a good framework for the kind of performance
+> + * knobs this driver controls. We can't use device tree properties as it deals
+> + * with hardware configuration rather than description. We also don't want to
+> + * commit to maintaining some random sysfs attributes.
+> + *
+> + * For now we just hardcode the register values for the boards that need
+> + * some changes (as is the case for the LCD controller on da850-lcdk - the
+> + * first board we support here). When linux gets an appropriate framework,
+> + * we'll easily convert the driver to it.
+> + */
+> +
+> +struct da8xx_ddrctl_config_knob {
+> +	const char *name;
+> +	u32 reg;
+> +	u32 mask;
+> +	u32 offset;
 
-Of course, you probably could argue that nobody cares too deeply about
-the exact format of the extended logging, and you'd probably be right.
-But still..
+nit: call this shift instead, which will also map well onto the regmap
+accessors (which you'll use when switching to syscon.)
 
-And yes, what we probably *should* do is to do the newline breaking
-when adding things to the log, rather than doing it in the
-"msg_print_text()" phase.
+> +};
+> +
+> +static const struct da8xx_ddrctl_config_knob da8xx_ddrctl_knobs[] = {
+> +	{
+> +		.name = "da850-pbbpr",
+> +		.reg = 0x20,
+> +		.mask = 0xffffff00,
+> +		.offset = 0,
+> +	},
+> +};
+> +
+> +struct da8xx_ddrctl_setting {
+> +	const char *name;
+> +	u32 val;
+> +};
+> +
+> +struct da8xx_ddrctl_board_settings {
+> +	const char *board;
+> +	const struct da8xx_ddrctl_setting *settings;
+> +};
+> +
+> +static const struct da8xx_ddrctl_setting da850_lcdk_ddrctl_settings[] = {
+> +	{
+> +		.name = "da850-pbbpr",
+> +		.val = 0x20,
+> +	},
+> +	{ }
+> +};
+> +
+> +static const struct da8xx_ddrctl_board_settings da8xx_ddrctl_board_confs[] = {
+> +	{
+> +		.board = "ti,da850-lcdk",
+> +		.settings = da850_lcdk_ddrctl_settings,
+> +	},
+> +};
+> +
+> +static const struct da8xx_ddrctl_config_knob *
+> +da8xx_ddrctl_match_knob(const struct da8xx_ddrctl_setting *setting)
+> +{
+> +	const struct da8xx_ddrctl_config_knob *knob;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_knobs); i++) {
+> +		knob = &da8xx_ddrctl_knobs[i];
+> +
+> +		if (strcmp(knob->name, setting->name) == 0)
+> +			return knob;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +static const struct da8xx_ddrctl_setting *da8xx_ddrctl_get_board_settings(void)
+> +{
+> +	const struct da8xx_ddrctl_board_settings *board_settings;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_board_confs); i++) {
+> +		board_settings = &da8xx_ddrctl_board_confs[0];
 
-There's a reason why I actually would have liked to entirely rewrite
-the whole printk mess. But there's also a reason I didn't - I'm not
-quite _that_ much of a glutton for punishment.
+Looks like that '0' should be 'i' ?
 
-             Linus
+> +		if (of_machine_is_compatible(board_settings->board))
+> +			return board_settings->settings;
+> +	}
+> +
+> +	return NULL;
+> +}
+> +
+> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
+> +{
+> +	const struct da8xx_ddrctl_config_knob *knob;
+> +	const struct da8xx_ddrctl_setting *setting;
+> +	struct device_node *node;
+> +	struct resource *res;
+> +	void __iomem *ddrctl;
+> +	struct device *dev;
+> +	u32 reg;
+> +
+> +	dev = &pdev->dev;
+> +	node = dev->of_node;
+> +
+> +	setting = da8xx_ddrctl_get_board_settings();
+> +	if (!setting) {
+> +		dev_err(dev, "no settings for board '%s'\n",
+> +			of_flat_dt_get_machine_name());
+> +		return -EINVAL;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ddrctl = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ddrctl)) {
+> +		dev_err(dev, "unable to map memory controller registers\n");
+> +		return PTR_ERR(ddrctl);
+> +	}
+> +
+> +	for (; setting->name; setting++) {
+> +		knob = da8xx_ddrctl_match_knob(setting);
+> +		if (!knob) {
+> +			dev_warn(dev,
+> +				 "no such config option: %s\n", setting->name);
+> +			continue;
+> +		}
+> +
+> +		if (knob->reg > (res->end - res->start - sizeof(u32))) {
+> +			dev_warn(dev,
+> +				 "register offset of '%s' exceeds mapped memory size\n",
+> +				 knob->name);
+> +			continue;
+> +		}
+> +
+> +		reg = __raw_readl(ddrctl + knob->reg);
+> +		reg &= knob->mask;
+> +		reg |= setting->val << knob->offset;
+> +
+> +		dev_dbg(dev, "writing 0x%08x to %s\n", reg, setting->name);
+> +
+> +		__raw_writel(reg, ddrctl + knob->reg);
+
+nit: I don't think you need the __raw accessors here.
+
+But in any case, moving to syscon you'll be using regmap accessors, and
+this can just be converted to a single regmap_update_bits.
+
+Kevin
+
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id da8xx_ddrctl_of_match[] = {
+> +	{ .compatible = "ti,da850-ddr-controller", },
+> +	{ },
+> +};
+> +
+> +static struct platform_driver da8xx_ddrctl_driver = {
+> +	.probe = da8xx_ddrctl_probe,
+> +	.driver = {
+> +		.name = "da850-ddr-controller",
+> +		.of_match_table = da8xx_ddrctl_of_match,
+> +	},
+> +};
+> +module_platform_driver(da8xx_ddrctl_driver);
+> +
+> +MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
+> +MODULE_DESCRIPTION("TI da8xx DDR2/mDDR controller driver");
+> +MODULE_LICENSE("GPL v2");
