@@ -1,70 +1,46 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 14:29:59 -0500
-Subject: [PATCH 4/4] ARM: dts: da850: Add the usb otg device node
-In-Reply-To: <1477406345-27192-5-git-send-email-abailon@baylibre.com>
-References: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
- <1477406345-27192-5-git-send-email-abailon@baylibre.com>
-Message-ID: <6768df59-153e-e841-6894-dbab337f71d8@lechnology.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 25 Oct 2016 22:18:52 +0200 (CEST)
+Subject: [PATCH 3/3] drivers: iommu: io-pgtable-arm: use const and
+ __initconst for iommu_gather_ops structures
+In-Reply-To: <1477418772-12184-4-git-send-email-bhumirks@gmail.com>
+References: <1477418772-12184-1-git-send-email-bhumirks@gmail.com>
+ <1477418772-12184-4-git-send-email-bhumirks@gmail.com>
+Message-ID: <alpine.DEB.2.20.1610252218290.2062@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2016 09:39 AM, Alexandre Bailon wrote:
-> This adds the device tree node for the usb otg
-> controller present in the da850 family of SoC's.
-> This also enables the otg usb controller for the lcdk board.
+
+
+On Tue, 25 Oct 2016, Bhumika Goyal wrote:
+
+> Check for iommu_gather_ops structures that are only stored in the tlb
+> field of an io_pgtable_cfg structure. The tlb field is of type
+> const struct iommu_gather_ops *, so iommu_gather_ops structures
+> having this property can be declared as const. Also, replace __initdata
+> with __initconst.
 >
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+
 > ---
->  arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
->  arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
->  2 files changed, 23 insertions(+)
+>  drivers/iommu/io-pgtable-arm.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index 7b8ab21..dca9735 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -158,6 +158,14 @@
->  	rx-num-evt = <32>;
->  };
+> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+> index f5c90e1..412e21d 100644
+> --- a/drivers/iommu/io-pgtable-arm.c
+> +++ b/drivers/iommu/io-pgtable-arm.c
+> @@ -916,7 +916,7 @@ static void dummy_tlb_sync(void *cookie)
+>  	WARN_ON(cookie != cfg_cookie);
+>  }
 >
-> +&usb_phy {
-> +	status = "okay";
-> +	};
-> +
-> +&usb20 {
-> +	status = "okay";
-> +};
-> +
->  &aemif {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&nand_pins>;
-> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-> index f79e1b9..b11d395 100644
-> --- a/arch/arm/boot/dts/da850.dtsi
-> +++ b/arch/arm/boot/dts/da850.dtsi
-> @@ -372,6 +372,21 @@
->  					>;
->  			status = "disabled";
->  		};
-> +		usb_phy: usb-phy {
-> +			compatible = "ti,da830-usb-phy";
-> +			#phy-cells = <1>;
-> +			status = "disabled";
-> +		};
-> +		usb20: usb20 at 200000 {
-
-This should be usb0: usb at 200000
-
-> +			compatible = "ti,da830-musb";
-> +			reg = <0x200000 0x10000>;
-> +			interrupts = <58>;
-> +			interrupt-names = "mc";
-> +			dr_mode = "otg";
-> +			phys = <&usb_phy 0>;
-> +			phy-names = "usb-phy";
-> +			status = "disabled";
-> +		};
->  		gpio: gpio at 226000 {
->  			compatible = "ti,dm6441-gpio";
->  			gpio-controller;
+> -static struct iommu_gather_ops dummy_tlb_ops __initdata = {
+> +static const struct iommu_gather_ops dummy_tlb_ops __initconst = {
+>  	.tlb_flush_all	= dummy_tlb_flush_all,
+>  	.tlb_add_flush	= dummy_tlb_add_flush,
+>  	.tlb_sync	= dummy_tlb_sync,
+> --
+> 1.9.1
+>
 >
