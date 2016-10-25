@@ -1,38 +1,31 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 25 Oct 2016 14:14:25 +0200
-Subject: [PATCH/RFT v2 06/17] ARM: davinci: da8xx: Fix some redefined
- symbol warnings
-In-Reply-To: <9fa01842-cf8e-87e9-75ce-5d4b2841fdfe@ti.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-7-ahaslam@baylibre.com>
- <9fa01842-cf8e-87e9-75ce-5d4b2841fdfe@ti.com>
-Message-ID: <0d8e4d79-a8f4-9cad-cc52-7aa5ae49998e@baylibre.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 25 Oct 2016 14:23:01 +0200
+Subject: [v17 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <CAFqH_50_OwsbMWHkT_eukF52BVZYyMbGiamXO=pV4PpJq6BADA@mail.gmail.com>
+References: <1472280263-18177-1-git-send-email-jitao.shi@mediatek.com>
+ <1472280263-18177-2-git-send-email-jitao.shi@mediatek.com>
+ <CAFqH_50_OwsbMWHkT_eukF52BVZYyMbGiamXO=pV4PpJq6BADA@mail.gmail.com>
+Message-ID: <e00519e2-990c-b9b2-71d4-a4c8d36f5e65@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2016 12:03 PM, Sekhar Nori wrote:
-> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->> From: Alexandre Bailon <abailon@baylibre.com>
->>
->> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
->> but da8xx-cfgchip.h intend to replace them.
->> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
->> Remove the old macros.
->>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> 
-> This is a v4.9-rc bug fix. Can you please post it as a separate patch
-> for Greg to pick up?
-> 
-Done
-> You can add:
-> 
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
-Actually, I didn't add it because I had to make few changes to
-submit as a separate patch. I hope I did it in right way.
-> 
-> Thanks,
-> Sekhar
-> 
-Thanks,
-Alexandre
+
+
+On 10/18/2016 04:37 PM, Enric Balletbo Serra wrote:
+[...]
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/bridge/parade-ps8640.c
+[...]
+>> +
+>> +/* Firmware */
+>> +#define PS_FW_NAME             "ps864x_fw.bin"
+>> +
+>
+> From where I can download this firmware image?
+>
+
+I suppose this FW bits have to be added to linux-firmware repository 
+first, before this patch can be accepted.
+
+Regards,
+Matthias
