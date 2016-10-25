@@ -1,80 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 25 Oct 2016 12:24:35 +0200
-Subject: [RFC] shutdown machine when li-ion battery goes below 3V
-In-Reply-To: <201610242348.47484@pali>
-References: <20161024212250.GA31336@amd>
- <20161024212932.uhjz752z2cy5hohl@atomide.com>
- <20161024214152.GA32310@amd> <201610242348.47484@pali>
-Message-ID: <20161025102435.GA6916@amd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 25 Oct 2016 12:28:16 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <20161025091210.rjfhvq4mqtuquei5@tower>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <3851270.xZRcP9hae0@wuerfel> <20161025091210.rjfhvq4mqtuquei5@tower>
+Message-ID: <4146248.jXuviLlvH5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-10-24 23:48:47, Pali Roh?r wrote:
-> On Monday 24 October 2016 23:41:52 Pavel Machek wrote:
-> > On Mon 2016-10-24 14:29:33, Tony Lindgren wrote:
-> > > Also, the shutdown voltage can depend on external devices
-> > > connected. It could be for example 3.3V depending on eMMC on some
-> > > devices while devices with no eMMC could have it at 3.0V.
+On Tuesday, October 25, 2016 10:12:10 PM CEST Michael Cree wrote:
+> On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
+> > I see your point, but I think there are serious issues with the current
+> > approach as well:
 > > 
-> > Actually, I'd like to shutdown at 3.3V or more (like 3.5V), because
-> > going below that is pretty mean to the battery. But if I set
-> > threshold too high, GSM activity will push it below that for a very
-> > short while, and I'll shutdown too soon.
+> > - a lot of the less common architectures just don't get updated
+> >   in time, out of 22 architectures that don't use asm-generic/unistd.h,
+> >   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
 > > 
-> > Ideas welcome...
+> > - some architectures that add all syscalls sometimes make a mistake
+> >   and forget one, e.g. alpha apparently never added __NR_bpf, but it
+> >   did add the later __NR_execveat.
 > 
-> bq27x00 has EDVF flag which means that battery is empty. Maemo with 
-> bq27x00 driver is configured to issue system shutdown when EDVF is set.
+> __NR_bpf was not forgotten on Alpha.  It was not wired up because
+> extra architecture support is needed which has not been implemented.
 > 
-> Maybe kernel should issue emergency shutdown e.g. after minute or two 
-> after EDVF flag is set?
+> But maybe we should just wire it up to sys_ni_syscall in the meantime
+> so a syscall number is reserved for it, and user space can call it to
+> get -ENOSYS returned.
 
-Thanks for pointer.
+Ah, I must have misinterpreted the code then. I assumed that the
+bpf syscall always works on all architectures, but that only the
+jit compiler for it required architecture specific code to make it
+more efficient.
 
-EDVF seems to be exposed as health. ... but only if battery is
-calibrated, AFAICT.
+The implementation of sys_bfp is compile-time selectable at the moment
+and falls back to sys_no_syscall if CONFIG_BPF_SYSCALL is disabled.
+If it doesn't work on Alpha, maybe that symbol could have a "depends
+on !ALPHA" or "depends on BPF_SUPPORT"?
 
- if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
-      dev_info_once(di->dev, "battery is not calibrated! ignoring capacity values\n");
-      ...
-      cache.health = -ENODATA;
+sys_seccomp is another one that falls into a similar category, but
+it already depends on HAVE_ARCH_SECCOMP_FILTER, and most other
+architectures have assigned a syscall number but not set this symbol.
+This one will actually allow you to set strict seccomp mode even
+without the Kconfig symbol, just not allow to set a filter.
 
-Plus, it prioritizes battery cold over battery dead. IMO we don't need
-to shutdown on battery cold (we just may not charge the battery), but
-we need to shutdown on battery dead.
-
-So something like this?
-
-								Pavel
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
-index 8eb2f8f..5ddf6d7 100644
---- a/drivers/power/supply/bq27xxx_battery.c
-+++ b/drivers/power/supply/bq27xxx_battery.c
-@@ -680,10 +680,10 @@ static int bq27xxx_battery_read_health(struct bq27xxx_device_info *di)
- 	/* Unlikely but important to return first */
- 	if (unlikely(bq27xxx_battery_overtemp(di, flags)))
- 		return POWER_SUPPLY_HEALTH_OVERHEAT;
--	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
--		return POWER_SUPPLY_HEALTH_COLD;
- 	if (unlikely(bq27xxx_battery_dead(di, flags)))
- 		return POWER_SUPPLY_HEALTH_DEAD;
-+	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
-+		return POWER_SUPPLY_HEALTH_COLD;
- 
- 	return POWER_SUPPLY_HEALTH_GOOD;
- }
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/199ed265/attachment.sig>
+	Arnd
