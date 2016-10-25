@@ -1,57 +1,34 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Oct 2016 16:59:38 +0100
-Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
- correct compatibles
-In-Reply-To: <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
-References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
- <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
-Message-ID: <383a62dd-b4d7-f764-baf1-ff73691b3cbc@arm.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 25 Oct 2016 10:59:19 -0500
+Subject: [PATCH] ARM: socfpga_defconfig: Enable HIGHMEM
+Message-ID: <1477411159-31558-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
+All of the SoCFPGA boards have at least 1GB of RAM, so enabling HIGHMEM
+is necessary to avoid the following warning:
 
-On 25/10/16 16:26, Lina Iyer wrote:
-> Update domain-idle-state binding to use "domain-idle-state" compatible
-> from Documentation/devicetree/bindings/arm/idle-states.txt.
->
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-> index e165036..6fb53a3 100644
-> --- a/Documentation/devicetree/bindings/power/power_domain.txt
-> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
-> @@ -30,8 +30,9 @@ Optional properties:
->     available in the next section.
->
->  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
-> -                generic domain power state. The idle state definitions are
-> -                compatible with arm,idle-state specified in [1].
-> +                generic domain power state. The idle state definitions must be
-> +                compatible with "domain-idle-state"
+[    0.000000] Truncating RAM at 0x00000000-0x40000000 to -0x30000000
+[    0.000000] Consider using a HIGHMEM enabled kernel.
 
-I would reword the below a bit different so that it's flexible to be
-reused without "arm,idle-state".
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/configs/socfpga_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-> as well as
-> +                "arm,idle-state" as defined in [1].
-
-'Idle states that are "arm,idle-state" compatible are generally
-"domain-idle-state" compatible as well if it's a PM domain.'
-
-or something like that in line with what's in patch 2/4.
-
-That would give us the scope of reuse of "domain-idle-state" in device
-for future. Also it aligns with your patch 4/4.
-
-Otherwise, it looks good.
-
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index 4660506..f5b9bc5 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -25,6 +25,7 @@ CONFIG_PCIE_ALTERA_MSI=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_VFP=y
 -- 
-Regards,
-Sudeep
+1.7.9.5
