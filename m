@@ -1,89 +1,89 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Tue, 25 Oct 2016 08:56:33 +0800
-Subject: [PATCH v2] char: hw_random: atmel-rng: disable TRNG during suspend
-Message-ID: <1477356993-27778-1-git-send-email-wenyou.yang@atmel.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 20:02:00 -0500
+Subject: [PATCH/RFT v2 15/17] usb: host: ohci-da8xx: Add devicetree
+ bindings documentation
+In-Reply-To: <20161024164634.4330-16-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-16-ahaslam@baylibre.com>
+Message-ID: <523928a1-a321-abb6-504f-a1053c88ce53@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To fix the over consumption on the VDDCore due to the TRNG enabled,
-disable the TRNG during suspend, not only disable the user interface
-clock (which is controlled by PMC). Because the user interface clock
-is independent from any clock that may be used in the entropy source
-logic circuitry.
+On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> This patch documents the device tree bindings required for
+> the ohci controller found in TI da8xx family of SoC's
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>  .../devicetree/bindings/usb/ohci-da8xx.txt         | 39 ++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+>
+> diff --git a/Documentation/devicetree/bindings/usb/ohci-da8xx.txt b/Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+> new file mode 100644
+> index 0000000..4251c84
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+> @@ -0,0 +1,39 @@
+> +DA8XX USB OHCI controller
+> +
+> +Required properties:
+> +
+> + - compatible: Should be "ti,da830-ohci"
+> + - reg:        Should contain one register range i.e. start and length
+> + - interrupts: Description of the interrupt line
+> + - phys:       Phandle for the PHY device
+> + - phy-names:  Should be "usb-phy"
+> +
+> +Optional properties:
+> + - vbus-supply: Regulator that controls vbus power
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
 
-Changes in v2:
- - Enable the user interface first, then enable the internal clock
-   when resume.
+Isn't vbus-supply property required?
 
- drivers/char/hw_random/atmel-rng.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+If it is really supposed to be optional, the ohci driver needs to use 
+devm_regulator_get_optional() and handle the case when there is no 
+regulator.
 
-diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-index 0fcc9e6..ae7cae5 100644
---- a/drivers/char/hw_random/atmel-rng.c
-+++ b/drivers/char/hw_random/atmel-rng.c
-@@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
- 		return 0;
- }
- 
-+static void atmel_trng_enable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+}
-+
-+static void atmel_trng_disable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY, trng->base + TRNG_CR);
-+}
-+
- static int atmel_trng_probe(struct platform_device *pdev)
- {
- 	struct atmel_trng *trng;
-@@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+	atmel_trng_enable(trng);
- 	trng->rng.name = pdev->name;
- 	trng->rng.read = atmel_trng_read;
- 
-@@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
- 
- 	hwrng_unregister(&trng->rng);
- 
--	writel(TRNG_KEY, trng->base + TRNG_CR);
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
- 
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -113,8 +124,15 @@ static int atmel_trng_suspend(struct device *dev)
- static int atmel_trng_resume(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(trng->clk);
-+	if (ret)
-+		return ret;
- 
--	return clk_prepare_enable(trng->clk);
-+	atmel_trng_enable(trng);
-+
-+	return 0;
- }
- 
- static const struct dev_pm_ops atmel_trng_pm_ops = {
--- 
-2.7.4
+I don't see a problem with making it required though since one can just 
+use a dummy supply if there is not a real one.
+
+> +
+> +Example for omap138-lck:
+> +
+> +vbus_fixed: fixed-regulator-vbus {
+> +        compatible = "regulator-fixed";
+> +        gpio = <&gpio 109 0>;
+> +        oc-gpio = <&gpio 36 0>;
+> +        regulator-boot-on;
+> +        enable-active-high;
+> +        regulator-name = "vbus";
+> +        regulator-min-microvolt = <5000000>;
+> +        regulator-max-microvolt = <5000000>;
+> +};
+> +
+> +usb_phy: usb-phy {
+> +        compatible = "ti,da830-usb-phy";
+> +        #phy-cells = <1>;
+> +        status = "disabled";
+
+why disabled?
+
+> +};
+> +usb: usb at 0225000 {
+> +        compatible = "ti,da830-ohci";
+> +        reg = <0x225000 0x1000>;
+> +        interrupts = <59>;
+> +        phys = <&usb_phy 1>;
+> +        phy-names = "usb-phy";
+
+missing vbus-supply property
+
+> +        status = "disabled";
+
+why disabled?
+
+> +};
+>
