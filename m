@@ -1,52 +1,121 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 25 Oct 2016 18:25:12 +0200
-Subject: [PATCH 00/10] Add support for STM32 ADC
-Message-ID: <1477412722-24061-1-git-send-email-fabrice.gasnier@st.com>
+Date: Tue, 25 Oct 2016 18:25:16 +0200
+Subject: [PATCH 04/10] iio: adc: stm32: add optional support for exti gpios
+In-Reply-To: <1477412722-24061-1-git-send-email-fabrice.gasnier@st.com>
+References: <1477412722-24061-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1477412722-24061-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for STM32F4 ADC into IIO framework.
-STM32F4 ADC is a 12-bit successive approximation analog-to-digital
-converter. It has up to 19 multiplexed input channels. Conversions can
-be performed in single, continuous, scan or discontinuous mode.
-Conversions can be launched in software or using hardware triggers.
+STM32 ADC may use EXTi signals routed internally as trigger source
+for conversions. Configure them as interrupt to configure this path
+in HW to adc.
+Note: interrupt handler isn't required here, and corresponding interrupt
+can be kept masked at exti controller level.
 
-This driver has been developed and tested on STM32F429 eval board.
-It consist of a core driver, to ease support for other STM32 family
-ADCs, and a specific driver for STM32F4 ADC.
-It allows to use direct or triggered buffer modes with triggers.
-Optional support for DMA and few extended attributes is included.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/stm32/stm32-adc.c | 45 +++++++++++++++++++++++++++++++++++++++
+ drivers/iio/adc/stm32/stm32-adc.h |  3 +++
+ 2 files changed, 48 insertions(+)
 
-Fabrice Gasnier (10):
-  Documentation: dt-bindings: Document STM32 ADC DT bindings
-  iio: adc: Add stm32 support
-  iio: adc: stm32: add optional dma support
-  iio: adc: stm32: add optional support for exti gpios
-  iio: adc: stm32: add trigger polarity ext attr
-  iio: adc: stm32: add ext attrs to configure sampling time
-  ARM: configs: stm32: enable IIO ADC driver
-  ARM: dts: stm32f429: Add adc support
-  ARM: dts: stm32f429: enable adc on eval board
-  ARM: dts: stm32f429: Add dma support to adc
-
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   78 ++
- arch/arm/boot/dts/stm32429i-eval.dts               |   30 +
- arch/arm/boot/dts/stm32f429.dtsi                   |   68 +
- arch/arm/configs/stm32_defconfig                   |    2 +
- drivers/iio/adc/Kconfig                            |    2 +
- drivers/iio/adc/Makefile                           |    1 +
- drivers/iio/adc/stm32/Kconfig                      |   36 +
- drivers/iio/adc/stm32/Makefile                     |    4 +
- drivers/iio/adc/stm32/stm32-adc.c                  | 1334 ++++++++++++++++++++
- drivers/iio/adc/stm32/stm32-adc.h                  |  489 +++++++
- drivers/iio/adc/stm32/stm32f4-adc.c                |  652 ++++++++++
- 11 files changed, 2696 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
- create mode 100644 drivers/iio/adc/stm32/Kconfig
- create mode 100644 drivers/iio/adc/stm32/Makefile
- create mode 100644 drivers/iio/adc/stm32/stm32-adc.c
- create mode 100644 drivers/iio/adc/stm32/stm32-adc.h
- create mode 100644 drivers/iio/adc/stm32/stm32f4-adc.c
-
+diff --git a/drivers/iio/adc/stm32/stm32-adc.c b/drivers/iio/adc/stm32/stm32-adc.c
+index 25d0307..1a13450 100644
+--- a/drivers/iio/adc/stm32/stm32-adc.c
++++ b/drivers/iio/adc/stm32/stm32-adc.c
+@@ -482,6 +482,12 @@ static irqreturn_t stm32_adc_common_isr(int irq, void *data)
+ 	return ret;
+ }
+ 
++static irqreturn_t stm32_adc_exti_handler(int irq, void *data)
++{
++	/* Exti handler should not be invoqued, and is not used */
++	return IRQ_HANDLED;
++}
++
+ /**
+  * stm32_adc_validate_trigger() - validate trigger for stm32 adc
+  * @indio_dev: IIO device
+@@ -1051,6 +1057,41 @@ static void stm32_adc_unregister(struct stm32_adc *adc)
+ 	}
+ }
+ 
++static int stm32_adc_exti_probe(struct stm32_adc_common *common)
++{
++	int i, irq, ret;
++
++	common->gpios = devm_gpiod_get_array_optional(common->dev, NULL,
++						      GPIOD_IN);
++	if (!common->gpios)
++		return 0;
++
++	for (i = 0; i < common->gpios->ndescs; i++) {
++		irq = gpiod_to_irq(common->gpios->desc[i]);
++		if (irq < 0) {
++			dev_err(common->dev, "gpio %d to irq failed\n", i);
++			return irq;
++		}
++
++		ret = devm_request_irq(common->dev, irq, stm32_adc_exti_handler,
++				       0, dev_name(common->dev), common);
++		if (ret) {
++			dev_err(common->dev, "request IRQ %d failed\n", irq);
++			return ret;
++		}
++
++		/*
++		 * gpios are configured as interrupts, so exti trigger path is
++		 * configured in HW. But getting interrupts when starting
++		 * conversions is unused here, so mask it in on exti
++		 * controller by default.
++		 */
++		disable_irq(irq);
++	}
++
++	return 0;
++}
++
+ int stm32_adc_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node, *child;
+@@ -1131,6 +1172,10 @@ int stm32_adc_probe(struct platform_device *pdev)
+ 		goto err_clk_disable;
+ 	}
+ 
++	ret = stm32_adc_exti_probe(common);
++	if (ret)
++		goto err_clk_disable;
++
+ 	/* Parse adc child nodes to retrieve master/slave instances data */
+ 	for_each_available_child_of_node(np, child) {
+ 		ret = stm32_adc_register(common, child);
+diff --git a/drivers/iio/adc/stm32/stm32-adc.h b/drivers/iio/adc/stm32/stm32-adc.h
+index 01a0dda..fe3568b 100644
+--- a/drivers/iio/adc/stm32/stm32-adc.h
++++ b/drivers/iio/adc/stm32/stm32-adc.h
+@@ -23,6 +23,7 @@
+ #define __STM32_ADC_H
+ 
+ #include <linux/dmaengine.h>
++#include <linux/gpio/consumer.h>
+ #include <linux/irq_work.h>
+ 
+ /*
+@@ -323,6 +324,7 @@ struct stm32_adc {
+  * @aclk:		common clock for the analog circuitry
+  * @vref:		regulator reference
+  * @vref_mv:		vref voltage (mv)
++ * @gpio_descs:		gpio descriptor used to configure EXTi triggers
+  * @lock:		mutex
+  */
+ struct stm32_adc_common {
+@@ -335,6 +337,7 @@ struct stm32_adc_common {
+ 	struct clk			*aclk;
+ 	struct regulator		*vref;
+ 	int				vref_mv;
++	struct gpio_descs		*gpios;
+ 	struct mutex			lock;	/* read_raw lock */
+ };
+ 
 -- 
 1.9.1
