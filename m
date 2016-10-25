@@ -1,88 +1,91 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 25 Oct 2016 20:34:48 +0300
-Subject: [PATCH V4 0/5] firmware: Add support for TI System Control
- Interface (TI-SCI) protocol driver
-In-Reply-To: <20161018230837.6515-1-nm@ti.com>
-References: <20161018230837.6515-1-nm@ti.com>
-Message-ID: <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 25 Oct 2016 10:34:38 -0700
+Subject: [PATCH] ARM: imx6: Fix GPC probe error path
+Message-ID: <1477416878-30353-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/10/16 02:08, Nishanth Menon wrote:
-> Version 4 of the series is basically a rebase to v4.9-rc1, no functional
-> changes.
+GPC may fail to instantiate with
 
-Hi,
+imx-gpc: probe of 20dc000.gpc failed with error -22
 
-Any final comments on this series, or shall I send a pull-req forward? 
-Very minimal changes compared to v3 so should be good to go imo.
+which is returned from of_genpd_add_provider_onecell(). The error path
+does not call pm_genpd_remove(). This results in the following crash
+later on.
 
--Tero
+Unhandled fault: page domain fault (0x01b) at 0x00000040
+pgd = c0204000
+[00000040] *pgd=00000000
+Internal error: : 1b [#1] SMP ARM
+Modules linked in:
+CPU: 0 PID: 108 Comm: kworker/0:3 Not tainted 4.9.0-rc2 #8
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Workqueue: pm genpd_power_off_work_fn
+task: c759ea00 task.stack: c766a000
+PC is at mutex_lock+0xc/0x4c
+LR is at regulator_disable+0x28/0x64
+...
+[<c0bc2694>] (mutex_lock) from [<c06e4e8c>] (regulator_disable+0x28/0x64)
+[<c06e4e8c>] (regulator_disable) from [<c0323b68>] (imx6q_pm_pu_power_off+0x90/0x98)
+[<c0323b68>] (imx6q_pm_pu_power_off) from [<c07efb04>] (genpd_poweroff+0x114/0x1d4)
+[<c07efb04>] (genpd_poweroff) from [<c07efdc0>] (genpd_power_off_work_fn+0x20/0x2c)
+[<c07efdc0>] (genpd_power_off_work_fn) from [<c0358f70>] (process_one_work+0x138/0x34c)
+[<c0358f70>] (process_one_work) from [<c03591bc>] (worker_thread+0x38/0x510)
+[<c03591bc>] (worker_thread) from [<c035e48c>] (kthread+0xdc/0xf4)
+[<c035e48c>] (kthread) from [<c0307eb8>] (ret_from_fork+0x14/0x3c)
 
->
-> Texas Instruments' Keystone generation System on Chips (SoC)
-> starting with 66AK2G02[1], now include a dedicated SoC System Control
-> entity called PMMC(Power Management Micro Controller) in line with
-> ARM architecture recommendations. The function of this module is
-> to integrate all system operations in a centralized location.
-> Communication with the SoC System Control entity from various
-> processing units like ARM/DSP occurs over Message Manager hardware
-> block.
->
-> This series adds the base support for TI System Control Interface
-> (TI-SCI) protocol[2]. The protocol is built on top of Texas
-> Instrument's Message Manager communication mechanism[3].
->
-> Overall architecture is very similar to SCPI[4] as follows:
-> +-------------+   +---------+     +------^-----+
-> | TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
-> +------+------+   +----+----+     +------+-----+
->        |               |                 |
->        |          +----v--------------+  |
->        +----------> TISCI Protocol(*) <--+
->                   +----+--------------+
->                        |
->                    +---v-----------+
->                    | MAILBOX  FWK  |
->                    +---+-----------+
->                        |
->                    +---v-----------+
->                    |  TI MSGMGR    |-> TISCI hardware block
->                    +---------------+
-> (*) This series.
->
->
-> V4 of the series is based off v4.9-rc1 and is also available here:
-> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.10/tisci-base-v4
-> Quick boot test: http://pastebin.ubuntu.com/23346183/
->
-> Changes since v3:
-> 	- rebase to v4.9-rc1
-> 	- minor checkpatch fixes
->
-> V3: https://lkml.org/lkml/2016/9/6/747
-> V2: https://lkml.org/lkml/2016/8/30/273
-> V1: https://lkml.org/lkml/2016/8/19/768
->
-> Nishanth Menon (5):
->   Documentation: Add support for TI System Control Interface (TI-SCI)
->     protocol
->   firmware: Add basic support for TI System Control Interface (TI-SCI)
->     protocol
->   firmware: ti_sci: Add support for Device control
->   firmware: ti_sci: Add support for Clock control
->   firmware: ti_sci: Add support for reboot core service
->
->  .../devicetree/bindings/arm/keystone/ti,sci.txt    |   81 +
->  MAINTAINERS                                        |   10 +
->  drivers/firmware/Kconfig                           |   15 +
->  drivers/firmware/Makefile                          |    1 +
->  drivers/firmware/ti_sci.c                          | 1991 ++++++++++++++++++++
->  drivers/firmware/ti_sci.h                          |  492 +++++
->  include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
->  7 files changed, 2839 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->  create mode 100644 drivers/firmware/ti_sci.c
->  create mode 100644 drivers/firmware/ti_sci.h
->  create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
->
+This is seen with multi_v7_defconfig and imx6dl-sabrelite.dtb running in
+qemu (v2.7 patched to fix a qemu related problem). The error return from
+of_genpd_add_provider_onecell() is not seen in v4.8 and may be caused by
+a devicetree change (this is a wild guess only), but that is a different
+problem.
+
+Fixes: 00eb60a8b4f7 ("ARM: imx6: gpc: Add PU power domain for GPU/VPU")
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+Several bisect attempts trying to track down "imx-gpc: probe ... failed
+with error -22" point to commit 00e729c93395 ("Merge tag 'armsoc-dt' of
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc"). I have not
+been able to track down the real culprit. Part of the problem is that
+CONFIG_REGULATOR_ANATOP must be enabled for the problem to be seen, and
+CONFIG_ARCH_AT91 causes compile errors for some sequence of commits between
+v4.8 and v4.9-rc1. But even after taking this into account, the bisect
+results always point to 00e729c93395. If anyone has an idea how to track
+down that problem, or what might be causing it, please let me know.
+
+ arch/arm/mach-imx/gpc.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 0df062d8b2c9..f3f40045b4c9 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -409,6 +409,7 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+ {
+ 	struct clk *clk;
+ 	int i;
++	int ret;
+ 
+ 	imx6q_pu_domain.reg = pu_reg;
+ 
+@@ -431,9 +432,14 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+ 		return 0;
+ 
+ 	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+-	return of_genpd_add_provider_onecell(dev->of_node,
+-					     &imx_gpc_onecell_data);
++	ret = of_genpd_add_provider_onecell(dev->of_node,
++					    &imx_gpc_onecell_data);
++	if (ret)
++		goto genpd_remove;
++	return 0;
+ 
++genpd_remove:
++	pm_genpd_remove(&imx6q_pu_domain.base);
+ clk_err:
+ 	while (i--)
+ 		clk_put(imx6q_pu_domain.clk[i]);
+-- 
+2.5.0
