@@ -1,44 +1,68 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 25 Oct 2016 23:19:50 +0200
-Subject: [PATCH 0/5] ARM: dts: imx: update Boundary Devices boards support
-Message-ID: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+Date: Tue, 25 Oct 2016 23:19:53 +0200
+Subject: [PATCH 3/5] ARM: dts: imx6qdl-sabrelite: add missing USB PHY reset
+ control
+In-Reply-To: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+Message-ID: <20161025211955.5345-4-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Declared as a regulator since the driver doesn't have a reset-gpios
+property for this.
 
-This series includes several patches to update the support for our platforms.
+This ensures that the PHY is woken up, not depending on the state the
+second stage bootloader leaves the pin.
 
-Here are the main goals of this series:
-1- Adding support for our latest SOM (SOM2)
-2- Fix panel naming consistency across the boards
-  -> This way our U-Boot bootscript[1] can easily set the panel compatible.
-3- Fix USB PHY reset for some boards
-  -> U-Boot used to always set the reset pin whether usb was used or not.
-     Anyway, the kernel should not be dependent on the bootloader.
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Let me know if you have any question.
-
-Regards,
-Gary
-
-[1] https://github.com/boundarydevices/u-boot-imx6/blob/boundary-v2016.03/board/boundary/nitrogen6x/6x_bootscript-mainline.txt
-
-Gary Bisson (5):
-  ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2 support
-  ARM: dts: imx6qdl-sabrelite: rename panel nodes
-  ARM: dts: imx6qdl-sabrelite: add missing USB PHY reset control
-  ARM: dts: imx6qdl-nitrogen6x: rename panel nodes
-  ARM: dts: imx6qdl-nitrogen6x: add missing USB PHY reset control
-
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi     |  24 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi      |  24 +-
- 5 files changed, 868 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index cebea8a..bf00267 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -94,6 +94,19 @@
+ 			pinctrl-0 = <&pinctrl_can_xcvr>;
+ 			gpio = <&gpio1 2 GPIO_ACTIVE_LOW>;
+ 		};
++
++		reg_usb_h1_vbus: regulator at 4 {
++			compatible = "regulator-fixed";
++			reg = <4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usbh1>;
++			regulator-name = "usb_h1_vbus";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			regulator-always-on;
++		};
+ 	};
+ 
+ 	gpio-keys {
+@@ -481,6 +494,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_usbh1: usbh1grp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x030b0
++			>;
++		};
++
+ 		pinctrl_usbotg: usbotggrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
+@@ -578,6 +597,7 @@
+ };
+ 
+ &usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
+ 	status = "okay";
+ };
+ 
 -- 
 2.9.3
