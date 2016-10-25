@@ -1,100 +1,123 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 25 Oct 2016 10:49:55 +0200
-Subject: [PATCH v2] char: hw_random: atmel-rng: disable TRNG during suspend
-In-Reply-To: <1477356993-27778-1-git-send-email-wenyou.yang@atmel.com>
-References: <1477356993-27778-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <231367f2-03e2-5bf3-2358-135fec438676@atmel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 25 Oct 2016 16:50:25 +0800
+Subject: [PATCH v2 8/8] ARM: dts: sun6i: hummingbird-a31: Enable display
+ output through VGA bridge
+In-Reply-To: <bac9a59f-df97-245b-f349-bed57dec6aad@codeaurora.org>
+References: <20161020034344.14154-1-wens@csie.org>
+ <20161020034344.14154-9-wens@csie.org>
+ <bac9a59f-df97-245b-f349-bed57dec6aad@codeaurora.org>
+Message-ID: <CAGb2v64bMqixiw=kA5_DyncSW7+=dC8foNvOpYUmNAM3zfL0mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/10/2016 ? 02:56, Wenyou Yang a ?crit :
-> To fix the over consumption on the VDDCore due to the TRNG enabled,
-> disable the TRNG during suspend, not only disable the user interface
-> clock (which is controlled by PMC). Because the user interface clock
-> is independent from any clock that may be used in the entropy source
-> logic circuitry.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+On Tue, Oct 25, 2016 at 4:13 PM, Archit Taneja <architt@codeaurora.org> wrote:
+>
+>
+> On 10/20/2016 09:13 AM, Chen-Yu Tsai wrote:
+>>
+>> The Hummingbird A31 board has a RGB-to-VGA bridge which converts RGB
+>> output from the LCD interface to VGA signals.
+>>
+>> Enable this part of the display pipeline.
+>
+>
+> I couldn't find the enable-gpios binding for the bridge that you
+> introduced in the previous patch. Is that intentional?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Error on my part. Thanks for spotting that.
 
-Thanks
+ChenYu
 
-> ---
-> 
-> Changes in v2:
->  - Enable the user interface first, then enable the internal clock
->    when resume.
-> 
->  drivers/char/hw_random/atmel-rng.c | 24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-> index 0fcc9e6..ae7cae5 100644
-> --- a/drivers/char/hw_random/atmel-rng.c
-> +++ b/drivers/char/hw_random/atmel-rng.c
-> @@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
->  		return 0;
->  }
->  
-> +static void atmel_trng_enable(struct atmel_trng *trng)
-> +{
-> +	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-> +}
-> +
-> +static void atmel_trng_disable(struct atmel_trng *trng)
-> +{
-> +	writel(TRNG_KEY, trng->base + TRNG_CR);
-> +}
-> +
->  static int atmel_trng_probe(struct platform_device *pdev)
->  {
->  	struct atmel_trng *trng;
-> @@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> -	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-> +	atmel_trng_enable(trng);
->  	trng->rng.name = pdev->name;
->  	trng->rng.read = atmel_trng_read;
->  
-> @@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
->  
->  	hwrng_unregister(&trng->rng);
->  
-> -	writel(TRNG_KEY, trng->base + TRNG_CR);
-> +	atmel_trng_disable(trng);
->  	clk_disable_unprepare(trng->clk);
->  
->  	return 0;
-> @@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
->  {
->  	struct atmel_trng *trng = dev_get_drvdata(dev);
->  
-> +	atmel_trng_disable(trng);
->  	clk_disable_unprepare(trng->clk);
->  
->  	return 0;
-> @@ -113,8 +124,15 @@ static int atmel_trng_suspend(struct device *dev)
->  static int atmel_trng_resume(struct device *dev)
->  {
->  	struct atmel_trng *trng = dev_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(trng->clk);
-> +	if (ret)
-> +		return ret;
->  
-> -	return clk_prepare_enable(trng->clk);
-> +	atmel_trng_enable(trng);
-> +
-> +	return 0;
->  }
->  
->  static const struct dev_pm_ops atmel_trng_pm_ops = {
-> 
-
-
--- 
-Nicolas Ferre
+>
+> Thanks,
+> Archit
+>
+>
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 56
+>> +++++++++++++++++++++++++++++
+>>  1 file changed, 56 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> index 9a74637f677f..05a49b2147f1 100644
+>> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+>> @@ -63,6 +63,49 @@
+>>                 stdout-path = "serial0:115200n8";
+>>         };
+>>
+>> +       bridge {
+>> +               compatible = "dumb-vga-dac";
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +
+>> +               ports {
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       port at 0 {
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +                               reg = <0>;
+>> +
+>> +                               vga_bridge_in: endpoint at 0 {
+>> +                                       reg = <0>;
+>> +                                       remote-endpoint =
+>> <&tcon0_out_vga>;
+>> +                               };
+>> +                       };
+>> +
+>> +                       port at 1 {
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +                               reg = <1>;
+>> +
+>> +                               vga_bridge_out: endpoint at 0 {
+>> +                                       reg = <0>;
+>> +                                       remote-endpoint = <&vga_con_in>;
+>> +                               };
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +       vga {
+>> +               compatible = "vga-connector";
+>> +
+>> +               port {
+>> +                       vga_con_in: endpoint {
+>> +                               remote-endpoint = <&vga_bridge_out>;
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>>         wifi_pwrseq: wifi_pwrseq {
+>>                 compatible = "mmc-pwrseq-simple";
+>>                 reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
+>> @@ -245,6 +288,19 @@
+>>         status = "okay";
+>>  };
+>>
+>> +&tcon0 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&lcd0_rgb888_pins>;
+>> +       status = "okay";
+>> +};
+>> +
+>> +&tcon0_out {
+>> +       tcon0_out_vga: endpoint at 0 {
+>> +               reg = <0>;
+>> +               remote-endpoint = <&vga_bridge_in>;
+>> +       };
+>> +};
+>> +
+>>  &uart0 {
+>>         pinctrl-names = "default";
+>>         pinctrl-0 = <&uart0_pins_a>;
+>>
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
