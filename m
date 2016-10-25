@@ -1,29 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 18:32:48 -0500
-Subject: [PATCH] ARM: DTS: da850: Add DMA to SPI0
-Message-ID: <1477438368-16208-1-git-send-email-david@lechnology.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 26 Oct 2016 12:52:42 +1300
+Subject: [PATCH] ARM: mvebu: Update comment for main PLL frequency
+Message-ID: <20161025235242.31764-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the bindings for DMA on SPI0
+The actual frequency was updated in commit ae142bd99765 ("ARM: mvebu:
+Fix the main PLL frequency on Armada 375, 38x and 39x SoCs") but the
+comment was not updated. Update it now.
 
-Signed-off-by: David Lechner <david@lechnology.com>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- arch/arm/boot/dts/da850.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/armada-375.dtsi | 2 +-
+ arch/arm/boot/dts/armada-38x.dtsi | 2 +-
+ arch/arm/boot/dts/armada-39x.dtsi | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 06a5abc..baadebe 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -349,6 +349,8 @@
- 			num-cs = <6>;
- 			ti,davinci-spi-intr-line = <1>;
- 			interrupts = <20>;
-+			dmas = <&edma0 14 0>, <&edma0 15 0>;
-+			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
- 		spi1: spi at 30e000 {
+diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
+index cc952cf8ec30..45fa92f9cf5c 100644
+--- a/arch/arm/boot/dts/armada-375.dtsi
++++ b/arch/arm/boot/dts/armada-375.dtsi
+@@ -65,7 +65,7 @@
+ 	};
+ 
+ 	clocks {
+-		/* 2 GHz fixed main PLL */
++		/* 1 GHz fixed main PLL */
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index 2d7668848c5a..7450e9fea45d 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -661,7 +661,7 @@
+ 	};
+ 
+ 	clocks {
+-		/* 2 GHz fixed main PLL */
++		/* 1 GHz fixed main PLL */
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
+index 34cba87f9200..de171baffcf6 100644
+--- a/arch/arm/boot/dts/armada-39x.dtsi
++++ b/arch/arm/boot/dts/armada-39x.dtsi
+@@ -573,7 +573,7 @@
+ 	};
+ 
+ 	clocks {
+-		/* 2 GHz fixed main PLL */
++		/* 1 GHz fixed main PLL */
+ 		mainpll: mainpll {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
 -- 
-2.7.4
+2.10.1
