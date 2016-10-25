@@ -1,94 +1,85 @@
 From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Tue, 25 Oct 2016 20:35:45 +0800
-Subject: [PATCH 6/6] arm64: dts: ls1046a: add PCIe dts node
-In-Reply-To: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1477398945-22774-6-git-send-email-Minghuan.Lian@nxp.com>
+Date: Tue, 25 Oct 2016 20:36:56 +0800
+Subject: [PATCH] pci: layerscape: add LS1046a support
+Message-ID: <1477399016-22826-1-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LS1046a has three PCIe controllers.
+From: "mingkai.hu@nxp.com" <mingkai.hu@nxp.com>
+
+1. LS1046a PCIe controller has a different LUT_DBG offset.
+Available "lut_dbg" is added to ls_pcie_drvdata to describe
+this difference.
+2. Match LS1046 PCIe compatible
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Signed-off-by: Mingkai Hu <mingkai.hu@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 66 ++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
+ drivers/pci/host/pci-layerscape.c                        | 13 ++++++++++++-
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index 5509dca..427cba4 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -543,5 +543,71 @@
- 					     <0 157 0x4>;
- 			};
- 		};
-+
-+		pcie at 3400000 {
-+			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
-+			       0x40 0x00000000 0x0 0x00002000>; /* configuration space */
-+			reg-names = "regs", "config";
-+			interrupts = <0 118 0x4>, /* controller interrupt */
-+				     <0 117 0x4>; /* PME interrupt */
-+			interrupt-names = "aer", "pme";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			dma-coherent;
-+			num-lanes = <4>;
-+			bus-range = <0x0 0xff>;
-+			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-+				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-+			msi-parent = <&msi>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 7>;
-+			interrupt-map = <0000 0 0 1 &gic 0 110 0x4>;
-+		};
-+
-+		pcie at 3500000 {
-+			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
-+			       0x48 0x00000000 0x0 0x00002000>; /* configuration space */
-+			reg-names = "regs", "config";
-+			interrupts = <0 128 0x4>,
-+				     <0 127 0x4>;
-+			interrupt-names = "aer", "pme";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			dma-coherent;
-+			num-lanes = <2>;
-+			bus-range = <0x0 0xff>;
-+			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
-+				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-+			msi-parent = <&msi>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 7>;
-+			interrupt-map = <0000 0 0 1 &gic 0 120 0x4>;
-+		};
-+
-+		pcie at 3600000 {
-+			compatible = "fsl,ls1046a-pcie", "snps,dw-pcie";
-+			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
-+			       0x50 0x00000000 0x0 0x00002000>; /* configuration space */
-+			reg-names = "regs", "config";
-+			interrupts = <0 162 0x4>,
-+				     <0 161 0x4>;
-+			interrupt-names = "aer", "pme";
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			dma-coherent;
-+			num-lanes = <2>;
-+			bus-range = <0x0 0xff>;
-+			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
-+				  0x82000000 0x0 0x40000000 0x50 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-+			msi-parent = <&msi>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0 0 0 7>;
-+			interrupt-map = <0000 0 0 1 &gic 0 154 0x4>;
-+		};
- 	};
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 41e9f55..ee1c72d5 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -15,6 +15,7 @@ Required properties:
+ - compatible: should contain the platform identifier such as:
+         "fsl,ls1021a-pcie", "snps,dw-pcie"
+         "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
++        "fsl,ls1046a-pcie"
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 958187f..8cebf9a 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -41,6 +41,7 @@
+ struct ls_pcie_drvdata {
+ 	u32 lut_offset;
+ 	u32 ltssm_shift;
++	u32 lut_dbg;
+ 	struct pcie_host_ops *ops;
  };
+ 
+@@ -134,7 +135,7 @@ static int ls_pcie_link_up(struct pcie_port *pp)
+ 	struct ls_pcie *pcie = to_ls_pcie(pp);
+ 	u32 state;
+ 
+-	state = (ioread32(pcie->lut + PCIE_LUT_DBG) >>
++	state = (ioread32(pcie->lut + pcie->drvdata->lut_dbg) >>
+ 		 pcie->drvdata->ltssm_shift) &
+ 		 LTSSM_STATE_MASK;
+ 
+@@ -196,18 +197,28 @@ static int ls_pcie_msi_host_init(struct pcie_port *pp,
+ static struct ls_pcie_drvdata ls1043_drvdata = {
+ 	.lut_offset = 0x10000,
+ 	.ltssm_shift = 24,
++	.lut_dbg = 0x7fc,
++	.ops = &ls_pcie_host_ops,
++};
++
++static struct ls_pcie_drvdata ls1046_drvdata = {
++	.lut_offset = 0x80000,
++	.ltssm_shift = 24,
++	.lut_dbg = 0x407fc,
+ 	.ops = &ls_pcie_host_ops,
+ };
+ 
+ static struct ls_pcie_drvdata ls2080_drvdata = {
+ 	.lut_offset = 0x80000,
+ 	.ltssm_shift = 0,
++	.lut_dbg = 0x7fc,
+ 	.ops = &ls_pcie_host_ops,
+ };
+ 
+ static const struct of_device_id ls_pcie_of_match[] = {
+ 	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+ 	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
++	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
+ 	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
+ 	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
+ 	{ },
 -- 
 1.9.1
