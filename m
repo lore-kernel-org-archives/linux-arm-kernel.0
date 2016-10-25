@@ -1,64 +1,136 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 25 Oct 2016 12:07:51 +0530
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com>
-Message-ID: <7024bec3-2ebe-db82-12e2-6d6bcc664c6b@ti.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 25 Oct 2016 12:13:52 +0530
+Subject: [PATCH 3/4] iommu/arm-smmu: Add context save restore support
+In-Reply-To: <CANLsYkxumkKodObeH9N4KGecsWYpwEo1DfR1WrBctzRY-ESFrg@mail.gmail.com>
+References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
+ <1477070066-15044-4-git-send-email-sricharan@codeaurora.org>
+ <CANLsYkxumkKodObeH9N4KGecsWYpwEo1DfR1WrBctzRY-ESFrg@mail.gmail.com>
+Message-ID: <009401d22e8b$29eb1610$7dc14230$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On Tuesday 25 October 2016 11:46 AM, John Syne wrote:
-> 
->> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
+>> The smes registers and the context bank registers are
+>> back. The data required to configure the context banks
+>> are the master's domain data and pgtable cfgs.
+>> So store them as a part of the context banks info
+>> the ones that are needs to be saved and restored.
+>> Fortunately the smes are already stored as a part
+>> of the smmu device structure. So just write that
+>> and just reconfigure the context banks on the restore
+>> path.
 >>
->>>
->>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>
-[...]
->>>>>>
->>>>>> ---
->>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
->>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>> index b9a53e0..96c4207 100644
->>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>> @@ -90,7 +90,7 @@
->>>>>> /* Delay register */
->>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
->>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
->>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
->>>> Wouldn?t this be better to add this to the devicetree?
->>>>
->>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->>>
->>> For a touch screen, there is not need to change in these parameter
->>> settings, so my opinion is to keep it as is. Or am I missing something?
->> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen.
-> 
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 52 +++++++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 51 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 45f2762..578cdc2 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -328,6 +328,11 @@ struct arm_smmu_master_cfg {
+>>  #define for_each_cfg_sme(fw, i, idx) \
+>>         for (i = 0; idx = __fwspec_cfg(fw)->smendx[i], i < fw->num_ids; ++i)
+>>
+>> +struct cbinfo {
+>> +       struct arm_smmu_domain          *domain;
+>> +       struct io_pgtable_cfg           pgtbl_cfg;
+>> +};
+>> +
+>>  struct arm_smmu_device {
+>>         struct device                   *dev;
+>>
+>> @@ -378,6 +383,9 @@ struct arm_smmu_device {
+>>         struct clk                      **clocks;
+>>
+>>         u32                             cavium_id_base; /* Specific to Cavium */
+>> +
+>> +       /* For save/restore of context bank registers */
+>> +       struct cbinfo                   *cb_saved_ctx;
+>
+>It's not that clear to me this will become an array - better
+>documentation would help reviewing the code.
 
-ti_am335x_adc driver already supports above DT parameters and its upto
-the user to adjust these parameters as required.
+   ok, will add the doc for this.
 
-> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
-> 
-> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
-> 
-> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
-> 
+>
+>>  };
+>>
+>>  enum arm_smmu_context_fmt {
+>> @@ -972,6 +980,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>>
+>>         /* Initialise the context bank with our page table cfg */
+>>         arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+>> +       smmu->cb_saved_ctx[cfg->cbndx].domain = smmu_domain;
+>> +       smmu->cb_saved_ctx[cfg->cbndx].pgtbl_cfg = pgtbl_cfg;
+>>
+>>         /*
+>>          * Request context fault interrupt. Do this last to avoid the
+>> @@ -1861,6 +1871,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+>>         }
+>>         dev_notice(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+>>                    smmu->num_context_banks, smmu->num_s2_context_banks);
+>> +
+>> +       smmu->cb_saved_ctx = devm_kzalloc(smmu->dev,
+>> +                            sizeof(struct cbinfo) * smmu->num_context_banks,
+>> +                            GFP_KERNEL);
+>>         /*
+>>          * Cavium CN88xx erratum #27704.
+>>          * Ensure ASID and VMID allocation is unique across all SMMUs in
+>> @@ -2115,8 +2129,44 @@ static int arm_smmu_resume(struct device *dev)
+>>  {
+>>         struct platform_device *pdev = to_platform_device(dev);
+>>         struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+>> +       struct arm_smmu_domain *domain = NULL;
+>> +       struct io_pgtable_cfg *pgtbl_cfg = NULL;
+>> +       struct arm_smmu_smr *smrs = smmu->smrs;
+>> +       int i = 0, idx, cb, ret, pcb = 0;
+>> +
+>> +       ret = arm_smmu_enable_clocks(smmu);
+>> +       if (ret)
+>> +               return ret;
+>> +
+>> +       arm_smmu_device_reset(smmu);
+>>
+>> -       return arm_smmu_enable_clocks(smmu);
+>> +       /* Restore the smes and the context banks */
+>> +       for (idx = 0; idx < smmu->num_mapping_groups; ++idx) {
+>> +               mutex_lock(&smmu->stream_map_mutex);
+>> +               if (!smrs[idx].valid) {
+>> +                       mutex_unlock(&smmu->stream_map_mutex);
+>> +                       continue;
+>> +               }
+>> +
+>> +               arm_smmu_write_sme(smmu, idx);
+>> +               cb = smmu->s2crs[idx].cbndx;
+>> +               mutex_unlock(&smmu->stream_map_mutex);
+>> +
+>> +               if (!i || (cb != pcb)) {
+>> +                       domain = smmu->cb_saved_ctx[cb].domain;
+>> +                       pgtbl_cfg = &smmu->cb_saved_ctx[cb].pgtbl_cfg;
+>> +
+>> +                       if (domain) {
+>> +                               mutex_lock(&domain->init_mutex);
+>> +                               arm_smmu_init_context_bank(domain, pgtbl_cfg);
+>> +                               mutex_unlock(&domain->init_mutex);
+>> +                       }
+>> +               }
+>> +               pcb = cb;
+>> +               i++;
+>
+>What are you doing with variable 'i'?  Again, some comments would
+>greatly help with reviewing.
 
-Touchscreen driver (ti_am335x_tsc.c) does not support above DT parameters.
+       hmm, i was using  variable 'i' to pass through the 'if' first time
+       even if cb != pcb, because pcb is uninitialized at that point.
+        But i could just initialize 'pcb' with some -EINVAL and then
+      avoid the extra 'i' itself.  Also check for cb != pcb was required
+      because same context bank could be populated multiple times
+      for different sids in sequence.  I will document these and send V2.
+  
+      Thanks for your time to review this.
 
--- 
-Regards
-Vignesh
+Regards,
+ Sricharan
