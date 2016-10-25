@@ -1,7 +1,7 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 25 Oct 2016 20:10:00 +0200
+Date: Tue, 25 Oct 2016 20:20:52 +0200
 Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
-In-Reply-To: <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
+In-Reply-To: <1477409478.2482.113.camel@baylibre.com>
 References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
  <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
  <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
@@ -12,36 +12,39 @@ References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
  <dee26f0b-e175-f8a0-2b73-08e8e324841c@arm.com>
  <1477405332.2482.87.camel@baylibre.com>
  <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
-Message-ID: <CACRpkdba_iaOK61KiQGvJZYuz7-PiBgtN4vxv__tJLsZ8ZVL=w@mail.gmail.com>
+ <1477409478.2482.113.camel@baylibre.com>
+Message-ID: <CACRpkdbGo4BJOdzkgBrE9jT-rKodd4zssCnOtOuGS+OqV-Uc6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 4:47 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 25/10/16 15:22, Jerome Brunet wrote:
+On Tue, Oct 25, 2016 at 5:31 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Tue, 2016-10-25 at 15:47 +0100, Marc Zyngier wrote:
 
->> There is a few problems to guarantee that gpio == hwirq.
->> 1. We have 2 instances of pinctrl, to guarantee that the linux gpio
->> number == hwirq, we would have to guarantee the order in which they are
->> probed. At least this my understanding
->
-> Maybe I wasn't clear enough, and my use of gpio is probably wrong. So
-> Linux has a gpio number, which is obviously an abstract number (just
-> like the Linux irq number). But the pad number, in the context of given
-> SoC, is constant. So we have:
->
->         pad->gpio
->         hwirq->irq
->
-> Why can't you have pad == hwirq, always? This is already what you have
-> in the irqchip driver. This would simplify a lot of things.
+>> Is gpio_to_irq() supposed to allocate an interrupt? Or merely to
+>> report the existence of a mapping?
 
-My thought as well.
+It should provide an IRQ corresponding to the gpio line, if possible.
 
-We usually refer to the local numberspace on the GPIO controller
-as "offsets", so line offsets 0...31 on a gpiochip with 31 lines.
+However the semantic is such, that it is not necessary to call to_irq()
+before using an IRQ: the irqchip and gpiochip abstractions should be
+orthogonal.
 
-The ngpio in struct gpio_chip is the number of lines on that controller,
-and should nominally map 1:1 to hwirq sources.
+This goes especially when using device tree or ACPI, where you
+may reference an IRQ from something modeled as irqchip, which
+is simultaneously a gpiochip.
+
+> Linus, please correct me if I'm wrong,
+> .to_irq gets the linux gpio number and returns the linux virtual irq
+> numbers, 0 if there is no interrupt.
+
+Yes. But it may *or may not* be called before using the IRQ.
+
+So it should look up or try to create a mapping on request, but not
+assume to have been called before using some line as IRQ.
+
+The only thing you should assume to be called before an interrupt
+is put to use is the stuff in irqchip. So you have to do your
+dynamic irqdomain mapping elsewhere than .to_irq().
 
 Yours,
 Linus Walleij
