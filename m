@@ -1,39 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 25 Oct 2016 10:02:39 -0700
-Subject: [PATCH v2 0/4] ARM: K2G: Add support for TI-SCI Generic PM Domains
-In-Reply-To: <20161019203347.17893-1-d-gerlach@ti.com> (Dave Gerlach's message
- of "Wed, 19 Oct 2016 15:33:43 -0500")
-References: <20161019203347.17893-1-d-gerlach@ti.com>
-Message-ID: <7hr374uztc.fsf@baylibre.com>
+From: rth@twiddle.net (Richard Henderson)
+Date: Tue, 25 Oct 2016 10:03:43 -0700
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <4146248.jXuviLlvH5@wuerfel>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <3851270.xZRcP9hae0@wuerfel> <20161025091210.rjfhvq4mqtuquei5@tower>
+ <4146248.jXuviLlvH5@wuerfel>
+Message-ID: <d113bb21-cf52-6531-10b4-f73fc0b9e809@twiddle.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Gerlach <d-gerlach@ti.com> writes:
+On 10/25/2016 03:28 AM, Arnd Bergmann wrote:
+> On Tuesday, October 25, 2016 10:12:10 PM CEST Michael Cree wrote:
+>> On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
+>>> I see your point, but I think there are serious issues with the current
+>>> approach as well:
+>>>
+>>> - a lot of the less common architectures just don't get updated
+>>>   in time, out of 22 architectures that don't use asm-generic/unistd.h,
+>>>   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
+>>>
+>>> - some architectures that add all syscalls sometimes make a mistake
+>>>   and forget one, e.g. alpha apparently never added __NR_bpf, but it
+>>>   did add the later __NR_execveat.
+>>
+>> __NR_bpf was not forgotten on Alpha.  It was not wired up because
+>> extra architecture support is needed which has not been implemented.
+>>
+>> But maybe we should just wire it up to sys_ni_syscall in the meantime
+>> so a syscall number is reserved for it, and user space can call it to
+>> get -ENOSYS returned.
+> 
+> Ah, I must have misinterpreted the code then. I assumed that the
+> bpf syscall always works on all architectures, but that only the
+> jit compiler for it required architecture specific code to make it
+> more efficient.
 
-> Hi,
-> This is v2 of the series to add support for TI SCI PM Domains. v1 of
-> the series can be found here [1]. Several things have changed since v1:
->
-> - New patch to add a void *data to struct generic_pm_domain_data to
->   allow to store per device data associated with a genpd
-> - From v1, squash patch 1 and 2 to introduce docs and dt-bindings in
->   one patch based on comment from Ulf
-> - Fix some grammar errors in Documentation
-> - Based on comments from Ulf, rework actual genpd implementation to
->   avoid creating one genpd per device and instead use device start/stop
->   hooks provided as part of genpd to control device state based on pm_runtime
->   implementation. Also make use of new of_genpd_add_provider_simple API
->   introduced by Jon Hunter and do not provide custom of_xlate to genpd core,
->   instead registering devices as they probe through attach_dev hook provided
->   by genpd framework.
->
-> Most of the changes were motivated by the comments from Ulf Hannson on v1 that we
-> should not use a 1-to-1 genpd to device mapping. The new approach allows us to
-> create a single genpd and store information about each device as they attach to
-> the genpd. Then the device start/stop hooks for that genpd leverage the
-> per-device data to control power states over the TI SCI protocol.
->
-> This driver makes use of the ti_sci driver sent here [2] by Nishanth Menon and
-> applies on top of his series on v4.9-rc1.
+That was my interpretation as well.  What's the problem, Michael?
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+
+r~
