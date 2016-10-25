@@ -1,51 +1,42 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 25 Oct 2016 11:37:18 +0200
-Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
- platform declaration.
-In-Reply-To: <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-3-ahaslam@baylibre.com>
- <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
-Message-ID: <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 25 Oct 2016 11:37:58 +0200
+Subject: [PATCH v3 1/2] ARM: at91: define LPDDR types
+In-Reply-To: <20161025093759.20913-1-alexandre.belloni@free-electrons.com>
+References: <20161025093759.20913-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20161025093759.20913-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekar,
+The Atmel MPDDR controller support LPDDR2 and LPDDR3 memories, add their
+types.
 
-On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->> From: David Lechner <david@lechnology.com>
->>
->> The CFGCHIP registers are used by a number of devices, so using a syscon
->> device to share them. The first consumer of this will by the phy-da8xx-usb
->> driver.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> [Axel: minor fix: change id to -1]
->
-> Can you please clarify this change? There could be other syscon devices
-> on the chip for other common registers. Why use the singular device-id?
->
+Cc: <stable@vger.kernel.org> # 4.4+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ include/soc/at91/at91sam9_ddrsdr.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-in the case of non DT boot, the phy driver is looking for "syscon" :
-
-d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
-
-if we register the syscon driver with id = 0, the actual name of the syscon
-device will be "syscon.0" and the phy driver will fail to probe, because
-the strncmp match in the syscon driver (syscon_match_pdevname)
-will fail.
-
-should i change the phy driver instead?
-
-
-Regards,
-Axel.
-
-
-
->> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->
-> Thanks,
-> Sekhar
->
+diff --git a/include/soc/at91/at91sam9_ddrsdr.h b/include/soc/at91/at91sam9_ddrsdr.h
+index dc10c52e0e91..393362bdb860 100644
+--- a/include/soc/at91/at91sam9_ddrsdr.h
++++ b/include/soc/at91/at91sam9_ddrsdr.h
+@@ -81,6 +81,7 @@
+ #define			AT91_DDRSDRC_LPCB_POWER_DOWN		2
+ #define			AT91_DDRSDRC_LPCB_DEEP_POWER_DOWN	3
+ #define		AT91_DDRSDRC_CLKFR	(1 << 2)	/* Clock Frozen */
++#define		AT91_DDRSDRC_LPDDR2_PWOFF	(1 << 3)	/* LPDDR Power Off */
+ #define		AT91_DDRSDRC_PASR	(7 << 4)	/* Partial Array Self Refresh */
+ #define		AT91_DDRSDRC_TCSR	(3 << 8)	/* Temperature Compensated Self Refresh */
+ #define		AT91_DDRSDRC_DS		(3 << 10)	/* Drive Strength */
+@@ -96,7 +97,9 @@
+ #define			AT91_DDRSDRC_MD_SDR		0
+ #define			AT91_DDRSDRC_MD_LOW_POWER_SDR	1
+ #define			AT91_DDRSDRC_MD_LOW_POWER_DDR	3
++#define			AT91_DDRSDRC_MD_LPDDR3		5
+ #define			AT91_DDRSDRC_MD_DDR2		6	/* [SAM9 Only] */
++#define			AT91_DDRSDRC_MD_LPDDR2		7
+ #define		AT91_DDRSDRC_DBW	(1 << 4)		/* Data Bus Width */
+ #define			AT91_DDRSDRC_DBW_32BITS		(0 <<  4)
+ #define			AT91_DDRSDRC_DBW_16BITS		(1 <<  4)
+-- 
+2.9.3
