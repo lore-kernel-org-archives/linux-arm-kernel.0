@@ -1,36 +1,60 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 25 Oct 2016 23:09:18 +0800
-Subject: [PATCH v3 03/14] ACPI: ARM64: IORT: add missing comment for
- iort_dev_find_its_id()
-In-Reply-To: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
-References: <1477408169-22217-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1477408169-22217-4-git-send-email-guohanjun@huawei.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 25 Oct 2016 23:24:30 +0800
+Subject: [PATCH v6 00/16] ACPI IORT ARM SMMU support
+In-Reply-To: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
+References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
+Message-ID: <e52c2ad5-08fc-f236-a768-fbf03dd3d552@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On 2016/10/19 0:03, Lorenzo Pieralisi wrote:
+> This patch series is v6 of a previous posting:
+>
+> https://lkml.org/lkml/2016/9/9/418
+>
+> v5 -> v6
+> 	- Rebased against v4.9-rc1
+> 	- Changed FWNODE_IOMMU to FWNODE_ACPI_STATIC
+> 	- Moved platform devices creation into IORT code
+> 	- Updated fwnode handling
+> 	- Added default dma masks initialization
+>
+> v4 -> v5
+> 	- Added SMMUv1/v2 support
+> 	- Rebased against v4.8-rc5 and dependencies series
+> 	- Consolidated IORT platform devices creation
+>
+[...]
+>
+> The ACPI IORT table provides information that allows instantiating
+> ARM SMMU devices and carrying out id mappings between components on
+> ARM based systems (devices, IOMMUs, interrupt controllers).
+>
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+>
+> Building on basic IORT support, this patchset enables ARM SMMUs support
+> on ACPI systems.
+>
+> Most of the code is aimed at building the required generic ACPI
+> infrastructure to create and enable IOMMU components and to bring
+> the IOMMU infrastructure for ACPI on par with DT, which is going to
+> make future ARM SMMU components easier to integrate.
+>
+[...]
+>
+> This patchset is provided for review/testing purposes here:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/iort-smmu-v6
+>
+> Tested on Juno and FVP models for ARM SMMU v1 and v3 probing path.
 
-We are missing req_id's comment for iort_dev_find_its_id(),
-add it back.
+I rebased my platform MSI, interrupt producer and mbi-gen patch set
+on top of yours, and test it on Hisilicon D03 board with SMMv3
+enabled, USB and SAS are working properly with configuration
+in IORT (yes, I need to add patch from Robin - iommu/arm-smmu: Don't
+inadvertently reject multiple SMMUv3s),
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/acpi/arm64/iort.c | 1 +
- 1 file changed, 1 insertion(+)
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index ee68cfc..03bae2c 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -446,6 +446,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- /**
-  * iort_dev_find_its_id() - Find the ITS identifier for a device
-  * @dev: The device.
-+ * @req_id: Device's Requster ID
-  * @idx: Index of the ITS identifier list.
-  * @its_id: ITS identifier.
-  *
--- 
-1.7.12.4
+Thanks
+Hanjun
