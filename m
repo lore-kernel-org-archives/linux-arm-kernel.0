@@ -1,66 +1,88 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 10:44:44 -0500
-Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
-In-Reply-To: <0b7cf7a1-e234-2868-dfde-347c92c23829@ti.com>
-References: <1477075018-20176-1-git-send-email-david@lechnology.com>
- <1477075018-20176-6-git-send-email-david@lechnology.com>
- <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
- <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
- <b6cd3c47-0df8-266a-2b8d-13c82062b647@lechnology.com>
- <84648cb0-f1fa-d88b-bac2-79208af01ca6@lechnology.com>
- <0b7cf7a1-e234-2868-dfde-347c92c23829@ti.com>
-Message-ID: <565013e4-efbe-df79-a52f-329be51289c5@lechnology.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 25 Oct 2016 17:46:32 +0200 (CEST)
+Subject: [PATCH] drivers: iommu: constify iommu_gather_ops structures
+In-Reply-To: <1477409624-30949-1-git-send-email-bhumirks@gmail.com>
+References: <1477409624-30949-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <alpine.DEB.2.10.1610251746150.3039@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2016 05:58 AM, Sekhar Nori wrote:
-> On Tuesday 25 October 2016 02:50 AM, David Lechner wrote:
->> On 10/24/2016 02:50 PM, David Lechner wrote:
->>> On 10/24/2016 10:50 AM, David Lechner wrote:
->>>> On 10/24/2016 06:58 AM, Sekhar Nori wrote:
->>>>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
->>>>>
->>>>>> +&ehrpwm1 {
->>>>>> +    status = "disabled";
->>>>>
->>>>> Hmm, disabled? Can you add this node when you actually use it?
->>>>
->>>> Not sure why I have this disabled. Like the gpios, the pwms can be used
->>>> via sysfs, so I would like to leave them.
->>>>
->>>
->>> Now I remember why these are disabled. The clock matching is broken.
->>> Only the first ehrpwm and the first ecap get clocks. The others fail.
->>>
->>> I can change these to "okay". It will just result in a kernel error
->>> message until the clocks are fixed.
->>>
->>
->> correction: it is not the clocks that are broken. it is the device names.
->>
->> In  arch/arm/mach-davinci/da8xx-dt.c, we have...
->>
->>
->>     OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
->>     OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
->>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
->>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
->>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
->>
->>
->> Which causes each device to have the same device node name. This causes
->> sysfs errors because it is trying to register a second device at the
->> same sysfs path.
->>
->> If you change the names here, then the device do not work because the
->> clock lookup fails.
->
-> Yeah, this is incorrect (I should have caught it in review). The device
-> id should have been present in the lookup. Can you fix auxdata and clock
-> lookup too and send a separate patch? Its probably a v4.9-rc candidate.
->
-> Thanks,
-> Sekhar
->
+On Tue, 25 Oct 2016, Bhumika Goyal wrote:
 
-Yes, I can do this.
+> Check for iommu_gather_ops structures that are only stored in the tlb
+> field of an io_pgtable_cfg structure. The tlb field is of type
+> const struct iommu_gather_ops *, so iommu_gather_ops structures
+> having this property can be declared as const.
+> Done using Coccinelle:
+>
+> @r1 disable optional_qualifier @
+> identifier i;
+> position p;
+> @@
+> static struct iommu_gather_ops i at p = {...};
+>
+> @ok1@
+> identifier r1.i;
+> position p;
+> struct io_pgtable_cfg q;
+> @@
+> q.tlb=&i at p;
+>
+> @bad@
+> position p!={r1.p,ok1.p};
+> identifier r1.i;
+> @@
+> i at p
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> static
+> +const
+> struct iommu_gather_ops i={...};
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> +const
+> struct iommu_gather_ops i;
+>
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+
+> ---
+>  drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
+>  drivers/iommu/ipmmu-vmsa.c         | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> index f50e51c..1465bbc 100644
+> --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> @@ -741,7 +741,7 @@ static void dummy_tlb_sync(void *cookie)
+>  	WARN_ON(cookie != cfg_cookie);
+>  }
+>
+> -static struct iommu_gather_ops dummy_tlb_ops = {
+> +static const struct iommu_gather_ops dummy_tlb_ops = {
+>  	.tlb_flush_all	= dummy_tlb_flush_all,
+>  	.tlb_add_flush	= dummy_tlb_add_flush,
+>  	.tlb_sync	= dummy_tlb_sync,
+> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+> index ace331d..b8bcf18 100644
+> --- a/drivers/iommu/ipmmu-vmsa.c
+> +++ b/drivers/iommu/ipmmu-vmsa.c
+> @@ -283,7 +283,7 @@ static void ipmmu_tlb_add_flush(unsigned long iova, size_t size,
+>  	/* The hardware doesn't support selective TLB flush. */
+>  }
+>
+> -static struct iommu_gather_ops ipmmu_gather_ops = {
+> +static const struct iommu_gather_ops ipmmu_gather_ops = {
+>  	.tlb_flush_all = ipmmu_tlb_flush_all,
+>  	.tlb_add_flush = ipmmu_tlb_add_flush,
+>  	.tlb_sync = ipmmu_tlb_flush_all,
+> --
+> 1.9.1
+>
+>
