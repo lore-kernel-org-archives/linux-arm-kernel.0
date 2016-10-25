@@ -1,62 +1,62 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 25 Oct 2016 09:16:32 +0800
-Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
-In-Reply-To: <147733850401.29612.2343965740004706258@sboyd-linaro>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-3-stephen.boyd@linaro.org>
- <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
- <147733850401.29612.2343965740004706258@sboyd-linaro>
-Message-ID: <20161025011632.GA23876@b29397-desktop>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 20:39:23 -0500
+Subject: [PATCH/RFT v2 12/17] USB: ochi-da8xx: Use a regulator for
+ vbus/overcurrent
+In-Reply-To: <20161024164634.4330-13-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-13-ahaslam@baylibre.com>
+Message-ID: <672c1f1a-58b7-6947-7fb2-acd38fab8597@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 12:48:24PM -0700, Stephen Boyd wrote:
-> Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
-> > Hi,
-> > 
-> > On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> > > The ULPI bus can be built as a module, and it will soon be
-> > > calling these functions when it supports probing devices from DT.
-> > > Export them so they can be used by the ULPI module.
-> > >
-> > > Acked-by: Rob Herring <robh@kernel.org>
-> > > Cc: <devicetree@vger.kernel.org>
-> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > > ---
-> > >  drivers/of/device.c | 2 ++
-> > >  1 file changed, 2 insertions(+)
-> > >
-> > > diff --git a/drivers/of/device.c b/drivers/of/device.c
-> > > index 8a22a253a830..6719ab35b62e 100644
-> > > --- a/drivers/of/device.c
-> > > +++ b/drivers/of/device.c
-> > > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
-> > >
-> > >         return tsize;
-> > >  }
-> > > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
-> > >
-> > >  int of_device_request_module(struct device *dev)
-> > >  {
-> > > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
-> > >         }
-> > >         mutex_unlock(&of_mutex);
-> > >  }
-> > > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
-> > 
-> > This is trailing the wrong function.
-> > 
-> 
-> Good catch. Must have been some bad rebase.
-> 
-> Peter, can you fix it while applying or should I resend this patch?
-> 
+On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> Currently, the da8xx ohci driver uses a set of gpios and callbacks in
+> board files to handle vbus and overcurrent irqs form the power supply.
+> However, this does not play nice when moving to a DT based boot were
+> we wont have board files.
+>
+> Instead of requesting and handling the gpio, use the regulator framework
+> to take care of enabling and disabling vbus power.
+> This has the benefit
+> that we dont need to pass any more platform data to the driver:
+>
+> These will be handled by the regulator framework:
+> set_power   ->  regulator_enable/regulator_disable
+> get_power   ->  regulator_is_enabled
+> get_oci     ->  regulator_get_mode
+> ocic_notify ->  regulator notification
+>
+> We can keep the default potpgt and use the regulator start delay instead:
+> potpgt      -> regulator startup delay time
+>
+> The hawk board does not have a GPIO/OVERCURRENT gpio to control vbus,
+> (they should not have been decleared/reserved) so, just remove those
+> definitions from the hwk board file.
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
 
-But, this is device tree patch. I can only get chipidea part and other
-USB patches if Greg agrees.
 
--- 
+How do you recover after an overcurrent event?
 
-Best Regards,
-Peter Chen
+I have configured a fixed-regulator using device-tree, but similar to 
+the configuration in the board files here. However, when I shorted out 
+the VBUS and caused an overcurrent event, I see nothing in the kernel 
+log saying that there was an overcurrent event and after I remove the 
+short, the regulator is never turned back on.
+
+
+
+> @@ -163,7 +198,6 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+>  				  u16 wIndex, char *buf, u16 wLength)
+>  {
+>  	struct device *dev		= hcd->self.controller;
+> -	struct da8xx_ohci_root_hub *hub	= dev_get_platdata(dev);
+
+nit: unnecessary whitespace change
+
+>  	int temp;
+>
+>  	switch (typeReq) {
