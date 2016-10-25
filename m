@@ -1,40 +1,33 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 25 Oct 2016 11:25:31 +0200
-Subject: [PATCH] ahci: use pci_alloc_irq_vectors
-In-Reply-To: <20161022141123.GA25500@lst.de>
-References: <1473088905-27670-1-git-send-email-hch@lst.de>
- <1473088905-27670-2-git-send-email-hch@lst.de>
- <20160906163946.GB24268@htj.duckdns.org>
- <20161020154722.GH22012@rric.localdomain>
- <20161021125918.GA18082@lst.de>
- <20161021140106.GU25086@rric.localdomain>
- <20161022141123.GA25500@lst.de>
-Message-ID: <20161025092531.GG2151@rric.localdomain>
+From: mcree@orcon.net.nz (Michael Cree)
+Date: Tue, 25 Oct 2016 22:12:10 +1300
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <3851270.xZRcP9hae0@wuerfel>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <13702107.LdHY4HTXyY@wuerfel>
+ <20161019155325.GR1041@n2100.armlinux.org.uk>
+ <3851270.xZRcP9hae0@wuerfel>
+Message-ID: <20161025091210.rjfhvq4mqtuquei5@tower>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.10.16 16:11:23, Christoph Hellwig wrote:
-> Hi Robert,
+On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
+> I see your point, but I think there are serious issues with the current
+> approach as well:
 > 
-> is this a controller that's using MSI-X?
+> - a lot of the less common architectures just don't get updated
+>   in time, out of 22 architectures that don't use asm-generic/unistd.h,
+>   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
 > 
-> If so can you try the patch below?
+> - some architectures that add all syscalls sometimes make a mistake
+>   and forget one, e.g. alpha apparently never added __NR_bpf, but it
+>   did add the later __NR_execveat.
 
-Great, that fixes the issue. Thanks.
+__NR_bpf was not forgotten on Alpha.  It was not wired up because
+extra architecture support is needed which has not been implemented.
 
-Tested-by: Robert Richter <rrichter@cavium.com>
+But maybe we should just wire it up to sys_ni_syscall in the meantime
+so a syscall number is reserved for it, and user space can call it to
+get -ENOSYS returned.
 
-> 
-> diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-> index ba5f11c..5fe852d 100644
-> --- a/drivers/ata/ahci.c
-> +++ b/drivers/ata/ahci.c
-> @@ -1617,7 +1617,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->  		/* legacy intx interrupts */
->  		pci_intx(pdev, 1);
->  	}
-> -	hpriv->irq = pdev->irq;
-> +	hpriv->irq = pci_irq_vector(pdev, 0);
->  
->  	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
->  		host->flags |= ATA_HOST_PARALLEL_SCAN;
+Cheers
+Michael.
