@@ -1,60 +1,39 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 25 Oct 2016 12:07:11 +0200
-Subject: [PATCH 4/4] iommu/arm-smmu: Add the device_link between masters
- and smmu
-In-Reply-To: <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
-References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
- <CGME20161021171456eucas1p172cd17e1d3b498eac68210a39f54e025@eucas1p1.samsung.com>
- <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
-Message-ID: <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 25 Oct 2016 15:42:59 +0530
+Subject: [PATCH/RFT v2 07/17] ARM: davinci: da8xx: Enable the usb20 "per"
+ clk on phy_clk_enable
+In-Reply-To: <20161024164634.4330-8-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-8-ahaslam@baylibre.com>
+Message-ID: <833b6b60-4504-dac7-ccbb-bc08c985ad01@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+> index 9e41a7f..982e105 100644
+> --- a/arch/arm/mach-davinci/usb-da8xx.c
+> +++ b/arch/arm/mach-davinci/usb-da8xx.c
+> @@ -53,11 +53,19 @@ int __init da8xx_register_usb_refclkin(int rate)
+>  
+>  static void usb20_phy_clk_enable(struct clk *clk)
+>  {
+> +	struct clk *usb20_clk;
+>  	u32 val;
+>  	u32 timeout = 500000; /* 500 msec */
+>  
+>  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+>  
+> +	usb20_clk = clk_get(NULL, "usb20");
 
+We should not be using a NULL device pointer here. Can you pass the musb
+device pointer available in the same file? Also, da850_clks[] in da850.c
+needs to be fixed to add the matching device name.
 
-On 2016-10-21 19:14, Sricharan R wrote:
-> The device link between master and its smmu is added so that
-> the smmu gets runtime enabled/disabled when the master needs it.
-> This is done from add_device callback which gets called once
-> when the master is added to the smmu group.
->
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->   drivers/iommu/arm-smmu.c | 9 +++++++++
->   1 file changed, 9 insertions(+)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 578cdc2..71ce4b6 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1470,6 +1470,15 @@ static int arm_smmu_add_device(struct device *dev)
->   		goto out_free;
->   	pm_runtime_put_sync(smmu->dev);
->   
-> +	/*
-> +	 * Establish the link between smmu and master, so that the
-> +	 * smmu gets runtime enabled/disabled as per the master's
-> +	 * needs.
-> +	 */
-> +
-> +	device_link_add(dev, smmu->dev, DEVICE_LINK_AVAILABLE,
-> +			DEVICE_LINK_PM_RUNTIME);
+> +	if (IS_ERR(usb20_clk)) {
+> +		pr_err("could not get usb20 clk\n");
+> +		return;
+> +	}
 
-Please update to the latest version of Rafael's patches. In V5 the 
-initial link
-state is not needed anymore and there was an important fix for creating 
-links
-during master's driver probing, what happens after applying your IOMMU 
-deferred
-probe patchset.
-
-> +
->   	return 0;
->   
->   out_free:
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thanks,
+Sekhar
