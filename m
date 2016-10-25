@@ -1,150 +1,86 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 25 Oct 2016 11:57:37 +0530
-Subject: [PATCH 2/4] iommu/arm-smmu: Add pm_runtime/sleep ops
-In-Reply-To: <CANLsYkw8Y-5MkeM2U9fLWX951Mo7ErsMCUBjSx3-0689jWD4rQ@mail.gmail.com>
-References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
- <1477070066-15044-3-git-send-email-sricharan@codeaurora.org>
- <CANLsYkw8Y-5MkeM2U9fLWX951Mo7ErsMCUBjSx3-0689jWD4rQ@mail.gmail.com>
-Message-ID: <008e01d22e88$e575ac90$b06105b0$@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 25 Oct 2016 07:38:47 +0100
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock
+ to 24MHz
+In-Reply-To: <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com>
+References: <20161024060226.4170-1-mugunthanvnm@ti.com>
+ <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+ <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
+ <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
+ <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com>
+Message-ID: <20161025063847.GD8574@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 24 Oct 2016, John Syne wrote:
+> > On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
+> >> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+> >> 
+> >> On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
+> >>>>> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+> >>>>> 
+> >>>>> Increase ADC reference clock from 3MHz to 24MHz so that the
+> >>>>> sampling rates goes up from 100K samples per second to 800K
+> >>>>> samples per second on AM335x and AM437x SoC.
+> >>>>> 
+> >>>>> Also increase opendelay for touchscreen configuration to
+> >>>>> equalize the increase in ADC reference clock frequency,
+> >>>>> which results in the same amount touch events reported via
+> >>>>> evtest on AM335x GP EVM.
+> >>>>> 
+> >>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> >>>>> ---
+> >>>>> 
+> >>>>> This patch depends on ADC DMA patch series [1]
+> >>>>> 
+> >>>>> Without DMA support, when ADC ref clock is set at 24MHz, I am
+> >>>>> seeing fifo overflow as CPU is not able to pull the ADC samples.
+> >>>>> This answers that DMA support is must for ADC to consume the
+> >>>>> samples generated at 24MHz with no open, step delay or
+> >>>>> averaging with patch [2].
+> >>>>> 
+> >>>>> Measured the performance with the iio_generic_buffer with the
+> >>>>> patch [3] applied
+> >>>>> 
+> >>>>> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
+> >>>>> [2] - http://pastebin.ubuntu.com/23357935/
+> >>>>> [3] - http://pastebin.ubuntu.com/23357939/
+> >>>>> 
+> >>>>> ---
+> >>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
+> >>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>>> 
+> >>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+> >>>>> index b9a53e0..96c4207 100644
+> >>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+> >>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+> >>>>> @@ -90,7 +90,7 @@
+> >>>>> /* Delay register */
+> >>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
+> >>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
+> >>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
+> >>> Wouldn?t this be better to add this to the devicetree?
+> >>> 
+> >>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
+> >>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
+> >>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+> >> 
+> >> For a touch screen, there is not need to change in these parameter
+> >> settings, so my opinion is to keep it as is. Or am I missing something?
+> > I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
+> 
+> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
+> 
+> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
+> 
+> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
 
->On 21 October 2016 at 11:14, Sricharan R <sricharan@codeaurora.org> wrote:
->> The smmu needs to be functional when the respective
->> master/s using it are active. As there is a device_link
->> between the master and smmu, the pm runtime ops for the smmu
->> gets invoked in sync with the master's runtime, thus the
->> smmu remains powered only when needed.
->>
->> There are couple of places in the driver during probe,
->> master attach, where the smmu needs to be clocked without
->> the context of the master. So doing a pm_runtime_get/put sync
->> in those places separately.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu.c | 109 ++++++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 108 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 083489e4..45f2762 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -45,6 +45,7 @@
->>  #include <linux/of_iommu.h>
->>  #include <linux/pci.h>
->>  #include <linux/platform_device.h>
->> +#include <linux/pm_runtime.h>
->>  #include <linux/slab.h>
->>  #include <linux/spinlock.h>
->>
->> @@ -373,6 +374,8 @@ struct arm_smmu_device {
->>         u32                             num_global_irqs;
->>         u32                             num_context_irqs;
->>         unsigned int                    *irqs;
->> +       int                             num_clocks;
->> +       struct clk                      **clocks;
->>
->>         u32                             cavium_id_base; /* Specific to Cavium */
->>  };
->> @@ -430,6 +433,31 @@ static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
->>         return container_of(dom, struct arm_smmu_domain, domain);
->>  }
->>
->> +static int arm_smmu_enable_clocks(struct arm_smmu_device *smmu)
->> +{
->> +       int i, ret = 0;
->> +
->> +       for (i = 0; i < smmu->num_clocks; ++i) {
->> +               ret = clk_prepare_enable(smmu->clocks[i]);
->> +               if (ret) {
->> +                       dev_err(smmu->dev, "Couldn't enable clock #%d\n", i);
->> +                       while (i--)
->> +                               clk_disable_unprepare(smmu->clocks[i]);
->> +                       break;
->> +               }
->> +       }
->> +
->> +       return ret;
->> +}
->> +
->> +static void arm_smmu_disable_clocks(struct arm_smmu_device *smmu)
->> +{
->> +       int i;
->> +
->> +       for (i = 0; i < smmu->num_clocks; ++i)
->> +               clk_disable_unprepare(smmu->clocks[i]);
->> +}
->> +
->>  static void parse_driver_options(struct arm_smmu_device *smmu)
->>  {
->>         int i = 0;
->> @@ -1187,11 +1215,13 @@ static void arm_smmu_master_free_smes(struct iommu_fwspec *fwspec)
->>         int i, idx;
->>
->>         mutex_lock(&smmu->stream_map_mutex);
->> +       pm_runtime_get_sync(smmu->dev);
->
->Since this is generic code it is probably a good idea to check the
->return value, same for _put_sync() below.
+This looks like configuration, no?
 
- Ok, i will do it for V2.
+DT should be used to describe the hardware.
 
->
->>         for_each_cfg_sme(fwspec, i, idx) {
->>                 if (arm_smmu_free_sme(smmu, idx))
->>                         arm_smmu_write_sme(smmu, idx);
->>                 cfg->smendx[i] = INVALID_SMENDX;
->>         }
->> +       pm_runtime_put_sync(smmu->dev);
->>         mutex_unlock(&smmu->stream_map_mutex);
->>  }
->>
->> @@ -1424,9 +1454,11 @@ static int arm_smmu_add_device(struct device *dev)
->>         while (i--)
->>                 cfg->smendx[i] = INVALID_SMENDX;
->>
->> +       pm_runtime_get_sync(smmu->dev);
->>         ret = arm_smmu_master_alloc_smes(dev);
->>         if (ret)
->>                 goto out_free;
->> +       pm_runtime_put_sync(smmu->dev);
->>
->>         return 0;
->>
->> @@ -1650,6 +1682,44 @@ static int arm_smmu_id_size_to_bits(int size)
->>         }
->>  }
->>
->> +static int arm_smmu_init_clocks(struct arm_smmu_device *smmu)
->> +{
->> +       const char *cname;
->> +       struct property *prop;
->> +       int i;
->> +       struct device *dev = smmu->dev;
->> +
->> +       smmu->num_clocks =
->> +               of_property_count_strings(dev->of_node, "clock-names");
->> +
->> +       if (smmu->num_clocks < 1)
->> +               return 0;
->> +
->> +       smmu->clocks = devm_kzalloc(dev,
->> +                                   sizeof(*smmu->clocks) * smmu->num_clocks,
->> +                                   GFP_KERNEL);
->> +
->> +       if (!smmu->clocks) {
->> +               dev_err(dev, "Failed to allocate memory for clocks\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +       i = 0;
->
->Please do the initialisation above when you declare the variable.
-
-     ok, will change it.
-
-Regards,
- Sricharan
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
