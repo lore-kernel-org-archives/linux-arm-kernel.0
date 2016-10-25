@@ -1,28 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Oct 2016 12:51:35 +0200
-Subject: [PATCH] ARM: dts: sun8i: fix the pinmux for UART1
-In-Reply-To: <20161024170831.38819-1-icenowy@aosc.xyz>
-References: <20161024170831.38819-1-icenowy@aosc.xyz>
-Message-ID: <20161025105135.gg6cizedwmbuarqi@lukather>
+Date: Tue, 25 Oct 2016 12:43:21 +0200
+Subject: [PATCH 1/3] phy: sun4i: check PHY id when poking unknown bit of
+ pmu
+In-Reply-To: <1773661477366364@web4j.yandex.ru>
+References: <20161024035930.20274-1-icenowy@aosc.xyz>
+ <20161024082802.ev72szwmuqba5ll4@lukather>
+ <1773661477366364@web4j.yandex.ru>
+Message-ID: <20161025104321.ux2kmqr6rws2c65p@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 01:08:31AM +0800, Icenowy Zheng wrote:
-> When the patch is applied, the allwinner,driver and allwinner,pull
-> properties are removed.
-> 
-> Although they're described to be optional in the devicetree binding,
-> without them, the pinmux cannot be initialized, and the uart cannot
-> be used.
-> 
-> Add them back to fix the problem, and makes the bluetooth on iNet D978
-> Rev2 board work.
-> 
-> Fixes: 82eec384249f (ARM: dts: sun8i: add pinmux for UART1 at PG)
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Hi,
 
-Applied, thanks!
+On Tue, Oct 25, 2016 at 11:32:44AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> > On Mon, Oct 24, 2016 at 11:59:30AM +0800, Icenowy Zheng wrote:
+> > 
+> >> Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
+> >> The code that poke some unknown bit of PMU for H3/A64 didn't check
+> >> the PHY, and will cause kernel oops when PHY 0 is used.
+> >>
+> >> Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
+> >>
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> > 
+> > Cc'ing stable would be nice.
+> 
+> Yes... As it's also used by H3...
+> 
+> > 
+> > Apart from that, Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> If I change it to check whether phy->pmu is null, will you keep the ACK?
+
+Yep, thanks!
+
 Maxime
 
 -- 
@@ -35,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/1babf742/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/09742e34/attachment.sig>
