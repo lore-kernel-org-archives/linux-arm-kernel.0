@@ -1,62 +1,68 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 11:24:17 -0500
-Subject: [PATCH/RFT v2 11/17] USB: OHCI: make ohci-da8xx a separate driver
-In-Reply-To: <CAKXjFTM8RwsAut8cD0n0foxueSjR4VB4k4WJizXo9SyaW3viOA@mail.gmail.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-12-ahaslam@baylibre.com>
- <403743d8-dff2-3389-105b-1082b674b0b8@lechnology.com>
- <CAKXjFTPvEXPRyq0HZiF7mcHWFaFoH7MjFqEKnTyuSCUOB=U7Aw@mail.gmail.com>
- <21019d11-3b01-3e0e-60bc-c4873cf20237@lechnology.com>
- <CAKXjFTM8RwsAut8cD0n0foxueSjR4VB4k4WJizXo9SyaW3viOA@mail.gmail.com>
-Message-ID: <52b6439e-2bb8-a9d0-da8c-93646b6ee4b0@lechnology.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Tue, 25 Oct 2016 10:24:40 -0600
+Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
+ correct compatibles
+In-Reply-To: <383a62dd-b4d7-f764-baf1-ff73691b3cbc@arm.com>
+References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
+ <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
+ <383a62dd-b4d7-f764-baf1-ff73691b3cbc@arm.com>
+Message-ID: <20161025162440.GA48977@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2016 11:21 AM, Axel Haslam wrote:
-> On Tue, Oct 25, 2016 at 6:12 PM, David Lechner <david@lechnology.com> wrote:
->> On 10/25/2016 02:39 AM, Axel Haslam wrote:
->>>
->>> On Tue, Oct 25, 2016 at 2:38 AM, David Lechner <david@lechnology.com>
->>> wrote:
->>>>
->>>> On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
->>>>>
->>>>>
->>>>> -#ifndef CONFIG_ARCH_DAVINCI_DA8XX
->>>>> -#error "This file is DA8xx bus glue.  Define
->>>>> CONFIG_ARCH_DAVINCI_DA8XX."
->>>>> -#endif
->>>>> +#include "ohci.h"
->>>>> +
->>>>> +#define DRIVER_DESC "OHCI DA8XX driver"
->>>>> +
->>>>> +static const char hcd_name[] = "ohci-da8xx";
->>>>
->>>>
->>>>
->>>> why static const char instead of #define? This is only used one time in a
->>>> pr_info, so it seems kind of pointless anyway.
->>>
->>>
->>> Other drivers are using static const for the same variable.
->>> i think static const is preferred over #define because #define doet give a
->>> type.
->>> If you dont mind ill keep it static const.
->>>
+On Tue, Oct 25 2016 at 09:59 -0600, Sudeep Holla wrote:
+>
+>
+>On 25/10/16 16:26, Lina Iyer wrote:
+>>Update domain-idle-state binding to use "domain-idle-state" compatible
+>>from Documentation/devicetree/bindings/arm/idle-states.txt.
 >>
->> If this string was used in this file more than one place, I would agree with
->> you, but currently it is only used as the argument of a pr_info(). The
->> string "ohci-da8xx" could just be included in the fmt string instead of
->> using "%s".
->
-> I think the purpose was to use it in the .name of the platform_driver
-> structure, too. only that not everybody is doing that, i looked at some bad
->  examples :(
->
-> would you agree to keep it if we use it in .name too?
->
-> -Axel
->
+>>Cc: <devicetree@vger.kernel.org>
+>>Cc: Rob Herring <robh@kernel.org>
+>>Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+>>Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>---
+>> Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
+>> 1 file changed, 5 insertions(+), 4 deletions(-)
 >>
+>>diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+>>index e165036..6fb53a3 100644
+>>--- a/Documentation/devicetree/bindings/power/power_domain.txt
+>>+++ b/Documentation/devicetree/bindings/power/power_domain.txt
+>>@@ -30,8 +30,9 @@ Optional properties:
+>>    available in the next section.
+>>
+>> - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>>-                generic domain power state. The idle state definitions are
+>>-                compatible with arm,idle-state specified in [1].
+>>+                generic domain power state. The idle state definitions must be
+>>+                compatible with "domain-idle-state"
+>
+>I would reword the below a bit different so that it's flexible to be
+>reused without "arm,idle-state".
+>
+>>as well as
+>>+                "arm,idle-state" as defined in [1].
+>
+>'Idle states that are "arm,idle-state" compatible are generally
+>"domain-idle-state" compatible as well if it's a PM domain.'
+>
+I believe we should have both compatible strings. Per [1], any CPU that
+follows the idle state compatible *must* have "arm,idle-state" as a
+compatible. Since we are re-using the same compatible, its only correct
+that we retain what is already spec'd up in [1] and in addition provide
+this new compatible.
 
-Yes, that will make more sense. ;-)
+Thanks,
+Lina
+
+>or something like that in line with what's in patch 2/4.
+>
+>That would give us the scope of reuse of "domain-idle-state" in device
+>for future. Also it aligns with your patch 4/4.
+>
+>Otherwise, it looks good.
+>
+>-- 
+>Regards,
+>Sudeep
