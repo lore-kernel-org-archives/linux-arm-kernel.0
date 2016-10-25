@@ -1,93 +1,60 @@
-From: john3909@gmail.com (John Syne)
-Date: Tue, 25 Oct 2016 08:47:30 -0700
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <20161025063847.GD8574@dell>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
-Message-ID: <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 25 Oct 2016 10:53:12 -0500
+Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
+ platform declaration.
+In-Reply-To: <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-3-ahaslam@baylibre.com>
+ <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
+ <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
+ <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
+Message-ID: <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sekhar,
 
-> On Oct 24, 2016, at 11:38 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> On Mon, 24 Oct 2016, John Syne wrote:
->>> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
->>>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>> 
->>>> On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
->>>>>>> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>>>>> 
->>>>>>> Increase ADC reference clock from 3MHz to 24MHz so that the
->>>>>>> sampling rates goes up from 100K samples per second to 800K
->>>>>>> samples per second on AM335x and AM437x SoC.
->>>>>>> 
->>>>>>> Also increase opendelay for touchscreen configuration to
->>>>>>> equalize the increase in ADC reference clock frequency,
->>>>>>> which results in the same amount touch events reported via
->>>>>>> evtest on AM335x GP EVM.
->>>>>>> 
->>>>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->>>>>>> ---
->>>>>>> 
->>>>>>> This patch depends on ADC DMA patch series [1]
->>>>>>> 
->>>>>>> Without DMA support, when ADC ref clock is set at 24MHz, I am
->>>>>>> seeing fifo overflow as CPU is not able to pull the ADC samples.
->>>>>>> This answers that DMA support is must for ADC to consume the
->>>>>>> samples generated at 24MHz with no open, step delay or
->>>>>>> averaging with patch [2].
->>>>>>> 
->>>>>>> Measured the performance with the iio_generic_buffer with the
->>>>>>> patch [3] applied
->>>>>>> 
->>>>>>> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
->>>>>>> [2] - http://pastebin.ubuntu.com/23357935/
->>>>>>> [3] - http://pastebin.ubuntu.com/23357939/
->>>>>>> 
->>>>>>> ---
->>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
->>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>> 
->>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> index b9a53e0..96c4207 100644
->>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> @@ -90,7 +90,7 @@
->>>>>>> /* Delay register */
->>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
->>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
->>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
->>>>> Wouldn?t this be better to add this to the devicetree?
->>>>> 
->>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->>>> 
->>>> For a touch screen, there is not need to change in these parameter
->>>> settings, so my opinion is to keep it as is. Or am I missing something?
->>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
->> 
->> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
->> 
->> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
->> 
->> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
-> 
-> This looks like configuration, no?
-> 
-> DT should be used to describe the hardware.
-You may be right, but how is this different to setting the baud rate on a serial channel or sampling rate on a audio channel? Looking through the DT, there are many configuration settings, so I?m not sure what is the correct way to handle this. Surely it is better to handle this in DT vs hard coding these settings?
+On 10/25/2016 05:17 AM, Sekhar Nori wrote:
+> On Tuesday 25 October 2016 03:07 PM, Axel Haslam wrote:
+>> Hi Sekar,
+>>
+>> On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+>>>> From: David Lechner <david@lechnology.com>
+>>>>
+>>>> The CFGCHIP registers are used by a number of devices, so using a syscon
+>>>> device to share them. The first consumer of this will by the phy-da8xx-usb
+>>>> driver.
+>>>>
+>>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>>> [Axel: minor fix: change id to -1]
+>>>
+>>> Can you please clarify this change? There could be other syscon devices
+>>> on the chip for other common registers. Why use the singular device-id?
+>>>
+>>
+>> in the case of non DT boot, the phy driver is looking for "syscon" :
+>>
+>> d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
+>>
+>> if we register the syscon driver with id = 0, the actual name of the syscon
+>> device will be "syscon.0" and the phy driver will fail to probe, because
+>> the strncmp match in the syscon driver (syscon_match_pdevname)
+>> will fail.
+>>
+>> should i change the phy driver instead?
+>
+> Yes, please. Forcing only one syscon region for the whole chip will be
+> too restrictive, I am pretty sure.
+>
+> Thanks,
+> Sekhar
+>
 
-Regards,
-John
-> 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+In the previous review, you requested that this be changed to -1 [1].
+
+If we change it back to 0, it will also require reverting a patch to the 
+phy driver that has already been merged[2].
+
+[1]: http://www.gossamer-threads.com/lists/linux/kernel/2435807?page=last
+[2]: http://www.gossamer-threads.com/lists/linux/kernel/2518804
