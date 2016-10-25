@@ -1,141 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Oct 2016 11:20:13 +0100
-Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-In-Reply-To: <20161024161656.GM15620@leverpostej>
-References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
- <20161024161656.GM15620@leverpostej>
-Message-ID: <6849e197-f029-0ab9-7e76-d01c21d8432e@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 25 Oct 2016 12:24:35 +0200
+Subject: [RFC] shutdown machine when li-ion battery goes below 3V
+In-Reply-To: <201610242348.47484@pali>
+References: <20161024212250.GA31336@amd>
+ <20161024212932.uhjz752z2cy5hohl@atomide.com>
+ <20161024214152.GA32310@amd> <201610242348.47484@pali>
+Message-ID: <20161025102435.GA6916@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Mon 2016-10-24 23:48:47, Pali Roh?r wrote:
+> On Monday 24 October 2016 23:41:52 Pavel Machek wrote:
+> > On Mon 2016-10-24 14:29:33, Tony Lindgren wrote:
+> > > Also, the shutdown voltage can depend on external devices
+> > > connected. It could be for example 3.3V depending on eMMC on some
+> > > devices while devices with no eMMC could have it at 3.0V.
+> > 
+> > Actually, I'd like to shutdown at 3.3V or more (like 3.5V), because
+> > going below that is pretty mean to the battery. But if I set
+> > threshold too high, GSM activity will push it below that for a very
+> > short while, and I'll shutdown too soon.
+> > 
+> > Ideas welcome...
+> 
+> bq27x00 has EDVF flag which means that battery is empty. Maemo with 
+> bq27x00 driver is configured to issue system shutdown when EDVF is set.
+> 
+> Maybe kernel should issue emergency shutdown e.g. after minute or two 
+> after EDVF flag is set?
 
-On 24/10/16 17:16, Mark Rutland wrote:
-> Hi Marc,
-> 
-> On Mon, Oct 24, 2016 at 04:31:28PM +0100, Marc Zyngier wrote:
->> Architecturally, TLBs are private to the (physical) CPU they're
->> associated with. But when multiple vcpus from the same VM are
->> being multiplexed on the same CPU, the TLBs are not private
->> to the vcpus (and are actually shared across the VMID).
->>
->> Let's consider the following scenario:
->>
->> - vcpu-0 maps PA to VA
->> - vcpu-1 maps PA' to VA
->>
->> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
->> by vcpu-0 accesses, and access the wrong physical page.
-> 
-> It might be worth noting that this could also lead to TLB conflicts and
-> other such fun usually associated with missing TLB maintenance,
-> depending on the two mappings (or the intermediate stages thereof).
-> 
->> The solution to this is to keep a per-VM map of which vcpu ran last
->> on each given physical CPU, and invalidate local TLBs when switching
->> to a different vcpu from the same VM.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Modulo my comment on preemptiblity of kvm_arch_sched_in, everything
-> below is a nit. Assuming that's not preemptible, this looks right to me.
-> 
-> FWIW, with or without the other comments considered:
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> 
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  5 +++++
->>  arch/arm/include/asm/kvm_hyp.h    |  1 +
->>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++++-
->>  arch/arm/kvm/hyp/switch.c         |  9 +++++++++
->>  arch/arm64/include/asm/kvm_host.h |  6 +++++-
->>  arch/arm64/kvm/hyp/switch.c       |  8 ++++++++
->>  6 files changed, 62 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 2d19e02..035e744 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -57,6 +57,8 @@ struct kvm_arch {
->>  	/* VTTBR value associated with below pgd and vmid */
->>  	u64    vttbr;
->>  
->> +	int __percpu *last_vcpu_ran;
->> +
->>  	/* Timer */
->>  	struct arch_timer_kvm	timer;
->>  
->> @@ -174,6 +176,9 @@ struct kvm_vcpu_arch {
->>  	/* vcpu power-off state */
->>  	bool power_off;
->>  
->> +	/* TLBI required */
->> +	bool requires_tlbi;
-> 
-> A bit of a nit, but it's not clear which class of TLBI is required, or
-> why. It's probably worth a comment (and perhaps a bikeshed), like:
-> 
-> 	/*
-> 	 * Local TLBs potentially contain conflicting entries from
-> 	 * another vCPU within this VMID. All entries for this VMID must
-> 	 * be invalidated from (local) TLBs before we run this vCPU.
-> 	 */
-> 	bool tlb_vmid_stale;
+Thanks for pointer.
 
-Yup, looks good.
+EDVF seems to be exposed as health. ... but only if battery is
+calibrated, AFAICT.
 
-> 
-> [...]
-> 
->> +void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
->> +{
->> +	int *last_ran;
->> +
->> +	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
->> +
->> +	/*
->> +	 * If we're very unlucky and get preempted before having ran
->> +	 * this vcpu for real, we'll end-up in a situation where any
->> +	 * vcpu that gets scheduled will perform an invalidation (this
->> +	 * vcpu explicitely requires it, and all the others will have
->> +	 * a different vcpu_id).
->> +	 */
-> 
-> Nit: s/explicitely/explicitly/
-> 
-> To bikeshed a little further, perhaps:
-> 
-> 	/*
-> 	 * We might get preempted before the vCPU actually runs, but
-> 	 * this is fine. Our TLBI stays pending until we actually make
-> 	 * it to __activate_vm, so we won't miss a TLBI. If another vCPU
-> 	 * gets scheduled, it will see our vcpu_id in last_ran, and pend
-> 	 * a TLBI for itself.
-> 	 */
+ if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
+      dev_info_once(di->dev, "battery is not calibrated! ignoring capacity values\n");
+      ...
+      cache.health = -ENODATA;
 
-Looks good too. I'll incorporate this into v2.
+Plus, it prioritizes battery cold over battery dead. IMO we don't need
+to shutdown on battery cold (we just may not charge the battery), but
+we need to shutdown on battery dead.
 
-> 
->> +	if (*last_ran != vcpu->vcpu_id) {
->> +		if (*last_ran != -1)
->> +			vcpu->arch.requires_tlbi = true;
->> +
->> +		*last_ran = vcpu->vcpu_id;
->> +	}
->> +}
-> 
-> I take it this function is run in some non-preemptible context; if so,
-> this looks correct to me.
-> 
-> If this is preemptible, then this looks racy.
+So something like this?
 
-This function is called from a preempt notifier, which itself isn't
-preemptible.
+								Pavel
 
-Thanks,
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-	M.
+diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
+index 8eb2f8f..5ddf6d7 100644
+--- a/drivers/power/supply/bq27xxx_battery.c
++++ b/drivers/power/supply/bq27xxx_battery.c
+@@ -680,10 +680,10 @@ static int bq27xxx_battery_read_health(struct bq27xxx_device_info *di)
+ 	/* Unlikely but important to return first */
+ 	if (unlikely(bq27xxx_battery_overtemp(di, flags)))
+ 		return POWER_SUPPLY_HEALTH_OVERHEAT;
+-	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
+-		return POWER_SUPPLY_HEALTH_COLD;
+ 	if (unlikely(bq27xxx_battery_dead(di, flags)))
+ 		return POWER_SUPPLY_HEALTH_DEAD;
++	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
++		return POWER_SUPPLY_HEALTH_COLD;
+ 
+ 	return POWER_SUPPLY_HEALTH_GOOD;
+ }
+
+
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/199ed265/attachment.sig>
