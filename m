@@ -1,139 +1,107 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 25 Oct 2016 14:01:16 +0100
-Subject: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
-In-Reply-To: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <0416d929-dfef-da09-8d9a-d1db8575afef@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 25 Oct 2016 15:08:20 +0200
+Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
+In-Reply-To: <ec7c6cc5-cf9a-9c75-4b07-e337064c7d6e@arm.com>
+References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+ <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
+ <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
+ <1477040798.15560.96.camel@baylibre.com>
+ <CACRpkdYUVXny57AC9rKX3VRAyooEk_2XLvqe9jOuT3rOaE75rg@mail.gmail.com>
+ <ec7c6cc5-cf9a-9c75-4b07-e337064c7d6e@arm.com>
+Message-ID: <1477400900.2482.51.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/16 13:35, Minghuan Lian wrote:
-> 1. The different version of a SoC may have different MSI
-> implementation. But compatible "fsl,<soc-name>-msi" can not describe
-> the SoC version.
-
-Can't it?
-
-	compatible = "fsl-ls1043a-rev11-msi";
-
-Oh, I guess it can!
-
-Joking aside, if there are multiple versions of a piece of hardware
-which require *different* treatment by drivers, then it is obviously
-wrong to use the same compatible string because *they are not compatible*.
-
-> The MSI driver will use SoC match interface to get
-> SoC type and version instead of compatible string. So all MSI node
-> can use the common compatible "fsl,ls-scfg-msi" and the original
-> compatible is unnecessary.
-
-If there is some common level of functionality that *all* variants
-support without the driver having to know which one is which, then there
-might be some sense in having an additional common compatible to
-represent that level of functionality, e.g.
-
-	compatible = "fsl-ls1043a-rev11-msi", "fsl,ls-scfg-msi";
-
-But if, say, new variants turn out to have less functionality, rather
-than more, then there's probably not much point, and we should stick to
-specific, accurate, compatible strings.
-
-DT is not specific to a kernel version, nor even to Linux. A string
-which triggers some board-specific magic in a specific version of a
-Linux driver does not describe the hardware.
-
-Robin.
-
-> 2. Layerscape SoCs may have one or several MSI controllers.
-> In order to increase MSI interrupt number of a PCIe, the patch
-> moves all MSI node into the parent node "msi-controller". So a
-> PCIe can request MSI from all the MSI controllers.
+On Tue, 2016-10-25 at 11:38 +0100, Marc Zyngier wrote:
+> > 
+> On 25/10/16 10:14, Linus Walleij wrote:
+> > 
+> > On Fri, Oct 21, 2016 at 11:06 AM, Jerome Brunet <jbrunet@baylibre.c
+> > om> wrote:
+> > 
+> > > 
+> > > > 
+> > > > Isn't this usecase (also as described in the cover letter) a
+> > > > textbook
+> > > > example of when you should be using hierarchical irqdomain?
+> > > > 
+> > > > Please check with Marc et al on hierarchical irqdomains.
+> > > 
+> > > Linus,
+> > > Do you mean I should create a new hierarchical irqdomains in each
+> > > of
+> > > the two pinctrl instances we have in these SoC, these domains
+> > > being
+> > > stacked on the one I just added for controller in irqchip ?
+> > > 
+> > > I did not understand this is what you meant when I asked you the
+> > > question at ELCE.
+> > 
+> > Honestly, I do not understand when and where to properly use
+> > hierarchical irqdomain, even after Marc's talk at ELC-E.
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 57 +++++++++++++++++++---
->  1 file changed, 49 insertions(+), 8 deletions(-)
+> I probably didn't do that good a job explaining it then. Let's try
+> again. You want to use hierarchical domains when you want to describe
+> an
+> interrupt whose path traverses multiple controllers without ever
+> being
+> multiplexed with other signals. As long as you have this 1:1
+> relationship between controllers, you can use them.
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> index 9e38949..29f95fd 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
-> @@ -1,18 +1,28 @@
->  * Freescale Layerscape SCFG PCIe MSI controller
->  
-> +Layerscape SoCs may have one or multiple MSI controllers.
-> +Each MSI controller must be showed as a child node.
-> +
->  Required properties:
->  
-> -- compatible: should be "fsl,<soc-name>-msi" to identify
-> -	      Layerscape PCIe MSI controller block such as:
-> -              "fsl,1s1021a-msi"
-> -              "fsl,1s1043a-msi"
-> +- compatible: should be "fsl,ls-scfg-msi"
-> +- #address-cells: must be 2
-> +- #size-cells: must be 2
-> +- ranges: allows valid 1:1 translation between child's address space and
-> +	  parent's address space
->  - msi-controller: indicates that this is a PCIe MSI controller node
-> +
-> +Required child node:
-> +A child node must exist to represent the MSI controller.
-> +The following are properties specific to those nodes:
-> +
->  - reg: physical base address of the controller and length of memory mapped.
->  - interrupts: an interrupt to the parent interrupt controller.
->  
->  Optional properties:
->  - interrupt-parent: the phandle to the parent interrupt controller.
->  
-> +Notes:
->  This interrupt controller hardware is a second level interrupt controller that
->  is hooked to a parent interrupt controller: e.g: ARM GIC for ARM-based
->  platforms. If interrupt-parent is not provided, the default parent interrupt
-> @@ -22,9 +32,40 @@ MSI controller node
->  
->  Examples:
->  
-> -	msi1: msi-controller at 1571000 {
-> -		compatible = "fsl,1s1043a-msi";
-> -		reg = <0x0 0x1571000 0x0 0x8>,
-> +	msi: msi-controller {
-> +		compatible = "fsl,ls-scfg-msi";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
->  		msi-controller;
-> -		interrupts = <0 116 0x4>;
-> +
-> +		msi0 at 1580000 {
-> +			reg = <0x0 0x1580000 0x0 0x10000>;
-> +			interrupts = <0 116 0x4>,
-> +				     <0 111 0x4>,
-> +				     <0 112 0x4>,
-> +				     <0 113 0x4>;
-> +		};
-> +
-> +		msi1 at 1590000 {
-> +			reg = <0x0 0x1590000 0x0 0x10000>;
-> +			interrupts = <0 126 0x4>,
-> +				     <0 121 0x4>,
-> +				     <0 122 0x4>,
-> +				     <0 123 0x4>;
-> +		};
-> +
-> +		msi2 at 15a0000 {
-> +			reg = <0x0 0x15a0000 0x0 0x10000>;
-> +			interrupts = <0 160 0x4>,
-> +				     <0 155 0x4>,
-> +				     <0 156 0x4>,
-> +				     <0 157 0x4>;
-> +		};
-> +	};
-> +
-> +	pcie at 3400000 {
-> +			...
-> +			msi-parent = <&msi>;
-> +			...
->  	};
+
+Linus, Marc,
+
+The calculation is question here is meant to get the appropriate hwirq
+number from a particular gpio (and deal with the gpios that can't
+provide an irq at all).?
+
+If I look at other gpio drivers, many are doing exactly this kind of
+calculation before calling 'irq_create_mapping' in the to_irq callback.
+For example:
+- pinctrl/nomadik/pinctrl-abx500.c
+- pinctrl/samsung/pinctrl-exynos5440.c
+
+Some can afford to create all the mappings in the probe and just call
+'irq_find_mapping' (gpio/gpio_tegra.c) but this would not work here. We
+have only 8 upstream irqs for 130+ pins, so only 8 mappings possible at
+a time.?
+
+My understanding is that irqdomain provide a way to map hwirq to linux
+virq (and back), not map gpio number to hwirq, right?
+
+Even if I implement an another irqdomain at the gpio level, I would
+still have to perform this kind of calculation, one way or the other.
+
+> > Which is problematic since quite a few GPIO drivers now
+> > need to use them.
+> > 
+> > I will review his slides, in the meantime I would say: whatever
+> > Marc ACKs is fine with me. I trust this guy 100%. So I guess I
+> > could ask that he ACK the entire chain of patches
+> > from GIC->specialchip->GPIO.
+
+Actually this discussion go me thinking about another issue we have
+with this hardware.
+We are looking for a way to implement support for IRQ_TYPE_EDGE_BOTH
+(needed for things like gpio-keys or mmc card detect).?
+The controller can do each edge but not both at the same time.
+I'm thinking that implementing another irqdomain at the gpio level
+would allow to properly check the pad level in the EOI callback then
+set the next expected edge type accordingly (using
+'irq_chip_set_type_parent')
+
+Would it be acceptable ?
+
+It looks a few other drivers deal with IRQ_TYPE_EDGE_BOTH in a similar
+way (gpio/gpio-omap.c, gpio/gpio-dwapb.c)
+
+> Man, I don't even trust myself... ;-)
 > 
+> Thanks,
+> 
+> 	M.
+
+Thx
+Regards
+
+Jerome
