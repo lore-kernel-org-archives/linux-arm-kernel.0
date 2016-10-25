@@ -1,17 +1,26 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 25 Oct 2016 14:31:00 -0700
-Subject: [PATCH 1/2] of, numa: Add function to disable of_node_to_nid().
+Date: Tue, 25 Oct 2016 14:31:01 -0700
+Subject: [PATCH 2/2] arm64,
+ numa: Force of_node_to_nid to return NUMA_NO_NODE when numa=off.
 In-Reply-To: <1477431061-7258-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1477431061-7258-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1477431061-7258-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1477431061-7258-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-On arm64 NUMA kernels we can pass "numa=off" on the command line to
-disable NUMA.  A side effect of this is that kmalloc_node() calls to
-non-zero nodes will crash the system with an OOPS:
+When "numa=off" is passed on the command line, of_node_to_nid() still
+returns the node number (which can be greater than zero).  However, in
+this case all the memory is associated with the dummy node zero.  This
+causes OOPS in kernel/irq/irqdomain.c:
+
+    domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+                  GFP_KERNEL, of_node_to_nid(of_node));
+...
+
+which in my case then caused the kernel to OOPS for the IRQ controller
+on node 1:
 
 [    0.000000] [<fffffc00081bba84>] __alloc_pages_nodemask+0xa4/0xe68
 [    0.000000] [<fffffc00082163a8>] new_slab+0xd0/0x57c
@@ -21,80 +30,40 @@ non-zero nodes will crash the system with an OOPS:
 [    0.000000] [<fffffc00081119b8>] __irq_domain_add+0x7c/0x164
 [    0.000000] [<fffffc0008b75d30>] its_probe+0x784/0x81c
 [    0.000000] [<fffffc0008b75e10>] its_init+0x48/0x1b0
-.
-.
-.
 
-This is caused by code like this in kernel/irq/irqdomain.c
-
-    domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
-                  GFP_KERNEL, of_node_to_nid(of_node));
-
-When NUMA is disabled, the concept of a node is really undefined, so
-of_node_to_nid() should unconditionally return NUMA_NO_NODE.
-
-Add __of_force_no_numa() to allow of_node_to_nid() to be forced to
-return NUMA_NO_NODE.
-
-The follow on patch will call this new function from the arm64 numa
-code.
+Fix by forcing of_node_to_nid() to return NUMA_NO_NODE when numa=off.
+The kmalloc_node() family is perfectly happy when the node is
+specified as NUMA_NO_NODE.
 
 Reported-by: Gilbert Netzer <noname@pdc.kth.se>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/of/of_numa.c | 15 +++++++++++++++
- include/linux/of.h   |  2 ++
- 2 files changed, 17 insertions(+)
+ arch/arm64/mm/numa.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index f63d4b0d..2212299 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -150,12 +150,27 @@ static int __init of_numa_parse_distance_map(void)
- 	return ret;
- }
- 
-+static bool of_force_no_numa;
-+
-+void __of_force_no_numa(void)
-+{
-+	of_force_no_numa = true;
-+}
-+
- int of_node_to_nid(struct device_node *device)
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 778a985..6d34ebb 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -41,8 +41,10 @@ static __init int numa_parse_early_param(char *opt)
  {
- 	struct device_node *np;
- 	u32 nid;
- 	int r = -ENODATA;
+ 	if (!opt)
+ 		return -EINVAL;
+-	if (!strncmp(opt, "off", 3))
++	if (!strncmp(opt, "off", 3)) {
++		__of_force_no_numa();
+ 		numa_off = true;
++	}
  
-+	/*
-+	 * If NUMA forced off, nodes are meaningless.  Return
-+	 * NUMA_NO_NODE so that any node specific memory allocations
-+	 * can succeed from the default pool.
-+	 */
-+	if (of_force_no_numa)
-+		return NUMA_NO_NODE;
-+
- 	np = of_node_get(device);
- 
- 	while (np) {
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 299aeb1..6f6244e 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -850,11 +850,13 @@ static inline void of_property_clear_flag(struct property *p, unsigned long flag
- 
- #if defined(CONFIG_OF) && defined(CONFIG_NUMA)
- extern int of_node_to_nid(struct device_node *np);
-+extern void __of_force_no_numa(void);
- #else
- static inline int of_node_to_nid(struct device_node *device)
- {
- 	return NUMA_NO_NODE;
+ 	return 0;
  }
-+static inline void __of_force_no_numa(void) { /* Empty */ }
- #endif
+@@ -432,6 +434,7 @@ static int __init dummy_numa_init(void)
+ 		return ret;
+ 	}
  
- #ifdef CONFIG_OF_NUMA
++	__of_force_no_numa();
+ 	numa_off = true;
+ 	return 0;
+ }
 -- 
 1.8.3.1
