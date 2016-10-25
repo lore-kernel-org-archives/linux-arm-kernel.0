@@ -1,100 +1,72 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Tue, 25 Oct 2016 09:55:37 -0500
-Subject: [PATCH v21 6/9] fpga: fpga-region: device tree control for FPGA
+Date: Tue, 25 Oct 2016 09:55:39 -0500
+Subject: [PATCH v21 8/9] fpga: add altera freeze bridge support
 In-Reply-To: <20161025145540.3722-1-atull@opensource.altera.com>
 References: <20161025145540.3722-1-atull@opensource.altera.com>
-Message-ID: <20161025145540.3722-7-atull@opensource.altera.com>
+Message-ID: <20161025145540.3722-9-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FPGA Regions support programming FPGA under control of the Device
-Tree.
+Add a low level driver for Altera Freeze Bridges to the FPGA Bridge
+framework.  A freeze bridge is a bridge that exists in the FPGA
+fabric to isolate one region of the FPGA from the busses while that
+one region is being reprogrammed.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
 ---
-v9:  initial version (this patch added during rest of patchset's v9)
-v10: request deferral if fpga mgr or bridges not available yet
-     cleanup as fpga manager core goes into the real kernel
-     Don't assume bridges are disabled before programming FPGA
-     Don't hang onto reference for fpga manager
-     Move to staging/simple-fpga-bus
-v11: No change in this patch for v11 of the patch set
-v12: Moved out of staging.
-     Use fpga bridges framework.
-v13: If no bridges are specified, assume we don't need any.
-     Clean up debug messages
-     Some dev_info -> dev_dbg
-     Remove unneeded #include
-     Fix size of array of pointers
-     Don't need to specify .owner
-     Use common binding: firmware-name
-v14: OK it's not a simple bus.  Call it "FPGA Area"
-     Remove bindings that specify FPGA manager and FPGA bridges
-     Use parent FPGA bridge and bridges that are its peers
-     Use ancestor FPGA Manager
-v15: Add altr,fpga-bus implementation
-     Change compatible string "fpga-area" -> "altr,fpga-area"
-v16: Much changes as FPGA Areas and Busses become FPGA Regions
-     Add reconfig notifier, don't rely on simple-bus
-v17: Use new overlay notifier instead of reconfig notifier
-     Add external_fpga_config property used in u-boot
-     Change partial-reconfig binding to partial-fpga-config to be
-       similar to *-fpga-config bindings used in u-boot
-v18: No change to this patch in v18 of patch set
-v19: add fpga image information struct
-     support region as child of fpga bridge
-     remove message about not finding region
-     Make a tristate in the Kconfig
-     Add dependency on bridges in Kconfig
+v19: added in v19 of patchset as it needs for fpga info struct
 v20: No change for this patch in v20 of patchset
 v21: No change for this patch in v21 of patchset
 ---
- drivers/fpga/Kconfig          |   7 +
- drivers/fpga/Makefile         |   3 +
- drivers/fpga/fpga-region.c    | 603 ++++++++++++++++++++++++++++++++++++++++++
- include/linux/fpga/fpga-mgr.h |   2 +
- 4 files changed, 615 insertions(+)
- create mode 100644 drivers/fpga/fpga-region.c
+ drivers/fpga/Kconfig                |   9 ++
+ drivers/fpga/Makefile               |   1 +
+ drivers/fpga/altera-freeze-bridge.c | 273 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 283 insertions(+)
+ create mode 100644 drivers/fpga/altera-freeze-bridge.c
 
 diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index 9b20f45..e0e1257 100644
+index 5605ad6..8fe6a84 100644
 --- a/drivers/fpga/Kconfig
 +++ b/drivers/fpga/Kconfig
-@@ -13,6 +13,13 @@ config FPGA
+@@ -47,6 +47,15 @@ config SOCFPGA_FPGA_BRIDGE
+ 	  Say Y to enable drivers for FPGA bridges for Altera SOCFPGA
+ 	  devices.
  
- if FPGA
- 
-+config FPGA_REGION
-+	tristate "FPGA Region"
-+	depends on OF && FPGA_BRIDGE
++config ALTERA_FREEZE_BRIDGE
++	tristate "Altera FPGA Freeze Bridge"
++	depends on ARCH_SOCFPGA && FPGA_BRIDGE
 +	help
-+	  FPGA Regions allow loading FPGA images under control of
-+	  the Device Tree.
++	  Say Y to enable drivers for Altera FPGA Freeze bridges.  A
++	  freeze bridge is a bridge that exists in the FPGA fabric to
++	  isolate one region of the FPGA from the busses while that
++	  region is being reprogrammed.
 +
- config FPGA_MGR_SOCFPGA
- 	tristate "Altera SOCFPGA FPGA Manager"
- 	depends on ARCH_SOCFPGA
+ endif # FPGA
+ 
+ endmenu
 diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 4baef00..8d746c3 100644
+index e658436..a6f874d 100644
 --- a/drivers/fpga/Makefile
 +++ b/drivers/fpga/Makefile
-@@ -11,3 +11,6 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
- 
+@@ -12,6 +12,7 @@ obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
  # FPGA Bridge Drivers
  obj-$(CONFIG_FPGA_BRIDGE)		+= fpga-bridge.o
-+
-+# High Level Interfaces
-+obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
-diff --git a/drivers/fpga/fpga-region.c b/drivers/fpga/fpga-region.c
+ obj-$(CONFIG_SOCFPGA_FPGA_BRIDGE)	+= altera-hps2fpga.o altera-fpga2sdram.o
++obj-$(CONFIG_ALTERA_FREEZE_BRIDGE)	+= altera-freeze-bridge.o
+ 
+ # High Level Interfaces
+ obj-$(CONFIG_FPGA_REGION)		+= fpga-region.o
+diff --git a/drivers/fpga/altera-freeze-bridge.c b/drivers/fpga/altera-freeze-bridge.c
 new file mode 100644
-index 0000000..3222fdb
+index 0000000..8dcd9fb
 --- /dev/null
-+++ b/drivers/fpga/fpga-region.c
-@@ -0,0 +1,603 @@
++++ b/drivers/fpga/altera-freeze-bridge.c
+@@ -0,0 +1,273 @@
 +/*
-+ * FPGA Region - Device Tree support for FPGA programming under Linux
++ * FPGA Freeze Bridge Controller
 + *
-+ *  Copyright (C) 2013-2016 Altera Corporation
++ *  Copyright (C) 2016 Altera Corporation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify it
 + * under the terms and conditions of the GNU General Public License,
@@ -108,606 +80,261 @@ index 0000000..3222fdb
 + * You should have received a copy of the GNU General Public License along with
 + * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+
-+#include <linux/fpga/fpga-bridge.h>
-+#include <linux/fpga/fpga-mgr.h>
-+#include <linux/idr.h>
++#include <linux/delay.h>
++#include <linux/io.h>
 +#include <linux/kernel.h>
-+#include <linux/list.h>
++#include <linux/of_device.h>
 +#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
++#include <linux/fpga/fpga-bridge.h>
 +
-+/**
-+ * struct fpga_region - FPGA Region structure
-+ * @dev: FPGA Region device
-+ * @mutex: enforces exclusive reference to region
-+ * @bridge_list: list of FPGA bridges specified in region
-+ * @info: fpga image specific information
-+ */
-+struct fpga_region {
-+	struct device dev;
-+	struct mutex mutex; /* for exclusive reference to region */
-+	struct list_head bridge_list;
-+	struct fpga_image_info *info;
-+};
++#define FREEZE_CSR_STATUS_OFFSET		0
++#define FREEZE_CSR_CTRL_OFFSET			4
++#define FREEZE_CSR_ILLEGAL_REQ_OFFSET		8
++#define FREEZE_CSR_REG_VERSION			12
 +
-+#define to_fpga_region(d) container_of(d, struct fpga_region, dev)
++#define FREEZE_CSR_SUPPORTED_VERSION		2
 +
-+static DEFINE_IDA(fpga_region_ida);
-+static struct class *fpga_region_class;
++#define FREEZE_CSR_STATUS_FREEZE_REQ_DONE	BIT(0)
++#define FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE	BIT(1)
 +
-+static const struct of_device_id fpga_region_of_match[] = {
-+	{ .compatible = "fpga-region", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, fpga_region_of_match);
++#define FREEZE_CSR_CTRL_FREEZE_REQ		BIT(0)
++#define FREEZE_CSR_CTRL_RESET_REQ		BIT(1)
++#define FREEZE_CSR_CTRL_UNFREEZE_REQ		BIT(2)
 +
-+static int fpga_region_of_node_match(struct device *dev, const void *data)
-+{
-+	return dev->of_node == data;
-+}
++#define FREEZE_BRIDGE_NAME			"freeze"
 +
-+/**
-+ * fpga_region_find - find FPGA region
-+ * @np: device node of FPGA Region
-+ * Caller will need to put_device(&region->dev) when done.
-+ * Returns FPGA Region struct or NULL
-+ */
-+static struct fpga_region *fpga_region_find(struct device_node *np)
-+{
++struct altera_freeze_br_data {
 +	struct device *dev;
++	void __iomem *base_addr;
++	bool enable;
++};
 +
-+	dev = class_find_device(fpga_region_class, NULL, np,
-+				fpga_region_of_node_match);
-+	if (!dev)
-+		return NULL;
-+
-+	return to_fpga_region(dev);
-+}
-+
-+/**
-+ * fpga_region_get - get an exclusive reference to a fpga region
-+ * @region: FPGA Region struct
-+ *
-+ * Caller should call fpga_region_put() when done with region.
-+ *
-+ * Return fpga_region struct if successful.
-+ * Return -EBUSY if someone already has a reference to the region.
-+ * Return -ENODEV if @np is not a FPGA Region.
++/*
++ * Poll status until status bit is set or we have a timeout.
 + */
-+static struct fpga_region *fpga_region_get(struct fpga_region *region)
++static int altera_freeze_br_req_ack(struct altera_freeze_br_data *priv,
++				    u32 timeout, u32 req_ack)
 +{
-+	struct device *dev = &region->dev;
++	struct device *dev = priv->dev;
++	void __iomem *csr_illegal_req_addr = priv->base_addr +
++					     FREEZE_CSR_ILLEGAL_REQ_OFFSET;
++	u32 status, illegal, ctrl;
++	int ret = -ETIMEDOUT;
 +
-+	if (!mutex_trylock(&region->mutex)) {
-+		dev_dbg(dev, "%s: FPGA Region already in use\n", __func__);
-+		return ERR_PTR(-EBUSY);
-+	}
++	do {
++		illegal = readl(csr_illegal_req_addr);
++		if (illegal) {
++			dev_err(dev, "illegal request detected 0x%x", illegal);
 +
-+	get_device(dev);
-+	of_node_get(dev->of_node);
-+	if (!try_module_get(dev->parent->driver->owner)) {
-+		of_node_put(dev->of_node);
-+		put_device(dev);
-+		mutex_unlock(&region->mutex);
-+		return ERR_PTR(-ENODEV);
-+	}
++			writel(1, csr_illegal_req_addr);
 +
-+	dev_dbg(&region->dev, "get\n");
++			illegal = readl(csr_illegal_req_addr);
++			if (illegal)
++				dev_err(dev, "illegal request not cleared 0x%x",
++					illegal);
 +
-+	return region;
-+}
-+
-+/**
-+ * fpga_region_put - release a reference to a region
-+ *
-+ * @region: FPGA region
-+ */
-+static void fpga_region_put(struct fpga_region *region)
-+{
-+	struct device *dev = &region->dev;
-+
-+	dev_dbg(&region->dev, "put\n");
-+
-+	module_put(dev->parent->driver->owner);
-+	of_node_put(dev->of_node);
-+	put_device(dev);
-+	mutex_unlock(&region->mutex);
-+}
-+
-+/**
-+ * fpga_region_get_manager - get exclusive reference for FPGA manager
-+ * @region: FPGA region
-+ *
-+ * Get FPGA Manager from "fpga-mgr" property or from ancestor region.
-+ *
-+ * Caller should call fpga_mgr_put() when done with manager.
-+ *
-+ * Return: fpga manager struct or IS_ERR() condition containing error code.
-+ */
-+static struct fpga_manager *fpga_region_get_manager(struct fpga_region *region)
-+{
-+	struct device *dev = &region->dev;
-+	struct device_node *np = dev->of_node;
-+	struct device_node  *mgr_node;
-+	struct fpga_manager *mgr;
-+
-+	of_node_get(np);
-+	while (np) {
-+		if (of_device_is_compatible(np, "fpga-region")) {
-+			mgr_node = of_parse_phandle(np, "fpga-mgr", 0);
-+			if (mgr_node) {
-+				mgr = of_fpga_mgr_get(mgr_node);
-+				of_node_put(np);
-+				return mgr;
-+			}
-+		}
-+		np = of_get_next_parent(np);
-+	}
-+	of_node_put(np);
-+
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+/**
-+ * fpga_region_get_bridges - create a list of bridges
-+ * @region: FPGA region
-+ * @overlay: device node of the overlay
-+ *
-+ * Create a list of bridges including the parent bridge and the bridges
-+ * specified by "fpga-bridges" property.  Note that the
-+ * fpga_bridges_enable/disable/put functions are all fine with an empty list
-+ * if that happens.
-+ *
-+ * Caller should call fpga_bridges_put(&region->bridge_list) when
-+ * done with the bridges.
-+ *
-+ * Return 0 for success (even if there are no bridges specified)
-+ * or -EBUSY if any of the bridges are in use.
-+ */
-+static int fpga_region_get_bridges(struct fpga_region *region,
-+				   struct device_node *overlay)
-+{
-+	struct device *dev = &region->dev;
-+	struct device_node *region_np = dev->of_node;
-+	struct device_node *br, *np, *parent_br = NULL;
-+	int i, ret;
-+
-+	/* If parent is a bridge, add to list */
-+	ret = fpga_bridge_get_to_list(region_np->parent, region->info,
-+				      &region->bridge_list);
-+	if (ret == -EBUSY)
-+		return ret;
-+
-+	if (!ret)
-+		parent_br = region_np->parent;
-+
-+	/* If overlay has a list of bridges, use it. */
-+	if (of_parse_phandle(overlay, "fpga-bridges", 0))
-+		np = overlay;
-+	else
-+		np = region_np;
-+
-+	for (i = 0; ; i++) {
-+		br = of_parse_phandle(np, "fpga-bridges", i);
-+		if (!br)
-+			break;
-+
-+		/* If parent bridge is in list, skip it. */
-+		if (br == parent_br)
-+			continue;
-+
-+		/* If node is a bridge, get it and add to list */
-+		ret = fpga_bridge_get_to_list(br, region->info,
-+					      &region->bridge_list);
-+
-+		/* If any of the bridges are in use, give up */
-+		if (ret == -EBUSY) {
-+			fpga_bridges_put(&region->bridge_list);
-+			return -EBUSY;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * fpga_region_program_fpga - program FPGA
-+ * @region: FPGA region
-+ * @firmware_name: name of FPGA image firmware file
-+ * @overlay: device node of the overlay
-+ * Program an FPGA using information in the device tree.
-+ * Function assumes that there is a firmware-name property.
-+ * Return 0 for success or negative error code.
-+ */
-+static int fpga_region_program_fpga(struct fpga_region *region,
-+				    const char *firmware_name,
-+				    struct device_node *overlay)
-+{
-+	struct fpga_manager *mgr;
-+	int ret;
-+
-+	region = fpga_region_get(region);
-+	if (IS_ERR(region)) {
-+		pr_err("failed to get fpga region\n");
-+		return PTR_ERR(region);
-+	}
-+
-+	mgr = fpga_region_get_manager(region);
-+	if (IS_ERR(mgr)) {
-+		pr_err("failed to get fpga region manager\n");
-+		return PTR_ERR(mgr);
-+	}
-+
-+	ret = fpga_region_get_bridges(region, overlay);
-+	if (ret) {
-+		pr_err("failed to get fpga region bridges\n");
-+		goto err_put_mgr;
-+	}
-+
-+	ret = fpga_bridges_disable(&region->bridge_list);
-+	if (ret) {
-+		pr_err("failed to disable region bridges\n");
-+		goto err_put_br;
-+	}
-+
-+	ret = fpga_mgr_firmware_load(mgr, region->info, firmware_name);
-+	if (ret) {
-+		pr_err("failed to load fpga image\n");
-+		goto err_put_br;
-+	}
-+
-+	ret = fpga_bridges_enable(&region->bridge_list);
-+	if (ret) {
-+		pr_err("failed to enable region bridges\n");
-+		goto err_put_br;
-+	}
-+
-+	fpga_mgr_put(mgr);
-+	fpga_region_put(region);
-+
-+	return 0;
-+
-+err_put_br:
-+	fpga_bridges_put(&region->bridge_list);
-+err_put_mgr:
-+	fpga_mgr_put(mgr);
-+	fpga_region_put(region);
-+
-+	return ret;
-+}
-+
-+/**
-+ * child_regions_with_firmware
-+ * @overlay: device node of the overlay
-+ *
-+ * If the overlay adds child FPGA regions, they are not allowed to have
-+ * firmware-name property.
-+ *
-+ * Return 0 for OK or -EINVAL if child FPGA region adds firmware-name.
-+ */
-+static int child_regions_with_firmware(struct device_node *overlay)
-+{
-+	struct device_node *child_region;
-+	const char *child_firmware_name;
-+	int ret = 0;
-+
-+	of_node_get(overlay);
-+
-+	child_region = of_find_matching_node(overlay, fpga_region_of_match);
-+	while (child_region) {
-+		if (!of_property_read_string(child_region, "firmware-name",
-+					     &child_firmware_name)) {
 +			ret = -EINVAL;
 +			break;
 +		}
-+		child_region = of_find_matching_node(child_region,
-+						     fpga_region_of_match);
-+	}
 +
-+	of_node_put(child_region);
++		status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++		dev_dbg(dev, "%s %x %x\n", __func__, status, req_ack);
++		status &= req_ack;
++		if (status) {
++			ctrl = readl(priv->base_addr + FREEZE_CSR_CTRL_OFFSET);
++			dev_dbg(dev, "%s request %x acknowledged %x %x\n",
++				__func__, req_ack, status, ctrl);
++			ret = 0;
++			break;
++		}
 +
-+	if (ret)
-+		pr_err("firmware-name not allowed in child FPGA region: %s",
-+		       child_region->full_name);
++		udelay(1);
++	} while (timeout--);
++
++	if (ret == -ETIMEDOUT)
++		dev_err(dev, "%s timeout waiting for 0x%x\n",
++			__func__, req_ack);
 +
 +	return ret;
 +}
 +
-+/**
-+ * fpga_region_notify_pre_apply - pre-apply overlay notification
-+ *
-+ * @region: FPGA region that the overlay was applied to
-+ * @nd: overlay notification data
-+ *
-+ * Called after when an overlay targeted to a FPGA Region is about to be
-+ * applied.  Function will check the properties that will be added to the FPGA
-+ * region.  If the checks pass, it will program the FPGA.
-+ *
-+ * The checks are:
-+ * The overlay must add either firmware-name or external-fpga-config property
-+ * to the FPGA Region.
-+ *
-+ *   firmware-name        : program the FPGA
-+ *   external-fpga-config : FPGA is already programmed
-+ *
-+ * The overlay can add other FPGA regions, but child FPGA regions cannot have a
-+ * firmware-name property since those regions don't exist yet.
-+ *
-+ * If the overlay that breaks the rules, notifier returns an error and the
-+ * overlay is rejected before it goes into the main tree.
-+ *
-+ * Returns 0 for success or negative error code for failure.
-+ */
-+static int fpga_region_notify_pre_apply(struct fpga_region *region,
-+					struct of_overlay_notify_data *nd)
++static int altera_freeze_br_do_freeze(struct altera_freeze_br_data *priv,
++				      u32 timeout)
 +{
-+	const char *firmware_name = NULL;
-+	struct fpga_image_info *info;
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
 +	int ret;
 +
-+	info = devm_kzalloc(&region->dev, sizeof(*info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
 +
-+	region->info = info;
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
 +
-+	/* Reject overlay if child FPGA Regions have firmware-name property */
-+	ret = child_regions_with_firmware(nd->overlay);
-+	if (ret)
-+		return ret;
-+
-+	/* Read FPGA region properties from the overlay */
-+	if (of_property_read_bool(nd->overlay, "partial-fpga-config"))
-+		info->flags |= FPGA_MGR_PARTIAL_RECONFIG;
-+
-+	if (of_property_read_bool(nd->overlay, "external-fpga-config"))
-+		info->flags |= FPGA_MGR_EXTERNAL_CONFIG;
-+
-+	of_property_read_string(nd->overlay, "firmware-name", &firmware_name);
-+
-+	of_property_read_u32(nd->overlay, "region-unfreeze-timeout-us",
-+			     &info->enable_timeout_us);
-+
-+	of_property_read_u32(nd->overlay, "region-freeze-timeout-us",
-+			     &info->disable_timeout_us);
-+
-+	/* If FPGA was externally programmed, don't specify firmware */
-+	if ((info->flags & FPGA_MGR_EXTERNAL_CONFIG) && firmware_name) {
-+		pr_err("error: specified firmware and external-fpga-config");
-+		return -EINVAL;
-+	}
-+
-+	/* FPGA is already configured externally.  We're done. */
-+	if (info->flags & FPGA_MGR_EXTERNAL_CONFIG)
++	if (status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already disabled %d\n",
++			__func__, status);
 +		return 0;
-+
-+	/* If we got this far, we should be programming the FPGA */
-+	if (!firmware_name) {
-+		pr_err("should specify firmware-name or external-fpga-config\n");
++	} else if (!(status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not enabled %d\n", __func__, status);
 +		return -EINVAL;
 +	}
 +
-+	return fpga_region_program_fpga(region, firmware_name, nd->overlay);
-+}
++	writel(FREEZE_CSR_CTRL_FREEZE_REQ, csr_ctrl_addr);
 +
-+/**
-+ * fpga_region_notify_post_remove - post-remove overlay notification
-+ *
-+ * @region: FPGA region that was targeted by the overlay that was removed
-+ * @nd: overlay notification data
-+ *
-+ * Called after an overlay has been removed if the overlay's target was a
-+ * FPGA region.
-+ */
-+static void fpga_region_notify_post_remove(struct fpga_region *region,
-+					   struct of_overlay_notify_data *nd)
-+{
-+	fpga_bridges_disable(&region->bridge_list);
-+	fpga_bridges_put(&region->bridge_list);
-+	devm_kfree(&region->dev, region->info);
-+	region->info = NULL;
-+}
-+
-+/**
-+ * of_fpga_region_notify - reconfig notifier for dynamic DT changes
-+ * @nb:		notifier block
-+ * @action:	notifier action
-+ * @arg:	reconfig data
-+ *
-+ * This notifier handles programming a FPGA when a "firmware-name" property is
-+ * added to a fpga-region.
-+ *
-+ * Returns NOTIFY_OK or error if FPGA programming fails.
-+ */
-+static int of_fpga_region_notify(struct notifier_block *nb,
-+				 unsigned long action, void *arg)
-+{
-+	struct of_overlay_notify_data *nd = arg;
-+	struct fpga_region *region;
-+	int ret;
-+
-+	switch (action) {
-+	case OF_OVERLAY_PRE_APPLY:
-+		pr_debug("%s OF_OVERLAY_PRE_APPLY\n", __func__);
-+		break;
-+	case OF_OVERLAY_POST_APPLY:
-+		pr_debug("%s OF_OVERLAY_POST_APPLY\n", __func__);
-+		return NOTIFY_OK;       /* not for us */
-+	case OF_OVERLAY_PRE_REMOVE:
-+		pr_debug("%s OF_OVERLAY_PRE_REMOVE\n", __func__);
-+		return NOTIFY_OK;       /* not for us */
-+	case OF_OVERLAY_POST_REMOVE:
-+		pr_debug("%s OF_OVERLAY_POST_REMOVE\n", __func__);
-+		break;
-+	default:			/* should not happen */
-+		return NOTIFY_OK;
-+	}
-+
-+	region = fpga_region_find(nd->target);
-+	if (!region)
-+		return NOTIFY_OK;
-+
-+	ret = 0;
-+	switch (action) {
-+	case OF_OVERLAY_PRE_APPLY:
-+		ret = fpga_region_notify_pre_apply(region, nd);
-+		break;
-+
-+	case OF_OVERLAY_POST_REMOVE:
-+		fpga_region_notify_post_remove(region, nd);
-+		break;
-+	}
-+
-+	put_device(&region->dev);
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_FREEZE_REQ_DONE);
 +
 +	if (ret)
-+		return notifier_from_errno(ret);
++		writel(0, csr_ctrl_addr);
++	else
++		writel(FREEZE_CSR_CTRL_RESET_REQ, csr_ctrl_addr);
 +
-+	return NOTIFY_OK;
++	return ret;
 +}
 +
-+static struct notifier_block fpga_region_of_nb = {
-+	.notifier_call = of_fpga_region_notify,
++static int altera_freeze_br_do_unfreeze(struct altera_freeze_br_data *priv,
++					u32 timeout)
++{
++	struct device *dev = priv->dev;
++	void __iomem *csr_ctrl_addr = priv->base_addr +
++				      FREEZE_CSR_CTRL_OFFSET;
++	u32 status;
++	int ret;
++
++	writel(0, csr_ctrl_addr);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE) {
++		dev_dbg(dev, "%s bridge already enabled %d\n",
++			__func__, status);
++		return 0;
++	} else if (!(status & FREEZE_CSR_STATUS_FREEZE_REQ_DONE)) {
++		dev_err(dev, "%s bridge not frozen %d\n", __func__, status);
++		return -EINVAL;
++	}
++
++	writel(FREEZE_CSR_CTRL_UNFREEZE_REQ, csr_ctrl_addr);
++
++	ret = altera_freeze_br_req_ack(priv, timeout,
++				       FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE);
++
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++
++	dev_dbg(dev, "%s %d %d\n", __func__, status, readl(csr_ctrl_addr));
++
++	writel(0, csr_ctrl_addr);
++
++	return ret;
++}
++
++/*
++ * enable = 1 : allow traffic through the bridge
++ * enable = 0 : disable traffic through the bridge
++ */
++static int altera_freeze_br_enable_set(struct fpga_bridge *bridge,
++				       bool enable)
++{
++	struct altera_freeze_br_data *priv = bridge->priv;
++	struct fpga_image_info *info = bridge->info;
++	u32 timeout = 0;
++	int ret;
++
++	if (enable) {
++		if (info)
++			timeout = info->enable_timeout_us;
++
++		ret = altera_freeze_br_do_unfreeze(bridge->priv, timeout);
++	} else {
++		if (info)
++			timeout = info->disable_timeout_us;
++
++		ret = altera_freeze_br_do_freeze(bridge->priv, timeout);
++	}
++
++	if (!ret)
++		priv->enable = enable;
++
++	return ret;
++}
++
++static int altera_freeze_br_enable_show(struct fpga_bridge *bridge)
++{
++	struct altera_freeze_br_data *priv = bridge->priv;
++
++	return priv->enable;
++}
++
++static struct fpga_bridge_ops altera_freeze_br_br_ops = {
++	.enable_set = altera_freeze_br_enable_set,
++	.enable_show = altera_freeze_br_enable_show,
 +};
 +
-+static int fpga_region_probe(struct platform_device *pdev)
++static const struct of_device_id altera_freeze_br_of_match[] = {
++	{ .compatible = "altr,freeze-bridge-controller", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, altera_freeze_br_of_match);
++
++static int altera_freeze_br_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct fpga_region *region;
-+	int id, ret = 0;
++	struct device_node *np = pdev->dev.of_node;
++	struct altera_freeze_br_data *priv;
++	struct resource *res;
++	u32 status, revision;
 +
-+	region = kzalloc(sizeof(*region), GFP_KERNEL);
-+	if (!region)
++	if (!np)
++		return -ENODEV;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
 +		return -ENOMEM;
 +
-+	id = ida_simple_get(&fpga_region_ida, 0, 0, GFP_KERNEL);
-+	if (id < 0) {
-+		ret = id;
-+		goto err_kfree;
-+	}
++	priv->dev = dev;
 +
-+	mutex_init(&region->mutex);
-+	INIT_LIST_HEAD(&region->bridge_list);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	priv->base_addr = devm_ioremap_resource(dev, res);
++	if (IS_ERR(priv->base_addr))
++		return PTR_ERR(priv->base_addr);
 +
-+	device_initialize(&region->dev);
-+	region->dev.class = fpga_region_class;
-+	region->dev.parent = dev;
-+	region->dev.of_node = np;
-+	region->dev.id = id;
-+	dev_set_drvdata(dev, region);
++	status = readl(priv->base_addr + FREEZE_CSR_STATUS_OFFSET);
++	if (status & FREEZE_CSR_STATUS_UNFREEZE_REQ_DONE)
++		priv->enable = 1;
 +
-+	ret = dev_set_name(&region->dev, "region%d", id);
-+	if (ret)
-+		goto err_remove;
++	revision = readl(priv->base_addr + FREEZE_CSR_REG_VERSION);
++	if (revision != FREEZE_CSR_SUPPORTED_VERSION)
++		dev_warn(dev,
++			 "%s Freeze Controller unexpected revision %d != %d\n",
++			 __func__, revision, FREEZE_CSR_SUPPORTED_VERSION);
 +
-+	ret = device_add(&region->dev);
-+	if (ret)
-+		goto err_remove;
-+
-+	of_platform_populate(np, fpga_region_of_match, NULL, &region->dev);
-+
-+	dev_info(dev, "FPGA Region probed\n");
-+
-+	return 0;
-+
-+err_remove:
-+	ida_simple_remove(&fpga_region_ida, id);
-+err_kfree:
-+	kfree(region);
-+
-+	return ret;
++	return fpga_bridge_register(dev, FREEZE_BRIDGE_NAME,
++				    &altera_freeze_br_br_ops, priv);
 +}
 +
-+static int fpga_region_remove(struct platform_device *pdev)
++static int altera_freeze_br_remove(struct platform_device *pdev)
 +{
-+	struct fpga_region *region = platform_get_drvdata(pdev);
-+
-+	device_unregister(&region->dev);
++	fpga_bridge_unregister(&pdev->dev);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver fpga_region_driver = {
-+	.probe = fpga_region_probe,
-+	.remove = fpga_region_remove,
++static struct platform_driver altera_freeze_br_driver = {
++	.probe = altera_freeze_br_probe,
++	.remove = altera_freeze_br_remove,
 +	.driver = {
-+		.name	= "fpga-region",
-+		.of_match_table = of_match_ptr(fpga_region_of_match),
++		.name	= "altera_freeze_br",
++		.of_match_table = of_match_ptr(altera_freeze_br_of_match),
 +	},
 +};
 +
-+static void fpga_region_dev_release(struct device *dev)
-+{
-+	struct fpga_region *region = to_fpga_region(dev);
++module_platform_driver(altera_freeze_br_driver);
 +
-+	ida_simple_remove(&fpga_region_ida, region->dev.id);
-+	kfree(region);
-+}
-+
-+/**
-+ * fpga_region_init - init function for fpga_region class
-+ * Creates the fpga_region class and registers a reconfig notifier.
-+ */
-+static int __init fpga_region_init(void)
-+{
-+	int ret;
-+
-+	fpga_region_class = class_create(THIS_MODULE, "fpga_region");
-+	if (IS_ERR(fpga_region_class))
-+		return PTR_ERR(fpga_region_class);
-+
-+	fpga_region_class->dev_release = fpga_region_dev_release;
-+
-+	ret = of_overlay_notifier_register(&fpga_region_of_nb);
-+	if (ret)
-+		goto err_class;
-+
-+	ret = platform_driver_register(&fpga_region_driver);
-+	if (ret)
-+		goto err_plat;
-+
-+	return 0;
-+
-+err_plat:
-+	of_overlay_notifier_unregister(&fpga_region_of_nb);
-+err_class:
-+	class_destroy(fpga_region_class);
-+	ida_destroy(&fpga_region_ida);
-+	return ret;
-+}
-+
-+static void __exit fpga_region_exit(void)
-+{
-+	platform_driver_unregister(&fpga_region_driver);
-+	of_overlay_notifier_unregister(&fpga_region_of_nb);
-+	class_destroy(fpga_region_class);
-+	ida_destroy(&fpga_region_ida);
-+}
-+
-+subsys_initcall(fpga_region_init);
-+module_exit(fpga_region_exit);
-+
-+MODULE_DESCRIPTION("FPGA Region");
++MODULE_DESCRIPTION("Altera Freeze Bridge");
 +MODULE_AUTHOR("Alan Tull <atull@opensource.altera.com>");
 +MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-index 040b86d..12f6207 100644
---- a/include/linux/fpga/fpga-mgr.h
-+++ b/include/linux/fpga/fpga-mgr.h
-@@ -65,8 +65,10 @@ enum fpga_mgr_states {
- /*
-  * FPGA Manager flags
-  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
-+ * FPGA_MGR_EXTERNAL_CONFIG: FPGA has been configured prior to Linux booting
-  */
- #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
-+#define FPGA_MGR_EXTERNAL_CONFIG	BIT(1)
- 
- /**
-  * struct fpga_image_info - information specific to a FPGA image
 -- 
 2.10.1
