@@ -1,40 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Oct 2016 11:05:50 +0100
-Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
-In-Reply-To: <CAGXu5jKXoo5KWqq0dsWRFvW0Y3dXXs+-ab=ymVUnzcmovUsOkg@mail.gmail.com>
-References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
- <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
- <20161024174840.GR15620@leverpostej>
- <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
- <20161024180941.GT15620@leverpostej>
- <20161024181548.GA8275@leverpostej>
- <CAGXu5jKXoo5KWqq0dsWRFvW0Y3dXXs+-ab=ymVUnzcmovUsOkg@mail.gmail.com>
-Message-ID: <20161025100550.GB8898@leverpostej>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 25 Oct 2016 12:07:11 +0200
+Subject: [PATCH 4/4] iommu/arm-smmu: Add the device_link between masters
+ and smmu
+In-Reply-To: <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
+References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
+ <CGME20161021171456eucas1p172cd17e1d3b498eac68210a39f54e025@eucas1p1.samsung.com>
+ <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 11:18:35AM -0700, Kees Cook wrote:
-> On Mon, Oct 24, 2016 at 11:15 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Oct 24, 2016 at 07:09:42PM +0100, Mark Rutland wrote:
-> >> It's really crazy how broken a kernel can be yet still "work"; clearly
-> >> we better tests are needed. :/
-> >
-> > Clearly we better grammar need too. :(
-> 
-> Out of curiosity, what workflow would have tripped over the entry.S bug?
+Hi Sricharan,
 
-There are two bugs:
 
-The issues in [1] would show up if you were attempting to use
-breakpoints or watchpoints -- we'd never disable the single step.
+On 2016-10-21 19:14, Sricharan R wrote:
+> The device link between master and its smmu is added so that
+> the smmu gets runtime enabled/disabled when the master needs it.
+> This is done from add_device callback which gets called once
+> when the master is added to the smmu group.
+>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>   drivers/iommu/arm-smmu.c | 9 +++++++++
+>   1 file changed, 9 insertions(+)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 578cdc2..71ce4b6 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1470,6 +1470,15 @@ static int arm_smmu_add_device(struct device *dev)
+>   		goto out_free;
+>   	pm_runtime_put_sync(smmu->dev);
+>   
+> +	/*
+> +	 * Establish the link between smmu and master, so that the
+> +	 * smmu gets runtime enabled/disabled as per the master's
+> +	 * needs.
+> +	 */
+> +
+> +	device_link_add(dev, smmu->dev, DEVICE_LINK_AVAILABLE,
+> +			DEVICE_LINK_PM_RUNTIME);
 
-The broken 're-entered irq stack' check [2] would be an issue if we were
-close to exhausting the stack -- we'd never switch to the IRQ stack when
-we take an IRQ in a kernel context. I'm not sure of a particular
-workload.
+Please update to the latest version of Rafael's patches. In V5 the 
+initial link
+state is not needed anymore and there was an important fix for creating 
+links
+during master's driver probing, what happens after applying your IOMMU 
+deferred
+probe patchset.
 
-Thanks,
-Mark.
+> +
+>   	return 0;
+>   
+>   out_free:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462932.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462891.html
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
