@@ -1,167 +1,79 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 25 Oct 2016 10:37:06 -0600
-Subject: [PATCH] exynos-drm: Fix display manager failing to start without
- IOMMU problem
-In-Reply-To: <49780a7f-59a4-d2b0-380c-4bd330660ba2@osg.samsung.com>
-References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
- <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
- <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
- <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
- <57B29925.4020600@samsung.com>
- <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
- <CAAQKjZMFOe7Aa5Hq5gbMj7=h2VfgXq5jgqbB1wqcZcYZ0ZKZxA@mail.gmail.com>
- <49780a7f-59a4-d2b0-380c-4bd330660ba2@osg.samsung.com>
-Message-ID: <fa4114e0-9382-0653-7dc6-a63f1312d616@osg.samsung.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 25 Oct 2016 09:44:23 -0700
+Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
+In-Reply-To: <20161025143237.GD8898@leverpostej>
+References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
+ <20161024113131.GH15620@leverpostej> <1477326477.1984.2.camel@perches.com>
+ <20161025143237.GD8898@leverpostej>
+Message-ID: <1477413863.1998.7.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2016 04:27 PM, Shuah Khan wrote:
-> On 10/19/2016 08:16 AM, Inki Dae wrote:
->> Hi Shuah,
->>
->> 2016-10-13 8:11 GMT+09:00 Shuah Khan <shuahkh@osg.samsung.com>:
->>> Hi Inki,
->>>
->>> On 08/15/2016 10:40 PM, Inki Dae wrote:
->>>
->>>>>
->>>>> okay the very first commit that added IOMMU support
->>>>> introduced the code that rejects non-contig gem memory
->>>>> type without IOMMU.
->>>>>
->>>>> commit 0519f9a12d0113caab78980c48a7902d2bd40c2c
->>>>> Author: Inki Dae <inki.dae@samsung.com>
->>>>> Date:   Sat Oct 20 07:53:42 2012 -0700
->>>>>
->>>>>     drm/exynos: add iommu support for exynos drm framework
->>>>>
->>>
->>> I haven't given up on this yet. I am still seeing the following failure:
->>>
->>> Additional debug messages I added:
->>> [   15.287403] exynos_drm_gem_create_ioctl() 1
->>> [   15.287419] exynos_drm_gem_create() flags 1
->>>
->>> [   15.311511] [drm:exynos_drm_framebuffer_init] *ERROR* Non-contiguous GEM memory is not supported.
->>>
->>> Additional debug message I added:
->>> [   15.318981] [drm:exynos_user_fb_create] *ERROR* failed to initialize framebuffer
->>>
->>> This is what happens:
->>>
->>> 1. exynos_drm_gem_create_ioctl() gets called with EXYNOS_BO_NONCONTIG request
->>> 2. exynos_drm_gem_create(0 goes ahead and creates the GEM buffers
->>> 3. exynos_user_fb_create() tries to associate GEM to fb and fails during
->>>    check_fb_gem_memory_type()
->>>
->>> At this point, there is no recovery and lightdm fails
->>>
->>> xf86-video-armsoc/src/drmmode_exynos/drmmode_exynos.c assumes contiguous
->>> allocations are not supported in some exynos drm versions: The following
->>> commit introduced this change:
->>>
->>> https://git.linaro.org/arm/xorg/driver/xf86-video-armsoc.git/commitdiff/3be1f6273441fe95dd442f44064387322e16b7e9
->>>
->>> excerpts from the diff:-       if (create_gem->buf_type == ARMSOC_BO_SCANOUT)
->>> -               create_exynos.flags = EXYNOS_BO_CONTIG;
->>> -       else
->>> -               create_exynos.flags = EXYNOS_BO_NONCONTIG;
->>> +
->>> +       /* Contiguous allocations are not supported in some exynos drm versions.
->>> +        * When they are supported all allocations are effectively contiguous
->>> +        * anyway, so for simplicity we always request non contiguous buffers.
->>> +        */
->>> +       create_exynos.flags = EXYNOS_BO_NONCONTIG;
->>>
->>
->> Above comment, "Contiguous allocations are not supported in some
->> exynos drm versions.", seems wrong assumption.
->> The root cause, contiguous allocation is not supported, would be that
->> they used Linux kernel which didn't have CMA region enough - as
->> default 16MB, or didn't declare CMA region enough for the DMA device.
->> So I think they should not force to flag EXYNOS_BO_NONCONTIG and they
->> should manage the error case if the allocation failed.
+(adding Linus Torvalds)
+
+On Tue, 2016-10-25 at 15:32 +0100, Mark Rutland wrote:
+> On Mon, Oct 24, 2016 at 09:27:57AM -0700, Joe Perches wrote:
+> > On Mon, 2016-10-24 at 12:31 +0100, Mark Rutland wrote:
+> > > On Sun, Oct 23, 2016 at 01:40:49PM -0700, Joe Perches wrote:
+> > > > commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
+> > > > corrected the KERN_CONT fallout from commit 4bcc595ccd80
+> > > > ("printk: reinstate KERN_CONT for printing continuation lines"), but
+> > > > the code still has unnecessary KERN_CONT uses.  Remove them.
+> > > 
+> > > Why are these unnecessary KERN_CONTs a larger problem than duplicating
+> > > the format string for a third time? Having to duplicate it at all was
+> > > annoying enough.
+> > 
+> > Not printing partial lines is the best solution to avoiding
+> > message output interleaving.
 > 
-> This assumption doesn't sound correct and forcing NONCONTIG isn't right
-> either. 
+> Looking further, it seems that KERN_CONT is terminally broken. The core
+> code somehow swallows newlines from some KERN_CONT prints in a
+> non-deterministic fashion, and also appears to insert newlines from thin
+> air. This happens in the absence of intervening printks.
 > 
->>
->>> There might have been logic on exynos_drm that forced Contig when it coudn't
->>> support NONCONTIG. At least, that is what this comment suggests. This assumption
->>> doesn't appear to be a good one and not sure if this change was made to fix a bug.
->>>
->>> After the IOMMU support, this assumption is no longer true. Hence, with IOMMU
->>> support, latest kernels have a mismatch with the installed xf86-video-armsoc
->>>
->>> This is what I am running into. This leads to the following question:
->>>
->>> 1. How do we ensure exynos_drm kernel changes don't break user-space
->>>    specifically xf86-video-armsoc
->>> 2. This seems to have gone undetected for a while. I see a change in
->>>    exynos_drm_gem_dumb_create() that is probably addressing this type
->>>    of breakage. Commit 122beea84bb90236b1ae545f08267af58591c21b adds
->>>    handling for IOMMU NONCONTIG case.
->>
->> Seems this patch has a problem. This patch forces to flag NONCONTIG if
->> iommu is enabled. The flag should be depend on the argument from
->> user-space.
->> I.e., if user-space requested a gem allocation with CONTIG flag, then
->> Exynos drm driver should allocate contiguous memory even though iommu
->> is enabled.
->>
->>>
->>> Anyway, I am interested in getting the exynos_drm kernel side code
->>> and xf86-video-armsoc in sync to resolve the issue.
->>>
->>> Could you recommend a going forward plan?
->>
->> My opinion are,
->>
->> 1. Do not force to flag EXYNOS_BO_NONCONTIG at xf86-video-armsoc
-
-Okay more on this. I fixed xf86-video-armso to ask for EXYNOS_BO_CONTIG
-for ARMSOC_BO_SCANOUT and EXYNOS_BO_NONCONTIG in all other cases.
-
-Revert of the commit: 3be1f6273441fe95dd442f44064387322e16b7e9
-
-With this change, now display manager starts just fine. However, it turns
-out xf86-video-armsoc is obsoleted in favor of xf86-video-modesetting. The
-last update to xf86-video-armsoc git was 3 years ago.
-
-I am not sure where to send the fix and doesn't look like it is being
-maintained actively. I can pursue it further and try to get this into
-xf86-video-armsoc provided I can find the maintainer for this seemingly
-inactive project.
-
-I brought in the latest xf86-video-modesetting bits from
-
-https://cgit.freedesktop.org/xorg/driver/xf86-video-modesetting
-
-I removed xf86-video-armsoc and installed xf86-video-modesetting and that
-worked just fine. xf86-video-modesetting uses dumb_create interface instead
-of DRM_IOCTL_EXYNOS_GEM_CREATE.
-
-dumb_create interface eliminates the need for DRM_IOCTL_EXYNOS_GEM_CREATE
-in userspace. libdrm-2.4.71 does call DRM_IOCTL_EXYNOS_GEM_CREATE.
-
-The question is do we still need to continue to support the custom gem
-create interface DRM_IOCTL_EXYNOS_GEM_CREATE? Some drm drivers seem to
-support it and some don't. Unfortunately, if userspace requests noncontig
-for scanout, we will continue to see problems with display manager when
-iommu is disabled. dumb create hides all of that, are there good reasons
-to continue to support it in exynos drm?
-
-Exposing CONTIG and NONCONTIG to userspace appears to be causing problems
-when exynos drm determines it can't support non-contig GEM buffers in fb
-init after userspace allocates them.
-
->> 2. Do not force to flag NONCONTIG at Exynos drm driver even though
->> iommu is enabled and flag allocation type with the argument from
->> user-space.
->>
-
-exynos_drm_gem_dumb_create() doesn't take any flags, there is no need
-to change the above.
-
-thanks,
--- Shuah
+> With the current code in v4.9-rc2, we get output like:
+> 
+> x29: 0000ffffe4938c80 x28: 0000000000000000 
+> x27: 0000000000000000 x26: 0000000000000000 x25: 0000000000000000 x24: 0000000000000000 
+> x23: 0000000000000000 x22: 0000000000000000 
+> x21: 0000000000400470 x20: 0000000000000000 
+> x19: 0000000000000000 x18: 0000ffffe4938b60 
+> x17: 0000000000411000 x16: 0000ffff82f72c9c 
+> x15: 0000ffff830c8000 x14: 0000000000000040 
+> x13: 0000ffff830c8028 x12: 0000000000008738 
+> x11: 0000000000000008 
+> x10: 00000000ffffffff 
+> x9 : 0000ffff830b4e40 x8 : 2f2f2f2f2f2f2f2f 
+> x7 : b3b3bab7acff8b8a x6 : 0000ffff83097aa8 
+> x5 : 54d58839205d3679 x4 : 0000000000000000 
+> x3 : 00000000004005d0 x2 : ffff000000000000 
+> x1 : 0000ffffe4938e08 x0 : ffff000000000000 
+> 
+> ... or:
+> 
+> x29: 0000fffff6f6a600 x28: 0000000000000000 x27: 0000000000000000 x26: 0000000000000000 x25: 0000000000000000 x24: 0000000000000000 x23: 0000000000000000 x22: 0000000000000000 x21: 0000000000400470 x20: 0000000000000000 x19: 0000000000000000 x18: 0000fffff6f6a4e0 x17: 0000000000411000 x16: 0000ffffa6e1fc9c x15: 0000ffffa6f75000 x14: 0000000000000040 
+> x13: 0000ffffa6f75028 x12: 0000000000008738 x11: 0000000000000008 x10: 00000000ffffffff 
+> x9 : 0000ffffa6f61e40 x8 : 2f2f2f2f2f2f2f2f x7 : b3b3bab7acff8b8a x6 : 0000ffffa6f44aa8 
+> x5 : 874b6ebb9d5e2f3d x4 : 0000000000000000 x3 : 00000000004005d0 x2 : ffff000000000000 
+> x1 : 0000fffff6f6a788 x0 : ffff000000000000 
+> 
+> ... and of course, the buffer shown by $(dmesg) or $(demsg -T) is equally
+> insane, but different.
+> 
+> I found that adding a space prior to newlines prevented them from being
+> swallowed, but $(dmesg) would still suffer from random additions.
+> 
+> Given all that, unless the core code is changed to as to behave
+> deterministically at least for trivial cases like this one, I think we
+> should avoid KERN_CONT like the plague.
+> 
+> So FWIW, so long as you fold in the changes I requested in my other
+> reply, please add:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> ... I'll go fix up show_pte() without pr_cont().
+> 
+> Thanks,
+> Mark.
