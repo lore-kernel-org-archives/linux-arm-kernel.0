@@ -1,33 +1,29 @@
-From: mcree@orcon.net.nz (Michael Cree)
-Date: Tue, 25 Oct 2016 22:12:10 +1300
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <3851270.xZRcP9hae0@wuerfel>
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <13702107.LdHY4HTXyY@wuerfel>
- <20161019155325.GR1041@n2100.armlinux.org.uk>
- <3851270.xZRcP9hae0@wuerfel>
-Message-ID: <20161025091210.rjfhvq4mqtuquei5@tower>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 25 Oct 2016 11:32:01 +0200
+Subject: [PATCH 0/4] i2c: Fix module autoload for some i2c busses
+ platform drivers
+In-Reply-To: <1476824508-4679-1-git-send-email-javier@osg.samsung.com>
+References: <1476824508-4679-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20161025093201.GE1597@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
-> I see your point, but I think there are serious issues with the current
-> approach as well:
+On Tue, Oct 18, 2016 at 06:01:44PM -0300, Javier Martinez Canillas wrote:
+> Hello Wolfram,
 > 
-> - a lot of the less common architectures just don't get updated
->   in time, out of 22 architectures that don't use asm-generic/unistd.h,
->   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
+> I noticed that module autoload won't be working in some of the i2c
+> busses drivers. This patch series contains the fixes for these.
 > 
-> - some architectures that add all syscalls sometimes make a mistake
->   and forget one, e.g. alpha apparently never added __NR_bpf, but it
->   did add the later __NR_execveat.
+> Best regards,
+> Javier
 
-__NR_bpf was not forgotten on Alpha.  It was not wired up because
-extra architecture support is needed which has not been implemented.
+Applied to for-current, thank you very much for doing this
+subsystem-wide!
 
-But maybe we should just wire it up to sys_ni_syscall in the meantime
-so a syscall number is reserved for it, and user space can call it to
-get -ENOSYS returned.
-
-Cheers
-Michael.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/a53437d0/attachment.sig>
