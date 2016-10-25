@@ -1,26 +1,22 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Oct 2016 13:36:04 -0700
-Subject: [PATCH v2 3/4] clk: imx31: fix rewritten input argument of
- mx31_clocks_init()
-In-Reply-To: <1474848223-19728-4-git-send-email-vz@mleia.com>
+Date: Tue, 25 Oct 2016 13:37:26 -0700
+Subject: [PATCH v2 4/4] ARM: clk: imx31: properly init clocks for
+ machines with DT
+In-Reply-To: <1474848223-19728-5-git-send-email-vz@mleia.com>
 References: <1474848223-19728-1-git-send-email-vz@mleia.com>
- <1474848223-19728-4-git-send-email-vz@mleia.com>
-Message-ID: <20161025203604.GB26139@codeaurora.org>
+ <1474848223-19728-5-git-send-email-vz@mleia.com>
+Message-ID: <20161025203726.GC26139@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/26, Vladimir Zapolskiy wrote:
-> Function mx31_clocks_init() is called during clock intialization on
-> legacy boards with reference clock frequency passed as its input
-> argument, this can be verified by examination of the function
-> declaration found in arch/arm/mach-imx/common.h and actual function
-> users which include that header file.
+> Clock initialization for i.MX31 powered machines with DT support
+> should be done by a call of an init function registered with
+> CLK_OF_DECLARE() in common clock framework.
 > 
-> Inside CCF driver the function ignores its input argument, by chance
-> the used value in the function body is the same as input arguments on
-> side of all callers.
+> The change converts exported mx31_clocks_init_dt() into a static
+> initialization function registered by CLK_OF_DECLARE().
 > 
-> Fixes: d9388c843237 ("clk: imx31: Do not call mxc_timer_init twice when booting with DT")
 > Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
 > ---
 
