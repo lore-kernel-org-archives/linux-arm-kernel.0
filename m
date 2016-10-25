@@ -1,148 +1,77 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 25 Oct 2016 15:23:38 +0200
-Subject: [PATCH 1/2] mm/memblock: prepare a capability to support
- memblock near alloc
-In-Reply-To: <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
- <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20161025132338.GA31239@dhcp22.suse.cz>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 25 Oct 2016 14:28:54 +0100
+Subject: [PATCH] irqchip/ls-scfg-msi: update Layerscape SCFG MSI driver
+In-Reply-To: <1477399162-22881-1-git-send-email-Minghuan.Lian@nxp.com>
+References: <1477399162-22881-1-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <20161025132854.GC8898@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 25-10-16 10:59:17, Zhen Lei wrote:
-> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
-> actually exist. The percpu variable areas and numa control blocks of that
-> memoryless numa nodes need to be allocated from the nearest available
-> node to improve performance.
-> 
-> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
-> specified nid at the first time, but if that allocation failed it will
-> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
-> the second time.
-> 
-> To compatible the above old scene, I use a marco node_distance_ready to
-> control it. By default, the marco node_distance_ready is not defined in
-> any platforms, the above mentioned functions will work as normal as
-> before. Otherwise, they will try the nearest node first.
+On Tue, Oct 25, 2016 at 08:39:22PM +0800, Minghuan Lian wrote:
+> 1. The patch uses soc_device_match() to match the SoC family
+> and revision instead of DTS compatible, because compatible cannot
+> describe the SoC revision information.
 
-I am sorry but it is absolutely unclear to me _what_ is the motivation
-of the patch. Is this a performance optimization, correctness issue or
-something else? Could you please restate what is the problem, why do you
-think it has to be fixed at memblock layer and describe what the actual
-fix is please?
+What difference do you care about? If it affects the programming model
+of the device, it should be described in the compatible string, or in
+properties on the device node.
 
->From a quick glance you are trying to bend over the memblock API for
-something that should be handled on a different layer.
+Matching the SoC is a bit aof a warning sign. If there's information
+that we need, but don't currently have, please extend the binding to
+provide it.
 
-> 
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  mm/memblock.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++---------
->  1 file changed, 65 insertions(+), 11 deletions(-)
-> 
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 7608bc3..556bbd2 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -1213,9 +1213,71 @@ phys_addr_t __init memblock_alloc(phys_addr_t size, phys_addr_t align)
->  	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
->  }
-> 
-> +#ifndef node_distance_ready
-> +#define node_distance_ready()		0
-> +#endif
-> +
-> +static phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size,
-> +					phys_addr_t align, phys_addr_t start,
-> +					phys_addr_t end, int nid, ulong flags,
-> +					int alloc_func_type)
-> +{
-> +	int nnid, round = 0;
-> +	u64 pa;
-> +	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
-> +
-> +	bitmap_zero(nodes_map, MAX_NUMNODES);
-> +
-> +again:
-> +	/*
-> +	 * There are total 4 cases:
-> +	 * <nid == NUMA_NO_NODE>
-> +	 *   1)2) node_distance_ready || !node_distance_ready
-> +	 *	Round 1, nnid = nid = NUMA_NO_NODE;
-> +	 * <nid != NUMA_NO_NODE>
-> +	 *   3) !node_distance_ready
-> +	 *	Round 1, nnid = nid;
-> +	 *    ::Round 2, currently only applicable for alloc_func_type = <0>
-> +	 *	Round 2, nnid = NUMA_NO_NODE;
-> +	 *   4) node_distance_ready
-> +	 *	Round 1, LOCAL_DISTANCE, nnid = nid;
-> +	 *	Round ?, nnid = nearest nid;
-> +	 */
-> +	if (!node_distance_ready() || (nid == NUMA_NO_NODE)) {
-> +		nnid = (++round == 1) ? nid : NUMA_NO_NODE;
-> +	} else {
-> +		int i, distance = INT_MAX;
-> +
-> +		for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
-> +			if (node_distance(nid, i) < distance) {
-> +				nnid = i;
-> +				distance = node_distance(nid, i);
-> +			}
-> +	}
-> +
-> +	switch (alloc_func_type) {
-> +	case 0:
-> +		pa = memblock_find_in_range_node(size, align, start, end, nnid, flags);
-> +		break;
-> +
-> +	case 1:
-> +	default:
-> +		pa = memblock_alloc_nid(size, align, nnid);
-> +		if (!node_distance_ready())
-> +			return pa;
-> +	}
-> +
-> +	if (!pa && (nnid != NUMA_NO_NODE)) {
-> +		bitmap_set(nodes_map, nnid, 1);
-> +		goto again;
-> +	}
-> +
-> +	return pa;
-> +}
-> +
->  phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
->  {
-> -	phys_addr_t res = memblock_alloc_nid(size, align, nid);
-> +	phys_addr_t res = memblock_alloc_near_nid(size, align, 0, 0, nid, 0, 1);
-> 
->  	if (res)
->  		return res;
-> @@ -1276,19 +1338,11 @@ static void * __init memblock_virt_alloc_internal(
->  		max_addr = memblock.current_limit;
-> 
->  again:
-> -	alloc = memblock_find_in_range_node(size, align, min_addr, max_addr,
-> -					    nid, flags);
-> +	alloc = memblock_alloc_near_nid(size, align, min_addr, max_addr,
-> +					    nid, flags, 0);
->  	if (alloc)
->  		goto done;
-> 
-> -	if (nid != NUMA_NO_NODE) {
-> -		alloc = memblock_find_in_range_node(size, align, min_addr,
-> -						    max_addr, NUMA_NO_NODE,
-> -						    flags);
-> -		if (alloc)
-> -			goto done;
-> -	}
-> -
->  	if (min_addr) {
->  		min_addr = 0;
->  		goto again;
-> --
-> 2.5.0
-> 
+> +struct ls_scfg_msi_cfg {
+> +	u32 ibs_shift; /* Shift of interrupt bit select */
+> +	u32 msir_irqs; /* The irq number per MSIR */
+> +	u32 msir_base; /* The base address of MSIR */
+> +};
 
--- 
-Michal Hocko
-SUSE Labs
+> +static struct ls_scfg_msi_cfg ls1021_msi_cfg = {
+> +	.ibs_shift = 3,
+> +	.msir_irqs = IRQS_32_PER_MSIR,
+> +	.msir_base = 0x4,
+> +};
+> +
+> +static struct ls_scfg_msi_cfg ls1043_rev11_msi_cfg = {
+> +	.ibs_shift = 2,
+> +	.msir_irqs = IRQS_8_PER_MSIR,
+> +	.msir_base = 0x10,
+> +};
+> +
+> +static struct ls_scfg_msi_cfg ls1046_msi_cfg = {
+> +	.ibs_shift = 2,
+> +	.msir_irqs = IRQS_32_PER_MSIR,
+> +	.msir_base = 0x4,
+> +};
+> +
+> +static struct soc_device_attribute soc_msi_matches[] = {
+> +	{ .family = "QorIQ LS1021A",
+> +	  .data = &ls1021_msi_cfg },
+> +	{ .family = "QorIQ LS1012A",
+> +	  .data = &ls1021_msi_cfg },
+> +	{ .family = "QorIQ LS1043A", .revision = "1.0",
+> +	  .data = &ls1021_msi_cfg },
+> +	{ .family = "QorIQ LS1043A", .revision = "1.1",
+> +	  .data = &ls1043_rev11_msi_cfg },
+> +	{ .family = "QorIQ LS1046A",
+> +	  .data = &ls1046_msi_cfg },
+> +	{ },
+
+If the base address of a register differs in this manner, then these
+aren't "compatible", and should have separate strings.
+
+Either that, or the binding should mandate a property to describe this.
+
+You can *add* a new string, for which that property is mandatory, if you
+believe you will see greate variation here in future.
+
+>  static const struct of_device_id ls_scfg_msi_id[] = {
+> -	{ .compatible = "fsl,1s1021a-msi", },
+> -	{ .compatible = "fsl,1s1043a-msi", },
+> +	{ .compatible = "fsl,ls-scfg-msi" },
+>  	{},
+
+NAK. Breaking support for existing DTBs is not ok.
+
+Thanks,
+Mark.
