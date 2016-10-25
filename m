@@ -1,166 +1,66 @@
 From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 25 Oct 2016 16:39:04 +0200
-Subject: [PATCH 3/4] usb: musb: da8xx: Add DT support for the DA8xx driver
+Date: Tue, 25 Oct 2016 16:39:05 +0200
+Subject: [PATCH 4/4] ARM: dts: da850: Add the usb otg device node
 In-Reply-To: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
 References: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1477406345-27192-4-git-send-email-abailon@baylibre.com>
+Message-ID: <1477406345-27192-5-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Petr Kulhavy <petr@barix.com>
+This adds the device tree node for the usb otg
+controller present in the da850 family of SoC's.
+This also enables the otg usb controller for the lcdk board.
 
-This adds DT support for TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver
-
-Signed-off-by: Petr Kulhavy <petr@barix.com>
 Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 ---
- drivers/usb/musb/da8xx.c | 76 ++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 67 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+ arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-index 210b7e4..d465087 100644
---- a/drivers/usb/musb/da8xx.c
-+++ b/drivers/usb/musb/da8xx.c
-@@ -6,6 +6,9 @@
-  * Based on the DaVinci "glue layer" code.
-  * Copyright (C) 2005-2006 by Texas Instruments
-  *
-+ * DT support
-+ * Copyright (c) 2016 Petr Kulhavy <petr@barix.com>
-+ *
-  * This file is part of the Inventra Controller Driver for Linux.
-  *
-  * The Inventra Controller Driver for Linux is free software; you
-@@ -433,6 +436,21 @@ static int da8xx_musb_exit(struct musb *musb)
- 	return 0;
- }
- 
-+static inline u8 get_vbus_power(struct device *dev)
-+{
-+	struct regulator *vbus_supply;
-+	int current_uA;
-+
-+	vbus_supply = regulator_get_optional(dev, "vbus");
-+	if (IS_ERR(vbus_supply))
-+		return 255;
-+	current_uA = regulator_get_current_limit(vbus_supply);
-+	regulator_put(vbus_supply);
-+	if (current_uA <= 0 || current_uA > 510000)
-+		return 255;
-+	return current_uA / 1000 / 2;
-+}
-+
- static const struct musb_platform_ops da8xx_ops = {
- 	.quirks		= MUSB_DMA_CPPI | MUSB_INDEXED_EP,
- 	.init		= da8xx_musb_init,
-@@ -458,6 +476,12 @@ static const struct platform_device_info da8xx_dev_info = {
- 	.dma_mask	= DMA_BIT_MASK(32),
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21..dca9735 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -158,6 +158,14 @@
+ 	rx-num-evt = <32>;
  };
  
-+static const struct musb_hdrc_config da8xx_config = {
-+	.ram_bits = 10,
-+	.num_eps = 5,
-+	.multipoint = 1,
++&usb_phy {
++	status = "okay";
++	};
++
++&usb20 {
++	status = "okay";
 +};
 +
- static int da8xx_probe(struct platform_device *pdev)
- {
- 	struct resource musb_resources[2];
-@@ -465,7 +489,9 @@ static int da8xx_probe(struct platform_device *pdev)
- 	struct da8xx_glue		*glue;
- 	struct platform_device_info	pinfo;
- 	struct clk			*clk;
-+	struct device_node		*np = pdev->dev.of_node;
- 	int				ret;
-+	struct resource *res;
- 
- 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
- 	if (!glue)
-@@ -486,6 +512,18 @@ static int da8xx_probe(struct platform_device *pdev)
- 	glue->dev			= &pdev->dev;
- 	glue->clk			= clk;
- 
-+	if (IS_ENABLED(CONFIG_OF) && np) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			/* FIXME */
-+			return -ENOMEM;
-+		}
-+
-+		pdata->config	= &da8xx_config;
-+		pdata->mode	= musb_get_mode(&pdev->dev);
-+		pdata->power	= get_vbus_power(&pdev->dev);
-+	}
-+
- 	pdata->platform_ops		= &da8xx_ops;
- 
- 	glue->usb_phy = usb_phy_generic_register();
-@@ -499,15 +537,21 @@ static int da8xx_probe(struct platform_device *pdev)
- 	memset(musb_resources, 0x00, sizeof(*musb_resources) *
- 			ARRAY_SIZE(musb_resources));
- 
--	musb_resources[0].name = pdev->resource[0].name;
--	musb_resources[0].start = pdev->resource[0].start;
--	musb_resources[0].end = pdev->resource[0].end;
--	musb_resources[0].flags = pdev->resource[0].flags;
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to get memory.\n");
-+		ret = -EINVAL;
-+		goto err_unregister_usb_phy;
-+	}
-+	musb_resources[0] = *res;
- 
--	musb_resources[1].name = pdev->resource[1].name;
--	musb_resources[1].start = pdev->resource[1].start;
--	musb_resources[1].end = pdev->resource[1].end;
--	musb_resources[1].flags = pdev->resource[1].flags;
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "failed to get irq.\n");
-+		ret = -EINVAL;
-+		goto err_unregister_usb_phy;
-+	}
-+	musb_resources[1] = *res;
- 
- 	pinfo = da8xx_dev_info;
- 	pinfo.parent = &pdev->dev;
-@@ -520,9 +564,14 @@ static int da8xx_probe(struct platform_device *pdev)
- 	ret = PTR_ERR_OR_ZERO(glue->musb);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to register musb device: %d\n", ret);
--		usb_phy_generic_unregister(glue->usb_phy);
-+		goto err_unregister_usb_phy;
- 	}
- 
-+	return 0;
-+
-+err_unregister_usb_phy:
-+	usb_phy_generic_unregister(glue->usb_phy);
-+
- 	return ret;
- }
- 
-@@ -536,11 +585,20 @@ static int da8xx_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id da8xx_id_table[] = {
-+	{
-+		.compatible = "ti,da830-musb",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, da8xx_id_table);
-+
- static struct platform_driver da8xx_driver = {
- 	.probe		= da8xx_probe,
- 	.remove		= da8xx_remove,
- 	.driver		= {
- 		.name	= "musb-da8xx",
-+		.of_match_table = of_match_ptr(da8xx_id_table),
- 	},
- };
- 
+ &aemif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&nand_pins>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f79e1b9..b11d395 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -372,6 +372,21 @@
+ 					>;
+ 			status = "disabled";
+ 		};
++		usb_phy: usb-phy {
++			compatible = "ti,da830-usb-phy";
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++		usb20: usb20 at 200000 {
++			compatible = "ti,da830-musb";
++			reg = <0x200000 0x10000>;
++			interrupts = <58>;
++			interrupt-names = "mc";
++			dr_mode = "otg";
++			phys = <&usb_phy 0>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
+ 		gpio: gpio at 226000 {
+ 			compatible = "ti,dm6441-gpio";
+ 			gpio-controller;
 -- 
 2.7.3
