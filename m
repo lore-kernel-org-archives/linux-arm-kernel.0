@@ -1,31 +1,71 @@
 From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 25 Oct 2016 16:39:01 +0200
-Subject: [PATCH 0/4] Add DT support for DA8xx
-Message-ID: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
+Date: Tue, 25 Oct 2016 16:39:02 +0200
+Subject: [PATCH 1/4] dt/bindings: Add binding for the DA8xx MUSB driver
+In-Reply-To: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
+References: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
+Message-ID: <1477406345-27192-2-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this series is to add DT support to the da8xx USB OTG.
-This series should apply and build without any issues but it has
-some dependencies on "Add DT support for ohci-da8xx" series.
-Without it, the phy init will fail and then the da8xx driver will also fail.
+From: Petr Kulhavy <petr@barix.com>
 
-Alexandre Bailon (1):
-  ARM: dts: da850: Add the usb otg device node
+DT binding for the TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver.
 
-Petr Kulhavy (3):
-  dt/bindings: Add binding for the DA8xx MUSB driver
-  usb: musb: core: added helper function for parsing DT
-  usb: musb: da8xx: Add DT support for the DA8xx driver
-
- .../devicetree/bindings/usb/da8xx-usb.txt          | 33 ++++++++++
- arch/arm/boot/dts/da850-lcdk.dts                   |  8 +++
- arch/arm/boot/dts/da850.dtsi                       | 15 +++++
- drivers/usb/musb/da8xx.c                           | 76 +++++++++++++++++++---
- drivers/usb/musb/musb_core.c                       | 19 ++++++
- drivers/usb/musb/musb_core.h                       |  5 ++
- 6 files changed, 147 insertions(+), 9 deletions(-)
+Signed-off-by: Petr Kulhavy <petr@barix.com>
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+---
+ .../devicetree/bindings/usb/da8xx-usb.txt          | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/da8xx-usb.txt
 
+diff --git a/Documentation/devicetree/bindings/usb/da8xx-usb.txt b/Documentation/devicetree/bindings/usb/da8xx-usb.txt
+new file mode 100644
+index 0000000..5663d79
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/da8xx-usb.txt
+@@ -0,0 +1,43 @@
++TI DA8xx MUSB
++~~~~~~~~~~~~~
++For DA8xx/OMAP-L1x/AM17xx/AM18xx platforms.
++
++Required properties:
++~~~~~~~~~~~~~~~~~~~~
++ - compatible : Should be set to "ti,da830-musb".
++
++ - reg: Offset and length of the USB controller register set.
++
++ - interrupts: The USB interrupt number.
++
++ - interrupt-names: Should be set to "mc".
++
++ - dr_mode: The USB operation mode. Should be one of "host", "peripheral" or "otg".
++
++ - phys: Phandle for the PHY device
++
++ - phy-names: Should be "usb-phy"
++
++Optional properties:
++~~~~~~~~~~~~~~~~~~~~
++ - vbus-supply: Phandle to a regulator providing the USB bus power.
++
++Example:
++	usb_phy: usb-phy {
++		compatible = "ti,da830-usb-phy";
++		#phy-cells = <0>;
++		status = "okay";
++	};
++	usb20: usb at 1e00000 {
++		compatible = "ti,da830-musb";
++		reg =   <0x00200000 0x10000>;
++		interrupts = <58>;
++		interrupt-names = "mc";
++
++		dr_mode = "host";
++		vbus-supply = <&usb_vbus>;
++		phys = <&usb_phy 0>;
++		phy-names = "usb-phy";
++
++		status = "okay";
++	};
 -- 
 2.7.3
