@@ -1,39 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 25 Oct 2016 11:32:44 +0800
-Subject: [PATCH 1/3] phy: sun4i: check PHY id when poking unknown bit of pmu
-In-Reply-To: <20161024082802.ev72szwmuqba5ll4@lukather>
-References: <20161024035930.20274-1-icenowy@aosc.xyz>
- <20161024082802.ev72szwmuqba5ll4@lukather>
-Message-ID: <1773661477366364@web4j.yandex.ru>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 25 Oct 2016 11:40:06 +0800
+Subject: [PATCH v2] hwrng: meson: Fix module autoload for OF registration
+In-Reply-To: <1476733877-20275-1-git-send-email-javier@osg.samsung.com>
+References: <1476733877-20275-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20161025034006.GD18685@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On Mon, Oct 24, 2016 at 11:59:30AM +0800, Icenowy Zheng wrote:
+On Mon, Oct 17, 2016 at 04:51:17PM -0300, Javier Martinez Canillas wrote:
+> If the driver is built as a module, autoload won't work because the module
+> alias information is not filled. So user-space can't match the registered
+> device with the corresponding module.
 > 
->> Allwinner SoC's PHY 0, when used as OTG controller, have no pmu part.
->> The code that poke some unknown bit of PMU for H3/A64 didn't check
->> the PHY, and will cause kernel oops when PHY 0 is used.
->>
->> Fixes: b3e0d141ca9f (phy: sun4i: add support for A64 usb phy)
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Export the module alias information using the MODULE_DEVICE_TABLE() macro.
 > 
-> Cc'ing stable would be nice.
-
-Yes... As it's also used by H3...
-
+> Before this patch:
 > 
-> Apart from that, Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-If I change it to check whether phy->pmu is null, will you keep the ACK?
-
+> $ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
+> alias:          platform:meson-rng
 > 
-> Thanks!
-> Maxime
+> After this patch:
 > 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> $ modinfo drivers/char/hw_random/meson-rng.ko | grep alias
+> alias:          platform:meson-rng
+> alias:          of:N*T*Camlogic,meson-rngC*
+> alias:          of:N*T*Camlogic,meson-rng
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Patch applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
