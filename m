@@ -1,11 +1,11 @@
 From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Tue, 25 Oct 2016 22:20:40 +0200 (CEST)
-Subject: [PATCH 2/3] drivers: iommu: arm-smmu-v3: constify iommu_gather_ops
+Date: Tue, 25 Oct 2016 22:21:28 +0200 (CEST)
+Subject: [PATCH 1/3] drivers: iommu: arm-smmu: constify iommu_gather_ops
  structures
-In-Reply-To: <1477418772-12184-3-git-send-email-bhumirks@gmail.com>
+In-Reply-To: <1477418772-12184-2-git-send-email-bhumirks@gmail.com>
 References: <1477418772-12184-1-git-send-email-bhumirks@gmail.com>
- <1477418772-12184-3-git-send-email-bhumirks@gmail.com>
-Message-ID: <alpine.DEB.2.20.1610252220140.2062@hadrien>
+ <1477418772-12184-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <alpine.DEB.2.20.1610252221141.2062@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,15 +23,15 @@ On Tue, 25 Oct 2016, Bhumika Goyal wrote:
 Acked-by: Julia Lawall <julia.lawall@lip6.fr>
 
 > ---
->  drivers/iommu/arm-smmu-v3.c | 2 +-
+>  drivers/iommu/arm-smmu.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 15c01c3..51d8be4 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1358,7 +1358,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
->  	} while (size -= granule);
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index c841eb7..a5bc8fb 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -640,7 +640,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+>  	}
 >  }
 >
 > -static struct iommu_gather_ops arm_smmu_gather_ops = {
