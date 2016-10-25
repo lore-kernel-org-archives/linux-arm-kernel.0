@@ -1,162 +1,88 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 25 Oct 2016 19:32:39 +0200
-Subject: [PATCH/RFT v2 12/17] USB: ochi-da8xx: Use a regulator for
- vbus/overcurrent
-In-Reply-To: <09a4391e-63b6-1622-f964-4aff0ecae87c@lechnology.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-13-ahaslam@baylibre.com>
- <672c1f1a-58b7-6947-7fb2-acd38fab8597@lechnology.com>
- <CAKXjFTOxQ58rThpPw9t73k-BBZ8YKGvMhWfAG1r+3kC=GJVxWg@mail.gmail.com>
- <09a4391e-63b6-1622-f964-4aff0ecae87c@lechnology.com>
-Message-ID: <CAKXjFTNrmmP++_xRq74G0Kx52R5w5TjTRukC=uB7rGwz8+EqUQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 25 Oct 2016 20:34:48 +0300
+Subject: [PATCH V4 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <20161018230837.6515-1-nm@ti.com>
+References: <20161018230837.6515-1-nm@ti.com>
+Message-ID: <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 6:53 PM, David Lechner <david@lechnology.com> wrote:
-> On 10/25/2016 03:24 AM, Axel Haslam wrote:
->>
->> On Tue, Oct 25, 2016 at 3:39 AM, David Lechner <david@lechnology.com>
->> wrote:
->>>
->>> On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
->>>>
->>>>
->>>> From: Axel Haslam <ahaslam@baylibre.com>
->>>>
->>>> Currently, the da8xx ohci driver uses a set of gpios and callbacks in
->>>> board files to handle vbus and overcurrent irqs form the power supply.
->>>> However, this does not play nice when moving to a DT based boot were
->>>> we wont have board files.
->>>>
->>>> Instead of requesting and handling the gpio, use the regulator framework
->>>> to take care of enabling and disabling vbus power.
->>>> This has the benefit
->>>> that we dont need to pass any more platform data to the driver:
->>>>
->>>> These will be handled by the regulator framework:
->>>> set_power   ->  regulator_enable/regulator_disable
->>>> get_power   ->  regulator_is_enabled
->>>> get_oci     ->  regulator_get_mode
->>>> ocic_notify ->  regulator notification
->>>>
->>>> We can keep the default potpgt and use the regulator start delay
->>>> instead:
->>>> potpgt      -> regulator startup delay time
->>>>
->>>> The hawk board does not have a GPIO/OVERCURRENT gpio to control vbus,
->>>> (they should not have been decleared/reserved) so, just remove those
->>>> definitions from the hwk board file.
->>>>
->>>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->>>> ---
->>>
->>>
->>>
->>>
->>> How do you recover after an overcurrent event?
->>>
->>> I have configured a fixed-regulator using device-tree, but similar to the
->>> configuration in the board files here. However, when I shorted out the
->>> VBUS
->>> and caused an overcurrent event, I see nothing in the kernel log saying
->>> that
->>> there was an overcurrent event and after I remove the short, the
->>> regulator
->>> is never turned back on.
->>>
->>>
->>
->> You should have the patch to fix gpiolib, and you should declare the
->> over current gpio on the regulator as such:
->> (if the pin is enabled high you should add oc-active-high);
->>
->>        vbus_fixed: fixed-regulator-vbus {
->>                compatible = "regulator-fixed";
->>                gpio = <&gpio 109 0>;
->>                oc-gpio = <&gpio 36 0>;
->>                regulator-boot-on;
->>                enable-active-high;
->>                regulator-name = "vbus";
->>                regulator-min-microvolt = <5000000>;
->>                regulator-max-microvolt = <5000000>;
->>        };
->>
->>
->> Question: Do you see that the over current gpio was requested
->> in debugfs/gpio? and, do you see the interrupt in /proc/interrupts?
->>
->> If you unplug and plug in back the usb device it should work again.
->> also you can unbind and bind it should also start to work:
->> something like:
->>
->> echo usb1 >/sys/bus/usb/drivers/usb/unbind
->> echo usb1 >/sys/bus/usb/drivers/usb/bind
->>
->>
->
-> I have added oc-active-high and I get different results, but it is still not
-> quite right. When I short the VBUS, I can see that my overcurrent gpio
-> changes state. However, the driver does not turn of the VBUS. When I remove
-> the short, I get an overcurrent error in the kernel log. I would expect this
-> when I create the short, not when I remove it. I also tried adding
-> GPIO_ACTIVE_LOW to the oc-gpio, but this did not change the behavior. In
-> either case, the oc_gpio shows as high under normal conditions, so perhaps
-> there is a problem with the gpio-davinci driver not picking up
-> GPIO_ACTIVE_LOW from the device tree.
->
->
-> My regulator is basically the same. My device just uses different gpios.
->
->         vbus_reg: vbus-reg {
->                 compatible = "regulator-fixed";
->                 pinctrl-names = "default";
->                 pinctrl-0 = <&usb11_pins>;
->                 gpio = <&gpio 101 GPIO_ACTIVE_LOW>;
->                 oc-gpio = <&gpio 99 0>;
->                 enable-active-high;
->                 oc-active-high;
->                 regulator-name = "vbus";
->                 regulator-min-microvolt = <5000000>;
->                 regulator-max-microvolt = <5000000>;
->         }
->
->
-> It seems to me though that I should not have oc-active-high since under
-> normal conditions, the oc_gpio is high and during an overcurrent event, the
+On 19/10/16 02:08, Nishanth Menon wrote:
+> Version 4 of the series is basically a rebase to v4.9-rc1, no functional
+> changes.
 
-in my board the over current gpio is active low too, i was just mentiontioning
-to add that in case yours  was not.
+Hi,
 
-> oc_gpio is low. Double-checking the behavior without oc-active-high, I see
-> that the vbus gpio is turned off in response to the overcurrent event, but I
-> don't get the overcurrent message in the kernel log. Perhaps this is because
-> as soon as there is an overcurrent event the vbus turns off and the oc_gpio
-> returns to normal before the usb driver has a chance to poll the overcurrent
-> state?
+Any final comments on this series, or shall I send a pull-req forward? 
+Very minimal changes compared to v3 so should be good to go imo.
 
-Perhaps. i dont have a board that has overcurrent, or that i can
-switch vbus off.
-what is exactly the log you are refering to?
-
-im wondering, was the behavior different before the patches?
-it should be the same without the patches.
+-Tero
 
 >
-> Also, unplugging the device and plugging it back in does nothing. Unbinding
-> and binding the driver does work, but that does not seem like a very nice
-> way to have to recover from an overcurrent event.
-
-im guessing that unplug and plug wont work as vbus is gone and
-we cannot detect it anymore (contrary to my setup were i always have vbus)
-sorry for suggesting that before.
-
-we could recover vbus automatically form the notification,
-(when the over-current condition disappears) but then im afraid we
-might oscillate, even if we retry after some timeout. so perhaps
-bind/unbind is the right thing to do, as it requires the user to correct
-the problem. I dont know if there is a better solution.
-
-
+> Texas Instruments' Keystone generation System on Chips (SoC)
+> starting with 66AK2G02[1], now include a dedicated SoC System Control
+> entity called PMMC(Power Management Micro Controller) in line with
+> ARM architecture recommendations. The function of this module is
+> to integrate all system operations in a centralized location.
+> Communication with the SoC System Control entity from various
+> processing units like ARM/DSP occurs over Message Manager hardware
+> block.
+>
+> This series adds the base support for TI System Control Interface
+> (TI-SCI) protocol[2]. The protocol is built on top of Texas
+> Instrument's Message Manager communication mechanism[3].
+>
+> Overall architecture is very similar to SCPI[4] as follows:
+> +-------------+   +---------+     +------^-----+
+> | TI SCI GENPD|   |TISCI Clk|     |TISCI reset |
+> +------+------+   +----+----+     +------+-----+
+>        |               |                 |
+>        |          +----v--------------+  |
+>        +----------> TISCI Protocol(*) <--+
+>                   +----+--------------+
+>                        |
+>                    +---v-----------+
+>                    | MAILBOX  FWK  |
+>                    +---+-----------+
+>                        |
+>                    +---v-----------+
+>                    |  TI MSGMGR    |-> TISCI hardware block
+>                    +---------------+
+> (*) This series.
 >
 >
+> V4 of the series is based off v4.9-rc1 and is also available here:
+> https://github.com/nmenon/linux-2.6-playground/commits/upstream/v4.10/tisci-base-v4
+> Quick boot test: http://pastebin.ubuntu.com/23346183/
+>
+> Changes since v3:
+> 	- rebase to v4.9-rc1
+> 	- minor checkpatch fixes
+>
+> V3: https://lkml.org/lkml/2016/9/6/747
+> V2: https://lkml.org/lkml/2016/8/30/273
+> V1: https://lkml.org/lkml/2016/8/19/768
+>
+> Nishanth Menon (5):
+>   Documentation: Add support for TI System Control Interface (TI-SCI)
+>     protocol
+>   firmware: Add basic support for TI System Control Interface (TI-SCI)
+>     protocol
+>   firmware: ti_sci: Add support for Device control
+>   firmware: ti_sci: Add support for Clock control
+>   firmware: ti_sci: Add support for reboot core service
+>
+>  .../devicetree/bindings/arm/keystone/ti,sci.txt    |   81 +
+>  MAINTAINERS                                        |   10 +
+>  drivers/firmware/Kconfig                           |   15 +
+>  drivers/firmware/Makefile                          |    1 +
+>  drivers/firmware/ti_sci.c                          | 1991 ++++++++++++++++++++
+>  drivers/firmware/ti_sci.h                          |  492 +++++
+>  include/linux/soc/ti/ti_sci_protocol.h             |  249 +++
+>  7 files changed, 2839 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>  create mode 100644 drivers/firmware/ti_sci.c
+>  create mode 100644 drivers/firmware/ti_sci.h
+>  create mode 100644 include/linux/soc/ti/ti_sci_protocol.h
 >
