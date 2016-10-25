@@ -1,79 +1,74 @@
 From: joe@perches.com (Joe Perches)
-Date: Tue, 25 Oct 2016 09:44:23 -0700
-Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
-In-Reply-To: <20161025143237.GD8898@leverpostej>
-References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
- <20161024113131.GH15620@leverpostej> <1477326477.1984.2.camel@perches.com>
- <20161025143237.GD8898@leverpostej>
-Message-ID: <1477413863.1998.7.camel@perches.com>
+Date: Tue, 25 Oct 2016 09:40:26 -0700
+Subject: [PATCH V2] arm64: Neaten show_regs, remove KERN_CONT
+Message-ID: <289fb30081aba03fec0c960e7334f707bf36c881.1477413522.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Linus Torvalds)
+commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
+corrected the KERN_CONT fallout from commit 4bcc595ccd80
+("printk: reinstate KERN_CONT for printing continuation lines"), but
+the code still has unnecessary KERN_CONT uses.
 
-On Tue, 2016-10-25 at 15:32 +0100, Mark Rutland wrote:
-> On Mon, Oct 24, 2016 at 09:27:57AM -0700, Joe Perches wrote:
-> > On Mon, 2016-10-24 at 12:31 +0100, Mark Rutland wrote:
-> > > On Sun, Oct 23, 2016 at 01:40:49PM -0700, Joe Perches wrote:
-> > > > commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
-> > > > corrected the KERN_CONT fallout from commit 4bcc595ccd80
-> > > > ("printk: reinstate KERN_CONT for printing continuation lines"), but
-> > > > the code still has unnecessary KERN_CONT uses.  Remove them.
-> > > 
-> > > Why are these unnecessary KERN_CONTs a larger problem than duplicating
-> > > the format string for a third time? Having to duplicate it at all was
-> > > annoying enough.
-> > 
-> > Not printing partial lines is the best solution to avoiding
-> > message output interleaving.
-> 
-> Looking further, it seems that KERN_CONT is terminally broken. The core
-> code somehow swallows newlines from some KERN_CONT prints in a
-> non-deterministic fashion, and also appears to insert newlines from thin
-> air. This happens in the absence of intervening printks.
-> 
-> With the current code in v4.9-rc2, we get output like:
-> 
-> x29: 0000ffffe4938c80 x28: 0000000000000000 
-> x27: 0000000000000000 x26: 0000000000000000 x25: 0000000000000000 x24: 0000000000000000 
-> x23: 0000000000000000 x22: 0000000000000000 
-> x21: 0000000000400470 x20: 0000000000000000 
-> x19: 0000000000000000 x18: 0000ffffe4938b60 
-> x17: 0000000000411000 x16: 0000ffff82f72c9c 
-> x15: 0000ffff830c8000 x14: 0000000000000040 
-> x13: 0000ffff830c8028 x12: 0000000000008738 
-> x11: 0000000000000008 
-> x10: 00000000ffffffff 
-> x9 : 0000ffff830b4e40 x8 : 2f2f2f2f2f2f2f2f 
-> x7 : b3b3bab7acff8b8a x6 : 0000ffff83097aa8 
-> x5 : 54d58839205d3679 x4 : 0000000000000000 
-> x3 : 00000000004005d0 x2 : ffff000000000000 
-> x1 : 0000ffffe4938e08 x0 : ffff000000000000 
-> 
-> ... or:
-> 
-> x29: 0000fffff6f6a600 x28: 0000000000000000 x27: 0000000000000000 x26: 0000000000000000 x25: 0000000000000000 x24: 0000000000000000 x23: 0000000000000000 x22: 0000000000000000 x21: 0000000000400470 x20: 0000000000000000 x19: 0000000000000000 x18: 0000fffff6f6a4e0 x17: 0000000000411000 x16: 0000ffffa6e1fc9c x15: 0000ffffa6f75000 x14: 0000000000000040 
-> x13: 0000ffffa6f75028 x12: 0000000000008738 x11: 0000000000000008 x10: 00000000ffffffff 
-> x9 : 0000ffffa6f61e40 x8 : 2f2f2f2f2f2f2f2f x7 : b3b3bab7acff8b8a x6 : 0000ffffa6f44aa8 
-> x5 : 874b6ebb9d5e2f3d x4 : 0000000000000000 x3 : 00000000004005d0 x2 : ffff000000000000 
-> x1 : 0000fffff6f6a788 x0 : ffff000000000000 
-> 
-> ... and of course, the buffer shown by $(dmesg) or $(demsg -T) is equally
-> insane, but different.
-> 
-> I found that adding a space prior to newlines prevented them from being
-> swallowed, but $(dmesg) would still suffer from random additions.
-> 
-> Given all that, unless the core code is changed to as to behave
-> deterministically at least for trivial cases like this one, I think we
-> should avoid KERN_CONT like the plague.
-> 
-> So FWIW, so long as you fold in the changes I requested in my other
-> reply, please add:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> ... I'll go fix up show_pte() without pr_cont().
-> 
-> Thanks,
-> Mark.
+Remove the KERN_CONT uses to avoid possible message interleaving.
+
+Miscellanea:
+
+o Remove unnecessary trailing blank from the output too.
+o Convert i and top_reg to unsigned int
+o Move the extra blank line after __show_reg to the caller for symmetry
+
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm64/kernel/process.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 01753cd7d3f0..5ba12f019bf7 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -168,7 +168,7 @@ void machine_restart(char *cmd)
+ 
+ void __show_regs(struct pt_regs *regs)
+ {
+-	int i, top_reg;
++	unsigned int i, top_reg;
+ 	u64 lr, sp;
+ 
+ 	if (compat_user_mode(regs)) {
+@@ -190,24 +190,23 @@ void __show_regs(struct pt_regs *regs)
+ 
+ 	i = top_reg;
+ 
+-	while (i >= 0) {
+-		printk("x%-2d: %016llx ", i, regs->regs[i]);
++	if (i % 2) {
++		printk("x%-2d: %016llx\n", i, regs->regs[i]);
+ 		i--;
+-
+-		if (i % 2 == 0) {
+-			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
+-			i--;
+-		}
+-
+-		pr_cont("\n");
+ 	}
+-	printk("\n");
++	while (i > 0) {
++		printk("x%-2d: %016llx x%-2d: %016llx\n",
++		       i, regs->regs[i],
++		       i - 1, regs->regs[i - 1]);
++		i -= 2;
++	}
+ }
+ 
+ void show_regs(struct pt_regs * regs)
+ {
+ 	printk("\n");
+ 	__show_regs(regs);
++	printk("\n");
+ }
+ 
+ static void tls_thread_flush(void)
+-- 
+2.10.0.rc2.1.g053435c
