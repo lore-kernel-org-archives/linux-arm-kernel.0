@@ -1,46 +1,100 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 25 Oct 2016 10:36:34 +0200
-Subject: Disabling an interrupt in the handler locks the system up
-In-Reply-To: <580F17E7.5060603@laposte.net>
-References: <580A4460.2090306@free.fr>
- <a79e2d2c-8ec8-744f-50fb-8c39216aa23e@arm.com> <580A60ED.3030307@free.fr>
- <20161021201448.3f4a0a7a@arm.com> <580A70B9.8060507@free.fr>
- <alpine.DEB.2.20.1610212147420.4855@nanos> <580A7A2B.5000702@free.fr>
- <20161022123713.6dc788b3@arm.com> <580BF1D4.2030509@free.fr>
- <580E3308.4050507@free.fr> <alpine.DEB.2.20.1610241847580.5002@nanos>
- <580F17E7.5060603@laposte.net>
-Message-ID: <580F1992.2070602@free.fr>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 25 Oct 2016 10:49:55 +0200
+Subject: [PATCH v2] char: hw_random: atmel-rng: disable TRNG during suspend
+In-Reply-To: <1477356993-27778-1-git-send-email-wenyou.yang@atmel.com>
+References: <1477356993-27778-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <231367f2-03e2-5bf3-2358-135fec438676@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/2016 10:29, Sebastian Frias wrote:
-
-> On 10/24/2016 06:55 PM, Thomas Gleixner wrote:
->
->> On Mon, 24 Oct 2016, Mason wrote:
->>
->>> For the record, setting the IRQ_DISABLE_UNLAZY flag for this device
->>> makes the system lock-up disappear.
->>
->> The way how lazy irq disabling works is:
->>
->> 1) Interrupt is marked disabled in software, but the hardware is not masked
->>
->> 2) If the interrupt fires befor the interrupt is reenabled, then it's
->>    masked at the hardware level in the low level interrupt flow handler.
+Le 25/10/2016 ? 02:56, Wenyou Yang a ?crit :
+> To fix the over consumption on the VDDCore due to the TRNG enabled,
+> disable the TRNG during suspend, not only disable the user interface
+> clock (which is controlled by PMC). Because the user interface clock
+> is independent from any clock that may be used in the entropy source
+> logic circuitry.
 > 
-> Would you mind explaining what is the intention behind?
-> Because it does not seem obvious why there isn't a direct map between
-> "disable_irq*()" and "mask_irq()"
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-I had a similar, but slightly different question:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-What is the difference between struct irq_chip's
+Thanks
 
- * @irq_shutdown:	shut down the interrupt (defaults to ->disable if NULL)
- * @irq_disable:	disable the interrupt
- * @irq_mask:		mask an interrupt source
+> ---
+> 
+> Changes in v2:
+>  - Enable the user interface first, then enable the internal clock
+>    when resume.
+> 
+>  drivers/char/hw_random/atmel-rng.c | 24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
+> index 0fcc9e6..ae7cae5 100644
+> --- a/drivers/char/hw_random/atmel-rng.c
+> +++ b/drivers/char/hw_random/atmel-rng.c
+> @@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
+>  		return 0;
+>  }
+>  
+> +static void atmel_trng_enable(struct atmel_trng *trng)
+> +{
+> +	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
+> +}
+> +
+> +static void atmel_trng_disable(struct atmel_trng *trng)
+> +{
+> +	writel(TRNG_KEY, trng->base + TRNG_CR);
+> +}
+> +
+>  static int atmel_trng_probe(struct platform_device *pdev)
+>  {
+>  	struct atmel_trng *trng;
+> @@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		return ret;
+>  
+> -	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
+> +	atmel_trng_enable(trng);
+>  	trng->rng.name = pdev->name;
+>  	trng->rng.read = atmel_trng_read;
+>  
+> @@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
+>  
+>  	hwrng_unregister(&trng->rng);
+>  
+> -	writel(TRNG_KEY, trng->base + TRNG_CR);
+> +	atmel_trng_disable(trng);
+>  	clk_disable_unprepare(trng->clk);
+>  
+>  	return 0;
+> @@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
+>  {
+>  	struct atmel_trng *trng = dev_get_drvdata(dev);
+>  
+> +	atmel_trng_disable(trng);
+>  	clk_disable_unprepare(trng->clk);
+>  
+>  	return 0;
+> @@ -113,8 +124,15 @@ static int atmel_trng_suspend(struct device *dev)
+>  static int atmel_trng_resume(struct device *dev)
+>  {
+>  	struct atmel_trng *trng = dev_get_drvdata(dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(trng->clk);
+> +	if (ret)
+> +		return ret;
+>  
+> -	return clk_prepare_enable(trng->clk);
+> +	atmel_trng_enable(trng);
+> +
+> +	return 0;
+>  }
+>  
+>  static const struct dev_pm_ops atmel_trng_pm_ops = {
+> 
 
-(enable seems to default to unmask, but disable does not default to mask)
 
-Regards.
+-- 
+Nicolas Ferre
