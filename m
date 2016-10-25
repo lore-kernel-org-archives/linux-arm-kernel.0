@@ -1,25 +1,62 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 24 Oct 2016 20:12:59 -0500
-Subject: [PATCH/RFT v2 13/17] USB: da8xx: use ohci priv data instead of
- globals
-In-Reply-To: <20161024164634.4330-14-ahaslam@baylibre.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-14-ahaslam@baylibre.com>
-Message-ID: <0cf6f211-90ba-2f7b-978f-f1cfa1b11554@lechnology.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 25 Oct 2016 09:16:32 +0800
+Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <147733850401.29612.2343965740004706258@sboyd-linaro>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-3-stephen.boyd@linaro.org>
+ <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+ <147733850401.29612.2343965740004706258@sboyd-linaro>
+Message-ID: <20161025011632.GA23876@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
-> From: Axel Haslam <ahaslam@baylibre.com>
-> >  static const struct ohci_driver_overrides da8xx_overrides __initconst = {
-> -	.reset		= ohci_da8xx_reset
-> +	.reset		= ohci_da8xx_reset,
-> +	.extra_priv_size = sizeof(struct da8xx_ohci_hcd),
+On Mon, Oct 24, 2016 at 12:48:24PM -0700, Stephen Boyd wrote:
+> Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
+> > Hi,
+> > 
+> > On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > > The ULPI bus can be built as a module, and it will soon be
+> > > calling these functions when it supports probing devices from DT.
+> > > Export them so they can be used by the ULPI module.
+> > >
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > Cc: <devicetree@vger.kernel.org>
+> > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > ---
+> > >  drivers/of/device.c | 2 ++
+> > >  1 file changed, 2 insertions(+)
+> > >
+> > > diff --git a/drivers/of/device.c b/drivers/of/device.c
+> > > index 8a22a253a830..6719ab35b62e 100644
+> > > --- a/drivers/of/device.c
+> > > +++ b/drivers/of/device.c
+> > > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+> > >
+> > >         return tsize;
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
+> > >
+> > >  int of_device_request_module(struct device *dev)
+> > >  {
+> > > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+> > >         }
+> > >         mutex_unlock(&of_mutex);
+> > >  }
+> > > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+> > 
+> > This is trailing the wrong function.
+> > 
+> 
+> Good catch. Must have been some bad rebase.
+> 
+> Peter, can you fix it while applying or should I resend this patch?
+> 
 
-nit: since you are changing both lines anyway, you might as well make 
-the ='s line up.
+But, this is device tree patch. I can only get chipidea part and other
+USB patches if Greg agrees.
 
->  };
->
->  /*
->
+-- 
+
+Best Regards,
+Peter Chen
