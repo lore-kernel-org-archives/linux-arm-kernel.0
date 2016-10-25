@@ -1,69 +1,47 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 25 Oct 2016 12:17:45 +0200
-Subject: [RFC] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <20161024170035.GO15620@leverpostej>
-References: <1477327596-16060-1-git-send-email-bgolaszewski@baylibre.com>
- <1477327596-16060-2-git-send-email-bgolaszewski@baylibre.com>
- <20161024170035.GO15620@leverpostej>
-Message-ID: <CAMpxmJWkb3OQAxCMWT6yrGu1df8vXtxOJHS6Qu4pyrSaYJ5xEg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 25 Oct 2016 15:47:28 +0530
+Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
+ platform declaration.
+In-Reply-To: <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-3-ahaslam@baylibre.com>
+ <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
+ <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
+Message-ID: <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-24 19:00 GMT+02:00 Mark Rutland <mark.rutland@arm.com>:
-> On Mon, Oct 24, 2016 at 06:46:36PM +0200, Bartosz Golaszewski wrote:
->> +
->> +     dev = &pdev->dev;
->> +     node = dev->of_node;
->> +
->> +     /* Find the board name. */
->> +     for (parent = node;
->> +          !of_node_is_root(parent);
->> +          parent = of_get_parent(parent));
->> +
->> +     ret = of_property_read_string(parent, "compatible", &board);
->> +     if (ret) {
->> +             dev_err(dev, "unable to read the soc model\n");
->> +             return ret;
->> +     }
->
-> I can see that you want to expose sysfs knobs for this, but is it really
-> necessary to match boards like this? It's very fragile, and commits us
-> to maintaining a database of board data (i.e. a board file).
->
-> I am very much not keen on that.
->
+On Tuesday 25 October 2016 03:07 PM, Axel Haslam wrote:
+> Hi Sekar,
+> 
+> On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+>>> From: David Lechner <david@lechnology.com>
+>>>
+>>> The CFGCHIP registers are used by a number of devices, so using a syscon
+>>> device to share them. The first consumer of this will by the phy-da8xx-usb
+>>> driver.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> [Axel: minor fix: change id to -1]
+>>
+>> Can you please clarify this change? There could be other syscon devices
+>> on the chip for other common registers. Why use the singular device-id?
+>>
+> 
+> in the case of non DT boot, the phy driver is looking for "syscon" :
+> 
+> d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
+> 
+> if we register the syscon driver with id = 0, the actual name of the syscon
+> device will be "syscon.0" and the phy driver will fail to probe, because
+> the strncmp match in the syscon driver (syscon_match_pdevname)
+> will fail.
+> 
+> should i change the phy driver instead?
 
-I Mark,
+Yes, please. Forcing only one syscon region for the whole chip will be
+too restrictive, I am pretty sure.
 
-I don't want to expose any new sysfs interface.
-
-The initial idea was to follow the way the ti-aemif driver is
-implemented and expose DT bindings for the memory controller knobs
-(initially only the Peripheral Bus Burst Priority Register, tweaking
-which is required to make LCDC work correctly on da850 based boards as
-mentioned by Kevin). This was rejected as it's not hardware
-description but configuration, so it should not be controlled by DT
-properties.
-
-The correct approach for this kind of performance knobs doesn't exist
-yet. There was a BoF during this year's ELCE in Berlin during which
-several ideas were discussed, but no code has been written so far.
-
-Using sysfs would have exactly the same disadvantage - committing to a
-stable interface that would have to be maintained indefinitely.
-
-In the end it was decided that a fairly good, temporary solution would
-be to create a driver for the da850 DDR controller which would
-hardcode the required tweaks for several boards (as the LCDC issue is
-known to affect more TI SoCs and boards). Once a framework for
-performance knobs is implemented and merged, it would be easy to port
-the driver to it as we would not have implemented any stable
-interface.
-
-The same solution would be used for the SYSCFG registers on the da8xx SoCs.
-
-Hope that clarifies the need for this patch a bit. I will address all
-other issues in v2.
-
-Best regards,
-Bartosz Golaszewski
+Thanks,
+Sekhar
