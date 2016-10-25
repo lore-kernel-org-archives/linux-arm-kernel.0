@@ -1,63 +1,41 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 25 Oct 2016 16:55:32 -0700
-Subject: [RFC PATCH 2/6] ARM: davinci: da8xx: VPIF: enable DT init
+Date: Tue, 25 Oct 2016 16:55:35 -0700
+Subject: [RFC PATCH 5/6] [media] davinci: vpif_capture: don't lock over
+ s_stream
 In-Reply-To: <20161025235536.7342-1-khilman@baylibre.com>
 References: <20161025235536.7342-1-khilman@baylibre.com>
-Message-ID: <20161025235536.7342-3-khilman@baylibre.com>
+Message-ID: <20161025235536.7342-6-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic support for DT initializaion of VPIF (capture) via DT.  Clocks
-and mux still need to happen in this file until there are real clock and
-pinctrl drivers, but the video nodes and subdevs can all come from DT.
+Video capture subdevs may be over I2C and may sleep during xfer, so we
+cannot do IRQ-disabled locking when calling the subdev.
 
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/media/platform/davinci/vpif_capture.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index c9f7e9274aa8..e1b7d72f9070 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -17,6 +17,7 @@
- #include <mach/common.h>
- #include "cp_intc.h"
- #include <mach/da8xx.h>
-+#include <mach/mux.h>
+diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+index 79cef74e164f..becc3e63b472 100644
+--- a/drivers/media/platform/davinci/vpif_capture.c
++++ b/drivers/media/platform/davinci/vpif_capture.c
+@@ -193,12 +193,16 @@ static int vpif_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 		}
+ 	}
  
- static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-@@ -38,14 +39,30 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 		       NULL),
- 	OF_DEV_AUXDATA("ti,da830-mcasp-audio", 0x01d00000, "davinci-mcasp.0", NULL),
- 	OF_DEV_AUXDATA("ti,da850-aemif", 0x68000000, "ti-aemif", NULL),
-+	OF_DEV_AUXDATA("ti,vpif", 0x01e17000, "vpif", NULL),
- 	{}
- };
- 
- #ifdef CONFIG_ARCH_DAVINCI_DA850
- 
-+#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE)
-+static __init void da850_vpif_capture_init(void)
-+{
-+	int ret;
-+	
-+	ret = davinci_cfg_reg_list(da850_vpif_capture_pins);
-+	if (ret)
-+		pr_warn("da850_evm_init: VPIF capture mux setup failed: %d\n",
-+			ret);
-+}
-+#else
-+#define da850_vpif_capture_init()
-+#endif
++	spin_unlock_irqrestore(&common->irqlock, flags);
 +
- static void __init da850_init_machine(void)
- {
- 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
-+	da850_vpif_capture_init();
- }
+ 	ret = v4l2_subdev_call(ch->sd, video, s_stream, 1);
+ 	if (ret && ret != -ENOIOCTLCMD && ret != -ENODEV) {
+ 		vpif_dbg(1, debug, "stream on failed in subdev\n");
+ 		goto err;
+ 	}
  
- static const char *const da850_boards_compat[] __initconst = {
++	spin_lock_irqsave(&common->irqlock, flags);
++
+ 	/* Call vpif_set_params function to set the parameters and addresses */
+ 	ret = vpif_set_video_params(vpif, ch->channel_id);
+ 	if (ret < 0) {
 -- 
 2.9.3
