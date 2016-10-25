@@ -1,34 +1,53 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 25 Oct 2016 10:59:19 -0500
-Subject: [PATCH] ARM: socfpga_defconfig: Enable HIGHMEM
-Message-ID: <1477411159-31558-1-git-send-email-dinguyen@opensource.altera.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 25 Oct 2016 11:05:02 -0500
+Subject: [PATCH/RFT v2 07/17] ARM: davinci: da8xx: Enable the usb20 "per"
+ clk on phy_clk_enable
+In-Reply-To: <833b6b60-4504-dac7-ccbb-bc08c985ad01@ti.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-8-ahaslam@baylibre.com>
+ <833b6b60-4504-dac7-ccbb-bc08c985ad01@ti.com>
+Message-ID: <5abddbfe-0338-6406-9299-1d2d3fb957a3@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On 10/25/2016 05:12 AM, Sekhar Nori wrote:
+> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+>> diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+>> index 9e41a7f..982e105 100644
+>> --- a/arch/arm/mach-davinci/usb-da8xx.c
+>> +++ b/arch/arm/mach-davinci/usb-da8xx.c
+>> @@ -53,11 +53,19 @@ int __init da8xx_register_usb_refclkin(int rate)
+>>
+>>  static void usb20_phy_clk_enable(struct clk *clk)
+>>  {
+>> +	struct clk *usb20_clk;
+>>  	u32 val;
+>>  	u32 timeout = 500000; /* 500 msec */
+>>
+>>  	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+>>
+>> +	usb20_clk = clk_get(NULL, "usb20");
+>
+> We should not be using a NULL device pointer here. Can you pass the musb
+> device pointer available in the same file? Also, da850_clks[] in da850.c
+> needs to be fixed to add the matching device name.
 
-All of the SoCFPGA boards have at least 1GB of RAM, so enabling HIGHMEM
-is necessary to avoid the following warning:
+This clock can be used for usb 1.1 PHY even when musb is not being used, 
+so I don't think we can depend on having a musb device here.
 
-[    0.000000] Truncating RAM at 0x00000000-0x40000000 to -0x30000000
-[    0.000000] Consider using a HIGHMEM enabled kernel.
+Also, in a previous review, it was decided that the usb clocks should 
+*not* be added to da850_clks[] [1]. Instead, they are dynamically 
+registered elsewhere.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/configs/socfpga_defconfig |    1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index 4660506..f5b9bc5 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -25,6 +25,7 @@ CONFIG_PCIE_ALTERA_MSI=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_VFP=y
--- 
-1.7.9.5
+[1]: http://www.gossamer-threads.com/lists/linux/kernel/2396533
+
+>
+>> +	if (IS_ERR(usb20_clk)) {
+>> +		pr_err("could not get usb20 clk\n");
+>> +		return;
+>> +	}
+>
+> Thanks,
+> Sekhar
+>
