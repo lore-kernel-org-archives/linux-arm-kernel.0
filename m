@@ -1,68 +1,51 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 12:54:04 -0500
-Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
-Message-ID: <1477418044-24603-1-git-send-email-david@lechnology.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 25 Oct 2016 10:55:45 -0700
+Subject: [PATCH] arm64: Neaten show_regs, remove KERN_CONT
+In-Reply-To: <CA+55aFwFQSass91gdGsjo4BkkAYmoFSn-Cpm6yF+SygF_tRp1g@mail.gmail.com>
+References: <4cbf196b83cd9d175634e7056744dc649ae87f63.1477253239.git.joe@perches.com>
+ <20161024113131.GH15620@leverpostej> <1477326477.1984.2.camel@perches.com>
+ <20161024164255.GN15620@leverpostej>
+ <CA+55aFwFQSass91gdGsjo4BkkAYmoFSn-Cpm6yF+SygF_tRp1g@mail.gmail.com>
+Message-ID: <CA+55aFw4EP_qxZ8tcRUV=PcLx_XbwXXOU_yp3cJHVjazof_0MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes pwm name matching for DA850 familiy devices. When using device
-tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
-same name, which caused errors when trying to register the devices.
+On Tue, Oct 25, 2016 at 10:38 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Mon, Oct 24, 2016 at 9:42 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> That does not appear to be the case; as fr as I can tell the core prints a
+>> timestamp per line as required. If I run:
+>>
+>>         printk("TEST\nLINE1\nLINE2\nLINE3\nLINE4\n");
+>
+> Please don't do this.
 
-The names for clock matching in da850_clks[] also have to be updated to
-to exactly match in order for the clock lookup to work correctly.
+Side note: even with my patch, the above kind of stuff hits other special cases.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
+In particular, the "extended header" that is printed to special
+consoles (really just the network console) will only print one header
+for each record. So you'll end up with the "normal" logs having time
+appended to each line, but the extended logs that use
+"msg_print_ext_body()" will have just a header for each record, and
+then within the record the newlines will be escaped as "\0a", I think.
 
-Tested working on LEGO MINDSTORMS EV3.
+We could fix that too, but basically newlines in the middle of a
+string has never really worked reliably. I think historically (long
+long ago) they were just printed as-is, and did not have the loglevel
+or the timestamp, for example. Now those should work for normal
+logging, but there clearly are still cases where it breaks down.
 
+Of course, you probably could argue that nobody cares too deeply about
+the exact format of the extended logging, and you'd probably be right.
+But still..
 
- arch/arm/mach-davinci/da850.c    | 10 +++++++---
- arch/arm/mach-davinci/da8xx-dt.c | 10 +++++-----
- 2 files changed, 12 insertions(+), 8 deletions(-)
+And yes, what we probably *should* do is to do the newline breaking
+when adding things to the log, rather than doing it in the
+"msg_print_text()" phase.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index ed3d0e9..6b78a8f 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -510,9 +510,13 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("vpif",		NULL,		&vpif_clk),
- 	CLK("ahci_da850",		NULL,		&sata_clk),
- 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
--	CLK("ehrpwm",		"fck",		&ehrpwm_clk),
--	CLK("ehrpwm",		"tbclk",	&ehrpwm_tbclk),
--	CLK("ecap",		"fck",		&ecap_clk),
-+	CLK("ehrpwm.0",		"fck",		&ehrpwm_clk),
-+	CLK("ehrpwm.0",		"tbclk",	&ehrpwm_tbclk),
-+	CLK("ehrpwm.1",		"fck",		&ehrpwm_clk),
-+	CLK("ehrpwm.1",		"tbclk",	&ehrpwm_tbclk),
-+	CLK("ecap.0",		"fck",		&ecap_clk),
-+	CLK("ecap.1",		"fck",		&ecap_clk),
-+	CLK("ecap.2",		"fck",		&ecap_clk),
- 	CLK(NULL,		NULL,		NULL),
- };
- 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 7947267..6ad8ddb 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -23,11 +23,11 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
- 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
--	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
--	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
--	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
--	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
--	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm.0", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm.1", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap.0", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap.1", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap.2", NULL),
- 	OF_DEV_AUXDATA("ti,da830-spi", 0x01c41000, "spi_davinci.0", NULL),
- 	OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
- 	OF_DEV_AUXDATA("ns16550a", 0x01c42000, "serial8250.0", NULL),
--- 
-2.7.4
+There's a reason why I actually would have liked to entirely rewrite
+the whole printk mess. But there's also a reason I didn't - I'm not
+quite _that_ much of a glutton for punishment.
+
+             Linus
