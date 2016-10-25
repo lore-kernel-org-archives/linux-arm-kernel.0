@@ -1,227 +1,71 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Tue, 25 Oct 2016 08:47:48 +0800
-Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
- default list
-In-Reply-To: <20161024090931.GR7370@jhogan-linux.le.imgtec.org>
-References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
- <20161024090931.GR7370@jhogan-linux.le.imgtec.org>
-Message-ID: <CAFiDJ59PdOiqiF8wFVFrkB4k0B6S5cTGVQPUpdjZ=83iv7GQag@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 24 Oct 2016 19:48:08 -0500
+Subject: [PATCH/RFT v2 17/17] ARM: dts: da850: add usb device node
+In-Reply-To: <20161024164634.4330-18-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-18-ahaslam@baylibre.com>
+Message-ID: <59ca6a1f-6db9-eed2-8e8a-77657c7febac@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 5:09 PM, James Hogan <james.hogan@imgtec.com> wrote:
-> On Sat, Oct 22, 2016 at 03:14:04PM +0300, Yury Norov wrote:
->> The newer prlimit64 syscall provides all the functionality provided by
->> the getrlimit and setrlimit syscalls and adds the pid of target process,
->> so future architectures won't need to include getrlimit and setrlimit.
->>
->> Therefore drop getrlimit and setrlimit syscalls from the generic syscall
->> list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the architecture's
->> unistd.h prior to including asm-generic/unistd.h, and adjust all
->> architectures using the generic syscall list to define it so that no
->> in-tree architectures are affected.
->>
->> Cc: Vineet Gupta <vgupta@synopsys.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Mark Salter <msalter@redhat.com>
->> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Richard Kuo <rkuo@codeaurora.org>
->> Cc: James Hogan <james.hogan@imgtec.com>
->> Cc: Ley Foon Tan <lftan@altera.com>
->> Cc: Jonas Bonn <jonas@southpole.se>
->> Cc: Chen Liqin <liqin.linux@gmail.com>
->> Cc: Lennox Wu <lennox.wu@gmail.com>
->> Cc: Chris Metcalf <cmetcalf@mellanox.com>
->> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Andrew Pinski <Andrew.Pinski@cavium.com>
->> Cc: linux-snps-arc at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-c6x-dev at linux-c6x.org
->> Cc: uclinux-h8-devel at lists.sourceforge.jp
->> Cc: linux-hexagon at vger.kernel.org
->> Cc: linux-metag at vger.kernel.org
->> Cc: nios2-dev at lists.rocketboards.org
->> Cc: linux-arch at vger.kernel.or
->> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
->>
->> ---
->>  arch/arc/include/uapi/asm/unistd.h       | 1 +
->>  arch/arm64/include/uapi/asm/unistd.h     | 1 +
->>  arch/c6x/include/uapi/asm/unistd.h       | 1 +
->>  arch/h8300/include/uapi/asm/unistd.h     | 1 +
->>  arch/hexagon/include/uapi/asm/unistd.h   | 1 +
->>  arch/metag/include/uapi/asm/unistd.h     | 1 +
+On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
 >
-> Acked-by: James Hogan <james.hogan@imgtec.com> [metag]
+> This adds the usb (ohci) device node for the da850 soc.
+> Also it enables it for the lcdk board
 >
-> Cheers
-> James
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
+>  arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
+>  2 files changed, 16 insertions(+)
 >
->>  arch/nios2/include/uapi/asm/unistd.h     | 1 +
-Acked-by: Ley Foon Tan <lftan@altera.com> [nios2]
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index 7b8ab21..fa91339 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -86,6 +86,14 @@
+>  	};
+>  };
+>
+> +&usb_phy {
+> +	status = "okay";
+> +};
+> +
+> +&usb {
+> +	status = "okay";
 
+Don't you need to specify a regulator here using the vbus-supply property?
 
->>  arch/openrisc/include/uapi/asm/unistd.h  | 1 +
->>  arch/score/include/uapi/asm/unistd.h     | 1 +
->>  arch/tile/include/uapi/asm/unistd.h      | 1 +
->>  arch/unicore32/include/uapi/asm/unistd.h | 1 +
->>  include/uapi/asm-generic/unistd.h        | 5 +++++
->>  12 files changed, 16 insertions(+)
->>
->> diff --git a/arch/arc/include/uapi/asm/unistd.h b/arch/arc/include/uapi/asm/unistd.h
->> index 41fa2ec..928546d 100644
->> --- a/arch/arc/include/uapi/asm/unistd.h
->> +++ b/arch/arc/include/uapi/asm/unistd.h
->> @@ -16,6 +16,7 @@
->>  #define _UAPI_ASM_ARC_UNISTD_H
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #define __ARCH_WANT_SYS_EXECVE
->>  #define __ARCH_WANT_SYS_CLONE
->>  #define __ARCH_WANT_SYS_VFORK
->> diff --git a/arch/arm64/include/uapi/asm/unistd.h b/arch/arm64/include/uapi/asm/unistd.h
->> index 043d17a..48355a6 100644
->> --- a/arch/arm64/include/uapi/asm/unistd.h
->> +++ b/arch/arm64/include/uapi/asm/unistd.h
->> @@ -15,5 +15,6 @@
->>   */
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>
->>  #include <asm-generic/unistd.h>
->> diff --git a/arch/c6x/include/uapi/asm/unistd.h b/arch/c6x/include/uapi/asm/unistd.h
->> index 12d73d9..f676231 100644
->> --- a/arch/c6x/include/uapi/asm/unistd.h
->> +++ b/arch/c6x/include/uapi/asm/unistd.h
->> @@ -15,6 +15,7 @@
->>   */
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #define __ARCH_WANT_SYS_CLONE
->>
->>  /* Use the standard ABI for syscalls. */
->> diff --git a/arch/h8300/include/uapi/asm/unistd.h b/arch/h8300/include/uapi/asm/unistd.h
->> index 7dd20ef..2f98394 100644
->> --- a/arch/h8300/include/uapi/asm/unistd.h
->> +++ b/arch/h8300/include/uapi/asm/unistd.h
->> @@ -1,5 +1,6 @@
->>  #define __ARCH_NOMMU
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>
->>  #include <asm-generic/unistd.h>
->> diff --git a/arch/hexagon/include/uapi/asm/unistd.h b/arch/hexagon/include/uapi/asm/unistd.h
->> index 2151760..52d585c 100644
->> --- a/arch/hexagon/include/uapi/asm/unistd.h
->> +++ b/arch/hexagon/include/uapi/asm/unistd.h
->> @@ -28,6 +28,7 @@
->>
->>  #define sys_mmap2 sys_mmap_pgoff
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #define __ARCH_WANT_SYS_EXECVE
->>  #define __ARCH_WANT_SYS_CLONE
->>  #define __ARCH_WANT_SYS_VFORK
->> diff --git a/arch/metag/include/uapi/asm/unistd.h b/arch/metag/include/uapi/asm/unistd.h
->> index 459b6ec..16b5cb3 100644
->> --- a/arch/metag/include/uapi/asm/unistd.h
->> +++ b/arch/metag/include/uapi/asm/unistd.h
->> @@ -8,6 +8,7 @@
->>   */
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>
->>  /* Use the standard ABI for syscalls. */
->>  #include <asm-generic/unistd.h>
->> diff --git a/arch/nios2/include/uapi/asm/unistd.h b/arch/nios2/include/uapi/asm/unistd.h
->> index 51a32c7..b0dda4d 100644
->> --- a/arch/nios2/include/uapi/asm/unistd.h
->> +++ b/arch/nios2/include/uapi/asm/unistd.h
->> @@ -18,6 +18,7 @@
->>   #define sys_mmap2 sys_mmap_pgoff
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>
->>  /* Use the standard ABI for syscalls */
->>  #include <asm-generic/unistd.h>
->> diff --git a/arch/openrisc/include/uapi/asm/unistd.h b/arch/openrisc/include/uapi/asm/unistd.h
->> index 471905b..6812d81 100644
->> --- a/arch/openrisc/include/uapi/asm/unistd.h
->> +++ b/arch/openrisc/include/uapi/asm/unistd.h
->> @@ -21,6 +21,7 @@
->>  #define sys_mmap2 sys_mmap_pgoff
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #define __ARCH_WANT_SYS_FORK
->>  #define __ARCH_WANT_SYS_CLONE
->>
->> diff --git a/arch/score/include/uapi/asm/unistd.h b/arch/score/include/uapi/asm/unistd.h
->> index d4008c3..7ad1bdc 100644
->> --- a/arch/score/include/uapi/asm/unistd.h
->> +++ b/arch/score/include/uapi/asm/unistd.h
->> @@ -1,6 +1,7 @@
->>  #define __ARCH_HAVE_MMU
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #define __ARCH_WANT_SYSCALL_NO_AT
->>  #define __ARCH_WANT_SYSCALL_NO_FLAGS
->>  #define __ARCH_WANT_SYSCALL_OFF_T
->> diff --git a/arch/tile/include/uapi/asm/unistd.h b/arch/tile/include/uapi/asm/unistd.h
->> index 24e9187..cf0505f 100644
->> --- a/arch/tile/include/uapi/asm/unistd.h
->> +++ b/arch/tile/include/uapi/asm/unistd.h
->> @@ -13,6 +13,7 @@
->>   */
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>  #if !defined(__LP64__) || defined(__SYSCALL_COMPAT)
->>  /* Use the flavor of this syscall that matches the 32-bit API better. */
->>  #define __ARCH_WANT_SYNC_FILE_RANGE2
->> diff --git a/arch/unicore32/include/uapi/asm/unistd.h b/arch/unicore32/include/uapi/asm/unistd.h
->> index 1f63c47..ef25aec 100644
->> --- a/arch/unicore32/include/uapi/asm/unistd.h
->> +++ b/arch/unicore32/include/uapi/asm/unistd.h
->> @@ -11,6 +11,7 @@
->>   */
->>
->>  #define __ARCH_WANT_RENAMEAT
->> +#define __ARCH_WANT_SET_GET_RLIMIT
->>
->>  /* Use the standard ABI for syscalls. */
->>  #include <asm-generic/unistd.h>
->> diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
->> index 9b1462e..bbaeac0 100644
->> --- a/include/uapi/asm-generic/unistd.h
->> +++ b/include/uapi/asm-generic/unistd.h
->> @@ -465,10 +465,15 @@ __SYSCALL(__NR_uname, sys_newuname)
->>  __SYSCALL(__NR_sethostname, sys_sethostname)
->>  #define __NR_setdomainname 162
->>  __SYSCALL(__NR_setdomainname, sys_setdomainname)
->> +
->> +#ifdef __ARCH_WANT_SET_GET_RLIMIT
->> +/* getrlimit and setrlimit are superseded with prlimit64 */
->>  #define __NR_getrlimit 163
->>  __SC_COMP(__NR_getrlimit, sys_getrlimit, compat_sys_getrlimit)
->>  #define __NR_setrlimit 164
->>  __SC_COMP(__NR_setrlimit, sys_setrlimit, compat_sys_setrlimit)
->> +#endif
->> +
->>  #define __NR_getrusage 165
->>  __SC_COMP(__NR_getrusage, sys_getrusage, compat_sys_getrusage)
->>  #define __NR_umask 166
->> --
->> 2.7.4
->>
+> +};
+> +
+>  &serial2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&serial2_rxtx_pins>;
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 33fcdce..ec2cec3 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -381,6 +381,14 @@
+>  			#phy-cells = <1>;
+>  			status = "disabled";
+>  		};
+> +		usb: usb at 0225000 {
+
+Don't need the leading 0 on usb at 225000
+
+The alias (usb:) might need to be more specific since there is a second 
+usb device that will be added later for musb. (The comments in the 
+previous review only referred to the "usb" in "usb@", not the alias.)
+
+> +			compatible = "ti,da830-ohci";
+> +			reg = <0x225000 0x1000>;
+> +			interrupts = <59>;
+> +			phys = <&usb_phy 1>;
+> +			phy-names = "usb-phy";
+> +			status = "disabled";
+> +		};
+>  		gpio: gpio at 226000 {
+>  			compatible = "ti,dm6441-gpio";
+>  			gpio-controller;
+>
