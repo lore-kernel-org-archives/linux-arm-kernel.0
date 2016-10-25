@@ -1,109 +1,62 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 25 Oct 2016 18:22:47 +0200
-Subject: [PATCH] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161025161135.7316-1-richard.genoud@gmail.com>
-References: <20161025161135.7316-1-richard.genoud@gmail.com>
-Message-ID: <20161025162247.phhevbtd6dsmknbr@piout.net>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 25 Oct 2016 11:24:17 -0500
+Subject: [PATCH/RFT v2 11/17] USB: OHCI: make ohci-da8xx a separate driver
+In-Reply-To: <CAKXjFTM8RwsAut8cD0n0foxueSjR4VB4k4WJizXo9SyaW3viOA@mail.gmail.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-12-ahaslam@baylibre.com>
+ <403743d8-dff2-3389-105b-1082b674b0b8@lechnology.com>
+ <CAKXjFTPvEXPRyq0HZiF7mcHWFaFoH7MjFqEKnTyuSCUOB=U7Aw@mail.gmail.com>
+ <21019d11-3b01-3e0e-60bc-c4873cf20237@lechnology.com>
+ <CAKXjFTM8RwsAut8cD0n0foxueSjR4VB4k4WJizXo9SyaW3viOA@mail.gmail.com>
+Message-ID: <52b6439e-2bb8-a9d0-da8c-93646b6ee4b0@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/25/2016 11:21 AM, Axel Haslam wrote:
+> On Tue, Oct 25, 2016 at 6:12 PM, David Lechner <david@lechnology.com> wrote:
+>> On 10/25/2016 02:39 AM, Axel Haslam wrote:
+>>>
+>>> On Tue, Oct 25, 2016 at 2:38 AM, David Lechner <david@lechnology.com>
+>>> wrote:
+>>>>
+>>>> On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
+>>>>>
+>>>>>
+>>>>> -#ifndef CONFIG_ARCH_DAVINCI_DA8XX
+>>>>> -#error "This file is DA8xx bus glue.  Define
+>>>>> CONFIG_ARCH_DAVINCI_DA8XX."
+>>>>> -#endif
+>>>>> +#include "ohci.h"
+>>>>> +
+>>>>> +#define DRIVER_DESC "OHCI DA8XX driver"
+>>>>> +
+>>>>> +static const char hcd_name[] = "ohci-da8xx";
+>>>>
+>>>>
+>>>>
+>>>> why static const char instead of #define? This is only used one time in a
+>>>> pr_info, so it seems kind of pointless anyway.
+>>>
+>>>
+>>> Other drivers are using static const for the same variable.
+>>> i think static const is preferred over #define because #define doet give a
+>>> type.
+>>> If you dont mind ill keep it static const.
+>>>
+>>
+>> If this string was used in this file more than one place, I would agree with
+>> you, but currently it is only used as the argument of a pr_info(). The
+>> string "ohci-da8xx" could just be included in the fmt string instead of
+>> using "%s".
+>
+> I think the purpose was to use it in the .name of the platform_driver
+> structure, too. only that not everybody is doing that, i looked at some bad
+>  examples :(
+>
+> would you agree to keep it if we use it in .name too?
+>
+> -Axel
+>
+>>
 
-On 25/10/2016 at 18:11:35 +0200, Richard Genoud wrote :
-> commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-> hardware handshake is enabled"), despite its title, broke hardware
-> handshake on *every* Atmel platforms.
-> 
-> The only one partially working is the SAMA5D2.
-> 
-
-[...]
-
-> Changes since v4:
->  - the mctrl_gpio_use_rtscts() is gone since it was atmel_serial
->  specific. (so patch 1 is gone)
->  - patches 2 and 3 have been merged together since it didn't make
->  a lot of sense to correct the GPIO case in one separate patch.
->  - ATMEL_US_USMODE_HWHS is now unset for platform with PDC
-> 
-> Changes since v3:
->  - remove superfluous #include <linux/err.h> (thanks to Uwe)
->  - rebase on next-20160930
-> 
-> Changes since v2:
->  - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
->  - fix typos in patch 2/3
->  - rebase on next-20160927
->  - simplify the logic in patch 3/3.
-> 
-> Changes since v1:
->  - Correct patch 1 with the error found by kbuild.
->  - Add Alexandre's Acked-by on patch 2
->  - Rewrite patch 3 logic in the light of the on-going discussion
->    with Cyrille and Alexandre.
-> 
-
-The changelog has to go after the --- marker.
-
-> * the list may not be exhaustive
-> 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-> ---
->  drivers/tty/serial/atmel_serial.c | 25 +++++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
-> 
->  I think this should go in the stable tree since it fixes the flow
->  control broken since v4.0.
->  But It won't compile on versions before 4.9rc1 because:
->  function atmel_use_fifo was introduced in 4.4.12 / 4.7
->  variable atmel_port was introduced in 4.9rc1
-> 
->  That's why I didn't add the Cc stable in the email body.
-> 
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index fd8aa1f4ba78..2c7c45904ba7 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2132,11 +2132,28 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		mode |= ATMEL_US_USMODE_RS485;
->  	} else if (termios->c_cflag & CRTSCTS) {
->  		/* RS232 with hardware handshake (RTS/CTS) */
-> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> -			termios->c_cflag &= ~CRTSCTS;
-> -		} else {
-> +		if (atmel_use_fifo(port) &&
-> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
-> +			/*
-> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
-> +			 * be able to drive the RTS pin high/low when the RX
-> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
-> +			 * It will also disable the transmitter when the CTS
-> +			 * pin is high.
-> +			 * This mode is not activated if CTS pin is a GPIO
-> +			 * because in this case, the transmitter is always
-> +			 * disabled.
-> +			 * If the RTS pin is a GPIO, the controller won't be
-> +			 * able to drive it according to the FIFO thresholds,
-> +			 * but it will be handled by the driver.
-> +			 */
->  			mode |= ATMEL_US_USMODE_HWHS;
-> +		} else {
-> +			/*
-> +			 * For platforms without FIFO, the flow control is
-> +			 * handled by the driver.
-> +			 */
-> +			mode |= ATMEL_US_USMODE_NORMAL;
->  		}
->  	} else {
->  		/* RS232 without hadware handshake */
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Yes, that will make more sense. ;-)
