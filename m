@@ -1,92 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 25 Oct 2016 18:07:45 +0100
-Subject: [PATCH V2] arm64: Neaten show_regs, remove KERN_CONT
-In-Reply-To: <289fb30081aba03fec0c960e7334f707bf36c881.1477413522.git.joe@perches.com>
-References: <289fb30081aba03fec0c960e7334f707bf36c881.1477413522.git.joe@perches.com>
-Message-ID: <20161025170745.GE8898@leverpostej>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 25 Oct 2016 19:09:36 +0200
+Subject: [PATCH 2/3] ARM: convert to generated system call tables
+In-Reply-To: <4146248.jXuviLlvH5@wuerfel>
+References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
+ <3851270.xZRcP9hae0@wuerfel>
+ <20161025091210.rjfhvq4mqtuquei5@tower> <4146248.jXuviLlvH5@wuerfel>
+Message-ID: <CAMuHMdUdi353sSYwnfk85CnhOkFB5ddE8U2x2Z+yjTCo58s+3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 09:40:26AM -0700, Joe Perches wrote:
-> commit db4b0710fae9 ("arm64: fix show_regs fallout from KERN_CONT changes")
-> corrected the KERN_CONT fallout from commit 4bcc595ccd80
-> ("printk: reinstate KERN_CONT for printing continuation lines"), but
-> the code still has unnecessary KERN_CONT uses.
-> 
-> Remove the KERN_CONT uses to avoid possible message interleaving.
-> 
-> Miscellanea:
-> 
-> o Remove unnecessary trailing blank from the output too.
-> o Convert i and top_reg to unsigned int
-> o Move the extra blank line after __show_reg to the caller for symmetry
-> Signed-off-by: Joe Perches <joe@perches.com>
-> ---
->  arch/arm64/kernel/process.c | 21 ++++++++++-----------
->  1 file changed, 10 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 01753cd7d3f0..5ba12f019bf7 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -168,7 +168,7 @@ void machine_restart(char *cmd)
->  
->  void __show_regs(struct pt_regs *regs)
->  {
-> -	int i, top_reg;
-> +	unsigned int i, top_reg;
+On Tue, Oct 25, 2016 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday, October 25, 2016 10:12:10 PM CEST Michael Cree wrote:
+>> On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
+>> > I see your point, but I think there are serious issues with the current
+>> > approach as well:
+>> >
+>> > - a lot of the less common architectures just don't get updated
+>> >   in time, out of 22 architectures that don't use asm-generic/unistd.h,
+>> >   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
+>> >
+>> > - some architectures that add all syscalls sometimes make a mistake
+>> >   and forget one, e.g. alpha apparently never added __NR_bpf, but it
+>> >   did add the later __NR_execveat.
+>>
+>> __NR_bpf was not forgotten on Alpha.  It was not wired up because
+>> extra architecture support is needed which has not been implemented.
+>>
+>> But maybe we should just wire it up to sys_ni_syscall in the meantime
+>> so a syscall number is reserved for it, and user space can call it to
+>> get -ENOSYS returned.
+>
+> Ah, I must have misinterpreted the code then. I assumed that the
+> bpf syscall always works on all architectures, but that only the
+> jit compiler for it required architecture specific code to make it
+> more efficient.
+>
+> The implementation of sys_bfp is compile-time selectable at the moment
+> and falls back to sys_no_syscall if CONFIG_BPF_SYSCALL is disabled.
+> If it doesn't work on Alpha, maybe that symbol could have a "depends
+> on !ALPHA" or "depends on BPF_SUPPORT"?
 
-This change is not necessary. These will work perfectly fine as ints;
-please leave them as-is.
+Yes, BPF should just work (m68k has it).
 
->  	u64 lr, sp;
->  
->  	if (compat_user_mode(regs)) {
-> @@ -190,24 +190,23 @@ void __show_regs(struct pt_regs *regs)
->  
->  	i = top_reg;
->  
-> -	while (i >= 0) {
-> -		printk("x%-2d: %016llx ", i, regs->regs[i]);
-> +	if (i % 2) {
+> sys_seccomp is another one that falls into a similar category, but
+> it already depends on HAVE_ARCH_SECCOMP_FILTER, and most other
+> architectures have assigned a syscall number but not set this symbol.
+> This one will actually allow you to set strict seccomp mode even
+> without the Kconfig symbol, just not allow to set a filter.
 
-This should be:
+Seccomp needs architecture support (m68k doesn't have it).
 
-	if (i % 2 == 0) {
+Gr{oetje,eeting}s,
 
-Otherwise we'll lose x0 in the native case (and x29 will be given a line
-of its own).
+                        Geert
 
-> +		printk("x%-2d: %016llx\n", i, regs->regs[i]);
->  		i--;
-> -
-> -		if (i % 2 == 0) {
-> -			pr_cont("x%-2d: %016llx ", i, regs->regs[i]);
-> -			i--;
-> -		}
-> -
-> -		pr_cont("\n");
->  	}
-> -	printk("\n");
-> +	while (i > 0) {
-> +		printk("x%-2d: %016llx x%-2d: %016llx\n",
-> +		       i, regs->regs[i],
-> +		       i - 1, regs->regs[i - 1]);
-> +		i -= 2;
-> +	}
->  }
->  
->  void show_regs(struct pt_regs * regs)
->  {
->  	printk("\n");
->  	__show_regs(regs);
-> +	printk("\n");
->  }
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Other functions call __show_regs() directly and the trailing newline
-there is expected. Please leave it in __show_regs().
-
-Otherwise, this looks fine to me.
-
-Thanks,
-Mark.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
