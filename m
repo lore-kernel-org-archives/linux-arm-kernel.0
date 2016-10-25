@@ -1,230 +1,561 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 25 Oct 2016 15:47:46 +0100
-Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
-In-Reply-To: <1477405332.2482.87.camel@baylibre.com>
-References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
- <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
- <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
- <1477040798.15560.96.camel@baylibre.com>
- <CACRpkdYUVXny57AC9rKX3VRAyooEk_2XLvqe9jOuT3rOaE75rg@mail.gmail.com>
- <ec7c6cc5-cf9a-9c75-4b07-e337064c7d6e@arm.com>
- <1477400900.2482.51.camel@baylibre.com>
- <dee26f0b-e175-f8a0-2b73-08e8e324841c@arm.com>
- <1477405332.2482.87.camel@baylibre.com>
-Message-ID: <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
+From: atull@opensource.altera.com (Alan Tull)
+Date: Tue, 25 Oct 2016 09:55:32 -0500
+Subject: [PATCH v21 1/9] fpga: add bindings document for fpga region
+In-Reply-To: <20161025145540.3722-1-atull@opensource.altera.com>
+References: <20161025145540.3722-1-atull@opensource.altera.com>
+Message-ID: <20161025145540.3722-2-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/16 15:22, Jerome Brunet wrote:
-> On Tue, 2016-10-25 at 14:38 +0100, Marc Zyngier wrote:
->> On 25/10/16 14:08, Jerome Brunet wrote:
->>>
->>> On Tue, 2016-10-25 at 11:38 +0100, Marc Zyngier wrote:
->>>>
->>>>>
->>>>>
->>>> On 25/10/16 10:14, Linus Walleij wrote:
->>>>>
->>>>>
->>>>> On Fri, Oct 21, 2016 at 11:06 AM, Jerome Brunet <jbrunet@baylib
->>>>> re.c
->>>>> om> wrote:
->>>>>
->>>>>>
->>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Isn't this usecase (also as described in the cover letter)
->>>>>>> a
->>>>>>> textbook
->>>>>>> example of when you should be using hierarchical irqdomain?
->>>>>>>
->>>>>>> Please check with Marc et al on hierarchical irqdomains.
->>>>>>
->>>>>> Linus,
->>>>>> Do you mean I should create a new hierarchical irqdomains in
->>>>>> each
->>>>>> of
->>>>>> the two pinctrl instances we have in these SoC, these domains
->>>>>> being
->>>>>> stacked on the one I just added for controller in irqchip ?
->>>>>>
->>>>>> I did not understand this is what you meant when I asked you
->>>>>> the
->>>>>> question at ELCE.
->>>>>
->>>>> Honestly, I do not understand when and where to properly use
->>>>> hierarchical irqdomain, even after Marc's talk at ELC-E.
->>>>
->>>> I probably didn't do that good a job explaining it then. Let's
->>>> try
->>>> again. You want to use hierarchical domains when you want to
->>>> describe
->>>> an
->>>> interrupt whose path traverses multiple controllers without ever
->>>> being
->>>> multiplexed with other signals. As long as you have this 1:1
->>>> relationship between controllers, you can use them.
->>>>
->>>
->>> Linus, Marc,
->>>
->>> The calculation is question here is meant to get the appropriate
->>> hwirq
->>> number from a particular gpio (and deal with the gpios that can't
->>> provide an irq at all). 
->>>
->>> If I look at other gpio drivers, many are doing exactly this kind
->>> of
->>> calculation before calling 'irq_create_mapping' in the to_irq
->>> callback.
->>> For example:
->>> - pinctrl/nomadik/pinctrl-abx500.c
->>> - pinctrl/samsung/pinctrl-exynos5440.c
->>>
->>> Some can afford to create all the mappings in the probe and just
->>> call
->>> 'irq_find_mapping' (gpio/gpio_tegra.c) but this would not work
->>> here. We
->>> have only 8 upstream irqs for 130+ pins, so only 8 mappings
->>> possible at
->>> a time. 
->>>
->>> My understanding is that irqdomain provide a way to map hwirq to
->>> linux
->>> virq (and back), not map gpio number to hwirq, right?
->>
->> But why are those number different? Why don't you use the same
->> namespace? If gpio == hwirq, all your problems are already solved. If
->> you don't find the mapping in the irqdomain, then there is no irq,
->> end
->> of story. What am I missing?
->>
-> 
-> There is a few problems to guarantee that gpio == hwirq.
-> 1. We have 2 instances of pinctrl, to guarantee that the linux gpio
-> number == hwirq, we would have to guarantee the order in which they are
-> probed. At least this my understanding 
+New bindings document for FPGA Region to support programming
+FPGA's under Device Tree control
 
-Maybe I wasn't clear enough, and my use of gpio is probably wrong. So
-Linux has a gpio number, which is obviously an abstract number (just
-like the Linux irq number). But the pad number, in the context of given
-SoC, is constant. So we have:
+Signed-off-by: Alan Tull <atull@opensource.altera.com>
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+v9:  initial version added to this patchset
+v10: s/fpga/FPGA/g
+     replace DT overlay example with slightly more complicated example
+     move to staging/simple-fpga-bus
+v11: No change in this patch for v11 of the patch set
+v12: Moved out of staging.
+     Changed to use FPGA bridges framework instead of resets
+     for bridges.
+v13: bridge at 0xff20000 -> bridge at ff200000, etc
+     Leave out directly talking about overlays
+     Remove regs and clocks directly under simple-fpga-bus in example
+     Use common "firmware-name" binding instead of "fpga-firmware"
+v14: Use firmware-name in bindings description
+     Call it FPGA Area
+     Remove bindings that specify FPGA Manager and FPGA Bridges
+v15: Cleanup as per Rob's comments
+     Combine usage doc with bindings document
+     Document as being Altera specific
+     Additions and changes to add FPGA Bus
+v16: Reworked to document FPGA Regions
+     rename altera-fpga-bus-fpga-area.txt -> fpga-region.txt
+     Remove references that made it sound exclusive to Altera
+     Remove altr, prefix from fpga-bus and fpga-area compatible strings
+     Added Moritz' usage example with Xilinx
+     Cleaned up unit addresses
+v17: Lots of rewrites to try to make things clearer
+     Clarify that overlay can be rejected if FPGA isn't programmed
+     Add external-fpga-config binding already used in u-boot
+     Change partial-reconfig binding to partial-fpga-config to align
+       with existing u-boot binding format *-fpga-config
+     Add a document from Xilinx' website
+v18: Fix node names underscores to be hyphens
+     Fix copy/pasted duplicate nodes in diagram
+v19: Fix more underscores
+     Make FPGA regions to be children of bridges
+     General cleanup and clarification
+v20: Add Rob's reviewed-by
+v21: No change for this patch in v21 of patchset
+---
+ .../devicetree/bindings/fpga/fpga-region.txt       | 494 +++++++++++++++++++++
+ 1 file changed, 494 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/fpga-region.txt
 
-	pad->gpio
-	hwirq->irq
-
-Why can't you have pad == hwirq, always? This is already what you have
-in the irqchip driver. This would simplify a lot of things.
-
-> 2. Inside each instance, we may have banks that can't have irq. We even
-> have a bank on meson8b which has a mixed state (the last pins don't
-> have irqs, while the first ones do). those banks/pins are still valid
-> gpios with gpio numbers. This introduce a shift between the gpio
-> numbering and the hwirq.
-> 
-> The point of this calculation is take the offset given to the 'to_irq'
-> callback, remove the gpio bank base number and add irq base number.
-> There is a few trick added to handled the case in 2.
-
-You seem to assume linear mappings, which is pretty dangerous.
-
-> 
-> In addition, to call 'irq_find_mapping', we would first have to create
-> the mapping, in the probe I suppose. This would call the allocate
-> callback of the domain, in which we can allocate only 8 interrupts.
-> 
-> That's why I create the mapping in the .to_irq callback.
-
-Is gpio_to_irq() supposed to allocate an interrupt? Or merely to report
-the existence of a mapping?
-
-> 
->>>
->>>
->>> Even if I implement an another irqdomain at the gpio level, I would
->>> still have to perform this kind of calculation, one way or the
->>> other.
->>>
->>>>
->>>>>
->>>>> Which is problematic since quite a few GPIO drivers now
->>>>> need to use them.
->>>>>
->>>>> I will review his slides, in the meantime I would say: whatever
->>>>> Marc ACKs is fine with me. I trust this guy 100%. So I guess I
->>>>> could ask that he ACK the entire chain of patches
->>>>> from GIC->specialchip->GPIO.
->>>
->>> Actually this discussion go me thinking about another issue we have
->>> with this hardware.
->>> We are looking for a way to implement support for
->>> IRQ_TYPE_EDGE_BOTH
->>> (needed for things like gpio-keys or mmc card detect). 
->>> The controller can do each edge but not both at the same time.
->>> I'm thinking that implementing another irqdomain at the gpio level
->>> would allow to properly check the pad level in the EOI callback
->>> then
->>> set the next expected edge type accordingly (using
->>> 'irq_chip_set_type_parent')
->>>
->>> Would it be acceptable ?
->>
->> I really don't see what another irqdomain brings to the table. This
->> is
->> not a separate piece of HW, so the hwirq:irq mapping is still the
->> same.
->> I fail to see what the benefit is.
-> 
-> The separate piece of hw is the gpio itself. 
-> The irq-controller (in irqchip) can't read the gpio state because it is
-> simply another device.
-> 
-> The domain I'm thinking about wouldn't do much, I reckon. 
-> It would just register an irqchip which would only implement eoi.
-> For everything else, it would rely the parent controller.
-> From your explanation, I understood this is the purpose of hierarchy
-> domains, For each hw in the chain to handle only what it can, and rely
-> on its parent for the rest.
-
-Right. But that doesn't make it more reliable, see below.
-
-> 
->>
->>>
->>> It looks a few other drivers deal with IRQ_TYPE_EDGE_BOTH in a
->>> similar
->>> way (gpio/gpio-omap.c, gpio/gpio-dwapb.c)
->>
->> Being already done doesn't make it reliable. If the line goes low
->> between latching the rising edge and reprogramming the trigger,
->> you've
->> lost at least *two* interrupts (the falling edge and the following
->> rising edge).
-> 
-> If a 'usual' controller support IRQ_TYPE_EDGE_BOTH and the line goes
-> low between latching rising edge and handling the interrupt, wouldn't
-> you miss the falling edge anyway ? The signal is just going too fast
-> the HW to handle everything.
-
-That's the role of the HW to ensure that you don't loose any interrupt,
-up to the sampling frequency of the controller. Doing it in SW is always
-going to be a wonderful case of "it mostly work".
-
-> For the second rising edge, I disagree, it would not be lost, since we
-> would read the pad state, get a low level, and reprogram the controller
-> for another rising edge.
-
-You always have a race between checking your level and switching the
-configuration, which is likely to be slow anyway. In the meantime, the
-level has changed and you're dead.
-
-Anyway, I suggest you focus on getting something simple up and running,
-and postpone the funky (read broken) stuff for later, once you have
-something that looks vaguely sane (because we're not quite there yet).
-
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/fpga/fpga-region.txt b/Documentation/devicetree/bindings/fpga/fpga-region.txt
+new file mode 100644
+index 0000000..3b32ba1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fpga/fpga-region.txt
+@@ -0,0 +1,494 @@
++FPGA Region Device Tree Binding
++
++Alan Tull 2016
++
++ CONTENTS
++ - Introduction
++ - Terminology
++ - Sequence
++ - FPGA Region
++ - Supported Use Models
++ - Device Tree Examples
++ - Constraints
++
++
++Introduction
++============
++
++FPGA Regions represent FPGA's and partial reconfiguration regions of FPGA's in
++the Device Tree.  FPGA Regions provide a way to program FPGAs under device tree
++control.
++
++This device tree binding document hits some of the high points of FPGA usage and
++attempts to include terminology used by both major FPGA manufacturers.  This
++document isn't a replacement for any manufacturers specifications for FPGA
++usage.
++
++
++Terminology
++===========
++
++Full Reconfiguration
++ * The entire FPGA is programmed.
++
++Partial Reconfiguration (PR)
++ * A section of an FPGA is reprogrammed while the rest of the FPGA is not
++   affected.
++ * Not all FPGA's support PR.
++
++Partial Reconfiguration Region (PRR)
++ * Also called a "reconfigurable partition"
++ * A PRR is a specific section of a FPGA reserved for reconfiguration.
++ * A base (or static) FPGA image may create a set of PRR's that later may
++   be independently reprogrammed many times.
++ * The size and specific location of each PRR is fixed.
++ * The connections at the edge of each PRR are fixed.  The image that is loaded
++   into a PRR must fit and must use a subset of the region's connections.
++ * The busses within the FPGA are split such that each region gets its own
++   branch that may be gated independently.
++
++Persona
++ * Also called a "partial bit stream"
++ * An FPGA image that is designed to be loaded into a PRR.  There may be
++   any number of personas designed to fit into a PRR, but only one at at time
++   may be loaded.
++ * A persona may create more regions.
++
++FPGA Bridge
++ * FPGA Bridges gate bus signals between a host and FPGA.
++ * FPGA Bridges should be disabled while the FPGA is being programmed to
++   prevent spurious signals on the cpu bus and to the soft logic.
++ * FPGA bridges may be actual hardware or soft logic on an FPGA.
++ * During Full Reconfiguration, hardware bridges between the host and FPGA
++   will be disabled.
++ * During Partial Reconfiguration of a specific region, that region's bridge
++   will be used to gate the busses.  Traffic to other regions is not affected.
++ * In some implementations, the FPGA Manager transparantly handles gating the
++   buses, eliminating the need to show the hardware FPGA bridges in the
++   device tree.
++ * An FPGA image may create a set of reprogrammable regions, each having its
++   own bridge and its own split of the busses in the FPGA.
++
++FPGA Manager
++ * An FPGA Manager is a hardware block that programs an FPGA under the control
++   of a host processor.
++
++Base Image
++ * Also called the "static image"
++ * An FPGA image that is designed to do full reconfiguration of the FPGA.
++ * A base image may set up a set of partial reconfiguration regions that may
++   later be reprogrammed.
++
++    ----------------       ----------------------------------
++    |  Host CPU    |       |             FPGA               |
++    |              |       |                                |
++    |          ----|       |       -----------    --------  |
++    |          | H |       |   |==>| Bridge0 |<==>| PRR0 |  |
++    |          | W |       |   |   -----------    --------  |
++    |          |   |       |   |                            |
++    |          | B |<=====>|<==|   -----------    --------  |
++    |          | R |       |   |==>| Bridge1 |<==>| PRR1 |  |
++    |          | I |       |   |   -----------    --------  |
++    |          | D |       |   |                            |
++    |          | G |       |   |   -----------    --------  |
++    |          | E |       |   |==>| Bridge2 |<==>| PRR2 |  |
++    |          ----|       |       -----------    --------  |
++    |              |       |                                |
++    ----------------       ----------------------------------
++
++Figure 1: An FPGA set up with a base image that created three regions.  Each
++region (PRR0-2) gets its own split of the busses that is independently gated by
++a soft logic bridge (Bridge0-2) in the FPGA.  The contents of each PRR can be
++reprogrammed independently while the rest of the system continues to function.
++
++
++Sequence
++========
++
++When a DT overlay that targets a FPGA Region is applied, the FPGA Region will
++do the following:
++
++ 1. Disable appropriate FPGA bridges.
++ 2. Program the FPGA using the FPGA manager.
++ 3. Enable the FPGA bridges.
++ 4. The Device Tree overlay is accepted into the live tree.
++ 5. Child devices are populated.
++
++When the overlay is removed, the child nodes will be removed and the FPGA Region
++will disable the bridges.
++
++
++FPGA Region
++===========
++
++FPGA Regions represent FPGA's and FPGA PR regions in the device tree.  An FPGA
++Region brings together the elements needed to program on a running system and
++add the child devices:
++
++ * FPGA Manager
++ * FPGA Bridges
++ * image-specific information needed to to the programming.
++ * child nodes
++
++The intended use is that a Device Tree overlay (DTO) can be used to reprogram an
++FPGA while an operating system is running.
++
++An FPGA Region that exists in the live Device Tree reflects the current state.
++If the live tree shows a "firmware-name" property or child nodes under a FPGA
++Region, the FPGA already has been programmed.  A DTO that targets a FPGA Region
++and adds the "firmware-name" property is taken as a request to reprogram the
++FPGA.  After reprogramming is successful, the overlay is accepted into the live
++tree.
++
++The base FPGA Region in the device tree represents the FPGA and supports full
++reconfiguration.  It must include a phandle to an FPGA Manager.  The base
++FPGA region will be the child of one of the hardware bridges (the bridge that
++allows register access) between the cpu and the FPGA.  If there are more than
++one bridge to control during FPGA programming, the region will also contain a
++list of phandles to the additional hardware FPGA Bridges.
++
++For partial reconfiguration (PR), each PR region will have an FPGA Region.
++These FPGA regions are children of FPGA bridges which are then children of the
++base FPGA region.  The "Full Reconfiguration to add PRR's" example below shows
++this.
++
++If an FPGA Region does not specify a FPGA Manager, it will inherit the FPGA
++Manager specified by its ancestor FPGA Region.  This supports both the case
++where the same FPGA Manager is used for all of a FPGA as well the case where
++a different FPGA Manager is used for each region.
++
++FPGA Regions do not inherit their ancestor FPGA regions' bridges.  This prevents
++shutting down bridges that are upstream from the other active regions while one
++region is getting reconfigured (see Figure 1 above).  During PR, the FPGA's
++hardware bridges remain enabled.  The PR regions' bridges will be FPGA bridges
++within the static image of the FPGA.
++
++Required properties:
++- compatible : should contain "fpga-region"
++- fpga-mgr : should contain a phandle to an FPGA Manager.  Child FPGA Regions
++	inherit this property from their ancestor regions.  A fpga-mgr property
++	in a region will override any inherited FPGA manager.
++- #address-cells, #size-cells, ranges : must be present to handle address space
++	mapping for child nodes.
++
++Optional properties:
++- firmware-name : should contain the name of an FPGA image file located on the
++	firmware search path.  If this property shows up in a live device tree
++	it indicates that the FPGA has already been programmed with this image.
++	If this property is in an overlay targeting a FPGA region, it is a
++	request to program the FPGA with that image.
++- fpga-bridges : should contain a list of phandles to FPGA Bridges that must be
++	controlled during FPGA programming along with the parent FPGA bridge.
++	This property is optional if the FPGA Manager handles the bridges.
++        If the fpga-region is  the child of a fpga-bridge, the list should not
++        contain the parent bridge.
++- partial-fpga-config : boolean, set if partial reconfiguration is to be done,
++	otherwise full reconfiguration is done.
++- external-fpga-config : boolean, set if the FPGA has already been configured
++	prior to OS boot up.
++- region-unfreeze-timeout-us : The maximum time in microseconds to wait for
++	bridges to successfully become enabled after the region has been
++	programmed.
++- region-freeze-timeout-us : The maximum time in microseconds to wait for
++	bridges to successfully become disabled before the region has been
++	programmed.
++- child nodes : devices in the FPGA after programming.
++
++In the example below, when an overlay is applied targeting fpga-region0,
++fpga_mgr is used to program the FPGA.  Two bridges are controlled during
++programming: the parent fpga_bridge0 and fpga_bridge1.  Because the region is
++the child of fpga_bridge0, only fpga_bridge1 needs to be specified in the
++fpga-bridges property.  During programming, these bridges are disabled, the
++firmware specified in the overlay is loaded to the FPGA using the FPGA manager
++specified in the region.  If FPGA programming succeeds, the bridges are
++reenabled and the overlay makes it into the live device tree.  The child devices
++are then populated.  If FPGA programming fails, the bridges are left disabled
++and the overlay is rejected.  The overlay's ranges property maps the lwhps
++bridge's region (0xff200000) and the hps bridge's region (0xc0000000) for use by
++the two child devices.
++
++Example:
++Base tree contains:
++
++	fpga_mgr: fpga-mgr at ff706000 {
++		compatible = "altr,socfpga-fpga-mgr";
++		reg = <0xff706000 0x1000
++		       0xffb90000 0x20>;
++		interrupts = <0 175 4>;
++	};
++
++	fpga_bridge0: fpga-bridge at ff400000 {
++		compatible = "altr,socfpga-lwhps2fpga-bridge";
++		reg = <0xff400000 0x100000>;
++		resets = <&rst LWHPS2FPGA_RESET>;
++		clocks = <&l4_main_clk>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		fpga_region0: fpga-region0 {
++			compatible = "fpga-region";
++			fpga-mgr = <&fpga_mgr>;
++		};
++	};
++
++	fpga_bridge1: fpga-bridge at ff500000 {
++		compatible = "altr,socfpga-hps2fpga-bridge";
++		reg = <0xff500000 0x10000>;
++		resets = <&rst HPS2FPGA_RESET>;
++		clocks = <&l4_main_clk>;
++	};
++
++Overlay contains:
++
++/dts-v1/ /plugin/;
++/ {
++	fragment at 0 {
++		target = <&fpga_region0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			firmware-name = "soc_system.rbf";
++			fpga-bridges = <&fpga_bridge1>;
++			ranges = <0x20000 0xff200000 0x100000>,
++				 <0x0 0xc0000000 0x20000000>;
++
++			gpio at 10040 {
++				compatible = "altr,pio-1.0";
++				reg = <0x10040 0x20>;
++				altr,gpio-bank-width = <4>;
++				#gpio-cells = <2>;
++				clocks = <2>;
++				gpio-controller;
++			};
++
++			onchip-memory {
++				device_type = "memory";
++				compatible = "altr,onchipmem-15.1";
++				reg = <0x0 0x10000>;
++			};
++		};
++	};
++};
++
++
++Supported Use Models
++====================
++
++In all cases the live DT must have the FPGA Manager, FPGA Bridges (if any), and
++a FPGA Region.  The target of the Device Tree Overlay is the FPGA Region.  Some
++uses are specific to a FPGA device.
++
++ * No FPGA Bridges
++   In this case, the FPGA Manager which programs the FPGA also handles the
++   bridges behind the scenes.  No FPGA Bridge devices are needed for full
++   reconfiguration.
++
++ * Full reconfiguration with hardware bridges
++   In this case, there are hardware bridges between the processor and FPGA that
++   need to be controlled during full reconfiguration.  Before the overlay is
++   applied, the live DT must include the FPGA Manager, FPGA Bridges, and a
++   FPGA Region.  The FPGA Region is the child of the bridge that allows
++   register access to the FPGA.  Additional bridges may be listed in a
++   fpga-bridges property in the FPGA region or in the device tree overlay.
++
++ * Partial reconfiguration with bridges in the FPGA
++   In this case, the FPGA will have one or more PRR's that may be programmed
++   separately while the rest of the FPGA can remain active.  To manage this,
++   bridges need to exist in the FPGA that can gate the buses going to each FPGA
++   region while the buses are enabled for other sections.  Before any partial
++   reconfiguration can be done, a base FPGA image must be loaded which includes
++   PRR's with FPGA bridges.  The device tree should have a FPGA region for each
++   PRR.
++
++Device Tree Examples
++====================
++
++The intention of this section is to give some simple examples, focusing on
++the placement of the elements detailed above, especially:
++ * FPGA Manager
++ * FPGA Bridges
++ * FPGA Region
++ * ranges
++ * target-path or target
++
++For the purposes of this section, I'm dividing the Device Tree into two parts,
++each with its own requirements.  The two parts are:
++ * The live DT prior to the overlay being added
++ * The DT overlay
++
++The live Device Tree must contain an FPGA Region, an FPGA Manager, and any FPGA
++Bridges.  The FPGA Region's "fpga-mgr" property specifies the manager by phandle
++to handle programming the FPGA.  If the FPGA Region is the child of another FPGA
++Region, the parent's FPGA Manager is used.  If FPGA Bridges need to be involved,
++they are specified in the FPGA Region by the "fpga-bridges" property.  During
++FPGA programming, the FPGA Region will disable the bridges that are in its
++"fpga-bridges" list and will re-enable them after FPGA programming has
++succeeded.
++
++The Device Tree Overlay will contain:
++ * "target-path" or "target"
++   The insertion point where the the contents of the overlay will go into the
++   live tree.  target-path is a full path, while target is a phandle.
++ * "ranges"
++    The address space mapping from processor to FPGA bus(ses).
++ * "firmware-name"
++   Specifies the name of the FPGA image file on the firmware search
++   path.  The search path is described in the firmware class documentation.
++ * "partial-fpga-config"
++   This binding is a boolean and should be present if partial reconfiguration
++   is to be done.
++ * child nodes corresponding to hardware that will be loaded in this region of
++   the FPGA.
++
++Device Tree Example: Full Reconfiguration without Bridges
++=========================================================
++
++Live Device Tree contains:
++	fpga_mgr0: fpga-mgr at f8007000 {
++		compatible = "xlnx,zynq-devcfg-1.0";
++		reg = <0xf8007000 0x100>;
++		interrupt-parent = <&intc>;
++		interrupts = <0 8 4>;
++		clocks = <&clkc 12>;
++		clock-names = "ref_clk";
++		syscon = <&slcr>;
++	};
++
++	fpga_region0: fpga-region0 {
++		compatible = "fpga-region";
++		fpga-mgr = <&fpga_mgr0>;
++		#address-cells = <0x1>;
++		#size-cells = <0x1>;
++		ranges;
++	};
++
++DT Overlay contains:
++/dts-v1/ /plugin/;
++/ {
++fragment at 0 {
++	target = <&fpga_region0>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++	__overlay__ {
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		firmware-name = "zynq-gpio.bin";
++
++		gpio1: gpio at 40000000 {
++			compatible = "xlnx,xps-gpio-1.00.a";
++			reg = <0x40000000 0x10000>;
++			gpio-controller;
++			#gpio-cells = <0x2>;
++			xlnx,gpio-width= <0x6>;
++		};
++	};
++};
++
++Device Tree Example: Full Reconfiguration to add PRR's
++======================================================
++
++The base FPGA Region is specified similar to the first example above.
++
++This example programs the FPGA to have two regions that can later be partially
++configured.  Each region has its own bridge in the FPGA fabric.
++
++DT Overlay contains:
++/dts-v1/ /plugin/;
++/ {
++	fragment at 0 {
++		target = <&fpga_region0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			firmware-name = "base.rbf";
++
++			fpga-bridge at 4400 {
++				compatible = "altr,freeze-bridge";
++				reg = <0x4400 0x10>;
++
++				fpga_region1: fpga-region1 {
++					compatible = "fpga-region";
++					#address-cells = <0x1>;
++					#size-cells = <0x1>;
++					ranges;
++				};
++			};
++
++			fpga-bridge at 4420 {
++				compatible = "altr,freeze-bridge";
++				reg = <0x4420 0x10>;
++
++				fpga_region2: fpga-region2 {
++					compatible = "fpga-region";
++					#address-cells = <0x1>;
++					#size-cells = <0x1>;
++					ranges;
++				};
++			};
++		};
++	};
++};
++
++Device Tree Example: Partial Reconfiguration
++============================================
++
++This example reprograms one of the PRR's set up in the previous example.
++
++The sequence that occurs when this overlay is similar to the above, the only
++differences are that the FPGA is partially reconfigured due to the
++"partial-fpga-config" boolean and the only bridge that is controlled during
++programming is the FPGA based bridge of fpga_region1.
++
++/dts-v1/ /plugin/;
++/ {
++	fragment at 0 {
++		target = <&fpga_region1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		__overlay__ {
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			firmware-name = "soc_image2.rbf";
++			partial-fpga-config;
++
++			gpio at 10040 {
++				compatible = "altr,pio-1.0";
++				reg = <0x10040 0x20>;
++				clocks = <0x2>;
++				altr,gpio-bank-width = <0x4>;
++				resetvalue = <0x0>;
++				#gpio-cells = <0x2>;
++				gpio-controller;
++			};
++		};
++	};
++};
++
++Constraints
++===========
++
++It is beyond the scope of this document to fully describe all the FPGA design
++constraints required to make partial reconfiguration work[1] [2] [3], but a few
++deserve quick mention.
++
++A persona must have boundary connections that line up with those of the partion
++or region it is designed to go into.
++
++During programming, transactions through those connections must be stopped and
++the connections must be held at a fixed logic level.  This can be achieved by
++FPGA Bridges that exist on the FPGA fabric prior to the partial reconfiguration.
++
++--
++[1] www.altera.com/content/dam/altera-www/global/en_US/pdfs/literature/ug/ug_partrecon.pdf
++[2] tspace.library.utoronto.ca/bitstream/1807/67932/1/Byma_Stuart_A_201411_MAS_thesis.pdf
++[3] http://www.xilinx.com/support/documentation/sw_manuals/xilinx14_1/ug702.pdf
 -- 
-Jazz is not dead. It just smells funny...
+2.10.1
