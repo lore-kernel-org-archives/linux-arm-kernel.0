@@ -1,23 +1,16 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 25 Oct 2016 11:43:41 +0800
-Subject: [PATCH] hwrng: meson: Remove unneeded platform MODULE_ALIAS
-In-Reply-To: <1476906618-14455-1-git-send-email-javier@osg.samsung.com>
-References: <1476906618-14455-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <20161025034341.GI18685@gondor.apana.org.au>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 24 Oct 2016 20:59:32 -0700
+Subject: [PATCH] ARM64: dts: bcm2835: Fix bcm2837 compatible string
+In-Reply-To: <1477321791-7896-1-git-send-email-afaerber@suse.de>
+References: <1477321791-7896-1-git-send-email-afaerber@suse.de>
+Message-ID: <87eg35axjv.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 19, 2016 at 04:50:18PM -0300, Javier Martinez Canillas wrote:
-> The Amlogic Meson is a DT-only platform, which means the devices are
-> registered via OF and not using the legacy platform devices support.
-> 
-> So there's no need to have a MODULE_ALIAS("platform:meson-rng") since
-> the reported uevent MODALIAS to user-space will always be the OF one.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+e<#secure method=pgpmime mode=sign>
+Andreas F?rber <afaerber@suse.de> writes:
 
-Patch applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+> bcm2837-rpi-3-b.dts, its only in-tree user, was overriding it as
+> "brcm,bcm2837" already.
+
+Pulled to bcm2835-dt-64-next.  Thanks!
