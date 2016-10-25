@@ -1,16 +1,17 @@
 From: atull@opensource.altera.com (Alan Tull)
-Date: Tue, 25 Oct 2016 09:55:33 -0500
-Subject: [PATCH v21 2/9] doc: fpga-mgr: add fpga image info to api
+Date: Tue, 25 Oct 2016 09:55:35 -0500
+Subject: [PATCH v21 4/9] fpga-mgr: add fpga image information struct
 In-Reply-To: <20161025145540.3722-1-atull@opensource.altera.com>
 References: <20161025145540.3722-1-atull@opensource.altera.com>
-Message-ID: <20161025145540.3722-3-atull@opensource.altera.com>
+Message-ID: <20161025145540.3722-5-atull@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch adds a minor change in the FPGA Manager API
 to hold information that is specific to an FPGA image
 file.  This change is expected to bring little, if any,
-pain.
+pain.  The socfpga and zynq drivers are fixed up in
+this patch.
 
 An FPGA image file will have particulars that affect how the
 image is programmed to the FPGA.  One example is that
@@ -21,101 +22,221 @@ enabling or disabling the bridges in the FPGA.  As the
 complexity of the FPGA design increases, the bridges in the
 FPGA may take longer times to enable or disable.
 
-This patch documents the change in the FPGA Manager API
-functions, replacing the 'u32 flag' parameter with a pointer
-to struct fpga_image_info.
+This patch adds a new 'struct fpga_image_info', moves the
+current 'u32 flags' to it.  Two other image-specific u32's
+are added for the bridge enable/disable timeouts.  The FPGA
+Manager API functions are changed, replacing the 'u32 flag'
+parameter with a pointer to struct fpga_image_info.
+Subsequent patches fix the existing low level FPGA manager
+drivers.
 
 Signed-off-by: Alan Tull <atull@opensource.altera.com>
 Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
 v19: Added in v19 of this patchset
-v20: No change for this patch in v20 of patchset
-v21: s/Mangager/Manager/
-     Add Moritz' ack
+v20: Squashed patches that change API for socfpga and zynq
+v21: Add Moritz' ack
+     s/Mangager/Manager/
 ---
- Documentation/fpga/fpga-mgr.txt | 32 +++++++++++++++++++++-----------
- 1 file changed, 21 insertions(+), 11 deletions(-)
+ drivers/fpga/fpga-mgr.c       | 17 +++++++++--------
+ drivers/fpga/socfpga.c        |  7 ++++---
+ drivers/fpga/zynq-fpga.c      | 10 ++++++----
+ include/linux/fpga/fpga-mgr.h | 23 +++++++++++++++++++----
+ 4 files changed, 38 insertions(+), 19 deletions(-)
 
-diff --git a/Documentation/fpga/fpga-mgr.txt b/Documentation/fpga/fpga-mgr.txt
-index ce3e84f..9227e3f 100644
---- a/Documentation/fpga/fpga-mgr.txt
-+++ b/Documentation/fpga/fpga-mgr.txt
-@@ -18,21 +18,25 @@ API Functions:
- To program the FPGA from a file or from a buffer:
- -------------------------------------------------
+diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+index 953dc91..c58b4c4 100644
+--- a/drivers/fpga/fpga-mgr.c
++++ b/drivers/fpga/fpga-mgr.c
+@@ -32,7 +32,7 @@ static struct class *fpga_mgr_class;
+ /**
+  * fpga_mgr_buf_load - load fpga from image in buffer
+  * @mgr:	fpga manager
+- * @flags:	flags setting fpga confuration modes
++ * @info:	fpga image specific information
+  * @buf:	buffer contain fpga image
+  * @count:	byte count of buf
+  *
+@@ -43,8 +43,8 @@ static struct class *fpga_mgr_class;
+  *
+  * Return: 0 on success, negative error code otherwise.
+  */
+-int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+-		      size_t count)
++int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
++		      const char *buf, size_t count)
+ {
+ 	struct device *dev = &mgr->dev;
+ 	int ret;
+@@ -55,7 +55,7 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+ 	 * ready to receive an FPGA image.
+ 	 */
+ 	mgr->state = FPGA_MGR_STATE_WRITE_INIT;
+-	ret = mgr->mops->write_init(mgr, flags, buf, count);
++	ret = mgr->mops->write_init(mgr, info, buf, count);
+ 	if (ret) {
+ 		dev_err(dev, "Error preparing FPGA for writing\n");
+ 		mgr->state = FPGA_MGR_STATE_WRITE_INIT_ERR;
+@@ -78,7 +78,7 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
+ 	 * steps to finish and set the FPGA into operating mode.
+ 	 */
+ 	mgr->state = FPGA_MGR_STATE_WRITE_COMPLETE;
+-	ret = mgr->mops->write_complete(mgr, flags);
++	ret = mgr->mops->write_complete(mgr, info);
+ 	if (ret) {
+ 		dev_err(dev, "Error after writing image data to FPGA\n");
+ 		mgr->state = FPGA_MGR_STATE_WRITE_COMPLETE_ERR;
+@@ -93,7 +93,7 @@ EXPORT_SYMBOL_GPL(fpga_mgr_buf_load);
+ /**
+  * fpga_mgr_firmware_load - request firmware and load to fpga
+  * @mgr:	fpga manager
+- * @flags:	flags setting fpga confuration modes
++ * @info:	fpga image specific information
+  * @image_name:	name of image file on the firmware search path
+  *
+  * Request an FPGA image using the firmware class, then write out to the FPGA.
+@@ -103,7 +103,8 @@ EXPORT_SYMBOL_GPL(fpga_mgr_buf_load);
+  *
+  * Return: 0 on success, negative error code otherwise.
+  */
+-int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
++int fpga_mgr_firmware_load(struct fpga_manager *mgr,
++			   struct fpga_image_info *info,
+ 			   const char *image_name)
+ {
+ 	struct device *dev = &mgr->dev;
+@@ -121,7 +122,7 @@ int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
+ 		return ret;
+ 	}
  
--	int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
-+	int fpga_mgr_buf_load(struct fpga_manager *mgr,
-+			      struct fpga_image_info *info,
- 		              const char *buf, size_t count);
+-	ret = fpga_mgr_buf_load(mgr, flags, fw->data, fw->size);
++	ret = fpga_mgr_buf_load(mgr, info, fw->data, fw->size);
  
- Load the FPGA from an image which exists as a buffer in memory.
+ 	release_firmware(fw);
  
--	int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
-+	int fpga_mgr_firmware_load(struct fpga_manager *mgr,
-+				   struct fpga_image_info *info,
- 		                   const char *image_name);
+diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+index 27d2ff2..b6672e6 100644
+--- a/drivers/fpga/socfpga.c
++++ b/drivers/fpga/socfpga.c
+@@ -407,13 +407,14 @@ static int socfpga_fpga_reset(struct fpga_manager *mgr)
+ /*
+  * Prepare the FPGA to receive the configuration data.
+  */
+-static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
++static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr,
++					   struct fpga_image_info *info,
+ 					   const char *buf, size_t count)
+ {
+ 	struct socfpga_fpga_priv *priv = mgr->priv;
+ 	int ret;
  
- Load the FPGA from an image which exists as a file.  The image file must be on
--the firmware search path (see the firmware class documentation).
--
--For both these functions, flags == 0 for normal full reconfiguration or
--FPGA_MGR_PARTIAL_RECONFIG for partial reconfiguration.  If successful, the FPGA
--ends up in operating mode.  Return 0 on success or a negative error code.
-+the firmware search path (see the firmware class documentation).  If successful,
-+the FPGA ends up in operating mode.  Return 0 on success or a negative error
-+code.
+-	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
++	if (info->flags & FPGA_MGR_PARTIAL_RECONFIG) {
+ 		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+ 		return -EINVAL;
+ 	}
+@@ -478,7 +479,7 @@ static int socfpga_fpga_ops_configure_write(struct fpga_manager *mgr,
+ }
  
-+A FPGA design contained in a FPGA image file will likely have particulars that
-+affect how the image is programmed to the FPGA.  These are contained in struct
-+fpga_image_info.  Currently the only such particular is a single flag bit
-+indicating whether the image is for full or partial reconfiguration.
+ static int socfpga_fpga_ops_configure_complete(struct fpga_manager *mgr,
+-					       u32 flags)
++					       struct fpga_image_info *info)
+ {
+ 	struct socfpga_fpga_priv *priv = mgr->priv;
+ 	u32 status;
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index c2fb412..249682e 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -175,7 +175,8 @@ static irqreturn_t zynq_fpga_isr(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
  
- To get/put a reference to a FPGA manager:
- -----------------------------------------
-@@ -70,8 +74,11 @@ struct device_node *mgr_node = ...
- char *buf = ...
- int count = ...
+-static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
++static int zynq_fpga_ops_write_init(struct fpga_manager *mgr,
++				    struct fpga_image_info *info,
+ 				    const char *buf, size_t count)
+ {
+ 	struct zynq_fpga_priv *priv;
+@@ -189,7 +190,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 		return err;
  
-+/* struct with information about the FPGA image to program. */
-+struct fpga_image_info info;
+ 	/* don't globally reset PL if we're doing partial reconfig */
+-	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
++	if (!(info->flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+ 		/* assert AXI interface resets */
+ 		regmap_write(priv->slcr, SLCR_FPGA_RST_CTRL_OFFSET,
+ 			     FPGA_RST_ALL_MASK);
+@@ -343,7 +344,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 	return err;
+ }
+ 
+-static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
++static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr,
++					struct fpga_image_info *info)
+ {
+ 	struct zynq_fpga_priv *priv = mgr->priv;
+ 	int err;
+@@ -364,7 +366,7 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+ 		return err;
+ 
+ 	/* for the partial reconfig case we didn't touch the level shifters */
+-	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
++	if (!(info->flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+ 		/* enable level shifters from PL to PS */
+ 		regmap_write(priv->slcr, SLCR_LVL_SHFTR_EN_OFFSET,
+ 			     LVL_SHFTR_ENABLE_PL_TO_PS);
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index 0940bf4..040b86d 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -69,6 +69,18 @@ enum fpga_mgr_states {
+ #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
+ 
+ /**
++ * struct fpga_image_info - information specific to a FPGA image
++ * @flags: boolean flags as defined above
++ * @enable_timeout_us: maximum time to enable traffic through bridge (uSec)
++ * @disable_timeout_us: maximum time to disable traffic through bridge (uSec)
++ */
++struct fpga_image_info {
++	u32 flags;
++	u32 enable_timeout_us;
++	u32 disable_timeout_us;
++};
 +
- /* flags indicates whether to do full or partial reconfiguration */
--int flags = 0;
-+info.flags = 0;
++/**
+  * struct fpga_manager_ops - ops for low level fpga manager drivers
+  * @state: returns an enum value of the FPGA's state
+  * @write_init: prepare the FPGA to receive confuration data
+@@ -82,10 +94,12 @@ enum fpga_mgr_states {
+  */
+ struct fpga_manager_ops {
+ 	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
+-	int (*write_init)(struct fpga_manager *mgr, u32 flags,
++	int (*write_init)(struct fpga_manager *mgr,
++			  struct fpga_image_info *info,
+ 			  const char *buf, size_t count);
+ 	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
+-	int (*write_complete)(struct fpga_manager *mgr, u32 flags);
++	int (*write_complete)(struct fpga_manager *mgr,
++			      struct fpga_image_info *info);
+ 	void (*fpga_remove)(struct fpga_manager *mgr);
+ };
  
- int ret;
+@@ -109,10 +123,11 @@ struct fpga_manager {
  
-@@ -79,7 +86,7 @@ int ret;
- struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
+ #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
  
- /* Load the buffer to the FPGA */
--ret = fpga_mgr_buf_load(mgr, flags, buf, count);
-+ret = fpga_mgr_buf_load(mgr, &info, buf, count);
+-int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
++int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
+ 		      const char *buf, size_t count);
  
- /* Release the FPGA manager */
- fpga_mgr_put(mgr);
-@@ -96,8 +103,11 @@ struct device_node *mgr_node = ...
- /* FPGA image is in this file which is in the firmware search path */
- const char *path = "fpga-image-9.rbf"
+-int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
++int fpga_mgr_firmware_load(struct fpga_manager *mgr,
++			   struct fpga_image_info *info,
+ 			   const char *image_name);
  
-+/* struct with information about the FPGA image to program. */
-+struct fpga_image_info info;
-+
- /* flags indicates whether to do full or partial reconfiguration */
--int flags = 0;
-+info.flags = 0;
- 
- int ret;
- 
-@@ -105,7 +115,7 @@ int ret;
- struct fpga_manager *mgr = of_fpga_mgr_get(mgr_node);
- 
- /* Get the firmware image (path) and load it to the FPGA */
--ret = fpga_mgr_firmware_load(mgr, flags, path);
-+ret = fpga_mgr_firmware_load(mgr, &info, path);
- 
- /* Release the FPGA manager */
- fpga_mgr_put(mgr);
+ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
 -- 
 2.10.1
