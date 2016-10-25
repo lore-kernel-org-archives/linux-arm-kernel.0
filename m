@@ -1,21 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 25 Oct 2016 19:28:27 -0200
-Subject: [PATCH 3/5] ARM: dts: imx6qdl-sabrelite: add missing USB PHY
- reset control
-In-Reply-To: <20161025211955.5345-4-gary.bisson@boundarydevices.com>
-References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
- <20161025211955.5345-4-gary.bisson@boundarydevices.com>
-Message-ID: <CAOMZO5Aok5w=Di0hZpr7E6PZr6rJ1Xg-xkWcB+u=7xKCT5uWvA@mail.gmail.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Tue, 25 Oct 2016 14:30:59 -0700
+Subject: [PATCH 0/2] arm64, numa: Fix OOPS with numa=off
+Message-ID: <1477431061-7258-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+From: David Daney <david.daney@cavium.com>
 
-On Tue, Oct 25, 2016 at 7:19 PM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Declared as a regulator since the driver doesn't have a reset-gpios
-> property for this.
+We get an OOPS in the arm64 kernel on NUMA systems when numa=off is
+passed on the command line.
 
-Peter Chen is working on adding USB reset-gpio property this. Please
-check his series:
-https://www.spinics.net/lists/arm-kernel/msg536105.html
+Fix it by returning NUMA_NO_NODE from of_node_to_nid when numa=off.
+
+David Daney (2):
+  of, numa: Add function to disable of_node_to_nid().
+  arm64, numa: Force of_node_to_nid to return NUMA_NO_NODE when
+    numa=off.
+
+ arch/arm64/mm/numa.c |  5 ++++-
+ drivers/of/of_numa.c | 15 +++++++++++++++
+ include/linux/of.h   |  2 ++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+-- 
+1.8.3.1
