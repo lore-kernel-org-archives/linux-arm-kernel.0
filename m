@@ -1,60 +1,57 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 10:53:12 -0500
-Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
- platform declaration.
-In-Reply-To: <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-3-ahaslam@baylibre.com>
- <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
- <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
- <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
-Message-ID: <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 25 Oct 2016 16:59:38 +0100
+Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
+ correct compatibles
+In-Reply-To: <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
+References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
+ <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <383a62dd-b4d7-f764-baf1-ff73691b3cbc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
 
-On 10/25/2016 05:17 AM, Sekhar Nori wrote:
-> On Tuesday 25 October 2016 03:07 PM, Axel Haslam wrote:
->> Hi Sekar,
->>
->> On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->>> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->>>> From: David Lechner <david@lechnology.com>
->>>>
->>>> The CFGCHIP registers are used by a number of devices, so using a syscon
->>>> device to share them. The first consumer of this will by the phy-da8xx-usb
->>>> driver.
->>>>
->>>> Signed-off-by: David Lechner <david@lechnology.com>
->>>> [Axel: minor fix: change id to -1]
->>>
->>> Can you please clarify this change? There could be other syscon devices
->>> on the chip for other common registers. Why use the singular device-id?
->>>
->>
->> in the case of non DT boot, the phy driver is looking for "syscon" :
->>
->> d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
->>
->> if we register the syscon driver with id = 0, the actual name of the syscon
->> device will be "syscon.0" and the phy driver will fail to probe, because
->> the strncmp match in the syscon driver (syscon_match_pdevname)
->> will fail.
->>
->> should i change the phy driver instead?
+
+On 25/10/16 16:26, Lina Iyer wrote:
+> Update domain-idle-state binding to use "domain-idle-state" compatible
+> from Documentation/devicetree/bindings/arm/idle-states.txt.
 >
-> Yes, please. Forcing only one syscon region for the whole chip will be
-> too restrictive, I am pretty sure.
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
 >
-> Thanks,
-> Sekhar
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index e165036..6fb53a3 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -30,8 +30,9 @@ Optional properties:
+>     available in the next section.
 >
+>  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+> -                generic domain power state. The idle state definitions are
+> -                compatible with arm,idle-state specified in [1].
+> +                generic domain power state. The idle state definitions must be
+> +                compatible with "domain-idle-state"
 
-In the previous review, you requested that this be changed to -1 [1].
+I would reword the below a bit different so that it's flexible to be
+reused without "arm,idle-state".
 
-If we change it back to 0, it will also require reverting a patch to the 
-phy driver that has already been merged[2].
+> as well as
+> +                "arm,idle-state" as defined in [1].
 
-[1]: http://www.gossamer-threads.com/lists/linux/kernel/2435807?page=last
-[2]: http://www.gossamer-threads.com/lists/linux/kernel/2518804
+'Idle states that are "arm,idle-state" compatible are generally
+"domain-idle-state" compatible as well if it's a PM domain.'
+
+or something like that in line with what's in patch 2/4.
+
+That would give us the scope of reuse of "domain-idle-state" in device
+for future. Also it aligns with your patch 4/4.
+
+Otherwise, it looks good.
+
+-- 
+Regards,
+Sudeep
