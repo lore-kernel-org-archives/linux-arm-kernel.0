@@ -1,8 +1,10 @@
 From: hongtao.jia@nxp.com (Jia Hongtao)
-Date: Tue, 25 Oct 2016 10:15:41 +0800
-Subject: [PATCH V3 1/2] powerpc/mpc85xx: Update TMU device tree node for
- T1040/T1042
-Message-ID: <1477361742-589-1-git-send-email-hongtao.jia@nxp.com>
+Date: Tue, 25 Oct 2016 10:15:42 +0800
+Subject: [PATCH V3 2/2] powerpc/mpc85xx: Update TMU device tree node for
+ T1023/T1024
+In-Reply-To: <1477361742-589-1-git-send-email-hongtao.jia@nxp.com>
+References: <1477361742-589-1-git-send-email-hongtao.jia@nxp.com>
+Message-ID: <1477361742-589-2-git-send-email-hongtao.jia@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,28 +22,28 @@ Changes for V3:
 Changes for V2:
 * Rebase on latest linux-next tree (next-20161006).
 
- arch/powerpc/boot/dts/fsl/t1040si-post.dtsi | 4 ++--
+ arch/powerpc/boot/dts/fsl/t1023si-post.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-index 44e399b..145c7f4 100644
---- a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-+++ b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-@@ -526,7 +526,7 @@
- 
- 				       0x00030000 0x00000012
- 				       0x00030001 0x0000001d>;
+diff --git a/arch/powerpc/boot/dts/fsl/t1023si-post.dtsi b/arch/powerpc/boot/dts/fsl/t1023si-post.dtsi
+index 6e0b489..bce762a 100644
+--- a/arch/powerpc/boot/dts/fsl/t1023si-post.dtsi
++++ b/arch/powerpc/boot/dts/fsl/t1023si-post.dtsi
+@@ -321,7 +321,7 @@
+ 				       0x00030001 0x0000000d
+ 				       0x00030002 0x00000019
+ 				       0x00030003 0x00000024>;
 -		#thermal-sensor-cells = <0>;
 +		#thermal-sensor-cells = <1>;
  	};
  
  	thermal-zones {
-@@ -534,7 +534,7 @@
+@@ -329,7 +329,7 @@
  			polling-delay-passive = <1000>;
  			polling-delay = <5000>;
  
 -			thermal-sensors = <&tmu>;
-+			thermal-sensors = <&tmu 2>;
++			thermal-sensors = <&tmu 0>;
  
  			trips {
  				cpu_alert: cpu-alert {
