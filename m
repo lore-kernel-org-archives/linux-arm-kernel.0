@@ -1,170 +1,65 @@
-From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Tue, 25 Oct 2016 13:40:45 +0800
-Subject: [PATCH v2] drm/mediatek: fixed the calc method of data rate per lane
-Message-ID: <1477374045-2837-1-git-send-email-jitao.shi@mediatek.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 25 Oct 2016 11:22:46 +0530
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
+ 24MHz
+In-Reply-To: <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+References: <20161024060226.4170-1-mugunthanvnm@ti.com>
+ <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+Message-ID: <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tune dsi frame rate by pixel clock, dsi add some extra signal (i.e. Tlpx,
-Ths-prepare, Ths-zero, Ths-trail,Ths-exit) when enter and exit LP mode, this
-signal will cause h-time larger than normal and reduce FPS.
-Need to multiply a coefficient to offset the extra signal's effect.
-coefficient = ((htotal*bpp/lane_number)+Tlpx+Ths_prep+Ths_zero+Ths_trail+
-                Ths_exit)/(htotal*bpp/lane_number))
+On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
+>> > On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>> > 
+>> > Increase ADC reference clock from 3MHz to 24MHz so that the
+>> > sampling rates goes up from 100K samples per second to 800K
+>> > samples per second on AM335x and AM437x SoC.
+>> > 
+>> > Also increase opendelay for touchscreen configuration to
+>> > equalize the increase in ADC reference clock frequency,
+>> > which results in the same amount touch events reported via
+>> > evtest on AM335x GP EVM.
+>> > 
+>> > Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>> > ---
+>> > 
+>> > This patch depends on ADC DMA patch series [1]
+>> > 
+>> > Without DMA support, when ADC ref clock is set at 24MHz, I am
+>> > seeing fifo overflow as CPU is not able to pull the ADC samples.
+>> > This answers that DMA support is must for ADC to consume the
+>> > samples generated at 24MHz with no open, step delay or
+>> > averaging with patch [2].
+>> > 
+>> > Measured the performance with the iio_generic_buffer with the
+>> > patch [3] applied
+>> > 
+>> > [1] - http://www.spinics.net/lists/devicetree/msg145045.html
+>> > [2] - http://pastebin.ubuntu.com/23357935/
+>> > [3] - http://pastebin.ubuntu.com/23357939/
+>> > 
+>> > ---
+>> > include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
+>> > 1 file changed, 2 insertions(+), 2 deletions(-)
+>> > 
+>> > diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>> > index b9a53e0..96c4207 100644
+>> > --- a/include/linux/mfd/ti_am335x_tscadc.h
+>> > +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>> > @@ -90,7 +90,7 @@
+>> > /* Delay register */
+>> > #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
+>> > #define STEPDELAY_OPEN(val)	((val) << 0)
+>> > -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
+> Wouldn?t this be better to add this to the devicetree?
+> 
+> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
+> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
+> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
 
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
----
-Change since v1:
- - phy_timing2 and phy_timing3 refer clock cycle time.
- - define values of LPX HS_PRPR HS_ZERO HS_TRAIL TA_GO TA_SURE TA_GET DA_HS_EXIT
----
- drivers/gpu/drm/mediatek/mtk_dsi.c |  103 +++++++++++++++++++++++-------------
- 1 file changed, 67 insertions(+), 36 deletions(-)
+For a touch screen, there is not need to change in these parameter
+settings, so my opinion is to keep it as is. Or am I missing something?
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 28b2044..ade6f46 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -85,16 +85,16 @@
- #define LD0_WAKEUP_EN			BIT(2)
- 
- #define DSI_PHY_TIMECON0	0x110
--#define LPX				(0xff << 0)
--#define HS_PRPR				(0xff << 8)
--#define HS_ZERO				(0xff << 16)
--#define HS_TRAIL			(0xff << 24)
-+#define LPX				(5 << 0)
-+#define HS_PRPR				(6 << 8)
-+#define HS_ZERO				(10 << 16)
-+#define HS_TRAIL			(8 << 24)
- 
- #define DSI_PHY_TIMECON1	0x114
--#define TA_GO				(0xff << 0)
--#define TA_SURE				(0xff << 8)
--#define TA_GET				(0xff << 16)
--#define DA_HS_EXIT			(0xff << 24)
-+#define TA_GO				(20 << 0)
-+#define TA_SURE				(7 << 8)
-+#define TA_GET				(25 << 16)
-+#define DA_HS_EXIT			(7 << 24)
- 
- #define DSI_PHY_TIMECON2	0x118
- #define CONT_DET			(0xff << 0)
-@@ -158,28 +158,14 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
- 	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
- }
- 
--static void dsi_phy_timconfig(struct mtk_dsi *dsi)
-+static void dsi_phy_timconfig(struct mtk_dsi *dsi, u32 phy_timing0,
-+			      u32 phy_timing1, u32 phy_timing2,
-+			      u32 phy_timing3)
- {
--	u32 timcon0, timcon1, timcon2, timcon3;
--	unsigned int ui, cycle_time;
--	unsigned int lpx;
--
--	ui = 1000 / dsi->data_rate + 0x01;
--	cycle_time = 8000 / dsi->data_rate + 0x01;
--	lpx = 5;
--
--	timcon0 = (8 << 24) | (0xa << 16) | (0x6 << 8) | lpx;
--	timcon1 = (7 << 24) | (5 * lpx << 16) | ((3 * lpx) / 2) << 8 |
--		  (4 * lpx);
--	timcon2 = ((NS_TO_CYCLE(0x64, cycle_time) + 0xa) << 24) |
--		  (NS_TO_CYCLE(0x150, cycle_time) << 16);
--	timcon3 = (2 * lpx) << 16 | NS_TO_CYCLE(80 + 52 * ui, cycle_time) << 8 |
--		   NS_TO_CYCLE(0x40, cycle_time);
--
--	writel(timcon0, dsi->regs + DSI_PHY_TIMECON0);
--	writel(timcon1, dsi->regs + DSI_PHY_TIMECON1);
--	writel(timcon2, dsi->regs + DSI_PHY_TIMECON2);
--	writel(timcon3, dsi->regs + DSI_PHY_TIMECON3);
-+	writel(phy_timing0, dsi->regs + DSI_PHY_TIMECON0);
-+	writel(phy_timing1, dsi->regs + DSI_PHY_TIMECON1);
-+	writel(phy_timing2, dsi->regs + DSI_PHY_TIMECON2);
-+	writel(phy_timing3, dsi->regs + DSI_PHY_TIMECON3);
- }
- 
- static void mtk_dsi_enable(struct mtk_dsi *dsi)
-@@ -202,19 +188,51 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- {
- 	struct device *dev = dsi->dev;
- 	int ret;
-+	u64 bit_clock, total_bits;
-+	u32 htotal, htotal_bits, bit_per_pixel, overhead_cycles, overhead_bits;
-+	u32 phy_timing0, phy_timing1, phy_timing2, phy_timing3;
-+	u32 ui, cycle_time;
- 
- 	if (++dsi->refcount != 1)
- 		return 0;
- 
-+	switch (dsi->format) {
-+	case MIPI_DSI_FMT_RGB565:
-+		bit_per_pixel = 16;
-+		break;
-+	case MIPI_DSI_FMT_RGB666_PACKED:
-+		bit_per_pixel = 18;
-+		break;
-+	case MIPI_DSI_FMT_RGB666:
-+	case MIPI_DSI_FMT_RGB888:
-+	default:
-+		bit_per_pixel = 24;
-+		break;
-+	}
-+	/**
-+	 * data_rate = (pixel_clock) * bit_per_pixel * mipi_ratio / lane_num;
-+	 * vm.pixelclock is Khz, data_rata unit is Hz, so need to multiply 1000
-+	 * mipi_ratio is (htotal * byte_per_pixel / lane_num + Tlpx + Ths_prep
-+	 *		  + Thstrail + Ths_exit + Ths_zero) /
-+	 *		 (htotal * byte_per_pixel /lane_number)
-+	 */
-+	bit_clock = dsi->vm.pixelclock * 1000 * bit_per_pixel;
-+	htotal = dsi->vm.hactive + dsi->vm.hback_porch + dsi->vm.hfront_porch +
-+		 dsi->vm.hsync_len;
-+	htotal_bits = htotal * bit_per_pixel;
-+
- 	/**
--	 * data_rate = (pixel_clock / 1000) * pixel_dipth * mipi_ratio;
--	 * pixel_clock unit is Khz, data_rata unit is MHz, so need divide 1000.
--	 * mipi_ratio is mipi clk coefficient for balance the pixel clk in mipi.
--	 * we set mipi_ratio is 1.05.
-+	 * overhead = lpx + hs_prepare + hs_zero + hs_trail + hs_exit
- 	 */
--	dsi->data_rate = dsi->vm.pixelclock * 3 * 21 / (1 * 1000 * 10);
-+	overhead_cycles = LPX + (HS_PRPR >> 8) + (HS_ZERO >> 16) +
-+			  (HS_TRAIL >> 24) + (DA_HS_EXIT >> 24);
-+	overhead_bits = overhead_cycles * dsi->lanes * 8;
-+	total_bits = htotal_bits + overhead_bits;
- 
--	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate * 1000000);
-+	dsi->data_rate = DIV_ROUND_UP_ULL(bit_clock * total_bits,
-+					  htotal_bits * dsi->lanes);
-+
-+	ret = clk_set_rate(dsi->hs_clk, dsi->data_rate);
- 	if (ret < 0) {
- 		dev_err(dev, "Failed to set data rate: %d\n", ret);
- 		goto err_refcount;
-@@ -236,7 +254,20 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
- 
- 	mtk_dsi_enable(dsi);
- 	mtk_dsi_reset(dsi);
--	dsi_phy_timconfig(dsi);
-+
-+	ui = 1000 / dsi->data_rate + 0x01;
-+	cycle_time = 8000 / dsi->data_rate + 0x01;
-+
-+	phy_timing0 = LPX | HS_PRPR | HS_ZERO | HS_TRAIL;
-+	phy_timing1 = TA_GO | TA_SURE | TA_GET | DA_HS_EXIT;
-+	phy_timing2 = ((NS_TO_CYCLE(0x64, cycle_time) + 0xa) << 24) |
-+		      (NS_TO_CYCLE(0x150, cycle_time) << 16);
-+	phy_timing3 = (2 * LPX) << 16 |
-+		      NS_TO_CYCLE(80 + 52 * ui, cycle_time) << 8 |
-+		      NS_TO_CYCLE(0x40, cycle_time);
-+
-+	dsi_phy_timconfig(dsi, phy_timing0, phy_timing1, phy_timing2,
-+			  phy_timing3);
- 
- 	return 0;
- 
--- 
-1.7.9.5
+Regards
+Mugunthan V N
