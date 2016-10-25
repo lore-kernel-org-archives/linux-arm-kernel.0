@@ -1,47 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 25 Oct 2016 12:28:16 +0200
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <20161025091210.rjfhvq4mqtuquei5@tower>
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <3851270.xZRcP9hae0@wuerfel> <20161025091210.rjfhvq4mqtuquei5@tower>
-Message-ID: <4146248.jXuviLlvH5@wuerfel>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 25 Oct 2016 15:58:53 +0530
+Subject: [PATCH/RFT v2 08/17] ARM: davinci: hawk: add full constraints for
+ ohci plat boot
+In-Reply-To: <20161024164634.4330-9-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-9-ahaslam@baylibre.com>
+Message-ID: <522eeb9a-6fb1-88eb-5c58-7ee209a50fc3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 25, 2016 10:12:10 PM CEST Michael Cree wrote:
-> On Fri, Oct 21, 2016 at 03:06:45PM +0200, Arnd Bergmann wrote:
-> > I see your point, but I think there are serious issues with the current
-> > approach as well:
-> > 
-> > - a lot of the less common architectures just don't get updated
-> >   in time, out of 22 architectures that don't use asm-generic/unistd.h,
-> >   only 12 have pwritev2 in linux-next, and only three have pkey_mprotect
-> > 
-> > - some architectures that add all syscalls sometimes make a mistake
-> >   and forget one, e.g. alpha apparently never added __NR_bpf, but it
-> >   did add the later __NR_execveat.
+On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
 > 
-> __NR_bpf was not forgotten on Alpha.  It was not wired up because
-> extra architecture support is needed which has not been implemented.
+> The phy framework requests an optional "phy" regulator. If it does
+> not find one, it returns -EPROBE_DEFER. In the case of non-DT based boot
+> for the omap138-lcdk board, this would prevent the usb11 phy to probe
+> correctly and ohci would not enumerate.
 > 
-> But maybe we should just wire it up to sys_ni_syscall in the meantime
-> so a syscall number is reserved for it, and user space can call it to
-> get -ENOSYS returned.
+> By calling "regulator_has_full_constraints", An error would be returned
 
-Ah, I must have misinterpreted the code then. I assumed that the
-bpf syscall always works on all architectures, but that only the
-jit compiler for it required architecture specific code to make it
-more efficient.
+nit: prefer regulator_has_full_constraints()
 
-The implementation of sys_bfp is compile-time selectable at the moment
-and falls back to sys_no_syscall if CONFIG_BPF_SYSCALL is disabled.
-If it doesn't work on Alpha, maybe that symbol could have a "depends
-on !ALPHA" or "depends on BPF_SUPPORT"?
+> instead of DEFER for the "optional" regulator, and the probe of
+> the phy driver can continue normally without a regulator.
+> 
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 
-sys_seccomp is another one that falls into a similar category, but
-it already depends on HAVE_ARCH_SECCOMP_FILTER, and most other
-architectures have assigned a syscall number but not set this symbol.
-This one will actually allow you to set strict seccomp mode even
-without the Kconfig symbol, just not allow to set a filter.
+Looks good to me. Just drop the "hawk: from subject line since you also
+touch da830 evm. I am not sure what "ohci plat boot" means. How about
+the following:
 
-	Arnd
+"ARM: davinci: da8xx: fix OHCI PHY probe for non-DT boot"
+
+Thanks,
+Sekhar
