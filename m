@@ -1,53 +1,32 @@
-From: grmoore@opensource.altera.com (Graham Moore)
-Date: Tue, 25 Oct 2016 10:38:10 -0500
-Subject: [PATCH 3/3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
-In-Reply-To: <c62baad6-2528-a9df-6b09-3dba66785102@opensource.altera.com>
-References: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
- <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
- <20161020071913.rlka3or4c7fzjpyv@pengutronix.de>
- <c62baad6-2528-a9df-6b09-3dba66785102@opensource.altera.com>
-Message-ID: <5e0adad1-8ef2-029f-cfcd-4a07c962fda2@opensource.altera.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 25 Oct 2016 08:44:00 -0700
+Subject: [PATCH 3/5] staging/vchi: Fix some pointer math for 64-bit.
+In-Reply-To: <20161025075515.GA29765@kroah.com>
+References: <20161017194406.1080-1-eric@anholt.net>
+ <20161017194406.1080-4-eric@anholt.net> <20161025075515.GA29765@kroah.com>
+Message-ID: <87oa281lj3.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/2016 09:12 AM, Dinh Nguyen wrote:
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+
+> On Mon, Oct 17, 2016 at 12:44:04PM -0700, Eric Anholt wrote:
+>> These were throwing warnings on aarch64, and all are trivially
+>> converted to longs.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 6 +++---
+>>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c     | 5 +++--
+>>  2 files changed, 6 insertions(+), 5 deletions(-)
 >
->
-> On 10/20/2016 02:19 AM, Steffen Trumtrar wrote:
->
->>> +		cdns,tslch-ns = <4>;
->>> +
->>> +		partition at qspi-boot {
->>> +			/* 8MB for raw data. */
->>> +			label = "Flash 0 Raw Data";
->>> +			reg = <0x0 0x800000>;
->>> +		};
->>> +
->>> +		partition at qspi-rootfs {
->>> +			/* 120MB for jffs2 data. */
->>> +			label = "Flash 0 jffs2 Filesystem";
->>> +			reg = <0x800000 0x7800000>;
->>> +		};
->>> +	};
->>> +};
->>> +
->>
->> What is the current preferred way of handling the partitions?
->> This doesn't fit my Sockit configuration for example. So I would always
->> have to patch the devicetree.
->
-> I'm not 100% sure on this. Graham, do you have any insight?
->>
+> This didnt apply anymore as I think I took the other fixups, sorry.
 
-Well, strictly speaking, these partitions are only for the socdk, the 
-Altera dev kit.  Our sample designs and file systems expect this layout.
-
-Therefore, these partitions are not required for any other dev kits, and 
-can probably be left out.
-
-Or, Steffen, if you have a standard layout you'd like to see, then put 
-that in there.
-
-I think some people will have to patch the layout regardless.
-
--Graham
+No problem, I'm happy to see Michael's stuff getting merged.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/36d2d692/attachment-0001.sig>
