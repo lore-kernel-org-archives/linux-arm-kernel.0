@@ -1,49 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Oct 2016 15:26:48 +0200
-Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
- randomness
-In-Reply-To: <20161025053855.GA901@Red>
-References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
- <20161024201020.h6akyqad2o42xkhq@lukather>
- <20161025053855.GA901@Red>
-Message-ID: <20161025132648.txeo3rw6yz5wutrg@lukather>
+Date: Tue, 25 Oct 2016 15:41:50 +0200
+Subject: [PATCH v3 3/6] dt-bindings: pinctrl: Deprecate sunxi pinctrl
+ bindings
+In-Reply-To: <CACRpkdYGYPhPZQmgeLA-K-RQKZMLy1qHY6P7LS6SKsFC=d=MHg@mail.gmail.com>
+References: <cover.f893b02a9f816dad8fad3986672b05c4b211e2b1.1476971126.git-series.maxime.ripard@free-electrons.com>
+ <6aec73cd3b9d3dbf1085d042ec6c23f385a300de.1476971126.git-series.maxime.ripard@free-electrons.com>
+ <CACRpkdb7zs7Nhs3i1o=WUt787vJCuePre3Tj3wLu++qwpO0atQ@mail.gmail.com>
+ <20161024194917.g5oezqc4uacsyt24@lukather>
+ <CACRpkdYGYPhPZQmgeLA-K-RQKZMLy1qHY6P7LS6SKsFC=d=MHg@mail.gmail.com>
+Message-ID: <20161025134150.dct42swdbwxzgbgb@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 07:38:55AM +0200, LABBE Corentin wrote:
-> On Mon, Oct 24, 2016 at 10:10:20PM +0200, Maxime Ripard wrote:
-> > On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
-> > > Since SID's content is constant over reboot,
-> > 
-> > That's not true, at least not across all the Allwinner SoCs, and
-> > especially not on the A10 and A20 that this driver supports.
-> > 
-> 
-> On my cubieboard2 (A20)
-> hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> *
-> 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> *
-> 00000200
-> cubiedev ~ # reboot
-> cubiedev ~ # hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> *
-> 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> *
-> 00000200
-> 
-> So clearly for me its constant.
+Hi Linus,
 
-It's constant across reboots, but not across devices. Each device have
-a different SID content, therefore it's a relevant source of entropy
-in the system.
+On Tue, Oct 25, 2016 at 02:07:27PM +0200, Linus Walleij wrote:
+> On Mon, Oct 24, 2016 at 9:49 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+> > However, it looks like the first patch from this serie is missing from
+> > your tree, is there a reason for that?
+> 
+> No can you point it out?
 
+Sure:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462500.html
+
+> > Also, in order to preserve bisectability, could you create an
+> > immutable branch for those sunxi patches so that I can merge the DT
+> > bits?
+> 
+> It's too late because they are already in the devel branch
+> and mixed up with merged of *other* immutable stuff.
+
+Hmmmm, ok.
+
+> However I think it is plain wrong to try to keep any bisectability
+> between the kernel at large and arch/*/boot/dts/*, because
+> the DTS stuff is supposed to at some point be maintained outside
+> of the kernel and for all OSes, they simply shouldn't be sync:ed.
+
+Yes, in the case of a new driver that needs to be introduced, I
+definitely get your point.
+
+However, during a conversion like we're doing here, this is not ideal,
+because it essentially means that you will not have a branch that
+works, at all.
+
+I'll hold off on those patches until 4.11 then.
+
+Thanks!
 Maxime
 
 -- 
@@ -56,4 +62,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/bf2671a3/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/b74e47e6/attachment-0001.sig>
