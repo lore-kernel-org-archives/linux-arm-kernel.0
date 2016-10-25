@@ -1,74 +1,53 @@
-From: john3909@gmail.com (John Syne)
-Date: Tue, 25 Oct 2016 08:39:12 -0700
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <7024bec3-2ebe-db82-12e2-6d6bcc664c6b@ti.com>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com>
- <7024bec3-2ebe-db82-12e2-6d6bcc664c6b@ti.com>
-Message-ID: <893994DA-C6BB-4562-8207-1F75E6568A0B@gmail.com>
+From: grmoore@opensource.altera.com (Graham Moore)
+Date: Tue, 25 Oct 2016 10:38:10 -0500
+Subject: [PATCH 3/3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+In-Reply-To: <c62baad6-2528-a9df-6b09-3dba66785102@opensource.altera.com>
+References: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
+ <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
+ <20161020071913.rlka3or4c7fzjpyv@pengutronix.de>
+ <c62baad6-2528-a9df-6b09-3dba66785102@opensource.altera.com>
+Message-ID: <5e0adad1-8ef2-029f-cfcd-4a07c962fda2@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/20/2016 09:12 AM, Dinh Nguyen wrote:
+>
+>
+> On 10/20/2016 02:19 AM, Steffen Trumtrar wrote:
+>
+>>> +		cdns,tslch-ns = <4>;
+>>> +
+>>> +		partition at qspi-boot {
+>>> +			/* 8MB for raw data. */
+>>> +			label = "Flash 0 Raw Data";
+>>> +			reg = <0x0 0x800000>;
+>>> +		};
+>>> +
+>>> +		partition at qspi-rootfs {
+>>> +			/* 120MB for jffs2 data. */
+>>> +			label = "Flash 0 jffs2 Filesystem";
+>>> +			reg = <0x800000 0x7800000>;
+>>> +		};
+>>> +	};
+>>> +};
+>>> +
+>>
+>> What is the current preferred way of handling the partitions?
+>> This doesn't fit my Sockit configuration for example. So I would always
+>> have to patch the devicetree.
+>
+> I'm not 100% sure on this. Graham, do you have any insight?
+>>
 
-> On Oct 24, 2016, at 11:37 PM, Vignesh R <vigneshr@ti.com> wrote:
-> 
-> 
-> 
-> On Tuesday 25 October 2016 11:46 AM, John Syne wrote:
->> 
->>> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
->>> 
->>>> 
->>>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>> 
-> [...]
->>>>>>> 
->>>>>>> ---
->>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
->>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>> 
->>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> index b9a53e0..96c4207 100644
->>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>> @@ -90,7 +90,7 @@
->>>>>>> /* Delay register */
->>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
->>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
->>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
->>>>> Wouldn?t this be better to add this to the devicetree?
->>>>> 
->>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->>>> 
->>>> For a touch screen, there is not need to change in these parameter
->>>> settings, so my opinion is to keep it as is. Or am I missing something?
->>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen.
->> 
-> 
-> ti_am335x_adc driver already supports above DT parameters and its upto
-> the user to adjust these parameters as required.
-> 
->> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
->> 
->> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
->> 
->> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
->> 
-> 
-> Touchscreen driver (ti_am335x_tsc.c) does not support above DT parameters.
-This patch series also modifies ti_am335x_adc.c
+Well, strictly speaking, these partitions are only for the socdk, the 
+Altera dev kit.  Our sample designs and file systems expect this layout.
 
-https://github.com/analogdevicesinc/linux/blob/master/drivers/iio/adc/ti_am335x_adc.c#L447
+Therefore, these partitions are not required for any other dev kits, and 
+can probably be left out.
 
-Regards,
-John
-> 
-> -- 
-> Regards
-> Vignesh
+Or, Steffen, if you have a standard layout you'd like to see, then put 
+that in there.
+
+I think some people will have to patch the layout regardless.
+
+-Graham
