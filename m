@@ -1,76 +1,124 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 25 Oct 2016 17:52:36 +0100
-Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
- correct compatibles
-In-Reply-To: <20161025162440.GA48977@linaro.org>
-References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
- <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
- <383a62dd-b4d7-f764-baf1-ff73691b3cbc@arm.com>
- <20161025162440.GA48977@linaro.org>
-Message-ID: <21245968-30ff-a55a-7130-8439097ee8f4@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 25 Oct 2016 11:53:58 -0500
+Subject: [PATCH/RFT v2 12/17] USB: ochi-da8xx: Use a regulator for
+ vbus/overcurrent
+In-Reply-To: <CAKXjFTOxQ58rThpPw9t73k-BBZ8YKGvMhWfAG1r+3kC=GJVxWg@mail.gmail.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-13-ahaslam@baylibre.com>
+ <672c1f1a-58b7-6947-7fb2-acd38fab8597@lechnology.com>
+ <CAKXjFTOxQ58rThpPw9t73k-BBZ8YKGvMhWfAG1r+3kC=GJVxWg@mail.gmail.com>
+Message-ID: <09a4391e-63b6-1622-f964-4aff0ecae87c@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 25/10/16 17:24, Lina Iyer wrote:
-> On Tue, Oct 25 2016 at 09:59 -0600, Sudeep Holla wrote:
->>
->>
->> On 25/10/16 16:26, Lina Iyer wrote:
->>> Update domain-idle-state binding to use "domain-idle-state" compatible
->>> from Documentation/devicetree/bindings/arm/idle-states.txt.
+On 10/25/2016 03:24 AM, Axel Haslam wrote:
+> On Tue, Oct 25, 2016 at 3:39 AM, David Lechner <david@lechnology.com> wrote:
+>> On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
 >>>
->>> Cc: <devicetree@vger.kernel.org>
->>> Cc: Rob Herring <robh@kernel.org>
->>> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
->>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>>> From: Axel Haslam <ahaslam@baylibre.com>
+>>>
+>>> Currently, the da8xx ohci driver uses a set of gpios and callbacks in
+>>> board files to handle vbus and overcurrent irqs form the power supply.
+>>> However, this does not play nice when moving to a DT based boot were
+>>> we wont have board files.
+>>>
+>>> Instead of requesting and handling the gpio, use the regulator framework
+>>> to take care of enabling and disabling vbus power.
+>>> This has the benefit
+>>> that we dont need to pass any more platform data to the driver:
+>>>
+>>> These will be handled by the regulator framework:
+>>> set_power   ->  regulator_enable/regulator_disable
+>>> get_power   ->  regulator_is_enabled
+>>> get_oci     ->  regulator_get_mode
+>>> ocic_notify ->  regulator notification
+>>>
+>>> We can keep the default potpgt and use the regulator start delay instead:
+>>> potpgt      -> regulator startup delay time
+>>>
+>>> The hawk board does not have a GPIO/OVERCURRENT gpio to control vbus,
+>>> (they should not have been decleared/reserved) so, just remove those
+>>> definitions from the hwk board file.
+>>>
+>>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 >>> ---
->>> Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
->>> 1 file changed, 5 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt
->>> b/Documentation/devicetree/bindings/power/power_domain.txt
->>> index e165036..6fb53a3 100644
->>> --- a/Documentation/devicetree/bindings/power/power_domain.txt
->>> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
->>> @@ -30,8 +30,9 @@ Optional properties:
->>>    available in the next section.
->>>
->>> - domain-idle-states : A phandle of an idle-state that shall be
->>> soaked into a
->>> -                generic domain power state. The idle state
->>> definitions are
->>> -                compatible with arm,idle-state specified in [1].
->>> +                generic domain power state. The idle state
->>> definitions must be
->>> +                compatible with "domain-idle-state"
 >>
->> I would reword the below a bit different so that it's flexible to be
->> reused without "arm,idle-state".
 >>
->>> as well as
->>> +                "arm,idle-state" as defined in [1].
 >>
->> 'Idle states that are "arm,idle-state" compatible are generally
->> "domain-idle-state" compatible as well if it's a PM domain.'
+>> How do you recover after an overcurrent event?
 >>
-> I believe we should have both compatible strings. Per [1], any CPU that
-> follows the idle state compatible *must* have "arm,idle-state" as a
-> compatible.
-
-Yes that's implicit for a CPU device. But generic power domain bindings
-should not have that explicitly as it *can be* used for non CPU device.
-
-> Since we are re-using the same compatible, its only correct
-> that we retain what is already spec'd up in [1] and in addition provide
-> this new compatible.
+>> I have configured a fixed-regulator using device-tree, but similar to the
+>> configuration in the board files here. However, when I shorted out the VBUS
+>> and caused an overcurrent event, I see nothing in the kernel log saying that
+>> there was an overcurrent event and after I remove the short, the regulator
+>> is never turned back on.
+>>
+>>
+>
+> You should have the patch to fix gpiolib, and you should declare the
+> over current gpio on the regulator as such:
+> (if the pin is enabled high you should add oc-active-high);
+>
+>        vbus_fixed: fixed-regulator-vbus {
+>                compatible = "regulator-fixed";
+>                gpio = <&gpio 109 0>;
+>                oc-gpio = <&gpio 36 0>;
+>                regulator-boot-on;
+>                enable-active-high;
+>                regulator-name = "vbus";
+>                regulator-min-microvolt = <5000000>;
+>                regulator-max-microvolt = <5000000>;
+>        };
+>
+>
+> Question: Do you see that the over current gpio was requested
+> in debugfs/gpio? and, do you see the interrupt in /proc/interrupts?
+>
+> If you unplug and plug in back the usb device it should work again.
+> also you can unbind and bind it should also start to work:
+> something like:
+>
+> echo usb1 >/sys/bus/usb/drivers/usb/unbind
+> echo usb1 >/sys/bus/usb/drivers/usb/bind
+>
 >
 
-Yes [1] applies for *CPUs only* while this applies for *any device* and
-*any power domain*, so I would drop *must have* "arm,idle-state" here
-to keep this generic based on my understanding on how compatibles work.
+I have added oc-active-high and I get different results, but it is still 
+not quite right. When I short the VBUS, I can see that my overcurrent 
+gpio changes state. However, the driver does not turn of the VBUS. When 
+I remove the short, I get an overcurrent error in the kernel log. I 
+would expect this when I create the short, not when I remove it. I also 
+tried adding  GPIO_ACTIVE_LOW to the oc-gpio, but this did not change 
+the behavior. In either case, the oc_gpio shows as high under normal 
+conditions, so perhaps there is a problem with the gpio-davinci driver 
+not picking up GPIO_ACTIVE_LOW from the device tree.
 
--- 
-Regards,
-Sudeep
+
+My regulator is basically the same. My device just uses different gpios.
+
+	vbus_reg: vbus-reg {
+		compatible = "regulator-fixed";
+		pinctrl-names = "default";
+		pinctrl-0 = <&usb11_pins>;
+		gpio = <&gpio 101 GPIO_ACTIVE_LOW>;
+		oc-gpio = <&gpio 99 0>;
+		enable-active-high;
+		oc-active-high;
+		regulator-name = "vbus";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+	}
+
+
+It seems to me though that I should not have oc-active-high since under 
+normal conditions, the oc_gpio is high and during an overcurrent event, 
+the oc_gpio is low. Double-checking the behavior without oc-active-high, 
+I see that the vbus gpio is turned off in response to the overcurrent 
+event, but I don't get the overcurrent message in the kernel log. 
+Perhaps this is because as soon as there is an overcurrent event the 
+vbus turns off and the oc_gpio returns to normal before the usb driver 
+has a chance to poll the overcurrent state?
+
+Also, unplugging the device and plugging it back in does nothing. 
+Unbinding and binding the driver does work, but that does not seem like 
+a very nice way to have to recover from an overcurrent event.
