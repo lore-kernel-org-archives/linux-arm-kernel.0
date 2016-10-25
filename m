@@ -1,59 +1,86 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 25 Oct 2016 12:52:23 +0200
-Subject: [PATCH/RFT v2 12/17] USB: ochi-da8xx: Use a regulator for
- vbus/overcurrent
-In-Reply-To: <d7e2b356-4874-fdc1-c505-70e57e3908de@ti.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-13-ahaslam@baylibre.com>
- <d7e2b356-4874-fdc1-c505-70e57e3908de@ti.com>
-Message-ID: <CAKXjFTNb3TRFRtrJoWKomETkzv1o5XhjSj54z-dFdZUi3oAFsA@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 25 Oct 2016 12:53:20 +0200
+Subject: [RFC] shutdown machine when li-ion battery goes below 3V
+In-Reply-To: <20161025102435.GA6916@amd>
+References: <20161024212250.GA31336@amd>
+ <20161024212932.uhjz752z2cy5hohl@atomide.com>
+ <20161024214152.GA32310@amd> <201610242348.47484@pali>
+ <20161025102435.GA6916@amd>
+Message-ID: <20161025105320.GK12154@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 12:43 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->> From: Axel Haslam <ahaslam@baylibre.com>
->>
->> Currently, the da8xx ohci driver uses a set of gpios and callbacks in
->> board files to handle vbus and overcurrent irqs form the power supply.
->> However, this does not play nice when moving to a DT based boot were
->> we wont have board files.
->>
->> Instead of requesting and handling the gpio, use the regulator framework
->> to take care of enabling and disabling vbus power. This has the benefit
->> that we dont need to pass any more platform data to the driver:
->>
->> These will be handled by the regulator framework:
->> set_power   ->  regulator_enable/regulator_disable
->> get_power   ->  regulator_is_enabled
->> get_oci     ->  regulator_get_mode
->> ocic_notify ->  regulator notification
->>
->> We can keep the default potpgt and use the regulator start delay instead:
->> potpgt      -> regulator startup delay time
->>
->> The hawk board does not have a GPIO/OVERCURRENT gpio to control vbus,
->> (they should not have been decleared/reserved) so, just remove those
->> definitions from the hwk board file.
->>
->> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/board-da830-evm.c     |  97 ++++++++----------------
->>  arch/arm/mach-davinci/board-omapl138-hawk.c |  96 +-----------------------
->>  arch/arm/mach-davinci/include/mach/da8xx.h  |   2 +-
->>  arch/arm/mach-davinci/usb-da8xx.c           |   3 +-
->>  drivers/usb/host/ohci-da8xx.c               | 111 ++++++++++++++++++----------
->>  include/linux/platform_data/usb-davinci.h   |  19 -----
->>  6 files changed, 105 insertions(+), 223 deletions(-)
->
-> Can you separate out the driver enhancement from the platform
-> (mach-davinci) changes? They need to go through different trees.
->
+On Tuesday 25 October 2016 12:24:35 Pavel Machek wrote:
+> On Mon 2016-10-24 23:48:47, Pali Roh?r wrote:
+> > On Monday 24 October 2016 23:41:52 Pavel Machek wrote:
+> > > On Mon 2016-10-24 14:29:33, Tony Lindgren wrote:
+> > > > Also, the shutdown voltage can depend on external devices
+> > > > connected. It could be for example 3.3V depending on eMMC on some
+> > > > devices while devices with no eMMC could have it at 3.0V.
+> > > 
+> > > Actually, I'd like to shutdown at 3.3V or more (like 3.5V), because
+> > > going below that is pretty mean to the battery. But if I set
+> > > threshold too high, GSM activity will push it below that for a very
+> > > short while, and I'll shutdown too soon.
+> > > 
+> > > Ideas welcome...
+> > 
+> > bq27x00 has EDVF flag which means that battery is empty. Maemo with 
+> > bq27x00 driver is configured to issue system shutdown when EDVF is set.
+> > 
+> > Maybe kernel should issue emergency shutdown e.g. after minute or two 
+> > after EDVF flag is set?
+> 
+> Thanks for pointer.
+> 
+> EDVF seems to be exposed as health. ... but only if battery is
+> calibrated, AFAICT.
 
-Ok, i will do that,  (it might require intermediate code to have
-the driver working on each patch)
+No, EDVF is available also for uncalibrated battery. There are EDV1 and
+EDVF flags. Both are set based on battery voltage and some other
+parameters from bq EEPROM.
 
-> Thanks,
-> Sekhar
->
->
+>  if (has_ci_flag && (cache.flags & BQ27000_FLAG_CI)) {
+>       dev_info_once(di->dev, "battery is not calibrated! ignoring capacity values\n");
+
+Yes, it ignores only capacity values (which needs calibration), not
+those raw flags which works also without calibration.
+
+>       ...
+>       cache.health = -ENODATA;
+> 
+> Plus, it prioritizes battery cold over battery dead. IMO we don't need
+> to shutdown on battery cold (we just may not charge the battery), but
+> we need to shutdown on battery dead.
+> 
+> So something like this?
+> 
+> 								Pavel
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
+> index 8eb2f8f..5ddf6d7 100644
+> --- a/drivers/power/supply/bq27xxx_battery.c
+> +++ b/drivers/power/supply/bq27xxx_battery.c
+> @@ -680,10 +680,10 @@ static int bq27xxx_battery_read_health(struct bq27xxx_device_info *di)
+>  	/* Unlikely but important to return first */
+>  	if (unlikely(bq27xxx_battery_overtemp(di, flags)))
+>  		return POWER_SUPPLY_HEALTH_OVERHEAT;
+> -	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
+> -		return POWER_SUPPLY_HEALTH_COLD;
+>  	if (unlikely(bq27xxx_battery_dead(di, flags)))
+>  		return POWER_SUPPLY_HEALTH_DEAD;
+> +	if (unlikely(bq27xxx_battery_undertemp(di, flags)))
+> +		return POWER_SUPPLY_HEALTH_COLD;
+>  
+>  	return POWER_SUPPLY_HEALTH_GOOD;
+>  }
+> 
+> 
+
+Looks like this is OK.
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
