@@ -1,123 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 25 Oct 2016 16:50:25 +0800
-Subject: [PATCH v2 8/8] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
-In-Reply-To: <bac9a59f-df97-245b-f349-bed57dec6aad@codeaurora.org>
-References: <20161020034344.14154-1-wens@csie.org>
- <20161020034344.14154-9-wens@csie.org>
- <bac9a59f-df97-245b-f349-bed57dec6aad@codeaurora.org>
-Message-ID: <CAGb2v64bMqixiw=kA5_DyncSW7+=dC8foNvOpYUmNAM3zfL0mw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 25 Oct 2016 10:51:03 +0200
+Subject: [PATCH v3 0/5] Add runtime PM support for clocks (on Exynos SoC
+ example)
+In-Reply-To: <1477311130-6534-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161024121224eucas1p1070b72308dc9c8d8d2b10fa5bfeaf5ed@eucas1p1.samsung.com>
+ <1477311130-6534-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <3b50ab04-74d2-da25-d0a8-63a90ce69d93@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 4:13 PM, Archit Taneja <architt@codeaurora.org> wrote:
->
->
-> On 10/20/2016 09:13 AM, Chen-Yu Tsai wrote:
->>
->> The Hummingbird A31 board has a RGB-to-VGA bridge which converts RGB
->> output from the LCD interface to VGA signals.
->>
->> Enable this part of the display pipeline.
->
->
-> I couldn't find the enable-gpios binding for the bridge that you
-> introduced in the previous patch. Is that intentional?
+Dear All,
 
-Error on my part. Thanks for spotting that.
 
-ChenYu
+On 2016-10-24 14:12, Marek Szyprowski wrote:
+> This patchset adds runtime PM support to common clock framework. This is an
+> attempt to implement support for clock controllers, which belongs to a power
+> domain. This approach works surprisingly well on Exynos 4412 and 5433 SoCs,
+> what allowed us to solve various freeze/crash issues related to power
+> management.
+>
+> The main idea behind this patchset is to keep clock's controller power domain
+> enabled every time when at least one of its clock is enabled or access to its
+> registers is being made. Clock controller driver (clock provider) can
+> supply a struct device pointer, which is the used by clock core for tracking and
+> managing clock's controller runtime pm state. Each clk_prepare() operation will
+> first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
+> will do pm_runtime_put() at the end.
+>
+> This runtime PM feature has been tested with Exynos4412 and Exynos5433 clocks
+> drivers. Both have some clocks, which belongs to respective power domains and
+> need special handling during power on/off procedures. Till now it wasn't handled
+> at all, what caused various problems.
+>
+> Patches for exynos 4412 and 5433 clocks drivers change the way the clock
+> provider is initialized. Instead of CLK_OF_DECLARE based initialization, a
+> complete platform device driver infrastructure is being used. This is needed to
+> let driver to use runtime pm feature and integrate with generic power domains.
+> The side-effect of this change is a delay in clock provider registeration
+> during system boot, so early initialized drivers might get EPROBEDEFER error
+> when requesting their clocks. This is an issue for IOMMU drivers, so
+> this patchset will be fully functional once the deferred probe for IOMMU
+> will be merged.
+>
+> The side-effect of this patchset is the one can finally read
+> /sys/kernel/debug/clk/clk_summary on all Exynos4412 boards without any freeze.
+>
+> If one wants to test this patchset (on Exynos4412 Trats2 device with FIMC-IS
+> driver), I've provided a branch with all needed patches (fixes for Exynos,
+> FIMC-IS driver and IOMMU deferred probe):
+> https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.9-clocks-pm-v3
+>
+> Patches are based on vanilla v4.9-rc1 kernel.
 
->
-> Thanks,
-> Archit
->
->
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 56
->> +++++++++++++++++++++++++++++
->>  1 file changed, 56 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> index 9a74637f677f..05a49b2147f1 100644
->> --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
->> @@ -63,6 +63,49 @@
->>                 stdout-path = "serial0:115200n8";
->>         };
->>
->> +       bridge {
->> +               compatible = "dumb-vga-dac";
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       port at 0 {
->> +                               #address-cells = <1>;
->> +                               #size-cells = <0>;
->> +                               reg = <0>;
->> +
->> +                               vga_bridge_in: endpoint at 0 {
->> +                                       reg = <0>;
->> +                                       remote-endpoint =
->> <&tcon0_out_vga>;
->> +                               };
->> +                       };
->> +
->> +                       port at 1 {
->> +                               #address-cells = <1>;
->> +                               #size-cells = <0>;
->> +                               reg = <1>;
->> +
->> +                               vga_bridge_out: endpoint at 0 {
->> +                                       reg = <0>;
->> +                                       remote-endpoint = <&vga_con_in>;
->> +                               };
->> +                       };
->> +               };
->> +       };
->> +
->> +       vga {
->> +               compatible = "vga-connector";
->> +
->> +               port {
->> +                       vga_con_in: endpoint {
->> +                               remote-endpoint = <&vga_bridge_out>;
->> +                       };
->> +               };
->> +       };
->> +
->>         wifi_pwrseq: wifi_pwrseq {
->>                 compatible = "mmc-pwrseq-simple";
->>                 reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
->> @@ -245,6 +288,19 @@
->>         status = "okay";
->>  };
->>
->> +&tcon0 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&lcd0_rgb888_pins>;
->> +       status = "okay";
->> +};
->> +
->> +&tcon0_out {
->> +       tcon0_out_vga: endpoint at 0 {
->> +               reg = <0>;
->> +               remote-endpoint = <&vga_bridge_in>;
->> +       };
->> +};
->> +
->>  &uart0 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&uart0_pins_a>;
->>
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+If one want to test this patchset together with my recently posted 
+Exynos IOMMU
+runtime PM patches (V5: 
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1253432.html),
+I prepared a single branch with both patchsets and all their prerequisites:
+
+https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.9-iommu-pm-v5-clocks-pm-v3
+
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
