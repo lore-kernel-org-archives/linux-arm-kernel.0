@@ -1,53 +1,57 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 25 Oct 2016 08:26:36 -0700
-Subject: [PATCH 1/4] PM / doc: Update device documentation for devices in IRQ
- safe PM domains
+Date: Tue, 25 Oct 2016 08:26:38 -0700
+Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
+ correct compatibles
 In-Reply-To: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
 References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1477409199-52182-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update documentation to reflect the changes made to support IRQ safe PM
-domains.
+Update domain-idle-state binding to use "domain-idle-state" compatible
+from Documentation/devicetree/bindings/arm/idle-states.txt.
 
+Cc: <devicetree@vger.kernel.org>
+Cc: Rob Herring <robh@kernel.org>
+Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Rafael J. Wysocki <rjw@rjwysocki.net>
 ---
- Documentation/power/devices.txt | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/power/devices.txt b/Documentation/power/devices.txt
-index 8ba6625..73ddea3 100644
---- a/Documentation/power/devices.txt
-+++ b/Documentation/power/devices.txt
-@@ -607,7 +607,9 @@ individually.  Instead, a set of devices sharing a power resource can be put
- into a low-power state together at the same time by turning off the shared
- power resource.  Of course, they also need to be put into the full-power state
- together, by turning the shared power resource on.  A set of devices with this
--property is often referred to as a power domain.
-+property is often referred to as a power domain. A power domain may also be
-+nested inside another power domain. The nested domain is referred to as the
-+sub-domain of the parent domain.
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index e165036..6fb53a3 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -30,8 +30,9 @@ Optional properties:
+    available in the next section.
  
- Support for power domains is provided through the pm_domain field of struct
- device.  This field is a pointer to an object of type struct dev_pm_domain,
-@@ -629,6 +631,16 @@ support for power domains into subsystem-level callbacks, for example by
- modifying the platform bus type.  Other platforms need not implement it or take
- it into account in any way.
+ - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+-                generic domain power state. The idle state definitions are
+-                compatible with arm,idle-state specified in [1].
++                generic domain power state. The idle state definitions must be
++                compatible with "domain-idle-state" as well as
++                "arm,idle-state" as defined in [1].
+   The domain-idle-state property reflects the idle state of this PM domain and
+   not the idle states of the devices or sub-domains in the PM domain. Devices
+   and sub-domains have their own idle-states independent of the parent
+@@ -85,7 +86,7 @@ Example 3:
+ 	};
  
-+Devices may be defined as IRQ-safe which indicates to the PM core that their
-+runtime PM callbacks may be invoked with disabled interrupts (see
-+Documentation/power/runtime_pm.txt for more information).  If an IRQ-safe
-+device belongs to a PM domain, the runtime PM of the domain will be
-+disallowed, unless the domain itself is defined as IRQ-safe. However, it
-+makes sense to define a PM domain as IRQ-safe only if all the devices in it
-+are IRQ-safe. Moreover, if an IRQ-safe domain has a parent domain, the runtime
-+PM of the parent is only allowed if the parent itself is IRQ-safe too with the
-+additional restriction that all child domains of an IRQ-safe parent must also
-+be IRQ-safe.
+ 	DOMAIN_RET: state at 0 {
+-		compatible = "arm,idle-state";
++		compatible = "domain-idle-state", "arm,idle-state";
+ 		reg = <0x0>;
+ 		entry-latency-us = <1000>;
+ 		exit-latency-us = <2000>;
+@@ -93,7 +94,7 @@ Example 3:
+ 	};
  
- Device Low Power (suspend) States
- ---------------------------------
+ 	DOMAIN_PWR_DN: state at 1 {
+-		compatible = "arm,idle-state";
++		compatible = "domain-idle-state", "arm,idle-state";
+ 		reg = <0x1>;
+ 		entry-latency-us = <5000>;
+ 		exit-latency-us = <8000>;
 -- 
 2.7.4
