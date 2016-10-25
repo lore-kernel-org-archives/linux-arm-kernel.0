@@ -1,77 +1,62 @@
-From: hongtao.jia@nxp.com (Troy Jia)
-Date: Tue, 25 Oct 2016 02:29:46 +0000
-Subject: [PATCH V2 1/5] powerpc/mpc85xx: Update TMU device tree node for
- T1040/T1042
-In-Reply-To: <20161024083654.GB30578@tiger>
-References: <1475995626-14049-1-git-send-email-hongtao.jia@nxp.com>
- <20161024083654.GB30578@tiger>
-Message-ID: <AM4PR0401MB18431A1DD9E2061FC71414D3EBA80@AM4PR0401MB1843.eurprd04.prod.outlook.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 25 Oct 2016 10:47:55 +0800
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1190898538.120930.02d69662-0b1a-447d-9c29-782aec7a1189.open-xchange@email.1und1.de>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+ <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+ <87eg35snvg.fsf@eliezer.anholt.net>
+ <1190898538.120930.02d69662-0b1a-447d-9c29-782aec7a1189.open-xchange@email.1und1.de>
+Message-ID: <1477363675.2298.2.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, October 24, 2016 4:37 PM
-> To: Troy Jia <hongtao.jia@nxp.com>
-> Cc: rui.zhang at intel.com; edubezval at gmail.com; robh+dt at kernel.org; Scott Wood
-> <scott.wood@nxp.com>; devicetree at vger.kernel.org; linuxppc-
-> dev at lists.ozlabs.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH V2 1/5] powerpc/mpc85xx: Update TMU device tree node for
-> T1040/T1042
+On Mon, 2016-10-24 at 20:25 +0200, Stefan Wahren wrote:
+> > 
+> > Eric Anholt <eric@anholt.net> hat am 24. Oktober 2016 um 18:38
+> > geschrieben:
+> > 
+> > 
+> > Stefan Wahren <stefan.wahren@i2se.com> writes:
+> > 
+> > > 
+> > > Hi Martin,
+> > > 
+> > > Am 28.09.2016 um 23:10 schrieb Eric Anholt:
+> > > > 
+> > > > kernel at martin.sperl.org writes:
+> > > > 
+> > > > > 
+> > > > > From: Martin Sperl <kernel@martin.sperl.org>
+> > > > > 
+> > > > > Add basic thermal driver for bcm2835 SOC.
+> > > > > 
+> > > > > This driver currently relies on the firmware setting up the
+> > > > > tsense HW block and does not set it up itself.
+> > > > > 
+> > > > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> > > > > Acked-by: Eric Anholt <eric@anholt.net>
+> > > > > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > > > What's the status of merging this one???I'd like to merge the
+> > > > other
+> > > > patches.
+> > > i think it's necessary to rebase the whole series. Maybe we could
+> > > get it
+> > > into 4.10.
+> > Why would it need to be rebased???The status, as far as I know, is
+> > that
+> > we're still waiting for the subsystem maintainer to respond.
+> Since at least this patch won't apply anymore, but feedback from
+> maintainer is
+> still good :-)
 > 
-> On Sun, Oct 09, 2016 at 02:47:02PM +0800, Jia Hongtao wrote:
-> > From: Hongtao Jia <hongtao.jia@nxp.com>
-> >
-> > SoC compatible string and endianness property are added according to
-> > the new bindings.
-> 
-> The commit log doesn't seem to match the actual changes.  Same for patch 2/5.
+> Sorry for this impatience, but i'm afraid that we possibly miss 4.10.
 
-Right. I just revise the log and sent a new version. Please help to review.
-Thanks.
+Eduardo,
 
--Hongtao.
+any comments on this patchset?
 
-> 
-> >
-> > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
-> > ---
-> > Changes for V2:
-> > * Rebase on latest linux-next tree (next-20161006).
-> >
-> >  arch/powerpc/boot/dts/fsl/t1040si-post.dtsi | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> > b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> > index 44e399b..145c7f4 100644
-> > --- a/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> > +++ b/arch/powerpc/boot/dts/fsl/t1040si-post.dtsi
-> > @@ -526,7 +526,7 @@
-> >
-> >  				       0x00030000 0x00000012
-> >  				       0x00030001 0x0000001d>;
-> > -		#thermal-sensor-cells = <0>;
-> > +		#thermal-sensor-cells = <1>;
-> >  	};
-> >
-> >  	thermal-zones {
-> > @@ -534,7 +534,7 @@
-> >  			polling-delay-passive = <1000>;
-> >  			polling-delay = <5000>;
-> >
-> > -			thermal-sensors = <&tmu>;
-> > +			thermal-sensors = <&tmu 2>;
-> >
-> >  			trips {
-> >  				cpu_alert: cpu-alert {
-> > --
-> > 2.1.0.27.g96db324
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+thanks,
+rui
