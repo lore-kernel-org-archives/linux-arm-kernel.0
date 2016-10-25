@@ -1,23 +1,61 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 25 Oct 2016 12:57:37 +0200
-Subject: [RFC] shutdown machine when li-ion battery goes below 3V
-In-Reply-To: <20161025105604.GA25855@amd>
-References: <20161024212250.GA31336@amd>
- <20161024212932.uhjz752z2cy5hohl@atomide.com>
- <20161024214152.GA32310@amd> <201610242348.47484@pali>
- <20161025102435.GA6916@amd> <20161025105320.GK12154@pali>
- <20161025105604.GA25855@amd>
-Message-ID: <20161025105737.GL12154@pali>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 25 Oct 2016 16:28:02 +0530
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <84648cb0-f1fa-d88b-bac2-79208af01ca6@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+ <1593441f-d147-4c91-8aab-8622dd8ced19@lechnology.com>
+ <b6cd3c47-0df8-266a-2b8d-13c82062b647@lechnology.com>
+ <84648cb0-f1fa-d88b-bac2-79208af01ca6@lechnology.com>
+Message-ID: <0b7cf7a1-e234-2868-dfde-347c92c23829@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 October 2016 12:56:04 Pavel Machek wrote:
-> Take a look at code. Health is not read from hardware unless battery
-> is calibrated.
+On Tuesday 25 October 2016 02:50 AM, David Lechner wrote:
+> On 10/24/2016 02:50 PM, David Lechner wrote:
+>> On 10/24/2016 10:50 AM, David Lechner wrote:
+>>> On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+>>>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>>>>
+>>>>> +&ehrpwm1 {
+>>>>> +    status = "disabled";
+>>>>
+>>>> Hmm, disabled? Can you add this node when you actually use it?
+>>>
+>>> Not sure why I have this disabled. Like the gpios, the pwms can be used
+>>> via sysfs, so I would like to leave them.
+>>>
+>>
+>> Now I remember why these are disabled. The clock matching is broken.
+>> Only the first ehrpwm and the first ecap get clocks. The others fail.
+>>
+>> I can change these to "okay". It will just result in a kernel error
+>> message until the clocks are fixed.
+>>
+> 
+> correction: it is not the clocks that are broken. it is the device names.
+> 
+> In  arch/arm/mach-davinci/da8xx-dt.c, we have...
+> 
+> 
+>     OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
+>     OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f02000, "ehrpwm", NULL),
+>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
+>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
+>     OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
+> 
+> 
+> Which causes each device to have the same device node name. This causes
+> sysfs errors because it is trying to register a second device at the
+> same sysfs path.
+> 
+> If you change the names here, then the device do not work because the
+> clock lookup fails.
 
-Then it is bug. EDVF should be accepted also when battery is not
-calibrated.
+Yeah, this is incorrect (I should have caught it in review). The device
+id should have been present in the lookup. Can you fix auxdata and clock
+lookup too and send a separate patch? Its probably a v4.9-rc candidate.
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Thanks,
+Sekhar
