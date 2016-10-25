@@ -1,30 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 25 Oct 2016 16:25:57 +0530
-Subject: [PATCH/RFT v2 00/17] Add DT support for ohci-da8xx
-In-Reply-To: <20161024164634.4330-1-ahaslam@baylibre.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
-Message-ID: <39744873-14ec-5eae-640c-10435b9eb492@ti.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 25 Oct 2016 12:57:37 +0200
+Subject: [RFC] shutdown machine when li-ion battery goes below 3V
+In-Reply-To: <20161025105604.GA25855@amd>
+References: <20161024212250.GA31336@amd>
+ <20161024212932.uhjz752z2cy5hohl@atomide.com>
+ <20161024214152.GA32310@amd> <201610242348.47484@pali>
+ <20161025102435.GA6916@amd> <20161025105320.GK12154@pali>
+ <20161025105604.GA25855@amd>
+Message-ID: <20161025105737.GL12154@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel,
+On Tuesday 25 October 2016 12:56:04 Pavel Machek wrote:
+> Take a look at code. Health is not read from hardware unless battery
+> is calibrated.
 
-On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
-> From: Axel Haslam <ahaslam@baylibre.com>
-> 
-> The purpose of this patch series is to add DT support and modernize
-> the ohci-da8xx glue driver without breaking the non-DT boot,
-> which is still used in unconverted davinci devices.
+Then it is bug. EDVF should be accepted also when battery is not
+calibrated.
 
->From a mach-davinci perspective, there are some patches which seem to be
-safe to apply and some which depend on corresponding driver changes to
-get in.
-
-In order to speed up the process of applying this series, can you split
-the mach-davinci updates which are safe to apply into a separate series.
-
-For DT patches, the bindings should be accepted. For other patches, they
-should not be causing any regressions.
-
-Thanks,
-Sekhar
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
