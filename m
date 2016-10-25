@@ -1,88 +1,93 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Tue, 25 Oct 2016 17:46:32 +0200 (CEST)
-Subject: [PATCH] drivers: iommu: constify iommu_gather_ops structures
-In-Reply-To: <1477409624-30949-1-git-send-email-bhumirks@gmail.com>
-References: <1477409624-30949-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <alpine.DEB.2.10.1610251746150.3039@hadrien>
+From: john3909@gmail.com (John Syne)
+Date: Tue, 25 Oct 2016 08:47:30 -0700
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
+ 24MHz
+In-Reply-To: <20161025063847.GD8574@dell>
+References: <20161024060226.4170-1-mugunthanvnm@ti.com>
+ <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+ <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
+ <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
+ <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
+Message-ID: <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 25 Oct 2016, Bhumika Goyal wrote:
 
-> Check for iommu_gather_ops structures that are only stored in the tlb
-> field of an io_pgtable_cfg structure. The tlb field is of type
-> const struct iommu_gather_ops *, so iommu_gather_ops structures
-> having this property can be declared as const.
-> Done using Coccinelle:
->
-> @r1 disable optional_qualifier @
-> identifier i;
-> position p;
-> @@
-> static struct iommu_gather_ops i at p = {...};
->
-> @ok1@
-> identifier r1.i;
-> position p;
-> struct io_pgtable_cfg q;
-> @@
-> q.tlb=&i at p;
->
-> @bad@
-> position p!={r1.p,ok1.p};
-> identifier r1.i;
-> @@
-> i at p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> static
-> +const
-> struct iommu_gather_ops i={...};
->
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> +const
-> struct iommu_gather_ops i;
->
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> On Oct 24, 2016, at 11:38 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> On Mon, 24 Oct 2016, John Syne wrote:
+>>> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
+>>>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>>>> 
+>>>> On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
+>>>>>>> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>>>>>>> 
+>>>>>>> Increase ADC reference clock from 3MHz to 24MHz so that the
+>>>>>>> sampling rates goes up from 100K samples per second to 800K
+>>>>>>> samples per second on AM335x and AM437x SoC.
+>>>>>>> 
+>>>>>>> Also increase opendelay for touchscreen configuration to
+>>>>>>> equalize the increase in ADC reference clock frequency,
+>>>>>>> which results in the same amount touch events reported via
+>>>>>>> evtest on AM335x GP EVM.
+>>>>>>> 
+>>>>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>>>>>>> ---
+>>>>>>> 
+>>>>>>> This patch depends on ADC DMA patch series [1]
+>>>>>>> 
+>>>>>>> Without DMA support, when ADC ref clock is set at 24MHz, I am
+>>>>>>> seeing fifo overflow as CPU is not able to pull the ADC samples.
+>>>>>>> This answers that DMA support is must for ADC to consume the
+>>>>>>> samples generated at 24MHz with no open, step delay or
+>>>>>>> averaging with patch [2].
+>>>>>>> 
+>>>>>>> Measured the performance with the iio_generic_buffer with the
+>>>>>>> patch [3] applied
+>>>>>>> 
+>>>>>>> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
+>>>>>>> [2] - http://pastebin.ubuntu.com/23357935/
+>>>>>>> [3] - http://pastebin.ubuntu.com/23357939/
+>>>>>>> 
+>>>>>>> ---
+>>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
+>>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>>>> 
+>>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>> index b9a53e0..96c4207 100644
+>>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>> @@ -90,7 +90,7 @@
+>>>>>>> /* Delay register */
+>>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
+>>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
+>>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
+>>>>> Wouldn?t this be better to add this to the devicetree?
+>>>>> 
+>>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
+>>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
+>>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+>>>> 
+>>>> For a touch screen, there is not need to change in these parameter
+>>>> settings, so my opinion is to keep it as is. Or am I missing something?
+>>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
+>> 
+>> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
+>> 
+>> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
+>> 
+>> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
+> 
+> This looks like configuration, no?
+> 
+> DT should be used to describe the hardware.
+You may be right, but how is this different to setting the baud rate on a serial channel or sampling rate on a audio channel? Looking through the DT, there are many configuration settings, so I?m not sure what is the correct way to handle this. Surely it is better to handle this in DT vs hard coding these settings?
 
-Acked-by: Julia Lawall <julia.lawall@lip6.fr>
-
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 2 +-
->  drivers/iommu/ipmmu-vmsa.c         | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index f50e51c..1465bbc 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -741,7 +741,7 @@ static void dummy_tlb_sync(void *cookie)
->  	WARN_ON(cookie != cfg_cookie);
->  }
->
-> -static struct iommu_gather_ops dummy_tlb_ops = {
-> +static const struct iommu_gather_ops dummy_tlb_ops = {
->  	.tlb_flush_all	= dummy_tlb_flush_all,
->  	.tlb_add_flush	= dummy_tlb_add_flush,
->  	.tlb_sync	= dummy_tlb_sync,
-> diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
-> index ace331d..b8bcf18 100644
-> --- a/drivers/iommu/ipmmu-vmsa.c
-> +++ b/drivers/iommu/ipmmu-vmsa.c
-> @@ -283,7 +283,7 @@ static void ipmmu_tlb_add_flush(unsigned long iova, size_t size,
->  	/* The hardware doesn't support selective TLB flush. */
->  }
->
-> -static struct iommu_gather_ops ipmmu_gather_ops = {
-> +static const struct iommu_gather_ops ipmmu_gather_ops = {
->  	.tlb_flush_all = ipmmu_tlb_flush_all,
->  	.tlb_add_flush = ipmmu_tlb_add_flush,
->  	.tlb_sync = ipmmu_tlb_flush_all,
-> --
-> 1.9.1
->
->
+Regards,
+John
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
