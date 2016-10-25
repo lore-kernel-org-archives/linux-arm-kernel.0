@@ -1,91 +1,118 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue, 25 Oct 2016 10:03:44 +0200
-Subject: [PATCH/RFT v2 17/17] ARM: dts: da850: add usb device node
-In-Reply-To: <59ca6a1f-6db9-eed2-8e8a-77657c7febac@lechnology.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-18-ahaslam@baylibre.com>
- <59ca6a1f-6db9-eed2-8e8a-77657c7febac@lechnology.com>
-Message-ID: <CAKXjFTNSX0-bWqdxH3JFmZRV5U_UHu3ma0iaPp0JWK0WNKDQdQ@mail.gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Tue, 25 Oct 2016 13:39:27 +0530
+Subject: [PATCH v2 1/8] drm/bridge: rgb-to-vga: Support an enable GPIO
+In-Reply-To: <20161020034344.14154-2-wens@csie.org>
+References: <20161020034344.14154-1-wens@csie.org>
+ <20161020034344.14154-2-wens@csie.org>
+Message-ID: <0b5fbe8e-e51b-c874-e1a3-0b88dc65e361@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 2:48 AM, David Lechner <david@lechnology.com> wrote:
-> On 10/24/2016 11:46 AM, ahaslam at baylibre.com wrote:
->>
->> From: Axel Haslam <ahaslam@baylibre.com>
->>
->> This adds the usb (ohci) device node for the da850 soc.
->> Also it enables it for the lcdk board
->>
->> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
->> ---
->>  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
->>  arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
->>  2 files changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
->> b/arch/arm/boot/dts/da850-lcdk.dts
->> index 7b8ab21..fa91339 100644
->> --- a/arch/arm/boot/dts/da850-lcdk.dts
->> +++ b/arch/arm/boot/dts/da850-lcdk.dts
->> @@ -86,6 +86,14 @@
->>         };
->>  };
->>
->> +&usb_phy {
->> +       status = "okay";
->> +};
->> +
->> +&usb {
->> +       status = "okay";
+Hi,
+
+On 10/20/2016 09:13 AM, Chen-Yu Tsai wrote:
+> Some rgb-to-vga bridges have an enable GPIO, either directly tied to
+> an enable pin on the bridge IC, or indirectly controlling a power
+> switch.
 >
->
-> Don't you need to specify a regulator here using the vbus-supply property?
+> Add support for it.
 
-its is not mandatory, the regulator framework is giving a dummy supply
-on regulator_get if it does not find a regulator on device tree. That is
-what i could understand from: _regulator_get in regulator/core.c
+Does the bridge on your platform have an active/passive DAC, or is it a
+smarter encoder chip that is capable of doing more? If so, it might be
+good to have a separate DT compatible string to it, like what's done
+in the patch titled:
 
-Also, in the case of platform based boot, if the board init calls
-regulator_has_full_constraints which is anyways needed for the phy to probe
-correctly it will also return a dummy regulator.
+drm: bridge: vga-dac: Add adi,adv7123 compatible string
 
+so that we can switch to a different driver later if needed.
+
+Thanks,
+Archit
 
 >
->> +};
->> +
->>  &serial2 {
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&serial2_rxtx_pins>;
->> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
->> index 33fcdce..ec2cec3 100644
->> --- a/arch/arm/boot/dts/da850.dtsi
->> +++ b/arch/arm/boot/dts/da850.dtsi
->> @@ -381,6 +381,14 @@
->>                         #phy-cells = <1>;
->>                         status = "disabled";
->>                 };
->> +               usb: usb at 0225000 {
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+>  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 28 ++++++++++++++++++++++
+>  2 files changed, 30 insertions(+)
 >
+> diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> index 003bc246a270..d3484822bf77 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> @@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+>  - Video port 0 for RGB input
+>  - Video port 1 for VGA output
 >
-> Don't need the leading 0 on usb at 225000
+> +Optional properties:
+> +- enable-gpios: GPIO pin to enable or disable the bridge
 >
-> The alias (usb:) might need to be more specific since there is a second usb
-> device that will be added later for musb. (The comments in the previous
-> review only referred to the "usb" in "usb@", not the alias.)
+>  Example
+>  -------
+> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> index afec232185a7..b487e5e9b56d 100644
+> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+> @@ -10,6 +10,7 @@
+>   * the License, or (at your option) any later version.
+>   */
+>
+> +#include <linux/gpio/consumer.h>
+>  #include <linux/module.h>
+>  #include <linux/of_graph.h>
+>
+> @@ -23,6 +24,7 @@ struct dumb_vga {
+>  	struct drm_connector	connector;
+>
+>  	struct i2c_adapter	*ddc;
+> +	struct gpio_desc	*enable_gpio;
+>  };
+>
+>  static inline struct dumb_vga *
+> @@ -124,8 +126,26 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
+>  	return 0;
+>  }
+>
+> +static void dumb_vga_enable(struct drm_bridge *bridge)
+> +{
+> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +
+> +	if (vga->enable_gpio)
+> +		gpiod_set_value_cansleep(vga->enable_gpio, 1);
+> +}
+> +
+> +static void dumb_vga_disable(struct drm_bridge *bridge)
+> +{
+> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +
+> +	if (vga->enable_gpio)
+> +		gpiod_set_value_cansleep(vga->enable_gpio, 0);
+> +}
+> +
+>  static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
+>  	.attach		= dumb_vga_attach,
+> +	.enable		= dumb_vga_enable,
+> +	.disable	= dumb_vga_disable,
+>  };
+>
+>  static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+> @@ -169,6 +189,14 @@ static int dumb_vga_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	platform_set_drvdata(pdev, vga);
+>
+> +	vga->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+> +						   GPIOD_OUT_LOW);
+> +	if (IS_ERR(vga->enable_gpio)) {
+> +		ret = PTR_ERR(vga->enable_gpio);
+> +		dev_err(&pdev->dev, "failed to request GPIO: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+>  	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+>  	if (IS_ERR(vga->ddc)) {
+>  		if (PTR_ERR(vga->ddc) == -ENODEV) {
+>
 
-ok.
-
->
->> +                       compatible = "ti,da830-ohci";
->> +                       reg = <0x225000 0x1000>;
->> +                       interrupts = <59>;
->> +                       phys = <&usb_phy 1>;
->> +                       phy-names = "usb-phy";
->> +                       status = "disabled";
->> +               };
->>                 gpio: gpio at 226000 {
->>                         compatible = "ti,dm6441-gpio";
->>                         gpio-controller;
->>
->
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
