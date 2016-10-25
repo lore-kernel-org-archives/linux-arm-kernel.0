@@ -1,289 +1,211 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 25 Oct 2016 10:57:37 -0700
-Subject: [RFC v2] ARM: memory: da8xx-ddrctl: new driver
-In-Reply-To: <1477402876-22472-2-git-send-email-bgolaszewski@baylibre.com>
- (Bartosz Golaszewski's message of "Tue, 25 Oct 2016 15:41:16 +0200")
-References: <1477402876-22472-1-git-send-email-bgolaszewski@baylibre.com>
- <1477402876-22472-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <7hy41ctipa.fsf@baylibre.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Tue, 25 Oct 2016 19:57:33 +0200
+Subject: [PATCH] exynos-drm: Fix display manager failing to start without
+ IOMMU problem
+In-Reply-To: <fa4114e0-9382-0653-7dc6-a63f1312d616@osg.samsung.com>
+References: <CGME20160810214111epcas1p4dd2a581353b550a1992fc7695e846da7@epcas1p4.samsung.com>
+ <1470850251-9150-1-git-send-email-shuahkh@osg.samsung.com>
+ <57ABB1ED.1080301@samsung.com> <57ABB31E.1070802@osg.samsung.com>
+ <57AE0736.6020705@osg.samsung.com> <57AE0CCB.1010708@osg.samsung.com>
+ <57B29925.4020600@samsung.com>
+ <ce7a035c-f881-82ac-97f6-869442d1ed47@osg.samsung.com>
+ <CAAQKjZMFOe7Aa5Hq5gbMj7=h2VfgXq5jgqbB1wqcZcYZ0ZKZxA@mail.gmail.com>
+ <49780a7f-59a4-d2b0-380c-4bd330660ba2@osg.samsung.com>
+ <fa4114e0-9382-0653-7dc6-a63f1312d616@osg.samsung.com>
+Message-ID: <580F9D0D.7000104@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
-
-> Create a new driver for the da8xx DDR2/mDDR controller and implement
-> support for writing to the Peripheral Bus Burst Priority Register.
->
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 +++
->  drivers/memory/Kconfig                             |   8 +
->  drivers/memory/Makefile                            |   1 +
->  drivers/memory/da8xx-ddrctl.c                      | 175 +++++++++++++++++++++
->  4 files changed, 204 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
->  create mode 100644 drivers/memory/da8xx-ddrctl.c
->
-> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> new file mode 100644
-> index 0000000..7e271dd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
-> @@ -0,0 +1,20 @@
-> +* Device tree bindings for Texas Instruments da8xx DDR2/mDDR memory controller
-> +
-> +The DDR2/mDDR memory controller present on Texas Instruments da8xx SoCs features
-> +a set of registers which allow to tweak the controller's behavior.
-> +
-> +Documentation:
-> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
-> +
-> +Required properties:
-> +
-> +- compatible:		"ti,da850-ddr-controller" - for da850 SoC based boards
-> +- reg:			a tuple containing the base address of the memory
-> +			controller and the size of the memory area to map
-> +
-> +Example for da850 shown below.
-> +
-> +ddrctl {
-> +	compatible = "ti,da850-ddr-controller";
-> +	reg = <0xB0000000 0x100>;
-> +};
-
-Axel's series for the USB PHY reminded me that the PHY also has some
-config registers in this same area, and his series creates a syscon for
-a similar range of registers.
-
-Could you create a syscon for the SYSCFG0 registers, which would then
-be used by ths driver and your other drivers/bus driver?  Then the
-binding  would just reference the sysconf via phandle, and your driver
-can use syscon_regmap_lookup_by_phandle()
-
-> diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-> index 4b4c0c3..ec80e35 100644
-> --- a/drivers/memory/Kconfig
-> +++ b/drivers/memory/Kconfig
-> @@ -134,6 +134,14 @@ config MTK_SMI
->  	  mainly help enable/disable iommu and control the power domain and
->  	  clocks for each local arbiter.
->  
-> +config DA8XX_DDRCTL
-> +	bool "Texas Instruments da8xx DDR2/mDDR driver"
-> +	depends on ARCH_DAVINCI_DA8XX
-> +	help
-> +	  This driver is for the DDR2/mDDR Memory Controller present on
-> +	  Texas Instruments da8xx SoCs. It's used to tweak various memory
-> +	  controller configuration options.
-> +
->  source "drivers/memory/samsung/Kconfig"
->  source "drivers/memory/tegra/Kconfig"
->  
-> diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
-> index b20ae38..e88097fb 100644
-> --- a/drivers/memory/Makefile
-> +++ b/drivers/memory/Makefile
-> @@ -17,6 +17,7 @@ obj-$(CONFIG_MVEBU_DEVBUS)	+= mvebu-devbus.o
->  obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
->  obj-$(CONFIG_JZ4780_NEMC)	+= jz4780-nemc.o
->  obj-$(CONFIG_MTK_SMI)		+= mtk-smi.o
-> +obj-$(CONFIG_DA8XX_DDRCTL)	+= da8xx-ddrctl.o
->  
->  obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
->  obj-$(CONFIG_TEGRA_MC)		+= tegra/
-> diff --git a/drivers/memory/da8xx-ddrctl.c b/drivers/memory/da8xx-ddrctl.c
-> new file mode 100644
-> index 0000000..66022df
-> --- /dev/null
-> +++ b/drivers/memory/da8xx-ddrctl.c
-> @@ -0,0 +1,175 @@
-> +/*
-> + * TI da8xx DDR2/mDDR controller driver
-> + *
-> + * Copyright (C) 2016 BayLibre SAS
-> + *
-> + * Author:
-> + *   Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +
-> +/*
-> + * REVISIT: Linux doesn't have a good framework for the kind of performance
-> + * knobs this driver controls. We can't use device tree properties as it deals
-> + * with hardware configuration rather than description. We also don't want to
-> + * commit to maintaining some random sysfs attributes.
-> + *
-> + * For now we just hardcode the register values for the boards that need
-> + * some changes (as is the case for the LCD controller on da850-lcdk - the
-> + * first board we support here). When linux gets an appropriate framework,
-> + * we'll easily convert the driver to it.
-> + */
-> +
-> +struct da8xx_ddrctl_config_knob {
-> +	const char *name;
-> +	u32 reg;
-> +	u32 mask;
-> +	u32 offset;
-
-nit: call this shift instead, which will also map well onto the regmap
-accessors (which you'll use when switching to syscon.)
-
-> +};
-> +
-> +static const struct da8xx_ddrctl_config_knob da8xx_ddrctl_knobs[] = {
-> +	{
-> +		.name = "da850-pbbpr",
-> +		.reg = 0x20,
-> +		.mask = 0xffffff00,
-> +		.offset = 0,
-> +	},
-> +};
-> +
-> +struct da8xx_ddrctl_setting {
-> +	const char *name;
-> +	u32 val;
-> +};
-> +
-> +struct da8xx_ddrctl_board_settings {
-> +	const char *board;
-> +	const struct da8xx_ddrctl_setting *settings;
-> +};
-> +
-> +static const struct da8xx_ddrctl_setting da850_lcdk_ddrctl_settings[] = {
-> +	{
-> +		.name = "da850-pbbpr",
-> +		.val = 0x20,
-> +	},
-> +	{ }
-> +};
-> +
-> +static const struct da8xx_ddrctl_board_settings da8xx_ddrctl_board_confs[] = {
-> +	{
-> +		.board = "ti,da850-lcdk",
-> +		.settings = da850_lcdk_ddrctl_settings,
-> +	},
-> +};
-> +
-> +static const struct da8xx_ddrctl_config_knob *
-> +da8xx_ddrctl_match_knob(const struct da8xx_ddrctl_setting *setting)
-> +{
-> +	const struct da8xx_ddrctl_config_knob *knob;
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_knobs); i++) {
-> +		knob = &da8xx_ddrctl_knobs[i];
-> +
-> +		if (strcmp(knob->name, setting->name) == 0)
-> +			return knob;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +static const struct da8xx_ddrctl_setting *da8xx_ddrctl_get_board_settings(void)
-> +{
-> +	const struct da8xx_ddrctl_board_settings *board_settings;
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(da8xx_ddrctl_board_confs); i++) {
-> +		board_settings = &da8xx_ddrctl_board_confs[0];
-
-Looks like that '0' should be 'i' ?
-
-> +		if (of_machine_is_compatible(board_settings->board))
-> +			return board_settings->settings;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +static int da8xx_ddrctl_probe(struct platform_device *pdev)
-> +{
-> +	const struct da8xx_ddrctl_config_knob *knob;
-> +	const struct da8xx_ddrctl_setting *setting;
-> +	struct device_node *node;
-> +	struct resource *res;
-> +	void __iomem *ddrctl;
-> +	struct device *dev;
-> +	u32 reg;
-> +
-> +	dev = &pdev->dev;
-> +	node = dev->of_node;
-> +
-> +	setting = da8xx_ddrctl_get_board_settings();
-> +	if (!setting) {
-> +		dev_err(dev, "no settings for board '%s'\n",
-> +			of_flat_dt_get_machine_name());
-> +		return -EINVAL;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	ddrctl = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(ddrctl)) {
-> +		dev_err(dev, "unable to map memory controller registers\n");
-> +		return PTR_ERR(ddrctl);
-> +	}
-> +
-> +	for (; setting->name; setting++) {
-> +		knob = da8xx_ddrctl_match_knob(setting);
-> +		if (!knob) {
-> +			dev_warn(dev,
-> +				 "no such config option: %s\n", setting->name);
-> +			continue;
-> +		}
-> +
-> +		if (knob->reg > (res->end - res->start - sizeof(u32))) {
-> +			dev_warn(dev,
-> +				 "register offset of '%s' exceeds mapped memory size\n",
-> +				 knob->name);
-> +			continue;
-> +		}
-> +
-> +		reg = __raw_readl(ddrctl + knob->reg);
-> +		reg &= knob->mask;
-> +		reg |= setting->val << knob->offset;
-> +
-> +		dev_dbg(dev, "writing 0x%08x to %s\n", reg, setting->name);
-> +
-> +		__raw_writel(reg, ddrctl + knob->reg);
-
-nit: I don't think you need the __raw accessors here.
-
-But in any case, moving to syscon you'll be using regmap accessors, and
-this can just be converted to a single regmap_update_bits.
-
-Kevin
+Hello Shuah,
 
 
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id da8xx_ddrctl_of_match[] = {
-> +	{ .compatible = "ti,da850-ddr-controller", },
-> +	{ },
-> +};
-> +
-> +static struct platform_driver da8xx_ddrctl_driver = {
-> +	.probe = da8xx_ddrctl_probe,
-> +	.driver = {
-> +		.name = "da850-ddr-controller",
-> +		.of_match_table = da8xx_ddrctl_of_match,
-> +	},
-> +};
-> +module_platform_driver(da8xx_ddrctl_driver);
-> +
-> +MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
-> +MODULE_DESCRIPTION("TI da8xx DDR2/mDDR controller driver");
-> +MODULE_LICENSE("GPL v2");
+Shuah Khan wrote:
+> On 10/19/2016 04:27 PM, Shuah Khan wrote:
+>> On 10/19/2016 08:16 AM, Inki Dae wrote:
+>>> Hi Shuah,
+>>>
+>>> 2016-10-13 8:11 GMT+09:00 Shuah Khan <shuahkh@osg.samsung.com>:
+>>>> Hi Inki,
+>>>>
+>>>> On 08/15/2016 10:40 PM, Inki Dae wrote:
+>>>>
+>>>>>>
+>>>>>> okay the very first commit that added IOMMU support
+>>>>>> introduced the code that rejects non-contig gem memory
+>>>>>> type without IOMMU.
+>>>>>>
+>>>>>> commit 0519f9a12d0113caab78980c48a7902d2bd40c2c
+>>>>>> Author: Inki Dae <inki.dae@samsung.com>
+>>>>>> Date:   Sat Oct 20 07:53:42 2012 -0700
+>>>>>>
+>>>>>>     drm/exynos: add iommu support for exynos drm framework
+>>>>>>
+>>>>
+>>>> I haven't given up on this yet. I am still seeing the following failure:
+>>>>
+>>>> Additional debug messages I added:
+>>>> [   15.287403] exynos_drm_gem_create_ioctl() 1
+>>>> [   15.287419] exynos_drm_gem_create() flags 1
+>>>>
+>>>> [   15.311511] [drm:exynos_drm_framebuffer_init] *ERROR* Non-contiguous GEM memory is not supported.
+>>>>
+>>>> Additional debug message I added:
+>>>> [   15.318981] [drm:exynos_user_fb_create] *ERROR* failed to initialize framebuffer
+>>>>
+>>>> This is what happens:
+>>>>
+>>>> 1. exynos_drm_gem_create_ioctl() gets called with EXYNOS_BO_NONCONTIG request
+>>>> 2. exynos_drm_gem_create(0 goes ahead and creates the GEM buffers
+>>>> 3. exynos_user_fb_create() tries to associate GEM to fb and fails during
+>>>>    check_fb_gem_memory_type()
+>>>>
+>>>> At this point, there is no recovery and lightdm fails
+>>>>
+>>>> xf86-video-armsoc/src/drmmode_exynos/drmmode_exynos.c assumes contiguous
+>>>> allocations are not supported in some exynos drm versions: The following
+>>>> commit introduced this change:
+>>>>
+>>>> https://git.linaro.org/arm/xorg/driver/xf86-video-armsoc.git/commitdiff/3be1f6273441fe95dd442f44064387322e16b7e9
+>>>>
+>>>> excerpts from the diff:-       if (create_gem->buf_type == ARMSOC_BO_SCANOUT)
+>>>> -               create_exynos.flags = EXYNOS_BO_CONTIG;
+>>>> -       else
+>>>> -               create_exynos.flags = EXYNOS_BO_NONCONTIG;
+>>>> +
+>>>> +       /* Contiguous allocations are not supported in some exynos drm versions.
+>>>> +        * When they are supported all allocations are effectively contiguous
+>>>> +        * anyway, so for simplicity we always request non contiguous buffers.
+>>>> +        */
+>>>> +       create_exynos.flags = EXYNOS_BO_NONCONTIG;
+>>>>
+>>>
+>>> Above comment, "Contiguous allocations are not supported in some
+>>> exynos drm versions.", seems wrong assumption.
+>>> The root cause, contiguous allocation is not supported, would be that
+>>> they used Linux kernel which didn't have CMA region enough - as
+>>> default 16MB, or didn't declare CMA region enough for the DMA device.
+>>> So I think they should not force to flag EXYNOS_BO_NONCONTIG and they
+>>> should manage the error case if the allocation failed.
+>>
+>> This assumption doesn't sound correct and forcing NONCONTIG isn't right
+>> either. 
+>>
+>>>
+>>>> There might have been logic on exynos_drm that forced Contig when it coudn't
+>>>> support NONCONTIG. At least, that is what this comment suggests. This assumption
+>>>> doesn't appear to be a good one and not sure if this change was made to fix a bug.
+>>>>
+>>>> After the IOMMU support, this assumption is no longer true. Hence, with IOMMU
+>>>> support, latest kernels have a mismatch with the installed xf86-video-armsoc
+>>>>
+>>>> This is what I am running into. This leads to the following question:
+>>>>
+>>>> 1. How do we ensure exynos_drm kernel changes don't break user-space
+>>>>    specifically xf86-video-armsoc
+>>>> 2. This seems to have gone undetected for a while. I see a change in
+>>>>    exynos_drm_gem_dumb_create() that is probably addressing this type
+>>>>    of breakage. Commit 122beea84bb90236b1ae545f08267af58591c21b adds
+>>>>    handling for IOMMU NONCONTIG case.
+>>>
+>>> Seems this patch has a problem. This patch forces to flag NONCONTIG if
+>>> iommu is enabled. The flag should be depend on the argument from
+>>> user-space.
+>>> I.e., if user-space requested a gem allocation with CONTIG flag, then
+>>> Exynos drm driver should allocate contiguous memory even though iommu
+>>> is enabled.
+>>>
+>>>>
+>>>> Anyway, I am interested in getting the exynos_drm kernel side code
+>>>> and xf86-video-armsoc in sync to resolve the issue.
+>>>>
+>>>> Could you recommend a going forward plan?
+>>>
+>>> My opinion are,
+>>>
+>>> 1. Do not force to flag EXYNOS_BO_NONCONTIG at xf86-video-armsoc
+> 
+> Okay more on this. I fixed xf86-video-armso to ask for EXYNOS_BO_CONTIG
+> for ARMSOC_BO_SCANOUT and EXYNOS_BO_NONCONTIG in all other cases.
+> 
+> Revert of the commit: 3be1f6273441fe95dd442f44064387322e16b7e9
+> 
+> With this change, now display manager starts just fine. However, it turns
+> out xf86-video-armsoc is obsoleted in favor of xf86-video-modesetting. The
+> last update to xf86-video-armsoc git was 3 years ago.
+IIRC xf86-video-armsoc was created to facilitate integration with the
+proprietary Mali userspace blob. I don't think that can be done with the
+modesetting DDX.
+
+
+
+> I am not sure where to send the fix and doesn't look like it is being
+> maintained actively. I can pursue it further and try to get this into
+> xf86-video-armsoc provided I can find the maintainer for this seemingly
+> inactive project.
+I was wondering if anyone has actually complained about this issue?
+
+
+
+> I brought in the latest xf86-video-modesetting bits from
+> 
+> https://cgit.freedesktop.org/xorg/driver/xf86-video-modesetting
+> 
+> I removed xf86-video-armsoc and installed xf86-video-modesetting and that
+> worked just fine. xf86-video-modesetting uses dumb_create interface instead
+> of DRM_IOCTL_EXYNOS_GEM_CREATE.
+> 
+> dumb_create interface eliminates the need for DRM_IOCTL_EXYNOS_GEM_CREATE
+> in userspace. libdrm-2.4.71 does call DRM_IOCTL_EXYNOS_GEM_CREATE.
+> 
+> The question is do we still need to continue to support the custom gem
+> create interface DRM_IOCTL_EXYNOS_GEM_CREATE?
+I'd say yes. With just the dumb_create interface it is not possible to
+change the type of buffer you get. And if you want to support any kind
+of hw acceleration in the DDX, you probably want to control at least the
+caching behaviour of the buffer.
+
+
+
+> Some drm drivers seem to support it and some don't.
+Not sure I understand this. I don't think any other DRM driver except
+for exynos supports this ioctl. But all drivers have their own ioctls to
+request memory (DRM_IOCTL_ETNAVIV_GEM_NEW, DRM_IOCTL_VC4_CREATE_BO, etc.)
+
+
+
+>  Unfortunately, if userspace requests noncontig
+> for scanout, we will continue to see problems with display manager when
+> iommu is disabled. dumb create hides all of that, are there good reasons
+> to continue to support it in exynos drm?
+In addition to the stuff I said above, you can use it for render nodes.
+That doesn't work for dumb_create.
+
+
+> Exposing CONTIG and NONCONTIG to userspace appears to be causing problems
+> when exynos drm determines it can't support non-contig GEM buffers in fb
+> init after userspace allocates them.
+Might be missing something here, but this whole thing just looks like a
+bug in xf86-video-armsoc. No matter from which perspective you look, the
+commit that changed all allocations to noncontig was plain wrong.
+
+My guess: This was done to paper over some bug in some vendor kernel for
+a product using an Exynos SoC.
+
+
+With best wishes,
+Tobias
+
+
+
+> 
+>>> 2. Do not force to flag NONCONTIG at Exynos drm driver even though
+>>> iommu is enabled and flag allocation type with the argument from
+>>> user-space.
+>>>
+> 
+> exynos_drm_gem_dumb_create() doesn't take any flags, there is no need
+> to change the above.
+> 
+> thanks,
+> -- Shuah
+> 
