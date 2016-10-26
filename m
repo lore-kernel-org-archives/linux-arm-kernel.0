@@ -1,87 +1,22 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 26 Oct 2016 19:01:12 +0200
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <4264651.gPKphdYuCx@wuerfel>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <4818149.nzRaU7vJQE@amdc1976> <4264651.gPKphdYuCx@wuerfel>
-Message-ID: <1913139.FJW82OAuEF@amdc3058>
+From: thierry.escande@collabora.com (Thierry Escande)
+Date: Wed, 26 Oct 2016 19:04:06 +0200
+Subject: [PATCH 0/2] ARM DMA mapping
+Message-ID: <1477501448-30915-1-git-send-email-thierry.escande@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Wednesday, July 13, 2016 04:37:31 PM Arnd Bergmann wrote:
-> On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
-> > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > > This patch disables deprecated IDE subsystem in assabet_defconfig
-> > > > (no IDE host drivers are selected in this config so there is no
-> > > > valid reason to enable IDE subsystem itself).
-> > > > 
-> > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > 
-> > > I think the series makes a lot of sense. I have checked your assertions
-> > > in the changelogs and found no flaws in your logic, so I think we should
-> > > take them all through arm-soc unless there are other concerns.
-> > 
-> > Thank you.
-> > 
-> > Should I resend everything or just patches that were not reposted yet
-> > (the ones that were marked as RFT initially and got no feedback)?
-> 
-> I'd be fine with just getting a pull request with all the patches that
-> had no negative feedback and that were not already applied (if any).
+This series introduces 2 changes in ARM DMA mapping. The first one is
+about supporting cache maintenance after calling arm_dma_get_sgtable().
+The other one handles VMA access protection in __get_dma_pgprot().
 
-Here it is (sorry for taking so long).
+Heng-Ruey Hsu (2):
+  ARM: dma-mapping: Support cache sync after arm_dma_get_sgtable
+  ARM: dma-mapping: Handle prot with non-consistent dma attribute
 
-The following changes since commit 07d9a380680d1c0eb51ef87ff2eab5c994949e69:
+ arch/arm/mm/dma-mapping.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-  Linux 4.9-rc2 (2016-10-23 17:10:14 -0700)
-
-are available in the git repository at:
-
-  https://github.com/bzolnier/linux.git v4.9-rc2-arm-configs-pata
-
-for you to fetch changes up to bc9c6cc857849ec0d83bd13c1812bae9345dc553:
-
-  arm: spitz_defconfig: convert to use libata PATA drivers (2016-10-26 18:43:33 +0200)
-
-----------------------------------------------------------------
-Bartlomiej Zolnierkiewicz (16):
-      arm: assabet_defconfig: disable IDE subsystem
-      arm: badge4_defconfig: disable IDE subsystem
-      arm: cerfcube_defconfig: disable IDE subsystem
-      arm: lart_defconfig: disable IDE subsystem
-      arm: mainstone_defconfig: disable IDE subsystem
-      arm: shannon_defconfig: disable IDE subsystem
-      arm: collie_defconfig: convert to use libata PATA drivers
-      arm: omap1_defconfig: convert to use libata PATA drivers
-      arm: am200epdkit_defconfig: convert to use libata PATA drivers
-      arm: corgi_defconfig: convert to use libata PATA drivers
-      arm: h3600_defconfig: convert to use libata PATA drivers
-      arm: ixp4xx_defconfig: convert to use libata PATA drivers
-      arm: jornada720_defconfig: convert to use libata PATA drivers
-      arm: netwinder_defconfig: convert to use libata PATA drivers
-      arm: s3c2410_defconfig: convert to use libata PATA drivers
-      arm: spitz_defconfig: convert to use libata PATA drivers
-
- arch/arm/configs/am200epdkit_defconfig |  5 +++--
- arch/arm/configs/assabet_defconfig     |  1 -
- arch/arm/configs/badge4_defconfig      |  2 --
- arch/arm/configs/cerfcube_defconfig    |  1 -
- arch/arm/configs/collie_defconfig      |  5 +++--
- arch/arm/configs/corgi_defconfig       |  7 +++----
- arch/arm/configs/h3600_defconfig       |  5 +++--
- arch/arm/configs/ixp4xx_defconfig      |  9 +++++----
- arch/arm/configs/jornada720_defconfig  |  5 +++--
- arch/arm/configs/lart_defconfig        |  2 --
- arch/arm/configs/mainstone_defconfig   |  1 -
- arch/arm/configs/netwinder_defconfig   |  7 ++++---
- arch/arm/configs/omap1_defconfig       |  4 ++--
- arch/arm/configs/s3c2410_defconfig     | 10 +++-------
- arch/arm/configs/shannon_defconfig     |  1 -
- arch/arm/configs/spitz_defconfig       |  8 +++-----
- 16 files changed, 32 insertions(+), 41 deletions(-)
+-- 
+2.7.4
