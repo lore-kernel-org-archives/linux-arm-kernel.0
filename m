@@ -1,82 +1,43 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Oct 2016 15:39:19 -0500
-Subject: [PATCH 1/6] dt: bindings: Add Allwinner Q8 tablets hardware
- manager bindings
-In-Reply-To: <20161014075337.10452-2-hdegoede@redhat.com>
+Date: Wed, 26 Oct 2016 15:54:51 -0500
+Subject: Add Allwinner Q8 tablets hardware manager
+In-Reply-To: <20161024173900.GP15620@leverpostej>
 References: <20161014075337.10452-1-hdegoede@redhat.com>
- <20161014075337.10452-2-hdegoede@redhat.com>
-Message-ID: <20161026203919.63izobxnn2h33oh2@rob-hp-laptop>
+ <20161024173900.GP15620@leverpostej>
+Message-ID: <20161026205451.cgk5xam334ncg6op@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 14, 2016 at 09:53:32AM +0200, Hans de Goede wrote:
-> Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
-> of which a new batch is produced every few weeks. Each batch uses a
-> different mix of touchscreen, accelerometer and wifi peripherals.
+On Mon, Oct 24, 2016 at 06:39:01PM +0100, Mark Rutland wrote:
+> On Fri, Oct 14, 2016 at 09:53:31AM +0200, Hans de Goede wrote:
+> > Hi Rob, Mark, et al.,
 > 
-> Given that each batch is different creating a devicetree for each variant
-> is not desirable, work is being done on a Q8 tablet hardware manager which
-> auto-detects the touchscreen and accelerometer and will update the dt with
-> what it has found, so that a single generic dt can be used for these tablets.
+> Hi Hans,
 > 
-> This commit adds dt-bindings for this hardware manager.
+> Apologies for the delay in replying to this.
 > 
-> Note the wifi is connected to a discoverable bus (sdio or usb) and will be
-> autodetected by the mmc resp. usb subsystems.
+> I'd like to be clear that I do understand that there is a problem that
+> needs to be addressed here. However, I do not believe that the *current*
+> in-kernel approach is correct. More on that below.
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  .../misc/allwinner,sunxi-q8-hardwaremgr.txt        | 71 ++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> > Mark, I know that we discussed this at ELCE and you clearly indicated
+> > that according to you this does not belong in the kernel. I was a bit
+> > surprised by this part of the discussion.
+> > 
+> > I had posted a RFC earlier and Rob had indicated that given that the q8
+> > tablets are a special case, as my code uses actual probing rather then some
+> > pre-arranged id mechanism with say an eeprom, that doing this in a
+> > non-generic manner would be ok for my special case.
 > 
-> diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
-> new file mode 100644
-> index 0000000..a81b258
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
-> @@ -0,0 +1,71 @@
-> +Q8 tablet hardware manager
-> +--------------------------
-> +
-> +Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets of
-> +which a new batch is produced every few weeks. Each batch uses a different
-> +mix of touchscreen, accelerometer and wifi peripherals.
-> +
-> +Given that each batch is different creating a devicetree for each variant is
-> +not desirable. The Q8 tablet hardware manager bindings are bindings for an os
-> +module which auto-detects the touchscreen and accelerometer so that a single
-> +generic dts can be used for these tablets.
-> +
-> +The wifi is connected to a discoverable bus and will be autodetected by the os.
-> +
-> +Required properties:
-> + - toplevel / machine compatible, one of:
-> +	"allwinner,q8-a13"
-> +	"allwinner,q8-a23"
-> +	"allwinner,q8-a33"
-> + - touchscreen node   : There must be a template touchscreen node named
-> +			"touchscreen", this must be a child node of the
-> +			touchscreen i2c bus
-> + - accelerometer node : There must be a template accelerometer node named
-> +			"accelerometer", this must be a child node of the
-> +			accelerometer i2c bus
-> +
-> +touchscreen node required properties:
-> + - interrupt-parent   : phandle pointing to the interrupt controller
-> +			serving the touchscreen interrupt
-> + - interrupts         : interrupt specification for the touchscreen interrupt
-> + - power-gpios        : Specification for the pin connected to the touchscreen's
-> +			enable / wake pin. This needs to be driven high to
-> +			enable the touchscreen controller
+> To some extent, Rob and I may have differing views here; I'm not
+> entirely sure what Rob's view is, and I cannot talk on his behalf. I
+> certainly must apologise for having not commented on said RFC, however.
 
-enable-gpios is the common name.
-
-I was going to say you need to list possible compatible strings here 
-also. However, I now wonder if this binding doc is even needed. The 
-binding docs should just be the bindings for each touchscreen or 
-accelerometer. The fact that the node is completed at run-time whether 
-the bootloader or kernel doesn't matter for the binding definition. When 
-and it is completed is orthogonal to the binding definition.
+I've focused mainly on the bindings which I certainly had issues with 
+how the RFC was done. As to where this should be done, keeping all the 
+dirty bits in firmware/bootloader is certainly appealing. However, there 
+are cases where data alone can't abstract out board differences and we 
+need board code. Whether this is one of them, well, that is Hans' job to 
+convince Mark.
 
 Rob
