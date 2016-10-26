@@ -1,70 +1,68 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 26 Oct 2016 13:48:56 -0200
-Subject: [PATCH RESEND 1/3] clk: imx6: Mask mmdc_ch1 handshake for
- periph2_sel and mmdc_ch1_axi_podf
-In-Reply-To: <1476750554-21961-1-git-send-email-festevam@gmail.com>
-References: <1476750554-21961-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAOMZO5BQHKv7dxJTq2C1qdvhhRRRW8bafaXoQW77AKLNTWggAg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 26 Oct 2016 08:50:06 -0700
+Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
+In-Reply-To: <CACRpkdYqoU0foW1izcZapbgUm+NO4quz9AZZBmts4841BRcigA@mail.gmail.com>
+ (Linus Walleij's message of "Wed, 26 Oct 2016 16:32:29 +0200")
+References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+ <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
+ <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
+ <1477040798.15560.96.camel@baylibre.com>
+ <CACRpkdYUVXny57AC9rKX3VRAyooEk_2XLvqe9jOuT3rOaE75rg@mail.gmail.com>
+ <ec7c6cc5-cf9a-9c75-4b07-e337064c7d6e@arm.com>
+ <1477400900.2482.51.camel@baylibre.com>
+ <dee26f0b-e175-f8a0-2b73-08e8e324841c@arm.com>
+ <1477405332.2482.87.camel@baylibre.com>
+ <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
+ <1477409478.2482.113.camel@baylibre.com>
+ <CACRpkdbGo4BJOdzkgBrE9jT-rKodd4zssCnOtOuGS+OqV-Uc6Q@mail.gmail.com>
+ <1477491766.2482.159.camel@baylibre.com>
+ <CACRpkdYqoU0foW1izcZapbgUm+NO4quz9AZZBmts4841BRcigA@mail.gmail.com>
+Message-ID: <7hk2cvrtxt.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
+Hi Linus,
 
-Are you collecting the imx clk patches in this cycle?
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-I see no response from Stephen on this series from a long time.
+> On Wed, Oct 26, 2016 at 4:22 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+>> On Tue, 2016-10-25 at 20:20 +0200, Linus Walleij wrote:
+>
+>>> However the semantic is such, that it is not necessary to call
+>>> to_irq()
+>>> before using an IRQ: the irqchip and gpiochip abstractions should be
+>>> orthogonal.
+>>
+>> Linus,
+>>
+>> They are orthogonal. You can request an irq from the irqchip controller
+>> without the gpiochip, like any other irq controller.
+>
+> OK good, sorry if I'm stating the obvious.
+>
+>> irq_create_mapping (and irq_create_fwspec_mapping) internally calls
+>> irq_find_mapping. So if the mapping already exist (the irq is already
+>> used before calling to_irq), the existing mapping will be returned. The
+>> mapping will be actually created only if needed. It seems to be in line
+>> with your explanation, no ?
+>
+> Yes, but you want to call irq_create_mapping() in slowpath (irq setup)
+> and irq_find_mapping() in fastpath (irq handler). Else the first IRQ
+> may result in unwelcomed surprises.
+>
+>> There is really a *lot* of gpio drivers which use irq_create_mapping in
+>> the to_irq callback, are these all wrong ?
+>
+> Yes they are all wrong. They should all be using irq_find_mapping().
 
-We missed 4.9, so hopefully this can land in 4.10.
+So, dumb question from someone trying (but having a hard time) to follow
+and understand the rationale...
 
-On Mon, Oct 17, 2016 at 10:29 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
->
-> MMDC CH1 is not used on i.MX6Q, so the handshake needed to change the
-> parent of periph2_sel or the divider of mmdc_ch1_axi_podf will never
-> succeed.
-> Disable the handshake mechanism to allow changing the frequency of
-> mmdc_ch1_axi, allowing to use it as a possible source for the LDB DI
-> clock.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  drivers/clk/imx/clk-imx6q.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-> index ce8ea10..66825a8 100644
-> --- a/drivers/clk/imx/clk-imx6q.c
-> +++ b/drivers/clk/imx/clk-imx6q.c
-> @@ -156,6 +156,19 @@ static struct clk ** const uart_clks[] __initconst = {
->         NULL
->  };
->
-> +#define CCM_CCDR               0x04
-> +
-> +#define CCDR_MMDC_CH1_MASK     BIT(16)
-> +
-> +static void __init imx6q_mmdc_ch1_mask_handshake(void __iomem *ccm_base)
-> +{
-> +       unsigned int reg;
-> +
-> +       reg = readl_relaxed(ccm_base + CCM_CCDR);
-> +       reg |= CCDR_MMDC_CH1_MASK;
-> +       writel_relaxed(reg, ccm_base + CCM_CCDR);
-> +}
-> +
->  static void __init imx6q_clocks_init(struct device_node *ccm_node)
->  {
->         struct device_node *np;
-> @@ -297,6 +310,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
->         base = of_iomap(np, 0);
->         WARN_ON(!base);
->
-> +       imx6q_mmdc_ch1_mask_handshake(base);
-> +
->         /*                                              name                reg       shift width parent_names     num_parents */
->         clk[IMX6QDL_CLK_STEP]             = imx_clk_mux("step",             base + 0xc,  8,  1, step_sels,         ARRAY_SIZE(step_sels));
->         clk[IMX6QDL_CLK_PLL1_SW]          = imx_clk_mux("pll1_sw",          base + 0xc,  2,  1, pll1_sw_sels,      ARRAY_SIZE(pll1_sw_sels));
-> --
-> 2.7.4
->
+If it's wrong enough to completely reject, why are changes still being
+merged that are doing it so wrong?  (e.g. like this one[1], just merged
+for v4.9)
+
+Kevin
+
+[1] 0eb9f683336d pinctrl: Add IRQ support to STM32 gpios
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/pinctrl/stm32/pinctrl-stm32.c?id=0eb9f683336d7eb99a3b75987620417c574ffb57
