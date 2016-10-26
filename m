@@ -1,70 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 25 Oct 2016 12:42:09 +0200
-Subject: [PATCH 5/8] ARM: gr8: Add missing pwm channel 1 pin
-In-Reply-To: <CAGb2v64Ai+8sUPyH9aTnKUw1ROmQNxzCEqUXrT4v8Q-nipqR3Q@mail.gmail.com>
-References: <cover.bb1e4a568bc16ada5254cad063f4afbaa1ca5906.1476951078.git-series.maxime.ripard@free-electrons.com>
- <0df42247c3348e7f6aed945e5669cec87f96f7ac.1476951078.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v66w0sTzn_SWH4rrpWKOosSxALV8ot3CBQbGhwLxvX1vxw@mail.gmail.com>
- <20161020170739.lgt2ywm346vm47zd@lukather>
- <CAGb2v64Ai+8sUPyH9aTnKUw1ROmQNxzCEqUXrT4v8Q-nipqR3Q@mail.gmail.com>
-Message-ID: <20161025104209.edtqoymu4thc56p4@lukather>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Wed, 26 Oct 2016 22:09:07 +0000
+Subject: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
+In-Reply-To: <20161026103101.GC19965@leverpostej>
+References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
+ <20161026103101.GC19965@leverpostej>
+Message-ID: <DB4PR04MB07813D4DA5D5567229394A7D8FAB0@DB4PR04MB0781.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 12:10:26PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Oct 21, 2016 at 1:07 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Oct 20, 2016 at 10:10:03PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Oct 20, 2016 at 4:12 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > The PWM controller has two different channels, but only the first pin was
-> >> > exposed in the DTSI. Add the other one.
-> >> >
-> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>
-> >> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> >>
-> >> > ---
-> >> >  arch/arm/boot/dts/ntc-gr8.dtsi | 7 +++++++
-> >> >  1 file changed, 7 insertions(+), 0 deletions(-)
-> >> >
-> >> > diff --git a/arch/arm/boot/dts/ntc-gr8.dtsi b/arch/arm/boot/dts/ntc-gr8.dtsi
-> >> > index 74aff795e723..fad7381630f3 100644
-> >> > --- a/arch/arm/boot/dts/ntc-gr8.dtsi
-> >> > +++ b/arch/arm/boot/dts/ntc-gr8.dtsi
-> >> > @@ -854,6 +854,13 @@
-> >> >                                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> >> >                         };
-> >> >
-> >> > +                       pwm1_pins_a: pwm1 at 0 {
-> >>
-> >> Nit: really don't need "_a" and "@0" here.
+
+
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Wednesday, October 26, 2016 5:31 AM
+> To: M.H. Lian <minghuan.lian@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>; Stuart
+> Yoder <stuart.yoder@nxp.com>; Leo Li <leoyang.li@nxp.com>; Scott Wood
+> <scott.wood@nxp.com>; Shawn Guo <shawnguo@kernel.org>; Mingkai Hu
+> <mingkai.hu@nxp.com>
+> Subject: Re: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
+> 
+> On Tue, Oct 25, 2016 at 08:35:40PM +0800, Minghuan Lian wrote:
+> > 1. The different version of a SoC may have different MSI
+> > implementation. But compatible "fsl,<soc-name>-msi" can not describe
+> > the SoC version.
+> 
+> Surely, "fsl,<soc-name>-<rev>-msi" can describe this?
+> 
+> If the hardware differs, it needs a new compatible string.
+> 
+> If there's some configuration value that varies across revisions (e.g.
+> number of slots), you can add a proeprty to describe that explciitly.
+> 
+> > The MSI driver will use SoC match interface to get SoC type and
+> > version instead of compatible string. So all MSI node can use the
+> > common compatible "fsl,ls-scfg-msi" and the original compatible is
+> > unnecessary.
 > >
-> > Fixed and applied.
+> > 2. Layerscape SoCs may have one or several MSI controllers.
+> > In order to increase MSI interrupt number of a PCIe, the patch moves
+> > all MSI node into the parent node "msi-controller". So a PCIe can
+> > request MSI from all the MSI controllers.
 > 
-> Oops, you forgot to fix the label in the chip-pro dts:
+> This is not necessary, and does not represent a real block of hardware.
+> So NAK for this approach.
 > 
->   DTC     arch/arm/boot/dts/ntc-gr8-chip-pro.dtb
-> ERROR (phandle_references): Reference to non-existent node or label
-> "pwm1_pins_a"
+> The msi-parent property can contain a list of MSI controllers. See the examples
+> in Documentation/devicetree/bindings/interrupt-controller/msi.txt.
+> Likewise, the msi-map property can map to a number of MSI controllers.
 > 
-> ERROR: Input tree has errors, aborting (use -f to force output)
-> scripts/Makefile.lib:313: recipe for target
-> 'arch/arm/boot/dts/ntc-gr8-chip-pro.dtb' failed
+> If the core code can only consider one at a time, then that's an issue to be
+> addressed in core code, not one to be bodged around in bindings.
+> 
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> > ---
+> >  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 57 +++++++++++++++++++---
+> >  1 file changed, 49 insertions(+), 8 deletions(-)
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > index 9e38949..29f95fd 100644
+> > ---
+> > a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-sc
+> > +++ fg-msi.txt
+> > @@ -1,18 +1,28 @@
+> >  * Freescale Layerscape SCFG PCIe MSI controller
+> >
+> > +Layerscape SoCs may have one or multiple MSI controllers.
+> > +Each MSI controller must be showed as a child node.
+> > +
+> >  Required properties:
+> >
+> > -- compatible: should be "fsl,<soc-name>-msi" to identify
+> > -	      Layerscape PCIe MSI controller block such as:
+> > -              "fsl,1s1021a-msi"
+> > -              "fsl,1s1043a-msi"
+> > +- compatible: should be "fsl,ls-scfg-msi"
+> 
+> This breaks old DTBs, and throws away information which you describe above as
+> valuable. So another NAK for that.
 
-Yeah, it was noticed by linux-next too, and I fixed it...
+I agree with you that we should maintain the backward compatibility.  But on the other hand, I just found that there is a silly typo in the original binding that "ls" is wrongly spelled as "1s" and they look too close to be noticed in previous patch reviews.  :(  The driver and all the DTSes used the binding with the typo which covered up the problem.  So even if we want to keep the "fsl,<soc-name>-msi" binding, we probably want to fix the typo, right?  And that breaks the backward compatibility too.
 
-Sorry for that.
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161025/7c71abee/attachment.sig>
+Regards,
+Leo
