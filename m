@@ -1,43 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Oct 2016 15:54:51 -0500
-Subject: Add Allwinner Q8 tablets hardware manager
-In-Reply-To: <20161024173900.GP15620@leverpostej>
-References: <20161014075337.10452-1-hdegoede@redhat.com>
- <20161024173900.GP15620@leverpostej>
-Message-ID: <20161026205451.cgk5xam334ncg6op@rob-hp-laptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 26 Oct 2016 15:56:19 -0500
+Subject: [PATCH 0/5] Minimal cpuidle fixes for omap5 and dra7
+In-Reply-To: <20161026151703.24730-1-tony@atomide.com>
+References: <20161026151703.24730-1-tony@atomide.com>
+Message-ID: <c1b6bf69-ed11-3355-323f-9d6503180310@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 06:39:01PM +0100, Mark Rutland wrote:
-> On Fri, Oct 14, 2016 at 09:53:31AM +0200, Hans de Goede wrote:
-> > Hi Rob, Mark, et al.,
-> 
-> Hi Hans,
-> 
-> Apologies for the delay in replying to this.
-> 
-> I'd like to be clear that I do understand that there is a problem that
-> needs to be addressed here. However, I do not believe that the *current*
-> in-kernel approach is correct. More on that below.
-> 
-> > Mark, I know that we discussed this at ELCE and you clearly indicated
-> > that according to you this does not belong in the kernel. I was a bit
-> > surprised by this part of the discussion.
-> > 
-> > I had posted a RFC earlier and Rob had indicated that given that the q8
-> > tablets are a special case, as my code uses actual probing rather then some
-> > pre-arranged id mechanism with say an eeprom, that doing this in a
-> > non-generic manner would be ok for my special case.
-> 
-> To some extent, Rob and I may have differing views here; I'm not
-> entirely sure what Rob's view is, and I cannot talk on his behalf. I
-> certainly must apologise for having not commented on said RFC, however.
+Tony,
+On 10/26/2016 10:16 AM, Tony Lindgren wrote:
+> Hi all,
+>
+> Here are some fixes to get minimal cpuidle support working with omap5
+> and dra7. Not sure if there are still some unsorted issues on enabling
+> this on dra7, but at least omap5 has been behving for me for few
+> weeks with these.
 
-I've focused mainly on the bindings which I certainly had issues with 
-how the RFC was done. As to where this should be done, keeping all the 
-dirty bits in firmware/bootloader is certainly appealing. However, there 
-are cases where data alone can't abstract out board differences and we 
-need board code. Whether this is one of them, well, that is Hans' job to 
-convince Mark.
+I am OK with cpuidle for OMAP5, but NOT dra7. we have enabled this 
+series of patches close to a couple of years back and hit quiet a few 
+issues that do not have silicon resolution. CPU states lower than WFI 
+will not work in cpuidle for DRA7 and has already been "descoped" from 
+TI investigation charter. details of the issue remain TI internal, 
+given that the descope was already done.
 
-Rob
+Again, OMAP5 has only had limited exposure from verification point of 
+view - and all of it TI internal (unlike OMAP4 which has had 
+production devices go ahead) -> at the very least, I'd link it with 
+experimental.
+
+-- 
+Regards,
+Nishanth Menon
