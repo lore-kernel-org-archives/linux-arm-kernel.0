@@ -1,35 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 26 Oct 2016 23:33:15 +0530
-Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
-In-Reply-To: <7heg33rtdl.fsf@baylibre.com>
-References: <1477418044-24603-1-git-send-email-david@lechnology.com>
- <f423a705-5ae2-78cf-2b63-609dd4e2cdf6@ti.com> <7heg33rtdl.fsf@baylibre.com>
-Message-ID: <6a145c99-eb39-d937-71b9-3ac709bf760e@ti.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Wed, 26 Oct 2016 13:05:12 -0500
+Subject: [PATCHv2] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+Message-ID: <1477505112-26079-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 October 2016 09:32 PM, Kevin Hilman wrote:
-> Hi Sekhar,
-> 
-> Sekhar Nori <nsekhar@ti.com> writes:
-> 
->> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
->>> This fixes pwm name matching for DA850 familiy devices. When using device
->>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
->>> same name, which caused errors when trying to register the devices.
->>>
->>> The names for clock matching in da850_clks[] also have to be updated to
->>> to exactly match in order for the clock lookup to work correctly.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>
->> Applied to "fixes" branch. Will send upstream after testing a bit and
->> also waiting to see if anyone else has any comments.
-> 
-> I'm not seeing a fixes branch in your tree.  Did you push this out?
-> Similarily, I didn't see the updates in v4.10/defconfig either.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Pushed now. Will push a merged master branch tomorrow after some testing.
+Enable the QSPI node and add the flash chip.
 
-Thanks,
-Sekhar
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v2: Remove partition entries for the SoCKIT
+---
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 02e22f5..2ce6736 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -175,6 +175,27 @@
+ 	status = "okay";
+ };
+ 
++&qspi {
++	status = "okay";
++
++	flash: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q256a";
++		reg = <0>;
++		spi-max-frequency = <100000000>;
++
++		m25p,fast-read;
++		cdns,page-size = <256>;
++		cdns,block-size = <16>;
++		cdns,read-delay = <4>;
++		cdns,tshsl-ns = <50>;
++		cdns,tsd2d-ns = <50>;
++		cdns,tchsh-ns = <4>;
++		cdns,tslch-ns = <4>;
++	};
++};
++
+ &usb1 {
+ 	status = "okay";
+ };
+-- 
+1.7.9.5
