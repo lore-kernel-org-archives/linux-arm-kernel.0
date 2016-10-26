@@ -1,55 +1,93 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 26 Oct 2016 10:28:43 +0200
-Subject: [linux-sunxi] [PATCH RESEND 1/2] dt: bindings: add
- allwinner,otg-routed property for phy-sun4i-usb
-In-Reply-To: <20161025041139.46454-1-icenowy@aosc.xyz>
-References: <20161025041139.46454-1-icenowy@aosc.xyz>
-Message-ID: <55fe59fc-6e93-d519-2d7c-264c48820fc4@redhat.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 26 Oct 2016 16:31:55 +0800
+Subject: [PATCH v14 1/9] clocksource/drivers/arm_arch_timer: Move enums
+ and defines to header file
+In-Reply-To: <20161020144510.GJ10234@leverpostej>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-2-git-send-email-fu.wei@linaro.org>
+ <20161020144510.GJ10234@leverpostej>
+Message-ID: <CADyBb7shWfCQycmo0GcheX2NSsrjYBpzdtYFqymvDNCKi0QM2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mark
 
-On 25-10-16 06:11, Icenowy Zheng wrote:
-> On some newer Allwinner SoCs (H3 or A64), the PHY0 can be either routed to
-> the MUSB controller (which is an OTG controller) or the OHCI/EHCI pair
-> (which is a Host-only controller, but more stable and easy to implement).
+On 20 October 2016 at 22:45, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
 >
-> This property marks whether on a certain board which controller should be
-> attached to the PHY.
+> On Thu, Sep 29, 2016 at 02:17:09AM +0800, fu.wei at linaro.org wrote:
+>> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+>> index caedb74..6f06481 100644
+>> --- a/include/clocksource/arm_arch_timer.h
+>> +++ b/include/clocksource/arm_arch_timer.h
+>> @@ -19,6 +19,9 @@
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-
-Icenowy, I appreciate your work on this, but we really need full otg
-support with dynamic switching rather then hardwiring the routing, so
-this cannot go in as is.
-
-NACK.
-
-Regards,
-
-Hans
-
-
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Please add:
 >
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 287150d..a63c766 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -36,6 +36,12 @@ Optional properties:
->  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
->  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
+> #include <linux/bitops.h>
 >
-> +Optional properties for H3 or A64 SoCs:
-> +- allwinner,otg-routed : USB0 (OTG) PHY is routed to OHCI/EHCI pair rather than
-> +			 MUSB. (boolean, if this property is set, the OHCI/EHCI
-> +			 controllers at PHY0 should be enabled and the MUSB
-> +			 controller must *NOT* be enabled)
-> +
->  Example:
->  	usbphy: phy at 0x01c13400 {
->  		#phy-cells = <1>;
+> ... immediately before the includes below; it's needed to ensure that
+> BIT() is defined in all cases. Previously we were relying on implicit
+> header includes, which is not good practice.
+
+yes, you are right!
+added this, thanks !
+
 >
+>>  #include <linux/timecounter.h>
+>>  #include <linux/types.h>
+>>
+>> +#define ARCH_CP15_TIMER                      BIT(0)
+>> +#define ARCH_MEM_TIMER                       BIT(1)
+>
+> If we're going to expose these in a header, it would be better to rename
+> them to something that makes their usage/meaning clear. These should
+> probably be ARCH_TIMER_TYPE_{CP15,MEM}.
+>
+> I guess this can wait for subsequent cleanup.
+>
+>> +enum ppi_nr {
+>> +     PHYS_SECURE_PPI,
+>> +     PHYS_NONSECURE_PPI,
+>> +     VIRT_PPI,
+>> +     HYP_PPI,
+>> +     MAX_TIMER_PPI
+>> +};
+>
+> Please rename this to arch_timer_ppi_nr (updating the single user in
+> drivers/clocksource/arm_arch_timer.c). That'll avoid the potential for
+> name clashes in files this happens to get included in (potentially
+> transitively via other headers).
+
+OK, NP, I have fixed this.
+
+>
+> With those changes (regardless of the ARCH_TIMER_TYPE_* bits):
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+For ARCH_TIMER_TYPE_*, maybe I should add a patch at the end of this
+patchset to fix it, OK ?
+
+Thanks for ACK :-)
+
+>
+> Thanks,
+> Mark.
+>
+>> +
+>>  #define ARCH_TIMER_PHYS_ACCESS               0
+>>  #define ARCH_TIMER_VIRT_ACCESS               1
+>>  #define ARCH_TIMER_MEM_PHYS_ACCESS   2
+>> --
+>> 2.7.4
+>>
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
