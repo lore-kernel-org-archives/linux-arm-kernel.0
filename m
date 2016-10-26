@@ -1,53 +1,83 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 26 Oct 2016 15:00:20 +0530
-Subject: [PATCH/RFT v2 07/17] ARM: davinci: da8xx: Enable the usb20 "per"
- clk on phy_clk_enable
-In-Reply-To: <5abddbfe-0338-6406-9299-1d2d3fb957a3@lechnology.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-8-ahaslam@baylibre.com>
- <833b6b60-4504-dac7-ccbb-bc08c985ad01@ti.com>
- <5abddbfe-0338-6406-9299-1d2d3fb957a3@lechnology.com>
-Message-ID: <4472acb6-803b-0c44-2556-8b9430321e97@ti.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed, 26 Oct 2016 11:31:18 +0200
+Subject: [PATCH 3/4] usb: musb: da8xx: Add DT support for the DA8xx driver
+In-Reply-To: <82a39c63-8486-de00-3a0f-8d9d267b6404@cogentembedded.com>
+References: <1477406345-27192-1-git-send-email-abailon@baylibre.com>
+ <1477406345-27192-4-git-send-email-abailon@baylibre.com>
+ <82a39c63-8486-de00-3a0f-8d9d267b6404@cogentembedded.com>
+Message-ID: <5ae4c10c-a0a3-3cd7-d30a-4bae6920b4af@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 October 2016 09:35 PM, David Lechner wrote:
-> On 10/25/2016 05:12 AM, Sekhar Nori wrote:
->> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->>> diff --git a/arch/arm/mach-davinci/usb-da8xx.c
->>> b/arch/arm/mach-davinci/usb-da8xx.c
->>> index 9e41a7f..982e105 100644
->>> --- a/arch/arm/mach-davinci/usb-da8xx.c
->>> +++ b/arch/arm/mach-davinci/usb-da8xx.c
->>> @@ -53,11 +53,19 @@ int __init da8xx_register_usb_refclkin(int rate)
->>>
->>>  static void usb20_phy_clk_enable(struct clk *clk)
->>>  {
->>> +    struct clk *usb20_clk;
->>>      u32 val;
->>>      u32 timeout = 500000; /* 500 msec */
->>>
->>>      val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
->>>
->>> +    usb20_clk = clk_get(NULL, "usb20");
->>
->> We should not be using a NULL device pointer here. Can you pass the musb
->> device pointer available in the same file? Also, da850_clks[] in da850.c
->> needs to be fixed to add the matching device name.
+On 10/25/2016 07:38 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> This clock can be used for usb 1.1 PHY even when musb is not being used,
-> so I don't think we can depend on having a musb device here.
-
-Replied to this against the same question in v6 patch series you posted.
-
-> Also, in a previous review, it was decided that the usb clocks should
-> *not* be added to da850_clks[] [1]. Instead, they are dynamically
-> registered elsewhere.
-
-Thats only the USB phy clocks since there is associated
-enable()/disable()/set_parent() code which is better kept outside of
-da850.c for readability. No other reason. Lookup for the USB 2.0 module
-clock is already present in da850.c
-
-Thanks,
-Sekhar
+> On 10/25/2016 05:39 PM, Alexandre Bailon wrote:
+> 
+>> From: Petr Kulhavy <petr@barix.com>
+>>
+>> This adds DT support for TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver
+>>
+>> Signed-off-by: Petr Kulhavy <petr@barix.com>
+>> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+>> ---
+>>  drivers/usb/musb/da8xx.c | 76
+>> ++++++++++++++++++++++++++++++++++++++++++------
+>>  1 file changed, 67 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+>> index 210b7e4..d465087 100644
+>> --- a/drivers/usb/musb/da8xx.c
+>> +++ b/drivers/usb/musb/da8xx.c
+>> @@ -6,6 +6,9 @@
+>>   * Based on the DaVinci "glue layer" code.
+>>   * Copyright (C) 2005-2006 by Texas Instruments
+>>   *
+>> + * DT support
+>> + * Copyright (c) 2016 Petr Kulhavy <petr@barix.com>
+>> + *
+>>   * This file is part of the Inventra Controller Driver for Linux.
+>>   *
+>>   * The Inventra Controller Driver for Linux is free software; you
+> [...]
+>> @@ -499,15 +537,21 @@ static int da8xx_probe(struct platform_device
+>> *pdev)
+>>      memset(musb_resources, 0x00, sizeof(*musb_resources) *
+>>              ARRAY_SIZE(musb_resources));
+>>
+>> -    musb_resources[0].name = pdev->resource[0].name;
+>> -    musb_resources[0].start = pdev->resource[0].start;
+>> -    musb_resources[0].end = pdev->resource[0].end;
+>> -    musb_resources[0].flags = pdev->resource[0].flags;
+>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +    if (!res) {
+>> +        dev_err(&pdev->dev, "failed to get memory.\n");
+>> +        ret = -EINVAL;
+>> +        goto err_unregister_usb_phy;
+>> +    }
+>> +    musb_resources[0] = *res;
+> 
+>    What does this change have to do with the DT conversion?
+Nothing. I will remove it.
+> 
+>>
+>> -    musb_resources[1].name = pdev->resource[1].name;
+>> -    musb_resources[1].start = pdev->resource[1].start;
+>> -    musb_resources[1].end = pdev->resource[1].end;
+>> -    musb_resources[1].flags = pdev->resource[1].flags;
+>> +    res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> +    if (!res) {
+>> +        dev_err(&pdev->dev, "failed to get irq.\n");
+>> +        ret = -EINVAL;
+>> +        goto err_unregister_usb_phy;
+>> +    }
+>> +    musb_resources[1] = *res;
+> 
+>    And this?
+>    I'm also concerned that you'd copy the resource linkage fields which
+> the existing code avoids...
+> 
+> [...]
+> 
+> MBR, Sergei
+> 
