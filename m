@@ -1,30 +1,67 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Wed, 26 Oct 2016 14:39:47 +0200
-Subject: [PATCH v2] ARM: davinci: da8xx: Fix some redefined symbol warnings
-In-Reply-To: <3dc1c2c2-c4c5-07d0-3d3e-b8d917adda81@ti.com>
-References: <1477397492-7925-1-git-send-email-abailon@baylibre.com>
- <1477397492-7925-2-git-send-email-abailon@baylibre.com>
- <3dc1c2c2-c4c5-07d0-3d3e-b8d917adda81@ti.com>
-Message-ID: <e8963754-4bea-631b-82c5-555c521fd873@baylibre.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 26 Oct 2016 13:51:51 +0100
+Subject: [PATCH 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <1476394329-31696-2-git-send-email-tthayer@opensource.altera.com>
+References: <1476394329-31696-1-git-send-email-tthayer@opensource.altera.com>
+ <1476394329-31696-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20161026125151.GK11267@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2016 01:57 PM, Sekhar Nori wrote:
-> On Tuesday 25 October 2016 05:41 PM, Alexandre Bailon wrote:
->> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
->> but da8xx-cfgchip.h intend to replace them.
->> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
->> Remove the macro and update the da830-evm board file to use da8xx-cfgchip.h
->>
->> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+On Thu, 13 Oct 2016, tthayer at opensource.altera.com wrote:
+
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> This leads to build error on v4.9-rc2:
-Oops! Sorry for that. I will  fit it.
+> Add the Arria10 DevKit System Resource Chip register and state
+> monitoring module to the MFD.
 > 
-> arch/arm/mach-davinci/board-da830-evm.c: In function 'da830_evm_usb_init':
-> arch/arm/mach-davinci/board-da830-evm.c:120:15: error: 'CFGCHIP2_REFFREQ' undeclared (first use in this function)
->   cfgchip2 &= ~CFGCHIP2_REFFREQ;
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> Note: This needs to be applied to the bindings document that
+> was Acked & Applied but didn't reach the for-next branch.
+> See https://patchwork.ozlabs.org/patch/629397/
+> ---
+> ---
+>  .../devicetree/bindings/mfd/altera-a10sr.txt       |    9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> Thanks,
-> Sekhar
-> 
+> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> index ea151f2..0787ec6 100644
+> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
+>  Device                   Description
+>  ------                   ----------
+>  a10sr_gpio               GPIO Controller
+> +a10sr_monitor            Register and State Monitoring
+>  
+>  Arria10 GPIO
+>  Required Properties:
+> @@ -27,6 +28,10 @@ Required Properties:
+>                        the second cell is used to specify flags.
+>                        See ../gpio/gpio.txt for more information.
+>  
+> +Arria10 Register and State Monitor
+> +Required Properties:
+> +- compatible        : Should be "altr,a10sr-mon"
+
+Why not "-monitor"?
+
+>  Example:
+>  
+>          resource-manager at 0 {
+> @@ -43,4 +48,8 @@ Example:
+>  			gpio-controller;
+>  			#gpio-cells = <2>;
+>  		};
+> +
+> +		a10sr_monitor {
+> +			compatible = "altr,a10sr-mon";
+> +		};
+>  	};
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
