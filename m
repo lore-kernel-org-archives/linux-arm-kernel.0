@@ -1,198 +1,81 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 26 Oct 2016 11:10:44 +0800
-Subject: [PATCH 1/2] mm/memblock: prepare a capability to support memblock
- near alloc
-In-Reply-To: <20161025132338.GA31239@dhcp22.suse.cz>
-References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
- <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
- <20161025132338.GA31239@dhcp22.suse.cz>
-Message-ID: <58101EB4.2080305@huawei.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 26 Oct 2016 08:47:18 +0530
+Subject: [PATCH V2 0/6] ARM64: Uprobe support added
+In-Reply-To: <cover.1474960629.git.panand@redhat.com>
+References: <cover.1474960629.git.panand@redhat.com>
+Message-ID: <CAHB_Gup_kEZbO7K7WVUvj8fZbj8f62UpHiKcqvmb09a1ixR5zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Catalin,
+
+Please let me know if everything else other than is_trap_insn() looks
+fine to you. May be I can work well in time. It would be great if we
+can make it into v4.9.
 
 
-On 2016/10/25 21:23, Michal Hocko wrote:
-> On Tue 25-10-16 10:59:17, Zhen Lei wrote:
->> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
->> actually exist. The percpu variable areas and numa control blocks of that
->> memoryless numa nodes need to be allocated from the nearest available
->> node to improve performance.
->>
->> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
->> specified nid at the first time, but if that allocation failed it will
->> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
->> the second time.
->>
->> To compatible the above old scene, I use a marco node_distance_ready to
->> control it. By default, the marco node_distance_ready is not defined in
->> any platforms, the above mentioned functions will work as normal as
->> before. Otherwise, they will try the nearest node first.
-> 
-> I am sorry but it is absolutely unclear to me _what_ is the motivation
-> of the patch. Is this a performance optimization, correctness issue or
-> something else? Could you please restate what is the problem, why do you
-> think it has to be fixed at memblock layer and describe what the actual
-> fix is please?
-This is a performance optimization. The problem is if some memoryless numa nodes are
-actually exist, for example: there are total 4 nodes, 0,1,2,3, node 1 has no memory,
-and the node distances is as below:
-                    ---------board-------
-		    |                   |
-                    |                   |
-                 socket0             socket1
-                   / \                 / \
-                  /   \               /   \
-               node0 node1         node2 node3
-distance[1][0] is nearer than distance[1][2] and distance[1][3]. CPUs on node1 access
-the memory of node0 is faster than node2 or node3.
+~Pratyush
 
-Linux defines a lot of percpu variables, each cpu has a copy of it and most of the time
-only to access their own percpu area. In this example, we hope the percpu area of CPUs
-on node1 allocated from node0. But without these patches, it's not sure that.
 
-If each node has their own memory, we can directly use below functions to allocate memory
-from its local node:
-1. memblock_alloc_nid
-2. memblock_alloc_try_nid
-3. memblock_virt_alloc_try_nid_nopanic
-4. memblock_virt_alloc_try_nid
-
-So, these patches is only used for numa memoryless scenario.
-
-Another use case is the control block "extern pg_data_t *node_data[]",
-Here is an example of x86 numa in arch/x86/mm/numa.c:
-static void __init alloc_node_data(int nid)
-{
-	... ...
-        /*
-         * Allocate node data.  Try node-local memory and then any node.	//==>But the nearest node is the best
-         * Never allocate in DMA zone.
-         */
-        nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
-        if (!nd_pa) {
-                nd_pa = __memblock_alloc_base(nd_size, SMP_CACHE_BYTES,
-                                              MEMBLOCK_ALLOC_ACCESSIBLE);
-                if (!nd_pa) {
-                        pr_err("Cannot find %zu bytes in node %d\n",
-                               nd_size, nid);
-                        return;
-                }
-        }
-        nd = __va(nd_pa);
-        ... ...
-        node_data[nid] = nd;
-
-> 
->>From a quick glance you are trying to bend over the memblock API for
-> something that should be handled on a different layer.
-> 
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  mm/memblock.c | 76 ++++++++++++++++++++++++++++++++++++++++++++++++++---------
->>  1 file changed, 65 insertions(+), 11 deletions(-)
->>
->> diff --git a/mm/memblock.c b/mm/memblock.c
->> index 7608bc3..556bbd2 100644
->> --- a/mm/memblock.c
->> +++ b/mm/memblock.c
->> @@ -1213,9 +1213,71 @@ phys_addr_t __init memblock_alloc(phys_addr_t size, phys_addr_t align)
->>  	return memblock_alloc_base(size, align, MEMBLOCK_ALLOC_ACCESSIBLE);
->>  }
->>
->> +#ifndef node_distance_ready
->> +#define node_distance_ready()		0
->> +#endif
->> +
->> +static phys_addr_t __init memblock_alloc_near_nid(phys_addr_t size,
->> +					phys_addr_t align, phys_addr_t start,
->> +					phys_addr_t end, int nid, ulong flags,
->> +					int alloc_func_type)
->> +{
->> +	int nnid, round = 0;
->> +	u64 pa;
->> +	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
->> +
->> +	bitmap_zero(nodes_map, MAX_NUMNODES);
->> +
->> +again:
->> +	/*
->> +	 * There are total 4 cases:
->> +	 * <nid == NUMA_NO_NODE>
->> +	 *   1)2) node_distance_ready || !node_distance_ready
->> +	 *	Round 1, nnid = nid = NUMA_NO_NODE;
->> +	 * <nid != NUMA_NO_NODE>
->> +	 *   3) !node_distance_ready
->> +	 *	Round 1, nnid = nid;
->> +	 *    ::Round 2, currently only applicable for alloc_func_type = <0>
->> +	 *	Round 2, nnid = NUMA_NO_NODE;
->> +	 *   4) node_distance_ready
->> +	 *	Round 1, LOCAL_DISTANCE, nnid = nid;
->> +	 *	Round ?, nnid = nearest nid;
->> +	 */
->> +	if (!node_distance_ready() || (nid == NUMA_NO_NODE)) {
->> +		nnid = (++round == 1) ? nid : NUMA_NO_NODE;
->> +	} else {
->> +		int i, distance = INT_MAX;
->> +
->> +		for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
->> +			if (node_distance(nid, i) < distance) {
->> +				nnid = i;
->> +				distance = node_distance(nid, i);
->> +			}
->> +	}
->> +
->> +	switch (alloc_func_type) {
->> +	case 0:
->> +		pa = memblock_find_in_range_node(size, align, start, end, nnid, flags);
->> +		break;
->> +
->> +	case 1:
->> +	default:
->> +		pa = memblock_alloc_nid(size, align, nnid);
->> +		if (!node_distance_ready())
->> +			return pa;
->> +	}
->> +
->> +	if (!pa && (nnid != NUMA_NO_NODE)) {
->> +		bitmap_set(nodes_map, nnid, 1);
->> +		goto again;
->> +	}
->> +
->> +	return pa;
->> +}
->> +
->>  phys_addr_t __init memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
->>  {
->> -	phys_addr_t res = memblock_alloc_nid(size, align, nid);
->> +	phys_addr_t res = memblock_alloc_near_nid(size, align, 0, 0, nid, 0, 1);
->>
->>  	if (res)
->>  		return res;
->> @@ -1276,19 +1338,11 @@ static void * __init memblock_virt_alloc_internal(
->>  		max_addr = memblock.current_limit;
->>
->>  again:
->> -	alloc = memblock_find_in_range_node(size, align, min_addr, max_addr,
->> -					    nid, flags);
->> +	alloc = memblock_alloc_near_nid(size, align, min_addr, max_addr,
->> +					    nid, flags, 0);
->>  	if (alloc)
->>  		goto done;
->>
->> -	if (nid != NUMA_NO_NODE) {
->> -		alloc = memblock_find_in_range_node(size, align, min_addr,
->> -						    max_addr, NUMA_NO_NODE,
->> -						    flags);
->> -		if (alloc)
->> -			goto done;
->> -	}
->> -
->>  	if (min_addr) {
->>  		min_addr = 0;
->>  		goto again;
->> --
->> 2.5.0
->>
-> 
+On Tue, Sep 27, 2016 at 1:17 PM, Pratyush Anand <panand@redhat.com> wrote:
+> Changes since v1:
+> * Exposed sync_icache_aliases() and used that in stead of flush_uprobe_xol_access()
+> * Assigned 0x0005 to BRK64_ESR_UPROBES in stead of 0x0008
+> * moved uprobe_opcode_t from probes.h to uprobes.h
+> * Assigned 4 to TIF_UPROBE instead of 5
+> * Assigned AARCH64_INSN_SIZE to UPROBE_SWBP_INSN_SIZE instead of hard code 4.
+> * Removed saved_fault_code from struct arch_uprobe_task
+> * Removed preempt_dis(en)able() from arch_uprobe_copy_ixol()
+> * Removed case INSN_GOOD from arch_uprobe_analyze_insn()
+> * Now we do check that probe point is not for a 32 bit task.
+> * Return a false positive from is_tarp_insn()
+> * Changes for rebase conflict resolution
+>
+> V1 was here: https://lkml.org/lkml/2016/8/2/29
+> Patches have been rebased on next-20160927, so that there would be no
+> conflicts with other arm64/for-next/core patches.
+>
+> Patches have been tested for following:
+> 1. Step-able instructions, like sub, ldr, add etc.
+> 2. Simulation-able like ret, cbnz, cbz etc.
+> 3. uretprobe
+> 4. Reject-able instructions like sev, wfe etc.
+> 5. trapped and abort xol path
+> 6. probe at unaligned user address.
+> 7. longjump test cases
+>
+> aarch32 task probing is not yet supported.
+>
+> Pratyush Anand (6):
+>   arm64: kprobe: protect/rename few definitions to be reused by uprobe
+>   arm64: kgdb_step_brk_fn: ignore other's exception
+>   arm64: Handle TRAP_TRACE for user mode as well
+>   arm64: Handle TRAP_BRKPT for user mode as well
+>   arm64: introduce mm context flag to keep 32 bit task information
+>   arm64: Add uprobe support
+>
+>  arch/arm64/Kconfig                      |   3 +
+>  arch/arm64/include/asm/cacheflush.h     |   1 +
+>  arch/arm64/include/asm/debug-monitors.h |   3 +
+>  arch/arm64/include/asm/elf.h            |  12 +-
+>  arch/arm64/include/asm/mmu.h            |   1 +
+>  arch/arm64/include/asm/probes.h         |  19 +--
+>  arch/arm64/include/asm/ptrace.h         |   8 ++
+>  arch/arm64/include/asm/thread_info.h    |   5 +-
+>  arch/arm64/include/asm/uprobes.h        |  36 ++++++
+>  arch/arm64/kernel/debug-monitors.c      |  40 +++---
+>  arch/arm64/kernel/kgdb.c                |   3 +
+>  arch/arm64/kernel/probes/Makefile       |   2 +
+>  arch/arm64/kernel/probes/decode-insn.c  |  32 ++---
+>  arch/arm64/kernel/probes/decode-insn.h  |   8 +-
+>  arch/arm64/kernel/probes/kprobes.c      |  36 +++---
+>  arch/arm64/kernel/probes/uprobes.c      | 221 ++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/signal.c              |   3 +
+>  arch/arm64/mm/flush.c                   |   2 +-
+>  18 files changed, 371 insertions(+), 64 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/uprobes.h
+>  create mode 100644 arch/arm64/kernel/probes/uprobes.c
+>
+> --
+> 2.7.4
+>
