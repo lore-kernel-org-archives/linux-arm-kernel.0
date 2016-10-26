@@ -1,52 +1,97 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 13:17:30 +0100
-Subject: [PATCH 1/4] mfd: ti_am335x_tscadc: store physical address
-In-Reply-To: <f271b805-82c2-a45e-0de9-39edafd34d2e@ti.com>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
- <20160921161134.6951-2-mugunthanvnm@ti.com>
- <20160927194045.GK21388@dell>
- <f271b805-82c2-a45e-0de9-39edafd34d2e@ti.com>
-Message-ID: <20161026121730.GS8574@dell>
+Date: Wed, 26 Oct 2016 13:27:10 +0100
+Subject: [PATCH 0/7] mfd: Fix all W=1 warnings
+In-Reply-To: <5506538.euWBouSNJd@wuerfel>
+References: <20160915104521.14286-1-lee.jones@linaro.org>
+ <5506538.euWBouSNJd@wuerfel>
+Message-ID: <20161026122710.GZ8574@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Sep 2016, Mugunthan V N wrote:
+On Thu, 15 Sep 2016, Arnd Bergmann wrote:
 
-> On Wednesday 28 September 2016 01:10 AM, Lee Jones wrote:
-> > On Wed, 21 Sep 2016, Mugunthan V N wrote:
-> > 
-> >> store the physical address of the device in its priv to use it
-> >> for DMA addressing in the client drivers.
-> >>
-> >> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> >> ---
-> >>  drivers/mfd/ti_am335x_tscadc.c       | 1 +
-> >>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
-> >>  2 files changed, 2 insertions(+)
-> >>
-> >> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
-> >> index c8f027b..0f3fab4 100644
-> >> --- a/drivers/mfd/ti_am335x_tscadc.c
-> >> +++ b/drivers/mfd/ti_am335x_tscadc.c
-> >> @@ -183,6 +183,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
-> >>  		tscadc->irq = err;
-> >>  
-> >>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >> +	tscadc->tscadc_phys_base = res->start;
-> > 
-> > This is unusual.  Can't you use a virt_to_phys() variant instead?
+> On Thursday, September 15, 2016 11:45:14 AM CEST Lee Jones wrote:
+> > It really is as simple as it sounds!
 > > 
 > 
-> I tried using virt_to_phys(), but its not working for me.
-> Also saw many drivers uses like this to get physical address
-> ("git grep -n " res->start;" drivers/*").
+> I seem to have one that you didn't find.
 
-Very well:
+Applied, thanks.
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
-Let me know how you wish this set to be handled.
+> 8<--------
+> From 6c63171eba728fc6d8bc6358884deaccd4cee33d Mon Sep 17 00:00:00 2001
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Thu, 4 Aug 2016 15:28:51 +0200
+> Subject: [PATCH] mfd: tps65912: move regmap config into core driver
+> 
+> When building with extra warnings enabled, most files including
+> linux/mfd/tps65912.h warn about a static variable defined in the
+> header:
+> 
+> include/linux/mfd/tps65912.h:331:35: warning: 'tps65912_regmap_config' defined but not used [-Wunused-const-variable=]
+> 
+> We also duplicate the data structure between the i2c and spi front-end
+> drivers. Moving it into the driver code avoids the warning and
+> the duplication.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/drivers/mfd/tps65912-core.c b/drivers/mfd/tps65912-core.c
+> index a88cfa80dbc4..f33567bc428d 100644
+> --- a/drivers/mfd/tps65912-core.c
+> +++ b/drivers/mfd/tps65912-core.c
+> @@ -77,6 +77,23 @@ static struct regmap_irq_chip tps65912_irq_chip = {
+>  	.init_ack_masked = true,
+>  };
+>  
+> +static const struct regmap_range tps65912_yes_ranges[] = {
+> +	regmap_reg_range(TPS65912_INT_STS, TPS65912_GPIO5),
+> +};
+> +
+> +static const struct regmap_access_table tps65912_volatile_table = {
+> +	.yes_ranges = tps65912_yes_ranges,
+> +	.n_yes_ranges = ARRAY_SIZE(tps65912_yes_ranges),
+> +};
+> +
+> +const struct regmap_config tps65912_regmap_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 8,
+> +	.cache_type = REGCACHE_RBTREE,
+> +	.volatile_table = &tps65912_volatile_table,
+> +};
+> +EXPORT_SYMBOL_GPL(tps65912_regmap_config);
+> +
+>  int tps65912_device_init(struct tps65912 *tps)
+>  {
+>  	int ret;
+> diff --git a/include/linux/mfd/tps65912.h b/include/linux/mfd/tps65912.h
+> index 1a603701550e..b25d0297ba88 100644
+> --- a/include/linux/mfd/tps65912.h
+> +++ b/include/linux/mfd/tps65912.h
+> @@ -319,21 +319,7 @@ struct tps65912 {
+>  	struct regmap_irq_chip_data *irq_data;
+>  };
+>  
+> -static const struct regmap_range tps65912_yes_ranges[] = {
+> -	regmap_reg_range(TPS65912_INT_STS, TPS65912_GPIO5),
+> -};
+> -
+> -static const struct regmap_access_table tps65912_volatile_table = {
+> -	.yes_ranges = tps65912_yes_ranges,
+> -	.n_yes_ranges = ARRAY_SIZE(tps65912_yes_ranges),
+> -};
+> -
+> -static const struct regmap_config tps65912_regmap_config = {
+> -	.reg_bits = 8,
+> -	.val_bits = 8,
+> -	.cache_type = REGCACHE_RBTREE,
+> -	.volatile_table = &tps65912_volatile_table,
+> -};
+> +extern const struct regmap_config tps65912_regmap_config;
+>  
+>  int tps65912_device_init(struct tps65912 *tps);
+>  int tps65912_device_exit(struct tps65912 *tps);
+> 
 
 -- 
 Lee Jones
