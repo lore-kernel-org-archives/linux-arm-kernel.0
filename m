@@ -1,21 +1,49 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Wed, 26 Oct 2016 17:11:22 +0200
-Subject: [PATCH 4/5] ARM: configs: Add new config fragment to change RAM start
- point
-In-Reply-To: <1477494683-29890-1-git-send-email-alexandre.torgue@st.com>
-References: <1477494683-29890-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <1477494683-29890-5-git-send-email-alexandre.torgue@st.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Wed, 26 Oct 2016 10:18:32 -0500
+Subject: [PATCH 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
+In-Reply-To: <20161026125233.GL11267@dell>
+References: <1476394329-31696-1-git-send-email-tthayer@opensource.altera.com>
+ <1476394329-31696-4-git-send-email-tthayer@opensource.altera.com>
+ <20161026125233.GL11267@dell>
+Message-ID: <f85a537e-716f-cc40-a47a-0f2345526fef@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-diff --git a/arch/arm/configs/dram_0xc0000000.config b/arch/arm/configs/dram_0xc0000000.config
-new file mode 100644
-index 0000000..343d533
---- /dev/null
-+++ b/arch/arm/configs/dram_0xc0000000.config
-@@ -0,0 +1 @@
-+CONFIG_DRAM_BASE=0xc0000000
--- 
-1.9.1
+
+On 10/26/2016 07:52 AM, Lee Jones wrote:
+> On Thu, 13 Oct 2016, tthayer at opensource.altera.com wrote:
+>
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the Altera Arria10 DevKit System Resource Monitor functionality
+>> to the MFD device.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>>  drivers/mfd/altera-a10sr.c |    4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+>> index 06e1f7f..0942d7d 100644
+>> --- a/drivers/mfd/altera-a10sr.c
+>> +++ b/drivers/mfd/altera-a10sr.c
+>> @@ -33,6 +33,10 @@
+>>  		.name = "altr_a10sr_gpio",
+>>  		.of_compatible = "altr,a10sr-gpio",
+>>  	},
+>> +	{
+>> +		.name = "altr_a10sr_mon",
+>> +		.of_compatible = "altr,a10sr-mon",
+>
+> "-monitor" would be better in my opinion.
+>
+
+OK. I'm flexible and it is clearer. I'll make the changes and resubmit.
+Thanks for reviewing!
+
+>> +	},
+>>  };
+>>
+>>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
+>
