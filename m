@@ -1,38 +1,70 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 26 Oct 2016 09:56:20 +0100
-Subject: [PATCH] ARM: sti: stih410-clocks: Add PROC_STFE as a critical
- clock
-In-Reply-To: <20161026085141.GJ8574@dell>
-References: <1476804957-24000-1-git-send-email-peter.griffin@linaro.org>
- <20161024085304.GE14477@dell>
- <20161024134416.GB10440@griffinp-ThinkPad-X1-Carbon-2nd>
- <20161025074257.GF8574@dell>
- <20161025093926.GA3206@griffinp-ThinkPad-X1-Carbon-2nd>
- <20161025100141.GH8574@dell>
- <20161025134940.GA3993@griffinp-ThinkPad-X1-Carbon-2nd>
- <20161026085141.GJ8574@dell>
-Message-ID: <20161026085620.GA5476@griffinp-ThinkPad-X1-Carbon-2nd>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 14:26:07 +0530
+Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
+ platform declaration.
+In-Reply-To: <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-3-ahaslam@baylibre.com>
+ <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
+ <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
+ <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
+ <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
+Message-ID: <236fc069-b24b-ed8a-55c1-e3e7af08a229@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Wed, 26 Oct 2016, Lee Jones wrote:
-
-> > > > If the clock is enabled when Linux boots, the Linux clock framework *needs*
-> > > > to assume the hardware may have been used in previous boot stages, and it should
-> > > > not attempt to disable the clock.
-> > > 
-> > > None of the boot loaders we use do this.
-> > 
-> > But the Linux kernel isn't just used by us. It is not uncommon for STB
-> > bootloaders to get information from the frontend as part of the boot process. 
+On Tuesday 25 October 2016 09:23 PM, David Lechner wrote:
+> Hi Sekhar,
 > 
-> Okay, this is the clincher.  Since we need to support non-standard
-> bootloaders, it's difficult to guarantee that the clock will be
-> disabled at boot.  For this reason, I believe that we can call this a
-> critical clock.
+> On 10/25/2016 05:17 AM, Sekhar Nori wrote:
+>> On Tuesday 25 October 2016 03:07 PM, Axel Haslam wrote:
+>>> Hi Sekar,
+>>>
+>>> On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>>> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
+>>>>> From: David Lechner <david@lechnology.com>
+>>>>>
+>>>>> The CFGCHIP registers are used by a number of devices, so using a
+>>>>> syscon
+>>>>> device to share them. The first consumer of this will by the
+>>>>> phy-da8xx-usb
+>>>>> driver.
+>>>>>
+>>>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>>>> [Axel: minor fix: change id to -1]
+>>>>
+>>>> Can you please clarify this change? There could be other syscon devices
+>>>> on the chip for other common registers. Why use the singular device-id?
+>>>>
+>>>
+>>> in the case of non DT boot, the phy driver is looking for "syscon" :
+>>>
+>>> d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
+>>>
+>>> if we register the syscon driver with id = 0, the actual name of the
+>>> syscon
+>>> device will be "syscon.0" and the phy driver will fail to probe, because
+>>> the strncmp match in the syscon driver (syscon_match_pdevname)
+>>> will fail.
+>>>
+>>> should i change the phy driver instead?
+>>
+>> Yes, please. Forcing only one syscon region for the whole chip will be
+>> too restrictive, I am pretty sure.
+>>
+>> Thanks,
+>> Sekhar
+>>
 > 
-That's good news as the STi maintainer already acked and applied the patch.
+> In the previous review, you requested that this be changed to -1 [1].
+> 
+> If we change it back to 0, it will also require reverting a patch to the
+> phy driver that has already been merged[2].
 
-Peter.
+Sigh. Sorry about going around in circles on this one. Lets go with what
+you have. If and when there is a need for another syscon node, the
+driver and platform code can be updated. At least we will know why the
+change is being done at that time.
+
+Thanks,
+Sekhar
