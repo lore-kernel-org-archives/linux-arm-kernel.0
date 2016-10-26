@@ -1,156 +1,307 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 26 Oct 2016 09:27:57 +0800
-Subject: [PATCH v8 0/8] power: add power sequence library
-In-Reply-To: <5513671.XlE8bb9pVt@vostro.rjw.lan>
-References: <1476413995-20361-1-git-send-email-peter.chen@nxp.com>
- <5097336.earU4jV2qd@vostro.rjw.lan>
- <20161017013058.GA1301@b29397-desktop>
- <5513671.XlE8bb9pVt@vostro.rjw.lan>
-Message-ID: <20161026012757.GA11376@b29397-desktop>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 25 Oct 2016 18:24:32 -0700
+Subject: [RFC PATCH v2 1/1] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
+ controller
+In-Reply-To: <20160921212258.GE20006@localhost>
+References: <20160921212258.GE20006@localhost>
+Message-ID: <ff2976e86b4990fba80544e9916a85361afcc237.1477443743.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 02:35:38AM +0200, Rafael J. Wysocki wrote:
-> On Monday, October 17, 2016 09:30:59 AM Peter Chen wrote:
-> > On Fri, Oct 14, 2016 at 02:09:31PM +0200, Rafael J. Wysocki wrote:
-> > > On Friday, October 14, 2016 10:59:47 AM Peter Chen wrote:
-> > > > Hi all,
-> > > > 
-> > > > This is a follow-up for my last power sequence framework patch set [1].
-> > > > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> > > > power sequence instances will be added at postcore_initcall, the match
-> > > > criteria is compatible string first, if the compatible string is not
-> > > > matched between dts and library, it will try to use generic power sequence.
-> > > > 	 
-> > > > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > > > if only one power sequence instance is needed, for more power sequences
-> > > > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> > > > 
-> > > > In future, if there are special power sequence requirements, the special
-> > > > power sequence library can be created.
-> > > > 
-> > > > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> > > > two hot-plug devices to simulate this use case, the related binding
-> > > > change is updated at patch [1/6], The udoo board changes were tested
-> > > > using my last power sequence patch set.[3]
-> > > > 
-> > > > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> > > > need to power on itself before it can be found by ULPI bus.
-> > > > 
-> > > > [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> > > > [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> > > > [3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> > > > 
-> > > > Changes for v8:
-> > > > - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
-> > > >   preallocate instances problem which the number of instance is decided at
-> > > >   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
-> > > > - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
-> > > >   match method. [Patch 2/8]
-> > > > - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
-> > > > 
-> > > > Changes for v7:
-> > > > - Create kinds of power sequence instance at postcore_initcall, and match
-> > > >   the instance with node using compatible string, the beneit of this is
-> > > >   the host driver doesn't need to consider which pwrseq instance needs
-> > > >   to be used, and pwrseq core will match it, however, it eats some memories
-> > > >   if less power sequence instances are used. [Patch 2/8]
-> > > > - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
-> > > > - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
-> > > >   use device_node for parameters at pwrseq_on. [Patch 2/8]
-> > > > - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
-> > > > - Tested three pwrseq instances together using both specific compatible string and
-> > > >   generic libraries.
-> > > > 
-> > > > Changes for v6:
-> > > > - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
-> > > > - Change chipidea core of_node assignment for coming user. (patch [5/6])
-> > > > - Applies Joshua Clayton's three dts changes for two boards,
-> > > >   the USB device's reg has only #address-cells, but without #size-cells.
-> > > > 
-> > > > Changes for v5:
-> > > > - Delete pwrseq_register/pwrseq_unregister, which is useless currently
-> > > > - Fix the linker error when the pwrseq user is compiled as module
-> > > > 
-> > > > Changes for v4:
-> > > > - Create the patch on next-20160722 
-> > > > - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
-> > > > - Using more friendly wait method for reset gpio [Patch 2/6]
-> > > > - Support multiple input clocks [Patch 2/6]
-> > > > - Add Rob Herring's ack for DT changes
-> > > > - Add Joshua Clayton's Tested-by
-> > > > 
-> > > > Changes for v3:
-> > > > - Delete "power-sequence" property at binding-doc, and change related code
-> > > >   at both library and user code.
-> > > > - Change binding-doc example node name with Rob's comments
-> > > > - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
-> > > >   add additional code request gpio with proper gpio flags
-> > > > - Add Philipp Zabel's Ack and MAINTAINER's entry
-> > > > 
-> > > > Changes for v2:
-> > > > - Delete "pwrseq" prefix and clock-names for properties at dt binding
-> > > > - Should use structure not but its pointer for kzalloc
-> > > > - Since chipidea core has no of_node, let core's of_node equals glue
-> > > >   layer's at core's probe
-> > > > 
-> > > > Joshua Clayton (2):
-> > > >   ARM: dts: imx6qdl: Enable usb node children with <reg>
-> > > >   ARM: dts: imx6q-evi: Fix onboard hub reset line
-> > > > 
-> > > > Peter Chen (6):
-> > > >   binding-doc: power: pwrseq-generic: add binding doc for generic power
-> > > >     sequence library
-> > > >   power: add power sequence library
-> > > >   binding-doc: usb: usb-device: add optional properties for power
-> > > >     sequence
-> > > >   usb: core: add power sequence handling for USB devices
-> > > >   usb: chipidea: let chipidea core device of_node equal's glue layer
-> > > >     device of_node
-> > > >   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-> > > > 
-> > > >  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 ++++++
-> > > >  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
-> > > >  MAINTAINERS                                        |   9 +
-> > > >  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
-> > > >  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++-
-> > > >  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
-> > > >  drivers/power/Kconfig                              |   1 +
-> > > >  drivers/power/Makefile                             |   1 +
-> > > >  drivers/power/pwrseq/Kconfig                       |  19 ++
-> > > >  drivers/power/pwrseq/Makefile                      |   2 +
-> > > >  drivers/power/pwrseq/core.c                        | 191 +++++++++++++++++++++
-> > > >  drivers/power/pwrseq/pwrseq_generic.c              | 183 ++++++++++++++++++++
-> > > >  drivers/usb/chipidea/core.c                        |  27 ++-
-> > > >  drivers/usb/core/hub.c                             |  41 ++++-
-> > > >  drivers/usb/core/hub.h                             |   1 +
-> > > >  include/linux/power/pwrseq.h                       |  72 ++++++++
-> > > >  16 files changed, 621 insertions(+), 41 deletions(-)
-> > > >  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
-> > > >  create mode 100644 drivers/power/pwrseq/Kconfig
-> > > >  create mode 100644 drivers/power/pwrseq/Makefile
-> > > >  create mode 100644 drivers/power/pwrseq/core.c
-> > > >  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
-> > > >  create mode 100644 include/linux/power/pwrseq.h
-> > > 
-> > > Meta question: Who's the maintainer you are targetting this at?
-> > > 
-> > 
-> > Sebastian Reichel mentioned it is better through your tree.
-> > I could be the maintainer for it, and send "GIT PULL" for you
-> > through my git
-> > (https://git.kernel.org/cgit/linux/kernel/git/peter.chen/usb.git/)
-> > Is it ok for you?
-> 
-> Let me review the series first. :-)
-> 
+PCIe controllers in X-Gene SoCs is not ECAM compliant: software
+needs to configure additional controller's register to address
+device at bus:dev:function.
 
-A nice ping..., thanks.
+This patch depends on "ECAM quirks handling for ARM64 platforms"
+series (http://www.spinics.net/lists/arm-kernel/msg530692.html,
+the series was also modified by Bjorn) to address the limitation
+above for X-Gene PCIe controller.
 
-Just see someone is also waiting this series.
-http://www.spinics.net/lists/devicetree/msg147655.html
+The quirk will only be applied for X-Gene PCIe MCFG table with
+OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
 
+Signed-off-by: Duc Dang <dhdang@apm.com>
+---
+v2 changes:
+	1. Get rid of pci-xgene-ecam.c file and fold quirk code into pci-xgene.c
+	2. Redefine fixup array for X-Gene
+	3. Use devm_ioremap_resource to map csr_base
+
+ drivers/acpi/pci_mcfg.c      |  30 ++++++++
+ drivers/pci/host/pci-xgene.c | 165 ++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/pci-ecam.h     |   5 ++
+ 3 files changed, 197 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+index bb2c508..9dfc937 100644
+--- a/drivers/acpi/pci_mcfg.c
++++ b/drivers/acpi/pci_mcfg.c
+@@ -96,6 +96,36 @@ struct mcfg_fixup {
+ 	THUNDER_ECAM_MCFG(2, 12),
+ 	THUNDER_ECAM_MCFG(2, 13),
+ #endif
++#ifdef CONFIG_PCI_XGENE
++#define XGENE_V1_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v1_pcie_ecam_ops }
++#define XGENE_V2_1_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v2_1_pcie_ecam_ops }
++#define XGENE_V2_2_ECAM_MCFG(rev, seg) \
++	{"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
++		&xgene_v2_2_pcie_ecam_ops }
++
++	/* X-Gene SoC with v1 PCIe controller */
++	XGENE_V1_ECAM_MCFG(1, 0),
++	XGENE_V1_ECAM_MCFG(1, 1),
++	XGENE_V1_ECAM_MCFG(1, 2),
++	XGENE_V1_ECAM_MCFG(1, 3),
++	XGENE_V1_ECAM_MCFG(1, 4),
++	XGENE_V1_ECAM_MCFG(2, 0),
++	XGENE_V1_ECAM_MCFG(2, 1),
++	XGENE_V1_ECAM_MCFG(2, 2),
++	XGENE_V1_ECAM_MCFG(2, 3),
++	XGENE_V1_ECAM_MCFG(2, 4),
++	/* X-Gene SoC with v2.1 PCIe controller */
++	XGENE_V2_1_ECAM_MCFG(3, 0),
++	XGENE_V2_1_ECAM_MCFG(3, 1),
++	/* X-Gene SoC with v2.2 PCIe controller */
++	XGENE_V2_2_ECAM_MCFG(4, 0),
++	XGENE_V2_2_ECAM_MCFG(4, 1),
++	XGENE_V2_2_ECAM_MCFG(4, 2),
++#endif
+ };
+ 
+ static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 1de23d7..d6aa642 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -27,6 +27,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_pci.h>
+ #include <linux/pci.h>
++#include <linux/pci-acpi.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -64,6 +66,7 @@
+ /* PCIe IP version */
+ #define XGENE_PCIE_IP_VER_UNKN		0
+ #define XGENE_PCIE_IP_VER_1		1
++#define XGENE_PCIE_IP_VER_2		2
+ 
+ struct xgene_pcie_port {
+ 	struct device_node	*node;
+@@ -97,7 +100,15 @@ static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
+  */
+ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
++
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
+ 
+ 	if (bus->number >= (bus->primary + 1))
+ 		return port->cfg_base + AXI_EP_CFG_ACCESS;
+@@ -111,10 +122,18 @@ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+  */
+ static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
+ 	unsigned int b, d, f;
+ 	u32 rtdid_val = 0;
+ 
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
++
+ 	b = bus->number;
+ 	d = PCI_SLOT(devfn);
+ 	f = PCI_FUNC(devfn);
+@@ -158,7 +177,15 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+ 				    int where, int size, u32 *val)
+ {
+-	struct xgene_pcie_port *port = bus->sysdata;
++	struct pci_config_window *cfg;
++	struct xgene_pcie_port *port;
++
++	if (acpi_disabled)
++		port = bus->sysdata;
++	else {
++		cfg = bus->sysdata;
++		port = cfg->priv;
++	}
+ 
+ 	if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
+ 	    PCIBIOS_SUCCESSFUL)
+@@ -189,6 +216,138 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+ 	.write = pci_generic_config_write32,
+ };
+ 
++#ifdef CONFIG_ACPI
++static struct resource xgene_v1_csr_res[] = {
++	[0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
++	[1] = DEFINE_RES_MEM(0x1f2c0000UL, SZ_64K),
++	[2] = DEFINE_RES_MEM(0x1f2d0000UL, SZ_64K),
++	[3] = DEFINE_RES_MEM(0x1f500000UL, SZ_64K),
++	[4] = DEFINE_RES_MEM(0x1f510000UL, SZ_64K),
++};
++
++static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v1_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_1;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v1_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v1_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++
++static struct resource xgene_v2_1_csr_res[] = {
++	[0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
++	[1] = DEFINE_RES_MEM(0x1f2c0000UL, SZ_64K),
++};
++
++static int xgene_v2_1_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v2_1_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_2;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v2_1_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++
++static struct resource xgene_v2_2_csr_res[] = {
++	[0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
++	[1] = DEFINE_RES_MEM(0x1f500000UL, SZ_64K),
++	[2] = DEFINE_RES_MEM(0x1f2d0000UL, SZ_64K),
++};
++
++static int xgene_v2_2_pcie_ecam_init(struct pci_config_window *cfg)
++{
++	struct acpi_device *adev = to_acpi_device(cfg->parent);
++	struct acpi_pci_root *root = acpi_driver_data(adev);
++	struct device *dev = cfg->parent;
++	struct xgene_pcie_port *port;
++	struct resource *csr;
++
++	port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
++	if (!port)
++		return -ENOMEM;
++
++	csr = &xgene_v2_2_csr_res[root->segment];
++	port->csr_base = devm_ioremap_resource(dev, csr);
++	if (IS_ERR(port->csr_base)) {
++		kfree(port);
++		return -ENOMEM;
++	}
++
++	port->cfg_base = cfg->win;
++	port->version = XGENE_PCIE_IP_VER_2;
++
++	cfg->priv = port;
++
++	return 0;
++}
++
++struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops = {
++	.bus_shift      = 16,
++	.init           = xgene_v2_2_pcie_ecam_init,
++	.pci_ops        = {
++		.map_bus        = xgene_pcie_map_bus,
++		.read           = xgene_pcie_config_read32,
++		.write          = pci_generic_config_write,
++	}
++};
++#endif
++
+ static u64 xgene_pcie_set_ib_mask(struct xgene_pcie_port *port, u32 addr,
+ 				  u32 flags, u64 size)
+ {
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+index 35f0e81..40da3e7 100644
+--- a/include/linux/pci-ecam.h
++++ b/include/linux/pci-ecam.h
+@@ -65,6 +65,11 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+ #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
+ extern struct pci_ecam_ops pci_thunder_ecam_ops;
+ #endif
++#ifdef CONFIG_PCI_XGENE
++extern struct pci_ecam_ops xgene_v1_pcie_ecam_ops;
++extern struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops;
++extern struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops;
++#endif
+ 
+ #ifdef CONFIG_PCI_HOST_GENERIC
+ /* for DT-based PCI controllers that support ECAM */
 -- 
-
-Best Regards,
-Peter Chen
+1.9.1
