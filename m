@@ -1,53 +1,38 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 26 Oct 2016 16:54:48 +0800
-Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify ACPI
- support code.
-In-Reply-To: <20161021112120.GC16630@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
- <20161020165747.GD27598@leverpostej>
- <20161021111352.GA16630@leverpostej> <20161021112120.GC16630@leverpostej>
-Message-ID: <CADyBb7ukv4boB7iSt3cxr6SQK_KNsSirAWuP4J+zU-=E2QaEQA@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 26 Oct 2016 09:56:20 +0100
+Subject: [PATCH] ARM: sti: stih410-clocks: Add PROC_STFE as a critical
+ clock
+In-Reply-To: <20161026085141.GJ8574@dell>
+References: <1476804957-24000-1-git-send-email-peter.griffin@linaro.org>
+ <20161024085304.GE14477@dell>
+ <20161024134416.GB10440@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161025074257.GF8574@dell>
+ <20161025093926.GA3206@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161025100141.GH8574@dell>
+ <20161025134940.GA3993@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161026085141.GJ8574@dell>
+Message-ID: <20161026085620.GA5476@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Lee,
 
-On 21 October 2016 at 19:21, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 21, 2016 at 12:14:01PM +0100, Mark Rutland wrote:
->> On Thu, Oct 20, 2016 at 05:58:17PM +0100, Mark Rutland wrote:
->> > On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
->> > > + arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
->> > > + arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
->> > > + arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
->> > > + /* Always-on capability */
->> > > + arch_timer_c3stop = acpi_gtdt_c3stop();
->> >
->> > ... I think we should check the flag on the relevant interrupt, though
->> > that's worth clarifying.
->>
->> I see I misread the spec; this is part of the common flags.
->>
->> Please ignore this point; sorry for the noise.
->
-> Actually, I misread the spec this time around; the flag *can* differ per
-> interrupt for the sysreg/cp15 timer, but not for the MMIO timers where
-> the flag is in a common field.
->
-> So please *do* consider the above.
+On Wed, 26 Oct 2016, Lee Jones wrote:
 
-yes , you are right , will do
-Thanks :-)
+> > > > If the clock is enabled when Linux boots, the Linux clock framework *needs*
+> > > > to assume the hardware may have been used in previous boot stages, and it should
+> > > > not attempt to disable the clock.
+> > > 
+> > > None of the boot loaders we use do this.
+> > 
+> > But the Linux kernel isn't just used by us. It is not uncommon for STB
+> > bootloaders to get information from the frontend as part of the boot process. 
+> 
+> Okay, this is the clincher.  Since we need to support non-standard
+> bootloaders, it's difficult to guarantee that the clock will be
+> disabled at boot.  For this reason, I believe that we can call this a
+> critical clock.
+> 
+That's good news as the STi maintainer already acked and applied the patch.
 
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Peter.
