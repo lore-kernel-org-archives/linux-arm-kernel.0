@@ -1,194 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Oct 2016 15:07:58 +0100
-Subject: [PATCH V3 4/8] drivers: platform: Configure dma operations at
- probe time
-In-Reply-To: <1475600632-21289-5-git-send-email-sricharan@codeaurora.org>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <1475600632-21289-5-git-send-email-sricharan@codeaurora.org>
-Message-ID: <a77ab9da-1347-49e8-6c55-071bd712729a@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 26 Oct 2016 16:22:46 +0200
+Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
+In-Reply-To: <CACRpkdbGo4BJOdzkgBrE9jT-rKodd4zssCnOtOuGS+OqV-Uc6Q@mail.gmail.com>
+References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
+ <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
+ <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
+ <1477040798.15560.96.camel@baylibre.com>
+ <CACRpkdYUVXny57AC9rKX3VRAyooEk_2XLvqe9jOuT3rOaE75rg@mail.gmail.com>
+ <ec7c6cc5-cf9a-9c75-4b07-e337064c7d6e@arm.com>
+ <1477400900.2482.51.camel@baylibre.com>
+ <dee26f0b-e175-f8a0-2b73-08e8e324841c@arm.com>
+ <1477405332.2482.87.camel@baylibre.com>
+ <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
+ <1477409478.2482.113.camel@baylibre.com>
+ <CACRpkdbGo4BJOdzkgBrE9jT-rKodd4zssCnOtOuGS+OqV-Uc6Q@mail.gmail.com>
+Message-ID: <1477491766.2482.159.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Lorenzo
-
-On 04/10/16 18:03, Sricharan R wrote:
-> Configuring DMA ops at probe time will allow deferring device probe when
-> the IOMMU isn't available yet. The dma_configure for the device is now called
-> from the generic device_attach callback just before the bus/driver probe
-> is called. This way, configuring the dma ops for the device would be called
-> at the same place for all bus_types, hence the deferred probing mechanism
-> should work for all buses as well.
+On Tue, 2016-10-25 at 20:20 +0200, Linus Walleij wrote:
+> On Tue, Oct 25, 2016 at 5:31 PM, Jerome Brunet <jbrunet@baylibre.com>
+> wrote:
+> > 
+> > On Tue, 2016-10-25 at 15:47 +0100, Marc Zyngier wrote:
 > 
-> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->        |                         |
-> pci_bus_add_device     (device_add/driver_register)
->        |                         |
-> device_attach           device_initial_probe
->        |                         |
-> __device_attach_driver    __device_attach_driver
->        |
-> driver_probe_device
->        |
-> really_probe
->        |
-> dma_configure
+> > 
+> > > 
+> > > Is gpio_to_irq() supposed to allocate an interrupt? Or merely to
+> > > report the existence of a mapping?
 > 
->  Similarly on the device/driver_unregister path __device_release_driver is
->  called which inturn calls dma_deconfigure.
+> It should provide an IRQ corresponding to the gpio line, if possible.
 > 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  drivers/base/dd.c           | 10 ++++++++++
->  drivers/base/dma-mapping.c  | 11 +++++++++++
->  drivers/of/platform.c       |  4 ----
->  drivers/pci/probe.c         |  5 +----
->  include/linux/dma-mapping.h |  3 +++
->  5 files changed, 25 insertions(+), 8 deletions(-)
+> However the semantic is such, that it is not necessary to call
+> to_irq()
+> before using an IRQ: the irqchip and gpiochip abstractions should be
+> orthogonal.
+
+Linus,
+
+They are?orthogonal. You can request an irq from the irqchip controller
+without the gpiochip, like any other irq controller.
+
 > 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index 16688f5..cfebd48 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -19,6 +19,7 @@
->  
->  #include <linux/device.h>
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/module.h>
->  #include <linux/kthread.h>
->  #include <linux/wait.h>
-> @@ -353,6 +354,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  	if (ret)
->  		goto pinctrl_bind_failed;
->  
-> +	ret = dma_configure(dev);
-> +	if (ret)
-> +		goto dma_failed;
-> +
->  	if (driver_sysfs_add(dev)) {
->  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
->  			__func__, dev_name(dev));
-> @@ -395,6 +400,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  	goto done;
->  
->  probe_failed:
-> +	dma_deconfigure(dev);
-> +dma_failed:
->  	if (dev->bus)
->  		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
->  					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
-> @@ -780,6 +787,9 @@ static void __device_release_driver(struct device *dev)
->  			dev->bus->remove(dev);
->  		else if (drv->remove)
->  			drv->remove(dev);
-> +
-> +		dma_deconfigure(dev);
-> +
->  		devres_release_all(dev);
->  		dev->driver = NULL;
->  		dev_set_drvdata(dev, NULL);
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index d799662..54e87f5 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -10,6 +10,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/export.h>
->  #include <linux/gfp.h>
-> +#include <linux/of_device.h>
->  #include <linux/slab.h>
->  #include <linux/vmalloc.h>
->  
-> @@ -166,6 +167,16 @@ void dmam_free_noncoherent(struct device *dev, size_t size, void *vaddr,
->  }
->  EXPORT_SYMBOL(dmam_free_noncoherent);
->  
-> +int dma_configure(struct device *dev)
-> +{
-> +	return of_dma_configure(dev, dev->of_node);
-> +}
-> +
-> +void dma_deconfigure(struct device *dev)
-> +{
-> +	of_dma_deconfigure(dev);
-> +}
-> +
->  #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
->  
->  static void dmam_coherent_decl_release(struct device *dev, void *res)
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 9cb7090..adbd77c 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -181,11 +181,9 @@ static struct platform_device *of_platform_device_create_pdata(
->  
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
-> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->  	of_msi_configure(&dev->dev, dev->dev.of_node);
->  
->  	if (of_device_add(dev) != 0) {
-> -		of_dma_deconfigure(&dev->dev);
->  		platform_device_put(dev);
->  		goto err_clear_flag;
->  	}
-> @@ -242,7 +240,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  		dev_set_name(&dev->dev, "%s", bus_id);
->  	else
->  		of_device_make_bus_id(&dev->dev);
-> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->  
->  	/* Allow the HW Peripheral ID to be overridden */
->  	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-> @@ -536,7 +533,6 @@ static int of_platform_device_destroy(struct device *dev, void *data)
->  		amba_device_unregister(to_amba_device(dev));
->  #endif
->  
-> -	of_dma_deconfigure(dev);
->  	of_node_clear_flag(dev->of_node, OF_POPULATED);
->  	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
->  	return 0;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 93f280d..85c9553 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1724,10 +1724,7 @@ static void pci_dma_configure(struct pci_dev *dev)
->  {
->  	struct device *bridge = pci_get_host_bridge_device(dev);
->  
-> -	if (IS_ENABLED(CONFIG_OF) &&
-> -		bridge->parent && bridge->parent->of_node) {
-> -			of_dma_configure(&dev->dev, bridge->parent->of_node);
-> -	} else if (has_acpi_companion(bridge)) {
-> +	if (has_acpi_companion(bridge)) {
->  		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
->  		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
-
-It seems a bit awkward leaving pci_dma_configure here, doing DMA
-configuration at device add, after we've allegedly moved DMA
-configuration to driver probe. Lorenzo, do you foresee any issues if
-this probe-time of_dma_configure() path were to also multiplex
-acpi_dma_configure() in future, such that everything would be back in
-the same place eventually?
-
-Conversely, is there actually any issue with leaving pci_dma_configure()
-unchanged, and simply moving the call from pci_device_add() into
-dma_configure()?
-
-Robin.
-
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index 66533e1..2766dbe 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -656,6 +656,9 @@ dma_mark_declared_memory_occupied(struct device *dev,
->  }
->  #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
->  
-> +int dma_configure(struct device *dev);
-> +void dma_deconfigure(struct device *dev);
-> +
->  /*
->   * Managed DMA API
->   */
+> This goes especially when using device tree or ACPI, where you
+> may reference an IRQ from something modeled as irqchip, which
+> is simultaneously a gpiochip.
 > 
+> > 
+> > Linus, please correct me if I'm wrong,
+> > .to_irq gets the linux gpio number and returns the linux virtual
+> > irq
+> > numbers, 0 if there is no interrupt.
+> 
+> Yes. But it may *or may not* be called before using the IRQ.
+> 
+> So it should look up or try to create a mapping on request, but not
+> assume to have been called before using some line as IRQ.
+> 
+> The only thing you should assume to be called before an interrupt
+> is put to use is the stuff in irqchip. So you have to do your
+> dynamic irqdomain mapping elsewhere than .to_irq().
+
+irq_create_mapping (and irq_create_fwspec_mapping) internally calls
+irq_find_mapping. So if the mapping already exist (the irq is already
+used before calling to_irq), the existing mapping will be returned. The
+mapping will be actually created only if needed. It seems to be in line
+with your explanation, no ?
+
+There is really a *lot* of gpio drivers which use irq_create_mapping in
+the to_irq callback, are these all wrong ?
+If this should not be used, what should we all do instead ??
+
+> 
+> Yours,
+> Linus Walleij
