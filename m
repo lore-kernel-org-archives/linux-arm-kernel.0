@@ -1,48 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 26 Oct 2016 18:50:52 +0100
-Subject: [PATCH 02/12] ASoC: dapm: Implement stereo mixer control support
-In-Reply-To: <20161003110804.28235-3-wens@csie.org>
-References: <20161003110804.28235-1-wens@csie.org>
- <20161003110804.28235-3-wens@csie.org>
-Message-ID: <20161026175052.GE25322@sirena.org.uk>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 26 Oct 2016 10:54:50 -0700
+Subject: [PATCH] arm64: dts: msm8996: Correct slpi region reg definition
+Message-ID: <1477504490-7818-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 03, 2016 at 07:07:54PM +0800, Chen-Yu Tsai wrote:
+I missed the missing cell in the reg property of the slpi region in my review,
+so let's add it.
 
->  	/* find dapm widget path assoc with kcontrol */
->  	dapm_kcontrol_for_each_path(path, kcontrol) {
-> +		/*
-> +		 * If status for the second channel was given ( >= 0 ),
-> +		 * consider the second and later paths as the second
-> +		 * channel.
-> +		 */
-> +		if (found && rconnect >= 0)
-> +			soc_dapm_connect_path(path, rconnect, "mixer update");
-> +		else
-> +			soc_dapm_connect_path(path, connect, "mixer update");
->  		found = 1;
-> -		soc_dapm_connect_path(path, connect, "mixer update");
+Fixes: 2b7f0de19648 ("arm64: dts: msm8996: Add reserve-memory nodes")
+Cc: Sarangdhar Joshi <spjoshi@codeaurora.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This really only works for two channels with the current inteface - the
-comment makes it sound like it'll work for more but we can only pass in
-two (and there's only support for specifying two everywhere).
-
-> -	change = dapm_kcontrol_set_value(kcontrol, val);
-> +	/* This assumes field width < (bits in unsigned int / 2) */
-> +	change = dapm_kcontrol_set_value(kcontrol, val | (rval << width));
-
-That seems like a bit of an assumption in cases where we've got a single
-control for both power and volume?  They're very rare though, I'm not
-even sure any exist.  It'd be good to have a check in the code just in
-case it does come up, it'll likely be a nightmare to debug if someone
-does run into it.
-
-Otherwise I think this makes sense.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161026/6a7d0d11/attachment.sig>
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index b97647d29842..215de91e802d 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -42,7 +42,7 @@
+ 		};
+ 
+ 		slpi_region: slpi at 90b00000 {
+-			reg = <0x0 0x90b00000 0xa00000>;
++			reg = <0x0 0x90b00000 0x0 0xa00000>;
+ 			no-map;
+ 		};
+ 
+-- 
+2.5.0
