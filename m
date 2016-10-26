@@ -1,46 +1,35 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 26 Oct 2016 20:58:27 +0300
-Subject: Pinctrl nodes missing for USB
-In-Reply-To: <CANAwSgSfRVDA_MXN9S+G0-u-mQNhPuPJ65FT_Y-ZH5nFpX4ptg@mail.gmail.com>
-References: <CANAwSgQ=pp93tDAERQ1iaryY3_pVhTeun=RaTo9ws1UKtS1PhA@mail.gmail.com>
- <20161026165348.GA5600@kozik-lap>
- <CANAwSgSfRVDA_MXN9S+G0-u-mQNhPuPJ65FT_Y-ZH5nFpX4ptg@mail.gmail.com>
-Message-ID: <20161026175827.GA10224@kozik-lap>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 23:33:15 +0530
+Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
+In-Reply-To: <7heg33rtdl.fsf@baylibre.com>
+References: <1477418044-24603-1-git-send-email-david@lechnology.com>
+ <f423a705-5ae2-78cf-2b63-609dd4e2cdf6@ti.com> <7heg33rtdl.fsf@baylibre.com>
+Message-ID: <6a145c99-eb39-d937-71b9-3ac709bf760e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 11:15:51PM +0530, Anand Moon wrote:
-> Hi Krzysztof
+On Wednesday 26 October 2016 09:32 PM, Kevin Hilman wrote:
+> Hi Sekhar,
 > 
-> On 26 October 2016 at 22:23, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Wed, Oct 26, 2016 at 05:56:54PM +0530, Anand Moon wrote:
-> >> Hi All,
-> >>
-> >> I have tried to enable CONFIG_DEBUG_PINCTRL=y on Odroid XU4.
-> >> Just to try to understand the feature.
-> >> Is this feature suppoted for USB nodes.
-> >>
-> >> Below is the output of failed to pase pinctrl for USB nodes via dts.
-> >
-> > I do not see any question here...
-> >
-> > Anyway the devices not instantiated from DT will have such warning and
-> > USB devices are not present in DT, from obvious reasons... However what
-> > surprises me is why pinctrl_dt_to_map() was called for USB devices?
-> >
-> > Best regards,
-> > Krzysztof
-> >
-> [snip]
+> Sekhar Nori <nsekhar@ti.com> writes:
 > 
-> Sorry. I was just referring HK odroidxu3 dts for reference for dwc3 controller.
+>> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
+>>> This fixes pwm name matching for DA850 familiy devices. When using device
+>>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
+>>> same name, which caused errors when trying to register the devices.
+>>>
+>>> The names for clock matching in da850_clks[] also have to be updated to
+>>> to exactly match in order for the clock lookup to work correctly.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>
+>> Applied to "fixes" branch. Will send upstream after testing a bit and
+>> also waiting to see if anyone else has any comments.
 > 
-> https://github.com/hardkernel/linux/blob/odroidxu3-3.10.y/arch/arm/boot/dts/exynos5422-odroidxu3.dts#L525
-> 
-> I am just trying to understand if such a configuration possible for
-> dwc3 controllers.
+> I'm not seeing a fixes branch in your tree.  Did you push this out?
+> Similarily, I didn't see the updates in v4.10/defconfig either.
 
-What do you mean by "configuration"? Which configuration?
+Pushed now. Will push a merged master branch tomorrow after some testing.
 
-Best regards,
-Krzysztof
+Thanks,
+Sekhar
