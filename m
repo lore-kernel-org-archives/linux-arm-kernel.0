@@ -1,47 +1,41 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Oct 2016 09:52:15 +0200
-Subject: arm/boot/dts/at91sam9260.dtsi USB clock divisors and AT91SAM9G20
-In-Reply-To: <CAAkeqgVrCEAtX+Tujjqe4admkhnn1746kL4_d8Z1NjCwVwUGcA@mail.gmail.com>
-References: <CAAkeqgVrCEAtX+Tujjqe4admkhnn1746kL4_d8Z1NjCwVwUGcA@mail.gmail.com>
-Message-ID: <20161026075215.f5gpk6xoex6t3zco@piout.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 13:29:39 +0530
+Subject: [PATCH v6 1/5] ARM: davinci: da8xx: add usb phy clocks
+In-Reply-To: <1477451211-31979-2-git-send-email-david@lechnology.com>
+References: <1477451211-31979-1-git-send-email-david@lechnology.com>
+ <1477451211-31979-2-git-send-email-david@lechnology.com>
+Message-ID: <6bcc1ac1-446c-6191-1c63-e37ccfaf9556@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/2016 at 10:49:01 -0700, Andrey Yurovsky wrote :
-> I'm working at an AT91SAM9G20 on which the USB clock divisor was wrong
-> and traced the issue down to arm/boot/dts/at91sam9260.dtsi which is
-> included like this:
+On Wednesday 26 October 2016 08:36 AM, David Lechner wrote:
+> Up to this point, the USB phy clock configuration was handled manually in
+> the board files and in the usb drivers. This adds proper clocks so that
+> the usb drivers can use clk_get and clk_enable and not have to worry about
+> the details. Also, the related code is removed from the board files and
+> replaced with the new clock registration functions.
 > 
-> at91sam9g20ek_common.dtsi
->     at91sam9g20.dtsi
->         at91sam9260.dtsi
+> Signed-off-by: David Lechner <david@lechnology.com>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
 > 
-> This has a node:
+> I have added "ARM: davinci: da8xx: Enable the usb20 "per" clk on phy_clk_enable"
+> from Axel Haslam to this patch.
 > 
->                 usb: usbck {
->                     compatible = "atmel,at91rm9200-clk-usb";
->                     #clock-cells = <0>;
->                     atmel,clk-divisors = <1 2 4 0>;
->                     clocks = <&pllb>;
->                 };
+> In the review of Axel's patch, Sekhar said:
 > 
-> However the G20 parts seem to need a different divisor, for me this works:
+>> We should not be using a NULL device pointer here. Can you pass the musb
+>> device pointer available in the same file? Also, da850_clks[] in da850.c
+>> needs to be fixed to add the matching device name.
 > 
->                 usb: usbck {
->                     compatible = "atmel,at91rm9200-clk-usb";
->                     #clock-cells = <0>;
->                     atmel,clk-divisors = <4 2 0 0>;
->                     clocks = <&pllb>;
->                 };
-> 
-> Should the USB clock node be moved to a separate .dtsi file to account
-> for this difference?
+> However, the musb device may not be registered. The usb20_clk can be used to
+> supply a 48MHz clock to USB 1.1 (ohci) without using the musb device. So, I am
+> inclined to leave this as NULL.
 
-I think the easiest way of doing it is to override atmel,clk-divisors in
-at91sam9g20.dtsi.
+But clock look-up has nothing to do with device being registered AFAICT.
+It is used to identify the clock consumer. Passing NULL there means the
+clock is not associated with any device. Which is not correct as we are
+specifically looking at MUSB module clock.
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Sekhar
