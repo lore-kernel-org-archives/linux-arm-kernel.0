@@ -1,56 +1,117 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 26 Oct 2016 09:44:05 +0530
-Subject: [PATCH 4/4] iommu/arm-smmu: Add the device_link between masters
- and smmu
-In-Reply-To: <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
-References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
- <CGME20161021171456eucas1p172cd17e1d3b498eac68210a39f54e025@eucas1p1.samsung.com>
- <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
- <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
-Message-ID: <001301d22f3f$6788cf30$369a6d90$@codeaurora.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 26 Oct 2016 10:07:23 +0530
+Subject: [PATCH v2] arm64: Add support for additional relocations in the
+ kexec purgatory code
+In-Reply-To: <1476960211-25594-1-git-send-email-catalin.marinas@arm.com>
+References: <1476960211-25594-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <6eb25c47-6fbd-4b7a-e450-6de6388a9d55@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
 
+
+On Thursday 20 October 2016 04:13 PM, Catalin Marinas wrote:
+> When compiling the kexec-tools with gcc6, the following additional
+> reolcations are generated in the purgatory.ro file:
 >
->On 2016-10-21 19:14, Sricharan R wrote:
->> The device link between master and its smmu is added so that
->> the smmu gets runtime enabled/disabled when the master needs it.
->> This is done from add_device callback which gets called once
->> when the master is added to the smmu group.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>   drivers/iommu/arm-smmu.c | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 578cdc2..71ce4b6 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1470,6 +1470,15 @@ static int arm_smmu_add_device(struct device *dev)
->>   		goto out_free;
->>   	pm_runtime_put_sync(smmu->dev);
->>
->> +	/*
->> +	 * Establish the link between smmu and master, so that the
->> +	 * smmu gets runtime enabled/disabled as per the master's
->> +	 * needs.
->> +	 */
->> +
->> +	device_link_add(dev, smmu->dev, DEVICE_LINK_AVAILABLE,
->> +			DEVICE_LINK_PM_RUNTIME);
+> R_AARCH64_ADR_PREL_PG_HI21
+> R_AARCH64_ADD_ABS_LO12_NC
+> R_AARCH64_LDST64_ABS_LO12_NC
 >
->Please update to the latest version of Rafael's patches. In V5 the
->initial link
->state is not needed anymore and there was an important fix for creating
->links
->during master's driver probing, what happens after applying your IOMMU
->deferred
->probe patchset.
+> This patch modifies the arm64 machine_apply_elf_rel() function to handle
+> these relocations.
 
-   Sure i will update to V5. I see that i am on V4.
+Noticed that, gcc version of fedora koji(6.2.1-2.fc25) inserts another 
+relocation and kexec-tools generates following error.
 
-Regards,
- Sricharan
+machine_apply_elf_rel: ERROR Unknown type: 261
+
+I have a fixup here:
+https://github.com/pratyushanand/kexec-tools/commit/0eb8a908f617e0f957df7fb3ef293596f47e6832
+
+May be I will send them separately.
+
+~Pratyush
+>
+> Cc: Geoff Levand <geoff@infradead.org>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>
+> Changes for v2:
+> - Fixed the type string to drop the "R_AARCH64_" prefix
+>
+>  kexec/arch/arm64/kexec-arm64.c | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>
+> diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
+> index 2e8839a..e067a23 100644
+> --- a/kexec/arch/arm64/kexec-arm64.c
+> +++ b/kexec/arch/arm64/kexec-arm64.c
+> @@ -550,6 +550,14 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+>  # define R_AARCH64_ADR_PREL_LO21 274
+>  #endif
+>
+> +#if !defined(R_AARCH64_ADR_PREL_PG_HI21)
+> +# define R_AARCH64_ADR_PREL_PG_HI21 275
+> +#endif
+> +
+> +#if !defined(R_AARCH64_ADD_ABS_LO12_NC)
+> +# define R_AARCH64_ADD_ABS_LO12_NC 277
+> +#endif
+> +
+>  #if !defined(R_AARCH64_JUMP26)
+>  # define R_AARCH64_JUMP26 282
+>  #endif
+> @@ -558,10 +566,15 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+>  # define R_AARCH64_CALL26 283
+>  #endif
+>
+> +#if !defined(R_AARCH64_LDST64_ABS_LO12_NC)
+> +# define R_AARCH64_LDST64_ABS_LO12_NC 286
+> +#endif
+> +
+>  	uint64_t *loc64;
+>  	uint32_t *loc32;
+>  	uint64_t *location = (uint64_t *)ptr;
+>  	uint64_t data = *location;
+> +	uint64_t imm;
+>  	const char *type = NULL;
+>
+>  	switch(r_type) {
+> @@ -585,6 +598,19 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+>  		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
+>  			+ (((value - address) << 3) & 0xffffe0));
+>  		break;
+> +	case R_AARCH64_ADR_PREL_PG_HI21:
+> +		type = "ADR_PREL_PG_HI21";
+> +		imm = ((value & ~0xfff) - (address & ~0xfff)) >> 12;
+> +		loc32 = ptr;
+> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
+> +			+ ((imm & 3) << 29) + ((imm & 0x1ffffc) << (5 - 2)));
+> +		break;
+> +	case R_AARCH64_ADD_ABS_LO12_NC:
+> +		type = "ADD_ABS_LO12_NC";
+> +		loc32 = ptr;
+> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
+> +			+ ((value & 0xfff) << 10));
+> +		break;
+>  	case R_AARCH64_JUMP26:
+>  		type = "JUMP26";
+>  		loc32 = ptr;
+> @@ -597,6 +623,15 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+>  		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
+>  			+ (((value - address) >> 2) & 0x3ffffff));
+>  		break;
+> +	case R_AARCH64_LDST64_ABS_LO12_NC:
+> +		if (value & 7)
+> +			die("%s: ERROR Unaligned value: %lx\n", __func__,
+> +				value);
+> +		type = "LDST64_ABS_LO12_NC";
+> +		loc32 = ptr;
+> +		*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
+> +			+ ((value & 0xff8) << (10 - 3)));
+> +		break;
+>  	default:
+>  		die("%s: ERROR Unknown type: %lu\n", __func__, r_type);
+>  		break;
+>
