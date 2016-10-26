@@ -1,43 +1,38 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 13:52:33 +0100
-Subject: [PATCH 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
-In-Reply-To: <1476394329-31696-4-git-send-email-tthayer@opensource.altera.com>
-References: <1476394329-31696-1-git-send-email-tthayer@opensource.altera.com>
- <1476394329-31696-4-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20161026125233.GL11267@dell>
+Date: Wed, 26 Oct 2016 14:00:22 +0100
+Subject: [PATCH] ARM: sti: stih410-clocks: Add PROC_STFE as a critical
+ clock
+In-Reply-To: <20161026085620.GA5476@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1476804957-24000-1-git-send-email-peter.griffin@linaro.org>
+ <20161024085304.GE14477@dell>
+ <20161024134416.GB10440@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161025074257.GF8574@dell>
+ <20161025093926.GA3206@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161025100141.GH8574@dell>
+ <20161025134940.GA3993@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20161026085141.GJ8574@dell>
+ <20161026085620.GA5476@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20161026130022.GB12618@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Oct 2016, tthayer at opensource.altera.com wrote:
+> > > > > If the clock is enabled when Linux boots, the Linux clock framework *needs*
+> > > > > to assume the hardware may have been used in previous boot stages, and it should
+> > > > > not attempt to disable the clock.
+> > > > 
+> > > > None of the boot loaders we use do this.
+> > > 
+> > > But the Linux kernel isn't just used by us. It is not uncommon for STB
+> > > bootloaders to get information from the frontend as part of the boot process. 
+> > 
+> > Okay, this is the clincher.  Since we need to support non-standard
+> > bootloaders, it's difficult to guarantee that the clock will be
+> > disabled at boot.  For this reason, I believe that we can call this a
+> > critical clock.
 
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> Add the Altera Arria10 DevKit System Resource Monitor functionality
-> to the MFD device.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
->  drivers/mfd/altera-a10sr.c |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
-> index 06e1f7f..0942d7d 100644
-> --- a/drivers/mfd/altera-a10sr.c
-> +++ b/drivers/mfd/altera-a10sr.c
-> @@ -33,6 +33,10 @@
->  		.name = "altr_a10sr_gpio",
->  		.of_compatible = "altr,a10sr-gpio",
->  	},
-> +	{
-> +		.name = "altr_a10sr_mon",
-> +		.of_compatible = "altr,a10sr-mon",
+> That's good news as the STi maintainer already acked and applied the patch.
 
-"-monitor" would be better in my opinion.
-
-> +	},
->  };
->  
->  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
+Matters not.  That's why we have `git rebase` and `git revert`. ;)
 
 -- 
 Lee Jones
