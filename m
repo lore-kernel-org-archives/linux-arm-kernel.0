@@ -1,47 +1,58 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 26 Oct 2016 14:24:22 +0900
-Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
-Message-ID: <20161026052422.17283.57864.sendpatchset@little-apple>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 26 Oct 2016 07:56:48 +0200
+Subject: [PATCH v5 3/9] drm/hisilicon/hibmc: Add support for frame buffer
+In-Reply-To: <1477449426-69018-4-git-send-email-zourongrong@gmail.com>
+References: <1477449426-69018-1-git-send-email-zourongrong@gmail.com>
+ <1477449426-69018-4-git-send-email-zourongrong@gmail.com>
+Message-ID: <20161026055648.bipks7wthiu4gmlf@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+On Wed, Oct 26, 2016 at 10:37:00AM +0800, Rongrong Zou wrote:
+> Add support for fbdev and kms fb management.
+> 
+> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 
-Extend the ARM64 defconfig to enable the DU DRM device as module
-together with required dependencies of V4L2 FCP and VSP modules.
+Small drive-by comment below.
 
-This enables VGA output on the r8a7795 Salvator-X board.
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> index db8d80e..d41138a 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> @@ -20,9 +20,23 @@
+>  #define HIBMC_DRM_DRV_H
+>  
+>  #include <drm/drmP.h>
+> +#include <drm/drm_fb_helper.h>
+>  #include <drm/ttm/ttm_bo_driver.h>
+>  #include <drm/drm_gem.h>
+>  
+> +struct hibmc_framebuffer {
+> +	struct drm_framebuffer fb;
+> +	struct drm_gem_object *obj;
+> +	bool is_fbdev_fb;
+> +};
+> +
+> +struct hibmc_fbdev {
+> +	struct drm_fb_helper helper;
+> +	struct hibmc_framebuffer fb;
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
----
+I wouldn't embed the single framebuffer here, but instead have a pointer
+and just refcount it. This here is a pattern that predates framebuffer
+refcounting, and it leads to plenty of surprises.
 
- Written against next-20161026
+Maybe we should update the documentation of
+drm_framebuffer_unregister_private() to mention that it is deprecated? The
+overview doc in drm_framebuffer.c already explains that, but I guess
+that's not obvious enough.
 
- arch/arm64/configs/defconfig |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Can you pls do that patch? And pls make sure it all looks pretty when
+building the docs with
 
---- 0001/arch/arm64/configs/defconfig
-+++ work/arch/arm64/configs/defconfig	2016-10-26 14:10:58.220607110 +0900
-@@ -293,8 +293,22 @@ CONFIG_REGULATOR_PWM=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_S2MPS11=y
-+CONFIG_MEDIA_SUPPORT=m
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
-+CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
-+# CONFIG_DVB_NET is not set
-+CONFIG_V4L_MEM2MEM_DRIVERS=y
-+CONFIG_VIDEO_RENESAS_FCP=m
-+CONFIG_VIDEO_RENESAS_VSP1=m
- CONFIG_DRM=m
- CONFIG_DRM_NOUVEAU=m
-+CONFIG_DRM_RCAR_DU=m
-+CONFIG_DRM_RCAR_HDMI=y
-+CONFIG_DRM_RCAR_LVDS=y
-+CONFIG_DRM_RCAR_VSP=y
- CONFIG_DRM_TEGRA=m
- CONFIG_DRM_PANEL_SIMPLE=m
- CONFIG_DRM_I2C_ADV7511=m
+$ make htmldocs
+
+Thanks, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
