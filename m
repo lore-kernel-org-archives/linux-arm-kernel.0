@@ -1,60 +1,102 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 26 Oct 2016 18:41:42 +0100
-Subject: [PATCH v2 2/8] KVM: Track the pid of the VM process
+Date: Wed, 26 Oct 2016 18:41:43 +0100
+Subject: [PATCH v2 3/8] perf/trace: Add notification for perf trace events
 In-Reply-To: <20161026174148.17172-1-punit.agrawal@arm.com>
 References: <20161026174148.17172-1-punit.agrawal@arm.com>
-Message-ID: <20161026174148.17172-3-punit.agrawal@arm.com>
+Message-ID: <20161026174148.17172-4-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userspace tools such as perf can be used to profile individual
-processes.
+Add a mechanism to notify listeners about perf trace event state
+changes. This enables listeners to take actions requiring the event
+context (e.g., attached process).
 
-Track the PID of the virtual machine process to match profiling requests
-targeted at it. This can be used to take appropriate action to enable
-the requested profiling operations for the VMs of interest.
+The notification mechanism can be used to reduce trace point based
+profiling overhead by enabling/disabling hardware traps for specific
+contexts (e.g., virtual machines).
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Steven Rostedt <rostedt@goodmis.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Jiri Olsa <jolsa@kernel.org>
 ---
- include/linux/kvm_host.h | 1 +
- virt/kvm/kvm_main.c      | 2 ++
- 2 files changed, 3 insertions(+)
+ include/linux/trace_events.h    |  3 +++
+ kernel/trace/trace_event_perf.c | 24 ++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 01c0b9c..4caff20 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -375,6 +375,7 @@ struct kvm_memslots {
- struct kvm {
- 	spinlock_t mmu_lock;
- 	struct mutex slots_lock;
-+	struct pid *pid;
- 	struct mm_struct *mm; /* userspace tied to this vm */
- 	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
- 	struct srcu_struct srcu;
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 28510e7..ed3823c 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -615,6 +615,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
- 	spin_lock_init(&kvm->mmu_lock);
- 	atomic_inc(&current->mm->mm_count);
- 	kvm->mm = current->mm;
-+	kvm->pid = get_task_pid(current->group_leader, PIDTYPE_PID);
- 	kvm_eventfd_init(kvm);
- 	mutex_init(&kvm->lock);
- 	mutex_init(&kvm->irq_lock);
-@@ -714,6 +715,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
- 	int i;
- 	struct mm_struct *mm = kvm->mm;
+diff --git a/include/linux/trace_events.h b/include/linux/trace_events.h
+index be00761..5924032 100644
+--- a/include/linux/trace_events.h
++++ b/include/linux/trace_events.h
+@@ -505,6 +505,9 @@ perf_trace_buf_submit(void *raw_data, int size, int rctx, u16 type,
+ {
+ 	perf_tp_event(type, count, raw_data, size, regs, head, rctx, task);
+ }
++
++extern int perf_trace_notifier_register(struct notifier_block *nb);
++extern int perf_trace_notifier_unregister(struct notifier_block *nb);
+ #endif
  
-+	put_pid(kvm->pid);
- 	kvm_destroy_vm_debugfs(kvm);
- 	kvm_arch_sync_events(kvm);
- 	spin_lock(&kvm_lock);
+ #endif /* _LINUX_TRACE_EVENT_H */
+diff --git a/kernel/trace/trace_event_perf.c b/kernel/trace/trace_event_perf.c
+index 562fa69..9aaaacf 100644
+--- a/kernel/trace/trace_event_perf.c
++++ b/kernel/trace/trace_event_perf.c
+@@ -6,10 +6,12 @@
+  */
+ 
+ #include <linux/module.h>
++#include <linux/notifier.h>
+ #include <linux/kprobes.h>
+ #include "trace.h"
+ 
+ static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
++static RAW_NOTIFIER_HEAD(perf_trace_notifier_list);
+ 
+ /*
+  * Force it to be aligned to unsigned long to avoid misaligned accesses
+@@ -86,6 +88,26 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
+ 	return 0;
+ }
+ 
++int perf_trace_notifier_register(struct notifier_block *nb)
++{
++	return raw_notifier_chain_register(&perf_trace_notifier_list, nb);
++}
++
++int perf_trace_notifier_unregister(struct notifier_block *nb)
++{
++	return raw_notifier_chain_unregister(&perf_trace_notifier_list, nb);
++}
++
++static void perf_trace_notify(enum trace_reg event, struct perf_event *p_event)
++{
++	/*
++	 * We use raw notifiers here as we are called with the
++	 * event_mutex held.
++	 */
++	raw_notifier_call_chain(&perf_trace_notifier_list,
++				     event, p_event);
++}
++
+ static int perf_trace_event_reg(struct trace_event_call *tp_event,
+ 				struct perf_event *p_event)
+ {
+@@ -176,6 +198,7 @@ static void perf_trace_event_unreg(struct perf_event *p_event)
+ static int perf_trace_event_open(struct perf_event *p_event)
+ {
+ 	struct trace_event_call *tp_event = p_event->tp_event;
++	perf_trace_notify(TRACE_REG_PERF_OPEN, p_event);
+ 	return tp_event->class->reg(tp_event, TRACE_REG_PERF_OPEN, p_event);
+ }
+ 
+@@ -183,6 +206,7 @@ static void perf_trace_event_close(struct perf_event *p_event)
+ {
+ 	struct trace_event_call *tp_event = p_event->tp_event;
+ 	tp_event->class->reg(tp_event, TRACE_REG_PERF_CLOSE, p_event);
++	perf_trace_notify(TRACE_REG_PERF_CLOSE, p_event);
+ }
+ 
+ static int perf_trace_event_init(struct trace_event_call *tp_event,
 -- 
 2.9.3
