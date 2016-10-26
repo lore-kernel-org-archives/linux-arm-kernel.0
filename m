@@ -1,53 +1,36 @@
-From: ahaslam@baylibre.com (ahaslam at baylibre.com)
-Date: Wed, 26 Oct 2016 21:49:16 +0200
-Subject: [PATCH] ARM: davinci: register the usb20_phy clock on the DT file
-Message-ID: <20161026194916.14546-1-ahaslam@baylibre.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 26 Oct 2016 12:53:20 -0700
+Subject: [PATCH 0/5] Minimal cpuidle fixes for omap5 and dra7
+In-Reply-To: <20161026151703.24730-1-tony@atomide.com>
+References: <20161026151703.24730-1-tony@atomide.com>
+Message-ID: <ecf2d8f9-c385-26db-7ffd-49026ecbc380@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam@baylibre.com>
 
-The usb20_phy clock needs to be registered for the driver to be able
-to get and enable a clock. Currently the usb phy clocks are registered
-form board files, which will not be called during a device tree based
-boot.
 
-To be able to probe correctly usb form a device tree boot, register
-the usb phy clocks form the DT specific init.
+On 10/26/2016 8:16 AM, Tony Lindgren wrote:
+> Hi all,
+>
+> Here are some fixes to get minimal cpuidle support working with omap5
+> and dra7. Not sure if there are still some unsorted issues on enabling
+> this on dra7, but at least omap5 has been behving for me for few
+> weeks with these.
+>
+> Regards,
+>
+> Tony
+>
+>
+> Santosh Shilimkar (1):
+>   ARM: DRA7: PM: cpuidle MPU CSWR support
+>
+> Tony Lindgren (4):
+>   ARM: OMAP5: Fix build for PM code
+>   ARM: OMAP5: Fix mpuss_early_init
+>   ARM: OMAP4+: Fix bad fallthrough for cpuidle
+>   ARM: OMAP5: Enable minimal cpuidle for omap5 retention
+>
+Feel free to add my ack if you need one.
 
-Unfourtunatly, davinci does not have proper clock support on device tree
-yet, so by registering the clock form de DT specific file we are
-forced to hardcode the parent clock, and cannot select refclkin as
-parent for any of the phy clocks of the da850 family.
-
-As none of the current da850 based boards currently in mainline use
-refclkin as source. I guess we can live with this limitation until clocks
-are correctly represented through CCF/device tree.
-
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
-
-This patch depends on David's series for usb clocks:
-
-currently:
-[PATCH v6 0/5] da8xx USB PHY platform devices and clocks
-https://lkml.org/lkml/2016/10/25/867
-
- arch/arm/mach-davinci/da8xx-dt.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index c9f7e92..7947267 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -45,6 +45,8 @@
- 
- static void __init da850_init_machine(void)
- {
-+	da8xx_register_usb20_phy_clk(false);
-+	da8xx_register_usb11_phy_clk(false);
- 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
- }
- 
--- 
-1.9.1
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
