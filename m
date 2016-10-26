@@ -1,75 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 26 Oct 2016 11:43:43 +0200
-Subject: [PATCH] [media] media: mtk-mdp: mark PM functions as __maybe_unused
-Message-ID: <20161026094411.785911-1-arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 26 Oct 2016 10:55:58 +0100
+Subject: [PATCH 00/10] arm64: move thread_info off of the task stack
+In-Reply-To: <2db24d48-3a8a-11c2-9b2c-26a51a3baa36@redhat.com>
+References: <1476904234-9511-1-git-send-email-mark.rutland@arm.com>
+ <10401f46-cabc-23ec-a448-c377dbce7911@redhat.com>
+ <20161024174840.GR15620@leverpostej>
+ <fb8c8a44-36c8-9bbb-5cbb-9b42fd815d8d@redhat.com>
+ <20161024180941.GT15620@leverpostej>
+ <2db24d48-3a8a-11c2-9b2c-26a51a3baa36@redhat.com>
+Message-ID: <20161026095557.GA19965@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A previous patch tried to fix a build error, but introduced another
-warning:
+On Tue, Oct 25, 2016 at 05:46:39PM -0700, Laura Abbott wrote:
+> On 10/24/2016 11:09 AM, Mark Rutland wrote:
+> >On Mon, Oct 24, 2016 at 10:58:10AM -0700, Laura Abbott wrote:
+> >>On 10/24/2016 10:48 AM, Mark Rutland wrote:
+> >>>On Mon, Oct 24, 2016 at 10:38:59AM -0700, Laura Abbott wrote:
+> >>>>On 10/19/2016 12:10 PM, Mark Rutland wrote:
+> >>>>>[3] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/ti-stack-split
+> >>>
+> >>>>I pulled the arm64/ti-stack-split branch on top of a Fedora
+> >>>>tree and ran back-to-back kernel RPM builds for a long weekend.
+> >>>>It's still going as of this morning so you can take that as a
+> >>>>
+> >>>>Tested-by: Laura Abbott <labbott@redhat.com>
+> >>>
+> >>>Thanks! That's much appreciated!
+> >>>
+> >>>Just to check, did you grab the version with entry.S fixes rolled in
+> >>>(where the head is 657f54256c427fec)?
+> >>
+> >>Ah I did not. That came in after I started the test. I'll start
+> >>another run with the new version.
+> >
+> >Sorry about that; thanks for respinning!
+ 
+> While not as long running, I gave it another spin and it seemed to
+> work fine as well.
 
-drivers/media/platform/mtk-mdp/mtk_mdp_core.c:71:13: error: ?mtk_mdp_clock_off? defined but not used [-Werror=unused-function]
-drivers/media/platform/mtk-mdp/mtk_mdp_core.c:62:13: error: ?mtk_mdp_clock_on? defined but not used [-Werror=unused-function]
+Thanks, that's much appreciated!
 
-This marks all the PM functions as __maybe_unused and removes
-the #ifdef around them, as that will always do the right thing.
+I've applied your Tested-by to the series.
 
-Fixes: 1b06fcf56aa6 ("[media] media: mtk-mdp: fix build error")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/media/platform/mtk-mdp/mtk_mdp_core.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-index 40a229d8a1f5..d4c740263457 100644
---- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-+++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.c
-@@ -233,8 +233,7 @@ static int mtk_mdp_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--static int mtk_mdp_pm_suspend(struct device *dev)
-+static int __maybe_unused mtk_mdp_pm_suspend(struct device *dev)
- {
- 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
- 
-@@ -243,7 +242,7 @@ static int mtk_mdp_pm_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int mtk_mdp_pm_resume(struct device *dev)
-+static int __maybe_unused mtk_mdp_pm_resume(struct device *dev)
- {
- 	struct mtk_mdp_dev *mdp = dev_get_drvdata(dev);
- 
-@@ -251,10 +250,8 @@ static int mtk_mdp_pm_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif /* CONFIG_PM */
- 
--#ifdef CONFIG_PM_SLEEP
--static int mtk_mdp_suspend(struct device *dev)
-+static int __maybe_unused mtk_mdp_suspend(struct device *dev)
- {
- 	if (pm_runtime_suspended(dev))
- 		return 0;
-@@ -262,14 +259,13 @@ static int mtk_mdp_suspend(struct device *dev)
- 	return mtk_mdp_pm_suspend(dev);
- }
- 
--static int mtk_mdp_resume(struct device *dev)
-+static int __maybe_unused mtk_mdp_resume(struct device *dev)
- {
- 	if (pm_runtime_suspended(dev))
- 		return 0;
- 
- 	return mtk_mdp_pm_resume(dev);
- }
--#endif /* CONFIG_PM_SLEEP */
- 
- static const struct dev_pm_ops mtk_mdp_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(mtk_mdp_suspend, mtk_mdp_resume)
--- 
-2.9.0
+Thanks,
+Mark.
