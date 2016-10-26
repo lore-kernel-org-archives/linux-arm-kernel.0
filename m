@@ -1,32 +1,46 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 26 Oct 2016 10:54:50 -0700
-Subject: [PATCH] arm64: dts: msm8996: Correct slpi region reg definition
-Message-ID: <1477504490-7818-1-git-send-email-bjorn.andersson@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 26 Oct 2016 20:58:27 +0300
+Subject: Pinctrl nodes missing for USB
+In-Reply-To: <CANAwSgSfRVDA_MXN9S+G0-u-mQNhPuPJ65FT_Y-ZH5nFpX4ptg@mail.gmail.com>
+References: <CANAwSgQ=pp93tDAERQ1iaryY3_pVhTeun=RaTo9ws1UKtS1PhA@mail.gmail.com>
+ <20161026165348.GA5600@kozik-lap>
+ <CANAwSgSfRVDA_MXN9S+G0-u-mQNhPuPJ65FT_Y-ZH5nFpX4ptg@mail.gmail.com>
+Message-ID: <20161026175827.GA10224@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I missed the missing cell in the reg property of the slpi region in my review,
-so let's add it.
+On Wed, Oct 26, 2016 at 11:15:51PM +0530, Anand Moon wrote:
+> Hi Krzysztof
+> 
+> On 26 October 2016 at 22:23, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Wed, Oct 26, 2016 at 05:56:54PM +0530, Anand Moon wrote:
+> >> Hi All,
+> >>
+> >> I have tried to enable CONFIG_DEBUG_PINCTRL=y on Odroid XU4.
+> >> Just to try to understand the feature.
+> >> Is this feature suppoted for USB nodes.
+> >>
+> >> Below is the output of failed to pase pinctrl for USB nodes via dts.
+> >
+> > I do not see any question here...
+> >
+> > Anyway the devices not instantiated from DT will have such warning and
+> > USB devices are not present in DT, from obvious reasons... However what
+> > surprises me is why pinctrl_dt_to_map() was called for USB devices?
+> >
+> > Best regards,
+> > Krzysztof
+> >
+> [snip]
+> 
+> Sorry. I was just referring HK odroidxu3 dts for reference for dwc3 controller.
+> 
+> https://github.com/hardkernel/linux/blob/odroidxu3-3.10.y/arch/arm/boot/dts/exynos5422-odroidxu3.dts#L525
+> 
+> I am just trying to understand if such a configuration possible for
+> dwc3 controllers.
 
-Fixes: 2b7f0de19648 ("arm64: dts: msm8996: Add reserve-memory nodes")
-Cc: Sarangdhar Joshi <spjoshi@codeaurora.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+What do you mean by "configuration"? Which configuration?
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index b97647d29842..215de91e802d 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -42,7 +42,7 @@
- 		};
- 
- 		slpi_region: slpi at 90b00000 {
--			reg = <0x0 0x90b00000 0xa00000>;
-+			reg = <0x0 0x90b00000 0x0 0xa00000>;
- 			no-map;
- 		};
- 
--- 
-2.5.0
+Best regards,
+Krzysztof
