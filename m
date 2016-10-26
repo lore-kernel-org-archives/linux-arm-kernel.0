@@ -1,351 +1,125 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 26 Oct 2016 19:35:55 +0200
-Subject: [PATCH 2/2] ARM: bus: da8xx-mstpri: new driver
-In-Reply-To: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1477503355-2600-3-git-send-email-bgolaszewski@baylibre.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 26 Oct 2016 18:41:40 +0100
+Subject: [PATCH v2 0/8] Add support for monitoring guest TLB operations
+Message-ID: <20161026174148.17172-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create the driver for the da8xx master peripheral priority
-configuration and implement support for writing to the three
-Master Priority registers on da850 SoCs.
+Hi,
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
- drivers/bus/Kconfig                                |   9 +
- drivers/bus/Makefile                               |   2 +
- drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
- 4 files changed, 297 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
- create mode 100644 drivers/bus/da8xx-mstpri.c
+This is the fourth posting of this series. The biggest change compared
+to previous vesion is the addition of support for ARM hosts. With the
+addition of ARM support, the patchset is now more complete. Prior
+versions can be found at [0][1][2].
 
-diff --git a/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
-new file mode 100644
-index 0000000..225af09
---- /dev/null
-+++ b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
-@@ -0,0 +1,20 @@
-+* Device tree bindings for Texas Instruments da8xx master peripheral
-+  priority driver
-+
-+DA8XX SoCs feature a set of registers allowing to change the priority of all
-+peripherals classified as masters.
-+
-+Documentation:
-+OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
-+
-+Required properties:
-+
-+- compatible:		"ti,da850-mstpri", "syscon" - for da850 based boards
-+- reg:			offset and length of the mstpri registers
-+
-+Example for da850-lcdk is shown below.
-+
-+mstpri {
-+	compatible = "ti,da850-mstpri";
-+	reg = <0x14110 0x0c>;
-+};
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 7010dca..ed6a89c 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -166,4 +166,13 @@ config VEXPRESS_CONFIG
- 	help
- 	  Platform configuration infrastructure for the ARM Ltd.
- 	  Versatile Express.
-+
-+config DA8XX_MSTPRI
-+	bool "TI da8xx master peripheral priority driver"
-+	depends on ARCH_DAVINCI_DA8XX
-+	help
-+	  Driver for Texas Instruments da8xx master peripheral priority
-+	  configuration. Allows to adjust the priorities of all master
-+	  peripherals.
-+
- endmenu
-diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
-index c6cfa6b..2adb540 100644
---- a/drivers/bus/Makefile
-+++ b/drivers/bus/Makefile
-@@ -21,3 +21,5 @@ obj-$(CONFIG_SIMPLE_PM_BUS)	+= simple-pm-bus.o
- obj-$(CONFIG_TEGRA_ACONNECT)	+= tegra-aconnect.o
- obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
- obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
-+
-+obj-$(CONFIG_DA8XX_MSTPRI)	+= da8xx-mstpri.o
-diff --git a/drivers/bus/da8xx-mstpri.c b/drivers/bus/da8xx-mstpri.c
-new file mode 100644
-index 0000000..00c4f83
---- /dev/null
-+++ b/drivers/bus/da8xx-mstpri.c
-@@ -0,0 +1,266 @@
-+/*
-+ * TI da8xx master peripheral priority driver
-+ *
-+ * Copyright (C) 2016 BayLibre SAS
-+ *
-+ * Author:
-+ *   Bartosz Golaszewski <bgolaszewski@baylibre.com.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of_fdt.h>
-+
-+/*
-+ * REVISIT: Linux doesn't have a good framework for the kind of performance
-+ * knobs this driver controls. We can't use device tree properties as it deals
-+ * with hardware configuration rather than description. We also don't want to
-+ * commit to maintaining some random sysfs attributes.
-+ *
-+ * For now we just hardcode the register values for the boards that need
-+ * some changes (as is the case for the LCD controller on da850-lcdk - the
-+ * first board we support here). When linux gets an appropriate framework,
-+ * we'll easily convert the driver to it.
-+ */
-+
-+#define DA8XX_MSTPRI0_OFFSET		0
-+#define DA8XX_MSTPRI1_OFFSET		4
-+#define DA8XX_MSTPRI2_OFFSET		8
-+
-+enum {
-+	DA8XX_MSTPRI_ARM_I = 0,
-+	DA8XX_MSTPRI_ARM_D,
-+	DA8XX_MSTPRI_UPP,
-+	DA8XX_MSTPRI_SATA,
-+	DA8XX_MSTPRI_PRU0,
-+	DA8XX_MSTPRI_PRU1,
-+	DA8XX_MSTPRI_EDMA30TC0,
-+	DA8XX_MSTPRI_EDMA30TC1,
-+	DA8XX_MSTPRI_EDMA31TC0,
-+	DA8XX_MSTPRI_VPIF_DMA_0,
-+	DA8XX_MSTPRI_VPIF_DMA_1,
-+	DA8XX_MSTPRI_EMAC,
-+	DA8XX_MSTPRI_USB0CFG,
-+	DA8XX_MSTPRI_USB0CDMA,
-+	DA8XX_MSTPRI_UHPI,
-+	DA8XX_MSTPRI_USB1,
-+	DA8XX_MSTPRI_LCDC,
-+};
-+
-+struct da8xx_mstpri_descr {
-+	int reg;
-+	int shift;
-+	int mask;
-+};
-+
-+static const struct da8xx_mstpri_descr da8xx_mstpri_priority_list[] = {
-+	[DA8XX_MSTPRI_ARM_I] = {
-+		.reg = DA8XX_MSTPRI0_OFFSET,
-+		.shift = 0,
-+		.mask = 0x0000000f,
-+	},
-+	[DA8XX_MSTPRI_ARM_D] = {
-+		.reg = DA8XX_MSTPRI0_OFFSET,
-+		.shift = 4,
-+		.mask = 0x000000f0,
-+	},
-+	[DA8XX_MSTPRI_UPP] = {
-+		.reg = DA8XX_MSTPRI0_OFFSET,
-+		.shift = 16,
-+		.mask = 0x000f0000,
-+	},
-+	[DA8XX_MSTPRI_SATA] = {
-+		.reg = DA8XX_MSTPRI0_OFFSET,
-+		.shift = 20,
-+		.mask = 0x00f00000,
-+	},
-+	[DA8XX_MSTPRI_PRU0] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 0,
-+		.mask = 0x0000000f,
-+	},
-+	[DA8XX_MSTPRI_PRU1] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 4,
-+		.mask = 0x000000f0,
-+	},
-+	[DA8XX_MSTPRI_EDMA30TC0] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 8,
-+		.mask = 0x00000f00,
-+	},
-+	[DA8XX_MSTPRI_EDMA30TC1] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 12,
-+		.mask = 0x0000f000,
-+	},
-+	[DA8XX_MSTPRI_EDMA31TC0] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 16,
-+		.mask = 0x000f0000,
-+	},
-+	[DA8XX_MSTPRI_VPIF_DMA_0] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 24,
-+		.mask = 0x0f000000,
-+	},
-+	[DA8XX_MSTPRI_VPIF_DMA_1] = {
-+		.reg = DA8XX_MSTPRI1_OFFSET,
-+		.shift = 28,
-+		.mask = 0xf0000000,
-+	},
-+	[DA8XX_MSTPRI_EMAC] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 0,
-+		.mask = 0x0000000f,
-+	},
-+	[DA8XX_MSTPRI_USB0CFG] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 8,
-+		.mask = 0x00000f00,
-+	},
-+	[DA8XX_MSTPRI_USB0CDMA] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 12,
-+		.mask = 0x0000f000,
-+	},
-+	[DA8XX_MSTPRI_UHPI] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 20,
-+		.mask = 0x00f00000,
-+	},
-+	[DA8XX_MSTPRI_USB1] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 24,
-+		.mask = 0x0f000000,
-+	},
-+	[DA8XX_MSTPRI_LCDC] = {
-+		.reg = DA8XX_MSTPRI2_OFFSET,
-+		.shift = 28,
-+		.mask = 0xf0000000,
-+	},
-+};
-+
-+struct da8xx_mstpri_priority {
-+	int which;
-+	u32 val;
-+};
-+
-+struct da8xx_mstpri_board_priorities {
-+	const char *board;
-+	const struct da8xx_mstpri_priority *priorities;
-+	size_t numprio;
-+};
-+
-+/*
-+ * Default memory settings of da850 do not meet the throughput/latency
-+ * requirements of tilcdc. This results in the image displayed being
-+ * incorrect and the following warning being displayed by the LCDC
-+ * drm driver:
-+ *
-+ *   tilcdc da8xx_lcdc.0: tilcdc_crtc_irq(0x00000020): FIFO underfow
-+ */
-+static const struct da8xx_mstpri_priority da850_lcdk_priorities[] = {
-+	{
-+		.which = DA8XX_MSTPRI_LCDC,
-+		.val = 0,
-+	},
-+	{
-+		.which = DA8XX_MSTPRI_EDMA30TC1,
-+		.val = 0,
-+	},
-+	{
-+		.which = DA8XX_MSTPRI_EDMA30TC0,
-+		.val = 1,
-+	},
-+};
-+
-+static const struct da8xx_mstpri_board_priorities da8xx_mstpri_board_confs[] = {
-+	{
-+		.board = "ti,da850-lcdk",
-+		.priorities = da850_lcdk_priorities,
-+		.numprio = ARRAY_SIZE(da850_lcdk_priorities),
-+	},
-+};
-+
-+static const struct da8xx_mstpri_board_priorities *
-+da8xx_mstpri_get_board_prio(void)
-+{
-+	const struct da8xx_mstpri_board_priorities *board_prio;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(da8xx_mstpri_board_confs); i++) {
-+		board_prio = &da8xx_mstpri_board_confs[i];
-+
-+		if (of_machine_is_compatible(board_prio->board))
-+			return board_prio;
-+	}
-+
-+	return NULL;
-+}
-+
-+static int da8xx_mstpri_probe(struct platform_device *pdev)
-+{
-+	const struct da8xx_mstpri_board_priorities *prio_list;
-+	const struct da8xx_mstpri_descr *prio_descr;
-+	const struct da8xx_mstpri_priority *prio;
-+	struct device *dev = &pdev->dev;
-+	struct regmap *mstpri;
-+	int i, ret;
-+
-+	mstpri = syscon_regmap_lookup_by_compatible("ti,da850-mstpri");
-+	if (IS_ERR(mstpri)) {
-+		dev_err(dev, "unable to map mstpri registers\n");
-+		return PTR_ERR(mstpri);
-+	}
-+
-+	prio_list = da8xx_mstpri_get_board_prio();
-+	if (!prio_list) {
-+		dev_err(dev, "no master priotities defined for board '%s'\n",
-+			of_flat_dt_get_machine_name());
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < prio_list->numprio; i++) {
-+		prio = &prio_list->priorities[i];
-+		prio_descr = &da8xx_mstpri_priority_list[prio->which];
-+
-+		ret = regmap_update_bits(mstpri, prio_descr->reg,
-+					 prio_descr->mask,
-+					 prio->val << prio_descr->shift);
-+		if (ret) {
-+			dev_warn(dev,
-+				 "error updating bits for register [%d]: %d\n",
-+				 prio_descr->reg, ret);
-+			continue;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id da8xx_mstpri_of_match[] = {
-+	{ .compatible = "ti,da850-mstpri", },
-+	{ },
-+};
-+
-+static struct platform_driver da8xx_mstpri_driver = {
-+	.probe = da8xx_mstpri_probe,
-+	.driver = {
-+		.name = "da8xx-mstpri",
-+		.of_match_table = da8xx_mstpri_of_match,
-+	},
-+};
-+module_platform_driver(da8xx_mstpri_driver);
-+
-+MODULE_AUTHOR("Bartosz Golaszewski <bgolaszewski@baylibre.com>");
-+MODULE_DESCRIPTION("TI da8xx master peripheral priority driver");
-+MODULE_LICENSE("GPL v2");
+I would particularly appreciate feedback from maintainers on the
+approach to tie the control of TLB monitoring with perf trace events
+(Patch 3 and 4) especially if there are any suggestions on avoiding
+(or reducing) the overhead of "perf trace" notifications.
+
+I looked at using regfunc/unregfunc tracepoint hooks but they don't
+include the event context. But the bigger problem was that the
+callbacks are only called on the first instance of simultaneously
+executing perf stat invocations.
+
+Changelog and previous cover-letter follows.
+
+Changes:
+
+v1 -> v2
+
+* New (Patch 6) - Add support for trapping and emulating TLB
+  operations to ARM hosts
+* Move common code to handle perf trace notifications to virt/kvm/arm
+* Move tracepoint to include/trace/events/kvm.h
+* Drop patch to introduce __tlbi helper as it is now merged
+* Reorder patches
+
+RFC v2 -> v1
+* Dropped the RFC tag
+* Patch 2 - Use VM thread group id for identification
+* Patch 4 - Update comment for clarity
+* Patch 6 - Add comment explaining switch to hype-role when VHE is enabled
+* Patch 7 - Add comment to clarify struct kvm_trace_hook
+
+RFC -> RFC v2
+* Patch 4 - Rename left-over TLBI macro to __TLBI
+* Patch 6 - Replace individual TLB operation emulation with
+  invalidating all stage 1 TLB for the VM. TLB monitoring is expected
+  to be a debug feature and performance is not critical.
+
+Although there are no PMU events to monitor TLB operations, ARMv8
+supports trapping guest TLB maintenance operations to the
+hypervisor. This trapping mechanism can be used to monitor the use of
+guest TLB instructions.
+
+As taking a trap for every TLB operation can have significant
+overhead, trapping should only be enabled -
+
+* on user request
+* for the VM of interest
+
+This patchset adds support to listen to perf trace event state change
+notifications. The notifications and associated context are then used
+to enable trapping of guest TLB operations when requested by the
+user. The trap handling generates trace events (kvm_tlb_invalidate)
+which can already be counted using existing perf trace functionality.
+
+With this patchset, 'perf' tool when attached to a VM process can be
+used to monitor the TLB operations. E.g., to monitor a VM with process
+id 4166 -
+
+# perf stat -e "kvm:kvm_tlb_invalidate" -p 4166
+
+Perform some operations in VM (running 'make -j 7' on the kernel
+sources in this instance). Breaking out of perf shows -
+
+Performance counter stats for process id '4166':
+
+         7,471,974      kvm:kvm_tlb_invalidate
+
+     374.235405282 seconds time elapsed
+
+Thanks,
+Punit
+
+[0] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1210715.html
+[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1224353.html
+[2] https://marc.info/?l=linux-kernel&m=147376184208258&w=2
+
+Mark Rutland (1):
+  arm64/kvm: hyp: tlb: use __tlbi() helper
+
+Punit Agrawal (7):
+  KVM: Track the pid of the VM process
+  perf/trace: Add notification for perf trace events
+  KVM: arm/arm64: Register perf trace event notifier
+  KVM: Add event to trace tlb invalidations
+  arm: KVM: Handle trappable TLB instructions
+  arm64: KVM: Handle trappable TLB instructions
+  KVM: arm/arm64: Enable selective trapping of TLB instructions
+
+ arch/arm/include/asm/kvm_asm.h    |   1 +
+ arch/arm/include/asm/kvm_host.h   |   8 ++
+ arch/arm/kvm/Kconfig              |   4 +
+ arch/arm/kvm/Makefile             |   1 +
+ arch/arm/kvm/arm.c                |   2 +
+ arch/arm/kvm/coproc.c             |  55 ++++++++++++++
+ arch/arm/kvm/hyp/tlb.c            |  33 ++++++++
+ arch/arm64/include/asm/kvm_asm.h  |   1 +
+ arch/arm64/include/asm/kvm_host.h |   8 ++
+ arch/arm64/kvm/Kconfig            |   4 +
+ arch/arm64/kvm/Makefile           |   1 +
+ arch/arm64/kvm/hyp/tlb.c          |  87 +++++++++++++++++++--
+ arch/arm64/kvm/sys_regs.c         |  81 ++++++++++++++++++++
+ include/linux/kvm_host.h          |   1 +
+ include/linux/trace_events.h      |   3 +
+ include/trace/events/kvm.h        |  17 +++++
+ kernel/trace/trace_event_perf.c   |  24 ++++++
+ virt/kvm/arm/perf_trace.c         | 154 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/kvm_main.c               |   2 +
+ 19 files changed, 481 insertions(+), 6 deletions(-)
+ create mode 100644 virt/kvm/arm/perf_trace.c
+
 -- 
 2.9.3
