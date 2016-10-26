@@ -1,48 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Oct 2016 15:27:14 +0200
-Subject: [PATCH v4 0/7] Add R8A7743/SK-RZG1M board support
-In-Reply-To: <1a85f851-29ec-1c14-8905-8b0645f5bb1c@cogentembedded.com>
-References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
- <CAMuHMdUNgnYc1O7DATNH1r9SQ72eqtxwFvqcen08Tq+Er3LuvQ@mail.gmail.com>
- <1a85f851-29ec-1c14-8905-8b0645f5bb1c@cogentembedded.com>
-Message-ID: <CAMuHMdWQegsEf_C=UGXpQiEAX0YQqy335teuvCZxBY6C=7QozA@mail.gmail.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 26 Oct 2016 21:41:44 +0800
+Subject: [PATCH v14 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <57010864-b2f0-d230-3138-8ace484acb04@arm.com>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-5-git-send-email-fu.wei@linaro.org>
+ <20161020163719.GC27598@leverpostej>
+ <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
+ <57010864-b2f0-d230-3138-8ace484acb04@arm.com>
+Message-ID: <CADyBb7uVaUGoOMBd-pnwT2suBy1OpAmQjLriOtSx1zMC-EWazw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 3:23 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 10/26/2016 03:08 PM, Geert Uytterhoeven wrote:
->>>    Here's the set of 8 patches against Simon Horman's 'renesas.git'
->>> repo's
->>> 'renesas-devel-20161021-v4.9-rc1' tag. I'm adding the device tree support
->>> for
->>> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the
->>> board
->>> seems identical to the R8A7791/Porter board. The device tree patches
->>> depend on
->>> the R8A7743 CPG/MSSR driver series just posted in order to compile and
->>> work.
+Hi Marc,
+
+On 26 October 2016 at 20:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 26/10/16 12:10, Fu Wei wrote:
+>> Hi Mark,
 >>
+>> On 21 October 2016 at 00:37, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> Hi,
+>>>
+>>> As a heads-up, on v4.9-rc1 I see conflicts at least against
+>>> arch/arm64/Kconfig. Luckily git am -3 seems to be able to fix that up
+>>> automatically, but this will need to be rebased before the next posting
+>>> and/or merging.
+>>>
+>>> On Thu, Sep 29, 2016 at 02:17:12AM +0800, fu.wei at linaro.org wrote:
+>>>> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
+>>>> +{
+>>>> +     int trigger, polarity;
+>>>> +
+>>>> +     if (!interrupt)
+>>>> +             return 0;
+>>>
+>>> Urgh.
+>>>
+>>> Only the secure interrupt (which we do not need) is optional in this
+>>> manner, and (hilariously), zero appears to also be a valid GSIV, per
+>>> figure 5-24 in the ACPI 6.1 spec.
+>>>
+>>> So, I think that:
+>>>
+>>> (a) we should not bother parsing the secure interrupt
 >>
->> They depend only on "[PATCH v3 1/2] ARM: shmobile: r8a7743: add CPG clock
->> index macros" of that series, right?
->>
->> "[PATCH v3 2/2] clk: renesas: cpg-mssr: add R8A7743 support" is not
->> needed,
+>> If I understand correctly, from this point of view, kernel don't
+>> handle the secure interrupt.
+>> But the current arm_arch_timer driver still enable/disable/request
+>> PHYS_SECURE_PPI
+>> with PHYS_NONSECURE_PPI.
+>> That means we still need to parse the secure interrupt.
+>> Please correct me, if I misunderstand something? :-)
 >
->    How would "clocks" props _work_ without this patch?
+> That's because we can use the per-cpu timer when 32bit Linux is running
+> on the secure side (and we cannot distinguish between secure and
+> non-secure at runtime). ACPI is 64bit only, and Linux on 64bit isn't
+> supported on the secure side, so only registering the non-secure timer
+> is perfectly acceptable.
 
-Sorry, I was focusing too much on "compile"...
+Great thanks for your explanation :-)
+So we just don't need to fill arch_timer_ppi[PHYS_SECURE_PPI] , just skip it.
 
-Got my coke, switching brain to overdrive mode...
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
-Gr{oetje,eeting}s,
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+-- 
+Best regards,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Fu Wei
+Software Engineer
+Red Hat
