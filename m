@@ -1,28 +1,49 @@
-From: zourongrong@gmail.com (Rongrong Zou)
-Date: Wed, 26 Oct 2016 10:37:06 +0800
-Subject: [PATCH v5 9/9] MAINTAINERS: Update HISILICON DRM entries
-In-Reply-To: <1477449426-69018-1-git-send-email-zourongrong@gmail.com>
-References: <1477449426-69018-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1477449426-69018-10-git-send-email-zourongrong@gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 26 Oct 2016 10:59:27 +0800
+Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
+ hisilicon-161x01 erratum
+In-Reply-To: <20161024133945.GL15620@leverpostej>
+References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
+ <20161024111608.GG15620@leverpostej>
+ <7e839df8-f8f7-3b16-8321-4ff45b6c5884@huawei.com>
+ <20161024131617.GJ15620@leverpostej>
+ <1dcfb21a-7417-282e-f187-425d2c148672@huawei.com>
+ <20161024133945.GL15620@leverpostej>
+Message-ID: <05ebde92-60b5-88aa-0875-a9d2729eff8c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c447953..cc5ee3a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4117,6 +4117,7 @@ F:	drivers/gpu/drm/gma500/
- 
- DRM DRIVERS FOR HISILICON
- M:	Xinliang Liu <z.liuxinliang@hisilicon.com>
-+M:	Rongrong Zou <zourongrong@gmail.com>
- R:	Xinwei Kong <kong.kongxinwei@hisilicon.com>
- R:	Chen Feng <puck.chen@hisilicon.com>
- L:	dri-devel at lists.freedesktop.org
--- 
-1.9.1
+
+On 2016/10/24 21:39, Mark Rutland wrote:
+> On Mon, Oct 24, 2016 at 09:23:10PM +0800, Ding Tianhong wrote:
+>> On 2016/10/24 21:16, Mark Rutland wrote:
+>>> On Mon, Oct 24, 2016 at 08:40:01PM +0800, Ding Tianhong wrote:
+>>>> On 2016/10/24 19:16, Mark Rutland wrote:
+>>>>> Is "161x01" the *exact* erratum number, or is the 'x' a wildcard?
+>>>>
+>>>> The 'x' is a wildcard, it will cover 161001 to 161601 several numbers,
+>>>
+>>> Given you're using a wildcard, I take it that this is a *part* number?
+>>
+>> Yes, I was doubt how to fix this, should I choose a better erratum number?
+> 
+> Typically, we expect that each vendor has some central database of their
+> errata, with each having a unique ID.
+> 
+> If Huawei do not have such a database, I do not think that we should
+> invent an erratum number here.
+> 
+
+Hi Marko<
+
+After discussion with our chip developer, we decide the 161601 as the *exact* erratum number for this chip to cover
+all the problem and register this in our company's database, thanks.
+
+Ding
+
+> Thanks,
+> Mark.
+> 
+> .
+> 
