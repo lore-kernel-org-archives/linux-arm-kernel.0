@@ -1,36 +1,26 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 26 Oct 2016 12:53:20 -0700
-Subject: [PATCH 0/5] Minimal cpuidle fixes for omap5 and dra7
-In-Reply-To: <20161026151703.24730-1-tony@atomide.com>
-References: <20161026151703.24730-1-tony@atomide.com>
-Message-ID: <ecf2d8f9-c385-26db-7ffd-49026ecbc380@oracle.com>
+Date: Wed, 26 Oct 2016 12:56:06 -0700
+Subject: [PATCH V4 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com>
+References: <20161018230837.6515-1-nm@ti.com>
+ <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com>
+Message-ID: <45f55012-f027-51d1-bdf1-6fa1950f59ed@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/25/2016 10:34 AM, Tero Kristo wrote:
+> On 19/10/16 02:08, Nishanth Menon wrote:
+>> Version 4 of the series is basically a rebase to v4.9-rc1, no functional
+>> changes.
+>
+> Hi,
+>
+> Any final comments on this series, or shall I send a pull-req forward?
+> Very minimal changes compared to v3 so should be good to go imo.
+>
+The patchset looks fine to me from brief scan so please Go from
+my side at least for the pull request.
 
-
-On 10/26/2016 8:16 AM, Tony Lindgren wrote:
-> Hi all,
->
-> Here are some fixes to get minimal cpuidle support working with omap5
-> and dra7. Not sure if there are still some unsorted issues on enabling
-> this on dra7, but at least omap5 has been behving for me for few
-> weeks with these.
->
-> Regards,
->
-> Tony
->
->
-> Santosh Shilimkar (1):
->   ARM: DRA7: PM: cpuidle MPU CSWR support
->
-> Tony Lindgren (4):
->   ARM: OMAP5: Fix build for PM code
->   ARM: OMAP5: Fix mpuss_early_init
->   ARM: OMAP4+: Fix bad fallthrough for cpuidle
->   ARM: OMAP5: Enable minimal cpuidle for omap5 retention
->
-Feel free to add my ack if you need one.
-
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+Regards,
+Santosh
