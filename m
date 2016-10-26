@@ -1,109 +1,185 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Oct 2016 08:17:00 -0700
-Subject: [PATCH 2/5] ARM: OMAP5: Fix mpuss_early_init
+Date: Wed, 26 Oct 2016 08:17:02 -0700
+Subject: [PATCH 4/5] ARM: DRA7: PM: cpuidle MPU CSWR support
 In-Reply-To: <20161026151703.24730-1-tony@atomide.com>
 References: <20161026151703.24730-1-tony@atomide.com>
-Message-ID: <20161026151703.24730-3-tony@atomide.com>
+Message-ID: <20161026151703.24730-5-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to properly initialize mpuss also on omap5 like we do on omap4.
-Otherwise we run into similar kexec problems like we had on omap4 when
-trying to kexec from a kernel with PM initialized.
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Fixes: 0573b957fc21 ("ARM: OMAP4+: Prevent CPU1 related hang with kexec")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Add DRA74/72 CPUIDLE support.
+
+This patch adds MPUSS low power states in cpuidle.
+
+        C1 - CPU0 WFI + CPU1 WFI + MPU ON
+        C2 - CPU0 RET + CPU1 RET + MPU CSWR
+
+Tested on DRA74/72-EVM for C1 and C2 states.
+
+NOTE: DRA7 does not do voltage scaling as part of retention transition
+and has Mercury which speeds up transition paths - Latency numbers are
+based on measurements done by toggling GPIOs.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[ j-keerthy at ti.com rework on 3.14]
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+[nm at ti.com: updates based on profiling]
+[tony at atomide.com: dropped CPUIDLE_FLAG_TIME_VALID no longer used]
+Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
- arch/arm/mach-omap2/io.c                  |  3 ++-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c | 28 +++++++++++++++++++++-------
- arch/arm/mach-omap2/omap4-sar-layout.h    |  2 ++
- 3 files changed, 25 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/cpuidle44xx.c | 80 ++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/pm44xx.c      |  2 +-
+ 2 files changed, 80 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -717,10 +717,11 @@ void __init omap5_init_early(void)
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap2_control_base_init();
--	omap4_pm_init_early();
- 	omap2_prcm_base_init();
- 	omap5xxx_check_revision();
- 	omap4_sar_ram_init();
-+	omap4_mpuss_early_init();
-+	omap4_pm_init_early();
- 	omap54xx_voltagedomains_init();
- 	omap54xx_powerdomains_init();
- 	omap54xx_clockdomains_init();
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -371,8 +371,12 @@ int __init omap4_mpuss_init(void)
- 	pm_info = &per_cpu(omap4_pm_info, 0x0);
- 	if (sar_base) {
- 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
--		pm_info->wkup_sar_addr = sar_base +
--					CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-+		if (cpu_is_omap44xx())
-+			pm_info->wkup_sar_addr = sar_base +
-+				CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-+		else
-+			pm_info->wkup_sar_addr = sar_base +
-+				OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
- 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
- 	}
- 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
-@@ -391,8 +395,12 @@ int __init omap4_mpuss_init(void)
- 	pm_info = &per_cpu(omap4_pm_info, 0x1);
- 	if (sar_base) {
- 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
--		pm_info->wkup_sar_addr = sar_base +
--					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-+		if (cpu_is_omap44xx())
-+			pm_info->wkup_sar_addr = sar_base +
-+				CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-+		else
-+			pm_info->wkup_sar_addr = sar_base +
-+				OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
- 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
- 	}
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -21,6 +21,7 @@
+ #include "common.h"
+ #include "pm.h"
+ #include "prm.h"
++#include "soc.h"
+ #include "clockdomain.h"
  
-@@ -453,15 +461,21 @@ void __init omap4_mpuss_early_init(void)
- {
- 	unsigned long startup_pa;
+ #define MAX_CPUS	2
+@@ -30,6 +31,7 @@ struct idle_statedata {
+ 	u32 cpu_state;
+ 	u32 mpu_logic_state;
+ 	u32 mpu_state;
++	u32 mpu_state_vote;
+ };
  
--	if (!cpu_is_omap44xx())
-+	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
- 		return;
+ static struct idle_statedata omap4_idle_data[] = {
+@@ -50,12 +52,26 @@ static struct idle_statedata omap4_idle_data[] = {
+ 	},
+ };
  
- 	sar_base = omap4_get_sar_ram_base();
++static struct idle_statedata dra7_idle_data[] = {
++	{
++		.cpu_state = PWRDM_POWER_ON,
++		.mpu_state = PWRDM_POWER_ON,
++		.mpu_logic_state = PWRDM_POWER_ON,
++	},
++	{
++		.cpu_state = PWRDM_POWER_RET,
++		.mpu_state = PWRDM_POWER_RET,
++		.mpu_logic_state = PWRDM_POWER_RET,
++	},
++};
++
+ static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
+ static struct clockdomain *cpu_clkdm[MAX_CPUS];
  
- 	if (cpu_is_omap443x())
- 		startup_pa = virt_to_phys(omap4_secondary_startup);
--	else
-+	else if (cpu_is_omap446x())
- 		startup_pa = virt_to_phys(omap4460_secondary_startup);
-+	else
-+		startup_pa = virt_to_phys(omap5_secondary_startup);
+ static atomic_t abort_barrier;
+ static bool cpu_done[MAX_CPUS];
+ static struct idle_statedata *state_ptr = &omap4_idle_data[0];
++static DEFINE_RAW_SPINLOCK(mpu_lock);
  
--	writel_relaxed(startup_pa, sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
-+	if (cpu_is_omap44xx())
-+		writel_relaxed(startup_pa, sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
-+	else
-+		writel_relaxed(startup_pa, sar_base +
-+			       OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
+ /* Private functions */
+ 
+@@ -77,6 +93,32 @@ static int omap_enter_idle_simple(struct cpuidle_device *dev,
+ 	return index;
  }
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -31,6 +31,8 @@
- /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
- #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
- #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
-+#define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xe00
-+#define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xe04
  
- #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)
- #define SAR_SECURE_RAM_SIZE_OFFSET		(SAR_BANK3_OFFSET + 0x504)
++static int omap_enter_idle_smp(struct cpuidle_device *dev,
++			       struct cpuidle_driver *drv,
++			       int index)
++{
++	struct idle_statedata *cx = state_ptr + index;
++	unsigned long flag;
++
++	raw_spin_lock_irqsave(&mpu_lock, flag);
++	cx->mpu_state_vote++;
++	if (cx->mpu_state_vote == num_online_cpus()) {
++		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
++		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
++	}
++	raw_spin_unlock_irqrestore(&mpu_lock, flag);
++
++	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
++
++	raw_spin_lock_irqsave(&mpu_lock, flag);
++	if (cx->mpu_state_vote == num_online_cpus())
++		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
++	cx->mpu_state_vote--;
++	raw_spin_unlock_irqrestore(&mpu_lock, flag);
++
++	return index;
++}
++
+ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			int index)
+@@ -220,6 +262,32 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 	.safe_state_index = 0,
+ };
+ 
++static struct cpuidle_driver dra7_idle_driver = {
++	.name				= "dra7_idle",
++	.owner				= THIS_MODULE,
++	.states = {
++		{
++			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
++			.exit_latency = 2 + 2,
++			.target_residency = 5,
++			.enter = omap_enter_idle_simple,
++			.name = "C1",
++			.desc = "CPUx WFI, MPUSS ON"
++		},
++		{
++			/* C2 - CPU0 RET + CPU1 RET + MPU CSWR */
++			.exit_latency = 48 + 60,
++			.target_residency = 100,
++			.flags = CPUIDLE_FLAG_TIMER_STOP,
++			.enter = omap_enter_idle_smp,
++			.name = "C2",
++			.desc = "CPUx CSWR, MPUSS CSWR",
++		},
++	},
++	.state_count = ARRAY_SIZE(dra7_idle_data),
++	.safe_state_index = 0,
++};
++
+ /* Public functions */
+ 
+ /**
+@@ -230,6 +298,16 @@ static struct cpuidle_driver omap4_idle_driver = {
+  */
+ int __init omap4_idle_init(void)
+ {
++	struct cpuidle_driver *idle_driver;
++
++	if (soc_is_dra7xx()) {
++		state_ptr = &dra7_idle_data[0];
++		idle_driver = &dra7_idle_driver;
++	} else {
++		state_ptr = &omap4_idle_data[0];
++		idle_driver = &omap4_idle_driver;
++	}
++
+ 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+ 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
+ 	cpu_pd[1] = pwrdm_lookup("cpu1_pwrdm");
+@@ -244,5 +322,5 @@ int __init omap4_idle_init(void)
+ 	/* Configure the broadcast timer on each cpu */
+ 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
+ 
+-	return cpuidle_register(&omap4_idle_driver, cpu_online_mask);
++	return cpuidle_register(idle_driver, cpu_online_mask);
+ }
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -287,7 +287,7 @@ int __init omap4_pm_init(void)
+ 	/* Overwrite the default cpu_do_idle() */
+ 	arm_pm_idle = omap_default_idle;
+ 
+-	if (cpu_is_omap44xx())
++	if (cpu_is_omap44xx() || soc_is_dra7xx())
+ 		omap4_idle_init();
+ 
+ err2:
 -- 
 2.9.3
