@@ -1,77 +1,59 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 26 Oct 2016 21:41:44 +0800
-Subject: [PATCH v14 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <57010864-b2f0-d230-3138-8ace484acb04@arm.com>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-5-git-send-email-fu.wei@linaro.org>
- <20161020163719.GC27598@leverpostej>
- <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
- <57010864-b2f0-d230-3138-8ace484acb04@arm.com>
-Message-ID: <CADyBb7uVaUGoOMBd-pnwT2suBy1OpAmQjLriOtSx1zMC-EWazw@mail.gmail.com>
+From: rric@kernel.org (Robert Richter)
+Date: Wed, 26 Oct 2016 15:43:01 +0200
+Subject: [PATCH 1/2] of, numa: Add function to disable of_node_to_nid().
+In-Reply-To: <1477431061-7258-2-git-send-email-ddaney.cavm@gmail.com>
+References: <1477431061-7258-1-git-send-email-ddaney.cavm@gmail.com>
+ <1477431061-7258-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20161026134301.GV25086@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 25.10.16 14:31:00, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> On arm64 NUMA kernels we can pass "numa=off" on the command line to
+> disable NUMA.  A side effect of this is that kmalloc_node() calls to
+> non-zero nodes will crash the system with an OOPS:
+> 
+> [    0.000000] [<fffffc00081bba84>] __alloc_pages_nodemask+0xa4/0xe68
+> [    0.000000] [<fffffc00082163a8>] new_slab+0xd0/0x57c
+> [    0.000000] [<fffffc000821879c>] ___slab_alloc+0x2e4/0x514
+> [    0.000000] [<fffffc000823882c>] __slab_alloc+0x48/0x58
+> [    0.000000] [<fffffc00082195a0>] __kmalloc_node+0xd0/0x2e0
+> [    0.000000] [<fffffc00081119b8>] __irq_domain_add+0x7c/0x164
+> [    0.000000] [<fffffc0008b75d30>] its_probe+0x784/0x81c
+> [    0.000000] [<fffffc0008b75e10>] its_init+0x48/0x1b0
+> .
+> .
+> .
+> 
+> This is caused by code like this in kernel/irq/irqdomain.c
+> 
+>     domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+>                   GFP_KERNEL, of_node_to_nid(of_node));
+> 
+> When NUMA is disabled, the concept of a node is really undefined, so
+> of_node_to_nid() should unconditionally return NUMA_NO_NODE.
+> 
+> Add __of_force_no_numa() to allow of_node_to_nid() to be forced to
+> return NUMA_NO_NODE.
+> 
+> The follow on patch will call this new function from the arm64 numa
+> code.
 
-On 26 October 2016 at 20:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 26/10/16 12:10, Fu Wei wrote:
->> Hi Mark,
->>
->> On 21 October 2016 at 00:37, Mark Rutland <mark.rutland@arm.com> wrote:
->>> Hi,
->>>
->>> As a heads-up, on v4.9-rc1 I see conflicts at least against
->>> arch/arm64/Kconfig. Luckily git am -3 seems to be able to fix that up
->>> automatically, but this will need to be rebased before the next posting
->>> and/or merging.
->>>
->>> On Thu, Sep 29, 2016 at 02:17:12AM +0800, fu.wei at linaro.org wrote:
->>>> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
->>>> +{
->>>> +     int trigger, polarity;
->>>> +
->>>> +     if (!interrupt)
->>>> +             return 0;
->>>
->>> Urgh.
->>>
->>> Only the secure interrupt (which we do not need) is optional in this
->>> manner, and (hilariously), zero appears to also be a valid GSIV, per
->>> figure 5-24 in the ACPI 6.1 spec.
->>>
->>> So, I think that:
->>>
->>> (a) we should not bother parsing the secure interrupt
->>
->> If I understand correctly, from this point of view, kernel don't
->> handle the secure interrupt.
->> But the current arm_arch_timer driver still enable/disable/request
->> PHYS_SECURE_PPI
->> with PHYS_NONSECURE_PPI.
->> That means we still need to parse the secure interrupt.
->> Please correct me, if I misunderstand something? :-)
->
-> That's because we can use the per-cpu timer when 32bit Linux is running
-> on the secure side (and we cannot distinguish between secure and
-> non-secure at runtime). ACPI is 64bit only, and Linux on 64bit isn't
-> supported on the secure side, so only registering the non-secure timer
-> is perfectly acceptable.
+Didn't that work before? numa=off just maps all mem to node 0. If mem
+allocation is requested for another node it should just fall back to a
+node with mem (node 0 then). I suspect there is something wrong with
+the page initialization, see:
 
-Great thanks for your explanation :-)
-So we just don't need to fill arch_timer_ppi[PHYS_SECURE_PPI] , just skip it.
+ http://www.spinics.net/lists/arm-kernel/msg535191.html
+ https://bugzilla.redhat.com/show_bug.cgi?id=1387793
 
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+What is the complete oops?
 
+So I think k*alloc_node() must be able to handle requests to
+non-existing nodes. Otherwise your fix is incomplete, assume a failed
+of_numa_init() causing a dummy init but still some devices reporting a
+node.
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+-Robert
