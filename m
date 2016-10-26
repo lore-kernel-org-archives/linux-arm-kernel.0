@@ -1,53 +1,92 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 27 Oct 2016 06:42:37 +0800
-Subject: [rjarzmik:work/ac97 8/13] sound/soc/codecs/wm9713.c:20:30: fatal
- error: linux/mfd/wm97xx.h: No such file or directory
-Message-ID: <201610270634.EVYQ07c7%fengguang.wu@intel.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 26 Oct 2016 16:54:13 -0600
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+Message-ID: <20161026225413.GA6220@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux work/ac97
-head:   223e9c527c425b1b519468e54fff9f4f82a7f390
-commit: ded8ecc42087f1cdc4e356f118ea2e0d51691001 [8/13] ASoC: wm9713: add ac97 new bus support
-config: m32r-allyesconfig (attached as .config)
-compiler: m32r-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout ded8ecc42087f1cdc4e356f118ea2e0d51691001
-        # save the attached .config to linux build tree
-        make.cross ARCH=m32r 
+There is no sense in sending a bitstream we know will not work, and
+with the variety of options for bitstream generation in Xilinx tools
+it is not terribly clear or very well documented what the correct
+input should be, especially since auto-detection was removed from this
+driver.
 
-Note: the rjarzmik/work/ac97 HEAD 223e9c527c425b1b519468e54fff9f4f82a7f390 builds fine.
-      It only hurts bisectibility.
+All Zynq full configuration bitstreams must start with the sync word in
+the correct byte order.
 
-All errors (new ones prefixed by >>):
+Zynq is also only able to DMA dword quantities, so bitstreams must be
+a multiple of 4 bytes. This also fixes a DMA-past the end bug.
 
->> sound/soc/codecs/wm9713.c:20:30: fatal error: linux/mfd/wm97xx.h: No such file or directory
-    #include <linux/mfd/wm97xx.h>
-                                 ^
-   compilation terminated.
-
-vim +20 sound/soc/codecs/wm9713.c
-
-    14	 *   o Support for AC97 Codec, Voice DAC and Aux DAC
-    15	 *   o Support for DAPM
-    16	 */
-    17	
-    18	#include <linux/init.h>
-    19	#include <linux/slab.h>
-  > 20	#include <linux/mfd/wm97xx.h>
-    21	#include <linux/module.h>
-    22	#include <linux/device.h>
-    23	#include <linux/regmap.h>
-
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37174 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/e80c0cd2/attachment-0001.gz>
+ drivers/fpga/zynq-fpga.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index c2fb4120bd62..46a38772e7ee 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -184,12 +184,26 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 
+ 	priv = mgr->priv;
+ 
++	/* All valid bitstreams are multiples of 32 bits */
++	if ((count % 4) != 0)
++		return -EINVAL;
++
+ 	err = clk_enable(priv->clk);
+ 	if (err)
+ 		return err;
+ 
+ 	/* don't globally reset PL if we're doing partial reconfig */
+ 	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
++		/* Sanity check the proposed bitstream. It must start with the
++		 * sync word in the correct byte order and be a multiple of 4
++		 * bytes.
++		 */
++		if (count <= 4 || buf[0] != 0x66 || buf[1] != 0x55 ||
++		    buf[2] != 0x99 || buf[3] != 0xaa) {
++			err = -EINVAL;
++			goto out_err;
++		}
++
+ 		/* assert AXI interface resets */
+ 		regmap_write(priv->slcr, SLCR_FPGA_RST_CTRL_OFFSET,
+ 			     FPGA_RST_ALL_MASK);
+@@ -287,12 +301,9 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 	struct zynq_fpga_priv *priv;
+ 	int err;
+ 	char *kbuf;
+-	size_t in_count;
+ 	dma_addr_t dma_addr;
+-	u32 transfer_length;
+ 	u32 intr_status;
+ 
+-	in_count = count;
+ 	priv = mgr->priv;
+ 
+ 	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+@@ -318,11 +329,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 	 */
+ 	zynq_fpga_write(priv, DMA_SRC_ADDR_OFFSET, (u32)(dma_addr) + 1);
+ 	zynq_fpga_write(priv, DMA_DST_ADDR_OFFSET, (u32)DMA_INVALID_ADDRESS);
+-
+-	/* convert #bytes to #words */
+-	transfer_length = (count + 3) / 4;
+-
+-	zynq_fpga_write(priv, DMA_SRC_LEN_OFFSET, transfer_length);
++	zynq_fpga_write(priv, DMA_SRC_LEN_OFFSET, count / 4);
+ 	zynq_fpga_write(priv, DMA_DEST_LEN_OFFSET, 0);
+ 
+ 	wait_for_completion(&priv->dma_done);
+@@ -338,7 +345,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 	clk_disable(priv->clk);
+ 
+ out_free:
+-	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
++	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+ 
+ 	return err;
+ }
+-- 
+2.1.4
