@@ -1,78 +1,28 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Oct 2016 14:00:24 +0200
-Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for obtaining
- mode pin state
-In-Reply-To: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
+Date: Wed, 26 Oct 2016 14:08:44 +0200
+Subject: [PATCH v4 0/7] Add R8A7743/SK-RZG1M board support
+In-Reply-To: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUNgnYc1O7DATNH1r9SQ72eqtxwFvqcen08Tq+Er3LuvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Sergei,
 
-On Fri, Oct 21, 2016 at 3:17 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
-> state of the mode pins either by a call from the platform code, or
-> directly by using a hardcoded register access. This is a bit messy, and
-> creates a dependency between driver and platform code.
->
-> This patch series converts the various Renesas R-Car clock drivers
-> and support code from reading the mode pin states using a hardcoded
-> register access to using a new minimalistic R-Car RST driver.
->
-> All R-Car clock drivers will rely on the presence in DT of a device node
-> for the RST module.  Backwards compatibility with old DTBs is retained
-> only for R-Car Gen2, which has fallback code using its own private copy
-> of rcar_gen2_read_mode_pins().
->
-> After this, there is still one remaining user of
-> rcar_gen2_read_mode_pins() left in platform code. A patch series to
-> remove that user has already been posted, though ("[PATCH/RFT 0/4] ARM:
-> shmobile: R-Car Gen2: Allow booting secondary CPU cores in debug mode").
-> Since v3, the other user has been removed in commit 9f5ce39ddb8f68b3
-> ("ARM: shmobile: rcar-gen2: Obtain extal frequency from DT").
->
-> This series consists of 5 parts:
->   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
->      driver,
->   B. Patches 3-11 add device nodes for the RST modules to the R-Car DTS
->      files,
->   C. Patches 12-17 convert the clock drivers to call into the new R-Car
->      RST driver,
->   D. Patches 18-20 remove passing mode pin state to the clock drivers
->      from the platform code,
->   E. Patches 21-23 remove dead code from the clock drivers.
->
-> As is usually the case with moving functionality from platform code to
-> DT, there are lots of hard dependencies:
->   - The DT updates in Part B can be merged as soon as the DT bindings in
->     Part A have been approved,
->   - The clock driver updates in Part C depend functionally on the driver
->     code in Part A, and on the DT updates in Part B,
->   - The board code cleanups in Part D depend on the clock driver updates
->     in Part C,
->   - The block driver cleanups in part E depend on the board code
->     cleanups in part D.
->
-> Hence to maintain the required lockstep between SoC driver, clock
-> drivers, shmobile platform code, and shmobile DT, I propose to queue up
-> all patches in a single branch against v4.9-rc1, and send pull requests
-> to both Mike/Stephen (clock) and Simon (rest).
->
-> ***
+On Fri, Oct 21, 2016 at 10:39 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>    Here's the set of 8 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20161021-v4.9-rc1' tag. I'm adding the device tree support for
+> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the board
+> seems identical to the R8A7791/Porter board. The device tree patches depend on
+> the R8A7743 CPG/MSSR driver series just posted in order to compile and work.
 
->   - Mike/Stephen/Simon/Magnus: Are you OK with the suggested merge
->     approach above?
+They depend only on "[PATCH v3 1/2] ARM: shmobile: r8a7743: add CPG clock
+index macros" of that series, right?
 
-Is this OK for you?
-
-I'd like to move forward with this, as this is a prerequisite for adding
-support for new SoCs (RZ/G) without adding more copies of
-rcar_gen2_read_mode_pins(), and removing that function from platform code
-for good.
-
-Thanks!
+"[PATCH v3 2/2] clk: renesas: cpg-mssr: add R8A7743 support" is not needed,
+and introduces an additional dependency on "[PATCH 1/3] clk: renesas:
+cpg-mssr: add common R-Car Gen2 support".
 
 Gr{oetje,eeting}s,
 
