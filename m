@@ -1,443 +1,297 @@
 From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Wed, 26 Oct 2016 21:59:53 -0200
-Subject: [PATCH v4 1/3] mtd: s3c2410: make ecc mode configurable via platform
- data
+Date: Wed, 26 Oct 2016 21:59:55 -0200
+Subject: [PATCH v4 3/3] mtd: s3c2410: parse the device configuration from OF
+ node
 In-Reply-To: <1477526395-13103-1-git-send-email-sergio.prado@e-labworks.com>
 References: <1477526395-13103-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <1477526395-13103-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <1477526395-13103-4-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removing CONFIG_MTD_NAND_S3C2410_HWECC option and adding a ecc_mode
-field in the drivers's platform data structure so it can be selectable
-via platform data.
+Allows configuring Samsung's s3c2410 memory controller using a
+devicetree.
 
-Also setting this field to NAND_ECC_SOFT in all boards using this
-driver since none of them had CONFIG_MTD_NAND_S3C2410_HWECC enabled.
-
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 ---
- arch/arm/mach-s3c24xx/common-smdk.c            |   1 +
- arch/arm/mach-s3c24xx/mach-anubis.c            |   1 +
- arch/arm/mach-s3c24xx/mach-at2440evb.c         |   1 +
- arch/arm/mach-s3c24xx/mach-bast.c              |   1 +
- arch/arm/mach-s3c24xx/mach-gta02.c             |   1 +
- arch/arm/mach-s3c24xx/mach-jive.c              |   1 +
- arch/arm/mach-s3c24xx/mach-mini2440.c          |   1 +
- arch/arm/mach-s3c24xx/mach-osiris.c            |   1 +
- arch/arm/mach-s3c24xx/mach-qt2410.c            |   1 +
- arch/arm/mach-s3c24xx/mach-rx1950.c            |   1 +
- arch/arm/mach-s3c24xx/mach-rx3715.c            |   1 +
- arch/arm/mach-s3c24xx/mach-vstms.c             |   1 +
- arch/arm/mach-s3c64xx/mach-hmt.c               |   1 +
- arch/arm/mach-s3c64xx/mach-mini6410.c          |   1 +
- arch/arm/mach-s3c64xx/mach-real6410.c          |   1 +
- drivers/mtd/nand/Kconfig                       |   9 --
- drivers/mtd/nand/s3c2410.c                     | 119 +++++++++++++------------
- include/linux/platform_data/mtd-nand-s3c2410.h |   6 +-
- 18 files changed, 79 insertions(+), 70 deletions(-)
+ drivers/mtd/nand/s3c2410.c                     | 158 ++++++++++++++++++++++---
+ include/linux/platform_data/mtd-nand-s3c2410.h |   1 +
+ 2 files changed, 143 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/common-smdk.c b/arch/arm/mach-s3c24xx/common-smdk.c
-index e9fbcc91c5c0..9e0bc46e90ec 100644
---- a/arch/arm/mach-s3c24xx/common-smdk.c
-+++ b/arch/arm/mach-s3c24xx/common-smdk.c
-@@ -171,6 +171,7 @@
- 	.twrph1		= 20,
- 	.nr_sets	= ARRAY_SIZE(smdk_nand_sets),
- 	.sets		= smdk_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* devices we initialise */
-diff --git a/arch/arm/mach-s3c24xx/mach-anubis.c b/arch/arm/mach-s3c24xx/mach-anubis.c
-index d03df0df01fa..029ef1b58925 100644
---- a/arch/arm/mach-s3c24xx/mach-anubis.c
-+++ b/arch/arm/mach-s3c24xx/mach-anubis.c
-@@ -223,6 +223,7 @@ static void anubis_nand_select(struct s3c2410_nand_set *set, int slot)
- 	.nr_sets	= ARRAY_SIZE(anubis_nand_sets),
- 	.sets		= anubis_nand_sets,
- 	.select_chip	= anubis_nand_select,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* IDE channels */
-diff --git a/arch/arm/mach-s3c24xx/mach-at2440evb.c b/arch/arm/mach-s3c24xx/mach-at2440evb.c
-index 9ae170fef2a7..7b28eb623fc1 100644
---- a/arch/arm/mach-s3c24xx/mach-at2440evb.c
-+++ b/arch/arm/mach-s3c24xx/mach-at2440evb.c
-@@ -114,6 +114,7 @@
- 	.twrph1		= 40,
- 	.nr_sets	= ARRAY_SIZE(at2440evb_nand_sets),
- 	.sets		= at2440evb_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* DM9000AEP 10/100 ethernet controller */
-diff --git a/arch/arm/mach-s3c24xx/mach-bast.c b/arch/arm/mach-s3c24xx/mach-bast.c
-index ed07cf392d4b..5185036765db 100644
---- a/arch/arm/mach-s3c24xx/mach-bast.c
-+++ b/arch/arm/mach-s3c24xx/mach-bast.c
-@@ -299,6 +299,7 @@ static void bast_nand_select(struct s3c2410_nand_set *set, int slot)
- 	.nr_sets	= ARRAY_SIZE(bast_nand_sets),
- 	.sets		= bast_nand_sets,
- 	.select_chip	= bast_nand_select,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* DM9000 */
-diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
-index 27ae6877550f..b0ed401da3a3 100644
---- a/arch/arm/mach-s3c24xx/mach-gta02.c
-+++ b/arch/arm/mach-s3c24xx/mach-gta02.c
-@@ -443,6 +443,7 @@ static void gta02_udc_vbus_draw(unsigned int ma)
- 	.twrph1		= 15,
- 	.nr_sets	= ARRAY_SIZE(gta02_nand_sets),
- 	.sets		= gta02_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- 
-diff --git a/arch/arm/mach-s3c24xx/mach-jive.c b/arch/arm/mach-s3c24xx/mach-jive.c
-index 7d99fe8f6157..895aca225952 100644
---- a/arch/arm/mach-s3c24xx/mach-jive.c
-+++ b/arch/arm/mach-s3c24xx/mach-jive.c
-@@ -232,6 +232,7 @@
- 	.twrph1		= 40,
- 	.sets		= jive_nand_sets,
- 	.nr_sets	= ARRAY_SIZE(jive_nand_sets),
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static int __init jive_mtdset(char *options)
-diff --git a/arch/arm/mach-s3c24xx/mach-mini2440.c b/arch/arm/mach-s3c24xx/mach-mini2440.c
-index ec60bd4a1646..71af8d2fd320 100644
---- a/arch/arm/mach-s3c24xx/mach-mini2440.c
-+++ b/arch/arm/mach-s3c24xx/mach-mini2440.c
-@@ -287,6 +287,7 @@
- 	.nr_sets	= ARRAY_SIZE(mini2440_nand_sets),
- 	.sets		= mini2440_nand_sets,
- 	.ignore_unset_ecc = 1,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* DM9000AEP 10/100 ethernet controller */
-diff --git a/arch/arm/mach-s3c24xx/mach-osiris.c b/arch/arm/mach-s3c24xx/mach-osiris.c
-index 2f6fdc326835..70b0eb7d3134 100644
---- a/arch/arm/mach-s3c24xx/mach-osiris.c
-+++ b/arch/arm/mach-s3c24xx/mach-osiris.c
-@@ -238,6 +238,7 @@ static void osiris_nand_select(struct s3c2410_nand_set *set, int slot)
- 	.nr_sets	= ARRAY_SIZE(osiris_nand_sets),
- 	.sets		= osiris_nand_sets,
- 	.select_chip	= osiris_nand_select,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* PCMCIA control and configuration */
-diff --git a/arch/arm/mach-s3c24xx/mach-qt2410.c b/arch/arm/mach-s3c24xx/mach-qt2410.c
-index 984516e8307a..868c82087403 100644
---- a/arch/arm/mach-s3c24xx/mach-qt2410.c
-+++ b/arch/arm/mach-s3c24xx/mach-qt2410.c
-@@ -284,6 +284,7 @@
- 	.twrph1		= 20,
- 	.nr_sets	= ARRAY_SIZE(qt2410_nand_sets),
- 	.sets		= qt2410_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- /* UDC */
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 25a139bb9826..e86ad6a68a0b 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -611,6 +611,7 @@ static void rx1950_set_mmc_power(unsigned char power_mode, unsigned short vdd)
- 	.twrph1 = 15,
- 	.nr_sets = ARRAY_SIZE(rx1950_nand_sets),
- 	.sets = rx1950_nand_sets,
-+	.ecc_mode = NAND_ECC_SOFT,
- };
- 
- static struct s3c2410_udc_mach_info rx1950_udc_cfg __initdata = {
-diff --git a/arch/arm/mach-s3c24xx/mach-rx3715.c b/arch/arm/mach-s3c24xx/mach-rx3715.c
-index cf55196f89ca..a39fb9780dd3 100644
---- a/arch/arm/mach-s3c24xx/mach-rx3715.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx3715.c
-@@ -164,6 +164,7 @@
- 	.twrph1		= 15,
- 	.nr_sets	= ARRAY_SIZE(rx3715_nand_sets),
- 	.sets		= rx3715_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static struct platform_device *rx3715_devices[] __initdata = {
-diff --git a/arch/arm/mach-s3c24xx/mach-vstms.c b/arch/arm/mach-s3c24xx/mach-vstms.c
-index b4460d5f7011..f5e6322145fa 100644
---- a/arch/arm/mach-s3c24xx/mach-vstms.c
-+++ b/arch/arm/mach-s3c24xx/mach-vstms.c
-@@ -117,6 +117,7 @@
- 	.twrph1		= 20,
- 	.nr_sets	= ARRAY_SIZE(vstms_nand_sets),
- 	.sets		= vstms_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static struct platform_device *vstms_devices[] __initdata = {
-diff --git a/arch/arm/mach-s3c64xx/mach-hmt.c b/arch/arm/mach-s3c64xx/mach-hmt.c
-index bc7dc1fcbf7d..59b5531f1987 100644
---- a/arch/arm/mach-s3c64xx/mach-hmt.c
-+++ b/arch/arm/mach-s3c64xx/mach-hmt.c
-@@ -204,6 +204,7 @@ static void hmt_bl_exit(struct device *dev)
- 	.twrph1		= 40,
- 	.nr_sets	= ARRAY_SIZE(hmt_nand_sets),
- 	.sets		= hmt_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static struct gpio_led hmt_leds[] = {
-diff --git a/arch/arm/mach-s3c64xx/mach-mini6410.c b/arch/arm/mach-s3c64xx/mach-mini6410.c
-index ae999fb3fe6d..a3e3e25728b4 100644
---- a/arch/arm/mach-s3c64xx/mach-mini6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-mini6410.c
-@@ -142,6 +142,7 @@
- 	.twrph1		= 40,
- 	.nr_sets	= ARRAY_SIZE(mini6410_nand_sets),
- 	.sets		= mini6410_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static struct s3c_fb_pd_win mini6410_lcd_type0_fb_win = {
-diff --git a/arch/arm/mach-s3c64xx/mach-real6410.c b/arch/arm/mach-s3c64xx/mach-real6410.c
-index 4e240ffa7ac7..d6b3ffd7704b 100644
---- a/arch/arm/mach-s3c64xx/mach-real6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-real6410.c
-@@ -194,6 +194,7 @@
- 	.twrph1		= 40,
- 	.nr_sets	= ARRAY_SIZE(real6410_nand_sets),
- 	.sets		= real6410_nand_sets,
-+	.ecc_mode       = NAND_ECC_SOFT,
- };
- 
- static struct platform_device *real6410_devices[] __initdata = {
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 7b7a887b4709..9748f3580d4b 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -179,15 +179,6 @@ config MTD_NAND_S3C2410_DEBUG
- 	help
- 	  Enable debugging of the S3C NAND driver
- 
--config MTD_NAND_S3C2410_HWECC
--	bool "Samsung S3C NAND Hardware ECC"
--	depends on MTD_NAND_S3C2410
--	help
--	  Enable the use of the controller's internal ECC generator when
--	  using NAND. Early versions of the chips have had problems with
--	  incorrect ECC generation, and if using these, the default of
--	  software ECC is preferable.
--
- config MTD_NAND_NDFC
- 	tristate "NDFC NanD Flash Controller"
- 	depends on 4xx
 diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index d459c19d78de..371db0d48135 100644
+index 371db0d48135..b13208c526f8 100644
 --- a/drivers/mtd/nand/s3c2410.c
 +++ b/drivers/mtd/nand/s3c2410.c
-@@ -497,7 +497,6 @@ static int s3c2412_nand_devready(struct mtd_info *mtd)
+@@ -39,6 +39,8 @@
+ #include <linux/slab.h>
+ #include <linux/clk.h>
+ #include <linux/cpufreq.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  
- /* ECC handling functions */
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+@@ -185,6 +187,22 @@ struct s3c2410_nand_info {
+ #endif
+ };
  
--#ifdef CONFIG_MTD_NAND_S3C2410_HWECC
- static int s3c2410_nand_correct_data(struct mtd_info *mtd, u_char *dat,
- 				     u_char *read_ecc, u_char *calc_ecc)
- {
-@@ -649,7 +648,6 @@ static int s3c2440_nand_calculate_ecc(struct mtd_info *mtd, const u_char *dat,
- 
- 	return 0;
- }
--#endif
- 
- /* over-ride the standard functions for a little more speed. We can
-  * use read/write block to move the data buffers to/from the controller
-@@ -858,50 +856,7 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
- 	nmtd->info	   = info;
- 	nmtd->set	   = set;
- 
--#ifdef CONFIG_MTD_NAND_S3C2410_HWECC
--	chip->ecc.calculate = s3c2410_nand_calculate_ecc;
--	chip->ecc.correct   = s3c2410_nand_correct_data;
--	chip->ecc.mode	    = NAND_ECC_HW;
--	chip->ecc.strength  = 1;
--
--	switch (info->cpu_type) {
--	case TYPE_S3C2410:
--		chip->ecc.hwctl	    = s3c2410_nand_enable_hwecc;
--		chip->ecc.calculate = s3c2410_nand_calculate_ecc;
--		break;
--
--	case TYPE_S3C2412:
--		chip->ecc.hwctl     = s3c2412_nand_enable_hwecc;
--		chip->ecc.calculate = s3c2412_nand_calculate_ecc;
--		break;
--
--	case TYPE_S3C2440:
--		chip->ecc.hwctl     = s3c2440_nand_enable_hwecc;
--		chip->ecc.calculate = s3c2440_nand_calculate_ecc;
--		break;
--	}
--#else
--	chip->ecc.mode	    = NAND_ECC_SOFT;
--	chip->ecc.algo	= NAND_ECC_HAMMING;
--#endif
--
--	if (set->disable_ecc)
--		chip->ecc.mode	= NAND_ECC_NONE;
--
--	switch (chip->ecc.mode) {
--	case NAND_ECC_NONE:
--		dev_info(info->device, "NAND ECC disabled\n");
--		break;
--	case NAND_ECC_SOFT:
--		dev_info(info->device, "NAND soft ECC\n");
--		break;
--	case NAND_ECC_HW:
--		dev_info(info->device, "NAND hardware ECC\n");
--		break;
--	default:
--		dev_info(info->device, "NAND ECC UNKNOWN\n");
--		break;
--	}
-+	chip->ecc.mode = info->platform->ecc_mode;
- 
- 	/* If you use u-boot BBT creation code, specifying this flag will
- 	 * let the kernel fish out the BBT from the NAND, and also skip the
-@@ -923,28 +878,72 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
-  *
-  * The internal state is currently limited to the ECC state information.
- */
--static void s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
-+static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
- 				     struct s3c2410_nand_mtd *nmtd)
- {
- 	struct nand_chip *chip = &nmtd->chip;
- 
--	dev_dbg(info->device, "chip %p => page shift %d\n",
--		chip, chip->page_shift);
-+	switch (chip->ecc.mode) {
- 
--	if (chip->ecc.mode != NAND_ECC_HW)
--		return;
-+	case NAND_ECC_NONE:
-+		dev_info(info->device, "ECC disabled\n");
-+		break;
++struct s3c24XX_nand_devtype_data {
++	enum s3c_cpu_type type;
++};
 +
-+	case NAND_ECC_SOFT:
-+		/*
-+		 * This driver expects Hamming based ECC when ecc_mode is set
-+		 * to NAND_ECC_SOFT. Force ecc.algo to NAND_ECC_HAMMING to
-+		 * avoid adding an extra ecc_algo field to s3c2410_platform_nand.
-+		 */
-+		chip->ecc.algo = NAND_ECC_HAMMING;
-+		dev_info(info->device, "soft ECC\n");
-+		break;
++static const struct s3c24XX_nand_devtype_data s3c2410_nand_devtype_data = {
++	.type = TYPE_S3C2410,
++};
 +
-+	case NAND_ECC_HW:
-+		chip->ecc.calculate = s3c2410_nand_calculate_ecc;
-+		chip->ecc.correct   = s3c2410_nand_correct_data;
-+		chip->ecc.strength  = 1;
++static const struct s3c24XX_nand_devtype_data s3c2412_nand_devtype_data = {
++	.type = TYPE_S3C2412,
++};
 +
-+		switch (info->cpu_type) {
-+		case TYPE_S3C2410:
-+			chip->ecc.hwctl	    = s3c2410_nand_enable_hwecc;
-+			chip->ecc.calculate = s3c2410_nand_calculate_ecc;
-+			break;
++static const struct s3c24XX_nand_devtype_data s3c2440_nand_devtype_data = {
++	.type = TYPE_S3C2440,
++};
 +
-+		case TYPE_S3C2412:
-+			chip->ecc.hwctl     = s3c2412_nand_enable_hwecc;
-+			chip->ecc.calculate = s3c2412_nand_calculate_ecc;
-+			break;
-+
-+		case TYPE_S3C2440:
-+			chip->ecc.hwctl     = s3c2440_nand_enable_hwecc;
-+			chip->ecc.calculate = s3c2440_nand_calculate_ecc;
-+			break;
-+		}
-+
-+		dev_dbg(info->device, "chip %p => page shift %d\n",
-+			chip, chip->page_shift);
+ /* conversion functions */
  
- 		/* change the behaviour depending on whether we are using
- 		 * the large or small page nand device */
-+		if (chip->page_shift > 10) {
-+			chip->ecc.size	    = 256;
-+			chip->ecc.bytes	    = 3;
-+		} else {
-+			chip->ecc.size	    = 512;
-+			chip->ecc.bytes	    = 3;
-+			mtd_set_ooblayout(nand_to_mtd(chip), &s3c2410_ooblayout_ops);
-+		}
- 
--	if (chip->page_shift > 10) {
--		chip->ecc.size	    = 256;
--		chip->ecc.bytes	    = 3;
--	} else {
--		chip->ecc.size	    = 512;
--		chip->ecc.bytes	    = 3;
--		mtd_set_ooblayout(nand_to_mtd(chip), &s3c2410_ooblayout_ops);
-+		dev_info(info->device, "hardware ECC\n");
-+		break;
-+
-+	default:
-+		dev_err(info->device, "invalid ECC mode!\n");
-+		return -EINVAL;
- 	}
-+
-+	return 0;
+ static struct s3c2410_nand_mtd *s3c2410_nand_mtd_toours(struct mtd_info *mtd)
+@@ -794,6 +812,30 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
+ 	return -ENODEV;
  }
  
- /* s3c24xx_nand_probe
-@@ -1046,7 +1045,9 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
- 						 NULL);
- 
- 		if (nmtd->scan_res == 0) {
--			s3c2410_nand_update_chip(info, nmtd);
-+			err = s3c2410_nand_update_chip(info, nmtd);
-+			if (err < 0)
-+				goto exit_error;
- 			nand_scan_tail(mtd);
- 			s3c2410_nand_add_partition(info, nmtd, sets);
- 		}
-diff --git a/include/linux/platform_data/mtd-nand-s3c2410.h b/include/linux/platform_data/mtd-nand-s3c2410.h
-index c55e42ee57fa..729af13d1773 100644
---- a/include/linux/platform_data/mtd-nand-s3c2410.h
-+++ b/include/linux/platform_data/mtd-nand-s3c2410.h
-@@ -12,9 +12,10 @@
- #ifndef __MTD_NAND_S3C2410_H
- #define __MTD_NAND_S3C2410_H
- 
-+#include <linux/mtd/nand.h>
++static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd,
++					     const struct nand_data_interface *conf,
++					     bool check_only)
++{
++	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
++	struct s3c2410_platform_nand *pdata = info->platform;
++	const struct nand_sdr_timings *timings;
++	int tacls;
++
++	timings = nand_get_sdr_timings(conf);
++	if (IS_ERR(timings))
++		return -ENOTSUPP;
++
++	tacls = timings->tCLS_min - timings->tWP_min;
++	if (tacls < 0)
++		tacls = 0;
++
++	pdata->tacls  = DIV_ROUND_UP(tacls, 1000);
++	pdata->twrph0 = DIV_ROUND_UP(timings->tWP_min, 1000);
++	pdata->twrph1 = DIV_ROUND_UP(timings->tCLH_min, 1000);
++
++	return s3c2410_nand_setrate(info);
++}
 +
  /**
-  * struct s3c2410_nand_set - define a set of one or more nand chips
-- * @disable_ecc:	Entirely disable ECC - Dangerous
-  * @flash_bbt: 		Openmoko u-boot can create a Bad Block Table
-  *			Setting this flag will allow the kernel to
-  *			look for it at boot time and also skip the NAND
-@@ -31,7 +32,6 @@
-  * a warning at boot time.
-  */
- struct s3c2410_nand_set {
--	unsigned int		disable_ecc:1;
- 	unsigned int		flash_bbt:1;
+  * s3c2410_nand_init_chip - initialise a single instance of an chip
+  * @info: The base NAND controller the chip is on.
+@@ -808,9 +850,12 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+ 				   struct s3c2410_nand_mtd *nmtd,
+ 				   struct s3c2410_nand_set *set)
+ {
++	struct device_node *np = info->device->of_node;
+ 	struct nand_chip *chip = &nmtd->chip;
+ 	void __iomem *regs = info->regs;
  
- 	unsigned int		options;
-@@ -51,6 +51,8 @@ struct s3c2410_platform_nand {
- 
- 	unsigned int	ignore_unset_ecc:1;
- 
-+	nand_ecc_modes_t	ecc_mode;
++	nand_set_flash_node(chip, set->of_node);
 +
- 	int			nr_sets;
- 	struct s3c2410_nand_set *sets;
+ 	chip->write_buf    = s3c2410_nand_write_buf;
+ 	chip->read_buf     = s3c2410_nand_read_buf;
+ 	chip->select_chip  = s3c2410_nand_select_chip;
+@@ -819,6 +864,13 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+ 	chip->options	   = set->options;
+ 	chip->controller   = &info->controller;
  
++	/*
++	 * let's keep behavior unchanged for legacy boards booting via pdata and
++	 * auto-detect timings only when booting with a device tree.
++	 */
++	if (np)
++		chip->setup_data_interface = s3c2410_nand_setup_data_interface;
++
+ 	switch (info->cpu_type) {
+ 	case TYPE_S3C2410:
+ 		chip->IO_ADDR_W = regs + S3C2410_NFDATA;
+@@ -859,12 +911,9 @@ static void s3c2410_nand_init_chip(struct s3c2410_nand_info *info,
+ 	chip->ecc.mode = info->platform->ecc_mode;
+ 
+ 	/* If you use u-boot BBT creation code, specifying this flag will
+-	 * let the kernel fish out the BBT from the NAND, and also skip the
+-	 * full NAND scan that can take 1/2s or so. Little things... */
+-	if (set->flash_bbt) {
++	 * let the kernel fish out the BBT from the NAND */
++	if (set->flash_bbt)
+ 		chip->bbt_options |= NAND_BBT_USE_FLASH;
+-		chip->options |= NAND_SKIP_BBTSCAN;
+-	}
+ }
+ 
+ /**
+@@ -943,6 +992,77 @@ static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+ 		return -EINVAL;
+ 	}
+ 
++	if (chip->bbt_options & NAND_BBT_USE_FLASH)
++		chip->options |= NAND_SKIP_BBTSCAN;
++
++	return 0;
++}
++
++static const struct of_device_id s3c24xx_nand_dt_ids[] = {
++	{
++		.compatible = "samsung,s3c2410-nand",
++		.data = &s3c2410_nand_devtype_data,
++	}, {
++		.compatible = "samsung,s3c2412-nand", /* also compatible with s3c6400 */
++		.data = &s3c2412_nand_devtype_data,
++	}, {
++		.compatible = "samsung,s3c2440-nand",
++		.data = &s3c2440_nand_devtype_data,
++	},
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, s3c24xx_nand_dt_ids);
++
++static int s3c24xx_nand_probe_dt(struct platform_device *pdev)
++{
++	const struct s3c24XX_nand_devtype_data *devtype_data;
++	struct s3c2410_platform_nand *pdata;
++	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
++	struct device_node *np = pdev->dev.of_node, *child;
++	struct s3c2410_nand_set *sets;
++
++	devtype_data = of_device_get_match_data(&pdev->dev);
++	if (!devtype_data)
++		return -ENODEV;
++
++	info->cpu_type = devtype_data->type;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++
++	pdev->dev.platform_data = pdata;
++
++	pdata->nr_sets = of_get_child_count(np);
++	if (!pdata->nr_sets)
++		return 0;
++
++	sets = devm_kzalloc(&pdev->dev, sizeof(*sets) * pdata->nr_sets, GFP_KERNEL);
++	if (!sets)
++		return -ENOMEM;
++
++	pdata->sets = sets;
++
++	for_each_available_child_of_node(np, child) {
++
++		sets->name = (char *)child->name;
++		sets->of_node = child;
++		sets->nr_chips = 1;
++
++		of_node_get(child);
++
++		sets++;
++	}
++
++	return 0;
++}
++
++static int s3c24xx_nand_probe_pdata(struct platform_device *pdev)
++{
++	struct s3c2410_nand_info *info = platform_get_drvdata(pdev);
++
++	info->cpu_type = platform_get_device_id(pdev)->driver_data;
++
+ 	return 0;
+ }
+ 
+@@ -955,8 +1075,7 @@ static int s3c2410_nand_update_chip(struct s3c2410_nand_info *info,
+ */
+ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ {
+-	struct s3c2410_platform_nand *plat = to_nand_plat(pdev);
+-	enum s3c_cpu_type cpu_type;
++	struct s3c2410_platform_nand *plat;
+ 	struct s3c2410_nand_info *info;
+ 	struct s3c2410_nand_mtd *nmtd;
+ 	struct s3c2410_nand_set *sets;
+@@ -966,8 +1085,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 	int nr_sets;
+ 	int setno;
+ 
+-	cpu_type = platform_get_device_id(pdev)->driver_data;
+-
+ 	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+ 	if (info == NULL) {
+ 		err = -ENOMEM;
+@@ -989,6 +1106,16 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 
+ 	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+ 
++	if (pdev->dev.of_node)
++		err = s3c24xx_nand_probe_dt(pdev);
++	else
++		err = s3c24xx_nand_probe_pdata(pdev);
++
++	if (err)
++		goto exit_error;
++
++	plat = to_nand_plat(pdev);
++
+ 	/* allocate and map the resource */
+ 
+ 	/* currently we assume we have the one resource */
+@@ -997,7 +1124,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 
+ 	info->device	= &pdev->dev;
+ 	info->platform	= plat;
+-	info->cpu_type	= cpu_type;
+ 
+ 	info->regs = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(info->regs)) {
+@@ -1007,12 +1133,6 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 
+ 	dev_dbg(&pdev->dev, "mapped registers at %p\n", info->regs);
+ 
+-	/* initialise the hardware */
+-
+-	err = s3c2410_nand_inithw(info);
+-	if (err != 0)
+-		goto exit_error;
+-
+ 	sets = (plat != NULL) ? plat->sets : NULL;
+ 	nr_sets = (plat != NULL) ? plat->nr_sets : 1;
+ 
+@@ -1056,6 +1176,11 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
+ 			sets++;
+ 	}
+ 
++	/* initialise the hardware */
++	err = s3c2410_nand_inithw(info);
++	if (err != 0)
++		goto exit_error;
++
+ 	err = s3c2410_nand_cpufreq_register(info);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "failed to init cpufreq support\n");
+@@ -1156,6 +1281,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
+ 	.id_table	= s3c24xx_driver_ids,
+ 	.driver		= {
+ 		.name	= "s3c24xx-nand",
++		.of_match_table = s3c24xx_nand_dt_ids,
+ 	},
+ };
+ 
+diff --git a/include/linux/platform_data/mtd-nand-s3c2410.h b/include/linux/platform_data/mtd-nand-s3c2410.h
+index 729af13d1773..f01659026b26 100644
+--- a/include/linux/platform_data/mtd-nand-s3c2410.h
++++ b/include/linux/platform_data/mtd-nand-s3c2410.h
+@@ -40,6 +40,7 @@ struct s3c2410_nand_set {
+ 	char			*name;
+ 	int			*nr_map;
+ 	struct mtd_partition	*partitions;
++	struct device_node	*of_node;
+ };
+ 
+ struct s3c2410_platform_nand {
 -- 
 1.9.1
