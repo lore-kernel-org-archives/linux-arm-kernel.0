@@ -1,136 +1,173 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 26 Oct 2016 23:24:32 +0800
-Subject: [PATCH v14 7/9] clocksource/drivers/arm_arch_timer: Refactor the
- timer init code to prepare for GTDT
-In-Reply-To: <20161021113213.GD16630@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-8-git-send-email-fu.wei@linaro.org>
- <20161021113213.GD16630@leverpostej>
-Message-ID: <CADyBb7sJfY4=5NKKPGosOGv4sq4Tg2_TBW-XbWYoqfz4JNE-LA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Oct 2016 16:34:10 +0100
+Subject: [PATCH V3 8/8] arm64: dma-mapping: Remove the notifier trick to
+ handle early setting of dma_ops
+In-Reply-To: <1475600632-21289-9-git-send-email-sricharan@codeaurora.org>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <1475600632-21289-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <e4643826-3aa8-1e34-79a8-9e1fcf0fcb69@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 04/10/16 18:03, Sricharan R wrote:
+> With arch_setup_dma_ops now being called late during device's probe after the
+> device's iommu is probed, the notifier trick required to handle the early
+> setup of dma_ops before the iommu group gets created is not required.
+> So removing the notifier's here.
 
-On 21 October 2016 at 19:32, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Sep 29, 2016 at 02:17:15AM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> The patch refactor original memory-mapped timer init code:
->> (1) extract some subfunction for reusing some common code
->>     a. get_cnttidr
->>     b. is_best_frame
->> (2) move base address and irq code for arch_timer_mem to
->> arch_timer_mem_register
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 159 +++++++++++++++++++++--------------
->>  1 file changed, 96 insertions(+), 63 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index c7b0040..e78095f 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -57,6 +57,7 @@
->>  static unsigned arch_timers_present __initdata;
->>
->>  static void __iomem *arch_counter_base;
->> +static void __iomem *cntctlbase __initdata;
->>
->>  struct arch_timer {
->>       void __iomem *base;
->> @@ -656,15 +657,49 @@ out:
->>       return err;
->>  }
->>
->> -static int __init arch_timer_mem_register(void __iomem *base, unsigned int irq)
->> +static int __init arch_timer_mem_register(struct device_node *np, void *frame)
->>  {
->> -     int ret;
->> -     irq_handler_t func;
->> +     struct device_node *frame_node = NULL;
->>       struct arch_timer *t;
->> +     void __iomem *base;
->> +     irq_handler_t func;
->> +     unsigned int irq;
->> +     int ret;
->> +
->> +     if (!frame)
->> +             return -EINVAL;
->
-> Why would we call this without a frame?
+Hooray!
 
-Sorry, I just verify it , make sure frame is not NULL,
-Because it is a "static" function, so we do need this check?
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 100 ++------------------------------------------
+>  1 file changed, 3 insertions(+), 97 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index faf4b92..eb593af 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -799,24 +799,6 @@ static struct dma_map_ops iommu_dma_ops = {
+>  	.mapping_error = iommu_dma_mapping_error,
+>  };
+>  
+> -/*
+> - * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
+> - * everything it needs to - the device is only partially created and the
+> - * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
+> - * need this delayed attachment dance. Once IOMMU probe ordering is sorted
+> - * to move the arch_setup_dma_ops() call later, all the notifier bits below
+> - * become unnecessary, and will go away.
+> - */
+> -struct iommu_dma_notifier_data {
+> -	struct list_head list;
+> -	struct device *dev;
+> -	const struct iommu_ops *ops;
+> -	u64 dma_base;
+> -	u64 size;
+> -};
+> -static LIST_HEAD(iommu_dma_masters);
+> -static DEFINE_MUTEX(iommu_dma_notifier_lock);
+> -
+>  static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+>  			   u64 dma_base, u64 size)
 
->
->> +
->> +     if (np) {
->
-> ... or without a node?
+This should go as well...
 
-For "np", for now, we just  just verify it, but it is just paperation
-for GTDT support,
-Because in next patch, if np == NULL, that means we call this function
-from GTDT, but not DT.
+>  {
+> @@ -837,79 +819,9 @@ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+>  	return true;
+>  }
+>  
+> -static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+> -			      u64 dma_base, u64 size)
+> -{
+> -	struct iommu_dma_notifier_data *iommudata;
+> -
+> -	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
+> -	if (!iommudata)
+> -		return;
+> -
+> -	iommudata->dev = dev;
+> -	iommudata->ops = ops;
+> -	iommudata->dma_base = dma_base;
+> -	iommudata->size = size;
+> -
+> -	mutex_lock(&iommu_dma_notifier_lock);
+> -	list_add(&iommudata->list, &iommu_dma_masters);
+> -	mutex_unlock(&iommu_dma_notifier_lock);
+> -}
+> -
+> -static int __iommu_attach_notifier(struct notifier_block *nb,
+> -				   unsigned long action, void *data)
+> -{
+> -	struct iommu_dma_notifier_data *master, *tmp;
+> -
+> -	if (action != BUS_NOTIFY_BIND_DRIVER)
+> -		return 0;
+> -
+> -	mutex_lock(&iommu_dma_notifier_lock);
+> -	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
+> -		if (data == master->dev && do_iommu_attach(master->dev,
+> -				master->ops, master->dma_base, master->size)) {
+> -			list_del(&master->list);
+> -			kfree(master);
+> -			break;
+> -		}
+> -	}
+> -	mutex_unlock(&iommu_dma_notifier_lock);
+> -	return 0;
+> -}
+> -
+> -static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
+> -{
+> -	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
+> -	int ret;
+> -
+> -	if (!nb)
+> -		return -ENOMEM;
+> -
+> -	nb->notifier_call = __iommu_attach_notifier;
+> -
+> -	ret = bus_register_notifier(bus, nb);
+> -	if (ret) {
+> -		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
+> -			bus->name);
+> -		kfree(nb);
+> -	}
+> -	return ret;
+> -}
+> -
+>  static int __init __iommu_dma_init(void)
+>  {
+> -	int ret;
+> -
+> -	ret = iommu_dma_init();
+> -	if (!ret)
+> -		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
+> -	if (!ret)
+> -		ret = register_iommu_dma_ops_notifier(&amba_bustype);
+> -#ifdef CONFIG_PCI
+> -	if (!ret)
+> -		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
+> -#endif
+> -	return ret;
+> +	return iommu_dma_init();
+>  }
+>  arch_initcall(__iommu_dma_init);
+>  
+> @@ -920,18 +832,12 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  
+>  	if (!ops)
+>  		return;
+> -	/*
+> -	 * TODO: As a concession to the future, we're ready to handle being
+> -	 * called both early and late (i.e. after bus_add_device). Once all
+> -	 * the platform bus code is reworked to call us late and the notifier
+> -	 * junk above goes away, move the body of do_iommu_attach here.
 
->
->> +             frame_node = (struct device_node *)frame;
->> +             base = of_iomap(frame_node, 0);
->> +             arch_timer_detect_rate(base, np);
->
-> ... BANG! (we check base too late, below).
->
-> Please as Marc requested several versions ago: split the FW parsing
-> (ACPI and DT) so that happens first, *then* once we have the data in a
-> common format, use that to drive poking the HW, requesting IRQs, etc,
-> completely independent of the source.
->
-> In patches, do this by:
->
-> (1) adding the data structures
-> (2) splitting the existing DT probing to use them
-> (3) Adding ACPI functionality atop
+...per this commment. It has no need to be a separate function once this
+is the only call site (plus it has a misleadingly inaccurate name anyway).
 
-this patch is a preparation for GTDT support, I have splitted some
-functions for reusing them in next patch(GTDT support)
+> -	 */
+> +
+>  	group = iommu_group_get(dev);
+> +
+>  	if (group) {
+>  		do_iommu_attach(dev, ops, dma_base, size);
+>  		iommu_group_put(group);
+> -	} else {
+> -		queue_iommu_attach(dev, ops, dma_base, size);
+>  	}
+>  }
 
-if np == NULL, that means we call this function from GTDT, but
-if np != NULL, that means we call this function from DT
+I overlooked it in the last patch as the relevant context was in the
+cover letter, so I'll just add the comment here; the domain check and
+WARN_ON() in arch_teardown_dma_ops() is mostly a left-over from the
+'fake default domain' bodge that was already gone from the final version
+of the arm64 dma_ops series. It's based on the assumption that
+arch_teardown_dma_ops() is called after the device is removed from the
+bus - I'm not convinced that assumption was ever actually true, it now
+doesn't necessarily do anything anyway (since detach_device is
+deprecated). I'll spin a cleanup patch for that myself...
 
-
->
->> -static int __init arch_timer_mem_init(struct device_node *np)
->> +static int __init get_cnttidr(struct device_node *np, u32 *cnttidr)
->>  {
->> -     struct device_node *frame, *best_frame = NULL;
->> -     void __iomem *cntctlbase, *base;
->> -     unsigned int irq, ret = -EINVAL;
->> -     u32 cnttidr;
->> +     if (!cnttidr)
->> +             return -EINVAL;
->> +
->> +     if (np)
->> +             cntctlbase = of_iomap(np, 0);
->> +     else
->> +             return -EINVAL;
->
-> We want to check this for ACPI too, no?
-
-just like I said above, this is a preparation for GTDT support,
-
-So please correct me if I am doing this in the wrong way, thanks :-)
-
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Robin.
