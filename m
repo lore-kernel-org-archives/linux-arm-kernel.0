@@ -1,55 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 14:56:31 +0100
-Subject: [PATCH 7/7] mfd: tps65217: Fix mismatched interrupt number
-In-Reply-To: <20161021140106.21531-8-woogyom.kim@gmail.com>
-References: <20161021140106.21531-1-woogyom.kim@gmail.com>
- <20161021140106.21531-8-woogyom.kim@gmail.com>
-Message-ID: <20161026135631.GC13127@dell>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 26 Oct 2016 21:55:50 +0800
+Subject: [PATCH 0/7] ARM: dts: support I2SE Duckbill device
+In-Reply-To: <2694949.M3JJFNG6Xz@kerker>
+References: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
+ <20161024131209.GK30578@tiger> <2694949.M3JJFNG6Xz@kerker>
+Message-ID: <20161026135550.GQ30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 21 Oct 2016, Milo Kim wrote:
+On Mon, Oct 24, 2016 at 09:45:56PM +0200, Michael Heimpold wrote:
+> Actually it would even be 11 files for 8 boards, thats right.
+> There is no mechanism (no EEPROM, GPIO...) to automatically probe for the 
+> device variants, and the "variant-forming daugther boards" are
+> not switchable like the expansion boards e.g. for Raspberry Pi.
+> Another point is, that this would really require to use U-Boot to apply
+> the overlay (or another DT capable bootloader with this functionality).
+> For booting very fast, the good old Freescale bootlets are still
+> an option, which could not handle the overlays - at least at the moment...
+> However, it still an option to have a second look...
+> 
+> To reduce the number of files, I see the following other approaches:
+> - don't use the three "common" files which are included: -3 files (8 total)
+> - don't mainline Duckbill EnOcean, Duckbill 485 and Duckbill SPI:
+>   they are EOL, only Duckbill 2 variants are still sold;
+>   however, since Duckbill (without 2) is/was already mainlined, we
+>   should keep this, leaving 4 new variants + 1 old variant: -3 files (5 total)
+> - only mainline Duckbill 2 (generic board) and maintain all other variants
+>   in a private Github repo (this is what we are doing now): -3 files (2 total)
+> 
+> So, I'll discuss this again internally. Do you have any preference?
 
-> Enum value of 'tps65217_irq_type' is not matched with DT parsed hwirq
-> number[*].
-> 
-> The MFD driver gets the IRQ data by referencing hwirq, but the value is
-> different. So, irq_to_tps65217_irq() returns mismatched IRQ data.
-> Eventually, the power button driver enables not PB but USB interrupt
-> when it is probed.
-> 
-> According to the TPS65217 register map[**], USB interrupt is the LSB.
-> This patch synchronizes TPS65217 IRQ index.
-> 
-> [*]  include/dt-bindings/mfd/tps65217.h
-> [**] http://www.ti.com/lit/ds/symlink/tps65217.pdf
-> 
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
-> ---
->  include/linux/mfd/tps65217.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/linux/mfd/tps65217.h b/include/linux/mfd/tps65217.h
-> index 4ccda89..75a3a5f 100644
-> --- a/include/linux/mfd/tps65217.h
-> +++ b/include/linux/mfd/tps65217.h
-> @@ -235,9 +235,9 @@ struct tps65217_bl_pdata {
->  };
->  
->  enum tps65217_irq_type {
-> -	TPS65217_IRQ_PB,
-> -	TPS65217_IRQ_AC,
->  	TPS65217_IRQ_USB,
-> +	TPS65217_IRQ_AC,
-> +	TPS65217_IRQ_PB,
->  	TPS65217_NUM_IRQ
->  };
+I'm fine with the second one.
 
-This is why using enum for these types of assignments is sometimes
-dangerous.  It's probably best to be explicit.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Shawn
