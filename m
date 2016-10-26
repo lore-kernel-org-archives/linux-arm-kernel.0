@@ -1,81 +1,56 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 26 Oct 2016 08:47:18 +0530
-Subject: [PATCH V2 0/6] ARM64: Uprobe support added
-In-Reply-To: <cover.1474960629.git.panand@redhat.com>
-References: <cover.1474960629.git.panand@redhat.com>
-Message-ID: <CAHB_Gup_kEZbO7K7WVUvj8fZbj8f62UpHiKcqvmb09a1ixR5zw@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 26 Oct 2016 09:44:05 +0530
+Subject: [PATCH 4/4] iommu/arm-smmu: Add the device_link between masters
+ and smmu
+In-Reply-To: <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
+References: <1477070066-15044-1-git-send-email-sricharan@codeaurora.org>
+ <CGME20161021171456eucas1p172cd17e1d3b498eac68210a39f54e025@eucas1p1.samsung.com>
+ <1477070066-15044-5-git-send-email-sricharan@codeaurora.org>
+ <d0489bcc-573f-de7a-fb6e-59fee521dac8@samsung.com>
+Message-ID: <001301d22f3f$6788cf30$369a6d90$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Marek,
 
-Please let me know if everything else other than is_trap_insn() looks
-fine to you. May be I can work well in time. It would be great if we
-can make it into v4.9.
+>
+>On 2016-10-21 19:14, Sricharan R wrote:
+>> The device link between master and its smmu is added so that
+>> the smmu gets runtime enabled/disabled when the master needs it.
+>> This is done from add_device callback which gets called once
+>> when the master is added to the smmu group.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>   drivers/iommu/arm-smmu.c | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 578cdc2..71ce4b6 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1470,6 +1470,15 @@ static int arm_smmu_add_device(struct device *dev)
+>>   		goto out_free;
+>>   	pm_runtime_put_sync(smmu->dev);
+>>
+>> +	/*
+>> +	 * Establish the link between smmu and master, so that the
+>> +	 * smmu gets runtime enabled/disabled as per the master's
+>> +	 * needs.
+>> +	 */
+>> +
+>> +	device_link_add(dev, smmu->dev, DEVICE_LINK_AVAILABLE,
+>> +			DEVICE_LINK_PM_RUNTIME);
+>
+>Please update to the latest version of Rafael's patches. In V5 the
+>initial link
+>state is not needed anymore and there was an important fix for creating
+>links
+>during master's driver probing, what happens after applying your IOMMU
+>deferred
+>probe patchset.
 
+   Sure i will update to V5. I see that i am on V4.
 
-~Pratyush
-
-
-On Tue, Sep 27, 2016 at 1:17 PM, Pratyush Anand <panand@redhat.com> wrote:
-> Changes since v1:
-> * Exposed sync_icache_aliases() and used that in stead of flush_uprobe_xol_access()
-> * Assigned 0x0005 to BRK64_ESR_UPROBES in stead of 0x0008
-> * moved uprobe_opcode_t from probes.h to uprobes.h
-> * Assigned 4 to TIF_UPROBE instead of 5
-> * Assigned AARCH64_INSN_SIZE to UPROBE_SWBP_INSN_SIZE instead of hard code 4.
-> * Removed saved_fault_code from struct arch_uprobe_task
-> * Removed preempt_dis(en)able() from arch_uprobe_copy_ixol()
-> * Removed case INSN_GOOD from arch_uprobe_analyze_insn()
-> * Now we do check that probe point is not for a 32 bit task.
-> * Return a false positive from is_tarp_insn()
-> * Changes for rebase conflict resolution
->
-> V1 was here: https://lkml.org/lkml/2016/8/2/29
-> Patches have been rebased on next-20160927, so that there would be no
-> conflicts with other arm64/for-next/core patches.
->
-> Patches have been tested for following:
-> 1. Step-able instructions, like sub, ldr, add etc.
-> 2. Simulation-able like ret, cbnz, cbz etc.
-> 3. uretprobe
-> 4. Reject-able instructions like sev, wfe etc.
-> 5. trapped and abort xol path
-> 6. probe at unaligned user address.
-> 7. longjump test cases
->
-> aarch32 task probing is not yet supported.
->
-> Pratyush Anand (6):
->   arm64: kprobe: protect/rename few definitions to be reused by uprobe
->   arm64: kgdb_step_brk_fn: ignore other's exception
->   arm64: Handle TRAP_TRACE for user mode as well
->   arm64: Handle TRAP_BRKPT for user mode as well
->   arm64: introduce mm context flag to keep 32 bit task information
->   arm64: Add uprobe support
->
->  arch/arm64/Kconfig                      |   3 +
->  arch/arm64/include/asm/cacheflush.h     |   1 +
->  arch/arm64/include/asm/debug-monitors.h |   3 +
->  arch/arm64/include/asm/elf.h            |  12 +-
->  arch/arm64/include/asm/mmu.h            |   1 +
->  arch/arm64/include/asm/probes.h         |  19 +--
->  arch/arm64/include/asm/ptrace.h         |   8 ++
->  arch/arm64/include/asm/thread_info.h    |   5 +-
->  arch/arm64/include/asm/uprobes.h        |  36 ++++++
->  arch/arm64/kernel/debug-monitors.c      |  40 +++---
->  arch/arm64/kernel/kgdb.c                |   3 +
->  arch/arm64/kernel/probes/Makefile       |   2 +
->  arch/arm64/kernel/probes/decode-insn.c  |  32 ++---
->  arch/arm64/kernel/probes/decode-insn.h  |   8 +-
->  arch/arm64/kernel/probes/kprobes.c      |  36 +++---
->  arch/arm64/kernel/probes/uprobes.c      | 221 ++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/signal.c              |   3 +
->  arch/arm64/mm/flush.c                   |   2 +-
->  18 files changed, 371 insertions(+), 64 deletions(-)
->  create mode 100644 arch/arm64/include/asm/uprobes.h
->  create mode 100644 arch/arm64/kernel/probes/uprobes.c
->
-> --
-> 2.7.4
->
+Regards,
+ Sricharan
