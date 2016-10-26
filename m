@@ -1,148 +1,200 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 26 Oct 2016 11:44:40 -0600
-Subject: [PATCH] PCI: mvebu: Take control of mbus windows setup by the firmware
-Message-ID: <20161026174440.GA24717@obsidianresearch.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 26 Oct 2016 18:47:42 +0100
+Subject: [PATCH v2] modversions: treat symbol CRCs as 32 bit quantities on
+ 64 bit archs
+In-Reply-To: <CAKv+Gu-MEG5ayvBcbOwEFzaWPUvOwzTHVH9JKF_tKVN683Eh7A@mail.gmail.com>
+References: <1476956263-1787-1-git-send-email-ard.biesheuvel@linaro.org>
+ <871sz3xw1s.fsf@concordia.ellerman.id.au>
+ <CAKv+Gu-MEG5ayvBcbOwEFzaWPUvOwzTHVH9JKF_tKVN683Eh7A@mail.gmail.com>
+Message-ID: <CAKv+Gu8MJyyCWroHrfLANZU2Rmq7Efkag+JEssWpbqrGS0cznA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The firmware may setup the mbus to access PCI-E and indicate this
-has happened with a ranges mapping for the PCI-E ID. If this happens
-then the mbus setup and the pci dynamic setup conflict, creating
-problems.
+On 26 October 2016 at 14:04, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 26 October 2016 at 11:07, Michael Ellerman <mpe@ellerman.id.au> wrote:
+>> Hi Ard,
+>>
+>> I like the concept, but ...
+>>
+>> Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
+>>> The symbol CRCs are emitted as ELF symbols, which allows us to easily
+>>> populate the kcrctab sections by relying on the linker to associate
+>>> each kcrctab slot with the correct value.
+>>>
+>>> This has two downsides:
+>>> - given that the CRCs are treated as pointers, we waste 4 bytes for
+>>>   each CRC on 64 bit architectures,
+>>> - on architectures that support runtime relocation, a relocation entry is
+>>>   emitted for each CRC value, which may take up 24 bytes of __init space
+>>>   (on ELF64 systems)
+>>>
+>>> This comes down to a x8 overhead in [uncompressed] kernel size. In addition,
+>>> each relocation has to be reverted before the CRC value can be used.
+>>>
+>>> Switching to explicit 32 bit values on 64 bit architectures fixes both
+>>> issues, since 32 bit values are not treated as relocatable quantities on
+>>> ELF64 systems, even if the value ultimately resolves to a linker supplied
+>>> value.
+>>
+>> Are we sure that part is true? ("not treated as relocatable")
+>>
+>
+> Thanks for testing this.
+>
+>> A quick test build on powerpc gives me:
+>>
+>>   WARNING: 6829 bad relocations
+>>   c000000000ca3748 R_PPC64_ADDR16    *ABS*+0x0000000013f53da6
+>>   c000000000ca374a R_PPC64_ADDR16    *ABS*+0x00000000f7272059
+>>   c000000000ca374c R_PPC64_ADDR16    *ABS*+0x0000000002013d36
+>>   c000000000ca374e R_PPC64_ADDR16    *ABS*+0x00000000a59dffc8
+>>   ...
+>>
+>> Which is coming from our relocs_check.sh script, which checks that the
+>> generated relocations are ones we know how to handle.
+>>
+>
+> OK, first of all, it appears the ppc64 assembler interprets .word
+> differently than the arm64 one, so I will need to fold this in
+>
+> """
+> diff --git a/include/linux/export.h b/include/linux/export.h
+> index fa51ab2ad190..a000d421526d 100644
+> --- a/include/linux/export.h
+> +++ b/include/linux/export.h
+> @@ -54,7 +54,7 @@ extern struct module __this_module;
+>  #define __CRC_SYMBOL(sym, sec)                                         \
+>         asm("   .section \"___kcrctab" sec "+" #sym "\", \"a\"  \n"     \
+>             "   .weak   " VMLINUX_SYMBOL_STR(__crc_##sym) "     \n"     \
+> -           "   .word   " VMLINUX_SYMBOL_STR(__crc_##sym) "     \n"     \
+> +           "   .long   " VMLINUX_SYMBOL_STR(__crc_##sym) "     \n"     \
+>             "   .previous                                       \n");
+>  #endif
+>  #else
+> """
+>
+> With that change, the CRCs are actually emitted as
+>
+> WARNING: 7525 bad relocations
+> c000000000ce7f50 R_PPC64_ADDR32    *ABS*+0x0000000013f53da6
+> c000000000ce7f54 R_PPC64_ADDR32    *ABS*+0x0000000004f7c64e
+> c000000000ce7f58 R_PPC64_ADDR32    *ABS*+0x0000000092be8a3e
+>
+> which is still a bit disappointing, given that we still have 7525 RELA
+> entries to process.
+> I tried several thing, i.e., adding -Bsymbolic to the linker command
+> line, emitting the reference above as .hidden or emit  the definition
+> from the linker script as HIDDEN(), but nothing seems to make any
+> difference. (On arm64, -Bsymbolic eliminates *all* runtime relocations
+> except R_<arch>_RELATIVE ones)
+>
+>> And when I try to boot it I get:
+>>
+>>   virtio: disagrees about version of symbol module_layout
+>>   virtio: disagrees about version of symbol module_layout
+>>   scsi_mod: disagrees about version of symbol module_layout
+>>
+>> And it can't find my root file system (unsurprisingly as it's on scsi).
+>>
+>
+> Something like the below should fix it, I hope.
+>
+> """
+> diff --git a/arch/powerpc/kernel/reloc_64.S b/arch/powerpc/kernel/reloc_64.S
+> index d88736fbece6..99cdf2311ab5 100644
+> --- a/arch/powerpc/kernel/reloc_64.S
+> +++ b/arch/powerpc/kernel/reloc_64.S
+> @@ -14,6 +14,7 @@
+>  RELA = 7
+>  RELACOUNT = 0x6ffffff9
+>  R_PPC64_RELATIVE = 22
+> +R_PPC64_ADDR32 = 1
+>
+>  /*
+>   * r3 = desired final address of kernel
+> @@ -77,9 +78,22 @@ _GLOBAL(relocate)
+>         add     r0,r0,r3
+>         stdx    r0,r7,r6
+>         addi    r9,r9,24
+> -       bdnz    5b
+> +       b       7f
+> +
+> +       /*
+> +        * CRCs of exported symbols are emitted as 32-bit relocations against
+> +        * the *ABS* section with the CRC value recorded in the addend.
+> +        */
+> +6:     cmpdi   r0,R_PPC64_ADDR32
+> +       bne     7f
+> +       ld      r6,0(r9)        /* reloc->r_offset */
+> +       ld      r0,16(r9)       /* reloc->r_addend */
+> +       stwx    r0,r7,r6
+> +       addi    r9,r9,24
+> +
+> +7:     bdnz    5b
+> +       blr
+>
+> -6:     blr
+>
+>  .balign 8
+>  p_dyn: .llong  __dynamic_start - 0b
+> """
+>
+> Note that the loop no longer terminates at the first
+> non-R_PPC64_RELATIVE relocation, but that seems safer to me in any
+> case. It simply stores the value of r_addend at r_offset, which is the
+> correct thing to do for R_PPC64_ADDR32 relocations against the *ABS*
+> section, regardless of whether we are dealing with CRCs or something
+> else. Note that the comparison above will fail for R_PPC64_ADDR32
+> relocations against named symbols, since we compare the entire r_info
+> field and not just the type (as the comment a few lines higher up
+> suggests)
+>
+> Also a fix for relocs_check.sh:
+>
+> """
+> diff --git a/arch/powerpc/relocs_check.sh b/arch/powerpc/relocs_check.sh
+> index ec2d5c835170..2f510fbc87da 100755
+> --- a/arch/powerpc/relocs_check.sh
+> +++ b/arch/powerpc/relocs_check.sh
+> @@ -43,7 +43,8 @@ R_PPC_ADDR16_HA
+>  R_PPC_RELATIVE
+>  R_PPC_NONE' |
+>         grep -E -v '\<R_PPC64_ADDR64[[:space:]]+mach_' |
+> -       grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_'
+> +       grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_' |
+> +       grep -E -v '\<R_PPC64_ADDR32[[:space:]]+\*ABS\*'
+>  )
+>
+>  if [ -z "$bad_relocs" ]; then
+> """
+>
+> If these changes work for PPC, I think we should fold them in.
+> Hopefully, GNU ld for PPC will gain that ability to resolve absolute
+> relocations at build time (like other architectures), and then the
+> R_PPC64_ADDR32 handling will simply become dead code. In any case, it
+> is an improvement over the mangling of CRC values to undo the runtime
+> relocation, imo.
+>
 
-Have PCI-E assume control of the firmware specified default mapping by
-setting the value of the bridge window to match the firmware mapping.
+I have spent some more time looking into this, and it seems impossible
+to coerce the powerpc linker into resolving relocations against build
+time absolute constants at build time.
 
-Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
----
- drivers/bus/mvebu-mbus.c     | 36 ++++++++++++++++++++++++++++++++++++
- drivers/pci/host/pci-mvebu.c | 22 ++++++++++++++++++++++
- include/linux/mbus.h         |  3 +++
- 3 files changed, 61 insertions(+)
+Interestingly, the CONFIG_MODVERSIONS + CONFIG_RELOCATABLE issue
+exists on PPC32 as well, i.e., commit 0e0ed6406e61 ("powerpc/modules:
+Module CRC relocation fix causes perf issues") reintroduced it on
+PPC32 by making the fix PPC64 specific.
 
-In the DT this could look like:
+I think the fact that relocations against *ABS* symbols are converted
+into R_PPC[64]_RELATIVE relocations is a linker bug. I spotted
+something similar on arm64 a while ago
 
-	mbus {
-		ranges = <MBUS_ID(0x04, 0xe8) 0 0xe0000000 0x8000000 /* PEX 0 MEM */
-		pex@e0000000 {
-			compatible = "marvell,kirkwood-pcie";
-			ranges = <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000 /* Controller regs */
-				  0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-				  >;
-			pcie at 1,0 {
-				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0>;
-				reg = <0x0800 0 0  0 0>; // 0000:00:01.0
+https://lists.gnu.org/archive/html/bug-binutils/2016-07/msg00087.html
 
-				device at 0 {
-					reg = <0x0 0 0	0 0>; // 0000:01:00.0
-					ranges = <0x00000000  0x82000000 0x00000000 0x00000000	0x8000000>;
+but this has not been fixed yet either.
 
-Which is basically the OF way to describe PCI devices downstream of
-the interface and give information about what their BARs should be.
-
-This is useful if there is even more DT stuff below the explicitly
-declared device as it allows standard DT address translation to work
-properly.
-
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index c7f396903184..ce0ac5049c1f 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -922,6 +922,42 @@ int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
- 						 size, MVEBU_MBUS_NO_REMAP);
- }
- 
-+/**
-+ * mvebu_mbus_get_single_window_by_id() - return the location of the window if
-+ * the target/attribute has a single enabled mapping.
-+ *
-+ * RETURNS:
-+ *	-ENODEV if no mapping and -E2BIG if there is more than one mapping
-+ */
-+int mvebu_mbus_get_single_window_by_id(unsigned int target,
-+				       unsigned int attribute,
-+				       phys_addr_t *base, phys_addr_t *size)
-+{
-+	unsigned int win;
-+	unsigned int count = 0;
-+
-+	for (win = 0; win < mbus_state.soc->num_wins; win++) {
-+		u64 wbase;
-+		u32 wsize;
-+		u8 wtarget, wattr;
-+		int enabled;
-+
-+		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
-+				       &wsize, &wtarget, &wattr, NULL);
-+		if (enabled && wtarget == target && wattr == attribute) {
-+			*base = wbase;
-+			*size = wsize;
-+			count++;
-+		}
-+	}
-+
-+	if (count == 1)
-+		return 0;
-+	if (count == 0)
-+		return -ENODEV;
-+	return -E2BIG;
-+}
-+
- int mvebu_mbus_del_window(phys_addr_t base, size_t size)
- {
- 	int win;
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 307f81d6b479..5d5a2687b73e 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -464,6 +464,8 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
- static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
- {
- 	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
-+	int rc;
-+	phys_addr_t base, size;
- 
- 	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
- 
-@@ -480,6 +482,26 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
- 
- 	/* Add capabilities */
- 	bridge->status = PCI_STATUS_CAP_LIST;
-+
-+	/*
-+	 * If the firmware has already setup a window for PCIe then assume
-+	 * control of it by defaulting the BAR to the window setting.
-+	 */
-+	rc = mvebu_mbus_get_single_window_by_id(port->mem_target,
-+						port->mem_attr, &base, &size);
-+	if (rc == -E2BIG)
-+		pr_err(FW_BUG "%s: Too many pre-existing mbus mappings\n",
-+		       port->dn->name);
-+	if (!rc) {
-+		if ((base & 0xFFFFF) != 0 || ((size + base) & 0xFFFFF) != 0)
-+			pr_err(FW_BUG "%s: Invalid pre-existing mbus mapping\n",
-+			       port->dn->name);
-+		port->memwin_base = base;
-+		port->memwin_size = size;
-+		port->bridge.membase = (base >> 16) & 0xFFF0;
-+		port->bridge.memlimit = ((size - 1 + base) >> 16) & 0xFFF0;
-+		port->bridge.command |= PCI_COMMAND_MEMORY;
-+	}
- }
- 
- /*
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index d610232762e3..dfafc27b41b5 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -83,5 +83,8 @@ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
- 		    size_t sdram_size);
- int mvebu_mbus_dt_init(bool is_coherent);
-+int mvebu_mbus_get_single_window_by_id(unsigned int target,
-+				       unsigned int attribute,
-+				       phys_addr_t *base, phys_addr_t *size);
- 
- #endif /* __LINUX_MBUS_H */
--- 
-2.1.4
+Having to deal with toolchain bugs when working on issues like these
+is always a bit annoying, so I wonder what your take is on the PPC32
+issue. If nobody cares about CONFIG_RELOCATABLE on PPC32, perhaps it
+could be made mutually exclusive with CONFIG_MODVERSIONS on 32-bit
+PPC.
