@@ -1,108 +1,106 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 25 Oct 2016 19:35:11 -0700
-Subject: [PATCH] ARM: imx6: Fix GPC probe error path
-In-Reply-To: <1477416878-30353-1-git-send-email-linux@roeck-us.net>
-References: <1477416878-30353-1-git-send-email-linux@roeck-us.net>
-Message-ID: <39c26009-8e50-d182-dbfd-49f44cb9402a@roeck-us.net>
+From: zourongrong@gmail.com (Rongrong Zou)
+Date: Wed, 26 Oct 2016 10:36:57 +0800
+Subject: [PATCH v5 0/9] Add DRM driver for Hisilicon Hibmc
+Message-ID: <1477449426-69018-1-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2016 10:34 AM, Guenter Roeck wrote:
-> GPC may fail to instantiate with
->
-> imx-gpc: probe of 20dc000.gpc failed with error -22
->
-> which is returned from of_genpd_add_provider_onecell(). The error path
-> does not call pm_genpd_remove(). This results in the following crash
-> later on.
->
-> Unhandled fault: page domain fault (0x01b) at 0x00000040
-> pgd = c0204000
-> [00000040] *pgd=00000000
-> Internal error: : 1b [#1] SMP ARM
-> Modules linked in:
-> CPU: 0 PID: 108 Comm: kworker/0:3 Not tainted 4.9.0-rc2 #8
-> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-> Workqueue: pm genpd_power_off_work_fn
-> task: c759ea00 task.stack: c766a000
-> PC is at mutex_lock+0xc/0x4c
-> LR is at regulator_disable+0x28/0x64
-> ...
-> [<c0bc2694>] (mutex_lock) from [<c06e4e8c>] (regulator_disable+0x28/0x64)
-> [<c06e4e8c>] (regulator_disable) from [<c0323b68>] (imx6q_pm_pu_power_off+0x90/0x98)
-> [<c0323b68>] (imx6q_pm_pu_power_off) from [<c07efb04>] (genpd_poweroff+0x114/0x1d4)
-> [<c07efb04>] (genpd_poweroff) from [<c07efdc0>] (genpd_power_off_work_fn+0x20/0x2c)
-> [<c07efdc0>] (genpd_power_off_work_fn) from [<c0358f70>] (process_one_work+0x138/0x34c)
-> [<c0358f70>] (process_one_work) from [<c03591bc>] (worker_thread+0x38/0x510)
-> [<c03591bc>] (worker_thread) from [<c035e48c>] (kthread+0xdc/0xf4)
-> [<c035e48c>] (kthread) from [<c0307eb8>] (ret_from_fork+0x14/0x3c)
->
-> This is seen with multi_v7_defconfig and imx6dl-sabrelite.dtb running in
-> qemu (v2.7 patched to fix a qemu related problem). The error return from
-> of_genpd_add_provider_onecell() is not seen in v4.8 and may be caused by
-> a devicetree change (this is a wild guess only), but that is a different
-> problem.
->
-> Fixes: 00eb60a8b4f7 ("ARM: imx6: gpc: Add PU power domain for GPU/VPU")
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> Several bisect attempts trying to track down "imx-gpc: probe ... failed
-> with error -22" point to commit 00e729c93395 ("Merge tag 'armsoc-dt' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc"). I have not
-> been able to track down the real culprit. Part of the problem is that
-> CONFIG_REGULATOR_ANATOP must be enabled for the problem to be seen, and
-> CONFIG_ARCH_AT91 causes compile errors for some sequence of commits between
-> v4.8 and v4.9-rc1. But even after taking this into account, the bisect
-> results always point to 00e729c93395. If anyone has an idea how to track
-> down that problem, or what might be causing it, please let me know.
->
+This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
+BMC SoC with a display controller intergrated, usually it is used on
+server for Out-of-band management purpose. In this patch set, we just
+support basic function for Hibmc display subsystem. Hibmc display
+subsystem is connected to host CPU by PCIe as blow:
 
-Looking into this some more, it turns out that of_genpd_add_provider_onecell()
-now returns an error if one of the provided power domains does not exist.
-In this case, the "ARM" power domain does not exist. I don't see where it is
-created, so it may well be that this now fails for all imx6 boards with
-multi_v7_defconfig. Looking into kernelci.org test results, this is confirmed
-for at least imx6dl-riotboard. Overall I think it is quite safe to assume
-that all imx6 boards crash with mainline kernels and multi_v7_defconfig.
++----------+       +----------+
+|          | PCIe  |  Hibmc   |
+|host CPU( |<----->| display  |
+|arm64,x86)|       |subsystem |
++----------+       +----------+
 
-The change can be tracked down to commit 0159ec67076 ("PM / Domains: Verify
-the PM domain is present when adding a provider"). Adding everyone in the
-commit log for feedback.
+Hardware Detail for Hibmc display subsystem
+-----------
 
-Guenter
+  The display subsystem of Hibmc is show as bellow:
+  +----+      +----+      +----+     +--------+
+  |    |      |    |      |    |     |        |
+  | FB |----->| DE |----->|VDAC|---->|external|
+  |    |      |    |      |    |     | VGA    |
+  +----+      +----+      +----+     +--------+
 
->  arch/arm/mach-imx/gpc.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 0df062d8b2c9..f3f40045b4c9 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -409,6 +409,7 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
->  {
->  	struct clk *clk;
->  	int i;
-> +	int ret;
->
->  	imx6q_pu_domain.reg = pu_reg;
->
-> @@ -431,9 +432,14 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
->  		return 0;
->
->  	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
-> -	return of_genpd_add_provider_onecell(dev->of_node,
-> -					     &imx_gpc_onecell_data);
-> +	ret = of_genpd_add_provider_onecell(dev->of_node,
-> +					    &imx_gpc_onecell_data);
-> +	if (ret)
-> +		goto genpd_remove;
-> +	return 0;
->
-> +genpd_remove:
-> +	pm_genpd_remove(&imx6q_pu_domain.base);
->  clk_err:
->  	while (i--)
->  		clk_put(imx6q_pu_domain.clk[i]);
->
+  -DE(Display Engine) is the display controller.
+  -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
+  stream from DE to VGA analog signals.
+
+Change History
+------------
+
+Changes in v5:
+  -rebase on v4.9-rc2.
+  -replace drm_fb_helper_set_suspend() with 
+   drm_fb_helper_set_suspend_unlocked(), remove redundant console_lock() 
+   and console_unlock(). 
+
+Changes in v4:
+  -remove unused include files, and include header file when it is needed.
+  -remove unused FLAG in Kconfig: DRM_GEM_CMA_HELPER/DRM_KMS_CMA_HELPER.
+  -remove drm_helper_disable_unused_functions, since we use DRIVER_ATOMIC.
+
+Changes in v3:
+  -enable KMS, in v2, only fbdev is enabled.
+  -management video memory with ttm.
+  -add vblank interrupt.
+  -remove drm_connector_register_all() and drm_connector_unregister_all().
+  -I have a basic test with igt.
+
+Changes in v2:
+  -Remove self-defined macros for bit operations.
+  -Remove unused register.
+  -Replace those deprecated functions with new version of them.
+  -use drm_connector_register_all() to register connector after
+   drm_dev_register().
+
+The patch v2 is at
+https://lists.freedesktop.org/archives/dri-devel/2016-May/108661.html
+
+Rongrong Zou (9):
+  drm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
+  drm/hisilicon/hibmc: Add video memory management
+  drm/hisilicon/hibmc: Add support for frame buffer
+  drm/hisilicon/hibmc: Add plane for DE
+  drm/hisilicon/hibmc: Add crtc for DE
+  drm/hisilicon/hibmc: Add encoder for VDAC
+  drm/hisilicon/hibmc: Add connector for VDAC
+  drm/hisilicon/hibmc: Add vblank interruput
+  MAINTAINERS: Update HISILICON DRM entries
+
+ MAINTAINERS                                       |   1 +
+ drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
+ drivers/gpu/drm/hisilicon/Makefile                |   1 +
+ drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   9 +
+ drivers/gpu/drm/hisilicon/hibmc/Makefile          |   5 +
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 488 +++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h    |  29 ++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 410 ++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   | 117 +++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 256 ++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c |  85 ++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h |  28 ++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 212 ++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 165 +++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       | 563 ++++++++++++++++++++++
+ 15 files changed, 2370 insertions(+)
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
+
+-- 
+1.9.1
