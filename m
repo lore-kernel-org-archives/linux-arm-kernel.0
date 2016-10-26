@@ -1,46 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Oct 2016 14:45:57 +0100
-Subject: [PATCH v2] clocksource/arm_arch_timer: Map frame with
- of_io_request_and_map()
-In-Reply-To: <20161026073550.22918-1-sboyd@codeaurora.org>
-References: <20161026073550.22918-1-sboyd@codeaurora.org>
-Message-ID: <73f48436-c2b7-3c01-dc2c-f01cee03e20d@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 26 Oct 2016 21:53:38 +0800
+Subject: [PATCH 4/7] ARM: dts: add I2SE Duckbill common definitions
+In-Reply-To: <1477164150-13553-5-git-send-email-mhei@heimpold.de>
+References: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
+ <1477164150-13553-5-git-send-email-mhei@heimpold.de>
+Message-ID: <20161026135338.GP30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/16 08:35, Stephen Boyd wrote:
-> Let's use the of_io_request_and_map() API so that the frame
-> region is protected and shows up in /proc/iomem.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Changes from v1:
->  * Check for IS_ERR instead
-> 
->  drivers/clocksource/arm_arch_timer.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 73c487da6d2a..723cc924d8d1 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -964,8 +964,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
->  	}
->  
->  	ret= -ENXIO;
-> -	base = arch_counter_base = of_iomap(best_frame, 0);
-> -	if (!base) {
-> +	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
-> +							 "arch_mem_timer");
-> +	if (IS_ERR(base)) {
->  		pr_err("arch_timer: Can't map frame's registers\n");
->  		goto out;
->  	}
-> 
+On Sat, Oct 22, 2016 at 09:22:27PM +0200, Michael Heimpold wrote:
+> +			pinctrl at 80018000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&hog_pins_a>;
+> +
+> +				mac0_phy_reset_pin: mac0_phy_reset_pin at 0 {
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Please use hyphen instead of underscore in node name.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Shawn
+
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						MX28_PAD_GPMI_ALE__GPIO_0_26    /* PHY Reset */
+> +					>;
+> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
+> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+> +					fsl,pull-up = <MXS_PULL_DISABLE>;
+> +				};
