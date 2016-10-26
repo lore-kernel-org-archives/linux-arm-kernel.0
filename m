@@ -1,50 +1,24 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Oct 2016 11:37:39 +0100
-Subject: [PATCH] iommu/arm-smmu: Expunge redundant iommu_present() checks
-Message-ID: <fc2d2a1c58af73c74584bb830f50b4626b52ff63.1477478259.git.robin.murphy@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 16:07:29 +0530
+Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
+In-Reply-To: <1477418044-24603-1-git-send-email-david@lechnology.com>
+References: <1477418044-24603-1-git-send-email-david@lechnology.com>
+Message-ID: <f423a705-5ae2-78cf-2b63-609dd4e2cdf6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first thing bus_set_iommu() does is check if iommu_ops are already
-installed on the given bus, and immediately return -EBUSY if so. Since
-the return value makes no difference as we ignore it anyway, there is
-no need to redundantly duplicate that check by explicitly calling
-iommu_present() beforehand.
+On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
+> This fixes pwm name matching for DA850 familiy devices. When using device
+> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
+> same name, which caused errors when trying to register the devices.
+> 
+> The names for clock matching in da850_clks[] also have to be updated to
+> to exactly match in order for the clock lookup to work correctly.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-This does bring the slight change that we may now end up calling
-pci_request_acs() multiple times, but as that does nothing but set a
-variable to 1, the impact should be effectively zero.
+Applied to "fixes" branch. Will send upstream after testing a bit and
+also waiting to see if anyone else has any comments.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 12 ++++--------
- 1 file changed, 4 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index c841eb7a1a74..ef978db2bb54 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2000,17 +2000,13 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	arm_smmu_device_reset(smmu);
- 
- 	/* Oh, for a proper bus abstraction */
--	if (!iommu_present(&platform_bus_type))
--		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
-+	bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
- #ifdef CONFIG_ARM_AMBA
--	if (!iommu_present(&amba_bustype))
--		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-+	bus_set_iommu(&amba_bustype, &arm_smmu_ops);
- #endif
- #ifdef CONFIG_PCI
--	if (!iommu_present(&pci_bus_type)) {
--		pci_request_acs();
--		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
--	}
-+	pci_request_acs();
-+	bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
- #endif
- 	return 0;
- }
--- 
-1.9.1
+Thanks,
+Sekhar
