@@ -1,102 +1,49 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 26 Oct 2016 18:41:43 +0100
-Subject: [PATCH v2 3/8] perf/trace: Add notification for perf trace events
+Date: Wed, 26 Oct 2016 18:41:45 +0100
+Subject: [PATCH v2 5/8] KVM: Add event to trace tlb invalidations
 In-Reply-To: <20161026174148.17172-1-punit.agrawal@arm.com>
 References: <20161026174148.17172-1-punit.agrawal@arm.com>
-Message-ID: <20161026174148.17172-4-punit.agrawal@arm.com>
+Message-ID: <20161026174148.17172-6-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a mechanism to notify listeners about perf trace event state
-changes. This enables listeners to take actions requiring the event
-context (e.g., attached process).
-
-The notification mechanism can be used to reduce trace point based
-profiling overhead by enabling/disabling hardware traps for specific
-contexts (e.g., virtual machines).
+As TLB operations can have an impact on system performance, add a trace
+event to enable monitoring of guest TLB maintenance operations.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Jiri Olsa <jolsa@kernel.org>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
 ---
- include/linux/trace_events.h    |  3 +++
- kernel/trace/trace_event_perf.c | 24 ++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+ include/trace/events/kvm.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/include/linux/trace_events.h b/include/linux/trace_events.h
-index be00761..5924032 100644
---- a/include/linux/trace_events.h
-+++ b/include/linux/trace_events.h
-@@ -505,6 +505,9 @@ perf_trace_buf_submit(void *raw_data, int size, int rctx, u16 type,
- {
- 	perf_tp_event(type, count, raw_data, size, regs, head, rctx, task);
- }
+diff --git a/include/trace/events/kvm.h b/include/trace/events/kvm.h
+index 8ade3eb..4b3d07e 100644
+--- a/include/trace/events/kvm.h
++++ b/include/trace/events/kvm.h
+@@ -393,6 +393,23 @@ TRACE_EVENT(kvm_halt_poll_ns,
+ #define trace_kvm_halt_poll_ns_shrink(vcpu_id, new, old) \
+ 	trace_kvm_halt_poll_ns(false, vcpu_id, new, old)
+ 
++TRACE_EVENT(kvm_tlb_invalidate,
++	TP_PROTO(unsigned long vcpu_pc, u32 opcode),
++	TP_ARGS(vcpu_pc, opcode),
 +
-+extern int perf_trace_notifier_register(struct notifier_block *nb);
-+extern int perf_trace_notifier_unregister(struct notifier_block *nb);
- #endif
- 
- #endif /* _LINUX_TRACE_EVENT_H */
-diff --git a/kernel/trace/trace_event_perf.c b/kernel/trace/trace_event_perf.c
-index 562fa69..9aaaacf 100644
---- a/kernel/trace/trace_event_perf.c
-+++ b/kernel/trace/trace_event_perf.c
-@@ -6,10 +6,12 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/notifier.h>
- #include <linux/kprobes.h>
- #include "trace.h"
- 
- static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
-+static RAW_NOTIFIER_HEAD(perf_trace_notifier_list);
- 
- /*
-  * Force it to be aligned to unsigned long to avoid misaligned accesses
-@@ -86,6 +88,26 @@ static int perf_trace_event_perm(struct trace_event_call *tp_event,
- 	return 0;
- }
- 
-+int perf_trace_notifier_register(struct notifier_block *nb)
-+{
-+	return raw_notifier_chain_register(&perf_trace_notifier_list, nb);
-+}
++	TP_STRUCT__entry(
++		__field(unsigned long, vcpu_pc)
++		__field(u32, opcode)
++	),
 +
-+int perf_trace_notifier_unregister(struct notifier_block *nb)
-+{
-+	return raw_notifier_chain_unregister(&perf_trace_notifier_list, nb);
-+}
++	TP_fast_assign(
++		__entry->vcpu_pc = vcpu_pc;
++		__entry->opcode = opcode;
++	),
 +
-+static void perf_trace_notify(enum trace_reg event, struct perf_event *p_event)
-+{
-+	/*
-+	 * We use raw notifiers here as we are called with the
-+	 * event_mutex held.
-+	 */
-+	raw_notifier_call_chain(&perf_trace_notifier_list,
-+				     event, p_event);
-+}
++	TP_printk("vcpu_pc=0x%16lx opcode=%08x", __entry->vcpu_pc, __entry->opcode)
++);
 +
- static int perf_trace_event_reg(struct trace_event_call *tp_event,
- 				struct perf_event *p_event)
- {
-@@ -176,6 +198,7 @@ static void perf_trace_event_unreg(struct perf_event *p_event)
- static int perf_trace_event_open(struct perf_event *p_event)
- {
- 	struct trace_event_call *tp_event = p_event->tp_event;
-+	perf_trace_notify(TRACE_REG_PERF_OPEN, p_event);
- 	return tp_event->class->reg(tp_event, TRACE_REG_PERF_OPEN, p_event);
- }
+ #endif /* _TRACE_KVM_MAIN_H */
  
-@@ -183,6 +206,7 @@ static void perf_trace_event_close(struct perf_event *p_event)
- {
- 	struct trace_event_call *tp_event = p_event->tp_event;
- 	tp_event->class->reg(tp_event, TRACE_REG_PERF_CLOSE, p_event);
-+	perf_trace_notify(TRACE_REG_PERF_CLOSE, p_event);
- }
- 
- static int perf_trace_event_init(struct trace_event_call *tp_event,
+ /* This part must be outside protection */
 -- 
 2.9.3
