@@ -1,52 +1,109 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 26 Oct 2016 08:49:41 +0200
-Subject: [PATCH v2] staging: vc04_services: Replace dmac_map_area with
- dmac_map_sg
-In-Reply-To: <20161026022327.19055-1-mzoran@crowfest.net>
-References: <20161026022327.19055-1-mzoran@crowfest.net>
-Message-ID: <20161026064941.GB10572@kroah.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 26 Oct 2016 08:52:09 +0200
+Subject: [PATCH] tty/serial: at91: fix hardware handshake on Atmel
+ platforms
+In-Reply-To: <20161025162247.phhevbtd6dsmknbr@piout.net>
+References: <20161025161135.7316-1-richard.genoud@gmail.com>
+ <20161025162247.phhevbtd6dsmknbr@piout.net>
+Message-ID: <7fd48101-2948-6a83-5a0c-5669f3cbbe43@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 07:23:27PM -0700, Michael Zoran wrote:
-> The original arm implementation uses dmac_map_area which is not
-> portable.  Replace it with an architecture neutral version
-> which uses dma_map_sg.
+On 25/10/2016 18:22, Alexandre Belloni wrote:
+> Hi,
 > 
-> As you can see that for larger page sizes, the dma_map_sg
-> implementation is faster then the original unportable dma_map_area
-> implementation.
+> On 25/10/2016 at 18:11:35 +0200, Richard Genoud wrote :
+>> commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+>> hardware handshake is enabled"), despite its title, broke hardware
+>> handshake on *every* Atmel platforms.
+>>
+>> The only one partially working is the SAMA5D2.
+>>
 > 
-> Test                       dmac_map_area   dma_map_page dma_map_sg
-> vchiq_test -b 4 10000      51us/iter       76us/iter    76us
-> vchiq_test -b 8 10000      70us/iter       82us/iter    91us
-> vchiq_test -b 16 10000     94us/iter       118us/iter   121us
-> vchiq_test -b 32 10000     146us/iter      173us/iter   187us
-> vchiq_test -b 64 10000     263us/iter      328us/iter   299us
-> vchiq_test -b 128 10000    529us/iter      631us/iter   595us
-> vchiq_test -b 256 10000    2285us/iter     2275us/iter  2001us
-> vchiq_test -b 512 10000    4372us/iter     4616us/iter  4123us
+> [...]
 > 
-> For message sizes >= 64KB, dma_map_sg is faster then dma_map_page.
+>> Changes since v4:
+>>  - the mctrl_gpio_use_rtscts() is gone since it was atmel_serial
+>>  specific. (so patch 1 is gone)
+>>  - patches 2 and 3 have been merged together since it didn't make
+>>  a lot of sense to correct the GPIO case in one separate patch.
+>>  - ATMEL_US_USMODE_HWHS is now unset for platform with PDC
+>>
+>> Changes since v3:
+>>  - remove superfluous #include <linux/err.h> (thanks to Uwe)
+>>  - rebase on next-20160930
+>>
+>> Changes since v2:
+>>  - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
+>>  - fix typos in patch 2/3
+>>  - rebase on next-20160927
+>>  - simplify the logic in patch 3/3.
+>>
+>> Changes since v1:
+>>  - Correct patch 1 with the error found by kbuild.
+>>  - Add Alexandre's Acked-by on patch 2
+>>  - Rewrite patch 3 logic in the light of the on-going discussion
+>>    with Cyrille and Alexandre.
+>>
 > 
-> For message size >= 256KB, the dma_map_sg is the fastest
-> implementation.
-> 
-> "Normal" messages sizes should be about 1MB which is beyond
-> the length that this change shows a speed increase.
-> 
-> This is v2 of the patch which includes extra WARN_ONs and
-> incorporates feedback from Eric Anholt <eric@anholt.net>.
-> 
-> Signed-off-by: Michael Zoran <mzoran@crowfest.net>
-> ---
->  .../interface/vchiq_arm/vchiq_2835_arm.c           | 152 +++++++++++++--------
->  1 file changed, 93 insertions(+), 59 deletions(-)
+> The changelog has to go after the --- marker.
 
-Nice work!
-
-I'd like to get an ack from Eric before applying it...
-
-thanks,
-
-greg k-h
+You're right.
+thanks !
+>> * the list may not be exhaustive
+>>
+>> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> 
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+>> ---
+>>  drivers/tty/serial/atmel_serial.c | 25 +++++++++++++++++++++----
+>>  1 file changed, 21 insertions(+), 4 deletions(-)
+>>
+>>  I think this should go in the stable tree since it fixes the flow
+>>  control broken since v4.0.
+>>  But It won't compile on versions before 4.9rc1 because:
+>>  function atmel_use_fifo was introduced in 4.4.12 / 4.7
+>>  variable atmel_port was introduced in 4.9rc1
+>>
+>>  That's why I didn't add the Cc stable in the email body.
+>>
+>>
+>> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+>> index fd8aa1f4ba78..2c7c45904ba7 100644
+>> --- a/drivers/tty/serial/atmel_serial.c
+>> +++ b/drivers/tty/serial/atmel_serial.c
+>> @@ -2132,11 +2132,28 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>>  		mode |= ATMEL_US_USMODE_RS485;
+>>  	} else if (termios->c_cflag & CRTSCTS) {
+>>  		/* RS232 with hardware handshake (RTS/CTS) */
+>> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+>> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+>> -			termios->c_cflag &= ~CRTSCTS;
+>> -		} else {
+>> +		if (atmel_use_fifo(port) &&
+>> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
+>> +			/*
+>> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
+>> +			 * be able to drive the RTS pin high/low when the RX
+>> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
+>> +			 * It will also disable the transmitter when the CTS
+>> +			 * pin is high.
+>> +			 * This mode is not activated if CTS pin is a GPIO
+>> +			 * because in this case, the transmitter is always
+>> +			 * disabled.
+>> +			 * If the RTS pin is a GPIO, the controller won't be
+>> +			 * able to drive it according to the FIFO thresholds,
+>> +			 * but it will be handled by the driver.
+>> +			 */
+>>  			mode |= ATMEL_US_USMODE_HWHS;
+>> +		} else {
+>> +			/*
+>> +			 * For platforms without FIFO, the flow control is
+>> +			 * handled by the driver.
+>> +			 */
+>> +			mode |= ATMEL_US_USMODE_NORMAL;
+>>  		}
+>>  	} else {
+>>  		/* RS232 without hadware handshake */
+> 
