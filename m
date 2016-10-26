@@ -1,149 +1,71 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 26 Oct 2016 10:22:52 -0700
-Subject: [PATCH v3] drivers: psci: PSCI checker module
-In-Reply-To: <20161026171006.GA16248@red-moon>
-References: <20161020145115.6326-1-kevin.brodsky@arm.com>
- <20161025154535.GA3107@red-moon>
- <20161025183436.GF3716@linux.vnet.ibm.com>
- <20161026131752.GA15478@red-moon>
- <20161026151858.GQ3716@linux.vnet.ibm.com>
- <20161026171006.GA16248@red-moon>
-Message-ID: <20161026172252.GV3716@linux.vnet.ibm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Oct 2016 18:24:03 +0100
+Subject: [PATCH 1/2] ARM: dma-mapping: Support cache sync after
+ arm_dma_get_sgtable
+In-Reply-To: <1477501448-30915-2-git-send-email-thierry.escande@collabora.com>
+References: <1477501448-30915-1-git-send-email-thierry.escande@collabora.com>
+ <1477501448-30915-2-git-send-email-thierry.escande@collabora.com>
+Message-ID: <3c46b9df-7024-82bf-6360-01663a5edf43@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Oct 26, 2016 at 08:18:58AM -0700, Paul E. McKenney wrote:
-> > On Wed, Oct 26, 2016 at 02:17:52PM +0100, Lorenzo Pieralisi wrote:
-> > > On Tue, Oct 25, 2016 at 11:34:36AM -0700, Paul E. McKenney wrote:
-> > > 
-> > > [...]
-> > > 
-> > > > > > +static int __init psci_checker(void)
-> > > > > > +{
-> > > > > > +	int ret;
-> > > > > > +
-> > > > > > +	/*
-> > > > > > +	 * Since we're in an initcall, we assume that all the CPUs that all
-> > > > > > +	 * CPUs that can be onlined have been onlined.
-> > > > > > +	 *
-> > > > > > +	 * The tests assume that hotplug is enabled but nobody else is using it,
-> > > > > > +	 * otherwise the results will be unpredictable. However, since there
-> > > > > > +	 * is no userspace yet in initcalls, that should be fine.
-> > > > > 
-> > > > > I do not think it is. If you run a kernel with, say,
-> > > > > CONFIG_LOCK_TORTURE_TEST, cpus may disappear from the radar while
-> > > > > running the PSCI checker test itself; that at least would confuse the
-> > > > > checker, and that's just an example.
-> > > > > 
-> > > > > I added Paul to check what are the assumptions behind the torture test
-> > > > > hotplug tests, in particular if there are any implicit assumptions for
-> > > > > it to work (ie it is the only kernel test hotplugging cpus in and out
-> > > > > (?)), what I know is that the PSCI checker assumptions are not correct.
-> > > > 
-> > > > Both CONFIG_LOCK_TORTURE_TEST and CONFIG_RCU_TORTURE_TEST can and will
-> > > > hotplug CPUs.  The locktorture.onoff_holdoff and rcutorture.onoff_holdoff
-> > > > kernel parameters can delay the start of CPU-hotplug testing, and in
-> > > > my testing I set this delay to 30 seconds after boot.
-> > > > 
-> > > > One approach would be to make your test refuse to run if either of
-> > > > the lock/RCU torture tests was running.  Or do what Lorenzo suggests
-> > > > below.  The torture tests aren't crazy enough to offline the last CPU.
-> > > > Though they do try, just for effect, in cases where the last CPU is
-> > > > marked cpu_is_hotpluggable().  ;-)
-> > > 
-> > > Thank you Paul. I have an additional question though. Is there any
-> > > implicit assumption in LOCK/RCU torture tests whereby nothing else
-> > > in the kernel is hotplugging cpus in/out (through cpu_down()/up())
-> > > while they are running ?
-> > > 
-> > > I am asking because that's the main reason behind my query. Those tests
-> > > hotplug cpus in and out through cpu_down/up() but AFAICS nothing
-> > > prevents another piece of code in the kernel to call those functions and
-> > > the tests may just fail in that case (ie trying to cpu_down() a cpu
-> > > that is not online).
-> > > 
-> > > Are false negatives contemplated (or I am missing something) ?
-> > 
-> > The current code assumes nothing else doing CPU-hotplug operations,
-> > and will therefore print "RCU_HOTPLUG" error (or "LOCK_HOTPLUG" for
-> > locktorture) if any of the hotplug operations failed.
-> > 
-> > > I just would like to understand if what this patch currently does
-> > > is safe and sound. I think that calling cpu_down() and cpu_up()
-> > > is always safe, but the test can result in false negatives if
-> > > other kernel subsystems (eg LOCK torture test) are calling those
-> > > APIs in parallel (because cpu_down()/cpu_up() calls can fail - eg
-> > > trying to cpu_down() a cpu that is not online any longer, since it
-> > > was taken down by another kernel control path), that's the question
-> > > I have.
-> > 
-> > I am assuming that these added calls to cpu_down() and cpu_up() aren't
-> > enabled by default.  If they are, rcutorture and locktorture need some
-> > way to turn the off.
-> > 
-> > So maybe we need to have some sort of API that detects concurrent
-> > CPU-hotplug torturing?  Maybe something like the following?
-> > 
-> > 	static atomic_t n_cpu_hotplug_torturers;
-> > 	static atomic_t cpu_hotplug_concurrent_torture;
-> > 
-> > 	void torture_start_cpu_hotplug(void)
-> > 	{
-> > 		if (atomic_inc_return(&n_cpu_hotplug_torturers) > 1)
-> > 			atomic_inc(&cpu_hotplug_concurrent_torture);
-> > 	}
-> > 
-> > 	void torture_end_cpu_hotplug(void)
-> > 	{
-> > 		atomic_dec(&n_cpu_hotplug_torturers);
-> > 	}
-> > 
-> > 	bool torture_cpu_hotplug_was_concurrent(void)
-> > 	{
-> > 		return !!atomic_read(&cpu_hotplug_concurrent_torture);
-> > 	}
-> > 
-> > The locktorture and rcutorture code could then ignore CPU-hotplug
-> > errors that could be caused by concurrent access.  And complain
-> > bitterly about the concurrent access, of course!  ;-)
+On 26/10/16 18:04, Thierry Escande wrote:
+> From: Heng-Ruey Hsu <henryhsu@chromium.org>
 > 
-> This could do, even better if we extend the torture hotplug tests to
-> take a cpumask so that basically Kevin's patch will be based on torture
-> hotplug tests infrastructure :D (ie he/we wanted to hotplug a subset of
-> the online mask corresponding to a "cluster" of cpus, that's to test the
-> PSCI CPU ON/OFF firmware interface behind cpu hotplug operations).
+> Currently arm_dma_sync_sg_* require dma_address to do cache sync. But
+> dma address is set by map_sg(). We can't do cache sync after
+> arm_dma_get_sgtable. The behavior is different from iommu_ops.
 > 
-> Still, this implies logging every possible cpu_down()/cpu_up() caller
-> through torture_start_cpu_hotplug().
+> We don't have to get dma address in arm_dma_sync_sg_* and convert the
+> address to physical address in arm_dma_sync_single_*. With this change
+> sg_page() is used to get physical address and do sync directly.
 > 
-> What about userspace and sysfs interface that allow to offline cpus then ?
-> Point is, the torture hotplug tests take a snapshot of the maxcpu at
-> kthread init time and then randomize the logical cpu number, but it is
-> definitely possible unless I am mistaken that some of those cpus
-> disappear while the test is running and this will cause failures that
-> you can't detect through the API above.
+> Signed-off-by: Heng-Ruey Hsu <henryhsu@chromium.org>
+> Tested-by: Heng-ruey Hsu <henryhsu@chromium.org>
+> Reviewed-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Thierry Escande <thierry.escande@collabora.com>
+> ---
+>  arch/arm/mm/dma-mapping.c | 8 ++------
+>  1 file changed, 2 insertions(+), 6 deletions(-)
 > 
-> That's why I suggested using the:
-> 
-> freeze_secondary_cpus(int primary);
-> 
-> for this patch because that allows us to quiesce all cpus other than
-> primary at once, with no interference possible from other kernel control
-> paths (but it is not a perfect solution either).
-> 
-> Userspace notwithstanding, I think the best solution consists in either
-> making this patch hotplug tests work on top of the torture hotplug tests
-> API or solving the dependency at kconfig level by disabling the PSCI
-> checker if any of torture tests are enabled which is not ideal but
-> I do not see any other option.
-> 
-> Thanks a lot for your feedback, thoughts appreciated.
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index ab4f745..dc42ca6 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1120,13 +1120,11 @@ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+>  void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>  			int nents, enum dma_data_direction dir)
+>  {
+> -	struct dma_map_ops *ops = get_dma_ops(dev);
+>  	struct scatterlist *s;
+>  	int i;
+>  
+>  	for_each_sg(sg, s, nents, i)
+> -		ops->sync_single_for_cpu(dev, sg_dma_address(s), s->length,
+> -					 dir);
+> +		__dma_page_dev_to_cpu(sg_page(s), s->offset, s->length, dir);
 
-Let me ask the question more directly.
+This breaks dmabounce. The .sync_single_for_cpu implementation there is
+non-trivial.
 
-Why on earth are we trying to run these tests concurrently?
+Robin.
 
-After all, if we just run one at a time in isolation, there is no problem.
-
-							Thanx, Paul
+>  }
+>  
+>  /**
+> @@ -1139,13 +1137,11 @@ void arm_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg,
+>  void arm_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+>  			int nents, enum dma_data_direction dir)
+>  {
+> -	struct dma_map_ops *ops = get_dma_ops(dev);
+>  	struct scatterlist *s;
+>  	int i;
+>  
+>  	for_each_sg(sg, s, nents, i)
+> -		ops->sync_single_for_device(dev, sg_dma_address(s), s->length,
+> -					    dir);
+> +		__dma_page_cpu_to_dev(sg_page(s), s->offset, s->length, dir);
+>  }
+>  
+>  /*
+> 
