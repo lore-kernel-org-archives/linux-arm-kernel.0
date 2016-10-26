@@ -1,123 +1,64 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 26 Oct 2016 21:41:42 +0200
-Subject: [PATCH 4/9] ASoC: wm9713: add ac97 new bus support
-In-Reply-To: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1477510907-23495-5-git-send-email-robert.jarzmik@free.fr>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 26 Oct 2016 15:01:35 -0500
+Subject: [PATCH] ARM: davinci: register the usb20_phy clock on the DT file
+In-Reply-To: <20161026194916.14546-1-ahaslam@baylibre.com>
+References: <20161026194916.14546-1-ahaslam@baylibre.com>
+Message-ID: <f2aeafb1-38f4-9b1e-c3fd-a2984333d00f@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new ac97 bus model, where devices are automatically
-discovered on AC-Links.
+On 10/26/2016 02:49 PM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> The usb20_phy clock needs to be registered for the driver to be able
+> to get and enable a clock. Currently the usb phy clocks are registered
+> form board files, which will not be called during a device tree based
+> boot.
+>
+> To be able to probe correctly usb form a device tree boot, register
+> the usb phy clocks form the DT specific init.
+>
+> Unfourtunatly, davinci does not have proper clock support on device tree
+> yet, so by registering the clock form de DT specific file we are
+> forced to hardcode the parent clock, and cannot select refclkin as
+> parent for any of the phy clocks of the da850 family.
+>
+> As none of the current da850 based boards currently in mainline use
+> refclkin as source. I guess we can live with this limitation until clocks
+> are correctly represented through CCF/device tree.
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>
+> This patch depends on David's series for usb clocks:
+>
+> currently:
+> [PATCH v6 0/5] da8xx USB PHY platform devices and clocks
+> https://lkml.org/lkml/2016/10/25/867
+>
+>  arch/arm/mach-davinci/da8xx-dt.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index c9f7e92..7947267 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -45,6 +45,8 @@
+>
+>  static void __init da850_init_machine(void)
+>  {
+> +	da8xx_register_usb20_phy_clk(false);
+> +	da8xx_register_usb11_phy_clk(false);
+>  	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+>  }
+>
+>
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- sound/soc/codecs/Kconfig  |  3 ++-
- sound/soc/codecs/wm9713.c | 37 ++++++++++++++++++++++++++-----------
- 2 files changed, 28 insertions(+), 12 deletions(-)
 
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index c67667bb970f..c5871a299cfc 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -202,7 +202,7 @@ config SND_SOC_ALL_CODECS
- 	select SND_SOC_WM9090 if I2C
- 	select SND_SOC_WM9705 if SND_SOC_AC97_BUS
- 	select SND_SOC_WM9712 if SND_SOC_AC97_BUS
--	select SND_SOC_WM9713 if SND_SOC_AC97_BUS
-+	select SND_SOC_WM9713 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
-         help
-           Normally ASoC codec drivers are only built if a machine driver which
-           uses them is also built since they are only usable with a machine
-@@ -1061,6 +1061,7 @@ config SND_SOC_WM9712
- config SND_SOC_WM9713
- 	tristate
- 	select REGMAP_AC97
-+	select AC97_BUS_COMPAT if AC97_BUS_NEW
- 
- # Amp
- config SND_SOC_LM4857
-diff --git a/sound/soc/codecs/wm9713.c b/sound/soc/codecs/wm9713.c
-index e4301ddb1b84..2163232855cb 100644
---- a/sound/soc/codecs/wm9713.c
-+++ b/sound/soc/codecs/wm9713.c
-@@ -17,12 +17,15 @@
- 
- #include <linux/init.h>
- #include <linux/slab.h>
-+#include <linux/mfd/wm97xx.h>
- #include <linux/module.h>
- #include <linux/device.h>
- #include <linux/regmap.h>
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/ac97_codec.h>
-+#include <sound/ac97/codec.h>
-+#include <sound/ac97/compat.h>
- #include <sound/initval.h>
- #include <sound/pcm_params.h>
- #include <sound/tlv.h>
-@@ -38,6 +41,7 @@ struct wm9713_priv {
- 	u32 pll_in; /* PLL input frequency */
- 	unsigned int hp_mixer[2];
- 	struct mutex lock;
-+	struct wm97xx_platform_data *mfd_pdata;
- };
- 
- #define HPL_MIXER 0
-@@ -1207,15 +1211,21 @@ static int wm9713_soc_probe(struct snd_soc_codec *codec)
- 	struct wm9713_priv *wm9713 = snd_soc_codec_get_drvdata(codec);
- 	struct regmap *regmap;
- 
--	wm9713->ac97 = snd_soc_new_ac97_codec(codec, WM9713_VENDOR_ID,
--		WM9713_VENDOR_ID_MASK);
--	if (IS_ERR(wm9713->ac97))
--		return PTR_ERR(wm9713->ac97);
--
--	regmap = regmap_init_ac97(wm9713->ac97, &wm9713_regmap_config);
--	if (IS_ERR(regmap)) {
--		snd_soc_free_ac97_codec(wm9713->ac97);
--		return PTR_ERR(regmap);
-+	if (wm9713->mfd_pdata) {
-+		wm9713->ac97 = wm9713->mfd_pdata->ac97;
-+		regmap = wm9713->mfd_pdata->regmap;
-+	} else {
-+#ifdef CONFIG_SND_SOC_AC97_BUS
-+		wm9713->ac97 = snd_soc_new_ac97_codec(codec, WM9713_VENDOR_ID,
-+						      WM9713_VENDOR_ID_MASK);
-+		if (IS_ERR(wm9713->ac97))
-+			return PTR_ERR(wm9713->ac97);
-+		regmap = regmap_init_ac97(wm9713->ac97, &wm9713_regmap_config);
-+		if (IS_ERR(regmap)) {
-+			snd_soc_free_ac97_codec(wm9713->ac97);
-+			return PTR_ERR(regmap);
-+		}
-+#endif
- 	}
- 
- 	snd_soc_codec_init_regmap(codec, regmap);
-@@ -1230,8 +1240,12 @@ static int wm9713_soc_remove(struct snd_soc_codec *codec)
- {
- 	struct wm9713_priv *wm9713 = snd_soc_codec_get_drvdata(codec);
- 
--	snd_soc_codec_exit_regmap(codec);
--	snd_soc_free_ac97_codec(wm9713->ac97);
-+	if (!wm9713->mfd_pdata) {
-+		snd_soc_codec_exit_regmap(codec);
-+#ifdef CONFIG_SND_SOC_AC97_BUS
-+		snd_soc_free_ac97_codec(wm9713->ac97);
-+#endif
-+	}
- 	return 0;
- }
- 
-@@ -1262,6 +1276,7 @@ static int wm9713_probe(struct platform_device *pdev)
- 
- 	mutex_init(&wm9713->lock);
- 
-+	wm9713->mfd_pdata = dev_get_platdata(&pdev->dev);
- 	platform_set_drvdata(pdev, wm9713);
- 
- 	return snd_soc_register_codec(&pdev->dev,
--- 
-2.1.4
+You should check for error on return and print a warning if there is an 
+error. Like this: https://patchwork.kernel.org/patch/9395635/
+
+(I actually just had to make this change a few minutes ago to 
+troubleshoot a problem that I am working on. 
+da8xx_register_usb11_phy_clk() is failing for some reason that I have 
+not figured out yet.)
