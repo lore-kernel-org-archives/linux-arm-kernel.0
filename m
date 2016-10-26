@@ -1,30 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 26 Oct 2016 21:02:12 +0200
-Subject: [RFC PATCH 1/5] of: introduce the overlay manager
-In-Reply-To: <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <20161026145756.21689-2-antoine.tenart@free-electrons.com>
- <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
-Message-ID: <20161026210212.09cd85f4@free-electrons.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Wed, 26 Oct 2016 22:19:38 +0300
+Subject: MAINTAINERS entry for ARM/CLKDEV SUPPORT
+In-Reply-To: <20161010141819.GA1041@n2100.armlinux.org.uk>
+References: <20161010140810.GA30609@mwanda>
+ <20161010141819.GA1041@n2100.armlinux.org.uk>
+Message-ID: <20161026191938.GT4418@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 26 Oct 2016 10:29:59 -0600, Mathieu Poirier wrote:
-
-> > +       overlay = devm_kzalloc(dev, sizeof(*overlay), GFP_KERNEL);  
+On Mon, Oct 10, 2016 at 03:18:19PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Oct 10, 2016 at 05:08:10PM +0300, Dan Carpenter wrote:
+> > Hello Stephen Boyd,
 > 
-> Function devm_kzalloc() can sleep but you're holding a spinlock - I'm
-> surprised the kernel didn't complain here.  Allocate the memory before
-> holding the lock.  If the overly is already loaded simply free it on
-> the error path.
+> Okay, that's really not nice.
+> 
+> This is _not_ a question for Stephen.  Stephen does _not_ co-maintain
+> clkdev or the clk API, but co-maintains CCF.  I've no idea why you are
+> addressing this to Stephen when this is clearly a question for me to
+> answer.
+> 
 
-Actually, I'm not sure using a spinlock here is appropriate. Using a
-mutex would probably be better.
+Sorry, I didn't mean to offend.  He's the one who deleted the clkdev.h
+file though so I thought he might know if it should still be listed or
+if it was gone for good.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+The clkdev.c question was a throw away thing that occured to me before I
+hit send.
+
+regards,
+dan carpenter
