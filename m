@@ -1,93 +1,35 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 27 Oct 2016 05:06:26 +0800
-Subject: [rjarzmik:work/ac97 9/13] sound/arm/pxa2xx-ac97.c:34:34: error:
- passing argument 1 of 'pxa2xx_ac97_try_cold_reset' from incompatible pointer
- type
-Message-ID: <201610270521.fqOxW0kz%fengguang.wu@intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Oct 2016 14:31:31 -0700
+Subject: MAINTAINERS entry for ARM/CLKDEV SUPPORT
+In-Reply-To: <20161026191938.GT4418@mwanda>
+References: <20161010140810.GA30609@mwanda>
+ <20161010141819.GA1041@n2100.armlinux.org.uk> <20161026191938.GT4418@mwanda>
+Message-ID: <663e5d47-c2b5-c76f-01b4-0fb9a792acf6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/rjarzmik/linux work/ac97
-head:   223e9c527c425b1b519468e54fff9f4f82a7f390
-commit: 99ed942665174ff3212a5e2353a1dc2e6df76ff9 [9/13] ASoC: pxa: switch to new ac97 bus support
-config: arm-viper_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 99ed942665174ff3212a5e2353a1dc2e6df76ff9
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 10/26/2016 12:19 PM, Dan Carpenter wrote:
+> On Mon, Oct 10, 2016 at 03:18:19PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Oct 10, 2016 at 05:08:10PM +0300, Dan Carpenter wrote:
+>>> Hello Stephen Boyd,
+>> Okay, that's really not nice.
+>>
+>> This is _not_ a question for Stephen.  Stephen does _not_ co-maintain
+>> clkdev or the clk API, but co-maintains CCF.  I've no idea why you are
+>> addressing this to Stephen when this is clearly a question for me to
+>> answer.
+>>
+> Sorry, I didn't mean to offend.  He's the one who deleted the clkdev.h
+> file though so I thought he might know if it should still be listed or
+> if it was gone for good.
+>
 
-All errors (new ones prefixed by >>):
+Yes, the arm version isn't coming back. We should delete
+arch/arm/include/asm/clkdev.h from the maintainers file and perhaps
+replace it with the asm-generic one. But we can delete the generic file
+too once blackfin removes their clkdev.h header. That patch is still
+outstanding.
 
-   sound/arm/pxa2xx-ac97.c: In function 'pxa2xx_ac97_reset':
->> sound/arm/pxa2xx-ac97.c:34:34: error: passing argument 1 of 'pxa2xx_ac97_try_cold_reset' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     if (!pxa2xx_ac97_try_cold_reset(ac97)) {
-                                     ^~~~
-   In file included from sound/arm/pxa2xx-ac97.c:24:0:
-   include/sound/pxa2xx-lib.h:31:13: note: expected 'struct ac97_controller *' but argument is of type 'struct snd_ac97 *'
-    extern bool pxa2xx_ac97_try_cold_reset(struct ac97_controller *adrv);
-                ^~~~~~~~~~~~~~~~~~~~~~~~~~
->> sound/arm/pxa2xx-ac97.c:35:30: error: passing argument 1 of 'pxa2xx_ac97_try_warm_reset' from incompatible pointer type [-Werror=incompatible-pointer-types]
-      pxa2xx_ac97_try_warm_reset(ac97);
-                                 ^~~~
-   In file included from sound/arm/pxa2xx-ac97.c:24:0:
-   include/sound/pxa2xx-lib.h:30:13: note: expected 'struct ac97_controller *' but argument is of type 'struct snd_ac97 *'
-    extern bool pxa2xx_ac97_try_warm_reset(struct ac97_controller *adrv);
-                ^~~~~~~~~~~~~~~~~~~~~~~~~~
->> sound/arm/pxa2xx-ac97.c:38:27: error: passing argument 1 of 'pxa2xx_ac97_finish_reset' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     pxa2xx_ac97_finish_reset(ac97);
-                              ^~~~
-   In file included from sound/arm/pxa2xx-ac97.c:24:0:
-   include/sound/pxa2xx-lib.h:32:13: note: expected 'struct ac97_controller *' but argument is of type 'struct snd_ac97 *'
-    extern void pxa2xx_ac97_finish_reset(struct ac97_controller *adrv);
-                ^~~~~~~~~~~~~~~~~~~~~~~~
-   sound/arm/pxa2xx-ac97.c: At top level:
->> sound/arm/pxa2xx-ac97.c:42:10: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .read = pxa2xx_ac97_read,
-             ^~~~~~~~~~~~~~~~
-   sound/arm/pxa2xx-ac97.c:42:10: note: (near initialization for 'pxa2xx_ac97_ops.read')
-   sound/arm/pxa2xx-ac97.c:43:11: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     .write = pxa2xx_ac97_write,
-              ^~~~~~~~~~~~~~~~~
-   sound/arm/pxa2xx-ac97.c:43:11: note: (near initialization for 'pxa2xx_ac97_ops.write')
-   cc1: some warnings being treated as errors
-
-vim +/pxa2xx_ac97_try_cold_reset +34 sound/arm/pxa2xx-ac97.c
-
-a09e64fb Russell King            2008-08-05  28  #include <mach/audio.h>
-2c484df0 Takashi Iwai            2005-06-30  29  
-2c484df0 Takashi Iwai            2005-06-30  30  #include "pxa2xx-pcm.h"
-2c484df0 Takashi Iwai            2005-06-30  31  
-d18f8376 Takashi Iwai            2005-11-17  32  static void pxa2xx_ac97_reset(struct snd_ac97 *ac97)
-2c484df0 Takashi Iwai            2005-06-30  33  {
-9c636342 Dmitry Eremin-Solenikov 2008-09-10 @34  	if (!pxa2xx_ac97_try_cold_reset(ac97)) {
-9c636342 Dmitry Eremin-Solenikov 2008-09-10 @35  		pxa2xx_ac97_try_warm_reset(ac97);
-2c484df0 Takashi Iwai            2005-06-30  36  	}
-2c484df0 Takashi Iwai            2005-06-30  37  
-9c636342 Dmitry Eremin-Solenikov 2008-09-10 @38  	pxa2xx_ac97_finish_reset(ac97);
-2c484df0 Takashi Iwai            2005-06-30  39  }
-2c484df0 Takashi Iwai            2005-06-30  40  
-d18f8376 Takashi Iwai            2005-11-17  41  static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
-2c484df0 Takashi Iwai            2005-06-30 @42  	.read	= pxa2xx_ac97_read,
-2c484df0 Takashi Iwai            2005-06-30  43  	.write	= pxa2xx_ac97_write,
-2c484df0 Takashi Iwai            2005-06-30  44  	.reset	= pxa2xx_ac97_reset,
-2c484df0 Takashi Iwai            2005-06-30  45  };
-
-:::::: The code at line 34 was first introduced by commit
-:::::: 9c63634221f67450ead19820e33996b69691194f ALSA: Separate common pxa2xx-ac97 code
-
-:::::: TO: Dmitry Baryshkov <dbaryshkov@gmail.com>
-:::::: CC: Jaroslav Kysela <perex@perex.cz>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 18279 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/286943ab/attachment-0001.gz>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
