@@ -1,60 +1,55 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 26 Oct 2016 13:11:14 +0100
-Subject: [PATCH v14 4/9] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-5-git-send-email-fu.wei@linaro.org>
- <20161020163719.GC27598@leverpostej>
- <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
-Message-ID: <57010864-b2f0-d230-3138-8ace484acb04@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 26 Oct 2016 13:17:30 +0100
+Subject: [PATCH 1/4] mfd: ti_am335x_tscadc: store physical address
+In-Reply-To: <f271b805-82c2-a45e-0de9-39edafd34d2e@ti.com>
+References: <20160921161134.6951-1-mugunthanvnm@ti.com>
+ <20160921161134.6951-2-mugunthanvnm@ti.com>
+ <20160927194045.GK21388@dell>
+ <f271b805-82c2-a45e-0de9-39edafd34d2e@ti.com>
+Message-ID: <20161026121730.GS8574@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/16 12:10, Fu Wei wrote:
-> Hi Mark,
+On Fri, 30 Sep 2016, Mugunthan V N wrote:
+
+> On Wednesday 28 September 2016 01:10 AM, Lee Jones wrote:
+> > On Wed, 21 Sep 2016, Mugunthan V N wrote:
+> > 
+> >> store the physical address of the device in its priv to use it
+> >> for DMA addressing in the client drivers.
+> >>
+> >> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+> >> ---
+> >>  drivers/mfd/ti_am335x_tscadc.c       | 1 +
+> >>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
+> >>  2 files changed, 2 insertions(+)
+> >>
+> >> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
+> >> index c8f027b..0f3fab4 100644
+> >> --- a/drivers/mfd/ti_am335x_tscadc.c
+> >> +++ b/drivers/mfd/ti_am335x_tscadc.c
+> >> @@ -183,6 +183,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
+> >>  		tscadc->irq = err;
+> >>  
+> >>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >> +	tscadc->tscadc_phys_base = res->start;
+> > 
+> > This is unusual.  Can't you use a virt_to_phys() variant instead?
+> > 
 > 
-> On 21 October 2016 at 00:37, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi,
->>
->> As a heads-up, on v4.9-rc1 I see conflicts at least against
->> arch/arm64/Kconfig. Luckily git am -3 seems to be able to fix that up
->> automatically, but this will need to be rebased before the next posting
->> and/or merging.
->>
->> On Thu, Sep 29, 2016 at 02:17:12AM +0800, fu.wei at linaro.org wrote:
->>> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
->>> +{
->>> +     int trigger, polarity;
->>> +
->>> +     if (!interrupt)
->>> +             return 0;
->>
->> Urgh.
->>
->> Only the secure interrupt (which we do not need) is optional in this
->> manner, and (hilariously), zero appears to also be a valid GSIV, per
->> figure 5-24 in the ACPI 6.1 spec.
->>
->> So, I think that:
->>
->> (a) we should not bother parsing the secure interrupt
-> 
-> If I understand correctly, from this point of view, kernel don't
-> handle the secure interrupt.
-> But the current arm_arch_timer driver still enable/disable/request
-> PHYS_SECURE_PPI
-> with PHYS_NONSECURE_PPI.
-> That means we still need to parse the secure interrupt.
-> Please correct me, if I misunderstand something? :-)
+> I tried using virt_to_phys(), but its not working for me.
+> Also saw many drivers uses like this to get physical address
+> ("git grep -n " res->start;" drivers/*").
 
-That's because we can use the per-cpu timer when 32bit Linux is running
-on the secure side (and we cannot distinguish between secure and
-non-secure at runtime). ACPI is 64bit only, and Linux on 64bit isn't
-supported on the secure side, so only registering the non-secure timer
-is perfectly acceptable.
+Very well:
 
-Thanks,
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-	M.
+Let me know how you wish this set to be handled.
+
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
