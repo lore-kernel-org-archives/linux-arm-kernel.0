@@ -1,7 +1,7 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 26 Oct 2016 16:23:36 +0200
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 26 Oct 2016 16:32:29 +0200
 Subject: [PATCH 4/9] pinctrl: meson: allow gpio to request irq
-In-Reply-To: <CACRpkdba_iaOK61KiQGvJZYuz7-PiBgtN4vxv__tJLsZ8ZVL=w@mail.gmail.com>
+In-Reply-To: <1477491766.2482.159.camel@baylibre.com>
 References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
  <1476871709-8359-5-git-send-email-jbrunet@baylibre.com>
  <CACRpkdaCZPS45t3eTcjJExOu=YT_YkjNkdpg09jQqvLQOJH=Qw@mail.gmail.com>
@@ -12,86 +12,46 @@ References: <1476871709-8359-1-git-send-email-jbrunet@baylibre.com>
  <dee26f0b-e175-f8a0-2b73-08e8e324841c@arm.com>
  <1477405332.2482.87.camel@baylibre.com>
  <bbc268c8-35c3-206a-46b1-62cebef174b2@arm.com>
- <CACRpkdba_iaOK61KiQGvJZYuz7-PiBgtN4vxv__tJLsZ8ZVL=w@mail.gmail.com>
-Message-ID: <1477491816.2482.160.camel@baylibre.com>
+ <1477409478.2482.113.camel@baylibre.com>
+ <CACRpkdbGo4BJOdzkgBrE9jT-rKodd4zssCnOtOuGS+OqV-Uc6Q@mail.gmail.com>
+ <1477491766.2482.159.camel@baylibre.com>
+Message-ID: <CACRpkdYqoU0foW1izcZapbgUm+NO4quz9AZZBmts4841BRcigA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-10-25 at 20:10 +0200, Linus Walleij wrote:
-> On Tue, Oct 25, 2016 at 4:47 PM, Marc Zyngier <marc.zyngier@arm.com>
-> wrote:
-> > 
-> > On 25/10/16 15:22, Jerome Brunet wrote:
-> 
-> > 
-> > > 
-> > > There is a few problems to guarantee that gpio == hwirq.
-> > > 1. We have 2 instances of pinctrl, to guarantee that the linux
-> > > gpio
-> > > number == hwirq, we would have to guarantee the order in which
-> > > they are
-> > > probed. At least this my understanding
-> > 
-> > Maybe I wasn't clear enough, and my use of gpio is probably wrong.
-> > So
-> > Linux has a gpio number, which is obviously an abstract number
-> > (just
-> > like the Linux irq number). But the pad number, in the context of
-> > given
-> > SoC, is constant. So we have:
-> > 
-> > ????????pad->gpio
-> > ????????hwirq->irq
-> > 
-> > Why can't you have pad == hwirq, always? This is already what you
-> > have
-> > in the irqchip driver. This would simplify a lot of things.
-> 
-> My thought as well.
-> 
-> We usually refer to the local numberspace on the GPIO controller
-> as "offsets", so line offsets 0...31 on a gpiochip with 31 lines.
-> 
-> The ngpio in struct gpio_chip is the number of lines on that
-> controller,
-> and should nominally map 1:1 to hwirq sources.
+On Wed, Oct 26, 2016 at 4:22 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Tue, 2016-10-25 at 20:20 +0200, Linus Walleij wrote:
 
-Indeed it should be the the case, and for meson, it is pretty close.
-The irqchip controller provide a number of hwirq. Each hwirq maps to
-one, and only one, pin. But since not every pins are connected to the
-irqchip controller, the opposite is not true.
+>> However the semantic is such, that it is not necessary to call
+>> to_irq()
+>> before using an IRQ: the irqchip and gpiochip abstractions should be
+>> orthogonal.
+>
+> Linus,
+>
+> They are orthogonal. You can request an irq from the irqchip controller
+> without the gpiochip, like any other irq controller.
 
-Taking an example with 16 gpios, here is what it could look like with
-the exception we have on meson :
+OK good, sorry if I'm stating the obvious.
 
-gpio offset [ 0 ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?10 11 12 13 14 15 ]
-hwirq num ? [ 0 ?1 ?2 ?3] NC NC[4 ?5 ?6 ?7 ?8 ?9 ?10]NC NC NC
+> irq_create_mapping (and irq_create_fwspec_mapping) internally calls
+> irq_find_mapping. So if the mapping already exist (the irq is already
+> used before calling to_irq), the existing mapping will be returned. The
+> mapping will be actually created only if needed. It seems to be in line
+> with your explanation, no ?
 
-Like gpio offset are used (internally) in the driver to find
-appropriate gpio registers and bit, the hwirq has a meaning too.
-It is the setting you put in the channel multiplexer of the controller
-to select the proper pin to spy on.
+Yes, but you want to call irq_create_mapping() in slowpath (irq setup)
+and irq_find_mapping() in fastpath (irq handler). Else the first IRQ
+may result in unwelcomed surprises.
 
-In the end, these gpio offset and hwirq number are different. I would
-prefer to have hwirq == gpio and go your way, it would make my life
-easier, but I don't see how it would work.
+> There is really a *lot* of gpio drivers which use irq_create_mapping in
+> the to_irq callback, are these all wrong ?
 
-The irqchip controller cares only about the hwirq number. You can
-actually request an interrupt directly to the controller by asking the
-proper hwirq number (in DT for example), without involving the gpio
-driver (tested).
+Yes they are all wrong. They should all be using irq_find_mapping().
 
-The relation between the pins and the interrupt number is provided by
-the manufacturer in the Datasheet [1], in the section GPIO Interrupt.
+> If this should not be used, what should we all do instead ?
 
-Looking at other gpio drivers, it is not uncommon to have some simple
-calculation to get from gpio offset to the hwirq number. I don't get
-what is the specific problem here ?
+Call irq_create_mapping() in some other place.
 
-If I missed something, feel free to point it out.
-
-[1]?http://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%202015012
-6.pdf
-> 
-> Yours,
-> Linus Walleij
+Yours,
+Linus Walleij
