@@ -1,48 +1,33 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 26 Oct 2016 11:11:48 -0700
-Subject: [PATCH v3] drivers: psci: PSCI checker module
-In-Reply-To: <20161026173534.GC16248@red-moon>
-References: <20161020145115.6326-1-kevin.brodsky@arm.com>
- <20161025154535.GA3107@red-moon>
- <20161025183436.GF3716@linux.vnet.ibm.com>
- <20161026131752.GA15478@red-moon>
- <20161026151858.GQ3716@linux.vnet.ibm.com>
- <20161026171006.GA16248@red-moon>
- <20161026172252.GV3716@linux.vnet.ibm.com>
- <20161026173534.GC16248@red-moon>
-Message-ID: <20161026181148.GW3716@linux.vnet.ibm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 26 Oct 2016 18:14:00 +0000
+Subject: [PATCH 2/2] ARM: dts: bcm283x: fix typo in mailbox address
+In-Reply-To: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
+References: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1477505640-26658-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 06:35:34PM +0100, Lorenzo Pieralisi wrote:
-> On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
-> > On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
+The address of the mailbox node in the bcm283x.dts has also a typo.
+So fix it accordingly.
 
-[ . . . ]
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: 05b682b7a3b2 ("ARM: bcm2835: dt: Add the mailbox to the device tree")
+---
+ arch/arm/boot/dts/bcm283x.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> > > Thanks a lot for your feedback, thoughts appreciated.
-> > 
-> > Let me ask the question more directly.
-> > 
-> > Why on earth are we trying to run these tests concurrently?
-> 
-> We must prevent that, no question about that, that's why I started
-> this discussion. It is not fine to enable this checker and the
-> RCU/LOCK torture hotplug tests at the same time.
-> 
-> > After all, if we just run one at a time in isolation, there is no
-> > problem.
-> 
-> Fine by me, it was to understand if the current assumptions we made
-> are correct and they are definitely not. If we enable the PSCI checker
-> we must disable the torture rcu/lock hotplug tests either statically or
-> dynamically.
-
-What rcutorture, locktorture, and rcuperf do is to invoke
-torture_init_begin(), which returns false if one of these tests
-is already running.
-
-Perhaps we should extract this torture-test-exclusion and require
-than conflicting torture tests invoke it?
-
-							Thanx, Paul
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 46d46d8..74dd21b 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -104,7 +104,7 @@
+ 			reg = <0x7e104000 0x10>;
+ 		};
+ 
+-		mailbox: mailbox at 7e00b800 {
++		mailbox: mailbox at 7e00b880 {
+ 			compatible = "brcm,bcm2835-mbox";
+ 			reg = <0x7e00b880 0x40>;
+ 			interrupts = <0 1>;
+-- 
+1.7.9.5
