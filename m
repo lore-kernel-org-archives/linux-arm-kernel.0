@@ -1,109 +1,193 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 26 Oct 2016 08:52:09 +0200
-Subject: [PATCH] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161025162247.phhevbtd6dsmknbr@piout.net>
-References: <20161025161135.7316-1-richard.genoud@gmail.com>
- <20161025162247.phhevbtd6dsmknbr@piout.net>
-Message-ID: <7fd48101-2948-6a83-5a0c-5669f3cbbe43@gmail.com>
+From: minghuan.lian@nxp.com (M.H. Lian)
+Date: Wed, 26 Oct 2016 06:55:22 +0000
+Subject: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
+In-Reply-To: <0416d929-dfef-da09-8d9a-d1db8575afef@arm.com>
+References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
+ <0416d929-dfef-da09-8d9a-d1db8575afef@arm.com>
+Message-ID: <VI1PR04MB161582C628C5EA4CD08B15C6E8AB0@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/2016 18:22, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 25/10/2016 at 18:11:35 +0200, Richard Genoud wrote :
->> commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
->> hardware handshake is enabled"), despite its title, broke hardware
->> handshake on *every* Atmel platforms.
->>
->> The only one partially working is the SAMA5D2.
->>
-> 
-> [...]
-> 
->> Changes since v4:
->>  - the mctrl_gpio_use_rtscts() is gone since it was atmel_serial
->>  specific. (so patch 1 is gone)
->>  - patches 2 and 3 have been merged together since it didn't make
->>  a lot of sense to correct the GPIO case in one separate patch.
->>  - ATMEL_US_USMODE_HWHS is now unset for platform with PDC
->>
->> Changes since v3:
->>  - remove superfluous #include <linux/err.h> (thanks to Uwe)
->>  - rebase on next-20160930
->>
->> Changes since v2:
->>  - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
->>  - fix typos in patch 2/3
->>  - rebase on next-20160927
->>  - simplify the logic in patch 3/3.
->>
->> Changes since v1:
->>  - Correct patch 1 with the error found by kbuild.
->>  - Add Alexandre's Acked-by on patch 2
->>  - Rewrite patch 3 logic in the light of the on-going discussion
->>    with Cyrille and Alexandre.
->>
-> 
-> The changelog has to go after the --- marker.
+Hi Robin,
 
-You're right.
-thanks !
->> * the list may not be exhaustive
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+Please see my comments inline.
+
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Tuesday, October 25, 2016 9:01 PM
+> To: M.H. Lian <minghuan.lian@nxp.com>; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org
+> Cc: Marc Zyngier <marc.zyngier@arm.com>; Stuart Yoder
+> <stuart.yoder@nxp.com>; Leo Li <leoyang.li@nxp.com>; Scott Wood
+> <scott.wood@nxp.com>; Shawn Guo <shawnguo@kernel.org>; Mingkai Hu
+> <mingkai.hu@nxp.com>
+> Subject: Re: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG
+> MSI
 > 
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> On 25/10/16 13:35, Minghuan Lian wrote:
+> > 1. The different version of a SoC may have different MSI
+> > implementation. But compatible "fsl,<soc-name>-msi" can not describe
+> > the SoC version.
 > 
->> ---
->>  drivers/tty/serial/atmel_serial.c | 25 +++++++++++++++++++++----
->>  1 file changed, 21 insertions(+), 4 deletions(-)
->>
->>  I think this should go in the stable tree since it fixes the flow
->>  control broken since v4.0.
->>  But It won't compile on versions before 4.9rc1 because:
->>  function atmel_use_fifo was introduced in 4.4.12 / 4.7
->>  variable atmel_port was introduced in 4.9rc1
->>
->>  That's why I didn't add the Cc stable in the email body.
->>
->>
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index fd8aa1f4ba78..2c7c45904ba7 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -2132,11 +2132,28 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->>  		mode |= ATMEL_US_USMODE_RS485;
->>  	} else if (termios->c_cflag & CRTSCTS) {
->>  		/* RS232 with hardware handshake (RTS/CTS) */
->> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->> -			termios->c_cflag &= ~CRTSCTS;
->> -		} else {
->> +		if (atmel_use_fifo(port) &&
->> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
->> +			/*
->> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
->> +			 * be able to drive the RTS pin high/low when the RX
->> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
->> +			 * It will also disable the transmitter when the CTS
->> +			 * pin is high.
->> +			 * This mode is not activated if CTS pin is a GPIO
->> +			 * because in this case, the transmitter is always
->> +			 * disabled.
->> +			 * If the RTS pin is a GPIO, the controller won't be
->> +			 * able to drive it according to the FIFO thresholds,
->> +			 * but it will be handled by the driver.
->> +			 */
->>  			mode |= ATMEL_US_USMODE_HWHS;
->> +		} else {
->> +			/*
->> +			 * For platforms without FIFO, the flow control is
->> +			 * handled by the driver.
->> +			 */
->> +			mode |= ATMEL_US_USMODE_NORMAL;
->>  		}
->>  	} else {
->>  		/* RS232 without hadware handshake */
+> Can't it?
 > 
+> 	compatible = "fsl-ls1043a-rev11-msi";
+> 
+> Oh, I guess it can!
+> 
+> Joking aside, if there are multiple versions of a piece of hardware which
+> require *different* treatment by drivers, then it is obviously wrong to use
+> the same compatible string because *they are not compatible*.
+> 
+[Minghuan Lian]  Yes, but Rev1.0 and Rev1.1 SoC will use the same dts files.
+We cannot create different dts files for each revision of the same kind of SoC.
+It means that there are different variants in the different versions of the same SoC that will use the same compatible string.
+So I have to use SoC match interface to get the versions.
+
+I'm too radical. I do not want to first check SoC family via compatible string and then check revision via SoC match or SVR.
+I selected the "SoC match" like the following to get the related information at only one place. 
+
+static struct soc_device_attribute soc_msi_matches[] = {
+	{ .family = "QorIQ LS1021A",
+	  .data = &ls1021_msi_cfg },
+	{ .family = "QorIQ LS1012A",
+	  .data = &ls1021_msi_cfg },
+	{ .family = "QorIQ LS1043A", .revision = "1.0",
+	  .data = &ls1021_msi_cfg },
+	{ .family = "QorIQ LS1043A", .revision = "1.1",
+	  .data = &ls1043_rev11_msi_cfg },
+	{ .family = "QorIQ LS1046A",
+	  .data = &ls1046_msi_cfg },
+	{ },
+};
+
+I will remain the SoC related compatible and try to describe the difference via some kind of the property.
+
+> > The MSI driver will use SoC match interface to get SoC type and
+> > version instead of compatible string. So all MSI node can use the
+> > common compatible "fsl,ls-scfg-msi" and the original compatible is
+> > unnecessary.
+> 
+> If there is some common level of functionality that *all* variants support
+> without the driver having to know which one is which, then there might be
+> some sense in having an additional common compatible to represent that
+> level of functionality, e.g.
+> 
+> 	compatible = "fsl-ls1043a-rev11-msi", "fsl,ls-scfg-msi";
+> 
+> But if, say, new variants turn out to have less functionality, rather than more,
+> then there's probably not much point, and we should stick to specific,
+> accurate, compatible strings.
+> 
+> DT is not specific to a kernel version, nor even to Linux. A string which triggers
+> some board-specific magic in a specific version of a Linux driver does not
+> describe the hardware.
+> 
+> Robin.
+> 
+> > 2. Layerscape SoCs may have one or several MSI controllers.
+> > In order to increase MSI interrupt number of a PCIe, the patch moves
+> > all MSI node into the parent node "msi-controller". So a PCIe can
+> > request MSI from all the MSI controllers.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> > ---
+> >  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 57 +++++++++++++++++++--
+> -
+> >  1 file changed, 49 insertions(+), 8 deletions(-)
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > index 9e38949..29f95fd 100644
+> > ---
+> > a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-m
+> > si.txt
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-sc
+> > +++ fg-msi.txt
+> > @@ -1,18 +1,28 @@
+> >  * Freescale Layerscape SCFG PCIe MSI controller
+> >
+> > +Layerscape SoCs may have one or multiple MSI controllers.
+> > +Each MSI controller must be showed as a child node.
+> > +
+> >  Required properties:
+> >
+> > -- compatible: should be "fsl,<soc-name>-msi" to identify
+> > -	      Layerscape PCIe MSI controller block such as:
+> > -              "fsl,1s1021a-msi"
+> > -              "fsl,1s1043a-msi"
+> > +- compatible: should be "fsl,ls-scfg-msi"
+> > +- #address-cells: must be 2
+> > +- #size-cells: must be 2
+> > +- ranges: allows valid 1:1 translation between child's address space and
+> > +	  parent's address space
+> >  - msi-controller: indicates that this is a PCIe MSI controller node
+> > +
+> > +Required child node:
+> > +A child node must exist to represent the MSI controller.
+> > +The following are properties specific to those nodes:
+> > +
+> >  - reg: physical base address of the controller and length of memory
+> mapped.
+> >  - interrupts: an interrupt to the parent interrupt controller.
+> >
+> >  Optional properties:
+> >  - interrupt-parent: the phandle to the parent interrupt controller.
+> >
+> > +Notes:
+> >  This interrupt controller hardware is a second level interrupt
+> > controller that  is hooked to a parent interrupt controller: e.g: ARM
+> > GIC for ARM-based  platforms. If interrupt-parent is not provided, the
+> > default parent interrupt @@ -22,9 +32,40 @@ MSI controller node
+> >
+> >  Examples:
+> >
+> > -	msi1: msi-controller at 1571000 {
+> > -		compatible = "fsl,1s1043a-msi";
+> > -		reg = <0x0 0x1571000 0x0 0x8>,
+> > +	msi: msi-controller {
+> > +		compatible = "fsl,ls-scfg-msi";
+> > +		#address-cells = <2>;
+> > +		#size-cells = <2>;
+> > +		ranges;
+> >  		msi-controller;
+> > -		interrupts = <0 116 0x4>;
+> > +
+> > +		msi0 at 1580000 {
+> > +			reg = <0x0 0x1580000 0x0 0x10000>;
+> > +			interrupts = <0 116 0x4>,
+> > +				     <0 111 0x4>,
+> > +				     <0 112 0x4>,
+> > +				     <0 113 0x4>;
+> > +		};
+> > +
+> > +		msi1 at 1590000 {
+> > +			reg = <0x0 0x1590000 0x0 0x10000>;
+> > +			interrupts = <0 126 0x4>,
+> > +				     <0 121 0x4>,
+> > +				     <0 122 0x4>,
+> > +				     <0 123 0x4>;
+> > +		};
+> > +
+> > +		msi2 at 15a0000 {
+> > +			reg = <0x0 0x15a0000 0x0 0x10000>;
+> > +			interrupts = <0 160 0x4>,
+> > +				     <0 155 0x4>,
+> > +				     <0 156 0x4>,
+> > +				     <0 157 0x4>;
+> > +		};
+> > +	};
+> > +
+> > +	pcie at 3400000 {
+> > +			...
+> > +			msi-parent = <&msi>;
+> > +			...
+> >  	};
+> >
