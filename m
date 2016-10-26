@@ -1,371 +1,52 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 26 Oct 2016 10:29:59 -0600
-Subject: [RFC PATCH 1/5] of: introduce the overlay manager
-In-Reply-To: <20161026145756.21689-2-antoine.tenart@free-electrons.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <20161026145756.21689-2-antoine.tenart@free-electrons.com>
-Message-ID: <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 26 Oct 2016 11:37:04 -0500
+Subject: [PATCH v6 1/5] ARM: davinci: da8xx: add usb phy clocks
+In-Reply-To: <6bcc1ac1-446c-6191-1c63-e37ccfaf9556@ti.com>
+References: <1477451211-31979-1-git-send-email-david@lechnology.com>
+ <1477451211-31979-2-git-send-email-david@lechnology.com>
+ <6bcc1ac1-446c-6191-1c63-e37ccfaf9556@ti.com>
+Message-ID: <0302c410-4b05-3a5b-3801-5ab73089a9e2@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
-
-Please find my comments below.
-
-On 26 October 2016 at 08:57, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> The overlay manager is an in-kernel library helping to handle dt overlay
-> loading when using capes.
+On 10/26/2016 02:59 AM, Sekhar Nori wrote:
+> On Wednesday 26 October 2016 08:36 AM, David Lechner wrote:
+>> Up to this point, the USB phy clock configuration was handled manually in
+>> the board files and in the usb drivers. This adds proper clocks so that
+>> the usb drivers can use clk_get and clk_enable and not have to worry about
+>> the details. Also, the related code is removed from the board files and
+>> replaced with the new clock registration functions.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+>> ---
+>>
+>> I have added "ARM: davinci: da8xx: Enable the usb20 "per" clk on phy_clk_enable"
+>> from Axel Haslam to this patch.
+>>
+>> In the review of Axel's patch, Sekhar said:
+>>
+>>> We should not be using a NULL device pointer here. Can you pass the musb
+>>> device pointer available in the same file? Also, da850_clks[] in da850.c
+>>> needs to be fixed to add the matching device name.
+>>
+>> However, the musb device may not be registered. The usb20_clk can be used to
+>> supply a 48MHz clock to USB 1.1 (ohci) without using the musb device. So, I am
+>> inclined to leave this as NULL.
 >
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/of/Kconfig                           |   2 +
->  drivers/of/Makefile                          |   1 +
->  drivers/of/overlay-manager/Kconfig           |   6 +
->  drivers/of/overlay-manager/Makefile          |   1 +
->  drivers/of/overlay-manager/overlay-manager.c | 199 +++++++++++++++++++++++++++
->  include/linux/overlay-manager.h              |  38 +++++
->  6 files changed, 247 insertions(+)
->  create mode 100644 drivers/of/overlay-manager/Kconfig
->  create mode 100644 drivers/of/overlay-manager/Makefile
->  create mode 100644 drivers/of/overlay-manager/overlay-manager.c
->  create mode 100644 include/linux/overlay-manager.h
+> But clock look-up has nothing to do with device being registered AFAICT.
+> It is used to identify the clock consumer. Passing NULL there means the
+> clock is not associated with any device. Which is not correct as we are
+> specifically looking at MUSB module clock.
 >
-> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-> index bc07ad30c9bf..e57aeaf0bf4f 100644
-> --- a/drivers/of/Kconfig
-> +++ b/drivers/of/Kconfig
-> @@ -116,4 +116,6 @@ config OF_OVERLAY
->  config OF_NUMA
->         bool
+> Thanks,
+> Sekhar
 >
-> +source "drivers/of/overlay-manager/Kconfig"
-> +
->  endif # OF
-> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
-> index d7efd9d458aa..d738fd41271f 100644
-> --- a/drivers/of/Makefile
-> +++ b/drivers/of/Makefile
-> @@ -16,3 +16,4 @@ obj-$(CONFIG_OF_OVERLAY) += overlay.o
->  obj-$(CONFIG_OF_NUMA) += of_numa.o
->
->  obj-$(CONFIG_OF_UNITTEST) += unittest-data/
-> +obj-y += overlay-manager/
-> diff --git a/drivers/of/overlay-manager/Kconfig b/drivers/of/overlay-manager/Kconfig
-> new file mode 100644
-> index 000000000000..eeb76054dcb8
-> --- /dev/null
-> +++ b/drivers/of/overlay-manager/Kconfig
-> @@ -0,0 +1,6 @@
-> +config OF_OVERLAY_MGR
-> +       bool "Device Tree Overlay Manager"
-> +       depends on OF_OVERLAY
-> +       help
-> +         Enable the overlay manager to handle automatic overlay loading when
-> +         devices are detected.
-> diff --git a/drivers/of/overlay-manager/Makefile b/drivers/of/overlay-manager/Makefile
-> new file mode 100644
-> index 000000000000..86d2b53950e7
-> --- /dev/null
-> +++ b/drivers/of/overlay-manager/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_OF_OVERLAY_MGR)                   += overlay-manager.o
-> diff --git a/drivers/of/overlay-manager/overlay-manager.c b/drivers/of/overlay-manager/overlay-manager.c
-> new file mode 100644
-> index 000000000000..a725d7e24d38
-> --- /dev/null
-> +++ b/drivers/of/overlay-manager/overlay-manager.c
-> @@ -0,0 +1,199 @@
-> +/*
-> + * Copyright (C) 2016 - Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/firmware.h>
-> +#include <linux/list.h>
-> +#include <linux/of.h>
-> +#include <linux/of_fdt.h>
-> +#include <linux/overlay-manager.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +struct overlay_mgr_overlay {
-> +       struct list_head list;
-> +       char *name;
-> +};
 
-Please use the proper documentation format for structures.
+FWIW, clk_get() uses dev_name() to get the device name, which will 
+return NULL until after the platform device is registered.
 
-> +
-> +LIST_HEAD(overlay_mgr_overlays);
-> +LIST_HEAD(overlay_mgr_formats);
-> +DEFINE_SPINLOCK(overlay_mgr_lock);
-> +DEFINE_SPINLOCK(overlay_mgr_format_lock);
-> +
-> +/*
-> + * overlay_mgr_register_format()
-> + *
-> + * Adds a new format candidate to the list of supported formats. The registered
-> + * formats are used to parse the headers stored on the dips.
-> + */
-> +int overlay_mgr_register_format(struct overlay_mgr_format *candidate)
-> +{
-> +       struct overlay_mgr_format *format;
-> +       int err = 0;
-> +
-> +       spin_lock(&overlay_mgr_format_lock);
-> +
-> +       /* Check if the format is already registered */
-> +       list_for_each_entry(format, &overlay_mgr_formats, list) {
-> +               if (!strcpy(format->name, candidate->name)) {
-
-This function is public to the rest of the kernel - limiting the
-lenght of ->name and using strncpy() is probably a good idea.
-
-> +                       err = -EEXIST;
-> +                       goto err;
-> +               }
-> +       }
-> +
-> +       list_add_tail(&candidate->list, &overlay_mgr_formats);
-> +
-> +err:
-> +       spin_unlock(&overlay_mgr_format_lock);
-> +       return err;
-> +}
-> +EXPORT_SYMBOL_GPL(overlay_mgr_register_format);
-> +
-> +/*
-> + * overlay_mgr_parse()
-> + *
-> + * Parse raw data with registered format parsers. Fills the candidate string if
-> + * one parser understood the raw data format.
-> + */
-> +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
-
-I'm pretty sure there is another way to proceed than using 3 levels of
-references.  It makes the code hard to read and a prime candidate for
-errors.
-
-> +                     unsigned *n)
-> +{
-> +       struct list_head *pos, *tmp;
-> +       struct overlay_mgr_format *format;
-> +
-> +       list_for_each_safe(pos, tmp, &overlay_mgr_formats) {
-> +               format = list_entry(pos, struct overlay_mgr_format, list);
-
-Can you use list_for_each_safe_entry() ?
-
-> +
-> +               format->parse(dev, data, candidates, n);
-
-->parse() returns an error code.  It is probably a good idea to check
-it.  If it isn't needed then a comment explaining why it is the case
-would be appreciated.
-
-> +               if (n > 0)
-> +                       return 0;
-> +       }
-> +
-> +       return -EINVAL;
-> +}
-> +EXPORT_SYMBOL_GPL(overlay_mgr_parse);
-> +
-> +static int overlay_mgr_check_overlay(struct device_node *node)
-> +{
-> +       struct property *p;
-> +       const char *str = NULL;
-> +
-> +       p = of_find_property(node, "compatible", NULL);
-> +       if (!p)
-> +               return -EINVAL;
-> +
-> +       do {
-> +               str = of_prop_next_string(p, str);
-> +               if (of_machine_is_compatible(str))
-> +                       return 0;
-> +       } while (str);
-> +
-> +       return -EINVAL;
-> +}
-> +
-> +/*
-> + * _overlay_mgr_insert()
-> + *
-> + * Try to request and apply an overlay given a candidate name.
-> + */
-> +static int _overlay_mgr_apply(struct device *dev, char *candidate)
-> +{
-> +       struct overlay_mgr_overlay *overlay;
-> +       struct device_node *node;
-> +       const struct firmware *firmware;
-> +       char *firmware_name;
-> +       int err = 0;
-> +
-> +       spin_lock(&overlay_mgr_lock);
-> +
-> +       list_for_each_entry(overlay, &overlay_mgr_overlays, list) {
-> +               if (!strcmp(overlay->name, candidate)) {
-> +                       dev_err(dev, "overlay already loaded\n");
-> +                       err = -EEXIST;
-> +                       goto err_lock;
-> +               }
-> +       }
-> +
-> +       overlay = devm_kzalloc(dev, sizeof(*overlay), GFP_KERNEL);
-
-Function devm_kzalloc() can sleep but you're holding a spinlock - I'm
-surprised the kernel didn't complain here.  Allocate the memory before
-holding the lock.  If the overly is already loaded simply free it on
-the error path.
-
-> +       if (!overlay) {
-> +               err = -ENOMEM;
-> +               goto err_lock;
-> +       }
-> +
-> +       overlay->name = candidate;
-> +
-> +       firmware_name = kasprintf(GFP_KERNEL, "overlay-%s.dtbo", candidate);
-> +       if (!firmware_name) {
-> +               err = -ENOMEM;
-> +               goto err_free;
-> +       }
-> +
-> +       dev_info(dev, "requesting firmware '%s'\n", firmware_name);
-> +
-> +       err = request_firmware_direct(&firmware, firmware_name, dev);
-> +       if (err) {
-> +               dev_info(dev, "failed to request firmware '%s'\n",
-> +                        firmware_name);
-> +               goto err_free;
-> +       }
-> +
-> +       of_fdt_unflatten_tree((unsigned long *)firmware->data, NULL, &node);
-> +       if (!node) {
-> +               dev_err(dev, "failed to unflatted tree\n");
-> +               err = -EINVAL;
-> +               goto err_fw;
-> +       }
-> +
-> +       of_node_set_flag(node, OF_DETACHED);
-> +
-> +       err = of_resolve_phandles(node);
-> +       if (err) {
-> +               dev_err(dev, "failed to resolve phandles: %d\n", err);
-> +               goto err_fw;
-> +       }
-> +
-> +       err = overlay_mgr_check_overlay(node);
-> +       if (err) {
-> +               dev_err(dev, "overlay checks failed: %d\n", err);
-> +               goto err_fw;
-> +       }
-> +
-> +       err = of_overlay_create(node);
-> +       if (err < 0) {
-> +               dev_err(dev, "failed to create overlay: %d\n", err);
-> +               goto err_fw;
-> +       }
-> +
-> +       list_add_tail(&overlay->list, &overlay_mgr_overlays);
-> +
-> +       dev_info(dev, "loaded firmware '%s'\n", firmware_name);
-> +
-
-out:
-
-> +       spin_unlock(&overlay_mgr_lock);
-> +       return 0;
-
-return err;
-
-> +
-> +err_fw:
-> +       release_firmware(firmware);
-> +err_free:
-> +       devm_kfree(dev, overlay);
-
-goto out;
-
-> +err_lock:
-> +       spin_unlock(&overlay_mgr_lock);
-> +       return err;
-
-This code is repeated twice.  See above corrections to fix the situation.
-
-> +}
-> +
-> +int overlay_mgr_apply(struct device *dev, char **candidates, unsigned n)
-> +{
-> +       int i, ret;
-> +
-> +       for (i=0; i < n; i++) {
-
-I'm surprised checkpatch.pl let you get away with this one.
-
-> +               ret = _overlay_mgr_apply(dev, candidates[i]);
-> +               if (!ret)
-> +                       return 0;
-> +       }
-> +
-> +       return -EINVAL;
-> +}
-> +EXPORT_SYMBOL_GPL(overlay_mgr_apply);
-> diff --git a/include/linux/overlay-manager.h b/include/linux/overlay-manager.h
-> new file mode 100644
-> index 000000000000..8adcc4f5ddf6
-> --- /dev/null
-> +++ b/include/linux/overlay-manager.h
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright (C) 2016 - Antoine Tenart <antoine.tenart@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __OVERLAY_MGR_H__
-> +#define __OVERLAY_MGR_H__
-> +
-> +#include <linux/device.h>
-> +#include <linux/list.h>
-> +#include <linux/sizes.h>
-> +
-> +#define OVERLAY_MGR_DIP_MAX_SZ         SZ_128
-> +
-> +struct overlay_mgr_format {
-> +       struct list_head list;
-> +       char *name;
-> +       int (*parse)(struct device *dev, void *data, char ***candidates,
-> +                    unsigned *n);
-> +};
-
-Please use the kernel documentation standard.
-
-> +
-> +int overlay_mgr_register_format(struct overlay_mgr_format *candidate);
-> +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
-> +                     unsigned *n);
-> +int overlay_mgr_apply(struct device *dev, char **candidates, unsigned n);
-> +
-> +#define dip_convert(field)                                      \
-> +        (                                                       \
-> +                (sizeof(field) == 1) ? field :                  \
-> +                (sizeof(field) == 2) ? be16_to_cpu(field) :     \
-> +                (sizeof(field) == 4) ? be32_to_cpu(field) :     \
-> +                -1                                              \
-> +        )
-
-Please document your macro definition.  Otherwise reviewers are left guessing...
-
-> +
-> +#endif /* __OVERLAY_MGR_H__ */
-> --
-> 2.10.1
->
+I can add the device references anyway. However, this is complicated by 
+the fact that the musb platform device declaration is inside of an #if 
+IS_ENABLED(CONFIG_USB_MUSB_HDRC). I can either remove the #if or add 
+more #if's. Do you have a preference on this?
