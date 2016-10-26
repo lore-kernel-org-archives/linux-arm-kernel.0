@@ -1,33 +1,33 @@
-From: yurovsky@gmail.com (Andrey Yurovsky)
-Date: Wed, 26 Oct 2016 10:43:31 -0700
-Subject: [PATCH] at91sam9g20.dtsi: set correct USB clock divisors
-Message-ID: <1477503811-32697-1-git-send-email-yurovsky@gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Oct 2016 18:43:57 +0100
+Subject: [PATCH v2 2/2] arm64: Wire up iommu_dma_{map, unmap}_resource()
+In-Reply-To: <4e84146ae49a4edd5f1226d76617be9aa92a58ee.1477503578.git.robin.murphy@arm.com>
+References: <4e84146ae49a4edd5f1226d76617be9aa92a58ee.1477503578.git.robin.murphy@arm.com>
+Message-ID: <44f25ba8a19dcd39479292c3a2da4b5c996e161e.1477503578.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT91SAM9G20 has different clock divisors from the otherwise similar
-AT91SAM9260. Set them in at91sam9g20.dtsi so that all AT91SAM9G20 users set up
-the USB host controller clocks correctly.
+With no coherency to worry about, just plug'em straight in.
 
-Signed-off-by: Andrey Yurovsky <yurovsky@gmail.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/at91sam9g20.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/mm/dma-mapping.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-index f593016..6c4488c 100644
---- a/arch/arm/boot/dts/at91sam9g20.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-@@ -62,6 +62,10 @@
- 					atmel,clk-output-range = <0 133000000>;
- 					atmel,clk-divisors = <1 2 4 6>;
- 				};
-+
-+				usb: usbck {
-+					atmel,clk-divisors = <4 2 0 0>;
-+				};
- 			};
- 		};
- 	};
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 3f74d0d98de6..5cd0a383b14b 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -796,6 +796,8 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+ 	.sync_single_for_device = __iommu_sync_single_for_device,
+ 	.sync_sg_for_cpu = __iommu_sync_sg_for_cpu,
+ 	.sync_sg_for_device = __iommu_sync_sg_for_device,
++	.map_resource = iommu_dma_map_resource,
++	.unmap_resource = iommu_dma_unmap_resource,
+ 	.dma_supported = iommu_dma_supported,
+ 	.mapping_error = iommu_dma_mapping_error,
+ };
 -- 
-2.7.4
+1.9.1
