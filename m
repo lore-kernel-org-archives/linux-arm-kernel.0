@@ -1,133 +1,376 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 25 Oct 2016 18:31:29 -0700
-Subject: [RFC PATCH] PCI/ACPI: xgene: Add ECAM quirk for X-Gene PCIe
- controller
-In-Reply-To: <20160921212258.GE20006@localhost>
-References: <1474122278-32525-1-git-send-email-dhdang@apm.com>
- <20160919200614.GB21763@localhost>
- <CADaLNDmYoYAiufYFrwhWjPBj29XPBSx1FydoM67v0c03D8N7vQ@mail.gmail.com>
- <20160921212258.GE20006@localhost>
-Message-ID: <CADaLNDmBTCApAnWqmYyzj1zTsF5Sh=Nn3urVqeb-Wc9JdsBskw@mail.gmail.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Tue, 25 Oct 2016 19:23:27 -0700
+Subject: [PATCH v2] staging: vc04_services: Replace dmac_map_area with
+ dmac_map_sg
+Message-ID: <20161026022327.19055-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 21, 2016 at 2:22 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Mon, Sep 19, 2016 at 06:07:37PM -0700, Duc Dang wrote:
->> On Mon, Sep 19, 2016 at 1:06 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
->> > On Sat, Sep 17, 2016 at 07:24:38AM -0700, Duc Dang wrote:
->
->> This patch only adds the ability for X-Gene PCIe controller to be
->> probable in ACPI boot mode. All the 'quirk' code added is for ECAM to
->> work with X-Gene.
->>
->> > I sort of expected this to also remove, for example, the seemingly
->> > identical xgene_pcie_config_read32() in drivers/pci/host/pci-xgene.c.
->> > Actually, a bunch of this code seems to be duplicated from there.  It
->> > doesn't seem like we should end up with all this duplicated code.
->> >
->> > I'd really like it better if all this could get folded into
->> > pci-xgene.c so we don't end up with more files.
->>
->> I am still debating whether to put this X-Gene ECAM quirk code into
->> drivers/acpi or keep it here in drivers/pci/host. But given the
->> direction of other quirk patches for ThunderX and HiSi, seem like the
->> quirk will stay in drivers/pci/host. I can definitely fold the new
->> quirk code into pci-xgene.c as you suggested and eliminate the
->> identical one.
->
-> I like Tomasz's patches, where the MCFG quirk itself is in
-> acpi/pci_mcfg.c, and it uses config accessors exported from
-> drivers/pci/host.
+The original arm implementation uses dmac_map_area which is not
+portable.  Replace it with an architecture neutral version
+which uses dma_map_sg.
 
-Yes, I removed the new file and folded the quirk code into pci-xgene.c.
+As you can see that for larger page sizes, the dma_map_sg
+implementation is faster then the original unportable dma_map_area
+implementation.
 
->
-> I do not want to end up with duplicate accessors.  The mapping
-> functions and accessors should be the same whether we're booting with
-> DT or ACPI.
->
-> I think a patch to add ACPI support should only contain:
->
->   - acpi/pci_mcfg.c quirks to fix incorrect ACPI MCFG resources or use
->     special accessors,
->
->   - pnp/quirks.c quirks to compensate for missing ACPI _CRS for the
->     ECAM regions, and
->
->   - pci-xgene.c code to derive the csr_base and cfg_base.  Today we
->     get that from DT, but the _CRS producer/consumer mess means we
->     don't have a good way to get it from ACPI, so you'll need some
->     sort of quirk for this.
+Test                       dmac_map_area   dma_map_page dma_map_sg
+vchiq_test -b 4 10000      51us/iter       76us/iter    76us
+vchiq_test -b 8 10000      70us/iter       82us/iter    91us
+vchiq_test -b 16 10000     94us/iter       118us/iter   121us
+vchiq_test -b 32 10000     146us/iter      173us/iter   187us
+vchiq_test -b 64 10000     263us/iter      328us/iter   299us
+vchiq_test -b 128 10000    529us/iter      631us/iter   595us
+vchiq_test -b 256 10000    2285us/iter     2275us/iter  2001us
+vchiq_test -b 512 10000    4372us/iter     4616us/iter  4123us
 
-The new quirk code (v2 patch) follows this direction, but I have not
-found a good way to introduce quirk into pnp/quirks.c yet. Just to
-clarify a little bit, our ACPI table provides ECAM base address from
-_CBA method. The missing piece is the controller register base address
-(csr_base) that I need to get from a hard-coded resource array.
+For message sizes >= 64KB, dma_map_sg is faster then dma_map_page.
 
-I also owe you the rework for Configuration Request Retry Status
-workaround, but it will need to be done in a separate patch set for
-both DT and ACPI.
->
->> >> +struct xgene_pcie_acpi_root {
->> >> +     void __iomem *csr_base;
->> >> +     u32 version;
->> >> +};
->> >
->> > I think this should be folded into struct xgene_pcie_port so we don't
->> > have to allocate and manage it separately.
->>
->> I will need to look into this more. When booting with ACPI mode, the
->> code in pci-xgene.c is not used (except the cfg read/write functions
->> that are shared with ECAM quirk code), so puting these into
->> xgene_pcie_port will force ECAM quirk code to allocate this structure
->> as well.
->
-> This information is needed whether booting with DT or ACPI, so we
-> should use the existing xgene_pcie_port.csr_base and initialize it
-> differently depending on which we're using.
+For message size >= 256KB, the dma_map_sg is the fastest
+implementation.
 
-The new ECAM quirk code will also allocate struct xgene_pcie_port, I
-got rid of xgene_pcie_acpi_root struct.
+"Normal" messages sizes should be about 1MB which is beyond
+the length that this change shows a speed increase.
 
->
->> >> +     default:
->> >> +             return -ENODEV;
->> >> +     }
->> >> +
->> >> +     xgene_root->csr_base = ioremap(csr_base, XGENE_CSR_LENGTH);
->> >
->> > There should be a request_region() somewhere, too.  Ideal would be to
->> > use devm_ioremap_resource(), but I don't know where this apparent
->> > resource is coming from.
->>
->> Yes, I will use request_region/devm_ioremap_resource here.
->
-> We're not *adding* any new resources that need ioremapping; all we're
-> doing is changing the *source* of the resource, so we should use the
-> same devm_ioremap_resource() you already have in xgene_pcie_map_reg().
-> You might have to refactor that slightly so we can lookup the resource
-> via either DT or ACPI (you'll probably actually use a quirk since ACPI
-> doesn't have a good mechanism for this), and then use the same call to
-> devm_ioremap_resource().
+This is v2 of the patch which includes extra WARN_ONs and
+incorporates feedback from Eric Anholt <eric@anholt.net>.
 
-I changed to use devm_ioremap_resource to map the csr_base from the
-fixed resource array defined for each X-Gene SoC. The 'cat
-/proc/iomem' for PCIe port on Mustang board is like following:
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ .../interface/vchiq_arm/vchiq_2835_arm.c           | 152 +++++++++++++--------
+ 1 file changed, 93 insertions(+), 59 deletions(-)
 
-1f2b0000-1f2bffff : PNP0A08:00
-e040000000-e07fffffff : PCI Bus 0000:00
-  e040000000-e0401fffff : PCI Bus 0000:01
-    e040000000-e0400fffff : 0000:01:00.0
-      e040000000-e0400fffff : mlx4_core
-    e040100000-e0401fffff : 0000:01:00.0
-e0d0000000-e0dfffffff : PCI ECAM
-f000000000-ffffffffff : PCI Bus 0000:00
-  f000000000-f001ffffff : PCI Bus 0000:01
-    f000000000-f001ffffff : 0000:01:00.0
-      f000000000-f001ffffff : mlx4_core
-
-Is this what you expect? Or you are looking for something else?
-
-Regards,
-Duc Dabng.
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index 32d12e6..a5afcc5 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -45,13 +45,8 @@
+ #include <asm/pgtable.h>
+ #include <soc/bcm2835/raspberrypi-firmware.h>
+ 
+-#define dmac_map_area			__glue(_CACHE,_dma_map_area)
+-#define dmac_unmap_area 		__glue(_CACHE,_dma_unmap_area)
+-
+ #define TOTAL_SLOTS (VCHIQ_SLOT_ZERO_SLOTS + 2 * 32)
+ 
+-#define VCHIQ_ARM_ADDRESS(x) ((void *)((char *)x + g_virt_to_bus_offset))
+-
+ #include "vchiq_arm.h"
+ #include "vchiq_2835.h"
+ #include "vchiq_connected.h"
+@@ -73,7 +68,7 @@ static unsigned int g_fragments_size;
+ static char *g_fragments_base;
+ static char *g_free_fragments;
+ static struct semaphore g_free_fragments_sema;
+-static unsigned long g_virt_to_bus_offset;
++static struct device *g_dev;
+ 
+ extern int vchiq_arm_log_level;
+ 
+@@ -84,10 +79,11 @@ vchiq_doorbell_irq(int irq, void *dev_id);
+ 
+ static int
+ create_pagelist(char __user *buf, size_t count, unsigned short type,
+-                struct task_struct *task, PAGELIST_T ** ppagelist);
++		struct task_struct *task, PAGELIST_T **ppagelist,
++		dma_addr_t *dma_addr);
+ 
+ static void
+-free_pagelist(PAGELIST_T *pagelist, int actual);
++free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual);
+ 
+ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ {
+@@ -101,8 +97,6 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 	int slot_mem_size, frag_mem_size;
+ 	int err, irq, i;
+ 
+-	g_virt_to_bus_offset = virt_to_dma(dev, (void *)0);
+-
+ 	(void)of_property_read_u32(dev->of_node, "cache-line-size",
+ 				   &g_cache_line_size);
+ 	g_fragments_size = 2 * g_cache_line_size;
+@@ -118,7 +112,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 		return -ENOMEM;
+ 	}
+ 
+-	WARN_ON(((int)slot_mem & (PAGE_SIZE - 1)) != 0);
++	WARN_ON(((unsigned long)slot_mem & (PAGE_SIZE - 1)) != 0);
+ 
+ 	vchiq_slot_zero = vchiq_init_slots(slot_mem, slot_mem_size);
+ 	if (!vchiq_slot_zero)
+@@ -170,6 +164,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 		return err ? : -ENXIO;
+ 	}
+ 
++	g_dev = dev;
+ 	vchiq_log_info(vchiq_arm_log_level,
+ 		"vchiq_init - done (slots %pK, phys %pad)",
+ 		vchiq_slot_zero, &slot_phys);
+@@ -233,6 +228,7 @@ vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
+ {
+ 	PAGELIST_T *pagelist;
+ 	int ret;
++	dma_addr_t dma_addr;
+ 
+ 	WARN_ON(memhandle != VCHI_MEM_HANDLE_INVALID);
+ 
+@@ -241,12 +237,14 @@ vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
+ 			? PAGELIST_READ
+ 			: PAGELIST_WRITE,
+ 			current,
+-			&pagelist);
++			&pagelist,
++			&dma_addr);
++
+ 	if (ret != 0)
+ 		return VCHIQ_ERROR;
+ 
+ 	bulk->handle = memhandle;
+-	bulk->data = VCHIQ_ARM_ADDRESS(pagelist);
++	bulk->data = (void *)(unsigned long)dma_addr;
+ 
+ 	/* Store the pagelist address in remote_data, which isn't used by the
+ 	   slave. */
+@@ -259,7 +257,8 @@ void
+ vchiq_complete_bulk(VCHIQ_BULK_T *bulk)
+ {
+ 	if (bulk && bulk->remote_data && bulk->actual)
+-		free_pagelist((PAGELIST_T *)bulk->remote_data, bulk->actual);
++		free_pagelist((dma_addr_t)(unsigned long)bulk->data,
++			      (PAGELIST_T *)bulk->remote_data, bulk->actual);
+ }
+ 
+ void
+@@ -353,38 +352,44 @@ vchiq_doorbell_irq(int irq, void *dev_id)
+ ** obscuring the new data underneath. We can solve this by transferring the
+ ** partial cache lines separately, and allowing the ARM to copy into the
+ ** cached area.
+-
+-** N.B. This implementation plays slightly fast and loose with the Linux
+-** driver programming rules, e.g. its use of dmac_map_area instead of
+-** dma_map_single, but it isn't a multi-platform driver and it benefits
+-** from increased speed as a result.
+ */
+ 
+ static int
+ create_pagelist(char __user *buf, size_t count, unsigned short type,
+-	struct task_struct *task, PAGELIST_T ** ppagelist)
++		struct task_struct *task, PAGELIST_T **ppagelist,
++		dma_addr_t *dma_addr)
+ {
+ 	PAGELIST_T *pagelist;
+ 	struct page **pages;
+-	unsigned long *addrs;
+-	unsigned int num_pages, offset, i;
+-	char *addr, *base_addr, *next_addr;
+-	int run, addridx, actual_pages;
++	u32 *addrs;
++	unsigned int num_pages, offset, i, k;
++	int actual_pages;
+         unsigned long *need_release;
++	size_t pagelist_size;
++	struct scatterlist *scatterlist, *sg;
++	int dma_buffers;
++	int dir;
+ 
+-	offset = (unsigned int)buf & (PAGE_SIZE - 1);
++	offset = ((unsigned int)(unsigned long)buf & (PAGE_SIZE - 1));
+ 	num_pages = (count + offset + PAGE_SIZE - 1) / PAGE_SIZE;
+ 
++	pagelist_size = sizeof(PAGELIST_T) +
++			(num_pages * sizeof(unsigned long)) +
++			sizeof(unsigned long) +
++			(num_pages * sizeof(pages[0]) +
++			(num_pages * sizeof(struct scatterlist)));
++
+ 	*ppagelist = NULL;
+ 
++	dir = (type == PAGELIST_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
++
+ 	/* Allocate enough storage to hold the page pointers and the page
+ 	** list
+ 	*/
+-	pagelist = kmalloc(sizeof(PAGELIST_T) +
+-                           (num_pages * sizeof(unsigned long)) +
+-                           sizeof(unsigned long) +
+-                           (num_pages * sizeof(pages[0])),
+-                           GFP_KERNEL);
++	pagelist = dma_zalloc_coherent(g_dev,
++				       pagelist_size,
++				       dma_addr,
++				       GFP_KERNEL);
+ 
+ 	vchiq_log_trace(vchiq_arm_log_level, "create_pagelist - %pK",
+ 			pagelist);
+@@ -394,10 +399,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 	addrs = pagelist->addrs;
+         need_release = (unsigned long *)(addrs + num_pages);
+ 	pages = (struct page **)(addrs + num_pages + 1);
++	scatterlist = (struct scatterlist *)(pages + num_pages);
+ 
+ 	if (is_vmalloc_addr(buf)) {
+-		int dir = (type == PAGELIST_WRITE) ?
+-			DMA_TO_DEVICE : DMA_FROM_DEVICE;
+ 		unsigned long length = count;
+ 		unsigned int off = offset;
+ 
+@@ -410,7 +414,6 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 			if (bytes > length)
+ 				bytes = length;
+ 			pages[actual_pages] = pg;
+-			dmac_map_area(page_address(pg) + off, bytes, dir);
+ 			length -= bytes;
+ 			off = 0;
+ 		}
+@@ -438,7 +441,8 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 				actual_pages--;
+ 				put_page(pages[actual_pages]);
+ 			}
+-			kfree(pagelist);
++			dma_free_coherent(g_dev, pagelist_size,
++					  pagelist, *dma_addr);
+ 			if (actual_pages == 0)
+ 				actual_pages = -ENOMEM;
+ 			return actual_pages;
+@@ -450,30 +454,44 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 	pagelist->type = type;
+ 	pagelist->offset = offset;
+ 
+-	/* Group the pages into runs of contiguous pages */
++	for (i = 0; i < num_pages; i++)
++		sg_set_page(scatterlist + i, pages[i], PAGE_SIZE, 0);
++
++	dma_buffers = dma_map_sg(g_dev,
++				 scatterlist,
++				 num_pages,
++				 dir);
+ 
+-	base_addr = VCHIQ_ARM_ADDRESS(page_address(pages[0]));
+-	next_addr = base_addr + PAGE_SIZE;
+-	addridx = 0;
+-	run = 0;
++	if (dma_buffers == 0) {
++		dma_free_coherent(g_dev, pagelist_size,
++				  pagelist, *dma_addr);
+ 
+-	for (i = 1; i < num_pages; i++) {
+-		addr = VCHIQ_ARM_ADDRESS(page_address(pages[i]));
+-		if ((addr == next_addr) && (run < (PAGE_SIZE - 1))) {
+-			next_addr += PAGE_SIZE;
+-			run++;
++		return -EINTR;
++	}
++
++	/* Combine adjacent blocks for performance */
++	k = 0;
++	for_each_sg(scatterlist, sg, dma_buffers, i) {
++		u32 len = sg_dma_len(sg);
++		u32 addr = sg_dma_address(sg);
++
++		/* Note: addrs is the address + page_count - 1
++		 * The firmware expects the block to be page
++		 * aligned and a multiple of the page size
++		 */
++		WARN_ON(len == 0);
++		WARN_ON(len & ~PAGE_MASK);
++		WARN_ON(addr & ~PAGE_MASK);
++		if (k > 0 &&
++		    ((addrs[k - 1] & PAGE_MASK) |
++			((addrs[k - 1] & ~PAGE_MASK) + 1) << PAGE_SHIFT)
++		    == addr) {
++			addrs[k - 1] += (len >> PAGE_SHIFT);
+ 		} else {
+-			addrs[addridx] = (unsigned long)base_addr + run;
+-			addridx++;
+-			base_addr = addr;
+-			next_addr = addr + PAGE_SIZE;
+-			run = 0;
++			addrs[k++] = addr | ((len >> PAGE_SHIFT) - 1);
+ 		}
+ 	}
+ 
+-	addrs[addridx] = (unsigned long)base_addr + run;
+-	addridx++;
+-
+ 	/* Partial cache lines (fragments) require special measures */
+ 	if ((type == PAGELIST_READ) &&
+ 		((pagelist->offset & (g_cache_line_size - 1)) ||
+@@ -482,7 +500,10 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 		char *fragments;
+ 
+ 		if (down_interruptible(&g_free_fragments_sema) != 0) {
+-			kfree(pagelist);
++			dma_unmap_sg(g_dev, scatterlist, num_pages,
++				     DMA_BIDIRECTIONAL);
++			dma_free_coherent(g_dev, pagelist_size,
++					  pagelist, *dma_addr);
+ 			return -EINTR;
+ 		}
+ 
+@@ -497,29 +518,42 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 			(fragments - g_fragments_base) / g_fragments_size;
+ 	}
+ 
+-	dmac_flush_range(pagelist, addrs + num_pages);
+-
+ 	*ppagelist = pagelist;
+ 
+ 	return 0;
+ }
+ 
+ static void
+-free_pagelist(PAGELIST_T *pagelist, int actual)
++free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual)
+ {
+         unsigned long *need_release;
+ 	struct page **pages;
+ 	unsigned int num_pages, i;
++	size_t pagelist_size;
++	struct scatterlist *scatterlist;
++	int dir;
+ 
+ 	vchiq_log_trace(vchiq_arm_log_level, "free_pagelist - %pK, %d",
+ 			pagelist, actual);
+ 
++	dir = (pagelist->type == PAGELIST_WRITE) ? DMA_TO_DEVICE :
++						   DMA_FROM_DEVICE;
++
+ 	num_pages =
+ 		(pagelist->length + pagelist->offset + PAGE_SIZE - 1) /
+ 		PAGE_SIZE;
+ 
++	pagelist_size = sizeof(PAGELIST_T) +
++			(num_pages * sizeof(unsigned long)) +
++			sizeof(unsigned long) +
++			(num_pages * sizeof(pages[0]) +
++			(num_pages * sizeof(struct scatterlist)));
++
+         need_release = (unsigned long *)(pagelist->addrs + num_pages);
+ 	pages = (struct page **)(pagelist->addrs + num_pages + 1);
++	scatterlist = (struct scatterlist *)(pages + num_pages);
++
++	dma_unmap_sg(g_dev, scatterlist, num_pages, dir);
+ 
+ 	/* Deal with any partial cache lines (fragments) */
+ 	if (pagelist->type >= PAGELIST_READ_WITH_FRAGMENTS) {
+@@ -569,8 +603,7 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
+ 
+ 				if (bytes > length)
+ 					bytes = length;
+-				dmac_unmap_area(page_address(pg) + offset,
+-						bytes, DMA_FROM_DEVICE);
++
+ 				length -= bytes;
+ 				offset = 0;
+ 				set_page_dirty(pg);
+@@ -579,5 +612,6 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
+ 		}
+ 	}
+ 
+-	kfree(pagelist);
++	dma_free_coherent(g_dev, pagelist_size,
++			  pagelist, dma_addr);
+ }
+-- 
+2.10.1
