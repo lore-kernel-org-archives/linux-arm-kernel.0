@@ -1,104 +1,69 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 27 Oct 2016 01:37:39 +0900
-Subject: [PATCH 2/2] ARM: dts: uniphier: add CPU clocks and OPP table for PXs2
- SoC
-In-Reply-To: <1477499859-12415-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1477499859-12415-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1477499859-12415-2-git-send-email-yamada.masahiro@socionext.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 26 Oct 2016 10:42:28 -0600
+Subject: [RFC PATCH 4/5] w1: add a callback to call slave when a new
+ device is connected
+In-Reply-To: <20161026145756.21689-5-antoine.tenart@free-electrons.com>
+References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+ <20161026145756.21689-5-antoine.tenart@free-electrons.com>
+Message-ID: <CANLsYkxfnF9-H9mawt3BWTgy5gjf8Qs3O6iSRGiLQ=8vfYACTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a CPU clock to every CPU node and a CPU OPP table to use the
-generic cpufreq driver.
+On 26 October 2016 at 08:57, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
+> This patch adds the possibility for slave drivers to register a
+> callback, to be called whenever a new device matching the slave ID
+> is connected.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/w1/w1.c        | 10 ++++++++++
+>  drivers/w1/w1_family.h |  2 ++
+>  2 files changed, 12 insertions(+)
+>
+> diff --git a/drivers/w1/w1.c b/drivers/w1/w1.c
+> index 80d0cc4e6e7f..7010ffd1ea93 100644
+> --- a/drivers/w1/w1.c
+> +++ b/drivers/w1/w1.c
+> @@ -659,6 +659,16 @@ static int w1_family_notify(unsigned long action, struct w1_slave *sl)
+>                                 return err;
+>                         }
+>                 }
+> +               if (fops->callback) {
+> +                       err = fops->callback(sl);
+> +                       /*
+> +                        * Do not return an error as the slave driver correctly
+> +                        * probed.
+> +                        */
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+I don't get this part.  What's the point of calling a callback if a
+failure is not important - maybe I'm just missing something.
 
- arch/arm/boot/dts/uniphier-pxs2.dtsi | 46 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
-
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index 950f07b..83ba3e6 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -56,32 +56,78 @@
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
- 			next-level-cache = <&l2>;
-+			operating-points-v2 = <&cpu_opp>;
- 		};
- 
- 		cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
- 			next-level-cache = <&l2>;
-+			operating-points-v2 = <&cpu_opp>;
- 		};
- 
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <2>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
- 			next-level-cache = <&l2>;
-+			operating-points-v2 = <&cpu_opp>;
- 		};
- 
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <3>;
-+			clocks = <&sys_clk 32>;
- 			enable-method = "psci";
- 			next-level-cache = <&l2>;
-+			operating-points-v2 = <&cpu_opp>;
-+		};
-+	};
-+
-+	cpu_opp: opp_table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 150000000 {
-+			opp-hz = /bits/ 64 <150000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 300000000 {
-+			opp-hz = /bits/ 64 <300000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 600000000 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 800000000 {
-+			opp-hz = /bits/ 64 <800000000>;
-+			clock-latency-ns = <300>;
-+		};
-+		opp at 1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			clock-latency-ns = <300>;
- 		};
- 	};
- 
--- 
-1.9.1
+> +                       if (err)
+> +                               dev_err(&sl->dev,
+> +                                       "callback call failed. err=%d\n", err);
+> +               }
+>
+>                 break;
+>         case BUS_NOTIFY_DEL_DEVICE:
+> diff --git a/drivers/w1/w1_family.h b/drivers/w1/w1_family.h
+> index 10a7a0767187..5e165babc6f3 100644
+> --- a/drivers/w1/w1_family.h
+> +++ b/drivers/w1/w1_family.h
+> @@ -55,11 +55,13 @@ struct w1_slave;
+>   * @add_slave: add_slave
+>   * @remove_slave: remove_slave
+>   * @groups: sysfs group
+> + * @callback: called when a new device is discovered
+>   */
+>  struct w1_family_ops
+>  {
+>         int  (* add_slave)(struct w1_slave *);
+>         void (* remove_slave)(struct w1_slave *);
+> +       int  (* callback)(struct w1_slave *);
+>         const struct attribute_group **groups;
+>  };
+>
+> --
+> 2.10.1
+>
