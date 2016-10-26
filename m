@@ -1,44 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 26 Oct 2016 10:55:28 +0200
-Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
-In-Reply-To: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
-References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
-Message-ID: <20161026085528.vjjypbfmfbhvileb@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 26 Oct 2016 17:13:46 -0500
+Subject: [PATCH v2 1/8] drm/bridge: rgb-to-vga: Support an enable GPIO
+In-Reply-To: <20161020034344.14154-2-wens@csie.org>
+References: <20161020034344.14154-1-wens@csie.org>
+ <20161020034344.14154-2-wens@csie.org>
+Message-ID: <20161026221346.tdpmbrwca4jehch2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 12:00:30AM -0700, Alexandru Gagniuc wrote:
-> This is the seventh attempt to get this patch in. I was prompted to look
-> into this again as someone recently remarked:
+On Thu, Oct 20, 2016 at 11:43:37AM +0800, Chen-Yu Tsai wrote:
+> Some rgb-to-vga bridges have an enable GPIO, either directly tied to
+> an enable pin on the bridge IC, or indirectly controlling a power
+> switch.
 > 
-> " cool, to bad spi does not work properly on allwinner..."
+> Add support for it.
 > 
-> Two and a half years ago,  we were told this will all be handled with DMA.
-> A year or so ago, we were told this will all be handled with DMA.
-> A week or so ago, we were told this will all be handled with DMA.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+>  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 28 ++++++++++++++++++++++
+>  2 files changed, 30 insertions(+)
 > 
-> See the pattern?
-> When DMA finally takes over, this fallback path is not mutually exclusive.
+> diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> index 003bc246a270..d3484822bf77 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> @@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+>  - Video port 0 for RGB input
+>  - Video port 1 for VGA output
+>  
+> +Optional properties:
+> +- enable-gpios: GPIO pin to enable or disable the bridge
 
-I definitely agree, and we had this patch in the CHIP kernel for quite
-some time, working like a charm.
+This should also define the active state.
 
-I was planning to respin it in the next few days, glad to see you took
-care of it :)
+> +static void dumb_vga_enable(struct drm_bridge *bridge)
+> +{
+> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +
+> +	if (vga->enable_gpio)
+> +		gpiod_set_value_cansleep(vga->enable_gpio, 1);
 
-Mark, any comments on this? For the record, it already has my Acked-by.
+So the driver should allow either active high or low.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161026/f2bea18e/attachment.sig>
+> +}
+> +
+> +static void dumb_vga_disable(struct drm_bridge *bridge)
+> +{
+> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> +
+> +	if (vga->enable_gpio)
+> +		gpiod_set_value_cansleep(vga->enable_gpio, 0);
+> +}
+> +
