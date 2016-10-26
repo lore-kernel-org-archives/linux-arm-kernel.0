@@ -1,35 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 26 Oct 2016 21:55:50 +0800
-Subject: [PATCH 0/7] ARM: dts: support I2SE Duckbill device
-In-Reply-To: <2694949.M3JJFNG6Xz@kerker>
-References: <1477164150-13553-1-git-send-email-mhei@heimpold.de>
- <20161024131209.GK30578@tiger> <2694949.M3JJFNG6Xz@kerker>
-Message-ID: <20161026135550.GQ30578@tiger>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 26 Oct 2016 15:00:54 +0100
+Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
+In-Reply-To: <20161024104747.GC1440@katana>
+References: <20161005155112.13774-1-hdegoede@redhat.com>
+ <20161005155112.13774-2-hdegoede@redhat.com>
+ <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
+ <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
+ <20161024100938.GI14477@dell> <20161024101659.GA1440@katana>
+ <20161024103428.GA8574@dell> <20161024104747.GC1440@katana>
+Message-ID: <20161026140054.GE13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 09:45:56PM +0200, Michael Heimpold wrote:
-> Actually it would even be 11 files for 8 boards, thats right.
-> There is no mechanism (no EEPROM, GPIO...) to automatically probe for the 
-> device variants, and the "variant-forming daugther boards" are
-> not switchable like the expansion boards e.g. for Raspberry Pi.
-> Another point is, that this would really require to use U-Boot to apply
-> the overlay (or another DT capable bootloader with this functionality).
-> For booting very fast, the good old Freescale bootlets are still
-> an option, which could not handle the overlays - at least at the moment...
-> However, it still an option to have a second look...
-> 
-> To reduce the number of files, I see the following other approaches:
-> - don't use the three "common" files which are included: -3 files (8 total)
-> - don't mainline Duckbill EnOcean, Duckbill 485 and Duckbill SPI:
->   they are EOL, only Duckbill 2 variants are still sold;
->   however, since Duckbill (without 2) is/was already mainlined, we
->   should keep this, leaving 4 new variants + 1 old variant: -3 files (5 total)
-> - only mainline Duckbill 2 (generic board) and maintain all other variants
->   in a private Github repo (this is what we are doing now): -3 files (2 total)
-> 
-> So, I'll discuss this again internally. Do you have any preference?
+On Mon, 24 Oct 2016, Wolfram Sang wrote:
 
-I'm fine with the second one.
+> 
+> > I was under the impression it was all but ready.
+> 
+> Then, I would have applied it.
+> 
+> > What are you waiting on?
+> 
+> Lee, I don't want to explain it *again*. Please re-read Kieran's last
+> attempt.
 
-Shawn
+I met with Kieran.  He's submitted a new version.
+
+Here's hoping! ;)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
