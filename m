@@ -1,70 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 26 Oct 2016 14:26:07 +0530
-Subject: [PATCH/RFT v2 02/17] ARM: davinci: da8xx: Add CFGCHIP syscon
- platform declaration.
-In-Reply-To: <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
-References: <20161024164634.4330-1-ahaslam@baylibre.com>
- <20161024164634.4330-3-ahaslam@baylibre.com>
- <7f9efe9d-0912-e10a-3e45-24c5d2b455ab@ti.com>
- <CAKXjFTOVuWRL+yuk6sARa2PAd6j-V4Ej5AmPGz7F7JXKidvJrg@mail.gmail.com>
- <758f206c-d0bd-6f70-da1e-42c88d6dd1f0@ti.com>
- <c3af8517-c452-ae8c-6840-dd8a684e4ab2@lechnology.com>
-Message-ID: <236fc069-b24b-ed8a-55c1-e3e7af08a229@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 26 Oct 2016 09:57:35 +0100
+Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
+ correct compatibles
+In-Reply-To: <7hh980taqp.fsf@baylibre.com>
+References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
+ <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
+ <7hh980taqp.fsf@baylibre.com>
+Message-ID: <68dc67d1-b443-f7b1-6229-0ac54e403d61@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 25 October 2016 09:23 PM, David Lechner wrote:
-> Hi Sekhar,
-> 
-> On 10/25/2016 05:17 AM, Sekhar Nori wrote:
->> On Tuesday 25 October 2016 03:07 PM, Axel Haslam wrote:
->>> Hi Sekar,
->>>
->>> On Tue, Oct 25, 2016 at 10:10 AM, Sekhar Nori <nsekhar@ti.com> wrote:
->>>> On Monday 24 October 2016 10:16 PM, ahaslam at baylibre.com wrote:
->>>>> From: David Lechner <david@lechnology.com>
->>>>>
->>>>> The CFGCHIP registers are used by a number of devices, so using a
->>>>> syscon
->>>>> device to share them. The first consumer of this will by the
->>>>> phy-da8xx-usb
->>>>> driver.
->>>>>
->>>>> Signed-off-by: David Lechner <david@lechnology.com>
->>>>> [Axel: minor fix: change id to -1]
->>>>
->>>> Can you please clarify this change? There could be other syscon devices
->>>> on the chip for other common registers. Why use the singular device-id?
->>>>
->>>
->>> in the case of non DT boot, the phy driver is looking for "syscon" :
->>>
->>> d_phy->regmap = syscon_regmap_lookup_by_pdevname("syscon");
->>>
->>> if we register the syscon driver with id = 0, the actual name of the
->>> syscon
->>> device will be "syscon.0" and the phy driver will fail to probe, because
->>> the strncmp match in the syscon driver (syscon_match_pdevname)
->>> will fail.
->>>
->>> should i change the phy driver instead?
->>
->> Yes, please. Forcing only one syscon region for the whole chip will be
->> too restrictive, I am pretty sure.
->>
->> Thanks,
->> Sekhar
->>
-> 
-> In the previous review, you requested that this be changed to -1 [1].
-> 
-> If we change it back to 0, it will also require reverting a patch to the
-> phy driver that has already been merged[2].
 
-Sigh. Sorry about going around in circles on this one. Lets go with what
-you have. If and when there is a need for another syscon node, the
-driver and platform code can be updated. At least we will know why the
-change is being done at that time.
 
-Thanks,
-Sekhar
+On 25/10/16 21:49, Kevin Hilman wrote:
+> Lina Iyer <lina.iyer@linaro.org> writes:
+>
+>> Update domain-idle-state binding to use "domain-idle-state" compatible
+>> from Documentation/devicetree/bindings/arm/idle-states.txt.
+>>
+>> Cc: <devicetree@vger.kernel.org>
+>> Cc: Rob Herring <robh@kernel.org>
+>> Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+>> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
+>>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> With no current users for this, I don't see the point of adding a
+> compatible now.
+>
+> IMO, this should wait and be added with the identified user we can
+> discuss it then.
+>
+
+No, IMO it needs to be used for the proposed SoC idle/genpd solution.
+
+I understand the nodes that are "arm,idle-state" compatible can be used
+for this new SoC hierarchical idle management, but it was never defined
+for that use originally. So this new feature must be advertised by the 
+firmware with the presence of "domain-idle-state".
+
+Yes we might have other ways to detect that but I have already seen that 
+broken on the reference platform, so we need alternate/DT way to specify 
+that.
+
+Not all existing "arm,idle-state" compatible nodes will be capable of
+supporting this new SoC idle feature. It's just better and safer for a
+new feature getting added that relies on DT to have a new compatible.
+
+-- 
+Regards,
+Sudeep
