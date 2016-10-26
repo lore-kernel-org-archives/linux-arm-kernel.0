@@ -1,42 +1,48 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 26 Oct 2016 23:15:51 +0530
-Subject: Pinctrl nodes missing for USB
-In-Reply-To: <20161026165348.GA5600@kozik-lap>
-References: <CANAwSgQ=pp93tDAERQ1iaryY3_pVhTeun=RaTo9ws1UKtS1PhA@mail.gmail.com>
- <20161026165348.GA5600@kozik-lap>
-Message-ID: <CANAwSgSfRVDA_MXN9S+G0-u-mQNhPuPJ65FT_Y-ZH5nFpX4ptg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Oct 2016 18:50:52 +0100
+Subject: [PATCH 02/12] ASoC: dapm: Implement stereo mixer control support
+In-Reply-To: <20161003110804.28235-3-wens@csie.org>
+References: <20161003110804.28235-1-wens@csie.org>
+ <20161003110804.28235-3-wens@csie.org>
+Message-ID: <20161026175052.GE25322@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof
+On Mon, Oct 03, 2016 at 07:07:54PM +0800, Chen-Yu Tsai wrote:
 
-On 26 October 2016 at 22:23, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Wed, Oct 26, 2016 at 05:56:54PM +0530, Anand Moon wrote:
->> Hi All,
->>
->> I have tried to enable CONFIG_DEBUG_PINCTRL=y on Odroid XU4.
->> Just to try to understand the feature.
->> Is this feature suppoted for USB nodes.
->>
->> Below is the output of failed to pase pinctrl for USB nodes via dts.
->
-> I do not see any question here...
->
-> Anyway the devices not instantiated from DT will have such warning and
-> USB devices are not present in DT, from obvious reasons... However what
-> surprises me is why pinctrl_dt_to_map() was called for USB devices?
->
-> Best regards,
-> Krzysztof
->
-[snip]
+>  	/* find dapm widget path assoc with kcontrol */
+>  	dapm_kcontrol_for_each_path(path, kcontrol) {
+> +		/*
+> +		 * If status for the second channel was given ( >= 0 ),
+> +		 * consider the second and later paths as the second
+> +		 * channel.
+> +		 */
+> +		if (found && rconnect >= 0)
+> +			soc_dapm_connect_path(path, rconnect, "mixer update");
+> +		else
+> +			soc_dapm_connect_path(path, connect, "mixer update");
+>  		found = 1;
+> -		soc_dapm_connect_path(path, connect, "mixer update");
 
-Sorry. I was just referring HK odroidxu3 dts for reference for dwc3 controller.
+This really only works for two channels with the current inteface - the
+comment makes it sound like it'll work for more but we can only pass in
+two (and there's only support for specifying two everywhere).
 
-https://github.com/hardkernel/linux/blob/odroidxu3-3.10.y/arch/arm/boot/dts/exynos5422-odroidxu3.dts#L525
+> -	change = dapm_kcontrol_set_value(kcontrol, val);
+> +	/* This assumes field width < (bits in unsigned int / 2) */
+> +	change = dapm_kcontrol_set_value(kcontrol, val | (rval << width));
 
-I am just trying to understand if such a configuration possible for
-dwc3 controllers.
+That seems like a bit of an assumption in cases where we've got a single
+control for both power and volume?  They're very rare though, I'm not
+even sure any exist.  It'd be good to have a check in the code just in
+case it does come up, it'll likely be a nightmare to debug if someone
+does run into it.
 
-Best Regards
-Anand Moon
+Otherwise I think this makes sense.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161026/6a7d0d11/attachment.sig>
