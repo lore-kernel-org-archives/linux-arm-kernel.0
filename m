@@ -1,10 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 13:51:51 +0100
-Subject: [PATCH 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
-In-Reply-To: <1476394329-31696-2-git-send-email-tthayer@opensource.altera.com>
+Date: Wed, 26 Oct 2016 13:52:33 +0100
+Subject: [PATCH 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
+In-Reply-To: <1476394329-31696-4-git-send-email-tthayer@opensource.altera.com>
 References: <1476394329-31696-1-git-send-email-tthayer@opensource.altera.com>
- <1476394329-31696-2-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20161026125151.GK11267@dell>
+ <1476394329-31696-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20161026125233.GL11267@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,53 +12,32 @@ On Thu, 13 Oct 2016, tthayer at opensource.altera.com wrote:
 
 > From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Add the Arria10 DevKit System Resource Chip register and state
-> monitoring module to the MFD.
+> Add the Altera Arria10 DevKit System Resource Monitor functionality
+> to the MFD device.
 > 
 > Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
-> Note: This needs to be applied to the bindings document that
-> was Acked & Applied but didn't reach the for-next branch.
-> See https://patchwork.ozlabs.org/patch/629397/
-> ---
-> ---
->  .../devicetree/bindings/mfd/altera-a10sr.txt       |    9 +++++++++
->  1 file changed, 9 insertions(+)
+>  drivers/mfd/altera-a10sr.c |    4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> index ea151f2..0787ec6 100644
-> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
->  Device                   Description
->  ------                   ----------
->  a10sr_gpio               GPIO Controller
-> +a10sr_monitor            Register and State Monitoring
->  
->  Arria10 GPIO
->  Required Properties:
-> @@ -27,6 +28,10 @@ Required Properties:
->                        the second cell is used to specify flags.
->                        See ../gpio/gpio.txt for more information.
->  
-> +Arria10 Register and State Monitor
-> +Required Properties:
-> +- compatible        : Should be "altr,a10sr-mon"
+> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+> index 06e1f7f..0942d7d 100644
+> --- a/drivers/mfd/altera-a10sr.c
+> +++ b/drivers/mfd/altera-a10sr.c
+> @@ -33,6 +33,10 @@
+>  		.name = "altr_a10sr_gpio",
+>  		.of_compatible = "altr,a10sr-gpio",
+>  	},
+> +	{
+> +		.name = "altr_a10sr_mon",
+> +		.of_compatible = "altr,a10sr-mon",
 
-Why not "-monitor"?
+"-monitor" would be better in my opinion.
 
->  Example:
+> +	},
+>  };
 >  
->          resource-manager at 0 {
-> @@ -43,4 +48,8 @@ Example:
->  			gpio-controller;
->  			#gpio-cells = <2>;
->  		};
-> +
-> +		a10sr_monitor {
-> +			compatible = "altr,a10sr-mon";
-> +		};
->  	};
+>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
 
 -- 
 Lee Jones
