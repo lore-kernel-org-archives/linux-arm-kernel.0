@@ -1,48 +1,26 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 26 Oct 2016 13:56:29 +0200
-Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for obtaining
- mode pin state
-In-Reply-To: <1477064730.2508.24.camel@pengutronix.de>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
- <1477064730.2508.24.camel@pengutronix.de>
-Message-ID: <CAMuHMdUsuoLni1FUwCPXM2WrGpwKVR4UA85zujpbcwmdPMXpdg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 17:27:45 +0530
+Subject: [PATCH v2] ARM: davinci: da8xx: Fix some redefined symbol warnings
+In-Reply-To: <1477397492-7925-2-git-send-email-abailon@baylibre.com>
+References: <1477397492-7925-1-git-send-email-abailon@baylibre.com>
+ <1477397492-7925-2-git-send-email-abailon@baylibre.com>
+Message-ID: <3dc1c2c2-c4c5-07d0-3d3e-b8d917adda81@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philip,
+On Tuesday 25 October 2016 05:41 PM, Alexandre Bailon wrote:
+> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
+> but da8xx-cfgchip.h intend to replace them.
+> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
+> Remove the macro and update the da830-evm board file to use da8xx-cfgchip.h
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 
-On Fri, Oct 21, 2016 at 5:45 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Am Freitag, den 21.10.2016, 15:17 +0200 schrieb Geert Uytterhoeven:
->>         Hi Philipp, Mike, Stephen, Simon, Magnus,
->>       (see questions *** below!)
->>
->> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
->> state of the mode pins either by a call from the platform code, or
->> directly by using a hardcoded register access. This is a bit messy, and
->> creates a dependency between driver and platform code.
->>
->> This patch series converts the various Renesas R-Car clock drivers
->> and support code from reading the mode pin states using a hardcoded
->> register access to using a new minimalistic R-Car RST driver.
+This leads to build error on v4.9-rc2:
 
-[...]
+arch/arm/mach-davinci/board-da830-evm.c: In function 'da830_evm_usb_init':
+arch/arm/mach-davinci/board-da830-evm.c:120:15: error: 'CFGCHIP2_REFFREQ' undeclared (first use in this function)
+  cfgchip2 &= ~CFGCHIP2_REFFREQ;
 
->>   - Philip: While this is a driver for a reset-controller, currently it
->>     doesn't provide any reset-controller functionality. Hence I added it
->>     to drivers/soc/renesas/. Is that OK for you?
->
-> Absolutely, as long as the driver isn't even a reset controller
-> provider, this is the right place.
-
-Thank you!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Sekhar
