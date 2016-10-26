@@ -1,51 +1,32 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 26 Oct 2016 17:51:07 +0200
-Subject: [PATCH] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161026153548.xxvciigcscrjb5uv@piout.net>
-References: <20161025161135.7316-1-richard.genoud@gmail.com>
- <20161025171754.a4lult2ld3gv5a2q@pengutronix.de>
- <f89c29e4-b68f-a8ea-cefb-e70dda6739a0@gmail.com>
- <20161026153548.xxvciigcscrjb5uv@piout.net>
-Message-ID: <CACQ1gAhfSQG1_otKjvQUiXCajfZvOM-=VqhyKs1D+fXEU9eCnw@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 26 Oct 2016 09:02:14 -0700
+Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
+In-Reply-To: <f423a705-5ae2-78cf-2b63-609dd4e2cdf6@ti.com> (Sekhar Nori's
+ message of "Wed, 26 Oct 2016 16:07:29 +0530")
+References: <1477418044-24603-1-git-send-email-david@lechnology.com>
+ <f423a705-5ae2-78cf-2b63-609dd4e2cdf6@ti.com>
+Message-ID: <7heg33rtdl.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-26 17:35 GMT+02:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> Richard,
->
-> On 26/10/2016 at 16:55:02 +0200, Richard Genoud wrote :
->> On 25/10/2016 19:17, Uwe Kleine-K?nig wrote:
->> Quote from the commit message:
->> "   Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
->>     hardware handshake is enabled") actually allowed to enable hardware
->>     handshaking.
->>     Before, the CRTSCTS flags was silently ignored.
->> "
->> This wasn't true.
->> This was a misunderstanding of the ATMEL_US_USMODE_HWHS flag:
->> Commit 1cf6e8fc8341 didn't allowed to enable hardware handshaking, but
->> introduced the ATMEL_US_USMODE_HWHS flag.
->> And before 1cf6e8fc8341, the CRTSCTS flags wasn't silently ignored, it
->> was perfectly respected.
->>
->
-> It was not really a misunderstanding, it is a difference in
-> expectations. There is one topic on which we don't agree and I'm fine
-> with your solution as long as I don't have to support people with the
-> failures (hence my ack). My (and Cyrille's) opinion is that CRTSCTS has
-> to be 100% reliable and this is only possible with assistance from the
-> hardware. That's why I wanted to report when HW didn't have proper
-> support to userspace.
-> On your side you are fine with software handling of RTS and CTS (which
-> is a feature that worked before our patches). You just have to remember
-> that at some point because of latencies and the way the IPs are clocked,
-> this will fail and you'll start losing bytes.
->
-> Again, I'm fine with that but I won't handle people complaining about it
-> :)
+Hi Sekhar,
 
-So you broke this on purpose ?
-Without saying so in the commit message ?
-Nice to know.
+Sekhar Nori <nsekhar@ti.com> writes:
+
+> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
+>> This fixes pwm name matching for DA850 familiy devices. When using device
+>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
+>> same name, which caused errors when trying to register the devices.
+>> 
+>> The names for clock matching in da850_clks[] also have to be updated to
+>> to exactly match in order for the clock lookup to work correctly.
+>> 
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>
+> Applied to "fixes" branch. Will send upstream after testing a bit and
+> also waiting to see if anyone else has any comments.
+
+I'm not seeing a fixes branch in your tree.  Did you push this out?
+Similarily, I didn't see the updates in v4.10/defconfig either.
+
+Kevin
