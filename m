@@ -1,70 +1,53 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 26 Oct 2016 17:27:01 -0500
-Subject: [PATCH V4 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <1476954940-242159-4-git-send-email-yuanzhichang@hisilicon.com>
-References: <1476954940-242159-1-git-send-email-yuanzhichang@hisilicon.com>
- <1476954940-242159-4-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <20161026222701.pptd33e5uaokhvce@rob-hp-laptop>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 27 Oct 2016 06:42:37 +0800
+Subject: [rjarzmik:work/ac97 8/13] sound/soc/codecs/wm9713.c:20:30: fatal
+ error: linux/mfd/wm97xx.h: No such file or directory
+Message-ID: <201610270634.EVYQ07c7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 05:15:40PM +0800, zhichang.yuan wrote:
-> On Hip06, the accesses to LPC peripherals work in an indirect way. A
-> corresponding LPC driver configure some registers in LPC master at first, then
-> the real accesses on LPC slave devices are finished by the LPC master, which
-> is transparent to LPC driver.
-> This patch implement the relevant driver for Hip06 LPC. Cooperating with
-> indirect-IO, ipmi messages is in service without any changes on ipmi driver.
-> 
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> ---
->  .../arm/hisilicon/hisilicon-low-pin-count.txt      |  31 ++
->  MAINTAINERS                                        |   8 +
->  drivers/bus/Kconfig                                |   8 +
->  drivers/bus/Makefile                               |   1 +
->  drivers/bus/hisi_lpc.c                             | 501 +++++++++++++++++++++
->  5 files changed, 549 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->  create mode 100644 drivers/bus/hisi_lpc.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-> new file mode 100644
-> index 0000000..e681419
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-> @@ -0,0 +1,31 @@
-> +Hisilicon Hip06 low-pin-count device
-> +  Usually LPC controller is part of PCI host bridge, so the legacy ISA ports
-> +  locate on LPC bus can be accessed direclty. But some SoCs have independent
-> +  LPC controller, and access the legacy ports by triggering LPC I/O cycles.
-> +  Hisilicon Hip06 implements this LPC device.
-> +
-> +Required properties:
-> +- compatible: should be "hisilicon,low-pin-count"
+tree:   https://github.com/rjarzmik/linux work/ac97
+head:   223e9c527c425b1b519468e54fff9f4f82a7f390
+commit: ded8ecc42087f1cdc4e356f118ea2e0d51691001 [8/13] ASoC: wm9713: add ac97 new bus support
+config: m32r-allyesconfig (attached as .config)
+compiler: m32r-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout ded8ecc42087f1cdc4e356f118ea2e0d51691001
+        # save the attached .config to linux build tree
+        make.cross ARCH=m32r 
 
-This should be an SoC specific compatible string.
+Note: the rjarzmik/work/ac97 HEAD 223e9c527c425b1b519468e54fff9f4f82a7f390 builds fine.
+      It only hurts bisectibility.
 
-> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
-> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
-> +- reg: base memory range where the register set for this device is mapped.
-> +
-> +Note:
-> +  The node name before '@' must be "isa" to represent the binding stick to the
-> +  ISA/EISA binding specification.
-> +
-> +Example:
-> +
-> +isa at a01b0000 {
-> +	compatible = "hisilicom,low-pin-count";
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	reg = <0x0 0xa01b0000 0x0 0x1000>;
-> +
-> +	ipmi0: bt at e4 {
-> +		compatible = "ipmi-bt";
-> +		device_type = "ipmi";
-> +		reg = <0x01 0xe4 0x04>;
-> +		status = "disabled";
-> +	};
-> +};
+All errors (new ones prefixed by >>):
+
+>> sound/soc/codecs/wm9713.c:20:30: fatal error: linux/mfd/wm97xx.h: No such file or directory
+    #include <linux/mfd/wm97xx.h>
+                                 ^
+   compilation terminated.
+
+vim +20 sound/soc/codecs/wm9713.c
+
+    14	 *   o Support for AC97 Codec, Voice DAC and Aux DAC
+    15	 *   o Support for DAPM
+    16	 */
+    17	
+    18	#include <linux/init.h>
+    19	#include <linux/slab.h>
+  > 20	#include <linux/mfd/wm97xx.h>
+    21	#include <linux/module.h>
+    22	#include <linux/device.h>
+    23	#include <linux/regmap.h>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37174 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/e80c0cd2/attachment-0001.gz>
