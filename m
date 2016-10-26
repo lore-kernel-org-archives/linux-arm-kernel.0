@@ -1,69 +1,24 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 26 Oct 2016 10:42:28 -0600
-Subject: [RFC PATCH 4/5] w1: add a callback to call slave when a new
- device is connected
-In-Reply-To: <20161026145756.21689-5-antoine.tenart@free-electrons.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <20161026145756.21689-5-antoine.tenart@free-electrons.com>
-Message-ID: <CANLsYkxfnF9-H9mawt3BWTgy5gjf8Qs3O6iSRGiLQ=8vfYACTQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 26 Oct 2016 17:45:51 +0100
+Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
+In-Reply-To: <CADi83T55fLfiMs+z0R6tf=fcFmuPS0fDFKwtXy25AKiEP1DiXw@mail.gmail.com>
+References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
+ <20161026100743.GZ17252@sirena.org.uk>
+ <CADi83T55fLfiMs+z0R6tf=fcFmuPS0fDFKwtXy25AKiEP1DiXw@mail.gmail.com>
+Message-ID: <20161026164551.GB25322@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 October 2016 at 08:57, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
-> This patch adds the possibility for slave drivers to register a
-> callback, to be called whenever a new device matching the slave ID
-> is connected.
->
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/w1/w1.c        | 10 ++++++++++
->  drivers/w1/w1_family.h |  2 ++
->  2 files changed, 12 insertions(+)
->
-> diff --git a/drivers/w1/w1.c b/drivers/w1/w1.c
-> index 80d0cc4e6e7f..7010ffd1ea93 100644
-> --- a/drivers/w1/w1.c
-> +++ b/drivers/w1/w1.c
-> @@ -659,6 +659,16 @@ static int w1_family_notify(unsigned long action, struct w1_slave *sl)
->                                 return err;
->                         }
->                 }
-> +               if (fops->callback) {
-> +                       err = fops->callback(sl);
-> +                       /*
-> +                        * Do not return an error as the slave driver correctly
-> +                        * probed.
-> +                        */
+On Wed, Oct 26, 2016 at 09:06:31AM -0700, Alex Gagniuc wrote:
 
-I don't get this part.  What's the point of calling a callback if a
-failure is not important - maybe I'm just missing something.
+> Thanks for the heads up! Sorry about that. Do you want me to resend
+> this as a single mail?
 
-> +                       if (err)
-> +                               dev_err(&sl->dev,
-> +                                       "callback call failed. err=%d\n", err);
-> +               }
->
->                 break;
->         case BUS_NOTIFY_DEL_DEVICE:
-> diff --git a/drivers/w1/w1_family.h b/drivers/w1/w1_family.h
-> index 10a7a0767187..5e165babc6f3 100644
-> --- a/drivers/w1/w1_family.h
-> +++ b/drivers/w1/w1_family.h
-> @@ -55,11 +55,13 @@ struct w1_slave;
->   * @add_slave: add_slave
->   * @remove_slave: remove_slave
->   * @groups: sysfs group
-> + * @callback: called when a new device is discovered
->   */
->  struct w1_family_ops
->  {
->         int  (* add_slave)(struct w1_slave *);
->         void (* remove_slave)(struct w1_slave *);
-> +       int  (* callback)(struct w1_slave *);
->         const struct attribute_group **groups;
->  };
->
-> --
-> 2.10.1
->
+It's fine, no need.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161026/47c93815/attachment.sig>
