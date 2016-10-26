@@ -1,42 +1,114 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 26 Oct 2016 10:39:16 -0600
-Subject: [RFC PATCH 3/5] w1: report errors returned by w1_family_notify
-In-Reply-To: <20161026145756.21689-4-antoine.tenart@free-electrons.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <20161026145756.21689-4-antoine.tenart@free-electrons.com>
-Message-ID: <CANLsYkzrDr6EUfVfJp25a7ztiUyxoj9BqSRa6_7RHv+9joMM7w@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 27 Oct 2016 01:37:38 +0900
+Subject: [PATCH 1/2] ARM: dts: uniphier: add CPU clocks and OPP table for Pro5
+ SoC
+Message-ID: <1477499859-12415-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 October 2016 at 08:57, Antoine Tenart
-<antoine.tenart@free-electrons.com> wrote:
+Add a CPU clock to every CPU node and a CPU OPP table to use the
+generic cpufreq driver.
 
-GKH won't accept an empty commit log.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> ---
->  drivers/w1/w1.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/w1/w1.c b/drivers/w1/w1.c
-> index bb34362e930a..80d0cc4e6e7f 100644
-> --- a/drivers/w1/w1.c
-> +++ b/drivers/w1/w1.c
-> @@ -702,7 +702,9 @@ static int __w1_attach_slave_device(struct w1_slave *sl)
->                         dev_name(&sl->dev), err);
->                 return err;
->         }
-> -       w1_family_notify(BUS_NOTIFY_ADD_DEVICE, sl);
-> +       err = w1_family_notify(BUS_NOTIFY_ADD_DEVICE, sl);
-> +       if (err)
-> +               return err;
->
->         dev_set_uevent_suppress(&sl->dev, false);
->         kobject_uevent(&sl->dev.kobj, KOBJ_ADD);
-> --
-> 2.10.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ arch/arm/boot/dts/uniphier-pro5.dtsi | 74 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
+
+diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
+index 5357ea9..5bd6068 100644
+--- a/arch/arm/boot/dts/uniphier-pro5.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
+@@ -56,16 +56,90 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
++			clocks = <&sys_clk 32>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&l2>;
++			operating-points-v2 = <&cpu_opp>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <1>;
++			clocks = <&sys_clk 32>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&l2>;
++			operating-points-v2 = <&cpu_opp>;
++		};
++	};
++
++	cpu_opp: opp_table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 116667000 {
++			opp-hz = /bits/ 64 <116667000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 150000000 {
++			opp-hz = /bits/ 64 <150000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 175000000 {
++			opp-hz = /bits/ 64 <175000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 233334000 {
++			opp-hz = /bits/ 64 <233334000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 350000000 {
++			opp-hz = /bits/ 64 <350000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 466667000 {
++			opp-hz = /bits/ 64 <466667000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 700000000 {
++			opp-hz = /bits/ 64 <700000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 933334000 {
++			opp-hz = /bits/ 64 <933334000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			clock-latency-ns = <300>;
++		};
++		opp at 1400000000 {
++			opp-hz = /bits/ 64 <1400000000>;
++			clock-latency-ns = <300>;
+ 		};
+ 	};
+ 
+-- 
+1.9.1
