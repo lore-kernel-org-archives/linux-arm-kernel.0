@@ -1,88 +1,55 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 26 Oct 2016 16:28:43 +0800
-Subject: [PATCH v14 3/9] clocksource/drivers/arm_arch_timer: Improve
- printk relevant code
-In-Reply-To: <20161020153244.GB27598@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-4-git-send-email-fu.wei@linaro.org>
- <20161020153244.GB27598@leverpostej>
-Message-ID: <CADyBb7tLeOoDsYHx_qE7TQgq-0VDVzY6E-t8nNmC=ge5u5xhMQ@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 26 Oct 2016 10:28:43 +0200
+Subject: [linux-sunxi] [PATCH RESEND 1/2] dt: bindings: add
+ allwinner,otg-routed property for phy-sun4i-usb
+In-Reply-To: <20161025041139.46454-1-icenowy@aosc.xyz>
+References: <20161025041139.46454-1-icenowy@aosc.xyz>
+Message-ID: <55fe59fc-6e93-d519-2d7c-264c48820fc4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi,
 
-On 20 October 2016 at 23:32, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Sep 29, 2016 at 02:17:11AM +0800, fu.wei at linaro.org wrote:
->>  static void arch_timer_banner(unsigned type)
->>  {
->> -     pr_info("Architected %s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
->> -                  type & ARCH_CP15_TIMER ? "cp15" : "",
->> -                  type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
->> -                  type & ARCH_MEM_TIMER ? "mmio" : "",
->> -                  (unsigned long)arch_timer_rate / 1000000,
->> -                  (unsigned long)(arch_timer_rate / 10000) % 100,
->> -                  type & ARCH_CP15_TIMER ?
->> -                  (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
->> -                     "",
->> -                  type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
->> -                  type & ARCH_MEM_TIMER ?
->> -                     arch_timer_mem_use_virtual ? "virt" : "phys" :
->> -                     "");
->> +     pr_info("%s%s%s timer(s) running at %lu.%02luMHz (%s%s%s).\n",
->> +             type & ARCH_CP15_TIMER ? "cp15" : "",
->> +             type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  " and " : "",
->> +             type & ARCH_MEM_TIMER ? "mmio" : "",
->> +             (unsigned long)arch_timer_rate / 1000000,
->> +             (unsigned long)(arch_timer_rate / 10000) % 100,
->> +             type & ARCH_CP15_TIMER ?
->> +             (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
->> +             "",
-> Please restore the additional indent on this line...
+On 25-10-16 06:11, Icenowy Zheng wrote:
+> On some newer Allwinner SoCs (H3 or A64), the PHY0 can be either routed to
+> the MUSB controller (which is an OTG controller) or the OHCI/EHCI pair
+> (which is a Host-only controller, but more stable and easy to implement).
 >
->> +             type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
->> +             type & ARCH_MEM_TIMER ?
->> +             arch_timer_mem_use_virtual ? "virt" : "phys" :
->> +             "");
+> This property marks whether on a certain board which controller should be
+> attached to the PHY.
 >
-> ... and these two.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+Icenowy, I appreciate your work on this, but we really need full otg
+support with dynamic switching rather then hardwiring the routing, so
+this cannot go in as is.
+
+NACK.
+
+Regards,
+
+Hans
+
+
+> ---
+>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 >
-> No matter what checkpatch says, I prefer the code that way so as to keep
-> the ternary clear.
-
-yes, NP, I have fixed it :-)
-
+> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> index 287150d..a63c766 100644
+> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+> @@ -36,6 +36,12 @@ Optional properties:
+>  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+>  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
 >
-> [...]
+> +Optional properties for H3 or A64 SoCs:
+> +- allwinner,otg-routed : USB0 (OTG) PHY is routed to OHCI/EHCI pair rather than
+> +			 MUSB. (boolean, if this property is set, the OHCI/EHCI
+> +			 controllers at PHY0 should be enabled and the MUSB
+> +			 controller must *NOT* be enabled)
+> +
+>  Example:
+>  	usbphy: phy at 0x01c13400 {
+>  		#phy-cells = <1>;
 >
->> @@ -768,7 +769,7 @@ static int __init arch_timer_init(void)
->>               return ret;
->>
->>       arch_timer_kvm_info.virtual_irq = arch_timer_ppi[VIRT_PPI];
->> -
->> +
->
-> Please mention the whitespace fixup in the commit message. It's
-> surprising otherwise.
-
-OK, added this message.
-
->
-> With all that:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Great thanks :-)
-
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
