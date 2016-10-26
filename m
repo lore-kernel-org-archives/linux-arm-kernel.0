@@ -1,44 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 26 Oct 2016 11:35:31 +0100
-Subject: [PATCH 5/6] arm64: dts: ls1043a: update gic dts node
-In-Reply-To: <1477398945-22774-5-git-send-email-Minghuan.Lian@nxp.com>
-References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
- <1477398945-22774-5-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20161026103516.GE19965@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Oct 2016 11:37:39 +0100
+Subject: [PATCH] iommu/arm-smmu: Expunge redundant iommu_present() checks
+Message-ID: <fc2d2a1c58af73c74584bb830f50b4626b52ff63.1477478259.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 08:35:44PM +0800, Minghuan Lian wrote:
-> From: Gong Qianyu <Qianyu.Gong@nxp.com>
-> 
-> In order to support kvm, rev1.1 LS1043a GIC register has been
-> changed to align as 64K. The patch updates GIC node according to
-> the rev1.1 hardware.
-> 
-> Signed-off-by: Gong Qianyu <Qianyu.Gong@nxp.com>
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index 5295bb9..da1809d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -144,10 +144,10 @@
->  		compatible = "arm,gic-400";
->  		#interrupt-cells = <3>;
->  		interrupt-controller;
-> -		reg = <0x0 0x1401000 0 0x1000>, /* GICD */
-> -		      <0x0 0x1402000 0 0x2000>, /* GICC */
-> -		      <0x0 0x1404000 0 0x2000>, /* GICH */
-> -		      <0x0 0x1406000 0 0x2000>; /* GICV */
-> +		reg = <0x0 0x1410000 0 0x10000>, /* GICD */
-> +		      <0x0 0x1420000 0 0x20000>, /* GICC */
-> +		      <0x0 0x1440000 0 0x20000>, /* GICH */
-> +		      <0x0 0x1460000 0 0x20000>; /* GICV */
+The first thing bus_set_iommu() does is check if iommu_ops are already
+installed on the given bus, and immediately return -EBUSY if so. Since
+the return value makes no difference as we ignore it anyway, there is
+no need to redundantly duplicate that check by explicitly calling
+iommu_present() beforehand.
 
-... this breaks HW prior to rev1.1, then.
+This does bring the slight change that we may now end up calling
+pci_request_acs() multiple times, but as that does nothing but set a
+variable to 1, the impact should be effectively zero.
 
-Thanks,
-Mark.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index c841eb7a1a74..ef978db2bb54 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -2000,17 +2000,13 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	arm_smmu_device_reset(smmu);
+ 
+ 	/* Oh, for a proper bus abstraction */
+-	if (!iommu_present(&platform_bus_type))
+-		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
++	bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
+ #ifdef CONFIG_ARM_AMBA
+-	if (!iommu_present(&amba_bustype))
+-		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
++	bus_set_iommu(&amba_bustype, &arm_smmu_ops);
+ #endif
+ #ifdef CONFIG_PCI
+-	if (!iommu_present(&pci_bus_type)) {
+-		pci_request_acs();
+-		bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+-	}
++	pci_request_acs();
++	bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
+ #endif
+ 	return 0;
+ }
+-- 
+1.9.1
