@@ -1,31 +1,39 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Wed, 26 Oct 2016 22:19:38 +0300
-Subject: MAINTAINERS entry for ARM/CLKDEV SUPPORT
-In-Reply-To: <20161010141819.GA1041@n2100.armlinux.org.uk>
-References: <20161010140810.GA30609@mwanda>
- <20161010141819.GA1041@n2100.armlinux.org.uk>
-Message-ID: <20161026191938.GT4418@mwanda>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 26 Oct 2016 15:35:56 -0400
+Subject: [PATCH 0/5] add NS2 support to bgmac
+Message-ID: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 10, 2016 at 03:18:19PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 10, 2016 at 05:08:10PM +0300, Dan Carpenter wrote:
-> > Hello Stephen Boyd,
-> 
-> Okay, that's really not nice.
-> 
-> This is _not_ a question for Stephen.  Stephen does _not_ co-maintain
-> clkdev or the clk API, but co-maintains CCF.  I've no idea why you are
-> addressing this to Stephen when this is clearly a question for me to
-> answer.
-> 
+Add support for the amac found in the Broadcom Northstar2 SoC to the
+bgmac driver.  This necessitates adding support to connect to an
+externally defined phy (as described in the device tree) in the driver.
+These phy changes are in addition to the changes necessary to get NS2
+working.
 
-Sorry, I didn't mean to offend.  He's the one who deleted the clkdev.h
-file though so I thought he might know if it should still be listed or
-if it was gone for good.
+This series (based on the net-next git tree) has been tested on NSP and
+NS2 HW.
 
-The clkdev.c question was a throw away thing that occured to me before I
-hit send.
+Jon Mason (4):
+  Documentation: devicetree: net: add NS2 bindings to amac
+  net: ethernet: bgmac: device tree phy enablement
+  net: ethernet: bgmac: add NS2 support
+  arm64: dts: NS2: add AMAC ethernet support
 
-regards,
-dan carpenter
+Vikas Soni (1):
+  net: phy: broadcom: Add BCM54810 phy entry
+
+ .../devicetree/bindings/net/brcm,amac.txt          |   7 +-
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |   5 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  12 +++
+ drivers/net/ethernet/broadcom/bgmac-bcma.c         |  48 +++++++++
+ drivers/net/ethernet/broadcom/bgmac-platform.c     | 108 ++++++++++++++++++++-
+ drivers/net/ethernet/broadcom/bgmac.c              |  56 +----------
+ drivers/net/ethernet/broadcom/bgmac.h              |   9 ++
+ drivers/net/phy/Kconfig                            |   2 +-
+ drivers/net/phy/broadcom.c                         |  65 +++++++++++++
+ include/linux/brcmphy.h                            |   7 ++
+ 10 files changed, 264 insertions(+), 55 deletions(-)
+
+-- 
+2.7.4
