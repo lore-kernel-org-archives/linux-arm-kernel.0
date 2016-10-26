@@ -1,376 +1,108 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Tue, 25 Oct 2016 19:23:27 -0700
-Subject: [PATCH v2] staging: vc04_services: Replace dmac_map_area with
- dmac_map_sg
-Message-ID: <20161026022327.19055-1-mzoran@crowfest.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 25 Oct 2016 19:35:11 -0700
+Subject: [PATCH] ARM: imx6: Fix GPC probe error path
+In-Reply-To: <1477416878-30353-1-git-send-email-linux@roeck-us.net>
+References: <1477416878-30353-1-git-send-email-linux@roeck-us.net>
+Message-ID: <39c26009-8e50-d182-dbfd-49f44cb9402a@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original arm implementation uses dmac_map_area which is not
-portable.  Replace it with an architecture neutral version
-which uses dma_map_sg.
+On 10/25/2016 10:34 AM, Guenter Roeck wrote:
+> GPC may fail to instantiate with
+>
+> imx-gpc: probe of 20dc000.gpc failed with error -22
+>
+> which is returned from of_genpd_add_provider_onecell(). The error path
+> does not call pm_genpd_remove(). This results in the following crash
+> later on.
+>
+> Unhandled fault: page domain fault (0x01b) at 0x00000040
+> pgd = c0204000
+> [00000040] *pgd=00000000
+> Internal error: : 1b [#1] SMP ARM
+> Modules linked in:
+> CPU: 0 PID: 108 Comm: kworker/0:3 Not tainted 4.9.0-rc2 #8
+> Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+> Workqueue: pm genpd_power_off_work_fn
+> task: c759ea00 task.stack: c766a000
+> PC is at mutex_lock+0xc/0x4c
+> LR is at regulator_disable+0x28/0x64
+> ...
+> [<c0bc2694>] (mutex_lock) from [<c06e4e8c>] (regulator_disable+0x28/0x64)
+> [<c06e4e8c>] (regulator_disable) from [<c0323b68>] (imx6q_pm_pu_power_off+0x90/0x98)
+> [<c0323b68>] (imx6q_pm_pu_power_off) from [<c07efb04>] (genpd_poweroff+0x114/0x1d4)
+> [<c07efb04>] (genpd_poweroff) from [<c07efdc0>] (genpd_power_off_work_fn+0x20/0x2c)
+> [<c07efdc0>] (genpd_power_off_work_fn) from [<c0358f70>] (process_one_work+0x138/0x34c)
+> [<c0358f70>] (process_one_work) from [<c03591bc>] (worker_thread+0x38/0x510)
+> [<c03591bc>] (worker_thread) from [<c035e48c>] (kthread+0xdc/0xf4)
+> [<c035e48c>] (kthread) from [<c0307eb8>] (ret_from_fork+0x14/0x3c)
+>
+> This is seen with multi_v7_defconfig and imx6dl-sabrelite.dtb running in
+> qemu (v2.7 patched to fix a qemu related problem). The error return from
+> of_genpd_add_provider_onecell() is not seen in v4.8 and may be caused by
+> a devicetree change (this is a wild guess only), but that is a different
+> problem.
+>
+> Fixes: 00eb60a8b4f7 ("ARM: imx6: gpc: Add PU power domain for GPU/VPU")
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> Several bisect attempts trying to track down "imx-gpc: probe ... failed
+> with error -22" point to commit 00e729c93395 ("Merge tag 'armsoc-dt' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc"). I have not
+> been able to track down the real culprit. Part of the problem is that
+> CONFIG_REGULATOR_ANATOP must be enabled for the problem to be seen, and
+> CONFIG_ARCH_AT91 causes compile errors for some sequence of commits between
+> v4.8 and v4.9-rc1. But even after taking this into account, the bisect
+> results always point to 00e729c93395. If anyone has an idea how to track
+> down that problem, or what might be causing it, please let me know.
+>
 
-As you can see that for larger page sizes, the dma_map_sg
-implementation is faster then the original unportable dma_map_area
-implementation.
+Looking into this some more, it turns out that of_genpd_add_provider_onecell()
+now returns an error if one of the provided power domains does not exist.
+In this case, the "ARM" power domain does not exist. I don't see where it is
+created, so it may well be that this now fails for all imx6 boards with
+multi_v7_defconfig. Looking into kernelci.org test results, this is confirmed
+for at least imx6dl-riotboard. Overall I think it is quite safe to assume
+that all imx6 boards crash with mainline kernels and multi_v7_defconfig.
 
-Test                       dmac_map_area   dma_map_page dma_map_sg
-vchiq_test -b 4 10000      51us/iter       76us/iter    76us
-vchiq_test -b 8 10000      70us/iter       82us/iter    91us
-vchiq_test -b 16 10000     94us/iter       118us/iter   121us
-vchiq_test -b 32 10000     146us/iter      173us/iter   187us
-vchiq_test -b 64 10000     263us/iter      328us/iter   299us
-vchiq_test -b 128 10000    529us/iter      631us/iter   595us
-vchiq_test -b 256 10000    2285us/iter     2275us/iter  2001us
-vchiq_test -b 512 10000    4372us/iter     4616us/iter  4123us
+The change can be tracked down to commit 0159ec67076 ("PM / Domains: Verify
+the PM domain is present when adding a provider"). Adding everyone in the
+commit log for feedback.
 
-For message sizes >= 64KB, dma_map_sg is faster then dma_map_page.
+Guenter
 
-For message size >= 256KB, the dma_map_sg is the fastest
-implementation.
-
-"Normal" messages sizes should be about 1MB which is beyond
-the length that this change shows a speed increase.
-
-This is v2 of the patch which includes extra WARN_ONs and
-incorporates feedback from Eric Anholt <eric@anholt.net>.
-
-Signed-off-by: Michael Zoran <mzoran@crowfest.net>
----
- .../interface/vchiq_arm/vchiq_2835_arm.c           | 152 +++++++++++++--------
- 1 file changed, 93 insertions(+), 59 deletions(-)
-
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-index 32d12e6..a5afcc5 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-@@ -45,13 +45,8 @@
- #include <asm/pgtable.h>
- #include <soc/bcm2835/raspberrypi-firmware.h>
- 
--#define dmac_map_area			__glue(_CACHE,_dma_map_area)
--#define dmac_unmap_area 		__glue(_CACHE,_dma_unmap_area)
--
- #define TOTAL_SLOTS (VCHIQ_SLOT_ZERO_SLOTS + 2 * 32)
- 
--#define VCHIQ_ARM_ADDRESS(x) ((void *)((char *)x + g_virt_to_bus_offset))
--
- #include "vchiq_arm.h"
- #include "vchiq_2835.h"
- #include "vchiq_connected.h"
-@@ -73,7 +68,7 @@ static unsigned int g_fragments_size;
- static char *g_fragments_base;
- static char *g_free_fragments;
- static struct semaphore g_free_fragments_sema;
--static unsigned long g_virt_to_bus_offset;
-+static struct device *g_dev;
- 
- extern int vchiq_arm_log_level;
- 
-@@ -84,10 +79,11 @@ vchiq_doorbell_irq(int irq, void *dev_id);
- 
- static int
- create_pagelist(char __user *buf, size_t count, unsigned short type,
--                struct task_struct *task, PAGELIST_T ** ppagelist);
-+		struct task_struct *task, PAGELIST_T **ppagelist,
-+		dma_addr_t *dma_addr);
- 
- static void
--free_pagelist(PAGELIST_T *pagelist, int actual);
-+free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual);
- 
- int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- {
-@@ -101,8 +97,6 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- 	int slot_mem_size, frag_mem_size;
- 	int err, irq, i;
- 
--	g_virt_to_bus_offset = virt_to_dma(dev, (void *)0);
--
- 	(void)of_property_read_u32(dev->of_node, "cache-line-size",
- 				   &g_cache_line_size);
- 	g_fragments_size = 2 * g_cache_line_size;
-@@ -118,7 +112,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- 		return -ENOMEM;
- 	}
- 
--	WARN_ON(((int)slot_mem & (PAGE_SIZE - 1)) != 0);
-+	WARN_ON(((unsigned long)slot_mem & (PAGE_SIZE - 1)) != 0);
- 
- 	vchiq_slot_zero = vchiq_init_slots(slot_mem, slot_mem_size);
- 	if (!vchiq_slot_zero)
-@@ -170,6 +164,7 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- 		return err ? : -ENXIO;
- 	}
- 
-+	g_dev = dev;
- 	vchiq_log_info(vchiq_arm_log_level,
- 		"vchiq_init - done (slots %pK, phys %pad)",
- 		vchiq_slot_zero, &slot_phys);
-@@ -233,6 +228,7 @@ vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
- {
- 	PAGELIST_T *pagelist;
- 	int ret;
-+	dma_addr_t dma_addr;
- 
- 	WARN_ON(memhandle != VCHI_MEM_HANDLE_INVALID);
- 
-@@ -241,12 +237,14 @@ vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
- 			? PAGELIST_READ
- 			: PAGELIST_WRITE,
- 			current,
--			&pagelist);
-+			&pagelist,
-+			&dma_addr);
-+
- 	if (ret != 0)
- 		return VCHIQ_ERROR;
- 
- 	bulk->handle = memhandle;
--	bulk->data = VCHIQ_ARM_ADDRESS(pagelist);
-+	bulk->data = (void *)(unsigned long)dma_addr;
- 
- 	/* Store the pagelist address in remote_data, which isn't used by the
- 	   slave. */
-@@ -259,7 +257,8 @@ void
- vchiq_complete_bulk(VCHIQ_BULK_T *bulk)
- {
- 	if (bulk && bulk->remote_data && bulk->actual)
--		free_pagelist((PAGELIST_T *)bulk->remote_data, bulk->actual);
-+		free_pagelist((dma_addr_t)(unsigned long)bulk->data,
-+			      (PAGELIST_T *)bulk->remote_data, bulk->actual);
- }
- 
- void
-@@ -353,38 +352,44 @@ vchiq_doorbell_irq(int irq, void *dev_id)
- ** obscuring the new data underneath. We can solve this by transferring the
- ** partial cache lines separately, and allowing the ARM to copy into the
- ** cached area.
--
--** N.B. This implementation plays slightly fast and loose with the Linux
--** driver programming rules, e.g. its use of dmac_map_area instead of
--** dma_map_single, but it isn't a multi-platform driver and it benefits
--** from increased speed as a result.
- */
- 
- static int
- create_pagelist(char __user *buf, size_t count, unsigned short type,
--	struct task_struct *task, PAGELIST_T ** ppagelist)
-+		struct task_struct *task, PAGELIST_T **ppagelist,
-+		dma_addr_t *dma_addr)
- {
- 	PAGELIST_T *pagelist;
- 	struct page **pages;
--	unsigned long *addrs;
--	unsigned int num_pages, offset, i;
--	char *addr, *base_addr, *next_addr;
--	int run, addridx, actual_pages;
-+	u32 *addrs;
-+	unsigned int num_pages, offset, i, k;
-+	int actual_pages;
-         unsigned long *need_release;
-+	size_t pagelist_size;
-+	struct scatterlist *scatterlist, *sg;
-+	int dma_buffers;
-+	int dir;
- 
--	offset = (unsigned int)buf & (PAGE_SIZE - 1);
-+	offset = ((unsigned int)(unsigned long)buf & (PAGE_SIZE - 1));
- 	num_pages = (count + offset + PAGE_SIZE - 1) / PAGE_SIZE;
- 
-+	pagelist_size = sizeof(PAGELIST_T) +
-+			(num_pages * sizeof(unsigned long)) +
-+			sizeof(unsigned long) +
-+			(num_pages * sizeof(pages[0]) +
-+			(num_pages * sizeof(struct scatterlist)));
-+
- 	*ppagelist = NULL;
- 
-+	dir = (type == PAGELIST_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
-+
- 	/* Allocate enough storage to hold the page pointers and the page
- 	** list
- 	*/
--	pagelist = kmalloc(sizeof(PAGELIST_T) +
--                           (num_pages * sizeof(unsigned long)) +
--                           sizeof(unsigned long) +
--                           (num_pages * sizeof(pages[0])),
--                           GFP_KERNEL);
-+	pagelist = dma_zalloc_coherent(g_dev,
-+				       pagelist_size,
-+				       dma_addr,
-+				       GFP_KERNEL);
- 
- 	vchiq_log_trace(vchiq_arm_log_level, "create_pagelist - %pK",
- 			pagelist);
-@@ -394,10 +399,9 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 	addrs = pagelist->addrs;
-         need_release = (unsigned long *)(addrs + num_pages);
- 	pages = (struct page **)(addrs + num_pages + 1);
-+	scatterlist = (struct scatterlist *)(pages + num_pages);
- 
- 	if (is_vmalloc_addr(buf)) {
--		int dir = (type == PAGELIST_WRITE) ?
--			DMA_TO_DEVICE : DMA_FROM_DEVICE;
- 		unsigned long length = count;
- 		unsigned int off = offset;
- 
-@@ -410,7 +414,6 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 			if (bytes > length)
- 				bytes = length;
- 			pages[actual_pages] = pg;
--			dmac_map_area(page_address(pg) + off, bytes, dir);
- 			length -= bytes;
- 			off = 0;
- 		}
-@@ -438,7 +441,8 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 				actual_pages--;
- 				put_page(pages[actual_pages]);
- 			}
--			kfree(pagelist);
-+			dma_free_coherent(g_dev, pagelist_size,
-+					  pagelist, *dma_addr);
- 			if (actual_pages == 0)
- 				actual_pages = -ENOMEM;
- 			return actual_pages;
-@@ -450,30 +454,44 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 	pagelist->type = type;
- 	pagelist->offset = offset;
- 
--	/* Group the pages into runs of contiguous pages */
-+	for (i = 0; i < num_pages; i++)
-+		sg_set_page(scatterlist + i, pages[i], PAGE_SIZE, 0);
-+
-+	dma_buffers = dma_map_sg(g_dev,
-+				 scatterlist,
-+				 num_pages,
-+				 dir);
- 
--	base_addr = VCHIQ_ARM_ADDRESS(page_address(pages[0]));
--	next_addr = base_addr + PAGE_SIZE;
--	addridx = 0;
--	run = 0;
-+	if (dma_buffers == 0) {
-+		dma_free_coherent(g_dev, pagelist_size,
-+				  pagelist, *dma_addr);
- 
--	for (i = 1; i < num_pages; i++) {
--		addr = VCHIQ_ARM_ADDRESS(page_address(pages[i]));
--		if ((addr == next_addr) && (run < (PAGE_SIZE - 1))) {
--			next_addr += PAGE_SIZE;
--			run++;
-+		return -EINTR;
-+	}
-+
-+	/* Combine adjacent blocks for performance */
-+	k = 0;
-+	for_each_sg(scatterlist, sg, dma_buffers, i) {
-+		u32 len = sg_dma_len(sg);
-+		u32 addr = sg_dma_address(sg);
-+
-+		/* Note: addrs is the address + page_count - 1
-+		 * The firmware expects the block to be page
-+		 * aligned and a multiple of the page size
-+		 */
-+		WARN_ON(len == 0);
-+		WARN_ON(len & ~PAGE_MASK);
-+		WARN_ON(addr & ~PAGE_MASK);
-+		if (k > 0 &&
-+		    ((addrs[k - 1] & PAGE_MASK) |
-+			((addrs[k - 1] & ~PAGE_MASK) + 1) << PAGE_SHIFT)
-+		    == addr) {
-+			addrs[k - 1] += (len >> PAGE_SHIFT);
- 		} else {
--			addrs[addridx] = (unsigned long)base_addr + run;
--			addridx++;
--			base_addr = addr;
--			next_addr = addr + PAGE_SIZE;
--			run = 0;
-+			addrs[k++] = addr | ((len >> PAGE_SHIFT) - 1);
- 		}
- 	}
- 
--	addrs[addridx] = (unsigned long)base_addr + run;
--	addridx++;
--
- 	/* Partial cache lines (fragments) require special measures */
- 	if ((type == PAGELIST_READ) &&
- 		((pagelist->offset & (g_cache_line_size - 1)) ||
-@@ -482,7 +500,10 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 		char *fragments;
- 
- 		if (down_interruptible(&g_free_fragments_sema) != 0) {
--			kfree(pagelist);
-+			dma_unmap_sg(g_dev, scatterlist, num_pages,
-+				     DMA_BIDIRECTIONAL);
-+			dma_free_coherent(g_dev, pagelist_size,
-+					  pagelist, *dma_addr);
- 			return -EINTR;
- 		}
- 
-@@ -497,29 +518,42 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 			(fragments - g_fragments_base) / g_fragments_size;
- 	}
- 
--	dmac_flush_range(pagelist, addrs + num_pages);
--
- 	*ppagelist = pagelist;
- 
- 	return 0;
- }
- 
- static void
--free_pagelist(PAGELIST_T *pagelist, int actual)
-+free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual)
- {
-         unsigned long *need_release;
- 	struct page **pages;
- 	unsigned int num_pages, i;
-+	size_t pagelist_size;
-+	struct scatterlist *scatterlist;
-+	int dir;
- 
- 	vchiq_log_trace(vchiq_arm_log_level, "free_pagelist - %pK, %d",
- 			pagelist, actual);
- 
-+	dir = (pagelist->type == PAGELIST_WRITE) ? DMA_TO_DEVICE :
-+						   DMA_FROM_DEVICE;
-+
- 	num_pages =
- 		(pagelist->length + pagelist->offset + PAGE_SIZE - 1) /
- 		PAGE_SIZE;
- 
-+	pagelist_size = sizeof(PAGELIST_T) +
-+			(num_pages * sizeof(unsigned long)) +
-+			sizeof(unsigned long) +
-+			(num_pages * sizeof(pages[0]) +
-+			(num_pages * sizeof(struct scatterlist)));
-+
-         need_release = (unsigned long *)(pagelist->addrs + num_pages);
- 	pages = (struct page **)(pagelist->addrs + num_pages + 1);
-+	scatterlist = (struct scatterlist *)(pages + num_pages);
-+
-+	dma_unmap_sg(g_dev, scatterlist, num_pages, dir);
- 
- 	/* Deal with any partial cache lines (fragments) */
- 	if (pagelist->type >= PAGELIST_READ_WITH_FRAGMENTS) {
-@@ -569,8 +603,7 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
- 
- 				if (bytes > length)
- 					bytes = length;
--				dmac_unmap_area(page_address(pg) + offset,
--						bytes, DMA_FROM_DEVICE);
-+
- 				length -= bytes;
- 				offset = 0;
- 				set_page_dirty(pg);
-@@ -579,5 +612,6 @@ free_pagelist(PAGELIST_T *pagelist, int actual)
- 		}
- 	}
- 
--	kfree(pagelist);
-+	dma_free_coherent(g_dev, pagelist_size,
-+			  pagelist, dma_addr);
- }
--- 
-2.10.1
+>  arch/arm/mach-imx/gpc.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+> index 0df062d8b2c9..f3f40045b4c9 100644
+> --- a/arch/arm/mach-imx/gpc.c
+> +++ b/arch/arm/mach-imx/gpc.c
+> @@ -409,6 +409,7 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+>  {
+>  	struct clk *clk;
+>  	int i;
+> +	int ret;
+>
+>  	imx6q_pu_domain.reg = pu_reg;
+>
+> @@ -431,9 +432,14 @@ static int imx_gpc_genpd_init(struct device *dev, struct regulator *pu_reg)
+>  		return 0;
+>
+>  	pm_genpd_init(&imx6q_pu_domain.base, NULL, false);
+> -	return of_genpd_add_provider_onecell(dev->of_node,
+> -					     &imx_gpc_onecell_data);
+> +	ret = of_genpd_add_provider_onecell(dev->of_node,
+> +					    &imx_gpc_onecell_data);
+> +	if (ret)
+> +		goto genpd_remove;
+> +	return 0;
+>
+> +genpd_remove:
+> +	pm_genpd_remove(&imx6q_pu_domain.base);
+>  clk_err:
+>  	while (i--)
+>  		clk_put(imx6q_pu_domain.clk[i]);
+>
