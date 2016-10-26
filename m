@@ -1,32 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 15:00:54 +0100
+Date: Wed, 26 Oct 2016 15:01:52 +0100
 Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
-In-Reply-To: <20161024104747.GC1440@katana>
+In-Reply-To: <20161005155112.13774-2-hdegoede@redhat.com>
 References: <20161005155112.13774-1-hdegoede@redhat.com>
  <20161005155112.13774-2-hdegoede@redhat.com>
- <CAGb2v67iQikSHcwS15VmSC6fNMVG9Zya9fz6C6b5+wW43rPZfw@mail.gmail.com>
- <bbd16837-a260-b574-1b1a-1bede038e3de@redhat.com>
- <20161024100938.GI14477@dell> <20161024101659.GA1440@katana>
- <20161024103428.GA8574@dell> <20161024104747.GC1440@katana>
-Message-ID: <20161026140054.GE13127@dell>
+Message-ID: <20161026140152.GF13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 24 Oct 2016, Wolfram Sang wrote:
+On Wed, 05 Oct 2016, Hans de Goede wrote:
 
+> The i2c subsys does not load modules by compatible, only by
+> i2c-id, with e.g. a modalias of: "i2c:axp209".
 > 
-> > I was under the impression it was all but ready.
+> Populate the axp20x_i2c_id[] table with supported ids, so that
+> module auto-loading will work.
 > 
-> Then, I would have applied it.
-> 
-> > What are you waiting on?
-> 
-> Lee, I don't want to explain it *again*. Please re-read Kieran's last
-> attempt.
+> Reported-by: Dennis Gilmore <dennis@ausil.us>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/mfd/axp20x-i2c.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 
-I met with Kieran.  He's submitted a new version.
+Applied (for now), thanks.
 
-Here's hoping! ;)
+> diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
+> index b1b8658..d35a5fe 100644
+> --- a/drivers/mfd/axp20x-i2c.c
+> +++ b/drivers/mfd/axp20x-i2c.c
+> @@ -69,10 +69,11 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
+>  
+> -/*
+> - * This is useless for OF-enabled devices, but it is needed by I2C subsystem
+> - */
+>  static const struct i2c_device_id axp20x_i2c_id[] = {
+> +	{ "axp152", 0 },
+> +	{ "axp202", 0 },
+> +	{ "axp209", 0 },
+> +	{ "axp221", 0 },
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
 
 -- 
 Lee Jones
