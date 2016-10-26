@@ -1,49 +1,222 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 26 Oct 2016 22:14:46 +0200
-Subject: [PATCH 2/3] ARM: convert to generated system call tables
-In-Reply-To: <CAMuHMdVy_h6Uss9bwVK5hGD42bXeEBcBsBDwCpx_eYnT9r+=Lw@mail.gmail.com>
- (Geert Uytterhoeven's message of "Mon, 24 Oct 2016 11:25:03 +0200")
-References: <E1bwa6s-0004ZY-4k@rmk-PC.armlinux.org.uk>
- <4337157.Eff9E2riVH@wuerfel>
- <20161021154856.GC1041@n2100.armlinux.org.uk>
- <24632117.YsmPs86ri6@wuerfel> <87eg382kv9.fsf@belgarion.home>
- <CAMuHMdVy_h6Uss9bwVK5hGD42bXeEBcBsBDwCpx_eYnT9r+=Lw@mail.gmail.com>
-Message-ID: <87vawe27gp.fsf@belgarion.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 26 Oct 2016 13:21:11 -0700
+Subject: [PATCH 2/5] ARM: OMAP5: Fix mpuss_early_init
+In-Reply-To: <20161026151703.24730-3-tony@atomide.com>
+References: <20161026151703.24730-1-tony@atomide.com>
+ <20161026151703.24730-3-tony@atomide.com>
+Message-ID: <20161026202111.6jwclrnxnslnhqay@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> writes:
+* Tony Lindgren <tony@atomide.com> [161026 08:18]:
+> We need to properly initialize mpuss also on omap5 like we do on omap4.
+> Otherwise we run into similar kexec problems like we had on omap4 when
+> trying to kexec from a kernel with PM initialized.
+...
 
-> On Sat, Oct 22, 2016 at 10:23 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->> Arnd Bergmann <arnd@arndb.de> writes:
->>
->>> On Friday, October 21, 2016 4:48:56 PM CEST Russell King - ARM Linux wrote:
->>>> What's the point of the x32 mode?
->>>
->>> On x86, the motivation is faster code for most use cases that
->>> don't need a lot of memory, as the 64-bit opcodes have 16 registers
->>> rather than 8 in 32-bit mode but 32-bit pointers have lower
->>> cache footprint than 64-bit pointers.
->>
->> For completness, the second point of x32 AFAIU is the IP-relative addressing
->> which is not available in standard 32 bit mode, which improves PIC code. For
->> simple not algorithmic code (think Android HAL for example) with many shared
->> libraries, it's better in the Hardware Abstraction Layer Libraries, instead of
->> the push-to-stack and pop register.
->
-> But that's not an advantage compared to full am64 mode, right?
-Nope, the amd64 (that's what you have in mind with am64, not aarch64 right ?)
-mode has the IP-relative has well, so x32 has no advantage over amd64 in this
-area.
+> +	else if (cpu_is_omap446x())
+>  		startup_pa = virt_to_phys(omap4460_secondary_startup);
+> +	else
+> +		startup_pa = virt_to_phys(omap5_secondary_startup);
 
-x32 over amd64 advantage is cache and memory footprint AFAICT, I don't see other
-benefits. There doesn't seem to be any ISA differences, or I didn't really
-notice in my daily system performance analysis job.
+Here we need to check for omap5_secondary_hyp_startup too. And with
+omap4 and omap5 being optional, we need to fix up things for make
+randconfig builds as reported by the kbuild test robot.
 
-There was a nice presentation made by Peter Anvin at a Plumber conference, here
-: http://linuxplumbersconf.org/2011/ocw/sessions/531
+Updated patch below.
 
-Cheers.
+Regards,
 
+Tony
+
+8< -----------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Tue, 25 Oct 2016 08:33:32 -0700
+Subject: [PATCH] ARM: OMAP5: Fix mpuss_early_init
+
+We need to properly initialize mpuss also on omap5 like we do on omap4.
+Otherwise we run into similar kexec problems like we had on omap4 when
+trying to kexec from a kernel with PM initialized.
+
+Fixes: 0573b957fc21 ("ARM: OMAP4+: Prevent CPU1 related hang with kexec")
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/common.h              | 38 +++++++++++++++++++++++--------
+ arch/arm/mach-omap2/io.c                  |  3 ++-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c | 32 ++++++++++++++++++++------
+ arch/arm/mach-omap2/omap4-sar-layout.h    |  2 ++
+ 4 files changed, 58 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -262,8 +262,6 @@ extern void __iomem *omap4_get_sar_ram_base(void);
+ extern void omap4_mpuss_early_init(void);
+ extern void omap_do_wfi(void);
+ 
+-extern void omap4_secondary_startup(void);
+-extern void omap4460_secondary_startup(void);
+ 
+ #ifdef CONFIG_SMP
+ /* Needed for secondary core boot */
+@@ -275,16 +273,11 @@ extern void omap4_cpu_die(unsigned int cpu);
+ extern int omap4_cpu_kill(unsigned int cpu);
+ 
+ extern const struct smp_operations omap4_smp_ops;
+-
+-extern void omap5_secondary_startup(void);
+-extern void omap5_secondary_hyp_startup(void);
+ #endif
+ 
+ #if defined(CONFIG_SMP) && defined(CONFIG_PM)
+ extern int omap4_mpuss_init(void);
+ extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
+-extern int omap4_finish_suspend(unsigned long cpu_state);
+-extern void omap4_cpu_resume(void);
+ extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
+ #else
+ static inline int omap4_enter_lowpower(unsigned int cpu,
+@@ -305,14 +298,41 @@ static inline int omap4_mpuss_init(void)
+ 	return 0;
+ }
+ 
++#endif
++
++#ifdef CONFIG_ARCH_OMAP4
++void omap4_secondary_startup(void);
++void omap4460_secondary_startup(void);
++int omap4_finish_suspend(unsigned long cpu_state);
++void omap4_cpu_resume(void);
++#else
++static inline void omap4_secondary_startup(void)
++{
++}
++
++static inline void omap4460_secondary_startup(void)
++{
++}
+ static inline int omap4_finish_suspend(unsigned long cpu_state)
+ {
+ 	return 0;
+ }
+-
+ static inline void omap4_cpu_resume(void)
+-{}
++{
++}
++#endif
+ 
++#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
++void omap5_secondary_startup(void);
++void omap5_secondary_hyp_startup(void);
++#else
++static inline void omap5_secondary_startup(void)
++{
++}
++
++static inline void omap5_secondary_hyp_startup(void)
++{
++}
+ #endif
+ 
+ void pdata_quirks_init(const struct of_device_id *);
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -717,10 +717,11 @@ void __init omap5_init_early(void)
+ 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
+ 	omap2_control_base_init();
+-	omap4_pm_init_early();
+ 	omap2_prcm_base_init();
+ 	omap5xxx_check_revision();
+ 	omap4_sar_ram_init();
++	omap4_mpuss_early_init();
++	omap4_pm_init_early();
+ 	omap54xx_voltagedomains_init();
+ 	omap54xx_powerdomains_init();
+ 	omap54xx_clockdomains_init();
+diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+--- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
++++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
+@@ -48,6 +48,7 @@
+ #include <asm/smp_scu.h>
+ #include <asm/pgalloc.h>
+ #include <asm/suspend.h>
++#include <asm/virt.h>
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ #include "soc.h"
+@@ -371,8 +372,12 @@ int __init omap4_mpuss_init(void)
+ 	pm_info = &per_cpu(omap4_pm_info, 0x0);
+ 	if (sar_base) {
+ 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
+-		pm_info->wkup_sar_addr = sar_base +
+-					CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
++		if (cpu_is_omap44xx())
++			pm_info->wkup_sar_addr = sar_base +
++				CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
++		else
++			pm_info->wkup_sar_addr = sar_base +
++				OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
+ 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
+ 	}
+ 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
+@@ -391,8 +396,12 @@ int __init omap4_mpuss_init(void)
+ 	pm_info = &per_cpu(omap4_pm_info, 0x1);
+ 	if (sar_base) {
+ 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
+-		pm_info->wkup_sar_addr = sar_base +
+-					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++		if (cpu_is_omap44xx())
++			pm_info->wkup_sar_addr = sar_base +
++				CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
++		else
++			pm_info->wkup_sar_addr = sar_base +
++				OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
+ 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
+ 	}
+ 
+@@ -453,15 +462,24 @@ void __init omap4_mpuss_early_init(void)
+ {
+ 	unsigned long startup_pa;
+ 
+-	if (!cpu_is_omap44xx())
++	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
+ 		return;
+ 
+ 	sar_base = omap4_get_sar_ram_base();
+ 
+ 	if (cpu_is_omap443x())
+ 		startup_pa = virt_to_phys(omap4_secondary_startup);
+-	else
++	else if (cpu_is_omap446x())
+ 		startup_pa = virt_to_phys(omap4460_secondary_startup);
++	else if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
++		startup_pa = virt_to_phys(omap5_secondary_hyp_startup);
++	else
++		startup_pa = virt_to_phys(omap5_secondary_startup);
+ 
+-	writel_relaxed(startup_pa, sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
++	if (cpu_is_omap44xx())
++		writel_relaxed(startup_pa, sar_base +
++			       CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
++	else
++		writel_relaxed(startup_pa, sar_base +
++			       OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
+ }
+diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
+--- a/arch/arm/mach-omap2/omap4-sar-layout.h
++++ b/arch/arm/mach-omap2/omap4-sar-layout.h
+@@ -31,6 +31,8 @@
+ /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
+ #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
+ #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
++#define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xe00
++#define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xe04
+ 
+ #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)
+ #define SAR_SECURE_RAM_SIZE_OFFSET		(SAR_BANK3_OFFSET + 0x504)
 -- 
-Robert
+2.9.3
