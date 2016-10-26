@@ -1,162 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 26 Oct 2016 18:35:34 +0100
-Subject: [PATCH v3] drivers: psci: PSCI checker module
-In-Reply-To: <20161026172252.GV3716@linux.vnet.ibm.com>
-References: <20161020145115.6326-1-kevin.brodsky@arm.com>
- <20161025154535.GA3107@red-moon>
- <20161025183436.GF3716@linux.vnet.ibm.com>
- <20161026131752.GA15478@red-moon>
- <20161026151858.GQ3716@linux.vnet.ibm.com>
- <20161026171006.GA16248@red-moon>
- <20161026172252.GV3716@linux.vnet.ibm.com>
-Message-ID: <20161026173534.GC16248@red-moon>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 26 Oct 2016 19:35:53 +0200
+Subject: [PATCH 0/2] ARM: da850: new drivers for better LCDC support
+Message-ID: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
-> On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Oct 26, 2016 at 08:18:58AM -0700, Paul E. McKenney wrote:
-> > > On Wed, Oct 26, 2016 at 02:17:52PM +0100, Lorenzo Pieralisi wrote:
-> > > > On Tue, Oct 25, 2016 at 11:34:36AM -0700, Paul E. McKenney wrote:
-> > > > 
-> > > > [...]
-> > > > 
-> > > > > > > +static int __init psci_checker(void)
-> > > > > > > +{
-> > > > > > > +	int ret;
-> > > > > > > +
-> > > > > > > +	/*
-> > > > > > > +	 * Since we're in an initcall, we assume that all the CPUs that all
-> > > > > > > +	 * CPUs that can be onlined have been onlined.
-> > > > > > > +	 *
-> > > > > > > +	 * The tests assume that hotplug is enabled but nobody else is using it,
-> > > > > > > +	 * otherwise the results will be unpredictable. However, since there
-> > > > > > > +	 * is no userspace yet in initcalls, that should be fine.
-> > > > > > 
-> > > > > > I do not think it is. If you run a kernel with, say,
-> > > > > > CONFIG_LOCK_TORTURE_TEST, cpus may disappear from the radar while
-> > > > > > running the PSCI checker test itself; that at least would confuse the
-> > > > > > checker, and that's just an example.
-> > > > > > 
-> > > > > > I added Paul to check what are the assumptions behind the torture test
-> > > > > > hotplug tests, in particular if there are any implicit assumptions for
-> > > > > > it to work (ie it is the only kernel test hotplugging cpus in and out
-> > > > > > (?)), what I know is that the PSCI checker assumptions are not correct.
-> > > > > 
-> > > > > Both CONFIG_LOCK_TORTURE_TEST and CONFIG_RCU_TORTURE_TEST can and will
-> > > > > hotplug CPUs.  The locktorture.onoff_holdoff and rcutorture.onoff_holdoff
-> > > > > kernel parameters can delay the start of CPU-hotplug testing, and in
-> > > > > my testing I set this delay to 30 seconds after boot.
-> > > > > 
-> > > > > One approach would be to make your test refuse to run if either of
-> > > > > the lock/RCU torture tests was running.  Or do what Lorenzo suggests
-> > > > > below.  The torture tests aren't crazy enough to offline the last CPU.
-> > > > > Though they do try, just for effect, in cases where the last CPU is
-> > > > > marked cpu_is_hotpluggable().  ;-)
-> > > > 
-> > > > Thank you Paul. I have an additional question though. Is there any
-> > > > implicit assumption in LOCK/RCU torture tests whereby nothing else
-> > > > in the kernel is hotplugging cpus in/out (through cpu_down()/up())
-> > > > while they are running ?
-> > > > 
-> > > > I am asking because that's the main reason behind my query. Those tests
-> > > > hotplug cpus in and out through cpu_down/up() but AFAICS nothing
-> > > > prevents another piece of code in the kernel to call those functions and
-> > > > the tests may just fail in that case (ie trying to cpu_down() a cpu
-> > > > that is not online).
-> > > > 
-> > > > Are false negatives contemplated (or I am missing something) ?
-> > > 
-> > > The current code assumes nothing else doing CPU-hotplug operations,
-> > > and will therefore print "RCU_HOTPLUG" error (or "LOCK_HOTPLUG" for
-> > > locktorture) if any of the hotplug operations failed.
-> > > 
-> > > > I just would like to understand if what this patch currently does
-> > > > is safe and sound. I think that calling cpu_down() and cpu_up()
-> > > > is always safe, but the test can result in false negatives if
-> > > > other kernel subsystems (eg LOCK torture test) are calling those
-> > > > APIs in parallel (because cpu_down()/cpu_up() calls can fail - eg
-> > > > trying to cpu_down() a cpu that is not online any longer, since it
-> > > > was taken down by another kernel control path), that's the question
-> > > > I have.
-> > > 
-> > > I am assuming that these added calls to cpu_down() and cpu_up() aren't
-> > > enabled by default.  If they are, rcutorture and locktorture need some
-> > > way to turn the off.
-> > > 
-> > > So maybe we need to have some sort of API that detects concurrent
-> > > CPU-hotplug torturing?  Maybe something like the following?
-> > > 
-> > > 	static atomic_t n_cpu_hotplug_torturers;
-> > > 	static atomic_t cpu_hotplug_concurrent_torture;
-> > > 
-> > > 	void torture_start_cpu_hotplug(void)
-> > > 	{
-> > > 		if (atomic_inc_return(&n_cpu_hotplug_torturers) > 1)
-> > > 			atomic_inc(&cpu_hotplug_concurrent_torture);
-> > > 	}
-> > > 
-> > > 	void torture_end_cpu_hotplug(void)
-> > > 	{
-> > > 		atomic_dec(&n_cpu_hotplug_torturers);
-> > > 	}
-> > > 
-> > > 	bool torture_cpu_hotplug_was_concurrent(void)
-> > > 	{
-> > > 		return !!atomic_read(&cpu_hotplug_concurrent_torture);
-> > > 	}
-> > > 
-> > > The locktorture and rcutorture code could then ignore CPU-hotplug
-> > > errors that could be caused by concurrent access.  And complain
-> > > bitterly about the concurrent access, of course!  ;-)
-> > 
-> > This could do, even better if we extend the torture hotplug tests to
-> > take a cpumask so that basically Kevin's patch will be based on torture
-> > hotplug tests infrastructure :D (ie he/we wanted to hotplug a subset of
-> > the online mask corresponding to a "cluster" of cpus, that's to test the
-> > PSCI CPU ON/OFF firmware interface behind cpu hotplug operations).
-> > 
-> > Still, this implies logging every possible cpu_down()/cpu_up() caller
-> > through torture_start_cpu_hotplug().
-> > 
-> > What about userspace and sysfs interface that allow to offline cpus then ?
-> > Point is, the torture hotplug tests take a snapshot of the maxcpu at
-> > kthread init time and then randomize the logical cpu number, but it is
-> > definitely possible unless I am mistaken that some of those cpus
-> > disappear while the test is running and this will cause failures that
-> > you can't detect through the API above.
-> > 
-> > That's why I suggested using the:
-> > 
-> > freeze_secondary_cpus(int primary);
-> > 
-> > for this patch because that allows us to quiesce all cpus other than
-> > primary at once, with no interference possible from other kernel control
-> > paths (but it is not a perfect solution either).
-> > 
-> > Userspace notwithstanding, I think the best solution consists in either
-> > making this patch hotplug tests work on top of the torture hotplug tests
-> > API or solving the dependency at kconfig level by disabling the PSCI
-> > checker if any of torture tests are enabled which is not ideal but
-> > I do not see any other option.
-> > 
-> > Thanks a lot for your feedback, thoughts appreciated.
-> 
-> Let me ask the question more directly.
-> 
-> Why on earth are we trying to run these tests concurrently?
+This series adds two new drivers in order to better support the LCDC
+rev1 present on the da850 boards.
 
-We must prevent that, no question about that, that's why I started
-this discussion. It is not fine to enable this checker and the
-RCU/LOCK torture hotplug tests at the same time.
+The first patch adds a new memory driver which allows to write to the
+DDR2/mDDR memory controller present on the da8xx SoCs. Since the
+memory controller region is not mapped by anyone else, I went with
+platform_get_resource() and ioremap() approach.
 
-> After all, if we just run one at a time in isolation, there is no
-> problem.
+The second patch adds a new bus driver which allows to interact with
+the MSTPRI registers of the SYSCFG0 module. The SYSCFG0 registers
+are used by many drivers, hence the syscon/regmap approach.
 
-Fine by me, it was to understand if the current assumptions we made
-are correct and they are definitely not. If we enable the PSCI checker
-we must disable the torture rcu/lock hotplug tests either statically or
-dynamically.
+As is mentioned in the comments: we don't want to commit to supporting
+stable interfaces (DT bindings or sysfs attributes) so we hardcode the
+settings required by some boards (for now only da850-lcdk) with the
+hope that linux gets an appropriate framework for performance knobs
+in the future.
 
-Thanks,
-Lorenz
+Potential extensions of these drivers should be straightforward in the
+future.
+
+Tested on a da850-lcdk with a display connected over VGA and some
+additional work on the tilcdc driver.
+
+NOTE I'm sending this as v1, but it's a follow-up to a series I sent
+previously and the RFC with the ddrctl driver. I dropped the dt patch
+for now.
+
+Bartosz Golaszewski (2):
+  ARM: memory: da8xx-ddrctl: new driver
+  ARM: bus: da8xx-mstpri: new driver
+
+ .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
+ .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 ++
+ drivers/bus/Kconfig                                |   9 +
+ drivers/bus/Makefile                               |   2 +
+ drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/da8xx-ddrctl.c                      | 175 ++++++++++++++
+ 8 files changed, 501 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+ create mode 100644 drivers/bus/da8xx-mstpri.c
+ create mode 100644 drivers/memory/da8xx-ddrctl.c
+
+-- 
+2.9.3
