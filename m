@@ -1,48 +1,47 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 26 Oct 2016 10:10:23 +0530
-Subject: [PATCH] arm64: Add support of R_AARCH64_PREL32 relocation in purgatory
-Message-ID: <0eb8a908f617e0f957df7fb3ef293596f47e6832.1477456661.git.panand@redhat.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 26 Oct 2016 14:24:22 +0900
+Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
+Message-ID: <20161026052422.17283.57864.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc version in fedora koji is  6.2.1-2.fc25. kexec-tools compiled with this
-gcc produced another relocation error:
+From: Magnus Damm <damm+renesas@opensource.se>
 
-machine_apply_elf_rel: ERROR Unknown type: 261
+Extend the ARM64 defconfig to enable the DU DRM device as module
+together with required dependencies of V4L2 FCP and VSP modules.
 
-This patch fixes the above error.
+This enables VGA output on the r8a7795 Salvator-X board.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 ---
- kexec/arch/arm64/kexec-arm64.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
 
-diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index 218f0bc832cd..b12de4772412 100644
---- a/kexec/arch/arm64/kexec-arm64.c
-+++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -720,6 +720,10 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- # define R_AARCH64_ABS64 257
- #endif
- 
-+#if !defined(R_AARCH64_PREL32)
-+# define R_AARCH64_PREL32 261
-+#endif
-+
- #if !defined(R_AARCH64_LD_PREL_LO19)
- # define R_AARCH64_LD_PREL_LO19 273
- #endif
-@@ -761,6 +765,11 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- 		loc64 = ptr;
- 		*loc64 = cpu_to_elf64(ehdr, elf64_to_cpu(ehdr, *loc64) + value);
- 		break;
-+	case R_AARCH64_PREL32:
-+		type = "PREL32";
-+		loc32 = ptr;
-+		*loc32 = cpu_to_elf32(ehdr, elf32_to_cpu(ehdr, *loc32) + value - address);
-+		break;
- 	case R_AARCH64_LD_PREL_LO19:
- 		type = "LD_PREL_LO19";
- 		loc32 = ptr;
--- 
-2.7.4
+ Written against next-20161026
+
+ arch/arm64/configs/defconfig |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+--- 0001/arch/arm64/configs/defconfig
++++ work/arch/arm64/configs/defconfig	2016-10-26 14:10:58.220607110 +0900
+@@ -293,8 +293,22 @@ CONFIG_REGULATOR_PWM=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_QCOM_SPMI=y
+ CONFIG_REGULATOR_S2MPS11=y
++CONFIG_MEDIA_SUPPORT=m
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_MEDIA_ANALOG_TV_SUPPORT=y
++CONFIG_MEDIA_DIGITAL_TV_SUPPORT=y
++CONFIG_MEDIA_CONTROLLER=y
++CONFIG_VIDEO_V4L2_SUBDEV_API=y
++# CONFIG_DVB_NET is not set
++CONFIG_V4L_MEM2MEM_DRIVERS=y
++CONFIG_VIDEO_RENESAS_FCP=m
++CONFIG_VIDEO_RENESAS_VSP1=m
+ CONFIG_DRM=m
+ CONFIG_DRM_NOUVEAU=m
++CONFIG_DRM_RCAR_DU=m
++CONFIG_DRM_RCAR_HDMI=y
++CONFIG_DRM_RCAR_LVDS=y
++CONFIG_DRM_RCAR_VSP=y
+ CONFIG_DRM_TEGRA=m
+ CONFIG_DRM_PANEL_SIMPLE=m
+ CONFIG_DRM_I2C_ADV7511=m
