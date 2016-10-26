@@ -1,73 +1,39 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 26 Oct 2016 09:22:36 +0200
-Subject: [PATCH 3/3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
-In-Reply-To: <5e0adad1-8ef2-029f-cfcd-4a07c962fda2@opensource.altera.com>
-References: <1476908324-12313-1-git-send-email-dinguyen@opensource.altera.com>
- <1476908324-12313-3-git-send-email-dinguyen@opensource.altera.com>
- <20161020071913.rlka3or4c7fzjpyv@pengutronix.de>
- <c62baad6-2528-a9df-6b09-3dba66785102@opensource.altera.com>
- <5e0adad1-8ef2-029f-cfcd-4a07c962fda2@opensource.altera.com>
-Message-ID: <20161026072235.ardwmhqbqgq376vu@pengutronix.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 26 Oct 2016 00:35:50 -0700
+Subject: [PATCH v2] clocksource/arm_arch_timer: Map frame with
+ of_io_request_and_map()
+Message-ID: <20161026073550.22918-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Let's use the of_io_request_and_map() API so that the frame
+region is protected and shows up in /proc/iomem.
 
-On Tue, Oct 25, 2016 at 10:38:10AM -0500, Graham Moore wrote:
-> On 10/20/2016 09:12 AM, Dinh Nguyen wrote:
-> > 
-> > 
-> > On 10/20/2016 02:19 AM, Steffen Trumtrar wrote:
-> > 
-> > > > +		cdns,tslch-ns = <4>;
-> > > > +
-> > > > +		partition at qspi-boot {
-> > > > +			/* 8MB for raw data. */
-> > > > +			label = "Flash 0 Raw Data";
-> > > > +			reg = <0x0 0x800000>;
-> > > > +		};
-> > > > +
-> > > > +		partition at qspi-rootfs {
-> > > > +			/* 120MB for jffs2 data. */
-> > > > +			label = "Flash 0 jffs2 Filesystem";
-> > > > +			reg = <0x800000 0x7800000>;
-> > > > +		};
-> > > > +	};
-> > > > +};
-> > > > +
-> > > 
-> > > What is the current preferred way of handling the partitions?
-> > > This doesn't fit my Sockit configuration for example. So I would always
-> > > have to patch the devicetree.
-> > 
-> > I'm not 100% sure on this. Graham, do you have any insight?
-> > > 
-> 
-> Well, strictly speaking, these partitions are only for the socdk, the Altera
-> dev kit.  Our sample designs and file systems expect this layout.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-The thing is, that I don't think these partitions belong in a mainline
-dts at all. But I'm not sure what the current policy is.
+Changes from v1:
+ * Check for IS_ERR instead
 
-> 
-> Therefore, these partitions are not required for any other dev kits, and can
-> probably be left out.
-> 
-> Or, Steffen, if you have a standard layout you'd like to see, then put that
-> in there.
-> 
+ drivers/clocksource/arm_arch_timer.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Well in my case, it actually doesn't really matter. All the boards
-I use do not have u-boot as bootloader but barebox. And barebox uses
-devicetree fixups for adding the partition layout that fits the
-particular use case. All other partitions are thrown out.
-I don't know if u-boot does something like this.
-
-Regards,
-Steffen
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 73c487da6d2a..723cc924d8d1 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -964,8 +964,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	}
+ 
+ 	ret= -ENXIO;
+-	base = arch_counter_base = of_iomap(best_frame, 0);
+-	if (!base) {
++	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
++							 "arch_mem_timer");
++	if (IS_ERR(base)) {
+ 		pr_err("arch_timer: Can't map frame's registers\n");
+ 		goto out;
+ 	}
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
