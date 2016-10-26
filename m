@@ -1,49 +1,34 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 26 Oct 2016 10:59:27 +0800
-Subject: [PATCH 1/3] arm64: arch_timer: Add device tree binding for
- hisilicon-161x01 erratum
-In-Reply-To: <20161024133945.GL15620@leverpostej>
-References: <962ea92f-870b-e1d0-5bb7-1a6d66c35122@huawei.com>
- <20161024111608.GG15620@leverpostej>
- <7e839df8-f8f7-3b16-8321-4ff45b6c5884@huawei.com>
- <20161024131617.GJ15620@leverpostej>
- <1dcfb21a-7417-282e-f187-425d2c148672@huawei.com>
- <20161024133945.GL15620@leverpostej>
-Message-ID: <05ebde92-60b5-88aa-0875-a9d2729eff8c@huawei.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 25 Oct 2016 22:06:50 -0500
+Subject: [PATCH v6 4/5] ARM: DTS: da850: Add cfgchip syscon node
+In-Reply-To: <1477451211-31979-1-git-send-email-david@lechnology.com>
+References: <1477451211-31979-1-git-send-email-david@lechnology.com>
+Message-ID: <1477451211-31979-5-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a syscon node for the SoC CFGCHIPn registers. This is needed for
+the new usb phy driver.
 
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-On 2016/10/24 21:39, Mark Rutland wrote:
-> On Mon, Oct 24, 2016 at 09:23:10PM +0800, Ding Tianhong wrote:
->> On 2016/10/24 21:16, Mark Rutland wrote:
->>> On Mon, Oct 24, 2016 at 08:40:01PM +0800, Ding Tianhong wrote:
->>>> On 2016/10/24 19:16, Mark Rutland wrote:
->>>>> Is "161x01" the *exact* erratum number, or is the 'x' a wildcard?
->>>>
->>>> The 'x' is a wildcard, it will cover 161001 to 161601 several numbers,
->>>
->>> Given you're using a wildcard, I take it that this is a *part* number?
->>
->> Yes, I was doubt how to fix this, should I choose a better erratum number?
-> 
-> Typically, we expect that each vendor has some central database of their
-> errata, with each having a unique ID.
-> 
-> If Huawei do not have such a database, I do not think that we should
-> invent an erratum number here.
-> 
-
-Hi Marko<
-
-After discussion with our chip developer, we decide the 161601 as the *exact* erratum number for this chip to cover
-all the problem and register this in our company's database, thanks.
-
-Ding
-
-> Thanks,
-> Mark.
-> 
-> .
-> 
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f79e1b9..6bbf20d 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -188,6 +188,10 @@
+ 			};
+ 
+ 		};
++		cfgchip: cfgchip at 1417c {
++			compatible = "ti,da830-cfgchip", "syscon";
++			reg = <0x1417c 0x14>;
++		};
+ 		edma0: edma at 0 {
+ 			compatible = "ti,edma3-tpcc";
+ 			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
+-- 
+2.7.4
