@@ -1,222 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 26 Oct 2016 13:21:11 -0700
-Subject: [PATCH 2/5] ARM: OMAP5: Fix mpuss_early_init
-In-Reply-To: <20161026151703.24730-3-tony@atomide.com>
-References: <20161026151703.24730-1-tony@atomide.com>
- <20161026151703.24730-3-tony@atomide.com>
-Message-ID: <20161026202111.6jwclrnxnslnhqay@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 26 Oct 2016 15:39:19 -0500
+Subject: [PATCH 1/6] dt: bindings: Add Allwinner Q8 tablets hardware
+ manager bindings
+In-Reply-To: <20161014075337.10452-2-hdegoede@redhat.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+ <20161014075337.10452-2-hdegoede@redhat.com>
+Message-ID: <20161026203919.63izobxnn2h33oh2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [161026 08:18]:
-> We need to properly initialize mpuss also on omap5 like we do on omap4.
-> Otherwise we run into similar kexec problems like we had on omap4 when
-> trying to kexec from a kernel with PM initialized.
-...
+On Fri, Oct 14, 2016 at 09:53:32AM +0200, Hans de Goede wrote:
+> Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets
+> of which a new batch is produced every few weeks. Each batch uses a
+> different mix of touchscreen, accelerometer and wifi peripherals.
+> 
+> Given that each batch is different creating a devicetree for each variant
+> is not desirable, work is being done on a Q8 tablet hardware manager which
+> auto-detects the touchscreen and accelerometer and will update the dt with
+> what it has found, so that a single generic dt can be used for these tablets.
+> 
+> This commit adds dt-bindings for this hardware manager.
+> 
+> Note the wifi is connected to a discoverable bus (sdio or usb) and will be
+> autodetected by the mmc resp. usb subsystems.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../misc/allwinner,sunxi-q8-hardwaremgr.txt        | 71 ++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> new file mode 100644
+> index 0000000..a81b258
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/misc/allwinner,sunxi-q8-hardwaremgr.txt
+> @@ -0,0 +1,71 @@
+> +Q8 tablet hardware manager
+> +--------------------------
+> +
+> +Allwinnner A13 / A23 / A33 based Q8 tablets are popular cheap 7" tablets of
+> +which a new batch is produced every few weeks. Each batch uses a different
+> +mix of touchscreen, accelerometer and wifi peripherals.
+> +
+> +Given that each batch is different creating a devicetree for each variant is
+> +not desirable. The Q8 tablet hardware manager bindings are bindings for an os
+> +module which auto-detects the touchscreen and accelerometer so that a single
+> +generic dts can be used for these tablets.
+> +
+> +The wifi is connected to a discoverable bus and will be autodetected by the os.
+> +
+> +Required properties:
+> + - toplevel / machine compatible, one of:
+> +	"allwinner,q8-a13"
+> +	"allwinner,q8-a23"
+> +	"allwinner,q8-a33"
+> + - touchscreen node   : There must be a template touchscreen node named
+> +			"touchscreen", this must be a child node of the
+> +			touchscreen i2c bus
+> + - accelerometer node : There must be a template accelerometer node named
+> +			"accelerometer", this must be a child node of the
+> +			accelerometer i2c bus
+> +
+> +touchscreen node required properties:
+> + - interrupt-parent   : phandle pointing to the interrupt controller
+> +			serving the touchscreen interrupt
+> + - interrupts         : interrupt specification for the touchscreen interrupt
+> + - power-gpios        : Specification for the pin connected to the touchscreen's
+> +			enable / wake pin. This needs to be driven high to
+> +			enable the touchscreen controller
 
-> +	else if (cpu_is_omap446x())
->  		startup_pa = virt_to_phys(omap4460_secondary_startup);
-> +	else
-> +		startup_pa = virt_to_phys(omap5_secondary_startup);
+enable-gpios is the common name.
 
-Here we need to check for omap5_secondary_hyp_startup too. And with
-omap4 and omap5 being optional, we need to fix up things for make
-randconfig builds as reported by the kbuild test robot.
+I was going to say you need to list possible compatible strings here 
+also. However, I now wonder if this binding doc is even needed. The 
+binding docs should just be the bindings for each touchscreen or 
+accelerometer. The fact that the node is completed at run-time whether 
+the bootloader or kernel doesn't matter for the binding definition. When 
+and it is completed is orthogonal to the binding definition.
 
-Updated patch below.
-
-Regards,
-
-Tony
-
-8< -----------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 25 Oct 2016 08:33:32 -0700
-Subject: [PATCH] ARM: OMAP5: Fix mpuss_early_init
-
-We need to properly initialize mpuss also on omap5 like we do on omap4.
-Otherwise we run into similar kexec problems like we had on omap4 when
-trying to kexec from a kernel with PM initialized.
-
-Fixes: 0573b957fc21 ("ARM: OMAP4+: Prevent CPU1 related hang with kexec")
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/common.h              | 38 +++++++++++++++++++++++--------
- arch/arm/mach-omap2/io.c                  |  3 ++-
- arch/arm/mach-omap2/omap-mpuss-lowpower.c | 32 ++++++++++++++++++++------
- arch/arm/mach-omap2/omap4-sar-layout.h    |  2 ++
- 4 files changed, 58 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -262,8 +262,6 @@ extern void __iomem *omap4_get_sar_ram_base(void);
- extern void omap4_mpuss_early_init(void);
- extern void omap_do_wfi(void);
- 
--extern void omap4_secondary_startup(void);
--extern void omap4460_secondary_startup(void);
- 
- #ifdef CONFIG_SMP
- /* Needed for secondary core boot */
-@@ -275,16 +273,11 @@ extern void omap4_cpu_die(unsigned int cpu);
- extern int omap4_cpu_kill(unsigned int cpu);
- 
- extern const struct smp_operations omap4_smp_ops;
--
--extern void omap5_secondary_startup(void);
--extern void omap5_secondary_hyp_startup(void);
- #endif
- 
- #if defined(CONFIG_SMP) && defined(CONFIG_PM)
- extern int omap4_mpuss_init(void);
- extern int omap4_enter_lowpower(unsigned int cpu, unsigned int power_state);
--extern int omap4_finish_suspend(unsigned long cpu_state);
--extern void omap4_cpu_resume(void);
- extern int omap4_hotplug_cpu(unsigned int cpu, unsigned int power_state);
- #else
- static inline int omap4_enter_lowpower(unsigned int cpu,
-@@ -305,14 +298,41 @@ static inline int omap4_mpuss_init(void)
- 	return 0;
- }
- 
-+#endif
-+
-+#ifdef CONFIG_ARCH_OMAP4
-+void omap4_secondary_startup(void);
-+void omap4460_secondary_startup(void);
-+int omap4_finish_suspend(unsigned long cpu_state);
-+void omap4_cpu_resume(void);
-+#else
-+static inline void omap4_secondary_startup(void)
-+{
-+}
-+
-+static inline void omap4460_secondary_startup(void)
-+{
-+}
- static inline int omap4_finish_suspend(unsigned long cpu_state)
- {
- 	return 0;
- }
--
- static inline void omap4_cpu_resume(void)
--{}
-+{
-+}
-+#endif
- 
-+#if defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX)
-+void omap5_secondary_startup(void);
-+void omap5_secondary_hyp_startup(void);
-+#else
-+static inline void omap5_secondary_startup(void)
-+{
-+}
-+
-+static inline void omap5_secondary_hyp_startup(void)
-+{
-+}
- #endif
- 
- void pdata_quirks_init(const struct of_device_id *);
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -717,10 +717,11 @@ void __init omap5_init_early(void)
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap2_control_base_init();
--	omap4_pm_init_early();
- 	omap2_prcm_base_init();
- 	omap5xxx_check_revision();
- 	omap4_sar_ram_init();
-+	omap4_mpuss_early_init();
-+	omap4_pm_init_early();
- 	omap54xx_voltagedomains_init();
- 	omap54xx_powerdomains_init();
- 	omap54xx_clockdomains_init();
-diff --git a/arch/arm/mach-omap2/omap-mpuss-lowpower.c b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
---- a/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-+++ b/arch/arm/mach-omap2/omap-mpuss-lowpower.c
-@@ -48,6 +48,7 @@
- #include <asm/smp_scu.h>
- #include <asm/pgalloc.h>
- #include <asm/suspend.h>
-+#include <asm/virt.h>
- #include <asm/hardware/cache-l2x0.h>
- 
- #include "soc.h"
-@@ -371,8 +372,12 @@ int __init omap4_mpuss_init(void)
- 	pm_info = &per_cpu(omap4_pm_info, 0x0);
- 	if (sar_base) {
- 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET0;
--		pm_info->wkup_sar_addr = sar_base +
--					CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-+		if (cpu_is_omap44xx())
-+			pm_info->wkup_sar_addr = sar_base +
-+				CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
-+		else
-+			pm_info->wkup_sar_addr = sar_base +
-+				OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET;
- 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET0;
- 	}
- 	pm_info->pwrdm = pwrdm_lookup("cpu0_pwrdm");
-@@ -391,8 +396,12 @@ int __init omap4_mpuss_init(void)
- 	pm_info = &per_cpu(omap4_pm_info, 0x1);
- 	if (sar_base) {
- 		pm_info->scu_sar_addr = sar_base + SCU_OFFSET1;
--		pm_info->wkup_sar_addr = sar_base +
--					CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-+		if (cpu_is_omap44xx())
-+			pm_info->wkup_sar_addr = sar_base +
-+				CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
-+		else
-+			pm_info->wkup_sar_addr = sar_base +
-+				OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET;
- 		pm_info->l2x0_sar_addr = sar_base + L2X0_SAVE_OFFSET1;
- 	}
- 
-@@ -453,15 +462,24 @@ void __init omap4_mpuss_early_init(void)
- {
- 	unsigned long startup_pa;
- 
--	if (!cpu_is_omap44xx())
-+	if (!(cpu_is_omap44xx() || soc_is_omap54xx()))
- 		return;
- 
- 	sar_base = omap4_get_sar_ram_base();
- 
- 	if (cpu_is_omap443x())
- 		startup_pa = virt_to_phys(omap4_secondary_startup);
--	else
-+	else if (cpu_is_omap446x())
- 		startup_pa = virt_to_phys(omap4460_secondary_startup);
-+	else if ((__boot_cpu_mode & MODE_MASK) == HYP_MODE)
-+		startup_pa = virt_to_phys(omap5_secondary_hyp_startup);
-+	else
-+		startup_pa = virt_to_phys(omap5_secondary_startup);
- 
--	writel_relaxed(startup_pa, sar_base + CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
-+	if (cpu_is_omap44xx())
-+		writel_relaxed(startup_pa, sar_base +
-+			       CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
-+	else
-+		writel_relaxed(startup_pa, sar_base +
-+			       OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET);
- }
-diff --git a/arch/arm/mach-omap2/omap4-sar-layout.h b/arch/arm/mach-omap2/omap4-sar-layout.h
---- a/arch/arm/mach-omap2/omap4-sar-layout.h
-+++ b/arch/arm/mach-omap2/omap4-sar-layout.h
-@@ -31,6 +31,8 @@
- /* CPUx Wakeup Non-Secure Physical Address offsets in SAR_BANK3 */
- #define CPU0_WAKEUP_NS_PA_ADDR_OFFSET		0xa04
- #define CPU1_WAKEUP_NS_PA_ADDR_OFFSET		0xa08
-+#define OMAP5_CPU0_WAKEUP_NS_PA_ADDR_OFFSET	0xe00
-+#define OMAP5_CPU1_WAKEUP_NS_PA_ADDR_OFFSET	0xe04
- 
- #define SAR_BACKUP_STATUS_OFFSET		(SAR_BANK3_OFFSET + 0x500)
- #define SAR_SECURE_RAM_SIZE_OFFSET		(SAR_BANK3_OFFSET + 0x504)
--- 
-2.9.3
+Rob
