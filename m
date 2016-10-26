@@ -1,33 +1,25 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 26 Oct 2016 15:56:19 -0500
-Subject: [PATCH 0/5] Minimal cpuidle fixes for omap5 and dra7
-In-Reply-To: <20161026151703.24730-1-tony@atomide.com>
-References: <20161026151703.24730-1-tony@atomide.com>
-Message-ID: <c1b6bf69-ed11-3355-323f-9d6503180310@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 26 Oct 2016 16:02:29 -0500
+Subject: [PATCH v1 1/4] dt-bindings: Document Broadcom iProc mailbox
+ controller driver
+In-Reply-To: <1476817238-1226-2-git-send-email-jonathan.richardson@broadcom.com>
+References: <1476817238-1226-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1476817238-1226-2-git-send-email-jonathan.richardson@broadcom.com>
+Message-ID: <20161026210229.awvweuxvsrowmmes@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 10/26/2016 10:16 AM, Tony Lindgren wrote:
-> Hi all,
->
-> Here are some fixes to get minimal cpuidle support working with omap5
-> and dra7. Not sure if there are still some unsorted issues on enabling
-> this on dra7, but at least omap5 has been behving for me for few
-> weeks with these.
+On Tue, Oct 18, 2016 at 12:00:35PM -0700, Jonathan Richardson wrote:
+> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> ---
+>  .../bindings/mailbox/brcm,iproc-mailbox.txt          | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
 
-I am OK with cpuidle for OMAP5, but NOT dra7. we have enabled this 
-series of patches close to a couple of years back and hit quiet a few 
-issues that do not have silicon resolution. CPU states lower than WFI 
-will not work in cpuidle for DRA7 and has already been "descoped" from 
-TI investigation charter. details of the issue remain TI internal, 
-given that the descope was already done.
-
-Again, OMAP5 has only had limited exposure from verification point of 
-view - and all of it TI internal (unlike OMAP4 which has had 
-production devices go ahead) -> at the very least, I'd link it with 
-experimental.
-
--- 
-Regards,
-Nishanth Menon
+Acked-by: Rob Herring <robh@kernel.org>
