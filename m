@@ -1,64 +1,148 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Oct 2016 18:43:56 +0100
-Subject: [PATCH v2 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
-Message-ID: <4e84146ae49a4edd5f1226d76617be9aa92a58ee.1477503578.git.robin.murphy@arm.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 26 Oct 2016 11:44:40 -0600
+Subject: [PATCH] PCI: mvebu: Take control of mbus windows setup by the firmware
+Message-ID: <20161026174440.GA24717@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new dma_{map,unmap}_resource() functions added to the DMA API
-for the benefit of cases like slave DMA, add suitable implementations to
-the arsenal of our generic layer. Since cache maintenance should not be
-a concern, these can both be standalone callback implementations without
-the need for arch code wrappers.
+The firmware may setup the mbus to access PCI-E and indicate this
+has happened with a ranges mapping for the PCI-E ID. If this happens
+then the mbus setup and the pci dynamic setup conflict, creating
+problems.
 
-CC: Joerg Roedel <joro@8bytes.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Have PCI-E assume control of the firmware specified default mapping by
+setting the value of the bridge window to match the firmware mapping.
+
+Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
+ drivers/bus/mvebu-mbus.c     | 36 ++++++++++++++++++++++++++++++++++++
+ drivers/pci/host/pci-mvebu.c | 22 ++++++++++++++++++++++
+ include/linux/mbus.h         |  3 +++
+ 3 files changed, 61 insertions(+)
 
-v2: Use iommu_dma_unmap_page for symmetry, instead of being sneaky.
+In the DT this could look like:
 
- drivers/iommu/dma-iommu.c | 13 +++++++++++++
- include/linux/dma-iommu.h |  4 ++++
- 2 files changed, 17 insertions(+)
+	mbus {
+		ranges = <MBUS_ID(0x04, 0xe8) 0 0xe0000000 0x8000000 /* PEX 0 MEM */
+		pex@e0000000 {
+			compatible = "marvell,kirkwood-pcie";
+			ranges = <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000 /* Controller regs */
+				  0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+				  >;
+			pcie at 1,0 {
+				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0>;
+				reg = <0x0800 0 0  0 0>; // 0000:00:01.0
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index c5ab8667e6f2..a2fd90a6a782 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -624,6 +624,19 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), sg_dma_address(sg));
+				device at 0 {
+					reg = <0x0 0 0	0 0>; // 0000:01:00.0
+					ranges = <0x00000000  0x82000000 0x00000000 0x00000000	0x8000000>;
+
+Which is basically the OF way to describe PCI devices downstream of
+the interface and give information about what their BARs should be.
+
+This is useful if there is even more DT stuff below the explicitly
+declared device as it allows standard DT address translation to work
+properly.
+
+diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
+index c7f396903184..ce0ac5049c1f 100644
+--- a/drivers/bus/mvebu-mbus.c
++++ b/drivers/bus/mvebu-mbus.c
+@@ -922,6 +922,42 @@ int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
+ 						 size, MVEBU_MBUS_NO_REMAP);
  }
  
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
++/**
++ * mvebu_mbus_get_single_window_by_id() - return the location of the window if
++ * the target/attribute has a single enabled mapping.
++ *
++ * RETURNS:
++ *	-ENODEV if no mapping and -E2BIG if there is more than one mapping
++ */
++int mvebu_mbus_get_single_window_by_id(unsigned int target,
++				       unsigned int attribute,
++				       phys_addr_t *base, phys_addr_t *size)
 +{
-+	return iommu_dma_map_page(dev, phys_to_page(phys), offset_in_page(phys),
-+			size, dma_direction_to_prot(dir, false) | IOMMU_MMIO);
++	unsigned int win;
++	unsigned int count = 0;
++
++	for (win = 0; win < mbus_state.soc->num_wins; win++) {
++		u64 wbase;
++		u32 wsize;
++		u8 wtarget, wattr;
++		int enabled;
++
++		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
++				       &wsize, &wtarget, &wattr, NULL);
++		if (enabled && wtarget == target && wattr == attribute) {
++			*base = wbase;
++			*size = wsize;
++			count++;
++		}
++	}
++
++	if (count == 1)
++		return 0;
++	if (count == 0)
++		return -ENODEV;
++	return -E2BIG;
 +}
 +
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
-+{
-+	iommu_dma_unmap_page(dev, handle, size, dir, attrs);
-+}
-+
- int iommu_dma_supported(struct device *dev, u64 mask)
+ int mvebu_mbus_del_window(phys_addr_t base, size_t size)
  {
- 	/*
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 32c589062bd9..7f7e9a7e3839 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -61,6 +61,10 @@ void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs);
- void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		enum dma_data_direction dir, unsigned long attrs);
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
- int iommu_dma_supported(struct device *dev, u64 mask);
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ 	int win;
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 307f81d6b479..5d5a2687b73e 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -464,6 +464,8 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+ {
+ 	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
++	int rc;
++	phys_addr_t base, size;
  
+ 	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
+ 
+@@ -480,6 +482,26 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
+ 
+ 	/* Add capabilities */
+ 	bridge->status = PCI_STATUS_CAP_LIST;
++
++	/*
++	 * If the firmware has already setup a window for PCIe then assume
++	 * control of it by defaulting the BAR to the window setting.
++	 */
++	rc = mvebu_mbus_get_single_window_by_id(port->mem_target,
++						port->mem_attr, &base, &size);
++	if (rc == -E2BIG)
++		pr_err(FW_BUG "%s: Too many pre-existing mbus mappings\n",
++		       port->dn->name);
++	if (!rc) {
++		if ((base & 0xFFFFF) != 0 || ((size + base) & 0xFFFFF) != 0)
++			pr_err(FW_BUG "%s: Invalid pre-existing mbus mapping\n",
++			       port->dn->name);
++		port->memwin_base = base;
++		port->memwin_size = size;
++		port->bridge.membase = (base >> 16) & 0xFFF0;
++		port->bridge.memlimit = ((size - 1 + base) >> 16) & 0xFFF0;
++		port->bridge.command |= PCI_COMMAND_MEMORY;
++	}
+ }
+ 
+ /*
+diff --git a/include/linux/mbus.h b/include/linux/mbus.h
+index d610232762e3..dfafc27b41b5 100644
+--- a/include/linux/mbus.h
++++ b/include/linux/mbus.h
+@@ -83,5 +83,8 @@ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
+ 		    size_t mbus_size, phys_addr_t sdram_phys_base,
+ 		    size_t sdram_size);
+ int mvebu_mbus_dt_init(bool is_coherent);
++int mvebu_mbus_get_single_window_by_id(unsigned int target,
++				       unsigned int attribute,
++				       phys_addr_t *base, phys_addr_t *size);
+ 
+ #endif /* __LINUX_MBUS_H */
 -- 
-1.9.1
+2.1.4
