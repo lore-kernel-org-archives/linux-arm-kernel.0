@@ -1,138 +1,152 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue, 25 Oct 2016 22:06:49 -0500
-Subject: [PATCH v6 3/5] ARM: davinci: da8xx: Add USB PHY platform declaration
+Date: Tue, 25 Oct 2016 22:06:48 -0500
+Subject: [PATCH v6 2/5] ARM: davinci: da8xx: Add CFGCHIP syscon platform
+ declaration.
 In-Reply-To: <1477451211-31979-1-git-send-email-david@lechnology.com>
 References: <1477451211-31979-1-git-send-email-david@lechnology.com>
-Message-ID: <1477451211-31979-4-git-send-email-david@lechnology.com>
+Message-ID: <1477451211-31979-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is now a proper phy driver for the DA8xx SoC USB PHY. This adds the
-platform device declarations needed to use it.
+The CFGCHIP registers are used by a number of devices, so using a syscon
+device to share them. The first consumer of this will by the phy-da8xx-usb
+driver.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
-da8xx-usb-phy device id is changed to -1 since there is only one da8xx-usb-phy
-device.
+syscon device id is changed to -1 since there is only one syscon device.
 
- arch/arm/mach-davinci/board-da830-evm.c     | 28 +++++-----------------------
- arch/arm/mach-davinci/board-omapl138-hawk.c |  5 +++++
- arch/arm/mach-davinci/include/mach/da8xx.h  |  1 +
- arch/arm/mach-davinci/usb-da8xx.c           | 11 +++++++++++
- 4 files changed, 22 insertions(+), 23 deletions(-)
+ arch/arm/mach-davinci/board-da830-evm.c     |  4 ++++
+ arch/arm/mach-davinci/board-da850-evm.c     |  4 ++++
+ arch/arm/mach-davinci/board-mityomapl138.c  |  4 ++++
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  4 ++++
+ arch/arm/mach-davinci/devices-da8xx.c       | 28 ++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h  |  2 ++
+ 6 files changed, 46 insertions(+)
 
 diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 3051cb6..c62766e 100644
+index 605d444..3051cb6 100644
 --- a/arch/arm/mach-davinci/board-da830-evm.c
 +++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -26,7 +26,6 @@
- #include <linux/platform_data/mtd-davinci.h>
- #include <linux/platform_data/mtd-davinci-aemif.h>
- #include <linux/platform_data/spi-davinci.h>
--#include <linux/platform_data/usb-davinci.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -106,30 +105,8 @@ static irqreturn_t da830_evm_usb_ocic_irq(int irq, void *dev_id)
- 
- static __init void da830_evm_usb_init(void)
- {
--	u32 cfgchip2;
+@@ -586,6 +586,10 @@ static __init void da830_evm_init(void)
+ 	struct davinci_soc_info *soc_info = &davinci_soc_info;
  	int ret;
  
--	/*
--	 * Set up USB clock/mode in the CFGCHIP2 register.
--	 * FYI:  CFGCHIP2 is 0x0000ef00 initially.
--	 */
--	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
--
--	/*
--	 * We have to override VBUS/ID signals when MUSB is configured into the
--	 * host-only mode -- ID pin will float if no cable is connected, so the
--	 * controller won't be able to drive VBUS thinking that it's a B-device.
--	 * Otherwise, we want to use the OTG mode and enable VBUS comparators.
--	 */
--	cfgchip2 &= ~CFGCHIP2_OTGMODE;
--#ifdef	CONFIG_USB_MUSB_HOST
--	cfgchip2 |=  CFGCHIP2_FORCE_HOST;
--#else
--	cfgchip2 |=  CFGCHIP2_SESENDEN | CFGCHIP2_VBDTCTEN;
--#endif
--
--	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
--
- 	/* USB_REFCLKIN is not used. */
- 	ret = da8xx_register_usb20_phy_clk(false);
- 	if (ret)
-@@ -141,6 +118,11 @@ static __init void da830_evm_usb_init(void)
- 		pr_warn("%s: USB 1.1 PHY CLK registration failed: %d\n",
- 			__func__, ret);
- 
-+	ret = da8xx_register_usb_phy();
++	ret = da8xx_register_cfgchip();
 +	if (ret)
-+		pr_warn("%s: USB PHY registration failed: %d\n",
-+			__func__, ret);
++		pr_warn("%s: CFGCHIP registration failed: %d\n", __func__, ret);
 +
- 	ret = davinci_cfg_reg(DA830_USB0_DRVVBUS);
+ 	ret = da830_register_gpio();
  	if (ret)
- 		pr_warn("%s: USB 2.0 PinMux setup failed: %d\n", __func__, ret);
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 8e4539f..ec5cb10 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1345,6 +1345,10 @@ static __init void da850_evm_init(void)
+ {
+ 	int ret;
+ 
++	ret = da8xx_register_cfgchip();
++	if (ret)
++		pr_warn("%s: CFGCHIP registration failed: %d\n", __func__, ret);
++
+ 	ret = da850_register_gpio();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
+index bc4e63f..1a6d430 100644
+--- a/arch/arm/mach-davinci/board-mityomapl138.c
++++ b/arch/arm/mach-davinci/board-mityomapl138.c
+@@ -514,6 +514,10 @@ static void __init mityomapl138_init(void)
+ {
+ 	int ret;
+ 
++	ret = da8xx_register_cfgchip();
++	if (ret)
++		pr_warn("%s: CFGCHIP registration failed: %d\n", __func__, ret);
++
+ 	/* for now, no special EDMA channels are reserved */
+ 	ret = da850_register_edma(NULL);
+ 	if (ret)
 diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 8691a25..c5cb8d9 100644
+index d4930b6..8691a25 100644
 --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
 +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -260,6 +260,11 @@ static __init void omapl138_hawk_usb_init(void)
- 		pr_warn("%s: USB 1.1 PHY CLK registration failed: %d\n",
- 			__func__, ret);
+@@ -294,6 +294,10 @@ static __init void omapl138_hawk_init(void)
+ {
+ 	int ret;
  
-+	ret = da8xx_register_usb_phy();
++	ret = da8xx_register_cfgchip();
 +	if (ret)
-+		pr_warn("%s: USB PHY registration failed: %d\n",
-+			__func__, ret);
++		pr_warn("%s: CFGCHIP registration failed: %d\n", __func__, ret);
 +
- 	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
- 			GPIOF_DIR_OUT, "USB1 VBUS");
- 	if (ret < 0) {
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index c32444b..38d932e 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -92,6 +92,7 @@ int da8xx_register_watchdog(void);
- int da8xx_register_usb_refclkin(int rate);
- int da8xx_register_usb20_phy_clk(bool use_usb_refclkin);
- int da8xx_register_usb11_phy_clk(bool use_usb_refclkin);
-+int da8xx_register_usb_phy(void);
- int da8xx_register_usb20(unsigned mA, unsigned potpgt);
- int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
- int da8xx_register_emac(void);
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-index 71a6d85..9c30bff 100644
---- a/arch/arm/mach-davinci/usb-da8xx.c
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -7,6 +7,7 @@
- #include <linux/platform_data/usb-davinci.h>
+ 	ret = da850_register_gpio();
+ 	if (ret)
+ 		pr_warn("%s: GPIO init failed: %d\n", __func__, ret);
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index add3771..31a99db 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -11,6 +11,7 @@
+  * (at your option) any later version.
+  */
+ #include <linux/init.h>
++#include <linux/platform_data/syscon.h>
  #include <linux/platform_device.h>
- #include <linux/mfd/da8xx-cfgchip.h>
-+#include <linux/phy/phy.h>
- #include <linux/usb/musb.h>
- 
- #include <mach/clock.h>
-@@ -243,6 +244,16 @@ int __init da8xx_register_usb11_phy_clk(bool use_usb_refclkin)
- 	return ret;
+ #include <linux/dma-contiguous.h>
+ #include <linux/serial_8250.h>
+@@ -1089,3 +1090,30 @@ int __init da850_register_sata(unsigned long refclkpn)
+ 	return platform_device_register(&da850_sata_device);
  }
- 
-+static struct platform_device da8xx_usb_phy = {
-+	.name		= "da8xx-usb-phy",
-+	.id		= -1,
+ #endif
++
++static struct syscon_platform_data da8xx_cfgchip_platform_data = {
++	.label	= "cfgchip",
 +};
 +
-+int __init da8xx_register_usb_phy(void)
-+{
-+	return platform_device_register(&da8xx_usb_phy);
-+}
++static struct resource da8xx_cfgchip_resources[] = {
++	{
++		.start	= DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP0_REG,
++		.end	= DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP4_REG + 3,
++		.flags	= IORESOURCE_MEM,
++	},
++};
 +
- #if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
++static struct platform_device da8xx_cfgchip_device = {
++	.name	= "syscon",
++	.id	= -1,
++	.dev	= {
++		.platform_data	= &da8xx_cfgchip_platform_data,
++	},
++	.num_resources	= ARRAY_SIZE(da8xx_cfgchip_resources),
++	.resource	= da8xx_cfgchip_resources,
++};
++
++int __init da8xx_register_cfgchip(void)
++{
++	return platform_device_register(&da8xx_cfgchip_device);
++}
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index c367530..c32444b 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -61,6 +61,7 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_CFGCHIP1_REG	0x180
+ #define DA8XX_CFGCHIP2_REG	0x184
+ #define DA8XX_CFGCHIP3_REG	0x188
++#define DA8XX_CFGCHIP4_REG	0x18c
  
- static struct musb_hdrc_config musb_config = {
+ #define DA8XX_SYSCFG1_BASE	(IO_PHYS + 0x22C000)
+ #define DA8XX_SYSCFG1_VIRT(x)	(da8xx_syscfg1_base + (x))
+@@ -116,6 +117,7 @@ void da8xx_rproc_reserve_cma(void);
+ int da8xx_register_rproc(void);
+ int da850_register_gpio(void);
+ int da830_register_gpio(void);
++int da8xx_register_cfgchip(void);
+ 
+ extern struct platform_device da8xx_serial_device[];
+ extern struct emac_platform_data da8xx_emac_pdata;
 -- 
 2.7.4
