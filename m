@@ -1,31 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 26 Oct 2016 18:13:59 +0000
-Subject: [PATCH 1/2] DT: binding: bcm2835-mbox: fix address typo in example
-Message-ID: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Oct 2016 19:19:31 +0100
+Subject: [PATCH] arm64: Remove pointless WARN_ON in DMA teardown
+Message-ID: <74f5ae2ead8bb8fa9fabcf88b5962885b29eb2d5.1477505971.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The address of the mailbox node in the example has a typo.
-So fix it accordingly.
+We expect arch_teardown_dma_ops() to be called very late in a device's
+life, after it has been removed from its bus, and thus after the IOMMU
+bus notifier has run. As such, even if this funny little check did make
+sense, it's unlikely to achieve what it thinks it's trying to do anyway.
+It's a residual trace of an earlier implementation which didn't belong
+here from the start; belatedly snuff it out.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Fixes: d4b5c782b9f4 ("dt/bindings: Add binding for the BCM2835 mailbox driver")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- .../bindings/mailbox/brcm,bcm2835-mbox.txt         |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/mm/dma-mapping.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-index e893615..b48d7d3 100644
---- a/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/brcm,bcm2835-mbox.txt
-@@ -12,7 +12,7 @@ Required properties:
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 5cd0a383b14b..290a84f3351f 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -940,11 +940,6 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
  
- Example:
+ void arch_teardown_dma_ops(struct device *dev)
+ {
+-	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+-
+-	if (WARN_ON(domain))
+-		iommu_detach_device(domain, dev);
+-
+ 	dev->archdata.dma_ops = NULL;
+ }
  
--mailbox: mailbox at 7e00b800 {
-+mailbox: mailbox at 7e00b880 {
- 	compatible = "brcm,bcm2835-mbox";
- 	reg = <0x7e00b880 0x40>;
- 	interrupts = <0 1>;
 -- 
-1.7.9.5
+1.9.1
