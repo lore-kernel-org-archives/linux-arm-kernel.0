@@ -1,48 +1,68 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 26 Oct 2016 15:01:52 +0100
-Subject: [PATCH] mfd: axp20x-i2c: Add i2c-ids to fix module auto-loading
-In-Reply-To: <20161005155112.13774-2-hdegoede@redhat.com>
-References: <20161005155112.13774-1-hdegoede@redhat.com>
- <20161005155112.13774-2-hdegoede@redhat.com>
-Message-ID: <20161026140152.GF13127@dell>
+Date: Wed, 26 Oct 2016 15:05:01 +0100
+Subject: [PATCH 05/14] mfd: sun6i-prcm: Add sun8i analog codec as subnode
+In-Reply-To: <c74aea452bd1831f439dd67884cb2879e0849f03.1475571575.git.mylene.josserand@free-electrons.com>
+References: <cover.1475571575.git.mylene.josserand@free-electrons.com>
+ <c74aea452bd1831f439dd67884cb2879e0849f03.1475571575.git.mylene.josserand@free-electrons.com>
+Message-ID: <20161026140501.GH13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Oct 2016, Hans de Goede wrote:
+On Tue, 04 Oct 2016, Myl?ne Josserand wrote:
 
-> The i2c subsys does not load modules by compatible, only by
-> i2c-id, with e.g. a modalias of: "i2c:axp209".
+> The sun8i audio codec is using PRCM registers to configure all the
+> analog part of the audio codec. It is added as a subnode of the PRCM
+> with his resource (offset of 0x1c0).
 > 
-> Populate the axp20x_i2c_id[] table with supported ids, so that
-> module auto-loading will work.
-> 
-> Reported-by: Dennis Gilmore <dennis@ausil.us>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 > ---
->  drivers/mfd/axp20x-i2c.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-
-Applied (for now), thanks.
-
-> diff --git a/drivers/mfd/axp20x-i2c.c b/drivers/mfd/axp20x-i2c.c
-> index b1b8658..d35a5fe 100644
-> --- a/drivers/mfd/axp20x-i2c.c
-> +++ b/drivers/mfd/axp20x-i2c.c
-> @@ -69,10 +69,11 @@ static const struct of_device_id axp20x_i2c_of_match[] = {
->  };
->  MODULE_DEVICE_TABLE(of, axp20x_i2c_of_match);
+>  drivers/mfd/sun6i-prcm.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+> index 011fcc5..e0c6bf5 100644
+> --- a/drivers/mfd/sun6i-prcm.c
+> +++ b/drivers/mfd/sun6i-prcm.c
+> @@ -12,6 +12,8 @@
+>  #include <linux/init.h>
+>  #include <linux/of.h>
 >  
-> -/*
-> - * This is useless for OF-enabled devices, but it is needed by I2C subsystem
-> - */
->  static const struct i2c_device_id axp20x_i2c_id[] = {
-> +	{ "axp152", 0 },
-> +	{ "axp202", 0 },
-> +	{ "axp209", 0 },
-> +	{ "axp221", 0 },
->  	{ },
+> +#define SUN6I_AUDIO_CODEC_ANALOG	0x1c0
+> +
+>  struct prcm_data {
+>  	int nsubdevs;
+>  	const struct mfd_cell *subdevs;
+> @@ -57,6 +59,14 @@ static const struct resource sun6i_a31_apb0_rstc_res[] = {
+>  	},
 >  };
->  MODULE_DEVICE_TABLE(i2c, axp20x_i2c_id);
+>  
+> +static const struct resource sun8i_adda_res[] = {
+> +	{
+> +		.start = SUN6I_AUDIO_CODEC_ANALOG,
+> +		.end = 0x1c3,
+
+This also needs defining.  No magic numbers please.
+
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+> +
+>  static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+>  	{
+>  		.name = "sun6i-a31-ar100-clk",
+> @@ -109,6 +119,12 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+>  		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
+>  		.resources = sun6i_a31_apb0_rstc_res,
+>  	},
+> +	{
+> +		.name = "sun8i-codec-analog",
+> +		.of_compatible = "allwinner,sun8i-codec-analog",
+> +		.num_resources = ARRAY_SIZE(sun8i_adda_res),
+> +		.resources = sun8i_adda_res,
+> +	},
+>  };
+>  
+>  static const struct prcm_data sun6i_a31_prcm_data = {
 
 -- 
 Lee Jones
