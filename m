@@ -1,54 +1,49 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 26 Oct 2016 18:54:35 +0800
-Subject: [PATCH v14 1/9] clocksource/drivers/arm_arch_timer: Move enums
- and defines to header file
-In-Reply-To: <20161026105144.GF19965@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-2-git-send-email-fu.wei@linaro.org>
- <20161020144510.GJ10234@leverpostej>
- <CADyBb7shWfCQycmo0GcheX2NSsrjYBpzdtYFqymvDNCKi0QM2A@mail.gmail.com>
- <20161026105144.GF19965@leverpostej>
-Message-ID: <CADyBb7vw3itsiHdcPMpMcbwoNj9SQNF7vZsOEiFNnk3uS60-jw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 26 Oct 2016 16:24:17 +0530
+Subject: [PATCH 2/5] ARM: davinci: Don't append git rev to local version
+In-Reply-To: <bf8cac01-910d-5afa-e840-f0d7ee96d22a@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-3-git-send-email-david@lechnology.com>
+ <20f3efba-4f79-3675-d2ce-09efe90fb692@ti.com>
+ <bf8cac01-910d-5afa-e840-f0d7ee96d22a@lechnology.com>
+Message-ID: <47ad8be9-54e0-4e0c-3ff5-31662e6ca4de@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark
-
-On 26 October 2016 at 18:51, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Oct 26, 2016 at 04:31:55PM +0800, Fu Wei wrote:
->> On 20 October 2016 at 22:45, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Sep 29, 2016 at 02:17:09AM +0800, fu.wei at linaro.org wrote:
->> >>  #include <linux/timecounter.h>
->> >>  #include <linux/types.h>
->> >>
->> >> +#define ARCH_CP15_TIMER                      BIT(0)
->> >> +#define ARCH_MEM_TIMER                       BIT(1)
->> >
->> > If we're going to expose these in a header, it would be better to rename
->> > them to something that makes their usage/meaning clear. These should
->> > probably be ARCH_TIMER_TYPE_{CP15,MEM}.
->
->> > With those changes (regardless of the ARCH_TIMER_TYPE_* bits):
->> >
->> > Acked-by: Mark Rutland <mark.rutland@arm.com>
+On Monday 24 October 2016 08:45 PM, David Lechner wrote:
+> On 10/24/2016 06:35 AM, Sekhar Nori wrote:
+>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>>> In the davinci default configuration, don't append the git revision to
+>>> the local kernel version by. This seems like the more desirable default
+>>> value.
 >>
->> For ARCH_TIMER_TYPE_*, maybe I should add a patch at the end of this
->> patchset to fix it, OK ?
->
-> Sure. If you could put that *earlier* in the patchset it would be
-> preferable so as to minimize churn.
+>> Why? To the contrary I actually quite like the fact that the git commit
+>> is appended to version string. Makes it easy for me to cross-check that
+>> I am booting the right image.
+>>
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>
+>> Thanks,
+>> Sekhar
+>>
+> 
+> Each time you make a commit, you get a new version, which installs
+> another copy of the kernel modules on the device. This will fill up the
+> SD card if you are making many commits.
 
-OK, NP, will do
+Right, but thats easily fixable by removing existing modules before
+installing new ones.
 
->
-> Thanks,
-> Mark.
+> Also, if someone wants to build the mainline kernel using the default
+> configuration, it seems odd to have a git revision tacked on to the end
+> even though you made no revisions.
 
+If you checkout a tag and build, then no commit information is added.
+Which I guess is what most end users will do.
 
+I don't see this done in other defconfigs like omap2plus and multi_v7 as
+well. I would like to keep it similar for davinci.
 
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Thanks,
+Sekhar
