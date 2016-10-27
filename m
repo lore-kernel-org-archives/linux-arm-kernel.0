@@ -1,35 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 27 Oct 2016 09:20:14 +0800
-Subject: [PATCH 02/12] ASoC: dapm: Implement stereo mixer control support
-In-Reply-To: <20161026165753.GC25322@sirena.org.uk>
-References: <20161003110804.28235-1-wens@csie.org>
- <20161003110804.28235-3-wens@csie.org>
- <20161026165753.GC25322@sirena.org.uk>
-Message-ID: <CAGb2v673TH0dw15wL6W6-i7tqu245epu22MxpEkjQuNHTBhnJw@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 26 Oct 2016 20:30:27 -0500
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+Message-ID: <38a3a10c-a269-6a9f-305c-7d38ec9b839b@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 12:57 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Oct 03, 2016 at 07:07:54PM +0800, Chen-Yu Tsai wrote:
+On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>> This adds a device tree definition file for LEGO MINDSTORMS EV3.
 >
->> While DAPM is mono or single channel, its controls can be shared between
->> widgets, such as sharing one stereo mixer control between the left and
->> right channel widgets.
+> Thanks for the patch!
 >
->> This patch introduces support for such shared mixer controls.
+>>
+>> What is working:
+>>
+>> * Pin muxing
+>> * MicroSD card reader
+>> * UART on input port 1
+>>
+>> What is partially working:
+>>
+>> * Buttons - working after GPIO fix
+>> * LEDs - working after GPIO fix
+>> * Poweroff/reset - working after GPIO fix
 >
-> Based on this changelog I'm really not sure what the intended semantic
-> of this change is which makes it difficult to review.  What are you
-> expecting these controls to look like and how are you expecting them to
-> work?
+> Is the GPIO fix something that will go in v4.9-rc cycle ?
 >
->> -static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i)
->> +static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i,
->> +                                    int nth_path)
->
-> It looks like the goal is to attach more than one path to a single
-> control somehow?
 
-Correct. I'll try to expand the commit log and add an example diagram.
-
-ChenYu
+FYI, the fix is in linux-gpio/fixes now.
