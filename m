@@ -1,39 +1,40 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 27 Oct 2016 08:32:03 -0600
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <bdae79f1-dfed-d735-cb49-9ce8aa0b6e4f@xilinx.com>
-References: <20161026225413.GA6220@obsidianresearch.com>
- <bdae79f1-dfed-d735-cb49-9ce8aa0b6e4f@xilinx.com>
-Message-ID: <20161027143203.GA6818@obsidianresearch.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Thu, 27 Oct 2016 16:33:08 +0200
+Subject: [PATCH v3] ARM: davinci: da8xx: Fix some redefined symbol warnings
+In-Reply-To: <ca32fd12-5299-02e8-24c4-501dda4291ab@ti.com>
+References: <1477485542-10555-1-git-send-email-abailon@baylibre.com>
+ <1477485542-10555-2-git-send-email-abailon@baylibre.com>
+ <7026f012-ffce-cc28-85be-9a5cd26de60f@ti.com>
+ <ca32fd12-5299-02e8-24c4-501dda4291ab@ti.com>
+Message-ID: <9ea6a516-86de-e0a3-5a07-d02c60bb820c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 09:42:03AM +0200, Michal Simek wrote:
-
-> I am not quite sure about this and I didn't try it on real hw.
-> But minimum bitstream size 52+B and more likely much more than this.
-
-Oh probably, I didn't try to guess what the minimum size is, that
-check is just to prevent reading past the end of the buffer.
-
-> This is taken from u-boot source code and this is full BIN header.
-> The code above is checking only the last word.
-
-There can be garbage before the sync word.  The hardware ignores
-everything till it gets the sync word.  Prior versions of the driver
-with the autodetection would discard the garbage.
-
-Since the autodetection was ripped out I didn't want to search since
-the intent seems to be for user space to provide a full bitstream,
-which should start at the sync word, but that is another option.
-
->        0x000000bb, /* Sync word */
->        0x11220044, /* Sync word */
->        DUMMY_WORD,
->        DUMMY_WORD,
->        0xaa995566, /* Sync word */
-
-This is the bus width detection pattern, I understood the Zync DevC
-interface was wired to 32 bits and did not respond to this.
-
-Jason
+On 10/27/2016 01:54 PM, Sekhar Nori wrote:
+> On Thursday 27 October 2016 05:13 PM, Sekhar Nori wrote:
+>> On Wednesday 26 October 2016 06:09 PM, Alexandre Bailon wrote:
+>>> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
+>>> but da8xx-cfgchip.h intend to replace them.
+>>> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
+>>
+>> Looks like this is not true for v4.9-rc2 and so I don't see any warnings
+> 
+> Ah, just noticed that _this_ is the patch that introduces
+> da8xx-cfgchip.h into usb-da8xx.c. So this is the patch that introduces
+> the warnings (and fixes them).
+> 
+> I can queue this for v4.10 (with Greg's ack) if you change the
+> description to make it about cleaning up duplicated defines between
+> da8xx-cfgchip.h and usb-davinci.h and not talk about "redefined symbol
+> warnings".
+I will do it.
+> 
+> Also, when adding a header file, can you please keep it sorted in
+> alphabetical order.
+Ok.
+> 
+> Thanks,
+> Sekhar
+> 
+Thanks,
+Alexandre
