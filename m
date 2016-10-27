@@ -1,200 +1,148 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 27 Oct 2016 14:21:14 +0200
-Subject: [PATCH] ARM: DT: stm32: move dma translation to board files
-In-Reply-To: <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
-References: <CAF3+Tqd2MGmz+8XhLXhaZiEc78QOwHSpVrQA65-p1AcfT+_xgg@mail.gmail.com>
- <404315f0-fc9e-93e2-54df-f85e484d9389@st.com>
- <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
-Message-ID: <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Oct 2016 13:23:10 +0100
+Subject: [PATCH v2 3/4] arm64: arch_timer: Work around Erratum
+ Hisilicon-161601
+In-Reply-To: <44cf2916-7c81-5cdf-d113-f99326eae2c6@huawei.com>
+References: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
+ <1477553651-13428-3-git-send-email-dingtianhong@huawei.com>
+ <16d8f329-3413-11da-6f2a-8b1a95c85352@arm.com>
+ <44cf2916-7c81-5cdf-d113-f99326eae2c6@huawei.com>
+Message-ID: <8267644f-c488-2d02-3dd0-c7d0ed23babf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bruno,
-
-On 10/27/2016 12:43 PM, Bruno Herrera wrote:
-> Hi Alex,
->
-> On Wed, Oct 26, 2016 at 7:09 AM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> Hi Bruno,
+On 27/10/16 13:17, Ding Tianhong wrote:
+> 
+> 
+> On 2016/10/27 18:58, Marc Zyngier wrote:
+>> On 27/10/16 08:34, Ding Tianhong wrote:
+>>> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
+>>> potential to contain an erroneous value when the timer value changes".
+>>> Accesses to TVAL (both read and write) are also affected due to the implicit counter
+>>> read.  Accesses to CVAL are not affected.
+>>>
+>>> The workaround is to reread the system count registers until the value of the second
+>>> read is larger than the first one by less than 32, the system counter can be guaranteed
+>>> not to return wrong value twice by back-to-back read and the error value is always larger
+>>> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+>>>
+>>> The workaround is enabled if the hisilicon,erratum-161601 property is found in
+>>> the timer node in the device tree.  This can be overridden with the
+>>> clocksource.arm_arch_timer.hisilicon-161601 boot parameter, which allows KVM
+>>> users to enable the workaround until a mechanism is implemented to
+>>> automatically communicate this information.
+>>>
+>>> Fix some description for fsl erratum a008585.
+>>>
+>>> v2: Significant rework based on feedback, including seperate the fsl erratum a008585
+>>>     to another patch, update the erratum name and remove unwanted code.
+>>>
+>>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>>> ---
+>>>  Documentation/arm64/silicon-errata.txt |  1 +
+>>>  Documentation/kernel-parameters.txt    |  9 ++++
+>>>  arch/arm64/include/asm/arch_timer.h    | 28 ++++++++++-
+>>>  drivers/clocksource/Kconfig            | 14 +++++-
+>>>  drivers/clocksource/arm_arch_timer.c   | 88 ++++++++++++++++++++++++++--------
+>>>  5 files changed, 118 insertions(+), 22 deletions(-)
+>>>
+>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>>> index 405da11..70c5d5e 100644
+>>> --- a/Documentation/arm64/silicon-errata.txt
+>>> +++ b/Documentation/arm64/silicon-errata.txt
+>>> @@ -63,3 +63,4 @@ stable kernels.
+>>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+>>>  |                |                 |                 |                         |
+>>>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
+>>> +| Hisilicon      | Hip05/Hip06/Hip07 | #161601       | HISILICON_ERRATUM_161601|
 >>
->> On 10/25/2016 11:06 PM, Bruno Herrera wrote:
->>>
->>> Hi Alexandre,
->>>
->>>>
->>>> stm32f469-disco and stm32f429-eval boards use SDRAM start address
->>>> remapping
->>>> (to @0) to boost performances. A DMA translation through "dma-ranges"
->>>> property was needed for other masters than the M4 CPU.
->>>> stm32f429-disco doesn't use remapping so doesn't need this DMA
->>>> translation.
->>>> This patches moves this DMA translation definition from stm32f429 soc
->>>> file
->>>> to board files.
->>>>
->>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>>
->>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>>> index 13c7cd2..a763c15 100644
->>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>>> @@ -82,6 +82,10 @@
->>>>                 };
->>>>         };
->>>>
->>>> +       soc {
->>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>> +       };
->>>> +
->>>>         usbotg_hs_phy: usbphy {
->>>>                 #phy-cells = <0>;
->>>>                 compatible = "usb-nop-xceiv";
->>>
->>>
->>> Shouldn't also the peripheral dma-ranges property move to board specific
->>> too?
->>> I  had this patch for while but I didn't had the time to submit:
+>> I've already commented on the alignment. Please read my initial review.
 >>
->>
->> Well spot I forgot it. Actually, discussing with Arnd ysterday on IIRC,
->> empty dma-ranges is not needed. Can you test on your side by removing
->> dma-ranges in usb node please ?
-> Unfortunately will take a time for me to set up this environment on
-> the STM32F4-EVAL board.
-> And on the discovery boards we dont have this scenario. That was the
-> main reason I did not submit the patch right away.
-> My conclusion and I might be wrong but is based on the my tests with
-> SDIO device at STM32F469I-DISCO board.
->
-> I started this issue as discussion at ST Forum but Maxime gave me the hint.
->
-> https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44
->
->> I will push a v2 by removing empty dma-ranges if tests are ok in your side.
->
-> From my understating/conclusion is: when empty property(dma-ranges) is
-> the device node, the mapping will be taken in consideration when using
-> DMA otherwise the mapping is ignored.
-> And in the SDIO case it is needed for DEV->MEM(SDRAM) and
-> MEM(SDRAM)->DEV. If it is not the case for the devices in question so
-> I suppose it can work without the property.
-
-For sure translation has to be done but I'm not sure that an empty 
-"dma-ranges" is needed in device node to activate it. For Ethernet empty 
-"dma-ranges" is not needed. I will try with usb.
-
-alex
-
->
->>
->> Thanks in advance
->> Alex
->>
->>
->>>
->>> Author: Bruno Herrera <bruherrera@gmail.com>
->>> Date:   Sun Oct 16 14:50:00 2016 -0200
->>>
->>>     ARM: DT: STM32: Use dma-ranges property per board not at dtsi file
->>>
->>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>> index 6bfc595..2a22a82 100644
->>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>> @@ -52,6 +52,10 @@
->>>         model = "STMicroelectronics STM32429i-EVAL board";
->>>         compatible = "st,stm32429i-eval", "st,stm32f429";
->>>
->>> +       soc {
->>> +               dma-ranges = <0xC0000000 0x0 0x10000000>;
->>> +       };
+> 
+> It sees misunderstood, fix it this time.
+> 
+>>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+>>> index 6fa1d8a..735b4b6 100644
+>>> --- a/Documentation/kernel-parameters.txt
+>>> +++ b/Documentation/kernel-parameters.txt
+>>> @@ -707,6 +707,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+>>>  			erratum.  If unspecified, the workaround is
+>>>  			enabled based on the device tree.
+>>>  
+>>> +	clocksource.arm_arch_timer.hisilicon-161601=
+>>> +			[ARM64]
+>>> +			Format: <bool>
+>>> +			Enable/disable the workaround of Hisilicon
+>>> +			erratum 161601.  This can be useful for KVM
+>>> +			guests, if the guest device tree doesn't show the
+>>> +			erratum.  If unspecified, the workaround is
+>>> +			enabled based on the device tree.
 >>> +
->>>         chosen {
->>>                 bootargs = "root=/dev/ram rdinit=/linuxrc";
->>>                 stdout-path = "serial0:115200n8";
->>> @@ -96,6 +100,7 @@
->>>
->>>  &ethernet0 {
->>>         status = "okay";
->>> +       dma-ranges;
->>>         pinctrl-0       = <&ethernet0_mii>;
->>>         pinctrl-names   = "default";
->>>         phy-mode        = "mii-id";
->>> @@ -116,6 +121,7 @@
->>>  };
->>>
->>>  &usbotg_hs {
->>> +       dma-ranges;
->>>         dr_mode = "host";
->>>         phys = <&usbotg_hs_phy>;
->>>         phy-names = "usb2-phy";
->>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>> b/arch/arm/boot/dts/stm32f429.dtsi
->>> index 7d624a2..697a133 100644
->>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>> @@ -59,7 +59,6 @@
->>>         };
->>>
->>>         soc {
->>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>
->>>                 timer2: timer at 40000000 {
->>>                         compatible = "st,stm32-timer";
->>> @@ -472,13 +471,11 @@
->>>                         st,syscon = <&syscfg 0x4>;
->>>                         snps,pbl = <8>;
->>>                         snps,mixed-burst;
->>> -                       dma-ranges;
->>>                         status = "disabled";
->>>                 };
->>>
->>>                 usbotg_hs: usb at 40040000 {
->>>                         compatible = "snps,dwc2";
->>> -                       dma-ranges;
->>>                         reg = <0x40040000 0x40000>;
->>>                         interrupts = <77>;
->>>                         clocks = <&rcc 0 29>;
->>>
->>>
->>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>>> b/arch/arm/boot/dts/stm32f429.dtsi
->>>> index 0596d60..3a1cfdd 100644
->>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>>> @@ -59,8 +59,6 @@
->>>>         };
->>>>
->>>>         soc {
->>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>> -
->>>>                 timer2: timer at 40000000 {
->>>>                         compatible = "st,stm32-timer";
->>>>                         reg = <0x40000000 0x400>;
->>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
->>>> b/arch/arm/boot/dts/stm32f469-disco.dts
->>>> index 9e73656..c2213c0 100644
->>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
->>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
->>>> @@ -64,6 +64,10 @@
->>>>         aliases {
->>>>                 serial0 = &usart3;
->>>>         };
->>>> +
->>>> +       soc {
->>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>> +       };
->>>>  };
->>>>
->>>>  &clk_hse {
->>>> --
->>>
->>>
->>>
->>> Br.,
->>> Bruno
->>>
+>>>  	clearcpuid=BITNUM [X86]
+>>>  			Disable CPUID feature X for the kernel. See
+>>>  			arch/x86/include/asm/cpufeatures.h for the valid bit
+>>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+>>> index 118719d8..49b3041 100644
+>>> --- a/arch/arm64/include/asm/arch_timer.h
+>>> +++ b/arch/arm64/include/asm/arch_timer.h
+>>> @@ -29,7 +29,7 @@
+>>>  
+>>>  #include <clocksource/arm_arch_timer.h>
+>>>  
+>>> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
+>>> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
+>>>  extern struct static_key_false arch_timer_read_ool_enabled;
+>>>  #define needs_timer_erratum_workaround() \
+>>>  	static_branch_unlikely(&arch_timer_read_ool_enabled)
+>>> @@ -65,11 +65,35 @@ extern struct arch_timer_erratum_workaround *erratum_workaround;
+>>>  	_new;						\
+>>>  })
+>>>  
+>>> +
+>>> +
+>>> +/*
+>>> + * The number of retries is an arbitrary value well beyond the highest number
+>>> + * of iterations the loop has been observed to take.
+>>> + * Verify whether the value of the second read is larger than the first by
+>>> + * less than 32 is the only way to confirm the value is correct, the system
+>>> + * counter can be guaranteed not to return wrong value twice by back-to-back read
+>>> + * and the error value is always larger than the correct one by 32.
+>>> + */
+>>> +#define __hisi_161601_read_reg(reg) ({				\
+>>> +	u64 _old, _new;						\
+>>> +	int _retries = 200;					\
 >>
+>> Please document how this value was found (either in the code or in the
+>> commit message).
+> 
+> It really difficult to give the accurate standard, theoretically the error should not happened
+> twice together, so maybe 2 is enough here, I just give a arbitrary value.
+> 
+>>
+>>> +								\
+>>> +	do {							\
+>>> +		_old = read_sysreg(reg);			\
+>>> +		_new = read_sysreg(reg);			\
+>>> +		_retries--;					\
+>>> +	} while (unlikely((_new - _old) >> 5) && _retries);	\
+>>> +								\
+>>> +	WARN_ON_ONCE(!_retries);				\
+>>> +	_new;							\
+>>> +})
+>>
+>> Same remark as in the previous patch.
+>>
+> 
+> I think the sentence *Verify whether the value of the second read is larger than the first by
+> less than 32 is the only way to confirm the value is correct* could explain why should *(_new - _old) >> 5*.
+> it is the same as (_new - _old)/32, also mean the _new should never bigger than _old more than 32.
+
+This is not about the explanation of the erratum, but about the location
+of the #define, which can be made private to the .c file instead of
+being globally visible.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
