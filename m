@@ -1,25 +1,67 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Oct 2016 09:15:24 +0200
-Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
-In-Reply-To: <20161027070801.GB7706@verge.net.au>
-References: <20161026052422.17283.57864.sendpatchset@little-apple>
- <20161027070801.GB7706@verge.net.au>
-Message-ID: <20161027071523.GD7706@verge.net.au>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 27 Oct 2016 09:22:35 +0200
+Subject: [PATCH 1/2] mm/memblock: prepare a capability to support
+ memblock near alloc
+In-Reply-To: <58116954.8080908@huawei.com>
+References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
+ <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
+ <20161025132338.GA31239@dhcp22.suse.cz>
+ <58101EB4.2080305@huawei.com>
+ <20161026093152.GE18382@dhcp22.suse.cz>
+ <58116954.8080908@huawei.com>
+Message-ID: <20161027072235.GB6454@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 09:08:01AM +0200, Simon Horman wrote:
-> On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm+renesas@opensource.se>
-> > 
-> > Extend the ARM64 defconfig to enable the DU DRM device as module
-> > together with required dependencies of V4L2 FCP and VSP modules.
-> > 
-> > This enables VGA output on the r8a7795 Salvator-X board.
-> > 
-> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+On Thu 27-10-16 10:41:24, Leizhen (ThunderTown) wrote:
 > 
-> Thanks, I have queued this up.
+> 
+> On 2016/10/26 17:31, Michal Hocko wrote:
+> > On Wed 26-10-16 11:10:44, Leizhen (ThunderTown) wrote:
+> >>
+> >>
+> >> On 2016/10/25 21:23, Michal Hocko wrote:
+> >>> On Tue 25-10-16 10:59:17, Zhen Lei wrote:
+> >>>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+> >>>> actually exist. The percpu variable areas and numa control blocks of that
+> >>>> memoryless numa nodes need to be allocated from the nearest available
+> >>>> node to improve performance.
+> >>>>
+> >>>> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
+> >>>> specified nid at the first time, but if that allocation failed it will
+> >>>> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
+> >>>> the second time.
+> >>>>
+> >>>> To compatible the above old scene, I use a marco node_distance_ready to
+> >>>> control it. By default, the marco node_distance_ready is not defined in
+> >>>> any platforms, the above mentioned functions will work as normal as
+> >>>> before. Otherwise, they will try the nearest node first.
+> >>>
+> >>> I am sorry but it is absolutely unclear to me _what_ is the motivation
+> >>> of the patch. Is this a performance optimization, correctness issue or
+> >>> something else? Could you please restate what is the problem, why do you
+> >>> think it has to be fixed at memblock layer and describe what the actual
+> >>> fix is please?
+> >>
+> >> This is a performance optimization.
+> > 
+> > Do you have any numbers to back the improvements?
+>
+> I have not collected any performance data, but at least in theory,
+> it's beneficial and harmless, except make code looks a bit
+> urly.
 
-Given discussion elsewhere on enabling DU I am holding off on this for a
-little; it is not queued up for now.
+The whole memoryless area is cluttered with hacks because everybody just
+adds pieces here and there to make his particular usecase work IMHO.
+Adding more on top for performance reasons which are even not measured
+to prove a clear win is a no go. Please step back try to think how this
+could be done with an existing infrastructure we have (some cleanups
+while doing that would be hugely appreciated) and if that is not
+possible then explain why and why it is not feasible to fix that before
+you start adding a new API.
+
+Thanks!
+
+-- 
+Michal Hocko
+SUSE Labs
