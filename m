@@ -1,69 +1,82 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 27 Oct 2016 16:39:24 +0900
-Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
- cores
-In-Reply-To: <CAMuHMdVKwg0SzEmu804UxTEE+N4atYjeKHNfCJ0eXf28fL+KJA@mail.gmail.com>
-References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoSsKTvMjATz89nEY06Fp-J20VqjDzW0JD1NDLqEJQPwsQ@mail.gmail.com>
- <CAMuHMdVKwg0SzEmu804UxTEE+N4atYjeKHNfCJ0eXf28fL+KJA@mail.gmail.com>
-Message-ID: <CANqRtoTJHrXK4NBWWDShoF1RnxpBhheDnvsfeyDO6cvLdbOE=A@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 27 Oct 2016 09:42:03 +0200
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161026225413.GA6220@obsidianresearch.com>
+References: <20161026225413.GA6220@obsidianresearch.com>
+Message-ID: <bdae79f1-dfed-d735-cb49-9ce8aa0b6e4f@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert and Simon,
+On 27.10.2016 00:54, Jason Gunthorpe wrote:
+> There is no sense in sending a bitstream we know will not work, and
+> with the variety of options for bitstream generation in Xilinx tools
+> it is not terribly clear or very well documented what the correct
+> input should be, especially since auto-detection was removed from this
+> driver.
+> 
+> All Zynq full configuration bitstreams must start with the sync word in
+> the correct byte order.
+> 
+> Zynq is also only able to DMA dword quantities, so bitstreams must be
+> a multiple of 4 bytes. This also fixes a DMA-past the end bug.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 25 ++++++++++++++++---------
+>  1 file changed, 16 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index c2fb4120bd62..46a38772e7ee 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -184,12 +184,26 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  
+>  	priv = mgr->priv;
+>  
+> +	/* All valid bitstreams are multiples of 32 bits */
+> +	if ((count % 4) != 0)
+> +		return -EINVAL;
+> +
+>  	err = clk_enable(priv->clk);
+>  	if (err)
+>  		return err;
+>  
+>  	/* don't globally reset PL if we're doing partial reconfig */
+>  	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+> +		/* Sanity check the proposed bitstream. It must start with the
+> +		 * sync word in the correct byte order and be a multiple of 4
+> +		 * bytes.
+> +		 */
+> +		if (count <= 4 || buf[0] != 0x66 || buf[1] != 0x55 ||
+> +		    buf[2] != 0x99 || buf[3] != 0xaa) {
+> +			err = -EINVAL;
+> +			goto out_err;
+> +		}
 
-On Thu, Oct 27, 2016 at 4:33 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Magnus,
->
-> On Thu, Oct 27, 2016 at 9:28 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> On Thu, Oct 27, 2016 at 4:00 PM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->>> Select ARM errata 798181 on SoCs cores affected CA15 cores.
->>>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>> ---
->>>  arch/arm/mach-shmobile/Kconfig | 6 ++++++
->>>  1 file changed, 6 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
->>> index c48be1d332ed..6fbd9b7d2d67 100644
->>> --- a/arch/arm/mach-shmobile/Kconfig
->>> +++ b/arch/arm/mach-shmobile/Kconfig
->>> @@ -60,6 +60,7 @@ config ARCH_R7S72100
->>>  config ARCH_R8A73A4
->>>         bool "R-Mobile APE6 (R8A73A40)"
->>>         select ARCH_RMOBILE
->>> +       select ARM_ERRATA_798181 if SMP
->>>         select RENESAS_IRQC
->>>
->>>  config ARCH_R8A7740
->>> @@ -70,6 +71,7 @@ config ARCH_R8A7740
->>>  config ARCH_R8A7743
->>>         bool "RZ/G1M (R8A77430)"
->>>         select ARCH_RCAR_GEN2
->>> +       select ARM_ERRATA_798181 if SMP
->>>
->>>  config ARCH_R8A7778
->>>         bool "R-Car M1A (R8A77781)"
->>> @@ -82,20 +84,24 @@ config ARCH_R8A7779
->>>  config ARCH_R8A7790
->>>         bool "R-Car H2 (R8A77900)"
->>>         select ARCH_RCAR_GEN2
->>> +       select ARM_ERRATA_798181 if SMP
->>>         select I2C
->>
->> Thanks for your help.
->>
->> I'm probably misunderstanding what this patch does and how the errata
->> effects the system, but the commit message says CA15 cores. The above
->> R-Car Gen1 and r8a7740 SoCs are not using CA15 - instead they use CA9.
->> Not sure if the errata still applies though.
->
-> Please don't become misled by the @@ context ;-)
+I am not quite sure about this and I didn't try it on real hw.
+But minimum bitstream size 52+B and more likely much more than this.
 
-Ouch, right... Sorry for the noise. The patch looks good, please proceed.
+This is taken from u-boot source code and this is full BIN header.
+The code above is checking only the last word.
+
+#define DUMMY_WORD      0xffffffff
+
+/* Xilinx binary format header */
+static const u32 bin_format[] = {
+        DUMMY_WORD, /* Dummy words */
+        DUMMY_WORD,
+        DUMMY_WORD,
+        DUMMY_WORD,
+        DUMMY_WORD,
+        DUMMY_WORD,
+        DUMMY_WORD,
+        DUMMY_WORD,
+        0x000000bb, /* Sync word */
+        0x11220044, /* Sync word */
+        DUMMY_WORD,
+        DUMMY_WORD,
+        0xaa995566, /* Sync word */
+};
 
 Thanks,
-
-/ magnus
+Michal
