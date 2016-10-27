@@ -1,67 +1,33 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed, 26 Oct 2016 19:18:18 -0500
-Subject: [PATCH v7 4/4] ARM: davinci: da8xx: register USB PHY clocks in the DT
- file
-In-Reply-To: <1477527498-21930-1-git-send-email-david@lechnology.com>
-References: <1477527498-21930-1-git-send-email-david@lechnology.com>
-Message-ID: <1477527498-21930-5-git-send-email-david@lechnology.com>
+Date: Wed, 26 Oct 2016 19:28:37 -0500
+Subject: [PATCH] ARM: davinci: Add full regulator constraints for non-DT
+ boot
+In-Reply-To: <20161026194155.14304-1-ahaslam@baylibre.com>
+References: <20161026194155.14304-1-ahaslam@baylibre.com>
+Message-ID: <6831ba9f-12a6-81fc-f34c-7e658f154cd6@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam@baylibre.com>
+On 10/26/2016 02:41 PM, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
+>
+> The phy framework requests an optional "phy" regulator. If it does
+> not find one, it returns -EPROBE_DEFER. In the case of non-DT boot
+> for the omap138-lcdk board, this would prevent the usb11 phy to probe
+> correctly and ohci would not enumerate.
+>
+> By calling "regulator_has_full_constraints", An error would be returned
+> instead of DEFER for the regulator, and the probe of the phy driver can
+> continue normally without a regulator.
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>
+> This applies cleanly after David's recent patches:
+>
+> [PATCH v6 0/5] da8xx USB PHY platform devices and clocks
+> https://lkml.org/lkml/2016/10/25/867
+>
 
-The usb20_phy clock needs to be registered for the driver to be able
-to get and enable a clock. Currently the usb phy clocks are registered
-form board files, which will not be called during a device tree based
-boot.
-
-To be able to probe correctly usb form a device tree boot, register
-the usb phy clocks form the DT specific init.
-
-Unfortunately, davinci does not have proper clock support on device tree
-yet, so by registering the clock form de DT specific file we are
-forced to hardcode the parent clock, and cannot select refclkin as
-parent for any of the phy clocks of the da850 family.
-
-As none of the current da850 based boards currently in mainline use
-refclkin as source. I guess we can live with this limitation until clocks
-are correctly represented through CCF/device tree.
-
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
-[Added error checking]
-Signed-off-by: David Lechner <david@lechnology.com>
----
-
-This patch was recently submitted separately. I added error checking and I am
-including it in this series since it is closely related. It could be combined
-with the "ARM: davinci: da8xx: add usb phy clocks" patch, but I think it is
-good to have a separate commit for the explanation in the commit message.
-
-
- arch/arm/mach-davinci/da8xx-dt.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 75e831d..839f8db 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -49,6 +49,17 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 
- static void __init da850_init_machine(void)
- {
-+	int ret;
-+
-+	ret = da8xx_register_usb20_phy_clk(false);
-+	if (ret)
-+		pr_warn("%s: registering USB 2.0 PHY clock failed: %d",
-+			__func__, ret);
-+	ret = da8xx_register_usb11_phy_clk(false);
-+	if (ret)
-+		pr_warn("%s: registering USB 1.1 PHY clock failed: %d",
-+			__func__, ret);
-+
- 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
- }
- 
--- 
-2.7.4
+Applies cleanly on v7 as well. And actually, this should apply cleanly 
+even without my patches.
