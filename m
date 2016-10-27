@@ -1,74 +1,51 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Thu, 27 Oct 2016 13:06:44 -0200
-Subject: [PATCH v2] ARM: dts: imx53-qsb: Fix regulator constraints
-Message-ID: <1477580804-1423-1-git-send-email-fabio.estevam@nxp.com>
+From: shihwei@cs.columbia.edu (Shih-Wei Li)
+Date: Thu, 27 Oct 2016 15:08:13 +0000
+Subject: [PATCH] KVM: arm/arm64: Kick VCPUs when queueing already pending IRQs
+Message-ID: <1477580893-3479-1-git-send-email-shihwei@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit fa93fd4ecc9c ("regulator: core: Ensure we are at least in
-bounds for our constraints") the imx53-qsb board populated with a Dialog
-DA9053 PMIC fails to boot:
+In cases like IPI, we could be queueing an interrupt for a VCPU
+that is already running and is not about to exit, because the
+VCPU has entered the VM with the interrupt pending and would
+not trap on EOI'ing that interrupt. This could result to delays
+in interrupt deliveries or even loss of interrupts.
+To guarantee prompt interrupt injection, here we have to try to
+kick the VCPU.
 
-LDO3: Bringing 3300000uV into 1800000-1800000uV
-
-The LDO3 voltage constraints passed in the device tree do not match
-the valid range according to the datasheet, so fix this accordingly to
-allow the board booting again.
-
-While at it, fix the other voltage constraints as well.
-
-Cc: <stable@vger.kernel.org> # 4.7.x
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
 ---
-Changes since v1:
-- Mention the commit that causes the issue
 
- arch/arm/boot/dts/imx53-qsb.dts | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+I've tested the code with an IPI test built on kvm-unit-test, which
+measures the cycles spent between one VCPU sending IPI to a target
+VCPU that busy loops in the VM, until the target VCPU ACKs and EOIs
+the IPI. The patch here can improve the performance in such case by
+more than 5000 cycles.
 
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index dec4b07..3799396 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -64,8 +64,8 @@
- 			};
+ virt/kvm/arm/vgic/vgic.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index b419a11..07cf239 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -273,6 +273,17 @@ retry:
+ 		 * no more work for us to do.
+ 		 */
+ 		spin_unlock(&irq->irq_lock);
++
++		/*
++		 * If the VCPU is not NULL, we could be queueing an
++		 * edge-triggered interrupt for a VCPU which is already
++		 * running and is not about to exit, because the VCPU has
++		 * entered the VM with the interrupt pending and it wouldn't
++		 * trap on EOI. To ensure prompt delivery of that interrupt,
++		 * we have to try to kick the VCPU.
++		 */
++		if (vcpu)
++			kvm_vcpu_kick(vcpu);
+ 		return false;
+ 	}
  
- 			ldo3_reg: ldo3 {
--				regulator-min-microvolt = <600000>;
--				regulator-max-microvolt = <1800000>;
-+				regulator-min-microvolt = <1725000>;
-+				regulator-max-microvolt = <3300000>;
- 				regulator-always-on;
- 			};
- 
-@@ -76,8 +76,8 @@
- 			};
- 
- 			ldo5_reg: ldo5 {
--				regulator-min-microvolt = <1725000>;
--				regulator-max-microvolt = <3300000>;
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3600000>;
- 				regulator-always-on;
- 			};
- 
-@@ -100,14 +100,14 @@
- 			};
- 
- 			ldo9_reg: ldo9 {
--				regulator-min-microvolt = <1200000>;
-+				regulator-min-microvolt = <1250000>;
- 				regulator-max-microvolt = <3600000>;
- 				regulator-always-on;
- 			};
- 
- 			ldo10_reg: ldo10 {
--				regulator-min-microvolt = <1250000>;
--				regulator-max-microvolt = <3650000>;
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3600000>;
- 				regulator-always-on;
- 			};
- 		};
 -- 
-2.7.4
+1.9.1
