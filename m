@@ -1,103 +1,62 @@
-From: john3909@gmail.com (John Syne)
-Date: Thu, 27 Oct 2016 14:17:21 -0700
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <20161026084811.GI8574@dell>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
- <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com> <20161026084811.GI8574@dell>
-Message-ID: <A5F6974F-5793-4E85-BF82-2D9309980991@gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 27 Oct 2016 17:21:07 -0400
+Subject: [PATCH 2/5] Documentation: devicetree: net: add NS2 bindings to
+ amac
+In-Reply-To: <20161027091757.GC12841@lunn.ch>
+References: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
+ <1477510561-17035-3-git-send-email-jon.mason@broadcom.com>
+ <20161027091757.GC12841@lunn.ch>
+Message-ID: <20161027212106.GA25693@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 27, 2016 at 11:17:57AM +0200, Andrew Lunn wrote:
+> On Wed, Oct 26, 2016 at 03:35:58PM -0400, Jon Mason wrote:
+> > Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> > ---
+> >  Documentation/devicetree/bindings/net/brcm,amac.txt | 7 +++++--
+> >  1 file changed, 5 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
+> > index ba5ecc1..f92caee 100644
+> > --- a/Documentation/devicetree/bindings/net/brcm,amac.txt
+> > +++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
+> > @@ -2,15 +2,18 @@ Broadcom AMAC Ethernet Controller Device Tree Bindings
+> >  -------------------------------------------------------------
+> >  
+> >  Required properties:
+> > - - compatible:	"brcm,amac" or "brcm,nsp-amac"
+> > + - compatible:	"brcm,amac", "brcm,nsp-amac", or "brcm,ns2-amac"
+> >   - reg:		Address and length of the GMAC registers,
+> >  		Address and length of the GMAC IDM registers
+> > +		Address and length of the NIC Port Manager registers (optional)
+> >   - reg-names:	Names of the registers.  Must have both "amac_base" and
+> > -		"idm_base"
+> > +		"idm_base". "nicpm_base" is optional (required for NS2)
+> >   - interrupts:	Interrupt number
+> >  
+> >  Optional properties:
+> >  - mac-address:	See ethernet.txt file in the same directory
+> > +- brcm,enet-phy-lane-swap:
+> > +		boolean; Swap the PHY lanes (needed on some SKUs of NS2)
 > 
-> On Oct 26, 2016, at 1:48 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> On Tue, 25 Oct 2016, John Syne wrote:
->>> On Oct 24, 2016, at 11:38 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>> On Mon, 24 Oct 2016, John Syne wrote:
->>>>> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
->>>>>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>>>> 
->>>>>> On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
->>>>>>>>> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
->>>>>>>>> 
->>>>>>>>> Increase ADC reference clock from 3MHz to 24MHz so that the
->>>>>>>>> sampling rates goes up from 100K samples per second to 800K
->>>>>>>>> samples per second on AM335x and AM437x SoC.
->>>>>>>>> 
->>>>>>>>> Also increase opendelay for touchscreen configuration to
->>>>>>>>> equalize the increase in ADC reference clock frequency,
->>>>>>>>> which results in the same amount touch events reported via
->>>>>>>>> evtest on AM335x GP EVM.
->>>>>>>>> 
->>>>>>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->>>>>>>>> ---
->>>>>>>>> 
->>>>>>>>> This patch depends on ADC DMA patch series [1]
->>>>>>>>> 
->>>>>>>>> Without DMA support, when ADC ref clock is set at 24MHz, I am
->>>>>>>>> seeing fifo overflow as CPU is not able to pull the ADC samples.
->>>>>>>>> This answers that DMA support is must for ADC to consume the
->>>>>>>>> samples generated at 24MHz with no open, step delay or
->>>>>>>>> averaging with patch [2].
->>>>>>>>> 
->>>>>>>>> Measured the performance with the iio_generic_buffer with the
->>>>>>>>> patch [3] applied
->>>>>>>>> 
->>>>>>>>> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
->>>>>>>>> [2] - http://pastebin.ubuntu.com/23357935/
->>>>>>>>> [3] - http://pastebin.ubuntu.com/23357939/
->>>>>>>>> 
->>>>>>>>> ---
->>>>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
->>>>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>>>> 
->>>>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>> index b9a53e0..96c4207 100644
->>>>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>> @@ -90,7 +90,7 @@
->>>>>>>>> /* Delay register */
->>>>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
->>>>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
->>>>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
->>>>>>> Wouldn?t this be better to add this to the devicetree?
->>>>>>> 
->>>>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->>>>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->>>>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->>>>>> 
->>>>>> For a touch screen, there is not need to change in these parameter
->>>>>> settings, so my opinion is to keep it as is. Or am I missing something?
->>>>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
->>>> 
->>>> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
->>>> 
->>>> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
->>>> 
->>>> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
->>> 
->>> This looks like configuration, no?
->>> 
->>> DT should be used to describe the hardware.
->> You may be right, but how is this different to setting the baud rate on a serial channel or sampling rate on a audio channel? Looking through the DT, there are many configuration settings, so I?m not sure what is the correct way to handle this. Surely it is better to handle this in DT vs hard coding these settings?
-> 
-> I think setting the UART baud rate is also an invalid DT entry.
-> 
-> It's okay to list all of the options in DT, but to actually select
-> one, that should be done either in userspace or as a kernel option.
-> Perhaps as a Kconfig selection.
-Yeah, this has been inconsistent for a long time. My only point was that these DT parameters had already been implemented in the ti_am335x_adc KM and I thought that this was better than hard coding these settings. Implementing this in Kconfig means rebuilding the KM, which isn?t desirable. Perhaps this should be done via sysfs attributes so as you say, a userspace app can configure this driver. I guess the DT code in ti_am335x_adc.c should be removed. 
+> Maybe i'm missing something here, but the patch to the PHY swapped the
+> lanes. This seems to be a PHY property, not a MAC property. And it
+> swapped them unconditionally....
 
-Regards,
-John
+It swapped them based on (from patch 1/5)
+       if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810 &&
+           phydev->dev_flags & PHY_BRCM_EXP_LANE_SWAP)
+
+That flag is being set in the driver based on whether the lanes need
+to be swapped (which depends on the SKU of NS2).  The only SKU of NS2
+we have upstream right now has it swapped, but one that should be
+pushed out in the next few weeks will not have this flag present.
+There is no way to detect it, and having a separate compat string
+seemed overkill.
+
+Thanks,
+Jon
+
 > 
-> -- 
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+> 	Andrew
