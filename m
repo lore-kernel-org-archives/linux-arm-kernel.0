@@ -1,109 +1,67 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 27 Oct 2016 13:56:11 -0500
-Subject: [PATCH 2/3] memremap: add MEMREMAP_EXEC and MEMREMAP_EXEC_NOCACHE
- flags
-In-Reply-To: <20161027185612.22362-1-d-gerlach@ti.com>
-References: <20161027185612.22362-1-d-gerlach@ti.com>
-Message-ID: <20161027185612.22362-3-d-gerlach@ti.com>
+Date: Thu, 27 Oct 2016 13:56:09 -0500
+Subject: [PATCH 0/3] Add memremap executable mapping and extend
+ drivers/misc/sram.c
+Message-ID: <20161027185612.22362-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add flags to memremap() for MEMREMAP_EXEC and MEMREMAP_EXEC_NOCACHE
-mappings. Mappings provided by these flags will both allow execution,
-with MEMREMAP_EXEC_NOCACHE also requiring the memory to be mapped
-non-cached. These mappings are useful for architectures that must map
-on-chip memory such as SRAM and then copy and execute code from it, such
-as code used to reconfigure system memory controllers or the low-level PM
-code on ARM platforms.
+Hi,
+There are several instances when one would want to execute out of on-chip
+SRAM, such as PM code on ARM platforms, so once again revisiting this
+series to allow that in a generic manner. Seems that having a solution for
+allowing SRAM to be mapped as executable will help clean up PM code on several
+ARM platforms that are using ARM internal __arm_ioremap_exec API
+and also open the door for PM support on new platforms like TI AM335x and
+AM437x. This was last sent as RFC here [1] and based on comments from Russell
+King and Arnd Bergmann has been rewritten to use memremap API rather than
+ioremap API, as executable iomem does not really make sense.
 
-Also add stubs for both underlying arch_memremap_exec/nocache calls that
-return NULL so that if either is attempted from a platform cannot map
-memory in such a way will fail.
+I still see several platforms (at-91, imx6, socfpga) that could make use
+of this and use the generic sram driver to allocate the SRAM needed for PM.
+This series allows direct allocation of SRAM using the generic SRAM driver
+that will be already mapped as executable. Otherwise platform SRAM allocation
+code must be used or if the generic sram driver is used as-is the memory
+must be remapped as executable after it has been mapped normally by the
+SRAM driver.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- include/linux/io.h |  2 ++
- kernel/memremap.c  | 34 +++++++++++++++++++++++++++++++++-
- 2 files changed, 35 insertions(+), 1 deletion(-)
+I had sent omap3 series to convert from using old omap sram platform
+mapping code to using the generic sram driver instead here [2] which was
+based on previous RFC but can easily be rebased on this updated series.
+Finally, forthcoming TI am335x and am437x PM code must make use of
+it as well, as portions of PM code are moving in to drivers.
 
-diff --git a/include/linux/io.h b/include/linux/io.h
-index e2c8419278c1..6668b6b9123b 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -136,6 +136,8 @@ enum {
- 	MEMREMAP_WB = 1 << 0,
- 	MEMREMAP_WT = 1 << 1,
- 	MEMREMAP_WC = 1 << 2,
-+	MEMREMAP_EXEC = 1 << 3,
-+	MEMREMAP_EXEC_NOCACHE = 1 << 4,
- };
- 
- void *memremap(resource_size_t offset, size_t size, unsigned long flags);
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index b501e390bb34..47cefc64057d 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -34,6 +34,21 @@ static void *arch_memremap_wb(resource_size_t offset, unsigned long size)
- }
- #endif
- 
-+#ifndef arch_memremap_exec
-+static void *arch_memremap_exec(resource_size_t offset, unsigned long size)
-+{
-+	return NULL;
-+}
-+#endif
-+
-+#ifndef arch_memremap_exec_nocache
-+static void *arch_memremap_exec_nocache(resource_size_t offset,
-+					unsigned long size)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static void *try_ram_remap(resource_size_t offset, size_t size)
- {
- 	unsigned long pfn = PHYS_PFN(offset);
-@@ -48,7 +63,8 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * memremap() - remap an iomem_resource as cacheable memory
-  * @offset: iomem resource start address
-  * @size: size of remap
-- * @flags: any of MEMREMAP_WB, MEMREMAP_WT and MEMREMAP_WC
-+ * @flags: any of MEMREMAP_WB, MEMREMAP_WT, MEMREMAP_WC, MEMREMAP_EXEC,
-+ *	   and MEMREMAP_EXEC_NOCACHE
-  *
-  * memremap() is "ioremap" for cases where it is known that the resource
-  * being mapped does not have i/o side effects and the __iomem
-@@ -70,6 +86,16 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
-  * MEMREMAP_WC - establish a writecombine mapping, whereby writes may
-  * be coalesced together (e.g. in the CPU's write buffers), but is otherwise
-  * uncached. Attempts to map System RAM with this mapping type will fail.
-+ *
-+ * MEMREMAP_EXEC - map memory as cached, as MEMREMAP_WB does, but also
-+ * executable to allow for executing code from something like an on-chip
-+ * memory. If support for executable mapping is not present on platform
-+ * then the mapping will fail.
-+ *
-+ * MEMREMAP_EXEC_NOCACHE - map memory as non-cached and executable to allow
-+ * for executing code from something like an on-chip memory. If support for
-+ * executable, non-cached mapping is not present on platform then the
-+ * mapping will fail.
-  */
- void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- {
-@@ -118,6 +144,12 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 	if (!addr && (flags & MEMREMAP_WC))
- 		addr = ioremap_wc(offset, size);
- 
-+	if (!addr && (flags & MEMREMAP_EXEC))
-+		addr = arch_memremap_exec(offset, size);
-+
-+	if (!addr && (flags & MEMREMAP_EXEC_NOCACHE))
-+		addr = arch_memremap_exec_nocache(offset, size);
-+
- 	return addr;
- }
- EXPORT_SYMBOL(memremap);
+Changes from the RFC include:
+
+- Rather than introduce ioremap_exec API, use memremap API, as the concept
+  of executable iomem does not make sense; any memory that can used to
+  run code should not have io side effects like iomem.
+- Rather than having a fallback mapping if a platform does not support
+  exec mappings under the memremap API, have the mapping fail, as if you
+  are mapping memory as exec, presumably you will then try to run code
+  from it which will fail anyway, so it makes more sense to prevent the
+  mapping in the first place.
+- Update sram driver to use memremap rather than ioremap for exec flags.
+
+Regards,
+Dave
+
+[1] http://www.spinics.net/lists/arm-kernel/msg503071.html
+[2] http://www.spinics.net/lists/linux-omap/msg128753.html
+
+Dave Gerlach (3):
+  ARM: memremap: implement arch_memremap_exec/exec_nocache
+  memremap: add MEMREMAP_EXEC and MEMREMAP_EXEC_NOCACHE flags
+  misc: SRAM: Add option to map SRAM to allow code execution
+
+ Documentation/devicetree/bindings/sram/sram.txt |  2 ++
+ arch/arm/include/asm/io.h                       |  5 ++++
+ arch/arm/mm/ioremap.c                           | 16 ++++++++++++
+ arch/arm/mm/nommu.c                             | 12 +++++++++
+ drivers/misc/sram.c                             |  7 +++++
+ include/linux/io.h                              |  2 ++
+ kernel/memremap.c                               | 34 ++++++++++++++++++++++++-
+ 7 files changed, 77 insertions(+), 1 deletion(-)
+
 -- 
 2.9.3
