@@ -1,58 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 28 Oct 2016 00:41:04 +0300
-Subject: [PATCH v5 7/7] ARM: dts: sk-rzg1m: add Ether support
-In-Reply-To: <1580369.yToZzJza1l@wasted.cogentembedded.com>
-References: <1580369.yToZzJza1l@wasted.cogentembedded.com>
-Message-ID: <1827621.8E41kAJ5kh@wasted.cogentembedded.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 27 Oct 2016 16:41:28 -0500
+Subject: [PATCH v3 0/3] cpufreq: Introduce TI CPUFreq/OPP Driver
+Message-ID: <20161027214131.1725-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SK-RZG1M board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+Hi,
+This series is v3 of the series to introduce the ti-cpufreq driver
+which parses SoC data and provides opp-supported-hw data to the
+OPP core in order to enable the proper OPPs for the silicon in use.
+v2 of this series can be found here [1].
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Several changes to the dt-binding and ti-cpufreq driver are
+present in v3, which are described in detail under scissors line
+in patches but mostly focused on moving properties that were added
+in cpu node previously to the operating-points node and updating
+driver to reflect these changes, along with using a common compatible
+for all ti platforms. Also, a new patch was added to expose an internal
+OPP core API to allow a common way to get a reference to the OPP table
+from a platform driver.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+I have just sent the driver and binding here but have held off on the
+updated DT nodes, I will send these out once we can agree on the binding
+and driver changes but have pushed them if anyone is curious here [2].
 
----
-Changes in version 4:
-- added Geert's tag.
+Regards,
+Dave
 
-Changes in version 2:
-- new patch.
+[1] http://www.spinics.net/lists/linux-omap/msg131601.html
+[2] https://github.com/dgerlach/linux-pm/tree/upstream/v4.9/ti-cpufreq-driver-v3
 
- arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+Dave Gerlach (3):
+  PM / OPP: Expose _of_get_opp_desc_node as dev_pm_opp API
+  Documentation: dt: add bindings for ti-cpufreq
+  cpufreq: ti: Add cpufreq driver to determine available OPPs at runtime
 
-Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-+++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
-@@ -20,7 +20,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -42,3 +42,16 @@
- &scif0 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 132 ++++++++++
+ drivers/base/power/opp/of.c                        |   8 +-
+ drivers/base/power/opp/opp.h                       |   1 -
+ drivers/cpufreq/Kconfig.arm                        |  11 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/ti-cpufreq.c                       | 288 +++++++++++++++++++++
+ include/linux/pm_opp.h                             |   6 +
+ 7 files changed, 442 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+ create mode 100644 drivers/cpufreq/ti-cpufreq.c
+
+-- 
+2.9.3
