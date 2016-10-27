@@ -1,148 +1,110 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 27 Oct 2016 12:30:09 -0500
-Subject: [RFC PATCH 0/5] Add an overlay manager to handle board capes
-In-Reply-To: <4ca9db09-e52c-11ec-133b-8f193b9b7174@redhat.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <CAL_JsqL9yWBj0yYE54XGi87YPGugGAACzr=CuW6dk5kk3EuyCA@mail.gmail.com>
- <4ca9db09-e52c-11ec-133b-8f193b9b7174@redhat.com>
-Message-ID: <CAL_JsqKTMjj0x6Zq3t5GsWvAC1qN10r333v9uGXkJq_DjioRmA@mail.gmail.com>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Thu, 27 Oct 2016 19:31:52 +0200
+Subject: Add Allwinner Q8 tablets hardware manager
+In-Reply-To: <4cfdd415-1965-7be9-b204-86a9931683a6@redhat.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+ <20161024173900.GP15620@leverpostej>
+ <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
+ <CAJ-oXjQbOkrkNToEXYmPUZOgYBGbxQREZ4NL4bMcZmG=KP2vQQ@mail.gmail.com>
+ <99dde1e0-26f0-cc7b-36bf-1181c47296f9@redhat.com>
+ <CAJ-oXjTfRDvSKs9zZBxt1V2MR5C+XnsqfZBRTWwRrJXx-_7r=Q@mail.gmail.com>
+ <4cfdd415-1965-7be9-b204-86a9931683a6@redhat.com>
+Message-ID: <CAJ-oXjRJrs77yE-skpZ-V4e=rdhRyfNve9bibf1VOaZYy2=tRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 10:13 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+2016-10-27 16:53 GMT+02:00 Hans de Goede <hdegoede@redhat.com>:
 > Hi,
 >
-> On 27-10-16 15:41, Rob Herring wrote:
->>
->> Please Cc the maintainers of drivers/of/.
->>
->> + Frank R, Hans, Dmitry S
->>
->> On Wed, Oct 26, 2016 at 9:57 AM, Antoine Tenart
->> <antoine.tenart@free-electrons.com> wrote:
->>>
->>> Hi all,
->>>
->>> Many boards now come with dips and compatible capes; among others the
->>> C.H.I.P, or Beaglebones. All these boards have a kernel implementing an
->>> out-of-tree "cape manager" which is used to detected capes, retrieve
->>> their description and apply a corresponding overlay. This series is an
->>> attempt to start a discussion, with an implementation of such a manager
->>> which is somehow generic (i.e. formats or cape detectors can be added).
->>> Other use cases could make use of this manager to dynamically load dt
->>> overlays based on some input / hw presence.
->>
->>
->> I'd like to see an input source be the kernel command line and/or a DT
->> chosen property. Another overlay manager was proposed not to long
->> ago[1] as well. There's also the Allwinner tablet use case from Hans
->> where i2c devices are probed and detected. That's not using overlays
->> currently, but maybe could.
+> No, the firmware-name (and matching resolution as different firmwares
+> report different axis-ranges for the same digitizer) is selected
+> primarily by the touchscreen_variant which sets: touchscreen_fw_name,
+> touchscreen_width and touchscreen_height.
 >
+> The touchscreen_variant module option defaults to -1 which means "auto",
+> when it is auto it gets set based on the touchscreen / accelerometer
+> combination (which more or less uniquely identifies boards sofar),
+> likewise all the other touchscreen module options default to -1,
+> but can be overridden from the commandline.
 >
-> Actually I'm currently thinking in a different direction, which I
-> think will be good for the boards where some ICs are frequently
-> replaced by 2nd (and 3th and 4th) sources, rather then that we're
-> dealing with an extension connector with capes / daughter boards.
+> The intention is for things to just work, the commandline options are
+> there as a fallback.
+Ok, so I was really off. Sorry.
+Now I think I understand the full complexity of the problem.
+
+> We could just have:
 >
-> Although there is some overlap I'm starting to think that we need to
-> treat these 2 cases differently. Let me quickly copy and paste
-> the basic idea I've for the 2nd source touchscreen / accelerometer
-> chip case:
+>         i2c-probe-stop-at-first-match-0 = <&touchscreen1>, <&touchscreen2>,
+> <&touchscreen3>;
+>         i2c-probe-stop-at-first-match-1 = <&accelerometer1>,
+> <&accelerometer2>;
 >
-> """
-> The kernel actually already has a detect() method in struct i2c_driver,
-> we could use that (we would need to implement it in drivers which do not
-> have it yet). Note on second thought it seems it may be better to use
-> probe() for this, see below.
+> And have the i2c bus code look for an i2c-probe-stop-at-first-match-[i++]
+> property
+> until it is not found. Having a child-node with its own compatible for this
+> feels wrong, as it uses a hierarchy where there really is none.
+Ok, looks much better indeed.
+I had one case where accelerometers could be on either i2c1 or i2c5.
+Do you think this could be handled as well, or this makes things much
+more complicated to fit in the i2c driver?
+
+> So this would require us to be able to filter (to use your example)
+> on if another i2c device is found and on which address it is found,
+> that does not even take the rda559x check into account and is
+> going to cause interesting ordering issues, how do we know when
+> we can actually do the filtering if some of the variables we are
+> filtering on are set by other auto-detected paths. Which auto-detect /
+> i2c-probe-stop-at-first-match list do we execute first ? Worse
+> actually for accelerometer orientation I will likely need to
+> set the mount-matrix based on the detected touchscreen ...
 >
-> Then we could have something like this in dt:
+> The rda559x here is a sdio wifi chip, which is also connected to the
+> i2c, and currently is detected through i2c to be able to separately
+> identify 2 q8 boards which share the same touchscreen + accelerometer
+> combination and who knows what other checks I or other people can
+> come up with to differentiate board variants which do not have
+> a simple eeprom to uniquely id them.
 >
-> &i2c0 {
->     touchscreen1: gsl1680 at 40 {
->         reg = <0x40>;
->         compatible = "silead,gsl1680";
->         enable-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
->         status = "disabled";
->     };
+> So as said before, no this cannot be all done in dt without
+> adding a turing complete language to dt, and that is just to
+> select which touchscreen_variant to use.
+Ok, now that I understand the scope of your needs.
+I agree with you, this needs a (close to) turing complete language.
+I'm still not really happy about doing it in a driver, but I agree the
+full scope you need is scarce enough.
+Assuming this is done in a driver, there would need to be some
+plumbing between i2c-probe-stop-at-first-match, device's probe
+function and your driver, so that your driver only does the various
+if/cases and DT changes, but there is no actual device communication
+done in that driver.
+
+> Then there also the probem of the combinatorial explosion having
+> not only 2 firmware files but also invert-x and invert-y flags causes:
+> We have 2 revisions with each 2 different firmware-files (more actually
+> but I've reduced the set since some firmwares are compatible) with each
+> both the x- and / or y axis as normal or inverted, for a total of:
+> 2 (revision) * 2 (firmware-files) * 2 (x-inverted or not) * 2 (y...) = 16
+> touchscreen variants, which means dt nodes for touchscreen1 to touchscreen16
+> and that is just the silead gsl1680, some of these tablets also have
+> elan or zeitec touchscreen controllers.
 >
->     touchscreen2: ektf2127 at 15 {
->         reg = <0x15>;
-
-Do you ever have different devices with the same address? That would
-be somewhat problematic as really these should be
-"touchscreen@<addr>".
-
->         compatible = "elan,ektf2127";
->         enable-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
->         status = "disabled";
->     };
+> Now imagine what happens if a new board comes out which needs a 3th firmware
+> file... I hope you can understand this is not a route I want to go.
+Right, I agree with you.
+> Another problem is that if a user encounters the need for a new firmware
+> variant he can now not easily try this (where as before we had
+> module options to separately override firmware-name, the size, etc.
 >
->     i2c-probe-stop-at-first-match-0 = <&touchscreen1>, <&touchscreen2>;
->     i2c-probe-stop-at-first-match-1 = <&accelerometer1>, <&accelerometer2>;
-> }
->
-> Which would make the i2c subsys call detect (*) on each device, until
-> a device is found. Likewise we could have a "i2c-probe-all" property
-> which also walks a list of phandles but does not stop on the first
-> match.
->
-> ...
->
-> *) Yes this sounds Linux specific, but it really is just "execute
-> to-be-probed
-> device compatible specific detection method"
-> """
+> As written in my previous mail, this is all rather gsl1680 specific,
+> and esp. being able to override the firmware-name, the size, etc.
+> through module options is going to be useful (to ask endusers to test
+> stuff without recompiling) on x86 too. So we will likely want to add
+> most of the necessary stuff to the silead driver anyways.
 
-Yeah, not a fan of these properties at first glance. Why can't you
-just fail probe on the non-existent devices?
-
-
-> This does not 100% solve all q8 issues (see the "Add Allwinner Q8 tablets
-> hardware manager" thread), but does solve quite a bit of the use-case
-> and this matches what many vendor os-images (typically android) are
-> actually doing for these kind of boards.
-
-BTW, I've been meaning to ask you if you are looking at the Android
-side of things as well?
-
-> As for the bits this does not solve, those are mostly board specific details
-> which cannot be probed at all, and on x86 are typically solved in the device
-> driver by doing a dmi check to identify the board and then apply a board
-> specific workaround in the driver.
->
-> I've come to believe that we should similarly delegate dealing this to
-> device
-> drivers in the devicetree case. Note that dt should still of course fully
-> describe the hardware for normal hardware, the driver would just need to
-> care
-> about weird board quirks in certain exceptions.
-
-Which is fine IMO, though I do think we should look at those cases
-carefully to ensure they stay the exception.
-
-> A more interesting problem here is that dt does not have something like
-> DMI, there is the machine compatible, but that typically does not contain
-> board revision info (where as DMI often does). I believe that this is
-> actually something which should be fixed at the bootloader level
-> have it prepend a new machine compatible which contains revision info.
->
-> Hmm, if we make the bootloader prepend a new machine compatible which
-> contains
-> revision info, we could then trigger quirks on this and in some cases avoid
-> the need for dealing with board quirks in the driver ...
-
-That would work. Board and chip versions both need better handling in
-kernel IMO.
-
-QCom has a whole scheme around version numbering in compatible
-strings. (Unfortunately, bootloaders only support their previous way
-of doing things.)
-
-> Note this is all very specific to dealing with board (revision) variants,
-> for add-ons having the bootloader add info to the machine compatible does
-> not seem the right solution.
-
-Agreed.
-
-Rob
+That's not currently the case, but can't we assume it will become easy
+for users to install a DT overlay?
+This would drop all your needs of module parameters, and would
+actually be more modulable than your current scheme.
+It is a more longer term thought, and could instead apply to further
+boards having the same sort of troubles as you, rather than for this
+first driver.
