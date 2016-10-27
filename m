@@ -1,105 +1,69 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 27 Oct 2016 14:23:26 -0700
-Subject: [kernel-hardening] Re: [PATCH v3 0/7] arm64: Privileged Access
- Never using TTBR0_EL1 switching
-In-Reply-To: <20161027145450.GB3762@e104818-lin.cambridge.arm.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <20160915162044.GB19214@leverpostej>
- <20160929224452.GA71670@samitolvanen.mtv.corp.google.com>
- <CAGXu5jKEpZgc9zqmX=QKs_NH70fX_4CRNEtFKXEETK6UwykNMw@mail.gmail.com>
- <20161027145450.GB3762@e104818-lin.cambridge.arm.com>
-Message-ID: <CAGXu5jL9=DKZSdOHh9gUqn5y478p7dwbVRFoQv5op5v8wLWBRw@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Oct 2016 14:25:08 -0700
+Subject: [PATCH 2/5] Documentation: devicetree: net: add NS2 bindings to
+ amac
+In-Reply-To: <20161027212106.GA25693@broadcom.com>
+References: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
+ <1477510561-17035-3-git-send-email-jon.mason@broadcom.com>
+ <20161027091757.GC12841@lunn.ch> <20161027212106.GA25693@broadcom.com>
+Message-ID: <1a3e3dad-fd99-f58c-2742-f90d02d1392c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 7:54 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, Sep 30, 2016 at 11:42:02AM -0700, Kees Cook wrote:
->> On Thu, Sep 29, 2016 at 3:44 PM, Sami Tolvanen <samitolvanen@google.com> wrote:
->> > On Thu, Sep 15, 2016 at 05:20:45PM +0100, Mark Rutland wrote:
->> >> Likewise, how do we handle __flush_cache_user_range and
->> >> flush_icache_range? Some callers (e.g. __do_compat_cache_op) pass in
->> >> __user addresses.
->> >
->> > Also EXEC_USERSPACE in lkdtm passes a user space address to flush_icache_range
->> > and causes the process to hang when I tested these patches on HiKey.
->> >
->> > Adding uaccess_{enable,disable}_not_uao to __flush_cache_user_range appears to
->> > fix the problem.
+On 10/27/2016 02:21 PM, Jon Mason wrote:
+> On Thu, Oct 27, 2016 at 11:17:57AM +0200, Andrew Lunn wrote:
+>> On Wed, Oct 26, 2016 at 03:35:58PM -0400, Jon Mason wrote:
+>>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/net/brcm,amac.txt | 7 +++++--
+>>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
+>>> index ba5ecc1..f92caee 100644
+>>> --- a/Documentation/devicetree/bindings/net/brcm,amac.txt
+>>> +++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
+>>> @@ -2,15 +2,18 @@ Broadcom AMAC Ethernet Controller Device Tree Bindings
+>>>  -------------------------------------------------------------
+>>>  
+>>>  Required properties:
+>>> - - compatible:	"brcm,amac" or "brcm,nsp-amac"
+>>> + - compatible:	"brcm,amac", "brcm,nsp-amac", or "brcm,ns2-amac"
+>>>   - reg:		Address and length of the GMAC registers,
+>>>  		Address and length of the GMAC IDM registers
+>>> +		Address and length of the NIC Port Manager registers (optional)
+>>>   - reg-names:	Names of the registers.  Must have both "amac_base" and
+>>> -		"idm_base"
+>>> +		"idm_base". "nicpm_base" is optional (required for NS2)
+>>>   - interrupts:	Interrupt number
+>>>  
+>>>  Optional properties:
+>>>  - mac-address:	See ethernet.txt file in the same directory
+>>> +- brcm,enet-phy-lane-swap:
+>>> +		boolean; Swap the PHY lanes (needed on some SKUs of NS2)
 >>
->> I had a thought just now on this: is lkdtm maybe doing the wrong thing
->> here? i.e. should lkdtm be the one do to the uaccess_en/disable
->> instead of flush_icache_range() itself, since it's the one abusing the
->> API?
->
-> (preparing the v4 series)
->
-> I think lkdtm is using the API incorrectly here. The documentation for
-> flush_icache_range() (Documentation/cachetlb.txt) states that it is to
-> be used on kernel addresses. Even with uaccess_enable/disable in lkdtm,
-> faults on user space can still happen and the flush_icache_range()
-> function must be able to handle them. It happens to work on arm64
-> because of the fall through __flush_cache_user_range() but that's not
-> guaranteed on other architectures.
->
-> A potential solution is to use access_process_vm() and let the arch code
-> handle the cache maintenance automatically:
+>> Maybe i'm missing something here, but the patch to the PHY swapped the
+>> lanes. This seems to be a PHY property, not a MAC property. And it
+>> swapped them unconditionally....
+> 
+> It swapped them based on (from patch 1/5)
+>        if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810 &&
+>            phydev->dev_flags & PHY_BRCM_EXP_LANE_SWAP)
+> 
+> That flag is being set in the driver based on whether the lanes need
+> to be swapped (which depends on the SKU of NS2).  The only SKU of NS2
+> we have upstream right now has it swapped, but one that should be
+> pushed out in the next few weeks will not have this flag present.
+> There is no way to detect it, and having a separate compat string
+> seemed overkill.
 
-Ah, perfect! I'll give this a spin, thanks!
+Andrew has a point thought that this is a property that is associated
+with the PHY, and not with the Ethernet MAC per se, as such, you can put
+it in the Ethernet PHY node, and look up the proper from
+drivers/net/phy/broadcom.c, and come up with a Broadcom Ethernet PHY
+binding document (sorry).
 
--Kees
-
-> ---------------------8<--------------------------------
-> From fcbb7c9c30daf9bfc2a215ec10dba79c109ab835 Mon Sep 17 00:00:00 2001
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Thu, 27 Oct 2016 15:47:20 +0100
-> Subject: [PATCH] lkdtm: Do not use flush_icache_range() on user addresses
->
-> The flush_icache_range() API is meant to be used on kernel addresses
-> only as it may not have the infrastructure (exception entries) to handle
-> user memory faults.
->
-> The lkdtm execute_user_location() function tests the kernel execution of
-> user space addresses by mmap'ing an anonymous page, copying some code
-> together with cache maintenance and attempting to run it. However, the
-> cache maintenance step may fail because of the incorrect API usage
-> described above. The patch changes lkdtm to use access_process_vm() for
-> copying the code into user space which would take care of the necessary
-> cache maintenance.
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  drivers/misc/lkdtm_perms.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
-> index 45f1c0f96612..c7635a79341f 100644
-> --- a/drivers/misc/lkdtm_perms.c
-> +++ b/drivers/misc/lkdtm_perms.c
-> @@ -60,15 +60,18 @@ static noinline void execute_location(void *dst, bool write)
->
->  static void execute_user_location(void *dst)
->  {
-> +       int copied;
-> +
->         /* Intentionally crossing kernel/user memory boundary. */
->         void (*func)(void) = dst;
->
->         pr_info("attempting ok execution at %p\n", do_nothing);
->         do_nothing();
->
-> -       if (copy_to_user((void __user *)dst, do_nothing, EXEC_SIZE))
-> +       copied = access_process_vm(current, (unsigned long)dst, do_nothing,
-> +                                  EXEC_SIZE, FOLL_WRITE);
-> +       if (copied < EXEC_SIZE)
->                 return;
-> -       flush_icache_range((unsigned long)dst, (unsigned long)dst + EXEC_SIZE);
->         pr_info("attempting bad execution at %p\n", func);
->         func();
->  }
-
-
-
+There is no need to have a specific compatible string allocated, using
+the (mostly) generic Ethernet PHY binding, plus this property documented
+would be good enough.
 -- 
-Kees Cook
-Nexus Security
+Florian
