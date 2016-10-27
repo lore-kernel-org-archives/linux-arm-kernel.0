@@ -1,7 +1,9 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 27 Oct 2016 09:40:50 -0700
+Date: Thu, 27 Oct 2016 09:40:51 -0700
 Subject: [PATCH] irq-bcm2836: Prevent spurious interrupts, and trap them early
-Message-ID: <20161027164051.22493-1-eric@anholt.net>
+In-Reply-To: <20161027164051.22493-1-eric@anholt.net>
+References: <20161027164051.22493-1-eric@anholt.net>
+Message-ID: <20161027164051.22493-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
