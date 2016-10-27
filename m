@@ -1,124 +1,61 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 27 Oct 2016 18:43:44 -0400
-Subject: [PATCH 1/5] net: phy: broadcom: Add BCM54810 phy entry
-In-Reply-To: <20161027091505.GB12841@lunn.ch>
-References: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
- <1477510561-17035-2-git-send-email-jon.mason@broadcom.com>
- <20161027091505.GB12841@lunn.ch>
-Message-ID: <20161027224341.GB25693@broadcom.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 27 Oct 2016 23:47:12 +0100
+Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
+In-Reply-To: <20161027212727.leqg3gvwhd3u64er@lukather>
+References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
+ <20161026085528.vjjypbfmfbhvileb@lukather>
+ <20161027111419.GK25322@sirena.org.uk>
+ <20161027212727.leqg3gvwhd3u64er@lukather>
+Message-ID: <20161027224712.GY25322@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 11:15:05AM +0200, Andrew Lunn wrote:
-> On Wed, Oct 26, 2016 at 03:35:57PM -0400, Jon Mason wrote:
-> > From: Vikas Soni <vsoni@broadcom.com>
-> > 
-> > Add BCM54810 phy entry
-> 
-> Hi Jon, Vikis
-> 
-> The subject line is a bit misleading. It does more than add a PHY ID
-> entry.
+On Thu, Oct 27, 2016 at 11:27:27PM +0200, Maxime Ripard wrote:
+> On Thu, Oct 27, 2016 at 12:14:19PM +0100, Mark Brown wrote:
 
-All of the parts are related to adding the BCM54810 Phy, but I agree it
-could be more verbose about what is happening.
+> > but since I'm not turning up anything with this subject line I've no
+> > idea what that might have been (and that's very concerning in itself
+> > given that this is apparently v7...).
 
-> > Signed-off-by: Vikas Soni <vsoni@broadcom.com>
-> > Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> > ---
-> >  drivers/net/phy/Kconfig    |  2 +-
-> >  drivers/net/phy/broadcom.c | 65 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/brcmphy.h    |  7 +++++
-> >  3 files changed, 73 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-> > index 45f68ea..31967ca 100644
-> > --- a/drivers/net/phy/Kconfig
-> > +++ b/drivers/net/phy/Kconfig
-> > @@ -217,7 +217,7 @@ config BROADCOM_PHY
-> >  	select BCM_NET_PHYLIB
-> >  	---help---
-> >  	  Currently supports the BCM5411, BCM5421, BCM5461, BCM54616S, BCM5464,
-> > -	  BCM5481 and BCM5482 PHYs.
-> > +	  BCM5481, BCM54810 and BCM5482 PHYs.
-> >  
-> >  config CICADA_PHY
-> >  	tristate "Cicada PHYs"
-> > diff --git a/drivers/net/phy/broadcom.c b/drivers/net/phy/broadcom.c
-> > index 870327e..cdce761 100644
-> > --- a/drivers/net/phy/broadcom.c
-> > +++ b/drivers/net/phy/broadcom.c
-> > @@ -35,6 +35,35 @@ static int bcm54xx_auxctl_write(struct phy_device *phydev, u16 regnum, u16 val)
-> >  	return phy_write(phydev, MII_BCM54XX_AUX_CTL, regnum | val);
-> >  }
-> >  
-> > +static int bcm54810_config(struct phy_device *phydev)
-> > +{
-> > +	int rc;
-> > +
-> > +	/* Disable BroadR-Reach */
-> > +	rc = bcm_phy_write_exp(phydev, BCM54810_EXP_BROADREACH_LRE_MISC_CTL, 0);
-> > +	if (rc < 0)
-> > +		return rc;
-> > +
-> > +	/* SKEW DISABLE */
-> > +	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
-> > +				  0xF0E0);
-> > +	if (rc < 0)
-> > +		return rc;
-> > +
-> > +	/* DELAY DISABLE */
-> > +	rc = bcm54xx_auxctl_write(phydev, MII_BCM54XX_AUXCTL_SHDWSEL_MISC,
-> > +				  0x7000);
-> 
-> This driver mostly uses symbolic names, not #defines. Please can you
-> use #defines here and else were in this patch.
+> v4 was here: https://patchwork.kernel.org/patch/3893371/
+> v5: https://patchwork.kernel.org/patch/5455381/
+> v6: https://patchwork.kernel.org/patch/6975871/
 
-Will do.  After looking at this, this appears to be setup for a read
-that doesn't follow.  I'll audit this, clean it up and resend.
+> So basically, I really have no idea why, but it really seems like it
+> was just falling through the cracks, repeatedly (I'm not puting the
+> blame on anyone though, it just happened). Maybe it was just because
+> of the lack of comments :)
 
- 
-> > +	if (rc < 0)
-> > +		return rc;
-> > +
-> > +	/* DELAY DISABLE */
-> > +	rc = bcm_phy_write_shadow(phydev, BCM54810_SHD_CLK_CTL, 0);
-> > +	if (rc < 0)
-> > +		return rc;
-> 
-> Twice the same comment?
->
-> > +
-> > +	return 0;
-> > +}
-> > +
-> >  /* Needs SMDSP clock enabled via bcm54xx_phydsp_config() */
-> >  static int bcm50610_a0_workaround(struct phy_device *phydev)
-> >  {
-> > @@ -207,6 +236,20 @@ static int bcm54xx_config_init(struct phy_device *phydev)
-> >  	    (phydev->dev_flags & PHY_BRCM_AUTO_PWRDWN_ENABLE))
-> >  		bcm54xx_adjust_rxrefclk(phydev);
-> >  
-> > +	if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810) {
-> > +		err = bcm54810_config(phydev);
-> > +		if (err)
-> > +			return err;
-> > +
-> > +		reg = phy_read(phydev, MII_BMCR);
-> > +		if (reg < 0)
-> > +			return reg;
-> > +
-> > +		err = phy_write(phydev, MII_BMCR, reg & ~BMCR_PDOWN);
-> > +		if (err)
-> > +			return err;
-> 
-> This seems a bit odd. I would expect the PHY core correctly handles
-> the PHY being powered down. Can you explain this a bit more, why it is
-> needed.
+Oh, those subject lines were all starting ARM: rather than spi: -
+there's a good chance I didn't look at the patches if I was busy
+thinking they were changes for arch/arm rather than the SPI driver.
 
-I believe it was needed in earlier versions of the code, but doesn't
-seem to be needed anymore.  Removing.
+> > I'm also concerned that there isn't a version of this for sun6i,
+> > it's going to make all the cut'n'pasting between the two drivers
+> > harder if we make changes in one and not the other.
 
-> 
-> 	Thanks
-> 		Andrew
+> I think I'll give reg_field a shot though, and try to merge the sun6i
+> driver into this one and see the results. If it can help your
+> decision.
+
+It would definitely be nice given the level of duplication.
+
+> > If the concern from the previous reviews to do with not using DMA is
+> > there some reason it's hard to do DMA?
+
+> I think just like Alexandru that it is orthogonal. But to really
+> answer, no, it's not difficult. There's just been some fundamental
+> disagreement on whether DMA was supposed to be optional or not that
+> stalled everything I guess.
+
+Oh, I seem to remember some patches adding DMA support that were doing
+some strange special snowflake thing with ignoring errors now that I
+think about it but that's not this one...  why did nobody ever follow up
+on those?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/f8c15ff9/attachment.sig>
