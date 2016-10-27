@@ -1,37 +1,69 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 27 Oct 2016 16:37:53 +0900
-Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
-In-Reply-To: <20161027071523.GD7706@verge.net.au>
-References: <20161026052422.17283.57864.sendpatchset@little-apple>
- <20161027070801.GB7706@verge.net.au> <20161027071523.GD7706@verge.net.au>
-Message-ID: <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
+Date: Thu, 27 Oct 2016 16:39:24 +0900
+Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
+ cores
+In-Reply-To: <CAMuHMdVKwg0SzEmu804UxTEE+N4atYjeKHNfCJ0eXf28fL+KJA@mail.gmail.com>
+References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoSsKTvMjATz89nEY06Fp-J20VqjDzW0JD1NDLqEJQPwsQ@mail.gmail.com>
+ <CAMuHMdVKwg0SzEmu804UxTEE+N4atYjeKHNfCJ0eXf28fL+KJA@mail.gmail.com>
+Message-ID: <CANqRtoTJHrXK4NBWWDShoF1RnxpBhheDnvsfeyDO6cvLdbOE=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Geert and Simon,
 
-On Thu, Oct 27, 2016 at 4:15 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Oct 27, 2016 at 09:08:01AM +0200, Simon Horman wrote:
->> On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
->> > From: Magnus Damm <damm+renesas@opensource.se>
->> >
->> > Extend the ARM64 defconfig to enable the DU DRM device as module
->> > together with required dependencies of V4L2 FCP and VSP modules.
->> >
->> > This enables VGA output on the r8a7795 Salvator-X board.
->> >
->> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->>
->> Thanks, I have queued this up.
+On Thu, Oct 27, 2016 at 4:33 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Magnus,
 >
-> Given discussion elsewhere on enabling DU I am holding off on this for a
-> little; it is not queued up for now.
+> On Thu, Oct 27, 2016 at 9:28 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> On Thu, Oct 27, 2016 at 4:00 PM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>>> Select ARM errata 798181 on SoCs cores affected CA15 cores.
+>>>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>  arch/arm/mach-shmobile/Kconfig | 6 ++++++
+>>>  1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+>>> index c48be1d332ed..6fbd9b7d2d67 100644
+>>> --- a/arch/arm/mach-shmobile/Kconfig
+>>> +++ b/arch/arm/mach-shmobile/Kconfig
+>>> @@ -60,6 +60,7 @@ config ARCH_R7S72100
+>>>  config ARCH_R8A73A4
+>>>         bool "R-Mobile APE6 (R8A73A40)"
+>>>         select ARCH_RMOBILE
+>>> +       select ARM_ERRATA_798181 if SMP
+>>>         select RENESAS_IRQC
+>>>
+>>>  config ARCH_R8A7740
+>>> @@ -70,6 +71,7 @@ config ARCH_R8A7740
+>>>  config ARCH_R8A7743
+>>>         bool "RZ/G1M (R8A77430)"
+>>>         select ARCH_RCAR_GEN2
+>>> +       select ARM_ERRATA_798181 if SMP
+>>>
+>>>  config ARCH_R8A7778
+>>>         bool "R-Car M1A (R8A77781)"
+>>> @@ -82,20 +84,24 @@ config ARCH_R8A7779
+>>>  config ARCH_R8A7790
+>>>         bool "R-Car H2 (R8A77900)"
+>>>         select ARCH_RCAR_GEN2
+>>> +       select ARM_ERRATA_798181 if SMP
+>>>         select I2C
+>>
+>> Thanks for your help.
+>>
+>> I'm probably misunderstanding what this patch does and how the errata
+>> effects the system, but the commit message says CA15 cores. The above
+>> R-Car Gen1 and r8a7740 SoCs are not using CA15 - instead they use CA9.
+>> Not sure if the errata still applies though.
+>
+> Please don't become misled by the @@ context ;-)
 
-Sure, thanks for holding off the DT integration patches for r8a7796.
-Please note that as of mainline v4.9-rc2 the r8a7795 Salvator-X board
-has thanks to DU, FCP and VSP a working VGA port. So enabling those
-devices in the defconfig from now on makes sense to me.
+Ouch, right... Sorry for the noise. The patch looks good, please proceed.
 
-Cheers,
+Thanks,
 
 / magnus
