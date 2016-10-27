@@ -1,40 +1,83 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu, 27 Oct 2016 16:33:08 +0200
-Subject: [PATCH v3] ARM: davinci: da8xx: Fix some redefined symbol warnings
-In-Reply-To: <ca32fd12-5299-02e8-24c4-501dda4291ab@ti.com>
-References: <1477485542-10555-1-git-send-email-abailon@baylibre.com>
- <1477485542-10555-2-git-send-email-abailon@baylibre.com>
- <7026f012-ffce-cc28-85be-9a5cd26de60f@ti.com>
- <ca32fd12-5299-02e8-24c4-501dda4291ab@ti.com>
-Message-ID: <9ea6a516-86de-e0a3-5a07-d02c60bb820c@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Oct 2016 16:35:05 +0200
+Subject: [PATCH] drm/sun4i: Add a few formats
+In-Reply-To: <CAGb2v65=6YGaaC3QimPHyP=FKJofygReozmnKLV8CGXvjWGtvQ@mail.gmail.com>
+References: <20161018084614.2443-1-maxime.ripard@free-electrons.com>
+ <CAGb2v65uZFQnRme9LrRykze=a4d_7=HS=Gvu6E_eBG5tSw8nTw@mail.gmail.com>
+ <20161024144014.occkqw2v5c2ghx4w@lukather>
+ <CAGb2v65=6YGaaC3QimPHyP=FKJofygReozmnKLV8CGXvjWGtvQ@mail.gmail.com>
+Message-ID: <20161027143505.rblgbz5uqjynrtjk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2016 01:54 PM, Sekhar Nori wrote:
-> On Thursday 27 October 2016 05:13 PM, Sekhar Nori wrote:
->> On Wednesday 26 October 2016 06:09 PM, Alexandre Bailon wrote:
->>> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
->>> but da8xx-cfgchip.h intend to replace them.
->>> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
->>
->> Looks like this is not true for v4.9-rc2 and so I don't see any warnings
+Hi,
+
+On Tue, Oct 25, 2016 at 08:42:26AM +0800, Chen-Yu Tsai wrote:
+> On Mon, Oct 24, 2016 at 10:40 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Fri, Oct 21, 2016 at 11:15:32AM +0800, Chen-Yu Tsai wrote:
+> >> On Tue, Oct 18, 2016 at 4:46 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > The planes can do more than what was previously exposed. Add support for
+> >> > them.
+> >> >
+> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > ---
+> >> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++++
+> >> >  drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 ++++++
+> >> >  2 files changed, 26 insertions(+)
+> >> >
+> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> >> > index afb7ddf660ef..b184a476a480 100644
+> >> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
+> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+> >> > @@ -96,6 +96,22 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
+> >> >                 *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB8888;
+> >> >                 break;
+> >> >
+> >> > +       case DRM_FORMAT_ARGB4444:
+> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB4444;
+> >> > +               break;
+> >> > +
+> >> > +       case DRM_FORMAT_ARGB1555:
+> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB1555;
+> >> > +               break;
+> >> > +
+> >> > +       case DRM_FORMAT_RGBA5551:
+> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA5551;
+> >> > +               break;
+> >> > +
+> >> > +       case DRM_FORMAT_RGBA4444:
+> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA4444;
+> >>
+> >> The A20 manual only lists ARGB4444, not RGBA4444. There might be
+> >> some discrepancy here. We can deal with them
+> >
+> > Hmm, yes, that's weird. But I guess this would be part of porting it
+> > to the A20.
+> >
+> >> Also there are some more formats missing from the list, could you
+> >> add them as well?
+> >
+> > Which one do you refer to?
 > 
-> Ah, just noticed that _this_ is the patch that introduces
-> da8xx-cfgchip.h into usb-da8xx.c. So this is the patch that introduces
-> the warnings (and fixes them).
-> 
-> I can queue this for v4.10 (with Greg's ack) if you change the
-> description to make it about cleaning up duplicated defines between
-> da8xx-cfgchip.h and usb-davinci.h and not talk about "redefined symbol
-> warnings".
-I will do it.
-> 
-> Also, when adding a header file, can you please keep it sorted in
-> alphabetical order.
-Ok.
-> 
-> Thanks,
-> Sekhar
-> 
+> RGB556 and RGB655.
+
+These formats are not supported by Linux yet though.
+
 Thanks,
-Alexandre
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/0673d783/attachment.sig>
