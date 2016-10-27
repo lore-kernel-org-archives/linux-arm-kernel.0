@@ -1,41 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Oct 2016 12:14:19 +0100
-Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
-In-Reply-To: <20161026085528.vjjypbfmfbhvileb@lukather>
-References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
- <20161026085528.vjjypbfmfbhvileb@lukather>
-Message-ID: <20161027111419.GK25322@sirena.org.uk>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 27 Oct 2016 12:40:07 +0300
+Subject: [PATCH 02/18] arm64: ilp32: add documentation on the ILP32 ABI
+ for ARM64
+In-Reply-To: <352ff60e-3975-8421-3274-3a904c0ac642@mellanox.com>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <1477081997-4770-3-git-send-email-ynorov@caviumnetworks.com>
+ <352ff60e-3975-8421-3274-3a904c0ac642@mellanox.com>
+Message-ID: <20161027094007.GB3666@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 10:55:28AM +0200, Maxime Ripard wrote:
-> On Wed, Oct 26, 2016 at 12:00:30AM -0700, Alexandru Gagniuc wrote:
+Hi Chris,
 
-> > When DMA finally takes over, this fallback path is not mutually exclusive.
+Thank you for comments
 
-> I definitely agree, and we had this patch in the CHIP kernel for quite
-> some time, working like a charm.
+On Mon, Oct 24, 2016 at 12:36:27PM -0400, Chris Metcalf wrote:
+> On 10/21/2016 4:33 PM, Yury Norov wrote:
+> >Based on Andrew Pinski's patch-series.
+> >
+> >Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> >---
+> >  Documentation/arm64/ilp32.txt | 46 +++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 46 insertions(+)
+> >  create mode 100644 Documentation/arm64/ilp32.txt
+> >
+> >diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+> >new file mode 100644
+> >index 0000000..b96c18f
+> >--- /dev/null
+> >+++ b/Documentation/arm64/ilp32.txt
+> >@@ -0,0 +1,46 @@
+> >+ILP32 AARCH64 SYSCALL ABI
+> >+=========================
+> >+
+> >+This document describes the ILP32 syscall ABI and where it differs
+> >+from the generic compat linux syscall interface.
+> >+
+> >+AARCH64/ILP32 userspace can potentially access top halves of registers that
+> >+are passed as syscall arguments, so such registers (w0-w7) are deloused.
+> 
+> I'm not sure what "potentially access" here means: I think what you want to say
+> is that userspace can pass garbage in the top half, but you should be clearer about
+> what you mean here. 
 
-> I was planning to respin it in the next few days, glad to see you took
-> care of it :)
+Yes. Will change.
 
-> Mark, any comments on this? For the record, it already has my Acked-by.
+> Also, you shouldn't use "deloused" here, since it's not a term
+> that's defined elsewhere in the kernel, even though it's been used colloquially on LKML.
+> Provide an actual implementation definition, like "have their top 32 bits zeroed".
 
-Without knowing what the previous discussion was it's hard to comment,
-it sounds like some prior review comments are just being ignored here
-but since I'm not turning up anything with this subject line I've no
-idea what that might have been (and that's very concerning in itself
-given that this is apparently v7...).  I'm also concerned that there
-isn't a version of this for sun6i, it's going to make all the
-cut'n'pasting between the two drivers harder if we make changes in one
-and not the other.
+Agree.
+In fact 'delouse' is used in the name of corresponding macro in
+include/linux/compat.h:
+29 #ifndef __SC_DELOUSE
+30 #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
+31 #endif
 
-If the concern from the previous reviews to do with not using DMA is
-there some reason it's hard to do DMA?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/279cec73/attachment.sig>
+But it's not for documentation.
+
+> 
+> >+AARCH64/ILP32 provides next types turned to 64-bit (comparing to AARCH32):
+> 
+> What does "turned" mean here?  And I "next types" isn't standard English; you want
+> to say something like "the following types".  Likewise later with "next syscalls".
+
+Thanks, will change.
+
+Yury
