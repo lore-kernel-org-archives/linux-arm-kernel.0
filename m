@@ -1,142 +1,208 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 27 Oct 2016 10:41:24 +0800
-Subject: [PATCH 1/2] mm/memblock: prepare a capability to support memblock
- near alloc
-In-Reply-To: <20161026093152.GE18382@dhcp22.suse.cz>
-References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
- <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
- <20161025132338.GA31239@dhcp22.suse.cz> <58101EB4.2080305@huawei.com>
- <20161026093152.GE18382@dhcp22.suse.cz>
-Message-ID: <58116954.8080908@huawei.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 27 Oct 2016 08:25:43 +0530
+Subject: [PATCH V3 5/8] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <f08e65b4-f755-897c-f776-40f0d6788251@arm.com>
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <1475600632-21289-6-git-send-email-sricharan@codeaurora.org>
+ <f08e65b4-f755-897c-f776-40f0d6788251@arm.com>
+Message-ID: <004a01d22ffd$9fd937d0$df8ba770$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Robin,
 
-
-On 2016/10/26 17:31, Michal Hocko wrote:
-> On Wed 26-10-16 11:10:44, Leizhen (ThunderTown) wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 >>
+>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>> be handled separately from the .of_xlate() failures to support deferred
+>> probing.
 >>
->> On 2016/10/25 21:23, Michal Hocko wrote:
->>> On Tue 25-10-16 10:59:17, Zhen Lei wrote:
->>>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
->>>> actually exist. The percpu variable areas and numa control blocks of that
->>>> memoryless numa nodes need to be allocated from the nearest available
->>>> node to improve performance.
->>>>
->>>> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
->>>> specified nid at the first time, but if that allocation failed it will
->>>> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
->>>> the second time.
->>>>
->>>> To compatible the above old scene, I use a marco node_distance_ready to
->>>> control it. By default, the marco node_distance_ready is not defined in
->>>> any platforms, the above mentioned functions will work as normal as
->>>> before. Otherwise, they will try the nearest node first.
->>>
->>> I am sorry but it is absolutely unclear to me _what_ is the motivation
->>> of the patch. Is this a performance optimization, correctness issue or
->>> something else? Could you please restate what is the problem, why do you
->>> think it has to be fixed at memblock layer and describe what the actual
->>> fix is please?
+>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>> been deferred, or having failed.
 >>
->> This is a performance optimization.
-> 
-> Do you have any numbers to back the improvements?
-I have not collected any performance data, but at least in theory, it's beneficial and harmless,
-except make code looks a bit urly. Because all related functions are actually defined as __init,
-for example:
-phys_addr_t __init memblock_alloc_try_nid(
-void * __init memblock_virt_alloc_try_nid(
-
-And all related memory(percpu variables and NODE_DATA) is mostly referred at running time.
-
-> 
->> The problem is if some memoryless numa nodes are
->> actually exist, for example: there are total 4 nodes, 0,1,2,3, node 1 has no memory,
->> and the node distances is as below:
->>                     ---------board-------
->> 		    |                   |
->>                     |                   |
->>                  socket0             socket1
->>                    / \                 / \
->>                   /   \               /   \
->>                node0 node1         node2 node3
->> distance[1][0] is nearer than distance[1][2] and distance[1][3]. CPUs on node1 access
->> the memory of node0 is faster than node2 or node3.
+>> The first case occurs when the device tree describes the bus master and
+>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>> or the device driver has not been compiled in. Return NULL, the caller
+>> will configure the device without an IOMMU.
 >>
->> Linux defines a lot of percpu variables, each cpu has a copy of it and most of the time
->> only to access their own percpu area. In this example, we hope the percpu area of CPUs
->> on node1 allocated from node0. But without these patches, it's not sure that.
-> 
-> I am not familiar with the percpu allocator much so I might be
-> completely missig a point but why cannot this be solved in the percpu
-> allocator directly e.g. by using cpu_to_mem which should already be
-> memoryless aware.
-My test result told me that it can not:
-[    0.000000] Initmem setup node 0 [mem 0x0000000000000000-0x00000011ffffffff]
-[    0.000000] Could not find start_pfn for node 1
-[    0.000000] Initmem setup node 1 [mem 0x0000000000000000-0x0000000000000000]
-[    0.000000] Initmem setup node 2 [mem 0x0000001200000000-0x00000013ffffffff]
-[    0.000000] Initmem setup node 3 [mem 0x0000001400000000-0x00000017ffffffff]
+>> The second and third cases are handled by deferring the probe of the bus
+>> master device which will eventually get reprobed after the IOMMU.
+>>
+>> The last case is currently handled by deferring the probe of the bus
+>> master device as well. A mechanism to either configure the bus master
+>> device without an IOMMU or to fail the bus master device probe depending
+>> on whether the IOMMU is optional or mandatory would be a good
+>> enhancement.
+>>
+>> The current iommu framework handles pci and non-pci devices separately,
+>> so taken care of both the paths in this patch. The iommu's add_device
+>> callback is invoked after the master's configuration data is added in
+>> xlate. This is needed because the iommu core calls add_device callback
+>> during the BUS_ADD_DEVICE notifier, which is of no use now. Eventually
+>> that call has to be removed.
+>
+>Laurent's signoff seems to have gone missing here.
 
+Ah, preserved his authorship, but missed this. Will add it back.
 
-[   14.801895] NODE_DATA(0) = 0x11ffffe500
-[   14.805749] NODE_DATA(1) = 0x11ffffca00	//(1), see below
-[   14.809602] NODE_DATA(2) = 0x13ffffe500
-[   14.813455] NODE_DATA(3) = 0x17fffe5480
-[   14.817316] cpu 0 on node0: 11fff87638
-[   14.821083] cpu 1 on node0: 11fff9c638
-[   14.824850] cpu 2 on node0: 11fffb1638
-[   14.828616] cpu 3 on node0: 11fffc6638
-[   14.832383] cpu 4 on node1: 17fff8a638	//(2), see below
-[   14.836149] cpu 5 on node1: 17fff9f638
-[   14.839912] cpu 6 on node1: 17fffb4638
-[   14.843677] cpu 7 on node1: 17fffc9638
-[   14.847444] cpu 8 on node2: 13fffa4638
-[   14.851210] cpu 9 on node2: 13fffb9638
-[   14.854976] cpu10 on node2: 13fffce638
-[   14.858742] cpu11 on node2: 13fffe3638
-[   14.862510] cpu12 on node3: 17fff36638
-[   14.866276] cpu13 on node3: 17fff4b638
-[   14.870042] cpu14 on node3: 17fff60638
-[   14.873809] cpu15 on node3: 17fff75638
+>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/iommu/of_iommu.c  | 47 +++++++++++++++++++++++++++++++++++++++++++----
+>>  drivers/of/device.c       |  7 ++++++-
+>>  include/linux/of_device.h |  6 ++++--
+>>  3 files changed, 53 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 5b82862..1a5e28b 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/of.h>
+>>  #include <linux/of_iommu.h>
+>>  #include <linux/of_pci.h>
+>> +#include <linux/pci.h>
+>>  #include <linux/slab.h>
+>>
+>>  static const struct of_device_id __iommu_of_table_sentinel
+>> @@ -167,12 +168,29 @@ static const struct iommu_ops
+>>  		return NULL;
+>>
+>>  	ops = of_iommu_get_ops(iommu_spec.np);
+>> +
+>> +	if (!ops) {
+>> +		const struct of_device_id *oid;
+>> +
+>> +		oid = of_match_node(&__iommu_of_table, iommu_spec.np);
+>> +		ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
+>
+>It would seem even simpler and more convenient to roll this into the end
+>of of_iommu_get_ops():
 
-(1) memblock_alloc_try_nid and with these patches, memory was allocated from node0
-(2) do the same implementation as X86 and PowerPC, memory was allocated from node3:
-    	return  __alloc_bootmem_node(NODE_DATA(nid), size, align, __pa(MAX_DMA_ADDRESS));
+ok, understand. Will move this there.
 
-I'm not sure how about on X86 and PowerPC, here is my test cases. Is anybody interested and
-have testing environment, can you help me to execute it?
+>
+>	if (!ops && of_match_node(&__iommu_of_table, iommu_spec.np))
+>		ops = ERR_PTR(-EPROBE_DEFER);
+>
+>then just fix up the existing !ops checks to !IS_ERR(ops) appropriately.
 
-static int tst_numa_002(void)
-{
-        int i;
+ok.
 
-        for (i = 0; i < nr_node_ids; i++)
-                pr_info("NODE_DATA(%d) = 0x%llx\n", i, virt_to_phys(NODE_DATA(i)));
+>
+>> +		return ops;
+>> +	}
+>> +
+>>  	if (!ops || !ops->of_xlate ||
+>>  	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+>>  	    ops->of_xlate(&pdev->dev, &iommu_spec))
+>>  		ops = NULL;
+>>
+>> +	if (ops && ops->add_device) {
+>> +		ops = (ops->add_device(&pdev->dev) == 0) ? ops : NULL;
+>
+>This is a really obtuse way of writing
+>
+>	if (ops->add_device(...))
+>		ops = NULL;
 
-        return 0;
-}
+ok, will change it this way.
 
-static int tst_numa_003(void)
-{
-        int cpu;
-        void __percpu *p;
+>
+>However, given that we're now returning an ERR_PTR, it would be worth
+>capturing the return value of add_device and propagating the error back
+>up - if the IOMMU driver has refused one of its masters for some reason,
+>it probably isn't safe to allow that device to do DMA either way, so we
+>ought to prevent it probing at all.
+>
 
-        p = __alloc_percpu(0x100, 1);
+ok, will return the err value instead of NULL here.
 
-        for_each_possible_cpu(cpu)
-                pr_info("cpu%2d on node%d: %llx\n", cpu, cpu_to_node(cpu), per_cpu_ptr_to_phys(per_cpu_ptr(p, cpu)));
+>> +
+>> +		if (!ops)
+>> +			dev_err(&pdev->dev, "Failed to setup iommu ops\n");
+>
+>Given the above, I think this should be more along the lines of "Device
+>rejected by IOMMU: %d" with the actual error code as well. It's one of
+>those "if you ever see it, you're going to have to debug it" cases, so
+>the clearer the better.
+>
 
-        free_percpu(p);
+ok, will reword the print.
 
-        return 0;
-}
+>> +	}
+>> +
+>>  	of_node_put(iommu_spec.np);
+>> +
+>>  	return ops;
+>>  }
+>>
+>> @@ -183,9 +201,15 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>  	struct device_node *np;
+>>  	const struct iommu_ops *ops = NULL;
+>>  	int idx = 0;
+>> +	struct device *bridge;
+>> +
+>> +	if (dev_is_pci(dev)) {
+>> +		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
+>>
+>> -	if (dev_is_pci(dev))
+>> -		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+>> +		if (bridge && bridge->parent && bridge->parent->of_node)
+>> +			return of_pci_iommu_configure(to_pci_dev(dev),
+>> +						      bridge->parent->of_node);
+>
+>		else fall through to treating it as a platform device?
+>
 
-> 
-> Generating a new API while we have means to use an existing one sounds
-> just not right to me.
-Yes, so I gave up to create two new functions and selected this implementation.
+ha, surely wrong. Will correct this and move it to the of_pci_iommu_configure helper.
 
-> 
+>...that's not right. Anyway, this is PCI-specific stuff so should be in
+>the PCI-specific helper function.
+>
+>> +	}
+>>
+>>  	/*
+>>  	 * We don't currently walk up the tree looking for a parent IOMMU.
+>> @@ -198,6 +222,14 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>  		np = iommu_spec.np;
+>>  		ops = of_iommu_get_ops(np);
+>>
+>> +		if (!ops) {
+>> +			const struct of_device_id *oid;
+>> +
+>> +			oid = of_match_node(&__iommu_of_table, np);
+>> +			ops = oid ? ERR_PTR(-EPROBE_DEFER) : NULL;
+>> +			goto err_put_node;
+>> +		}
+>
+>Same comment as above. Especially since moving it to of_iommu_get_ops()
+>would obviate the duplication.
+
+ok.
+
+>
+>> +
+>>  		if (!ops || !ops->of_xlate ||
+>>  		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+>>  		    ops->of_xlate(dev, &iommu_spec))
+>> @@ -207,11 +239,18 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>  		idx++;
+>>  	}
+>>
+>> +	if (ops && ops->add_device) {
+>> +		ops = (ops->add_device(dev) == 0) ? ops : NULL;
+>> +
+>> +		if (!ops)
+>> +			dev_err(dev, "Failed to setup iommu_ops\n");
+>> +	}
+>> +
+>
+>It would be nice to avoid duplicating this as well.
+
+ok, sure, will correct.
+
+Regards,
+ Sricharan
