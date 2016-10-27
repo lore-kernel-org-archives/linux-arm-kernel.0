@@ -1,41 +1,99 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 28 Oct 2016 01:09:53 +0800
-Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
-In-Reply-To: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
-Message-ID: <201610280016.MiLeMJw9%fengguang.wu@intel.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Thu, 27 Oct 2016 20:11:23 +0300
+Subject: Add Allwinner Q8 tablets hardware manager
+In-Reply-To: <CAJ-oXjT=eVwEk7t5WoZAhjMhiZZkq0NN5tFLidSnUNO97D62zQ@mail.gmail.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+ <20161024173900.GP15620@leverpostej>
+ <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
+ <9B288597-7812-459D-A5C7-B61107751DA6@konsulko.com>
+ <CAJ-oXjT=eVwEk7t5WoZAhjMhiZZkq0NN5tFLidSnUNO97D62zQ@mail.gmail.com>
+Message-ID: <D75CB7DE-4165-4D2F-B40B-D2B6875C0172@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mirza,
+Hi Pierre,
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.9-rc2 next-20161027]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+> On Oct 27, 2016, at 19:59 , Pierre-Hugues Husson <phh@phh.me> wrote:
+> 
+> 2016-10-27 17:52 GMT+02:00 Pantelis Antoniou <pantelis.antoniou@konsulko.com>:
+>> Yes there is no EEPROM but you might be able to map probing results to
+>> a fake ?model? number.
+>> 
+>> Let me expand a bit:
+>> 
+>> Assume that you have a number of probing steps, for example A, B, C each
+>> returning true or false, and C being executed only when B is ?true? you
+>> could do this to generate a bit field that identifies it.
+>> 
+>> For example let?s assume that model FOO?s probing steps are
+>> 
+>> A false, B true, C false -> 010
+>> 
+>> Model?s BAR
+>> 
+>> A true, B false, C don?t care -> 10x
+>> 
+>> Mapping these to models could be
+>> 
+>> Model FOO, (010 & 111) == 010 (all three probing steps must match)
+>> 
+>> Model BAR, (10x & 110) = 100 (the first two probing steps must match)
+> 
+> This method looks too complex on multiple grounds.
+> Assuming your method, I'm not too sure how this would actually be
+> described in a DTS.
+> Such probing steps should include reading/matching IDs in an EEPROM/on
+> an ADC, but it should also include the result of a driver's probe.
+> Also, drivers should have a way to report an ID/OTP instead of just a
+> boolean.
+> 
 
-url:    https://github.com/0day-ci/linux/commits/Mirza-Krak/clk-tegra-add-TEGRA20_CLK_NOR-to-init-table/20161027-225528
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm-davinci_all_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Err, I don?t think you got the point.
 
-All errors (new ones prefixed by >>):
+The probing steps are done by a board specific probe driver.
+This driver performs the probing steps (which is exactly what Hans?s
+method now does) but instead of applying changes to the device tree
+programmatically generates a model string.
 
->> Error: arch/arm/boot/dts/tegra20.dtsi:1.1-8 syntax error
-   FATAL ERROR: Unable to parse input tree
+This model string can be used by a general purpose overlay manager to apply
+the overlay(s) for the specific board. The plural part is important - read
+below.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20355 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161028/4237b36b/attachment-0001.gz>
+> As you mentioned, it is a way to distinguish models, not just a set of
+> parameters.
+> Does this mean that this DT would lead to loading various DT based on
+> the matching model, which would look like a FIT?
+> Also there is a modularity problem there. If I have phones with either
+> screen A or screen B, and with either accelerometer A or accelerometer
+> B, I would have to implement all four combinations.
+> 
+
+The model lookup need not result in a simple overlay to apply.
+
+So for your case it would be:
+
+model corp,0 -> overlay screen A + overlay accel A
+model corp,1 -> overlay screen A + overlay accel B
+model corp,2 -> overlay screen B + overlay accel A
+model corp,3 -> overlay screen B + overlay accel B
+
+You don?t need the combinatorial number of overlays.
+
+> I'm starting to agree with Hans, and to be able to implement
+> everything he needs, would require a turing complete device-tree,
+> which can include and apply device-tree overlays.
+> This doesn't mean it can't be done, nor that it shouldn't be done, but
+> that's a lot of work.
+> 
+> Hans' i2c-probe-stop-at-first-match does make sense for most usecases,
+> but I have two problems with it:
+> 1. It is I2C specific (as I've mentioned earlier, I have the same
+> needs with DSI panels)
+> 2. This looks like a temporary solution if a turing-complete solution
+> is to be implemented.
+
+A custom I2C method would not be optimal IMO.
+
+Regards
+
+? Pantelis
