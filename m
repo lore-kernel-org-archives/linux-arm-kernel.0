@@ -1,38 +1,90 @@
-From: mirza.krak@gmail.com (Mirza Krak)
-Date: Thu, 27 Oct 2016 20:55:08 +0200
-Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
-In-Reply-To: <201610280016.MiLeMJw9%fengguang.wu@intel.com>
-References: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
- <201610280016.MiLeMJw9%fengguang.wu@intel.com>
-Message-ID: <CALw8SCXKBvpBKuDWVhNLtLPuO60wF1YPHm0hUZ7xverxrPT=Aw@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 27 Oct 2016 13:56:10 -0500
+Subject: [PATCH 1/3] ARM: memremap: implement arch_memremap_exec/exec_nocache
+In-Reply-To: <20161027185612.22362-1-d-gerlach@ti.com>
+References: <20161027185612.22362-1-d-gerlach@ti.com>
+Message-ID: <20161027185612.22362-2-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-27 19:09 GMT+02:00 kbuild test robot <lkp@intel.com>:
-> Hi Mirza,
->
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.9-rc2 next-20161027]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> [Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-> [Check https://git-scm.com/docs/git-format-patch for more information]
->
-> url:    https://github.com/0day-ci/linux/commits/Mirza-Krak/clk-tegra-add-TEGRA20_CLK_NOR-to-init-table/20161027-225528
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-> config: arm-davinci_all_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->>> Error: arch/arm/boot/dts/tegra20.dtsi:1.1-8 syntax error
->    FATAL ERROR: Unable to parse input tree
+Introduce arch_memremap_exec and arch_memremap_exec_nocache for ARM to
+allow mapping of memory as executable. Some platforms have a requirement
+to map on-chip memory, such as SRAM, to hold and run code that cannot be
+executed in DRAM, such as low-level PM code or code to reconfigure the
+DRAM controller itself.
 
-That one was embarrassing. Sorry...
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/include/asm/io.h |  5 +++++
+ arch/arm/mm/ioremap.c     | 16 ++++++++++++++++
+ arch/arm/mm/nommu.c       | 12 ++++++++++++
+ 3 files changed, 33 insertions(+)
 
-Best Regards
-Mirza
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 021692c64de3..67476a5add20 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -411,6 +411,11 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ void iounmap(volatile void __iomem *iomem_cookie);
+ #define iounmap iounmap
+ 
++void *arch_memremap_exec(phys_addr_t phys_addr, size_t size);
++void *arch_memremap_exec_nocache(phys_addr_t phys_addr, size_t size);
++#define arch_memremap_exec arch_memremap_exec
++#define arch_memremap_exec_nocache arch_memremap_exec_nocache
++
+ void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
+ #define arch_memremap_wb arch_memremap_wb
+ 
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index ff0eed23ddf1..5c22a7a0b349 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -419,6 +419,22 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
+ 			__builtin_return_address(0));
+ }
+ 
++void *arch_memremap_exec(phys_addr_t phys_addr, size_t size)
++{
++	return (__force void *)arch_ioremap_caller(phys_addr, size,
++						   MT_MEMORY_RWX,
++						   __builtin_return_address(0));
++}
++EXPORT_SYMBOL(arch_memremap_exec);
++
++void *arch_memremap_exec_nocache(phys_addr_t phys_addr, size_t size)
++{
++	return (__force void *)arch_ioremap_caller(phys_addr, size,
++						   MT_MEMORY_RWX_NONCACHED,
++						   __builtin_return_address(0));
++}
++EXPORT_SYMBOL(arch_memremap_exec_nocache);
++
+ void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
+ {
+ 	return (__force void *)arch_ioremap_caller(phys_addr, size,
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 2740967727e2..038922133ec4 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -390,6 +390,18 @@ void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
+ 	return (void *)phys_addr;
+ }
+ 
++void *arch_memremap_exec(phys_addr_t phys_addr, size_t size)
++{
++	return (void *)phys_addr;
++}
++EXPORT_SYMBOL(arch_memremap_exec);
++
++void *arch_memremap_exec_nocache(phys_addr_t phys_addr, size_t size)
++{
++	return (void *)phys_addr;
++}
++EXPORT_SYMBOL(arch_memremap_exec_nocache);
++
+ void __iounmap(volatile void __iomem *addr)
+ {
+ }
+-- 
+2.9.3
