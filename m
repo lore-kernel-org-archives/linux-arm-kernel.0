@@ -1,61 +1,43 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 27 Oct 2016 09:00:06 +0200
-Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15 cores
-Message-ID: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Oct 2016 09:06:15 +0200
+Subject: [PATCH v4 0/7] Add R8A7743/SK-RZG1M board support
+In-Reply-To: <CAMuHMdWQegsEf_C=UGXpQiEAX0YQqy335teuvCZxBY6C=7QozA@mail.gmail.com>
+References: <2719479.geOc9vqcRS@wasted.cogentembedded.com>
+ <CAMuHMdUNgnYc1O7DATNH1r9SQ72eqtxwFvqcen08Tq+Er3LuvQ@mail.gmail.com>
+ <1a85f851-29ec-1c14-8905-8b0645f5bb1c@cogentembedded.com>
+ <CAMuHMdWQegsEf_C=UGXpQiEAX0YQqy335teuvCZxBY6C=7QozA@mail.gmail.com>
+Message-ID: <20161027070615.GA7706@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select ARM errata 798181 on SoCs cores affected CA15 cores.
+On Wed, Oct 26, 2016 at 03:27:14PM +0200, Geert Uytterhoeven wrote:
+> On Wed, Oct 26, 2016 at 3:23 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > On 10/26/2016 03:08 PM, Geert Uytterhoeven wrote:
+> >>>    Here's the set of 8 patches against Simon Horman's 'renesas.git'
+> >>> repo's
+> >>> 'renesas-devel-20161021-v4.9-rc1' tag. I'm adding the device tree support
+> >>> for
+> >>> the R8A7743-based SK-RZG1M board. The SoC is close to R8A7791 and the
+> >>> board
+> >>> seems identical to the R8A7791/Porter board. The device tree patches
+> >>> depend on
+> >>> the R8A7743 CPG/MSSR driver series just posted in order to compile and
+> >>> work.
+> >>
+> >>
+> >> They depend only on "[PATCH v3 1/2] ARM: shmobile: r8a7743: add CPG clock
+> >> index macros" of that series, right?
+> >>
+> >> "[PATCH v3 2/2] clk: renesas: cpg-mssr: add R8A7743 support" is not
+> >> needed,
+> >
+> >    How would "clocks" props _work_ without this patch?
+> 
+> Sorry, I was focusing too much on "compile"...
+> 
+> Got my coke, switching brain to overdrive mode...
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index c48be1d332ed..6fbd9b7d2d67 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -60,6 +60,7 @@ config ARCH_R7S72100
- config ARCH_R8A73A4
- 	bool "R-Mobile APE6 (R8A73A40)"
- 	select ARCH_RMOBILE
-+	select ARM_ERRATA_798181 if SMP
- 	select RENESAS_IRQC
- 
- config ARCH_R8A7740
-@@ -70,6 +71,7 @@ config ARCH_R8A7740
- config ARCH_R8A7743
- 	bool "RZ/G1M (R8A77430)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 
- config ARCH_R8A7778
- 	bool "R-Car M1A (R8A77781)"
-@@ -82,20 +84,24 @@ config ARCH_R8A7779
- config ARCH_R8A7790
- 	bool "R-Car H2 (R8A77900)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7791
- 	bool "R-Car M2-W (R8A77910)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7792
- 	bool "R-Car V2H (R8A77920)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 
- config ARCH_R8A7793
- 	bool "R-Car M2-N (R8A7793)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7794
--- 
-2.7.0.rc3.207.g0ac5344
+As we are talking about adding support for a new SoC I would be happy
+to queue up code in my tree that compiles under the assumption that
+in v4.10 the bits to make it run will appear in other branches.
