@@ -1,36 +1,59 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Thu, 27 Oct 2016 15:00:22 -0500
-Subject: [PATCHv2 0/4] Add Altera A10SR Status & Control Monitor
-Message-ID: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+Date: Thu, 27 Oct 2016 15:00:23 -0500
+Subject: [PATCHv2 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-This patch series adds the Altera Arria10 DevKit System Resource
-chip's Status and Control Monitor to the A10SR Multi-Function
-Device. An earlier patch added this to the hwmon class which
-wasn't the proper place so this functionality is added to the
-misc directory.
-Version 2 changes the DT names from -mon to -monitor for better
-readability and clarity and changed the previous version from
-modular to built-in.
+Add the Arria10 DevKit System Resource Chip register and state
+monitoring module to the MFD.
 
-Thor Thayer (4):
-  dt-bindings: mfd: Add Altera Arria10 SR Monitor
-  misc: Add Altera Arria10 System Resource Control
-  mfd: altr-a10sr: Add Arria10 SR Monitor
-  ARM: socfpga: dts: Add Monitor to A10-SR MFD
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+---
+Note: This needs to be applied to the bindings document that
+was Acked & Applied but didn't reach the for-next branch.
+See https://patchwork.ozlabs.org/patch/629397/
+---
+v2  Change compatible string -mon to -monitor for clarity
+---
+ Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- .../devicetree/bindings/mfd/altera-a10sr.txt       |   9 ++
- MAINTAINERS                                        |   1 +
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       |   4 +
- drivers/mfd/altera-a10sr.c                         |   4 +
- drivers/misc/Kconfig                               |   7 +
- drivers/misc/Makefile                              |   1 +
- drivers/misc/altera-a10sr-monitor.c                | 176 +++++++++++++++++++++
- 7 files changed, 202 insertions(+)
- create mode 100644 drivers/misc/altera-a10sr-monitor.c
-
+diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+index ea151f2..c47be28 100644
+--- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
++++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+@@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
+ Device                   Description
+ ------                   ----------
+ a10sr_gpio               GPIO Controller
++a10sr_monitor            Register and State Monitoring
+ 
+ Arria10 GPIO
+ Required Properties:
+@@ -27,6 +28,10 @@ Required Properties:
+                       the second cell is used to specify flags.
+                       See ../gpio/gpio.txt for more information.
+ 
++Arria10 Register and State Monitor
++Required Properties:
++- compatible        : Should be "altr,a10sr-monitor"
++
+ Example:
+ 
+         resource-manager at 0 {
+@@ -43,4 +48,8 @@ Example:
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 		};
++
++		a10sr_monitor {
++			compatible = "altr,a10sr-monitor";
++		};
+ 	};
 -- 
 1.9.1
