@@ -1,127 +1,75 @@
-From: phh@phh.me (Pierre-Hugues Husson)
-Date: Thu, 27 Oct 2016 10:10:18 +0200
-Subject: Add Allwinner Q8 tablets hardware manager
-In-Reply-To: <20161026205451.cgk5xam334ncg6op@rob-hp-laptop>
-References: <20161014075337.10452-1-hdegoede@redhat.com>
- <20161024173900.GP15620@leverpostej>
- <20161026205451.cgk5xam334ncg6op@rob-hp-laptop>
-Message-ID: <CAJ-oXjQ-kQ70WnZ4DOBSEMudPzULbN04r-FgWdtH3gPaF2afxg@mail.gmail.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Thu, 27 Oct 2016 16:23:10 +0800
+Subject: [PATCH 1/2] mm/memblock: prepare a capability to support memblock
+ near alloc
+In-Reply-To: <20161027072235.GB6454@dhcp22.suse.cz>
+References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
+ <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
+ <20161025132338.GA31239@dhcp22.suse.cz> <58101EB4.2080305@huawei.com>
+ <20161026093152.GE18382@dhcp22.suse.cz> <58116954.8080908@huawei.com>
+ <20161027072235.GB6454@dhcp22.suse.cz>
+Message-ID: <5811B96E.8040800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-(mail resent, because it had been filtered out by linux-arm-kernel and
-and devicetree because it contained an HTML part, sorry about that)
-
-2016-10-26 13:46 GMT+02:00 Hans de Goede <hdegoede@redhat.com>:
-
-> And as I tried to explain before, for this specific use-case describing
-> all this board specific knowledge in a generic manner in dt is simply
-> impossible, unless we add a turing complete language to dt aka aml.
 
 
-You keep saying this is a "specific use-case", but I don't agree.
-Most of cheap phone and tablets SoC manufacturer's Linux variant that
-I know of have (rather stupid) auto-detection methods.
-Not every phone manufacturer use it, because some have proper and
-constant supply chain, but still, that's not always the case.
-For instance you might look at this dts:
-https://github.com/Dee-UK/RK3288_Lollipop_Kernel/commit/9e056a10b0a773d285e8d2ae819e7c2451816492#diff-b25e1abc92522c85e9ef28704bf9284aR410
-This DTS is meant, like what you do, to be compatible with as many
-devices as possible at once.
-So it declares 4 different PMICs (and no they will never all be there
-at the same time), and two different accelerometers, 3 audio codecs,
-and two touchscreens.
-Or you can look at CodeAurora (Qualcomm public opensource tree) DTSs
-and see that a standard DTS support at least three different panels (
-see https://github.com/omnirom/android_kernel_oppo_msm8974/blob/27080b724f4cf281d598e7830abc5fc1292b5803/arch/arm/boot/dts/msm8974-mtp.dtsi#L15
-)
-And that's the fairly clean examples. Some SoC kernels are still using
-good old platform_data detection methods.
-
-Thus I believe that having a board-specific driver is not a good
-thing, because we would get many of those.
-
-When it comes to detection, I've witnessed various things.
-It can be kernel-side or bootloader-side "global setting" reading
-(like an ADC/resistor value, or an OTP), it can be bootloader doing
-the "brute-force", or it can be the kernel doing all the probes.
-
-For instance, as of today, on a Spreadtrum ODM tree, the bootloader
-will detect the screen by testing all knowns screens, the
-screen-drivers declare a get_id function, and the bootloader probes
-until the get_id matches the id declared by the screen driver.
-And then the bootloader tells the kernel, via cmdline, which screen is
-actually there (but auto-detection is also coded in kernel).
-Finally all possible sensors/touchscreen/camera are declared in DTS,
-and probe will filter-out N/C ones in the kernel.
-
-Now the big difference between my experience and what Hans is trying
-to do, is that I've always worked with devices with "safely" queriable
-IDs, either on i2c or dsi. I've never encountered SPI. This makes
-probing inherently more dangerous, but I believe the question roughly
-remains the same.
-
-I understand Mark's will of taking care of this "earlier" (either
-bootloader or a later kernel-loader (pxa-impedance-matcher)), but I
-feel like this is only giving the problem to someone else.
-I think that those auto-detection methods should be declared in a
-device-tree, though as Hans noted, this might end to be a
-turing-complete language.
-In my experience, I have never encountered a device requiring more
-than ordered probes, but backward compatibility was expected. (i.e. if
-IDs couldn't help distinguish two devices, the manufacturer would add
-another way to identify)
-
-As to whether this is bootloader's job or kernel's job, I don't have a
-really strong opinion.
-On one side, the kernel has all the drivers and probe functions, this
-would need little work to make this work.
-On the other side, if the "rules" are something like "read bus XXX,
-address YYY, expect ZZZ", the bootloader can handle it as well. But I
-don't think it is a good idea to have the bootloader know all the
-gsensor/screen/camera/... drivers (even if they are partial drivers
-dedicated to detection only)
-
-Regards,
-
-2016-10-26 22:54 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Mon, Oct 24, 2016 at 06:39:01PM +0100, Mark Rutland wrote:
->> On Fri, Oct 14, 2016 at 09:53:31AM +0200, Hans de Goede wrote:
->> > Hi Rob, Mark, et al.,
+On 2016/10/27 15:22, Michal Hocko wrote:
+> On Thu 27-10-16 10:41:24, Leizhen (ThunderTown) wrote:
 >>
->> Hi Hans,
 >>
->> Apologies for the delay in replying to this.
+>> On 2016/10/26 17:31, Michal Hocko wrote:
+>>> On Wed 26-10-16 11:10:44, Leizhen (ThunderTown) wrote:
+>>>>
+>>>>
+>>>> On 2016/10/25 21:23, Michal Hocko wrote:
+>>>>> On Tue 25-10-16 10:59:17, Zhen Lei wrote:
+>>>>>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
+>>>>>> actually exist. The percpu variable areas and numa control blocks of that
+>>>>>> memoryless numa nodes need to be allocated from the nearest available
+>>>>>> node to improve performance.
+>>>>>>
+>>>>>> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
+>>>>>> specified nid at the first time, but if that allocation failed it will
+>>>>>> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
+>>>>>> the second time.
+>>>>>>
+>>>>>> To compatible the above old scene, I use a marco node_distance_ready to
+>>>>>> control it. By default, the marco node_distance_ready is not defined in
+>>>>>> any platforms, the above mentioned functions will work as normal as
+>>>>>> before. Otherwise, they will try the nearest node first.
+>>>>>
+>>>>> I am sorry but it is absolutely unclear to me _what_ is the motivation
+>>>>> of the patch. Is this a performance optimization, correctness issue or
+>>>>> something else? Could you please restate what is the problem, why do you
+>>>>> think it has to be fixed at memblock layer and describe what the actual
+>>>>> fix is please?
+>>>>
+>>>> This is a performance optimization.
+>>>
+>>> Do you have any numbers to back the improvements?
 >>
->> I'd like to be clear that I do understand that there is a problem that
->> needs to be addressed here. However, I do not believe that the *current*
->> in-kernel approach is correct. More on that below.
->>
->> > Mark, I know that we discussed this at ELCE and you clearly indicated
->> > that according to you this does not belong in the kernel. I was a bit
->> > surprised by this part of the discussion.
->> >
->> > I had posted a RFC earlier and Rob had indicated that given that the q8
->> > tablets are a special case, as my code uses actual probing rather then some
->> > pre-arranged id mechanism with say an eeprom, that doing this in a
->> > non-generic manner would be ok for my special case.
->>
->> To some extent, Rob and I may have differing views here; I'm not
->> entirely sure what Rob's view is, and I cannot talk on his behalf. I
->> certainly must apologise for having not commented on said RFC, however.
->
-> I've focused mainly on the bindings which I certainly had issues with
-> how the RFC was done. As to where this should be done, keeping all the
-> dirty bits in firmware/bootloader is certainly appealing. However, there
-> are cases where data alone can't abstract out board differences and we
-> need board code. Whether this is one of them, well, that is Hans' job to
-> convince Mark.
->
-> Rob
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> I have not collected any performance data, but at least in theory,
+>> it's beneficial and harmless, except make code looks a bit
+>> urly.
+> 
+> The whole memoryless area is cluttered with hacks because everybody just
+> adds pieces here and there to make his particular usecase work IMHO.
+> Adding more on top for performance reasons which are even not measured
+OK, I will ask my colleagues for help, whether some APPs can be used or not.
+
+> to prove a clear win is a no go. Please step back try to think how this
+> could be done with an existing infrastructure we have (some cleanups
+OK, I will try to do it. But some infrastructures maybe only restricted in the
+theoretical analysis, I don't have the related testing environment, so there is
+no way to verify.
+
+
+> while doing that would be hugely appreciated) and if that is not
+> possible then explain why and why it is not feasible to fix that before
+I think it will be feasible.
+
+> you start adding a new API.
+> 
+> Thanks!
+> 
