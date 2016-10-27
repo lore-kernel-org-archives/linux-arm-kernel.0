@@ -1,19 +1,15 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Thu, 27 Oct 2016 16:01:08 +0200
-Subject: [PATCH V3 2/6] clk: tegra: add TEGRA30_CLK_NOR to init table
+Date: Thu, 27 Oct 2016 16:01:11 +0200
+Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
 In-Reply-To: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
 References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1477576872-2665-3-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mirza Krak <mirza.krak@gmail.com>
 
-Add TEGRA30_CLK_NOR to init table and set default rate to 127 MHz which
-is max rate.
-
-The maximum rate value of 127 MHz is pulled from the downstream L4T
-kernel.
+Add a device node for the GMI controller found on Tegra20.
 
 Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
@@ -21,25 +17,44 @@ Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
 ---
 
 Changes in v2:
-- no changes
+- added address-cells, size-cells and ranges properties
 
 Changes in v3:
-- Added comment in commit message where I got the maximum rates from.
+- fixed range address which is not the same as Tegra30.
 
- drivers/clk/tegra/clk-tegra30.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/tegra20.dtsi | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index 8e2db5e..67f1677 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1252,6 +1252,7 @@ static struct tegra_clk_init_table init_table[] __initdata = {
- 	{ TEGRA30_CLK_SDMMC1, TEGRA30_CLK_PLL_P, 48000000, 0 },
- 	{ TEGRA30_CLK_SDMMC2, TEGRA30_CLK_PLL_P, 48000000, 0 },
- 	{ TEGRA30_CLK_SDMMC3, TEGRA30_CLK_PLL_P, 48000000, 0 },
-+	{ TEGRA30_CLK_NOR, TEGRA30_CLK_PLL_P, 127000000, 0 },
- 	{ TEGRA30_CLK_PLL_M, TEGRA30_CLK_CLK_MAX, 0, 1 },
- 	{ TEGRA30_CLK_PCLK, TEGRA30_CLK_CLK_MAX, 0, 1 },
- 	{ TEGRA30_CLK_CSITE, TEGRA30_CLK_CLK_MAX, 0, 1 },
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 2207c08..b22cddb 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -1,4 +1,4 @@
+-#include <dt-bindings/clock/tegra20-car.h>
++include <dt-bindings/clock/tegra20-car.h>
+ #include <dt-bindings/gpio/tegra-gpio.h>
+ #include <dt-bindings/pinctrl/pinctrl-tegra.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+@@ -376,6 +376,20 @@
+ 		status = "disabled";
+ 	};
+
++
++	gmi at 70009000 {
++		compatible = "nvidia,tegra20-gmi";
++		reg = <0x70009000 0x1000>;
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0xd0000000 0xfffffff>;
++		clocks = <&tegra_car TEGRA20_CLK_NOR>;
++		clock-names = "gmi";
++		resets = < &tegra_car 42>;
++		reset-names = "gmi";
++		status = "disabled";
++	};
++
+ 	pwm: pwm at 7000a000 {
+ 		compatible = "nvidia,tegra20-pwm";
+ 		reg = <0x7000a000 0x100>;
 --
 2.1.4
