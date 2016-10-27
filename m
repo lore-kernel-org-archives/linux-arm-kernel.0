@@ -1,92 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Oct 2016 15:54:50 +0100
-Subject: [kernel-hardening] Re: [PATCH v3 0/7] arm64: Privileged Access
- Never using TTBR0_EL1 switching
-In-Reply-To: <CAGXu5jKEpZgc9zqmX=QKs_NH70fX_4CRNEtFKXEETK6UwykNMw@mail.gmail.com>
-References: <1473788797-10879-1-git-send-email-catalin.marinas@arm.com>
- <20160915162044.GB19214@leverpostej>
- <20160929224452.GA71670@samitolvanen.mtv.corp.google.com>
- <CAGXu5jKEpZgc9zqmX=QKs_NH70fX_4CRNEtFKXEETK6UwykNMw@mail.gmail.com>
-Message-ID: <20161027145450.GB3762@e104818-lin.cambridge.arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 27 Oct 2016 07:54:46 -0700
+Subject: [PATCH v3] drivers: psci: PSCI checker module
+In-Reply-To: <a3fd021e-1fae-08e3-994b-87efcf11b164@arm.com>
+References: <20161025154535.GA3107@red-moon>
+ <20161025183436.GF3716@linux.vnet.ibm.com>
+ <20161026131752.GA15478@red-moon>
+ <20161026151858.GQ3716@linux.vnet.ibm.com>
+ <20161026171006.GA16248@red-moon>
+ <20161026172252.GV3716@linux.vnet.ibm.com>
+ <20161026173534.GC16248@red-moon>
+ <20161026181148.GW3716@linux.vnet.ibm.com>
+ <20161027091306.GA16603@red-moon>
+ <a3fd021e-1fae-08e3-994b-87efcf11b164@arm.com>
+Message-ID: <20161027145446.GJ3716@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 30, 2016 at 11:42:02AM -0700, Kees Cook wrote:
-> On Thu, Sep 29, 2016 at 3:44 PM, Sami Tolvanen <samitolvanen@google.com> wrote:
-> > On Thu, Sep 15, 2016 at 05:20:45PM +0100, Mark Rutland wrote:
-> >> Likewise, how do we handle __flush_cache_user_range and
-> >> flush_icache_range? Some callers (e.g. __do_compat_cache_op) pass in
-> >> __user addresses.
+On Thu, Oct 27, 2016 at 01:51:57PM +0100, Kevin Brodsky wrote:
+> On 27/10/16 10:13, Lorenzo Pieralisi wrote:
+> >On Wed, Oct 26, 2016 at 11:11:48AM -0700, Paul E. McKenney wrote:
+> >>On Wed, Oct 26, 2016 at 06:35:34PM +0100, Lorenzo Pieralisi wrote:
+> >>>On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
+> >>>>On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
+> >>[ . . . ]
+> >>
+> >>>>>Thanks a lot for your feedback, thoughts appreciated.
+> >>>>Let me ask the question more directly.
+> >>>>
+> >>>>Why on earth are we trying to run these tests concurrently?
+> >>>We must prevent that, no question about that, that's why I started
+> >>>this discussion. It is not fine to enable this checker and the
+> >>>RCU/LOCK torture hotplug tests at the same time.
+> >>>
+> >>>>After all, if we just run one at a time in isolation, there is no
+> >>>>problem.
+> >>>Fine by me, it was to understand if the current assumptions we made
+> >>>are correct and they are definitely not. If we enable the PSCI checker
+> >>>we must disable the torture rcu/lock hotplug tests either statically or
+> >>>dynamically.
+> >>What rcutorture, locktorture, and rcuperf do is to invoke
+> >>torture_init_begin(), which returns false if one of these tests
+> >>is already running.
+> >>
+> >>Perhaps we should extract this torture-test-exclusion and require
+> >>than conflicting torture tests invoke it?
+> >Yes if it can be extracted as a check (but it should also prevent the
+> >torture tests from running and vice versa), either that or Kconfig
+> >dependency (which we could do as a first step, waiting to add the
+> >required interface to the torture test code ?).
 > >
-> > Also EXEC_USERSPACE in lkdtm passes a user space address to flush_icache_range
-> > and causes the process to hang when I tested these patches on HiKey.
-> >
-> > Adding uaccess_{enable,disable}_not_uao to __flush_cache_user_range appears to
-> > fix the problem.
+> >Thanks !
+> >Lorenzo
 > 
-> I had a thought just now on this: is lkdtm maybe doing the wrong thing
-> here? i.e. should lkdtm be the one do to the uaccess_en/disable
-> instead of flush_icache_range() itself, since it's the one abusing the
-> API?
+> That sounds like a reasonable idea, but then that would mean that the PSCI checker
+> would have to wait until the torture test is finished if it is already running (and
+> the other way around).
+> 
+> I wasn't aware that torture tests were hotplugging CPUs. I think that the most
+> sensible thing to do right now is to make CONFIG_PSCI_CHECKER depend on
+> !CONFIG_TORTURE_TEST (or maybe specifically !CONFIG_RCU_TORTURE_TEST &&
+> !CONFIG_LOCK_TORTURE_TEST). We can try to make them work together afterwards, but for
+> the sake of getting this patch merged in a reasonable amount of time, I think we
+> should just exclude the conflicting tests at the build level in this patch. I'll also
+> update the comment accordingly.
 
-(preparing the v4 series)
+I suggest !CONFIG_TORTURE_TEST, given that there are a couple of other
+tests in the offing.
 
-I think lkdtm is using the API incorrectly here. The documentation for
-flush_icache_range() (Documentation/cachetlb.txt) states that it is to
-be used on kernel addresses. Even with uaccess_enable/disable in lkdtm,
-faults on user space can still happen and the flush_icache_range()
-function must be able to handle them. It happens to work on arm64
-because of the fall through __flush_cache_user_range() but that's not
-guaranteed on other architectures.
+							Thanx, Paul
 
-A potential solution is to use access_process_vm() and let the arch code
-handle the cache maintenance automatically:
-
----------------------8<--------------------------------
->From fcbb7c9c30daf9bfc2a215ec10dba79c109ab835 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Thu, 27 Oct 2016 15:47:20 +0100
-Subject: [PATCH] lkdtm: Do not use flush_icache_range() on user addresses
-
-The flush_icache_range() API is meant to be used on kernel addresses
-only as it may not have the infrastructure (exception entries) to handle
-user memory faults.
-
-The lkdtm execute_user_location() function tests the kernel execution of
-user space addresses by mmap'ing an anonymous page, copying some code
-together with cache maintenance and attempting to run it. However, the
-cache maintenance step may fail because of the incorrect API usage
-described above. The patch changes lkdtm to use access_process_vm() for
-copying the code into user space which would take care of the necessary
-cache maintenance.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/misc/lkdtm_perms.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/misc/lkdtm_perms.c b/drivers/misc/lkdtm_perms.c
-index 45f1c0f96612..c7635a79341f 100644
---- a/drivers/misc/lkdtm_perms.c
-+++ b/drivers/misc/lkdtm_perms.c
-@@ -60,15 +60,18 @@ static noinline void execute_location(void *dst, bool write)
- 
- static void execute_user_location(void *dst)
- {
-+	int copied;
-+
- 	/* Intentionally crossing kernel/user memory boundary. */
- 	void (*func)(void) = dst;
- 
- 	pr_info("attempting ok execution at %p\n", do_nothing);
- 	do_nothing();
- 
--	if (copy_to_user((void __user *)dst, do_nothing, EXEC_SIZE))
-+	copied = access_process_vm(current, (unsigned long)dst, do_nothing,
-+				   EXEC_SIZE, FOLL_WRITE);
-+	if (copied < EXEC_SIZE)
- 		return;
--	flush_icache_range((unsigned long)dst, (unsigned long)dst + EXEC_SIZE);
- 	pr_info("attempting bad execution@%p\n", func);
- 	func();
- }
+> Thanks,
+> Kevin
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> 
