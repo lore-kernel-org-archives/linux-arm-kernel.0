@@ -1,38 +1,38 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Thu, 27 Oct 2016 15:00:25 -0500
-Subject: [PATCHv2 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
+Date: Thu, 27 Oct 2016 15:00:26 -0500
+Subject: [PATCHv2 4/4] ARM: socfpga: dts: Add Monitor to A10-SR MFD
 In-Reply-To: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
 References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1477598426-28125-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1477598426-28125-5-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-Add the Altera Arria10 DevKit System Resource Monitor functionality
-to the MFD device.
+Add the Monitor functionality to the Arria10 DevKit
+System Resource chip.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2  Change from -mon to -monitor for clarity
+v2  Change from -mon to -monitor for clarity.
 ---
- drivers/mfd/altera-a10sr.c | 4 ++++
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
-index 06e1f7f..30de652 100644
---- a/drivers/mfd/altera-a10sr.c
-+++ b/drivers/mfd/altera-a10sr.c
-@@ -33,6 +33,10 @@
- 		.name = "altr_a10sr_gpio",
- 		.of_compatible = "altr,a10sr-gpio",
- 	},
-+	{
-+		.name = "altr_a10sr_monitor",
-+		.of_compatible = "altr,a10sr-monitor",
-+	},
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+index eb00ae3..61a5f42 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+@@ -121,6 +121,10 @@
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 		};
++
++		a10sr_monitor {
++			compatible = "altr,a10sr-monitor";
++		};
+ 	};
  };
  
- static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
 -- 
 1.9.1
