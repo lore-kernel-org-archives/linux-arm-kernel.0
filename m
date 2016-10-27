@@ -1,85 +1,103 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 27 Oct 2016 23:15:40 +0200
-Subject: Add Allwinner Q8 tablets hardware manager
-In-Reply-To: <CAJ-oXjRJrs77yE-skpZ-V4e=rdhRyfNve9bibf1VOaZYy2=tRA@mail.gmail.com>
-References: <20161014075337.10452-1-hdegoede@redhat.com>
- <20161024173900.GP15620@leverpostej>
- <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
- <CAJ-oXjQbOkrkNToEXYmPUZOgYBGbxQREZ4NL4bMcZmG=KP2vQQ@mail.gmail.com>
- <99dde1e0-26f0-cc7b-36bf-1181c47296f9@redhat.com>
- <CAJ-oXjTfRDvSKs9zZBxt1V2MR5C+XnsqfZBRTWwRrJXx-_7r=Q@mail.gmail.com>
- <4cfdd415-1965-7be9-b204-86a9931683a6@redhat.com>
- <CAJ-oXjRJrs77yE-skpZ-V4e=rdhRyfNve9bibf1VOaZYy2=tRA@mail.gmail.com>
-Message-ID: <1a3f21dc-bd72-6749-6890-802be4bab038@redhat.com>
+From: john3909@gmail.com (John Syne)
+Date: Thu, 27 Oct 2016 14:17:21 -0700
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
+ 24MHz
+In-Reply-To: <20161026084811.GI8574@dell>
+References: <20161024060226.4170-1-mugunthanvnm@ti.com>
+ <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+ <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
+ <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
+ <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
+ <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com> <20161026084811.GI8574@dell>
+Message-ID: <A5F6974F-5793-4E85-BF82-2D9309980991@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27-10-16 19:31, Pierre-Hugues Husson wrote:
-> 2016-10-27 16:53 GMT+02:00 Hans de Goede <hdegoede@redhat.com>:
-
-<snip>
-
->> We could just have:
->>
->>         i2c-probe-stop-at-first-match-0 = <&touchscreen1>, <&touchscreen2>,
->> <&touchscreen3>;
->>         i2c-probe-stop-at-first-match-1 = <&accelerometer1>,
->> <&accelerometer2>;
->>
->> And have the i2c bus code look for an i2c-probe-stop-at-first-match-[i++]
->> property
->> until it is not found. Having a child-node with its own compatible for this
->> feels wrong, as it uses a hierarchy where there really is none.
-> Ok, looks much better indeed.
-> I had one case where accelerometers could be on either i2c1 or i2c5.
-> Do you think this could be handled as well, or this makes things much
-> more complicated to fit in the i2c driver?
-
-Handling that is easy, just add a i2c-probe-stop-at-first-match to
-both busses (with separate child nodes to be probed under each bus),
-the on one bus the probe-code will just read the end of the list
-and stop, I believe we should not treat that as an error anyways
-(even if there is only 1 bus).
-
->
->> So this would require us to be able to filter (to use your example)
->> on if another i2c device is found and on which address it is found,
->> that does not even take the rda559x check into account and is
->> going to cause interesting ordering issues, how do we know when
->> we can actually do the filtering if some of the variables we are
->> filtering on are set by other auto-detected paths. Which auto-detect /
->> i2c-probe-stop-at-first-match list do we execute first ? Worse
->> actually for accelerometer orientation I will likely need to
->> set the mount-matrix based on the detected touchscreen ...
->>
->> The rda559x here is a sdio wifi chip, which is also connected to the
->> i2c, and currently is detected through i2c to be able to separately
->> identify 2 q8 boards which share the same touchscreen + accelerometer
->> combination and who knows what other checks I or other people can
->> come up with to differentiate board variants which do not have
->> a simple eeprom to uniquely id them.
->>
->> So as said before, no this cannot be all done in dt without
->> adding a turing complete language to dt, and that is just to
->> select which touchscreen_variant to use.
-> Ok, now that I understand the scope of your needs.
-> I agree with you, this needs a (close to) turing complete language.
-> I'm still not really happy about doing it in a driver, but I agree the
-> full scope you need is scarce enough.
-> Assuming this is done in a driver, there would need to be some
-> plumbing between i2c-probe-stop-at-first-match, device's probe
-> function and your driver, so that your driver only does the various
-> if/cases and DT changes, but there is no actual device communication
-> done in that driver.
-
-Ah, no I meant dealing with this in the actual device driver,
-not in some special intermediate driver, just like the actual x86
-device drivers (sometimes) apply quirks based on board DMI strings.
-
-<snip>
+> 
+> On Oct 26, 2016, at 1:48 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> On Tue, 25 Oct 2016, John Syne wrote:
+>>> On Oct 24, 2016, at 11:38 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>> On Mon, 24 Oct 2016, John Syne wrote:
+>>>>> On Oct 24, 2016, at 11:01 PM, John Syne <john3909@gmail.com> wrote:
+>>>>>> On Oct 24, 2016, at 10:52 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>>>>>> 
+>>>>>> On Tuesday 25 October 2016 02:28 AM, John Syne wrote:
+>>>>>>>>> On Oct 23, 2016, at 11:02 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+>>>>>>>>> 
+>>>>>>>>> Increase ADC reference clock from 3MHz to 24MHz so that the
+>>>>>>>>> sampling rates goes up from 100K samples per second to 800K
+>>>>>>>>> samples per second on AM335x and AM437x SoC.
+>>>>>>>>> 
+>>>>>>>>> Also increase opendelay for touchscreen configuration to
+>>>>>>>>> equalize the increase in ADC reference clock frequency,
+>>>>>>>>> which results in the same amount touch events reported via
+>>>>>>>>> evtest on AM335x GP EVM.
+>>>>>>>>> 
+>>>>>>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+>>>>>>>>> ---
+>>>>>>>>> 
+>>>>>>>>> This patch depends on ADC DMA patch series [1]
+>>>>>>>>> 
+>>>>>>>>> Without DMA support, when ADC ref clock is set at 24MHz, I am
+>>>>>>>>> seeing fifo overflow as CPU is not able to pull the ADC samples.
+>>>>>>>>> This answers that DMA support is must for ADC to consume the
+>>>>>>>>> samples generated at 24MHz with no open, step delay or
+>>>>>>>>> averaging with patch [2].
+>>>>>>>>> 
+>>>>>>>>> Measured the performance with the iio_generic_buffer with the
+>>>>>>>>> patch [3] applied
+>>>>>>>>> 
+>>>>>>>>> [1] - http://www.spinics.net/lists/devicetree/msg145045.html
+>>>>>>>>> [2] - http://pastebin.ubuntu.com/23357935/
+>>>>>>>>> [3] - http://pastebin.ubuntu.com/23357939/
+>>>>>>>>> 
+>>>>>>>>> ---
+>>>>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
+>>>>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>>>>>> 
+>>>>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>>>> index b9a53e0..96c4207 100644
+>>>>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
+>>>>>>>>> @@ -90,7 +90,7 @@
+>>>>>>>>> /* Delay register */
+>>>>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
+>>>>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
+>>>>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
+>>>>>>> Wouldn?t this be better to add this to the devicetree?
+>>>>>>> 
+>>>>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
+>>>>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
+>>>>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+>>>>>> 
+>>>>>> For a touch screen, there is not need to change in these parameter
+>>>>>> settings, so my opinion is to keep it as is. Or am I missing something?
+>>>>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
+>>>> 
+>>>> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
+>>>> 
+>>>> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
+>>>> 
+>>>> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
+>>> 
+>>> This looks like configuration, no?
+>>> 
+>>> DT should be used to describe the hardware.
+>> You may be right, but how is this different to setting the baud rate on a serial channel or sampling rate on a audio channel? Looking through the DT, there are many configuration settings, so I?m not sure what is the correct way to handle this. Surely it is better to handle this in DT vs hard coding these settings?
+> 
+> I think setting the UART baud rate is also an invalid DT entry.
+> 
+> It's okay to list all of the options in DT, but to actually select
+> one, that should be done either in userspace or as a kernel option.
+> Perhaps as a Kconfig selection.
+Yeah, this has been inconsistent for a long time. My only point was that these DT parameters had already been implemented in the ti_am335x_adc KM and I thought that this was better than hard coding these settings. Implementing this in Kconfig means rebuilding the KM, which isn?t desirable. Perhaps this should be done via sysfs attributes so as you say, a userspace app can configure this driver. I guess the DT code in ti_am335x_adc.c should be removed. 
 
 Regards,
-
-Hans
+John
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
