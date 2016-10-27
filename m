@@ -1,57 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Oct 2016 10:49:00 +0100
-Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-In-Reply-To: <20161027091906.GA14734@cbox>
-References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
- <20161027091906.GA14734@cbox>
-Message-ID: <7541af85-05c4-25f9-2fa8-2eb7a0afbe84@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 27 Oct 2016 10:13:07 +0100
+Subject: [PATCH v3] drivers: psci: PSCI checker module
+In-Reply-To: <20161026181148.GW3716@linux.vnet.ibm.com>
+References: <20161020145115.6326-1-kevin.brodsky@arm.com>
+ <20161025154535.GA3107@red-moon>
+ <20161025183436.GF3716@linux.vnet.ibm.com>
+ <20161026131752.GA15478@red-moon>
+ <20161026151858.GQ3716@linux.vnet.ibm.com>
+ <20161026171006.GA16248@red-moon>
+ <20161026172252.GV3716@linux.vnet.ibm.com>
+ <20161026173534.GC16248@red-moon>
+ <20161026181148.GW3716@linux.vnet.ibm.com>
+Message-ID: <20161027091306.GA16603@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 27/10/16 10:19, Christoffer Dall wrote:
-> On Mon, Oct 24, 2016 at 04:31:28PM +0100, Marc Zyngier wrote:
->> Architecturally, TLBs are private to the (physical) CPU they're
->> associated with. But when multiple vcpus from the same VM are
->> being multiplexed on the same CPU, the TLBs are not private
->> to the vcpus (and are actually shared across the VMID).
->>
->> Let's consider the following scenario:
->>
->> - vcpu-0 maps PA to VA
->> - vcpu-1 maps PA' to VA
->>
->> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
->> by vcpu-0 accesses, and access the wrong physical page.
->>
->> The solution to this is to keep a per-VM map of which vcpu ran last
->> on each given physical CPU, and invalidate local TLBs when switching
->> to a different vcpu from the same VM.
+On Wed, Oct 26, 2016 at 11:11:48AM -0700, Paul E. McKenney wrote:
+> On Wed, Oct 26, 2016 at 06:35:34PM +0100, Lorenzo Pieralisi wrote:
+> > On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
+> > > On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
 > 
-> Just making sure I understand this:  The reason you cannot rely on the
-> guest doing the necessary distinction with ASIDs or invalidating the TLB
-> is that a guest (which assumes it's running on hardware) can validly
-> defer any neccessary invalidation until it starts running on other
-> physical CPUs, but we do this transparently in KVM?
+> [ . . . ]
+> 
+> > > > Thanks a lot for your feedback, thoughts appreciated.
+> > > 
+> > > Let me ask the question more directly.
+> > > 
+> > > Why on earth are we trying to run these tests concurrently?
+> > 
+> > We must prevent that, no question about that, that's why I started
+> > this discussion. It is not fine to enable this checker and the
+> > RCU/LOCK torture hotplug tests at the same time.
+> > 
+> > > After all, if we just run one at a time in isolation, there is no
+> > > problem.
+> > 
+> > Fine by me, it was to understand if the current assumptions we made
+> > are correct and they are definitely not. If we enable the PSCI checker
+> > we must disable the torture rcu/lock hotplug tests either statically or
+> > dynamically.
+> 
+> What rcutorture, locktorture, and rcuperf do is to invoke
+> torture_init_begin(), which returns false if one of these tests
+> is already running.
+> 
+> Perhaps we should extract this torture-test-exclusion and require
+> than conflicting torture tests invoke it?
 
-The guest wouldn't have to do any invalidation at all on real HW,
-because the TLBs are strictly private to a physical CPU (only the
-invalidation can be broadcast to the Inner Shareable domain). But when
-we multiplex two vcpus on the same physical CPU, we break the private
-semantics, and a vcpu could hit in the TLB entries populated by the
-another one.
+Yes if it can be extracted as a check (but it should also prevent the
+torture tests from running and vice versa), either that or Kconfig
+dependency (which we could do as a first step, waiting to add the
+required interface to the torture test code ?).
 
-As we cannot segregate the TLB entries per vcpu (but only per VMID), the
-workaround is to nuke all the TLBs for this VMID (locally only - no
-broadcast) each time we find that two vcpus are sharing the same
-physical CPU.
-
-Is that clearer?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks !
+Lorenzo
