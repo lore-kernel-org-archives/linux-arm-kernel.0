@@ -1,159 +1,170 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 27 Oct 2016 10:49:40 +0530
-Subject: [PATCH V3 8/8] arm64: dma-mapping: Remove the notifier trick to
- handle early setting of dma_ops
-In-Reply-To: <e4643826-3aa8-1e34-79a8-9e1fcf0fcb69@arm.com>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <1475600632-21289-9-git-send-email-sricharan@codeaurora.org>
- <e4643826-3aa8-1e34-79a8-9e1fcf0fcb69@arm.com>
-Message-ID: <005501d23011$bba47420$32ed5c60$@codeaurora.org>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Thu, 27 Oct 2016 12:10:42 +0530
+Subject: [PATCH v2 1/8] drm/bridge: rgb-to-vga: Support an enable GPIO
+In-Reply-To: <CAGb2v64=c5PFx+qJkfPeKYFQYLYoYfWgjg49O4Es5qVjuyf5gg@mail.gmail.com>
+References: <20161020034344.14154-1-wens@csie.org>
+ <20161020034344.14154-2-wens@csie.org>
+ <0b5fbe8e-e51b-c874-e1a3-0b88dc65e361@codeaurora.org>
+ <CAGb2v64=c5PFx+qJkfPeKYFQYLYoYfWgjg49O4Es5qVjuyf5gg@mail.gmail.com>
+Message-ID: <87ca071d-c396-25b3-aff4-c838c9003f94@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
->On 04/10/16 18:03, Sricharan R wrote:
->> With arch_setup_dma_ops now being called late during device's probe after the
->> device's iommu is probed, the notifier trick required to handle the early
->> setup of dma_ops before the iommu group gets created is not required.
->> So removing the notifier's here.
->
->Hooray!
->
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  arch/arm64/mm/dma-mapping.c | 100 ++------------------------------------------
->>  1 file changed, 3 insertions(+), 97 deletions(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index faf4b92..eb593af 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -799,24 +799,6 @@ static struct dma_map_ops iommu_dma_ops = {
->>  	.mapping_error = iommu_dma_mapping_error,
->>  };
->>
->> -/*
->> - * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
->> - * everything it needs to - the device is only partially created and the
->> - * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
->> - * need this delayed attachment dance. Once IOMMU probe ordering is sorted
->> - * to move the arch_setup_dma_ops() call later, all the notifier bits below
->> - * become unnecessary, and will go away.
->> - */
->> -struct iommu_dma_notifier_data {
->> -	struct list_head list;
->> -	struct device *dev;
->> -	const struct iommu_ops *ops;
->> -	u64 dma_base;
->> -	u64 size;
->> -};
->> -static LIST_HEAD(iommu_dma_masters);
->> -static DEFINE_MUTEX(iommu_dma_notifier_lock);
->> -
->>  static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
->>  			   u64 dma_base, u64 size)
->
->This should go as well...
 
- ok.
+On 10/25/2016 02:29 PM, Chen-Yu Tsai wrote:
+> On Tue, Oct 25, 2016 at 4:09 PM, Archit Taneja <architt@codeaurora.org> wrote:
+>> Hi,
+>>
+>> On 10/20/2016 09:13 AM, Chen-Yu Tsai wrote:
+>>>
+>>> Some rgb-to-vga bridges have an enable GPIO, either directly tied to
+>>> an enable pin on the bridge IC, or indirectly controlling a power
+>>> switch.
+>>>
+>>> Add support for it.
+>>
+>>
+>> Does the bridge on your platform have an active/passive DAC, or is it a
+>> smarter encoder chip that is capable of doing more? If so, it might be
+>> good to have a separate DT compatible string to it, like what's done
+>> in the patch titled:
+>>
+>> drm: bridge: vga-dac: Add adi,adv7123 compatible string
+>>
+>> so that we can switch to a different driver later if needed.
 >
->>  {
->> @@ -837,79 +819,9 @@ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
->>  	return true;
->>  }
->>
->> -static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
->> -			      u64 dma_base, u64 size)
->> -{
->> -	struct iommu_dma_notifier_data *iommudata;
->> -
->> -	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
->> -	if (!iommudata)
->> -		return;
->> -
->> -	iommudata->dev = dev;
->> -	iommudata->ops = ops;
->> -	iommudata->dma_base = dma_base;
->> -	iommudata->size = size;
->> -
->> -	mutex_lock(&iommu_dma_notifier_lock);
->> -	list_add(&iommudata->list, &iommu_dma_masters);
->> -	mutex_unlock(&iommu_dma_notifier_lock);
->> -}
->> -
->> -static int __iommu_attach_notifier(struct notifier_block *nb,
->> -				   unsigned long action, void *data)
->> -{
->> -	struct iommu_dma_notifier_data *master, *tmp;
->> -
->> -	if (action != BUS_NOTIFY_BIND_DRIVER)
->> -		return 0;
->> -
->> -	mutex_lock(&iommu_dma_notifier_lock);
->> -	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
->> -		if (data == master->dev && do_iommu_attach(master->dev,
->> -				master->ops, master->dma_base, master->size)) {
->> -			list_del(&master->list);
->> -			kfree(master);
->> -			break;
->> -		}
->> -	}
->> -	mutex_unlock(&iommu_dma_notifier_lock);
->> -	return 0;
->> -}
->> -
->> -static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
->> -{
->> -	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
->> -	int ret;
->> -
->> -	if (!nb)
->> -		return -ENOMEM;
->> -
->> -	nb->notifier_call = __iommu_attach_notifier;
->> -
->> -	ret = bus_register_notifier(bus, nb);
->> -	if (ret) {
->> -		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
->> -			bus->name);
->> -		kfree(nb);
->> -	}
->> -	return ret;
->> -}
->> -
->>  static int __init __iommu_dma_init(void)
->>  {
->> -	int ret;
->> -
->> -	ret = iommu_dma_init();
->> -	if (!ret)
->> -		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
->> -	if (!ret)
->> -		ret = register_iommu_dma_ops_notifier(&amba_bustype);
->> -#ifdef CONFIG_PCI
->> -	if (!ret)
->> -		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
->> -#endif
->> -	return ret;
->> +	return iommu_dma_init();
->>  }
->>  arch_initcall(__iommu_dma_init);
->>
->> @@ -920,18 +832,12 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
->>
->>  	if (!ops)
->>  		return;
->> -	/*
->> -	 * TODO: As a concession to the future, we're ready to handle being
->> -	 * called both early and late (i.e. after bus_add_device). Once all
->> -	 * the platform bus code is reworked to call us late and the notifier
->> -	 * junk above goes away, move the body of do_iommu_attach here.
+> The chip is GM7123. It is not configurable. It just takes the LCD RGB/SYNC
+> signals and converts them to analog. The only things you can change are
+> putting it into sleep mode and tweaking the output drive strength by
+
+Is sleep mode the thing that's controlled by this gpio?
+
+
+> changing the external reference resistor. The latter would be a hardware
+> design decision. I would say this qualifies as "dumb".
+
+Yeah, I agree. I'd want feedback from Laurent too, since he had comments
+on the usage of the original dumb-vga-dac driver.
+
 >
->...per this commment. It has no need to be a separate function once this
->is the only call site (plus it has a misleadingly inaccurate name anyway).
+> I revisited the board schematics, and the enable GPIO actually toggles
+> an external LDO regulator. So this might be better modeled as a regulator
+> supply?
 
- ya, missed to remove that function as well. Will do it in the next.
+If you model it as a regulator, how would you toggle the GPIO on your
+platform?
 
-Regards,
- Sricharan
+Looking at the chip pin out, there is a 3.3V VDD supply needed for the
+chip, so it would be good to have an optional 'power' regulator supply
+anyway.
+
+Archit
+
+>
+>
+> Thanks
+> ChenYu
+>
+>>
+>> Thanks,
+>> Archit
+>>
+>>
+>>>
+>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>>> ---
+>>>  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+>>>  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 28
+>>> ++++++++++++++++++++++
+>>>  2 files changed, 30 insertions(+)
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>>> b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>>> index 003bc246a270..d3484822bf77 100644
+>>> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>>> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+>>> @@ -16,6 +16,8 @@ graph bindings specified in
+>>> Documentation/devicetree/bindings/graph.txt.
+>>>  - Video port 0 for RGB input
+>>>  - Video port 1 for VGA output
+>>>
+>>> +Optional properties:
+>>> +- enable-gpios: GPIO pin to enable or disable the bridge
+>>>
+>>>  Example
+>>>  -------
+>>> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+>>> b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+>>> index afec232185a7..b487e5e9b56d 100644
+>>> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
+>>> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
+>>> @@ -10,6 +10,7 @@
+>>>   * the License, or (at your option) any later version.
+>>>   */
+>>>
+>>> +#include <linux/gpio/consumer.h>
+>>>  #include <linux/module.h>
+>>>  #include <linux/of_graph.h>
+>>>
+>>> @@ -23,6 +24,7 @@ struct dumb_vga {
+>>>         struct drm_connector    connector;
+>>>
+>>>         struct i2c_adapter      *ddc;
+>>> +       struct gpio_desc        *enable_gpio;
+>>>  };
+>>>
+>>>  static inline struct dumb_vga *
+>>> @@ -124,8 +126,26 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
+>>>         return 0;
+>>>  }
+>>>
+>>> +static void dumb_vga_enable(struct drm_bridge *bridge)
+>>> +{
+>>> +       struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+>>> +
+>>> +       if (vga->enable_gpio)
+>>> +               gpiod_set_value_cansleep(vga->enable_gpio, 1);
+>>> +}
+>>> +
+>>> +static void dumb_vga_disable(struct drm_bridge *bridge)
+>>> +{
+>>> +       struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+>>> +
+>>> +       if (vga->enable_gpio)
+>>> +               gpiod_set_value_cansleep(vga->enable_gpio, 0);
+>>> +}
+>>> +
+>>>  static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
+>>>         .attach         = dumb_vga_attach,
+>>> +       .enable         = dumb_vga_enable,
+>>> +       .disable        = dumb_vga_disable,
+>>>  };
+>>>
+>>>  static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
+>>> @@ -169,6 +189,14 @@ static int dumb_vga_probe(struct platform_device
+>>> *pdev)
+>>>                 return -ENOMEM;
+>>>         platform_set_drvdata(pdev, vga);
+>>>
+>>> +       vga->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+>>> +                                                  GPIOD_OUT_LOW);
+>>> +       if (IS_ERR(vga->enable_gpio)) {
+>>> +               ret = PTR_ERR(vga->enable_gpio);
+>>> +               dev_err(&pdev->dev, "failed to request GPIO: %d\n", ret);
+>>> +               return ret;
+>>> +       }
+>>> +
+>>>         vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
+>>>         if (IS_ERR(vga->ddc)) {
+>>>                 if (PTR_ERR(vga->ddc) == -ENODEV) {
+>>>
+>>
+>> --
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>> a Linux Foundation Collaborative Project
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
