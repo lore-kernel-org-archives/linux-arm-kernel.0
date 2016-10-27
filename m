@@ -1,49 +1,30 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu, 27 Oct 2016 09:06:26 +0200
-Subject: [PATCHv2] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
-In-Reply-To: <1477505112-26079-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1477505112-26079-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20161027070626.s3wwiadf2iumxe4u@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 27 Oct 2016 09:06:57 +0200
+Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
+ cores
+In-Reply-To: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX=XtQ1VQfGcY6CyMTGpSzdw_=39vUsqwTgk900fRtMyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 01:05:12PM -0500, dinguyen at opensource.altera.com wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> Enable the QSPI node and add the flash chip.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
-> v2: Remove partition entries for the SoCKIT
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 02e22f5..2ce6736 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -175,6 +175,27 @@
->  	status = "okay";
->  };
->  
-> +&qspi {
-> +	status = "okay";
-> +
-> +	flash: flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "n25q256a";
+On Thu, Oct 27, 2016 at 9:00 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Select ARM errata 798181 on SoCs cores affected CA15 cores.
 
-Did you test if this works correctly? According to my datasheet (Rev. C)
-the HPS qspi is a n25q00. The n25q256a is the other one.
+... cores with ...
 
-Regards,
-Steffen
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
