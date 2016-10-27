@@ -1,195 +1,88 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 27 Oct 2016 09:27:34 -0700
-Subject: [PATCHv4 4/4] arm64: dump: Add checking for writable and exectuable
- pages
-In-Reply-To: <1477585654-8908-1-git-send-email-labbott@redhat.com>
-References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
-Message-ID: <1477585654-8908-5-git-send-email-labbott@redhat.com>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Thu, 27 Oct 2016 17:30:55 +0100
+Subject: [RFC PATCH v2 5/8] arm64: compat: 32-bit vDSO setup
+In-Reply-To: <20161027163058.12156-1-kevin.brodsky@arm.com>
+References: <20161027163058.12156-1-kevin.brodsky@arm.com>
+Message-ID: <20161027163058.12156-6-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+If the compat vDSO is enabled, install it in compat processes. In this
+case, the compat vDSO replaces the vector page.
 
-Page mappings with full RWX permissions are a security risk. x86
-has an option to walk the page tables and dump any bad pages.
-(See e1a58320a38d ("x86/mm: Warn on W^X mappings")). Add a similar
-implementation for arm64.
+aarch32_setup_vectors_page has also been renamed to the more generic
+aarch32_setup_additional_pages to reflect both use cases.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 ---
-v4: Changed pr_info -> pr_warn. Added a separate count variable for uxn to avoid
-double counting.
----
- arch/arm64/Kconfig.debug        | 29 ++++++++++++++++++++++
- arch/arm64/include/asm/ptdump.h |  8 +++++++
- arch/arm64/mm/dump.c            | 53 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/mmu.c             |  2 ++
- 4 files changed, 92 insertions(+)
+ arch/arm64/include/asm/elf.h |  6 +++---
+ arch/arm64/kernel/vdso.c     | 22 +++++++++++++++++++++-
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index 21a5b74..d1ebd46 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -42,6 +42,35 @@ config ARM64_RANDOMIZE_TEXT_OFFSET
- 	  of TEXT_OFFSET and platforms must not require a specific
- 	  value.
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index a55384f4a5d7..7da9452596ad 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -185,10 +185,10 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+ #define compat_start_thread		compat_start_thread
+ #define COMPAT_SET_PERSONALITY(ex)	set_thread_flag(TIF_32BIT);
+ #define COMPAT_ARCH_DLINFO
+-extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
+-				      int uses_interp);
++extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
++					  int uses_interp);
+ #define compat_arch_setup_additional_pages \
+-					aarch32_setup_vectors_page
++					aarch32_setup_additional_pages
  
-+config DEBUG_WX
-+	bool "Warn on W+X mappings at boot"
-+	select ARM64_PTDUMP_CORE
-+	---help---
-+	  Generate a warning if any W+X mappings are found at boot.
-+
-+	  This is useful for discovering cases where the kernel is leaving
-+	  W+X mappings after applying NX, as such mappings are a security risk.
-+	  This check also includes UXN, which should be set on all kernel
-+	  mappings.
-+
-+	  Look for a message in dmesg output like this:
-+
-+	    arm64/mm: Checked W+X mappings: passed, no W+X pages found.
-+
-+	  or like this, if the check failed:
-+
-+	    arm64/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
-+
-+	  Note that even if the check fails, your kernel is possibly
-+	  still fine, as W+X mappings are not a security hole in
-+	  themselves, what they do is that they make the exploitation
-+	  of other unfixed kernel bugs easier.
-+
-+	  There is no runtime or memory usage effect of this option
-+	  once the kernel has booted up - it's a one time check.
-+
-+	  If in doubt, say "Y".
-+
- config DEBUG_SET_MODULE_RONX
- 	bool "Set loadable kernel module data as NX and text as RO"
- 	depends on MODULES
-diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-index f72ee69..6afd847 100644
---- a/arch/arm64/include/asm/ptdump.h
-+++ b/arch/arm64/include/asm/ptdump.h
-@@ -42,5 +42,13 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
- 	return 0;
- }
- #endif
-+void ptdump_check_wx(void);
- #endif /* CONFIG_ARM64_PTDUMP_CORE */
-+
-+#ifdef CONFIG_DEBUG_WX
-+#define debug_checkwx()	ptdump_check_wx()
-+#else
-+#define debug_checkwx()	do { } while (0)
-+#endif
-+
- #endif /* __ASM_PTDUMP_H */
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index bb36649..ef8aca8 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -74,6 +74,9 @@ struct pg_state {
- 	unsigned long start_address;
- 	unsigned level;
- 	u64 current_prot;
-+	bool check_wx;
-+	unsigned long wx_pages;
-+	unsigned long uxn_pages;
- };
+ #endif /* CONFIG_COMPAT */
  
- struct prot_bits {
-@@ -202,6 +205,35 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits,
- 	}
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index c239b1c15eb3..76fb5e9ca521 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -138,6 +138,25 @@ static int setup_vdso_pages(const struct vdso_mappings *mappings)
  }
  
-+static void note_prot_uxn(struct pg_state *st, unsigned long addr)
+ #ifdef CONFIG_COMPAT
++#ifdef CONFIG_VDSO32
++extern char vdso32_start, vdso32_end;
++
++static struct vdso_mappings vdso32_mappings __ro_after_init;
++
++static int __init vdso32_init(void)
 +{
-+	if (!st->check_wx)
-+		return;
++	return setup_vdso_mappings("vdso32", &vdso32_start, &vdso32_end,
++				   &vdso32_mappings);
++}
++arch_initcall(vdso32_init);
 +
-+	if ((st->current_prot & PTE_UXN) == PTE_UXN)
-+		return;
-+
-+	WARN_ONCE(1, "arm64/mm: Found non-UXN mapping at address %p/%pS\n",
-+		  (void *)st->start_address, (void *)st->start_address);
-+
-+	st->uxn_pages += (addr - st->start_address) / PAGE_SIZE;
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
++{
++	return setup_vdso_pages(&vdso32_mappings);
 +}
 +
-+static void note_prot_wx(struct pg_state *st, unsigned long addr)
-+{
-+	if (!st->check_wx)
-+		return;
-+	if ((st->current_prot & PTE_RDONLY) == PTE_RDONLY)
-+		return;
-+	if ((st->current_prot & PTE_PXN) == PTE_PXN)
-+		return;
++#else /* CONFIG_VDSO32 */
 +
-+	WARN_ONCE(1, "arm64/mm: Found insecure W+X mapping at address %p/%pS\n",
-+		  (void *)st->start_address, (void *)st->start_address);
-+
-+	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-+}
-+
- static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 				u64 val)
+ /*
+  * Create and map the vectors page for AArch32 tasks.
+  */
+@@ -172,7 +191,7 @@ static int __init alloc_vectors_page(void)
+ }
+ arch_initcall(alloc_vectors_page);
+ 
+-int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
++int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
  {
-@@ -219,6 +251,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 		unsigned long delta;
+ 	struct mm_struct *mm = current->mm;
+ 	unsigned long addr = AARCH32_VECTORS_BASE;
+@@ -196,6 +215,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
  
- 		if (st->current_prot) {
-+			note_prot_uxn(st, addr);
-+			note_prot_wx(st, addr);
- 			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
- 				   st->start_address, addr);
- 
-@@ -344,6 +378,25 @@ static struct ptdump_info kernel_ptdump_info = {
- 	.base_addr	= VA_START,
- };
- 
-+void ptdump_check_wx(void)
-+{
-+	struct pg_state st = {
-+		.seq = NULL,
-+		.marker = (struct addr_marker[]) {
-+			{ -1, NULL},
-+		},
-+		.check_wx = true,
-+	};
-+
-+	walk_pgd(&st, &init_mm, 0);
-+	note_page(&st, 0, 0, 0);
-+	if (st.wx_pages || st.uxn_pages)
-+		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found, %lu non-UXN pages found\n",
-+			st.wx_pages, st.uxn_pages);
-+	else
-+		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
-+}
-+
- static int ptdump_init(void)
- {
- 	ptdump_initialize();
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 05615a3..2cbe2fe 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -42,6 +42,7 @@
- #include <asm/tlb.h>
- #include <asm/memblock.h>
- #include <asm/mmu_context.h>
-+#include <asm/ptdump.h>
- 
- u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
- 
-@@ -396,6 +397,7 @@ void mark_rodata_ro(void)
- 	section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
- 	create_mapping_late(__pa(__start_rodata), (unsigned long)__start_rodata,
- 			    section_size, PAGE_KERNEL_RO);
-+	debug_checkwx();
+ 	return PTR_ERR_OR_ZERO(ret);
  }
++#endif /* CONFIG_VDSO32 */
+ #endif /* CONFIG_COMPAT */
  
- static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ extern char vdso_start, vdso_end;
 -- 
-2.7.4
+2.10.0
