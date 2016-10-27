@@ -1,30 +1,20 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 27 Oct 2016 09:06:57 +0200
-Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
- cores
-In-Reply-To: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
-References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX=XtQ1VQfGcY6CyMTGpSzdw_=39vUsqwTgk900fRtMyQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Oct 2016 09:08:01 +0200
+Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
+In-Reply-To: <20161026052422.17283.57864.sendpatchset@little-apple>
+References: <20161026052422.17283.57864.sendpatchset@little-apple>
+Message-ID: <20161027070801.GB7706@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 9:00 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Select ARM errata 798181 on SoCs cores affected CA15 cores.
+On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
+> 
+> Extend the ARM64 defconfig to enable the DU DRM device as module
+> together with required dependencies of V4L2 FCP and VSP modules.
+> 
+> This enables VGA output on the r8a7795 Salvator-X board.
+> 
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 
-... cores with ...
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks, I have queued this up.
