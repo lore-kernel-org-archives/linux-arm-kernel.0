@@ -1,156 +1,93 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 27 Oct 2016 16:51:21 -0400
-Subject: [PATCH 4/5] net: ethernet: bgmac: add NS2 support
-In-Reply-To: <eff0c717-ec4b-1dce-992a-ad5e958800f5@gmail.com>
-References: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
- <1477510561-17035-5-git-send-email-jon.mason@broadcom.com>
- <eff0c717-ec4b-1dce-992a-ad5e958800f5@gmail.com>
-Message-ID: <20161027205117.GA24397@broadcom.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 27 Oct 2016 23:10:28 +0200
+Subject: Add Allwinner Q8 tablets hardware manager
+In-Reply-To: <9B288597-7812-459D-A5C7-B61107751DA6@konsulko.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+ <20161024173900.GP15620@leverpostej>
+ <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
+ <9B288597-7812-459D-A5C7-B61107751DA6@konsulko.com>
+Message-ID: <d7e6ae76-4ac8-4ad4-a72d-99a58654ba9c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 02:50:39PM -0700, Florian Fainelli wrote:
-> On 10/26/2016 12:36 PM, Jon Mason wrote:
-> > Add support for the variant of amac hardware present in the Broadcom
-> > Northstar2 based SoCs.  Northstar2 requires an additional register to be
-> > configured with the port speed/duplexity (NICPM).  This can be added to
-> > the link callback to hide it from the instances that do not use this.
-> > Also, the bgmac_chip_reset() was intentionally removed to prevent the
-> > resetting of the chip to the default values on open.  Finally, clearing
-> > of the pending interrupts on init is required due to observed issues on
-> > some platforms.
-> > 
-> > Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> > ---
-> 
-> > +static void bgmac_nicpm_speed_set(struct net_device *net_dev)
-> > +{
-> > +	struct bgmac *bgmac = netdev_priv(net_dev);
-> > +	u32 val;
-> > +
-> > +	if (!bgmac->plat.nicpm_base)
-> > +		return;
-> > +
-> > +	val = NICPM_IOMUX_CTRL_INIT_VAL;
-> > +	switch (bgmac->net_dev->phydev->speed) {
-> > +	default:
-> > +		pr_err("Unsupported speed.  Defaulting to 1000Mb\n");
-> > +	case SPEED_1000:
-> > +		val |= NICPM_IOMUX_CTRL_SPD_1000M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-> > +		break;
-> > +	case SPEED_100:
-> > +		val |= NICPM_IOMUX_CTRL_SPD_100M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-> > +		break;
-> > +	case SPEED_10:
-> > +		val |= NICPM_IOMUX_CTRL_SPD_10M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-> > +		break;
-> > +	}
-> > +
-> > +	writel(val, bgmac->plat.nicpm_base + NICPM_IOMUX_CTRL);
-> > +
-> > +	usleep_range(10, 100);
-> 
-> Does not seem like a good idea, do you need that sleep?
+Hi,
 
-Oops, that's not supposed to be there.  Removed.
+On 27-10-16 17:52, Pantelis Antoniou wrote:
+> Hi Hans,
 
+<snip>
 
-> > +
-> > +	bgmac_adjust_link(bgmac->net_dev);
-> > +}
-> > +
-> >  static int platform_phy_connect(struct bgmac *bgmac)
-> >  {
-> >  	struct phy_device *phy_dev;
-> >  
-> > -	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
-> > -					 bgmac_adjust_link);
-> > +	if (bgmac->plat.nicpm_base)
-> > +		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-> > +						 bgmac->dev->of_node,
-> > +						 bgmac_nicpm_speed_set);
-> > +	else
-> > +		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-> > +						 bgmac->dev->of_node,
-> > +						 bgmac_adjust_link);
-> >  	if (!phy_dev) {
-> >  		dev_err(bgmac->dev, "Phy connect failed\n");
-> >  		return -ENODEV;
-> >  	}
-> >  
-> > +	if (bgmac->feature_flags & BGMAC_FEAT_LANE_SWAP)
-> > +		phy_dev->dev_flags |= PHY_BRCM_EXP_LANE_SWAP;
-> > +
-> >  	return 0;
-> >  }
-> >  
-> > @@ -140,6 +188,9 @@ static int bgmac_probe(struct platform_device *pdev)
-> >  
-> >  	platform_set_drvdata(pdev, bgmac);
-> >  
-> > +	if (of_property_read_bool(np, "brcm,enet-phy-lane-swap"))
-> > +		bgmac->feature_flags |= BGMAC_FEAT_LANE_SWAP;
-> > +
-> >  	/* Set the features of the 4707 family */
-> >  	bgmac->feature_flags |= BGMAC_FEAT_CLKCTLST;
-> >  	bgmac->feature_flags |= BGMAC_FEAT_NO_RESET;
-> > @@ -182,6 +233,14 @@ static int bgmac_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(bgmac->plat.idm_base))
-> >  		return PTR_ERR(bgmac->plat.idm_base);
-> >  
-> > +	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nicpm_base");
-> > +	if (regs) {
-> > +		bgmac->plat.nicpm_base = devm_ioremap_resource(&pdev->dev,
-> > +							       regs);
-> > +		if (IS_ERR(bgmac->plat.nicpm_base))
-> > +			return PTR_ERR(bgmac->plat.nicpm_base);
-> > +	}
-> > +
-> >  	bgmac->read = platform_bgmac_read;
-> >  	bgmac->write = platform_bgmac_write;
-> >  	bgmac->idm_read = platform_bgmac_idm_read;
-> > @@ -213,6 +272,7 @@ static int bgmac_remove(struct platform_device *pdev)
-> >  static const struct of_device_id bgmac_of_enet_match[] = {
-> >  	{.compatible = "brcm,amac",},
-> >  	{.compatible = "brcm,nsp-amac",},
-> > +	{.compatible = "brcm,ns2-amac",},
-> >  	{},
-> >  };
-> >  
-> > diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
-> > index 38876ec..1796208 100644
-> > --- a/drivers/net/ethernet/broadcom/bgmac.c
-> > +++ b/drivers/net/ethernet/broadcom/bgmac.c
-> > @@ -1082,6 +1082,9 @@ static void bgmac_enable(struct bgmac *bgmac)
-> >  /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipinit */
-> >  static void bgmac_chip_init(struct bgmac *bgmac)
-> >  {
-> > +	/* Clear any erroneously pending interrupts */
-> > +	bgmac_write(bgmac, BGMAC_INT_STATUS, ~0);
-> > +
-> >  	/* 1 interrupt per received frame */
-> >  	bgmac_write(bgmac, BGMAC_INT_RECV_LAZY, 1 << BGMAC_IRL_FC_SHIFT);
-> >  
-> > @@ -1158,8 +1161,6 @@ static int bgmac_open(struct net_device *net_dev)
-> >  	struct bgmac *bgmac = netdev_priv(net_dev);
-> >  	int err = 0;
-> >  
-> > -	bgmac_chip_reset(bgmac);
-> > -
-> 
-> Is this removal intentional? Maybe it should be special cased with
-> checking for a NS2 BGMAC instance and not do it in that case?
+>> Right, so again I think we need to split the discussion in 2 steps:
+>>
+>> 1) How do we apply the fixups, currently I'm using free-form changes
+>> done from C-code. I can envision moving to something like the quirk
+>> mechanism suggested by Pantelis in the past. Note this is not a perfect
+>> fit for my rather corner-case use-case, but I can understand that in
+>> general you want the variants to be described in dt, and activated
+>> in some way, rather then have c-code make free-form changes to the dt
+>>
+>
+> We?ve had this discussion before, so I guess here it goes again.
+>
+> I think the biggest objection is the programmatic way of applying
+> every quirk by ?hand?.
+>
+> If there was a way to keep the probing mechanism but just spit out
+> a ?model? number we could reasonably map it to an overlay to apply
+> with a generic overlay manager.
+>
+> From an internal s/w standpoint having an expansion board or soldered
+> parts makes no difference.
 
-The reset seems completely unnecessary.  There is already 2 resets in
-the probe routine, another reset serves no purpose.  I can add it
-back, as it does not seem to have the negative effect I was seeing
-before.
+I disagree, with soldered parts it often is the board has
+one of "accelerometer a", "b" or "c", where in the simple case
+my suggested i2c-probe-stop-at-first-match property will
+just work for a new board by creating a new dtb without needing any
+kernel changes, where as your suggested model-string generator
+C-code module would need updating.
 
-Of course, if I remove this one I should remove the reset in the close
-too (which seems even more unnecessary, but I didn't remove it).
+I think that there is a need for both really.
 
-Thanks,
-Jon
+>> 2) How do we select which fixups to apply. Again I can understand
+>> you wanting some well defined mechanism for this, but again my
+>> use-case is special and simply does not allow for this as there
+>> is no id-eeprom to read or some such.
+>>
+>
+> Yes there is no EEPROM but you might be able to map probing results to
+> a fake ?model? number.
+>
+> Let me expand a bit:
+>
+> Assume that you have a number of probing steps, for example A, B, C each
+> returning true or false, and C being executed only when B is ?true? you
+> could do this to generate a bit field that identifies it.
+>
+> For example let?s assume that model FOO?s probing steps are
+>
+> A false, B true, C false -> 010
+>
+> Model?s BAR
+>
+> A true, B false, C don?t care -> 10x
+>
+> Mapping these to models could be
+>
+> Model FOO, (010 & 111) == 010 (all three probing steps must match)
+>
+> Model BAR, (10x & 110) = 100 (the first two probing steps must match)
 
-> -- 
-> Florian
+Interesting this is actually the same direction my thoughts on this
+lead me in my reply in the other thread on this started by
+Antoine Tenart.
+
+Only difference is that I suggested putting the model-string
+generation in the bootloader, so it will just be there when the kernel
+boots. But I agree that given things like upgradability having
+the model-string generation code in the kernel is better.
+
+<snip>
+
+Regards,
+
+Hans
