@@ -1,78 +1,29 @@
-From: 0x7f454c46@gmail.com (Dmitry Safonov)
-Date: Thu, 27 Oct 2016 18:23:01 +0300
-Subject: [RFC PATCH 0/8] arm64: Add a compat vDSO
-In-Reply-To: <20160908140103.7468-1-kevin.brodsky@arm.com>
-References: <20160908140103.7468-1-kevin.brodsky@arm.com>
-Message-ID: <CAJwJo6aexCNNVoy9L+wqMJY1i1DVJix7UP1Z7exW1hGibHzJGQ@mail.gmail.com>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Thu, 27 Oct 2016 17:32:35 +0200
+Subject: [PATCH v4] Remove duplicated defines (was [PATCH v3] Fix some
+ potential warnings)
+Message-ID: <1477582356-28156-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-09-08 17:00 GMT+03:00 Kevin Brodsky <kevin.brodsky@arm.com>:
-> Hi,
->
-> This series adds support for a compat (AArch32) vDSO, providing two
-> userspace functionalities to compat processes:
->
-> * "Virtual" time syscalls (gettimeofday and clock_gettime). The
->   implementation is an adaptation of the arm vDSO (vgettimeofday.c),
->   sharing the data page with the 64-bit vDSO.
->
-> * sigreturn trampolines, following the example of the 64-bit vDSO
->   (sigreturn.S), but slightly more complicated because we provide A32
->   and T32 variants for both sigreturn and rt_sigreturn.
->
-> The first point brings the performance improvement expected of a vDSO,
-> by implementing time syscalls directly in userspace. The second point
-> allows us to get rid of the compat vector page, at the expense of the
-> kuser helpers (this is one reason for not enabling the compat vDSO by
-> default).
->
-> Unfortunately, this time we cannot escape using a 32-bit toolchain. To
-> build the compat VDSO, CONFIG_COMPAT_VDSO must be set *and*
-> CROSS_COMPILE_ARM32 must be defined to the prefix of a 32-bit compiler.
-> Failure to do so will not prevent building the kernel, but a warning
-> will be printed and the compat vDSO will not be built.
->
-> I have only tested the series with a 64-bit userspace (+ 32-bit glibc).
-> Testing it with a 32-bit userspace would be very welcome.
+Remove duplicated defines before they cause warning.
 
-Hi, what's up with these patches, are you gonna resend them or prepare
-a new version?
+Change in V2:
+Update the d830 evm board file to use the da8xx-cfgchip.h
+These changes are required as I'm sending this patch apart from
+the series "[PATCH/RFT v2 00/17] Add DT support for ohci-da8xx"
 
-> Thanks,
-> Kevin
->
-> Kevin Brodsky (8):
->   arm64: Refactor vDSO setup
->   arm64: compat: Add time-related syscall numbers
->   arm64: compat: Expose offset to registers in sigframes
->   arm64: compat: Add a 32-bit vDSO
->   arm64: compat: 32-bit vDSO setup
->   arm64: elf: Set AT_SYSINFO_EHDR in compat processes
->   arm64: compat: Use vDSO sigreturn trampolines if available
->   arm64: Wire up and expose the new compat vDSO
->
->  arch/arm64/Kconfig                       |  20 +++
->  arch/arm64/Makefile                      |  20 ++-
->  arch/arm64/include/asm/elf.h             |  15 +-
->  arch/arm64/include/asm/signal32.h        |  46 +++++
->  arch/arm64/include/asm/unistd.h          |   2 +
->  arch/arm64/include/asm/vdso.h            |   3 +
->  arch/arm64/kernel/Makefile               |   8 +-
->  arch/arm64/kernel/asm-offsets.c          |  13 ++
->  arch/arm64/kernel/signal32.c             |  61 ++-----
->  arch/arm64/kernel/vdso.c                 | 198 ++++++++++++---------
->  arch/arm64/kernel/vdso32/Makefile        | 121 +++++++++++++
->  arch/arm64/kernel/vdso32/sigreturn.S     |  86 +++++++++
->  arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
->  arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
->  arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
->  15 files changed, 883 insertions(+), 134 deletions(-)
->  create mode 100644 arch/arm64/kernel/vdso32/Makefile
->  create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
->  create mode 100644 arch/arm64/kernel/vdso32/vdso.S
->  create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
->  create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
+Changes in v3:
+* Change the patch description to better respect what the patch fix.
+* Sorted new header sorted in alphabetical order.
+
+Alexandre Bailon (1):
+  ARM: davinci: da8xx: Remove duplicated defines
+
+ arch/arm/mach-davinci/board-da830-evm.c     |  5 +++--
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  3 ++-
+ include/linux/platform_data/usb-davinci.h   | 23 -----------------------
+ 3 files changed, 5 insertions(+), 26 deletions(-)
 
 -- 
-             Dmitry
+2.7.3
