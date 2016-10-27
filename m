@@ -1,67 +1,60 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 27 Oct 2016 09:22:35 +0200
-Subject: [PATCH 1/2] mm/memblock: prepare a capability to support
- memblock near alloc
-In-Reply-To: <58116954.8080908@huawei.com>
-References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
- <1477364358-10620-2-git-send-email-thunder.leizhen@huawei.com>
- <20161025132338.GA31239@dhcp22.suse.cz>
- <58101EB4.2080305@huawei.com>
- <20161026093152.GE18382@dhcp22.suse.cz>
- <58116954.8080908@huawei.com>
-Message-ID: <20161027072235.GB6454@dhcp22.suse.cz>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 27 Oct 2016 16:28:17 +0900
+Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
+ cores
+In-Reply-To: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CANqRtoSsKTvMjATz89nEY06Fp-J20VqjDzW0JD1NDLqEJQPwsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 27-10-16 10:41:24, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2016/10/26 17:31, Michal Hocko wrote:
-> > On Wed 26-10-16 11:10:44, Leizhen (ThunderTown) wrote:
-> >>
-> >>
-> >> On 2016/10/25 21:23, Michal Hocko wrote:
-> >>> On Tue 25-10-16 10:59:17, Zhen Lei wrote:
-> >>>> If HAVE_MEMORYLESS_NODES is selected, and some memoryless numa nodes are
-> >>>> actually exist. The percpu variable areas and numa control blocks of that
-> >>>> memoryless numa nodes need to be allocated from the nearest available
-> >>>> node to improve performance.
-> >>>>
-> >>>> Although memblock_alloc_try_nid and memblock_virt_alloc_try_nid try the
-> >>>> specified nid at the first time, but if that allocation failed it will
-> >>>> directly drop to use NUMA_NO_NODE. This mean any nodes maybe possible at
-> >>>> the second time.
-> >>>>
-> >>>> To compatible the above old scene, I use a marco node_distance_ready to
-> >>>> control it. By default, the marco node_distance_ready is not defined in
-> >>>> any platforms, the above mentioned functions will work as normal as
-> >>>> before. Otherwise, they will try the nearest node first.
-> >>>
-> >>> I am sorry but it is absolutely unclear to me _what_ is the motivation
-> >>> of the patch. Is this a performance optimization, correctness issue or
-> >>> something else? Could you please restate what is the problem, why do you
-> >>> think it has to be fixed at memblock layer and describe what the actual
-> >>> fix is please?
-> >>
-> >> This is a performance optimization.
-> > 
-> > Do you have any numbers to back the improvements?
+Hi Simon,
+
+On Thu, Oct 27, 2016 at 4:00 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Select ARM errata 798181 on SoCs cores affected CA15 cores.
 >
-> I have not collected any performance data, but at least in theory,
-> it's beneficial and harmless, except make code looks a bit
-> urly.
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/Kconfig | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index c48be1d332ed..6fbd9b7d2d67 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -60,6 +60,7 @@ config ARCH_R7S72100
+>  config ARCH_R8A73A4
+>         bool "R-Mobile APE6 (R8A73A40)"
+>         select ARCH_RMOBILE
+> +       select ARM_ERRATA_798181 if SMP
+>         select RENESAS_IRQC
+>
+>  config ARCH_R8A7740
+> @@ -70,6 +71,7 @@ config ARCH_R8A7740
+>  config ARCH_R8A7743
+>         bool "RZ/G1M (R8A77430)"
+>         select ARCH_RCAR_GEN2
+> +       select ARM_ERRATA_798181 if SMP
+>
+>  config ARCH_R8A7778
+>         bool "R-Car M1A (R8A77781)"
+> @@ -82,20 +84,24 @@ config ARCH_R8A7779
+>  config ARCH_R8A7790
+>         bool "R-Car H2 (R8A77900)"
+>         select ARCH_RCAR_GEN2
+> +       select ARM_ERRATA_798181 if SMP
+>         select I2C
 
-The whole memoryless area is cluttered with hacks because everybody just
-adds pieces here and there to make his particular usecase work IMHO.
-Adding more on top for performance reasons which are even not measured
-to prove a clear win is a no go. Please step back try to think how this
-could be done with an existing infrastructure we have (some cleanups
-while doing that would be hugely appreciated) and if that is not
-possible then explain why and why it is not feasible to fix that before
-you start adding a new API.
+Thanks for your help.
 
-Thanks!
+I'm probably misunderstanding what this patch does and how the errata
+effects the system, but the commit message says CA15 cores. The above
+R-Car Gen1 and r8a7740 SoCs are not using CA15 - instead they use CA9.
+Not sure if the errata still applies though.
 
--- 
-Michal Hocko
-SUSE Labs
+So either the commit message or the list of the SoCs need to be updated.
+
+Thanks,
+
+/ magnus
