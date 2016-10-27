@@ -1,64 +1,122 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 27 Oct 2016 22:02:39 +0800
-Subject: [PATCH 02/12] ASoC: dapm: Implement stereo mixer control support
-In-Reply-To: <20161026175052.GE25322@sirena.org.uk>
-References: <20161003110804.28235-1-wens@csie.org>
- <20161003110804.28235-3-wens@csie.org>
- <20161026175052.GE25322@sirena.org.uk>
-Message-ID: <CAGb2v66gyJuakf_5mQJvuQ8VY3rRZtgkk2e=mCJqFT0pFBX=YA@mail.gmail.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Thu, 27 Oct 2016 16:03:42 +0200
+Subject: [RFC PATCH 1/5] of: introduce the overlay manager
+In-Reply-To: <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
+References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+ <20161026145756.21689-2-antoine.tenart@free-electrons.com>
+ <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
+Message-ID: <20161027140342.kidk4gqxwbtphrbs@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 1:50 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, Oct 03, 2016 at 07:07:54PM +0800, Chen-Yu Tsai wrote:
->
->>       /* find dapm widget path assoc with kcontrol */
->>       dapm_kcontrol_for_each_path(path, kcontrol) {
->> +             /*
->> +              * If status for the second channel was given ( >= 0 ),
->> +              * consider the second and later paths as the second
->> +              * channel.
->> +              */
->> +             if (found && rconnect >= 0)
->> +                     soc_dapm_connect_path(path, rconnect, "mixer update");
->> +             else
->> +                     soc_dapm_connect_path(path, connect, "mixer update");
->>               found = 1;
->> -             soc_dapm_connect_path(path, connect, "mixer update");
->
-> This really only works for two channels with the current inteface - the
-> comment makes it sound like it'll work for more but we can only pass in
-> two (and there's only support for specifying two everywhere).
+Hello Mathieu,
 
-I could rework it to pass a list of connected status' and the number
-of elements instead, but it wouldn't work well for situations where
-the number of channels on the kcontrol != the number of paths. I'm not
-sure if that's even a valid setup, but it does work with the current
-core code.
+On Wed, Oct 26, 2016 at 10:29:59AM -0600, Mathieu Poirier wrote:
+> 
+> Please find my comments below.
 
-On the other hand, are there kcontrols that are multi-channel
-(> 2 channels)?
+Thanks for the comments. I expected more distant reviews, on the overall
+architecture to know if this could fit the needs of others. But anyway
+your comments are helpful if we ever decide to go with an overlay
+manager like this one.
 
-I'm inclined to just fixup the comment to make it clear that the
-implementation supports stereo, i.e. 2 channels, only.
+> On 26 October 2016 at 08:57, Antoine Tenart
+> <antoine.tenart@free-electrons.com> wrote:
+> > +
+> > +/*
+> > + * overlay_mgr_register_format()
+> > + *
+> > + * Adds a new format candidate to the list of supported formats. The registered
+> > + * formats are used to parse the headers stored on the dips.
+> > + */
+> > +int overlay_mgr_register_format(struct overlay_mgr_format *candidate)
+> > +{
+> > +       struct overlay_mgr_format *format;
+> > +       int err = 0;
+> > +
+> > +       spin_lock(&overlay_mgr_format_lock);
+> > +
+> > +       /* Check if the format is already registered */
+> > +       list_for_each_entry(format, &overlay_mgr_formats, list) {
+> > +               if (!strcpy(format->name, candidate->name)) {
+> 
+> This function is public to the rest of the kernel - limiting the
+> lenght of ->name and using strncpy() is probably a good idea.
 
->
->> -     change = dapm_kcontrol_set_value(kcontrol, val);
->> +     /* This assumes field width < (bits in unsigned int / 2) */
->> +     change = dapm_kcontrol_set_value(kcontrol, val | (rval << width));
->
-> That seems like a bit of an assumption in cases where we've got a single
-> control for both power and volume?  They're very rare though, I'm not
-> even sure any exist.  It'd be good to have a check in the code just in
-> case it does come up, it'll likely be a nightmare to debug if someone
-> does run into it.
+I totally agree. This was in fact something I wanted to do.
 
-Agreed. I'll put a check and warning before it.
+> > +
+> > +/*
+> > + * overlay_mgr_parse()
+> > + *
+> > + * Parse raw data with registered format parsers. Fills the candidate string if
+> > + * one parser understood the raw data format.
+> > + */
+> > +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
+> 
+> I'm pretty sure there is another way to proceed than using 3 levels of
+> references.  It makes the code hard to read and a prime candidate for
+> errors.
 
->
-> Otherwise I think this makes sense.
+Sure. I guess we could allocate an array of fixed-length strings which
+would be less flexible but I don't think we need something that flexible
+here.
 
-Thanks for the review!
+> 
+> > +
+> > +               format->parse(dev, data, candidates, n);
+> 
+> ->parse() returns an error code.  It is probably a good idea to check
+> it.  If it isn't needed then a comment explaining why it is the case
+> would be appreciated.
 
-Regards
-ChenYu
+So the point of the parse function is to determine if the data read from
+a source is a compatible header of a given format. Returning an error
+doesn't mean the header won't be recognized by another one.
+
+We could maybe handle this better, by returning an error iif different
+that -EINVAL. Or we could have one function to check the compatibility
+and one to parse it, if compatible.
+
+> > +static int _overlay_mgr_apply(struct device *dev, char *candidate)
+> > +{
+> > +       struct overlay_mgr_overlay *overlay;
+> > +       struct device_node *node;
+> > +       const struct firmware *firmware;
+> > +       char *firmware_name;
+> > +       int err = 0;
+> > +
+> > +       spin_lock(&overlay_mgr_lock);
+> > +
+> > +       list_for_each_entry(overlay, &overlay_mgr_overlays, list) {
+> > +               if (!strcmp(overlay->name, candidate)) {
+> > +                       dev_err(dev, "overlay already loaded\n");
+> > +                       err = -EEXIST;
+> > +                       goto err_lock;
+> > +               }
+> > +       }
+> > +
+> > +       overlay = devm_kzalloc(dev, sizeof(*overlay), GFP_KERNEL);
+> 
+> Function devm_kzalloc() can sleep but you're holding a spinlock - I'm
+> surprised the kernel didn't complain here.  Allocate the memory before
+> holding the lock.  If the overly is already loaded simply free it on
+> the error path.
+
+Right.
+
+Thanks,
+
+Antoine
+
+-- 
+Antoine T?nart, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/ca58ff75/attachment.sig>
