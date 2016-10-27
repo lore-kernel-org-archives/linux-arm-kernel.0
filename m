@@ -1,170 +1,82 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 27 Oct 2016 18:08:35 +0200
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161027160406.25738-1-richard.genoud@gmail.com>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
-Message-ID: <c35b7ca0-2544-1fb3-ea26-b76ffa3e56d6@atmel.com>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Thu, 27 Oct 2016 17:09:54 +0100
+Subject: [RFC PATCH 0/8] arm64: Add a compat vDSO
+In-Reply-To: <CAJwJo6aexCNNVoy9L+wqMJY1i1DVJix7UP1Z7exW1hGibHzJGQ@mail.gmail.com>
+References: <20160908140103.7468-1-kevin.brodsky@arm.com>
+ <CAJwJo6aexCNNVoy9L+wqMJY1i1DVJix7UP1Z7exW1hGibHzJGQ@mail.gmail.com>
+Message-ID: <06584bac-ac82-4a93-3a35-a7fdfdd1a4c6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/10/2016 ? 18:04, Richard Genoud a ?crit :
-> After commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
-> when hardware handshake is enabled"), the hardware handshake wasn't
-> functional anymore on Atmel platforms (beside SAMA5D2).
-> 
-> To understand why, one has to understand the flag ATMEL_US_USMODE_HWHS
-> first:
-> Before commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
-> when hardware handshake is enabled"), this flag was never set.
-> Thus, the CTS/RTS where only handled by serial_core (and everything
-> worked just fine).
-> 
-> This commit introduced the use of the ATMEL_US_USMODE_HWHS flag,
-> enabling it for all boards when the user space enables flow control.
-> 
-> When the ATMEL_US_USMODE_HWHS is set, the Atmel USART controller
-> handles a part of the flow control job:
-> - disable the transmitter when the CTS pin gets high.
-> - drive the RTS pin high when the DMA buffer transfer is completed or
->   PDC RX buffer full or RX FIFO is beyond threshold. (depending on the
->   controller version).
-> 
-> NB: This feature is *not* mandatory for the flow control to work.
-> (Nevertheless, it's very useful if low latencies are needed.)
-> 
-> Now, the specifics of the ATMEL_US_USMODE_HWHS flag:
-> 
-> - For platforms with DMAC and no FIFOs (sam9x25, sam9x35, sama5D3,
-> sama5D4, sam9g15, sam9g25, sam9g35)* this feature simply doesn't work.
-> ( source: https://lkml.org/lkml/2016/9/7/598 )
-> Tested it on sam9g35, the RTS pins always stays up, even when RXEN=1
-> or a new DMA transfer descriptor is set.
-> => ATMEL_US_USMODE_HWHS must not be used for those platforms
-> 
-> - For platforms with a PDC (sam926{0,1,3}, sam9g10, sam9g20, sam9g45,
-> sam9g46)*, there's another kind of problem. Once the flag
-> ATMEL_US_USMODE_HWHS is set, the RTS pin can't be driven anymore via
-> RTSEN/RTSDIS in USART Control Register. The RTS pin can only be driven
-> by enabling/disabling the receiver or setting RCR=RNCR=0 in the PDC
-> (Receive (Next) Counter Register).
-> => Doing this is beyond the scope of this patch and could add other
-> bugs, so the original (and working) behaviour should be set for those
-> platforms (meaning ATMEL_US_USMODE_HWHS flag should be unset).
-> 
-> - For platforms with a FIFO (sama5d2)*, the RTS pin is driven according
-> to the RX FIFO thresholds, and can be also driven by RTSEN/RTSDIS in
-> USART Control Register. No problem here.
-> (This was the use case of commit 1cf6e8fc8341 ("tty/serial: at91: fix
-> RTS line management when hardware handshake is enabled"))
-> NB: If the CTS pin declared as a GPIO in the DTS, (for instance
-> cts-gpios = <&pioA PIN_PB31 GPIO_ACTIVE_LOW>), the transmitter will be
-> disabled.
-> => ATMEL_US_USMODE_HWHS flag can be set for this platform ONLY IF the
-> CTS pin is not a GPIO.
-> 
-> So, the only case when ATMEL_US_USMODE_HWHS can be enabled is when
-> (atmel_use_fifo(port) &&
->  !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS))
-> 
-> Tested on all Atmel USART controller flavours:
-> AT91SAM9G35-CM (DMAC flavour), AT91SAM9G20-EK (PDC flavour),
-> SAMA5D2xplained (FIFO flavour).
-> 
-> * the list may not be exhaustive
-> 
-> Cc: <stable@vger.kernel.org> #4.4+ (beware, missing atmel_port variable)
-> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 27/10/16 16:23, Dmitry Safonov wrote:
+> 2016-09-08 17:00 GMT+03:00 Kevin Brodsky <kevin.brodsky@arm.com>:
+>> Hi,
+>>
+>> This series adds support for a compat (AArch32) vDSO, providing two
+>> userspace functionalities to compat processes:
+>>
+>> * "Virtual" time syscalls (gettimeofday and clock_gettime). The
+>>   implementation is an adaptation of the arm vDSO (vgettimeofday.c),
+>>   sharing the data page with the 64-bit vDSO.
+>>
+>> * sigreturn trampolines, following the example of the 64-bit vDSO
+>>   (sigreturn.S), but slightly more complicated because we provide A32
+>>   and T32 variants for both sigreturn and rt_sigreturn.
+>>
+>> The first point brings the performance improvement expected of a vDSO,
+>> by implementing time syscalls directly in userspace. The second point
+>> allows us to get rid of the compat vector page, at the expense of the
+>> kuser helpers (this is one reason for not enabling the compat vDSO by
+>> default).
+>>
+>> Unfortunately, this time we cannot escape using a 32-bit toolchain. To
+>> build the compat VDSO, CONFIG_COMPAT_VDSO must be set *and*
+>> CROSS_COMPILE_ARM32 must be defined to the prefix of a 32-bit compiler.
+>> Failure to do so will not prevent building the kernel, but a warning
+>> will be printed and the compat vDSO will not be built.
+>>
+>> I have only tested the series with a 64-bit userspace (+ 32-bit glibc).
+>> Testing it with a 32-bit userspace would be very welcome.
+>
+> Hi, what's up with these patches, are you gonna resend them or prepare
+> a new version?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Absolutely, actually I was working on it just now, sending v2 very soon :-)
 
-Thanks
+Kevin
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 26 ++++++++++++++++++++++----
->  1 file changed, 22 insertions(+), 4 deletions(-)
-> 
-> Note for -stable:
-> This patch will apply on 4.4.x/4.8.x but compilation will fail due to
-> a missing variable atmel_port (introduced in 4.9-rc1):
-> 
->  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  			      struct ktermios *old)
->  {
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
->  	unsigned int old_mode, mode, imr, quot, baud;
-> 
-> Changes since v5:
->  - fix typos
->  - increase commentary
-> 
-> Changes since v4:
->  - the mctrl_gpio_use_rtscts() is gone since it was atmel_serial
->  specific. (so patch 1 is gone)
->  - patches 2 and 3 have been merged together since it didn't make
->  a lot of sense to correct the GPIO case in one separate patch.
->  - ATMEL_US_USMODE_HWHS is now unset for platform with PDC
-> 
-> Changes since v3:
->  - remove superfluous #include <linux/err.h> (thanks to Uwe)
->  - rebase on next-20160930
-> 
-> Changes since v2:
->  - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
->  - fix typos in patch 2/3
->  - rebase on next-20160927
->  - simplify the logic in patch 3/3.
-> 
-> Changes since v1:
->  - Correct patch 1 with the error found by kbuild.
->  - Add Alexandre's Acked-by on patch 2
->  - Rewrite patch 3 logic in the light of the on-going discussion
->    with Cyrille and Alexandre.
-> 
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index fd8aa1f4ba78..168b10cad47b 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		mode |= ATMEL_US_USMODE_RS485;
->  	} else if (termios->c_cflag & CRTSCTS) {
->  		/* RS232 with hardware handshake (RTS/CTS) */
-> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> -			termios->c_cflag &= ~CRTSCTS;
-> -		} else {
-> +		if (atmel_use_fifo(port) &&
-> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
-> +			/*
-> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
-> +			 * be able to drive the RTS pin high/low when the RX
-> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
-> +			 * It will also disable the transmitter when the CTS
-> +			 * pin is high.
-> +			 * This mode is not activated if CTS pin is a GPIO
-> +			 * because in this case, the transmitter is always
-> +			 * disabled (there must be an internal pull-up
-> +			 * responsible for this behaviour).
-> +			 * If the RTS pin is a GPIO, the controller won't be
-> +			 * able to drive it according to the FIFO thresholds,
-> +			 * but it will be handled by the driver.
-> +			 */
->  			mode |= ATMEL_US_USMODE_HWHS;
-> +		} else {
-> +			/*
-> +			 * For platforms without FIFO, the flow control is
-> +			 * handled by the driver.
-> +			 */
-> +			mode |= ATMEL_US_USMODE_NORMAL;
->  		}
->  	} else {
->  		/* RS232 without hadware handshake */
-> 
-
-
--- 
-Nicolas Ferre
+>> Thanks,
+>> Kevin
+>>
+>> Kevin Brodsky (8):
+>>   arm64: Refactor vDSO setup
+>>   arm64: compat: Add time-related syscall numbers
+>>   arm64: compat: Expose offset to registers in sigframes
+>>   arm64: compat: Add a 32-bit vDSO
+>>   arm64: compat: 32-bit vDSO setup
+>>   arm64: elf: Set AT_SYSINFO_EHDR in compat processes
+>>   arm64: compat: Use vDSO sigreturn trampolines if available
+>>   arm64: Wire up and expose the new compat vDSO
+>>
+>>  arch/arm64/Kconfig                       |  20 +++
+>>  arch/arm64/Makefile                      |  20 ++-
+>>  arch/arm64/include/asm/elf.h             |  15 +-
+>>  arch/arm64/include/asm/signal32.h        |  46 +++++
+>>  arch/arm64/include/asm/unistd.h          |   2 +
+>>  arch/arm64/include/asm/vdso.h            |   3 +
+>>  arch/arm64/kernel/Makefile               |   8 +-
+>>  arch/arm64/kernel/asm-offsets.c          |  13 ++
+>>  arch/arm64/kernel/signal32.c             |  61 ++-----
+>>  arch/arm64/kernel/vdso.c                 | 198 ++++++++++++---------
+>>  arch/arm64/kernel/vdso32/Makefile        | 121 +++++++++++++
+>>  arch/arm64/kernel/vdso32/sigreturn.S     |  86 +++++++++
+>>  arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
+>>  arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
+>>  arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
+>>  15 files changed, 883 insertions(+), 134 deletions(-)
+>>  create mode 100644 arch/arm64/kernel/vdso32/Makefile
+>>  create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
+>>  create mode 100644 arch/arm64/kernel/vdso32/vdso.S
+>>  create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
+>>  create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
+>
