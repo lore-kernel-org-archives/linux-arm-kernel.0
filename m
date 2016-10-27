@@ -1,60 +1,51 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Thu, 27 Oct 2016 10:50:48 +0200
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <20161026225413.GA6220@obsidianresearch.com>
-References: <20161026225413.GA6220@obsidianresearch.com>
-Message-ID: <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Thu, 27 Oct 2016 10:02:33 +0100
+Subject: [PATCH 7/9] Input: wm97xx: split out touchscreen registering
+In-Reply-To: <1477510907-23495-8-git-send-email-robert.jarzmik@free.fr>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-8-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20161027090233.GF28180@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/27/2016 12:54 AM, Jason Gunthorpe wrote:
-> There is no sense in sending a bitstream we know will not work, and
-> with the variety of options for bitstream generation in Xilinx tools
-> it is not terribly clear or very well documented what the correct
-> input should be, especially since auto-detection was removed from this
-> driver.
->
-> All Zynq full configuration bitstreams must start with the sync word in
-> the correct byte order.
->
-> Zynq is also only able to DMA dword quantities, so bitstreams must be
-> a multiple of 4 bytes. This also fixes a DMA-past the end bug.
->
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+On Wed, Oct 26, 2016 at 09:41:45PM +0200, Robert Jarzmik wrote:
+> wm97xx-core does several things in it initialization :
+>  - touchscreen input device setup
+>  - battery device creation
+> 
+> As the wm97xx is actually a multi-function device handling an audio
+> codec, a touchscreen, a gpio block and an ADC, reshape the probing to
+> isolate what is truly input/touchscreen specific from the remaining
+> part.
+> 
+> This is only code shuffling, there is no functional change.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 > ---
->  drivers/fpga/zynq-fpga.c | 25 ++++++++++++++++---------
->  1 file changed, 16 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index c2fb4120bd62..46a38772e7ee 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -184,12 +184,26 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
->
->  	priv = mgr->priv;
->
-> +	/* All valid bitstreams are multiples of 32 bits */
-> +	if ((count % 4) != 0)
-> +		return -EINVAL;
-> +
->  	err = clk_enable(priv->clk);
->  	if (err)
->  		return err;
->
->  	/* don't globally reset PL if we're doing partial reconfig */
->  	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
-> +		/* Sanity check the proposed bitstream. It must start with the
-> +		 * sync word in the correct byte order and be a multiple of 4
-> +		 * bytes.
-> +		 */
-> +		if (count <= 4 || buf[0] != 0x66 || buf[1] != 0x55 ||
-> +		    buf[2] != 0x99 || buf[3] != 0xaa) {
+>  drivers/input/touchscreen/wm97xx-core.c | 193 ++++++++++++++++++--------------
+>  1 file changed, 112 insertions(+), 81 deletions(-)
+> 
+> diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
+> index 83cf11312fd9..50a110e2988b 100644
+<snip>
+> +static void wm97xx_remove_battery(struct wm97xx *wm)
+> +{
+> +	platform_device_put(wm->battery_dev);
+> +}
+<snip>
+> @@ -724,10 +757,8 @@ static int wm97xx_remove(struct device *dev)
+>  {
+>  	struct wm97xx *wm = dev_get_drvdata(dev);
+>  
+> -	platform_device_unregister(wm->battery_dev);
+> -	platform_device_unregister(wm->touch_dev);
+> -	input_unregister_device(wm->input_dev);
+> -	kfree(wm);
+> +	wm97xx_remove_battery(wm);
 
-This checks if the bit stream is bigger then 4 bytes. We error out 
-before, if it is smaller. So you should fix the wording in the comment 
-and check for count == 4.
+The commit message says this is just shifting code around but the
+platform_device_unregister for the battery_dev seems to have
+turned into a platform_device_put here.
 
-Regards,
-Matthias
+Thanks,
+Charles
