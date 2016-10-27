@@ -1,52 +1,26 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 27 Oct 2016 10:55:42 -0500
-Subject: [PATCH v6 5/5] ARM: DTS: da850: Add usb phy node
-In-Reply-To: <d55f19f2-beb3-a681-a6e9-c1d2c303173c@ti.com>
-References: <1477451211-31979-1-git-send-email-david@lechnology.com>
- <1477451211-31979-6-git-send-email-david@lechnology.com>
- <d55f19f2-beb3-a681-a6e9-c1d2c303173c@ti.com>
-Message-ID: <7a57b179-bbe7-1412-84d4-8406981665ab@lechnology.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 27 Oct 2016 09:01:24 -0700
+Subject: [PATCH V4 0/5] firmware: Add support for TI System Control
+ Interface (TI-SCI) protocol driver
+In-Reply-To: <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com> (Tero Kristo's
+ message of "Tue, 25 Oct 2016 20:34:48 +0300")
+References: <20161018230837.6515-1-nm@ti.com>
+ <2694e4b5-20d5-f590-c6a6-55ff4cb8c16b@ti.com>
+Message-ID: <m260odhjcb.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2016 05:26 AM, Sekhar Nori wrote:
-> On Wednesday 26 October 2016 08:36 AM, David Lechner wrote:
->> Add a node for the new usb phy driver.
->
-> changed this to:
->
->     Add a node for usb phy device. This device
->     controls both the USB 1.1 and USB 2.0 PHYs.
->
-> mainly because the node is for the device, not the driver.
->
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->
-> Applied to v4.10/dt
->
-> Thanks,
-> Sekhar
->
+Tero Kristo <t-kristo@ti.com> writes:
 
-I found a better way to represent this device as a child of the syscon 
-node. How should we handle the change? Should I submit a new patch that 
-applies on top of this one or will you drop this patch and I should send 
-a new one to take it's place?
+> On 19/10/16 02:08, Nishanth Menon wrote:
+>> Version 4 of the series is basically a rebase to v4.9-rc1, no functional
+>> changes.
+>
+> Any final comments on this series, or shall I send a pull-req forward?
+> Very minimal changes compared to v3 so should be good to go imo.
 
-Assuming that you agree that this is better:
+Not a comment on the series, but a question on TI-SCI.
 
-	cfgchip: cfgchip at 1417c {
-		compatible = "ti,da830-cfgchip", "syscon", "simple-mfd";
-		reg = <0x1417c 0x14>;
+Will the uC firmware be open like it was on AM335x?
 
-		usb_phy: usb-phy {
-			compatible = "ti,da830-usb-phy";
-			#phy-cells = <1>;
-			status = "disabled";
-		};
-	};
-
-Since the phy consists entirely as registers in the syscon device, we 
-should make it a child of the syscon device instead of a child of the 
-soc node.
+Kevin
