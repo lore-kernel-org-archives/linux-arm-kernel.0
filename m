@@ -1,51 +1,28 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 27 Oct 2016 14:11:43 -0300
-Subject: [PATCH 3/3] ARM: dts: exynos: Document eMMC/SD/SDIO devices in
- Exynos5800 Peach Pi board
-In-Reply-To: <1477588303-13681-1-git-send-email-javier@osg.samsung.com>
-References: <1477588303-13681-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1477588303-13681-3-git-send-email-javier@osg.samsung.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 27 Oct 2016 19:16:34 +0200
+Subject: [linux-sunxi] [PATCH v5 2/7] ASoC: sunxi: Add a simple HDMI CODEC
+In-Reply-To: <CAGb2v67cE8v3=XtTzDBst2D2U6wM8pffQYK9nEok+j4xnPT39A@mail.gmail.com>
+References: <cover.1477142934.git.moinejf@free.fr>
+ <5cb540f20f64d28bd7dee82a0e14ee5209631979.1477142934.git.moinejf@free.fr>
+ <CAGb2v67cE8v3=XtTzDBst2D2U6wM8pffQYK9nEok+j4xnPT39A@mail.gmail.com>
+Message-ID: <20161027191634.f2fa6478cd07d84a60274339@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a cognitive load to figure out which mmc device nodes corresponds
-to the eMMC flash, uSD card and WiFI SDIO module on the Peach Pi board.
+On Fri, 28 Oct 2016 00:54:34 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-So it's better to have comments in the DTS to make this more clear.
+> There's already a driver for basically the same thing:
+> 
+>     sound/soc/codec/hdmi-codec.c
+> 
+> You use it by registering a sub-device from your hdmi driver, with the
+> proper platform_data and callbacks. Grep for HDMI_CODEC_DRV_NAME for
+> platforms already using it.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+I know that for a long time, and I will not use it on any account: it is
+a gasworks!
 
- arch/arm/boot/dts/exynos5800-peach-pi.dts | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index 01f466816fea..f9ff7f07ae0c 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -665,6 +665,7 @@
- 	status = "okay";
- };
- 
-+/* eMMC flash */
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
-@@ -683,6 +684,7 @@
- 	bus-width = <8>;
- };
- 
-+/* WiFi SDIO module */
- &mmc_1 {
- 	status = "okay";
- 	num-slots = <1>;
-@@ -702,6 +704,7 @@
- 	vqmmc-supply = <&buck10_reg>;
- };
- 
-+/* uSD card */
- &mmc_2 {
- 	status = "okay";
- 	num-slots = <1>;
 -- 
-2.7.4
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
