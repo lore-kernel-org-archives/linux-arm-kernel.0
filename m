@@ -1,67 +1,119 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 27 Oct 2016 11:51:26 +0100
-Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-In-Reply-To: <20161027100428.GA17829@cbox>
-References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
- <20161027091906.GA14734@cbox>
- <7541af85-05c4-25f9-2fa8-2eb7a0afbe84@arm.com>
- <20161027100428.GA17829@cbox>
-Message-ID: <20161027104925.GC27135@leverpostej>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Thu, 27 Oct 2016 11:34:06 +0200
+Subject: [PATCH v3 3/4] usb: musb: da8xx: Add DT support for the DA8xx driver
+In-Reply-To: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
+References: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
+Message-ID: <1477560847-8929-4-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+From: Petr Kulhavy <petr@barix.com>
 
-On Thu, Oct 27, 2016 at 12:04:28PM +0200, Christoffer Dall wrote:
-> On Thu, Oct 27, 2016 at 10:49:00AM +0100, Marc Zyngier wrote:
-> > The guest wouldn't have to do any invalidation at all on real HW,
-> > because the TLBs are strictly private to a physical CPU (only the
-> > invalidation can be broadcast to the Inner Shareable domain). But when
-> > we multiplex two vcpus on the same physical CPU, we break the private
-> > semantics, and a vcpu could hit in the TLB entries populated by the
-> > another one.
-> 
-> Such a guest would be using a mapping of the same VA with the same ASID
-> on two separate CPUs, each pointing to a separate PA.  If it ever were
-> to, say, migrate a task, it would have to do invalidations then.  Right?
+This adds DT support for TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver
 
-An OS (not Linux) could use a different ASID space per-cpu.
+Signed-off-by: Petr Kulhavy <petr@barix.com>
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Tested-by: David Lechner <david@lechnology.com>
+---
+ drivers/usb/musb/da8xx.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-e.g. with two single-threaded tasks A and B, you could have ASIDS:
-
-	cpu0	cpu1
-A	0	1
-B	1	0
-
-... and this would not be a problem, so long as when mappings changed
-maintenance were performed appropriately (e.g. perhaps it uses IPIs to
-trigger the relevant local TLB invlidation, rather than using broadcast
-ops).
-
-> Does Linux or other guests actually do this?
-
-Linux currently doesn't use ASIDs that way, but does use global mappings
-in a potentially-confliciting way in the cold-return paths (hotplug-on
-and return from idle). With two vCPUs, you could have a sequence like:
-
-	cpu0				cpu1
-	Task with ASID x started
-					hotplug on
-					install global TTBR0 mapping
-					global entry allocated into TLB
-	Task hits cpu1's global entry
-
-... which cannot happen bare-metal, and there's no point at which the
-guest can perform suitable maintenance.
-
-> Another fix would be to allocate a VMID per VCPU I suppose, just to
-> introduce a terrible TLB hit ratio :)
-
-That would break broadcast invalidation within the guest, no?
-
-... unless you also trapped all TLB maintenance, and did the IPI-based
-broadcast in SW.
-
-Thanks,
-Mark.
+diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+index 210b7e4..51ae3b6 100644
+--- a/drivers/usb/musb/da8xx.c
++++ b/drivers/usb/musb/da8xx.c
+@@ -6,6 +6,9 @@
+  * Based on the DaVinci "glue layer" code.
+  * Copyright (C) 2005-2006 by Texas Instruments
+  *
++ * DT support
++ * Copyright (c) 2016 Petr Kulhavy <petr@barix.com>
++ *
+  * This file is part of the Inventra Controller Driver for Linux.
+  *
+  * The Inventra Controller Driver for Linux is free software; you
+@@ -433,6 +436,21 @@ static int da8xx_musb_exit(struct musb *musb)
+ 	return 0;
+ }
+ 
++static inline u8 get_vbus_power(struct device *dev)
++{
++	struct regulator *vbus_supply;
++	int current_uA;
++
++	vbus_supply = regulator_get_optional(dev, "vbus");
++	if (IS_ERR(vbus_supply))
++		return 255;
++	current_uA = regulator_get_current_limit(vbus_supply);
++	regulator_put(vbus_supply);
++	if (current_uA <= 0 || current_uA > 510000)
++		return 255;
++	return current_uA / 1000 / 2;
++}
++
+ static const struct musb_platform_ops da8xx_ops = {
+ 	.quirks		= MUSB_DMA_CPPI | MUSB_INDEXED_EP,
+ 	.init		= da8xx_musb_init,
+@@ -458,6 +476,12 @@ static const struct platform_device_info da8xx_dev_info = {
+ 	.dma_mask	= DMA_BIT_MASK(32),
+ };
+ 
++static const struct musb_hdrc_config da8xx_config = {
++	.ram_bits = 10,
++	.num_eps = 5,
++	.multipoint = 1,
++};
++
+ static int da8xx_probe(struct platform_device *pdev)
+ {
+ 	struct resource musb_resources[2];
+@@ -465,6 +489,7 @@ static int da8xx_probe(struct platform_device *pdev)
+ 	struct da8xx_glue		*glue;
+ 	struct platform_device_info	pinfo;
+ 	struct clk			*clk;
++	struct device_node		*np = pdev->dev.of_node;
+ 	int				ret;
+ 
+ 	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+@@ -486,6 +511,16 @@ static int da8xx_probe(struct platform_device *pdev)
+ 	glue->dev			= &pdev->dev;
+ 	glue->clk			= clk;
+ 
++	if (IS_ENABLED(CONFIG_OF) && np) {
++		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++
++		pdata->config	= &da8xx_config;
++		pdata->mode	= musb_get_mode(&pdev->dev);
++		pdata->power	= get_vbus_power(&pdev->dev);
++	}
++
+ 	pdata->platform_ops		= &da8xx_ops;
+ 
+ 	glue->usb_phy = usb_phy_generic_register();
+@@ -536,11 +571,22 @@ static int da8xx_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id da8xx_id_table[] = {
++	{
++		.compatible = "ti,da830-musb",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, da8xx_id_table);
++#endif
++
+ static struct platform_driver da8xx_driver = {
+ 	.probe		= da8xx_probe,
+ 	.remove		= da8xx_remove,
+ 	.driver		= {
+ 		.name	= "musb-da8xx",
++		.of_match_table = of_match_ptr(da8xx_id_table),
+ 	},
+ };
+ 
+-- 
+2.7.3
