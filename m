@@ -1,61 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Oct 2016 23:47:12 +0100
-Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
-In-Reply-To: <20161027212727.leqg3gvwhd3u64er@lukather>
-References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
- <20161026085528.vjjypbfmfbhvileb@lukather>
- <20161027111419.GK25322@sirena.org.uk>
- <20161027212727.leqg3gvwhd3u64er@lukather>
-Message-ID: <20161027224712.GY25322@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 28 Oct 2016 01:13:31 +0200
+Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
+ platforms
+In-Reply-To: <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
+References: <20161027160406.25738-1-richard.genoud@gmail.com>
+ <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
+Message-ID: <20161027231331.gngekbg22wfvnolr@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 11:27:27PM +0200, Maxime Ripard wrote:
-> On Thu, Oct 27, 2016 at 12:14:19PM +0100, Mark Brown wrote:
+On 27/10/2016 at 20:02:29 +0200, Uwe Kleine-K?nig wrote :
+> Hello Richard,
+> 
+> On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
+> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> > index fd8aa1f4ba78..168b10cad47b 100644
+> > --- a/drivers/tty/serial/atmel_serial.c
+> > +++ b/drivers/tty/serial/atmel_serial.c
+> > @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+> >  		mode |= ATMEL_US_USMODE_RS485;
+> >  	} else if (termios->c_cflag & CRTSCTS) {
+> >  		/* RS232 with hardware handshake (RTS/CTS) */
+> > -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+> > -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+> > -			termios->c_cflag &= ~CRTSCTS;
+> > -		} else {
+> > +		if (atmel_use_fifo(port) &&
+> > +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
+> > +			/*
+> > +			 * with ATMEL_US_USMODE_HWHS set, the controller will
+> > +			 * be able to drive the RTS pin high/low when the RX
+> > +			 * FIFO is above RXFTHRES/below RXFTHRES2.
+> > +			 * It will also disable the transmitter when the CTS
+> > +			 * pin is high.
+> > +			 * This mode is not activated if CTS pin is a GPIO
+> > +			 * because in this case, the transmitter is always
+> > +			 * disabled (there must be an internal pull-up
+> > +			 * responsible for this behaviour).
+> > +			 * If the RTS pin is a GPIO, the controller won't be
+> > +			 * able to drive it according to the FIFO thresholds,
+> > +			 * but it will be handled by the driver.
+> > +			 */
+> >  			mode |= ATMEL_US_USMODE_HWHS;
+> 
+> You use
+> 
+> 	!mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
+> 
+> as indicator that the cts mode of the respective pin is used. Is this
+> reliable? (It's not if there are machines that don't use CTS, neither as
+> gpio nor using the hardware function.) Maybe this needs a dt property to
+> indicate that there is no (hw)handshaking available?
+> 
 
-> > but since I'm not turning up anything with this subject line I've no
-> > idea what that might have been (and that's very concerning in itself
-> > given that this is apparently v7...).
+We had a call today were we agreed that this should be added in a future
+patch. Let's fix the regression for now.
 
-> v4 was here: https://patchwork.kernel.org/patch/3893371/
-> v5: https://patchwork.kernel.org/patch/5455381/
-> v6: https://patchwork.kernel.org/patch/6975871/
 
-> So basically, I really have no idea why, but it really seems like it
-> was just falling through the cracks, repeatedly (I'm not puting the
-> blame on anyone though, it just happened). Maybe it was just because
-> of the lack of comments :)
-
-Oh, those subject lines were all starting ARM: rather than spi: -
-there's a good chance I didn't look at the patches if I was busy
-thinking they were changes for arch/arm rather than the SPI driver.
-
-> > I'm also concerned that there isn't a version of this for sun6i,
-> > it's going to make all the cut'n'pasting between the two drivers
-> > harder if we make changes in one and not the other.
-
-> I think I'll give reg_field a shot though, and try to merge the sun6i
-> driver into this one and see the results. If it can help your
-> decision.
-
-It would definitely be nice given the level of duplication.
-
-> > If the concern from the previous reviews to do with not using DMA is
-> > there some reason it's hard to do DMA?
-
-> I think just like Alexandru that it is orthogonal. But to really
-> answer, no, it's not difficult. There's just been some fundamental
-> disagreement on whether DMA was supposed to be optional or not that
-> stalled everything I guess.
-
-Oh, I seem to remember some patches adding DMA support that were doing
-some strange special snowflake thing with ignoring errors now that I
-think about it but that's not this one...  why did nobody ever follow up
-on those?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/f8c15ff9/attachment.sig>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
