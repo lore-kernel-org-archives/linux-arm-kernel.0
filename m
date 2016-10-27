@@ -1,94 +1,99 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Oct 2016 17:27:09 +0100
-Subject: [PATCH v3 1/3] powerpc/reloc32: fix corrupted modversion CRCs
+Date: Thu, 27 Oct 2016 17:27:10 +0100
+Subject: [PATCH v3 2/3] powerpc/reloc64: add support for 32-bit CRC
+ pseudo-symbols
 In-Reply-To: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1477585631-18574-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1477585631-18574-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix causes
-perf issues") fixed an issue with relocatable PIE kernels in a way that
-essentially reintroduced the issue again for 32-bit builds.
+In preparation of modifying the core modversions code to emit the CRCs
+as 32-bit quantities, ensure that 64-bit PowerPC will be able to deal
+with this when CONFIG_RELOCATABLE=y, in which case the CRCs will be
+emitted into the final ELF binary as R_PPC64_ADDR32 relocations.
 
-Since the chosen approach does is not applicable to 32-bit, fix the
-issue by updating the runtime relocation routine to ignore the load
-offset for the interval [__start___kcrctab, __stop___kcrctab_gpl_future),
-which is where the CRCs reside. This ensures that the values of the CRC
-pseudo-symbols are no longer made dependent on the runtime load offset.
+Since 32-bit relocations cannot be used to relocate memory addresses on
+64-bit architectures, and since the CRC pseudo-symbol references are
+emitted as anonymous relocations (i.e., against the NULL symbol in the
+.dynsym section) with the final value recorded in the addend (*), we
+can disregard any relocations where the symbol index != 0.
+
+* Note that unsatisfied CRC pseudo-symbol references are emitted as
+  R_PPC64_ADDR32 relocations against named symbols that are typed as
+  weak undefined in the .dynsym symbol table. These can simply be
+  ignored (as before), considering that zero CRCs are interpreted as
+  missing, and the module code deals with that accordingly.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/powerpc/kernel/reloc_32.S | 36 +++++++++++++++++---
- 1 file changed, 32 insertions(+), 4 deletions(-)
+ arch/powerpc/kernel/reloc_64.S | 22 ++++++++++++++++----
+ arch/powerpc/relocs_check.sh   |  3 ++-
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/powerpc/kernel/reloc_32.S b/arch/powerpc/kernel/reloc_32.S
-index f366fedb0872..150686b9febb 100644
---- a/arch/powerpc/kernel/reloc_32.S
-+++ b/arch/powerpc/kernel/reloc_32.S
-@@ -87,12 +87,12 @@ eodyn:				/* End of Dyn Table scan */
- 	 * Work out the current offset from the link time address of .rela
- 	 * section.
- 	 *  cur_offset[r7] = rela.run[r9] - rela.link [r7]
--	 *  _stext.link[r12] = _stext.run[r10] - cur_offset[r7]
--	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r12]
-+	 *  _stext.link[r11] = _stext.run[r10] - cur_offset[r7]
-+	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r11]
- 	 */
- 	subf	r7, r7, r9	/* cur_offset */
--	subf	r12, r7, r10
--	subf	r3, r12, r3	/* final_offset */
-+	subf	r11, r7, r10
-+	subf	r3, r11, r3	/* final_offset */
+diff --git a/arch/powerpc/kernel/reloc_64.S b/arch/powerpc/kernel/reloc_64.S
+index d88736fbece6..7927e00be746 100644
+--- a/arch/powerpc/kernel/reloc_64.S
++++ b/arch/powerpc/kernel/reloc_64.S
+@@ -14,6 +14,7 @@
+ RELA = 7
+ RELACOUNT = 0x6ffffff9
+ R_PPC64_RELATIVE = 22
++R_PPC64_ADDR32 = 1
  
- 	subf	r8, r6, r8	/* relaz -= relaent */
+ /*
+  * r3 = desired final address of kernel
+@@ -66,10 +67,10 @@ _GLOBAL(relocate)
+ 
  	/*
-@@ -101,6 +101,21 @@ eodyn:				/* End of Dyn Table scan */
- 	 * r13	- points to the symbol table
+ 	 * Run through the list of relocations and process the
+-	 * R_PPC64_RELATIVE ones.
++	 * R_PPC64_RELATIVE and R_PPC64_ADDR32 ones.
  	 */
- 
-+#ifdef CONFIG_MODVERSIONS
+ 	mtctr	r8
+-5:	ld	r0,8(9)		/* ELF64_R_TYPE(reloc->r_info) */
++5:	ld	r0,8(9)		/* reloc->r_info (type *and* symbol index) */
+ 	cmpdi	r0,R_PPC64_RELATIVE
+ 	bne	6f
+ 	ld	r6,0(r9)	/* reloc->r_offset */
+@@ -77,9 +78,22 @@ _GLOBAL(relocate)
+ 	add	r0,r0,r3
+ 	stdx	r0,r7,r6
+ 	addi	r9,r9,24
+-	bdnz	5b
++	b	7f
++
 +	/*
-+	 * Treat R_PPC_RELATIVE relocations differently when they target the
-+	 * interval [__start___kcrctab, __stop___kcrctab_gpl_future): in this
-+	 * case, the relocated quantities are CRC pseudo-symbols, which should
-+	 * be preserved as-is, rather than be modified to take the runtime
-+	 * offset into account.
++	 * CRCs of exported symbols are emitted as 32-bit relocations against
++	 * the NULL .dynsym entry, with the CRC value recorded in the addend.
 +	 */
-+	lwz	r10, (p_kcrc_start - 0b)(r12)
-+	lwz	r11, (p_kcrc_stop - 0b)(r12)
-+	subf	r12, r7, r12			/* link time addr of 0b */
-+	add	r10, r10, r12
-+	add	r11, r11, r12
-+#endif
++6:	cmpdi	r0,R_PPC64_ADDR32
++	bne	7f
++	ld	r6,0(r9)	/* reloc->r_offset */
++	ld	r0,16(r9)	/* reloc->r_addend */
++	stwx	r0,r7,r6
++	addi	r9,r9,24
 +
- 	/*
- 	 * Check if we have a relocation based on symbol
- 	 * r5 will hold the value of the symbol.
-@@ -135,7 +150,15 @@ get_type:
- 	bne	hi16
- 	lwz	r4, 0(r9)	/* r_offset */
- 	lwz	r0, 8(r9)	/* r_addend */
-+#ifdef CONFIG_MODVERSIONS
-+	cmplw	r4, r10
-+	blt	do_add
-+	cmplw	r4, r11
-+	blt	skip_add
-+do_add:
-+#endif
- 	add	r0, r0, r3	/* final addend */
-+skip_add:
- 	stwx	r0, r4, r7	/* memory[r4+r7]) = (u32)r0 */
- 	b	nxtrela		/* continue */
++7:	bdnz	5b
++	blr
  
-@@ -207,3 +230,8 @@ p_dyn:		.long	__dynamic_start - 0b
- p_rela:		.long	__rela_dyn_start - 0b
- p_sym:		.long	__dynamic_symtab - 0b
- p_st:		.long	_stext - 0b
-+
-+#ifdef CONFIG_MODVERSIONS
-+p_kcrc_start:	.long	__start___kcrctab - 0b
-+p_kcrc_stop:	.long	__stop___kcrctab_gpl_future - 0b
-+#endif
+-6:	blr
+ 
+ .balign 8
+ p_dyn:	.llong	__dynamic_start - 0b
+diff --git a/arch/powerpc/relocs_check.sh b/arch/powerpc/relocs_check.sh
+index ec2d5c835170..2f510fbc87da 100755
+--- a/arch/powerpc/relocs_check.sh
++++ b/arch/powerpc/relocs_check.sh
+@@ -43,7 +43,8 @@ R_PPC_ADDR16_HA
+ R_PPC_RELATIVE
+ R_PPC_NONE' |
+ 	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+mach_' |
+-	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_'
++	grep -E -v '\<R_PPC64_ADDR64[[:space:]]+__crc_' |
++	grep -E -v '\<R_PPC64_ADDR32[[:space:]]+\*ABS\*'
+ )
+ 
+ if [ -z "$bad_relocs" ]; then
 -- 
 2.7.4
