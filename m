@@ -1,259 +1,198 @@
-From: bruherrera@gmail.com (Bruno Herrera)
-Date: Thu, 27 Oct 2016 10:57:02 -0200
-Subject: [PATCH] ARM: DT: stm32: move dma translation to board files
-In-Reply-To: <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
-References: <CAF3+Tqd2MGmz+8XhLXhaZiEc78QOwHSpVrQA65-p1AcfT+_xgg@mail.gmail.com>
- <404315f0-fc9e-93e2-54df-f85e484d9389@st.com>
- <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
- <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
-Message-ID: <CAF3+TqcxVj9f7kcSQTKDercVfvDdLzAXGpUU1oAxeNBFZx73nQ@mail.gmail.com>
+From: phh@phh.me (Pierre-Hugues Husson)
+Date: Thu, 27 Oct 2016 14:57:25 +0200
+Subject: Add Allwinner Q8 tablets hardware manager
+In-Reply-To: <99dde1e0-26f0-cc7b-36bf-1181c47296f9@redhat.com>
+References: <20161014075337.10452-1-hdegoede@redhat.com>
+ <20161024173900.GP15620@leverpostej>
+ <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
+ <CAJ-oXjQbOkrkNToEXYmPUZOgYBGbxQREZ4NL4bMcZmG=KP2vQQ@mail.gmail.com>
+ <99dde1e0-26f0-cc7b-36bf-1181c47296f9@redhat.com>
+Message-ID: <CAJ-oXjTfRDvSKs9zZBxt1V2MR5C+XnsqfZBRTWwRrJXx-_7r=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+2016-10-27 11:14 GMT+02:00 Hans de Goede <hdegoede@redhat.com>:
+> In my experience with these cheap boards, there is a mix of auto-probing +
+> device / revision specific os-image modifications. I keep coming back to
+> the touchscreen controller firmware (but also the orientation), for the
+> gsl1680 controller I need at least 2 different firmware files (per gsl1680
+> revision) to make all q8 tablets I have working. This is simply not solved
+> by the vendor android code, they just shove the right firmware into the
+> os-image. Likewise for the touchscreen orientation (x-mirored, y-mirored,
+> etc) too is just a hard-coded setting in the os-image.
+Reading your patch, it looks like to handle the two different firmware
+files, you're simply adding a command-line switch, there is no
+detection involved.
+Am I understanding correctly?
+If this is the case, two things:
+1. I'm not too sure having the user choose this via cmdline is the
+right way. I think I'd rather have it set by userspace. (though that's
+not a strong opinion).
+Or if cmdline is being changed... how about having DTS (or just an
+overlay on top of it) being changed instead?
 
-On Thu, Oct 27, 2016 at 10:21 AM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Hi Bruno,
->
->
-> On 10/27/2016 12:43 PM, Bruno Herrera wrote:
->>
->> Hi Alex,
->>
->> On Wed, Oct 26, 2016 at 7:09 AM, Alexandre Torgue
->> <alexandre.torgue@st.com> wrote:
->>>
->>> Hi Bruno,
->>>
->>> On 10/25/2016 11:06 PM, Bruno Herrera wrote:
->>>>
->>>>
->>>> Hi Alexandre,
->>>>
->>>>>
->>>>> stm32f469-disco and stm32f429-eval boards use SDRAM start address
->>>>> remapping
->>>>> (to @0) to boost performances. A DMA translation through "dma-ranges"
->>>>> property was needed for other masters than the M4 CPU.
->>>>> stm32f429-disco doesn't use remapping so doesn't need this DMA
->>>>> translation.
->>>>> This patches moves this DMA translation definition from stm32f429 soc
->>>>> file
->>>>> to board files.
->>>>>
->>>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>>>
->>>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>>>> index 13c7cd2..a763c15 100644
->>>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>>>> @@ -82,6 +82,10 @@
->>>>>                 };
->>>>>         };
->>>>>
->>>>> +       soc {
->>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>>> +       };
->>>>> +
->>>>>         usbotg_hs_phy: usbphy {
->>>>>                 #phy-cells = <0>;
->>>>>                 compatible = "usb-nop-xceiv";
->>>>
->>>>
->>>>
->>>> Shouldn't also the peripheral dma-ranges property move to board specific
->>>> too?
->>>> I  had this patch for while but I didn't had the time to submit:
->>>
->>>
->>>
->>> Well spot I forgot it. Actually, discussing with Arnd ysterday on IIRC,
->>> empty dma-ranges is not needed. Can you test on your side by removing
->>> dma-ranges in usb node please ?
->>
->> Unfortunately will take a time for me to set up this environment on
->> the STM32F4-EVAL board.
->> And on the discovery boards we dont have this scenario. That was the
->> main reason I did not submit the patch right away.
->> My conclusion and I might be wrong but is based on the my tests with
->> SDIO device at STM32F469I-DISCO board.
->>
->> I started this issue as discussion at ST Forum but Maxime gave me the
->> hint.
->>
->>
->> https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44
->>
->>> I will push a v2 by removing empty dma-ranges if tests are ok in your
->>> side.
->>
->>
->> From my understating/conclusion is: when empty property(dma-ranges) is
->> the device node, the mapping will be taken in consideration when using
->> DMA otherwise the mapping is ignored.
->> And in the SDIO case it is needed for DEV->MEM(SDRAM) and
->> MEM(SDRAM)->DEV. If it is not the case for the devices in question so
->> I suppose it can work without the property.
->
->
-> For sure translation has to be done but I'm not sure that an empty
-> "dma-ranges" is needed in device node to activate it. For Ethernet empty
-> "dma-ranges" is not needed. I will try with usb.
+2. This could still be declared by DTS. For instance, assuming your
+i2c-probe-stop-at-first-match:
+&i2c0 {
+        touchscreen1: gsl1680 at 40 {
+                reg = <0x40>;
+                compatible = "silead,gsl1680";
+                enable-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+                touchscreen-size = <1024 600>;
+                touchscreen-fw = "gsl1680-a082-q8-700.fw";
+                filter-names = "touchscreen_variant";
+                filter-0 = "none", "gsl1680-a082-q8-700";
+                id = <0xa0820000>;
+                status = "disabled";
+        };
+        touchscreen2: gsl1680 at 40 {
+                reg = <0x40>;
+                compatible = "silead,gsl1680";
+                enable-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+                touchscreen-size = <480 800>;
+                touchscreen-fw = "gsl1680-a082-q8-a70.fw";
+                filter-names = "touchscreen_variant";
+                filter-0 = "gsl1680-a082-q8-a70";
+                id = <0xa0820000>;
+               status = "disabled";
+        };
+        touchscreen2: gsl1680 at 40 {
+                reg = <0x40>;
+                compatible = "silead,gsl1680";
+                enable-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+                touchscreen-size = <960 640>;
+                touchscreen-fw = "gsl1680-b482-q8-d702.fw";
+                filter-names = "touchscreen_variant";
+                filter-0 = "gsl1680-b482-q8-d702";
+                id = <0xb4820000>;
+               status = "disabled";
+        };
+        i2c-probe-stop-at-first-match = <&touchscreen1>,
+<&touchscreen2>, <&touchscreen3>;
+}
 
-In the case of SDIO it is needed. As example this is my working SDIO node:
+With "none" value being the value when the "touchscreen_variant"
+option is not defined in cmdline.
 
-sdio: sdio at 40012c00 {
-compatible = "arm,pl18x", "arm,primecell";
-arm,primecell-periphid = <0x00480181>;
-reg = <0x40012c00 0x400>;
-dmas =  <&dma2 6 4 0x10400 0x3>, /* Logical - DevToMem */
-<&dma2 3 4 0x10400 0x3>; /* Logical - MemToDev */
-dma-names = "rx", "tx";
-clocks = <&rcc 0 171>;
-clock-names = "apb_pclk";
-interrupts = <49>;
-status = "disabled";
+Please note that I'm not too sure whether SILEAD_REG_ID represents an
+OTP which can be changed by OEM, or if it's more of a hardware
+revision. Depending on this, this would either fit into a id =
+<0xa0820000> DTS line, or a compatible = "silead,gsl1680_a082",
+"silead,gsl1680"; DTS line.
+
+> Sofar I've only seen this with one type of touchscreen so an easy cop-out
+> would be to add an "optional-vddio-supply" to the the bindings for the
+> specific touchscreen use and put all the necessary logic in the driver.
+>
+> This does require propagating the learned need for the regulator
+> from the drivers detect() callback to probe() or alternatively I'm
+> thinking we should just use probe() instead of detect()to begin with,
+> that will save a lot of duplication with things
+> like code for enable gpio-s and regulators.
+>
+> So assuming we go for the cop-out option for 3. (I'm ok with that),
+> this would be a pretty clean solution adding just the 2 new:
+> i2c-probe-stop-at-first-match and i2c-probe-all properties to
+> the i2c-bus bindings. One problem here is that we may want to have
+> multiple i2c-probe-stop-at-first-match phandle lists on a single bus
+> (e.g. try 3 touchscreens + 6 accelerometers on the same bus, stop at
+> first touchscreen / first accelerometer), anyone have any ideas for
+> that?
+How about something like:
+
+&i2c1 {
+    touchscreen1....
+    touchscreen2....
+    touchscreen3....
+    accelerometer1....
+    accelerometer2....
+    accelerometer3....
+    accelerometer4....
+
+    select-one {
+       compatible = "i2c-select;
+       group-names = "touchscreen", "accelerometer";
+       group-0 = <&touchscreen1>, <&touchscreen2>, <&touchscreen3>;
+       group-1 = <&accelerometer1>, <&accelerometer2>,
+<&accelerometer3>, <&accelerometer4>;
+    };
 };
 
-&sdio {
-status = "okay";
-vmmc-supply = <&wlan_en>;
-bus-width = <4>;
-max-frequency = <24000000>;
-pinctrl-names = "default";
-pinctrl-0 = <&sdio_pins>;
-ti,non-removable;
-ti,needs-special-hs-handling;
-dma-ranges;
-cap-power-off-card;
-keep-power-in-suspend;
-
-#address-cells = <1>;
-#size-cells = <0>;
-wlcore: wlcore at 0 {
-compatible = "ti,wl1835";
-reg = <2>;
-interrupt-parent = <&gpioa>;
-interrupts = <8 IRQ_TYPE_EDGE_RISING>;
-};
-};
-
->
-> alex
->
->
+>> When it comes to detection, I've witnessed various things.
+>> It can be kernel-side or bootloader-side "global setting" reading (like an
+>> ADC/resistor value, or an OTP), it can be bootloader doing the
+>> "brute-force", or it can be the kernel doing all the probes.
 >>
->>>
->>> Thanks in advance
->>> Alex
->>>
->>>
->>>>
->>>> Author: Bruno Herrera <bruherrera@gmail.com>
->>>> Date:   Sun Oct 16 14:50:00 2016 -0200
->>>>
->>>>     ARM: DT: STM32: Use dma-ranges property per board not at dtsi file
->>>>
->>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>>> index 6bfc595..2a22a82 100644
->>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>>> @@ -52,6 +52,10 @@
->>>>         model = "STMicroelectronics STM32429i-EVAL board";
->>>>         compatible = "st,stm32429i-eval", "st,stm32f429";
->>>>
->>>> +       soc {
->>>> +               dma-ranges = <0xC0000000 0x0 0x10000000>;
->>>> +       };
->>>> +
->>>>         chosen {
->>>>                 bootargs = "root=/dev/ram rdinit=/linuxrc";
->>>>                 stdout-path = "serial0:115200n8";
->>>> @@ -96,6 +100,7 @@
->>>>
->>>>  &ethernet0 {
->>>>         status = "okay";
->>>> +       dma-ranges;
->>>>         pinctrl-0       = <&ethernet0_mii>;
->>>>         pinctrl-names   = "default";
->>>>         phy-mode        = "mii-id";
->>>> @@ -116,6 +121,7 @@
->>>>  };
->>>>
->>>>  &usbotg_hs {
->>>> +       dma-ranges;
->>>>         dr_mode = "host";
->>>>         phys = <&usbotg_hs_phy>;
->>>>         phy-names = "usb2-phy";
->>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>>> b/arch/arm/boot/dts/stm32f429.dtsi
->>>> index 7d624a2..697a133 100644
->>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>>> @@ -59,7 +59,6 @@
->>>>         };
->>>>
->>>>         soc {
->>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>>
->>>>                 timer2: timer at 40000000 {
->>>>                         compatible = "st,stm32-timer";
->>>> @@ -472,13 +471,11 @@
->>>>                         st,syscon = <&syscfg 0x4>;
->>>>                         snps,pbl = <8>;
->>>>                         snps,mixed-burst;
->>>> -                       dma-ranges;
->>>>                         status = "disabled";
->>>>                 };
->>>>
->>>>                 usbotg_hs: usb at 40040000 {
->>>>                         compatible = "snps,dwc2";
->>>> -                       dma-ranges;
->>>>                         reg = <0x40040000 0x40000>;
->>>>                         interrupts = <77>;
->>>>                         clocks = <&rcc 0 29>;
->>>>
->>>>
->>>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>>>> b/arch/arm/boot/dts/stm32f429.dtsi
->>>>> index 0596d60..3a1cfdd 100644
->>>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>>>> @@ -59,8 +59,6 @@
->>>>>         };
->>>>>
->>>>>         soc {
->>>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>>> -
->>>>>                 timer2: timer at 40000000 {
->>>>>                         compatible = "st,stm32-timer";
->>>>>                         reg = <0x40000000 0x400>;
->>>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
->>>>> b/arch/arm/boot/dts/stm32f469-disco.dts
->>>>> index 9e73656..c2213c0 100644
->>>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
->>>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
->>>>> @@ -64,6 +64,10 @@
->>>>>         aliases {
->>>>>                 serial0 = &usart3;
->>>>>         };
->>>>> +
->>>>> +       soc {
->>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>>> +       };
->>>>>  };
->>>>>
->>>>>  &clk_hse {
->>>>> --
->>>>
->>>>
->>>>
->>>>
->>>> Br.,
->>>> Bruno
->>>>
->>>
+>> For instance, as of today, on a Spreadtrum ODM tree, the bootloader will
+>> detect the screen by testing all knowns screens, the screen-drivers declare
+>> a get_id function, and the bootloader probes until the get_id matches the id
+>> declared by the screen driver.
+>> And then the bootloader tells the kernel, via cmdline, which screen is
+>> actually there (but auto-detection is also coded in kernel).
+>> Finally all possible sensors/touchscreen/camera are declared in DTS, and
+>> probe will filter-out N/C ones in the kernel.
+>>
+>> Now the big difference between my experience and what Hans is trying to
+>> do, is that I've always worked with devices with "safely" queriable IDs,
+>> either on i2c or dsi. I've never encountered SPI. This makes probing
+>> inherently more dangerous, but I believe the question roughly remains the
+>> same.
 >
+>
+> I'm dealing with i2c too, Mark mistakenly used SPI in his reply,
+> which I think is what got you thinking I've SPI.
+Right, so let's concentrate on reasonable bus-es first then. (I can
+think of I2C and DSI)
+
+> See above, I think that we can make this work by delegating the actual
+> detection to the driver (so each compatible can have a different detect
+> method / code).
+> So with this we can remove a big part of drivers/misc/q8-hardwaremgr.c, but
+> not all
+> of it. We still need board specific code somewhere to deal with things like
+> picking
+> the right touchscreen firmware and touchscreen orientation. This is all
+> somewhat
+> gsl1680 specific.
+> I actually have the same problem on x86 where the ACPI description of the
+> device
+> basically says: "There is a gsl1680 at this bus at this address" and does
+> not say
+> anything about firmware / orientation (again this is simply hardcoded
+> in the os-image these devices ship with).
+>
+> For x86 my plan is to have an array of configs in the driver and select the
+> right
+> one based on DMI strings, which is in essence putting board specific info in
+> the
+> driver.
+>
+> I can imagine mirroring this for ARM, and have an array of configs in the
+> driver
+> there too (for cases where cannot simply hardcode everything in dt only) and
+> have
+> some board specific code (activated by of_machine_is_compatible()) to select
+> the
+> right config.
+I do believe this can all be done in DTS, and at the moment, what
+you're describing seem to happen often enough to be worth writing
+generic code for.
+But then, I can't really tell which makes the most sense between
+source-based and devicetree-based.
+I prefer doing it in device-tree, since it means that any OEM can have
+his device supported by only providing DTB, and won't need to provide
+kernel patches.
+
+> 2) miscellaneous extra config on top of figuring out which ICs are
+> connected,
+> basically the kind of stuff many vendors simply hard-code in their device
+> specific os-image. This one is much more difficult to deal with and I think
+> we need to figure this out on a case by case basis. This will require board
+> specific code (just like the kernel has tons of DMI string activated board
+> specific code on x86) and what is the best code for this place to live will
+> be a case by case thing too.
+
+With things like mount-matrix devicetree property, the goal is to have
+such informations in the DTS.
+I'm not seeing every cases should be handled in DTS, but ATM I see no
+good reason.
