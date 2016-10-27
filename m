@@ -1,83 +1,215 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 27 Oct 2016 18:12:25 +0200
-Subject: [PATCH v4 0/3] mtd: s3c2410: add device tree support
-In-Reply-To: <1477526395-13103-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1477526395-13103-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20161027181225.3d5a6f04@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 27 Oct 2016 09:15:01 -0700
+Subject: [PATCH 4/5] ARM: DRA7: PM: cpuidle MPU CSWR support
+In-Reply-To: <20161026151703.24730-5-tony@atomide.com>
+References: <20161026151703.24730-1-tony@atomide.com>
+ <20161026151703.24730-5-tony@atomide.com>
+Message-ID: <20161027161501.oehhwixykldta7hz@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Oct 2016 21:59:52 -0200
-Sergio Prado <sergio.prado@e-labworks.com> wrote:
+* Tony Lindgren <tony@atomide.com> [161026 08:18]:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Add DRA74/72 CPUIDLE support.
 
-> This series adds support for configuring Samsung's s3c2410 and
-> compatible flash memory controller via devicetree.
-> 
-> Tested on FriendlyARM mini2440, based on s3c2440 SoC.
-> 
-> Patch 3 depends on patch 1.
+And as Nishnath noted, that hardware does not support deeper
+idle states properly. So below is patches 4 and 5 updated and
+squashed together into a single patche to enable cpuidle only
+for omap5.
 
-Applied.
+Regards,
 
-Thanks,
+Tony
 
-Boris
+8< -------------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Date: Tue, 25 Oct 2016 08:33:32 -0700
+Subject: [PATCH] ARM: OMAP5: Add basic cpuidle MPU CSWR support
 
-> 
-> Changes since v3:
-> - apply the timings in the end of ->setup_data_interface so the
->   timings can be changed at runtime by the MTD core.
-> 
-> Changes since v2:
-> - conditionally assign chip->setup_data_interface to
->   s3c2410_nand_setup_data_interface if booting via device tree
-> 
-> Changes since v1:
-> - automate timing selection when booting with a device tree
-> - make s3c24XX_nand_devtype_data structs "static const"
-> - removing samsung,s3c6400-nand compatible since it is equivalent to
->   samsung,s3c2412-nand
-> 
-> Changes since initial version:
-> - patch converted to a patch series
-> - read timings from nand_sdr_timings when booting with a device tree
-> - naming improvements in the device tree binding
->   (s/nand/nand-controller/, s/_/-, s/children/child)
-> - dropped property samsung,ignore_unset_ecc
-> - remove @0 from nand device node
-> - checking pdev->dev.of_node instead of using ifdef CONFIG_OF_MTD
-> - preventing from parsing device tree properties twice
-> - increment the nand controller child node refcount, since we
->   maintain a reference to it and its name field
-> - using of_device_get_match_data() instead of of_match_device()
->   to make the code simpler
-> - remove CONFIG_MTD_NAND_S3C2410_HWECC compile option so we can
->   select ECC mode using nand-ecc-mode property in the device tree
-> 
-> Sergio Prado (3):
->   mtd: s3c2410: make ecc mode configurable via platform data
->   dt-bindings: mtd: add DT binding for s3c2410 flash controller
->   mtd: s3c2410: parse the device configuration from OF node
-> 
->  .../devicetree/bindings/mtd/samsung-s3c2410.txt    |  56 +++++
->  arch/arm/mach-s3c24xx/common-smdk.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-anubis.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-at2440evb.c             |   1 +
->  arch/arm/mach-s3c24xx/mach-bast.c                  |   1 +
->  arch/arm/mach-s3c24xx/mach-gta02.c                 |   1 +
->  arch/arm/mach-s3c24xx/mach-jive.c                  |   1 +
->  arch/arm/mach-s3c24xx/mach-mini2440.c              |   1 +
->  arch/arm/mach-s3c24xx/mach-osiris.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-qt2410.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-rx1950.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-rx3715.c                |   1 +
->  arch/arm/mach-s3c24xx/mach-vstms.c                 |   1 +
->  arch/arm/mach-s3c64xx/mach-hmt.c                   |   1 +
->  arch/arm/mach-s3c64xx/mach-mini6410.c              |   1 +
->  arch/arm/mach-s3c64xx/mach-real6410.c              |   1 +
->  drivers/mtd/nand/Kconfig                           |   9 -
->  drivers/mtd/nand/s3c2410.c                         | 277 +++++++++++++++------
->  include/linux/platform_data/mtd-nand-s3c2410.h     |   7 +-
->  19 files changed, 278 insertions(+), 86 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/samsung-s3c2410.txt
-> 
+Add OMAP5 CPUIDLE support.
+
+This patch adds MPUSS low power states in cpuidle.
+
+        C1 - CPU0 WFI + CPU1 WFI + MPU ON
+        C2 - CPU0 RET + CPU1 RET + MPU CSWR
+
+Modified from TI kernel tree commit 605967fd2205 ("ARM: DRA7: PM:
+cpuidle MPU CSWR support") except enable cpuidle for omap5 instead
+of dra7.
+
+According to Nishanth Menon <nm@ti.com>, cpuidle on dra7 is not
+supported properly in the hardware so we don't want to enable it.
+However, for omap5 this adds some nice power savings. Note that
+the TI 3.8 based tree has other cpuidle states that we may be able
+to enable later on.
+
+On omap5-uevm, the power consumption eventually settles down to about
+920mW with ehci-omap and ohci-omap3 unloaded compared to about 1.7W
+without these patches. Note that it seems to take few minutes after
+booting for the idle power to go down to 920mW from 1.3W, no idea so
+far what might be causing that.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[ j-keerthy at ti.com rework on 3.14]
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+[nm at ti.com: updates based on profiling]
+[tony at atomide.com: dropped CPUIDLE_FLAG_TIME_VALID no longer used,
+changed for omap5 only as requested by Nishanth, updated comments]
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap2/cpuidle44xx.c | 80 ++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/pm44xx.c      |  2 +-
+ 2 files changed, 80 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/cpuidle44xx.c b/arch/arm/mach-omap2/cpuidle44xx.c
+--- a/arch/arm/mach-omap2/cpuidle44xx.c
++++ b/arch/arm/mach-omap2/cpuidle44xx.c
+@@ -21,6 +21,7 @@
+ #include "common.h"
+ #include "pm.h"
+ #include "prm.h"
++#include "soc.h"
+ #include "clockdomain.h"
+ 
+ #define MAX_CPUS	2
+@@ -30,6 +31,7 @@ struct idle_statedata {
+ 	u32 cpu_state;
+ 	u32 mpu_logic_state;
+ 	u32 mpu_state;
++	u32 mpu_state_vote;
+ };
+ 
+ static struct idle_statedata omap4_idle_data[] = {
+@@ -50,12 +52,26 @@ static struct idle_statedata omap4_idle_data[] = {
+ 	},
+ };
+ 
++static struct idle_statedata omap5_idle_data[] = {
++	{
++		.cpu_state = PWRDM_POWER_ON,
++		.mpu_state = PWRDM_POWER_ON,
++		.mpu_logic_state = PWRDM_POWER_ON,
++	},
++	{
++		.cpu_state = PWRDM_POWER_RET,
++		.mpu_state = PWRDM_POWER_RET,
++		.mpu_logic_state = PWRDM_POWER_RET,
++	},
++};
++
+ static struct powerdomain *mpu_pd, *cpu_pd[MAX_CPUS];
+ static struct clockdomain *cpu_clkdm[MAX_CPUS];
+ 
+ static atomic_t abort_barrier;
+ static bool cpu_done[MAX_CPUS];
+ static struct idle_statedata *state_ptr = &omap4_idle_data[0];
++static DEFINE_RAW_SPINLOCK(mpu_lock);
+ 
+ /* Private functions */
+ 
+@@ -77,6 +93,32 @@ static int omap_enter_idle_simple(struct cpuidle_device *dev,
+ 	return index;
+ }
+ 
++static int omap_enter_idle_smp(struct cpuidle_device *dev,
++			       struct cpuidle_driver *drv,
++			       int index)
++{
++	struct idle_statedata *cx = state_ptr + index;
++	unsigned long flag;
++
++	raw_spin_lock_irqsave(&mpu_lock, flag);
++	cx->mpu_state_vote++;
++	if (cx->mpu_state_vote == num_online_cpus()) {
++		pwrdm_set_logic_retst(mpu_pd, cx->mpu_logic_state);
++		omap_set_pwrdm_state(mpu_pd, cx->mpu_state);
++	}
++	raw_spin_unlock_irqrestore(&mpu_lock, flag);
++
++	omap4_enter_lowpower(dev->cpu, cx->cpu_state);
++
++	raw_spin_lock_irqsave(&mpu_lock, flag);
++	if (cx->mpu_state_vote == num_online_cpus())
++		omap_set_pwrdm_state(mpu_pd, PWRDM_POWER_ON);
++	cx->mpu_state_vote--;
++	raw_spin_unlock_irqrestore(&mpu_lock, flag);
++
++	return index;
++}
++
+ static int omap_enter_idle_coupled(struct cpuidle_device *dev,
+ 			struct cpuidle_driver *drv,
+ 			int index)
+@@ -220,6 +262,32 @@ static struct cpuidle_driver omap4_idle_driver = {
+ 	.safe_state_index = 0,
+ };
+ 
++static struct cpuidle_driver omap5_idle_driver = {
++	.name				= "omap5_idle",
++	.owner				= THIS_MODULE,
++	.states = {
++		{
++			/* C1 - CPU0 ON + CPU1 ON + MPU ON */
++			.exit_latency = 2 + 2,
++			.target_residency = 5,
++			.enter = omap_enter_idle_simple,
++			.name = "C1",
++			.desc = "CPUx WFI, MPUSS ON"
++		},
++		{
++			/* C2 - CPU0 RET + CPU1 RET + MPU CSWR */
++			.exit_latency = 48 + 60,
++			.target_residency = 100,
++			.flags = CPUIDLE_FLAG_TIMER_STOP,
++			.enter = omap_enter_idle_smp,
++			.name = "C2",
++			.desc = "CPUx CSWR, MPUSS CSWR",
++		},
++	},
++	.state_count = ARRAY_SIZE(omap5_idle_data),
++	.safe_state_index = 0,
++};
++
+ /* Public functions */
+ 
+ /**
+@@ -230,6 +298,16 @@ static struct cpuidle_driver omap4_idle_driver = {
+  */
+ int __init omap4_idle_init(void)
+ {
++	struct cpuidle_driver *idle_driver;
++
++	if (soc_is_omap54xx()) {
++		state_ptr = &omap5_idle_data[0];
++		idle_driver = &omap5_idle_driver;
++	} else {
++		state_ptr = &omap4_idle_data[0];
++		idle_driver = &omap4_idle_driver;
++	}
++
+ 	mpu_pd = pwrdm_lookup("mpu_pwrdm");
+ 	cpu_pd[0] = pwrdm_lookup("cpu0_pwrdm");
+ 	cpu_pd[1] = pwrdm_lookup("cpu1_pwrdm");
+@@ -244,5 +322,5 @@ int __init omap4_idle_init(void)
+ 	/* Configure the broadcast timer on each cpu */
+ 	on_each_cpu(omap_setup_broadcast_timer, NULL, 1);
+ 
+-	return cpuidle_register(&omap4_idle_driver, cpu_online_mask);
++	return cpuidle_register(idle_driver, cpu_online_mask);
+ }
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -287,7 +287,7 @@ int __init omap4_pm_init(void)
+ 	/* Overwrite the default cpu_do_idle() */
+ 	arm_pm_idle = omap_default_idle;
+ 
+-	if (cpu_is_omap44xx())
++	if (cpu_is_omap44xx() || soc_is_omap54xx())
+ 		omap4_idle_init();
+ 
+ err2:
+-- 
+2.9.3
