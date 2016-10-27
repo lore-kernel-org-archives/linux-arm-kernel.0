@@ -1,41 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Oct 2016 17:01:36 +0100
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161017185801.GT25086@rric.localdomain>
-References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
- <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
- <20161006161114.GH22012@rric.localdomain>
- <20161017185801.GT25086@rric.localdomain>
-Message-ID: <20161027160136.GD24290@arm.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Thu, 27 Oct 2016 11:00:57 -0500
+Subject: [PATCHv2] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+In-Reply-To: <20161027070626.s3wwiadf2iumxe4u@pengutronix.de>
+References: <1477505112-26079-1-git-send-email-dinguyen@opensource.altera.com>
+ <20161027070626.s3wwiadf2iumxe4u@pengutronix.de>
+Message-ID: <581224B9.4010808@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+On 10/27/2016 02:06 AM, Steffen Trumtrar wrote:
+> On Wed, Oct 26, 2016 at 01:05:12PM -0500, dinguyen at opensource.altera.com wrote:
+>> From: Dinh Nguyen <dinguyen@opensource.altera.com>
+>>
+>> Enable the QSPI node and add the flash chip.
+>>
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
+>> v2: Remove partition entries for the SoCKIT
+>> ---
+>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |   21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> index 02e22f5..2ce6736 100644
+>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> @@ -175,6 +175,27 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&qspi {
+>> +	status = "okay";
+>> +
+>> +	flash: flash at 0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		compatible = "n25q256a";
+> 
+> Did you test if this works correctly? According to my datasheet (Rev. C)
+> the HPS qspi is a n25q00. The n25q256a is the other one.
+> 
 
-On Mon, Oct 17, 2016 at 08:58:01PM +0200, Robert Richter wrote:
-> Mark, Will, any opinion here?
+No, I did not test this and thanks for catching it. On my SoCKIT, I see
+a marking "25Q00AA" on the QSPI chip. So do you know if the compatible
+string should be "n25q00a" or "n25q00". I guess I can test it.
 
-Having looking at this, I'm inclined to agree with you; pfn_valid() is
-all about whether the underlying mem_map (struct page *) entry exists,
-not about whether the page is mappable or not.
-
-That said, setting the zone for pages representing NOMAP memory feels
-like a slippery slope to losing information about them being NOMAP in
-the first place and the whole problem getting out-of-hand. Whilst I'm
-happy for pfn_valid() to return true (in the sense that we're within
-bounds of mem_map etc), I'm less happy that we're also saying that the
-struct page contains useful information, such as the zone and the node
-information, which is then subsequently used by the NUMA code.
-
-On top of that, pfn_valid is used in other places as a coarse "is this
-memory?" check, and will cause things like ioremap to fail whereas it
-wouldn't at the moment. It feels to me like NOMAP memory is a new type
-of memory where there *is* a struct page, but it shouldn't be used for
-anything. I don't think pfn_valid can describe that, given the way it's
-currently used, and flipping the logic is just likely to move the problem
-elsewhere.
-
-What options do we have for fixing this in the NUMA code?
-
-Will
+Dinh
