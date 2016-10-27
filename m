@@ -1,70 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 27 Oct 2016 14:28:26 +0200
-Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-In-Reply-To: <20161027104925.GC27135@leverpostej>
-References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
- <20161027091906.GA14734@cbox>
- <7541af85-05c4-25f9-2fa8-2eb7a0afbe84@arm.com>
- <20161027100428.GA17829@cbox> <20161027104925.GC27135@leverpostej>
-Message-ID: <20161027122826.GB19614@cbox>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Thu, 27 Oct 2016 13:51:57 +0100
+Subject: [PATCH v3] drivers: psci: PSCI checker module
+In-Reply-To: <20161027091306.GA16603@red-moon>
+References: <20161020145115.6326-1-kevin.brodsky@arm.com>
+ <20161025154535.GA3107@red-moon> <20161025183436.GF3716@linux.vnet.ibm.com>
+ <20161026131752.GA15478@red-moon> <20161026151858.GQ3716@linux.vnet.ibm.com>
+ <20161026171006.GA16248@red-moon> <20161026172252.GV3716@linux.vnet.ibm.com>
+ <20161026173534.GC16248@red-moon> <20161026181148.GW3716@linux.vnet.ibm.com>
+ <20161027091306.GA16603@red-moon>
+Message-ID: <a3fd021e-1fae-08e3-994b-87efcf11b164@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 11:51:26AM +0100, Mark Rutland wrote:
-> Hi Christoffer,
-> 
-> On Thu, Oct 27, 2016 at 12:04:28PM +0200, Christoffer Dall wrote:
-> > On Thu, Oct 27, 2016 at 10:49:00AM +0100, Marc Zyngier wrote:
-> > > The guest wouldn't have to do any invalidation at all on real HW,
-> > > because the TLBs are strictly private to a physical CPU (only the
-> > > invalidation can be broadcast to the Inner Shareable domain). But when
-> > > we multiplex two vcpus on the same physical CPU, we break the private
-> > > semantics, and a vcpu could hit in the TLB entries populated by the
-> > > another one.
-> > 
-> > Such a guest would be using a mapping of the same VA with the same ASID
-> > on two separate CPUs, each pointing to a separate PA.  If it ever were
-> > to, say, migrate a task, it would have to do invalidations then.  Right?
-> 
-> An OS (not Linux) could use a different ASID space per-cpu.
-> 
-> e.g. with two single-threaded tasks A and B, you could have ASIDS:
-> 
-> 	cpu0	cpu1
-> A	0	1
-> B	1	0
-> 
-> ... and this would not be a problem, so long as when mappings changed
-> maintenance were performed appropriately (e.g. perhaps it uses IPIs to
-> trigger the relevant local TLB invlidation, rather than using broadcast
-> ops).
-> 
-> > Does Linux or other guests actually do this?
-> 
-> Linux currently doesn't use ASIDs that way, but does use global mappings
-> in a potentially-confliciting way in the cold-return paths (hotplug-on
-> and return from idle). With two vCPUs, you could have a sequence like:
-> 
-> 	cpu0				cpu1
-> 	Task with ASID x started
-> 					hotplug on
-> 					install global TTBR0 mapping
-> 					global entry allocated into TLB
-> 	Task hits cpu1's global entry
-> 
-> ... which cannot happen bare-metal, and there's no point at which the
-> guest can perform suitable maintenance.
-> 
-> > Another fix would be to allocate a VMID per VCPU I suppose, just to
-> > introduce a terrible TLB hit ratio :)
-> 
-> That would break broadcast invalidation within the guest, no?
-> 
-> ... unless you also trapped all TLB maintenance, and did the IPI-based
-> broadcast in SW.
-> 
+On 27/10/16 10:13, Lorenzo Pieralisi wrote:
+> On Wed, Oct 26, 2016 at 11:11:48AM -0700, Paul E. McKenney wrote:
+>> On Wed, Oct 26, 2016 at 06:35:34PM +0100, Lorenzo Pieralisi wrote:
+>>> On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
+>>>> On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
+>> [ . . . ]
+>>
+>>>>> Thanks a lot for your feedback, thoughts appreciated.
+>>>> Let me ask the question more directly.
+>>>>
+>>>> Why on earth are we trying to run these tests concurrently?
+>>> We must prevent that, no question about that, that's why I started
+>>> this discussion. It is not fine to enable this checker and the
+>>> RCU/LOCK torture hotplug tests at the same time.
+>>>
+>>>> After all, if we just run one at a time in isolation, there is no
+>>>> problem.
+>>> Fine by me, it was to understand if the current assumptions we made
+>>> are correct and they are definitely not. If we enable the PSCI checker
+>>> we must disable the torture rcu/lock hotplug tests either statically or
+>>> dynamically.
+>> What rcutorture, locktorture, and rcuperf do is to invoke
+>> torture_init_begin(), which returns false if one of these tests
+>> is already running.
+>>
+>> Perhaps we should extract this torture-test-exclusion and require
+>> than conflicting torture tests invoke it?
+> Yes if it can be extracted as a check (but it should also prevent the
+> torture tests from running and vice versa), either that or Kconfig
+> dependency (which we could do as a first step, waiting to add the
+> required interface to the torture test code ?).
+>
+> Thanks !
+> Lorenzo
 
-Thanks for explanations, I'm getting the full picture now.
+That sounds like a reasonable idea, but then that would mean that the PSCI checker
+would have to wait until the torture test is finished if it is already running (and
+the other way around).
 
--Christoffer
+I wasn't aware that torture tests were hotplugging CPUs. I think that the most
+sensible thing to do right now is to make CONFIG_PSCI_CHECKER depend on
+!CONFIG_TORTURE_TEST (or maybe specifically !CONFIG_RCU_TORTURE_TEST &&
+!CONFIG_LOCK_TORTURE_TEST). We can try to make them work together afterwards, but for
+the sake of getting this patch merged in a reasonable amount of time, I think we
+should just exclude the conflicting tests at the build level in this patch. I'll also
+update the comment accordingly.
+
+Thanks,
+Kevin
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
