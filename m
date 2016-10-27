@@ -1,64 +1,45 @@
-From: phh@phh.me (Pierre-Hugues Husson)
-Date: Thu, 27 Oct 2016 18:59:00 +0200
-Subject: Add Allwinner Q8 tablets hardware manager
-In-Reply-To: <9B288597-7812-459D-A5C7-B61107751DA6@konsulko.com>
-References: <20161014075337.10452-1-hdegoede@redhat.com>
- <20161024173900.GP15620@leverpostej>
- <4cfbedb2-0249-e881-3577-dda0b0d4cabe@redhat.com>
- <9B288597-7812-459D-A5C7-B61107751DA6@konsulko.com>
-Message-ID: <CAJ-oXjT=eVwEk7t5WoZAhjMhiZZkq0NN5tFLidSnUNO97D62zQ@mail.gmail.com>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Thu, 27 Oct 2016 17:10:00 +0000
+Subject: SMR masking and PCI
+Message-ID: <VI1PR0401MB26389CC8820C9654337B578E8DAA0@VI1PR0401MB2638.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-27 17:52 GMT+02:00 Pantelis Antoniou <pantelis.antoniou@konsulko.com>:
-> Yes there is no EEPROM but you might be able to map probing results to
-> a fake ?model? number.
->
-> Let me expand a bit:
->
-> Assume that you have a number of probing steps, for example A, B, C each
-> returning true or false, and C being executed only when B is ?true? you
-> could do this to generate a bit field that identifies it.
->
-> For example let?s assume that model FOO?s probing steps are
->
-> A false, B true, C false -> 010
->
-> Model?s BAR
->
-> A true, B false, C don?t care -> 10x
->
-> Mapping these to models could be
->
-> Model FOO, (010 & 111) == 010 (all three probing steps must match)
->
-> Model BAR, (10x & 110) = 100 (the first two probing steps must match)
+Hi Robin,
 
-This method looks too complex on multiple grounds.
-Assuming your method, I'm not too sure how this would actually be
-described in a DTS.
-Such probing steps should include reading/matching IDs in an EEPROM/on
-an ADC, but it should also include the result of a driver's probe.
-Also, drivers should have a way to report an ID/OTP instead of just a
-boolean.
+A question about how the SMR masking defined in the arm,smmu binding
+relates to the PCI iommu-map.
 
-As you mentioned, it is a way to distinguish models, not just a set of
-parameters.
-Does this mean that this DT would lead to loading various DT based on
-the matching model, which would look like a FIT?
-Also there is a modularity problem there. If I have phones with either
-screen A or screen B, and with either accelerometer A or accelerometer
-B, I would have to implement all four combinations.
+The #iommu-cells property defines the number of cells an "IOMMU specifier"
+takes and 2 is specified to be:
 
-I'm starting to agree with Hans, and to be able to implement
-everything he needs, would require a turing complete device-tree,
-which can include and apply device-tree overlays.
-This doesn't mean it can't be done, nor that it shouldn't be done, but
-that's a lot of work.
+   SMMUs with stream matching support and complex masters
+   may use a value of 2, where the second cell represents
+   an SMR mask to combine with the ID in the first cell.
 
-Hans' i2c-probe-stop-at-first-match does make sense for most usecases,
-but I have two problems with it:
-1. It is I2C specific (as I've mentioned earlier, I have the same
-needs with DSI panels)
-2. This looks like a temporary solution if a turing-complete solution
-is to be implemented.
+An iommu-map entry is defined as:
+
+   (rid-base,iommu,iommu-base,length)
+
+What seems to be currently missing in the iommu-map support is
+the possibility the case where #iommu-cells=<2>.
+
+In this case iommu-base which is an IOMMU specifier should
+occupy 2 cells.  For example on an ls2085a we would want:
+
+	iommu-map = <0x0   0x6 0x7 0x3ff 0x1
+		       0x100 0x6 0x8 0x3ff 0x1>;
+
+...to mask our stream IDs to 10 bits.
+
+This should work in theory and comply with the bindings, no?
+
+of_pci_map_rid() seems to have a hardcoded assumption that
+each field in the map is 4 bytes.
+
+(Also, I guess that msi-map is not affected by this since it
+is not related to the IOMMU...but we do have common code
+handling both maps.)
+
+Thanks,
+Stuart
