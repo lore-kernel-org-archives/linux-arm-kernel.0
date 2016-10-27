@@ -1,42 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Oct 2016 21:27:13 +0200
-Subject: [PATCH 7/9] Input: wm97xx: split out touchscreen registering
-In-Reply-To: <20161027090233.GF28180@localhost.localdomain> (Charles Keepax's
- message of "Thu, 27 Oct 2016 10:02:33 +0100")
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
- <1477510907-23495-8-git-send-email-robert.jarzmik@free.fr>
- <20161027090233.GF28180@localhost.localdomain>
-Message-ID: <87r3711tke.fsf@belgarion.home>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Thu, 27 Oct 2016 15:00:22 -0500
+Subject: [PATCHv2 0/4] Add Altera A10SR Status & Control Monitor
+Message-ID: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Charles Keepax <ckeepax@opensource.wolfsonmicro.com> writes:
-> On Wed, Oct 26, 2016 at 09:41:45PM +0200, Robert Jarzmik wrote:
->> diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
->> index 83cf11312fd9..50a110e2988b 100644
-> <snip>
->> +static void wm97xx_remove_battery(struct wm97xx *wm)
->> +{
->> +	platform_device_put(wm->battery_dev);
->> +}
-> <snip>
->> @@ -724,10 +757,8 @@ static int wm97xx_remove(struct device *dev)
->>  {
->>  	struct wm97xx *wm = dev_get_drvdata(dev);
->>  
->> -	platform_device_unregister(wm->battery_dev);
->> -	platform_device_unregister(wm->touch_dev);
->> -	input_unregister_device(wm->input_dev);
->> -	kfree(wm);
->> +	wm97xx_remove_battery(wm);
->
-> The commit message says this is just shifting code around but the
-> platform_device_unregister for the battery_dev seems to have
-> turned into a platform_device_put here.
-Thanks for spotting that, it's clearly a defect in the patch.
-That implies a v2 at least for this one.
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Cheers.
+This patch series adds the Altera Arria10 DevKit System Resource
+chip's Status and Control Monitor to the A10SR Multi-Function
+Device. An earlier patch added this to the hwmon class which
+wasn't the proper place so this functionality is added to the
+misc directory.
+Version 2 changes the DT names from -mon to -monitor for better
+readability and clarity and changed the previous version from
+modular to built-in.
+
+Thor Thayer (4):
+  dt-bindings: mfd: Add Altera Arria10 SR Monitor
+  misc: Add Altera Arria10 System Resource Control
+  mfd: altr-a10sr: Add Arria10 SR Monitor
+  ARM: socfpga: dts: Add Monitor to A10-SR MFD
+
+ .../devicetree/bindings/mfd/altera-a10sr.txt       |   9 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       |   4 +
+ drivers/mfd/altera-a10sr.c                         |   4 +
+ drivers/misc/Kconfig                               |   7 +
+ drivers/misc/Makefile                              |   1 +
+ drivers/misc/altera-a10sr-monitor.c                | 176 +++++++++++++++++++++
+ 7 files changed, 202 insertions(+)
+ create mode 100644 drivers/misc/altera-a10sr-monitor.c
 
 -- 
-Robert
+1.9.1
