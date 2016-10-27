@@ -1,153 +1,176 @@
 From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu, 27 Oct 2016 17:30:58 +0100
-Subject: [RFC PATCH v2 8/8] arm64: Wire up and expose the new compat vDSO
+Date: Thu, 27 Oct 2016 17:30:53 +0100
+Subject: [RFC PATCH v2 3/8] arm64: compat: Expose offset to registers in
+ sigframes
 In-Reply-To: <20161027163058.12156-1-kevin.brodsky@arm.com>
 References: <20161027163058.12156-1-kevin.brodsky@arm.com>
-Message-ID: <20161027163058.12156-9-kevin.brodsky@arm.com>
+Message-ID: <20161027163058.12156-4-kevin.brodsky@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Expose the new compat vDSO via the COMPAT_VDSO config option.
+This will be needed to provide debug information (CFI/unwind tables)
+in compat sigreturn trampolines, part of the future compat vDSO.
 
-The option is not enabled in defconfig for two reasons:
-
-* The vDSO page replaces the vector page. The vDSO provides its own
-  sigreturn trampolines, replacing those in the vector page, but the
-  kuser helpers are gone. As a result enabling the compat vDSO will
-  break userspace programs relying on the kuser helpers.
-
-* We really need a 32-bit compiler this time, and we rely on the user
-  to provide it themselves by setting CROSS_COMPILE_ARM32. Therefore
-  enabling the option by default would make little sense, since the
-  user must explicitly set an environment variable anyway.
-
-CONFIG_COMPAT_VDSO is not directly used in the code, because we want
-to ignore it (build as if it were not set) if the user didn't set
-CROSS_COMPILE_ARM32 properly. If the variable has been set to a valid
-prefix, CONFIG_VDSO32 will be set; this is the option that the code
-and Makefiles test.
-
-For more flexibility, like CROSS_COMPILE, CROSS_COMPILE_ARM32 can also
-be set via CONFIG_CROSS_COMPILE_ARM32 (the environment variable
-overrides the config option).
+Also fix minor style issues reported by checkpatch.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 ---
- arch/arm64/Kconfig         | 26 ++++++++++++++++++++++++++
- arch/arm64/Makefile        | 28 ++++++++++++++++++++++++++--
- arch/arm64/kernel/Makefile |  8 ++++++--
- 3 files changed, 58 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/signal32.h | 46 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/asm-offsets.c   | 13 +++++++++++
+ arch/arm64/kernel/signal32.c      | 46 ---------------------------------------
+ 3 files changed, 59 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 969ef880d234..883e50def0eb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1017,6 +1017,32 @@ config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index eeaa97559bab..9b1bcd3abd83 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -20,6 +20,52 @@
+ #ifdef CONFIG_COMPAT
+ #include <linux/compat.h>
  
-+config COMPAT_VDSO
-+	bool "32-bit vDSO"
-+	depends on COMPAT
-+	default n
-+	help
-+	  Warning: this completely removes the compat vector page, including
-+	  kuser helpers, which may break 32-bit processes.
++struct compat_sigcontext {
++	/* We always set these two fields to 0 */
++	compat_ulong_t			trap_no;
++	compat_ulong_t			error_code;
 +
-+	  Warning: a 32-bit toolchain is necessary to build the vDSO. You
-+	  must explicitly define which toolchain should be used by setting
-+	  CROSS_COMPILE_ARM32 to the prefix of the 32-bit toolchain (same format
-+	  as CROSS_COMPILE). If a 32-bit compiler cannot be found, a warning
-+	  will be printed and the kernel will be built as if COMPAT_VDSO had not
-+	  been set.
++	compat_ulong_t			oldmask;
++	compat_ulong_t			arm_r0;
++	compat_ulong_t			arm_r1;
++	compat_ulong_t			arm_r2;
++	compat_ulong_t			arm_r3;
++	compat_ulong_t			arm_r4;
++	compat_ulong_t			arm_r5;
++	compat_ulong_t			arm_r6;
++	compat_ulong_t			arm_r7;
++	compat_ulong_t			arm_r8;
++	compat_ulong_t			arm_r9;
++	compat_ulong_t			arm_r10;
++	compat_ulong_t			arm_fp;
++	compat_ulong_t			arm_ip;
++	compat_ulong_t			arm_sp;
++	compat_ulong_t			arm_lr;
++	compat_ulong_t			arm_pc;
++	compat_ulong_t			arm_cpsr;
++	compat_ulong_t			fault_address;
++};
 +
-+	  Provide a vDSO to 32-bit processes. It includes the symbols provided
-+	  by the vDSO from the 32-bit kernel, so that a 32-bit libc can use
-+	  the compat vDSO without modification. It also provides sigreturn
-+	  trampolines, and replaces the vector page.
++struct compat_ucontext {
++	compat_ulong_t			uc_flags;
++	compat_uptr_t			uc_link;
++	compat_stack_t			uc_stack;
++	struct compat_sigcontext	uc_mcontext;
++	compat_sigset_t			uc_sigmask;
++	int		__unused[32 - (sizeof(compat_sigset_t) / sizeof(int))];
++	compat_ulong_t			uc_regspace[128] __aligned(8);
++};
 +
-+config CROSS_COMPILE_ARM32
-+	string "32-bit toolchain prefix"
-+	help
-+	  Same as setting CROSS_COMPILE_ARM32 in the environment, but saved for
-+	  future builds. The environment variable overrides this config option.
++struct compat_sigframe {
++	struct compat_ucontext	uc;
++	compat_ulong_t		retcode[2];
++};
 +
- endmenu
- 
- menu "Power management options"
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 3635b8662724..370d8de0c100 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -37,10 +37,32 @@ $(warning LSE atomics not supported by binutils)
-   endif
- endif
- 
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr)
-+ifeq ($(CONFIG_COMPAT_VDSO), y)
-+  CROSS_COMPILE_ARM32 ?= $(CONFIG_CROSS_COMPILE_ARM32:"%"=%)
++struct compat_rt_sigframe {
++	struct compat_siginfo info;
++	struct compat_sigframe sig;
++};
 +
-+  # Check that the user has provided a valid prefix for the 32-bit toolchain.
-+  # To prevent selecting the system gcc by default, the prefix is not allowed to
-+  # be empty, unlike CROSS_COMPILE. In the unlikely event that the system gcc
-+  # is actually the 32-bit ARM compiler to be used, the variable can be set to
-+  # the dirname (e.g. CROSS_COMPILE_ARM32=/usr/bin/).
-+  # Note: this Makefile is read both before and after regenerating the
-+  # config (if needed). Any warning appearing before the config has been
-+  # regenerated should be ignored.
-+  ifeq ($(CROSS_COMPILE_ARM32),)
-+    $(warning CROSS_COMPILE_ARM32 not defined or empty, the compat vDSO will not be built)
-+  else ifeq ($(shell which $(CROSS_COMPILE_ARM32)gcc 2> /dev/null),)
-+    $(warning $(CROSS_COMPILE_ARM32)gcc not found, the compat vDSO will not be built)
-+  else
-+    export CROSS_COMPILE_ARM32
-+    export CONFIG_VDSO32 := y
-+    vdso32 := -DCONFIG_VDSO32=1
-+  endif
-+endif
-+
-+KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(vdso32)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
- KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
--KBUILD_AFLAGS	+= $(lseinstr)
-+KBUILD_AFLAGS	+= $(lseinstr) $(vdso32)
+ #define AARCH32_KERN_SIGRET_CODE_OFFSET	0x500
  
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
-@@ -139,6 +161,8 @@ archclean:
- prepare: vdso_prepare
- vdso_prepare: prepare0
- 	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso include/generated/vdso-offsets.h
-+	$(if $(CONFIG_VDSO32),$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso32 \
-+					  include/generated/vdso32-offsets.h)
+ extern const compat_ulong_t aarch32_sigret_code[6];
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 4a2f0f0fef32..965371186a5a 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -26,6 +26,7 @@
+ #include <asm/cpufeature.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
++#include <asm/signal32.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/vdso_datapage.h>
+@@ -75,6 +76,18 @@ int main(void)
+   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
++#ifdef CONFIG_COMPAT
++  DEFINE(COMPAT_SIGFRAME_REGS_OFFSET,
++				offsetof(struct compat_sigframe, uc) +
++				offsetof(struct compat_ucontext, uc_mcontext) +
++				offsetof(struct compat_sigcontext, arm_r0));
++  DEFINE(COMPAT_RT_SIGFRAME_REGS_OFFSET,
++				offsetof(struct compat_rt_sigframe, sig) +
++				offsetof(struct compat_sigframe, uc) +
++				offsetof(struct compat_ucontext, uc_mcontext) +
++				offsetof(struct compat_sigcontext, arm_r0));
++  BLANK();
++#endif
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
+   BLANK();
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b7063de792f7..9de7d128e0e0 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -29,42 +29,6 @@
+ #include <asm/uaccess.h>
+ #include <asm/unistd.h>
  
- define archhelp
-   echo  '* Image.gz      - Compressed kernel image (arch/$(ARCH)/boot/Image.gz)'
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7d66bbaafc0c..1487f8cd06dd 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -27,8 +27,11 @@ OBJCOPYFLAGS := --prefix-symbols=__efistub_
- $(obj)/%.stub.o: $(obj)/%.o FORCE
- 	$(call if_changed,objcopy)
+-struct compat_sigcontext {
+-	/* We always set these two fields to 0 */
+-	compat_ulong_t			trap_no;
+-	compat_ulong_t			error_code;
+-
+-	compat_ulong_t			oldmask;
+-	compat_ulong_t			arm_r0;
+-	compat_ulong_t			arm_r1;
+-	compat_ulong_t			arm_r2;
+-	compat_ulong_t			arm_r3;
+-	compat_ulong_t			arm_r4;
+-	compat_ulong_t			arm_r5;
+-	compat_ulong_t			arm_r6;
+-	compat_ulong_t			arm_r7;
+-	compat_ulong_t			arm_r8;
+-	compat_ulong_t			arm_r9;
+-	compat_ulong_t			arm_r10;
+-	compat_ulong_t			arm_fp;
+-	compat_ulong_t			arm_ip;
+-	compat_ulong_t			arm_sp;
+-	compat_ulong_t			arm_lr;
+-	compat_ulong_t			arm_pc;
+-	compat_ulong_t			arm_cpsr;
+-	compat_ulong_t			fault_address;
+-};
+-
+-struct compat_ucontext {
+-	compat_ulong_t			uc_flags;
+-	compat_uptr_t			uc_link;
+-	compat_stack_t			uc_stack;
+-	struct compat_sigcontext	uc_mcontext;
+-	compat_sigset_t			uc_sigmask;
+-	int		__unused[32 - (sizeof (compat_sigset_t) / sizeof (int))];
+-	compat_ulong_t	uc_regspace[128] __attribute__((__aligned__(8)));
+-};
+-
+ struct compat_vfp_sigframe {
+ 	compat_ulong_t	magic;
+ 	compat_ulong_t	size;
+@@ -91,16 +55,6 @@ struct compat_aux_sigframe {
+ 	unsigned long			end_magic;
+ } __attribute__((__aligned__(8)));
  
--arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
--					   sys_compat.o entry32.o
-+arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o sys_compat.o	\
-+					   entry32.o
-+ifneq ($(CONFIG_VDSO32),y)
-+arm64-obj-y				+= kuser32.o
-+endif
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-@@ -52,6 +55,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
+-struct compat_sigframe {
+-	struct compat_ucontext	uc;
+-	compat_ulong_t		retcode[2];
+-};
+-
+-struct compat_rt_sigframe {
+-	struct compat_siginfo info;
+-	struct compat_sigframe sig;
+-};
+-
+ #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
  
- obj-y					+= $(arm64-obj-y) vdso/ probes/
-+obj-$(CONFIG_VDSO32)			+= vdso32/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
+ static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
 -- 
 2.10.0
