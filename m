@@ -1,36 +1,44 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 27 Oct 2016 16:59:56 +0530
-Subject: [PATCH 4/5] ARM: davinci: enable LEDs default-on trigger in
- default config
-In-Reply-To: <1477075018-20176-5-git-send-email-david@lechnology.com>
-References: <1477075018-20176-1-git-send-email-david@lechnology.com>
- <1477075018-20176-5-git-send-email-david@lechnology.com>
-Message-ID: <669b14c2-7f62-35bc-c8a3-6dde05a99fb1@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 27 Oct 2016 12:42:48 +0100
+Subject: [PATCH] ASoC: hdmi-codec: Fix hdmi_of_xlate_dai_name when
+ #sound-dai-cells = <0>
+Message-ID: <1477568568.2908.14.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
-> The LEDs default-on trigger is nice to have. For example, it can be used
-> to configure a LED as a power indicator.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->  arch/arm/configs/davinci_all_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-> index 9d7f0bc..e380743 100644
-> --- a/arch/arm/configs/davinci_all_defconfig
-> +++ b/arch/arm/configs/davinci_all_defconfig
-> @@ -181,6 +181,7 @@ CONFIG_LEDS_GPIO=m
->  CONFIG_LEDS_TRIGGERS=y
->  CONFIG_LEDS_TRIGGER_TIMER=m
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=m
-> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+If a DAI specifies "#sound-dai-cells = <0>" in device-tree then
+hdmi_of_xlate_dai_name() will be called with zero args, which it isn't
+implemented to cope with. The resulting use of an uninitialised variable
+for the id will usually result in an error like:
 
-Can this be module like rest of the triggers? It will come on later, but
-not sure if you care about the difference that much. Having it a module
-will be better for those boards that don't need it.
+  asoc-simple-card sound: parse error -11
+  asoc-simple-card: probe of sound failed with error -11
 
-Thanks,
-Sekhar
+Fix this by using and id of zero if no arg is provided.
+
+Fixes: 9731f82d6016 ("ASoC: hdmi-codec: enable multi probe for same device")
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+---
+
+Jyri, FYI, I believe this issue broke your commit df0bd1e8f3c508 ("ARM: dts:
+am335x-boneblack: Add HDMI audio support")
+
+ sound/soc/codecs/hdmi-codec.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
+index b904492..6661ace 100644
+--- a/sound/soc/codecs/hdmi-codec.c
++++ b/sound/soc/codecs/hdmi-codec.c
+@@ -364,7 +364,7 @@ static int hdmi_of_xlate_dai_name(struct snd_soc_component *component,
+ 				  struct of_phandle_args *args,
+ 				  const char **dai_name)
+ {
+-	int id = args->args[0];
++	int id = args->args_count ? args->args[0] : 0;
+ 
+ 	if (id < ARRAY_SIZE(hdmi_dai_name)) {
+ 		*dai_name = hdmi_dai_name[id];
+-- 
+2.1.4
