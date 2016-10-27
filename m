@@ -1,30 +1,43 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 27 Oct 2016 13:23:09 -0700
-Subject: [PATCH v2 2/2] arm64: dts: hi6220: add resets property into dwmmc
- nodes
-In-Reply-To: <CAKfTPtB0FtGbm4C5z+LJizrsHikKt_BGFti5XY+LN3w7zO1Vjw@mail.gmail.com>
-References: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
- <1472094041-5357-2-git-send-email-guodong.xu@linaro.org>
- <CAKfTPtB0FtGbm4C5z+LJizrsHikKt_BGFti5XY+LN3w7zO1Vjw@mail.gmail.com>
-Message-ID: <CALAqxLXfb48h8hMQmAaJ+YjA5=pekkQ8Dg8ReL6VTTfmuFRPDw@mail.gmail.com>
+From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
+Date: Thu, 27 Oct 2016 22:23:24 +0200
+Subject: [PATCH next 1/2] media: mtk-mdp: fix video_device_release argument
+In-Reply-To: <1473340146-6598-4-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1473340146-6598-4-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <20161027202325.20680-1-vincent.stehle@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 6:56 AM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
->
-> My hikey board failed to detect and mount sdcard with v4.9-rc1 and i
-> have bisected the issue to this patch. Once reverted, the sdcard is
-> detected again.
+video_device_release() takes a pointer to struct video_device as argument.
+Fix two call sites where the address of the pointer is passed instead.
 
-Hrm.. I've not seen this w/ my v4.9-rc2 based tree, and I don't have
-any mmc patches there.
+Fixes: c8eb2d7e8202fd9c ("[media] media: Add Mediatek MDP Driver")
+Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
+Cc: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+Cc: Hans Verkuil <hans.verkuil@cisco.com>
+Cc: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Can you send me your .config and point me to any other patches you're
-running with? Also do you have any details about the card in case its
-card specific?
-
-Guodong: Is there any bootloader dependency on that change?
-
-thanks
--john
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 9a747e7..4a9e3e9d 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -1267,13 +1267,13 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
+ err_vdev_register:
+ 	v4l2_m2m_release(mdp->m2m_dev);
+ err_m2m_init:
+-	video_device_release(&mdp->vdev);
++	video_device_release(mdp->vdev);
+ 
+ 	return ret;
+ }
+ 
+ void mtk_mdp_unregister_m2m_device(struct mtk_mdp_dev *mdp)
+ {
+-	video_device_release(&mdp->vdev);
++	video_device_release(mdp->vdev);
+ 	v4l2_m2m_release(mdp->m2m_dev);
+ }
+-- 
+2.9.3
