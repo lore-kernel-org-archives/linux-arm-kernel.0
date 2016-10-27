@@ -1,62 +1,100 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 27 Oct 2016 11:40:44 +0200
-Subject: [PATCH v2 2/9] dt-bindings: interrupt-controller: add DT
- binding for meson GPIO interrupt controller
-In-Reply-To: <20161027093205.GA27135@leverpostej>
-References: <1476890480-8884-1-git-send-email-jbrunet@baylibre.com>
- <1476890480-8884-3-git-send-email-jbrunet@baylibre.com>
- <20161026214234.4q6wmecehqh6q32o@rob-hp-laptop>
- <20161027093205.GA27135@leverpostej>
-Message-ID: <1477561244.2482.198.camel@baylibre.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 27 Oct 2016 12:29:19 +0300
+Subject: [PATCH 01/18] 32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+In-Reply-To: <22426495.JIjM4XpfGo@wuerfel>
+References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
+ <1477081997-4770-2-git-send-email-ynorov@caviumnetworks.com>
+ <7d5ef8e8-38f1-92fe-b584-242cc2924558@mellanox.com>
+ <22426495.JIjM4XpfGo@wuerfel>
+Message-ID: <20161027092919.GA3666@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-10-27 at 10:32 +0100, Mark Rutland wrote:
-> On Wed, Oct 26, 2016 at 04:42:35PM -0500, Rob Herring wrote:
+On Tue, Oct 25, 2016 at 12:22:47AM +0200, Arnd Bergmann wrote:
+> On Monday, October 24, 2016 12:30:47 PM CEST Chris Metcalf wrote:
+> > On 10/21/2016 4:33 PM, Yury Norov wrote:
+> > > All new 32-bit architectures should have 64-bit off_t type, but existing
+> > > architectures has 32-bit ones.
+> > >
+> > > [...]
+> > > For syscalls sys_openat() and sys_open_by_handle_at() force_o_largefile()
+> > > is called, to set O_LARGEFILE flag, and this is the only difference
+> > > comparing to compat versions. All compat ABIs are already turned to use
+> > > 64-bit off_t, except tile. So, compat versions for this syscalls are not
+> > > needed anymore. Tile is handled explicitly.
+> > >
+> > > [...]
+> > > --- a/arch/tile/kernel/compat.c
+> > > +++ b/arch/tile/kernel/compat.c
+> > > @@ -103,6 +103,9 @@ COMPAT_SYSCALL_DEFINE5(llseek, unsigned int, fd, unsigned int, offset_high,
+> > >   #define compat_sys_readahead sys32_readahead
+> > >   #define sys_llseek compat_sys_llseek
+> > >   
+> > > +#define sys_openat             compat_sys_openat
+> > > +#define sys_open_by_handle_at  compat_sys_open_by_handle_at
+> > > +
+> > >   /* Call the assembly trampolines where necessary. */
+> > >   #define compat_sys_rt_sigreturn _compat_sys_rt_sigreturn
+> > >   #define sys_clone _sys_clone
 > > 
-> > On Wed, Oct 19, 2016 at 05:21:13PM +0200, Jerome Brunet wrote:
-> > > 
-> > > 
-> > > This commit adds the device tree bindings description for
-> > > Amlogic's GPIO
-> > > interrupt controller available on the meson8, meson8b and gxbb
-> > > SoC families
-> > > 
-> > > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > > ---
-> > > Rob, I did not include the Ack you gave for the RFC as bindings
-> > > have slightly
-> > > changed. Only the interrupt property has be removed following a
-> > > discussion I
-> > > had with Marc
+> > This patch accomplishes two goals that could be completely separated.
+> > It's confusing to have them mixed in the same patch without any
+> > discussion of why they are in the same patch.
 > > 
-> > As Mark R already said, you should keep the interrupts property.
+> > First, you want to modify the default <asm/unistd.h> behavior for
+> > compat syscalls so that the default is sys_openat (etc) rather than
+> > the existing compat_sys_openat, and then use that new behavior for
+> > arm64 ILP32.  This lets you force O_LARGEFILE for arm64 ILP32 to
+> > support having a 64-bit off_t at all times.  To do that, you fix the
+> > asm-generic header, and then make tile have a special override.
+> > This seems reasonable enough.
+> > 
+> > Second, you introduce ARCH_32BIT_OFF_T basically as a synonym for
+> > "BITS_PER_WORD == 32", so that new 32-bit architectures can choose not
+> > to enable it.  This is fine in the abstract, but I'm a bit troubled by
+> > the fact that you are not actually introducing a new 32-bit
+> > architecture here (just a new 32-bit mode for the arm 64-bit kernel).
+> > Shouldn't this part of the change wait until someone actually has a
+> > new 32-bit kernel to drive this forward?
 > 
-> To be clear, the interrupt routing should be described *somehow*,
-> though
-> I don't think the generic interrupts property is correct, as this is
-> an
-> interrupt *router*, i.e. this device doesn't own the interrupt, it
-> just
-> joins two parts of the line together (and so flags are meaningless).
+> I asked for this specifically because we identified the problem
+> during the review of the aarch64 ilp32 code, and it might not
+> be noticed in the next architecture submission.
 > 
-> Thanks,
-> Mark.
+> The most important aspect from my perspective is that the new
+> ilp32 ABI on aarch64 behaves the same way that any native 32-bit
+> architecture does, and when we change the default, it should
+> be done for both compat mode and native mode at the same time.
+> 
+> > If you want to push forward the ARCH_32BIT_OFF_T change in the absence
+> > of an architecture that supports it, I would think it would be a lot
+> > less confusing to have these two in separate patches, and make it
+> > clear that the ARCH_32BIT_OFF_T change is just laying groundwork
+> > for some hypothetical future architecture.
+> > 
+> > The existing commit language itself is also confusing. You write "All
+> > compat ABIs are already turned to use 64-bit off_t, except tile."
+> > First, I'm not sure what you mean by "turned" here.  And, tile is just
+> > one of many compat ABIs that allow O_LARGEFILE not to be part of the
+> > open call: see arm64's AArch32 ABI, MIPS o32, s390 31-bit emulation,
+> > sparc64's 32-bit mode, and of course x86's 32-bit compat mode.
+> > Presumably your point here is that tile is the only pre-existing
+> > architecture that #includes <asm/unistd.h> to create its compat
+> > syscall table, and so I think "all except tile" here is particularly
+> > confusing, since there are no architectures except tile that use the
+> > __SYSCALL_COMPAT functionality in the current tree.
+> 
+> Agreed, this could be made clearer, and splitting the patch up
+> in two also seems reasonable, though I didn't see it as important.
+> 
+> 	Arnd
 
-Indeed Mark,
+In the past it was a separated series of 2 patches, and it was even
+acked by Arnd, but not submitted. 
+http://lists-archives.com/linux-kernel/28471253-32-bit-abi-introduce-arch_32bit_off_t-config-option.html
 
-I already rewritten the driver taking Marc's comment into account.
-There will be 2 properties added to the DT:
-?-?meson,upstream-interrupts : an array with the 8 gic interrupt used
-as output of the controller
-- ?meson,num-input-mux : the number of inputs (pads) available to the
-muxes
+I can restore that small series in aarch64/ilp32 for next iteration, or resend
+it separately if you think to submit it before aarch64/ilp32 (which is
+better, for me).
 
-I'm looking for solution to the "create mapping" issue we have in
-pinctrl (patch 4) before posting a v3.
-
-If you think these properties should be different, feel free to tell me
-now.
-
-Thx
-Jerome
+Yury
