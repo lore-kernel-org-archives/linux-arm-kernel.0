@@ -1,104 +1,191 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 27 Oct 2016 12:02:50 +0300
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <20161026220457.kvbd4wgtizdbndf3@rob-hp-laptop>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com>
- <20161026220457.kvbd4wgtizdbndf3@rob-hp-laptop>
-Message-ID: <8724b41d-158a-f52c-8df6-4e8913b4094a@ti.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu, 27 Oct 2016 11:10:06 +0200
+Subject: [RFC PATCH 1/5] of: introduce the overlay manager
+In-Reply-To: <20161026145756.21689-2-antoine.tenart@free-electrons.com>
+References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+ <20161026145756.21689-2-antoine.tenart@free-electrons.com>
+Message-ID: <1e9bb9f3-c365-2a7c-9da1-acc734bfadac@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/16 01:04, Rob Herring wrote:
-> On Wed, Oct 19, 2016 at 03:33:45PM -0500, Dave Gerlach wrote:
->> Add a generic power domain implementation, TI SCI PM Domains, that
->> will hook into the genpd framework and allow the TI SCI protocol to
->> control device power states.
->>
->> Also, provide macros representing each device index as understood
->> by TI SCI to be used in the device node power-domain references.
->> These are identifiers for the K2G devices managed by the PMMC.
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
->>  MAINTAINERS                                        |  2 +
->>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->>  3 files changed, 146 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>
->> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->> new file mode 100644
->> index 000000000000..32f38a349656
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->> @@ -0,0 +1,54 @@
->> +Texas Instruments TI-SCI Generic Power Domain
->> +---------------------------------------------
->> +
->> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->> +responsible for controlling the state of the IPs that are present.
->> +Communication between the host processor running an OS and the system
->> +controller happens through a protocol known as TI-SCI [1]. This pm domain
->> +implementation plugs into the generic pm domain framework and makes use of
->> +the TI SCI protocol power on and off each device when needed.
->> +
->> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->> +
->> +PM Domain Node
->> +==============
->> +The PM domain node represents the global PM domain managed by the PMMC,
->> +which in this case is the single implementation as documented by the generic
->> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
->> +
->> +Required Properties:
->> +--------------------
->> +- compatible: should be "ti,sci-pm-domain"
->> +- #power-domain-cells: Must be 0.
->> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
->> +
->> +Example:
->> +--------------------
->> +k2g_pds: k2g_pds {
->> +        compatible = "ti,sci-pm-domain";
->> +        #power-domain-cells = <0>;
->> +        ti,sci = <&pmmc>;
->> +};
+
+
+On 10/26/2016 04:57 PM, Antoine Tenart wrote:
+> The overlay manager is an in-kernel library helping to handle dt overlay
+> loading when using capes.
 >
-> Why not just make the PMMC node be the power-domain provider itself? If
-> not that, then make this a child node of it. The same comment applies to
-> all the SCI functions, but I guess I've already acked some of them.
-
-This seems to be a bug in this documentation actually. ti,sci handle is 
-no longer supported, and all the sci stuff must be under the parent sci 
-node.
-
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>  drivers/of/Kconfig                           |   2 +
+>  drivers/of/Makefile                          |   1 +
+>  drivers/of/overlay-manager/Kconfig           |   6 +
+>  drivers/of/overlay-manager/Makefile          |   1 +
+>  drivers/of/overlay-manager/overlay-manager.c | 199 +++++++++++++++++++++++++++
+>  include/linux/overlay-manager.h              |  38 +++++
+>  6 files changed, 247 insertions(+)
+>  create mode 100644 drivers/of/overlay-manager/Kconfig
+>  create mode 100644 drivers/of/overlay-manager/Makefile
+>  create mode 100644 drivers/of/overlay-manager/overlay-manager.c
+>  create mode 100644 include/linux/overlay-manager.h
 >
-> I really don't like reviewing all these TI SCI bindings one by one. Each
-> one on its own seems fine, but I don't see the full picture.
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index bc07ad30c9bf..e57aeaf0bf4f 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -116,4 +116,6 @@ config OF_OVERLAY
+>  config OF_NUMA
+>  	bool
+>
+> +source "drivers/of/overlay-manager/Kconfig"
+> +
+>  endif # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index d7efd9d458aa..d738fd41271f 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_OF_OVERLAY) += overlay.o
+>  obj-$(CONFIG_OF_NUMA) += of_numa.o
+>
+>  obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+> +obj-y += overlay-manager/
+> diff --git a/drivers/of/overlay-manager/Kconfig b/drivers/of/overlay-manager/Kconfig
+> new file mode 100644
+> index 000000000000..eeb76054dcb8
+> --- /dev/null
+> +++ b/drivers/of/overlay-manager/Kconfig
+> @@ -0,0 +1,6 @@
+> +config OF_OVERLAY_MGR
+> +	bool "Device Tree Overlay Manager"
+> +	depends on OF_OVERLAY
+> +	help
+> +	  Enable the overlay manager to handle automatic overlay loading when
+> +	  devices are detected.
+> diff --git a/drivers/of/overlay-manager/Makefile b/drivers/of/overlay-manager/Makefile
+> new file mode 100644
+> index 000000000000..86d2b53950e7
+> --- /dev/null
+> +++ b/drivers/of/overlay-manager/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_OF_OVERLAY_MGR)			+= overlay-manager.o
+> diff --git a/drivers/of/overlay-manager/overlay-manager.c b/drivers/of/overlay-manager/overlay-manager.c
+> new file mode 100644
+> index 000000000000..a725d7e24d38
+> --- /dev/null
+> +++ b/drivers/of/overlay-manager/overlay-manager.c
+> @@ -0,0 +1,199 @@
+> +/*
+> + * Copyright (C) 2016 - Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/firmware.h>
+> +#include <linux/list.h>
+> +#include <linux/of.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/overlay-manager.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +
+> +struct overlay_mgr_overlay {
+> +	struct list_head list;
+> +	char *name;
+> +};
+> +
+> +LIST_HEAD(overlay_mgr_overlays);
+> +LIST_HEAD(overlay_mgr_formats);
 
-The full picture is represented under the documentation for the main 
-protocol support itself. See this patch:
+Maybe you can find some better names for this, or rename the structs.
+This will make the code more readable.
 
-https://patchwork.kernel.org/patch/9383281/
+> +DEFINE_SPINLOCK(overlay_mgr_lock);
+> +DEFINE_SPINLOCK(overlay_mgr_format_lock);
 
-Copy pasted here as ref:
+As Thomas already said, a mutex should be fine. We are not doing any 
+time critical here, right?
 
-Example (K2G):
--------------
-         pmmc: pmmc {
-                 compatible = "ti,k2g-sci";
-                 ...
+> +
+> +/*
+> + * overlay_mgr_register_format()
+> + *
+> + * Adds a new format candidate to the list of supported formats. The registered
+> + * formats are used to parse the headers stored on the dips.
+> + */
+> +int overlay_mgr_register_format(struct overlay_mgr_format *candidate)
+> +{
+> +	struct overlay_mgr_format *format;
+> +	int err = 0;
+> +
+> +	spin_lock(&overlay_mgr_format_lock);
+> +
+> +	/* Check if the format is already registered */
+> +	list_for_each_entry(format, &overlay_mgr_formats, list) {
+> +		if (!strcpy(format->name, candidate->name)) {
+> +			err = -EEXIST;
+> +			goto err;
+> +		}
+> +	}
+> +
+> +	list_add_tail(&candidate->list, &overlay_mgr_formats);
+> +
+> +err:
+> +	spin_unlock(&overlay_mgr_format_lock);
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(overlay_mgr_register_format);
+> +
+> +/*
+> + * overlay_mgr_parse()
+> + *
+> + * Parse raw data with registered format parsers. Fills the candidate string if
+> + * one parser understood the raw data format.
+> + */
+> +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
+> +		      unsigned *n)
+> +{
+> +	struct list_head *pos, *tmp;
+> +	struct overlay_mgr_format *format;
+> +
+> +	list_for_each_safe(pos, tmp, &overlay_mgr_formats) {
+> +		format = list_entry(pos, struct overlay_mgr_format, list);
+> +
+> +		format->parse(dev, data, candidates, n);
+> +		if (n > 0)
+> +			return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL_GPL(overlay_mgr_parse);
+> +
+> +static int overlay_mgr_check_overlay(struct device_node *node)
+> +{
+> +	struct property *p;
+> +	const char *str = NULL;
+> +
+> +	p = of_find_property(node, "compatible", NULL);
+> +	if (!p)
+> +		return -EINVAL;
+> +
+> +	do {
+> +		str = of_prop_next_string(p, str);
+> +		if (of_machine_is_compatible(str))
+> +			return 0;
+> +	} while (str);
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +/*
+> + * _overlay_mgr_insert()
+> + *
+> + * Try to request and apply an overlay given a candidate name.
+> + */
+> +static int _overlay_mgr_apply(struct device *dev, char *candidate)
 
-                 my_clk_node: clk_node {
-                         ...
-                         ...
-                 };
+Should be __overlay_mgr_apply(...)
 
-                 my_pd_node: pd_node {
-                         ...
-                         ...
-                 };
-         };
+Cheers,
+Matthias
