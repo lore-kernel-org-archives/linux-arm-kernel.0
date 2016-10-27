@@ -1,75 +1,28 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu, 27 Oct 2016 11:34:05 +0200
-Subject: [PATCH v3 2/4] usb: musb: core: added helper function for parsing DT
-In-Reply-To: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
-References: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1477560847-8929-3-git-send-email-abailon@baylibre.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Thu, 27 Oct 2016 10:13:02 +0100
+Subject: [PATCH 9/9] Input: wm97xx: add new AC97 bus support
+In-Reply-To: <1477510907-23495-10-git-send-email-robert.jarzmik@free.fr>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-10-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <20161027091302.GH28180@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Petr Kulhavy <petr@barix.com>
+On Wed, Oct 26, 2016 at 09:41:47PM +0200, Robert Jarzmik wrote:
+> This adds support for the new AC97 bus code, which discovers the devices
+> rather than uses platform data.
+> 
+> As part of this discovery, it enables a multi-function device wm97xx,
+> which supports touchscreen, battery, ADC and an audio codec. This patch
+> adds the code to bind the touchscreen "cell" as the touchscreen driver.
+> 
+> This was tested on the pxa architecture with a pxa270 + wm9713 + the
+> mioa701 touchscreen.
+> 
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
 
-This adds the function musb_get_mode() to get the DT property "dr_mode"
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 
-Signed-off-by: Petr Kulhavy <petr@barix.com>
-Acked-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-Tested-by: David Lechner <david@lechnology.com>
----
- drivers/usb/musb/musb_core.c | 19 +++++++++++++++++++
- drivers/usb/musb/musb_core.h |  5 +++++
- 2 files changed, 24 insertions(+)
-
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index 27dadc0..bba07e7 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -100,6 +100,7 @@
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb.h>
-+#include <linux/usb/of.h>
- 
- #include "musb_core.h"
- #include "musb_trace.h"
-@@ -130,6 +131,24 @@ static inline struct musb *dev_to_musb(struct device *dev)
- 	return dev_get_drvdata(dev);
- }
- 
-+enum musb_mode musb_get_mode(struct device *dev)
-+{
-+	enum usb_dr_mode mode;
-+
-+	mode = usb_get_dr_mode(dev);
-+	switch (mode) {
-+	case USB_DR_MODE_HOST:
-+		return MUSB_HOST;
-+	case USB_DR_MODE_PERIPHERAL:
-+		return MUSB_PERIPHERAL;
-+	case USB_DR_MODE_OTG:
-+	case USB_DR_MODE_UNKNOWN:
-+	default:
-+		return MUSB_OTG;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(musb_get_mode);
-+
- /*-------------------------------------------------------------------------*/
- 
- #ifndef CONFIG_BLACKFIN
-diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-index 2cb88a49..a406468 100644
---- a/drivers/usb/musb/musb_core.h
-+++ b/drivers/usb/musb/musb_core.h
-@@ -617,4 +617,9 @@ static inline void musb_platform_post_root_reset_end(struct musb *musb)
- 		musb->ops->post_root_reset_end(musb);
- }
- 
-+/* gets the "dr_mode" property from DT and converts it into musb_mode
-+ * if the property is not found or not recognized returns MUSB_OTG
-+ */
-+extern enum musb_mode musb_get_mode(struct device *dev);
-+
- #endif	/* __MUSB_CORE_H__ */
--- 
-2.7.3
+Thanks,
+Charles
