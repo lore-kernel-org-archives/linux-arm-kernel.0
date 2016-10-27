@@ -1,66 +1,93 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu, 27 Oct 2016 11:34:07 +0200
-Subject: [PATCH v3 4/4] ARM: dts: da850: Add the usb otg device node
-In-Reply-To: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
-References: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1477560847-8929-5-git-send-email-abailon@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 27 Oct 2016 11:40:00 +0100
+Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
+ multiplexing vcpus on a single CPU
+In-Reply-To: <20161027100428.GA17829@cbox>
+References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
+ <20161027091906.GA14734@cbox> <7541af85-05c4-25f9-2fa8-2eb7a0afbe84@arm.com>
+ <20161027100428.GA17829@cbox>
+Message-ID: <f00b6e69-7b45-5238-4d3a-af8d77e85670@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device tree node for the usb otg
-controller present in the da850 family of SoC's.
-This also enables the otg usb controller for the lcdk board.
+On 27/10/16 11:04, Christoffer Dall wrote:
+> On Thu, Oct 27, 2016 at 10:49:00AM +0100, Marc Zyngier wrote:
+>> Hi Christoffer,
+>>
+>> On 27/10/16 10:19, Christoffer Dall wrote:
+>>> On Mon, Oct 24, 2016 at 04:31:28PM +0100, Marc Zyngier wrote:
+>>>> Architecturally, TLBs are private to the (physical) CPU they're
+>>>> associated with. But when multiple vcpus from the same VM are
+>>>> being multiplexed on the same CPU, the TLBs are not private
+>>>> to the vcpus (and are actually shared across the VMID).
+>>>>
+>>>> Let's consider the following scenario:
+>>>>
+>>>> - vcpu-0 maps PA to VA
+>>>> - vcpu-1 maps PA' to VA
+>>>>
+>>>> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
+>>>> by vcpu-0 accesses, and access the wrong physical page.
+>>>>
+>>>> The solution to this is to keep a per-VM map of which vcpu ran last
+>>>> on each given physical CPU, and invalidate local TLBs when switching
+>>>> to a different vcpu from the same VM.
+>>>
+>>> Just making sure I understand this:  The reason you cannot rely on the
+>>> guest doing the necessary distinction with ASIDs or invalidating the TLB
+>>> is that a guest (which assumes it's running on hardware) can validly
+>>> defer any neccessary invalidation until it starts running on other
+>>> physical CPUs, but we do this transparently in KVM?
+>>
+>> The guest wouldn't have to do any invalidation at all on real HW,
+>> because the TLBs are strictly private to a physical CPU (only the
+>> invalidation can be broadcast to the Inner Shareable domain). But when
+>> we multiplex two vcpus on the same physical CPU, we break the private
+>> semantics, and a vcpu could hit in the TLB entries populated by the
+>> another one.
+> 
+> Such a guest would be using a mapping of the same VA with the same ASID
+> on two separate CPUs, each pointing to a separate PA.  If it ever were
+> to, say, migrate a task, it would have to do invalidations then.  Right?
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
- arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
- 2 files changed, 23 insertions(+)
+This doesn't have to be ASID tagged. Actually, it is more likely to
+affect global mappings. Imagine for example that the kernel (which uses
+global mappings for its own page tables) decides to create per-cpu
+variable using this trick (all the CPUs have the same VA, but use
+different PAs). No invalidation at all, everything looks perfectly fine,
+until you start virtualizing it.
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21..9f5040c 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -158,6 +158,14 @@
- 	rx-num-evt = <32>;
- };
- 
-+&usb_phy {
-+	status = "okay";
-+	};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
- &aemif {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&nand_pins>;
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index f79e1b9..322a31a 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -372,6 +372,21 @@
- 					>;
- 			status = "disabled";
- 		};
-+		usb_phy: usb-phy {
-+			compatible = "ti,da830-usb-phy";
-+			#phy-cells = <1>;
-+			status = "disabled";
-+		};
-+		usb0: usb at 200000 {
-+			compatible = "ti,da830-musb";
-+			reg = <0x200000 0x10000>;
-+			interrupts = <58>;
-+			interrupt-names = "mc";
-+			dr_mode = "otg";
-+			phys = <&usb_phy 0>;
-+			phy-names = "usb-phy";
-+			status = "disabled";
-+		};
- 		gpio: gpio at 226000 {
- 			compatible = "ti,dm6441-gpio";
- 			gpio-controller;
+> Does Linux or other guests actually do this?
+
+Linux may hit it with CPU hotplug, which uses global mappings (which a
+vcpu using an ASID tagged mapping could then hit if the VAs overlap).
+
+> 
+> I would suspect Linux has to eventually invalidate those mappins if it
+> wants the scheduler to be allowed to freely move things around.
+> 
+>>
+>> As we cannot segregate the TLB entries per vcpu (but only per VMID), the
+>> workaround is to nuke all the TLBs for this VMID (locally only - no
+>> broadcast) each time we find that two vcpus are sharing the same
+>> physical CPU.
+>>
+>> Is that clearer?
+> 
+> Yes, the fix is clear, just want to make sure I understand that it's a
+> valid circumstance where this actually happens.  But in either case, we
+> probably have to fix this to emulate the hardware correctly.
+> 
+> Another fix would be to allocate a VMID per VCPU I suppose, just to
+> introduce a terrible TLB hit ratio :)
+
+But that would break TLB invalidations that are broadcast in the Inner
+Shareable domain. To do so, you'd have to trap every TBLI, and issue
+corresponding invalidations for all the vcpus. I'm not sure I want to
+see the performance number of that solution... ;-)
+
+Thanks,
+
+	M.
 -- 
-2.7.3
+Jazz is not dead. It just smells funny...
