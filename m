@@ -1,44 +1,28 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 27 Oct 2016 12:42:48 +0100
-Subject: [PATCH] ASoC: hdmi-codec: Fix hdmi_of_xlate_dai_name when
- #sound-dai-cells = <0>
-Message-ID: <1477568568.2908.14.camel@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 27 Oct 2016 17:13:13 +0530
+Subject: [PATCH v3] ARM: davinci: da8xx: Fix some redefined symbol warnings
+In-Reply-To: <1477485542-10555-2-git-send-email-abailon@baylibre.com>
+References: <1477485542-10555-1-git-send-email-abailon@baylibre.com>
+ <1477485542-10555-2-git-send-email-abailon@baylibre.com>
+Message-ID: <7026f012-ffce-cc28-85be-9a5cd26de60f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a DAI specifies "#sound-dai-cells = <0>" in device-tree then
-hdmi_of_xlate_dai_name() will be called with zero args, which it isn't
-implemented to cope with. The resulting use of an uninitialised variable
-for the id will usually result in an error like:
+On Wednesday 26 October 2016 06:09 PM, Alexandre Bailon wrote:
+> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
+> but da8xx-cfgchip.h intend to replace them.
+> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
 
-  asoc-simple-card sound: parse error -11
-  asoc-simple-card: probe of sound failed with error -11
+Looks like this is not true for v4.9-rc2 and so I don't see any warnings
+in v4.9-rc2. This is probably introduced due to some changes you are
+doing for v4.10 and so it is not a v4.9-rc candidate.
 
-Fix this by using and id of zero if no arg is provided.
+> Remove the macro and update the board files to use da8xx-cfgchip.h
 
-Fixes: 9731f82d6016 ("ASoC: hdmi-codec: enable multi probe for same device")
+This patch should probably be folded into the patch which actually
+introduces da8xx-cfgchip.h into usb-da8xx.c
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 
-Jyri, FYI, I believe this issue broke your commit df0bd1e8f3c508 ("ARM: dts:
-am335x-boneblack: Add HDMI audio support")
-
- sound/soc/codecs/hdmi-codec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
-index b904492..6661ace 100644
---- a/sound/soc/codecs/hdmi-codec.c
-+++ b/sound/soc/codecs/hdmi-codec.c
-@@ -364,7 +364,7 @@ static int hdmi_of_xlate_dai_name(struct snd_soc_component *component,
- 				  struct of_phandle_args *args,
- 				  const char **dai_name)
- {
--	int id = args->args[0];
-+	int id = args->args_count ? args->args[0] : 0;
- 
- 	if (id < ARRAY_SIZE(hdmi_dai_name)) {
- 		*dai_name = hdmi_dai_name[id];
--- 
-2.1.4
+Thanks,
+Sekhar
