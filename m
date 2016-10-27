@@ -1,76 +1,78 @@
-From: kevin.brodsky@arm.com (Kevin Brodsky)
-Date: Thu, 27 Oct 2016 17:30:57 +0100
-Subject: [RFC PATCH v2 7/8] arm64: compat: Use vDSO sigreturn trampolines if
- available
-In-Reply-To: <20161027163058.12156-1-kevin.brodsky@arm.com>
-References: <20161027163058.12156-1-kevin.brodsky@arm.com>
-Message-ID: <20161027163058.12156-8-kevin.brodsky@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 27 Oct 2016 17:32:52 +0100
+Subject: [PATCH v3] drivers: psci: PSCI checker module
+In-Reply-To: <9cf15020-5116-5082-d3d3-fba80fe2de70@arm.com>
+References: <20161026131752.GA15478@red-moon>
+ <20161026151858.GQ3716@linux.vnet.ibm.com>
+ <20161026171006.GA16248@red-moon>
+ <20161026172252.GV3716@linux.vnet.ibm.com>
+ <20161026173534.GC16248@red-moon>
+ <20161026181148.GW3716@linux.vnet.ibm.com>
+ <20161027091306.GA16603@red-moon>
+ <a3fd021e-1fae-08e3-994b-87efcf11b164@arm.com>
+ <20161027145446.GJ3716@linux.vnet.ibm.com>
+ <9cf15020-5116-5082-d3d3-fba80fe2de70@arm.com>
+Message-ID: <20161027163252.GA18653@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the compat vDSO is enabled, it replaces the vector page. Therefore,
-we use the sigreturn trampolines it provides instead of those in the
-vector page.
+On Thu, Oct 27, 2016 at 05:06:00PM +0100, Kevin Brodsky wrote:
+> On 27/10/16 15:54, Paul E. McKenney wrote:
+> >On Thu, Oct 27, 2016 at 01:51:57PM +0100, Kevin Brodsky wrote:
+> >> On 27/10/16 10:13, Lorenzo Pieralisi wrote:
+> >>> On Wed, Oct 26, 2016 at 11:11:48AM -0700, Paul E. McKenney wrote:
+> >>>> On Wed, Oct 26, 2016 at 06:35:34PM +0100, Lorenzo Pieralisi wrote:
+> >>>>> On Wed, Oct 26, 2016 at 10:22:52AM -0700, Paul E. McKenney wrote:
+> >>>>>> On Wed, Oct 26, 2016 at 06:10:06PM +0100, Lorenzo Pieralisi wrote:
+> >>>> [ . . . ]
+> >>>>
+> >>>>>>> Thanks a lot for your feedback, thoughts appreciated.
+> >>>>>> Let me ask the question more directly.
+> >>>>>>
+> >>>>>> Why on earth are we trying to run these tests concurrently?
+> >>>>> We must prevent that, no question about that, that's why I started
+> >>>>> this discussion. It is not fine to enable this checker and the
+> >>>>> RCU/LOCK torture hotplug tests at the same time.
+> >>>>>
+> >>>>>> After all, if we just run one at a time in isolation, there is no
+> >>>>>> problem.
+> >>>>> Fine by me, it was to understand if the current assumptions we made
+> >>>>> are correct and they are definitely not. If we enable the PSCI checker
+> >>>>> we must disable the torture rcu/lock hotplug tests either statically or
+> >>>>> dynamically.
+> >>>> What rcutorture, locktorture, and rcuperf do is to invoke
+> >>>> torture_init_begin(), which returns false if one of these tests
+> >>>> is already running.
+> >>>>
+> >>>> Perhaps we should extract this torture-test-exclusion and require
+> >>>> than conflicting torture tests invoke it?
+> >>> Yes if it can be extracted as a check (but it should also prevent the
+> >>> torture tests from running and vice versa), either that or Kconfig
+> >>> dependency (which we could do as a first step, waiting to add the
+> >>> required interface to the torture test code ?).
+> >>>
+> >>> Thanks !
+> >>> Lorenzo
+> >>
+> >> That sounds like a reasonable idea, but then that would mean that the PSCI checker
+> >> would have to wait until the torture test is finished if it is already running (and
+> >> the other way around).
+> >>
+> >> I wasn't aware that torture tests were hotplugging CPUs. I think that the most
+> >> sensible thing to do right now is to make CONFIG_PSCI_CHECKER depend on
+> >> !CONFIG_TORTURE_TEST (or maybe specifically !CONFIG_RCU_TORTURE_TEST &&
+> >> !CONFIG_LOCK_TORTURE_TEST). We can try to make them work together afterwards, but for
+> >> the sake of getting this patch merged in a reasonable amount of time, I think we
+> >> should just exclude the conflicting tests at the build level in this patch. I'll also
+> >> update the comment accordingly.
+> >
+> >I suggest !CONFIG_TORTURE_TEST, given that there are a couple of other
+> >tests in the offing.
+> >
+> >                            Thanx, Paul
+> 
+> Fair enough. If that's fine with Lorenzo, I'll add the dependency and post v4.
 
-Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
----
- arch/arm64/include/asm/vdso.h |  3 +++
- arch/arm64/kernel/signal32.c  | 15 +++++++++++++++
- 2 files changed, 18 insertions(+)
+Yes, that's fine by me, thanks a lot !
 
-diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-index 839ce0031bd5..f2a952338f1e 100644
---- a/arch/arm64/include/asm/vdso.h
-+++ b/arch/arm64/include/asm/vdso.h
-@@ -28,6 +28,9 @@
- #ifndef __ASSEMBLY__
- 
- #include <generated/vdso-offsets.h>
-+#ifdef CONFIG_VDSO32
-+#include <generated/vdso32-offsets.h>
-+#endif
- 
- #define VDSO_SYMBOL(base, name)						   \
- ({									   \
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index 9de7d128e0e0..b72a4180a531 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -28,6 +28,7 @@
- #include <asm/signal32.h>
- #include <asm/uaccess.h>
- #include <asm/unistd.h>
-+#include <asm/vdso.h>
- 
- struct compat_vfp_sigframe {
- 	compat_ulong_t	magic;
-@@ -438,6 +439,19 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 		retcode = ptr_to_compat(ka->sa.sa_restorer);
- 	} else {
- 		/* Set up sigreturn pointer */
-+#ifdef CONFIG_VDSO32
-+		void *vdso_page = current->mm->context.vdso;
-+		void *trampoline =
-+			(ka->sa.sa_flags & SA_SIGINFO
-+			 ? (thumb
-+			    ? VDSO_SYMBOL(vdso_page, compat_rt_sigreturn_thumb)
-+			    : VDSO_SYMBOL(vdso_page, compat_rt_sigreturn_arm))
-+			 : (thumb
-+			    ? VDSO_SYMBOL(vdso_page, compat_sigreturn_thumb)
-+			    : VDSO_SYMBOL(vdso_page, compat_sigreturn_arm)));
-+
-+		retcode = ptr_to_compat(trampoline) + thumb;
-+#else
- 		unsigned int idx = thumb << 1;
- 
- 		if (ka->sa.sa_flags & SA_SIGINFO)
-@@ -446,6 +460,7 @@ static void compat_setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 		retcode = AARCH32_VECTORS_BASE +
- 			  AARCH32_KERN_SIGRET_CODE_OFFSET +
- 			  (idx << 2) + thumb;
-+#endif
- 	}
- 
- 	regs->regs[0]	= usig;
--- 
-2.10.0
+Lorenzo
