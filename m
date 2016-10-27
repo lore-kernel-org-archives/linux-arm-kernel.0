@@ -1,69 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Oct 2016 13:54:21 +0200
-Subject: [PATCH] ARM: shmobile: select errata 798181 for SoCs with CA15
- cores
-In-Reply-To: <CANqRtoTJHrXK4NBWWDShoF1RnxpBhheDnvsfeyDO6cvLdbOE=A@mail.gmail.com>
-References: <1477551606-6903-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoSsKTvMjATz89nEY06Fp-J20VqjDzW0JD1NDLqEJQPwsQ@mail.gmail.com>
- <CAMuHMdVKwg0SzEmu804UxTEE+N4atYjeKHNfCJ0eXf28fL+KJA@mail.gmail.com>
- <CANqRtoTJHrXK4NBWWDShoF1RnxpBhheDnvsfeyDO6cvLdbOE=A@mail.gmail.com>
-Message-ID: <20161027115419.GC26581@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 27 Oct 2016 17:24:53 +0530
+Subject: [PATCH v3] ARM: davinci: da8xx: Fix some redefined symbol warnings
+In-Reply-To: <7026f012-ffce-cc28-85be-9a5cd26de60f@ti.com>
+References: <1477485542-10555-1-git-send-email-abailon@baylibre.com>
+ <1477485542-10555-2-git-send-email-abailon@baylibre.com>
+ <7026f012-ffce-cc28-85be-9a5cd26de60f@ti.com>
+Message-ID: <ca32fd12-5299-02e8-24c4-501dda4291ab@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 04:39:24PM +0900, Magnus Damm wrote:
-> Hi Geert and Simon,
+On Thursday 27 October 2016 05:13 PM, Sekhar Nori wrote:
+> On Wednesday 26 October 2016 06:09 PM, Alexandre Bailon wrote:
+>> Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
+>> but da8xx-cfgchip.h intend to replace them.
+>> The usb-da8xx.c is using both headers, causing redefined symbol warnings.
 > 
-> On Thu, Oct 27, 2016 at 4:33 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > Hi Magnus,
-> >
-> > On Thu, Oct 27, 2016 at 9:28 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> >> On Thu, Oct 27, 2016 at 4:00 PM, Simon Horman
-> >> <horms+renesas@verge.net.au> wrote:
-> >>> Select ARM errata 798181 on SoCs cores affected CA15 cores.
-> >>>
-> >>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >>> ---
-> >>>  arch/arm/mach-shmobile/Kconfig | 6 ++++++
-> >>>  1 file changed, 6 insertions(+)
-> >>>
-> >>> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-> >>> index c48be1d332ed..6fbd9b7d2d67 100644
-> >>> --- a/arch/arm/mach-shmobile/Kconfig
-> >>> +++ b/arch/arm/mach-shmobile/Kconfig
-> >>> @@ -60,6 +60,7 @@ config ARCH_R7S72100
-> >>>  config ARCH_R8A73A4
-> >>>         bool "R-Mobile APE6 (R8A73A40)"
-> >>>         select ARCH_RMOBILE
-> >>> +       select ARM_ERRATA_798181 if SMP
-> >>>         select RENESAS_IRQC
-> >>>
-> >>>  config ARCH_R8A7740
-> >>> @@ -70,6 +71,7 @@ config ARCH_R8A7740
-> >>>  config ARCH_R8A7743
-> >>>         bool "RZ/G1M (R8A77430)"
-> >>>         select ARCH_RCAR_GEN2
-> >>> +       select ARM_ERRATA_798181 if SMP
-> >>>
-> >>>  config ARCH_R8A7778
-> >>>         bool "R-Car M1A (R8A77781)"
-> >>> @@ -82,20 +84,24 @@ config ARCH_R8A7779
-> >>>  config ARCH_R8A7790
-> >>>         bool "R-Car H2 (R8A77900)"
-> >>>         select ARCH_RCAR_GEN2
-> >>> +       select ARM_ERRATA_798181 if SMP
-> >>>         select I2C
-> >>
-> >> Thanks for your help.
-> >>
-> >> I'm probably misunderstanding what this patch does and how the errata
-> >> effects the system, but the commit message says CA15 cores. The above
-> >> R-Car Gen1 and r8a7740 SoCs are not using CA15 - instead they use CA9.
-> >> Not sure if the errata still applies though.
-> >
-> > Please don't become misled by the @@ context ;-)
-> 
-> Ouch, right... Sorry for the noise. The patch looks good, please proceed.
+> Looks like this is not true for v4.9-rc2 and so I don't see any warnings
 
-Thanks, I have queued this up.
+Ah, just noticed that _this_ is the patch that introduces
+da8xx-cfgchip.h into usb-da8xx.c. So this is the patch that introduces
+the warnings (and fixes them).
+
+I can queue this for v4.10 (with Greg's ack) if you change the
+description to make it about cleaning up duplicated defines between
+da8xx-cfgchip.h and usb-davinci.h and not talk about "redefined symbol
+warnings".
+
+Also, when adding a header file, can you please keep it sorted in
+alphabetical order.
+
+Thanks,
+Sekhar
