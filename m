@@ -1,35 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 27 Oct 2016 19:36:17 +0100
-Subject: [linux-sunxi] [PATCH v5 2/7] ASoC: sunxi: Add a simple HDMI CODEC
-In-Reply-To: <20161027191634.f2fa6478cd07d84a60274339@free.fr>
-References: <cover.1477142934.git.moinejf@free.fr>
- <5cb540f20f64d28bd7dee82a0e14ee5209631979.1477142934.git.moinejf@free.fr>
- <CAGb2v67cE8v3=XtTzDBst2D2U6wM8pffQYK9nEok+j4xnPT39A@mail.gmail.com>
- <20161027191634.f2fa6478cd07d84a60274339@free.fr>
-Message-ID: <20161027183617.GR25322@sirena.org.uk>
+From: mirza.krak@gmail.com (Mirza Krak)
+Date: Thu, 27 Oct 2016 20:55:08 +0200
+Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
+In-Reply-To: <201610280016.MiLeMJw9%fengguang.wu@intel.com>
+References: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
+ <201610280016.MiLeMJw9%fengguang.wu@intel.com>
+Message-ID: <CALw8SCXKBvpBKuDWVhNLtLPuO60wF1YPHm0hUZ7xverxrPT=Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 07:16:34PM +0200, Jean-Francois Moine wrote:
-> Chen-Yu Tsai <wens@csie.org> wrote:
-> > There's already a driver for basically the same thing:
+2016-10-27 19:09 GMT+02:00 kbuild test robot <lkp@intel.com>:
+> Hi Mirza,
+>
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.9-rc2 next-20161027]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> [Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+> [Check https://git-scm.com/docs/git-format-patch for more information]
+>
+> url:    https://github.com/0day-ci/linux/commits/Mirza-Krak/clk-tegra-add-TEGRA20_CLK_NOR-to-init-table/20161027-225528
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+> config: arm-davinci_all_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
+>
+> All errors (new ones prefixed by >>):
+>
+>>> Error: arch/arm/boot/dts/tegra20.dtsi:1.1-8 syntax error
+>    FATAL ERROR: Unable to parse input tree
 
-> >     sound/soc/codec/hdmi-codec.c
+That one was embarrassing. Sorry...
 
-> > You use it by registering a sub-device from your hdmi driver, with the
-> > proper platform_data and callbacks. Grep for HDMI_CODEC_DRV_NAME for
-> > platforms already using it.
-
-> I know that for a long time, and I will not use it on any account: it is
-> a gasworks!
-
-If there are problems with what's there then articulate them and fix
-them, don't just open code something separate.  Just open coding
-something else without any articulated reasoning is not helping things.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/1b274085/attachment-0001.sig>
+Best Regards
+Mirza
