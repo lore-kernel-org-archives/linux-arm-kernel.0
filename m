@@ -1,51 +1,30 @@
-From: shihwei@cs.columbia.edu (Shih-Wei Li)
-Date: Thu, 27 Oct 2016 15:08:13 +0000
-Subject: [PATCH] KVM: arm/arm64: Kick VCPUs when queueing already pending IRQs
-Message-ID: <1477580893-3479-1-git-send-email-shihwei@cs.columbia.edu>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 27 Oct 2016 17:05:55 +0200
+Subject: [PATCH v7, 0/8] Add MediaTek USB3 DRD Driver
+In-Reply-To: <1476844107-31087-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1476844107-31087-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20161027150555.GA13414@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In cases like IPI, we could be queueing an interrupt for a VCPU
-that is already running and is not about to exit, because the
-VCPU has entered the VM with the interrupt pending and would
-not trap on EOI'ing that interrupt. This could result to delays
-in interrupt deliveries or even loss of interrupts.
-To guarantee prompt interrupt injection, here we have to try to
-kick the VCPU.
+On Wed, Oct 19, 2016 at 10:28:19AM +0800, Chunfeng Yun wrote:
+> These patches introduce the MediaTek USB3 dual-role controller
+> driver.
+> 
+> The driver can be configured as Dual-Role Device (DRD),
+> Peripheral Only and Host Only (xHCI) modes. It works well
+> with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
+> tested on MT8173 platform which only contains USB2.0 device IP,
+> and on MT6290 platform which contains USB3.0 device IP.
+> 
+> Change in v7:
+> 1. split dual-role driver into four patchs
+> 2. remove QMU done tasklet
+> 3. add a bool in xhci_hcd_mtk to signal absence of IPPC
 
-Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
----
+Given a lack of objection from anyone, I've now merged these to my tree
+to get them a spin in the 0-day build-bot.
 
-I've tested the code with an IPI test built on kvm-unit-test, which
-measures the cycles spent between one VCPU sending IPI to a target
-VCPU that busy loops in the VM, until the target VCPU ACKs and EOIs
-the IPI. The patch here can improve the performance in such case by
-more than 5000 cycles.
+thanks,
 
- virt/kvm/arm/vgic/vgic.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index b419a11..07cf239 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -273,6 +273,17 @@ retry:
- 		 * no more work for us to do.
- 		 */
- 		spin_unlock(&irq->irq_lock);
-+
-+		/*
-+		 * If the VCPU is not NULL, we could be queueing an
-+		 * edge-triggered interrupt for a VCPU which is already
-+		 * running and is not about to exit, because the VCPU has
-+		 * entered the VM with the interrupt pending and it wouldn't
-+		 * trap on EOI. To ensure prompt delivery of that interrupt,
-+		 * we have to try to kick the VCPU.
-+		 */
-+		if (vcpu)
-+			kvm_vcpu_kick(vcpu);
- 		return false;
- 	}
- 
--- 
-1.9.1
+greg k-h
