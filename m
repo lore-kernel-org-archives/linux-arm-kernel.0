@@ -1,69 +1,71 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Oct 2016 14:25:08 -0700
-Subject: [PATCH 2/5] Documentation: devicetree: net: add NS2 bindings to
- amac
-In-Reply-To: <20161027212106.GA25693@broadcom.com>
-References: <1477510561-17035-1-git-send-email-jon.mason@broadcom.com>
- <1477510561-17035-3-git-send-email-jon.mason@broadcom.com>
- <20161027091757.GC12841@lunn.ch> <20161027212106.GA25693@broadcom.com>
-Message-ID: <1a3e3dad-fd99-f58c-2742-f90d02d1392c@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Oct 2016 23:27:27 +0200
+Subject: [PATCH v7] spi: sun4i: Allow transfers larger than FIFO size
+In-Reply-To: <20161027111419.GK25322@sirena.org.uk>
+References: <1477465231-17704-1-git-send-email-mr.nuke.me@gmail.com>
+ <20161026085528.vjjypbfmfbhvileb@lukather>
+ <20161027111419.GK25322@sirena.org.uk>
+Message-ID: <20161027212727.leqg3gvwhd3u64er@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2016 02:21 PM, Jon Mason wrote:
-> On Thu, Oct 27, 2016 at 11:17:57AM +0200, Andrew Lunn wrote:
->> On Wed, Oct 26, 2016 at 03:35:58PM -0400, Jon Mason wrote:
->>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
->>> ---
->>>  Documentation/devicetree/bindings/net/brcm,amac.txt | 7 +++++--
->>>  1 file changed, 5 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> index ba5ecc1..f92caee 100644
->>> --- a/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> +++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> @@ -2,15 +2,18 @@ Broadcom AMAC Ethernet Controller Device Tree Bindings
->>>  -------------------------------------------------------------
->>>  
->>>  Required properties:
->>> - - compatible:	"brcm,amac" or "brcm,nsp-amac"
->>> + - compatible:	"brcm,amac", "brcm,nsp-amac", or "brcm,ns2-amac"
->>>   - reg:		Address and length of the GMAC registers,
->>>  		Address and length of the GMAC IDM registers
->>> +		Address and length of the NIC Port Manager registers (optional)
->>>   - reg-names:	Names of the registers.  Must have both "amac_base" and
->>> -		"idm_base"
->>> +		"idm_base". "nicpm_base" is optional (required for NS2)
->>>   - interrupts:	Interrupt number
->>>  
->>>  Optional properties:
->>>  - mac-address:	See ethernet.txt file in the same directory
->>> +- brcm,enet-phy-lane-swap:
->>> +		boolean; Swap the PHY lanes (needed on some SKUs of NS2)
->>
->> Maybe i'm missing something here, but the patch to the PHY swapped the
->> lanes. This seems to be a PHY property, not a MAC property. And it
->> swapped them unconditionally....
-> 
-> It swapped them based on (from patch 1/5)
->        if (BRCM_PHY_MODEL(phydev) == PHY_ID_BCM54810 &&
->            phydev->dev_flags & PHY_BRCM_EXP_LANE_SWAP)
-> 
-> That flag is being set in the driver based on whether the lanes need
-> to be swapped (which depends on the SKU of NS2).  The only SKU of NS2
-> we have upstream right now has it swapped, but one that should be
-> pushed out in the next few weeks will not have this flag present.
-> There is no way to detect it, and having a separate compat string
-> seemed overkill.
+Hi Mark,
 
-Andrew has a point thought that this is a property that is associated
-with the PHY, and not with the Ethernet MAC per se, as such, you can put
-it in the Ethernet PHY node, and look up the proper from
-drivers/net/phy/broadcom.c, and come up with a Broadcom Ethernet PHY
-binding document (sorry).
+On Thu, Oct 27, 2016 at 12:14:19PM +0100, Mark Brown wrote:
+> On Wed, Oct 26, 2016 at 10:55:28AM +0200, Maxime Ripard wrote:
+> > On Wed, Oct 26, 2016 at 12:00:30AM -0700, Alexandru Gagniuc wrote:
+> 
+> > > When DMA finally takes over, this fallback path is not mutually exclusive.
+> 
+> > I definitely agree, and we had this patch in the CHIP kernel for quite
+> > some time, working like a charm.
+> 
+> > I was planning to respin it in the next few days, glad to see you took
+> > care of it :)
+> 
+> > Mark, any comments on this? For the record, it already has my Acked-by.
+> 
+> Without knowing what the previous discussion was it's hard to comment,
+> it sounds like some prior review comments are just being ignored here
+> but since I'm not turning up anything with this subject line I've no
+> idea what that might have been (and that's very concerning in itself
+> given that this is apparently v7...).
 
-There is no need to have a specific compatible string allocated, using
-the (mostly) generic Ethernet PHY binding, plus this property documented
-would be good enough.
+v4 was here: https://patchwork.kernel.org/patch/3893371/
+v5: https://patchwork.kernel.org/patch/5455381/
+v6: https://patchwork.kernel.org/patch/6975871/
+
+So basically, I really have no idea why, but it really seems like it
+was just falling through the cracks, repeatedly (I'm not puting the
+blame on anyone though, it just happened). Maybe it was just because
+of the lack of comments :)
+
+> I'm also concerned that there isn't a version of this for sun6i,
+> it's going to make all the cut'n'pasting between the two drivers
+> harder if we make changes in one and not the other.
+
+I think I'll give reg_field a shot though, and try to merge the sun6i
+driver into this one and see the results. If it can help your
+decision.
+
+> If the concern from the previous reviews to do with not using DMA is
+> there some reason it's hard to do DMA?
+
+I think just like Alexandru that it is orthogonal. But to really
+answer, no, it's not difficult. There's just been some fundamental
+disagreement on whether DMA was supposed to be optional or not that
+stalled everything I guess.
+
+Maxime
+
 -- 
-Florian
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/21a7c571/attachment.sig>
