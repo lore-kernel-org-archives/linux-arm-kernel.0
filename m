@@ -1,38 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Oct 2016 12:19:53 +0200
-Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
-In-Reply-To: <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
-References: <20161026052422.17283.57864.sendpatchset@little-apple>
- <20161027070801.GB7706@verge.net.au>
- <20161027071523.GD7706@verge.net.au>
- <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
-Message-ID: <20161027101953.GB26581@verge.net.au>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 27 Oct 2016 12:24:48 +0200
+Subject: [PATCH v6 00/16] ACPI IORT ARM SMMU support
+In-Reply-To: <20161026110459.GA15276@red-moon>
+References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
+ <20161026110459.GA15276@red-moon>
+Message-ID: <CAJZ5v0i=ZZDwnAU_=cAW5NR5M7EAOVPmpdqfMhf_jGmeZoHLVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 04:37:53PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Thu, Oct 27, 2016 at 4:15 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 27, 2016 at 09:08:01AM +0200, Simon Horman wrote:
-> >> On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm+renesas@opensource.se>
-> >> >
-> >> > Extend the ARM64 defconfig to enable the DU DRM device as module
-> >> > together with required dependencies of V4L2 FCP and VSP modules.
-> >> >
-> >> > This enables VGA output on the r8a7795 Salvator-X board.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> >>
-> >> Thanks, I have queued this up.
-> >
-> > Given discussion elsewhere on enabling DU I am holding off on this for a
-> > little; it is not queued up for now.
-> 
-> Sure, thanks for holding off the DT integration patches for r8a7796.
-> Please note that as of mainline v4.9-rc2 the r8a7795 Salvator-X board
-> has thanks to DU, FCP and VSP a working VGA port. So enabling those
-> devices in the defconfig from now on makes sense to me.
+On Wed, Oct 26, 2016 at 1:04 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Rafael, Joerg (and anyone else CC'ed),
+>
+> On Tue, Oct 18, 2016 at 05:03:58PM +0100, Lorenzo Pieralisi wrote:
+>> This patch series is v6 of a previous posting:
+>>
+>> https://lkml.org/lkml/2016/9/9/418
+>>
+>> v5 -> v6
+>>       - Rebased against v4.9-rc1
+>>       - Changed FWNODE_IOMMU to FWNODE_ACPI_STATIC
+>>       - Moved platform devices creation into IORT code
+>>       - Updated fwnode handling
+>>       - Added default dma masks initialization
+>
+> Any comments on v6 ? Patches touching generic ACPI code
+> are {1, 2, 7}, patch 4 updates the IOMMU of_iommu_{set/get}_ops()
+> API to make it work on ACPI systems too, by replacing the
+> device_node with a fwnode_handle pointer as look-up token;
+> the remainder of patches are ARM specific and creates the
+> infrastructure to probe ARM SMMU devices through ACPI,
+> ARM IORT table in particular. Given the generic bits changes
+> above I would not leave it to late -rc to reach an agreement
+> please, thank you.
 
-Understood, I will queue up this patch.
+I'll do my best to look at these in the next few days, but please also
+note what I wrote before:
+
+http://marc.info/?l=linux-acpi&m=147744344531599&w=2
+
+Thanks,
+Rafael
