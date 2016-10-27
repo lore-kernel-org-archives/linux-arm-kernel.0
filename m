@@ -1,148 +1,99 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 27 Oct 2016 13:23:10 +0100
-Subject: [PATCH v2 3/4] arm64: arch_timer: Work around Erratum
- Hisilicon-161601
-In-Reply-To: <44cf2916-7c81-5cdf-d113-f99326eae2c6@huawei.com>
-References: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
- <1477553651-13428-3-git-send-email-dingtianhong@huawei.com>
- <16d8f329-3413-11da-6f2a-8b1a95c85352@arm.com>
- <44cf2916-7c81-5cdf-d113-f99326eae2c6@huawei.com>
-Message-ID: <8267644f-c488-2d02-3dd0-c7d0ed23babf@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 27 Oct 2016 14:27:57 +0200
+Subject: [PATCH] arm/arm64: KVM: Perform local TLB invalidation when
+ multiplexing vcpus on a single CPU
+In-Reply-To: <f00b6e69-7b45-5238-4d3a-af8d77e85670@arm.com>
+References: <1477323088-18768-1-git-send-email-marc.zyngier@arm.com>
+ <20161027091906.GA14734@cbox>
+ <7541af85-05c4-25f9-2fa8-2eb7a0afbe84@arm.com>
+ <20161027100428.GA17829@cbox>
+ <f00b6e69-7b45-5238-4d3a-af8d77e85670@arm.com>
+Message-ID: <20161027122757.GA19614@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/16 13:17, Ding Tianhong wrote:
+On Thu, Oct 27, 2016 at 11:40:00AM +0100, Marc Zyngier wrote:
+> On 27/10/16 11:04, Christoffer Dall wrote:
+> > On Thu, Oct 27, 2016 at 10:49:00AM +0100, Marc Zyngier wrote:
+> >> Hi Christoffer,
+> >>
+> >> On 27/10/16 10:19, Christoffer Dall wrote:
+> >>> On Mon, Oct 24, 2016 at 04:31:28PM +0100, Marc Zyngier wrote:
+> >>>> Architecturally, TLBs are private to the (physical) CPU they're
+> >>>> associated with. But when multiple vcpus from the same VM are
+> >>>> being multiplexed on the same CPU, the TLBs are not private
+> >>>> to the vcpus (and are actually shared across the VMID).
+> >>>>
+> >>>> Let's consider the following scenario:
+> >>>>
+> >>>> - vcpu-0 maps PA to VA
+> >>>> - vcpu-1 maps PA' to VA
+> >>>>
+> >>>> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
+> >>>> by vcpu-0 accesses, and access the wrong physical page.
+> >>>>
+> >>>> The solution to this is to keep a per-VM map of which vcpu ran last
+> >>>> on each given physical CPU, and invalidate local TLBs when switching
+> >>>> to a different vcpu from the same VM.
+> >>>
+> >>> Just making sure I understand this:  The reason you cannot rely on the
+> >>> guest doing the necessary distinction with ASIDs or invalidating the TLB
+> >>> is that a guest (which assumes it's running on hardware) can validly
+> >>> defer any neccessary invalidation until it starts running on other
+> >>> physical CPUs, but we do this transparently in KVM?
+> >>
+> >> The guest wouldn't have to do any invalidation at all on real HW,
+> >> because the TLBs are strictly private to a physical CPU (only the
+> >> invalidation can be broadcast to the Inner Shareable domain). But when
+> >> we multiplex two vcpus on the same physical CPU, we break the private
+> >> semantics, and a vcpu could hit in the TLB entries populated by the
+> >> another one.
+> > 
+> > Such a guest would be using a mapping of the same VA with the same ASID
+> > on two separate CPUs, each pointing to a separate PA.  If it ever were
+> > to, say, migrate a task, it would have to do invalidations then.  Right?
 > 
+> This doesn't have to be ASID tagged. Actually, it is more likely to
+> affect global mappings. Imagine for example that the kernel (which uses
+> global mappings for its own page tables) decides to create per-cpu
+> variable using this trick (all the CPUs have the same VA, but use
+> different PAs). No invalidation at all, everything looks perfectly fine,
+> until you start virtualizing it.
 > 
-> On 2016/10/27 18:58, Marc Zyngier wrote:
->> On 27/10/16 08:34, Ding Tianhong wrote:
->>> Erratum Hisilicon-161601 says that the ARM generic timer counter "has the
->>> potential to contain an erroneous value when the timer value changes".
->>> Accesses to TVAL (both read and write) are also affected due to the implicit counter
->>> read.  Accesses to CVAL are not affected.
->>>
->>> The workaround is to reread the system count registers until the value of the second
->>> read is larger than the first one by less than 32, the system counter can be guaranteed
->>> not to return wrong value twice by back-to-back read and the error value is always larger
->>> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
->>>
->>> The workaround is enabled if the hisilicon,erratum-161601 property is found in
->>> the timer node in the device tree.  This can be overridden with the
->>> clocksource.arm_arch_timer.hisilicon-161601 boot parameter, which allows KVM
->>> users to enable the workaround until a mechanism is implemented to
->>> automatically communicate this information.
->>>
->>> Fix some description for fsl erratum a008585.
->>>
->>> v2: Significant rework based on feedback, including seperate the fsl erratum a008585
->>>     to another patch, update the erratum name and remove unwanted code.
->>>
->>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->>> ---
->>>  Documentation/arm64/silicon-errata.txt |  1 +
->>>  Documentation/kernel-parameters.txt    |  9 ++++
->>>  arch/arm64/include/asm/arch_timer.h    | 28 ++++++++++-
->>>  drivers/clocksource/Kconfig            | 14 +++++-
->>>  drivers/clocksource/arm_arch_timer.c   | 88 ++++++++++++++++++++++++++--------
->>>  5 files changed, 118 insertions(+), 22 deletions(-)
->>>
->>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->>> index 405da11..70c5d5e 100644
->>> --- a/Documentation/arm64/silicon-errata.txt
->>> +++ b/Documentation/arm64/silicon-errata.txt
->>> @@ -63,3 +63,4 @@ stable kernels.
->>>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
->>>  |                |                 |                 |                         |
->>>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
->>> +| Hisilicon      | Hip05/Hip06/Hip07 | #161601       | HISILICON_ERRATUM_161601|
->>
->> I've already commented on the alignment. Please read my initial review.
->>
+> > Does Linux or other guests actually do this?
 > 
-> It sees misunderstood, fix it this time.
+> Linux may hit it with CPU hotplug, which uses global mappings (which a
+> vcpu using an ASID tagged mapping could then hit if the VAs overlap).
 > 
->>> diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
->>> index 6fa1d8a..735b4b6 100644
->>> --- a/Documentation/kernel-parameters.txt
->>> +++ b/Documentation/kernel-parameters.txt
->>> @@ -707,6 +707,15 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
->>>  			erratum.  If unspecified, the workaround is
->>>  			enabled based on the device tree.
->>>  
->>> +	clocksource.arm_arch_timer.hisilicon-161601=
->>> +			[ARM64]
->>> +			Format: <bool>
->>> +			Enable/disable the workaround of Hisilicon
->>> +			erratum 161601.  This can be useful for KVM
->>> +			guests, if the guest device tree doesn't show the
->>> +			erratum.  If unspecified, the workaround is
->>> +			enabled based on the device tree.
->>> +
->>>  	clearcpuid=BITNUM [X86]
->>>  			Disable CPUID feature X for the kernel. See
->>>  			arch/x86/include/asm/cpufeatures.h for the valid bit
->>> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
->>> index 118719d8..49b3041 100644
->>> --- a/arch/arm64/include/asm/arch_timer.h
->>> +++ b/arch/arm64/include/asm/arch_timer.h
->>> @@ -29,7 +29,7 @@
->>>  
->>>  #include <clocksource/arm_arch_timer.h>
->>>  
->>> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
->>> +#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585) || IS_ENABLED(CONFIG_HISILICON_ERRATUM_161601)
->>>  extern struct static_key_false arch_timer_read_ool_enabled;
->>>  #define needs_timer_erratum_workaround() \
->>>  	static_branch_unlikely(&arch_timer_read_ool_enabled)
->>> @@ -65,11 +65,35 @@ extern struct arch_timer_erratum_workaround *erratum_workaround;
->>>  	_new;						\
->>>  })
->>>  
->>> +
->>> +
->>> +/*
->>> + * The number of retries is an arbitrary value well beyond the highest number
->>> + * of iterations the loop has been observed to take.
->>> + * Verify whether the value of the second read is larger than the first by
->>> + * less than 32 is the only way to confirm the value is correct, the system
->>> + * counter can be guaranteed not to return wrong value twice by back-to-back read
->>> + * and the error value is always larger than the correct one by 32.
->>> + */
->>> +#define __hisi_161601_read_reg(reg) ({				\
->>> +	u64 _old, _new;						\
->>> +	int _retries = 200;					\
->>
->> Please document how this value was found (either in the code or in the
->> commit message).
-> 
-> It really difficult to give the accurate standard, theoretically the error should not happened
-> twice together, so maybe 2 is enough here, I just give a arbitrary value.
-> 
->>
->>> +								\
->>> +	do {							\
->>> +		_old = read_sysreg(reg);			\
->>> +		_new = read_sysreg(reg);			\
->>> +		_retries--;					\
->>> +	} while (unlikely((_new - _old) >> 5) && _retries);	\
->>> +								\
->>> +	WARN_ON_ONCE(!_retries);				\
->>> +	_new;							\
->>> +})
->>
->> Same remark as in the previous patch.
->>
-> 
-> I think the sentence *Verify whether the value of the second read is larger than the first by
-> less than 32 is the only way to confirm the value is correct* could explain why should *(_new - _old) >> 5*.
-> it is the same as (_new - _old)/32, also mean the _new should never bigger than _old more than 32.
 
-This is not about the explanation of the erratum, but about the location
-of the #define, which can be made private to the .c file instead of
-being globally visible.
+Right, ok, it's more threatening than I first thought.  Thanks for the
+explanation.
+
+> > 
+> > I would suspect Linux has to eventually invalidate those mappins if it
+> > wants the scheduler to be allowed to freely move things around.
+> > 
+> >>
+> >> As we cannot segregate the TLB entries per vcpu (but only per VMID), the
+> >> workaround is to nuke all the TLBs for this VMID (locally only - no
+> >> broadcast) each time we find that two vcpus are sharing the same
+> >> physical CPU.
+> >>
+> >> Is that clearer?
+> > 
+> > Yes, the fix is clear, just want to make sure I understand that it's a
+> > valid circumstance where this actually happens.  But in either case, we
+> > probably have to fix this to emulate the hardware correctly.
+> > 
+> > Another fix would be to allocate a VMID per VCPU I suppose, just to
+> > introduce a terrible TLB hit ratio :)
+> 
+> But that would break TLB invalidations that are broadcast in the Inner
+> Shareable domain. To do so, you'd have to trap every TBLI, and issue
+> corresponding invalidations for all the vcpus. I'm not sure I want to
+> see the performance number of that solution... ;-)
+> 
+Ah, yeah, that's ridiculous.  Forget what I said.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Christoffer
