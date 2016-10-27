@@ -1,114 +1,56 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 27 Oct 2016 09:07:00 -0500
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <8724b41d-158a-f52c-8df6-4e8913b4094a@ti.com>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com>
- <20161026220457.kvbd4wgtizdbndf3@rob-hp-laptop>
- <8724b41d-158a-f52c-8df6-4e8913b4094a@ti.com>
-Message-ID: <58120A04.2050501@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 27 Oct 2016 15:18:54 +0100
+Subject: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
+In-Reply-To: <DB4PR04MB07813D4DA5D5567229394A7D8FAB0@DB4PR04MB0781.eurprd04.prod.outlook.com>
+References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
+ <20161026103101.GC19965@leverpostej>
+ <DB4PR04MB07813D4DA5D5567229394A7D8FAB0@DB4PR04MB0781.eurprd04.prod.outlook.com>
+Message-ID: <20161027141826.GC30535@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2016 04:02 AM, Tero Kristo wrote:
-> On 27/10/16 01:04, Rob Herring wrote:
->> On Wed, Oct 19, 2016 at 03:33:45PM -0500, Dave Gerlach wrote:
->>> Add a generic power domain implementation, TI SCI PM Domains, that
->>> will hook into the genpd framework and allow the TI SCI protocol to
->>> control device power states.
->>>
->>> Also, provide macros representing each device index as understood
->>> by TI SCI to be used in the device node power-domain references.
->>> These are identifiers for the K2G devices managed by the PMMC.
->>>
->>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>> ---
->>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
->>>  MAINTAINERS                                        |  2 +
->>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->>>  3 files changed, 146 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> new file mode 100644
->>> index 000000000000..32f38a349656
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> @@ -0,0 +1,54 @@
->>> +Texas Instruments TI-SCI Generic Power Domain
->>> +---------------------------------------------
->>> +
->>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->>> +responsible for controlling the state of the IPs that are present.
->>> +Communication between the host processor running an OS and the system
->>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
->>> +implementation plugs into the generic pm domain framework and makes use of
->>> +the TI SCI protocol power on and off each device when needed.
->>> +
->>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>> +
->>> +PM Domain Node
->>> +==============
->>> +The PM domain node represents the global PM domain managed by the PMMC,
->>> +which in this case is the single implementation as documented by the generic
->>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
->>> +
->>> +Required Properties:
->>> +--------------------
->>> +- compatible: should be "ti,sci-pm-domain"
->>> +- #power-domain-cells: Must be 0.
->>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
->>> +
->>> +Example:
->>> +--------------------
->>> +k2g_pds: k2g_pds {
->>> +        compatible = "ti,sci-pm-domain";
->>> +        #power-domain-cells = <0>;
->>> +        ti,sci = <&pmmc>;
->>> +};
->>
->> Why not just make the PMMC node be the power-domain provider itself? If
->> not that, then make this a child node of it. The same comment applies to
->> all the SCI functions, but I guess I've already acked some of them.
+On Wed, Oct 26, 2016 at 10:09:07PM +0000, Leo Li wrote:
 > 
-> This seems to be a bug in this documentation actually. ti,sci handle is no
-> longer supported, and all the sci stuff must be under the parent sci node.
-> 
->>
->> I really don't like reviewing all these TI SCI bindings one by one. Each
->> one on its own seems fine, but I don't see the full picture.
-> 
-> The full picture is represented under the documentation for the main protocol
-> support itself. See this patch:
-> 
-> https://patchwork.kernel.org/patch/9383281/
-> 
-> Copy pasted here as ref:
-> 
-> Example (K2G):
-> -------------
->         pmmc: pmmc {
->                 compatible = "ti,k2g-sci";
->                 ...
-> 
->                 my_clk_node: clk_node {
->                         ...
->                         ...
->                 };
-> 
->                 my_pd_node: pd_node {
->                         ...
->                         ...
->                 };
->         };
-> 
-> 
+> > -----Original Message-----
+> > From: Mark Rutland [mailto:mark.rutland at arm.com]
+> > Sent: Wednesday, October 26, 2016 5:31 AM
+> > To: M.H. Lian <minghuan.lian@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > devicetree at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>; Stuart
+> > Yoder <stuart.yoder@nxp.com>; Leo Li <leoyang.li@nxp.com>; Scott Wood
+> > <scott.wood@nxp.com>; Shawn Guo <shawnguo@kernel.org>; Mingkai Hu
+> > <mingkai.hu@nxp.com>
+> > Subject: Re: [PATCH 1/6] dt/bindings: adjust bindings for Layerscape SCFG MSI
+> > 
+> > On Tue, Oct 25, 2016 at 08:35:40PM +0800, Minghuan Lian wrote:
 
-Yes my bad I will fix this in V3 once we straighten out the ID portion of the
-binding.
+> > > -- compatible: should be "fsl,<soc-name>-msi" to identify
+> > > -	      Layerscape PCIe MSI controller block such as:
+> > > -              "fsl,1s1021a-msi"
+> > > -              "fsl,1s1043a-msi"
+> > > +- compatible: should be "fsl,ls-scfg-msi"
+> > 
+> > This breaks old DTBs, and throws away information which you describe above as
+> > valuable. So another NAK for that.
+> 
+> I agree with you that we should maintain the backward compatibility.
+> But on the other hand, I just found that there is a silly typo in the
+> original binding that "ls" is wrongly spelled as "1s" and they look
+> too close to be noticed in previous patch reviews.  :(
 
-Regards,
-Dave
+Sure, that's annoying, but we're stuck with it.
+
+> The driver and all the DTSes used the binding with the typo which
+> covered up the problem.  So even if we want to keep the
+> "fsl,<soc-name>-msi" binding, we probably want to fix the typo, right?
+> And that breaks the backward compatibility too.
+
+Regardless of what we do, we should *not* break compatibility. The old
+strings must remain.
+
+However, we can *add* correctly-spelt variants, and mark the existing
+strings as deprecated (in both the binding and driver). The in-kernel
+dts can be updated to use the correctly-spelt strings.
+
+Thanks,
+Mark.
