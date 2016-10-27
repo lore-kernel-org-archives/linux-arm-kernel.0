@@ -1,62 +1,151 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 27 Oct 2016 20:02:29 +0200
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161027160406.25738-1-richard.genoud@gmail.com>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
-Message-ID: <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Oct 2016 19:51:54 +0200
+Subject: [PATCH 01/14] dma: sun6i-dma: Add burst case of 4
+In-Reply-To: <20161023183107.5b75b6aad62853378713299f@free.fr>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <3a2404510b5f8b16ae3bb193982d70f158700b2b.1475571575.git.mylene.josserand@free-electrons.com>
+ <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
+ <20161004165553.GS5228@lukather>
+ <20161023183107.5b75b6aad62853378713299f@free.fr>
+Message-ID: <20161027175154.v4kuhyvm3r5n6tdo@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Richard,
+On Sun, Oct 23, 2016 at 06:31:07PM +0200, Jean-Francois Moine wrote:
+> On Tue, 4 Oct 2016 18:55:54 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > On Tue, Oct 04, 2016 at 12:40:11PM +0200, Jean-Francois Moine wrote:
+> > > On Tue,  4 Oct 2016 11:46:14 +0200
+> > > Myl?ne Josserand <mylene.josserand@free-electrons.com> wrote:
+> > > 
+> > > > Add the case of a burst of 4 which is handled by the SoC.
+> > > > 
+> > > > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> > > > ---
+> > > >  drivers/dma/sun6i-dma.c | 2 ++
+> > > >  1 file changed, 2 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > > > index 8346199..0485204 100644
+> > > > --- a/drivers/dma/sun6i-dma.c
+> > > > +++ b/drivers/dma/sun6i-dma.c
+> > > > @@ -240,6 +240,8 @@ static inline s8 convert_burst(u32 maxburst)
+> > > >  	switch (maxburst) {
+> > > >  	case 1:
+> > > >  		return 0;
+> > > > +	case 4:
+> > > > +		return 1;
+> > > >  	case 8:
+> > > >  		return 2;
+> > > >  	default:
+> > > > -- 
+> > > > 2.9.3
+> > > 
+> > > This patch has already been rejected by Maxime in the threads
+> > > 	http://www.spinics.net/lists/dmaengine/msg08610.html
+> > > and
+> > > 	http://www.spinics.net/lists/dmaengine/msg08719.html
+> > > 
+> > > I hope you will find the way he wants for this maxburst to be added.
+> > 
+> > I was talking about something along these lines (not tested):
+> 
+> I wonder why you don't submit this yourself.
 
-On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index fd8aa1f4ba78..168b10cad47b 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		mode |= ATMEL_US_USMODE_RS485;
->  	} else if (termios->c_cflag & CRTSCTS) {
->  		/* RS232 with hardware handshake (RTS/CTS) */
-> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> -			termios->c_cflag &= ~CRTSCTS;
-> -		} else {
-> +		if (atmel_use_fifo(port) &&
-> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
-> +			/*
-> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
-> +			 * be able to drive the RTS pin high/low when the RX
-> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
-> +			 * It will also disable the transmitter when the CTS
-> +			 * pin is high.
-> +			 * This mode is not activated if CTS pin is a GPIO
-> +			 * because in this case, the transmitter is always
-> +			 * disabled (there must be an internal pull-up
-> +			 * responsible for this behaviour).
-> +			 * If the RTS pin is a GPIO, the controller won't be
-> +			 * able to drive it according to the FIFO thresholds,
-> +			 * but it will be handled by the driver.
-> +			 */
->  			mode |= ATMEL_US_USMODE_HWHS;
+I thought you were the one who cared. You asked for what I had in
+mind, here it is.
 
-You use
+> > -------8<---------
+> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > index 83461994e418..573ac4608293 100644
+> > --- a/drivers/dma/sun6i-dma.c
+> > +++ b/drivers/dma/sun6i-dma.c
+> > @@ -240,6 +240,8 @@ static inline s8 convert_burst(u32 maxburst)
+> >  	switch (maxburst) {
+> >  	case 1:
+> >  		return 0;
+> > +	case 4:
+> > +		return 1;
+> >  	case 8:
+> >  		return 2;
+> >  	default:
+> > @@ -1110,11 +1112,19 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+> >  	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+> >  						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+> >  						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
+> > +	sdc->slave.dst_bursts			= BIT(1) | BIT(8);
+> > +	sdc->slave.src_bursts			= BIT(1) | BIT(8);
+> >  	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
+> >  						  BIT(DMA_MEM_TO_DEV);
+> >  	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
+> >  	sdc->slave.dev = &pdev->dev;
+> >  
+> > +	if (of_device_is_compatible(pdev->dev.of_node,
+> > +				    "allwinner,sun8i-h3-dma")) {
+> > +		sdc->slave.dst_bursts |= BIT(4);
+> > +		sdc->slave.src_bursts |= BIT(4);
+> > +	}
+> > +
+> >  	sdc->pchans = devm_kcalloc(&pdev->dev, sdc->cfg->nr_max_channels,
+> >  				   sizeof(struct sun6i_pchan), GFP_KERNEL);
+> >  	if (!sdc->pchans)
+> > diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> > index cc535a478bae..f7bbec24bb58 100644
+> > --- a/include/linux/dmaengine.h
+> > +++ b/include/linux/dmaengine.h
+> > @@ -673,6 +673,8 @@ struct dma_filter {
+> >   * 	each type of direction, the dma controller should fill (1 <<
+> >   * 	<TYPE>) and same should be checked by controller as well
+> >   * @max_burst: max burst capability per-transfer
+> > + * @dst_bursts: bitfield of the available burst sizes for the destination
+> > + * @src_bursts: bitfield of the available burst sizes for the source
+> 
+> You did not define dst_bursts nor src_bursts.
+> 
+> >   * @residue_granularity: granularity of the transfer residue reported
+> >   *	by tx_status
+> >   * @device_alloc_chan_resources: allocate resources and return the
+> > @@ -800,6 +802,14 @@ struct dma_device {
+> >  static inline int dmaengine_slave_config(struct dma_chan *chan,
+> >  					  struct dma_slave_config *config)
+> >  {
+> > +	if (config->src_maxburst && config->device->src_bursts &&
+> > +	    !(BIT(config->src_maxburst) & config->device->src_bursts))
+> 
+> The maxburst may be as big as 4Kibytes, then, I am not sure that this
+> code will work!
+> 
+> > +		return -EINVAL;
+> > +
+> > +	if (config->dst_maxburst && config->device->dst_bursts &&
+> > +	    !(BIT(config->dst_maxburst) & config->device->dst_bursts))
+> > +		return -EINVAL;
+> > +
+> >  	if (chan->device->device_config)
+> >  		return chan->device->device_config(chan, config);
+> > -------8<------------ 
+> 
+> Yes, I know that the burst size is always a power of 2.
+> The best way to check it would be to change the {src,dts}_maxburst to a
+> bitmap of the possible bursts as 0x0d for 1,4 and 8 bytes. But this
+> asks for a lot of changes...
 
-	!mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
+To be honest, I'm not really a big fan of those tree wide changes
+without any way to maintain compatibility. It ends up in a single,
+huge patch if we want to maintain bisectability that just isn't
+reviewable.
 
-as indicator that the cts mode of the respective pin is used. Is this
-reliable? (It's not if there are machines that don't use CTS, neither as
-gpio nor using the hardware function.) Maybe this needs a dt property to
-indicate that there is no (hw)handshaking available?
-
-> +		} else {
-> +			...
->  		}
-
-Best regards
-Uwe
+Maxime
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/aaa8cf73/attachment.sig>
