@@ -1,44 +1,35 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 26 Oct 2016 17:57:24 -0700
-Subject: [PATCH v2] staging: vc04_services: Replace dmac_map_area with
- dmac_map_sg
-In-Reply-To: <20161026022327.19055-1-mzoran@crowfest.net>
-References: <20161026022327.19055-1-mzoran@crowfest.net>
-Message-ID: <87pommwqvf.fsf@eliezer.anholt.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 27 Oct 2016 09:20:14 +0800
+Subject: [PATCH 02/12] ASoC: dapm: Implement stereo mixer control support
+In-Reply-To: <20161026165753.GC25322@sirena.org.uk>
+References: <20161003110804.28235-1-wens@csie.org>
+ <20161003110804.28235-3-wens@csie.org>
+ <20161026165753.GC25322@sirena.org.uk>
+Message-ID: <CAGb2v673TH0dw15wL6W6-i7tqu245epu22MxpEkjQuNHTBhnJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Zoran <mzoran@crowfest.net> writes:
-
-> The original arm implementation uses dmac_map_area which is not
-> portable.  Replace it with an architecture neutral version
-> which uses dma_map_sg.
+On Thu, Oct 27, 2016 at 12:57 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Oct 03, 2016 at 07:07:54PM +0800, Chen-Yu Tsai wrote:
 >
-> As you can see that for larger page sizes, the dma_map_sg
-> implementation is faster then the original unportable dma_map_area
-> implementation.
+>> While DAPM is mono or single channel, its controls can be shared between
+>> widgets, such as sharing one stereo mixer control between the left and
+>> right channel widgets.
 >
-> Test                       dmac_map_area   dma_map_page dma_map_sg
-> vchiq_test -b 4 10000      51us/iter       76us/iter    76us
-> vchiq_test -b 8 10000      70us/iter       82us/iter    91us
-> vchiq_test -b 16 10000     94us/iter       118us/iter   121us
-> vchiq_test -b 32 10000     146us/iter      173us/iter   187us
-> vchiq_test -b 64 10000     263us/iter      328us/iter   299us
-> vchiq_test -b 128 10000    529us/iter      631us/iter   595us
-> vchiq_test -b 256 10000    2285us/iter     2275us/iter  2001us
-> vchiq_test -b 512 10000    4372us/iter     4616us/iter  4123us
+>> This patch introduces support for such shared mixer controls.
+>
+> Based on this changelog I'm really not sure what the intended semantic
+> of this change is which makes it difficult to review.  What are you
+> expecting these controls to look like and how are you expecting them to
+> work?
+>
+>> -static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i)
+>> +static void dapm_set_mixer_path_status(struct snd_soc_dapm_path *p, int i,
+>> +                                    int nth_path)
+>
+> It looks like the goal is to attach more than one path to a single
+> control somehow?
 
-Reviewed-by: Eric Anholt <eric@anholt.net>
+Correct. I'll try to expand the commit log and add an example diagram.
 
-Nice work!  More portability and better performance at the same time.
-
-A possible future improvement would be to track the pagelist, num_pages,
-and pagelist_size in a struct in the bulk->remote_data so we didn't need
-to recalculate them at free time.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161026/a859dc35/attachment.sig>
+ChenYu
