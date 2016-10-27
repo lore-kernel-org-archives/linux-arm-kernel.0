@@ -1,165 +1,84 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 27 Oct 2016 08:15:53 -0500
-Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <CAL_JsqJvm8+L0-pFQRQGYhvSzvqubWsBp8Q5kU-BPSiDmMau0A@mail.gmail.com>
-References: <20161019203347.17893-1-d-gerlach@ti.com>
- <20161019203347.17893-3-d-gerlach@ti.com> <7heg39pmgb.fsf@baylibre.com>
- <7f4754bb-7ded-6ce3-9558-a45b0d2b3888@ti.com> <7h1sz51y3p.fsf@baylibre.com>
- <CAL_JsqJvm8+L0-pFQRQGYhvSzvqubWsBp8Q5kU-BPSiDmMau0A@mail.gmail.com>
-Message-ID: <5811FE09.8000006@ti.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 27 Oct 2016 08:41:56 -0500
+Subject: [RFC PATCH 0/5] Add an overlay manager to handle board capes
+In-Reply-To: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+Message-ID: <CAL_JsqL9yWBj0yYE54XGi87YPGugGAACzr=CuW6dk5kk3EuyCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Jon
-On 10/26/2016 04:59 PM, Rob Herring wrote:
-> On Mon, Oct 24, 2016 at 12:00 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> Dave Gerlach <d-gerlach@ti.com> writes:
->>
->>> Hi,
->>> On 10/21/2016 01:48 PM, Kevin Hilman wrote:
->>>> Dave Gerlach <d-gerlach@ti.com> writes:
->>>>
->>>>> Add a generic power domain implementation, TI SCI PM Domains, that
->>>>> will hook into the genpd framework and allow the TI SCI protocol to
->>>>> control device power states.
->>>>>
->>>>> Also, provide macros representing each device index as understood
->>>>> by TI SCI to be used in the device node power-domain references.
->>>>> These are identifiers for the K2G devices managed by the PMMC.
->>>>>
->>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>>> ---
->>>>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
->>>>>  MAINTAINERS                                        |  2 +
->>>>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
->>>>>  3 files changed, 146 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>> new file mode 100644
->>>>> index 000000000000..32f38a349656
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>> @@ -0,0 +1,54 @@
->>>>> +Texas Instruments TI-SCI Generic Power Domain
->>>>> +---------------------------------------------
->>>>> +
->>>>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
->>>>> +responsible for controlling the state of the IPs that are present.
->>>>> +Communication between the host processor running an OS and the system
->>>>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
->>>>> +implementation plugs into the generic pm domain framework and makes use of
->>>>> +the TI SCI protocol power on and off each device when needed.
->>>>> +
->>>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>>>> +
->>>>> +PM Domain Node
->>>>> +==============
->>>>> +The PM domain node represents the global PM domain managed by the PMMC,
->>>>> +which in this case is the single implementation as documented by the generic
->>>>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
->>>>> +
->>>>> +Required Properties:
->>>>> +--------------------
->>>>> +- compatible: should be "ti,sci-pm-domain"
->>>>> +- #power-domain-cells: Must be 0.
->>>>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
->>>>>
->>>>> +Example:
->>>>> +--------------------
->>>>> +k2g_pds: k2g_pds {
->>>>
->>>> should use generic name like "power-contoller", e.g. k2g_pds: power-controller
->>>
->>> Ok, that makes more sense.
->>>
->>>>
->>>>> +        compatible = "ti,sci-pm-domain";
->>>>> +        #power-domain-cells = <0>;
->>>>> +        ti,sci = <&pmmc>;
->>>>> +};
->>>>> +
->>>>> +PM Domain Consumers
->>>>> +===================
->>>>> +Hardware blocks that require SCI control over their state must provide
->>>>> +a reference to the sci-pm-domain they are part of and a unique device
->>>>> +specific ID that identifies the device.
->>>>> +
->>>>> +Required Properties:
->>>>> +--------------------
->>>>> +- power-domains: phandle pointing to the corresponding PM domain node.
->>>>> +- ti,sci-id: index representing the device id to be passed oevr SCI to
->>>>> +        be used for device control.
->>>>
->>>> This ID doesn't look right.
->>>>
->>>> Why not use #power-domain-cells = <1> and pass the index in the DT? ...
-> 
-> Exactly. ti,sci-id is a NAK for me.
+Please Cc the maintainers of drivers/of/.
 
-I was told not to use the onecell during v1 discussion. I agree this would be
-ideal but I cannot due to what the bindings represent, the phandle parameter is
-an index into a list of genpds, whereas we need an actual ID number we can use
-and I do not have the ability to get that from the phandle.
++ Frank R, Hans, Dmitry S
 
-@Ulf/Jon, is there any hope of bringing back custom xlate functions for genpd
-providers? I don't have a good background on why it was even removed. I can
-maintain a single genpd for all devices but I need a way to parse this ID,
-whether it's from a separate property or a phandle. It is locked now to indexing
-into a list of genpds but I need additional per device information for devices
-bound to a genpd and I need either a custom parameter or the ability to parse
-the phandle myself.
+On Wed, Oct 26, 2016 at 9:57 AM, Antoine Tenart
+<antoine.tenart@free-electrons.com> wrote:
+> Hi all,
+>
+> Many boards now come with dips and compatible capes; among others the
+> C.H.I.P, or Beaglebones. All these boards have a kernel implementing an
+> out-of-tree "cape manager" which is used to detected capes, retrieve
+> their description and apply a corresponding overlay. This series is an
+> attempt to start a discussion, with an implementation of such a manager
+> which is somehow generic (i.e. formats or cape detectors can be added).
+> Other use cases could make use of this manager to dynamically load dt
+> overlays based on some input / hw presence.
 
-> 
->>>>
->>>>> +See dt-bindings/genpd/k2g.h for the list of valid identifiers for k2g.
->>>>> +
->>>>> +Example:
->>>>> +--------------------
->>>>> +uart0: serial at 02530c00 {
->>>>> +   compatible = "ns16550a";
->>>>> +   ...
->>>>> +   power-domains = <&k2g_pds>;
->>>>> +   ti,sci-id = <K2G_DEV_UART0>;
->>>>
->>>> ... like this:
->>>>
->>>>      power-domains = <&k2g_pds K2G_DEV_UART0>;
->>>
->>> That's how I did it in version one actually. I was able to define my
->>> own xlate function to parse the phandle and get that index, but Ulf
->>> pointed me to this series by Jon Hunter [1] that simplified genpd
->>> providers and dropped the concept of adding your own xlate. This locks
->>> the onecell approach to using a fixed static array of genpds that get
->>> indexed into (without passing the index to the provider, just the
->>> genpd that's looked up), which doesn't fit our usecase, as we don't
->>> want a 1 to 1 genpd to device mapping based on the comments provided
->>> in v1. Now we just use the genpd device attach/detach hooks to parse
->>> the sci-id and then use it in the genpd device start/stop hooks.
-> 
-> I have no idea what any of this means. All sounds like driver
-> architecture, not anything to do with bindings.
+I'd like to see an input source be the kernel command line and/or a DT
+chosen property. Another overlay manager was proposed not to long
+ago[1] as well. There's also the Allwinner tablet use case from Hans
+where i2c devices are probed and detected. That's not using overlays
+currently, but maybe could.
 
-This was a response to Kevin, not part of binding description.
+Another thing to consider is different sources of overlays. Besides in
+the filesystem, overlays could be built into the kernel (already
+supported), embedded in the dtb (as the other overlay mgr did) or we
+could extend FDT format to append them.
 
-> 
->>
->> Ah, right.  I remember now.  This approach allows you to use a single
->> genpd as discussed earlier.
->>
->> Makes sense now, suggestion retracted.
-> 
-> IIRC, the bindings in Jon's case had a node for each domain and didn't
-> need any additional property.
+> The proposed design is a library which can be used by detector drivers
+> to parse headers and load the corresponding overlay. Helpers are
+> provided for this purpose. The whole thing is divided into 3 entities:
+>
+> - The parser which is project-specific (to allow supporting headers
+>   already into the wild). It registers a function parsing an header's
+>   data and filling one or more strings which will be used to find
+>   matching dtbo on the fs.
+>
+> - The overlay manager helpers allowing to parse a header to retrieve
+>   the previously mentioned strings and to load a compatible overlay.
+>
+> - The detectors which are used to detect capes and get their description
+>   (to be parsed).
 
-Yes but we only have one domain and index into it, not into a list of domains,
-so the additional property is solving a different problem.
+What about things like power has to be turned on first to detect
+boards and read their ID? I think this needs to be tied into the
+driver model. Though, don't go sticking cape mgr nodes into DT. Maybe
+a driver gets bound to a connector node, but we've got to sort out
+connector bindings first.
 
-Regards,
-Dave
+> An example of parser and detector is given, compatible with what's done
+> for the C.H.I.P. As the w1 framework is really bad (and we should
+> probably do something about that) the detector code is far from being
+> perfect; but that's not related to what we try to achieve here.
+>
+> The actual implementation has a limitation: the detectors cannot be
+> built-in the kernel image as they would likely detect capes at boot time
+> but will fail to get their corresponding dt overlays as the fs isn't
+> mounted yet. The only case this can work is when dt overlays are
+> built-in firmwares. This isn't an issue for the C.H.I.P. use case right
+> now. There was a discussion about making an helper to wait for the
+> rootfs to be mount but the answer was "this is the driver's problem".
 
-> 
-> Rob
-> 
+I thought there are firmware loading calls that will wait. I think
+this all needs to work asynchronously both for firmware loading and
+because w1 is really slow.
+
+> I'd like to get comments, specifically from people using custom cape
+> managers, to see if this could fill their needs (with I guess some
+> modifications).
+
+Having 2 would certainly give a better sense this is generic.
+
+Rob
+
+[1] https://patchwork.ozlabs.org/patch/667805/
