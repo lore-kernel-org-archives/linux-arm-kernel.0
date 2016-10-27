@@ -1,42 +1,64 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 27 Oct 2016 09:07:23 +0530
-Subject: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
-In-Reply-To: <a3d4533f-165d-f444-7681-141479617a18@arm.com>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <1475600632-21289-7-git-send-email-sricharan@codeaurora.org>
- <a3d4533f-165d-f444-7681-141479617a18@arm.com>
-Message-ID: <004c01d23003$7230ed90$5692c8b0$@codeaurora.org>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Thu, 27 Oct 2016 11:54:35 +0800
+Subject: [PATCH 2/2] arm64/numa: support HAVE_MEMORYLESS_NODES
+In-Reply-To: <20161026183614.GJ15216@arm.com>
+References: <1477364358-10620-1-git-send-email-thunder.leizhen@huawei.com>
+ <1477364358-10620-3-git-send-email-thunder.leizhen@huawei.com>
+ <20161026183614.GJ15216@arm.com>
+Message-ID: <58117A7B.1040004@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
->-----Original Message-----
->From: Robin Murphy [mailto:robin.murphy at arm.com]
->Sent: Wednesday, October 26, 2016 8:37 PM
->To: Sricharan R <sricharan@codeaurora.org>; will.deacon at arm.com; joro at 8bytes.org; iommu at lists.linux-foundation.org; linux-arm-
->kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; laurent.pinchart at ideasonboard.com; m.szyprowski at samsung.com;
->tfiga at chromium.org; srinivas.kandagatla at linaro.org
->Subject: Re: [PATCH V3 6/8] arm: dma-mapping: Reset the device's dma_ops
->
->On 04/10/16 18:03, Sricharan R wrote:
->> The dma_ops for the device is not getting set to NULL in
->> arch_tear_down_dma_ops and this causes an issue when the
->> device's probe gets deferred and retried. So reset the
->> dma_ops to NULL.
->
->Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->
 
- Thanks.
+On 2016/10/27 2:36, Will Deacon wrote:
+> On Tue, Oct 25, 2016 at 10:59:18AM +0800, Zhen Lei wrote:
+>> Some numa nodes may have no memory. For example:
+>> 1) a node has no memory bank plugged.
+>> 2) a node has no memory bank slots.
+>>
+>> To ensure percpu variable areas and numa control blocks of the
+>> memoryless numa nodes to be allocated from the nearest available node to
+>> improve performance, defined node_distance_ready. And make its value to be
+>> true immediately after node distances have been initialized.
+>>
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  arch/arm64/Kconfig            | 4 ++++
+>>  arch/arm64/include/asm/numa.h | 3 +++
+>>  arch/arm64/mm/numa.c          | 6 +++++-
+>>  3 files changed, 12 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 30398db..648dd13 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -609,6 +609,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
+>>  	def_bool y
+>>  	depends on NUMA
+>>
+>> +config HAVE_MEMORYLESS_NODES
+>> +	def_bool y
+>> +	depends on NUMA
+> 
+> Given that patch 1 and the associated node_distance_ready stuff is all
+> an unqualified performance optimisation, is there any merit in just
+> enabling HAVE_MEMORYLESS_NODES in Kconfig and then optimising things as
+> a separate series when you have numbers to back it up?
+HAVE_MEMORYLESS_NODES is also an performance optimisation for memoryless scenario.
+For example:
+node0 is a memoryless node, node1 is the nearest node of node0.
+We want to allocate memory from node0, normally memory manager will try node0 first, then node1.
+But we have already kwown that node0 have no memory, so we can tell memory manager directly try
+node1 first. So HAVE_MEMORYLESS_NODES is used to skip the memoryless nodes, don't try them.
 
->This seems like it could stand independently from the rest of the series
->- might be worth rewording the commit message to more general terms,
->i.e. arch_teardown_dma_ops() being the inverse of arch_setup_dma_ops()
->thus clearing the ops set by the latter, and sending it to Russell as a
->fix in its own right.
+So I think the title of this patch is misleading, I will rewrite it in V2.
 
-  Ok, will reword the commit log and push this separately.
+Or, Do you mean separate it into a new patch?
 
-Regards,
- Sricharan
+
+> 
+> Will
+> 
+> .
+> 
