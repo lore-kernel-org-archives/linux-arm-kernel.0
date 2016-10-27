@@ -1,44 +1,37 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 27 Oct 2016 15:34:11 +0800
-Subject: [PATCH v2 4/4] arm64: arch timer: Add timer erratum property for
- Hip05-d02 and Hip06-d03
-In-Reply-To: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
-References: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1477553651-13428-4-git-send-email-dingtianhong@huawei.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 27 Oct 2016 16:37:53 +0900
+Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
+In-Reply-To: <20161027071523.GD7706@verge.net.au>
+References: <20161026052422.17283.57864.sendpatchset@little-apple>
+ <20161027070801.GB7706@verge.net.au> <20161027071523.GD7706@verge.net.au>
+Message-ID: <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable workaround for hisilicon erratum 161601 on Hip05-d02 and Hip06-d03 board.
+Hi Simon,
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+On Thu, Oct 27, 2016 at 4:15 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Oct 27, 2016 at 09:08:01AM +0200, Simon Horman wrote:
+>> On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
+>> > From: Magnus Damm <damm+renesas@opensource.se>
+>> >
+>> > Extend the ARM64 defconfig to enable the DU DRM device as module
+>> > together with required dependencies of V4L2 FCP and VSP modules.
+>> >
+>> > This enables VGA output on the r8a7795 Salvator-X board.
+>> >
+>> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+>>
+>> Thanks, I have queued this up.
+>
+> Given discussion elsewhere on enabling DU I am holding off on this for a
+> little; it is not queued up for now.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-index bf322ed..f815d94 100644
---- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-@@ -281,6 +281,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161601;
- 	};
- 
- 	pmu {
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index 5927bc4..d63990b 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -260,6 +260,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161601;
- 	};
- 
- 	pmu {
--- 
-1.9.0
+Sure, thanks for holding off the DT integration patches for r8a7796.
+Please note that as of mainline v4.9-rc2 the r8a7795 Salvator-X board
+has thanks to DU, FCP and VSP a working VGA port. So enabling those
+devices in the defconfig from now on makes sense to me.
+
+Cheers,
+
+/ magnus
