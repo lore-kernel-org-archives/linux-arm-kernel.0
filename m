@@ -1,107 +1,134 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu, 27 Oct 2016 17:32:36 +0200
-Subject: [PATCH v4] ARM: davinci: da8xx: Remove duplicated defines
-In-Reply-To: <1477582356-28156-1-git-send-email-abailon@baylibre.com>
-References: <1477582356-28156-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1477582356-28156-2-git-send-email-abailon@baylibre.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 27 Oct 2016 23:32:54 +0800
+Subject: [PATCH v3 2/3] drm: zte: add initial vou drm driver
+In-Reply-To: <20161020122958.GC10198@joana>
+Message-ID: <20161027153128.GS30578@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some macro for DA8xx CFGCHIP are defined in usb-davinci.h,
-but da8xx-cfgchip.h intend to replace them.
-Remove duplicated defines between da8xx-cfgchip.h and usb-davinci.h
+Hi Gustavo,
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- arch/arm/mach-davinci/board-da830-evm.c     |  5 +++--
- arch/arm/mach-davinci/board-omapl138-hawk.c |  3 ++-
- include/linux/platform_data/usb-davinci.h   | 23 -----------------------
- 3 files changed, 5 insertions(+), 26 deletions(-)
+Thanks for looking at the patch.
 
-diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
-index 3d8cf8c..df1f409 100644
---- a/arch/arm/mach-davinci/board-da830-evm.c
-+++ b/arch/arm/mach-davinci/board-da830-evm.c
-@@ -18,6 +18,7 @@
- #include <linux/i2c.h>
- #include <linux/i2c/pcf857x.h>
- #include <linux/platform_data/at24.h>
-+#include <linux/mfd/da8xx-cfgchip.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
- #include <linux/spi/spi.h>
-@@ -116,7 +117,7 @@ static __init void da830_evm_usb_init(void)
- 	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
- 
- 	/* USB2.0 PHY reference clock is 24 MHz */
--	cfgchip2 &= ~CFGCHIP2_REFFREQ;
-+	cfgchip2 &= ~CFGCHIP2_REFFREQ_MASK;
- 	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
- 
- 	/*
-@@ -133,7 +134,7 @@ static __init void da830_evm_usb_init(void)
- 	 * controller won't be able to drive VBUS thinking that it's a B-device.
- 	 * Otherwise, we want to use the OTG mode and enable VBUS comparators.
- 	 */
--	cfgchip2 &= ~CFGCHIP2_OTGMODE;
-+	cfgchip2 &= ~CFGCHIP2_OTGMODE_MASK;
- #ifdef	CONFIG_USB_MUSB_HOST
- 	cfgchip2 |=  CFGCHIP2_FORCE_HOST;
- #else
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index ee62486..e1efa10 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/console.h>
- #include <linux/gpio.h>
-+#include <linux/mfd/da8xx-cfgchip.h>
- #include <linux/platform_data/gpio-davinci.h>
- 
- #include <asm/mach-types.h>
-@@ -254,7 +255,7 @@ static __init void omapl138_hawk_usb_init(void)
- 	/* Setup the Ref. clock frequency for the HAWK at 24 MHz. */
- 
- 	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
--	cfgchip2 &= ~CFGCHIP2_REFFREQ;
-+	cfgchip2 &= ~CFGCHIP2_REFFREQ_MASK;
- 	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
- 	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
- 
-diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
-index e0bc4ab..0926e99 100644
---- a/include/linux/platform_data/usb-davinci.h
-+++ b/include/linux/platform_data/usb-davinci.h
-@@ -11,29 +11,6 @@
- #ifndef __ASM_ARCH_USB_H
- #define __ASM_ARCH_USB_H
- 
--/* DA8xx CFGCHIP2 (USB 2.0 PHY Control) register bits */
--#define CFGCHIP2_PHYCLKGD	(1 << 17)
--#define CFGCHIP2_VBUSSENSE	(1 << 16)
--#define CFGCHIP2_RESET		(1 << 15)
--#define CFGCHIP2_OTGMODE	(3 << 13)
--#define CFGCHIP2_NO_OVERRIDE	(0 << 13)
--#define CFGCHIP2_FORCE_HOST	(1 << 13)
--#define CFGCHIP2_FORCE_DEVICE 	(2 << 13)
--#define CFGCHIP2_FORCE_HOST_VBUS_LOW (3 << 13)
--#define CFGCHIP2_USB1PHYCLKMUX	(1 << 12)
--#define CFGCHIP2_USB2PHYCLKMUX	(1 << 11)
--#define CFGCHIP2_PHYPWRDN	(1 << 10)
--#define CFGCHIP2_OTGPWRDN	(1 << 9)
--#define CFGCHIP2_DATPOL 	(1 << 8)
--#define CFGCHIP2_USB1SUSPENDM	(1 << 7)
--#define CFGCHIP2_PHY_PLLON	(1 << 6)	/* override PLL suspend */
--#define CFGCHIP2_SESENDEN	(1 << 5)	/* Vsess_end comparator */
--#define CFGCHIP2_VBDTCTEN	(1 << 4)	/* Vbus comparator */
--#define CFGCHIP2_REFFREQ	(0xf << 0)
--#define CFGCHIP2_REFFREQ_12MHZ	(1 << 0)
--#define CFGCHIP2_REFFREQ_24MHZ	(2 << 0)
--#define CFGCHIP2_REFFREQ_48MHZ	(3 << 0)
--
- struct	da8xx_ohci_root_hub;
- 
- typedef void (*da8xx_ocic_handler_t)(struct da8xx_ohci_root_hub *hub,
--- 
-2.7.3
+> 2016-10-20 Shawn Guo <shawn.guo@linaro.org>:
+> 
+> > It adds the initial ZTE VOU display controller DRM driver.  There are
+> > still some features to be added, like overlay plane, scaling, and more
+> > output devices support.  But it's already useful with dual CRTCs and
+> > HDMI monitor working.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+
+<snip>
+
+> > +static void zx_hdmi_connector_destroy(struct drm_connector *connector)
+> > +{
+> > +     drm_connector_unregister(connector);
+> 
+> drm_connector_unregister() is not needed anymore. DRM core will call it
+> for you.
+> 
+> > +     drm_connector_cleanup(connector);
+> > +}
+> > +
+> > +static const struct drm_connector_funcs zx_hdmi_connector_funcs = {
+> > +     .dpms = drm_atomic_helper_connector_dpms,
+> > +     .fill_modes = drm_helper_probe_single_connector_modes,
+> > +     .detect = zx_hdmi_connector_detect,
+> > +     .destroy = zx_hdmi_connector_destroy,
+> 
+> Then here you can use drm_connector_cleanup() directly.
+
+Okay, will do.
+
+> > +     .reset = drm_atomic_helper_connector_reset,
+> > +     .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> > +     .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+> > +};
+
+<snip>
+
+> > +static void zx_crtc_atomic_begin(struct drm_crtc *crtc,
+> > +                              struct drm_crtc_state *state)
+> > +{
+> > +     struct drm_pending_vblank_event *event = crtc->state->event;
+> > +
+> > +     if (!event)
+> > +             return;
+> > +
+> > +     crtc->state->event = NULL;
+> > +
+> > +     spin_lock_irq(&crtc->dev->event_lock);
+> > +     if (drm_crtc_vblank_get(crtc) == 0)
+> > +             drm_crtc_arm_vblank_event(crtc, event);
+> > +     else
+> > +             drm_crtc_send_vblank_event(crtc, event);
+> > +     spin_unlock_irq(&crtc->dev->event_lock);
+> 
+> I think you may want to send the vblank event to userspace after you
+> commit your planes, and not before.
+
+I guess you are suggesting that the code should be implemented in
+.atomic_flush hook instead, right?
+
+> > +}
+> > +
+> > +static const struct drm_crtc_helper_funcs zx_crtc_helper_funcs = {
+> > +     .enable = zx_crtc_enable,
+> > +     .disable = zx_crtc_disable,
+> > +     .atomic_begin = zx_crtc_atomic_begin,
+> > +};
+> > +
+> > +static const struct drm_crtc_funcs zx_crtc_funcs = {
+> > +     .destroy = drm_crtc_cleanup,
+> > +     .set_config = drm_atomic_helper_set_config,
+> > +     .page_flip = drm_atomic_helper_page_flip,
+> > +     .reset = drm_atomic_helper_crtc_reset,
+> > +     .atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+> > +     .atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
+> > +};
+> > +
+> > +static int zx_crtc_init(struct drm_device *drm, struct zx_vou_hw *vou,
+> > +                     enum vou_chn_type chn_type)
+> > +{
+> > +     struct device *dev = vou->dev;
+> > +     struct zx_layer_data data;
+> > +     struct zx_crtc *zcrtc;
+> > +     int ret;
+> > +
+> > +     zcrtc = devm_kzalloc(dev, sizeof(*zcrtc), GFP_KERNEL);
+> > +     if (!zcrtc)
+> > +             return -ENOMEM;
+> > +
+> > +     zcrtc->vou = vou;
+> > +     zcrtc->chn_type = chn_type;
+> > +
+> > +     if (chn_type == VOU_CHN_MAIN) {
+> > +             data.layer = vou->osd + MAIN_GL_OFFSET;
+> > +             data.csc = vou->osd + MAIN_CSC_OFFSET;
+> > +             data.hbsc = vou->osd + MAIN_HBSC_OFFSET;
+> > +             data.rsz = vou->otfppu + MAIN_RSZ_OFFSET;
+> > +             zcrtc->chnreg = vou->osd + OSD_MAIN_CHN;
+> > +             zcrtc->regs = &main_crtc_regs;
+> > +             zcrtc->bits = &main_crtc_bits;
+> > +     } else {
+> > +             data.layer = vou->osd + AUX_GL_OFFSET;
+> > +             data.csc = vou->osd + AUX_CSC_OFFSET;
+> > +             data.hbsc = vou->osd + AUX_HBSC_OFFSET;
+> > +             data.rsz = vou->otfppu + AUX_RSZ_OFFSET;
+> > +             zcrtc->chnreg = vou->osd + OSD_AUX_CHN;
+> > +             zcrtc->regs = &aux_crtc_regs;
+> > +             zcrtc->bits = &aux_crtc_bits;
+> > +     }
+> > +
+> > +     zcrtc->pixclk = devm_clk_get(dev, (chn_type == VOU_CHN_MAIN) ?
+> > +                                       "main_wclk" : "aux_wclk");
+> > +     if (IS_ERR(zcrtc->pixclk)) {
+> > +             ret = PTR_ERR(zcrtc->pixclk);
+> > +             dev_err(dev, "failed to get pix clk: %d\n", ret);
+> 
+> DRM_ERROR() - here and in other places in your patch
+
+I will follow Sean's suggestion to use DRM_DEV_* for these messages.
+
+Shawn
