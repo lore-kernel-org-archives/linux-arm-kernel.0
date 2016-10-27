@@ -1,148 +1,343 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 27 Oct 2016 23:02:25 +0800
-Subject: [SPAM][PATCH 2/3] irqchip: mtk-cirq: Add mediatek mtk-cirq
- implement
-In-Reply-To: <1476335194-26604-3-git-send-email-youlin.pei@mediatek.com>
-References: <1476335194-26604-1-git-send-email-youlin.pei@mediatek.com>
- <1476335194-26604-3-git-send-email-youlin.pei@mediatek.com>
-Message-ID: <1477580545.5951.3.camel@mtksdaap41>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Thu, 27 Oct 2016 18:07:09 +0300
+Subject: [RFC PATCH 1/5] of: introduce the overlay manager
+In-Reply-To: <20161026145756.21689-2-antoine.tenart@free-electrons.com>
+References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
+ <20161026145756.21689-2-antoine.tenart@free-electrons.com>
+Message-ID: <2BF95C0B-2BAA-4BDD-AA60-D08613A9893A@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-10-13 at 13:06 +0800, Youlin Pei wrote:
-> This commit add the mtk-cirq implement for mt2701.
+Hi Antoine,
+
+> On Oct 26, 2016, at 17:57 , Antoine Tenart <antoine.tenart@free-electrons.com> wrote:
 > 
-> Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+> The overlay manager is an in-kernel library helping to handle dt overlay
+> loading when using capes.
+> 
+
+Code related comments
+
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
->  drivers/irqchip/Makefile       |    2 +-
->  drivers/irqchip/irq-mtk-cirq.c |  257 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 258 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/irqchip/irq-mtk-cirq.c
+> drivers/of/Kconfig                           |   2 +
+> drivers/of/Makefile                          |   1 +
+> drivers/of/overlay-manager/Kconfig           |   6 +
+> drivers/of/overlay-manager/Makefile          |   1 +
+> drivers/of/overlay-manager/overlay-manager.c | 199 +++++++++++++++++++++++++++
+> include/linux/overlay-manager.h              |  38 +++++
+> 6 files changed, 247 insertions(+)
+> create mode 100644 drivers/of/overlay-manager/Kconfig
+> create mode 100644 drivers/of/overlay-manager/Makefile
+> create mode 100644 drivers/of/overlay-manager/overlay-manager.c
+> create mode 100644 include/linux/overlay-manager.h
 > 
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index 4c203b6..eee95c6 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -59,7 +59,7 @@ obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
->  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
->  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
->  obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
-> -obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
-> +obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o irq-mtk-cirq.o
->  obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
->  obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
->  obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
-> diff --git a/drivers/irqchip/irq-mtk-cirq.c b/drivers/irqchip/irq-mtk-cirq.c
+> diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+> index bc07ad30c9bf..e57aeaf0bf4f 100644
+> --- a/drivers/of/Kconfig
+> +++ b/drivers/of/Kconfig
+> @@ -116,4 +116,6 @@ config OF_OVERLAY
+> config OF_NUMA
+> 	bool
+> 
+> +source "drivers/of/overlay-manager/Kconfig"
+> +
+> endif # OF
+> diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+> index d7efd9d458aa..d738fd41271f 100644
+> --- a/drivers/of/Makefile
+> +++ b/drivers/of/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_OF_OVERLAY) += overlay.o
+> obj-$(CONFIG_OF_NUMA) += of_numa.o
+> 
+> obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+> +obj-y += overlay-manager/
+> diff --git a/drivers/of/overlay-manager/Kconfig b/drivers/of/overlay-manager/Kconfig
 > new file mode 100644
-> index 0000000..544767d
+> index 000000000000..eeb76054dcb8
 > --- /dev/null
-> +++ b/drivers/irqchip/irq-mtk-cirq.c
-> @@ -0,0 +1,257 @@
+> +++ b/drivers/of/overlay-manager/Kconfig
+> @@ -0,0 +1,6 @@
+> +config OF_OVERLAY_MGR
+> +	bool "Device Tree Overlay Manager"
+> +	depends on OF_OVERLAY
+> +	help
+> +	  Enable the overlay manager to handle automatic overlay loading when
+> +	  devices are detected.
+> diff --git a/drivers/of/overlay-manager/Makefile b/drivers/of/overlay-manager/Makefile
+> new file mode 100644
+> index 000000000000..86d2b53950e7
+> --- /dev/null
+> +++ b/drivers/of/overlay-manager/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_OF_OVERLAY_MGR)			+= overlay-manager.o
+> diff --git a/drivers/of/overlay-manager/overlay-manager.c b/drivers/of/overlay-manager/overlay-manager.c
+> new file mode 100644
+> index 000000000000..a725d7e24d38
+> --- /dev/null
+> +++ b/drivers/of/overlay-manager/overlay-manager.c
+> @@ -0,0 +1,199 @@
 > +/*
-> + * Copyright (c) 2016 MediaTek Inc.
-> + * Author: Youlin.Pei <youlin.pei@mediatek.com>
+> + * Copyright (C) 2016 - Antoine Tenart <antoine.tenart@free-electrons.com>
 > + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
 > + */
 > +
-> +#include <linux/irq.h>
-> +#include <linux/irqchip.h>
-> +#include <linux/irqdomain.h>
+> +#include <linux/firmware.h>
+> +#include <linux/list.h>
 > +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/io.h>
+> +#include <linux/of_fdt.h>
+> +#include <linux/overlay-manager.h>
 > +#include <linux/slab.h>
 > +#include <linux/spinlock.h>
-> +#include <linux/syscore_ops.h>
 > +
-> +#define CIRQ_MASK_SET	0xC0
-> +#define CIRQ_MASK_CLR	0x100
-> +#define CIRQ_SENS_SET	0x180
-> +#define CIRQ_SENS_CLR	0x1C0
-
-nit: please use lower case for hex value
-
-> +#define CIRQ_POL_SET	0x240
-> +#define CIRQ_POL_CLR	0x280
-> +#define CIRQ_CONTROL	0x300
-> +
-> +#define CIRQ_EN		0x1
-
-nit: please align
-
-> +#define CIRQ_EDGE	0x2
-> +#define CIRQ_FLUSH	0x4
-> +
-> +#define CIRQ_IRQ_NUM    0x200
-> +
-> +struct mtk_cirq_chip_data {
-> +	void __iomem *base;
-> +	unsigned int ext_irq_start;
+> +struct overlay_mgr_overlay {
+> +	struct list_head list;
+> +	char *name;
 > +};
 > +
-
-<deleted..>
-
+> +LIST_HEAD(overlay_mgr_overlays);
+> +LIST_HEAD(overlay_mgr_formats);
+> +DEFINE_SPINLOCK(overlay_mgr_lock);
+> +DEFINE_SPINLOCK(overlay_mgr_format_lock);
 > +
-> +static int __init mtk_cirq_of_init(struct device_node *node,
-> +				   struct device_node *parent)
+
+Is there a reason for using spinlocks here? OF uses a mutex for
+locking since we don?t expect OF manipulation occurring in a
+non schedulable context.
+
+> +/*
+> + * overlay_mgr_register_format()
+> + *
+> + * Adds a new format candidate to the list of supported formats. The registered
+> + * formats are used to parse the headers stored on the dips.
+> + */
+> +int overlay_mgr_register_format(struct overlay_mgr_format *candidate)
 > +{
-> +	struct irq_domain *domain, *domain_parent;
-> +	int ret;
+> +	struct overlay_mgr_format *format;
+> +	int err = 0;
 > +
-> +	domain_parent = irq_find_host(parent);
-> +	if (!domain_parent) {
-> +		pr_err("mtk_cirq: interrupt-parent not found\n");
+> +	spin_lock(&overlay_mgr_format_lock);
+> +
+> +	/* Check if the format is already registered */
+> +	list_for_each_entry(format, &overlay_mgr_formats, list) {
+> +		if (!strcpy(format->name, candidate->name)) {
+> +			err = -EEXIST;
+> +			goto err;
+> +		}
+> +	}
+> +
+> +	list_add_tail(&candidate->list, &overlay_mgr_formats);
+> +
+> +err:
+> +	spin_unlock(&overlay_mgr_format_lock);
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(overlay_mgr_register_format);
+> +
+> +/*
+> + * overlay_mgr_parse()
+> + *
+> + * Parse raw data with registered format parsers. Fills the candidate string if
+> + * one parser understood the raw data format.
+> + */
+> +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
+> +		      unsigned *n)
+> +{
+
+The two argument format is not very readable. Perhaps use a structure instead?
+
+> +	struct list_head *pos, *tmp;
+> +	struct overlay_mgr_format *format;
+> +
+> +	list_for_each_safe(pos, tmp, &overlay_mgr_formats) {
+> +		format = list_entry(pos, struct overlay_mgr_format, list);
+> +
+> +		format->parse(dev, data, candidates, n);
+> +		if (n > 0)
+> +			return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL_GPL(overlay_mgr_parse);
+> +
+> +static int overlay_mgr_check_overlay(struct device_node *node)
+> +{
+> +	struct property *p;
+> +	const char *str = NULL;
+> +
+> +	p = of_find_property(node, "compatible", NULL);
+> +	if (!p)
 > +		return -EINVAL;
-> +	}
 > +
-> +	cirq_data = kzalloc(sizeof(*cirq_data), GFP_KERNEL);
-> +	if (!cirq_data)
-> +		return -ENOMEM;
-> +
-> +	cirq_data->base = of_iomap(node, 0);
-> +	if (!cirq_data->base) {
-> +		pr_err("mtk_cirq: unable to map cirq register\n");
-> +		ret = -ENXIO;
-> +		goto out_free;
-> +	}
-> +
-> +	if (of_property_read_u32(node, "mediatek,ext-irq-start",
-> +				 &cirq_data->ext_irq_start)) {
-> +		ret = -EINVAL;
-> +		goto out_free;
+> +	do {
+> +		str = of_prop_next_string(p, str);
+> +		if (of_machine_is_compatible(str))
+> +			return 0;
 
-Please propagate error returned from of_property_read_u32
-Should goto out_unmap when fail here.
+I think this is very similar to the way of_match_node works.
+Find a way to use that instead?
 
-Joe.C
-
-> +	}
+> +	} while (str);
 > +
-> +	domain = irq_domain_add_hierarchy(domain_parent, 0, CIRQ_IRQ_NUM, node,
-> +					  &cirq_domain_ops, cirq_data);
-> +	if (!domain) {
-> +		ret = -ENOMEM;
-> +		goto out_unmap;
-> +	}
-> +
-> +	mtk_cirq_syscore_init();
-> +
-> +	return 0;
-> +
-> +out_unmap:
-> +	iounmap(cirq_data->base);
-> +out_free:
-> +	kfree(cirq_data);
-> +	return ret;
+> +	return -EINVAL;
 > +}
 > +
-> +IRQCHIP_DECLARE(mtk_cirq, "mediatek,mt2701-cirq", mtk_cirq_of_init);
+> +/*
+> + * _overlay_mgr_insert()
+> + *
+> + * Try to request and apply an overlay given a candidate name.
+> + */
+> +static int _overlay_mgr_apply(struct device *dev, char *candidate)
+> +{
+> +	struct overlay_mgr_overlay *overlay;
+> +	struct device_node *node;
+> +	const struct firmware *firmware;
+> +	char *firmware_name;
+> +	int err = 0;
+> +
+> +	spin_lock(&overlay_mgr_lock);
+> +
+> +	list_for_each_entry(overlay, &overlay_mgr_overlays, list) {
+> +		if (!strcmp(overlay->name, candidate)) {
+> +			dev_err(dev, "overlay already loaded\n");
+> +			err = -EEXIST;
+> +			goto err_lock;
+> +		}
+> +	}
+> +
+> +	overlay = devm_kzalloc(dev, sizeof(*overlay), GFP_KERNEL);
+> +	if (!overlay) {
+> +		err = -ENOMEM;
+> +		goto err_lock;
+> +	}
+> +
+
+spinlock and possibly sleeping?
+
+> +	overlay->name = candidate;
+> +
+> +	firmware_name = kasprintf(GFP_KERNEL, "overlay-%s.dtbo", candidate);
+> +	if (!firmware_name) {
+> +		err = -ENOMEM;
+> +		goto err_free;
+> +	}
+> +
+> +	dev_info(dev, "requesting firmware '%s'\n", firmware_name);
+> +
+> +	err = request_firmware_direct(&firmware, firmware_name, dev);
+> +	if (err) {
+> +		dev_info(dev, "failed to request firmware '%s'\n",
+> +			 firmware_name);
+> +		goto err_free;
+> +	}
+> +
+
+Same here.
+
+> +	of_fdt_unflatten_tree((unsigned long *)firmware->data, NULL, &node);
+> +	if (!node) {
+> +		dev_err(dev, "failed to unflatted tree\n");
+> +		err = -EINVAL;
+> +		goto err_fw;
+> +	}
+> +
+> +	of_node_set_flag(node, OF_DETACHED);
+> +
+> +	err = of_resolve_phandles(node);
+> +	if (err) {
+> +		dev_err(dev, "failed to resolve phandles: %d\n", err);
+> +		goto err_fw;
+> +	}
+> +
+> +	err = overlay_mgr_check_overlay(node);
+> +	if (err) {
+> +		dev_err(dev, "overlay checks failed: %d\n", err);
+> +		goto err_fw;
+> +	}
+> +
+> +	err = of_overlay_create(node);
+> +	if (err < 0) {
+> +		dev_err(dev, "failed to create overlay: %d\n", err);
+> +		goto err_fw;
+> +	}
+> +
+> +	list_add_tail(&overlay->list, &overlay_mgr_overlays);
+> +
+> +	dev_info(dev, "loaded firmware '%s'\n", firmware_name);
+> +
+> +	spin_unlock(&overlay_mgr_lock);
+> +	return 0;
+> +
+> +err_fw:
+> +	release_firmware(firmware);
+> +err_free:
+> +	devm_kfree(dev, overlay);
+> +err_lock:
+> +	spin_unlock(&overlay_mgr_lock);
+> +	return err;
+> +}
+> +
+> +int overlay_mgr_apply(struct device *dev, char **candidates, unsigned n)
+> +{
+> +	int i, ret;
+> +
+> +	for (i=0; i < n; i++) {
+> +		ret = _overlay_mgr_apply(dev, candidates[i]);
+> +		if (!ret)
+> +			return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL_GPL(overlay_mgr_apply);
+> diff --git a/include/linux/overlay-manager.h b/include/linux/overlay-manager.h
+> new file mode 100644
+> index 000000000000..8adcc4f5ddf6
+> --- /dev/null
+> +++ b/include/linux/overlay-manager.h
+> @@ -0,0 +1,38 @@
+> +/*
+> + * Copyright (C) 2016 - Antoine Tenart <antoine.tenart@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef __OVERLAY_MGR_H__
+> +#define __OVERLAY_MGR_H__
+> +
+> +#include <linux/device.h>
+> +#include <linux/list.h>
+> +#include <linux/sizes.h>
+> +
+> +#define OVERLAY_MGR_DIP_MAX_SZ		SZ_128
+> +
+> +struct overlay_mgr_format {
+> +	struct list_head list;
+> +	char *name;
+> +	int (*parse)(struct device *dev, void *data, char ***candidates,
+> +		     unsigned *n);
+> +};
+> +
+> +int overlay_mgr_register_format(struct overlay_mgr_format *candidate);
+> +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
+> +		      unsigned *n);
+> +int overlay_mgr_apply(struct device *dev, char **candidates, unsigned n);
+> +
+> +#define dip_convert(field)                                      \
+> +        (                                                       \
+> +                (sizeof(field) == 1) ? field :                  \
+> +                (sizeof(field) == 2) ? be16_to_cpu(field) :     \
+> +                (sizeof(field) == 4) ? be32_to_cpu(field) :     \
+> +                -1                                              \
+> +        )
+> +
+> +#endif /* __OVERLAY_MGR_H__ */
+> -- 
+> 2.10.1
+> 
