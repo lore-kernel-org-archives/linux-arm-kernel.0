@@ -1,63 +1,37 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 28 Oct 2016 01:13:31 +0200
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
- <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
-Message-ID: <20161027231331.gngekbg22wfvnolr@piout.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Oct 2016 16:23:06 -0700
+Subject: [PATCH] ARM: dts: msm8974: Remove "unused" reserved region
+Message-ID: <20161027232306.13653-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/2016 at 20:02:29 +0200, Uwe Kleine-K?nig wrote :
-> Hello Richard,
-> 
-> On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
-> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> > index fd8aa1f4ba78..168b10cad47b 100644
-> > --- a/drivers/tty/serial/atmel_serial.c
-> > +++ b/drivers/tty/serial/atmel_serial.c
-> > @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
-> >  		mode |= ATMEL_US_USMODE_RS485;
-> >  	} else if (termios->c_cflag & CRTSCTS) {
-> >  		/* RS232 with hardware handshake (RTS/CTS) */
-> > -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> > -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> > -			termios->c_cflag &= ~CRTSCTS;
-> > -		} else {
-> > +		if (atmel_use_fifo(port) &&
-> > +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
-> > +			/*
-> > +			 * with ATMEL_US_USMODE_HWHS set, the controller will
-> > +			 * be able to drive the RTS pin high/low when the RX
-> > +			 * FIFO is above RXFTHRES/below RXFTHRES2.
-> > +			 * It will also disable the transmitter when the CTS
-> > +			 * pin is high.
-> > +			 * This mode is not activated if CTS pin is a GPIO
-> > +			 * because in this case, the transmitter is always
-> > +			 * disabled (there must be an internal pull-up
-> > +			 * responsible for this behaviour).
-> > +			 * If the RTS pin is a GPIO, the controller won't be
-> > +			 * able to drive it according to the FIFO thresholds,
-> > +			 * but it will be handled by the driver.
-> > +			 */
-> >  			mode |= ATMEL_US_USMODE_HWHS;
-> 
-> You use
-> 
-> 	!mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
-> 
-> as indicator that the cts mode of the respective pin is used. Is this
-> reliable? (It's not if there are machines that don't use CTS, neither as
-> gpio nor using the hardware function.) Maybe this needs a dt property to
-> indicate that there is no (hw)handshaking available?
-> 
+>From what I can tell by looking at the android 3.10 kernel
+sources for msm8974, this isn't actually a reserved region.
+Instead it's marked as "unused" for reserved regions. Let's
+remove it so we get back a good chunk of memory.
 
-We had a call today were we agreed that this should be added in a future
-patch. Let's fix the regression for now.
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 561d4d136762..5f4752696171 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -58,11 +58,6 @@
+ 			reg = <0x0fd80000 0x180000>;
+ 			no-map;
+ 		};
+-
+-		unused at 0ff00000 {
+-			reg = <0x0ff00000 0x10100000>;
+-			no-map;
+-		};
+ 	};
+ 
+ 	cpus {
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
