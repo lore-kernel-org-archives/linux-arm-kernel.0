@@ -1,56 +1,94 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 27 Oct 2016 17:27:08 +0100
-Subject: [PATCH v3 0/3] modversions: Fix CRC mangling under
- CONFIG_RELOCATABLE=y
-Message-ID: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu, 27 Oct 2016 17:27:09 +0100
+Subject: [PATCH v3 1/3] powerpc/reloc32: fix corrupted modversion CRCs
+In-Reply-To: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1477585631-18574-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is a followup to the single patch 'modversions: treat symbol
-CRCs as 32 bit quantities on 64 bit archs', of which two versions have
-been sent out so far [0][1]
+Commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix causes
+perf issues") fixed an issue with relocatable PIE kernels in a way that
+essentially reintroduced the issue again for 32-bit builds.
 
-As pointed out by Michael, GNU ld behaves a bit differently between arm64
-and PowerPC64, and where the former gets rid of all runtime relocations
-related to CRCs, the latter is not as easily convinced.
+Since the chosen approach does is not applicable to 32-bit, fix the
+issue by updating the runtime relocation routine to ignore the load
+offset for the interval [__start___kcrctab, __stop___kcrctab_gpl_future),
+which is where the CRCs reside. This ensures that the values of the CRC
+pseudo-symbols are no longer made dependent on the runtime load offset.
 
-Patch #1 fixes the issue where CRCs are corrupted by the runtime relocation
-routines for 32-bit PowerPC, for which the original fix was effectively
-reverted by commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix
-causes perf issues")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/powerpc/kernel/reloc_32.S | 36 +++++++++++++++++---
+ 1 file changed, 32 insertions(+), 4 deletions(-)
 
-Patch #2 adds handling of R_PPC64_ADDR32 relocations against the NULL .dynsym
-symbol entry to the PPC64 runtime relocation routines, so it is prepared to
-deal with CRCs being emitted as 32-bit quantities.
-
-Patch #3 is the original patch from the v1 and v2 submissions.
-
-Changes since v2:
-- added #1 and #2
-- updated #3 to deal with CRC entries being emitted from assembler
-- added Rusty's ack (#3)
-
-Branch can be found here:
-https://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git/log/?h=kcrctab-reloc
-
-[0] http://marc.info/?l=linux-kernel&m=147652300207369&w=2
-[1] http://marc.info/?l=linux-kernel&m=147695629614409&w=2
-
-Ard Biesheuvel (3):
-  powerpc/reloc32: fix corrupted modversion CRCs
-  powerpc/reloc64: add support for 32-bit CRC pseudo-symbols
-  modversions: treat symbol CRCs as 32 bit quantities on 64 bit archs
-
- arch/powerpc/include/asm/module.h |  4 --
- arch/powerpc/kernel/module_64.c   |  8 ----
- arch/powerpc/kernel/reloc_32.S    | 36 +++++++++++++--
- arch/powerpc/kernel/reloc_64.S    | 22 +++++++--
- arch/powerpc/relocs_check.sh      |  3 +-
- include/asm-generic/export.h      |  7 +--
- include/linux/export.h            |  8 ++++
- include/linux/module.h            | 14 +++---
- kernel/module.c                   | 47 +++++++-------------
- 9 files changed, 85 insertions(+), 64 deletions(-)
-
+diff --git a/arch/powerpc/kernel/reloc_32.S b/arch/powerpc/kernel/reloc_32.S
+index f366fedb0872..150686b9febb 100644
+--- a/arch/powerpc/kernel/reloc_32.S
++++ b/arch/powerpc/kernel/reloc_32.S
+@@ -87,12 +87,12 @@ eodyn:				/* End of Dyn Table scan */
+ 	 * Work out the current offset from the link time address of .rela
+ 	 * section.
+ 	 *  cur_offset[r7] = rela.run[r9] - rela.link [r7]
+-	 *  _stext.link[r12] = _stext.run[r10] - cur_offset[r7]
+-	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r12]
++	 *  _stext.link[r11] = _stext.run[r10] - cur_offset[r7]
++	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r11]
+ 	 */
+ 	subf	r7, r7, r9	/* cur_offset */
+-	subf	r12, r7, r10
+-	subf	r3, r12, r3	/* final_offset */
++	subf	r11, r7, r10
++	subf	r3, r11, r3	/* final_offset */
+ 
+ 	subf	r8, r6, r8	/* relaz -= relaent */
+ 	/*
+@@ -101,6 +101,21 @@ eodyn:				/* End of Dyn Table scan */
+ 	 * r13	- points to the symbol table
+ 	 */
+ 
++#ifdef CONFIG_MODVERSIONS
++	/*
++	 * Treat R_PPC_RELATIVE relocations differently when they target the
++	 * interval [__start___kcrctab, __stop___kcrctab_gpl_future): in this
++	 * case, the relocated quantities are CRC pseudo-symbols, which should
++	 * be preserved as-is, rather than be modified to take the runtime
++	 * offset into account.
++	 */
++	lwz	r10, (p_kcrc_start - 0b)(r12)
++	lwz	r11, (p_kcrc_stop - 0b)(r12)
++	subf	r12, r7, r12			/* link time addr of 0b */
++	add	r10, r10, r12
++	add	r11, r11, r12
++#endif
++
+ 	/*
+ 	 * Check if we have a relocation based on symbol
+ 	 * r5 will hold the value of the symbol.
+@@ -135,7 +150,15 @@ get_type:
+ 	bne	hi16
+ 	lwz	r4, 0(r9)	/* r_offset */
+ 	lwz	r0, 8(r9)	/* r_addend */
++#ifdef CONFIG_MODVERSIONS
++	cmplw	r4, r10
++	blt	do_add
++	cmplw	r4, r11
++	blt	skip_add
++do_add:
++#endif
+ 	add	r0, r0, r3	/* final addend */
++skip_add:
+ 	stwx	r0, r4, r7	/* memory[r4+r7]) = (u32)r0 */
+ 	b	nxtrela		/* continue */
+ 
+@@ -207,3 +230,8 @@ p_dyn:		.long	__dynamic_start - 0b
+ p_rela:		.long	__rela_dyn_start - 0b
+ p_sym:		.long	__dynamic_symtab - 0b
+ p_st:		.long	_stext - 0b
++
++#ifdef CONFIG_MODVERSIONS
++p_kcrc_start:	.long	__start___kcrctab - 0b
++p_kcrc_stop:	.long	__stop___kcrctab_gpl_future - 0b
++#endif
 -- 
 2.7.4
