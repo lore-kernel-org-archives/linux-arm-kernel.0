@@ -1,61 +1,39 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 27 Oct 2016 22:24:36 +0800
-Subject: [PATCH] ARM: davinci: register the usb20_phy clock on the DT file
-In-Reply-To: <20161026194916.14546-1-ahaslam@baylibre.com>
-Message-ID: <201610272246.ICxa2YRq%fengguang.wu@intel.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 27 Oct 2016 08:32:03 -0600
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <bdae79f1-dfed-d735-cb49-9ce8aa0b6e4f@xilinx.com>
+References: <20161026225413.GA6220@obsidianresearch.com>
+ <bdae79f1-dfed-d735-cb49-9ce8aa0b6e4f@xilinx.com>
+Message-ID: <20161027143203.GA6818@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Axel,
+On Thu, Oct 27, 2016 at 09:42:03AM +0200, Michal Simek wrote:
 
-[auto build test ERROR on arm-soc/for-next]
-[also build test ERROR on v4.9-rc2 next-20161027]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+> I am not quite sure about this and I didn't try it on real hw.
+> But minimum bitstream size 52+B and more likely much more than this.
 
-url:    https://github.com/0day-ci/linux/commits/ahaslam-baylibre-com/ARM-davinci-register-the-usb20_phy-clock-on-the-DT-file/20161027-040551
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-config: arm-davinci_all_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Oh probably, I didn't try to guess what the minimum size is, that
+check is just to prevent reading past the end of the buffer.
 
-All errors (new ones prefixed by >>):
+> This is taken from u-boot source code and this is full BIN header.
+> The code above is checking only the last word.
 
-   arch/arm/mach-davinci/da8xx-dt.c: In function 'da850_init_machine':
->> arch/arm/mach-davinci/da8xx-dt.c:48:2: error: implicit declaration of function 'da8xx_register_usb20_phy_clk' [-Werror=implicit-function-declaration]
-     da8xx_register_usb20_phy_clk(false);
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> arch/arm/mach-davinci/da8xx-dt.c:49:2: error: implicit declaration of function 'da8xx_register_usb11_phy_clk' [-Werror=implicit-function-declaration]
-     da8xx_register_usb11_phy_clk(false);
-     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+There can be garbage before the sync word.  The hardware ignores
+everything till it gets the sync word.  Prior versions of the driver
+with the autodetection would discard the garbage.
 
-vim +/da8xx_register_usb20_phy_clk +48 arch/arm/mach-davinci/da8xx-dt.c
+Since the autodetection was ripped out I didn't want to search since
+the intent seems to be for user space to provide a full bitstream,
+which should start at the sync word, but that is another option.
 
-    42	};
-    43	
-    44	#ifdef CONFIG_ARCH_DAVINCI_DA850
-    45	
-    46	static void __init da850_init_machine(void)
-    47	{
-  > 48		da8xx_register_usb20_phy_clk(false);
-  > 49		da8xx_register_usb11_phy_clk(false);
-    50		of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
-    51	}
-    52	
+>        0x000000bb, /* Sync word */
+>        0x11220044, /* Sync word */
+>        DUMMY_WORD,
+>        DUMMY_WORD,
+>        0xaa995566, /* Sync word */
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21064 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/615d600d/attachment-0001.gz>
+This is the bus width detection pattern, I understood the Zync DevC
+interface was wired to 32 bits and did not respond to this.
+
+Jason
