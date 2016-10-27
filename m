@@ -1,69 +1,44 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 27 Oct 2016 12:40:07 +0300
-Subject: [PATCH 02/18] arm64: ilp32: add documentation on the ILP32 ABI
- for ARM64
-In-Reply-To: <352ff60e-3975-8421-3274-3a904c0ac642@mellanox.com>
-References: <1477081997-4770-1-git-send-email-ynorov@caviumnetworks.com>
- <1477081997-4770-3-git-send-email-ynorov@caviumnetworks.com>
- <352ff60e-3975-8421-3274-3a904c0ac642@mellanox.com>
-Message-ID: <20161027094007.GB3666@yury-N73SV>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 27 Oct 2016 16:48:44 +0530
+Subject: [PATCH 5/5] ARM: dts: Add LEGO MINDSTORTMS EV3 dts
+In-Reply-To: <38a3a10c-a269-6a9f-305c-7d38ec9b839b@lechnology.com>
+References: <1477075018-20176-1-git-send-email-david@lechnology.com>
+ <1477075018-20176-6-git-send-email-david@lechnology.com>
+ <b0022fad-a96e-86d4-71ba-2b803e5421fe@ti.com>
+ <38a3a10c-a269-6a9f-305c-7d38ec9b839b@lechnology.com>
+Message-ID: <d17f4ea6-7925-e926-2310-edf5887edee7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-
-Thank you for comments
-
-On Mon, Oct 24, 2016 at 12:36:27PM -0400, Chris Metcalf wrote:
-> On 10/21/2016 4:33 PM, Yury Norov wrote:
-> >Based on Andrew Pinski's patch-series.
-> >
-> >Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> >---
-> >  Documentation/arm64/ilp32.txt | 46 +++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 46 insertions(+)
-> >  create mode 100644 Documentation/arm64/ilp32.txt
-> >
-> >diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-> >new file mode 100644
-> >index 0000000..b96c18f
-> >--- /dev/null
-> >+++ b/Documentation/arm64/ilp32.txt
-> >@@ -0,0 +1,46 @@
-> >+ILP32 AARCH64 SYSCALL ABI
-> >+=========================
-> >+
-> >+This document describes the ILP32 syscall ABI and where it differs
-> >+from the generic compat linux syscall interface.
-> >+
-> >+AARCH64/ILP32 userspace can potentially access top halves of registers that
-> >+are passed as syscall arguments, so such registers (w0-w7) are deloused.
+On Thursday 27 October 2016 07:00 AM, David Lechner wrote:
+> On 10/24/2016 06:58 AM, Sekhar Nori wrote:
+>> On Saturday 22 October 2016 12:06 AM, David Lechner wrote:
+>>> This adds a device tree definition file for LEGO MINDSTORMS EV3.
+>>
+>> Thanks for the patch!
+>>
+>>>
+>>> What is working:
+>>>
+>>> * Pin muxing
+>>> * MicroSD card reader
+>>> * UART on input port 1
+>>>
+>>> What is partially working:
+>>>
+>>> * Buttons - working after GPIO fix
+>>> * LEDs - working after GPIO fix
+>>> * Poweroff/reset - working after GPIO fix
+>>
+>> Is the GPIO fix something that will go in v4.9-rc cycle ?
+>>
 > 
-> I'm not sure what "potentially access" here means: I think what you want to say
-> is that userspace can pass garbage in the top half, but you should be clearer about
-> what you mean here. 
+> FYI, the fix is in linux-gpio/fixes now.
 
-Yes. Will change.
+Thanks, I added the patch to my 'acked' branch which has stuff useful
+for testing on davinci but not going through my tree. It gets merged
+into my master branch so that branch can be used for all mach-davinci
+development.
 
-> Also, you shouldn't use "deloused" here, since it's not a term
-> that's defined elsewhere in the kernel, even though it's been used colloquially on LKML.
-> Provide an actual implementation definition, like "have their top 32 bits zeroed".
-
-Agree.
-In fact 'delouse' is used in the name of corresponding macro in
-include/linux/compat.h:
-29 #ifndef __SC_DELOUSE
-30 #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
-31 #endif
-
-But it's not for documentation.
-
-> 
-> >+AARCH64/ILP32 provides next types turned to 64-bit (comparing to AARCH32):
-> 
-> What does "turned" mean here?  And I "next types" isn't standard English; you want
-> to say something like "the following types".  Likewise later with "next syscalls".
-
-Thanks, will change.
-
-Yury
+Thanks,
+Sekhar
