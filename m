@@ -1,137 +1,78 @@
 From: david@lechnology.com (David Lechner)
-Date: Wed, 26 Oct 2016 22:26:55 -0500
-Subject: [PATCH v2 3/4] usb: musb: da8xx: Add DT support for the DA8xx
- driver
-In-Reply-To: <1477494237-22831-4-git-send-email-abailon@baylibre.com>
+Date: Wed, 26 Oct 2016 22:27:13 -0500
+Subject: [PATCH v2 2/4] usb: musb: core: added helper function for parsing
+ DT
+In-Reply-To: <1477494237-22831-3-git-send-email-abailon@baylibre.com>
 References: <1477494237-22831-1-git-send-email-abailon@baylibre.com>
- <1477494237-22831-4-git-send-email-abailon@baylibre.com>
-Message-ID: <6bb1ca27-3aa4-c22b-c09a-9163f9aabeef@lechnology.com>
+ <1477494237-22831-3-git-send-email-abailon@baylibre.com>
+Message-ID: <0324b2c8-ef22-2ef5-1fcd-d1a0807e549e@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/26/2016 10:03 AM, Alexandre Bailon wrote:
 > From: Petr Kulhavy <petr@barix.com>
 >
-> This adds DT support for TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver
+> This adds the function musb_get_mode() to get the DT property "dr_mode"
 >
 > Signed-off-by: Petr Kulhavy <petr@barix.com>
+> Acked-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 > Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 > ---
->  drivers/usb/musb/da8xx.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
+>  drivers/usb/musb/musb_core.c | 19 +++++++++++++++++++
+>  drivers/usb/musb/musb_core.h |  5 +++++
+>  2 files changed, 24 insertions(+)
 >
-> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-> index 210b7e4..bfa571d 100644
-> --- a/drivers/usb/musb/da8xx.c
-> +++ b/drivers/usb/musb/da8xx.c
-> @@ -6,6 +6,9 @@
->   * Based on the DaVinci "glue layer" code.
->   * Copyright (C) 2005-2006 by Texas Instruments
->   *
-> + * DT support
-> + * Copyright (c) 2016 Petr Kulhavy <petr@barix.com>
-> + *
->   * This file is part of the Inventra Controller Driver for Linux.
->   *
->   * The Inventra Controller Driver for Linux is free software; you
-> @@ -433,6 +436,21 @@ static int da8xx_musb_exit(struct musb *musb)
->  	return 0;
+> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> index 27dadc0..bba07e7 100644
+> --- a/drivers/usb/musb/musb_core.c
+> +++ b/drivers/usb/musb/musb_core.c
+> @@ -100,6 +100,7 @@
+>  #include <linux/io.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/usb.h>
+> +#include <linux/usb/of.h>
+>
+>  #include "musb_core.h"
+>  #include "musb_trace.h"
+> @@ -130,6 +131,24 @@ static inline struct musb *dev_to_musb(struct device *dev)
+>  	return dev_get_drvdata(dev);
 >  }
 >
-> +static inline u8 get_vbus_power(struct device *dev)
+> +enum musb_mode musb_get_mode(struct device *dev)
 > +{
-> +	struct regulator *vbus_supply;
-> +	int current_uA;
+> +	enum usb_dr_mode mode;
 > +
-> +	vbus_supply = regulator_get_optional(dev, "vbus");
-> +	if (IS_ERR(vbus_supply))
-> +		return 255;
-> +	current_uA = regulator_get_current_limit(vbus_supply);
-> +	regulator_put(vbus_supply);
-> +	if (current_uA <= 0 || current_uA > 510000)
-> +		return 255;
-> +	return current_uA / 1000 / 2;
-> +}
-> +
->  static const struct musb_platform_ops da8xx_ops = {
->  	.quirks		= MUSB_DMA_CPPI | MUSB_INDEXED_EP,
->  	.init		= da8xx_musb_init,
-> @@ -458,6 +476,12 @@ static const struct platform_device_info da8xx_dev_info = {
->  	.dma_mask	= DMA_BIT_MASK(32),
->  };
->
-> +static const struct musb_hdrc_config da8xx_config = {
-> +	.ram_bits = 10,
-> +	.num_eps = 5,
-> +	.multipoint = 1,
-> +};
-> +
->  static int da8xx_probe(struct platform_device *pdev)
->  {
->  	struct resource musb_resources[2];
-> @@ -465,7 +489,9 @@ static int da8xx_probe(struct platform_device *pdev)
->  	struct da8xx_glue		*glue;
->  	struct platform_device_info	pinfo;
->  	struct clk			*clk;
-> +	struct device_node		*np = pdev->dev.of_node;
->  	int				ret;
-> +	struct resource *res;
-
-res is not used anywhere
-
->
->  	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
->  	if (!glue)
-> @@ -486,6 +512,18 @@ static int da8xx_probe(struct platform_device *pdev)
->  	glue->dev			= &pdev->dev;
->  	glue->clk			= clk;
->
-> +	if (IS_ENABLED(CONFIG_OF) && np) {
-> +		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-> +		if (!pdata) {
-> +			/* FIXME */
-
-Why FIXME? I don't see anything that needs to be fixed here.
-
-> +			return -ENOMEM;
-> +		}
-> +
-> +		pdata->config	= &da8xx_config;
-> +		pdata->mode	= musb_get_mode(&pdev->dev);
-> +		pdata->power	= get_vbus_power(&pdev->dev);
+> +	mode = usb_get_dr_mode(dev);
+> +	switch (mode) {
+> +	case USB_DR_MODE_HOST:
+> +		return MUSB_HOST;
+> +	case USB_DR_MODE_PERIPHERAL:
+> +		return MUSB_PERIPHERAL;
+> +	case USB_DR_MODE_OTG:
+> +	case USB_DR_MODE_UNKNOWN:
+> +	default:
+> +		return MUSB_OTG;
 > +	}
+> +}
+> +EXPORT_SYMBOL_GPL(musb_get_mode);
 > +
->  	pdata->platform_ops		= &da8xx_ops;
+>  /*-------------------------------------------------------------------------*/
 >
->  	glue->usb_phy = usb_phy_generic_register();
-> @@ -536,11 +574,20 @@ static int da8xx_remove(struct platform_device *pdev)
->  	return 0;
+>  #ifndef CONFIG_BLACKFIN
+> diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+> index 2cb88a49..a406468 100644
+> --- a/drivers/usb/musb/musb_core.h
+> +++ b/drivers/usb/musb/musb_core.h
+> @@ -617,4 +617,9 @@ static inline void musb_platform_post_root_reset_end(struct musb *musb)
+>  		musb->ops->post_root_reset_end(musb);
 >  }
 >
-
-Shouldn't you have #ifdef CONFIG_OF here since you are using 
-of_match_ptr() below?
-
-> +static const struct of_device_id da8xx_id_table[] = {
-> +	{
-> +		.compatible = "ti,da830-musb",
-> +	},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, da8xx_id_table);
-
-#endif
-
+> +/* gets the "dr_mode" property from DT and converts it into musb_mode
+> + * if the property is not found or not recognized returns MUSB_OTG
+> + */
+> +extern enum musb_mode musb_get_mode(struct device *dev);
 > +
->  static struct platform_driver da8xx_driver = {
->  	.probe		= da8xx_probe,
->  	.remove		= da8xx_remove,
->  	.driver		= {
->  		.name	= "musb-da8xx",
-> +		.of_match_table = of_match_ptr(da8xx_id_table),
->  	},
->  };
->
+>  #endif	/* __MUSB_CORE_H__ */
 >
 
 Tested working on LEGO MINDSTORMS EV3 using dr_mode = "peripheral" and 
