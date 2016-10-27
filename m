@@ -1,122 +1,114 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 27 Oct 2016 16:03:42 +0200
-Subject: [RFC PATCH 1/5] of: introduce the overlay manager
-In-Reply-To: <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
-References: <20161026145756.21689-1-antoine.tenart@free-electrons.com>
- <20161026145756.21689-2-antoine.tenart@free-electrons.com>
- <CANLsYkyszsn2TLYhUjHMt2ZnEUmE9eSc71W2KWBL0fWhh3PPBw@mail.gmail.com>
-Message-ID: <20161027140342.kidk4gqxwbtphrbs@kwain>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 27 Oct 2016 09:07:00 -0500
+Subject: [PATCH v2 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <8724b41d-158a-f52c-8df6-4e8913b4094a@ti.com>
+References: <20161019203347.17893-1-d-gerlach@ti.com>
+ <20161019203347.17893-3-d-gerlach@ti.com>
+ <20161026220457.kvbd4wgtizdbndf3@rob-hp-laptop>
+ <8724b41d-158a-f52c-8df6-4e8913b4094a@ti.com>
+Message-ID: <58120A04.2050501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mathieu,
-
-On Wed, Oct 26, 2016 at 10:29:59AM -0600, Mathieu Poirier wrote:
+On 10/27/2016 04:02 AM, Tero Kristo wrote:
+> On 27/10/16 01:04, Rob Herring wrote:
+>> On Wed, Oct 19, 2016 at 03:33:45PM -0500, Dave Gerlach wrote:
+>>> Add a generic power domain implementation, TI SCI PM Domains, that
+>>> will hook into the genpd framework and allow the TI SCI protocol to
+>>> control device power states.
+>>>
+>>> Also, provide macros representing each device index as understood
+>>> by TI SCI to be used in the device node power-domain references.
+>>> These are identifiers for the K2G devices managed by the PMMC.
+>>>
+>>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>> ---
+>>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 54 +++++++++++++
+>>>  MAINTAINERS                                        |  2 +
+>>>  include/dt-bindings/genpd/k2g.h                    | 90 ++++++++++++++++++++++
+>>>  3 files changed, 146 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>>  create mode 100644 include/dt-bindings/genpd/k2g.h
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>> b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>> new file mode 100644
+>>> index 000000000000..32f38a349656
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+>>> @@ -0,0 +1,54 @@
+>>> +Texas Instruments TI-SCI Generic Power Domain
+>>> +---------------------------------------------
+>>> +
+>>> +Some TI SoCs contain a system controller (like the PMMC, etc...) that is
+>>> +responsible for controlling the state of the IPs that are present.
+>>> +Communication between the host processor running an OS and the system
+>>> +controller happens through a protocol known as TI-SCI [1]. This pm domain
+>>> +implementation plugs into the generic pm domain framework and makes use of
+>>> +the TI SCI protocol power on and off each device when needed.
+>>> +
+>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>> +
+>>> +PM Domain Node
+>>> +==============
+>>> +The PM domain node represents the global PM domain managed by the PMMC,
+>>> +which in this case is the single implementation as documented by the generic
+>>> +PM domain bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+>>> +
+>>> +Required Properties:
+>>> +--------------------
+>>> +- compatible: should be "ti,sci-pm-domain"
+>>> +- #power-domain-cells: Must be 0.
+>>> +- ti,sci: Phandle to the TI SCI device to use for managing the devices.
+>>> +
+>>> +Example:
+>>> +--------------------
+>>> +k2g_pds: k2g_pds {
+>>> +        compatible = "ti,sci-pm-domain";
+>>> +        #power-domain-cells = <0>;
+>>> +        ti,sci = <&pmmc>;
+>>> +};
+>>
+>> Why not just make the PMMC node be the power-domain provider itself? If
+>> not that, then make this a child node of it. The same comment applies to
+>> all the SCI functions, but I guess I've already acked some of them.
 > 
-> Please find my comments below.
-
-Thanks for the comments. I expected more distant reviews, on the overall
-architecture to know if this could fit the needs of others. But anyway
-your comments are helpful if we ever decide to go with an overlay
-manager like this one.
-
-> On 26 October 2016 at 08:57, Antoine Tenart
-> <antoine.tenart@free-electrons.com> wrote:
-> > +
-> > +/*
-> > + * overlay_mgr_register_format()
-> > + *
-> > + * Adds a new format candidate to the list of supported formats. The registered
-> > + * formats are used to parse the headers stored on the dips.
-> > + */
-> > +int overlay_mgr_register_format(struct overlay_mgr_format *candidate)
-> > +{
-> > +       struct overlay_mgr_format *format;
-> > +       int err = 0;
-> > +
-> > +       spin_lock(&overlay_mgr_format_lock);
-> > +
-> > +       /* Check if the format is already registered */
-> > +       list_for_each_entry(format, &overlay_mgr_formats, list) {
-> > +               if (!strcpy(format->name, candidate->name)) {
+> This seems to be a bug in this documentation actually. ti,sci handle is no
+> longer supported, and all the sci stuff must be under the parent sci node.
 > 
-> This function is public to the rest of the kernel - limiting the
-> lenght of ->name and using strncpy() is probably a good idea.
-
-I totally agree. This was in fact something I wanted to do.
-
-> > +
-> > +/*
-> > + * overlay_mgr_parse()
-> > + *
-> > + * Parse raw data with registered format parsers. Fills the candidate string if
-> > + * one parser understood the raw data format.
-> > + */
-> > +int overlay_mgr_parse(struct device *dev, void *data, char ***candidates,
+>>
+>> I really don't like reviewing all these TI SCI bindings one by one. Each
+>> one on its own seems fine, but I don't see the full picture.
 > 
-> I'm pretty sure there is another way to proceed than using 3 levels of
-> references.  It makes the code hard to read and a prime candidate for
-> errors.
-
-Sure. I guess we could allocate an array of fixed-length strings which
-would be less flexible but I don't think we need something that flexible
-here.
-
+> The full picture is represented under the documentation for the main protocol
+> support itself. See this patch:
 > 
-> > +
-> > +               format->parse(dev, data, candidates, n);
+> https://patchwork.kernel.org/patch/9383281/
 > 
-> ->parse() returns an error code.  It is probably a good idea to check
-> it.  If it isn't needed then a comment explaining why it is the case
-> would be appreciated.
-
-So the point of the parse function is to determine if the data read from
-a source is a compatible header of a given format. Returning an error
-doesn't mean the header won't be recognized by another one.
-
-We could maybe handle this better, by returning an error iif different
-that -EINVAL. Or we could have one function to check the compatibility
-and one to parse it, if compatible.
-
-> > +static int _overlay_mgr_apply(struct device *dev, char *candidate)
-> > +{
-> > +       struct overlay_mgr_overlay *overlay;
-> > +       struct device_node *node;
-> > +       const struct firmware *firmware;
-> > +       char *firmware_name;
-> > +       int err = 0;
-> > +
-> > +       spin_lock(&overlay_mgr_lock);
-> > +
-> > +       list_for_each_entry(overlay, &overlay_mgr_overlays, list) {
-> > +               if (!strcmp(overlay->name, candidate)) {
-> > +                       dev_err(dev, "overlay already loaded\n");
-> > +                       err = -EEXIST;
-> > +                       goto err_lock;
-> > +               }
-> > +       }
-> > +
-> > +       overlay = devm_kzalloc(dev, sizeof(*overlay), GFP_KERNEL);
+> Copy pasted here as ref:
 > 
-> Function devm_kzalloc() can sleep but you're holding a spinlock - I'm
-> surprised the kernel didn't complain here.  Allocate the memory before
-> holding the lock.  If the overly is already loaded simply free it on
-> the error path.
+> Example (K2G):
+> -------------
+>         pmmc: pmmc {
+>                 compatible = "ti,k2g-sci";
+>                 ...
+> 
+>                 my_clk_node: clk_node {
+>                         ...
+>                         ...
+>                 };
+> 
+>                 my_pd_node: pd_node {
+>                         ...
+>                         ...
+>                 };
+>         };
+> 
+> 
 
-Right.
+Yes my bad I will fix this in V3 once we straighten out the ID portion of the
+binding.
 
-Thanks,
-
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161027/ca58ff75/attachment.sig>
+Regards,
+Dave
