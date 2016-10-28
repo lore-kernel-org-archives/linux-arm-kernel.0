@@ -1,18 +1,13 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 28 Oct 2016 12:30:03 +0100
-Subject: [GIT PULL] ARM: vexpress: fixes for v4.10
-Message-ID: <20161028113003.GC12241@e107155-lin>
+Date: Fri, 28 Oct 2016 12:30:38 +0100
+Subject: [GIT PULL] ARM: dts: vexpress: fixes/updates for v4.10
+Message-ID: <20161028113038.GD12241@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC team,
+Hi ARM Soc Team,
 
-These couple of fixes help to boot TC2 in HYP mode with CONFIG_MCPM
-enabled. This was not supported directly before and hence targeting for
-v4.10. Currently those who want to boot in HYP mode have to disable
-MCPM config in the build.
-
-Please pull.
+Please pull !
 
 --
 Regards,
@@ -24,27 +19,29 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-fixes-4.10
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-dt-4.10
 
-for you to fetch changes up to 801f33be8e902d8cea75cb7ac056d07c4fdd25f8:
+for you to fetch changes up to b01c3994817dc4e117c5642c3e09e0a231b5b477:
 
-  drivers: cci: add missing CCI port availability firmware check (2016-10-17 14:27:54 +0100)
-
-----------------------------------------------------------------
-ARMv7 Vexpress fixes for v4.10
-
-Couple of fixes to MCPM/CCI drivers to check and ensure that the kernel
-is actually allowed to take control over CCI ports(i.e. running in
-secure mode) before enabling MCPM.
-
-This is needed to boot Linux in HYP mode (very useful for development
-on virtualization) with CONFIG_MCPM enabled kernel.
+  ARM: dts: vexpress: add TC2 cpu capacity-dmips-mhz information (2016-10-17 17:05:58 +0100)
 
 ----------------------------------------------------------------
-Lorenzo Pieralisi (2):
-      ARM: vexpress: refine MCPM smp operations override criteria
-      drivers: cci: add missing CCI port availability firmware check
+ARMv7 Vexpress DT fixes/updates for v4.10
 
- arch/arm/mach-vexpress/platsmp.c | 34 ++++++++++++++++++++++++++--------
- drivers/bus/arm-cci.c            | 10 ++++++++++
- 2 files changed, 36 insertions(+), 8 deletions(-)
+1. Addition of CPU dmips/capacity information to TC2 platform
+
+2. Cleanup/fix unit address warnings and removal of skeleton.dtsi from
+   MPS2 device tree
+
+----------------------------------------------------------------
+Juri Lelli (1):
+      ARM: dts: vexpress: add TC2 cpu capacity-dmips-mhz information
+
+Vladimir Murzin (1):
+      ARM: dts: mps2: remove skeleton.dtsi include and fix unit address warnings
+
+ arch/arm/boot/dts/mps2-an385.dts           | 2 +-
+ arch/arm/boot/dts/mps2-an399.dts           | 2 +-
+ arch/arm/boot/dts/mps2.dtsi                | 4 +++-
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts | 5 +++++
+ 4 files changed, 10 insertions(+), 3 deletions(-)
