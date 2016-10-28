@@ -1,38 +1,52 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 28 Oct 2016 09:35:07 +0530
-Subject: [PATCH v3 1/3] PM / OPP: Expose _of_get_opp_desc_node as
- dev_pm_opp API
-In-Reply-To: <20161027214131.1725-2-d-gerlach@ti.com>
-References: <20161027214131.1725-1-d-gerlach@ti.com>
- <20161027214131.1725-2-d-gerlach@ti.com>
-Message-ID: <20161028040507.GJ10423@vireshk-i7>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 28 Oct 2016 09:46:09 +0530
+Subject: [PATCH V2] arm64: Add support of R_AARCH64_PREL32 relocation in
+ purgatory
+Message-ID: <f970f7938109c40833fc45e3d6d72b1dcdf14595.1477627895.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-10-16, 16:41, Dave Gerlach wrote:
-> Move _of_get_opp_desc_node into include/linux/pm_opp.h and rename it
-> dev_pm_opp_of_get_opp_desc_node to allow other drivers, such as platform
-> OPP and cpufreq drivers, to make use of it.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  drivers/base/power/opp/of.c  | 8 ++++----
->  drivers/base/power/opp/opp.h | 1 -
->  include/linux/pm_opp.h       | 6 ++++++
->  3 files changed, 10 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/base/power/opp/of.c b/drivers/base/power/opp/of.c
-> index 5552211e6fcd..215f5a538c78 100644
-> --- a/drivers/base/power/opp/of.c
-> +++ b/drivers/base/power/opp/of.c
-> @@ -198,7 +198,7 @@ void dev_pm_opp_of_remove_table(struct device *dev)
->  EXPORT_SYMBOL_GPL(dev_pm_opp_of_remove_table);
->  
->  /* Returns opp descriptor node for a device, caller must do of_node_put() */
-> -struct device_node *_of_get_opp_desc_node(struct device *dev)
-> +struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev)
+gcc version in fedora koji is  6.2.1-2.fc25. kexec-tools compiled with this
+gcc produced another relocation error:
 
-Export as well ?
+machine_apply_elf_rel: ERROR Unknown type: 261
 
+This patch fixes the above error.
+
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+v1 -> v2: fixed line width to less than 80 chars
+
+ kexec/arch/arm64/kexec-arm64.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
+index 218f0bc832cd..eb0c3b87354e 100644
+--- a/kexec/arch/arm64/kexec-arm64.c
++++ b/kexec/arch/arm64/kexec-arm64.c
+@@ -720,6 +720,10 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+ # define R_AARCH64_ABS64 257
+ #endif
+ 
++#if !defined(R_AARCH64_PREL32)
++# define R_AARCH64_PREL32 261
++#endif
++
+ #if !defined(R_AARCH64_LD_PREL_LO19)
+ # define R_AARCH64_LD_PREL_LO19 273
+ #endif
+@@ -761,6 +765,12 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
+ 		loc64 = ptr;
+ 		*loc64 = cpu_to_elf64(ehdr, elf64_to_cpu(ehdr, *loc64) + value);
+ 		break;
++	case R_AARCH64_PREL32:
++		type = "PREL32";
++		loc32 = ptr;
++		*loc32 = cpu_to_elf32(ehdr,
++			elf32_to_cpu(ehdr, *loc32) + value - address);
++		break;
+ 	case R_AARCH64_LD_PREL_LO19:
+ 		type = "LD_PREL_LO19";
+ 		loc32 = ptr;
 -- 
-viresh
+2.7.4
