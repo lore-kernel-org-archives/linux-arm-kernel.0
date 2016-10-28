@@ -1,473 +1,390 @@
 From: zourongrong@gmail.com (Rongrong Zou)
-Date: Fri, 28 Oct 2016 15:27:56 +0800
-Subject: [PATCH v6 3/9] drm/hisilicon/hibmc: Add support for frame buffer
+Date: Fri, 28 Oct 2016 15:27:58 +0800
+Subject: [PATCH v6 5/9] drm/hisilicon/hibmc: Add crtc for DE
 In-Reply-To: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
 References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1477639682-22520-4-git-send-email-zourongrong@gmail.com>
+Message-ID: <1477639682-22520-6-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for fbdev and kms fb management.
+Add crtc funcs and helper funcs for DE.
 
 Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 ---
- drivers/gpu/drm/hisilicon/hibmc/Makefile          |   2 +-
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   |  17 ++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  24 ++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 255 ++++++++++++++++++++++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c       |  66 ++++++
- 5 files changed, 363 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c  | 318 ++++++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c |   6 +
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |   2 +
+ 3 files changed, 326 insertions(+)
 
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-index d5c40b8..810a37e 100644
---- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
-+++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-@@ -1,5 +1,5 @@
- ccflags-y := -Iinclude/drm
--hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o hibmc_ttm.o
-+hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
+diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+index 9c1a68c..9b5d0d0 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
++++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+@@ -23,6 +23,7 @@
  
- obj-$(CONFIG_DRM_HISI_HIBMC)	+=hibmc-drm.o
- #obj-y	+= hibmc-drm.o
+ #include "hibmc_drm_drv.h"
+ #include "hibmc_drm_regs.h"
++#include "hibmc_drm_de.h"
+ #include "hibmc_drm_power.h"
+ 
+ /* ---------------------------------------------------------------------- */
+@@ -168,3 +169,320 @@ int hibmc_plane_init(struct hibmc_drm_device *hidev)
+ 	drm_plane_helper_add(plane, &hibmc_plane_helper_funcs);
+ 	return 0;
+ }
++
++static void hibmc_crtc_enable(struct drm_crtc *crtc)
++{
++	unsigned int reg;
++	/* power mode 0 is default. */
++	struct hibmc_drm_device *hidev = crtc->dev->dev_private;
++
++	hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
++
++	/* Enable display power gate & LOCALMEM power gate*/
++	reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
++	reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
++	reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
++	reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
++	reg |= HIBMC_CURR_GATE_DISPLAY(ON);
++	hibmc_set_current_gate(hidev, reg);
++	drm_crtc_vblank_on(crtc);
++}
++
++static void hibmc_crtc_disable(struct drm_crtc *crtc)
++{
++	unsigned int reg;
++	struct hibmc_drm_device *hidev = crtc->dev->dev_private;
++
++	drm_crtc_vblank_off(crtc);
++
++	hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_SLEEP);
++
++	/* Enable display power gate & LOCALMEM power gate*/
++	reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
++	reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
++	reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
++	reg |= HIBMC_CURR_GATE_LOCALMEM(OFF);
++	reg |= HIBMC_CURR_GATE_DISPLAY(OFF);
++	hibmc_set_current_gate(hidev, reg);
++}
++
++static int hibmc_crtc_atomic_check(struct drm_crtc *crtc,
++				   struct drm_crtc_state *state)
++{
++	return 0;
++}
++
++static unsigned int format_pll_reg(void)
++{
++	unsigned int pllreg = 0;
++	struct panel_pll pll = {0};
++
++	/* Note that all PLL's have the same format. Here,
++	 * we just use Panel PLL parameter to work out the bit
++	 * fields in the register.On returning a 32 bit number, the value can
++	 * be applied to any PLL in the calling function.
++	 */
++	pllreg |= HIBMC_PLL_CTRL_BYPASS(OFF) & HIBMC_PLL_CTRL_BYPASS_MASK;
++	pllreg |= HIBMC_PLL_CTRL_POWER(ON) & HIBMC_PLL_CTRL_POWER_MASK;
++	pllreg |= HIBMC_PLL_CTRL_INPUT(OSC) & HIBMC_PLL_CTRL_INPUT_MASK;
++	pllreg |= HIBMC_PLL_CTRL_POD(pll.POD) & HIBMC_PLL_CTRL_POD_MASK;
++	pllreg |= HIBMC_PLL_CTRL_OD(pll.OD) & HIBMC_PLL_CTRL_OD_MASK;
++	pllreg |= HIBMC_PLL_CTRL_N(pll.N) & HIBMC_PLL_CTRL_N_MASK;
++	pllreg |= HIBMC_PLL_CTRL_M(pll.M) & HIBMC_PLL_CTRL_M_MASK;
++
++	return pllreg;
++}
++
++static void set_vclock_hisilicon(struct drm_device *dev, unsigned long pll)
++{
++	unsigned long tmp0, tmp1;
++	struct hibmc_drm_device *hidev = dev->dev_private;
++
++	/* 1. outer_bypass_n=0 */
++	tmp0 = readl(hidev->mmio + CRT_PLL1_HS);
++	tmp0 &= 0xBFFFFFFF;
++	writel(tmp0, hidev->mmio + CRT_PLL1_HS);
++
++	/* 2. pll_pd=1?inter_bypass=1 */
++	writel(0x21000000, hidev->mmio + CRT_PLL1_HS);
++
++	/* 3. config pll */
++	writel(pll, hidev->mmio + CRT_PLL1_HS);
++
++	/* 4. delay  */
++	mdelay(1);
++
++	/* 5. pll_pd =0 */
++	tmp1 = pll & ~0x01000000;
++	writel(tmp1, hidev->mmio + CRT_PLL1_HS);
++
++	/* 6. delay  */
++	mdelay(1);
++
++	/* 7. inter_bypass=0 */
++	tmp1 &= ~0x20000000;
++	writel(tmp1, hidev->mmio + CRT_PLL1_HS);
++
++	/* 8. delay  */
++	mdelay(1);
++
++	/* 9. outer_bypass_n=1 */
++	tmp1 |= 0x40000000;
++	writel(tmp1, hidev->mmio + CRT_PLL1_HS);
++}
++
++/* This function takes care the extra registers and bit fields required to
++ *setup a mode in board.
++ *Explanation about Display Control register:
++ *FPGA only supports 7 predefined pixel clocks, and clock select is
++ *in bit 4:0 of new register 0x802a8.
++ */
++static unsigned int display_ctrl_adjust(struct drm_device *dev,
++					struct drm_display_mode *mode,
++					unsigned int ctrl)
++{
++	unsigned long x, y;
++	unsigned long pll1; /* bit[31:0] of PLL */
++	unsigned long pll2; /* bit[63:32] of PLL */
++	struct hibmc_drm_device *hidev = dev->dev_private;
++
++	x = mode->hdisplay;
++	y = mode->vdisplay;
++
++	/* Hisilicon has to set up a new register for PLL control
++	 *(CRT_PLL1_HS & CRT_PLL2_HS).
++	 */
++	if (x == 800 && y == 600) {
++		pll1 = CRT_PLL1_HS_40MHZ;
++		pll2 = CRT_PLL2_HS_40MHZ;
++	} else if (x == 1024 && y == 768) {
++		pll1 = CRT_PLL1_HS_65MHZ;
++		pll2 = CRT_PLL2_HS_65MHZ;
++	} else if (x == 1152 && y == 864) {
++		pll1 = CRT_PLL1_HS_80MHZ_1152;
++		pll2 = CRT_PLL2_HS_80MHZ;
++	} else if (x == 1280 && y == 768) {
++		pll1 = CRT_PLL1_HS_80MHZ;
++		pll2 = CRT_PLL2_HS_80MHZ;
++	} else if (x == 1280 && y == 720) {
++		pll1 = CRT_PLL1_HS_74MHZ;
++		pll2 = CRT_PLL2_HS_74MHZ;
++	} else if (x == 1280 && y == 960) {
++		pll1 = CRT_PLL1_HS_108MHZ;
++		pll2 = CRT_PLL2_HS_108MHZ;
++	} else if (x == 1280 && y == 1024) {
++		pll1 = CRT_PLL1_HS_108MHZ;
++		pll2 = CRT_PLL2_HS_108MHZ;
++	} else if (x == 1600 && y == 1200) {
++		pll1 = CRT_PLL1_HS_162MHZ;
++		pll2 = CRT_PLL2_HS_162MHZ;
++	} else if (x == 1920 && y == 1080) {
++		pll1 = CRT_PLL1_HS_148MHZ;
++		pll2 = CRT_PLL2_HS_148MHZ;
++	} else if (x == 1920 && y == 1200) {
++		pll1 = CRT_PLL1_HS_193MHZ;
++		pll2 = CRT_PLL2_HS_193MHZ;
++	} else /* default to VGA clock */ {
++		pll1 = CRT_PLL1_HS_25MHZ;
++		pll2 = CRT_PLL2_HS_25MHZ;
++	}
++
++	writel(pll2, hidev->mmio + CRT_PLL2_HS);
++	set_vclock_hisilicon(dev, pll1);
++
++	/* Hisilicon has to set up the top-left and bottom-right
++	 * registers as well.
++	 * Note that normal chip only use those two register for
++	 * auto-centering mode.
++	 */
++	writel((HIBMC_CRT_AUTO_CENTERING_TL_TOP(0) &
++		HIBMC_CRT_AUTO_CENTERING_TL_TOP_MSK) |
++	       (HIBMC_CRT_AUTO_CENTERING_TL_LEFT(0) &
++		HIBMC_CRT_AUTO_CENTERING_TL_LEFT_MSK),
++	       hidev->mmio + HIBMC_CRT_AUTO_CENTERING_TL);
++
++	writel((HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM(y - 1) &
++		HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM_MASK) |
++	       (HIBMC_CRT_AUTO_CENTERING_BR_RIGHT(x - 1) &
++		HIBMC_CRT_AUTO_CENTERING_BR_RIGHT_MASK),
++		hidev->mmio + HIBMC_CRT_AUTO_CENTERING_BR);
++
++	/* Assume common fields in ctrl have been properly set before
++	 * calling this function.
++	 * This function only sets the extra fields in ctrl.
++	 */
++
++	/* Set bit 25 of display controller: Select CRT or VGA clock */
++	ctrl &= ~HIBMC_CRT_DISP_CTL_CRTSELECT_MASK;
++	ctrl &= ~HIBMC_CRT_DISP_CTL_CLOCK_PHASE_MASK;
++
++	ctrl |= HIBMC_CRT_DISP_CTL_CRTSELECT(CRTSELECT_CRT);
++
++	/*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL, CRTSELECT, CRT);*/
++
++	/* Set bit 14 of display controller */
++	/*ctrl &= FIELD_CLEAR(HIBMC_CRT_DISP_CTL, CLOCK_PHASE);*/
++
++	/* clock_phase_polarity is 0 */
++	ctrl |= HIBMC_CRT_DISP_CTL_CLOCK_PHASE(PHASE_ACTIVE_HIGH);
++	/*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL,*/
++	/*CLOCK_PHASE, ACTIVE_HIGH);*/
++
++	writel(ctrl, hidev->mmio + HIBMC_CRT_DISP_CTL);
++
++	return ctrl;
++}
++
++static void hibmc_crtc_mode_set_nofb(struct drm_crtc *crtc)
++{
++	unsigned int val;
++	struct drm_display_mode *mode = &crtc->state->mode;
++	struct drm_device *dev = crtc->dev;
++	struct hibmc_drm_device *hidev = dev->dev_private;
++
++	writel(format_pll_reg(), hidev->mmio + HIBMC_CRT_PLL_CTRL);
++	writel((HIBMC_CRT_HORZ_TOTAL_TOTAL(mode->htotal - 1) &
++		HIBMC_CRT_HORZ_TOTAL_TOTAL_MASK) |
++		(HIBMC_CRT_HORZ_TOTAL_DISPLAY_END(mode->hdisplay - 1) &
++		HIBMC_CRT_HORZ_TOTAL_DISPLAY_END_MASK),
++		hidev->mmio + HIBMC_CRT_HORZ_TOTAL);
++
++	writel((HIBMC_CRT_HORZ_SYNC_WIDTH(mode->hsync_end - mode->hsync_start)
++		& HIBMC_CRT_HORZ_SYNC_WIDTH_MASK) |
++		(HIBMC_CRT_HORZ_SYNC_START(mode->hsync_start - 1)
++		& HIBMC_CRT_HORZ_SYNC_START_MASK),
++		hidev->mmio + HIBMC_CRT_HORZ_SYNC);
++
++	writel((HIBMC_CRT_VERT_TOTAL_TOTAL(mode->vtotal - 1) &
++		HIBMC_CRT_VERT_TOTAL_TOTAL_MASK) |
++		(HIBMC_CRT_VERT_TOTAL_DISPLAY_END(mode->vdisplay - 1) &
++		HIBMC_CRT_VERT_TOTAL_DISPLAY_END_MASK),
++		hidev->mmio + HIBMC_CRT_VERT_TOTAL);
++
++	writel((HIBMC_CRT_VERT_SYNC_HEIGHT(mode->vsync_end - mode->vsync_start)
++		& HIBMC_CRT_VERT_SYNC_HEIGHT_MASK) |
++	       (HIBMC_CRT_VERT_SYNC_START(mode->vsync_start - 1) &
++		HIBMC_CRT_VERT_SYNC_START_MASK),
++		hidev->mmio + HIBMC_CRT_VERT_SYNC);
++
++	val = HIBMC_CRT_DISP_CTL_VSYNC_PHASE(0) &
++	      HIBMC_CRT_DISP_CTL_VSYNC_PHASE_MASK;
++	val |= HIBMC_CRT_DISP_CTL_HSYNC_PHASE(0) &
++	       HIBMC_CRT_DISP_CTL_HSYNC_PHASE_MASK;
++	val |= HIBMC_CRT_DISP_CTL_TIMING(ENABLE);
++	val |= HIBMC_CRT_DISP_CTL_PLANE(ENABLE);
++
++	display_ctrl_adjust(dev, mode, val);
++}
++
++static void hibmc_crtc_atomic_begin(struct drm_crtc *crtc,
++				    struct drm_crtc_state *old_state)
++{
++	unsigned int reg;
++	struct drm_device *dev = crtc->dev;
++	struct hibmc_drm_device *hidev = dev->dev_private;
++
++	hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
++
++	/* Enable display power gate & LOCALMEM power gate*/
++	reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
++	reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
++	reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
++	reg |= HIBMC_CURR_GATE_DISPLAY(ON);
++	reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
++	hibmc_set_current_gate(hidev, reg);
++
++	/* We can add more initialization as needed. */
++}
++
++static void hibmc_crtc_atomic_flush(struct drm_crtc *crtc,
++				    struct drm_crtc_state *old_state)
++
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&crtc->dev->event_lock, flags);
++	if (crtc->state->event)
++		drm_crtc_send_vblank_event(crtc, crtc->state->event);
++	crtc->state->event = NULL;
++
++	spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
++}
++
++/* These provide the minimum set of functions required to handle a CRTC */
++static const struct drm_crtc_funcs hibmc_crtc_funcs = {
++	.page_flip = drm_atomic_helper_page_flip,
++	.set_config = drm_atomic_helper_set_config,
++	.destroy = drm_crtc_cleanup,
++	.reset = drm_atomic_helper_crtc_reset,
++	.atomic_duplicate_state =  drm_atomic_helper_crtc_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
++};
++
++static const struct drm_crtc_helper_funcs hibmc_crtc_helper_funcs = {
++	.enable		= hibmc_crtc_enable,
++	.disable	= hibmc_crtc_disable,
++	.mode_set_nofb	= hibmc_crtc_mode_set_nofb,
++	.atomic_check	= hibmc_crtc_atomic_check,
++	.atomic_begin	= hibmc_crtc_atomic_begin,
++	.atomic_flush	= hibmc_crtc_atomic_flush,
++};
++
++int hibmc_crtc_init(struct hibmc_drm_device *hidev)
++{
++	struct drm_device *dev = hidev->dev;
++	struct drm_crtc *crtc = &hidev->crtc;
++	struct drm_plane *plane = &hidev->plane;
++	int ret;
++
++	ret = drm_crtc_init_with_planes(dev, crtc, plane,
++					NULL, &hibmc_crtc_funcs, NULL);
++	if (ret) {
++		DRM_ERROR("failed to init crtc.\n");
++		return ret;
++	}
++
++	drm_mode_crtc_set_gamma_size(crtc, 256);
++	drm_crtc_helper_add(crtc, &hibmc_crtc_helper_funcs);
++	return 0;
++}
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-index 81f4301..5ac7a7e 100644
+index 7d96583..303cd36 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-@@ -66,11 +66,23 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+@@ -119,6 +119,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
+ 		return ret;
+ 	}
  
- static int hibmc_pm_suspend(struct device *dev)
- {
-+	struct pci_dev *pdev = to_pci_dev(dev);
-+	struct drm_device *drm_dev = pci_get_drvdata(pdev);
-+	struct hibmc_drm_device *hidev = drm_dev->dev_private;
-+
-+	drm_fb_helper_set_suspend_unlocked(&hidev->fbdev->helper, 1);
-+
- 	return 0;
- }
- 
- static int hibmc_pm_resume(struct device *dev)
- {
-+	struct pci_dev *pdev = to_pci_dev(dev);
-+	struct drm_device *drm_dev = pci_get_drvdata(pdev);
-+	struct hibmc_drm_device *hidev = drm_dev->dev_private;
-+
-+	drm_fb_helper_set_suspend_unlocked(&hidev->fbdev->helper, 0);
++	ret = hibmc_crtc_init(hidev);
++	if (ret) {
++		DRM_ERROR("failed to init crtc.\n");
++		return ret;
++	}
 +
  	return 0;
  }
  
-@@ -170,6 +182,7 @@ static int hibmc_unload(struct drm_device *dev)
- {
- 	struct hibmc_drm_device *hidev = dev->dev_private;
- 
-+	hibmc_fbdev_fini(hidev);
- 	hibmc_mm_fini(hidev);
- 	hibmc_hw_fini(hidev);
- 	dev->dev_private = NULL;
-@@ -195,6 +208,10 @@ static int hibmc_load(struct drm_device *dev, unsigned long flags)
- 	if (ret)
- 		goto err;
- 
-+	ret = hibmc_fbdev_init(hidev);
-+	if (ret)
-+		goto err;
-+
- 	return 0;
- 
- err:
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-index db8d80e..a40e9a7 100644
+index 49e39d2..5731ec2 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-@@ -20,9 +20,22 @@
- #define HIBMC_DRM_DRV_H
+@@ -46,6 +46,7 @@ struct hibmc_drm_device {
+ 	/* drm */
+ 	struct drm_device  *dev;
+ 	struct drm_plane plane;
++	struct drm_crtc crtc;
+ 	bool mode_config_initialized;
  
- #include <drm/drmP.h>
-+#include <drm/drm_fb_helper.h>
- #include <drm/ttm/ttm_bo_driver.h>
- #include <drm/drm_gem.h>
- 
-+struct hibmc_framebuffer {
-+	struct drm_framebuffer fb;
-+	struct drm_gem_object *obj;
-+	bool is_fbdev_fb;
-+};
-+
-+struct hibmc_fbdev {
-+	struct drm_fb_helper helper;
-+	struct hibmc_framebuffer *fb;
-+	int size;
-+};
-+
- struct hibmc_drm_device {
- 	/* hw */
- 	void __iomem   *mmio;
-@@ -41,9 +54,13 @@ struct hibmc_drm_device {
- 		bool initialized;
- 	} ttm;
- 
-+	/* fbdev */
-+	struct hibmc_fbdev *fbdev;
- 	bool mm_inited;
- };
- 
-+#define to_hibmc_framebuffer(x) container_of(x, struct hibmc_framebuffer, fb)
-+
- struct hibmc_bo {
- 	struct ttm_buffer_object bo;
- 	struct ttm_placement placement;
-@@ -65,8 +82,15 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
- 
+ 	/* ttm */
+@@ -85,6 +86,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
  #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
  
-+int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
-+void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
-+
- int hibmc_gem_create(struct drm_device *dev, u32 size, bool iskernel,
- 		     struct drm_gem_object **obj);
-+struct hibmc_framebuffer *
-+hibmc_framebuffer_init(struct drm_device *dev,
-+		       const struct drm_mode_fb_cmd2 *mode_cmd,
-+		       struct drm_gem_object *obj);
+ int hibmc_plane_init(struct hibmc_drm_device *hidev);
++int hibmc_crtc_init(struct hibmc_drm_device *hidev);
+ int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
+ void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
  
- int hibmc_mm_init(struct hibmc_drm_device *hibmc);
- void hibmc_mm_fini(struct hibmc_drm_device *hibmc);
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
-new file mode 100644
-index 0000000..630124b
---- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
-@@ -0,0 +1,255 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei.com>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <drm/drm_crtc.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_fb_helper.h>
-+
-+#include "hibmc_drm_drv.h"
-+
-+/* ---------------------------------------------------------------------- */
-+
-+static int hibmcfb_create_object(
-+				struct hibmc_drm_device *hidev,
-+				const struct drm_mode_fb_cmd2 *mode_cmd,
-+				struct drm_gem_object **gobj_p)
-+{
-+	struct drm_gem_object *gobj;
-+	struct drm_device *dev = hidev->dev;
-+	u32 size;
-+	int ret = 0;
-+
-+	size = mode_cmd->pitches[0] * mode_cmd->height;
-+	ret = hibmc_gem_create(dev, size, true, &gobj);
-+	if (ret)
-+		return ret;
-+
-+	*gobj_p = gobj;
-+	return ret;
-+}
-+
-+static struct fb_ops hibmc_drm_fb_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_check_var = drm_fb_helper_check_var,
-+	.fb_set_par = drm_fb_helper_set_par,
-+	.fb_fillrect = drm_fb_helper_sys_fillrect,
-+	.fb_copyarea = drm_fb_helper_sys_copyarea,
-+	.fb_imageblit = drm_fb_helper_sys_imageblit,
-+	.fb_pan_display = drm_fb_helper_pan_display,
-+	.fb_blank = drm_fb_helper_blank,
-+	.fb_setcmap = drm_fb_helper_setcmap,
-+};
-+
-+static int hibmc_drm_fb_create(struct drm_fb_helper *helper,
-+			       struct drm_fb_helper_surface_size *sizes)
-+{
-+	struct hibmc_fbdev *hi_fbdev =
-+		container_of(helper, struct hibmc_fbdev, helper);
-+	struct hibmc_drm_device *hidev =
-+		(struct hibmc_drm_device *)helper->dev->dev_private;
-+	struct fb_info *info;
-+	struct hibmc_framebuffer *hibmc_fb;
-+	struct drm_framebuffer *fb;
-+	struct drm_mode_fb_cmd2 mode_cmd;
-+	struct drm_gem_object *gobj = NULL;
-+	int ret = 0;
-+	size_t size;
-+	unsigned int bytes_per_pixel;
-+	struct hibmc_bo *bo = NULL;
-+
-+	DRM_DEBUG_DRIVER("surface width(%d), height(%d) and bpp(%d)\n",
-+			 sizes->surface_width, sizes->surface_height,
-+			 sizes->surface_bpp);
-+	sizes->surface_depth = 32;
-+
-+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-+
-+	mode_cmd.width = sizes->surface_width;
-+	mode_cmd.height = sizes->surface_height;
-+	mode_cmd.pitches[0] = mode_cmd.width * bytes_per_pixel;
-+	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-+							  sizes->surface_depth);
-+
-+	size = roundup(mode_cmd.pitches[0] * mode_cmd.height, PAGE_SIZE);
-+
-+	ret = hibmcfb_create_object(hidev, &mode_cmd, &gobj);
-+	if (ret) {
-+		DRM_ERROR("failed to create fbcon backing object %d\r\n", ret);
-+		return -ENOMEM;
-+	}
-+
-+	bo = gem_to_hibmc_bo(gobj);
-+
-+	ret = ttm_bo_reserve(&bo->bo, true, false, NULL);
-+	if (ret)
-+		return ret;
-+
-+	ret = hibmc_bo_pin(bo, TTM_PL_FLAG_VRAM, NULL);
-+	if (ret) {
-+		DRM_ERROR("failed to pin fbcon\n");
-+		return ret;
-+	}
-+
-+	ret = ttm_bo_kmap(&bo->bo, 0, bo->bo.num_pages, &bo->kmap);
-+
-+	if (ret) {
-+		DRM_ERROR("failed to kmap fbcon\n");
-+		ttm_bo_unreserve(&bo->bo);
-+		return ret;
-+	}
-+
-+	ttm_bo_unreserve(&bo->bo);
-+
-+	info = drm_fb_helper_alloc_fbi(helper);
-+	if (IS_ERR(info))
-+		return PTR_ERR(info);
-+
-+	info->par = hi_fbdev;
-+
-+	hibmc_fb = hibmc_framebuffer_init(hidev->dev, &mode_cmd, gobj);
-+	if (IS_ERR(hibmc_fb)) {
-+		drm_fb_helper_release_fbi(helper);
-+		return PTR_ERR(hibmc_fb);
-+	}
-+
-+	hi_fbdev->fb = hibmc_fb;
-+	hidev->fbdev->size = size;
-+	fb = &hibmc_fb->fb;
-+	if (!fb) {
-+		DRM_INFO("fb is NULL\n");
-+		return -EINVAL;
-+	}
-+
-+	hi_fbdev->helper.fb = fb;
-+
-+	strcpy(info->fix.id, "hibmcdrmfb");
-+
-+	info->flags = FBINFO_DEFAULT;
-+	info->fbops = &hibmc_drm_fb_ops;
-+
-+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
-+	drm_fb_helper_fill_var(info, &hidev->fbdev->helper, sizes->fb_width,
-+			       sizes->fb_height);
-+
-+	info->screen_base = bo->kmap.virtual;
-+	info->screen_size = size;
-+
-+	info->fix.smem_start = bo->bo.mem.bus.offset + bo->bo.mem.bus.base;
-+	info->fix.smem_len = size;
-+
-+	return 0;
-+}
-+
-+static void hibmc_fbdev_destroy(struct hibmc_fbdev *fbdev)
-+{
-+	struct hibmc_framebuffer *gfb = fbdev->fb;
-+	struct drm_fb_helper *fbh = &fbdev->helper;
-+
-+	DRM_DEBUG_DRIVER("hibmc_fbdev_destroy\n");
-+
-+	drm_fb_helper_unregister_fbi(fbh);
-+	drm_fb_helper_release_fbi(fbh);
-+
-+	drm_fb_helper_fini(fbh);
-+
-+	if (gfb)
-+		drm_framebuffer_unreference(&gfb->fb);
-+
-+	kfree(fbdev);
-+}
-+
-+static const struct drm_fb_helper_funcs hibmc_fbdev_helper_funcs = {
-+	.fb_probe = hibmc_drm_fb_create,
-+};
-+
-+int hibmc_fbdev_init(struct hibmc_drm_device *hidev)
-+{
-+	int ret;
-+	struct fb_var_screeninfo *var;
-+	struct fb_fix_screeninfo *fix;
-+	struct hibmc_fbdev *hifbdev;
-+
-+	hifbdev = kzalloc(sizeof(*hifbdev), GFP_KERNEL);
-+	if (!hifbdev)
-+		return -ENOMEM;
-+
-+	hidev->fbdev = hifbdev;
-+	drm_fb_helper_prepare(hidev->dev, &hifbdev->helper,
-+			      &hibmc_fbdev_helper_funcs);
-+
-+	/* Now just one crtc and one channel */
-+	ret = drm_fb_helper_init(hidev->dev,
-+				 &hifbdev->helper, 1, 1);
-+
-+	if (ret)
-+		return ret;
-+
-+	ret = drm_fb_helper_single_add_all_connectors(&hifbdev->helper);
-+	if (ret)
-+		goto fini;
-+
-+	ret = drm_fb_helper_initial_config(&hifbdev->helper, 16);
-+	if (ret)
-+		goto fini;
-+
-+	var = &hifbdev->helper.fbdev->var;
-+	fix = &hifbdev->helper.fbdev->fix;
-+
-+	DRM_DEBUG("Member of info->var is :\n"
-+		 "xres=%d\n"
-+		 "yres=%d\n"
-+		 "xres_virtual=%d\n"
-+		 "yres_virtual=%d\n"
-+		 "xoffset=%d\n"
-+		 "yoffset=%d\n"
-+		 "bits_per_pixel=%d\n"
-+		 "...\n", var->xres, var->yres, var->xres_virtual,
-+		 var->yres_virtual, var->xoffset, var->yoffset,
-+		 var->bits_per_pixel);
-+	DRM_DEBUG("Member of info->fix is :\n"
-+		 "smem_start=%lx\n"
-+		 "smem_len=%d\n"
-+		 "type=%d\n"
-+		 "type_aux=%d\n"
-+		 "visual=%d\n"
-+		 "xpanstep=%d\n"
-+		 "ypanstep=%d\n"
-+		 "ywrapstep=%d\n"
-+		 "line_length=%d\n"
-+		 "accel=%d\n"
-+		 "capabilities=%d\n"
-+		 "...\n", fix->smem_start, fix->smem_len, fix->type,
-+		 fix->type_aux, fix->visual, fix->xpanstep,
-+		 fix->ypanstep, fix->ywrapstep, fix->line_length,
-+		 fix->accel, fix->capabilities);
-+
-+	return 0;
-+
-+fini:
-+	drm_fb_helper_fini(&hifbdev->helper);
-+	return ret;
-+}
-+
-+void hibmc_fbdev_fini(struct hibmc_drm_device *hidev)
-+{
-+	if (!hidev->fbdev)
-+		return;
-+
-+	hibmc_fbdev_destroy(hidev->fbdev);
-+	hidev->fbdev = NULL;
-+}
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-index 0802ebd..9822f62 100644
---- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_ttm.c
-@@ -488,3 +488,69 @@ int hibmc_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
- 	drm_gem_object_unreference_unlocked(obj);
- 	return 0;
- }
-+
-+/* ---------------------------------------------------------------------- */
-+
-+static void hibmc_user_framebuffer_destroy(struct drm_framebuffer *fb)
-+{
-+	struct hibmc_framebuffer *hibmc_fb = to_hibmc_framebuffer(fb);
-+
-+	drm_gem_object_unreference_unlocked(hibmc_fb->obj);
-+	drm_framebuffer_cleanup(fb);
-+	kfree(hibmc_fb);
-+}
-+
-+static const struct drm_framebuffer_funcs hibmc_fb_funcs = {
-+	.destroy = hibmc_user_framebuffer_destroy,
-+};
-+
-+struct hibmc_framebuffer *
-+hibmc_framebuffer_init(struct drm_device *dev,
-+		       const struct drm_mode_fb_cmd2 *mode_cmd,
-+		       struct drm_gem_object *obj)
-+{
-+	struct hibmc_framebuffer *hibmc_fb;
-+	int ret;
-+
-+	hibmc_fb = kzalloc(sizeof(*hibmc_fb), GFP_KERNEL);
-+	if (!hibmc_fb)
-+		return ERR_PTR(-ENOMEM);
-+
-+	drm_helper_mode_fill_fb_struct(&hibmc_fb->fb, mode_cmd);
-+	hibmc_fb->obj = obj;
-+	ret = drm_framebuffer_init(dev, &hibmc_fb->fb, &hibmc_fb_funcs);
-+	if (ret) {
-+		DRM_ERROR("drm_framebuffer_init failed: %d\n", ret);
-+		kfree(hibmc_fb);
-+		return ERR_PTR(ret);
-+	}
-+
-+	return hibmc_fb;
-+}
-+
-+static struct drm_framebuffer *
-+hibmc_user_framebuffer_create(struct drm_device *dev,
-+			      struct drm_file *filp,
-+			      const struct drm_mode_fb_cmd2 *mode_cmd)
-+{
-+	struct drm_gem_object *obj;
-+	struct hibmc_framebuffer *hibmc_fb;
-+
-+	DRM_DEBUG_DRIVER("%dx%d, format %c%c%c%c\n",
-+			 mode_cmd->width, mode_cmd->height,
-+			 (mode_cmd->pixel_format) & 0xff,
-+			 (mode_cmd->pixel_format >> 8)  & 0xff,
-+			 (mode_cmd->pixel_format >> 16) & 0xff,
-+			 (mode_cmd->pixel_format >> 24) & 0xff);
-+
-+	obj = drm_gem_object_lookup(filp, mode_cmd->handles[0]);
-+	if (!obj)
-+		return ERR_PTR(-ENOENT);
-+
-+	hibmc_fb = hibmc_framebuffer_init(dev, mode_cmd, obj);
-+	if (IS_ERR(hibmc_fb)) {
-+		drm_gem_object_unreference_unlocked(obj);
-+		return ERR_PTR((long)hibmc_fb);
-+	}
-+	return &hibmc_fb->fb;
-+}
 -- 
 1.9.1
