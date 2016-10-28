@@ -1,61 +1,165 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 28 Oct 2016 17:36:48 +0800
-Subject: [PATCH v9 1/4] soc: mediatek: Refine scpsys to support multiple
- platform
-In-Reply-To: <1d5cda95-467a-4f95-1cc9-b8f156271a54@gmail.com>
-References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
- <1476953798-23263-2-git-send-email-jamesjj.liao@mediatek.com>
- <1d5cda95-467a-4f95-1cc9-b8f156271a54@gmail.com>
-Message-ID: <1477647408.24014.6.camel@mtksdaap41>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 28 Oct 2016 11:40:45 +0200
+Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
+ platforms
+In-Reply-To: <20161027160406.25738-1-richard.genoud@gmail.com>
+References: <20161027160406.25738-1-richard.genoud@gmail.com>
+Message-ID: <ab8239e5-3169-ec09-c896-511239e1c564@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
-
-Sorry for late reply due to our email service.
-
-On Tue, 2016-10-25 at 16:04 +0200, Matthias Brugger wrote:
-> Hi James,
+Le 27/10/2016 ? 18:04, Richard Genoud a ?crit :
+> After commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
+> when hardware handshake is enabled"), the hardware handshake wasn't
+> functional anymore on Atmel platforms (beside SAMA5D2).
 > 
-> On 10/20/2016 10:56 AM, James Liao wrote:
-> > -static int scpsys_probe(struct platform_device *pdev)
-> > +static void init_clks(struct platform_device *pdev, struct clk *clk[CLK_MAX])
+> To understand why, one has to understand the flag ATMEL_US_USMODE_HWHS
+> first:
+> Before commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management
+> when hardware handshake is enabled"), this flag was never set.
+> Thus, the CTS/RTS where only handled by serial_core (and everything
+> worked just fine).
 > 
-> I prefer struct clk **clk.
-
-Okay.
-
-> > +{
-> > +	int i;
-> > +
-> > +	for (i = CLK_NONE + 1; i < CLK_MAX; i++)
-> > +		clk[i] = devm_clk_get(&pdev->dev, clk_names[i]);
-> > +}
-> > +
-> > +static struct scp *init_scp(struct platform_device *pdev,
-> > +			const struct scp_domain_data *scp_domain_data, int num)
-> >  {
-> >  	struct genpd_onecell_data *pd_data;
-> >  	struct resource *res;
-> > -	int i, j, ret;
-> > +	int i, j;
-> >  	struct scp *scp;
-> > -	struct clk *clk[MT8173_CLK_MAX];
-> > +	struct clk *clk[CLK_MAX];
+> This commit introduced the use of the ATMEL_US_USMODE_HWHS flag,
+> enabling it for all boards when the user space enables flow control.
 > 
-> should be *[CLK_MAX - 1] but I would prefer to define in the enum:
-> CLK_MAX = CLK_VENC_LT,
+> When the ATMEL_US_USMODE_HWHS is set, the Atmel USART controller
+> handles a part of the flow control job:
+> - disable the transmitter when the CTS pin gets high.
+> - drive the RTS pin high when the DMA buffer transfer is completed or
+>   PDC RX buffer full or RX FIFO is beyond threshold. (depending on the
+>   controller version).
+> 
+> NB: This feature is *not* mandatory for the flow control to work.
+> (Nevertheless, it's very useful if low latencies are needed.)
+> 
+> Now, the specifics of the ATMEL_US_USMODE_HWHS flag:
+> 
+> - For platforms with DMAC and no FIFOs (sam9x25, sam9x35, sama5D3,
+> sama5D4, sam9g15, sam9g25, sam9g35)* this feature simply doesn't work.
+> ( source: https://lkml.org/lkml/2016/9/7/598 )
+> Tested it on sam9g35, the RTS pins always stays up, even when RXEN=1
+> or a new DMA transfer descriptor is set.
+> => ATMEL_US_USMODE_HWHS must not be used for those platforms
+> 
+> - For platforms with a PDC (sam926{0,1,3}, sam9g10, sam9g20, sam9g45,
+> sam9g46)*, there's another kind of problem. Once the flag
+> ATMEL_US_USMODE_HWHS is set, the RTS pin can't be driven anymore via
+> RTSEN/RTSDIS in USART Control Register. The RTS pin can only be driven
+> by enabling/disabling the receiver or setting RCR=RNCR=0 in the PDC
+> (Receive (Next) Counter Register).
+> => Doing this is beyond the scope of this patch and could add other
+> bugs, so the original (and working) behaviour should be set for those
+> platforms (meaning ATMEL_US_USMODE_HWHS flag should be unset).
+> 
+> - For platforms with a FIFO (sama5d2)*, the RTS pin is driven according
+> to the RX FIFO thresholds, and can be also driven by RTSEN/RTSDIS in
+> USART Control Register. No problem here.
+> (This was the use case of commit 1cf6e8fc8341 ("tty/serial: at91: fix
+> RTS line management when hardware handshake is enabled"))
+> NB: If the CTS pin declared as a GPIO in the DTS, (for instance
+> cts-gpios = <&pioA PIN_PB31 GPIO_ACTIVE_LOW>), the transmitter will be
+> disabled.
+> => ATMEL_US_USMODE_HWHS flag can be set for this platform ONLY IF the
+> CTS pin is not a GPIO.
+> 
+> So, the only case when ATMEL_US_USMODE_HWHS can be enabled is when
+> (atmel_use_fifo(port) &&
+>  !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS))
+> 
+> Tested on all Atmel USART controller flavours:
+> AT91SAM9G35-CM (DMAC flavour), AT91SAM9G20-EK (PDC flavour),
+> SAMA5D2xplained (FIFO flavour).
+> 
+> * the list may not be exhaustive
+> 
+> Cc: <stable@vger.kernel.org> #4.4+ (beware, missing atmel_port variable)
+> Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when hardware handshake is enabled")
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
-After init_clks() the clk[] will have valid contents between
-clk[1]..clk[CLK_MAX-1], so it's necessary to declare clk[] with CLK_MAX
-elements.
+thanks :)
 
-> If you are ok with it, I can fix both of my comments when applying.
-
-Yes. struct clk **clk can be applied directly. But I think clk[CLK_MAX]
-should be kept in current implementation.
-
-
-Best regards,
-
-James
+> ---
+>  drivers/tty/serial/atmel_serial.c | 26 ++++++++++++++++++++++----
+>  1 file changed, 22 insertions(+), 4 deletions(-)
+> 
+> Note for -stable:
+> This patch will apply on 4.4.x/4.8.x but compilation will fail due to
+> a missing variable atmel_port (introduced in 4.9-rc1):
+> 
+>  static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  			      struct ktermios *old)
+>  {
+> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  	unsigned long flags;
+>  	unsigned int old_mode, mode, imr, quot, baud;
+> 
+> Changes since v5:
+>  - fix typos
+>  - increase commentary
+> 
+> Changes since v4:
+>  - the mctrl_gpio_use_rtscts() is gone since it was atmel_serial
+>  specific. (so patch 1 is gone)
+>  - patches 2 and 3 have been merged together since it didn't make
+>  a lot of sense to correct the GPIO case in one separate patch.
+>  - ATMEL_US_USMODE_HWHS is now unset for platform with PDC
+> 
+> Changes since v3:
+>  - remove superfluous #include <linux/err.h> (thanks to Uwe)
+>  - rebase on next-20160930
+> 
+> Changes since v2:
+>  - remove IS_ERR_OR_NULL() test in patch 1/3 as Uwe suggested.
+>  - fix typos in patch 2/3
+>  - rebase on next-20160927
+>  - simplify the logic in patch 3/3.
+> 
+> Changes since v1:
+>  - Correct patch 1 with the error found by kbuild.
+>  - Add Alexandre's Acked-by on patch 2
+>  - Rewrite patch 3 logic in the light of the on-going discussion
+>    with Cyrille and Alexandre.
+> 
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index fd8aa1f4ba78..168b10cad47b 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  		mode |= ATMEL_US_USMODE_RS485;
+>  	} else if (termios->c_cflag & CRTSCTS) {
+>  		/* RS232 with hardware handshake (RTS/CTS) */
+> -		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
+> -			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
+> -			termios->c_cflag &= ~CRTSCTS;
+> -		} else {
+> +		if (atmel_use_fifo(port) &&
+> +		    !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
+> +			/*
+> +			 * with ATMEL_US_USMODE_HWHS set, the controller will
+> +			 * be able to drive the RTS pin high/low when the RX
+> +			 * FIFO is above RXFTHRES/below RXFTHRES2.
+> +			 * It will also disable the transmitter when the CTS
+> +			 * pin is high.
+> +			 * This mode is not activated if CTS pin is a GPIO
+> +			 * because in this case, the transmitter is always
+> +			 * disabled (there must be an internal pull-up
+> +			 * responsible for this behaviour).
+> +			 * If the RTS pin is a GPIO, the controller won't be
+> +			 * able to drive it according to the FIFO thresholds,
+> +			 * but it will be handled by the driver.
+> +			 */
+>  			mode |= ATMEL_US_USMODE_HWHS;
+> +		} else {
+> +			/*
+> +			 * For platforms without FIFO, the flow control is
+> +			 * handled by the driver.
+> +			 */
+> +			mode |= ATMEL_US_USMODE_NORMAL;
+>  		}
+>  	} else {
+>  		/* RS232 without hadware handshake */
+> 
