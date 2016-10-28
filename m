@@ -1,64 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 27 Oct 2016 17:23:03 -0700
-Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <20160924235945.32128-1-iwamatsu@nigauri.org>
-References: <20160924235945.32128-1-iwamatsu@nigauri.org>
-Message-ID: <CAOesGMgkVWNZ0Nq0c-GZXbJETVBKOo2m5gZ1u8gUtb0tUDeqjQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Oct 2016 17:26:32 -0700
+Subject: [PATCH RESEND 1/3] clk: imx6: Mask mmdc_ch1 handshake for
+ periph2_sel and mmdc_ch1_axi_podf
+In-Reply-To: <CAOMZO5BQHKv7dxJTq2C1qdvhhRRRW8bafaXoQW77AKLNTWggAg@mail.gmail.com>
+References: <1476750554-21961-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5BQHKv7dxJTq2C1qdvhhRRRW8bafaXoQW77AKLNTWggAg@mail.gmail.com>
+Message-ID: <20161028002632.GO26139@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/26, Fabio Estevam wrote:
+> Shawn,
+> 
+> Are you collecting the imx clk patches in this cycle?
+> 
+> I see no response from Stephen on this series from a long time.
+> 
+> We missed 4.9, so hopefully this can land in 4.10.
+> 
 
-Saw this when looking at the patch when merging it.
+These patches are in the queue. If Shawn wants to pick up patches
+and send pull requests that's fine too.
 
-Please fix up with incremental patch. Dinh, this goes for other
-platforms under socfpga too, several have this problem:
-
-On Sat, Sep 24, 2016 at 4:59 PM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-> new file mode 100644
-> index 0000000..9aaf413
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-> @@ -0,0 +1,123 @@
-> +/*
-> + *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include "socfpga_cyclone5.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +       model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
-> +       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-
-You should add a compatible entry for your specific board. Compatible
-goes from specific to generic, so something like:
-
-compatible = "altr,macnica-sodia", "latr,socfpga-cyclone5", "altr,socfpga";
-
-You can even add entries for the specific rev (if there are
-differences). But at the very least, add one for the board.
-
-
-Dinh, please follow up for other boards as well. I've still merged the
-pull request you sent (email about that separately).
-
-
-Regards,
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
