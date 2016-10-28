@@ -1,168 +1,106 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Fri, 28 Oct 2016 12:19:44 +0200
-Subject: [PATCH v12 RESEND 4/4] Documentation: tee subsystem and op-tee driver
-In-Reply-To: <1477649984-16777-1-git-send-email-jens.wiklander@linaro.org>
-References: <1477649984-16777-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1477649984-16777-5-git-send-email-jens.wiklander@linaro.org>
+From: kevin.brodsky@arm.com (Kevin Brodsky)
+Date: Fri, 28 Oct 2016 11:20:07 +0100
+Subject: [RFC PATCH v2 4/8] arm64: compat: Add a 32-bit vDSO
+In-Reply-To: <20161028110926.0176e0ea@xhacker>
+References: <20161027163058.12156-1-kevin.brodsky@arm.com>
+ <20161027163058.12156-5-kevin.brodsky@arm.com>
+ <20161028110926.0176e0ea@xhacker>
+Message-ID: <22ae46f6-f881-63ec-388d-8a7f6cf9934d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- Documentation/00-INDEX |   2 +
- Documentation/tee.txt  | 118 +++++++++++++++++++++++++++++++++++++++++++++++++
- MAINTAINERS            |   1 +
- 3 files changed, 121 insertions(+)
- create mode 100644 Documentation/tee.txt
+On 28/10/16 04:09, Jisheng Zhang wrote:
+> Dear Kevin,
+>
+> On Thu, 27 Oct 2016 17:30:54 +0100 Kevin Brodsky wrote:
+>
+>> Provide the files necessary for building a compat (AArch32) vDSO in
+>> kernel/vdso32.
+>>
+>> This is mostly an adaptation of the arm vDSO. The most significant
+>> change in vgettimeofday.c is the use of the arm64 vdso_data struct,
+>> allowing the vDSO data page to be shared between the 32 and 64-bit
+>> vDSOs.
+>>
+>> In addition to the time functions, sigreturn trampolines are also
+>> provided, aiming at replacing those in the vector page. To improve
+>> debugging, CFI and unwinding directives are used, based on glibc's
+>> implementation. Symbol offsets are made available to the kernel using
+>> the same method as the 64-bit vDSO.
+>>
+>> There is unfortunately an important caveat to all this: we cannot get
+>> away with hand-coding 32-bit instructions like in kernel/kuser32.S,
+>> this time we really need a 32-bit compiler. The compat vDSO Makefile
+>> relies on CROSS_COMPILE_ARM32 to provide a 32-bit compiler,
+>> appropriate logic will be added to the arm64 Makefile later on to
+>> ensure that an attempt to build the compat vDSO is made only if this
+>> variable has been set properly.
+>>
+>> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+>> ---
+>>   arch/arm64/kernel/vdso32/Makefile        | 121 +++++++++++++
+>>   arch/arm64/kernel/vdso32/sigreturn.S     |  86 +++++++++
+>>   arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
+>>   arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
+>>   arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
+>>   5 files changed, 631 insertions(+)
+>>   create mode 100644 arch/arm64/kernel/vdso32/Makefile
+>>   create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
+>>   create mode 100644 arch/arm64/kernel/vdso32/vdso.S
+>>   create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
+>>   create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
+>>
+>> diff --git a/arch/arm64/kernel/vdso32/Makefile b/arch/arm64/kernel/vdso32/Makefile
+>> new file mode 100644
+>> index 000000000000..38facc870f6e
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/vdso32/Makefile
+>> @@ -0,0 +1,121 @@
+>> +#
+>> +# Building a vDSO image for AArch32.
+>> +#
+>> +# Author: Kevin Brodsky <kevin.brodsky@arm.com>
+>> +# A mix between the arm64 and arm vDSO Makefiles.
+>> +
+>> +CC_ARM32 := $(CROSS_COMPILE_ARM32)gcc
+>> +
+>> +# Same as cc-ldoption, but using CC_ARM32 instead of CC
+>> +cc32-ldoption = $(call try-run,\
+>> +        $(CC_ARM32) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
+>> +
+>> +# Borrow vdsomunge.c from the arm vDSO
+>> +munge := arch/arm/vdso/vdsomunge
+>> +hostprogs-y := $(srctree)/$(munge)
+>> +
+>> +c-obj-vdso := vgettimeofday.o
+>> +asm-obj-vdso := sigreturn.o
+>> +
+>> +# Build rules
+>> +targets := $(c-obj-vdso) $(asm-obj-vdso) vdso.so vdso.so.dbg vdso.so.raw
+>> +c-obj-vdso := $(addprefix $(obj)/, $(c-obj-vdso))
+>> +asm-obj-vdso := $(addprefix $(obj)/, $(asm-obj-vdso))
+>> +obj-vdso := $(c-obj-vdso) $(asm-obj-vdso)
+>> +
+>> +ccflags-y := -fPIC -fno-common -fno-builtin -fno-stack-protector
+>> +ccflags-y += -DDISABLE_BRANCH_PROFILING
+>> +
+>> +# Force -O2 to avoid libgcc dependencies
+>> +VDSO_CFLAGS := -march=armv8-a -O2
+> For completeness, bringing 32bit compiler need to check whether the 32bit
+> toolchain support some options. IIRC, armv8-a support isn't enabled until
+> gcc 4.8, so old toolchains such gcc-4.7 will complain:
+>   error: unrecognized argument in option ?-march=armv8-a?
+>
+> Thanks,
+> Jisheng
 
-diff --git a/Documentation/00-INDEX b/Documentation/00-INDEX
-index 3acc4f1..4a5a887 100644
---- a/Documentation/00-INDEX
-+++ b/Documentation/00-INDEX
-@@ -436,6 +436,8 @@ sysrq.txt
- 	- info on the magic SysRq key.
- target/
- 	- directory with info on generating TCM v4 fabric .ko modules
-+tee.txt
-+	- info on the TEE subsystem and drivers
- this_cpu_ops.txt
- 	- List rationale behind and the way to use this_cpu operations.
- thermal/
-diff --git a/Documentation/tee.txt b/Documentation/tee.txt
-new file mode 100644
-index 0000000..7185993
---- /dev/null
-+++ b/Documentation/tee.txt
-@@ -0,0 +1,118 @@
-+TEE subsystem
-+This document describes the TEE subsystem in Linux.
-+
-+A TEE (Trusted Execution Environment) is a trusted OS running in some
-+secure environment, for example, TrustZone on ARM CPUs, or a separate
-+secure co-processor etc. A TEE driver handles the details needed to
-+communicate with the TEE.
-+
-+This subsystem deals with:
-+
-+- Registration of TEE drivers
-+
-+- Managing shared memory between Linux and the TEE
-+
-+- Providing a generic API to the TEE
-+
-+The TEE interface
-+=================
-+
-+include/uapi/linux/tee.h defines the generic interface to a TEE.
-+
-+User space (the client) connects to the driver by opening /dev/tee[0-9]* or
-+/dev/teepriv[0-9]*.
-+
-+- TEE_IOC_SHM_ALLOC allocates shared memory and returns a file descriptor
-+  which user space can mmap. When user space doesn't need the file
-+  descriptor any more, it should be closed. When shared memory isn't needed
-+  any longer it should be unmapped with munmap() to allow the reuse of
-+  memory.
-+
-+- TEE_IOC_VERSION lets user space know which TEE this driver handles and
-+  the its capabilities.
-+
-+- TEE_IOC_OPEN_SESSION opens a new session to a Trusted Application.
-+
-+- TEE_IOC_INVOKE invokes a function in a Trusted Application.
-+
-+- TEE_IOC_CANCEL may cancel an ongoing TEE_IOC_OPEN_SESSION or TEE_IOC_INVOKE.
-+
-+- TEE_IOC_CLOSE_SESSION closes a session to a Trusted Application.
-+
-+There are two classes of clients, normal clients and supplicants. The latter is
-+a helper process for the TEE to access resources in Linux, for example file
-+system access. A normal client opens /dev/tee[0-9]* and a supplicant opens
-+/dev/teepriv[0-9].
-+
-+Much of the communication between clients and the TEE is opaque to the
-+driver. The main job for the driver is to receive requests from the
-+clients, forward them to the TEE and send back the results. In the case of
-+supplicants the communication goes in the other direction, the TEE sends
-+requests to the supplicant which then sends back the result.
-+
-+OP-TEE driver
-+=============
-+
-+The OP-TEE driver handles OP-TEE [1] based TEEs. Currently it is only the ARM
-+TrustZone based OP-TEE solution that is supported.
-+
-+Lowest level of communication with OP-TEE builds on ARM SMC Calling
-+Convention (SMCCC) [2], which is the foundation for OP-TEE's SMC interface
-+[3] used internally by the driver. Stacked on top of that is OP-TEE Message
-+Protocol [4].
-+
-+OP-TEE SMC interface provides the basic functions required by SMCCC and some
-+additional functions specific for OP-TEE. The most interesting functions are:
-+
-+- OPTEE_SMC_FUNCID_CALLS_UID (part of SMCCC) returns the version information
-+  which is then returned by TEE_IOC_VERSION
-+
-+- OPTEE_SMC_CALL_GET_OS_UUID returns the particular OP-TEE implementation, used
-+  to tell, for instance, a TrustZone OP-TEE apart from an OP-TEE running on a
-+  separate secure co-processor.
-+
-+- OPTEE_SMC_CALL_WITH_ARG drives the OP-TEE message protocol
-+
-+- OPTEE_SMC_GET_SHM_CONFIG lets the driver and OP-TEE agree on which memory
-+  range to used for shared memory between Linux and OP-TEE.
-+
-+The GlobalPlatform TEE Client API [5] is implemented on top of the generic
-+TEE API.
-+
-+Picture of the relationship between the different components in the
-+OP-TEE architecture.
-+
-+    User space                  Kernel                   Secure world
-+    ~~~~~~~~~~                  ~~~~~~                   ~~~~~~~~~~~~
-+ +--------+                                             +-------------+
-+ | Client |                                             | Trusted     |
-+ +--------+                                             | Application |
-+    /\                                                  +-------------+
-+    || +----------+                                           /\
-+    || |tee-      |                                           ||
-+    || |supplicant|                                           \/
-+    || +----------+                                     +-------------+
-+    \/      /\                                          | TEE Internal|
-+ +-------+  ||                                          | API         |
-+ + TEE   |  ||            +--------+--------+           +-------------+
-+ | Client|  ||            | TEE    | OP-TEE |           | OP-TEE      |
-+ | API   |  \/            | subsys | driver |           | Trusted OS  |
-+ +-------+----------------+----+-------+----+-----------+-------------+
-+ |      Generic TEE API        |       |     OP-TEE MSG               |
-+ |      IOCTL (TEE_IOC_*)      |       |     SMCCC (OPTEE_SMC_CALL_*) |
-+ +-----------------------------+       +------------------------------+
-+
-+RPC (Remote Procedure Call) are requests from secure world to kernel driver
-+or tee-supplicant. An RPC is identified by a special range of SMCCC return
-+values from OPTEE_SMC_CALL_WITH_ARG. RPC messages which are intended for the
-+kernel are handled by the kernel driver. Other RPC messages will be forwarded to
-+tee-supplicant without further involvement of the driver, except switching
-+shared memory buffer representation.
-+
-+References:
-+[1] https://github.com/OP-TEE/optee_os
-+[2] http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-+[3] drivers/tee/optee/optee_smc.h
-+[4] drivers/tee/optee/optee_msg.h
-+[5] http://www.globalplatform.org/specificationsdevice.asp look for
-+    "TEE Client API Specification v1.0" and click download.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8130af1..76e3a28 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10645,6 +10645,7 @@ S:	Maintained
- F:	include/linux/tee_drv.h
- F:	include/uapi/linux/tee.h
- F:	drivers/tee/
-+F:	Documentation/tee.txt
- 
- THUNDERBOLT DRIVER
- M:	Andreas Noever <andreas.noever@gmail.com>
--- 
-1.9.1
+That's a fair point. I guess -march=armv8-a is not strictly necessary and the 
+produced vDSO should be fine if arch/arm/vdso also compiles fine. However we would 
+still need to pass -march=armv7-a. I'm not sure what to do between:
+* Checking that the compiler supports -march=armv8-a when inspecting 
+CROSS_COMPILE_ARM32, and if it doesn't vdso32 will not be built.
+* Checking whether -march=armv8-a is available here, and if it is not fall back to 
+-march=armv7-a.
+
+Thanks!
+Kevin
