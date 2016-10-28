@@ -1,56 +1,58 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 29 Oct 2016 04:41:47 +0800
-Subject: [PATCH v2 3/5] fpga manager: Add cyclone-ps-spi driver for
- Altera FPGAs
-In-Reply-To: <202cdeff42a2de149c471630110a8b2657ccf5ca.1477669745.git.stillcompiling@gmail.com>
-Message-ID: <201610290422.JEtRRTFh%fengguang.wu@intel.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Fri, 28 Oct 2016 16:48:13 -0400
+Subject: [PATCH V6 0/3] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1477687696-1509-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.9-rc2 next-20161028]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+The first patch fixes probe deferral by allowing platform_device
+IRQ resources to be re-initialized if the ACPI core failed to find
+the IRQ domain during ACPI bus scan.
 
-url:    https://github.com/0day-ci/linux/commits/Joshua-Clayton/lib-add-bitrev8x4/20161029-012535
-config: openrisc-allmodconfig (attached as .config)
-compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
+The second patch adds support for ResourceSource/IRQ domain mapping
+when using Extended IRQ Resources with a specific ResourceSource.
+The core ACPI resource management code has been changed to lookup
+the IRQ domain when an IRQ resource indicates a ResourceSource,
+and register the IRQ on that domain, instead of a GSI.
 
-All errors (new ones prefixed by >>):
+The third patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
 
-   drivers/fpga/cyclone-ps-spi.c: In function 'cyclonespi_write':
-   drivers/fpga/cyclone-ps-spi.c:89:19: error: 'SZ_4K' undeclared (first use in this function)
-   drivers/fpga/cyclone-ps-spi.c:89:19: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/fpga/cyclone-ps-spi.c:89:19: error: type defaults to 'int' in declaration of '__UNIQUE_ID_min2_15'
+Changes V5 -> V6:
+* Drop probe table and on-demand probing based on resource_source
+* Add patch to fix probe deferral
+* Change back combiner driver to use the platform_device/platform_driver
+  APIs
 
-vim +89 drivers/fpga/cyclone-ps-spi.c
+Changes V4 -> V5:
+* Fix issues flagged by the 0-DAY build bot
+* Fix some minor style issues raised by Timur
 
-    83		struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-    84		const char *fw_data = buf;
-    85		const char *fw_data_end = fw_data + count;
-    86	
-    87		while (fw_data < fw_data_end) {
-    88			int ret;
-  > 89			size_t stride = min(fw_data_end - fw_data, SZ_4K);
-    90	
-    91			rev_buf((void *)fw_data, stride);
-    92			ret = spi_write(conf->spi, fw_data, stride);
+Changes V3 -> V4:
+* Add a DSDT device probe table that is used to probe DSDT IRQ chips
+  as necessary when converting HW IRQs to Linux IRQs
+* Describe IRQ combiner registers as ACPI Register resources
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 39284 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161029/d37f2726/attachment-0001.gz>
+Agustin Vega-Frias (3):
+  ACPI: Retry IRQ conversion if it failed previously
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   1 +
+ drivers/acpi/irqdomain.c            | 119 +++++++++++++
+ drivers/acpi/resource.c             |  80 ++++++++-
+ drivers/base/platform.c             |   9 +-
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 337 ++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h                |  32 ++++
+ 8 files changed, 577 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/acpi/irqdomain.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
