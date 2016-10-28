@@ -1,24 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 27 Oct 2016 17:00:06 -0700
-Subject: [PATCH] ARM: defconfig: update U8500 defconfig
-In-Reply-To: <1476696229-1964-1-git-send-email-linus.walleij@linaro.org>
-References: <1476696229-1964-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161028000006.GA7284@localhost>
+Date: Thu, 27 Oct 2016 17:01:34 -0700
+Subject: [PATCH] arm64: Enable HIBERNATION in defconfig
+In-Reply-To: <1476896392-28106-1-git-send-email-catalin.marinas@arm.com>
+References: <1476896392-28106-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20161028000134.GB7284@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 11:23:49AM +0200, Linus Walleij wrote:
-> Some config options like perf events and PM are now implicit,
-> we have an upstream driver for the AK8974, and we really
-> want the HRTIMER software triggers from configfs with some
-> of the sensors.
+On Wed, Oct 19, 2016 at 05:59:52PM +0100, Catalin Marinas wrote:
+> This patch adds CONFIG_HIBERNATION to the arm64 defconfig.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > ---
-> ARM SoC folks: please apply this wherever your usual batch of
-> defconfig changes go.
+> 
+> Re-sent post 4.9-rc1 as it was missed during the merging window.
 
-Thanks, applied!
+Thanks, applied to next/arm64 for 4.10.
 
 
 -Olof
