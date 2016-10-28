@@ -1,38 +1,17 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Oct 2016 17:01:48 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-Message-ID: <20161028160148.GD1076@arm.com>
+Date: Fri, 28 Oct 2016 17:02:14 +0100
+Subject: [PATCH v6] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <4d049ac5-2661-9af5-561b-6cd4029c3b83@codeaurora.org>
+References: <1474492374-12140-1-git-send-email-nleeder@codeaurora.org>
+ <20161004155304.GB29008@leverpostej>
+ <4d049ac5-2661-9af5-561b-6cd4029c3b83@codeaurora.org>
+Message-ID: <20161028160213.GH1076@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Tue, Oct 04, 2016 at 12:25:54PM -0400, Neil Leeder wrote:
+> Thanks Mark. I'll move it, rebase on 4.9-rc1 and run perf fuzzer.
 
-Please pull the following pair of fixes from Robin for the ARM SMMU
-drivers.
-
-Thanks,
+Did the fuzzer explode, or do you have a new version you can post?
 
 Will
-
---->8
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/fixes
-
-for you to fetch changes up to 5a5a057d2ba73ae4990b6dc283465b4886d93993:
-
-  iommu/arm-smmu: Don't inadvertently reject multiple SMMUv3s (2016-10-26 19:21:38 +0100)
-
-----------------------------------------------------------------
-Robin Murphy (2):
-      iommu/arm-smmu: Work around ARM DMA configuration
-      iommu/arm-smmu: Don't inadvertently reject multiple SMMUv3s
-
- drivers/iommu/arm-smmu-v3.c | 11 ++++-------
- drivers/iommu/arm-smmu.c    | 10 ++++++++++
- 2 files changed, 14 insertions(+), 7 deletions(-)
