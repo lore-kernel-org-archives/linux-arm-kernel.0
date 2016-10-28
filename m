@@ -1,49 +1,18 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 28 Oct 2016 12:31:04 +0100
-Subject: [GIT PULL] arm64: dts: juno: updates for v4.10
-Message-ID: <20161028113104.GE12241@e107155-lin>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 28 Oct 2016 09:34:16 -0200
+Subject: [PATCH 1/1] ARM: dts: imx6ul-14x14-evk: add USB dual-role support
+In-Reply-To: <1470128903-942-1-git-send-email-peter.chen@nxp.com>
+References: <1470128903-942-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <CAOMZO5Ddw7xg1hrDRtHnP3_fLE+bFcxMeQ=AByejE5HE=RH6wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+On Tue, Aug 2, 2016 at 6:08 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> With commit 851ce932242d ("usb: chipidea: otg: don't wait vbus
+> drops below BSV when starts host"), the driver can support
+> enabling vbus output without software control, so this board
+> (control vbus output through ID pin) can support dual-role now.
+>
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
 
-Please pull.
-
---
-Regards,
-Sudeep
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-dt-4.10
-
-for you to fetch changes up to c1ab65b24065ab04bdb0bc4e89d88784d38dc644:
-
-  arm64: dts: juno: add cpu capacity-dmips-mhz information to R2 boards (2016-10-17 17:43:22 +0100)
-
-----------------------------------------------------------------
-ARMv8 Vexpress/Juno DT updates for v4.10
-
-1. Addition of SMMU(MMU-401) device nodes mainly to assist other
-   developments and testing
-
-2. Addition of CPU dmips/capacity information on all the Juno boards
-
-----------------------------------------------------------------
-Juri Lelli (3):
-      arm64: dts: juno: add cpu capacity-dmips-mhz information to R0 boards
-      arm64: dts: juno: add cpu capacity-dmips-mhz information to R1 boards
-      arm64: dts: juno: add cpu capacity-dmips-mhz information to R2 boards
-
-Robin Murphy (1):
-      arm64: dts: juno: Add SMMUs device nodes
-
- arch/arm64/boot/dts/arm/juno-base.dtsi | 80 ++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts    |  6 +++
- arch/arm64/boot/dts/arm/juno-r2.dts    |  6 +++
- arch/arm64/boot/dts/arm/juno.dts       |  6 +++
- 4 files changed, 98 insertions(+)
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
