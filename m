@@ -1,18 +1,35 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 28 Oct 2016 15:35:07 +0530
-Subject: [PATCH] ARM: DTS: da850: Add DMA to SPI0
-In-Reply-To: <1477438368-16208-1-git-send-email-david@lechnology.com>
-References: <1477438368-16208-1-git-send-email-david@lechnology.com>
-Message-ID: <1df318e4-f755-a4db-7aa8-b62151397866@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 28 Oct 2016 18:11:51 +0800
+Subject: [PATCH 0/3] ARM: dts: sun9i: Enable SDIO-based WiFi
+Message-ID: <20161028101154.7350-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 26 October 2016 05:02 AM, David Lechner wrote:
-> Add the bindings for DMA on SPI0
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+Hi Maxime,
 
-Applied to v4.10/dt. small-case'd "DTS" in subject line while applying.
+Now that we have support for both PMICs, we can turn on the
+regulators needed for the onboard WiFi chips.
 
-Thanks,
-Sekhar
+This is a fairly simple series. The WiFi chips themselves are
+supported by the brcmfmac driver, but the user needs to get an
+nvram.txt file and put it in their firmware directory, in
+addition to the firmware file in linux-firmware. Otherwise we
+just need to enable the mmc controller and supply the vmmc and
+vqmmc regulators.
+
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (3):
+  ARM: dts: sun9i: Add mmc1 pinmux setting
+  ARM: dts: sun9i: a80-optimus: Enable AP6330 WiFi
+  ARM: dts: sun9i: cubieboard4: Enable AP6330 WiFi
+
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 32 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun9i-a80-optimus.dts     | 30 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun9i-a80.dtsi            |  8 ++++++++
+ 3 files changed, 70 insertions(+)
+
+-- 
+2.9.3
