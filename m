@@ -1,48 +1,36 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Fri, 28 Oct 2016 14:37:20 +0200
-Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
- randomness
-In-Reply-To: <20161025090634.3dae9ad52ae8382dde6af4c8@free.fr>
-References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
- <20161024201020.h6akyqad2o42xkhq@lukather>
- <20161025053855.GA901@Red>
- <20161025090634.3dae9ad52ae8382dde6af4c8@free.fr>
-Message-ID: <20161028123720.GA10889@Red>
+From: woogyom.kim@gmail.com (Milo Kim)
+Date: Fri, 28 Oct 2016 21:36:55 +0900
+Subject: [PATCH v2 1/8] ARM: dts: tps65217: Specify the interrupt controller
+In-Reply-To: <20161028123702.21849-1-woogyom.kim@gmail.com>
+References: <20161028123702.21849-1-woogyom.kim@gmail.com>
+Message-ID: <20161028123702.21849-2-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 09:06:34AM +0200, Jean-Francois Moine wrote:
-> On Tue, 25 Oct 2016 07:38:55 +0200
-> LABBE Corentin <clabbe.montjoie@gmail.com> wrote:
-> 
-> > > On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
-> > > > Since SID's content is constant over reboot,
-> > > 
-> > > That's not true, at least not across all the Allwinner SoCs, and
-> > > especially not on the A10 and A20 that this driver supports.
-> > > 
-> > 
-> > On my cubieboard2 (A20)
-> > hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000200
-> > cubiedev ~ # reboot
-> > cubiedev ~ # hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000200
-> > 
-> > So clearly for me its constant.
-> 
-> Even after power off/power on?
+TPS65217 MFD driver supports the IRQ domain to handle the charger input
+interrupts and push button status event. The interrupt controller enables
+corresponding IRQ handling in the charger[*] and power button driver[**].
 
-Yes, even after remove of any power supply.
+[*]  drivers/power/supply/tps65217_charger.c
+[**] drivers/input/misc/tps65218-pwrbutton.c
+
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/tps65217.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
+index a632724..27935f8 100644
+--- a/arch/arm/boot/dts/tps65217.dtsi
++++ b/arch/arm/boot/dts/tps65217.dtsi
+@@ -13,6 +13,8 @@
+ 
+ &tps {
+ 	compatible = "ti,tps65217";
++	interrupt-controller;
++	#interrupt-cells = <1>;
+ 
+ 	regulators {
+ 		#address-cells = <1>;
+-- 
+2.9.3
