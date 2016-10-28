@@ -1,41 +1,46 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 28 Oct 2016 15:54:08 +0900
-Subject: [PATCH v2 0/4] Support H3 SPI controller
-Message-ID: <20161028065412.23008-1-woogyom.kim@gmail.com>
+Date: Fri, 28 Oct 2016 15:54:09 +0900
+Subject: [PATCH v2 1/4] ARM: dts: sun8i: Add SPI pinctrl node in H3
+In-Reply-To: <20161028065412.23008-1-woogyom.kim@gmail.com>
+References: <20161028065412.23008-1-woogyom.kim@gmail.com>
+Message-ID: <20161028065412.23008-2-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 SPI controller has same architecture as A31.
-So most configuration is identical except one thing - FIFO capacity.
+H3 supports two SPI controllers. Four pins (MOSI, MISO, SCLK, SS) are
+configured through the pinctrl subsystem.
 
-                         A31    H3
-------------------------------------
-Number of controllers     4      2
-Number of FIFO depth     128    64
-Transfer bits             8      8
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Register maps are sharable, so sun6i SPI driver is reusable with
-device configuration.
-
-Tested on Nano Pi M1 and SPI slave device is TI LP8860.
-
-v2:
-  Include DTS patches
-  Use of_device_get_match_data() helper to get device specific data
-  Fix build warning of 64bit CPU architecture
-    (warning: cast from pointer to integer of different size
-     [-Wpointer-to-int-cast])
-
-Milo Kim (4):
-  ARM: dts: sun8i: Add SPI pinctrl node in H3
-  ARM: dts: sun8i: Add SPI controller node in H3
-  spi: sun6i: Add binding for Allwinner H3 SPI controller
-  spi: sun6i: Support Allwinner H3 SPI controller
-
- .../devicetree/bindings/spi/spi-sun6i.txt          | 25 +++++++++++-
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 46 ++++++++++++++++++++++
- drivers/spi/spi-sun6i.c                            | 18 ++++++---
- 3 files changed, 82 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 75a8654..8a59d8d 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -381,6 +381,20 @@
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
+ 
++			spi0_pins: spi0 {
++				allwinner,pins = "PC0", "PC1", "PC2", "PC3";
++				allwinner,function = "spi0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spi1_pins: spi1 {
++				allwinner,pins = "PA15", "PA16", "PA14", "PA13";
++				allwinner,function = "spi1";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
+ 			uart0_pins_a: uart0 at 0 {
+ 				allwinner,pins = "PA4", "PA5";
+ 				allwinner,function = "uart0";
 -- 
 2.9.3
