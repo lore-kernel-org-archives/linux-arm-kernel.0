@@ -1,42 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Oct 2016 18:27:16 +0100
-Subject: [PATCH v4 8/8] arm64: Enable CONFIG_ARM64_SW_TTBR0_PAN
-In-Reply-To: <1477675636-3957-1-git-send-email-catalin.marinas@arm.com>
-References: <1477675636-3957-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1477675636-3957-9-git-send-email-catalin.marinas@arm.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri, 28 Oct 2016 10:41:42 -0700
+Subject: [PATCH v2 5/5] fpga manager: cyclone-ps-spi: make delay variable
+In-Reply-To: <2239ffc8aba7d053825d2bea122a3c16cdd9f6e1.1477669745.git.stillcompiling@gmail.com>
+References: <cover.1477669744.git.stillcompiling@gmail.com>
+ <2239ffc8aba7d053825d2bea122a3c16cdd9f6e1.1477669745.git.stillcompiling@gmail.com>
+Message-ID: <20161028174142.GA18325@live.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Kconfig option to enable support for TTBR0 PAN
-emulation. The option is default off because of a slight performance hit
-when enabled, caused by the additional TTBR0_EL1 switching during user
-access operations or exception entry/exit code.
+Hi Joshua,
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+looks good to me; however, I think since you're adding initial support,
+I'd squash this together with [3/5].
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 969ef880d234..6b9a8446fc43 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -790,6 +790,14 @@ config SETEND_EMULATION
- 	  If unsure, say Y
- endif
- 
-+config ARM64_SW_TTBR0_PAN
-+	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
-+	help
-+	  Enabling this option prevents the kernel from accessing
-+	  user-space memory directly by pointing TTBR0_EL1 to a reserved
-+	  zeroed area and reserved ASID. The user access routines
-+	  restore the valid TTBR0_EL1 temporarily.
-+
- menu "ARMv8.1 architectural features"
- 
- config ARM64_HW_AFDBM
+On Fri, Oct 28, 2016 at 09:56:42AM -0700, Joshua Clayton wrote:
+> The status pin may not show ready in the time described in the
+> Altetera manual. check the value several times before giving up
+
+s/Altetera/Altera
+> For the hardware I am working on, the status pin takes 250 us,
+> 5 times as long as described by Altera.
+> 
+> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+> ---
+>  drivers/fpga/cyclone-ps-spi.c | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/fpga/cyclone-ps-spi.c b/drivers/fpga/cyclone-ps-spi.c
+> index 4b70d5c..c368223 100644
+> --- a/drivers/fpga/cyclone-ps-spi.c
+> +++ b/drivers/fpga/cyclone-ps-spi.c
+> @@ -20,6 +20,7 @@
+>  
+>  #define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
+> -#define FPGA_MIN_DELAY		250  /* min usecs to wait for config status */
+> +#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
+> +#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
+>  
+>  struct cyclonespi_conf {
+>  	struct gpio_desc *config;
+> @@ -42,6 +43,7 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+>  				 const char *buf, size_t count)
+>  {
+>  	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+> +	int i;
+>  
+>  	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
+>  		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+> @@ -56,13 +58,14 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+>  	}
+>  
+>  	gpiod_set_value(conf->config, 1);
+> -	usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+> -	if (gpiod_get_value(conf->status) == 0) {
+> -		dev_err(&mgr->dev, "Status pin not ready.\n");
+> -		return -EIO;
+> +	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
+> +		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+> +		if (gpiod_get_value(conf->status))
+> +			return 0;
+>  	}
+>  
+> -	return 0;
+> +	dev_err(&mgr->dev, "Status pin not ready.\n");
+> +	return -EIO;
+>  }
+>  
+>  static void rev_buf(void *buf, size_t len)
+> -- 
+> 2.7.4
+> 
+
+Cheers,
+
+Moritz
