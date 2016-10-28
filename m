@@ -1,51 +1,59 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 29 Oct 2016 01:07:45 +0300
-Subject: [PATCH 01/11] ARM: shmobile: r8a7745: add power domain index macros
+Date: Sat, 29 Oct 2016 01:16:54 +0300
+Subject: [PATCH 03/11] ARM: shmobile: r8a7745: basic SoC support
 In-Reply-To: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
 References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
-Message-ID: <1645729.DjklObBkNM@wasted.cogentembedded.com>
+Message-ID: <1638480.5pJxF7pUnz@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add macros usable by the device tree sources to reference R8A7745 SYSC power
-domains by index.
-
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+Add minimal support for the RZ/G1E (R8A7745) SoC.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- include/dt-bindings/power/r8a7745-sysc.h |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
+ arch/arm/mach-shmobile/Kconfig                     |    4 ++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           |    1 +
+ 3 files changed, 7 insertions(+)
 
-Index: renesas/include/dt-bindings/power/r8a7745-sysc.h
+Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
 ===================================================================
---- /dev/null
-+++ renesas/include/dt-bindings/power/r8a7745-sysc.h
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (C) 2016 Cogent Embedded Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#ifndef __DT_BINDINGS_POWER_R8A7745_SYSC_H__
-+#define __DT_BINDINGS_POWER_R8A7745_SYSC_H__
+--- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
++++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -15,6 +15,8 @@ SoCs:
+     compatible = "renesas,r8a7740"
+   - RZ/G1M (R8A77430)
+     compatible = "renesas,r8a7743"
++  - RZ/G1E (R8A77450)
++    compatible = "renesas,r8a7745"
+   - R-Car M1A (R8A77781)
+     compatible = "renesas,r8a7778"
+   - R-Car H1 (R8A77790)
+Index: renesas/arch/arm/mach-shmobile/Kconfig
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -73,6 +73,10 @@ config ARCH_R8A7743
+ 	select ARCH_RCAR_GEN2
+ 	select ARM_ERRATA_798181 if SMP
+ 
++config ARCH_R8A7745
++	bool "RZ/G1E (R8A77450)"
++	select ARCH_RCAR_GEN2
 +
-+/*
-+ * These power domain indices match the numbers of the interrupt bits
-+ * representing the power areas in the various Interrupt Registers
-+ * (e.g. SYSCISR, Interrupt Status Register)
-+ */
-+
-+#define R8A7745_PD_CA7_CPU0		 5
-+#define R8A7745_PD_CA7_CPU1		 6
-+#define R8A7745_PD_SGX			20
-+#define R8A7745_PD_CA7_SCU		21
-+
-+/* Always-on power area */
-+#define R8A7745_PD_ALWAYS_ON		32
-+
-+#endif /* __DT_BINDINGS_POWER_R8A7745_SYSC_H__ */
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+Index: renesas/arch/arm/mach-shmobile/setup-rcar-gen2.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ renesas/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -225,6 +225,7 @@ MACHINE_END
+ 
+ static const char * const rz_g1_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7743",
++	"renesas,r8a7745",
+ 	NULL,
+ };
+ 
