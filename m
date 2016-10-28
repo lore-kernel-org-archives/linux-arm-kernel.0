@@ -1,178 +1,111 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 28 Oct 2016 14:50:17 +0800
-Subject: [v15, 6/7] base: soc: introduce soc_device_match() interface
-In-Reply-To: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
-References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1477637418-38938-7-git-send-email-yangbo.lu@nxp.com>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Fri, 28 Oct 2016 07:08:44 +0000
+Subject: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
+ <1477625554-46700-6-git-send-email-yangbo.lu@nxp.com>
+ <1477629956.6812.15.camel@buserror.net>  
+Message-ID: <DB6PR0401MB2536E6A29246096648EEC890F8AD0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+> -----Original Message-----
+> From: Y.B. Lu
+> Sent: Friday, October 28, 2016 2:06 PM
+> To: Y.B. Lu; 'Scott Wood'; 'linux-mmc at vger.kernel.org';
+> 'ulf.hansson at linaro.org'; 'Arnd Bergmann'
+> Cc: 'linuxppc-dev at lists.ozlabs.org'; 'devicetree at vger.kernel.org';
+> 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
+> 'linux-clk at vger.kernel.org'; 'linux-i2c at vger.kernel.org';
+> 'iommu at lists.linux-foundation.org'; 'netdev at vger.kernel.org'; 'Greg
+> Kroah-Hartman'; 'Mark Rutland'; 'Rob Herring'; 'Russell King'; 'Jochen
+> Friedrich'; 'Joerg Roedel'; 'Claudiu Manoil'; 'Bhupesh Sharma'; Qiang
+> Zhao; 'Kumar Gala'; 'Santosh Shilimkar'; Leo Li; X.B. Xie; M.H. Lian
+> Subject: RE: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+> 
+> > -----Original Message-----
+> > From: Y.B. Lu
+> > Sent: Friday, October 28, 2016 2:00 PM
+> > To: 'Scott Wood'; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org;
+> > Arnd Bergmann
+> > Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org;
+> > linux-arm- kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > linux- clk at vger.kernel.org; linux-i2c at vger.kernel.org;
+> > iommu at lists.linux- foundation.org; netdev at vger.kernel.org; Greg
+> > Kroah-Hartman; Mark Rutland; Rob Herring; Russell King; Jochen
+> > Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma; Qiang Zhao;
+> Kumar Gala; Santosh Shilimkar; Leo Li; X.B.
+> > Xie; M.H. Lian
+> > Subject: RE: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+> >
+> >
+> >
+> > > -----Original Message-----
+> > > From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+> > > owner at vger.kernel.org] On Behalf Of Scott Wood
+> > > Sent: Friday, October 28, 2016 12:46 PM
+> > > To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Arnd
+> > > Bergmann
+> > > Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org;
+> > > linux-arm- kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > > linux- clk at vger.kernel.org; linux-i2c at vger.kernel.org;
+> > > iommu at lists.linux- foundation.org; netdev at vger.kernel.org; Greg
+> > > Kroah-Hartman; Mark Rutland; Rob Herring; Russell King; Jochen
+> > > Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma; Qiang Zhao;
+> > Kumar Gala; Santosh Shilimkar; Leo Li; X.B.
+> > > Xie; M.H. Lian
+> > > Subject: Re: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ
+> > > platforms
+> > >
+> > > On Fri, 2016-10-28 at 11:32 +0800, Yangbo Lu wrote:
+> > > > +	guts->regs = of_iomap(np, 0);
+> > > > +	if (!guts->regs)
+> > > > +		return -ENOMEM;
+> > > > +
+> > > > +	/* Register soc device */
+> > > > +	machine = of_flat_dt_get_machine_name();
+> > > > +	if (machine)
+> > > > +		soc_dev_attr.machine = devm_kstrdup(dev, machine,
+> > > > GFP_KERNEL);
+> > > > +
+> > > > +	svr = fsl_guts_get_svr();
+> > > > +	soc_die = fsl_soc_die_match(svr, fsl_soc_die);
+> > > > +	if (soc_die) {
+> > > > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> > > > +						?????"QorIQ %s", soc_die-
+> > > > >die);
+> > > > +	} else {
+> > > > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> > > > "QorIQ");
+> > > > +	}
+> > > > +	soc_dev_attr.soc_id = devm_kasprintf(dev, GFP_KERNEL,
+> > > > +					?????"svr:0x%08x", svr);
+> > > > +	soc_dev_attr.revision = devm_kasprintf(dev, GFP_KERNEL,
+> "%d.%d",
+> > > > +					???????SVR_MAJ(svr), SVR_MIN(svr));
+> > > > +
+> > > > +	soc_dev = soc_device_register(&soc_dev_attr);
+> > > > +	if (IS_ERR(soc_dev))
+> > > > +		return PTR_ERR(soc_dev);
+> > >
+> > > ioremap leaks on this error path. ?Use devm_ioremap_resource().
+> > >
+> >
+> > [Lu Yangbo-B47093] Ok. I have fixed it in v14. Thanks :)
+> 
+> [Lu Yangbo-B47093] Sorry, used the wrong error code... Will resent it
 
-We keep running into cases where device drivers want to know the exact
-version of the a SoC they are currently running on. In the past, this has
-usually been done through a vendor specific API that can be called by a
-driver, or by directly accessing some kind of version register that is
-not part of the device itself but that belongs to a global register area
-of the chip.
+[Lu Yangbo-B47093] The v15 had been sent. And dropped patch 'dt: bindings: update Freescale DCFG compatible',
+since that work has been done by below patch on ShawnGuo's linux tree.
+'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG and DCFG'
+https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt64&id=981034a2bfcaff5c95dafde24d7abfe7f9025c19
 
-Common reasons for doing this include:
+Thanks.
 
-- A machine is not using devicetree or similar for passing data about
-  on-chip devices, but just announces their presence using boot-time
-  platform devices, and the machine code itself does not care about the
-  revision.
-
-- There is existing firmware or boot loaders with existing DT binaries
-  with generic compatible strings that do not identify the particular
-  revision of each device, but the driver knows which SoC revisions
-  include which part.
-
-- A prerelease version of a chip has some quirks and we are using the same
-  version of the bootloader and the DT blob on both the prerelease and the
-  final version. An update of the DT binding seems inappropriate because
-  that would involve maintaining multiple copies of the dts and/or
-  bootloader.
-
-This patch introduces the soc_device_match() interface that is meant to
-work like of_match_node() but instead of identifying the version of a
-device, it identifies the SoC itself using a vendor-agnostic interface.
-
-Unlike of_match_node(), we do not do an exact string compare but instead
-use glob_match() to allow wildcards in strings.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
-Changes for v11:
-	- Added this patch for soc match
-Changes for v12:
-	- Corrected the author
-	- Rewrited soc_device_match with while loop
-Changes for v13:
-	- Added ack from Greg
-Changes for v14:
-	- None
-Changes for v15:
-	- None
----
- drivers/base/Kconfig    |  1 +
- drivers/base/soc.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/sys_soc.h |  3 +++
- 3 files changed, 70 insertions(+)
-
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index fdf44ca..991b21e 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -235,6 +235,7 @@ config GENERIC_CPU_AUTOPROBE
- 
- config SOC_BUS
- 	bool
-+	select GLOB
- 
- source "drivers/base/regmap/Kconfig"
- 
-diff --git a/drivers/base/soc.c b/drivers/base/soc.c
-index b63f23e..0c5cf87 100644
---- a/drivers/base/soc.c
-+++ b/drivers/base/soc.c
-@@ -13,6 +13,7 @@
- #include <linux/spinlock.h>
- #include <linux/sys_soc.h>
- #include <linux/err.h>
-+#include <linux/glob.h>
- 
- static DEFINE_IDA(soc_ida);
- 
-@@ -159,3 +160,68 @@ static int __init soc_bus_register(void)
- 	return bus_register(&soc_bus_type);
- }
- core_initcall(soc_bus_register);
-+
-+static int soc_device_match_one(struct device *dev, void *arg)
-+{
-+	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
-+	const struct soc_device_attribute *match = arg;
-+
-+	if (match->machine &&
-+	    !glob_match(match->machine, soc_dev->attr->machine))
-+		return 0;
-+
-+	if (match->family &&
-+	    !glob_match(match->family, soc_dev->attr->family))
-+		return 0;
-+
-+	if (match->revision &&
-+	    !glob_match(match->revision, soc_dev->attr->revision))
-+		return 0;
-+
-+	if (match->soc_id &&
-+	    !glob_match(match->soc_id, soc_dev->attr->soc_id))
-+		return 0;
-+
-+	return 1;
-+}
-+
-+/*
-+ * soc_device_match - identify the SoC in the machine
-+ * @matches: zero-terminated array of possible matches
-+ *
-+ * returns the first matching entry of the argument array, or NULL
-+ * if none of them match.
-+ *
-+ * This function is meant as a helper in place of of_match_node()
-+ * in cases where either no device tree is available or the information
-+ * in a device node is insufficient to identify a particular variant
-+ * by its compatible strings or other properties. For new devices,
-+ * the DT binding should always provide unique compatible strings
-+ * that allow the use of of_match_node() instead.
-+ *
-+ * The calling function can use the .data entry of the
-+ * soc_device_attribute to pass a structure or function pointer for
-+ * each entry.
-+ */
-+const struct soc_device_attribute *soc_device_match(
-+	const struct soc_device_attribute *matches)
-+{
-+	int ret = 0;
-+
-+	if (!matches)
-+		return NULL;
-+
-+	while (!ret) {
-+		if (!(matches->machine || matches->family ||
-+		      matches->revision || matches->soc_id))
-+			break;
-+		ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
-+				       soc_device_match_one);
-+		if (!ret)
-+			matches++;
-+		else
-+			return matches;
-+	}
-+	return NULL;
-+}
-+EXPORT_SYMBOL_GPL(soc_device_match);
-diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
-index 2739ccb..9f5eb06 100644
---- a/include/linux/sys_soc.h
-+++ b/include/linux/sys_soc.h
-@@ -13,6 +13,7 @@ struct soc_device_attribute {
- 	const char *family;
- 	const char *revision;
- 	const char *soc_id;
-+	const void *data;
- };
- 
- /**
-@@ -34,4 +35,6 @@ void soc_device_unregister(struct soc_device *soc_dev);
-  */
- struct device *soc_device_to_device(struct soc_device *soc);
- 
-+const struct soc_device_attribute *soc_device_match(
-+	const struct soc_device_attribute *matches);
- #endif /* __SOC_BUS_H */
--- 
-2.1.0.27.g96db324
+> 
+> >
+> > > -Scott
+> > >
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-mmc"
+> > > in the body of a message to majordomo at vger.kernel.org More majordomo
+> > > info at http://vger.kernel.org/majordomo-info.html
