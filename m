@@ -1,93 +1,52 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 28 Oct 2016 16:00:46 +0800
-Subject: [PATCH v3] char: hw_random: atmel-rng: disable TRNG during suspend
-Message-ID: <1477641646-30796-1-git-send-email-wenyou.yang@atmel.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 28 Oct 2016 09:18:24 +0100
+Subject: [PATCH v2] ASoC: hdmi-codec: Fix hdmi_of_xlate_dai_name when
+ #sound-dai-cells = <0>
+In-Reply-To: <20161027141956.GL25322@sirena.org.uk>
+References: <1477568568.2908.14.camel@linaro.org>
+ <20161027141956.GL25322@sirena.org.uk>
+Message-ID: <1477642704.3083.1.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To fix the over consumption on the VDDCore due to the TRNG enabled,
-disable the TRNG during suspend, not only disable the user interface
-clock (which is controlled by PMC). Because the user interface clock
-is independent from any clock that may be used in the entropy source
-logic circuitry.
+If a DAI specifies "#sound-dai-cells = <0>" in device-tree then
+hdmi_of_xlate_dai_name() will be called with zero args, which it isn't
+implemented to cope with. The resulting use of an uninitialised variable
+for the id will usually result in an error like:
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+  asoc-simple-card sound: parse error -11
+  asoc-simple-card: probe of sound failed with error -11
+
+Fix this by using and id of zero if no arg is provided.
+
+Fixes: 9731f82d6016 ("ASoC: hdmi-codec: enable multi probe for same device")
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
 ---
 
-Changes in v3:
- - Add Acked-by tag.
+Changes since v1
+- Replace ternary ?: operator with if/else
 
-Changes in v2:
- - Enable the user interface first, then enable the internal clock
-   when resume.
+ sound/soc/codecs/hdmi-codec.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
- drivers/char/hw_random/atmel-rng.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/char/hw_random/atmel-rng.c b/drivers/char/hw_random/atmel-rng.c
-index 0fcc9e6..ae7cae5 100644
---- a/drivers/char/hw_random/atmel-rng.c
-+++ b/drivers/char/hw_random/atmel-rng.c
-@@ -48,6 +48,16 @@ static int atmel_trng_read(struct hwrng *rng, void *buf, size_t max,
- 		return 0;
- }
- 
-+static void atmel_trng_enable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+}
-+
-+static void atmel_trng_disable(struct atmel_trng *trng)
-+{
-+	writel(TRNG_KEY, trng->base + TRNG_CR);
-+}
-+
- static int atmel_trng_probe(struct platform_device *pdev)
+diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
+index b904492..90b5948 100644
+--- a/sound/soc/codecs/hdmi-codec.c
++++ b/sound/soc/codecs/hdmi-codec.c
+@@ -364,7 +364,12 @@ static int hdmi_of_xlate_dai_name(struct snd_soc_component *component,
+ 				  struct of_phandle_args *args,
+ 				  const char **dai_name)
  {
- 	struct atmel_trng *trng;
-@@ -71,7 +81,7 @@ static int atmel_trng_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
--	writel(TRNG_KEY | 1, trng->base + TRNG_CR);
-+	atmel_trng_enable(trng);
- 	trng->rng.name = pdev->name;
- 	trng->rng.read = atmel_trng_read;
- 
-@@ -94,7 +104,7 @@ static int atmel_trng_remove(struct platform_device *pdev)
- 
- 	hwrng_unregister(&trng->rng);
- 
--	writel(TRNG_KEY, trng->base + TRNG_CR);
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -105,6 +115,7 @@ static int atmel_trng_suspend(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
- 
-+	atmel_trng_disable(trng);
- 	clk_disable_unprepare(trng->clk);
- 
- 	return 0;
-@@ -113,8 +124,15 @@ static int atmel_trng_suspend(struct device *dev)
- static int atmel_trng_resume(struct device *dev)
- {
- 	struct atmel_trng *trng = dev_get_drvdata(dev);
-+	int ret;
+-	int id = args->args[0];
++	int id;
 +
-+	ret = clk_prepare_enable(trng->clk);
-+	if (ret)
-+		return ret;
++	if (args->args_count)
++		id = args->args[0];
++	else
++		id = 0;
  
--	return clk_prepare_enable(trng->clk);
-+	atmel_trng_enable(trng);
-+
-+	return 0;
- }
- 
- static const struct dev_pm_ops atmel_trng_pm_ops = {
+ 	if (id < ARRAY_SIZE(hdmi_dai_name)) {
+ 		*dai_name = hdmi_dai_name[id];
 -- 
-2.7.4
+2.1.4
