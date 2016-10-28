@@ -1,49 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 28 Oct 2016 13:00:22 +0200 (CEST)
-Subject: [PATCH v2] irqchip/bcm2836: Prevent spurious interrupts
-In-Reply-To: <20161027182038.11312-1-eric@anholt.net>
-References: <20161027182038.11312-1-eric@anholt.net>
-Message-ID: <alpine.DEB.2.20.1610281257230.4896@nanos>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Fri, 28 Oct 2016 13:06:08 +0200
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161027143937.GC6818@obsidianresearch.com>
+References: <20161026225413.GA6220@obsidianresearch.com>
+ <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
+ <20161027143937.GC6818@obsidianresearch.com>
+Message-ID: <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Oct 2016, Eric Anholt wrote:
 
-> From: Phil Elwell <phil@raspberrypi.org>
-> 
-> The old arch-specific IRQ macros included a dsb to ensure the
-> write to clear the mailbox interrupt completed before returning
-> from the interrupt. The BCM2836 irqchip driver needs the same
-> precaution to avoid spurious interrupts.
 
-This is missing a fixes tag. I have no idea when that problem was
-introduced, so I have no way to decide whether this needs to be tagged
-stable or not.
+On 10/27/2016 04:39 PM, Jason Gunthorpe wrote:
+> On Thu, Oct 27, 2016 at 10:50:48AM +0200, Matthias Brugger wrote:
+>>> +		/* Sanity check the proposed bitstream. It must start with the
+>>> +		 * sync word in the correct byte order and be a multiple of 4
+>>> +		 * bytes.
+>>> +		 */
+>>> +		if (count <= 4 || buf[0] != 0x66 || buf[1] != 0x55 ||
+>>> +		    buf[2] != 0x99 || buf[3] != 0xaa) {
+>>
+>> This checks if the bit stream is bigger then 4 bytes. We error out before,
+>> if it is smaller.
+>
+> We do? Where?
+>
 
-Thanks,
+Just a few lines before:
 
-	tglx
++	/* All valid bitstreams are multiples of 32 bits */
++	if ((count % 4) != 0)
++		return -EINVAL;
++
 
-> 
-> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  drivers/irqchip/irq-bcm2836.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-> index d96b2c947e74..93e3f7660c42 100644
-> --- a/drivers/irqchip/irq-bcm2836.c
-> +++ b/drivers/irqchip/irq-bcm2836.c
-> @@ -175,6 +175,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
->  		u32 ipi = ffs(mbox_val) - 1;
->  
->  		writel(1 << ipi, mailbox0);
-> +		dsb(sy);
->  		handle_IPI(ipi, regs);
->  #endif
->  	} else if (stat) {
-> -- 
-> 2.9.3
-> 
-> 
+The only case we don't check is, if count == 0. If we check that here, 
+we can get rid of the count <= 4 check.
+
+>> So you should fix the wording in the comment and check for count ==
+>> 4.
+>
+> Ah right, the comment reflected an earlier revision that had the
+> length check here.
+>
+> The count <= 4 should stay here since it is primarily guarding against
+> read past the buffer in the if.
+
+If you insist in doing this check, it should be count < 4, because we 
+check the first four elements of buf, or do I miss something?
+
+Cheers,
+Matthias
+
+>
+> Jason
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
