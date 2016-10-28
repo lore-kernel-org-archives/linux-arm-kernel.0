@@ -1,52 +1,62 @@
 From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 28 Oct 2016 09:56:41 -0700
-Subject: [PATCH v2 4/5] ARM: dts: imx6q-evi: support cyclonespi
+Date: Fri, 28 Oct 2016 09:56:42 -0700
+Subject: [PATCH v2 5/5] fpga manager: cyclone-ps-spi: make delay variable
 In-Reply-To: <cover.1477669744.git.stillcompiling@gmail.com>
 References: <cover.1477669744.git.stillcompiling@gmail.com>
-Message-ID: <36eb925f0c63c931bd406d1719e76e42b7d9432a.1477669745.git.stillcompiling@gmail.com>
+Message-ID: <2239ffc8aba7d053825d2bea122a3c16cdd9f6e1.1477669745.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Altera cyclone V FPGA connected to an spi port
+The status pin may not show ready in the time described in the
+Altetera manual. check the value several times before giving up
+For the hardware I am working on, the status pin takes 250 us,
+5 times as long as described by Altera.
 
 Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
 ---
- arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/fpga/cyclone-ps-spi.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 6de21ff..bd0b85c 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -95,6 +95,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
- 	status = "okay";
-+
-+	fpga_spi: cyclonespi at 0 {
-+		compatible = "altr,cyclone-ps-spi-fpga-mgr";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		pinctrl-0 = <&pinctrl_fpgaspi>;
-+		config-gpio = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-+		status-gpio = <&gpio4 11 GPIO_ACTIVE_HIGH>;
-+	};
- };
+diff --git a/drivers/fpga/cyclone-ps-spi.c b/drivers/fpga/cyclone-ps-spi.c
+index 4b70d5c..c368223 100644
+--- a/drivers/fpga/cyclone-ps-spi.c
++++ b/drivers/fpga/cyclone-ps-spi.c
+@@ -20,6 +20,7 @@
  
- &ecspi3 {
-@@ -325,6 +334,13 @@
- 		>;
- 	};
+ #define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
+-#define FPGA_MIN_DELAY		250  /* min usecs to wait for config status */
++#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
++#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
  
-+	pinctrl_fpgaspi: fpgaspigrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_gpminand: gpminandgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
+ struct cyclonespi_conf {
+ 	struct gpio_desc *config;
+@@ -42,6 +43,7 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+ 				 const char *buf, size_t count)
+ {
+ 	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
++	int i;
+ 
+ 	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
+ 		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+@@ -56,13 +58,14 @@ static int cyclonespi_write_init(struct fpga_manager *mgr, u32 flags,
+ 	}
+ 
+ 	gpiod_set_value(conf->config, 1);
+-	usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
+-	if (gpiod_get_value(conf->status) == 0) {
+-		dev_err(&mgr->dev, "Status pin not ready.\n");
+-		return -EIO;
++	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
++		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
++		if (gpiod_get_value(conf->status))
++			return 0;
+ 	}
+ 
+-	return 0;
++	dev_err(&mgr->dev, "Status pin not ready.\n");
++	return -EIO;
+ }
+ 
+ static void rev_buf(void *buf, size_t len)
 -- 
 2.7.4
