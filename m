@@ -1,79 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 28 Oct 2016 11:42:45 -0400
-Subject: [PATCH] staging: vc04_services: tie up loose ends with
- dma_map_sg conversion
-In-Reply-To: <1477668994.12378.1.camel@crowfest.net>
-References: <20161028151651.3430-1-mzoran@crowfest.net>
- <20161028153124.GA29906@kroah.com>
- <1477668994.12378.1.camel@crowfest.net>
-Message-ID: <20161028154245.GA19454@kroah.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 28 Oct 2016 16:42:59 +0100
+Subject: [PATCH v3 0/5] Cavium ThunderX uncore PMU support
+In-Reply-To: <20161028153646.GA11371@hardcore>
+References: <1476955841-27898-1-git-send-email-jglauber@cavium.com>
+ <20161020103707.GB3175@twins.programming.kicks-ass.net>
+ <20161020112351.GC13708@hardcore> <20161028151749.GG14402@arm.com>
+ <20161028153646.GA11371@hardcore>
+Message-ID: <20161028154259.GM5806@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 08:36:34AM -0700, Michael Zoran wrote:
-> On Fri, 2016-10-28 at 11:31 -0400, Greg KH wrote:
-> > On Fri, Oct 28, 2016 at 08:16:51AM -0700, Michael Zoran wrote:
-> > > The conversion to dma_map_sg left a few loose ends.??This change
-> > > ties up those loose ends.
+On Fri, Oct 28, 2016 at 05:36:46PM +0200, Jan Glauber wrote:
+> On Fri, Oct 28, 2016 at 04:17:49PM +0100, Will Deacon wrote:
+> > On Thu, Oct 20, 2016 at 01:23:51PM +0200, Jan Glauber wrote:
+> > > On Thu, Oct 20, 2016 at 12:37:07PM +0200, Peter Zijlstra wrote:
+> > > > On Thu, Oct 20, 2016 at 11:30:36AM +0200, Jan Glauber wrote:
+> > > > > Note:
+> > > > > I'm using perf_sw_context in difference to perf_invalid_context
+> > > > > (see WARN_ON in perf_pmu_register). Reason is that with perf_invalid_context
+> > > > > add() is never called and the counter results are shown as "unsupported" by
+> > > > > perf. With perf_sw_context everything works as expected.
+> > > > 
+> > > > What?! All the uncore PMUs use perf_invalid_context. What doesn't work
+> > > > for you?
 > > > 
-> > > 1. Settings the DMA mask is mandatory on 64 bit even though it
-> > > is optional on 32 bit.??Set the mask so that DMA space is always
-> > > in the lower 32 bit range of data on both platforms.
+> > > OK, so using perf_invalid_context and "-a" seems to work.
 > > > 
-> > > 2. The scatterlist was not completely initialized correctly.
-> > > Initialize the list with sg_init_table so that DMA works correctly
-> > > if scatterlist debugging is enabled in the build configuration.
-> > > 
-> > > 3. The error paths in create_pagelist were not consistent.??Make
-> > > them all consistent by calling a helper function called
-> > > cleanup_pagelistinfo to cleanup regardless of what state the
-> > > pagelist
-> > > is in.
-> > > 
-> > > 4. create_pagelist and free_pagelist had a very large amount of
-> > > duplication in computing offsets into a single allocation of memory
-> > > in the DMA area.??Introduce a new structure called the pagelistinfo
-> > > that is appened to the end of the allocation to store necessary
-> > > information to prevent duplication of code and make cleanup on
-> > > errors
-> > > easier.
-> > > 
-> > > When combined with a fix for vchiq_copy_from_user which is not
-> > > included at this time, both functional and pings tests of
-> > > vchiq_test
-> > > now pass in both 32 bit and 64 bit modes.
-> > > 
-> > > Even though this cleanup could have been broken down to chunks,
-> > > all the changes are to a single file and submitting it as a single
-> > > related change should make reviewing the diff much easier then if
-> > > it
-> > > were submitted piecemeal.
+> > > But I must say that I hate that from a user perspective. The user needs to know about
+> > > the type of PMU behind the event and then provide "-a" or get a "<not supported"
+> > > as counter value?
 > > 
-> > No, it's harder.??A patch should only do one type of thing, this
-> > patch
-> > has to be reviewed thinking of 4 different things all at once, making
-> > it
-> > much more difficult to do so.
-> > 
-> > We write patches to be read easily, and make them easy to review.??We
-> > don't write them in a way to be easy for the developer to create :)
-> > 
-> > Can you please break this up into a patch series?
-> > 
-> > thanks,
-> > 
-> > greg k-h
+> > Sure, but in the interest of getting *something* merged, can we start
+> > off using perf_invalid_context and then have the discussion about whether
+> > or not this can be extended later on, please? If your PMU is a shared
+> > resource amongst CPUs, it maybe that all you want is a better error
+> > message from the perf tool (but again, this can come later!).
 > 
-> Point #1 and #2 would be very easy to seperate.   Point #3 and #4 are
-> essentually a redo of two major functions and are where most of the
-> changes are.
-> 
-> Would making #1 and #2 independent but combining #3 and #4 sufficient?
+> If that is the only obstacle I can repost with perf_sw_context (or do a
+> follow-up patch). After all it works, it is just "clueless" people like
+> me that are not aware of the required switches.
 
-I don't know, try it and see what the patches look like.
+Please send a version using perf_invalid_context (which I assume is what
+you meant above).
 
-Think about it from my point of view, which would be easier to review?
-
-thanks,
-
-greg k-h
+Thanks,
+Mark.
