@@ -1,41 +1,76 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 28 Oct 2016 10:49:14 -0300
-Subject: [PATCH 1/2] ARM: dts: exynos: Use macro for PWM signal polarity
- in Exynos4 boards
-In-Reply-To: <20161028134138.GB5646@kozik-lap>
-References: <1477590438-18095-1-git-send-email-javier@osg.samsung.com>
- <20161028134138.GB5646@kozik-lap>
-Message-ID: <31a8217c-969e-63a4-167c-9027ab1d8581@osg.samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 28 Oct 2016 15:38:46 +0100
+Subject: [PATCH 0/3] Support userspace irqchip with arch timers
+In-Reply-To: <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
+References: <20160927190806.22988-1-christoffer.dall@linaro.org>
+ <de375a6e-095c-a17a-0db7-876a5619df42@suse.de>
+ <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
+ <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
+Message-ID: <3928feee-cb23-8635-20bd-4c068b649a1d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Alex,
 
-On 10/28/2016 10:41 AM, Krzysztof Kozlowski wrote:
-> On Thu, Oct 27, 2016 at 02:47:17PM -0300, Javier Martinez Canillas wrote:
->> Using the PWM_POLARITY_INVERTED macro instead of the hardcoded number
->> 0 makes the DTS easier to read.
+On 30/09/16 20:31, Alexander Graf wrote:
 > 
 > 
-> Eeee.... PWM_POLARITY_INVERTED = 1 << 0 = 1.
+> On 30.09.16 17:43, Christoffer Dall wrote:
+>> On Fri, Sep 30, 2016 at 05:38:11PM +0200, Alexander Graf wrote:
+>>>
+>>>
+>>> On 30.09.16 16:54, Alexander Graf wrote:
+>>>>
+>>>>
+>>>> On 27.09.16 21:08, Christoffer Dall wrote:
+>>>>> Hi Alex,
+>>>>>
+>>>>> Marc and I have been looking at this during Linaro connect and have
+>>>>> slightly reworked your patch into this small series.
+>>>>>
+>>>>> It would be good if you could have a look at it and test it out.
+>>>>>
+>>>>> I've tested it with your QEMU, and it works for UP, but secondary CPUs
+>>>>> fail to come up, and it looks like the kernel never gets an IPI for
+>>>>> those CPUs from userspace.  Any chance you're willing to take a look at
+>>>>> that?
+>>>>
+>>>> I still need to see whether I can come up with a prettier solution, but
+>>>> for now this works:
+>>>>
+>>>> diff --git a/target-i386/kvm.c b/target-i386/kvm.c
+>>>
+>>> Eh, no, not in i386 code :). But the problem seems to be a missing
+>>> mpstate sync.
+>>>
+>> Yeah, that looked really dodgy.  Have you tested it? :)
 > 
-> And you are replacing 0 with 1. Hm? This is not described at all in
-> commit message...
+> This time around tested with the correct command line parameters I hope
+> :). I'll send a pretty patch later.
 > 
-> Best regards,
-> Krzysztof
+> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+> index b4c8fe2..b549f00 100644
+> --- a/target-arm/kvm.c
+> +++ b/target-arm/kvm.c
+> @@ -173,6 +173,12 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
+>       */
+>      kvm_async_interrupts_allowed = true;
 > 
+> +    /*
+> +     * PSCI wakes up secondary cores, so we always need to
+> +     * have vCPUs waiting in kernel space
+> +     */
+> +    kvm_halt_in_kernel_allowed = true;
+> +
+>      cap_has_mp_state = kvm_check_extension(s, KVM_CAP_MP_STATE);
+> 
+>      type_register_static(&host_arm_cpu_type_info);
 
-Damn! I don't know how I misread the DTS macro as 0, and didn't find issues
-when testing the patches on an Exynos5800 Peach Pi.
+What the status of userspace for this thing? Are QEMU patches being
+posted and reviewed?
 
-I should had run scripts/dtc/dtx_diff to notice that the DTB changed, I'm
-so sorry about that...
+Thanks,
 
-Please discard the patches.
-
-Best regards,
+	M.
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Jazz is not dead. It just smells funny...
