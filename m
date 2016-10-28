@@ -1,50 +1,64 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Fri, 28 Oct 2016 09:45:00 -0700
-Subject: specifying order of /dev/mmcblk devices via device-tree?
-In-Reply-To: <20161028153755.GL5806@leverpostej>
-References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
- <20161028153755.GL5806@leverpostej>
-Message-ID: <CAJ+vNU26tx-1bLKNpzYJ0UCeFJ-SczZOca1dYdt5mCGDxAuKTQ@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 29 Oct 2016 00:45:31 +0800
+Subject: [arm-platforms:kvm-arm64/fixes-4.9 2/3]
+ arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio.c:483: undefined reference
+ to `__aeabi_uldivmod'
+Message-ID: <201610290027.gd3IPY1z%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 8:37 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Oct 28, 2016 at 08:23:04AM -0700, Tim Harvey wrote:
->> Greetings,
->>
->> I have an IMX6 board that has the following:
->> sdhc1: mmc0: sdio radio
->> sdhc2: mmc1: /dev/mmcblk1: microSD connector
->> sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
->>
->> I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
->> registered as /dev/mmcblk1 so that permanent storage is the first
->> mmcblk device as I think this is more intuitive however currently
->> these get instanced in the order they appear in the imx6qdl.dtsi
->> device-tree configuration and are not able to be mapped the way I want
->> them in my dts file.
->>
->> Is there a way, or if not is there a desire for a way, to specify the
->> order of /dev/mmcblk devices via device-tree?
->
-> As with many other devices, there is no standard way of controlling the
-> Linux enumeration (and given the ID space is shared with other dynamic
-> devices it's not something that could generally work).
->
-> These should be refererd to by UUID if possible.
->
-> If not, we could cosider adding a by-dt-path or something like that.
->
-> Thanks,
-> Mark.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/fixes-4.9
+head:   3f3ed5826900f2f078417f8cf855c5977c3b28ea
+commit: 465c188f7bc881c095448e8c2b16688b02ac5c3c [2/3] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
+config: arm-axm55xx_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 465c188f7bc881c095448e8c2b16688b02ac5c3c
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Mark / Javier/ Fabio,
+All errors (new ones prefixed by >>):
 
-Thanks - this is very useful.
+   arch/arm/kvm/built-in.o: In function `check_region':
+>> arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio.c:483: undefined reference to `__aeabi_uldivmod'
 
-Yes, I agree that using UUID's is the way to go and now I see how that
-can be easily accessed via uboot 'part' command.
+vim +483 arch/arm/kvm/../../../virt/kvm/arm/vgic/vgic-mmio.c
 
-Regards,
+   467		case 4:
+   468			if (!((region->access_flags & VGIC_ACCESS_32bit) && !(addr & 3)))
+   469				return false;
+   470			break;
+   471		case 8:
+   472			if (!((region->access_flags & VGIC_ACCESS_64bit) && !(addr & 7)))
+   473				return false;
+   474			break;
+   475		default:
+   476			return false;
+   477		}
+   478	
+   479		if (!region->bits_per_irq)
+   480			return true;
+   481	
+   482		/* Do we access a non-allocated IRQ? */
+ > 483		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
+   484	}
+   485	
+   486	static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+   487				      gpa_t addr, int len, void *val)
+   488	{
+   489		struct vgic_io_device *iodev = kvm_to_vgic_iodev(dev);
+   490		const struct vgic_register_region *region;
+   491		unsigned long data = 0;
 
-Tim
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 19528 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161029/e5e15c7f/attachment-0001.gz>
