@@ -1,191 +1,176 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 28 Oct 2016 13:45:17 +0800
-Subject: [v14, 4/8] powerpc/fsl: move mpc85xx.h to include/linux/fsl
+Date: Fri, 28 Oct 2016 13:45:20 +0800
+Subject: [v14, 7/8] base: soc: introduce soc_device_match() interface
 In-Reply-To: <1477633521-7391-1-git-send-email-yangbo.lu@nxp.com>
 References: <1477633521-7391-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1477633521-7391-5-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1477633521-7391-8-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move mpc85xx.h to include/linux/fsl and rename it to svr.h as a common
-header file.  This SVR numberspace is used on some ARM chips as well as
-PPC, and even to check for a PPC SVR multi-arch drivers would otherwise
-need to ifdef the header inclusion and all references to the SVR symbols.
+From: Arnd Bergmann <arnd@arndb.de>
 
+We keep running into cases where device drivers want to know the exact
+version of the a SoC they are currently running on. In the past, this has
+usually been done through a vendor specific API that can be called by a
+driver, or by directly accessing some kind of version register that is
+not part of the device itself but that belongs to a global register area
+of the chip.
+
+Common reasons for doing this include:
+
+- A machine is not using devicetree or similar for passing data about
+  on-chip devices, but just announces their presence using boot-time
+  platform devices, and the machine code itself does not care about the
+  revision.
+
+- There is existing firmware or boot loaders with existing DT binaries
+  with generic compatible strings that do not identify the particular
+  revision of each device, but the driver knows which SoC revisions
+  include which part.
+
+- A prerelease version of a chip has some quirks and we are using the same
+  version of the bootloader and the DT blob on both the prerelease and the
+  final version. An update of the DT binding seems inappropriate because
+  that would involve maintaining multiple copies of the dts and/or
+  bootloader.
+
+This patch introduces the soc_device_match() interface that is meant to
+work like of_match_node() but instead of identifying the version of a
+device, it identifies the SoC itself using a vendor-agnostic interface.
+
+Unlike of_match_node(), we do not do an exact string compare but instead
+use glob_match() to allow wildcards in strings.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Joerg Roedel <jroedel@suse.de>
-[scottwood: update description]
-Signed-off-by: Scott Wood <oss@buserror.net>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
-Changes for v2:
-	- None
-Changes for v3:
-	- None
-Changes for v4:
-	- None
-Changes for v5:
-	- Changed to Move mpc85xx.h to include/linux/fsl/
-	- Adjusted '#include <linux/fsl/svr.h>' position in file
-Changes for v6:
-	- None
-Changes for v7:
-	- Added 'Acked-by: Wolfram Sang' for I2C part
-	- Also applied to arch/powerpc/kernel/cpu_setup_fsl_booke.S
-Changes for v8:
-	- Added 'Acked-by: Stephen Boyd' for clk part
-	- Added 'Acked-by: Scott Wood'
-	- Added 'Acked-by: Joerg Roedel' for iommu part
-Changes for v9:
-	- None
-Changes for v10:
-	- None
 Changes for v11:
-	- Updated description by Scott
+	- Added this patch for soc match
 Changes for v12:
-	- None
+	- Corrected the author
+	- Rewrited soc_device_match with while loop
 Changes for v13:
-	- None
+	- Added ack from Greg
 Changes for v14:
 	- None
 ---
- arch/powerpc/kernel/cpu_setup_fsl_booke.S                     | 2 +-
- arch/powerpc/sysdev/fsl_pci.c                                 | 2 +-
- drivers/clk/clk-qoriq.c                                       | 3 +--
- drivers/i2c/busses/i2c-mpc.c                                  | 2 +-
- drivers/iommu/fsl_pamu.c                                      | 3 +--
- drivers/net/ethernet/freescale/gianfar.c                      | 2 +-
- arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h | 4 ++--
- 7 files changed, 8 insertions(+), 10 deletions(-)
- rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+ drivers/base/Kconfig    |  1 +
+ drivers/base/soc.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sys_soc.h |  3 +++
+ 3 files changed, 70 insertions(+)
 
-diff --git a/arch/powerpc/kernel/cpu_setup_fsl_booke.S b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-index 462aed9..2b0284e 100644
---- a/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-+++ b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
-@@ -13,13 +13,13 @@
-  *
-  */
+diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
+index fdf44ca..991b21e 100644
+--- a/drivers/base/Kconfig
++++ b/drivers/base/Kconfig
+@@ -235,6 +235,7 @@ config GENERIC_CPU_AUTOPROBE
  
-+#include <linux/fsl/svr.h>
- #include <asm/page.h>
- #include <asm/processor.h>
- #include <asm/cputable.h>
- #include <asm/ppc_asm.h>
- #include <asm/mmu-book3e.h>
- #include <asm/asm-offsets.h>
--#include <asm/mpc85xx.h>
+ config SOC_BUS
+ 	bool
++	select GLOB
  
- _GLOBAL(__e500_icache_setup)
- 	mfspr	r0, SPRN_L1CSR1
-diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
-index d3a5974..cb0efea 100644
---- a/arch/powerpc/sysdev/fsl_pci.c
-+++ b/arch/powerpc/sysdev/fsl_pci.c
-@@ -22,6 +22,7 @@
- #include <linux/delay.h>
- #include <linux/string.h>
- #include <linux/fsl/edac.h>
-+#include <linux/fsl/svr.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/memblock.h>
-@@ -37,7 +38,6 @@
- #include <asm/pci-bridge.h>
- #include <asm/ppc-pci.h>
- #include <asm/machdep.h>
--#include <asm/mpc85xx.h>
- #include <asm/disassemble.h>
- #include <asm/ppc-opcode.h>
- #include <sysdev/fsl_soc.h>
-diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
-index 20b1055..dc778e8 100644
---- a/drivers/clk/clk-qoriq.c
-+++ b/drivers/clk/clk-qoriq.c
+ source "drivers/base/regmap/Kconfig"
+ 
+diff --git a/drivers/base/soc.c b/drivers/base/soc.c
+index b63f23e..0c5cf87 100644
+--- a/drivers/base/soc.c
++++ b/drivers/base/soc.c
 @@ -13,6 +13,7 @@
- #include <linux/clk.h>
- #include <linux/clk-provider.h>
- #include <linux/fsl/guts.h>
-+#include <linux/fsl/svr.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -1153,8 +1154,6 @@ static struct clk *clockgen_clk_get(struct of_phandle_args *clkspec, void *data)
+ #include <linux/spinlock.h>
+ #include <linux/sys_soc.h>
+ #include <linux/err.h>
++#include <linux/glob.h>
+ 
+ static DEFINE_IDA(soc_ida);
+ 
+@@ -159,3 +160,68 @@ static int __init soc_bus_register(void)
+ 	return bus_register(&soc_bus_type);
  }
+ core_initcall(soc_bus_register);
++
++static int soc_device_match_one(struct device *dev, void *arg)
++{
++	struct soc_device *soc_dev = container_of(dev, struct soc_device, dev);
++	const struct soc_device_attribute *match = arg;
++
++	if (match->machine &&
++	    !glob_match(match->machine, soc_dev->attr->machine))
++		return 0;
++
++	if (match->family &&
++	    !glob_match(match->family, soc_dev->attr->family))
++		return 0;
++
++	if (match->revision &&
++	    !glob_match(match->revision, soc_dev->attr->revision))
++		return 0;
++
++	if (match->soc_id &&
++	    !glob_match(match->soc_id, soc_dev->attr->soc_id))
++		return 0;
++
++	return 1;
++}
++
++/*
++ * soc_device_match - identify the SoC in the machine
++ * @matches: zero-terminated array of possible matches
++ *
++ * returns the first matching entry of the argument array, or NULL
++ * if none of them match.
++ *
++ * This function is meant as a helper in place of of_match_node()
++ * in cases where either no device tree is available or the information
++ * in a device node is insufficient to identify a particular variant
++ * by its compatible strings or other properties. For new devices,
++ * the DT binding should always provide unique compatible strings
++ * that allow the use of of_match_node() instead.
++ *
++ * The calling function can use the .data entry of the
++ * soc_device_attribute to pass a structure or function pointer for
++ * each entry.
++ */
++const struct soc_device_attribute *soc_device_match(
++	const struct soc_device_attribute *matches)
++{
++	int ret = 0;
++
++	if (!matches)
++		return NULL;
++
++	while (!ret) {
++		if (!(matches->machine || matches->family ||
++		      matches->revision || matches->soc_id))
++			break;
++		ret = bus_for_each_dev(&soc_bus_type, NULL, (void *)matches,
++				       soc_device_match_one);
++		if (!ret)
++			matches++;
++		else
++			return matches;
++	}
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(soc_device_match);
+diff --git a/include/linux/sys_soc.h b/include/linux/sys_soc.h
+index 2739ccb..9f5eb06 100644
+--- a/include/linux/sys_soc.h
++++ b/include/linux/sys_soc.h
+@@ -13,6 +13,7 @@ struct soc_device_attribute {
+ 	const char *family;
+ 	const char *revision;
+ 	const char *soc_id;
++	const void *data;
+ };
  
- #ifdef CONFIG_PPC
--#include <asm/mpc85xx.h>
--
- static const u32 a4510_svrs[] __initconst = {
- 	(SVR_P2040 << 8) | 0x10,	/* P2040 1.0 */
- 	(SVR_P2040 << 8) | 0x11,	/* P2040 1.1 */
-diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
-index 565a49a..e791c51 100644
---- a/drivers/i2c/busses/i2c-mpc.c
-+++ b/drivers/i2c/busses/i2c-mpc.c
-@@ -27,9 +27,9 @@
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
- #include <linux/delay.h>
-+#include <linux/fsl/svr.h>
- 
- #include <asm/mpc52xx.h>
--#include <asm/mpc85xx.h>
- #include <sysdev/fsl_soc.h>
- 
- #define DRV_NAME "mpc-i2c"
-diff --git a/drivers/iommu/fsl_pamu.c b/drivers/iommu/fsl_pamu.c
-index a34355f..af8fb27 100644
---- a/drivers/iommu/fsl_pamu.c
-+++ b/drivers/iommu/fsl_pamu.c
-@@ -21,11 +21,10 @@
- #include "fsl_pamu.h"
- 
- #include <linux/fsl/guts.h>
-+#include <linux/fsl/svr.h>
- #include <linux/interrupt.h>
- #include <linux/genalloc.h>
- 
--#include <asm/mpc85xx.h>
--
- /* define indexes for each operation mapping scenario */
- #define OMI_QMAN        0x00
- #define OMI_FMAN        0x01
-diff --git a/drivers/net/ethernet/freescale/gianfar.c b/drivers/net/ethernet/freescale/gianfar.c
-index 4b4f5bc..55be5ce 100644
---- a/drivers/net/ethernet/freescale/gianfar.c
-+++ b/drivers/net/ethernet/freescale/gianfar.c
-@@ -86,11 +86,11 @@
- #include <linux/udp.h>
- #include <linux/in.h>
- #include <linux/net_tstamp.h>
-+#include <linux/fsl/svr.h>
- 
- #include <asm/io.h>
- #ifdef CONFIG_PPC
- #include <asm/reg.h>
--#include <asm/mpc85xx.h>
- #endif
- #include <asm/irq.h>
- #include <asm/uaccess.h>
-diff --git a/arch/powerpc/include/asm/mpc85xx.h b/include/linux/fsl/svr.h
-similarity index 97%
-rename from arch/powerpc/include/asm/mpc85xx.h
-rename to include/linux/fsl/svr.h
-index 213f3a8..8d13836 100644
---- a/arch/powerpc/include/asm/mpc85xx.h
-+++ b/include/linux/fsl/svr.h
-@@ -9,8 +9,8 @@
-  * (at your option) any later version.
+ /**
+@@ -34,4 +35,6 @@ void soc_device_unregister(struct soc_device *soc_dev);
   */
+ struct device *soc_device_to_device(struct soc_device *soc);
  
--#ifndef __ASM_PPC_MPC85XX_H
--#define __ASM_PPC_MPC85XX_H
-+#ifndef FSL_SVR_H
-+#define FSL_SVR_H
- 
- #define SVR_REV(svr)	((svr) & 0xFF)		/* SOC design resision */
- #define SVR_MAJ(svr)	(((svr) >>  4) & 0xF)	/* Major revision field*/
++const struct soc_device_attribute *soc_device_match(
++	const struct soc_device_attribute *matches);
+ #endif /* __SOC_BUS_H */
 -- 
 2.1.0.27.g96db324
