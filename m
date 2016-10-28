@@ -1,52 +1,51 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 28 Oct 2016 15:07:14 -0700
-Subject: [RFC][PATCH] arm64: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <4911a788-602f-6ad0-b8e7-53f9de9fa8c5@redhat.com>
-References: <1477613892-26076-1-git-send-email-labbott@redhat.com>
- <20161028144951.GI5806@leverpostej>
- <4911a788-602f-6ad0-b8e7-53f9de9fa8c5@redhat.com>
-Message-ID: <6a76edf2-3f80-fb18-4fc1-2e0b1f085d20@redhat.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 29 Oct 2016 01:07:45 +0300
+Subject: [PATCH 01/11] ARM: shmobile: r8a7745: add power domain index macros
+In-Reply-To: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
+References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
+Message-ID: <1645729.DjklObBkNM@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
->>> new file mode 100644
->>> index 0000000..6c271e2
->>> --- /dev/null
->>> +++ b/arch/arm64/mm/physaddr.c
->>> @@ -0,0 +1,17 @@
->>> +#include <linux/mm.h>
->>> +
->>> +#include <asm/memory.h>
->>> +
->>> +unsigned long __virt_to_phys(unsigned long x)
->>> +{
->>> +    phys_addr_t __x = (phys_addr_t)x;
->>> +
->>> +    if (__x & BIT(VA_BITS - 1)) {
->>> +        /* The bit check ensures this is the right range */
->>> +        return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
->>> +    } else {
->>> +        VIRTUAL_BUG_ON(x < kimage_vaddr || x > (unsigned long)_end);
->>
->> IIUC, in (3) you were asking if the last check should be '>' or '>='?
->>
->> To match high_memory, I suspect the latter, as _end doesn't fall within
->> the mapped virtual address space.
->>
->
-> I was actually concerned about if _end would be correct with KASLR.
-> Ard confirmed that it gets fixed up to be correct. I'll change the
-> check to check for >=.
->
+Add macros usable by the device tree sources to reference R8A7745 SYSC power
+domains by index.
 
-While testing this, I found two places with __pa(_end) to get bounds,
-one in arm64 code and one in memblock code. x86 gets away with this
-because memblock is actually __pa_symbol and x86 does image placement
-different and can check against the maximum image size. I think
-including _end in __pa_symbol but excluding it from the generic
-__virt_to_phys makes sense. It's a bit nicer than doing _end - 1 +
-1 everywhere.
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
-Thanks,
-Laura
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+ include/dt-bindings/power/r8a7745-sysc.h |   25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+Index: renesas/include/dt-bindings/power/r8a7745-sysc.h
+===================================================================
+--- /dev/null
++++ renesas/include/dt-bindings/power/r8a7745-sysc.h
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2016 Cogent Embedded Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __DT_BINDINGS_POWER_R8A7745_SYSC_H__
++#define __DT_BINDINGS_POWER_R8A7745_SYSC_H__
++
++/*
++ * These power domain indices match the numbers of the interrupt bits
++ * representing the power areas in the various Interrupt Registers
++ * (e.g. SYSCISR, Interrupt Status Register)
++ */
++
++#define R8A7745_PD_CA7_CPU0		 5
++#define R8A7745_PD_CA7_CPU1		 6
++#define R8A7745_PD_SGX			20
++#define R8A7745_PD_CA7_SCU		21
++
++/* Always-on power area */
++#define R8A7745_PD_ALWAYS_ON		32
++
++#endif /* __DT_BINDINGS_POWER_R8A7745_SYSC_H__ */
