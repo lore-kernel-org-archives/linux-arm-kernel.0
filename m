@@ -1,56 +1,53 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Fri, 28 Oct 2016 14:05:36 -0700
-Subject: [PATCH v2 3/5] fpga manager: Add cyclone-ps-spi driver for Altera
- FPGAs
-In-Reply-To: <201610290422.JEtRRTFh%fengguang.wu@intel.com>
-References: <201610290422.JEtRRTFh%fengguang.wu@intel.com>
-Message-ID: <7f36c345-b4f9-60b2-5f88-99fa7ec31119@gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 28 Oct 2016 14:12:56 -0700
+Subject: [PATCH v2 2/2] arm64: dts: hi6220: add resets property into dwmmc
+ nodes
+In-Reply-To: <20161028123422.GA22734@leoy-linaro>
+References: <CALAqxLXfb48h8hMQmAaJ+YjA5=pekkQ8Dg8ReL6VTTfmuFRPDw@mail.gmail.com>
+ <CAKfTPtAXdkKcfpHmUmQNwuJxO0PORcCf49noST_CCkZPigPwgw@mail.gmail.com>
+ <CGME20161028072654epcas4p13cbf983b3e22dd96039ed33a4ac792d5@epcas4p1.samsung.com>
+ <20161028072640.GB17266@leoy-linaro>
+ <d7993c1a-5e50-9a33-0900-5c1a79884d3c@samsung.com>
+ <20161028073830.GC17266@leoy-linaro>
+ <24930ad4-313f-a4f0-c89a-770238863816@samsung.com>
+ <95e22336-0465-f1e1-71b8-548d0e6ee8b7@samsung.com>
+ <20161028101919.GA25564@leoy-linaro>
+ <f5dfafbb-39df-4edb-03b8-57c0e34c912f@samsung.com>
+ <20161028123422.GA22734@leoy-linaro>
+Message-ID: <CALAqxLX9_y8CpagsUeorOE4gpR6_i-_G+EZfXNpBxare3VnJCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dang it!
+On Fri, Oct 28, 2016 at 5:34 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> On Fri, Oct 28, 2016 at 08:52:49PM +0900, Jaehoon Chung wrote:
+>
+> [...]
+>
+>> >> Could you check the below thing..
+>> >>
+>> >>         /* find reset controller when exist */
+>> >> -       pdata->rstc = devm_reset_control_get_optional(dev, NULL);
+>> >> +       pdata->rstc = devm_reset_control_get_optional(dev, "dwmci-reset");
+>> >>         if (IS_ERR(pdata->rstc)) {
+>> >>                 if (PTR_ERR(pdata->rstc) == -EPROBE_DEFER)
+>> >>                         return ERR_PTR(-EPROBE_DEFER);
+>> >
+>> > Confirmed with this fixing, the kernel can bootup successfully.
+>> >
+>> > Thanks for this.
+>>
+>> Thanks for checking this..If this approach is not bad, i will send the patch.
+>> Or if there are other good approaches, let me know, plz.
+>
+> I'd like Guodong and John to confirm for Hikey specific. I have no
+> knowledge for this so cannot answer.
 
-This was flagged last time around and I forgot to fix it.
+No objection from me. I hadn't run into the issue, as I'm not booting
+off the sd card.
 
-On 10/28/2016 01:41 PM, kbuild test robot wrote:
-> Hi Joshua,
->
-> [auto build test ERROR on linus/master]
-> [also build test ERROR on v4.9-rc2 next-20161028]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> [Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-> [Check https://git-scm.com/docs/git-format-patch for more information]
->
-> url:    https://github.com/0day-ci/linux/commits/Joshua-Clayton/lib-add-bitrev8x4/20161029-012535
-> config: openrisc-allmodconfig (attached as .config)
-> compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
-> reproduce:Dang it!
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=openrisc 
->
-> All errors (new ones prefixed by >>):
->
->    drivers/fpga/cyclone-ps-spi.c: In function 'cyclonespi_write':
->    drivers/fpga/cyclone-ps-spi.c:89:19: error: 'SZ_4K' undeclared (first use in this function)
->    drivers/fpga/cyclone-ps-spi.c:89:19: note: each undeclared identifier is reported only once for each function it appears in
->>> drivers/fpga/cyclone-ps-spi.c:89:19: error: type defaults to 'int' in declaration of '__UNIQUE_ID_min2_15'
-> vim +89 drivers/fpga/cyclone-ps-spi.c
->
->     83		struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
->     84		const char *fw_data = buf;
->     85		const char *fw_data_end = fw_data + count;
->     86	
->     87		while (fw_data < fw_data_end) {
->     88			int ret;
->   > 89			size_t stride = min(fw_data_end - fw_data, SZ_4K);
->     90	
->     91			rev_buf((void *)fw_data, stride);
->     92			ret = spi_write(conf->spi, fw_data, stride);
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-Thanks, kbuild test robot.
-Will fix this time.
+The patch from Jaehoon doesn't seem to cause trouble in my testing so
+far, so I think its worth generating a patch and sending it in for
+4.9-rc
+
+thanks
+-john
