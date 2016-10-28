@@ -1,131 +1,69 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 28 Oct 2016 13:45:21 +0800
-Subject: [v14, 8/8] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <1477633521-7391-1-git-send-email-yangbo.lu@nxp.com>
-References: <1477633521-7391-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1477633521-7391-9-git-send-email-yangbo.lu@nxp.com>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Fri, 28 Oct 2016 06:00:03 +0000
+Subject: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <1477629956.6812.15.camel@buserror.net>
+References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
+ <1477625554-46700-6-git-send-email-yangbo.lu@nxp.com>
+ <1477629956.6812.15.camel@buserror.net>
+Message-ID: <DB6PR0401MB2536E2CE7B604554F52AF3AFF8AD0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eSDHC of T4240-R1.0-R2.0 has incorrect vender version and spec version.
-Acturally the right version numbers should be VVN=0x13 and SVN = 0x1.
-This patch adds the GUTS driver support for eSDHC driver to match SoC.
-And fix host version to avoid that incorrect version numbers break down
-the ADMA data transfer.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Scott Wood <oss@buserror.net>
----
-Changes for v2:
-	- Got SVR through iomap instead of dts
-Changes for v3:
-	- Managed GUTS through syscon instead of iomap in eSDHC driver
-Changes for v4:
-	- Got SVR by GUTS driver instead of SYSCON
-Changes for v5:
-	- Changed to get SVR through API fsl_guts_get_svr()
-	- Combined patch 4, patch 5 and patch 6 into one
-Changes for v6:
-	- Added 'Acked-by: Ulf Hansson'
-Changes for v7:
-	- None
-Changes for v8:
-	- Added 'Acked-by: Scott Wood'
-Changes for v9:
-	- None
-Changes for v10:
-	- None
-Changes for v11:
-	- Changed to use soc_device_match
-Changes for v12:
-	- Matched soc through .family field instead of .soc_id
-Changes for v13:
-	- None
-Changes for v14:
-	- None
----
- drivers/mmc/host/Kconfig          |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 20 ++++++++++++++++++++
- 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 5274f50..a1135a9 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -144,6 +144,7 @@ config MMC_SDHCI_OF_ESDHC
- 	depends on MMC_SDHCI_PLTFM
- 	depends on PPC || ARCH_MXC || ARCH_LAYERSCAPE
- 	select MMC_SDHCI_IO_ACCESSORS
-+	select FSL_GUTS
- 	help
- 	  This selects the Freescale eSDHC controller support.
- 
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index fb71c86..57bdb9e 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -18,6 +18,7 @@
- #include <linux/of.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-+#include <linux/sys_soc.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -28,6 +29,7 @@
- struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
-+	bool quirk_incorrect_hostver;
- };
- 
- /**
-@@ -73,6 +75,8 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
- static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 				     int spec_reg, u32 value)
- {
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 	u16 ret;
- 	int shift = (spec_reg & 0x2) * 8;
- 
-@@ -80,6 +84,12 @@ static u16 esdhc_readw_fixup(struct sdhci_host *host,
- 		ret = value & 0xffff;
- 	else
- 		ret = (value >> shift) & 0xffff;
-+	/* Workaround for T4240-R1.0-R2.0 eSDHC which has incorrect
-+	 * vendor version and spec version information.
-+	 */
-+	if ((spec_reg == SDHCI_HOST_VERSION) &&
-+	    (esdhc->quirk_incorrect_hostver))
-+		ret = (VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) | SDHCI_SPEC_200;
- 	return ret;
- }
- 
-@@ -558,6 +568,12 @@ static const struct sdhci_pltfm_data sdhci_esdhc_le_pdata = {
- 	.ops = &sdhci_esdhc_le_ops,
- };
- 
-+static struct soc_device_attribute soc_incorrect_hostver[] = {
-+	{ .family = "QorIQ T4240", .revision = "1.0", },
-+	{ .family = "QorIQ T4240", .revision = "2.0", },
-+	{ },
-+};
-+
- static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host;
-@@ -571,6 +587,10 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 	esdhc->vendor_ver = (host_ver & SDHCI_VENDOR_VER_MASK) >>
- 			     SDHCI_VENDOR_VER_SHIFT;
- 	esdhc->spec_ver = host_ver & SDHCI_SPEC_VER_MASK;
-+	if (soc_device_match(soc_incorrect_hostver))
-+		esdhc->quirk_incorrect_hostver = true;
-+	else
-+		esdhc->quirk_incorrect_hostver = false;
- }
- 
- static int sdhci_esdhc_probe(struct platform_device *pdev)
--- 
-2.1.0.27.g96db324
+> -----Original Message-----
+> From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
+> owner at vger.kernel.org] On Behalf Of Scott Wood
+> Sent: Friday, October 28, 2016 12:46 PM
+> To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Arnd
+> Bergmann
+> Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; Greg Kroah-Hartman; Mark Rutland;
+> Rob Herring; Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil;
+> Bhupesh Sharma; Qiang Zhao; Kumar Gala; Santosh Shilimkar; Leo Li; X.B.
+> Xie; M.H. Lian
+> Subject: Re: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+> 
+> On Fri, 2016-10-28 at 11:32 +0800, Yangbo Lu wrote:
+> > +	guts->regs = of_iomap(np, 0);
+> > +	if (!guts->regs)
+> > +		return -ENOMEM;
+> > +
+> > +	/* Register soc device */
+> > +	machine = of_flat_dt_get_machine_name();
+> > +	if (machine)
+> > +		soc_dev_attr.machine = devm_kstrdup(dev, machine,
+> > GFP_KERNEL);
+> > +
+> > +	svr = fsl_guts_get_svr();
+> > +	soc_die = fsl_soc_die_match(svr, fsl_soc_die);
+> > +	if (soc_die) {
+> > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> > +						?????"QorIQ %s", soc_die-
+> > >die);
+> > +	} else {
+> > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> > "QorIQ");
+> > +	}
+> > +	soc_dev_attr.soc_id = devm_kasprintf(dev, GFP_KERNEL,
+> > +					?????"svr:0x%08x", svr);
+> > +	soc_dev_attr.revision = devm_kasprintf(dev, GFP_KERNEL, "%d.%d",
+> > +					???????SVR_MAJ(svr), SVR_MIN(svr));
+> > +
+> > +	soc_dev = soc_device_register(&soc_dev_attr);
+> > +	if (IS_ERR(soc_dev))
+> > +		return PTR_ERR(soc_dev);
+> 
+> ioremap leaks on this error path. ?Use devm_ioremap_resource().
+> 
+
+[Lu Yangbo-B47093] Ok. I have fixed it in v14. Thanks :)
+
+> -Scott
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
