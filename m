@@ -1,70 +1,52 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 28 Oct 2016 16:05:46 -0600
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <20161028210015.GA19901@live.com>
-References: <20161026225413.GA6220@obsidianresearch.com>
- <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
- <20161027143937.GC6818@obsidianresearch.com>
- <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
- <20161028154740.GC10441@obsidianresearch.com>
- <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
- <20161028165555.GA17998@obsidianresearch.com>
- <20161028182308.GB18325@live.com>
- <20161028202619.GA29625@obsidianresearch.com>
- <20161028210015.GA19901@live.com>
-Message-ID: <20161028220546.GA19693@obsidianresearch.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 28 Oct 2016 15:07:14 -0700
+Subject: [RFC][PATCH] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <4911a788-602f-6ad0-b8e7-53f9de9fa8c5@redhat.com>
+References: <1477613892-26076-1-git-send-email-labbott@redhat.com>
+ <20161028144951.GI5806@leverpostej>
+ <4911a788-602f-6ad0-b8e7-53f9de9fa8c5@redhat.com>
+Message-ID: <6a76edf2-3f80-fb18-4fc1-2e0b1f085d20@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 02:00:15PM -0700, Moritz Fischer wrote:
+>>> diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+>>> new file mode 100644
+>>> index 0000000..6c271e2
+>>> --- /dev/null
+>>> +++ b/arch/arm64/mm/physaddr.c
+>>> @@ -0,0 +1,17 @@
+>>> +#include <linux/mm.h>
+>>> +
+>>> +#include <asm/memory.h>
+>>> +
+>>> +unsigned long __virt_to_phys(unsigned long x)
+>>> +{
+>>> +    phys_addr_t __x = (phys_addr_t)x;
+>>> +
+>>> +    if (__x & BIT(VA_BITS - 1)) {
+>>> +        /* The bit check ensures this is the right range */
+>>> +        return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+>>> +    } else {
+>>> +        VIRTUAL_BUG_ON(x < kimage_vaddr || x > (unsigned long)_end);
+>>
+>> IIUC, in (3) you were asking if the last check should be '>' or '>='?
+>>
+>> To match high_memory, I suspect the latter, as _end doesn't fall within
+>> the mapped virtual address space.
+>>
+>
+> I was actually concerned about if _end would be correct with KASLR.
+> Ard confirmed that it gets fixed up to be correct. I'll change the
+> check to check for >=.
+>
 
-> > What did you do to get a working bitfile? Are you using one of the
-> > Vivado automatic flows that 'handles' this for you? I am not.
-> 
-> https://github.com/EttusResearch/fpgadev/blob/master/usrp3/tools/scripts/viv_utils.tcl#L165
+While testing this, I found two places with __pa(_end) to get bounds,
+one in arm64 code and one in memblock code. x86 gets away with this
+because memblock is actually __pa_symbol and x86 does image placement
+different and can check against the maximum image size. I think
+including _end in __pa_symbol but excluding it from the generic
+__virt_to_phys makes sense. It's a bit nicer than doing _end - 1 +
+1 everywhere.
 
-Hm 404
-
-> Is what our build process does (we set the byte_swap_bin parameter to
-> 1). You're right in that write_bitstream will give you a non-swapped
-> version.
-
-?? byte_swap_bin is not documented in UG835
-
-> If we reevaluate now that we wanna support swapping we should do this at
-> a framework level. Maybe a preprocess callback or a FPGA_MGR_SWAP flag.
-> I'll need to think about this :-)
-
-I'm perfectly fine with the driver only working with a single canonical
-bitfile format. That seems completly reasonable, and I prefer an
-efficient programming sequence for performance.
-
-Further, eventually this framework is going to have to be fixed to be
-able to DMA out of the page cache and in that world there is no
-sensible option to process the data before sending it on to the
-hardware.
-
-> > So from my perspective, this driver is incompatible with the output of
-> > the Xilinx tools. I don't really care, we always post-process the
-> > output of write_bitfile, and I am happy to provide a canonized
-> > bitstream, but the driver needs to do more to help people get this
-> > right.
-> 
-> Ok, so I'm fine with adding the checks and a warning if you don't find
-> the sync word. We could add documentation describing which format we
-> expect.
-
-Maybe you could send a patch to update the comments for the driver, or
-add a documentation file how to produce an acceptable format using
-Xilinx tools..
-
-> Ok. That sounds reasonable.
-
-So, the question still remains, should the driver require the header
-be stripped (eg the sync word is the first 4 bytes), or should it
-search the first bit for an aligned sync word?
-
-Either requirement is acceptable to the hardware. My patch does the
-former, I suspect you need the later?
-
-Jason
+Thanks,
+Laura
