@@ -1,36 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Oct 2016 19:16:25 +0100
-Subject: [PATCH v2] spi: spi-fsl-dspi: Add DMA support for Vybrid
-In-Reply-To: <20161017062308.GA3478@Sanchayan-Arch.localdomain>
-References: <8ccf4f2f4e6739410d9e242f9d0e3f3bcc76d0e2.1475498805.git.maitysanchayan@gmail.com>
- <607397542d083f13dc98909958672eeb0d326c79.1475578195.git.maitysanchayan@gmail.com>
- <20161017062308.GA3478@Sanchayan-Arch.localdomain>
-Message-ID: <20161028181625.wjasnupsnzma2uum@sirena.org.uk>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Fri, 28 Oct 2016 14:17:43 -0400
+Subject: [PATCH v6] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <20161028160213.GH1076@arm.com>
+References: <1474492374-12140-1-git-send-email-nleeder@codeaurora.org>
+ <20161004155304.GB29008@leverpostej>
+ <4d049ac5-2661-9af5-561b-6cd4029c3b83@codeaurora.org>
+ <20161028160213.GH1076@arm.com>
+Message-ID: <a0851e78-dbc5-0f1b-476a-e14561f58e2b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 11:53:08AM +0530, maitysanchayan at gmail.com wrote:
-> Hello,
-> 
-> Ping?
+On 10/28/2016 12:02 PM, Will Deacon wrote:
+> On Tue, Oct 04, 2016 at 12:25:54PM -0400, Neil Leeder wrote:
+>> Thanks Mark. I'll move it, rebase on 4.9-rc1 and run perf fuzzer.
+>
+> Did the fuzzer explode, or do you have a new version you can post?
+>
+> Will
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
-Sending content free pings just adds to the mail volume (if they are
-seen at all) and if something has gone wrong you'll have to resend the
-patches anyway.
+Hi Will,
+I was delayed by some logistical problems, but the fuzzer ran fine and I 
+will post the updated patch shortly - sorry for the delay.
 
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161028/2a48a59a/attachment.sig>
+Neil
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
