@@ -1,63 +1,95 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Fri, 28 Oct 2016 16:48:16 -0400
-Subject: [PATCH V6 3/3] irqchip: qcom: Add IRQ combiner driver
-In-Reply-To: <1477687696-1509-1-git-send-email-agustinv@codeaurora.org>
-References: <1477687696-1509-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <1477687696-1509-4-git-send-email-agustinv@codeaurora.org>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Fri, 28 Oct 2016 16:50:13 -0400
+Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
+Message-ID: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver for interrupt combiners in the Top-level Control and Status
-Registers (TCSR) hardware block in Qualcomm Technologies chips.
+Adds perf events support for L2 cache PMU.
 
-An interrupt combiner in this block combines a set of interrupts by
-OR'ing the individual interrupt signals into a summary interrupt
-signal routed to a parent interrupt controller, and provides read-
-only, 32-bit registers to query the status of individual interrupts.
-The status bit for IRQ n is bit (n % 32) within register (n / 32)
-of the given combiner. Thus, each combiner can be described as a set
-of register offsets and the number of IRQs managed.
+The L2 cache PMU driver is named 'l2cache_0' and can be used
+with perf events to profile L2 events such as cache hits
+and misses on Qualcomm Technologies processors.
 
-Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
 ---
- drivers/irqchip/Kconfig             |   8 +
- drivers/irqchip/Makefile            |   1 +
- drivers/irqchip/qcom-irq-combiner.c | 337 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 346 insertions(+)
- create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+v7:
+Move to drivers/perf
+Rebased on 4.9-rc1
+Successfully ran perf fuzzer against driver
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index bc0af33..610f902 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -279,3 +279,11 @@ config EZNPS_GIC
- config STM32_EXTI
- 	bool
- 	select IRQ_DOMAIN
+v6: restore accidentally dropped Kconfig dependencies
+
+v5:
+Fold the header and l2-accessors into .c file
+Use multi-instance framework for hotplug
+Change terminology from slice to cluster for clarity
+Remove unnecessary rmw sequence for enable registers
+Use prev_count in hwc rather than in slice
+Enforce all events in same group on same CPU
+Add comments, rename variables for clarity
+
+v4:
+Replace notifier with hotplug statemachine
+Allocate PMU struct dynamically
+
+v3:
+Remove exports from l2-accessors
+Change l2-accessors Kconfig to make it not user-selectable
+Reorder and remove unnecessary includes
+
+v2:
+Add the l2-accessors patch to this patchset, previously posted separately.
+Remove sampling and per-task functionality for this uncore PMU.
+Use cpumask to replace code which filtered events to one cpu per slice.
+Replace manual event filtering with filter_match callback.
+Use a separate used_mask for event groups.
+Add hotplug notifier for CPU and irq migration.
+Remove extraneous synchronisation instructions.
+Other miscellaneous cleanup.
+
+ drivers/perf/Kconfig       |   9 +
+ drivers/perf/Makefile      |   1 +
+ drivers/perf/qcom_l2_pmu.c | 947 +++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h |   1 +
+ 4 files changed, 958 insertions(+)
+ create mode 100644 drivers/perf/qcom_l2_pmu.c
+
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 4d5c5f9..9365190 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -12,6 +12,15 @@ config ARM_PMU
+ 	  Say y if you want to use CPU performance monitors on ARM-based
+ 	  systems.
+ 
++config QCOM_L2_PMU
++	bool "Qualcomm Technologies L2-cache PMU"
++	depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
++	  help
++	  Provides support for the L2 cache performance monitor unit (PMU)
++	  in Qualcomm Technologies processors.
++	  Adds the L2 cache PMU into the perf events subsystem for
++	  monitoring L2 cache events.
 +
-+config QCOM_IRQ_COMBINER
-+	bool "QCOM IRQ combiner support"
-+	depends on ARCH_QCOM
-+	select IRQ_DOMAIN
-+	help
-+	  Say yes here to add support for the IRQ combiner devices embedded
-+	  in Qualcomm Technologies chips.
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e4dbfc8..1818a0b 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -74,3 +74,4 @@ obj-$(CONFIG_LS_SCFG_MSI)		+= irq-ls-scfg-msi.o
- obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
- obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o
- obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
-+obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
-diff --git a/drivers/irqchip/qcom-irq-combiner.c b/drivers/irqchip/qcom-irq-combiner.c
+ config XGENE_PMU
+         depends on PERF_EVENTS && ARCH_XGENE
+         bool "APM X-Gene SoC PMU"
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index b116e98..ef24833 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
++obj-$(CONFIG_QCOM_L2_PMU)	+= qcom_l2_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
 new file mode 100644
-index 0000000..fc25251
+index 0000000..c7b159f
 --- /dev/null
-+++ b/drivers/irqchip/qcom-irq-combiner.c
-@@ -0,0 +1,337 @@
-+/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
++++ b/drivers/perf/qcom_l2_pmu.c
+@@ -0,0 +1,947 @@
++/* Copyright (c) 2015,2016 The Linux Foundation. All rights reserved.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 and
@@ -68,332 +100,955 @@ index 0000000..fc25251
 + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + * GNU General Public License for more details.
 + */
-+
-+/*
-+ * Driver for interrupt combiners in the Top-level Control and Status
-+ * Registers (TCSR) hardware block in Qualcomm Technologies chips.
-+ * An interrupt combiner in this block combines a set of interrupts by
-+ * OR'ing the individual interrupt signals into a summary interrupt
-+ * signal routed to a parent interrupt controller, and provides read-
-+ * only, 32-bit registers to query the status of individual interrupts.
-+ * The status bit for IRQ n is bit (n % 32) within register (n / 32)
-+ * of the given combiner. Thus, each combiner can be described as a set
-+ * of register offsets and the number of IRQs managed.
-+ */
-+
 +#include <linux/acpi.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <linux/irqdomain.h>
++#include <linux/interrupt.h>
++#include <linux/perf_event.h>
 +#include <linux/platform_device.h>
 +
-+#define REG_SIZE 32
++#define MAX_L2_CTRS             9
 +
-+struct combiner_reg {
-+	void __iomem *addr;
-+	unsigned long mask;
-+};
++#define L2PMCR_NUM_EV_SHIFT     11
++#define L2PMCR_NUM_EV_MASK      0x1F
 +
-+struct combiner {
-+	struct irq_chip     irq_chip;
-+	struct irq_domain   *domain;
-+	int                 parent_irq;
-+	u32                 nirqs;
-+	u32                 nregs;
-+	struct combiner_reg regs[0];
-+};
++#define L2PMCR                  0x400
++#define L2PMCNTENCLR            0x403
++#define L2PMCNTENSET            0x404
++#define L2PMINTENCLR            0x405
++#define L2PMINTENSET            0x406
++#define L2PMOVSCLR              0x407
++#define L2PMOVSSET              0x408
++#define L2PMCCNTCR              0x409
++#define L2PMCCNTR               0x40A
++#define L2PMCCNTSR              0x40C
++#define L2PMRESR                0x410
++#define IA_L2PMXEVCNTCR_BASE    0x420
++#define IA_L2PMXEVCNTR_BASE     0x421
++#define IA_L2PMXEVFILTER_BASE   0x423
++#define IA_L2PMXEVTYPER_BASE    0x424
 +
-+static inline u32 irq_register(int irq)
++#define IA_L2_REG_OFFSET        0x10
++
++#define L2PMXEVFILTER_SUFILTER_ALL      0x000E0000
++#define L2PMXEVFILTER_ORGFILTER_IDINDEP 0x00000004
++#define L2PMXEVFILTER_ORGFILTER_ALL     0x00000003
++
++#define L2PM_CC_ENABLE          0x80000000
++
++#define L2EVTYPER_REG_SHIFT     3
++
++#define L2PMRESR_GROUP_BITS     8
++#define L2PMRESR_GROUP_MASK     GENMASK(7, 0)
++
++#define L2CYCLE_CTR_BIT         31
++#define L2CYCLE_CTR_RAW_CODE    0xFE
++
++#define L2PMCR_RESET_ALL        0x6
++#define L2PMCR_COUNTERS_ENABLE  0x1
++#define L2PMCR_COUNTERS_DISABLE 0x0
++
++#define L2PMRESR_EN             ((u64)1 << 63)
++
++#define L2_EVT_MASK             0x00000FFF
++#define L2_EVT_CODE_MASK        0x00000FF0
++#define L2_EVT_GRP_MASK         0x0000000F
++#define L2_EVT_CODE_SHIFT       4
++#define L2_EVT_GRP_SHIFT        0
++
++#define L2_EVT_CODE(event)   (((event) & L2_EVT_CODE_MASK) >> L2_EVT_CODE_SHIFT)
++#define L2_EVT_GROUP(event)  (((event) & L2_EVT_GRP_MASK) >> L2_EVT_GRP_SHIFT)
++
++#define L2_EVT_GROUP_MAX        7
++
++#define L2_MAX_PERIOD           U32_MAX
++#define L2_CNT_PERIOD           (U32_MAX - GENMASK(26, 0))
++
++#define L2CPUSRSELR_EL1         S3_3_c15_c0_6
++#define L2CPUSRDR_EL1           S3_3_c15_c0_7
++
++static DEFINE_RAW_SPINLOCK(l2_access_lock);
++
++/**
++ * set_l2_indirect_reg: write value to an L2 register
++ * @reg: Address of L2 register.
++ * @value: Value to be written to register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses
++ */
++static void set_l2_indirect_reg(u64 reg, u64 val)
 +{
-+	return irq / REG_SIZE;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg(reg, L2CPUSRSELR_EL1);
++	isb();
++	write_sysreg(val, L2CPUSRDR_EL1);
++	isb();
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
 +}
 +
-+static inline u32 irq_bit(int irq)
++/**
++ * get_l2_indirect_reg: read an L2 register value
++ * @reg: Address of L2 register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses
++ */
++static u64 get_l2_indirect_reg(u64 reg)
 +{
-+	return irq % REG_SIZE;
++	u64 val;
++	unsigned long flags;
 +
-+}
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg(reg, L2CPUSRSELR_EL1);
++	isb();
++	val = read_sysreg(L2CPUSRDR_EL1);
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
 +
-+static inline int irq_nr(u32 reg, u32 bit)
-+{
-+	return reg * REG_SIZE + bit;
++	return val;
 +}
 +
 +/*
-+ * Handler for the cascaded IRQ.
++ * Aggregate PMU. Implements the core pmu functions and manages
++ * the hardware PMUs.
 + */
-+static void combiner_handle_irq(struct irq_desc *desc)
++struct l2cache_pmu {
++	struct hlist_node node;
++	u32 num_pmus;
++	struct pmu pmu;
++	int num_counters;
++	cpumask_t cpumask;
++	struct platform_device *pdev;
++};
++
++/*
++ * The cache is made up of one or more clusters, each cluster has its own PMU.
++ * Each cluster is associated with one or more CPUs.
++ * This structure represents one of the hardware PMUs.
++ *
++ * Events can be envisioned as a 2-dimensional array. Each column represents
++ * a group of events. There are 8 groups. Only one entry from each
++ * group can be in use at a time. When an event is assigned a counter
++ * by *_event_add(), the counter index is assigned to group_to_counter[group].
++ * This allows *filter_match() to detect and reject conflicting events in
++ * the same group.
++ * Events are specified as 0xCCG, where CC is 2 hex digits specifying
++ * the code (array row) and G specifies the group (column).
++ *
++ * In addition there is a cycle counter event specified by L2CYCLE_CTR_RAW_CODE
++ * which is outside the above scheme.
++ */
++struct hml2_pmu {
++	struct perf_event *events[MAX_L2_CTRS];
++	struct l2cache_pmu *l2cache_pmu;
++	DECLARE_BITMAP(used_counters, MAX_L2_CTRS);
++	DECLARE_BITMAP(used_groups, L2_EVT_GROUP_MAX + 1);
++	int group_to_counter[L2_EVT_GROUP_MAX + 1];
++	int irq;
++	/* The CPU that is used for collecting events on this cluster */
++	int on_cpu;
++	/* All the CPUs associated with this cluster */
++	cpumask_t cluster_cpus;
++	spinlock_t pmu_lock;
++};
++
++#define to_l2cache_pmu(p) (container_of(p, struct l2cache_pmu, pmu))
++
++static DEFINE_PER_CPU(struct hml2_pmu *, pmu_cluster);
++static u32 l2_cycle_ctr_idx;
++static u32 l2_counter_present_mask;
++
++static inline u32 idx_to_reg_bit(u32 idx)
 +{
-+	struct combiner *combiner = irq_desc_get_handler_data(desc);
-+	struct irq_chip *chip = irq_desc_get_chip(desc);
-+	u32 reg;
++	if (idx == l2_cycle_ctr_idx)
++		return BIT(L2CYCLE_CTR_BIT);
 +
-+	chained_irq_enter(chip, desc);
++	return BIT(idx);
++}
 +
-+	for (reg = 0; reg < combiner->nregs; reg++) {
-+		int virq;
-+		int hwirq;
-+		u32 bit;
-+		u32 status;
++static inline struct hml2_pmu *get_hml2_pmu(int cpu)
++{
++	return per_cpu(pmu_cluster, cpu);
++}
 +
-+		if (combiner->regs[reg].mask == 0)
-+			continue;
++static void hml2_pmu__reset_on_cluster(void *x)
++{
++	/* Reset all ctrs */
++	set_l2_indirect_reg(L2PMCR, L2PMCR_RESET_ALL);
++	set_l2_indirect_reg(L2PMCNTENCLR, l2_counter_present_mask);
++	set_l2_indirect_reg(L2PMINTENCLR, l2_counter_present_mask);
++	set_l2_indirect_reg(L2PMOVSCLR, l2_counter_present_mask);
++}
 +
-+		status = readl_relaxed(combiner->regs[reg].addr);
-+		status &= combiner->regs[reg].mask;
++static inline void hml2_pmu__reset(struct hml2_pmu *cluster)
++{
++	cpumask_t *mask = &cluster->cluster_cpus;
 +
-+		while (status) {
-+			bit = __ffs(status);
-+			status &= ~(1 << bit);
-+			hwirq = irq_nr(reg, bit);
-+			virq = irq_find_mapping(combiner->domain, hwirq);
-+			if (virq >= 0)
-+				generic_handle_irq(virq);
++	if (smp_call_function_any(mask, hml2_pmu__reset_on_cluster, NULL, 1))
++		dev_err(&cluster->l2cache_pmu->pdev->dev,
++			"Failed to reset on cluster with cpu %d\n",
++			cpumask_first(&cluster->cluster_cpus));
++}
 +
++static inline void hml2_pmu__enable(void)
++{
++	set_l2_indirect_reg(L2PMCR, L2PMCR_COUNTERS_ENABLE);
++}
++
++static inline void hml2_pmu__disable(void)
++{
++	set_l2_indirect_reg(L2PMCR, L2PMCR_COUNTERS_DISABLE);
++}
++
++static inline void hml2_pmu__counter_set_value(u32 idx, u64 value)
++{
++	u32 counter_reg;
++
++	if (idx == l2_cycle_ctr_idx) {
++		set_l2_indirect_reg(L2PMCCNTR, value);
++	} else {
++		counter_reg = (idx * IA_L2_REG_OFFSET) + IA_L2PMXEVCNTR_BASE;
++		set_l2_indirect_reg(counter_reg, value & GENMASK(31, 0));
++	}
++}
++
++static inline u64 hml2_pmu__counter_get_value(u32 idx)
++{
++	u64 value;
++	u32 counter_reg;
++
++	if (idx == l2_cycle_ctr_idx) {
++		value = get_l2_indirect_reg(L2PMCCNTR);
++	} else {
++		counter_reg = (idx * IA_L2_REG_OFFSET) + IA_L2PMXEVCNTR_BASE;
++		value = get_l2_indirect_reg(counter_reg);
++	}
++
++	return value;
++}
++
++static inline void hml2_pmu__counter_enable(u32 idx)
++{
++	set_l2_indirect_reg(L2PMCNTENSET, idx_to_reg_bit(idx));
++}
++
++static inline void hml2_pmu__counter_disable(u32 idx)
++{
++	set_l2_indirect_reg(L2PMCNTENCLR, idx_to_reg_bit(idx));
++}
++
++static inline void hml2_pmu__counter_enable_interrupt(u32 idx)
++{
++	set_l2_indirect_reg(L2PMINTENSET, idx_to_reg_bit(idx));
++}
++
++static inline void hml2_pmu__counter_disable_interrupt(u32 idx)
++{
++	set_l2_indirect_reg(L2PMINTENCLR, idx_to_reg_bit(idx));
++}
++
++static inline void hml2_pmu__set_evccntcr(u32 val)
++{
++	set_l2_indirect_reg(L2PMCCNTCR, val);
++}
++
++static inline void hml2_pmu__set_evcntcr(u32 ctr, u32 val)
++{
++	u32 evtcr_reg = (ctr * IA_L2_REG_OFFSET) + IA_L2PMXEVCNTCR_BASE;
++
++	set_l2_indirect_reg(evtcr_reg, val);
++}
++
++static inline void hml2_pmu__set_evtyper(u32 ctr, u32 val)
++{
++	u32 evtype_reg = (ctr * IA_L2_REG_OFFSET) + IA_L2PMXEVTYPER_BASE;
++
++	set_l2_indirect_reg(evtype_reg, val);
++}
++
++static void hml2_pmu__set_resr(struct hml2_pmu *cluster,
++			       u32 event_group, u32 event_cc)
++{
++	u64 field;
++	u64 resr_val;
++	u32 shift;
++	unsigned long flags;
++
++	shift = L2PMRESR_GROUP_BITS * event_group;
++	field = ((u64)(event_cc & L2PMRESR_GROUP_MASK) << shift) | L2PMRESR_EN;
++
++	spin_lock_irqsave(&cluster->pmu_lock, flags);
++
++	resr_val = get_l2_indirect_reg(L2PMRESR);
++	resr_val &= ~(L2PMRESR_GROUP_MASK << shift);
++	resr_val |= field;
++	set_l2_indirect_reg(L2PMRESR, resr_val);
++
++	spin_unlock_irqrestore(&cluster->pmu_lock, flags);
++}
++
++/*
++ * Hardware allows filtering of events based on the originating
++ * CPU. Turn this off by setting filter bits to allow events from
++ * all CPUS, subunits and ID independent events in this cluster.
++ */
++static inline void hml2_pmu__set_evfilter_sys_mode(u32 ctr)
++{
++	u32 reg = (ctr * IA_L2_REG_OFFSET) + IA_L2PMXEVFILTER_BASE;
++	u32 val =  L2PMXEVFILTER_SUFILTER_ALL |
++		   L2PMXEVFILTER_ORGFILTER_IDINDEP |
++		   L2PMXEVFILTER_ORGFILTER_ALL;
++
++	set_l2_indirect_reg(reg, val);
++}
++
++static inline u32 hml2_pmu__getreset_ovsr(void)
++{
++	u32 result = get_l2_indirect_reg(L2PMOVSSET);
++
++	set_l2_indirect_reg(L2PMOVSCLR, result);
++	return result;
++}
++
++static inline bool hml2_pmu__has_overflowed(u32 ovsr)
++{
++	return !!(ovsr & l2_counter_present_mask);
++}
++
++static inline bool hml2_pmu__counter_has_overflowed(u32 ovsr, u32 idx)
++{
++	return !!(ovsr & idx_to_reg_bit(idx));
++}
++
++static void l2_cache__event_update_from_cluster(struct perf_event *event,
++						struct hml2_pmu *cluster)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	u64 delta64, prev, now;
++	u32 delta;
++	u32 idx = hwc->idx;
++
++	do {
++		prev = local64_read(&hwc->prev_count);
++		now = hml2_pmu__counter_get_value(idx);
++	} while (local64_cmpxchg(&hwc->prev_count, prev, now) != prev);
++
++	if (idx == l2_cycle_ctr_idx) {
++		/*
++		 * The cycle counter is 64-bit so needs separate handling
++		 * of 64-bit delta.
++		 */
++		delta64 = now - prev;
++		local64_add(delta64, &event->count);
++	} else {
++		/*
++		 * 32-bit counters need the unsigned 32-bit math to handle
++		 * overflow and now < prev
++		 */
++		delta = now - prev;
++		local64_add(delta, &event->count);
++	}
++}
++
++static void l2_cache__cluster_set_period(struct hml2_pmu *cluster,
++				       struct hw_perf_event *hwc)
++{
++	u64 base = L2_MAX_PERIOD - (L2_CNT_PERIOD - 1);
++	u32 idx = hwc->idx;
++	u64 prev = local64_read(&hwc->prev_count);
++	u64 value;
++
++	/*
++	 * Limit the maximum period to prevent the counter value
++	 * from overtaking the one we are about to program.
++	 * Use a starting value which is high enough that after
++	 * an overflow, interrupt latency will not cause the count
++	 * to reach the base value. If the previous value
++	 * is below the base, increase it to be above the base
++	 * and update prev_count accordingly. Otherwise if
++	 * the previous value is already above the base
++	 * nothing needs to be done to prev_count.
++	 */
++	if (prev < base) {
++		value = base + prev;
++		local64_set(&hwc->prev_count, value);
++	} else {
++		value = prev;
++	}
++
++	hml2_pmu__counter_set_value(idx, value);
++}
++
++static int l2_cache__get_event_idx(struct hml2_pmu *cluster,
++				   struct perf_event *event)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	int idx;
++
++	if (hwc->config_base == L2CYCLE_CTR_RAW_CODE) {
++		if (test_and_set_bit(l2_cycle_ctr_idx, cluster->used_counters))
++			return -EAGAIN;
++
++		return l2_cycle_ctr_idx;
++	}
++
++	for (idx = 0; idx < cluster->l2cache_pmu->num_counters - 1; idx++) {
++		if (!test_and_set_bit(idx, cluster->used_counters)) {
++			set_bit(L2_EVT_GROUP(hwc->config_base),
++				cluster->used_groups);
++			return idx;
 +		}
 +	}
 +
-+	chained_irq_exit(chip, desc);
++	/* The counters are all in use. */
++	return -EAGAIN;
++}
++
++static void l2_cache__clear_event_idx(struct hml2_pmu *cluster,
++				      struct perf_event *event)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
++
++	clear_bit(idx, cluster->used_counters);
++	if (hwc->config_base != L2CYCLE_CTR_RAW_CODE)
++		clear_bit(L2_EVT_GROUP(hwc->config_base), cluster->used_groups);
++}
++
++static irqreturn_t l2_cache__handle_irq(int irq_num, void *data)
++{
++	struct hml2_pmu *cluster = data;
++	int num_counters = cluster->l2cache_pmu->num_counters;
++	u32 ovsr;
++	int idx;
++
++	ovsr = hml2_pmu__getreset_ovsr();
++	if (!hml2_pmu__has_overflowed(ovsr))
++		return IRQ_NONE;
++
++	for_each_set_bit(idx, cluster->used_counters, num_counters) {
++		struct perf_event *event = cluster->events[idx];
++		struct hw_perf_event *hwc;
++
++		if (!hml2_pmu__counter_has_overflowed(ovsr, idx))
++			continue;
++
++		l2_cache__event_update_from_cluster(event, cluster);
++		hwc = &event->hw;
++
++		l2_cache__cluster_set_period(cluster, hwc);
++	}
++
++	return IRQ_HANDLED;
 +}
 +
 +/*
-+ * irqchip callbacks
++ * Implementation of abstract pmu functionality required by
++ * the core perf events code.
 + */
 +
-+static void combiner_irq_chip_mask_irq(struct irq_data *data)
++static void l2_cache__pmu_enable(struct pmu *pmu)
 +{
-+	struct combiner *combiner = irq_data_get_irq_chip_data(data);
-+	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
++	/*
++	 * Although there is only one PMU (per socket) controlling multiple
++	 * physical PMUs (per cluster), because we do not support per-task mode
++	 * each event is associated with a CPU. Each event has pmu_enable
++	 * called on its CPU, so here it is only necessary to enable the
++	 * counters for the current CPU.
++	 */
 +
-+	clear_bit(irq_bit(data->hwirq), &reg->mask);
++	hml2_pmu__enable();
 +}
 +
-+static void combiner_irq_chip_unmask_irq(struct irq_data *data)
++static void l2_cache__pmu_disable(struct pmu *pmu)
 +{
-+	struct combiner *combiner = irq_data_get_irq_chip_data(data);
-+	struct combiner_reg *reg = combiner->regs + irq_register(data->hwirq);
-+
-+	set_bit(irq_bit(data->hwirq), &reg->mask);
++	hml2_pmu__disable();
 +}
 +
-+/*
-+ * irq_domain_ops callbacks
-+ */
-+
-+static int combiner_irq_map(struct irq_domain *domain, unsigned int irq,
-+				   irq_hw_number_t hwirq)
++static int l2_cache__event_init(struct perf_event *event)
 +{
-+	struct combiner *combiner = domain->host_data;
++	struct hw_perf_event *hwc = &event->hw;
++	struct hml2_pmu *cluster;
++	struct perf_event *sibling;
++	struct l2cache_pmu *l2cache_pmu;
 +
-+	if (hwirq >= combiner->nirqs)
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	l2cache_pmu = to_l2cache_pmu(event->pmu);
++
++	if (hwc->sample_period) {
++		dev_warn(&l2cache_pmu->pdev->dev, "Sampling not supported\n");
++		return -EOPNOTSUPP;
++	}
++
++	if (event->cpu < 0) {
++		dev_warn(&l2cache_pmu->pdev->dev, "Per-task mode not supported\n");
++		return -EOPNOTSUPP;
++	}
++
++	/* We cannot filter accurately so we just don't allow it. */
++	if (event->attr.exclude_user || event->attr.exclude_kernel ||
++	    event->attr.exclude_hv || event->attr.exclude_idle) {
++		dev_warn(&l2cache_pmu->pdev->dev, "Can't exclude execution levels\n");
++		return -EOPNOTSUPP;
++	}
++
++	if (((L2_EVT_GROUP(event->attr.config) > L2_EVT_GROUP_MAX) ||
++	     ((event->attr.config & ~L2_EVT_MASK) != 0)) &&
++	    (event->attr.config != L2CYCLE_CTR_RAW_CODE)) {
++		dev_warn(&l2cache_pmu->pdev->dev, "Invalid config %llx\n",
++			 event->attr.config);
 +		return -EINVAL;
++	}
 +
-+	irq_set_chip_and_handler(irq, &combiner->irq_chip, handle_level_irq);
-+	irq_set_chip_data(irq, combiner);
-+	irq_set_parent(irq, combiner->parent_irq);
-+	irq_set_noprobe(irq);
-+	return 0;
-+}
++	/* Don't allow groups with mixed PMUs, except for s/w events */
++	if (event->group_leader->pmu != event->pmu &&
++	    !is_software_event(event->group_leader)) {
++		dev_warn(&l2cache_pmu->pdev->dev,
++			 "Can't create mixed PMU group\n");
++		return -EINVAL;
++	}
 +
-+static void combiner_irq_unmap(struct irq_domain *domain, unsigned int irq)
-+{
-+	irq_set_chip_and_handler(irq, NULL, NULL);
-+	irq_set_chip_data(irq, NULL);
-+	irq_set_parent(irq, -1);
-+}
-+
-+#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-+static int combiner_irq_translate(struct irq_domain *d, struct irq_fwspec *fws,
-+				  unsigned long *hwirq, unsigned int *type)
-+{
-+	if (is_acpi_node(fws->fwnode)) {
-+		if (fws->param_count != 2)
++	list_for_each_entry(sibling, &event->group_leader->sibling_list,
++			    group_entry)
++		if (sibling->pmu != event->pmu &&
++		    !is_software_event(sibling)) {
++			dev_warn(&l2cache_pmu->pdev->dev,
++				 "Can't create mixed PMU group\n");
 +			return -EINVAL;
++		}
 +
-+		*hwirq = fws->param[0];
-+		*type = fws->param[1];
-+		return 0;
++	/* Ensure all events in a group are on the same cpu */
++	cluster = get_hml2_pmu(event->cpu);
++	if ((event->group_leader != event) &&
++	    (cluster->on_cpu != event->group_leader->cpu)) {
++		dev_warn(&l2cache_pmu->pdev->dev,
++			 "Can't create group on CPUs %d and %d",
++			 event->cpu, event->group_leader->cpu);
++		return -EINVAL;
 +	}
 +
-+	return -EINVAL;
-+}
-+#endif
++	hwc->idx = -1;
++	hwc->config_base = event->attr.config;
 +
-+static const struct irq_domain_ops domain_ops = {
-+	.map = combiner_irq_map,
-+	.unmap = combiner_irq_unmap,
-+#ifdef	CONFIG_IRQ_DOMAIN_HIERARCHY
-+	.translate = combiner_irq_translate
-+#endif
++	/*
++	 * Ensure all events are on the same cpu so all events are in the
++	 * same cpu context, to avoid races on pmu_enable etc.
++	 */
++	event->cpu = cluster->on_cpu;
++
++	return 0;
++}
++
++static void l2_cache__event_start(struct perf_event *event, int flags)
++{
++	struct hml2_pmu *cluster;
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
++	u32 config;
++	u32 event_cc, event_group;
++
++	hwc->state = 0;
++
++	cluster = get_hml2_pmu(event->cpu);
++	l2_cache__cluster_set_period(cluster, hwc);
++
++	if (hwc->config_base == L2CYCLE_CTR_RAW_CODE) {
++		hml2_pmu__set_evccntcr(0x0);
++	} else {
++		config = hwc->config_base;
++		event_cc    = L2_EVT_CODE(config);
++		event_group = L2_EVT_GROUP(config);
++
++		hml2_pmu__set_evcntcr(idx, 0x0);
++		hml2_pmu__set_evtyper(idx, event_group);
++		hml2_pmu__set_resr(cluster, event_group, event_cc);
++		hml2_pmu__set_evfilter_sys_mode(idx);
++	}
++
++	hml2_pmu__counter_enable_interrupt(idx);
++	hml2_pmu__counter_enable(idx);
++}
++
++static void l2_cache__event_stop(struct perf_event *event, int flags)
++{
++	struct hml2_pmu *cluster;
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
++
++	if (!(hwc->state & PERF_HES_STOPPED)) {
++		cluster = get_hml2_pmu(event->cpu);
++		hml2_pmu__counter_disable_interrupt(idx);
++		hml2_pmu__counter_disable(idx);
++
++		if (flags & PERF_EF_UPDATE)
++			l2_cache__event_update_from_cluster(event, cluster);
++		hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
++	}
++}
++
++static int l2_cache__event_add(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	int idx;
++	int err = 0;
++	struct hml2_pmu *cluster;
++
++	cluster = get_hml2_pmu(event->cpu);
++
++	idx = l2_cache__get_event_idx(cluster, event);
++	if (idx < 0) {
++		err = idx;
++		return err;
++	}
++
++	hwc->idx = idx;
++	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
++	cluster->events[idx] = event;
++	cluster->group_to_counter[L2_EVT_GROUP(hwc->config_base)] = idx;
++	local64_set(&hwc->prev_count, 0ULL);
++
++	if (flags & PERF_EF_START)
++		l2_cache__event_start(event, flags);
++
++	/* Propagate changes to the userspace mapping. */
++	perf_event_update_userpage(event);
++
++	return err;
++}
++
++static void l2_cache__event_del(struct perf_event *event, int flags)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	struct hml2_pmu *cluster;
++	int idx = hwc->idx;
++
++	cluster = get_hml2_pmu(event->cpu);
++	l2_cache__event_stop(event, flags | PERF_EF_UPDATE);
++	cluster->events[idx] = NULL;
++	l2_cache__clear_event_idx(cluster, event);
++
++	perf_event_update_userpage(event);
++}
++
++static void l2_cache__event_read(struct perf_event *event)
++{
++	l2_cache__event_update_from_cluster(event, get_hml2_pmu(event->cpu));
++}
++
++static int l2_cache_filter_match(struct perf_event *event)
++{
++	struct hw_perf_event *hwc = &event->hw;
++	struct hml2_pmu *cluster = get_hml2_pmu(event->cpu);
++	unsigned int group = L2_EVT_GROUP(hwc->config_base);
++
++	/* check for column exclusion: group already in use by another event */
++	if (test_bit(group, cluster->used_groups) &&
++	    cluster->events[cluster->group_to_counter[group]] != event)
++		return 0;
++
++	return 1;
++}
++
++static ssize_t l2_cache_pmu_cpumask_show(struct device *dev,
++					 struct device_attribute *attr,
++					 char *buf)
++{
++	struct l2cache_pmu *l2cache_pmu = to_l2cache_pmu(dev_get_drvdata(dev));
++
++	return cpumap_print_to_pagebuf(true, buf, &l2cache_pmu->cpumask);
++}
++
++static DEVICE_ATTR(cpumask, S_IRUGO, l2_cache_pmu_cpumask_show, NULL);
++
++static struct attribute *l2_cache_pmu_cpumask_attrs[] = {
++	&dev_attr_cpumask.attr,
++	NULL,
++};
++
++static struct attribute_group l2_cache_pmu_cpumask_group = {
++	.attrs = l2_cache_pmu_cpumask_attrs,
++};
++
++/* CCG format for perf RAW codes. */
++PMU_FORMAT_ATTR(l2_code,   "config:4-11");
++PMU_FORMAT_ATTR(l2_group,  "config:0-3");
++static struct attribute *l2_cache_pmu_formats[] = {
++	&format_attr_l2_code.attr,
++	&format_attr_l2_group.attr,
++	NULL,
++};
++
++static struct attribute_group l2_cache_pmu_format_group = {
++	.name = "format",
++	.attrs = l2_cache_pmu_formats,
++};
++
++static const struct attribute_group *l2_cache_pmu_attr_grps[] = {
++	&l2_cache_pmu_format_group,
++	&l2_cache_pmu_cpumask_group,
++	NULL,
 +};
 +
 +/*
-+ * Device probing
++ * Generic device handlers
 + */
 +
-+#ifdef CONFIG_ACPI
-+
-+static acpi_status count_registers_cb(struct acpi_resource *ares, void *context)
-+{
-+	int *count = context;
-+
-+	if (ares->type == ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
-+		++(*count);
-+	return AE_OK;
-+}
-+
-+static int count_registers(struct platform_device *pdev)
-+{
-+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-+	acpi_status status;
-+	int count = 0;
-+
-+	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
-+		return -EINVAL;
-+
-+	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
-+				     count_registers_cb, &count);
-+	if (ACPI_FAILURE(status))
-+		return -EINVAL;
-+	return count;
-+}
-+
-+struct get_registers_context {
-+	struct device *dev;
-+	struct combiner *combiner;
-+	int err;
-+};
-+
-+static acpi_status get_registers_cb(struct acpi_resource *ares, void *context)
-+{
-+	struct get_registers_context *ctx = context;
-+	struct acpi_resource_generic_register *reg;
-+	phys_addr_t paddr;
-+	void __iomem *vaddr;
-+
-+	if (ares->type != ACPI_RESOURCE_TYPE_GENERIC_REGISTER)
-+		return AE_OK;
-+
-+	reg = &ares->data.generic_reg;
-+	paddr = reg->address;
-+	if ((reg->space_id != ACPI_SPACE_MEM) ||
-+	    (reg->bit_offset != 0) ||
-+	    (reg->bit_width > REG_SIZE)) {
-+		dev_err(ctx->dev, "Bad register resource @%pa\n", &paddr);
-+		ctx->err = -EINVAL;
-+		return AE_ERROR;
-+	}
-+
-+	vaddr = devm_ioremap(ctx->dev, reg->address, REG_SIZE);
-+	if (IS_ERR(vaddr)) {
-+		dev_err(ctx->dev, "Can't map register @%pa\n", &paddr);
-+		ctx->err = PTR_ERR(vaddr);
-+		return AE_ERROR;
-+	}
-+
-+	ctx->combiner->regs[ctx->combiner->nregs].addr = vaddr;
-+	ctx->combiner->nirqs += reg->bit_width;
-+	ctx->combiner->nregs++;
-+	return AE_OK;
-+}
-+
-+static int get_registers(struct platform_device *pdev, struct combiner *comb)
-+{
-+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
-+	acpi_status status;
-+	struct get_registers_context ctx;
-+
-+	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
-+		return -EINVAL;
-+
-+	ctx.dev = &pdev->dev;
-+	ctx.combiner = comb;
-+	ctx.err = 0;
-+
-+	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
-+				     get_registers_cb, &ctx);
-+	if (ACPI_FAILURE(status))
-+		return ctx.err;
-+	return 0;
-+}
-+
-+#else /* !CONFIG_ACPI */
-+
-+static int count_registers(struct platform_device *pdev)
-+{
-+	return -EINVAL;
-+}
-+
-+static int get_registers(struct platform_device *pdev, struct combiner *comb)
-+{
-+	return -EINVAL;
-+}
-+
-+#endif
-+
-+static int __init combiner_probe(struct platform_device *pdev)
-+{
-+	struct combiner *combiner;
-+	size_t alloc_sz;
-+	u32 nregs;
-+	int err;
-+
-+	nregs = count_registers(pdev);
-+	if (nregs <= 0) {
-+		dev_err(&pdev->dev, "Error reading register resources\n");
-+		return -EINVAL;
-+	}
-+
-+	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
-+	combiner = devm_kzalloc(&pdev->dev, alloc_sz, GFP_KERNEL);
-+	if (!combiner)
-+		return -ENOMEM;
-+
-+	err = get_registers(pdev, combiner);
-+	if (err < 0)
-+		return err;
-+
-+	combiner->parent_irq = platform_get_irq(pdev, 0);
-+	if (combiner->parent_irq <= 0) {
-+		dev_err(&pdev->dev, "Error getting IRQ resource\n");
-+		return -EINVAL;
-+	}
-+
-+	combiner->domain = irq_domain_create_linear(
-+		pdev->dev.fwnode, combiner->nirqs, &domain_ops, combiner);
-+	if (!combiner->domain)
-+		/* Errors printed by irq_domain_create_linear */
-+		return -ENODEV;
-+
-+	irq_set_chained_handler_and_data(combiner->parent_irq,
-+					 combiner_handle_irq, combiner);
-+	combiner->irq_chip.irq_mask = combiner_irq_chip_mask_irq;
-+	combiner->irq_chip.irq_unmask = combiner_irq_chip_unmask_irq;
-+	combiner->irq_chip.name = pdev->name;
-+
-+	dev_info(&pdev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
-+		 combiner->parent_irq, combiner->nirqs, combiner->regs[0].addr);
-+	return 0;
-+}
-+
-+static const struct acpi_device_id qcom_irq_combiner_acpi_match[] = {
-+	{ "QCOM80B1", },
++static const struct acpi_device_id l2_cache_pmu_acpi_match[] = {
++	{ "QCOM8130", },
 +	{ }
 +};
 +
-+static struct platform_driver qcom_irq_combiner_probe = {
++static int get_num_counters(void)
++{
++	int val;
++
++	val = get_l2_indirect_reg(L2PMCR);
++
++	/*
++	 * Read number of counters from L2PMCR and add 1
++	 * for the cycle counter.
++	 */
++	return ((val >> L2PMCR_NUM_EV_SHIFT) & L2PMCR_NUM_EV_MASK) + 1;
++}
++
++static int l2cache_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct hml2_pmu *cluster;
++	cpumask_t cluster_online_cpus;
++	struct l2cache_pmu *l2cache_pmu;
++
++	l2cache_pmu = hlist_entry_safe(node, struct l2cache_pmu, node);
++	cluster = get_hml2_pmu(cpu);
++	cpumask_and(&cluster_online_cpus, &cluster->cluster_cpus,
++		    cpu_online_mask);
++
++	if (cpumask_weight(&cluster_online_cpus) == 1) {
++		/* all CPUs on this cluster were down, use this one */
++		cluster->on_cpu = cpu;
++		cpumask_set_cpu(cpu, &l2cache_pmu->cpumask);
++		WARN_ON(irq_set_affinity(cluster->irq, cpumask_of(cpu)));
++	}
++
++	return 0;
++}
++
++static int l2cache_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
++{
++	struct hml2_pmu *cluster;
++	struct l2cache_pmu *l2cache_pmu;
++	cpumask_t cluster_online_cpus;
++	unsigned int target;
++
++	l2cache_pmu = hlist_entry_safe(node, struct l2cache_pmu, node);
++
++	if (!cpumask_test_and_clear_cpu(cpu, &l2cache_pmu->cpumask))
++		return 0;
++	cluster = get_hml2_pmu(cpu);
++	cpumask_and(&cluster_online_cpus, &cluster->cluster_cpus,
++		    cpu_online_mask);
++
++	/* Any other CPU for this cluster which is still online */
++	target = cpumask_any_but(&cluster_online_cpus, cpu);
++	if (target >= nr_cpu_ids)
++		return 0;
++
++	perf_pmu_migrate_context(&l2cache_pmu->pmu, cpu, target);
++	cluster->on_cpu = target;
++	cpumask_set_cpu(target, &l2cache_pmu->cpumask);
++	WARN_ON(irq_set_affinity(cluster->irq, cpumask_of(target)));
++
++	return 0;
++}
++
++static int l2_cache_pmu_probe_cluster(struct device *dev, void *data)
++{
++	struct platform_device *pdev = to_platform_device(dev->parent);
++	struct platform_device *sdev = to_platform_device(dev);
++	struct l2cache_pmu *l2cache_pmu = data;
++	struct hml2_pmu *cluster;
++	struct acpi_device *device;
++	unsigned long fw_cluster_id;
++	int cpu;
++	int err;
++	int irq;
++
++	if (acpi_bus_get_device(ACPI_HANDLE(dev), &device))
++		return -ENODEV;
++
++	if (kstrtol(device->pnp.unique_id, 10, &fw_cluster_id) < 0) {
++		dev_err(&pdev->dev, "unable to read ACPI uid\n");
++		return -ENODEV;
++	}
++
++	irq = platform_get_irq(sdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev,
++			"Failed to get valid irq for cluster %ld\n",
++			fw_cluster_id);
++		return irq;
++	}
++
++	cluster = devm_kzalloc(&pdev->dev, sizeof(*cluster), GFP_KERNEL);
++	if (!cluster)
++		return -ENOMEM;
++
++	cluster->l2cache_pmu = l2cache_pmu;
++	for_each_present_cpu(cpu) {
++		if (topology_physical_package_id(cpu) == fw_cluster_id) {
++			cpumask_set_cpu(cpu, &cluster->cluster_cpus);
++			per_cpu(pmu_cluster, cpu) = cluster;
++		}
++	}
++	cluster->irq = irq;
++
++	if (cpumask_empty(&cluster->cluster_cpus)) {
++		dev_err(&pdev->dev, "No CPUs found for L2 cache instance %ld\n",
++			fw_cluster_id);
++		return -ENODEV;
++	}
++
++	/* Pick one CPU to be the preferred one to use in the cluster */
++	cluster->on_cpu = cpumask_first(&cluster->cluster_cpus);
++
++	if (irq_set_affinity(irq, cpumask_of(cluster->on_cpu))) {
++		dev_err(&pdev->dev,
++			"Unable to set irq affinity (irq=%d, cpu=%d)\n",
++			irq, cluster->on_cpu);
++		return -ENODEV;
++	}
++
++	err = devm_request_irq(&pdev->dev, irq, l2_cache__handle_irq,
++			       IRQF_NOBALANCING, "l2-cache-pmu", cluster);
++	if (err) {
++		dev_err(&pdev->dev,
++			"Unable to request IRQ%d for L2 PMU counters\n", irq);
++		return err;
++	}
++
++	dev_info(&pdev->dev,
++		 "Registered L2 cache PMU instance %ld with %d CPUs\n",
++		 fw_cluster_id, cpumask_weight(&cluster->cluster_cpus));
++
++	cluster->pmu_lock = __SPIN_LOCK_UNLOCKED(cluster->pmu_lock);
++	cpumask_set_cpu(cluster->on_cpu, &l2cache_pmu->cpumask);
++
++	hml2_pmu__reset(cluster);
++	l2cache_pmu->num_pmus++;
++
++	return 0;
++}
++
++static int l2_cache_pmu_probe(struct platform_device *pdev)
++{
++	int err;
++	struct l2cache_pmu *l2cache_pmu;
++
++	l2cache_pmu =
++		devm_kzalloc(&pdev->dev, sizeof(*l2cache_pmu), GFP_KERNEL);
++	if (!l2cache_pmu)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, l2cache_pmu);
++	l2cache_pmu->pmu = (struct pmu) {
++		/* suffix is instance id for future use with multiple sockets */
++		.name		= "l2cache_0",
++		.task_ctx_nr    = perf_invalid_context,
++		.pmu_enable	= l2_cache__pmu_enable,
++		.pmu_disable	= l2_cache__pmu_disable,
++		.event_init	= l2_cache__event_init,
++		.add		= l2_cache__event_add,
++		.del		= l2_cache__event_del,
++		.start		= l2_cache__event_start,
++		.stop		= l2_cache__event_stop,
++		.read		= l2_cache__event_read,
++		.attr_groups	= l2_cache_pmu_attr_grps,
++		.filter_match   = l2_cache_filter_match,
++	};
++
++	l2cache_pmu->num_counters = get_num_counters();
++	l2cache_pmu->pdev = pdev;
++	l2_cycle_ctr_idx = l2cache_pmu->num_counters - 1;
++	l2_counter_present_mask = GENMASK(l2cache_pmu->num_counters - 2, 0) |
++		L2PM_CC_ENABLE;
++
++	cpumask_clear(&l2cache_pmu->cpumask);
++
++	/* Read cluster info and initialize each cluster */
++	err = device_for_each_child(&pdev->dev, l2cache_pmu,
++				    l2_cache_pmu_probe_cluster);
++	if (err < 0)
++		return err;
++
++	if (l2cache_pmu->num_pmus == 0) {
++		dev_err(&pdev->dev, "No hardware L2 cache PMUs found\n");
++		return -ENODEV;
++	}
++
++	err = perf_pmu_register(&l2cache_pmu->pmu, l2cache_pmu->pmu.name, -1);
++	if (err < 0) {
++		dev_err(&pdev->dev, "Error %d registering L2 cache PMU\n", err);
++		return err;
++	}
++
++	dev_info(&pdev->dev, "Registered L2 cache PMU using %d HW PMUs\n",
++		 l2cache_pmu->num_pmus);
++
++	err = cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
++					       &l2cache_pmu->node);
++
++	return err;
++}
++
++static int l2_cache_pmu_remove(struct platform_device *pdev)
++{
++	struct l2cache_pmu *l2cache_pmu =
++		to_l2cache_pmu(platform_get_drvdata(pdev));
++
++	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
++					       &l2cache_pmu->node);
++	perf_pmu_unregister(&l2cache_pmu->pmu);
++	return 0;
++}
++
++static struct platform_driver l2_cache_pmu_driver = {
 +	.driver = {
-+		.name = "qcom-irq-combiner",
++		.name = "qcom-l2cache-pmu",
 +		.owner = THIS_MODULE,
-+		.acpi_match_table = ACPI_PTR(qcom_irq_combiner_acpi_match),
++		.acpi_match_table = ACPI_PTR(l2_cache_pmu_acpi_match),
 +	},
-+	.probe = combiner_probe,
++	.probe = l2_cache_pmu_probe,
++	.remove = l2_cache_pmu_remove,
 +};
 +
-+static int __init register_qcom_irq_combiner(void)
++static int __init register_l2_cache_pmu_driver(void)
 +{
-+	return platform_driver_register(&qcom_irq_combiner_probe);
++	int err;
++
++	err = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
++				      "AP_PERF_ARM_QCOM_L2_ONLINE",
++				      l2cache_pmu_online_cpu,
++				      l2cache_pmu_offline_cpu);
++	if (err)
++		return err;
++
++	return platform_driver_register(&l2_cache_pmu_driver);
 +}
-+device_initcall(register_qcom_irq_combiner);
++device_initcall(register_l2_cache_pmu_driver);
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 9b207a8..fbe33d2 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -117,6 +117,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_ARM_CCI_ONLINE,
+ 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
+ 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
++	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+ 	CPUHP_AP_WORKQUEUE_ONLINE,
+ 	CPUHP_AP_RCUTREE_ONLINE,
+ 	CPUHP_AP_NOTIFY_ONLINE,
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
