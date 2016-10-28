@@ -1,271 +1,116 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri, 28 Oct 2016 16:56:57 -0400
-Subject: [PATCH v2 4/6] net: ethernet: bgmac: device tree phy enablement
-In-Reply-To: <1477688219-3871-1-git-send-email-jon.mason@broadcom.com>
-References: <1477688219-3871-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1477688219-3871-5-git-send-email-jon.mason@broadcom.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Fri, 28 Oct 2016 14:00:15 -0700
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161028202619.GA29625@obsidianresearch.com>
+References: <20161026225413.GA6220@obsidianresearch.com>
+ <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
+ <20161027143937.GC6818@obsidianresearch.com>
+ <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
+ <20161028154740.GC10441@obsidianresearch.com>
+ <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
+ <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+Message-ID: <20161028210015.GA19901@live.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the bgmac driver to allow for phy's defined by the device tree
+Jason,
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- drivers/net/ethernet/broadcom/bgmac-bcma.c     | 48 ++++++++++++++++++++++++
- drivers/net/ethernet/broadcom/bgmac-platform.c | 48 +++++++++++++++++++++++-
- drivers/net/ethernet/broadcom/bgmac.c          | 52 ++------------------------
- drivers/net/ethernet/broadcom/bgmac.h          |  7 ++++
- 4 files changed, 105 insertions(+), 50 deletions(-)
+On Fri, Oct 28, 2016 at 02:26:19PM -0600, Jason Gunthorpe wrote:
+> On Fri, Oct 28, 2016 at 11:23:08AM -0700, Moritz Fischer wrote:
+> 
+> > I'm fine with checking for boundary cases where the bitstreams are
+> > obviously too small or wrong size, I'm not convinced that checking using
+> > internal knowledge about the bistream format inside the kernel is the
+> > right place.
+> 
+> To be clear, the sync word is documented in the Xilinx public docs, it
+> is mandatory. I don't think there is anything wrong with doing basic
+> validation on the structure of the bitstream before sending it.
 
-diff --git a/drivers/net/ethernet/broadcom/bgmac-bcma.c b/drivers/net/ethernet/broadcom/bgmac-bcma.c
-index c16ec3a..3e3efde 100644
---- a/drivers/net/ethernet/broadcom/bgmac-bcma.c
-+++ b/drivers/net/ethernet/broadcom/bgmac-bcma.c
-@@ -80,6 +80,50 @@ static void bcma_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset, u32 mask,
- 	bcma_maskset32(bgmac->bcma.cmn, offset, mask, set);
- }
- 
-+static int bcma_phy_connect(struct bgmac *bgmac)
-+{
-+	struct phy_device *phy_dev;
-+	char bus_id[MII_BUS_ID_SIZE + 3];
-+
-+	/* Connect to the PHY */
-+	snprintf(bus_id, sizeof(bus_id), PHY_ID_FMT, bgmac->mii_bus->id,
-+		 bgmac->phyaddr);
-+	phy_dev = phy_connect(bgmac->net_dev, bus_id, bgmac_adjust_link,
-+			      PHY_INTERFACE_MODE_MII);
-+	if (IS_ERR(phy_dev)) {
-+		dev_err(bgmac->dev, "PHY connecton failed\n");
-+		return PTR_ERR(phy_dev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int bcma_phy_direct_connect(struct bgmac *bgmac)
-+{
-+	struct fixed_phy_status fphy_status = {
-+		.link = 1,
-+		.speed = SPEED_1000,
-+		.duplex = DUPLEX_FULL,
-+	};
-+	struct phy_device *phy_dev;
-+	int err;
-+
-+	phy_dev = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
-+	if (!phy_dev || IS_ERR(phy_dev)) {
-+		dev_err(bgmac->dev, "Failed to register fixed PHY device\n");
-+		return -ENODEV;
-+	}
-+
-+	err = phy_connect_direct(bgmac->net_dev, phy_dev, bgmac_adjust_link,
-+				 PHY_INTERFACE_MODE_MII);
-+	if (err) {
-+		dev_err(bgmac->dev, "Connecting PHY failed\n");
-+		return err;
-+	}
-+
-+	return err;
-+}
-+
- static const struct bcma_device_id bgmac_bcma_tbl[] = {
- 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_4706_MAC_GBIT,
- 		  BCMA_ANY_REV, BCMA_ANY_CLASS),
-@@ -275,6 +319,10 @@ static int bgmac_probe(struct bcma_device *core)
- 	bgmac->cco_ctl_maskset = bcma_bgmac_cco_ctl_maskset;
- 	bgmac->get_bus_clock = bcma_bgmac_get_bus_clock;
- 	bgmac->cmn_maskset32 = bcma_bgmac_cmn_maskset32;
-+	if (bgmac->mii_bus)
-+		bgmac->phy_connect = bcma_phy_connect;
-+	else
-+		bgmac->phy_connect = bcma_phy_direct_connect;
- 
- 	err = bgmac_enet_probe(bgmac);
- 	if (err)
-diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
-index be52f27..aed5dc5 100644
---- a/drivers/net/ethernet/broadcom/bgmac-platform.c
-+++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
-@@ -16,6 +16,7 @@
- #include <linux/bcma/bcma.h>
- #include <linux/etherdevice.h>
- #include <linux/of_address.h>
-+#include <linux/of_mdio.h>
- #include <linux/of_net.h>
- #include "bgmac.h"
- 
-@@ -86,6 +87,46 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
- 	WARN_ON(1);
- }
- 
-+static int platform_phy_connect(struct bgmac *bgmac)
-+{
-+	struct phy_device *phy_dev;
-+
-+	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
-+					 bgmac_adjust_link);
-+	if (!phy_dev) {
-+		dev_err(bgmac->dev, "Phy connect failed\n");
-+		return -ENODEV;
-+	}
-+
-+	return 0;
-+}
-+
-+static int platform_phy_direct_connect(struct bgmac *bgmac)
-+{
-+	struct fixed_phy_status fphy_status = {
-+		.link = 1,
-+		.speed = SPEED_1000,
-+		.duplex = DUPLEX_FULL,
-+	};
-+	struct phy_device *phy_dev;
-+	int err;
-+
-+	phy_dev = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
-+	if (!phy_dev || IS_ERR(phy_dev)) {
-+		dev_err(bgmac->dev, "Failed to register fixed PHY device\n");
-+		return -ENODEV;
-+	}
-+
-+	err = phy_connect_direct(bgmac->net_dev, phy_dev, bgmac_adjust_link,
-+				 PHY_INTERFACE_MODE_MII);
-+	if (err) {
-+		dev_err(bgmac->dev, "Connecting PHY failed\n");
-+		return err;
-+	}
-+
-+	return err;
-+}
-+
- static int bgmac_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
-@@ -102,7 +143,6 @@ static int bgmac_probe(struct platform_device *pdev)
- 	/* Set the features of the 4707 family */
- 	bgmac->feature_flags |= BGMAC_FEAT_CLKCTLST;
- 	bgmac->feature_flags |= BGMAC_FEAT_NO_RESET;
--	bgmac->feature_flags |= BGMAC_FEAT_FORCE_SPEED_2500;
- 	bgmac->feature_flags |= BGMAC_FEAT_CMDCFG_SR_REV4;
- 	bgmac->feature_flags |= BGMAC_FEAT_TX_MASK_SETUP;
- 	bgmac->feature_flags |= BGMAC_FEAT_RX_MASK_SETUP;
-@@ -151,6 +191,12 @@ static int bgmac_probe(struct platform_device *pdev)
- 	bgmac->cco_ctl_maskset = platform_bgmac_cco_ctl_maskset;
- 	bgmac->get_bus_clock = platform_bgmac_get_bus_clock;
- 	bgmac->cmn_maskset32 = platform_bgmac_cmn_maskset32;
-+	if (of_parse_phandle(np, "phy-handle", 0)) {
-+		bgmac->phy_connect = platform_phy_connect;
-+	} else {
-+		bgmac->phy_connect = platform_phy_direct_connect;
-+		bgmac->feature_flags |= BGMAC_FEAT_FORCE_SPEED_2500;
-+	}
- 
- 	return bgmac_enet_probe(bgmac);
- }
-diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
-index 856379c..4584958 100644
---- a/drivers/net/ethernet/broadcom/bgmac.c
-+++ b/drivers/net/ethernet/broadcom/bgmac.c
-@@ -1388,7 +1388,7 @@ static const struct ethtool_ops bgmac_ethtool_ops = {
-  * MII
-  **************************************************/
- 
--static void bgmac_adjust_link(struct net_device *net_dev)
-+void bgmac_adjust_link(struct net_device *net_dev)
- {
- 	struct bgmac *bgmac = netdev_priv(net_dev);
- 	struct phy_device *phy_dev = net_dev->phydev;
-@@ -1411,50 +1411,7 @@ static void bgmac_adjust_link(struct net_device *net_dev)
- 		phy_print_status(phy_dev);
- 	}
- }
--
--static int bgmac_phy_connect_direct(struct bgmac *bgmac)
--{
--	struct fixed_phy_status fphy_status = {
--		.link = 1,
--		.speed = SPEED_1000,
--		.duplex = DUPLEX_FULL,
--	};
--	struct phy_device *phy_dev;
--	int err;
--
--	phy_dev = fixed_phy_register(PHY_POLL, &fphy_status, -1, NULL);
--	if (!phy_dev || IS_ERR(phy_dev)) {
--		dev_err(bgmac->dev, "Failed to register fixed PHY device\n");
--		return -ENODEV;
--	}
--
--	err = phy_connect_direct(bgmac->net_dev, phy_dev, bgmac_adjust_link,
--				 PHY_INTERFACE_MODE_MII);
--	if (err) {
--		dev_err(bgmac->dev, "Connecting PHY failed\n");
--		return err;
--	}
--
--	return err;
--}
--
--static int bgmac_phy_connect(struct bgmac *bgmac)
--{
--	struct phy_device *phy_dev;
--	char bus_id[MII_BUS_ID_SIZE + 3];
--
--	/* Connect to the PHY */
--	snprintf(bus_id, sizeof(bus_id), PHY_ID_FMT, bgmac->mii_bus->id,
--		 bgmac->phyaddr);
--	phy_dev = phy_connect(bgmac->net_dev, bus_id, &bgmac_adjust_link,
--			      PHY_INTERFACE_MODE_MII);
--	if (IS_ERR(phy_dev)) {
--		dev_err(bgmac->dev, "PHY connecton failed\n");
--		return PTR_ERR(phy_dev);
--	}
--
--	return 0;
--}
-+EXPORT_SYMBOL_GPL(bgmac_adjust_link);
- 
- int bgmac_enet_probe(struct bgmac *info)
- {
-@@ -1507,10 +1464,7 @@ int bgmac_enet_probe(struct bgmac *info)
- 
- 	netif_napi_add(net_dev, &bgmac->napi, bgmac_poll, BGMAC_WEIGHT);
- 
--	if (!bgmac->mii_bus)
--		err = bgmac_phy_connect_direct(bgmac);
--	else
--		err = bgmac_phy_connect(bgmac);
-+	err = bgmac_phy_connect(bgmac);
- 	if (err) {
- 		dev_err(bgmac->dev, "Cannot connect to phy\n");
- 		goto err_dma_free;
-diff --git a/drivers/net/ethernet/broadcom/bgmac.h b/drivers/net/ethernet/broadcom/bgmac.h
-index 80836b4..ea52ac3 100644
---- a/drivers/net/ethernet/broadcom/bgmac.h
-+++ b/drivers/net/ethernet/broadcom/bgmac.h
-@@ -513,10 +513,12 @@ struct bgmac {
- 	u32 (*get_bus_clock)(struct bgmac *bgmac);
- 	void (*cmn_maskset32)(struct bgmac *bgmac, u16 offset, u32 mask,
- 			      u32 set);
-+	int (*phy_connect)(struct bgmac *bgmac);
- };
- 
- int bgmac_enet_probe(struct bgmac *info);
- void bgmac_enet_remove(struct bgmac *bgmac);
-+void bgmac_adjust_link(struct net_device *net_dev);
- 
- struct mii_bus *bcma_mdio_mii_register(struct bcma_device *core, u8 phyaddr);
- void bcma_mdio_mii_unregister(struct mii_bus *mii_bus);
-@@ -583,4 +585,9 @@ static inline void bgmac_set(struct bgmac *bgmac, u16 offset, u32 set)
- {
- 	bgmac_maskset(bgmac, offset, ~0, set);
- }
-+
-+static inline int bgmac_phy_connect(struct bgmac *bgmac)
-+{
-+	return bgmac->phy_connect(bgmac);
-+}
- #endif /* _BGMAC_H */
--- 
-2.7.4
+By 'internal' I meant internal to the bitstream. On second thought,
+you might have a point with the error message being not helpful (see
+below).
+> 
+> > > The problem with the way it is now is how hard it is to figure out
+> > > what the right bitstream format should be. Clear instructions to
+> > > canonize by droping the header before the sync word and byteswap so
+> > > the sync word is in the given order is much clearer..
+> > 
+> > I don't know about you, but for my designs I can just use what drops out
+> > of my Vivado build.
+> 
+> Are you sure? With a 4.8 kernel?
+> 
+>  # (in vivado 2016.3) write_bitstream -bin_file foo
+>  $ hexdump -C foo.bin
+>  00000000  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+>  *
+>  00000020  00 00 00 bb 11 22 00 44  ff ff ff ff ff ff ff ff  |.....".D........|
+>  00000030  aa 99 55 66 20 00 00 00  30 02 20 01 00 00 00 00  |..Uf ...0. .....|
+> 
+> So that isn't going to work, it needs byte swapping
+> 
+>  $ hexdump -C foo.bit
+>  000000a0  bb 11 22 00 44 ff ff ff  ff ff ff ff ff aa 99 55  |..".D..........U|
+>  000000b0  66 20 00 00 00 30 02 20  01 00 00 00 00 30 02 00  |f ...0. .....0..|
+> 
+> This also is not going to work, it needs byteswapping and the sync word
+> has to be 4 byte aligned.
+> 
+> What did you do to get a working bitfile? Are you using one of the
+> Vivado automatic flows that 'handles' this for you? I am not.
+
+https://github.com/EttusResearch/fpgadev/blob/master/usrp3/tools/scripts/viv_utils.tcl#L165
+
+Is what our build process does (we set the byte_swap_bin parameter to
+1). You're right in that write_bitstream will give you a non-swapped
+version.
+
+> Remember, 4.8 now has the patch to remove the autodetection that used
+> to correct both of the above two problems..
+
+The intial version had all the 'autocorrection' stuff in there, it was
+then decided that we're not gonna support this.
+
+The fact that we ended up supporting .bin in the initial version, and
+then had a 'patch' to remove that was due to Greg pulling in my code too
+early (before I could resubmit a squashed version).
+
+If we reevaluate now that we wanna support swapping we should do this at
+a framework level. Maybe a preprocess callback or a FPGA_MGR_SWAP flag.
+I'll need to think about this :-)
+
+> So from my perspective, this driver is incompatible with the output of
+> the Xilinx tools. I don't really care, we always post-process the
+> output of write_bitfile, and I am happy to provide a canonized
+> bitstream, but the driver needs to do more to help people get this
+> right.
+
+Ok, so I'm fine with adding the checks and a warning if you don't find
+the sync word. We could add documentation describing which format we
+expect.
+
+> 
+> > Are you unhappy with the way we document which format to use, or
+> > that we don't slice off the beginning (that gets ignored by hardware?).
+> 
+> Well, I'm unhappy I spent an hour wondering why things didn't work
+> with no information on what the expected format was now for this
+> driver. For a bit I wondered if there was a driver bug as this stuff
+> all worked for me with the original xdevcfg driver.
+> 
+> Some of the problems were bugs on my part (which would have been found
+> much faster with validation), but at the end of the day this is
+> horribly unfriendly. You get a timeout and a 'Failed' message, thats
+> it.
+> 
+> I think all common bitstream formatting errors would be detected by
+> simply validating the sync word.
+
+Ok. That sounds reasonable.
+
+Cheers
+
+Moritz
