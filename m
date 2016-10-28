@@ -1,52 +1,43 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 28 Oct 2016 09:46:09 +0530
-Subject: [PATCH V2] arm64: Add support of R_AARCH64_PREL32 relocation in
- purgatory
-Message-ID: <f970f7938109c40833fc45e3d6d72b1dcdf14595.1477627895.git.panand@redhat.com>
+From: oss@buserror.net (Scott Wood)
+Date: Thu, 27 Oct 2016 23:45:56 -0500
+Subject: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <1477625554-46700-6-git-send-email-yangbo.lu@nxp.com>
+References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
+ <1477625554-46700-6-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1477629956.6812.15.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc version in fedora koji is  6.2.1-2.fc25. kexec-tools compiled with this
-gcc produced another relocation error:
+On Fri, 2016-10-28 at 11:32 +0800, Yangbo Lu wrote:
+> +	guts->regs = of_iomap(np, 0);
+> +	if (!guts->regs)
+> +		return -ENOMEM;
+> +
+> +	/* Register soc device */
+> +	machine = of_flat_dt_get_machine_name();
+> +	if (machine)
+> +		soc_dev_attr.machine = devm_kstrdup(dev, machine,
+> GFP_KERNEL);
+> +
+> +	svr = fsl_guts_get_svr();
+> +	soc_die = fsl_soc_die_match(svr, fsl_soc_die);
+> +	if (soc_die) {
+> +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> +						?????"QorIQ %s", soc_die-
+> >die);
+> +	} else {
+> +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
+> "QorIQ");
+> +	}
+> +	soc_dev_attr.soc_id = devm_kasprintf(dev, GFP_KERNEL,
+> +					?????"svr:0x%08x", svr);
+> +	soc_dev_attr.revision = devm_kasprintf(dev, GFP_KERNEL, "%d.%d",
+> +					???????SVR_MAJ(svr), SVR_MIN(svr));
+> +
+> +	soc_dev = soc_device_register(&soc_dev_attr);
+> +	if (IS_ERR(soc_dev))
+> +		return PTR_ERR(soc_dev);
 
-machine_apply_elf_rel: ERROR Unknown type: 261
+ioremap leaks on this error path. ?Use devm_ioremap_resource().
 
-This patch fixes the above error.
-
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
-v1 -> v2: fixed line width to less than 80 chars
-
- kexec/arch/arm64/kexec-arm64.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
-index 218f0bc832cd..eb0c3b87354e 100644
---- a/kexec/arch/arm64/kexec-arm64.c
-+++ b/kexec/arch/arm64/kexec-arm64.c
-@@ -720,6 +720,10 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- # define R_AARCH64_ABS64 257
- #endif
- 
-+#if !defined(R_AARCH64_PREL32)
-+# define R_AARCH64_PREL32 261
-+#endif
-+
- #if !defined(R_AARCH64_LD_PREL_LO19)
- # define R_AARCH64_LD_PREL_LO19 273
- #endif
-@@ -761,6 +765,12 @@ void machine_apply_elf_rel(struct mem_ehdr *ehdr, struct mem_sym *UNUSED(sym),
- 		loc64 = ptr;
- 		*loc64 = cpu_to_elf64(ehdr, elf64_to_cpu(ehdr, *loc64) + value);
- 		break;
-+	case R_AARCH64_PREL32:
-+		type = "PREL32";
-+		loc32 = ptr;
-+		*loc32 = cpu_to_elf32(ehdr,
-+			elf32_to_cpu(ehdr, *loc32) + value - address);
-+		break;
- 	case R_AARCH64_LD_PREL_LO19:
- 		type = "LD_PREL_LO19";
- 		loc32 = ptr;
--- 
-2.7.4
+-Scott
