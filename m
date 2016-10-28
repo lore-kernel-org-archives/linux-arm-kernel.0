@@ -1,102 +1,42 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 28 Oct 2016 11:19:05 +0200
-Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
- section
-In-Reply-To: <20161027160136.GD24290@arm.com>
-References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
- <CAKv+Gu-oYzSn_eeqaX3QVFeQjBGkaX-Wh7+oPcQFcXv7J6GOFQ@mail.gmail.com>
- <20161006161114.GH22012@rric.localdomain>
- <20161017185801.GT25086@rric.localdomain>
- <20161027160136.GD24290@arm.com>
-Message-ID: <20161028091905.GM22012@rric.localdomain>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 28 Oct 2016 11:22:20 +0200
+Subject: [GIT PULL] Rockchip dts64 fixes for 4.9-rc
+Message-ID: <2007497.qXCdMDh9Wq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.10.16 17:01:36, Will Deacon wrote:
-> Hi Robert,
-> 
-> On Mon, Oct 17, 2016 at 08:58:01PM +0200, Robert Richter wrote:
-> > Mark, Will, any opinion here?
-> 
-> Having looking at this, I'm inclined to agree with you; pfn_valid() is
-> all about whether the underlying mem_map (struct page *) entry exists,
-> not about whether the page is mappable or not.
-> 
-> That said, setting the zone for pages representing NOMAP memory feels
-> like a slippery slope to losing information about them being NOMAP in
-> the first place and the whole problem getting out-of-hand. Whilst I'm
-> happy for pfn_valid() to return true (in the sense that we're within
-> bounds of mem_map etc), I'm less happy that we're also saying that the
-> struct page contains useful information, such as the zone and the node
-> information, which is then subsequently used by the NUMA code.
+Hi Arnd, Kevin, Olof,
 
-Let's see it in a different way, pfns and the struct page assigned to
-each of it is about *physical* memory. The system knows all the
-memory, some is free, some reserved and some marked NOMAP. Regardless
-of the mapping of the page the mm code maintains and uses that
-information.
+please find below two fixes for 64bit Rockchip boards. One makes
+binds/unbinds fail and the other drops one unnecessary property.
 
-There are assumptions on validity and checks in the code that now
-cause problems due to partly or non-existing data about nomap pages.
-This inconsistency is dangerous since a problem may occur any time
-then the page area is accessed first, thus a system may crash randomly
-depending on the memory access. Luckily, in my case it triggered
-reproducible while loading initrd during boot.
+Please pull.
+Thanks
+Heiko
 
-I also think that this is not only NUMA related. E.g. the following
-bug report is probably also related:
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
- https://bugzilla.redhat.com/show_bug.cgi?id=1387793
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-> On top of that, pfn_valid is used in other places as a coarse "is this
-> memory?" check, and will cause things like ioremap to fail whereas it
-> wouldn't at the moment.
+are available in the git repository at:
 
-IMO this is a misuse of pfn_valid() that needs to be fixed with
-additional checks, e.g. traversing memblocks.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.9-rockchip-dts64-fixes1
 
-> It feels to me like NOMAP memory is a new type
-> of memory where there *is* a struct page, but it shouldn't be used for
-> anything.
+for you to fetch changes up to 7c6273194445fe1316084d3096f9311c3dfa4da6:
 
-IMO, a NOMAP page should just be handled like a reserved page except
-that the page is marked reserved. See free_low_memory_core_early().
-Thus, NOMAP pages are not in the free pages list or set to reserved.
-It is simply not available for mapping at all. Isn't that exactly what
-it should be?
+  arm64: dts: rockchip: remove the abuse of keep-power-in-suspend (2016-10-18 20:03:54 +0200)
 
-I also did not yet understand the benefit of the differentiation
-between NOMAP and reserved and the original motivation for its
-implementation. I looked through the mail threads but could not find
-any hint. The only difference I see now is that it is not listed as a
-reserved page, but as long as it is not freed it should behave the
-same. I remember the case to handle memory different (coherency,
-etc.), but are not sure here. Ard, could you explain this?
+----------------------------------------------------------------
+Correct regulator handling on Rockchip arm64 boards to make
+bind/unbind calls work correctly and remove a sdio-only
+property from non-sdio mmc hosts, that accidentially was
+added there.
 
-> I don't think pfn_valid can describe that, given the way it's
-> currently used, and flipping the logic is just likely to move the problem
-> elsewhere.
-> 
-> What options do we have for fixing this in the NUMA code?
+----------------------------------------------------------------
+Shawn Lin (2):
+      arm64: dts: rockchip: remove always-on and boot-on from vcc_sd
+      arm64: dts: rockchip: remove the abuse of keep-power-in-suspend
 
-Out of my mind:
-
-1) Treat NOMAP pages same as reserved pages (my patch).
-
-2) Change mm code to allow arch specific early_pfn_valid().
-
-3) Fix mm code to only access stuct page (of a zone) if pfn_valid() is
-   true.
-
-There can be more alternatives. IMO:
-
- * We shouldn't touch generic mm code.
-
- * We should maintain a valid struct page for all pages in a sections.
-
- * We should only traverse memblock where really necessary (arm64
-   only).
-
- * I don't think this problem is numa specific.
-
--Robert
+ arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts        | 3 ---
+ arch/arm64/boot/dts/rockchip/rk3368-orion-r68-meta.dts | 4 ----
+ 2 files changed, 7 deletions(-)
