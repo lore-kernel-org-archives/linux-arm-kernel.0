@@ -1,23 +1,102 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 27 Oct 2016 18:39:40 -0700
-Subject: [PATCH v3 3/3] clk: stm32f469: Add QSPI clock
-In-Reply-To: <1477041810-12313-4-git-send-email-gabriel.fernandez@st.com>
-References: <1477041810-12313-1-git-send-email-gabriel.fernandez@st.com>
- <1477041810-12313-4-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20161028013940.GC16026@codeaurora.org>
+Date: Thu, 27 Oct 2016 18:41:30 -0700
+Subject: [PATCH v3 2/2] clk: imx: improve precision of AV PLL to 1 Hz
+In-Reply-To: <66f5967187f915fe7039f4dbfb77db88a2423094.1476267249.git.emil@limesaudio.com>
+References: <cover.1476267249.git.emil@limesaudio.com>
+ <66f5967187f915fe7039f4dbfb77db88a2423094.1476267249.git.emil@limesaudio.com>
+Message-ID: <20161028014130.GE16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 10/12, Emil Lundmark wrote:
+> The audio and video PLLs are designed to have a precision of 1 Hz if some
+> conditions are met. The current implementation only allows a precision that
+> depends on the rate of the parent clock. E.g., if the parent clock is 24
+> MHz, the precision will be 24 Hz; or more generally the precision will be
 > 
-> This patch adds the QSPI clock for stm32f469 discovery board.
-> The gate mapping is a little bit different from stm32f429 soc.
+>     p / 10^6 Hz
 > 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> where p is the parent clock rate. This comes down to how the register
+> values for the PLL's fractional loop divider are chosen.
+> 
+> The clock rate calculation for the PLL is
+> 
+>     PLL output frequency = Fref * (DIV_SELECT + NUM / DENOM)
+> 
+> or with a shorter notation
+> 
+>     r = p * (d + a / b)
+> 
+> In addition to all variables being integers, we also have the following
+> conditions:
+> 
+>     27 <= d <= 54
+> 
+>     -2^29 <= a <= 2^29-1
+>      0    <  b <= 2^30-1
+>     |a| < b
+> 
+> Here, d, a and b are register values for the fractional loop divider. We
+> want to chose d, a and b such that f(p, r) = p, i.e. f is our round_rate
+> function. Currently, d and b are chosen as
+> 
+>     d = r / p
+>     b = 10^6
+> 
+> hence we get the poor precision. And a is defined in terms of r, d, p and
+> b:
+> 
+>     a = (r - d * p) * b / p
+> 
+> I propose that if p <= 2^30-1 (i.e., the max value for b), we chose b as
+> 
+>     b = p
+> 
+> We can do this since
+> 
+>     |a| < b
+> 
+>     |(r - d * p) * b / p| < b
+> 
+>     |r - d * p| < p
+> 
+> Which have two solutions, one of them is when p < 0, so we can skip that
+> one. The other is when p > 0 and
+> 
+>     p * (d - 1) < r < p * (d + 1)
+> 
+> Substitute d = r / p:
+> 
+>     (r - p) < r < (r + p)  <=>  p > 0
+> 
+> So, as long as p > 0, we can chose b = p. This is a good choise for b since
+> 
+>     a = (r - d * p) * b / p
+>       = (r - d * p) * p / p
+>       = r - d * p
+> 
+>     r = p * (d + a / b)
+>       = p * d + p * a / b
+>       = p * d + p * a / p
+>       = p * d + a
+> 
+> and if d = r / p:
+> 
+>     a = r - d * p
+>       = r - r / p * p
+>       = 0
+> 
+>     r = p * d + a
+>       = p * d + 0
+>       = p * r / p
+>       = r
+> 
+> I reckon this is the intention by the design of the clock rate formula.
+> 
+> Signed-off-by: Emil Lundmark <emil@limesaudio.com>
 > ---
 
-Applied to clk-next + added Rob's ack from v2.
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
