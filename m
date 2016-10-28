@@ -1,47 +1,52 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 28 Oct 2016 10:55:55 -0600
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
-References: <20161026225413.GA6220@obsidianresearch.com>
- <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
- <20161027143937.GC6818@obsidianresearch.com>
- <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
- <20161028154740.GC10441@obsidianresearch.com>
- <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
-Message-ID: <20161028165555.GA17998@obsidianresearch.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Fri, 28 Oct 2016 09:56:37 -0700
+Subject: [PATCH v2 0/4] Altera Cyclone Passive Serial SPI FPGA Manager
+Message-ID: <cover.1477669744.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 06:36:06PM +0200, Matthias Brugger wrote:
+This series adds an FPGA manager for Altera cyclone FPGAs
+that can program them using an spi port and a couple of gpios, using
+Alteras passive serial protocol.
 
-> Sure but we are checking here that the bitstream passed to the kernel is
-> correct.
+Changes from v1:
+- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
+  This name change was requested by Alan Tull, to be specific about which
+  programming method is being employed on the fpga.
+- Changed the name of the reset-gpio to config-gpio to closer match the
+  way the pins are described in the Altera manual
+- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
 
-The intent to check if it *possible* that the bitstream is
-correct. Correct means that DONE will assert after programming. A 4
-byte bitstream will never assert DONE.
+- Added a bitrev8x4() function to the bitrev headers and implemented ARM
+ const, runtime, and ARM specific faster versions (This may end up
+ needing to be a standalone patch)
 
-Arguably the threshold should be larger but we don't know what the
-true minimum is.
+- Moved the bitswapping into cyclonespi_write(), as requested.
+  This falls short of my desired generic lsb first spi support, but is a step
+  in that direction.
 
-> +	/* All valid bitstreams are multiples of 32 bits */
-> +	if (!count || (count % 4) != 0)
-> +		return -EINVAL;
-> +
+- Fixed whitespace problems introduced during refactoring
 
-Too clever for my taste.
+- Replaced magic number for initial delay with a descriptive macro
+- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
 
-Aside from this, is the general idea even OK? In my world I cannonize
-the bitstream to start with the sync word, but others may not be doing
-that.
+Joshua Clayton (5):
+  lib: add bitrev8x4()
+  doc: dt: add cyclone-spi binding document
+  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
+  ARM: dts: imx6q-evi: support cyclonespi
+  fpga manager: cyclone-ps-spi: make delay variable
 
-I designed this patch based on the prior work to remove the
-auto-detection, eg that the driver should be passed a canonized
-bitstream.
+ .../bindings/fpga/cyclone-ps-spi-fpga-mgr.txt      |  23 +++
+ arch/arm/boot/dts/imx6q-evi.dts                    |  16 ++
+ arch/arm/include/asm/bitrev.h                      |   5 +
+ drivers/fpga/Kconfig                               |   7 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/cyclone-ps-spi.c                      | 175 +++++++++++++++++++++
+ include/linux/bitrev.h                             |  26 +++
+ 7 files changed, 253 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/cyclone-ps-spi-fpga-mgr.txt
+ create mode 100644 drivers/fpga/cyclone-ps-spi.c
 
-The problem with the way it is now is how hard it is to figure out
-what the right bitstream format should be. Clear instructions to
-canonize by droping the header before the sync word and byteswap so
-the sync word is in the given order is much clearer..
-
-Jason
+-- 
+2.7.4
