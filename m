@@ -1,79 +1,37 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 28 Oct 2016 10:19:15 +0300
-Subject: [PATCHv4 00/15] clk: ti: add support for hwmod clocks
-In-Reply-To: <20161028005341.GR26139@codeaurora.org>
-References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
- <20161028005341.GR26139@codeaurora.org>
-Message-ID: <2cfa10a9-9ea0-23e4-30de-9aece13e47e3@ti.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 28 Oct 2016 15:26:40 +0800
+Subject: [PATCH v2 2/2] arm64: dts: hi6220: add resets property into
+ dwmmc nodes
+In-Reply-To: <CAKfTPtAXdkKcfpHmUmQNwuJxO0PORcCf49noST_CCkZPigPwgw@mail.gmail.com>
+References: <1472094041-5357-1-git-send-email-guodong.xu@linaro.org>
+ <1472094041-5357-2-git-send-email-guodong.xu@linaro.org>
+ <CAKfTPtB0FtGbm4C5z+LJizrsHikKt_BGFti5XY+LN3w7zO1Vjw@mail.gmail.com>
+ <CALAqxLXfb48h8hMQmAaJ+YjA5=pekkQ8Dg8ReL6VTTfmuFRPDw@mail.gmail.com>
+ <CAKfTPtAXdkKcfpHmUmQNwuJxO0PORcCf49noST_CCkZPigPwgw@mail.gmail.com>
+Message-ID: <20161028072640.GB17266@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/10/16 03:53, Stephen Boyd wrote:
-> On 10/18, Tero Kristo wrote:
->> Hi,
->>
->> As a recap, this series is part of the ongoing work to get rid of the
->> hwmod database under mach-omap2 folder. This series converts the
->> existing clock related functionality to a new clock type, which will
->> allow removing all the .clkctrl related items from hwmod database.
->> This series adds sample solution for OMAP4 only, rest of the SoCs can
->> be converted automatically once the approach is acceptable.
->>
->> v4 has the following high level changes compared to v3:
->> - Clock data is now statically built-in to the driver
->> - Adds clockdomain provider support, which can be used to fetch
->>   clocks based on clockdomain relation. Only clockdomains need to be
->>   registered within DT.
->> - Added some automatic clock alias generation support to the TI clock
->>   drivers, if this is not acceptable, I can change this to add all the
->>   aliases under the individual drivers/clk/ti/clk-xyz.c files
->
-> Is there a plan to get rid of the aliases entirely? Or we can't
-> do that because DT is not fully supported on these platforms? I'm
-> mostly wondering how long that sort of code is going to stick
-> around and if it's better to fully compartmentalize it to the
-> SoCs that are affected or if it should be a core feature of TI
-> driver.
+On Fri, Oct 28, 2016 at 08:43:51AM +0200, Vincent Guittot wrote:
 
-Eventually that should happen. However, we have plenty of legacy code 
-still in place which depend on clk_get functionality within kernel. The 
-major contributing factor is the hwmod codebase, for which we have plans to:
+[...]
 
-- get this clock driver merged
-- implement a new interconnect driver for OMAP family SoCs
-- interconnect driver will use DT handles for fetching clocks, rather 
-than clock aliases
-- reset handling will be implemented as part of the interconnect driver 
-somehow (no prototype / clear plans for that as of yet)
-- all the hwmod stuff can be dropped
+> > running with? Also do you have any details about the card in case its
+> > card specific?
+> 
+> The sdcard is quite common: sandisk ultra 16GB
+> and my rootfs is on the sdcard
 
-The clock alias handling is still needed as a transition phase until all 
-the above is done, then we can start dropping them. Basically anything 
-that is using omap_hwmod depends on the clock aliases right now.
+I'm using rootfs in emmc also have same failure.
 
->
->> - As a sample, only omap4 clock data is available with this set
->>
->> After this series, the clock data can be dropped from the hwmod database
->> for OMAP4, I have working patches for this for anybody interested. Also,
->> the DT files require some modifications to add proper support for
->> clockdomain providers, and drop some unnecessary clock nodes.
->
-> Can this be shared as a git tree on the web? Hopefully I can see
-> the resulting DTS and understand what's going on better.
+> > Guodong: Is there any bootloader dependency on that change?
+> 
+> FYI, I use firmwares available in AOSP
 
-Sure, here is a test branch I've been using, it has some extra hacks on 
-top for debugging purposes, but the DTS changes are visible also.
+I tried latest firmware [1], still cannot boot up until revert the
+patch "arm64: dts: hi6220: add resets property into dwmmc nodes".
 
-https://github.com/t-kristo/linux-pm/tree/4.9-rc1-hwmod-clks-w-data
+[1] http://builds.96boards.org/snapshots/hikey/linaro/uefi-openplatformpkg/latest/
 
-
->
->>
->> Boot + simple PM test seems to be working on OMAP4 with this set, and
->> boot test with other boards I have access to don't seem to cause any
->> issues. Applies on top of 4.9-rc1.
->>
->
-> Awesome!
->
+Thanks,
+Leo Yan
