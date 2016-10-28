@@ -1,72 +1,124 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 28 Oct 2016 11:26:26 +0200
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
- <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
-Message-ID: <CACQ1gAhX-WCY3EqxBQ1=MJVsR0G5S21C8KxmO7=x9yW4H6P=xA@mail.gmail.com>
+From: randy.li@rock-chips.com (Randy Li)
+Date: Fri, 28 Oct 2016 17:29:15 +0800
+Subject: [PATCH] drm/rockchip: analogix_dp: add supports for regulators in
+ edp IP
+In-Reply-To: <6d050f06-996f-5ecc-20f9-587299ee34c7@rock-chips.com>
+References: <1477163933-13140-1-git-send-email-ayaka@soulik.info>
+ <6d050f06-996f-5ecc-20f9-587299ee34c7@rock-chips.com>
+Message-ID: <16dfbe16-eae7-8da9-4108-07e623210d35@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-27 20:02 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hello Richard,
->
-> On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
->> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> index fd8aa1f4ba78..168b10cad47b 100644
->> --- a/drivers/tty/serial/atmel_serial.c
->> +++ b/drivers/tty/serial/atmel_serial.c
->> @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->>               mode |= ATMEL_US_USMODE_RS485;
->>       } else if (termios->c_cflag & CRTSCTS) {
->>               /* RS232 with hardware handshake (RTS/CTS) */
->> -             if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->> -                     dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->> -                     termios->c_cflag &= ~CRTSCTS;
->> -             } else {
->> +             if (atmel_use_fifo(port) &&
->> +                 !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
->> +                     /*
->> +                      * with ATMEL_US_USMODE_HWHS set, the controller will
->> +                      * be able to drive the RTS pin high/low when the RX
->> +                      * FIFO is above RXFTHRES/below RXFTHRES2.
->> +                      * It will also disable the transmitter when the CTS
->> +                      * pin is high.
->> +                      * This mode is not activated if CTS pin is a GPIO
->> +                      * because in this case, the transmitter is always
->> +                      * disabled (there must be an internal pull-up
->> +                      * responsible for this behaviour).
->> +                      * If the RTS pin is a GPIO, the controller won't be
->> +                      * able to drive it according to the FIFO thresholds,
->> +                      * but it will be handled by the driver.
->> +                      */
->>                       mode |= ATMEL_US_USMODE_HWHS;
->
-> You use
->
->         !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
->
-> as indicator that the cts mode of the respective pin is used. Is this
-> reliable? (It's not if there are machines that don't use CTS, neither as
-> gpio nor using the hardware function.) Maybe this needs a dt property to
-> indicate that there is no (hw)handshaking available?
-I used that to filter-out the case where CTS is a GPIO.
-Now, for the machines that don't use CTS neither as GPIO nor using the
-hardware function, it's a whole different story, beyond the scope of this patch.
-And like you said, a DT property could be useful to handle this case.
-( It's a little bit like if there was an RS232 cable with just TX/RX/GND, but
-this will be way harder to detect :) )
-Anyway, patches are welcome to handle that, but I don't think it belongs
-in this one.
 
->> +             } else {
->> +                     ...
->>               }
+
+On 10/28/2016 05:11 PM, Shawn Lin wrote:
+> On 2016/10/23 3:18, Randy Li wrote:
+>> I found if eDP_AVDD_1V0 and eDP_AVDD_1V8 are not been power at
+>> RK3288, once trying to enable the pclk clock, the kernel would dead.
+>> This patch would try to enable them first. The eDP_AVDD_1V8 more
+>> likely to be applied to eDP phy, but I have no time to confirmed
+>> it yet.
 >
-> Best regards
-> Uwe
+> Comfirm it or at least someone should be able to answer your
+> question, Mark?
+I just forget to ask the IC department, the TRM didn't cover that.
+>
+> Have you considered to add some details about vcc-supply and vccio-
+> supply for your analogix_dp-rockchip.txt ?
+>
+> From your commit msg, these two properties are more likely to be
+> required but the code itself tell me them should be optional(from the
+> point of backward compatibility, it should also be optinoal).
+Yes, I keep it optional for the same reason. Most of boards won't turn 
+off those power supply and may use some fixed regulators.
+>
+>>
+>> Signed-off-by: Randy Li <ayaka@soulik.info>
+>> ---
+>>  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 25
+>> +++++++++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> index 8548e82..6bf0441 100644
+>> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+>> @@ -17,6 +17,7 @@
+>>  #include <linux/of_device.h>
+>>  #include <linux/of_graph.h>
+>>  #include <linux/regmap.h>
+>> +#include <linux/regulator/consumer.h>
+>>  #include <linux/reset.h>
+>>  #include <linux/clk.h>
+>>
+>> @@ -70,6 +71,7 @@ struct rockchip_dp_device {
+>>      struct clk               *grfclk;
+>>      struct regmap            *grf;
+>>      struct reset_control     *rst;
+>> +    struct regulator_bulk_data supplies[2];
+>>
+>>      struct work_struct     psr_work;
+>>      spinlock_t         psr_lock;
+>> @@ -146,6 +148,13 @@ static int rockchip_dp_poweron(struct
+>> analogix_dp_plat_data *plat_data)
+>>
+>>      cancel_work_sync(&dp->psr_work);
+>>
+>> +    ret = regulator_bulk_enable(ARRAY_SIZE(dp->supplies),
+>> +            dp->supplies);
+>> +    if (ret) {
+>> +        dev_err(dp->dev, "failed to enable vdd supply %d\n", ret);
+>> +        return ret;
+>> +    }
+>> +
+>>      ret = clk_prepare_enable(dp->pclk);
+>>      if (ret < 0) {
+>>          dev_err(dp->dev, "failed to enable pclk %d\n", ret);
+>> @@ -168,6 +177,9 @@ static int rockchip_dp_powerdown(struct
+>> analogix_dp_plat_data *plat_data)
+>>
+>>      clk_disable_unprepare(dp->pclk);
+>>
+>> +    regulator_bulk_disable(ARRAY_SIZE(dp->supplies),
+>> +            dp->supplies);
+>> +
+>>      return 0;
+>>  }
+>>
+>> @@ -323,6 +335,19 @@ static int rockchip_dp_init(struct
+>> rockchip_dp_device *dp)
+>>          return PTR_ERR(dp->rst);
+>>      }
+>>
+>> +    dp->supplies[0].supply = "vcc";
+>> +    dp->supplies[1].supply = "vccio";
+>> +    ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(dp->supplies),
+>> +            dp->supplies);
+>> +    if (ret < 0) {
+>> +        dev_err(dev, "failed to get regulators: %d\n", ret);
+>> +    }
+>> +    ret = regulator_bulk_enable(ARRAY_SIZE(dp->supplies),
+>> +            dp->supplies);
+>> +    if (ret < 0) {
+>> +        dev_err(dev, "failed to enable regulators: %d\n", ret);
+>> +    }
+>> +
+>>      ret = clk_prepare_enable(dp->pclk);
+>>      if (ret < 0) {
+>>          dev_err(dp->dev, "failed to enable pclk %d\n", ret);
+>>
+>
 >
 
-regards,
-Richard
+-- 
+Randy Li
+The third produce department
+===========================================================================
+This email message, including any attachments, is for the sole
+use of the intended recipient(s) and may contain confidential and
+privileged information. Any unauthorized review, use, disclosure or
+distribution is prohibited. If you are not the intended recipient, please
+contact the sender by reply e-mail and destroy all copies of the original
+message. [Fuzhou Rockchip Electronics, INC. China mainland]
+===========================================================================
