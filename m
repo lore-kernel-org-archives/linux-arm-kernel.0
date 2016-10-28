@@ -1,23 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Oct 2016 18:57:47 +0100
-Subject: [PATCH] ASoC: samsung: Drop AC97 drivers
-In-Reply-To: <1477671072-742-1-git-send-email-s.nawrocki@samsung.com>
-References: <1477671072-742-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <20161028175747.zmurlr6xhyoxc2l5@sirena.org.uk>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Fri, 28 Oct 2016 10:58:13 -0700
+Subject: [PATCH] staging: vc04_services: call sg_init_table to init scatterlist
+Message-ID: <20161028175813.28022-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 06:11:12PM +0200, Sylwester Nawrocki wrote:
-> The AC97 drivers are broken and it seems these have not been used
-> for a long time.  This patch removes the unused code, i.e. Samsung
-> SoC AC97 controller driver and related machine drivers:
-> ln2440sbc_alc650, smdk2443_wm9710, smdk_wm9713.
+Call the sg_init_table function to correctly initialze
+the DMA scatterlist.  This function is required to completely
+initialize the list and is mandatory if DMA debugging is
+enabled in the build configuration.
 
-This needs rebasing against some of the recent fixes, sorry.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161028/cddf7f0f/attachment.sig>
+One of the purposes of sg_init_table is to set
+the magic "cookie" on each list element and ensure
+the chain end is marked.
+
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index 6fa2b5a..21b26e5 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -464,6 +464,12 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
+ 	pagelist->type = type;
+ 	pagelist->offset = offset;
+ 
++	/*
++	 * Initialize the scatterlist so that the magic cookie
++	 *  is filled if debugging is enabled
++	 */
++	sg_init_table(scatterlist, num_pages);
++	/* Now set the pages for each scatterlist */
+ 	for (i = 0; i < num_pages; i++)
+ 		sg_set_page(scatterlist + i, pages[i], PAGE_SIZE, 0);
+ 
+-- 
+2.10.1
