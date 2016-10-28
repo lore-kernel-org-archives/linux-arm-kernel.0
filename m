@@ -1,37 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Oct 2016 16:37:55 +0100
-Subject: specifying order of /dev/mmcblk devices via device-tree?
-In-Reply-To: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
-References: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
-Message-ID: <20161028153755.GL5806@leverpostej>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 28 Oct 2016 11:42:45 -0400
+Subject: [PATCH] staging: vc04_services: tie up loose ends with
+ dma_map_sg conversion
+In-Reply-To: <1477668994.12378.1.camel@crowfest.net>
+References: <20161028151651.3430-1-mzoran@crowfest.net>
+ <20161028153124.GA29906@kroah.com>
+ <1477668994.12378.1.camel@crowfest.net>
+Message-ID: <20161028154245.GA19454@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 08:23:04AM -0700, Tim Harvey wrote:
-> Greetings,
+On Fri, Oct 28, 2016 at 08:36:34AM -0700, Michael Zoran wrote:
+> On Fri, 2016-10-28 at 11:31 -0400, Greg KH wrote:
+> > On Fri, Oct 28, 2016 at 08:16:51AM -0700, Michael Zoran wrote:
+> > > The conversion to dma_map_sg left a few loose ends.??This change
+> > > ties up those loose ends.
+> > > 
+> > > 1. Settings the DMA mask is mandatory on 64 bit even though it
+> > > is optional on 32 bit.??Set the mask so that DMA space is always
+> > > in the lower 32 bit range of data on both platforms.
+> > > 
+> > > 2. The scatterlist was not completely initialized correctly.
+> > > Initialize the list with sg_init_table so that DMA works correctly
+> > > if scatterlist debugging is enabled in the build configuration.
+> > > 
+> > > 3. The error paths in create_pagelist were not consistent.??Make
+> > > them all consistent by calling a helper function called
+> > > cleanup_pagelistinfo to cleanup regardless of what state the
+> > > pagelist
+> > > is in.
+> > > 
+> > > 4. create_pagelist and free_pagelist had a very large amount of
+> > > duplication in computing offsets into a single allocation of memory
+> > > in the DMA area.??Introduce a new structure called the pagelistinfo
+> > > that is appened to the end of the allocation to store necessary
+> > > information to prevent duplication of code and make cleanup on
+> > > errors
+> > > easier.
+> > > 
+> > > When combined with a fix for vchiq_copy_from_user which is not
+> > > included at this time, both functional and pings tests of
+> > > vchiq_test
+> > > now pass in both 32 bit and 64 bit modes.
+> > > 
+> > > Even though this cleanup could have been broken down to chunks,
+> > > all the changes are to a single file and submitting it as a single
+> > > related change should make reviewing the diff much easier then if
+> > > it
+> > > were submitted piecemeal.
+> > 
+> > No, it's harder.??A patch should only do one type of thing, this
+> > patch
+> > has to be reviewed thinking of 4 different things all at once, making
+> > it
+> > much more difficult to do so.
+> > 
+> > We write patches to be read easily, and make them easy to review.??We
+> > don't write them in a way to be easy for the developer to create :)
+> > 
+> > Can you please break this up into a patch series?
+> > 
+> > thanks,
+> > 
+> > greg k-h
 > 
-> I have an IMX6 board that has the following:
-> sdhc1: mmc0: sdio radio
-> sdhc2: mmc1: /dev/mmcblk1: microSD connector
-> sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
+> Point #1 and #2 would be very easy to seperate.   Point #3 and #4 are
+> essentually a redo of two major functions and are where most of the
+> changes are.
 > 
-> I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
-> registered as /dev/mmcblk1 so that permanent storage is the first
-> mmcblk device as I think this is more intuitive however currently
-> these get instanced in the order they appear in the imx6qdl.dtsi
-> device-tree configuration and are not able to be mapped the way I want
-> them in my dts file.
-> 
-> Is there a way, or if not is there a desire for a way, to specify the
-> order of /dev/mmcblk devices via device-tree?
+> Would making #1 and #2 independent but combining #3 and #4 sufficient?
 
-As with many other devices, there is no standard way of controlling the
-Linux enumeration (and given the ID space is shared with other dynamic
-devices it's not something that could generally work).
+I don't know, try it and see what the patches look like.
 
-These should be refererd to by UUID if possible.
+Think about it from my point of view, which would be easier to review?
 
-If not, we could cosider adding a by-dt-path or something like that.
+thanks,
 
-Thanks,
-Mark.
+greg k-h
