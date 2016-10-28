@@ -1,80 +1,29 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 28 Oct 2016 14:15:02 -0700
-Subject: [PATCH v2] of,
- numa: Return NUMA_NO_NODE from disable of_node_to_nid() if nid not
- possible.
-Message-ID: <1477689302-32671-1-git-send-email-ddaney.cavm@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 29 Oct 2016 01:03:02 +0300
+Subject: [PATCH v3 0/11] Add R8A7743/SK-RZG1M board support
+Message-ID: <2831086.2LWrckiJYz@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Hello.
 
-On arm64 NUMA kernels we can pass "numa=off" on the command line to
-disable NUMA.  A side effect of this is that kmalloc_node() calls to
-non-zero nodes will crash the system with an OOPS:
+   Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20161027-v4.9-rc2' tag plus the R8A7743/SK-RZG1M patch series.
+I'm adding the device tree support for the R8A7745-based SK-RZG1E board.
+The SoC is close to R8A7794 and the board seems identical to the R8A7794/SILK
+board. The device tree patches depend on the R8A7745 CPG/MSSR driver series
+just posted in order to compile and work.
 
-[    0.000000] ITS at 0x0000901000020000: allocated 2097152 Devices @10002000000 (flat, esz 8, psz 64K, shr 1)
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00001680
-[    0.000000] pgd = fffffc0009470000
-[    0.000000] [00001680] *pgd=0000010ffff90003, *pud=0000010ffff90003, *pmd=0000010ffff90003, *pte=0000000000000000
-[    0.000000] Internal error: Oops: 96000006 [#1] SMP
-.
-.
-.
-[    0.000000] [<fffffc00081c8950>] __alloc_pages_nodemask+0xa4/0xe68
-[    0.000000] [<fffffc000821fa70>] new_slab+0xd0/0x564
-[    0.000000] [<fffffc0008221e24>] ___slab_alloc+0x2e4/0x514
-[    0.000000] [<fffffc0008239498>] __slab_alloc+0x48/0x58
-[    0.000000] [<fffffc0008222c20>] __kmalloc_node+0xd0/0x2dc
-[    0.000000] [<fffffc0008115374>] __irq_domain_add+0x7c/0x164
-[    0.000000] [<fffffc0008b461dc>] its_probe+0x784/0x81c
-[    0.000000] [<fffffc0008b462bc>] its_init+0x48/0x1b0
-[    0.000000] [<fffffc0008b4543c>] gic_init_bases+0x228/0x360
-[    0.000000] [<fffffc0008b456bc>] gic_of_init+0x148/0x1cc
-[    0.000000] [<fffffc0008b5aec8>] of_irq_init+0x184/0x298
-[    0.000000] [<fffffc0008b43f9c>] irqchip_init+0x14/0x38
-[    0.000000] [<fffffc0008b12d60>] init_IRQ+0xc/0x30
-[    0.000000] [<fffffc0008b10a3c>] start_kernel+0x240/0x3b8
-[    0.000000] [<fffffc0008b101c4>] __primary_switched+0x30/0x6c
-[    0.000000] Code: 912ec2a0 b9403809 0a0902fb 37b007db (f9400300)
-.
-.
-.
+[01/12] ARM: shmobile: r8a7745: add power domain index macros
+[02/12] soc: renesas: rcar-sysc: add R8A7745 support
+[03/12] ARM: shmobile: r8a7745: basic SoC support
+[04/12] ARM: dts: r8a7745: initial SoC device tree
+[05/12] ARM: dts: r8a7745: add SYS-DMAC support
+[06/12] ARM: dts: r8a7745: add [H]SCIF{A|B} support
+[07/12] ARM: dts: r8a7745: add Ether support
+[08/12] ARM: dts: r8a7745: add IRQC support
+[09/12] ARM: shmobile: document SK-RZG1M board
+[10/12] ARM: dts: sk-rzg1e: initial device tree
+[11/12] ARM: dts: sk-rzg1e: add Ether support
 
-This is caused by code like this in kernel/irq/irqdomain.c
-
-    domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
-                  GFP_KERNEL, of_node_to_nid(of_node));
-
-When NUMA is disabled, the concept of a node is really undefined, so
-of_node_to_nid() should unconditionally return NUMA_NO_NODE.
-
-Fix by returning NUMA_NO_NODE when the nid is not in the set of
-possible nodes.
-
-Reported-by: Gilbert Netzer <noname@pdc.kth.se>
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- drivers/of/of_numa.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index f63d4b0d..a53982a 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -176,7 +176,12 @@ int of_node_to_nid(struct device_node *device)
- 			np->name);
- 	of_node_put(np);
- 
--	if (!r)
-+	/*
-+	 * If numa=off passed on command line, or with a defective
-+	 * device tree, the nid may not be in the set of possible
-+	 * nodes.  Check for this case and return NUMA_NO_NODE.
-+	 */
-+	if (!r && nid < MAX_NUMNODES && node_possible(nid))
- 		return nid;
- 
- 	return NUMA_NO_NODE;
--- 
-1.8.3.1
+WBR, Sergei
