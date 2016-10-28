@@ -1,234 +1,105 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 28 Oct 2016 11:27:50 +0100
-Subject: [PATCH v2] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-Message-ID: <1477650470-19104-1-git-send-email-marc.zyngier@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 28 Oct 2016 11:27:49 +0100
+Subject: [PATCH v3 1/3] powerpc/reloc32: fix corrupted modversion CRCs
+In-Reply-To: <1477585631-18574-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1477585631-18574-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <3ab144ec-4897-2c7e-7d9f-4d2e2a84d69a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architecturally, TLBs are private to the (physical) CPU they're
-associated with. But when multiple vcpus from the same VM are
-being multiplexed on the same CPU, the TLBs are not private
-to the vcpus (and are actually shared across the VMID).
+On 27/10/16 17:27, Ard Biesheuvel wrote:
+> Commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix causes
+> perf issues") fixed an issue with relocatable PIE kernels in a way that
+> essentially reintroduced the issue again for 32-bit builds.
+>
+> Since the chosen approach does is not applicable to 32-bit, fix the
+> issue by updating the runtime relocation routine to ignore the load
+> offset for the interval [__start___kcrctab, __stop___kcrctab_gpl_future),
+> which is where the CRCs reside. This ensures that the values of the CRC
+> pseudo-symbols are no longer made dependent on the runtime load offset.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Let's consider the following scenario:
+Ard,
 
-- vcpu-0 maps PA to VA
-- vcpu-1 maps PA' to VA
+These changes look good to me (having originally written the code).
 
-If run on the same physical CPU, vcpu-1 can hit TLB entries generated
-by vcpu-0 accesses, and access the wrong physical page.
+Reviewed-by : Suzuki K Poulose <suzuki.poulose@arm.com>
 
-The solution to this is to keep a per-VM map of which vcpu ran last
-on each given physical CPU, and invalidate local TLBs when switching
-to a different vcpu from the same VM.
+Cheers
+Suzuki
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
-Fixed comments, added Mark's RB.
-
- arch/arm/include/asm/kvm_host.h   | 11 ++++++++++-
- arch/arm/include/asm/kvm_hyp.h    |  1 +
- arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++++-
- arch/arm/kvm/hyp/switch.c         |  9 +++++++++
- arch/arm64/include/asm/kvm_host.h | 11 ++++++++++-
- arch/arm64/kvm/hyp/switch.c       |  8 ++++++++
- 6 files changed, 72 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 2d19e02..7290de6 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -57,6 +57,9 @@ struct kvm_arch {
- 	/* VTTBR value associated with below pgd and vmid */
- 	u64    vttbr;
- 
-+	/* The last vcpu id that ran on each physical CPU */
-+	int __percpu *last_vcpu_ran;
-+
- 	/* Timer */
- 	struct arch_timer_kvm	timer;
- 
-@@ -174,6 +177,13 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
- 
-+	/*
-+	 * Local TLBs potentially contain conflicting entries from
-+	 * another vCPU within this VMID. All entries for this VMID must
-+	 * be invalidated from (local) TLBs before we run this vCPU.
-+	 */
-+	bool tlb_vmid_stale;
-+
- 	 /* Don't run the guest (internal implementation need) */
- 	bool pause;
- 
-@@ -292,7 +302,6 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
--static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
- 
- static inline void kvm_arm_init_debug(void) {}
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 343135e..5850890 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -71,6 +71,7 @@
- #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
- #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
- #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
-+#define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
- #define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
- #define PRRR		__ACCESS_CP15(c10, 0, c2, 0)
- #define NMRR		__ACCESS_CP15(c10, 0, c2, 1)
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 08bb84f..e0d93cd 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -114,11 +114,18 @@ void kvm_arch_check_processor_compat(void *rtn)
-  */
- int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- {
--	int ret = 0;
-+	int ret, cpu;
- 
- 	if (type)
- 		return -EINVAL;
- 
-+	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
-+	if (!kvm->arch.last_vcpu_ran)
-+		return -ENOMEM;
-+
-+	for_each_possible_cpu(cpu)
-+		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
-+
- 	ret = kvm_alloc_stage2_pgd(kvm);
- 	if (ret)
- 		goto out_fail_alloc;
-@@ -141,6 +148,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- out_free_stage2_pgd:
- 	kvm_free_stage2_pgd(kvm);
- out_fail_alloc:
-+	free_percpu(kvm->arch.last_vcpu_ran);
-+	kvm->arch.last_vcpu_ran = NULL;
- 	return ret;
- }
- 
-@@ -168,6 +177,9 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
- {
- 	int i;
- 
-+	free_percpu(kvm->arch.last_vcpu_ran);
-+	kvm->arch.last_vcpu_ran = NULL;
-+
- 	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
- 		if (kvm->vcpus[i]) {
- 			kvm_arch_vcpu_free(kvm->vcpus[i]);
-@@ -310,6 +322,27 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
- 	return 0;
- }
- 
-+void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
-+{
-+	int *last_ran;
-+
-+	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
-+
-+	/*
-+	 * We might get preempted before the vCPU actually runs, but
-+	 * this is fine. Our TLBI stays pending until we actually make
-+	 * it to __activate_vm, so we won't miss a TLBI. If another
-+	 * vCPU gets scheduled, it will see our vcpu_id in last_ran,
-+	 * and pend a TLBI for itself.
-+	 */
-+	if (*last_ran != vcpu->vcpu_id) {
-+		if (*last_ran != -1)
-+			vcpu->arch.tlb_vmid_stale = true;
-+
-+		*last_ran = vcpu->vcpu_id;
-+	}
-+}
-+
- void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- {
- 	vcpu->cpu = cpu;
-diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
-index 92678b7..a411762 100644
---- a/arch/arm/kvm/hyp/switch.c
-+++ b/arch/arm/kvm/hyp/switch.c
-@@ -75,6 +75,15 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	write_sysreg(kvm->arch.vttbr, VTTBR);
-+	if (vcpu->arch.tlb_vmid_stale) {
-+		/* Force vttbr to be written */
-+		isb();
-+		/* Local invalidate only for this VMID */
-+		write_sysreg(0, TLBIALL);
-+		dsb(nsh);
-+		vcpu->arch.tlb_vmid_stale = false;
-+	}
-+
- 	write_sysreg(vcpu->arch.midr, VPIDR);
- }
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index bd94e67..0f62829 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -62,6 +62,9 @@ struct kvm_arch {
- 	/* VTTBR value associated with above pgd and vmid */
- 	u64    vttbr;
- 
-+	/* The last vcpu id that ran on each physical CPU */
-+	int __percpu *last_vcpu_ran;
-+
- 	/* The maximum number of vCPUs depends on the used GIC model */
- 	int max_vcpus;
- 
-@@ -252,6 +255,13 @@ struct kvm_vcpu_arch {
- 	/* vcpu power-off state */
- 	bool power_off;
- 
-+	/*
-+	 * Local TLBs potentially contain conflicting entries from
-+	 * another vCPU within this VMID. All entries for this VMID must
-+	 * be invalidated from (local) TLBs before we run this vCPU.
-+	 */
-+	bool tlb_vmid_stale;
-+
- 	/* Don't run the guest (internal implementation need) */
- 	bool pause;
- 
-@@ -368,7 +378,6 @@ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
--static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
- 
- void kvm_arm_init_debug(void);
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 83037cd..99d0f33 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -131,6 +131,14 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	if (vcpu->arch.tlb_vmid_stale) {
-+		/* Force vttbr_el2 to be written */
-+		isb();
-+		/* Local invalidate only for this VMID */
-+		asm volatile("tlbi vmalle1" : : );
-+		dsb(nsh);
-+		vcpu->arch.tlb_vmid_stale = false;
-+	}
- }
- 
- static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
--- 
-2.1.4
+> ---
+>  arch/powerpc/kernel/reloc_32.S | 36 +++++++++++++++++---
+>  1 file changed, 32 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/powerpc/kernel/reloc_32.S b/arch/powerpc/kernel/reloc_32.S
+> index f366fedb0872..150686b9febb 100644
+> --- a/arch/powerpc/kernel/reloc_32.S
+> +++ b/arch/powerpc/kernel/reloc_32.S
+> @@ -87,12 +87,12 @@ eodyn:				/* End of Dyn Table scan */
+>  	 * Work out the current offset from the link time address of .rela
+>  	 * section.
+>  	 *  cur_offset[r7] = rela.run[r9] - rela.link [r7]
+> -	 *  _stext.link[r12] = _stext.run[r10] - cur_offset[r7]
+> -	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r12]
+> +	 *  _stext.link[r11] = _stext.run[r10] - cur_offset[r7]
+> +	 *  final_offset[r3] = _stext.final[r3] - _stext.link[r11]
+>  	 */
+>  	subf	r7, r7, r9	/* cur_offset */
+> -	subf	r12, r7, r10
+> -	subf	r3, r12, r3	/* final_offset */
+> +	subf	r11, r7, r10
+> +	subf	r3, r11, r3	/* final_offset */
+>
+>  	subf	r8, r6, r8	/* relaz -= relaent */
+>  	/*
+> @@ -101,6 +101,21 @@ eodyn:				/* End of Dyn Table scan */
+>  	 * r13	- points to the symbol table
+>  	 */
+>
+> +#ifdef CONFIG_MODVERSIONS
+> +	/*
+> +	 * Treat R_PPC_RELATIVE relocations differently when they target the
+> +	 * interval [__start___kcrctab, __stop___kcrctab_gpl_future): in this
+> +	 * case, the relocated quantities are CRC pseudo-symbols, which should
+> +	 * be preserved as-is, rather than be modified to take the runtime
+> +	 * offset into account.
+> +	 */
+> +	lwz	r10, (p_kcrc_start - 0b)(r12)
+> +	lwz	r11, (p_kcrc_stop - 0b)(r12)
+> +	subf	r12, r7, r12			/* link time addr of 0b */
+> +	add	r10, r10, r12
+> +	add	r11, r11, r12
+> +#endif
+> +
+>  	/*
+>  	 * Check if we have a relocation based on symbol
+>  	 * r5 will hold the value of the symbol.
+> @@ -135,7 +150,15 @@ get_type:
+>  	bne	hi16
+>  	lwz	r4, 0(r9)	/* r_offset */
+>  	lwz	r0, 8(r9)	/* r_addend */
+> +#ifdef CONFIG_MODVERSIONS
+> +	cmplw	r4, r10
+> +	blt	do_add
+> +	cmplw	r4, r11
+> +	blt	skip_add
+> +do_add:
+> +#endif
+>  	add	r0, r0, r3	/* final addend */
+> +skip_add:
+>  	stwx	r0, r4, r7	/* memory[r4+r7]) = (u32)r0 */
+>  	b	nxtrela		/* continue */
+>
+> @@ -207,3 +230,8 @@ p_dyn:		.long	__dynamic_start - 0b
+>  p_rela:		.long	__rela_dyn_start - 0b
+>  p_sym:		.long	__dynamic_symtab - 0b
+>  p_st:		.long	_stext - 0b
+> +
+> +#ifdef CONFIG_MODVERSIONS
+> +p_kcrc_start:	.long	__start___kcrctab - 0b
+> +p_kcrc_stop:	.long	__stop___kcrctab_gpl_future - 0b
+> +#endif
+>
