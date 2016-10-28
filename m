@@ -1,27 +1,53 @@
 From: mbrugger@suse.com (Matthias Brugger)
-Date: Fri, 28 Oct 2016 18:37:22 +0200
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <20161028154819.GD10441@obsidianresearch.com>
-References: <20161026225413.GA6220@obsidianresearch.com>
- <7950dec2-cc69-6304-ea2d-92b1a890214e@suse.com>
- <20161028154819.GD10441@obsidianresearch.com>
-Message-ID: <6f848770-9999-bb9e-4e55-b7d86edeb013@suse.com>
+Date: Fri, 28 Oct 2016 18:38:51 +0200
+Subject: [PATCH] fpga: zynq-fpga: Delete not needed variable
+In-Reply-To: <20161028112722.22837-1-mbrugger@suse.com>
+References: <20161028112722.22837-1-mbrugger@suse.com>
+Message-ID: <a840247c-e1ad-e789-7947-3b499c887dec@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 28/10/16 17:48, Jason Gunthorpe wrote:
-> On Fri, Oct 28, 2016 at 01:12:06PM +0200, Matthias Brugger wrote:
->>> Zynq is also only able to DMA dword quantities, so bitstreams must be
->>> a multiple of 4 bytes. This also fixes a DMA-past the end bug.
->>
->> The you can also fix the transfer_length calculation in zynq_fpga_ops_write,
->> as we don't allow buffers which are not a multiple of 4.
+On 28/10/16 13:27, Matthias Brugger wrote:
+> Variable count is never changed in the write path,
+> we don't need to save it for freeing the dma memory.
 >
-> Didn't I do that? Did you see something else to change in the dma
-> part?
->
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 
-Sure you did, my mistake.
-Matthias
+This is obsolete, as Jason already has this in his patch [1].
+Sorry for the noise.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg538868.html
+
+> ---
+>  drivers/fpga/zynq-fpga.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index c2fb412..ffc2823 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -287,12 +287,10 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  	struct zynq_fpga_priv *priv;
+>  	int err;
+>  	char *kbuf;
+> -	size_t in_count;
+>  	dma_addr_t dma_addr;
+>  	u32 transfer_length;
+>  	u32 intr_status;
+>
+> -	in_count = count;
+>  	priv = mgr->priv;
+>
+>  	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
+> @@ -338,7 +336,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  	clk_disable(priv->clk);
+>
+>  out_free:
+> -	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
+> +	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
+>
+>  	return err;
+>  }
+>
