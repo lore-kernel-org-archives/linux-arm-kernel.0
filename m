@@ -1,15 +1,17 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 28 Oct 2016 16:10:19 +0100
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 28 Oct 2016 16:16:11 +0100
 Subject: [PATCH 2/2] irqchip/gic-v3: Use nops macro for Cavium ThunderX
  erratum 23154
 In-Reply-To: <1477653838-21569-2-git-send-email-will.deacon@arm.com>
 References: <1477653838-21569-1-git-send-email-will.deacon@arm.com>
  <1477653838-21569-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20161028151019.GK5806@leverpostej>
+Message-ID: <2016ac6f-3921-4053-c50d-c1d8adf42798@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 12:23:58PM +0100, Will Deacon wrote:
+Hi Will,
+
+On 28/10/16 12:23, Will Deacon wrote:
 > The workaround for Cavium ThunderX erratum 23154 has a homebrew
 > pipeflush built out of NOP sequences around the read of the IAR.
 > 
@@ -19,44 +21,10 @@ On Fri, Oct 28, 2016 at 12:23:58PM +0100, Will Deacon wrote:
 > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-(yes, I counted them)
+Both patches queued for 4.10.
 
 Thanks,
-Mark.
 
-> ---
->  arch/arm64/include/asm/arch_gicv3.h | 9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index fdf34f8b4ee0..0313670a3e3f 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -122,14 +122,9 @@ static inline u64 gic_read_iar_cavium_thunderx(void)
->  {
->  	u64 irqstat;
->  
-> -	asm volatile(
-> -		"nop;nop;nop;nop\n\t"
-> -		"nop;nop;nop;nop");
-> -
-> +	nops(8);
->  	irqstat = read_sysreg_s(ICC_IAR1_EL1);
-> -
-> -	asm volatile(
-> -		"nop;nop;nop;nop");
-> +	nops(4);
->  	mb();
->  
->  	return irqstat;
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+	M.
+-- 
+Jazz is not dead. It just smells funny...
