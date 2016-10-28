@@ -1,16 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 27 Oct 2016 17:03:03 -0700
-Subject: [GIT PULL] STi defconfig updates for v4.10
-In-Reply-To: <50be6ab2-2af8-b21e-770c-d141d6396179@st.com>
-References: <50be6ab2-2af8-b21e-770c-d141d6396179@st.com>
-Message-ID: <20161028000303.GC7284@localhost>
+Date: Thu, 27 Oct 2016 17:06:48 -0700
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.10, part 1
+In-Reply-To: <20161024141654.19832-1-dinguyen@kernel.org>
+References: <20161024141654.19832-1-dinguyen@kernel.org>
+Message-ID: <20161028000648.GB7931@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 05:20:27PM +0200, Patrice Chotard wrote:
-> Hi Olof, Arnd and Kevin,
+On Mon, Oct 24, 2016 at 09:16:54AM -0500, Dinh Nguyen wrote:
+> Hi Arnd, Kevin, Olof:
 > 
-> Please consider this first round of multi_v7_defconfig updates for v4.10 :
+> Please pull in these DTS updates for SoCFPGA for v4.10.
+> 
+> Thanks,
+> Dinh
 > 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
@@ -18,14 +21,13 @@ On Thu, Oct 20, 2016 at 05:20:27PM +0200, Patrice Chotard wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-defconfig-for-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.10_part_1
 > 
-> for you to fetch changes up to 620c52f4db4d47e1f33c64e641392fe575d5397f:
+> for you to fetch changes up to c96f5919e6b0d132aa9afe9f1adc872fc107d5bb:
 > 
->   ARM: multi_v7_defconfig: Remove stih41x phy Kconfig symbol. (2016-10-20 17:05:08 +0200)
+>   ARM: dts: socfpga: socrates: enable qspi (2016-10-18 22:18:14 -0500)
 
-
-Thanks, merged.
+Merged, thanks.
 
 
 -Olof
