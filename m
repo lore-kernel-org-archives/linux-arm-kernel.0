@@ -1,41 +1,42 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 28 Oct 2016 10:11:07 -0700
-Subject: [GIT PULL] Broadcom ARM64 Device Tree fixes for 4.9
-In-Reply-To: <1477331005-32163-1-git-send-email-f.fainelli@gmail.com>
-References: <1477331005-32163-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <690f5840-10b4-b9a8-b333-ab4876c49a5a@gmail.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Fri, 28 Oct 2016 10:11:59 -0700
+Subject: [PATCH] staging: vc04_services: setup DMA and coherent mask
+Message-ID: <20161028171159.23973-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2016 10:43 AM, Florian Fainelli wrote:
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-> 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/devicetree-arm64-fixes
-> 
-> for you to fetch changes up to 963d790468a2f581abf039b45edac79af5e16e55:
-> 
->   arm64: dts: Updated NAND DT properties for NS2 SVK (2016-10-23 14:50:20 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains a single fix for Broadcom ARM64-based SoCs:
-> 
-> - Ray adds the required bus width and OOB sector size properties to the
->   Northstar 2 SVK reference board in order for the NAND controller to work
->   properly
-> 
-> ----------------------------------------------------------------
-> Ray Jui (1):
->       arm64: dts: Updated NAND DT properties for NS2 SVK
-> 
->  arch/arm64/boot/dts/broadcom/ns2-svk.dts | 2 ++
->  1 file changed, 2 insertions(+)
+Setting the DMA mask is optional on 32 bit but
+is mandatory on 64 bit.  Set the DMA mask and coherent
+to force all DMA to be in the 32 bit address space.
 
-Arnd, Kevin, Olof,
+This is considered a "good practice" and most drivers
+already do this.
 
-Can you take this change? Thanks!
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ .../staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index a5afcc5..6fa2b5a 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -97,6 +97,16 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 	int slot_mem_size, frag_mem_size;
+ 	int err, irq, i;
+ 
++	/*
++	 * Setting the DMA mask is necessary in the 64 bit environment.
++	 * It isn't necessary in a 32 bit environment but is considered
++	 * a good practice.
++	 */
++	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++
++	if (err < 0)
++		return err;
++
+ 	(void)of_property_read_u32(dev->of_node, "cache-line-size",
+ 				   &g_cache_line_size);
+ 	g_fragments_size = 2 * g_cache_line_size;
 -- 
-Florian
+2.10.1
