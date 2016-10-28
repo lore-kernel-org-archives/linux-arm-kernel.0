@@ -1,41 +1,63 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 28 Oct 2016 18:27:09 +0100
-Subject: [PATCH v4 1/8] arm64: Update the synchronous external abort fault
- description
+Date: Fri, 28 Oct 2016 18:27:11 +0100
+Subject: [PATCH v4 3/8] arm64: Factor out TTBR0_EL1 post-update workaround
+ into a specific asm macro
 In-Reply-To: <1477675636-3957-1-git-send-email-catalin.marinas@arm.com>
 References: <1477675636-3957-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1477675636-3957-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1477675636-3957-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the description of the synchronous external aborts on
-translation table walks.
+This patch takes the errata workaround code out of cpu_do_switch_mm into
+a dedicated post_ttbr0_update_workaround macro which will be reused in a
+subsequent patch.
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Kees Cook <keescook@chromium.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/mm/fault.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/assembler.h | 13 +++++++++++++
+ arch/arm64/mm/proc.S               |  6 +-----
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 0f8788374815..d035cc594445 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -507,10 +507,10 @@ static const struct fault_info {
- 	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
--	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
--	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-+	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
- 	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
- 	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
- 	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 28bfe6132eb6..ab87006ff2fb 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -395,4 +395,17 @@ alternative_endif
+ 	movk	\reg, :abs_g0_nc:\val
+ 	.endm
+ 
++/*
++ * Errata workaround post TTBR0_EL1 update.
++ */
++	.macro	post_ttbr0_update_workaround
++#ifdef CONFIG_CAVIUM_ERRATUM_27456
++alternative_if ARM64_WORKAROUND_CAVIUM_27456
++	ic	iallu
++	dsb	nsh
++	isb
++alternative_else_nop_endif
++#endif
++	.endm
++
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 352c73b6a59e..c2adb0cb952a 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -136,11 +136,7 @@ ENTRY(cpu_do_switch_mm)
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+ 	isb
+-alternative_if ARM64_WORKAROUND_CAVIUM_27456
+-	ic	iallu
+-	dsb	nsh
+-	isb
+-alternative_else_nop_endif
++	post_ttbr0_update_workaround
+ 	ret
+ ENDPROC(cpu_do_switch_mm)
+ 
