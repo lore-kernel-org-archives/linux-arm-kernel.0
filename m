@@ -1,85 +1,49 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 28 Oct 2016 12:56:09 +0200
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <20161028095151.f24lhelfknzrpy6c@pengutronix.de>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
- <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
- <20161027231331.gngekbg22wfvnolr@piout.net>
- <20161028095151.f24lhelfknzrpy6c@pengutronix.de>
-Message-ID: <CACQ1gAjX6fVghjxf=o_WNUDYFW6Sc_HF_3G6gxrSma5F3qjpbQ@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 28 Oct 2016 13:00:22 +0200 (CEST)
+Subject: [PATCH v2] irqchip/bcm2836: Prevent spurious interrupts
+In-Reply-To: <20161027182038.11312-1-eric@anholt.net>
+References: <20161027182038.11312-1-eric@anholt.net>
+Message-ID: <alpine.DEB.2.20.1610281257230.4896@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-28 11:51 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> On Fri, Oct 28, 2016 at 01:13:31AM +0200, Alexandre Belloni wrote:
->> On 27/10/2016 at 20:02:29 +0200, Uwe Kleine-K?nig wrote :
->> > Hello Richard,
->> >
->> > On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
->> > > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
->> > > index fd8aa1f4ba78..168b10cad47b 100644
->> > > --- a/drivers/tty/serial/atmel_serial.c
->> > > +++ b/drivers/tty/serial/atmel_serial.c
->> > > @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->> > >           mode |= ATMEL_US_USMODE_RS485;
->> > >   } else if (termios->c_cflag & CRTSCTS) {
->> > >           /* RS232 with hardware handshake (RTS/CTS) */
->> > > -         if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
->> > > -                 dev_info(port->dev, "not enabling hardware flow control because DMA is used");
->> > > -                 termios->c_cflag &= ~CRTSCTS;
->> > > -         } else {
->> > > +         if (atmel_use_fifo(port) &&
->> > > +             !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
->> > > +                 /*
->> > > +                  * with ATMEL_US_USMODE_HWHS set, the controller will
->> > > +                  * be able to drive the RTS pin high/low when the RX
->> > > +                  * FIFO is above RXFTHRES/below RXFTHRES2.
->> > > +                  * It will also disable the transmitter when the CTS
->> > > +                  * pin is high.
->> > > +                  * This mode is not activated if CTS pin is a GPIO
->> > > +                  * because in this case, the transmitter is always
->> > > +                  * disabled (there must be an internal pull-up
->> > > +                  * responsible for this behaviour).
->> > > +                  * If the RTS pin is a GPIO, the controller won't be
->> > > +                  * able to drive it according to the FIFO thresholds,
->> > > +                  * but it will be handled by the driver.
->> > > +                  */
->> > >                   mode |= ATMEL_US_USMODE_HWHS;
->> >
->> > You use
->> >
->> >     !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
->> >
->> > as indicator that the cts mode of the respective pin is used. Is this
->> > reliable? (It's not if there are machines that don't use CTS, neither as
->> > gpio nor using the hardware function.) Maybe this needs a dt property to
->> > indicate that there is no (hw)handshaking available?
->> >
->>
->> We had a call today were we agreed that this should be added in a future
->> patch. Let's fix the regression for now.
->
-> A machine without CTS (neither gpio nor hw function) used to work fine
-> before the breaking commit, right? So this case is part of the
-> regression and needs a fix?
-Actually, a machine with a FIFO and without CTS didn't even exist at the
-time of the breaking commit (v4.0), the FIFO handling was introduced later,
-so it's not even a regression !
+On Thu, 27 Oct 2016, Eric Anholt wrote:
 
-> Anyhow, this probably shouldn't stop the commit entering mainline
-> because there are probably very few such machines (if any).
->
-> So:
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-> Best regards
-> Uwe
+> From: Phil Elwell <phil@raspberrypi.org>
+> 
+> The old arch-specific IRQ macros included a dsb to ensure the
+> write to clear the mailbox interrupt completed before returning
+> from the interrupt. The BCM2836 irqchip driver needs the same
+> precaution to avoid spurious interrupts.
 
+This is missing a fixes tag. I have no idea when that problem was
+introduced, so I have no way to decide whether this needs to be tagged
+stable or not.
 
-Thanks !
+Thanks,
 
-Greg, could you take this in your tree ?
+	tglx
 
-regards,
-Richard.
+> 
+> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  drivers/irqchip/irq-bcm2836.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+> index d96b2c947e74..93e3f7660c42 100644
+> --- a/drivers/irqchip/irq-bcm2836.c
+> +++ b/drivers/irqchip/irq-bcm2836.c
+> @@ -175,6 +175,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
+>  		u32 ipi = ffs(mbox_val) - 1;
+>  
+>  		writel(1 << ipi, mailbox0);
+> +		dsb(sy);
+>  		handle_IPI(ipi, regs);
+>  #endif
+>  	} else if (stat) {
+> -- 
+> 2.9.3
+> 
+> 
