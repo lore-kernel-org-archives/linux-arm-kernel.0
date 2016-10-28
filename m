@@ -1,27 +1,55 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Fri, 28 Oct 2016 08:23:04 -0700
-Subject: specifying order of /dev/mmcblk devices via device-tree?
-Message-ID: <CAJ+vNU1g8nQedd06LeaD10YWUQ_UmdRToUMFKaTNT1aNY56b0g@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 28 Oct 2016 11:31:24 -0400
+Subject: [PATCH] staging: vc04_services: tie up loose ends with
+ dma_map_sg conversion
+In-Reply-To: <20161028151651.3430-1-mzoran@crowfest.net>
+References: <20161028151651.3430-1-mzoran@crowfest.net>
+Message-ID: <20161028153124.GA29906@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+On Fri, Oct 28, 2016 at 08:16:51AM -0700, Michael Zoran wrote:
+> The conversion to dma_map_sg left a few loose ends.  This change
+> ties up those loose ends.
+> 
+> 1. Settings the DMA mask is mandatory on 64 bit even though it
+> is optional on 32 bit.  Set the mask so that DMA space is always
+> in the lower 32 bit range of data on both platforms.
+> 
+> 2. The scatterlist was not completely initialized correctly.
+> Initialize the list with sg_init_table so that DMA works correctly
+> if scatterlist debugging is enabled in the build configuration.
+> 
+> 3. The error paths in create_pagelist were not consistent.  Make
+> them all consistent by calling a helper function called
+> cleanup_pagelistinfo to cleanup regardless of what state the pagelist
+> is in.
+> 
+> 4. create_pagelist and free_pagelist had a very large amount of
+> duplication in computing offsets into a single allocation of memory
+> in the DMA area.  Introduce a new structure called the pagelistinfo
+> that is appened to the end of the allocation to store necessary
+> information to prevent duplication of code and make cleanup on errors
+> easier.
+> 
+> When combined with a fix for vchiq_copy_from_user which is not
+> included at this time, both functional and pings tests of vchiq_test
+> now pass in both 32 bit and 64 bit modes.
+> 
+> Even though this cleanup could have been broken down to chunks,
+> all the changes are to a single file and submitting it as a single
+> related change should make reviewing the diff much easier then if it
+> were submitted piecemeal.
 
-I have an IMX6 board that has the following:
-sdhc1: mmc0: sdio radio
-sdhc2: mmc1: /dev/mmcblk1: microSD connector
-sdhc3: mmc2: /dev/mmcblk2: on-board eMMC
+No, it's harder.  A patch should only do one type of thing, this patch
+has to be reviewed thinking of 4 different things all at once, making it
+much more difficult to do so.
 
-I would like to have sdhc3 registered as /dev/mmcblk0 and sdhc2
-registered as /dev/mmcblk1 so that permanent storage is the first
-mmcblk device as I think this is more intuitive however currently
-these get instanced in the order they appear in the imx6qdl.dtsi
-device-tree configuration and are not able to be mapped the way I want
-them in my dts file.
+We write patches to be read easily, and make them easy to review.  We
+don't write them in a way to be easy for the developer to create :)
 
-Is there a way, or if not is there a desire for a way, to specify the
-order of /dev/mmcblk devices via device-tree?
+Can you please break this up into a patch series?
 
-Regards,
+thanks,
 
-Tim
+greg k-h
