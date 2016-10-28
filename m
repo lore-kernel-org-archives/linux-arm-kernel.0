@@ -1,111 +1,60 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Fri, 28 Oct 2016 07:08:44 +0000
-Subject: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
- <1477625554-46700-6-git-send-email-yangbo.lu@nxp.com>
- <1477629956.6812.15.camel@buserror.net>  
-Message-ID: <DB6PR0401MB2536E6A29246096648EEC890F8AD0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 28 Oct 2016 14:50:12 +0800
+Subject: [v15, 1/7] ARM64: dts: ls2080a: add device configuration node
+In-Reply-To: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1477637418-38938-2-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Y.B. Lu
-> Sent: Friday, October 28, 2016 2:06 PM
-> To: Y.B. Lu; 'Scott Wood'; 'linux-mmc at vger.kernel.org';
-> 'ulf.hansson at linaro.org'; 'Arnd Bergmann'
-> Cc: 'linuxppc-dev at lists.ozlabs.org'; 'devicetree at vger.kernel.org';
-> 'linux-arm-kernel at lists.infradead.org'; 'linux-kernel at vger.kernel.org';
-> 'linux-clk at vger.kernel.org'; 'linux-i2c at vger.kernel.org';
-> 'iommu at lists.linux-foundation.org'; 'netdev at vger.kernel.org'; 'Greg
-> Kroah-Hartman'; 'Mark Rutland'; 'Rob Herring'; 'Russell King'; 'Jochen
-> Friedrich'; 'Joerg Roedel'; 'Claudiu Manoil'; 'Bhupesh Sharma'; Qiang
-> Zhao; 'Kumar Gala'; 'Santosh Shilimkar'; Leo Li; X.B. Xie; M.H. Lian
-> Subject: RE: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-> 
-> > -----Original Message-----
-> > From: Y.B. Lu
-> > Sent: Friday, October 28, 2016 2:00 PM
-> > To: 'Scott Wood'; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org;
-> > Arnd Bergmann
-> > Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org;
-> > linux-arm- kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > linux- clk at vger.kernel.org; linux-i2c at vger.kernel.org;
-> > iommu at lists.linux- foundation.org; netdev at vger.kernel.org; Greg
-> > Kroah-Hartman; Mark Rutland; Rob Herring; Russell King; Jochen
-> > Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma; Qiang Zhao;
-> Kumar Gala; Santosh Shilimkar; Leo Li; X.B.
-> > Xie; M.H. Lian
-> > Subject: RE: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ platforms
-> >
-> >
-> >
-> > > -----Original Message-----
-> > > From: linux-mmc-owner at vger.kernel.org [mailto:linux-mmc-
-> > > owner at vger.kernel.org] On Behalf Of Scott Wood
-> > > Sent: Friday, October 28, 2016 12:46 PM
-> > > To: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Arnd
-> > > Bergmann
-> > > Cc: linuxppc-dev at lists.ozlabs.org; devicetree at vger.kernel.org;
-> > > linux-arm- kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > > linux- clk at vger.kernel.org; linux-i2c at vger.kernel.org;
-> > > iommu at lists.linux- foundation.org; netdev at vger.kernel.org; Greg
-> > > Kroah-Hartman; Mark Rutland; Rob Herring; Russell King; Jochen
-> > > Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma; Qiang Zhao;
-> > Kumar Gala; Santosh Shilimkar; Leo Li; X.B.
-> > > Xie; M.H. Lian
-> > > Subject: Re: [v13, 5/8] soc: fsl: add GUTS driver for QorIQ
-> > > platforms
-> > >
-> > > On Fri, 2016-10-28 at 11:32 +0800, Yangbo Lu wrote:
-> > > > +	guts->regs = of_iomap(np, 0);
-> > > > +	if (!guts->regs)
-> > > > +		return -ENOMEM;
-> > > > +
-> > > > +	/* Register soc device */
-> > > > +	machine = of_flat_dt_get_machine_name();
-> > > > +	if (machine)
-> > > > +		soc_dev_attr.machine = devm_kstrdup(dev, machine,
-> > > > GFP_KERNEL);
-> > > > +
-> > > > +	svr = fsl_guts_get_svr();
-> > > > +	soc_die = fsl_soc_die_match(svr, fsl_soc_die);
-> > > > +	if (soc_die) {
-> > > > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
-> > > > +						?????"QorIQ %s", soc_die-
-> > > > >die);
-> > > > +	} else {
-> > > > +		soc_dev_attr.family = devm_kasprintf(dev, GFP_KERNEL,
-> > > > "QorIQ");
-> > > > +	}
-> > > > +	soc_dev_attr.soc_id = devm_kasprintf(dev, GFP_KERNEL,
-> > > > +					?????"svr:0x%08x", svr);
-> > > > +	soc_dev_attr.revision = devm_kasprintf(dev, GFP_KERNEL,
-> "%d.%d",
-> > > > +					???????SVR_MAJ(svr), SVR_MIN(svr));
-> > > > +
-> > > > +	soc_dev = soc_device_register(&soc_dev_attr);
-> > > > +	if (IS_ERR(soc_dev))
-> > > > +		return PTR_ERR(soc_dev);
-> > >
-> > > ioremap leaks on this error path. ?Use devm_ioremap_resource().
-> > >
-> >
-> > [Lu Yangbo-B47093] Ok. I have fixed it in v14. Thanks :)
-> 
-> [Lu Yangbo-B47093] Sorry, used the wrong error code... Will resent it
+Add the dts node for device configuration unit that provides
+general purpose configuration and status for the device.
 
-[Lu Yangbo-B47093] The v15 had been sent. And dropped patch 'dt: bindings: update Freescale DCFG compatible',
-since that work has been done by below patch on ShawnGuo's linux tree.
-'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG and DCFG'
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/dt64&id=981034a2bfcaff5c95dafde24d7abfe7f9025c19
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Acked-by: Scott Wood <oss@buserror.net>
+---
+Changes for v5:
+	- Added this patch
+Changes for v6:
+	- None
+Changes for v7:
+	- None
+Changes for v8:
+	- Added 'Acked-by: Scott Wood'
+Changes for v9:
+	- None
+Changes for v10:
+	- None
+Changes for v11:
+	- None
+Changes for v12:
+	- None
+Changes for v13:
+	- None
+Changes for v14:
+	- None
+Changes for v15:
+	- None
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Thanks.
-
-> 
-> >
-> > > -Scott
-> > >
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-mmc"
-> > > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > > info at http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 337da90..c03b099 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -215,6 +215,12 @@
+ 			clocks = <&sysclk>;
+ 		};
+ 
++		dcfg: dcfg at 1e00000 {
++			compatible = "fsl,ls2080a-dcfg", "syscon";
++			reg = <0x0 0x1e00000 0x0 0x10000>;
++			little-endian;
++		};
++
+ 		serial0: serial at 21c0500 {
+ 			compatible = "fsl,ns16550", "ns16550a";
+ 			reg = <0x0 0x21c0500 0x0 0x100>;
+-- 
+2.1.0.27.g96db324
