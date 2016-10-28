@@ -1,38 +1,65 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 28 Oct 2016 07:44:30 +0200
-Subject: [PATCH] arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
-In-Reply-To: <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
-References: <20161026052422.17283.57864.sendpatchset@little-apple>
- <20161027070801.GB7706@verge.net.au>
- <20161027071523.GD7706@verge.net.au>
- <CANqRtoTizLGYSgY-EV_DwC+yeqeuAsuBKPwXXW6zqwqpHM3MfA@mail.gmail.com>
-Message-ID: <20161028054430.GA1106@verge.net.au>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 28 Oct 2016 13:45:13 +0800
+Subject: [v14, 0/8] Fix eSDHC host version register bug
+Message-ID: <1477633521-7391-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 04:37:53PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Thu, Oct 27, 2016 at 4:15 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 27, 2016 at 09:08:01AM +0200, Simon Horman wrote:
-> >> On Wed, Oct 26, 2016 at 02:24:22PM +0900, Magnus Damm wrote:
-> >> > From: Magnus Damm <damm+renesas@opensource.se>
-> >> >
-> >> > Extend the ARM64 defconfig to enable the DU DRM device as module
-> >> > together with required dependencies of V4L2 FCP and VSP modules.
-> >> >
-> >> > This enables VGA output on the r8a7795 Salvator-X board.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> >>
-> >> Thanks, I have queued this up.
-> >
-> > Given discussion elsewhere on enabling DU I am holding off on this for a
-> > little; it is not queued up for now.
-> 
-> Sure, thanks for holding off the DT integration patches for r8a7796.
-> Please note that as of mainline v4.9-rc2 the r8a7795 Salvator-X board
-> has thanks to DU, FCP and VSP a working VGA port. So enabling those
-> devices in the defconfig from now on makes sense to me.
+This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+eSDHC controller. To match the SoC version and revision, 10 previous version
+patchsets had tried many methods but all of them were rejected by reviewers.
+Such as
+	- dts compatible method
+	- syscon method
+	- ifdef PPC method
+	- GUTS driver getting SVR method
+Anrd suggested a soc_device_match method in v10, and this is the only available
+method left now. This v11 patchset introduces the soc_device_match interface in
+soc driver.
 
-Understood, I have queued this up.
+The first six patches of Yangbo are to add the GUTS driver. This is used to
+register a soc device which contain soc version and revision information.
+The other two patches introduce the soc_device_match method in soc driver
+and apply it on esdhc driver to fix this bug.
+
+Arnd Bergmann (1):
+  base: soc: introduce soc_device_match() interface
+
+Yangbo Lu (7):
+  dt: bindings: update Freescale DCFG compatible
+  ARM64: dts: ls2080a: add device configuration node
+  dt: bindings: move guts devicetree doc out of powerpc directory
+  powerpc/fsl: move mpc85xx.h to include/linux/fsl
+  soc: fsl: add GUTS driver for QorIQ platforms
+  MAINTAINERS: add entry for Freescale SoC drivers
+  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+
+ Documentation/devicetree/bindings/arm/fsl.txt      |   6 +-
+ .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+ MAINTAINERS                                        |  11 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+ arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
+ drivers/base/Kconfig                               |   1 +
+ drivers/base/soc.c                                 |  66 ++++++
+ drivers/clk/clk-qoriq.c                            |   3 +-
+ drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+ drivers/iommu/fsl_pamu.c                           |   3 +-
+ drivers/mmc/host/Kconfig                           |   1 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+ drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+ drivers/soc/Kconfig                                |   3 +-
+ drivers/soc/fsl/Kconfig                            |  18 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/guts.c                             | 238 +++++++++++++++++++++
+ include/linux/fsl/guts.h                           | 125 ++++++-----
+ .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+ include/linux/sys_soc.h                            |   3 +
+ 21 files changed, 458 insertions(+), 62 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/guts.c
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+
+-- 
+2.1.0.27.g96db324
