@@ -1,35 +1,52 @@
 From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 28 Oct 2016 21:37:01 +0900
-Subject: [PATCH v2 7/8] ARM: dts: am335x: Add the power button interrupt
+Date: Fri, 28 Oct 2016 21:37:02 +0900
+Subject: [PATCH v2 8/8] mfd: tps65217: Fix mismatched interrupt number
 In-Reply-To: <20161028123702.21849-1-woogyom.kim@gmail.com>
 References: <20161028123702.21849-1-woogyom.kim@gmail.com>
-Message-ID: <20161028123702.21849-8-woogyom.kim@gmail.com>
+Message-ID: <20161028123702.21849-9-woogyom.kim@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the power button driver gets corresponding IRQ number by
-using platform_get_irq().
+Enum value of 'tps65217_irq_type' is not matched with DT parsed hwirq
+number[*].
+
+The MFD driver gets the IRQ data by referencing hwirq, but the value is
+different. So, irq_to_tps65217_irq() returns mismatched IRQ data.
+Eventually, the power button driver enables not PB but USB interrupt
+when it is probed.
+
+According to the TPS65217 register map[**], USB interrupt is the LSB.
+This patch defines synchronized IRQ value.
+
+[*]  include/dt-bindings/mfd/tps65217.h
+[**] http://www.ti.com/lit/ds/symlink/tps65217.pdf
 
 Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
 ---
- arch/arm/boot/dts/am335x-bone-common.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ include/linux/mfd/tps65217.h | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index cec9d91..0c0a90c 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -324,6 +324,11 @@
- 		status = "okay";
- 	};
+diff --git a/include/linux/mfd/tps65217.h b/include/linux/mfd/tps65217.h
+index 4ccda89..3cbec4b 100644
+--- a/include/linux/mfd/tps65217.h
++++ b/include/linux/mfd/tps65217.h
+@@ -234,12 +234,11 @@ struct tps65217_bl_pdata {
+ 	int dft_brightness;
+ };
  
-+	pwrbutton {
-+		interrupts = <TPS65217_IRQ_PB>;
-+		status = "okay";
-+	};
-+
- 	regulators {
- 		dcdc1_reg: regulator at 0 {
- 			regulator-name = "vdds_dpr";
+-enum tps65217_irq_type {
+-	TPS65217_IRQ_PB,
+-	TPS65217_IRQ_AC,
+-	TPS65217_IRQ_USB,
+-	TPS65217_NUM_IRQ
+-};
++/* Interrupt numbers */
++#define TPS65217_IRQ_USB		0
++#define TPS65217_IRQ_AC			1
++#define TPS65217_IRQ_PB			2
++#define TPS65217_NUM_IRQ		3
+ 
+ /**
+  * struct tps65217_board - packages regulator init data
 -- 
 2.9.3
