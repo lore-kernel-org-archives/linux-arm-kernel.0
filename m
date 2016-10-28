@@ -1,58 +1,83 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Fri, 28 Oct 2016 19:20:33 +0200
-Subject: pinctrl: mediatek: build failure if CONFIG_IRQ_DOMAIN is not set
-Message-ID: <1477675233.2167.11.camel@tiscali.nl>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 28 Oct 2016 12:24:06 -0500
+Subject: [PATCH v6 4/5] ARM: DTS: da850: Add cfgchip syscon node
+In-Reply-To: <m2fungcses.fsf@baylibre.com>
+References: <1477451211-31979-1-git-send-email-david@lechnology.com>
+ <1477451211-31979-5-git-send-email-david@lechnology.com>
+ <b9bfc4aa-ef52-53c4-dc7e-c0bc1c5969fb@lechnology.com>
+ <09eb61b9-d66e-838e-2411-d787fda65096@ti.com> <m2fungcses.fsf@baylibre.com>
+Message-ID: <8f57109a-a6c6-1559-7195-2a1bc5ad66c3@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/28/2016 12:08 PM, Kevin Hilman wrote:
+> Sekhar Nori <nsekhar@ti.com> writes:
+>
+>> On Wednesday 26 October 2016 09:38 PM, David Lechner wrote:
+>>> On 10/25/2016 10:06 PM, David Lechner wrote:
+>>>> Add a syscon node for the SoC CFGCHIPn registers. This is needed for
+>>>> the new usb phy driver.
+>>>>
+>>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/da850.dtsi | 4 ++++
+>>>>  1 file changed, 4 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+>>>> index f79e1b9..6bbf20d 100644
+>>>> --- a/arch/arm/boot/dts/da850.dtsi
+>>>> +++ b/arch/arm/boot/dts/da850.dtsi
+>>>> @@ -188,6 +188,10 @@
+>>>>              };
+>>>>
+>>>>          };
+>>>> +        cfgchip: cfgchip at 1417c {
+>>>
+>>> I wonder if there is a more generic name instead of cfgchip at . Is there a
+>>> preferred generic name for syscon nodes?
+>>
+>> I did not find anything in ePAPR, but chip-controller might be more
+>> appropriate.
+>>
+>>>
+>>>> +            compatible = "ti,da830-cfgchip", "syscon";
+>>
+>> Looks like we need "simple-mfd" too in the compatible list?
+>>
+>> I think we can also fold patch 5/5 into this patch and add the cfgchip
+>> along with USB phy child node included.
+>>
+>> If you respin the patch, I can drop 4/5 and 5/5 that I have queued and
+>> included the updated patch instead.
+>
+> Sekhar, what's your opinion of having this syscon just for CFGCHIP* vs
+> a single syscon for the whole SYSCFG0 region.
+>
+> The drivers/bus driver from Bartosz is also using SYSCFG0 registers, and
+> proposing a sysconf ro this region, but it will need to exclude the
+> CFGCHIPn registers if we also have this syscon.
 
-0) A rather spartan build, on x86_64, which did include
-drivers/pinctrl/mediatek/pinctrl-mtk-common.o failed like this:
+What about the pinmux registers, which are already being used separately 
+too?
 
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c: In function ?mtk_gpio_to_irq?:
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c:838:8: error: implicit declaration of function ?irq_find_mapping? [-Werror=implicit-function-declaration]
-  irq = irq_find_mapping(pctl->domain, pin->eint.eintnum);
-        ^~~~~~~~~~~~~~~~
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c: In function ?mtk_pctrl_init?:
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c:1474:17: error: implicit declaration of function ?irq_domain_add_linear? [-Werror=implicit-function-declaration]
-  pctl->domain = irq_domain_add_linear(np,
-                 ^~~~~~~~~~~~~~~~~~~~~
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c:1475:27: error: ?irq_domain_simple_ops? undeclared (first use in this function)
-   pctl->devdata->ap_num, &irq_domain_simple_ops, NULL);
-                           ^~~~~~~~~~~~~~~~~~~~~
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c:1475:27: note: each undeclared identifier is reported only once for each function it appears in
-drivers/pinctrl/mediatek/pinctrl-mtk-common.c:1484:14: error: implicit declaration of function ?irq_create_mapping? [-Werror=implicit-function-declaration]
-   int virq = irq_create_mapping(pctl->domain, i);
-              ^~~~~~~~~~~~~~~~~~
-cc1: some warnings being treated as errors
-make[3]: *** [drivers/pinctrl/mediatek/pinctrl-mtk-common.o] Error 1
-make[2]: *** [drivers/pinctrl/mediatek] Error 2
-make[1]: *** [drivers/pinctrl] Error 2
-make: *** [drivers] Error 2
+>
+> I tend to think we should just have one for the whole SYSCFG0 which
+> this series could use.
+>
+> Unfortunately, the PHY driver is already merged and it references the
+> syscon by compatible.  The PHY driver should probably be fixed to find
+> its syscon by phandle, and then maybe we could move to a single syscon
+> for SYSCFG0?
 
-1) That build had CONFIG_COMPILE_TEST set (obviously) but
-CONFIG_IRQ_DOMAIN not set.
+I agree that this should be change, but I was thinking we should use 
+syscon_node_to_regmap(np->parent) since the phy node should be a child 
+of the syscon node.
 
-2) This quick hack fixes that for me:
-
-diff --git a/drivers/pinctrl/mediatek/Kconfig b/drivers/pinctrl/mediatek/Kconfig
-index 419ea4d5964d..066087156dcc 100644
---- a/drivers/pinctrl/mediatek/Kconfig
-+++ b/drivers/pinctrl/mediatek/Kconfig
-@@ -7,6 +7,7 @@ config PINCTRL_MTK
-        select GENERIC_PINCONF
-        select GPIOLIB
-        select OF_GPIO
-+       select IRQ_DOMAIN
- 
- # For ARMv7 SoCs
- config PINCTRL_MT2701
-
-3) Would you like me to submit a proper (but lightly tested) patch or
-do you prefer to fix this yourself?
-
-Thanks,
-
-
-Paul Bolle
+>
+> Let us know your preference, I don't have a very strong feeling either
+> way, but since we're already part way down the path of the CFGCHIP
+> syscon, we should keep it and later migrate it to one for all of
+> SYSCFG0.
+>
+> Kevin
+>
