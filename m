@@ -1,94 +1,82 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 28 Oct 2016 22:25:50 +0200
-Subject: [PATCH 0/3] Support userspace irqchip with arch timers
-In-Reply-To: <56812724-4bac-8265-b6f6-b1ff00308ec0@arm.com>
-References: <20160927190806.22988-1-christoffer.dall@linaro.org>
- <de375a6e-095c-a17a-0db7-876a5619df42@suse.de>
- <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
- <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
- <3928feee-cb23-8635-20bd-4c068b649a1d@arm.com>
- <7500DEDE-EC21-4287-9B11-04C058A48747@suse.de>
- <56812724-4bac-8265-b6f6-b1ff00308ec0@arm.com>
-Message-ID: <554F7514-1900-41B4-8DDC-36C00B903164@suse.de>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Fri, 28 Oct 2016 14:26:19 -0600
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161028182308.GB18325@live.com>
+References: <20161026225413.GA6220@obsidianresearch.com>
+ <c0e99b6e-ae72-5c64-34c1-91865d0e00b5@suse.com>
+ <20161027143937.GC6818@obsidianresearch.com>
+ <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
+ <20161028154740.GC10441@obsidianresearch.com>
+ <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
+ <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+Message-ID: <20161028202619.GA29625@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 28, 2016 at 11:23:08AM -0700, Moritz Fischer wrote:
 
+> I'm fine with checking for boundary cases where the bitstreams are
+> obviously too small or wrong size, I'm not convinced that checking using
+> internal knowledge about the bistream format inside the kernel is the
+> right place.
 
-> Am 28.10.2016 um 17:57 schrieb Marc Zyngier <marc.zyngier@arm.com>:
+To be clear, the sync word is documented in the Xilinx public docs, it
+is mandatory. I don't think there is anything wrong with doing basic
+validation on the structure of the bitstream before sending it.
+
+> > The problem with the way it is now is how hard it is to figure out
+> > what the right bitstream format should be. Clear instructions to
+> > canonize by droping the header before the sync word and byteswap so
+> > the sync word is in the given order is much clearer..
 > 
->> On 28/10/16 16:52, Alexander Graf wrote:
->> 
->> 
->>> Am 28.10.2016 um 16:38 schrieb Marc Zyngier <marc.zyngier@arm.com>:
->>> 
->>> Alex,
->>> 
->>>> On 30/09/16 20:31, Alexander Graf wrote:
->>>> 
->>>> 
->>>>>> On 30.09.16 17:43, Christoffer Dall wrote:
->>>>>> On Fri, Sep 30, 2016 at 05:38:11PM +0200, Alexander Graf wrote:
->>>>>> 
->>>>>> 
->>>>>>> On 30.09.16 16:54, Alexander Graf wrote:
->>>>>>> 
->>>>>>> 
->>>>>>>> On 27.09.16 21:08, Christoffer Dall wrote:
->>>>>>>> Hi Alex,
->>>>>>>> 
->>>>>>>> Marc and I have been looking at this during Linaro connect and have
->>>>>>>> slightly reworked your patch into this small series.
->>>>>>>> 
->>>>>>>> It would be good if you could have a look at it and test it out.
->>>>>>>> 
->>>>>>>> I've tested it with your QEMU, and it works for UP, but secondary CPUs
->>>>>>>> fail to come up, and it looks like the kernel never gets an IPI for
->>>>>>>> those CPUs from userspace.  Any chance you're willing to take a look at
->>>>>>>> that?
->>>>>>> 
->>>>>>> I still need to see whether I can come up with a prettier solution, but
->>>>>>> for now this works:
->>>>>>> 
->>>>>>> diff --git a/target-i386/kvm.c b/target-i386/kvm.c
->>>>>> 
->>>>>> Eh, no, not in i386 code :). But the problem seems to be a missing
->>>>>> mpstate sync.
->>>>>> 
->>>>> Yeah, that looked really dodgy.  Have you tested it? :)
->>>> 
->>>> This time around tested with the correct command line parameters I hope
->>>> :). I'll send a pretty patch later.
->>>> 
->>>> diff --git a/target-arm/kvm.c b/target-arm/kvm.c
->>>> index b4c8fe2..b549f00 100644
->>>> --- a/target-arm/kvm.c
->>>> +++ b/target-arm/kvm.c
->>>> @@ -173,6 +173,12 @@ int kvm_arch_init(MachineState *ms, KVMState *s)
->>>>     */
->>>>    kvm_async_interrupts_allowed = true;
->>>> 
->>>> +    /*
->>>> +     * PSCI wakes up secondary cores, so we always need to
->>>> +     * have vCPUs waiting in kernel space
->>>> +     */
->>>> +    kvm_halt_in_kernel_allowed = true;
->>>> +
->>>>    cap_has_mp_state = kvm_check_extension(s, KVM_CAP_MP_STATE);
->>>> 
->>>>    type_register_static(&host_arm_cpu_type_info);
->>> 
->>> What the status of userspace for this thing? Are QEMU patches being
->>> posted and reviewed?
->> 
->> I didn't see a notification that the patches were merged. Are they in
->> Linus' tree yet? Then I can post enablement to qemu-devel.
-> 
-> I think you got it backward. I have no intention of merging them until I
-> see a vague consensus on the userspace API, and a set of patches ready
-> to be merged in QEMU.
+> I don't know about you, but for my designs I can just use what drops out
+> of my Vivado build.
 
-That's not how kvm apis are made.
+Are you sure? With a 4.8 kernel?
 
+ # (in vivado 2016.3) write_bitstream -bin_file foo
+ $ hexdump -C foo.bin
+ 00000000  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
+ *
+ 00000020  00 00 00 bb 11 22 00 44  ff ff ff ff ff ff ff ff  |.....".D........|
+ 00000030  aa 99 55 66 20 00 00 00  30 02 20 01 00 00 00 00  |..Uf ...0. .....|
 
-Alex
+So that isn't going to work, it needs byte swapping
+
+ $ hexdump -C foo.bit
+ 000000a0  bb 11 22 00 44 ff ff ff  ff ff ff ff ff aa 99 55  |..".D..........U|
+ 000000b0  66 20 00 00 00 30 02 20  01 00 00 00 00 30 02 00  |f ...0. .....0..|
+
+This also is not going to work, it needs byteswapping and the sync word
+has to be 4 byte aligned.
+
+What did you do to get a working bitfile? Are you using one of the
+Vivado automatic flows that 'handles' this for you? I am not.
+
+Remember, 4.8 now has the patch to remove the autodetection that used
+to correct both of the above two problems..
+
+So from my perspective, this driver is incompatible with the output of
+the Xilinx tools. I don't really care, we always post-process the
+output of write_bitfile, and I am happy to provide a canonized
+bitstream, but the driver needs to do more to help people get this
+right.
+
+> Are you unhappy with the way we document which format to use, or
+> that we don't slice off the beginning (that gets ignored by hardware?).
+
+Well, I'm unhappy I spent an hour wondering why things didn't work
+with no information on what the expected format was now for this
+driver. For a bit I wondered if there was a driver bug as this stuff
+all worked for me with the original xdevcfg driver.
+
+Some of the problems were bugs on my part (which would have been found
+much faster with validation), but at the end of the day this is
+horribly unfriendly. You get a timeout and a 'Failed' message, thats
+it.
+
+I think all common bitstream formatting errors would be detected by
+simply validating the sync word.
+
+Jason
