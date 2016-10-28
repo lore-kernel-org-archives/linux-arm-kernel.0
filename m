@@ -1,88 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 28 Oct 2016 08:11:44 -0400
-Subject: [PATCH v6] tty/serial: at91: fix hardware handshake on Atmel
- platforms
-In-Reply-To: <CACQ1gAjX6fVghjxf=o_WNUDYFW6Sc_HF_3G6gxrSma5F3qjpbQ@mail.gmail.com>
-References: <20161027160406.25738-1-richard.genoud@gmail.com>
- <20161027180229.5faqrvxa2a4pos7i@pengutronix.de>
- <20161027231331.gngekbg22wfvnolr@piout.net>
- <20161028095151.f24lhelfknzrpy6c@pengutronix.de>
- <CACQ1gAjX6fVghjxf=o_WNUDYFW6Sc_HF_3G6gxrSma5F3qjpbQ@mail.gmail.com>
-Message-ID: <20161028121144.GA3948@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 28 Oct 2016 14:24:27 +0200
+Subject: [PATCH] Revert "gpio/mvebu: convert to use
+ irq_domain_add_simple()"
+In-Reply-To: <87twbyb65j.fsf@free-electrons.com>
+References: <1476831396-24359-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <871szcerxl.fsf@free-electrons.com>
+ <20161019210341.GA3746@obsidianresearch.com>
+ <CACRpkdatYim3=tKeO-E1GazB7RV9XPdE-EBQs+FW+DrryATzRA@mail.gmail.com>
+ <87twbyb65j.fsf@free-electrons.com>
+Message-ID: <CACRpkdaWQCEJjNpAVSFeJVFPX9HVLeduLj+cOpSH7Y3CX8gWog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 12:56:09PM +0200, Richard Genoud wrote:
-> 2016-10-28 11:51 GMT+02:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> > On Fri, Oct 28, 2016 at 01:13:31AM +0200, Alexandre Belloni wrote:
-> >> On 27/10/2016 at 20:02:29 +0200, Uwe Kleine-K?nig wrote :
-> >> > Hello Richard,
-> >> >
-> >> > On Thu, Oct 27, 2016 at 06:04:06PM +0200, Richard Genoud wrote:
-> >> > > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> >> > > index fd8aa1f4ba78..168b10cad47b 100644
-> >> > > --- a/drivers/tty/serial/atmel_serial.c
-> >> > > +++ b/drivers/tty/serial/atmel_serial.c
-> >> > > @@ -2132,11 +2132,29 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
-> >> > >           mode |= ATMEL_US_USMODE_RS485;
-> >> > >   } else if (termios->c_cflag & CRTSCTS) {
-> >> > >           /* RS232 with hardware handshake (RTS/CTS) */
-> >> > > -         if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> >> > > -                 dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> >> > > -                 termios->c_cflag &= ~CRTSCTS;
-> >> > > -         } else {
-> >> > > +         if (atmel_use_fifo(port) &&
-> >> > > +             !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
-> >> > > +                 /*
-> >> > > +                  * with ATMEL_US_USMODE_HWHS set, the controller will
-> >> > > +                  * be able to drive the RTS pin high/low when the RX
-> >> > > +                  * FIFO is above RXFTHRES/below RXFTHRES2.
-> >> > > +                  * It will also disable the transmitter when the CTS
-> >> > > +                  * pin is high.
-> >> > > +                  * This mode is not activated if CTS pin is a GPIO
-> >> > > +                  * because in this case, the transmitter is always
-> >> > > +                  * disabled (there must be an internal pull-up
-> >> > > +                  * responsible for this behaviour).
-> >> > > +                  * If the RTS pin is a GPIO, the controller won't be
-> >> > > +                  * able to drive it according to the FIFO thresholds,
-> >> > > +                  * but it will be handled by the driver.
-> >> > > +                  */
-> >> > >                   mode |= ATMEL_US_USMODE_HWHS;
-> >> >
-> >> > You use
-> >> >
-> >> >     !mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)
-> >> >
-> >> > as indicator that the cts mode of the respective pin is used. Is this
-> >> > reliable? (It's not if there are machines that don't use CTS, neither as
-> >> > gpio nor using the hardware function.) Maybe this needs a dt property to
-> >> > indicate that there is no (hw)handshaking available?
-> >> >
-> >>
-> >> We had a call today were we agreed that this should be added in a future
-> >> patch. Let's fix the regression for now.
-> >
-> > A machine without CTS (neither gpio nor hw function) used to work fine
-> > before the breaking commit, right? So this case is part of the
-> > regression and needs a fix?
-> Actually, a machine with a FIFO and without CTS didn't even exist at the
-> time of the breaking commit (v4.0), the FIFO handling was introduced later,
-> so it's not even a regression !
-> 
-> > Anyhow, this probably shouldn't stop the commit entering mainline
-> > because there are probably very few such machines (if any).
-> >
-> > So:
-> > Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >
-> > Best regards
-> > Uwe
-> 
-> 
-> Thanks !
-> 
-> Greg, could you take this in your tree ?
+On Thu, Oct 27, 2016 at 9:30 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+>  On lun., oct. 24 2016, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Wed, Oct 19, 2016 at 11:03 PM, Jason Gunthorpe
+>> <jgunthorpe@obsidianresearch.com> wrote:
+>>
+>>> From 7566f05ac445b652ba7607cc1899fed10fea1c76 Mon Sep 17 00:00:00 2001
+>>> From: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>>> Date: Wed, 19 Oct 2016 14:57:45 -0600
+>>> Subject: [PATCH] gpio/mvebu: Use irq_domain_add_linear
+>>>
+>>> This fixes the irq allocation in this driver to not print:
+>>>  irq: Cannot allocate irq_descs @ IRQ34, assuming pre-allocated
+>>>  irq: Cannot allocate irq_descs @ IRQ66, assuming pre-allocated
+>>>
+>>> Which happens because the driver already called irq_alloc_descs()
+>>> and so the change to use irq_domain_add_simple resulted in calling
+>>> irq_alloc_descs() twice.
+>>>
+>>> Modernize the irq allocation in this driver to use the
+>>> irq_domain_add_linear flow directly and eliminate the use of
+>>> irq_domain_add_simple/legacy
+>>>
+>>> Fixes: ce931f571b6d ("gpio/mvebu: convert to use irq_domain_add_simple()")
+>>> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>>
+>> So can I just apply this?
+>> Gregory?
+>
+> For me it's OK.
 
-Now applied, thanks for working through all of this.
+APplied this inline version.
 
-greg k-h
+Yours,
+Linus Walleij
