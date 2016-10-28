@@ -1,61 +1,189 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 28 Oct 2016 11:32:32 +0800
-Subject: [v13, 6/8] MAINTAINERS: add entry for Freescale SoC drivers
+Date: Fri, 28 Oct 2016 11:32:30 +0800
+Subject: [v13, 4/8] powerpc/fsl: move mpc85xx.h to include/linux/fsl
 In-Reply-To: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
 References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1477625554-46700-7-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1477625554-46700-5-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add maintainer entry for Freescale SoC drivers including
-the QE library and the GUTS driver now. Also add maintainer
-for QE library.
+Move mpc85xx.h to include/linux/fsl and rename it to svr.h as a common
+header file.  This SVR numberspace is used on some ARM chips as well as
+PPC, and even to check for a PPC SVR multi-arch drivers would otherwise
+need to ifdef the header inclusion and all references to the SVR symbols.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Scott Wood <oss@buserror.net>
-Acked-by: Qiang Zhao <qiang.zhao@nxp.com>
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Joerg Roedel <jroedel@suse.de>
+[scottwood: update description]
+Signed-off-by: Scott Wood <oss@buserror.net>
 ---
-Changes for v8:
-	- Added this patch
-Changes for v9:
-	- Added linux-arm mail list
-	- Removed GUTS driver entry
-Changes for v10:
-	- Changed 'DRIVER' to 'DRIVERS'
-	- Added 'Acked-by' of Scott and Qiang
-Changes for v11:
+Changes for v2:
 	- None
+Changes for v3:
+	- None
+Changes for v4:
+	- None
+Changes for v5:
+	- Changed to Move mpc85xx.h to include/linux/fsl/
+	- Adjusted '#include <linux/fsl/svr.h>' position in file
+Changes for v6:
+	- None
+Changes for v7:
+	- Added 'Acked-by: Wolfram Sang' for I2C part
+	- Also applied to arch/powerpc/kernel/cpu_setup_fsl_booke.S
+Changes for v8:
+	- Added 'Acked-by: Stephen Boyd' for clk part
+	- Added 'Acked-by: Scott Wood'
+	- Added 'Acked-by: Joerg Roedel' for iommu part
+Changes for v9:
+	- None
+Changes for v10:
+	- None
+Changes for v11:
+	- Updated description by Scott
 Changes for v12:
 	- None
 Changes for v13:
 	- None
 ---
- MAINTAINERS | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S                     | 2 +-
+ arch/powerpc/sysdev/fsl_pci.c                                 | 2 +-
+ drivers/clk/clk-qoriq.c                                       | 3 +--
+ drivers/i2c/busses/i2c-mpc.c                                  | 2 +-
+ drivers/iommu/fsl_pamu.c                                      | 3 +--
+ drivers/net/ethernet/freescale/gianfar.c                      | 2 +-
+ arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h | 4 ++--
+ 7 files changed, 8 insertions(+), 10 deletions(-)
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index c72fa18..cf3aaee 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5037,9 +5037,18 @@ S:	Maintained
- F:	drivers/net/ethernet/freescale/fman
- F:	Documentation/devicetree/bindings/powerpc/fsl/fman.txt
+diff --git a/arch/powerpc/kernel/cpu_setup_fsl_booke.S b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
+index 462aed9..2b0284e 100644
+--- a/arch/powerpc/kernel/cpu_setup_fsl_booke.S
++++ b/arch/powerpc/kernel/cpu_setup_fsl_booke.S
+@@ -13,13 +13,13 @@
+  *
+  */
  
-+FREESCALE SOC DRIVERS
-+M:	Scott Wood <oss@buserror.net>
-+L:	linuxppc-dev at lists.ozlabs.org
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	drivers/soc/fsl/
-+F:	include/linux/fsl/
-+
- FREESCALE QUICC ENGINE LIBRARY
-+M:	Qiang Zhao <qiang.zhao@nxp.com>
- L:	linuxppc-dev at lists.ozlabs.org
--S:	Orphan
-+S:	Maintained
- F:	drivers/soc/fsl/qe/
- F:	include/soc/fsl/*qe*.h
- F:	include/soc/fsl/*ucc*.h
++#include <linux/fsl/svr.h>
+ #include <asm/page.h>
+ #include <asm/processor.h>
+ #include <asm/cputable.h>
+ #include <asm/ppc_asm.h>
+ #include <asm/mmu-book3e.h>
+ #include <asm/asm-offsets.h>
+-#include <asm/mpc85xx.h>
+ 
+ _GLOBAL(__e500_icache_setup)
+ 	mfspr	r0, SPRN_L1CSR1
+diff --git a/arch/powerpc/sysdev/fsl_pci.c b/arch/powerpc/sysdev/fsl_pci.c
+index d3a5974..cb0efea 100644
+--- a/arch/powerpc/sysdev/fsl_pci.c
++++ b/arch/powerpc/sysdev/fsl_pci.c
+@@ -22,6 +22,7 @@
+ #include <linux/delay.h>
+ #include <linux/string.h>
+ #include <linux/fsl/edac.h>
++#include <linux/fsl/svr.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/memblock.h>
+@@ -37,7 +38,6 @@
+ #include <asm/pci-bridge.h>
+ #include <asm/ppc-pci.h>
+ #include <asm/machdep.h>
+-#include <asm/mpc85xx.h>
+ #include <asm/disassemble.h>
+ #include <asm/ppc-opcode.h>
+ #include <sysdev/fsl_soc.h>
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index 20b1055..dc778e8 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -13,6 +13,7 @@
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/fsl/guts.h>
++#include <linux/fsl/svr.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+@@ -1153,8 +1154,6 @@ static struct clk *clockgen_clk_get(struct of_phandle_args *clkspec, void *data)
+ }
+ 
+ #ifdef CONFIG_PPC
+-#include <asm/mpc85xx.h>
+-
+ static const u32 a4510_svrs[] __initconst = {
+ 	(SVR_P2040 << 8) | 0x10,	/* P2040 1.0 */
+ 	(SVR_P2040 << 8) | 0x11,	/* P2040 1.1 */
+diff --git a/drivers/i2c/busses/i2c-mpc.c b/drivers/i2c/busses/i2c-mpc.c
+index 565a49a..e791c51 100644
+--- a/drivers/i2c/busses/i2c-mpc.c
++++ b/drivers/i2c/busses/i2c-mpc.c
+@@ -27,9 +27,9 @@
+ #include <linux/i2c.h>
+ #include <linux/interrupt.h>
+ #include <linux/delay.h>
++#include <linux/fsl/svr.h>
+ 
+ #include <asm/mpc52xx.h>
+-#include <asm/mpc85xx.h>
+ #include <sysdev/fsl_soc.h>
+ 
+ #define DRV_NAME "mpc-i2c"
+diff --git a/drivers/iommu/fsl_pamu.c b/drivers/iommu/fsl_pamu.c
+index a34355f..af8fb27 100644
+--- a/drivers/iommu/fsl_pamu.c
++++ b/drivers/iommu/fsl_pamu.c
+@@ -21,11 +21,10 @@
+ #include "fsl_pamu.h"
+ 
+ #include <linux/fsl/guts.h>
++#include <linux/fsl/svr.h>
+ #include <linux/interrupt.h>
+ #include <linux/genalloc.h>
+ 
+-#include <asm/mpc85xx.h>
+-
+ /* define indexes for each operation mapping scenario */
+ #define OMI_QMAN        0x00
+ #define OMI_FMAN        0x01
+diff --git a/drivers/net/ethernet/freescale/gianfar.c b/drivers/net/ethernet/freescale/gianfar.c
+index 4b4f5bc..55be5ce 100644
+--- a/drivers/net/ethernet/freescale/gianfar.c
++++ b/drivers/net/ethernet/freescale/gianfar.c
+@@ -86,11 +86,11 @@
+ #include <linux/udp.h>
+ #include <linux/in.h>
+ #include <linux/net_tstamp.h>
++#include <linux/fsl/svr.h>
+ 
+ #include <asm/io.h>
+ #ifdef CONFIG_PPC
+ #include <asm/reg.h>
+-#include <asm/mpc85xx.h>
+ #endif
+ #include <asm/irq.h>
+ #include <asm/uaccess.h>
+diff --git a/arch/powerpc/include/asm/mpc85xx.h b/include/linux/fsl/svr.h
+similarity index 97%
+rename from arch/powerpc/include/asm/mpc85xx.h
+rename to include/linux/fsl/svr.h
+index 213f3a8..8d13836 100644
+--- a/arch/powerpc/include/asm/mpc85xx.h
++++ b/include/linux/fsl/svr.h
+@@ -9,8 +9,8 @@
+  * (at your option) any later version.
+  */
+ 
+-#ifndef __ASM_PPC_MPC85XX_H
+-#define __ASM_PPC_MPC85XX_H
++#ifndef FSL_SVR_H
++#define FSL_SVR_H
+ 
+ #define SVR_REV(svr)	((svr) & 0xFF)		/* SOC design resision */
+ #define SVR_MAJ(svr)	(((svr) >>  4) & 0xF)	/* Major revision field*/
 -- 
 2.1.0.27.g96db324
