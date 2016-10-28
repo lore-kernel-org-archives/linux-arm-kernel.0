@@ -1,111 +1,72 @@
-From: woogyom.kim@gmail.com (Milo Kim)
-Date: Fri, 28 Oct 2016 15:59:02 +0900
-Subject: [PATCH v2 2/3] ARM: dts: sun8i: Use the common file in NanoPi NEO SBC
-In-Reply-To: <20161028065903.23298-1-woogyom.kim@gmail.com>
-References: <20161028065903.23298-1-woogyom.kim@gmail.com>
-Message-ID: <20161028065903.23298-3-woogyom.kim@gmail.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 28 Oct 2016 14:50:11 +0800
+Subject: [v15, 0/7] Fix eSDHC host version register bug
+Message-ID: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NanoPi common dtsi supports all components of NEO SBC, so just include it.
+This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+eSDHC controller. To match the SoC version and revision, 10 previous version
+patchsets had tried many methods but all of them were rejected by reviewers.
+Such as
+	- dts compatible method
+	- syscon method
+	- ifdef PPC method
+	- GUTS driver getting SVR method
+Anrd suggested a soc_device_match method in v10, and this is the only available
+method left now. This v11 patchset introduces the soc_device_match interface in
+soc driver.
 
-Cc: James Pettigrew <james@innovum.com.au>
-Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+The first five patches of Yangbo are to add the GUTS driver. This is used to
+register a soc device which contain soc version and revision information.
+The other two patches introduce the soc_device_match method in soc driver
+and apply it on esdhc driver to fix this bug.
+
 ---
- arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts | 79 +------------------------------
- 1 file changed, 1 insertion(+), 78 deletions(-)
+Changes for v15:
+	- Dropped patch 'dt: bindings: update Freescale DCFG compatible'
+	  since the work had been done by below patch on ShawnGuo's linux tree.
+	  'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG
+	   and DCFG'
+	- Fixed error code issue in guts driver
+---
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-index 3d64caf..8d2cc6e 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
-@@ -40,86 +40,9 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/dts-v1/;
--#include "sun8i-h3.dtsi"
--#include "sunxi-common-regulators.dtsi"
--
--#include <dt-bindings/gpio/gpio.h>
--#include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include "sun8i-h3-nanopi.dtsi"
- 
- / {
- 	model = "FriendlyARM NanoPi NEO";
- 	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
--
--	aliases {
--		serial0 = &uart0;
--	};
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
--
--		pwr {
--			label = "nanopi:green:pwr";
--			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
--			default-state = "on";
--		};
--
--		status {
--			label = "nanopi:blue:status";
--			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
--		};
--	};
--};
--
--&ehci3 {
--	status = "okay";
--};
--
--&mmc0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
--	vmmc-supply = <&reg_vcc3v3>;
--	bus-width = <4>;
--	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
--	cd-inverted;
--	status = "okay";
--};
--
--&ohci3 {
--	status = "okay";
--};
--
--&pio {
--	leds_opc: led-pins {
--		allwinner,pins = "PA10";
--		allwinner,function = "gpio_out";
--		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--	};
--};
--
--&r_pio {
--	leds_r_opc: led-pins {
--		allwinner,pins = "PL10";
--		allwinner,function = "gpio_out";
--		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
--		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
--	};
--};
--
--&uart0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&uart0_pins_a>;
--	status = "okay";
--};
--
--&usbphy {
--	/* USB VBUS is always on */
--	status = "okay";
- };
+Arnd Bergmann (1):
+  base: soc: introduce soc_device_match() interface
+
+Yangbo Lu (6):
+  ARM64: dts: ls2080a: add device configuration node
+  dt: bindings: move guts devicetree doc out of powerpc directory
+  powerpc/fsl: move mpc85xx.h to include/linux/fsl
+  soc: fsl: add GUTS driver for QorIQ platforms
+  MAINTAINERS: add entry for Freescale SoC drivers
+  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+
+ .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+ MAINTAINERS                                        |  11 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+ arch/powerpc/sysdev/fsl_pci.c                      |   2 +-
+ drivers/base/Kconfig                               |   1 +
+ drivers/base/soc.c                                 |  66 ++++++
+ drivers/clk/clk-qoriq.c                            |   3 +-
+ drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+ drivers/iommu/fsl_pamu.c                           |   3 +-
+ drivers/mmc/host/Kconfig                           |   1 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+ drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+ drivers/soc/Kconfig                                |   3 +-
+ drivers/soc/fsl/Kconfig                            |  18 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/guts.c                             | 237 +++++++++++++++++++++
+ include/linux/fsl/guts.h                           | 125 ++++++-----
+ .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+ include/linux/sys_soc.h                            |   3 +
+ 20 files changed, 452 insertions(+), 61 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/guts.c
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+
 -- 
-2.9.3
+2.1.0.27.g96db324
