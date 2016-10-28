@@ -1,36 +1,28 @@
 From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 28 Oct 2016 11:32:29 +0800
-Subject: [v13,
- 3/8] dt: bindings: move guts devicetree doc out of powerpc directory
+Date: Fri, 28 Oct 2016 11:32:32 +0800
+Subject: [v13, 6/8] MAINTAINERS: add entry for Freescale SoC drivers
 In-Reply-To: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
 References: <1477625554-46700-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1477625554-46700-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <1477625554-46700-7-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
-since it's used by not only PowerPC but also ARM. And add a specification
-for 'little-endian' property.
+Add maintainer entry for Freescale SoC drivers including
+the QE library and the GUTS driver now. Also add maintainer
+for QE library.
 
 Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Acked-by: Scott Wood <oss@buserror.net>
+Acked-by: Qiang Zhao <qiang.zhao@nxp.com>
 ---
-Changes for v4:
-	- Added this patch
-Changes for v5:
-	- Modified the description for little-endian property
-Changes for v6:
-	- None
-Changes for v7:
-	- None
 Changes for v8:
-	- Added 'Acked-by: Scott Wood'
-	- Added 'Acked-by: Rob Herring'
+	- Added this patch
 Changes for v9:
-	- None
+	- Added linux-arm mail list
+	- Removed GUTS driver entry
 Changes for v10:
-	- None
+	- Changed 'DRIVER' to 'DRIVERS'
+	- Added 'Acked-by' of Scott and Qiang
 Changes for v11:
 	- None
 Changes for v12:
@@ -38,26 +30,32 @@ Changes for v12:
 Changes for v13:
 	- None
 ---
- Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
- 1 file changed, 3 insertions(+)
- rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ MAINTAINERS | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-similarity index 91%
-rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
-index b71b203..07adca9 100644
---- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
-+++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
-@@ -25,6 +25,9 @@ Recommended properties:
-  - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
-    registers, for those SOCs that have a PAMU device.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index c72fa18..cf3aaee 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5037,9 +5037,18 @@ S:	Maintained
+ F:	drivers/net/ethernet/freescale/fman
+ F:	Documentation/devicetree/bindings/powerpc/fsl/fman.txt
  
-+ - little-endian : Indicates that the global utilities block is little
-+   endian. The default is big endian.
++FREESCALE SOC DRIVERS
++M:	Scott Wood <oss@buserror.net>
++L:	linuxppc-dev at lists.ozlabs.org
++L:	linux-arm-kernel at lists.infradead.org
++S:	Maintained
++F:	drivers/soc/fsl/
++F:	include/linux/fsl/
 +
- Examples:
- 	global-utilities at e0000 {	/* global utilities block */
- 		compatible = "fsl,mpc8548-guts";
+ FREESCALE QUICC ENGINE LIBRARY
++M:	Qiang Zhao <qiang.zhao@nxp.com>
+ L:	linuxppc-dev at lists.ozlabs.org
+-S:	Orphan
++S:	Maintained
+ F:	drivers/soc/fsl/qe/
+ F:	include/soc/fsl/*qe*.h
+ F:	include/soc/fsl/*ucc*.h
 -- 
 2.1.0.27.g96db324
