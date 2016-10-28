@@ -1,15 +1,14 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 29 Oct 2016 01:29:45 +0300
-Subject: [PATCH 10/12] ARM: dts: sk-rzg1e: initial device tree
+Date: Sat, 29 Oct 2016 01:31:16 +0300
+Subject: [PATCH 11/12] ARM: dts: sk-rzg1e: add Ether support
 In-Reply-To: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
 References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
-Message-ID: <17390303.uDhVlFKVKX@wasted.cogentembedded.com>
+Message-ID: <1653044.nY120UqMZW@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial  device tree for the R8A7745 SoC based SK-RZG1E board.
-The board has 1  debug  serial  port (SCIF2); include support for it,
-so that the serial console can  work.
+Define the SK-RZG1E board dependent part of the Ether device node.
+Enable DHCP and NFS root  for the kernel booting.
 
 Based on the original (and large) patch by Dmitry Shifrin
 <dmitry.shifrin@cogentembedded.com>.
@@ -17,63 +16,36 @@ Based on the original (and large) patch by Dmitry Shifrin
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/Makefile             |    1 
- arch/arm/boot/dts/r8a7745-sk-rzg1e.dts |   39 +++++++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
+ arch/arm/boot/dts/r8a7745-sk-rzg1e.dts |   15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -678,6 +678,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r8a73a4-ape6evm.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	r8a7743-sk-rzg1m.dtb \
-+	r8a7745-sk-rzg1e.dtb \
- 	r8a7778-bockw.dtb \
- 	r8a7779-marzen.dtb \
- 	r8a7790-lager.dtb \
 Index: renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
 ===================================================================
---- /dev/null
+--- renesas.orig/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
 +++ renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-@@ -0,0 +1,39 @@
-+/*
-+ * Device Tree Source for the SK-RZG1E board
-+ *
-+ * Copyright (C) 2016 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2. This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+@@ -20,7 +20,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -37,3 +37,16 @@
+ &scif2 {
+ 	status = "okay";
+ };
 +
-+/dts-v1/;
-+#include "r8a7745.dtsi"
-+
-+/ {
-+	model = "SK-RZG1E";
-+	compatible = "renesas,sk-rzg1e", "renesas,r8a7745";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif2 {
++&ether {
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
 +	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc>;
++		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
 +};
