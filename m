@@ -1,71 +1,94 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 28 Oct 2016 09:58:38 -0700
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <CACna6rxCdgyqFMU5-LD0rJn1s6voSiVvk1AGGnaykGZPMDbwPw@mail.gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com> <5420659.scnjID7ZLn@wuerfel>
- <ae624772-9306-50ee-3dc1-df8156eaa16d@broadcom.com>
- <acccb06d-14b9-33bd-466b-47dd3689e537@broadcom.com>
- <CACna6rxCdgyqFMU5-LD0rJn1s6voSiVvk1AGGnaykGZPMDbwPw@mail.gmail.com>
-Message-ID: <1b58db80-c9ff-d4d6-0df1-d80d1c03bc45@broadcom.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 28 Oct 2016 10:02:37 -0700
+Subject: [PATCH 1/2] of, numa: Add function to disable of_node_to_nid().
+In-Reply-To: <20161028101905.GA6343@arm.com>
+References: <1477431061-7258-1-git-send-email-ddaney.cavm@gmail.com>
+ <1477431061-7258-2-git-send-email-ddaney.cavm@gmail.com>
+ <20161028101905.GA6343@arm.com>
+Message-ID: <581384AD.1000309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
-
-On 10/28/2016 8:31 AM, Rafa? Mi?ecki wrote:
-> On 20 April 2016 at 20:18, Ray Jui <ray.jui@broadcom.com> wrote:
->> Hi Rafal/Florian/Arnd,
+On 10/28/2016 03:19 AM, Will Deacon wrote:
+> On Tue, Oct 25, 2016 at 02:31:00PM -0700, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
 >>
->> After a couple days of email exchange with the ASIC team, I think I've
->> figured out the behavior on all of the Broadcom SoCs that use this iProc
->> PCIe controller.
+>> On arm64 NUMA kernels we can pass "numa=off" on the command line to
+>> disable NUMA.  A side effect of this is that kmalloc_node() calls to
+>> non-zero nodes will crash the system with an OOPS:
 >>
->> On NSP, Cygnus, and NS2:
->> - There's an APB error enable register at offset 0xf40 from the iProc PCIe
->> controller's base address. If one clears bit 0 (enabled by default after
->> chip POR) of that register, one can stop this from being forwarded to "iProc
->> host" as an APB error/external imprecise abort
->> - I will submit a patch to the iProc PCIe driver to disable this error
->> forwarding
+>> [    0.000000] [<fffffc00081bba84>] __alloc_pages_nodemask+0xa4/0xe68
+>> [    0.000000] [<fffffc00082163a8>] new_slab+0xd0/0x57c
+>> [    0.000000] [<fffffc000821879c>] ___slab_alloc+0x2e4/0x514
+>> [    0.000000] [<fffffc000823882c>] __slab_alloc+0x48/0x58
+>> [    0.000000] [<fffffc00082195a0>] __kmalloc_node+0xd0/0x2e0
+>> [    0.000000] [<fffffc00081119b8>] __irq_domain_add+0x7c/0x164
+>> [    0.000000] [<fffffc0008b75d30>] its_probe+0x784/0x81c
+>> [    0.000000] [<fffffc0008b75e10>] its_init+0x48/0x1b0
+>> .
+>> .
+>> .
 >>
->> On NS:
->> - Unfortunately, there's no such control register in NS. In other words, we
->> cannot disable this error at the PCIe controller level
->> - FSR code corresponds to external (bit[12] = '1'), read (bit[11] = '0'),
->> imprecise abort (bits[10][3:0] = '1''0110'), i.e., external imprecise abort
->> triggered by read access. Our ASIC team believes a read access to a
->> non-exist APB register can also trigger an abort with the same FSR code.
->> Note this is the tricky part, by registering an abort hook that skips this
->> particular FSR, one has a chance of skipping other aborts triggered by
->> accessing invalid APB registers. But given that this cannot be disabled for
->> the PCIe controller NS, I'm not sure what approach we should take. Any
->> thoughts?
-> 
-> It's really late reply but I wanted to finally handle this problem.
-> 
-> From Ray's e-mail it seems Northstar is the only platform requiring
-> this workaround. So we don't have to worry about arm64.
+>> This is caused by code like this in kernel/irq/irqdomain.c
+>>
+>>      domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+>>                    GFP_KERNEL, of_node_to_nid(of_node));
+>>
+>> When NUMA is disabled, the concept of a node is really undefined, so
+>> of_node_to_nid() should unconditionally return NUMA_NO_NODE.
+>>
+>> Add __of_force_no_numa() to allow of_node_to_nid() to be forced to
+>> return NUMA_NO_NODE.
+>>
+>> The follow on patch will call this new function from the arm64 numa
+>> code.
+>>
+>> Reported-by: Gilbert Netzer <noname@pdc.kth.se>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/of/of_numa.c | 15 +++++++++++++++
+>>   include/linux/of.h   |  2 ++
+>>   2 files changed, 17 insertions(+)
+>>
+>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+>> index f63d4b0d..2212299 100644
+>> --- a/drivers/of/of_numa.c
+>> +++ b/drivers/of/of_numa.c
+>> @@ -150,12 +150,27 @@ static int __init of_numa_parse_distance_map(void)
+>>   	return ret;
+>>   }
+>>
+>> +static bool of_force_no_numa;
+>> +
+>> +void __of_force_no_numa(void)
+>> +{
+>> +	of_force_no_numa = true;
+>> +}
+>> +
+>>   int of_node_to_nid(struct device_node *device)
+>>   {
+>>   	struct device_node *np;
+>>   	u32 nid;
+>>   	int r = -ENODATA;
+>>
+>> +	/*
+>> +	 * If NUMA forced off, nodes are meaningless.  Return
+>> +	 * NUMA_NO_NODE so that any node specific memory allocations
+>> +	 * can succeed from the default pool.
+>> +	 */
+>> +	if (of_force_no_numa)
+>> +		return NUMA_NO_NODE;
+>
+> Why don't you just check if the nid you get back from the device is set in
+> numa_nodes_parsed and return NUMA_NO_NODE if not?
 
-Yes, Northstar is the only platform that requires this workaround. Even
-the arm32 platforms like NSP and Cygnus can disable unsupported request
-being forwarded as APB error. I've recently sent out a patch series to
-fix this for all other platforms, and sorry I should have included you
-in the email but I did not. I'll include you when revision 2 is sent out.
+numa_nodes_parsed is __initdata.  Perhaps node_possible_map would be better.
 
-> 
-> We have two options then:
-> 1) Add workaround in arch/arm/mach-bcm/bcm_5301x.c
-> 2) Add workaround into built-in drivers/pci/host/pcie-iproc-fault.c
+I will try that.
 
-How do you plan to implement pcie-iproc-fault.c? If it's similar to what
-you have now, then I think it fits more to bcm_5301x.c
+David.
 
-> 
-> Do you have any preference about that?
-> 
 
-Thanks,
-
-Ray
+>
+> Will
+>
