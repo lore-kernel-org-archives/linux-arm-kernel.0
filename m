@@ -1,49 +1,22 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 28 Oct 2016 12:51:34 +0200
-Subject: [PATCH v5 1/7] ARM: dts: r8a7743: initial SoC device tree
-In-Reply-To: <13559419.B3v0G6vn24@wasted.cogentembedded.com>
-References: <1580369.yToZzJza1l@wasted.cogentembedded.com>
- <13559419.B3v0G6vn24@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXt0yoHsk_BLpn+e8eqC+sz_VNV1xeOPPM4on=8i_Gb-Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Oct 2016 12:52:44 +0200
+Subject: [v15, 3/7] powerpc/fsl: move mpc85xx.h to include/linux/fsl
+In-Reply-To: <1477637418-38938-4-git-send-email-yangbo.lu@nxp.com>
+References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+ <1477637418-38938-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <2723366.1bJeJ7SKI6@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Friday, October 28, 2016 2:50:14 PM CEST Yangbo Lu wrote:
+> Move mpc85xx.h to include/linux/fsl and rename it to svr.h as a common
+> header file.  This SVR numberspace is used on some ARM chips as well as
+> PPC, and even to check for a PPC SVR multi-arch drivers would otherwise
+> need to ifdef the header inclusion and all references to the SVR symbols.
+> 
+> 
 
-On Thu, Oct 27, 2016 at 11:36 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> The  initial R8A7743 SoC device tree including CPU0, GIC, timer, SYSC, RST,
-> CPG, and the required clock descriptions.
->
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> ---
-> Changes in version 5:
-> - added the RST device node, updated the patch description accordingly.
+I don't see any of the contents of this header referenced by the soc driver
+any more. I think you can just drop this patch.
 
-Thanks for the update!
-
-> +++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-> @@ -0,0 +1,120 @@
-
-> +               rst: reset-controller at e6160000 {
-> +                       compatible = "renesas,r8a7743-rst";
-> +                       reg = <0 0xe6160000 0 0x0200>;
-
-I'd use "reg = <0 0xe6160000 0 0x0100>".
-Only R-Car Gen3 has registers above offset 0x100.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
