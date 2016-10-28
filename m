@@ -1,134 +1,61 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Sat, 29 Oct 2016 01:07:08 +0200
-Subject: Low network throughput on i.MX28
-In-Reply-To: <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
- <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
-Message-ID: <1477696028.31471.3.camel@embedded.rocks>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Oct 2016 16:36:17 -0700
+Subject: [PATCHv4 11/15] clk: ti: clockdomain: add clock provider support
+ to clockdomains
+In-Reply-To: <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
+References: <1476805568-19264-1-git-send-email-t-kristo@ti.com>
+ <1476805568-19264-12-git-send-email-t-kristo@ti.com>
+ <20161028005047.GQ26139@codeaurora.org>
+ <cd32a554-ba0a-33cd-c15c-121524ce679b@ti.com>
+ <20161028125112.xfyrx7l7m64z6cu6@atomide.com>
+Message-ID: <20161028233617.GP16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-10-15 at 18:16 +0200, Stefan Wahren wrote:
-> > J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Oktober 2016
-> > um 11:41
-> > geschrieben:
+On 10/28, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [161028 00:43]:
+> > On 28/10/16 03:50, Stephen Boyd wrote:
+> > > I suppose a PRCM is
+> > > like an MFD that has clocks and resets under it? On other
+> > > platforms we've combined that all into one node and just had
+> > > #clock-cells and #reset-cells in that node. Is there any reason
+> > > we can't do that here?
 > > 
+> > For OMAPs, there are typically multiple instances of the PRCM around; OMAP4
+> > for example has:
 > > 
+> > cm1 @ 0x4a004000 (clocks + clockdomains)
+> > cm2 @ 0x4a008000 (clocks + clockdomains)
+> > prm @ 0x4a306000 (few clocks + resets + power state handling)
+> > scrm @ 0x4a30a000 (few external clocks + plenty of misc stuff)
 > > 
+> > These instances are also under different power/voltage domains which means
+> > their PM behavior is different.
 > > 
-> > Hi Stefan,
-> > 
-> > Am 15. Oktober 2016 10:59:41 MESZ, schrieb Stefan Wahren
-> > <stefan.wahren@i2se.com>:
-> > > Hi J?rg,
-> > > 
-> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 15. Oktober
-> > > > 2016 um
-> > > 
-> > > 10:46
-> > > > geschrieben:
-> > > > 
-> > > > 
-> > > > Thanks!
-> > > > 
-> > > > 
-> > > > For the record:
-> > > > 
-> > > > Note, this is the result for the wireless interface.
-> > > > 
-> > > > I got one of my custom boards running the legacy Linux Kernel
-> > > > 2.6.35
-> > > > officially supported from Freescale (NXP) and the bcmdhd driver
-> > > > from
-> > > > the Wiced project, where I get >20Mbps TCP throughput. The
-> > > > firmware
-> > > > version reported is:
-> > > > 
-> > > > # wl ver
-> > > > 5.90 RC115.2
-> > > > wl0: Apr 24 2014 14:08:41 version 5.90.195.89.24 FWID 01-
-> > > > bc2d0891
-> > > > 
-> > > > 
-> > > > I got it also running with the Linux Kernel 4.1.15 from
-> > > > Freescale
-> > > 
-> > > [2],
-> > > > which is not officially supported for the i.MX28 target, with
-> > > > the
-> > > > latest bcmdhd version where I get <7Mbps TCP throughput (which
-> > > > is
-> > > 
-> > > much
-> > > > the same I get with the brcmfmac driver). The firmware version
-> > > 
-> > > reported
-> > > > is:
-> > > > 
-> > > > # wl ver
-> > > > 1.107 RC5.0
-> > > > wl0: Aug??8 2016 02:17:48 version 5.90.232 FWID 01-0
-> > > > 
-> > > > So, probably something is missing in the newer Kernel version,
-> > > > which
-> > > 
-> > > is
-> > > > present in the legacy Kernel 2.6.35.
-> > > > 
-> > > > [1]
-> > > 
-> > > http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?
-> > > h=
-> > > > imx_2.6.35_1.1.0
-> > > > [2]
-> > > 
-> > > http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/log/?
-> > > h=
-> > > > imx_4.1.15_1.0.0_ga
-> > > 
-> > > during implementation of DDR mode for the mmc driver [1] i
-> > > noticed a
-> > > performance
-> > > gap between the vendor kernel and mainline by a factor of 2. I
-> > > expect
-> > > that your
-> > > wireless interface is connected via SDIO.
-> > 
-> > Yes, it is. I had the suspicion that the MMC or the DMA driver is
-> > the
-> > bootleneck, too.
-> > 
-> > > 
-> > > [1] -
-> > > http://linux-arm-kernel.infradead.narkive.com/GNkqjvo8/patch-rfc-
-> > > 0-3-mmc-mxs-mmc-implement-ddr-support
-> > 
-> > Looks like the patches might help.
+> > The idea behind having a clockdomain as a provider was mostly to have the
+> > topology visible : prcm-instance -> clockdomain -> clocks
 > 
-> Unfortunately not, the performance gain is smaller than expected.
+> Yeah that's needed to get the interconnect hierarchy right for
+> genpd :)
 > 
-> > Have you tried SDIO wifi so far?
+> > ... but basically I think it would be possible to drop the clockdomain
+> > representation and just mark the prcm-instance as a clock provider. Tony,
+> > any thoughts on that?
 > 
-> No.
+> No let's not drop the clockdomains as those will be needed when we
+> move things into proper hierarchy within the interconnect instances.
+> This will then help with getting things right with genpd.
+> 
+> In the long run we just want to specify clockdomain and the offset of
+> the clock instance within the clockdomain in the dts files.
+> 
 
-You mentioned [1] an optimization in the Freescale vendor Linux kernel
-[2]. I would really like to see this optimization in the mainline
-kernel.
+Sorry, I have very little idea how OMAP hardware works. Do you
+mean that you will have different nodes for each clockdomain so
+that genpd can map 1:1 to the node in dts? But in hardware
+there's a prcm that allows us to control many clock domains
+through register read/writes? How is the interconnect involved?
 
-Did you ever tried to port this code from Freescale to mainline?
-
-Is it even possible, as the mainline driver uses the DMA engine?
-
-[1] http://linux-arm-kernel.infradead.narkive.com/GNkqjvo8/patch-rfc-0-
-3-mmc-mxs-mmc-implement-ddr-support#post8
-[2] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/
-?h=imx_2.6.35_maintain&id=b09358887fb4b67f6d497fac8cc48475c8bd292d
-
-Best regards,
-J?rg Krause
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
