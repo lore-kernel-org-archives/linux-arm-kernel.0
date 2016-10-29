@@ -1,293 +1,90 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Sat, 29 Oct 2016 11:46:42 +0200
-Subject: [PATCH v12 RESEND 0/4] generic TEE subsystem
-In-Reply-To: <1e532aeb-4944-62e4-c8c4-1e23438b92cd@ti.com>
-References: <1477649984-16777-1-git-send-email-jens.wiklander@linaro.org>
- <1e532aeb-4944-62e4-c8c4-1e23438b92cd@ti.com>
-Message-ID: <20161029094641.GA23362@ermac>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 29 Oct 2016 11:08:36 +0100
+Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
+In-Reply-To: <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 10:43:24AM -0500, Andrew F. Davis wrote:
-> On 10/28/2016 05:19 AM, Jens Wiklander wrote:
-> > Hi,
-> > 
-> > This patch set introduces a generic TEE subsystem. The TEE subsystem will
-> > contain drivers for various TEE implementations. A TEE (Trusted Execution
-> > Environment) is a trusted OS running in some secure environment, for
-> > example, TrustZone on ARM CPUs, or a separate secure co-processor etc.
-> > 
-> > Regarding use cases, TrustZone has traditionally been used for
-> > offloading secure tasks to the secure world. Examples include: 
-> > - Secure key handling where the OS may or may not have direct access to key
-> >   material.
-> > - E-commerce and payment technologies. Credentials, credit card numbers etc
-> >   could be stored in a more secure environment.
-> > - Trusted User Interface (TUI) to ensure that no-one can snoop PIN-codes
-> >   etc.
-> > - Secure boot to ensure that loaded binaries haven?t been tampered with.
-> >   It?s not strictly needed for secure boot, but you could enhance security
-> >   by leveraging a TEE during boot.
-> > - Digital Rights Management (DRM), the studios provides content with
-> >   different resolution depending on the security of the device. Higher
-> >   security means higher resolution.
-> > 
-> > A TEE could also be used in existing and new technologies. For example IMA
-> > (Integrity Measurement Architecture) which has been in the kernel for quite
-> > a while. Today you can enhance security by using a TPM-chip to sign the IMA
-> > measurement list. This is something that you also could do by leveraging a
-> > TEE.
-> > 
-> > Another example could be in 2-factor authentication which is becoming
-> > increasingly more important. FIDO (https://fidoalliance.org) for example
-> > are using public key cryptography in their 2-factor authentication standard
-> > (U2F). With FIDO, a private and public key pair will be generated for every
-> > site you visit and the private key should never leave the local device.
-> > This is an example where you could use secure storage in a TEE for the
-> > private key.
-> > 
-> > Today you will find a quite a few different out of tree implementations of
-> > TEE drivers which tends to fragment the TEE ecosystem and development. We
-> > think it would be a good idea to have a generic TEE driver integrated in
-> > the kernel which would serve as a base for several different TEE solutions,
-> > no matter if they are on-chip like TrustZone or if they are on a separate
-> > crypto co-processor.
-> > 
-> > To develop this TEE subsystem we have been using the open source TEE called
-> > OP-TEE (https://github.com/OP-TEE/optee_os) and therefore this would be the
-> > first TEE solution supported by this new subsystem. OP-TEE is a
-> > GlobalPlatform compliant TEE, however this TEE subsystem is not limited to
-> > only GlobalPlatform TEEs, instead we have tried to design it so that it
-> > should work with other TEE solutions also.
-> > 
-> 
-> The above is my biggest concern with this whole subsystem, to me it
-> still feels very OPTEE specific. As much as I would love to believe
-> OPTEE will be the end-all TEE, I'm sure we soon will start to see wider
-> use of vendor TEEs (like TI's own legacy Trustzone thing we are hoping
-> to depreciate with OPTEE moving forward), possibly Google's Trusty TEE,
-> and whatever Intel/AMD are cooking up for x86.
+On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Wire up the generic support for exposing CPU feature bits via the
+> modalias in /sys/device/system/cpu. This allows udev to automatically
+> load modules for things like crypto algorithms that are implemented
+> using optional instructions.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/Kconfig                  |  1 +
+>  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+>  2 files changed, 33 insertions(+)
+>
 
-I'd rather say that it's slightly GlobalPlatform specific, but a bit
-more flexible.
+Russell,
 
-> 
-> As we all know when things are upstreamed we lose the ability to make
-> radical changes easily, especially to full subsystems. What happens when
-> this framework, built with only one existing TEE, built by the one
-> existing TEE's devs, is not as flexible as we need when other TEEs start
-> rolling out?
+do you have any concerns regarding this patch? If not, I will drop it
+into the patch system.
 
-Initially the TEE subsystem was much more flexible and was criticized
-for that.
+Herbert,
 
-> 
-> Do we see this as a chicken and egg situation, or is there any harm
-> beyond the pains of supporting an out-of-tree driver for a while, to
-> wait until we have at least one other TEE to add to this subsystem
-> before merging?
-
-This proposal is the bare minimum to have something useful. On top of
-this there's more things we'd like to add, for example an in-kernel API
-for accessing the TEE and secure buffer handling. The way we're dealing
-with shared memory need to be improved to better support multiple guests
-communicating with one TEE.
-
-What we can do now with the subsystem now is somewhat limited by the
-fact that we're trying to upstream it and want to do that it in
-manageable increments.
+I will resend the followup patches in this series to linux-crypto@
+once this prerequisite is in place
 
 Thanks,
-Jens
+Ard.
 
-> 
-> This may also help with the perceived lack of reviewers for this series.
-> 
-> Thanks,
-> Andrew
-> 
-> > "tee: generic TEE subsystem" brings in the generic TEE subsystem which
-> > helps when writing a driver for a specific TEE, for example, OP-TEE.
-> > 
-> > "tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
-> > its work.
-> > 
-> > This patch set has been prepared in cooperation with Javier Gonz?lez who
-> > proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
-> > https://lwn.net/Articles/623380/ . We've since then changed the scope to
-> > TEE instead of TrustZone.
-> > 
-> > We have discussed the design on tee-dev at lists.linaro.org (archive at
-> > https://lists.linaro.org/pipermail/tee-dev/) with people from other
-> > companies, including Valentin Manea <valentin.manea@huawei.com>,
-> > Emmanuel MICHEL <emmanuel.michel@st.com>,
-> > Jean-michel DELORME <jean-michel.delorme@st.com>,
-> > and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
-> > agree on something that is generic enough to support many different
-> > TEEs while still keeping the interface together.
-> > 
-> > v12-resend:
-> > * Rebased on v4.9-rc2
-> > 
-> > v12:
-> > * Rebased on v4.8-rc5
-> > * Addressed review comments from Andrew F. Davis
-> > * Removed Acked-by: Andreas Dannenberg <dannenberg@ti.com> as the
-> >   mail bounces
-> > * Bugfix possible null dereference in error cleanup path of
-> >   optee_probe().
-> > * Bugfix optee_from_msg_param() when calculating offset of memref
-> >   into a shared memory object
-> > 
-> > v11:
-> > * Rebased on v4.8-rc3
-> > * Addressed review comments from Nishanth Menon
-> > * Made the TEE framework available as a loadable module.
-> > * Reviewed-by: Javier Gonz?lez <javier@javigon.com>
-> > * Zeroes shared memory on allocation to avoid information leakage
-> > * Links shared memory objects to context to avoid stealing of shared memory
-> >   object from an unrelated process
-> > * Allow RPC interruption if supplicant is unavailable
-> > 
-> > v10:
-> > * Rebased on v4.7-rc1
-> > * Addressed private review comments from Nishanth Menon
-> > * Optee driver only accepts one supplicant process on the privileged device
-> > * Optee driver avoids long delayed releases of shm objects
-> > * Added more comments on functions and structs
-> > 
-> > v9:
-> > * Rebased on v4.6-rc1
-> > * Acked-by: Andreas Dannenberg <dannenberg@ti.com>
-> > * Addressed comments from Al Viro how file descriptors are passed to
-> >   user space
-> > * Addressed comments from Randy Dunlap on documentation
-> > * Changed license for include/uapi/linux/tee.h
-> > 
-> > v8:
-> > * Rebased on v4.5-rc3
-> > * dt/bindings: add bindings for optee
-> >   Acked-by: Rob Herring <robh@kernel.org>
-> > * Fixes build error for X86
-> > * Fixes spell error in "dt/bindings: add bindings for optee"
-> > 
-> > v7:
-> > * Rebased on v4.5-rc2
-> > * Moved the ARM SMC Calling Convention support into a separate patch
-> >   set, which is now merged
-> > 
-> > v6:
-> > * Rebased on v4.3-rc7
-> > * Changed smccc interface to let the compiler marshal most of the
-> >   parameters
-> > * Added ARCH64 capability for smccc interface
-> > * Changed the PSCI firmware calls (both arm and arm64) to use the new
-> >   generic smccc interface instead instead of own assembly functions.
-> > * Move optee DT bindings to below arm/firmware
-> > * Defines method for OP-TEE driver to call secure world in DT, smc or hvc
-> > * Exposes implementation id of a TEE driver in sysfs
-> >   to easily spawn corresponding tee-supplicant when device is ready
-> > * Update OP-TEE Message Protocol to better cope with fragmented physical
-> >   memory
-> > * Read time directly from OP-TEE driver instead of forwarding the RPC
-> >   request to tee-supplicant
-> > 
-> > v5:
-> > * Replaced kref reference counting for the device with a size_t instead as
-> >   the counter is always protected by a mutex
-> > 
-> > v4:
-> > * Rebased on 4.1
-> > * Redesigned the synchronization around entry exit of normal SMC
-> > * Replaced rwsem on the driver instance with kref and completion since
-> >   rwsem wasn't intended to be used in this way
-> > * Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
-> >   future additional parameter types
-> > * Documents TEE subsystem and OP-TEE driver
-> > * Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
-> >   TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
-> > * DT bindings in a separate patch
-> > * Assembly parts moved to arch/arm and arch/arm64 respectively, in a
-> >   separate patch
-> > * Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
-> > * Removed CMA usage to limit the scope of the patch set
-> > 
-> > v3:
-> > * Rebased on 4.1-rc3 (dma_buf_export() API change)
-> > * A couple of small sparse fixes
-> > * Documents bindings for OP-TEE driver
-> > * Updated MAINTAINERS
-> > 
-> > v2:
-> > * Replaced the stubbed OP-TEE driver with a real OP-TEE driver
-> > * Removed most APIs not needed by OP-TEE in current state
-> > * Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
-> > * Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
-> > * Moved tee.h into include/uapi/linux/
-> > * Redefined tee.h IOCTL macros to be directly based on _IOR and friends
-> > * Removed version info on the API to user space, a data blob which
-> >   can contain an UUID is left for user space to be able to tell which
-> >   protocol to use in TEE_IOC_CMD
-> > * Changed user space exposed structures to only have types with __ prefix
-> > * Dropped THIS_MODULE from tee_fops
-> > * Reworked how the driver is registered and ref counted:
-> >   - moved from using an embedded struct miscdevice to an embedded struct
-> >     device.
-> >   - uses an struct rw_semaphore as synchronization for driver detachment
-> >   - uses alloc/register pattern from TPM
-> > 
-> > Thanks,
-> > Jens
-> > 
-> > Jens Wiklander (4):
-> >   dt/bindings: add bindings for optee
-> >   tee: generic TEE subsystem
-> >   tee: add OP-TEE driver
-> >   Documentation: tee subsystem and op-tee driver
-> > 
-> >  Documentation/00-INDEX                             |   2 +
-> >  .../bindings/arm/firmware/linaro,optee-tz.txt      |  31 +
-> >  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
-> >  Documentation/ioctl/ioctl-number.txt               |   1 +
-> >  Documentation/tee.txt                              | 118 +++
-> >  MAINTAINERS                                        |  13 +
-> >  drivers/Kconfig                                    |   2 +
-> >  drivers/Makefile                                   |   1 +
-> >  drivers/tee/Kconfig                                |  18 +
-> >  drivers/tee/Makefile                               |   5 +
-> >  drivers/tee/optee/Kconfig                          |   7 +
-> >  drivers/tee/optee/Makefile                         |   5 +
-> >  drivers/tee/optee/call.c                           | 435 ++++++++++
-> >  drivers/tee/optee/core.c                           | 598 ++++++++++++++
-> >  drivers/tee/optee/optee_msg.h                      | 435 ++++++++++
-> >  drivers/tee/optee/optee_private.h                  | 185 +++++
-> >  drivers/tee/optee/optee_smc.h                      | 446 ++++++++++
-> >  drivers/tee/optee/rpc.c                            | 404 +++++++++
-> >  drivers/tee/optee/supp.c                           | 273 +++++++
-> >  drivers/tee/tee_core.c                             | 901 +++++++++++++++++++++
-> >  drivers/tee/tee_private.h                          | 129 +++
-> >  drivers/tee/tee_shm.c                              | 357 ++++++++
-> >  drivers/tee/tee_shm_pool.c                         | 158 ++++
-> >  include/linux/tee_drv.h                            | 278 +++++++
-> >  include/uapi/linux/tee.h                           | 403 +++++++++
-> >  25 files changed, 5206 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
-> >  create mode 100644 Documentation/tee.txt
-> >  create mode 100644 drivers/tee/Kconfig
-> >  create mode 100644 drivers/tee/Makefile
-> >  create mode 100644 drivers/tee/optee/Kconfig
-> >  create mode 100644 drivers/tee/optee/Makefile
-> >  create mode 100644 drivers/tee/optee/call.c
-> >  create mode 100644 drivers/tee/optee/core.c
-> >  create mode 100644 drivers/tee/optee/optee_msg.h
-> >  create mode 100644 drivers/tee/optee/optee_private.h
-> >  create mode 100644 drivers/tee/optee/optee_smc.h
-> >  create mode 100644 drivers/tee/optee/rpc.c
-> >  create mode 100644 drivers/tee/optee/supp.c
-> >  create mode 100644 drivers/tee/tee_core.c
-> >  create mode 100644 drivers/tee/tee_private.h
-> >  create mode 100644 drivers/tee/tee_shm.c
-> >  create mode 100644 drivers/tee/tee_shm_pool.c
-> >  create mode 100644 include/linux/tee_drv.h
-> >  create mode 100644 include/uapi/linux/tee.h
-> > 
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index b5d529fdffab..1a0c6a486a9c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -21,6 +21,7 @@ config ARM
+>         select GENERIC_ALLOCATOR
+>         select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
+>         select GENERIC_CLOCKEVENTS_BROADCAST if SMP
+> +       select GENERIC_CPU_AUTOPROBE
+>         select GENERIC_EARLY_IOREMAP
+>         select GENERIC_IDLE_POLL_SETUP
+>         select GENERIC_IRQ_PROBE
+> diff --git a/arch/arm/include/asm/cpufeature.h b/arch/arm/include/asm/cpufeature.h
+> new file mode 100644
+> index 000000000000..19c3dddd901a
+> --- /dev/null
+> +++ b/arch/arm/include/asm/cpufeature.h
+> @@ -0,0 +1,32 @@
+> +/*
+> + * Copyright (C) 2016 Linaro Ltd. <ard.biesheuvel@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __ASM_CPUFEATURE_H
+> +#define __ASM_CPUFEATURE_H
+> +
+> +#include <asm/hwcap.h>
+> +
+> +/*
+> + * Due to the fact that ELF_HWCAP is a 32-bit type on ARM, and given the number
+> + * of optional CPU features it defines, ARM's CPU capability bits have been
+> + * divided across separate elf_hwcap and elf_hwcap2 variables, each of which
+> + * covers a subset of the available CPU features.
+> + *
+> + * Currently, only a few of those are suitable for automatic module loading
+> + * (which is the primary use case of this facility) and those happen to be all
+> + * covered by HWCAP2. So let's only expose those via the CPU modalias for now.
+> + */
+> +#define MAX_CPU_FEATURES       (8 * sizeof(elf_hwcap2))
+> +#define cpu_feature(x)         ilog2(HWCAP2_ ## x)
+> +
+> +static inline bool cpu_have_feature(unsigned int num)
+> +{
+> +       return elf_hwcap2 & (1UL << num);
+> +}
+> +
+> +#endif
+> --
+> 2.7.4
+>
