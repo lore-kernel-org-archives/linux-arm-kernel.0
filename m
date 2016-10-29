@@ -1,25 +1,34 @@
 From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Fri, 28 Oct 2016 17:08:46 -0700
-Subject: [PATCH 0/3] Remove clocks dependency from SCM driver
-Message-ID: <1477699729-18451-1-git-send-email-spjoshi@codeaurora.org>
+Date: Fri, 28 Oct 2016 17:08:47 -0700
+Subject: [PATCH 1/3] dt-bindings: firmware: scm: Add MSM8996 DT bindings
+In-Reply-To: <1477699729-18451-1-git-send-email-spjoshi@codeaurora.org>
+References: <1477699729-18451-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <1477699729-18451-2-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On earlier chiptsets (APQ8064, MSM8660, MSM8690, MSM8916,
-APQ8084, MSM8974) crypto operations of TZ were depends on crypto
-clocks controlled by users/clients. However on MSM8996 crypto clocks
-control is handled internally in TZ itself. The current series of
-patches handle this clock dependency in SCM driver.
+Add SCM DT bindings for Qualcomm's MSM8996 platform.
 
-Sarangdhar Joshi (3):
-  dt-bindings: firmware: scm: Add MSM8996 DT bindings
-  firmware: qcom: scm: Remove core, iface and bus clocks dependency
-  firmware: qcom: scm: Return PTR_ERR when devm_clk_get fails
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
+ Documentation/devicetree/bindings/firmware/qcom,scm.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
- .../devicetree/bindings/firmware/qcom,scm.txt      |  2 +
- drivers/firmware/qcom_scm.c                        | 65 +++++++++++++++-------
- 2 files changed, 48 insertions(+), 19 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+index 3b4436e..20f26fb 100644
+--- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
++++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+@@ -10,8 +10,10 @@ Required properties:
+  * "qcom,scm-apq8064" for APQ8064 platforms
+  * "qcom,scm-msm8660" for MSM8660 platforms
+  * "qcom,scm-msm8690" for MSM8690 platforms
++ * "qcom,scm-msm8996" for MSM8996 platforms
+  * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
+ - clocks: One to three clocks may be required based on compatible.
++ * No clock required for "qcom,scm-msm8996"
+  * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
+  * Core, iface, and bus clocks required for "qcom,scm"
+ - clock-names: Must contain "core" for the core clock, "iface" for the interface
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
