@@ -1,107 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Oct 2016 11:54:49 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20161029185449.GA7906@localhost>
+From: agraf@suse.de (Alexander Graf)
+Date: Sat, 29 Oct 2016 20:55:11 +0200
+Subject: [PATCH 0/3] Support userspace irqchip with arch timers
+In-Reply-To: <1154342410.9324183.1477747141878.JavaMail.zimbra@redhat.com>
+References: <20160927190806.22988-1-christoffer.dall@linaro.org>
+ <3e85d538-2539-f190-0d17-a2ecfe7b48ce@suse.de> <20160930154335.GB7996@cbox>
+ <71b0ae9d-baea-1f65-3c01-5d87f4f4746f@suse.de>
+ <3928feee-cb23-8635-20bd-4c068b649a1d@arm.com>
+ <7500DEDE-EC21-4287-9B11-04C058A48747@suse.de>
+ <56812724-4bac-8265-b6f6-b1ff00308ec0@arm.com>
+ <554F7514-1900-41B4-8DDC-36C00B903164@suse.de>
+ <1154342410.9324183.1477747141878.JavaMail.zimbra@redhat.com>
+Message-ID: <5D593F44-F76B-4E2C-B2F8-CA08DFE2D87F@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+
+> On 29 Oct 2016, at 15:19, Paolo Bonzini <pbonzini@redhat.com> wrote:
+> 
+>>>>> What the status of userspace for this thing? Are QEMU patches being
+>>>>> posted and reviewed?
+>>>> 
+>>>> I didn't see a notification that the patches were merged. Are they in
+>>>> Linus' tree yet? Then I can post enablement to qemu-devel.
+>>> 
+>>> I think you got it backward. I have no intention of merging them until I
+>>> see a vague consensus on the userspace API, and a set of patches ready
+>>> to be merged in QEMU.
+>> 
+>> That's not how kvm apis are made.
+> 
+> Actually I think it's always been like this, depending on what Marc meant for
+> "ready to be merged in QEMU".  It doesn't make sense to merge KVM APIs without
+> having userspace patches at least posted as RFC to qemu-devel, and without
+> having at least a positive response from the QEMU architecture maintainer.
+
+I halfway agree. I do agree that there needs to be a reference implementation that proves the API to make sense. That bit is referenced in the cover letter of the patch set.
+
+Peter as the QEMU architecture maintainer has been part of the review process and involved from the beginning. In fact, the current approach was his idea.
+
+Do we need to fly the loop over qemu-devel? I doubt it, but if it makes you happy I can post an RFC there too.
+
+> ARM does require a bit more care because there's no overlap between kernel
+> and userspace maintainers, so perhaps that's the source of the confusion?
+> 
+> Now, of course merging the patches in QEMU may take a month or two depending
+> on the timing (because you have to wait for the patches to be merged into
+> Linus's tree and for the KVM headers to be updated in QEMU---which is not
+> going to happen during freeze of course).  So of course the KVM patch thus
+> can be committed even if QEMU is in freeze, as long as the QEMU architecture
+> maintainer gives an overall green light.
+
+Right. My plan was to make sure that people agree on the KVM interface. Then directly send non-RFC patches to qemu-devel, which can only happen when the KVM patches are merged. I didn?t see any reason why that approach would be controversial, since everyone who really cared was involved.
+
+But again, I don?t care strongly enough to make a fuss. If people are happier with RFC patches on the ML rather than a github link to RFC patches, I?ll send them.
 
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
-
-for you to fetch changes up to b70e8beb09d313202afd9d3953f501f02ee4e44b:
-
-  Merge tag 'v4.9-rockchip-dts64-fixes1' of git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip into fixes (2016-10-29 11:09:37 -0700)
-
-----------------------------------------------------------------
-ARM: SoC fixes
-
-We haven't seen a whole lot of fixes for the first two weeks since the merge
-window, but here is the batch that we have at the moment.
-
-Nothing sticks out as particularly bad or scary, it's mostly a handful of
-smaller fixes to several platforms. The Uniphier reset controller changes
-could probably have been delayed to 4.10, but they're not scary and just
-plumbing up driver changes that went in during the merge window.
-
-We're also adding another maintainer to Marvell Berlin platforms, to help
-out when Sebastian is too busy. Yay teamwork!
-
-----------------------------------------------------------------
-Fabio Estevam (3):
-      ARM: imx: gpc: Initialize all power domains
-      ARM: imx: gpc: Fix the imx_gpc_genpd_init() error path
-      ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031
-
-Gregory CLEMENT (1):
-      ARM: mvebu: Select corediv clk for all mvebu v7 SoC
-
-Jisheng Zhang (1):
-      MAINTAINERS: add myself as Marvell berlin SoC maintainer
-
-Linus Walleij (2):
-      ARM: dts: fix the SD card on the Snowball
-      bus: qcom-ebi2: depend on ARCH_QCOM or COMPILE_TEST
-
-Marcin Wojtas (1):
-      arm64: dts: marvell: fix clocksource for CP110 master SPI0
-
-Masahiro Yamada (5):
-      ARM: uniphier: select ARCH_HAS_RESET_CONTROLLER
-      arm64: uniphier: select ARCH_HAS_RESET_CONTROLLER
-      reset: uniphier: rename MIO reset to SD reset for Pro5, PXs2, LD20 SoCs
-      ARM: dts: uniphier: change MIO node to SD control node
-      arm64: dts: uniphier: change MIO node to SD control node
-
-Olof Johansson (5):
-      Merge tag 'mvebu-fixes-4.8-3' of git://git.infradead.org/linux-mvebu into fixes
-      Merge tag 'uniphier-fixes-v4.9' of git://git.kernel.org/.../masahiroy/linux-uniphier into fixes
-      Merge tag 'imx-fixes-4.9' of git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'arm-soc/for-4.9/devicetree-arm64-fixes' of http://github.com/Broadcom/stblinux into fixes
-      Merge tag 'v4.9-rockchip-dts64-fixes1' of git://git.kernel.org/.../mmind/linux-rockchip into fixes
-
-Ray Jui (1):
-      arm64: dts: Updated NAND DT properties for NS2 SVK
-
-Scott Branden (1):
-      ARM: multi_v7_defconfig: Enable Intel e1000e driver
-
-Scott Wood (1):
-      arm64: dts: Add timer erratum property for LS2080A and LS1043A
-
-Shawn Lin (2):
-      arm64: dts: rockchip: remove always-on and boot-on from vcc_sd
-      arm64: dts: rockchip: remove the abuse of keep-power-in-suspend
-
-Stefan Agner (1):
-      ARM: dts: vf610: fix IRQ flag of global timer
-
- .../devicetree/bindings/reset/uniphier-reset.txt   | 62 +++++++++++-----------
- MAINTAINERS                                        |  1 +
- arch/arm/boot/dts/ste-snowball.dts                 | 15 +++++-
- arch/arm/boot/dts/uniphier-pro5.dtsi               |  4 +-
- arch/arm/boot/dts/uniphier-pxs2.dtsi               |  4 +-
- arch/arm/boot/dts/vf500.dtsi                       |  2 +-
- arch/arm/configs/multi_v7_defconfig                |  1 +
- arch/arm/mach-imx/gpc.c                            | 15 ++++--
- arch/arm/mach-imx/mach-imx6q.c                     |  2 +-
- arch/arm/mach-mvebu/Kconfig                        |  4 +-
- arch/arm/mach-uniphier/Kconfig                     |  1 +
- arch/arm64/Kconfig.platforms                       |  1 +
- arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  2 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  1 +
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  1 +
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  2 +-
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    |  3 --
- .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    |  4 --
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 12 ++---
- drivers/bus/Kconfig                                |  1 +
- drivers/reset/reset-uniphier.c                     | 16 +++---
- 21 files changed, 87 insertions(+), 67 deletions(-)
+Alex
