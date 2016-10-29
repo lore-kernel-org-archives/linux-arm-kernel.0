@@ -1,62 +1,26 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 29 Oct 2016 21:36:58 +0200
-Subject: [PATCH 04/15] video: fbdev: use permission-specific DEVICE_ATTR
- variants
-In-Reply-To: <1477769829-22230-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1477769829-22230-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1477769829-22230-5-git-send-email-Julia.Lawall@lip6.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 29 Oct 2016 23:02:40 +0200
+Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
+ default list
+In-Reply-To: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <2502005.4risrb1P1I@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DEVICE_ATTR_RW for read-write attributes.  This simplifies the
-source code, improves readbility, and reduces the chance of
-inconsistencies.
+On Saturday, October 22, 2016 3:14:04 PM CEST Yury Norov wrote:
+> The newer prlimit64 syscall provides all the functionality provided by
+> the getrlimit and setrlimit syscalls and adds the pid of target process,
+> so future architectures won't need to include getrlimit and setrlimit.
+> 
+> Therefore drop getrlimit and setrlimit syscalls from the generic syscall
+> list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the architecture's
+> unistd.h prior to including asm-generic/unistd.h, and adjust all
+> architectures using the generic syscall list to define it so that no
+> in-tree architectures are affected.
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
+The patch looks good, but shouldn't we also hide the actual syscall
+implementation if the symbol is not set? It's just dead code otherwise
+for new architectures.
 
-// <smpl>
-@rw@
-declarer name DEVICE_ATTR;
-identifier x,x_show,x_store;
-@@
-
-DEVICE_ATTR(x, \(0644\|S_IRUGO|S_IWUSR\), x_show, x_store);
-
-@script:ocaml@
-x << rw.x;
-x_show << rw.x_show;
-x_store << rw.x_store;
-@@
-
-if not (x^"_show" = x_show && x^"_store" = x_store)
-then Coccilib.include_match false
-
-@@
-declarer name DEVICE_ATTR_RW;
-identifier rw.x,rw.x_show,rw.x_store;
-@@
-
-- DEVICE_ATTR(x, \(0644\|S_IRUGO|S_IWUSR\), x_show, x_store);
-+ DEVICE_ATTR_RW(x);
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/video/fbdev/wm8505fb.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/video/fbdev/wm8505fb.c b/drivers/video/fbdev/wm8505fb.c
-index e925619..253ffe9 100644
---- a/drivers/video/fbdev/wm8505fb.c
-+++ b/drivers/video/fbdev/wm8505fb.c
-@@ -182,7 +182,7 @@ static ssize_t contrast_store(struct device *dev,
- 	return count;
- }
- 
--static DEVICE_ATTR(contrast, 0644, contrast_show, contrast_store);
-+static DEVICE_ATTR_RW(contrast);
- 
- static inline u_int chan_to_field(u_int chan, struct fb_bitfield *bf)
- {
+	Arnd
