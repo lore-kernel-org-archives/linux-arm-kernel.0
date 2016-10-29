@@ -1,84 +1,124 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 29 Oct 2016 18:25:46 +0800
-Subject: [PATCH] drm/sun4i: Add a few formats
-In-Reply-To: <20161027143505.rblgbz5uqjynrtjk@lukather>
-References: <20161018084614.2443-1-maxime.ripard@free-electrons.com>
- <CAGb2v65uZFQnRme9LrRykze=a4d_7=HS=Gvu6E_eBG5tSw8nTw@mail.gmail.com>
- <20161024144014.occkqw2v5c2ghx4w@lukather>
- <CAGb2v65=6YGaaC3QimPHyP=FKJofygReozmnKLV8CGXvjWGtvQ@mail.gmail.com>
- <20161027143505.rblgbz5uqjynrtjk@lukather>
-Message-ID: <CAGb2v65SqkU-7W4+JnnnF+RzJO_0-TRq+DykJRf9og1wGc4azQ@mail.gmail.com>
+Date: Sat, 29 Oct 2016 19:06:11 +0800
+Subject: [PATCH v3 2/2] ARM: dts: sun6i: hummingbird-a31: Enable display
+ output through VGA bridge
+In-Reply-To: <20161029110611.28951-1-wens@csie.org>
+References: <20161029110611.28951-1-wens@csie.org>
+Message-ID: <20161029110611.28951-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 10:35 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Tue, Oct 25, 2016 at 08:42:26AM +0800, Chen-Yu Tsai wrote:
->> On Mon, Oct 24, 2016 at 10:40 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Fri, Oct 21, 2016 at 11:15:32AM +0800, Chen-Yu Tsai wrote:
->> >> On Tue, Oct 18, 2016 at 4:46 PM, Maxime Ripard
->> >> <maxime.ripard@free-electrons.com> wrote:
->> >> > The planes can do more than what was previously exposed. Add support for
->> >> > them.
->> >> >
->> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> >> > ---
->> >> >  drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++++
->> >> >  drivers/gpu/drm/sun4i/sun4i_layer.c   |  6 ++++++
->> >> >  2 files changed, 26 insertions(+)
->> >> >
->> >> > diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> > index afb7ddf660ef..b184a476a480 100644
->> >> > --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> > +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
->> >> > @@ -96,6 +96,22 @@ static int sun4i_backend_drm_format_to_layer(struct drm_plane *plane,
->> >> >                 *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB8888;
->> >> >                 break;
->> >> >
->> >> > +       case DRM_FORMAT_ARGB4444:
->> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB4444;
->> >> > +               break;
->> >> > +
->> >> > +       case DRM_FORMAT_ARGB1555:
->> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_ARGB1555;
->> >> > +               break;
->> >> > +
->> >> > +       case DRM_FORMAT_RGBA5551:
->> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA5551;
->> >> > +               break;
->> >> > +
->> >> > +       case DRM_FORMAT_RGBA4444:
->> >> > +               *mode = SUN4I_BACKEND_LAY_FBFMT_RGBA4444;
->> >>
->> >> The A20 manual only lists ARGB4444, not RGBA4444. There might be
->> >> some discrepancy here. We can deal with them
->> >
->> > Hmm, yes, that's weird. But I guess this would be part of porting it
->> > to the A20.
->> >
->> >> Also there are some more formats missing from the list, could you
->> >> add them as well?
->> >
->> > Which one do you refer to?
->>
->> RGB556 and RGB655.
->
-> These formats are not supported by Linux yet though.
+The Hummingbird A31 board has a VGA DAC which converts RGB output
+from the LCD interface to VGA analog signals.
 
-I see. Sorry for the noise.
+Add nodes for the VGA DAC, its power supply, and enable this part
+of the display pipeline.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 76 +++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index 9a74637f677f..1ab28b2108fe 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -63,6 +63,62 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	vga-connector {
++		compatible = "vga-connector";
++
++		port {
++			vga_con_in: endpoint {
++				remote-endpoint = <&vga_dac_out>;
++			};
++		};
++	};
++
++	vga-dac {
++		compatible = "dumb-vga-dac";
++		vdd-supply = <&reg_vga_3v3>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++
++				vga_dac_in: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_vga>;
++				};
++			};
++
++			port at 1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				vga_dac_out: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vga_con_in>;
++				};
++			};
++		};
++	};
++
++	reg_vga_3v3: vga_3v3_regulator {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&vga_3v3_enable_pin_hummingbird>;
++		regulator-name = "vga-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		enable-active-high;
++		gpio = <&pio 7 25 GPIO_ACTIVE_HIGH>; /* PH25 */
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&pio 6 10 GPIO_ACTIVE_LOW>; /* PG10 */
+@@ -166,6 +222,13 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 	};
+ 
++	vga_3v3_enable_pin_hummingbird: vga_3v3_enable_pin {
++		allwinner,pins = "PH25";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	wifi_reset_pin_hummingbird: wifi_reset_pin at 0 {
+ 		allwinner,pins = "PG10";
+ 		allwinner,function = "gpio_out";
+@@ -245,6 +308,19 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd0_rgb888_pins>;
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_vga: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&vga_dac_in>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+-- 
+2.9.3
