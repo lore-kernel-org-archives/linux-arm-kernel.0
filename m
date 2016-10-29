@@ -1,37 +1,53 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Oct 2016 11:09:19 -0700
-Subject: [GIT PULL] Broadcom ARM64 Device Tree fixes for 4.9
-In-Reply-To: <1477331005-32163-1-git-send-email-f.fainelli@gmail.com>
-References: <1477331005-32163-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20161029180919.GC4195@localhost>
+Date: Sat, 29 Oct 2016 11:39:51 -0700
+Subject: [GIT PULL] firmware: SCPI updates for v4.10
+In-Reply-To: <20161028112920.GB12241@e107155-lin>
+References: <20161028112920.GB12241@e107155-lin>
+Message-ID: <20161029183951.GE4195@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:43:25AM -0700, Florian Fainelli wrote:
+Hi Sudeep,
+
+On Fri, Oct 28, 2016 at 12:29:20PM +0100, Sudeep Holla wrote:
+> Hi ARM-SoC Team,
+> 
+> Please pull !
+> 
+> --
+> Regards,
+> Sudeep
+> 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
 >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.9/devicetree-arm64-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scpi-updates-4.10
 > 
-> for you to fetch changes up to 963d790468a2f581abf039b45edac79af5e16e55:
+> for you to fetch changes up to a9e0192d8b35c6ab115a154ed1499ff39a0e5b06:
 > 
->   arm64: dts: Updated NAND DT properties for NS2 SVK (2016-10-23 14:50:20 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains a single fix for Broadcom ARM64-based SoCs:
-> 
-> - Ray adds the required bus width and OOB sector size properties to the
->   Northstar 2 SVK reference board in order for the NAND controller to work
->   properly
+>   firmware: arm_scpi: add support for legacy match table on Amlogic GXBB SoC (2016-10-19 15:17:28 +0100)
 > 
 > ----------------------------------------------------------------
-> Ray Jui (1):
->       arm64: dts: Updated NAND DT properties for NS2 SVK
+> SCPI updates for v4.10
+> 
+> 1. Adds support for Legacy SCPI(pre- SCPI v1.0) protocol
+> 
+> 2. Adds support for SCPI used on Amlogic GXBB SoC using the legacy
+>    SCPI protocol
+> 
+> ----------------------------------------------------------------
+> Neil Armstrong (5):
+>       dt-bindings: Add support for Amlogic GXBB SCPI Interface
 
-Merged, thanks.
+I had comments on this patch, just emailed as follow-up to it.
+
+Also, you didn't sign off on it when applying it, seems like a mistake.
+
+Please respin, ideally with the other changes also done (i.e. splitting off
+Juno stuff from arm,scpi.txt).
 
 
 -Olof
