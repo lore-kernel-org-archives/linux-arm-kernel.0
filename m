@@ -1,93 +1,138 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 30 Oct 2016 00:31:04 +0900
-Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
-In-Reply-To: <1476880777-5068-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1476880777-5068-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQfZ86_V6ZC5nnCB7Y4EvOPtFBUDM+Kfm9UNyE9h6MA4Q@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sun, 30 Oct 2016 00:27:08 +0800
+Subject: [rjarzmik:pxa/for-next 8/8] arch/arm/mach-pxa/em-x270.c:987:15:
+ error: variable 'camera_dummy_config' has initializer but incomplete type
+Message-ID: <201610300005.Wr8vvIuS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+tree:   https://github.com/rjarzmik/linux pxa/for-next
+head:   f27d52aafe46f2cdce6a075970861dab30ff715d
+commit: f27d52aafe46f2cdce6a075970861dab30ff715d [8/8] ARM: pxa: em-x270: use the new pxa_camera platform_data
+config: arm-pxa_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout f27d52aafe46f2cdce6a075970861dab30ff715d
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-If there is no objection to this patch,
-I will put it into Russell's patch tracker.
+All error/warnings (new ones prefixed by >>):
 
+>> arch/arm/mach-pxa/em-x270.c:987:15: error: variable 'camera_dummy_config' has initializer but incomplete type
+    static struct fixed_voltage_config camera_dummy_config = {
+                  ^~~~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-pxa/em-x270.c:988:2: error: unknown field 'supply_name' specified in initializer
+     .supply_name  = "camera_vdd",
+     ^
+>> arch/arm/mach-pxa/em-x270.c:988:18: warning: excess elements in struct initializer
+     .supply_name  = "camera_vdd",
+                     ^~~~~~~~~~~~
+   arch/arm/mach-pxa/em-x270.c:988:18: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:989:2: error: unknown field 'input_supply' specified in initializer
+     .input_supply  = "vcc cam",
+     ^
+   arch/arm/mach-pxa/em-x270.c:989:19: warning: excess elements in struct initializer
+     .input_supply  = "vcc cam",
+                      ^~~~~~~~~
+   arch/arm/mach-pxa/em-x270.c:989:19: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:990:2: error: unknown field 'microvolts' specified in initializer
+     .microvolts  = 2800000,
+     ^
+   arch/arm/mach-pxa/em-x270.c:990:17: warning: excess elements in struct initializer
+     .microvolts  = 2800000,
+                    ^~~~~~~
+   arch/arm/mach-pxa/em-x270.c:990:17: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:991:2: error: unknown field 'gpio' specified in initializer
+     .gpio   = GPIO56_MT9M111_nOE,
+     ^
+>> arch/arm/mach-pxa/em-x270.c:991:12: error: 'GPIO56_MT9M111_nOE' undeclared here (not in a function)
+     .gpio   = GPIO56_MT9M111_nOE,
+               ^~~~~~~~~~~~~~~~~~
+   arch/arm/mach-pxa/em-x270.c:991:12: warning: excess elements in struct initializer
+   arch/arm/mach-pxa/em-x270.c:991:12: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:992:2: error: unknown field 'enable_high' specified in initializer
+     .enable_high  = 0,
+     ^
+   arch/arm/mach-pxa/em-x270.c:992:18: warning: excess elements in struct initializer
+     .enable_high  = 0,
+                     ^
+   arch/arm/mach-pxa/em-x270.c:992:18: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:993:2: error: unknown field 'init_data' specified in initializer
+     .init_data  = &camera_dummy_initdata,
+     ^
+   arch/arm/mach-pxa/em-x270.c:993:16: warning: excess elements in struct initializer
+     .init_data  = &camera_dummy_initdata,
+                   ^
+   arch/arm/mach-pxa/em-x270.c:993:16: note: (near initialization for 'camera_dummy_config')
+>> arch/arm/mach-pxa/em-x270.c:987:36: error: storage size of 'camera_dummy_config' isn't known
+    static struct fixed_voltage_config camera_dummy_config = {
+                                       ^~~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-pxa/em-x270.c:996:31: warning: 'camera_supply_dummy_device' defined but not used [-Wunused-variable]
+    static struct platform_device camera_supply_dummy_device = {
+                                  ^~~~~~~~~~~~~~~~~~~~~~~~~~
+>> arch/arm/mach-pxa/em-x270.c:959:26: warning: 'em_x270_camera_ldo' defined but not used [-Wunused-variable]
+    static struct regulator *em_x270_camera_ldo;
+                             ^~~~~~~~~~~~~~~~~~
 
-2016-10-19 21:39 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> The UniPhier outer cache (arch/arm/mm/cache-uniphier.c) has 128 byte
-> line length and its tags are also managed per 128 byte line.  This
-> is very unfortunate, but the current 64 byte alignment for kmalloc()
-> causes sharing problems on DMA if used with this outer cache.
->
-> This commit adds ARM_L1_CACHE_SHIFT_7 to increase the DMA minimum
-> alignment to 128 byte if CACHE_UNIPHIER is enabled.  There are
-> several drivers that assume aligning to L1_CACHE_BYTES will be DMA
-> safe, so this commit also changes the L1_CACHE_BYTES for safety.
->
-> Having said that, I hesitate to align all the other SoCs in Multi
-> platform to the UniPhier's requirement.  So, I am disabling the
-> CONFIG_CACHE_UNIPHIER by default, so that multi_v7_defconfig will
-> still with CONFIG_ARM_L1_CACHE_SHIFT=6.  With this, UniPhier SoCs
-> become a bit slower, but it is much better than system crash.
-> If desired, the outer-cache can be enabled by the merge_config or
-> something.
->
-> Note:
-> The UniPhier PH1-Pro5 SoC is equipped also with L3 cache with 256 byte
-> line size but its tags are managed per 128 byte sub-line.
-> So, ARM_L1_CACHE_SHIFT_7 should be fine for all the UniPhier SoCs.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> I threw a question in January this year:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-January/400289.html
->
-> After a long interval, I came back to this topic.
->
->
->  arch/arm/mm/Kconfig | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index c1799dd..f68e8ec 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -991,7 +991,7 @@ config CACHE_TAUROS2
->  config CACHE_UNIPHIER
->         bool "Enable the UniPhier outer cache controller"
->         depends on ARCH_UNIPHIER
-> -       default y
-> +       select ARM_L1_CACHE_SHIFT_7
->         select OUTER_CACHE
->         select OUTER_CACHE_SYNC
->         help
-> @@ -1012,8 +1012,14 @@ config ARM_L1_CACHE_SHIFT_6
->         help
->           Setting ARM L1 cache line size to 64 Bytes.
->
-> +config ARM_L1_CACHE_SHIFT_7
-> +       bool
-> +       help
-> +         Setting ARM L1 cache line size to 128 Bytes.
-> +
->  config ARM_L1_CACHE_SHIFT
->         int
-> +       default 7 if ARM_L1_CACHE_SHIFT_7
->         default 6 if ARM_L1_CACHE_SHIFT_6
->         default 5
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+vim +/camera_dummy_config +987 arch/arm/mach-pxa/em-x270.c
 
+   953	#else
+   954	static inline void em_x270_init_gpio_keys(void) {}
+   955	#endif
+   956	
+   957	/* Quick Capture Interface and sensor setup */
+   958	#if defined(CONFIG_VIDEO_PXA27x) || defined(CONFIG_VIDEO_PXA27x_MODULE)
+ > 959	static struct regulator *em_x270_camera_ldo;
+   960	
+   961	static int em_x270_sensor_init(void)
+   962	{
+   963		int ret;
+   964	
+   965		ret = gpio_request(cam_reset, "camera reset");
+   966		if (ret)
+   967			return ret;
+   968	
+   969		gpio_direction_output(cam_reset, 0);
+   970		gpio_set_value(cam_reset, 1);
+   971	
+   972		return 0;
+   973	}
+   974	
+   975	static struct regulator_consumer_supply camera_dummy_supplies[] = {
+   976		REGULATOR_SUPPLY("vdd", "0-005d"),
+   977	};
+   978	
+   979	static struct regulator_init_data camera_dummy_initdata = {
+   980		.consumer_supplies = camera_dummy_supplies,
+   981		.num_consumer_supplies = ARRAY_SIZE(camera_dummy_supplies),
+   982		.constraints = {
+   983			.valid_ops_mask = REGULATOR_CHANGE_STATUS,
+   984		},
+   985	};
+   986	
+ > 987	static struct fixed_voltage_config camera_dummy_config = {
+ > 988		.supply_name		= "camera_vdd",
+ > 989		.input_supply		= "vcc cam",
+ > 990		.microvolts		= 2800000,
+ > 991		.gpio			= GPIO56_MT9M111_nOE,
+ > 992		.enable_high		= 0,
+ > 993		.init_data		= &camera_dummy_initdata,
+   994	};
+   995	
+ > 996	static struct platform_device camera_supply_dummy_device = {
+   997		.name	= "reg-fixed-voltage",
+   998		.id	= 1,
+   999		.dev	= {
 
-
--- 
-Best Regards
-Masahiro Yamada
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30095 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161030/40070bab/attachment-0001.gz>
