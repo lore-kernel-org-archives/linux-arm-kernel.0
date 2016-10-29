@@ -1,49 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 30 Oct 2016 00:31:27 +0300
-Subject: [PATCH] ARM: dts: r8a7794: remove Z clock
-In-Reply-To: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
-Message-ID: <2289596.xFBEUD1OgK@wasted.cogentembedded.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 30 Oct 2016 00:45:41 +0300
+Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
+ default list
+In-Reply-To: <2502005.4risrb1P1I@wuerfel>
+References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
+ <2502005.4risrb1P1I@wuerfel>
+Message-ID: <20161029214541.GA20037@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R8A7794 doesn't have Cortex-A15 CPUs, thus there's no Z clock...
+On Sat, Oct 29, 2016 at 11:02:40PM +0200, Arnd Bergmann wrote:
+> On Saturday, October 22, 2016 3:14:04 PM CEST Yury Norov wrote:
+> > The newer prlimit64 syscall provides all the functionality provided by
+> > the getrlimit and setrlimit syscalls and adds the pid of target process,
+> > so future architectures won't need to include getrlimit and setrlimit.
+> > 
+> > Therefore drop getrlimit and setrlimit syscalls from the generic syscall
+> > list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the architecture's
+> > unistd.h prior to including asm-generic/unistd.h, and adjust all
+> > architectures using the generic syscall list to define it so that no
+> > in-tree architectures are affected.
+> 
+> The patch looks good, but shouldn't we also hide the actual syscall
+> implementation if the symbol is not set? It's just dead code otherwise
+> for new architectures.
 
-Fixes: 0dce5454d5c2 ("ARM: shmobile: Initial r8a7794 SoC device tree")
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+I was thinking on it. The patch of James Hogan, b0da6d4415 (asm-generic:
+Drop renameat syscall from default list) doesn't do it for renameat(), so
+I decided not to do it too. It's not so easy to disable syscalls because arch
+may support few ABIs, and some of them may require the syscall. For example,
+arm64 supports lp64, aarch32 and ilp32, and first two ABIs need renameat()
+and getrlimit/setrlimit.
 
----
-The patch is against the 'master' branch of Simon Horman's 'renesas.git' repo.
+At now there's no arches that doesn't need renameat() and getrlimit/setrlimit,
+and there will be no such arch in nearest future. So there will be no
+dead code.
 
- arch/arm/boot/dts/r8a7794.dtsi            |    3 +--
- include/dt-bindings/clock/r8a7794-clock.h |    3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+But I agree with you that we need make that implementations 
+conditional. If I understand it correctly, we need something like
+__ARCH_WANT_SET_GET_RLIMIT in all existing Kconfigs, correct?
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1025,8 +1025,7 @@
- 			clocks = <&extal_clk &usb_extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "sdh", "sd0", "z",
--					     "rcan";
-+					     "lb", "qspi", "sdh", "sd0", "rcan";
- 			#power-domain-cells = <0>;
- 		};
- 		/* Variable factor clocks */
-Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
-===================================================================
---- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
-+++ renesas/include/dt-bindings/clock/r8a7794-clock.h
-@@ -20,8 +20,7 @@
- #define R8A7794_CLK_QSPI		5
- #define R8A7794_CLK_SDH			6
- #define R8A7794_CLK_SD0			7
--#define R8A7794_CLK_Z			8
--#define R8A7794_CLK_RCAN		9
-+#define R8A7794_CLK_RCAN		8
- 
- /* MSTP0 */
- #define R8A7794_CLK_MSIOF0		0
+I think this patch may be applied as is, and if needed I can send
+another patch that disables renameat() and getrlimit/setrlimit soon.
+
+James, what do you think?
+
+Yury.
