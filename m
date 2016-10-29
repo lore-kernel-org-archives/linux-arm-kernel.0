@@ -1,79 +1,80 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Sat, 29 Oct 2016 13:12:29 +0200
-Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external imprecise
- aborts
-Message-ID: <20161029111229.26875-1-zajec5@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 29 Oct 2016 12:19:01 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: Prevent VGIC_ADDR_TO_INTID from emiting
+ divisions
+Message-ID: <20161029111901.16668-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+Using non-constant number of bits for VGIC_ADDR_TO_INTID() leads
+to gcc 6.1 emiting calls to __aeabi_uldivmod, which the kernel
+does not implement.
 
-Since early BCM5301X days we got abort handler that was removed by
-commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
-fault handler"). It assumed we need to deal only with pending aborts
-left by the bootloader. Unfortunately this isn't true for BCM5301X.
+As we really don't want to implement complex division in the kernel,
+the only other option is to prove to the compiler that there is only
+a few values that are possible for the number of bits per IRQ, and
+that they are all power of 2.
 
-When probing PCI config space (device enumeration) it is expected to
-have master aborts on the PCI bus. Most bridges don't forward (or they
-allow disabling it) these errors onto the AXI/AMBA bus but not the
-Northstar (BCM5301X) one.
+We turn the VGIC_ADDR_TO_INTID macro into a switch that looks for
+the supported set of values (1, 2, 8, 64), and perform the computation
+accordingly. When "bits" is a constant, the compiler optimizes
+away the other cases. If not, we end-up with a small number of cases
+that GCC optimises reasonably well. Out of range values are detected
+both at build time (constants) and at run time (variables).
 
-iProc PCIe controller on Northstar seems to be some older one, without
-a control register for errors forwarding. It means we need to workaround
-this at platform level. All newer platforms are not affected by this
-issue.
-
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-bcm/bcm_5301x.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+This should be applied *before* Andre's patch fixing out of bound SPIs.
 
-diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-index c8830a2..fe067f6 100644
---- a/arch/arm/mach-bcm/bcm_5301x.c
-+++ b/arch/arm/mach-bcm/bcm_5301x.c
-@@ -9,14 +9,42 @@
- #include <asm/hardware/cache-l2x0.h>
+ virt/kvm/arm/vgic/vgic-mmio.h | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 4c34d39..a457282 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -57,10 +57,41 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+  * multiplication with the inverted fraction, and scale up both the
+  * numerator and denominator with 8 to support at most 64 bits per IRQ:
+  */
+-#define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
++#define __VGIC_ADDR_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
+ 					64 / (bits) / 8)
  
- #include <asm/mach/arch.h>
-+#include <asm/siginfo.h>
-+#include <asm/signal.h>
+ /*
++ * Perform the same computation, but also handle non-constant number
++ * of bits. We only care about the few cases that are required by
++ * GICv2/v3.
++ */
++#define VGIC_ADDR_TO_INTID(addr, bits)				\
++	({							\
++		u32 __v;					\
++		switch((bits)) {				\
++		case 1:						\
++			__v = __VGIC_ADDR_INTID((addr), 1);	\
++			break;					\
++		case 2:						\
++			__v = __VGIC_ADDR_INTID((addr), 2);	\
++			break;					\
++		case 8:						\
++			__v = __VGIC_ADDR_INTID((addr), 8);	\
++			break;					\
++		case 64:					\
++			__v = __VGIC_ADDR_INTID((addr), 64);	\
++			break;					\
++		default:					\
++			if (__builtin_constant_p((bits)))	\
++				BUILD_BUG();			\
++			else					\
++				BUG();				\
++		}						\
++								\
++		__v;						\
++	})
 +
-+#define FSR_EXTERNAL		(1 << 12)
-+#define FSR_READ		(0 << 10)
-+#define FSR_IMPRECISE		0x0406
- 
- static const char *const bcm5301x_dt_compat[] __initconst = {
- 	"brcm,bcm4708",
- 	NULL,
- };
- 
-+static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
-+				  struct pt_regs *regs)
-+{
-+	/*
-+	 * We want to ignore aborts forwarded from the PCIe bus that are
-+	 * expected and shouldn't really be passed by the PCIe controller.
-+	 * The biggest disadvantage is the same FSR code may be reported when
-+	 * reading non-existing APB register and we shouldn't ignore that.
-+	 */
-+	if (fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE))
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static void __init bcm5301x_init_early(void)
-+{
-+	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
-+			"imprecise external abort");
-+}
-+
- DT_MACHINE_START(BCM5301X, "BCM5301X")
- 	.l2c_aux_val	= 0,
- 	.l2c_aux_mask	= ~0,
- 	.dt_compat	= bcm5301x_dt_compat,
-+	.init_early	= bcm5301x_init_early,
- MACHINE_END
++/*
+  * Some VGIC registers store per-IRQ information, with a different number
+  * of bits per IRQ. For those registers this macro is used.
+  * The _WITH_LENGTH version instantiates registers with a fixed length
 -- 
 2.9.3
