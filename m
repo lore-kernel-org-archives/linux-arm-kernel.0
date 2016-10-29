@@ -1,21 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Oct 2016 11:41:11 -0700
-Subject: [GIT PULL] ARM: vexpress: fixes for v4.10
-In-Reply-To: <20161028113003.GC12241@e107155-lin>
-References: <20161028113003.GC12241@e107155-lin>
-Message-ID: <20161029184111.GF4195@localhost>
+Date: Sat, 29 Oct 2016 11:43:31 -0700
+Subject: [GIT PULL] ARM: dts: vexpress: fixes/updates for v4.10
+In-Reply-To: <20161028113038.GD12241@e107155-lin>
+References: <20161028113038.GD12241@e107155-lin>
+Message-ID: <20161029184331.GG4195@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 12:30:03PM +0100, Sudeep Holla wrote:
-> Hi ARM SoC team,
+On Fri, Oct 28, 2016 at 12:30:38PM +0100, Sudeep Holla wrote:
+> Hi ARM Soc Team,
 > 
-> These couple of fixes help to boot TC2 in HYP mode with CONFIG_MCPM
-> enabled. This was not supported directly before and hence targeting for
-> v4.10. Currently those who want to boot in HYP mode have to disable
-> MCPM config in the build.
-> 
-> Please pull.
+> Please pull !
 > 
 > --
 > Regards,
@@ -27,11 +22,19 @@ On Fri, Oct 28, 2016 at 12:30:03PM +0100, Sudeep Holla wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-fixes-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-dt-4.10
 > 
-> for you to fetch changes up to 801f33be8e902d8cea75cb7ac056d07c4fdd25f8:
+> for you to fetch changes up to b01c3994817dc4e117c5642c3e09e0a231b5b477:
 > 
->   drivers: cci: add missing CCI port availability firmware check (2016-10-17 14:27:54 +0100)
+>   ARM: dts: vexpress: add TC2 cpu capacity-dmips-mhz information (2016-10-17 17:05:58 +0100)
+> 
+> ----------------------------------------------------------------
+> ARMv7 Vexpress DT fixes/updates for v4.10
+> 
+> 1. Addition of CPU dmips/capacity information to TC2 platform
+> 
+> 2. Cleanup/fix unit address warnings and removal of skeleton.dtsi from
+>    MPS2 device tree
 
 Merged, thanks.
 
