@@ -1,23 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 29 Oct 2016 10:23:29 +0200
-Subject: [PATCH] video: ARM CLCD: fix Vexpress regression
-In-Reply-To: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
-References: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <CACRpkdaKpG2yYtbwD4_vLOo1CwRKvh=RWvwmVeN56aQu1ur=HA@mail.gmail.com>
+Date: Sat, 29 Oct 2016 10:36:01 +0200
+Subject: pinctrl: mediatek: build failure if CONFIG_IRQ_DOMAIN is not set
+In-Reply-To: <1477675233.2167.11.camel@tiscali.nl>
+References: <1477675233.2167.11.camel@tiscali.nl>
+Message-ID: <CACRpkdZ-8jSfyvP_kmVEW=N0FWv+vc+z08roFn4dsvRFxg7Amw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 8:46 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Fri, Oct 28, 2016 at 7:20 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
 
-> The CLCD does not come up on Versatile Express as it does not
-> (currently) have a syscon node for controlling the block apart
-> from the CLCD itself. Make sure the .init() function can bail
-> out without an error making it probe again.
->
-> Reported-by: Amit Pundir <amit.pundir@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 3) Would you like me to submit a proper (but lightly tested) patch or
+> do you prefer to fix this yourself?
 
-Tomi can you please pick this up?
+Please send a tested patch, I'll apply it.
+
+Thanks for finding this!
 
 Yours,
 Linus Walleij
