@@ -1,533 +1,177 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Sat, 29 Oct 2016 13:55:29 +0200
-Subject: [PATCH v4 1/5] arm64: perf: Basic uncore counter support for Cavium
- ThunderX SOC
+Date: Sat, 29 Oct 2016 13:55:32 +0200
+Subject: [PATCH v4 4/5] arm64: perf: Cavium ThunderX LMC uncore support
 In-Reply-To: <cover.1477741719.git.jglauber@cavium.com>
 References: <cover.1477741719.git.jglauber@cavium.com>
-Message-ID: <73173d6ad2430eead5e9da40564a90a60961b6d9.1477741719.git.jglauber@cavium.com>
+Message-ID: <f9baa80538f92f136691d7dc19f2fe6b08e75bd0.1477741719.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide "uncore" facilities for different non-CPU performance
-counter units.
-
-The uncore PMUs can be found under /sys/bus/event_source/devices.
-All counters are exported via sysfs in the corresponding events
-files under the PMU directory so the perf tool can list the event names.
-
-There are some points that are special in this implementation:
-
-1) The PMU detection relies on PCI device detection. If a
-   matching PCI device is found the PMU is created. The code can deal
-   with multiple units of the same type, e.g. more than one memory
-   controller.
-
-2) Counters are summarized across different units of the same type
-   on one NUMA node but not across NUMA nodes.
-   For instance L2C TAD 0..7 are presented as a single counter
-   (adding the values from TAD 0 to 7). Although losing the ability
-   to read a single value the merged values are easier to use.
-
-3) The counters are not CPU related. A random CPU is picked regardless
-   of the NUMA node. There is a small performance penalty for accessing
-   counters on a remote note but reading a performance counter is a
-   slow operation anyway.
+Support counters on the DRAM controllers.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
- drivers/perf/Kconfig                |  13 ++
- drivers/perf/Makefile               |   1 +
- drivers/perf/uncore/Makefile        |   1 +
- drivers/perf/uncore/uncore_cavium.c | 351 ++++++++++++++++++++++++++++++++++++
- drivers/perf/uncore/uncore_cavium.h |  71 ++++++++
- include/linux/cpuhotplug.h          |   1 +
- 6 files changed, 438 insertions(+)
- create mode 100644 drivers/perf/uncore/Makefile
- create mode 100644 drivers/perf/uncore/uncore_cavium.c
- create mode 100644 drivers/perf/uncore/uncore_cavium.h
+ drivers/perf/uncore/Makefile            |   3 +-
+ drivers/perf/uncore/uncore_cavium.c     |   1 +
+ drivers/perf/uncore/uncore_cavium.h     |   1 +
+ drivers/perf/uncore/uncore_cavium_lmc.c | 118 ++++++++++++++++++++++++++++++++
+ 4 files changed, 122 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
 
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index 4d5c5f9..3266c87 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -19,4 +19,17 @@ config XGENE_PMU
-         help
-           Say y if you want to use APM X-Gene SoC performance monitors.
- 
-+config UNCORE_PMU
-+	bool
-+
-+config UNCORE_PMU_CAVIUM
-+	depends on PERF_EVENTS && NUMA && ARM64
-+	bool "Cavium uncore PMU support"
-+	select UNCORE_PMU
-+	default y
-+	help
-+	  Say y if you want to access performance counters of subsystems
-+	  on a Cavium SOC like cache controller, memory controller or
-+	  processor interconnect.
-+
- endmenu
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index b116e98..d6c02c9 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o
- obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
-+obj-y += uncore/
 diff --git a/drivers/perf/uncore/Makefile b/drivers/perf/uncore/Makefile
-new file mode 100644
-index 0000000..6130e18
---- /dev/null
+index d5ef3db..ef04a2b9 100644
+--- a/drivers/perf/uncore/Makefile
 +++ b/drivers/perf/uncore/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o		\
+ 				   uncore_cavium_l2c_tad.o	\
+-				   uncore_cavium_l2c_cbc.o
++				   uncore_cavium_l2c_cbc.o	\
++				   uncore_cavium_lmc.o
 diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
-new file mode 100644
-index 0000000..a7b4277
---- /dev/null
+index 051f0fa..fd9e49e 100644
+--- a/drivers/perf/uncore/uncore_cavium.c
 +++ b/drivers/perf/uncore/uncore_cavium.c
-@@ -0,0 +1,351 @@
+@@ -348,6 +348,7 @@ static int __init thunder_uncore_init(void)
+ 
+ 	thunder_uncore_l2c_tad_setup();
+ 	thunder_uncore_l2c_cbc_setup();
++	thunder_uncore_lmc_setup();
+ 	return 0;
+ }
+ late_initcall(thunder_uncore_init);
+diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
+index 91d674a..3897586 100644
+--- a/drivers/perf/uncore/uncore_cavium.h
++++ b/drivers/perf/uncore/uncore_cavium.h
+@@ -71,3 +71,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
+ 				  char *page);
+ int thunder_uncore_l2c_tad_setup(void);
+ int thunder_uncore_l2c_cbc_setup(void);
++int thunder_uncore_lmc_setup(void);
+diff --git a/drivers/perf/uncore/uncore_cavium_lmc.c b/drivers/perf/uncore/uncore_cavium_lmc.c
+new file mode 100644
+index 0000000..9668197
+--- /dev/null
++++ b/drivers/perf/uncore/uncore_cavium_lmc.c
+@@ -0,0 +1,118 @@
 +/*
-+ * Cavium Thunder uncore PMU support.
++ * Cavium Thunder uncore PMU support, Local memory controller (LMC) counters.
 + *
-+ * Copyright (C) 2015,2016 Cavium Inc.
++ * Copyright 2016 Cavium Inc.
 + * Author: Jan Glauber <jan.glauber@cavium.com>
 + */
 +
-+#include <linux/cpufeature.h>
-+#include <linux/numa.h>
++#include <linux/perf_event.h>
 +#include <linux/slab.h>
 +
 +#include "uncore_cavium.h"
 +
-+/*
-+ * Some notes about the various counters supported by this "uncore" PMU
-+ * and the design:
-+ *
-+ * All counters are 64 bit long.
-+ * There are no overflow interrupts.
-+ * Counters are summarized per node/socket.
-+ * Most devices appear as separate PCI devices per socket with the exception
-+ * of OCX TLK which appears as one PCI device per socket and contains several
-+ * units with counters that are merged.
-+ * Some counters are selected via a control register (L2C TAD) and read by
-+ * a number of counter registers, others (L2C CBC, LMC & OCX TLK) have
-+ * one dedicated counter per event.
-+ * Some counters are not stoppable (L2C CBC & LMC).
-+ * Some counters are read-only (LMC).
-+ * All counters belong to PCI devices, the devices may have additional
-+ * drivers but we assume we are the only user of the counter registers.
-+ * We map the whole PCI BAR so we must be careful to forbid access to
-+ * addresses that contain neither counters nor counter control registers.
-+ */
++struct thunder_uncore *thunder_uncore_lmc;
 +
-+void thunder_uncore_read(struct perf_event *event)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	struct thunder_uncore_unit *unit;
-+	u64 prev, delta, new = 0;
++#define LMC_CONFIG_OFFSET		0x188
++#define LMC_CONFIG_RESET_BIT		BIT_ULL(17)
 +
-+	node = get_node(hwc->config, uncore);
++/* LMC event list */
++#define LMC_EVENT_IFB_CNT		0x1d0
++#define LMC_EVENT_OPS_CNT		0x1d8
++#define LMC_EVENT_DCLK_CNT		0x1e0
++#define LMC_EVENT_BANK_CONFLICT1	0x360
++#define LMC_EVENT_BANK_CONFLICT2	0x368
 +
-+	/* read counter values from all units on the node */
-+	list_for_each_entry(unit, &node->unit_list, entry)
-+		new += readq(hwc->event_base + unit->map);
++/* map counter numbers to register offsets */
++static int lmc_events[] = {
++	LMC_EVENT_IFB_CNT,
++	LMC_EVENT_OPS_CNT,
++	LMC_EVENT_DCLK_CNT,
++	LMC_EVENT_BANK_CONFLICT1,
++	LMC_EVENT_BANK_CONFLICT2,
++};
 +
-+	prev = local64_read(&hwc->prev_count);
-+	local64_set(&hwc->prev_count, new);
-+	delta = new - prev;
-+	local64_add(delta, &event->count);
-+}
-+
-+int thunder_uncore_add(struct perf_event *event, int flags, u64 config_base,
-+		       u64 event_base)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	int id;
-+
-+	node = get_node(hwc->config, uncore);
-+	id = get_id(hwc->config);
-+
-+	if (!cmpxchg(&node->events[id], NULL, event))
-+		hwc->idx = id;
-+
-+	if (hwc->idx == -1)
-+		return -EBUSY;
-+
-+	hwc->config_base = config_base;
-+	hwc->event_base = event_base;
-+	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
-+
-+	if (flags & PERF_EF_START)
-+		uncore->pmu.start(event, PERF_EF_RELOAD);
-+
-+	return 0;
-+}
-+
-+void thunder_uncore_del(struct perf_event *event, int flags)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	int i;
-+
-+	event->pmu->stop(event, PERF_EF_UPDATE);
-+
-+	/*
-+	 * For programmable counters we need to check where we installed it.
-+	 * To keep this function generic always test the more complicated
-+	 * case (free running counters won't need the loop).
-+	 */
-+	node = get_node(hwc->config, uncore);
-+	for (i = 0; i < node->num_counters; i++) {
-+		if (cmpxchg(&node->events[i], event, NULL) == event)
-+			break;
-+	}
-+	hwc->idx = -1;
-+}
-+
-+void thunder_uncore_start(struct perf_event *event, int flags)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	struct thunder_uncore_unit *unit;
-+	u64 new = 0;
-+
-+	/* read counter values from all units on the node */
-+	node = get_node(hwc->config, uncore);
-+	list_for_each_entry(unit, &node->unit_list, entry)
-+		new += readq(hwc->event_base + unit->map);
-+	local64_set(&hwc->prev_count, new);
-+
-+	hwc->state = 0;
-+	perf_event_update_userpage(event);
-+}
-+
-+void thunder_uncore_stop(struct perf_event *event, int flags)
++static int thunder_uncore_add_lmc(struct perf_event *event, int flags)
 +{
 +	struct hw_perf_event *hwc = &event->hw;
 +
-+	hwc->state |= PERF_HES_STOPPED;
-+
-+	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
-+		thunder_uncore_read(event);
-+		hwc->state |= PERF_HES_UPTODATE;
-+	}
++	return thunder_uncore_add(event, flags,
++				  LMC_CONFIG_OFFSET,
++				  lmc_events[get_id(hwc->config)]);
 +}
 +
-+int thunder_uncore_event_init(struct perf_event *event)
-+{
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	struct thunder_uncore *uncore;
++PMU_FORMAT_ATTR(event, "config:0-2");
 +
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
-+
-+	/* we do not support sampling */
-+	if (is_sampling_event(event))
-+		return -EINVAL;
-+
-+	/* counters do not have these bits */
-+	if (event->attr.exclude_user	||
-+	    event->attr.exclude_kernel	||
-+	    event->attr.exclude_host	||
-+	    event->attr.exclude_guest	||
-+	    event->attr.exclude_hv	||
-+	    event->attr.exclude_idle)
-+		return -EINVAL;
-+
-+	uncore = to_uncore(event->pmu);
-+	if (!uncore)
-+		return -ENODEV;
-+	if (!uncore->event_valid(event->attr.config & UNCORE_EVENT_ID_MASK))
-+		return -EINVAL;
-+
-+	/* check NUMA node */
-+	node = get_node(event->attr.config, uncore);
-+	if (!node) {
-+		pr_debug("Invalid NUMA node selected\n");
-+		return -EINVAL;
-+	}
-+
-+	hwc->config = event->attr.config;
-+	hwc->idx = -1;
-+	return 0;
-+}
-+
-+static ssize_t thunder_uncore_attr_show_cpumask(struct device *dev,
-+						struct device_attribute *attr,
-+						char *buf)
-+{
-+	struct pmu *pmu = dev_get_drvdata(dev);
-+	struct thunder_uncore *uncore =
-+		container_of(pmu, struct thunder_uncore, pmu);
-+
-+	return cpumap_print_to_pagebuf(true, buf, &uncore->active_mask);
-+}
-+static DEVICE_ATTR(cpumask, S_IRUGO, thunder_uncore_attr_show_cpumask, NULL);
-+
-+static struct attribute *thunder_uncore_attrs[] = {
-+	&dev_attr_cpumask.attr,
++static struct attribute *thunder_lmc_format_attr[] = {
++	&format_attr_event.attr,
++	&format_attr_node.attr,
 +	NULL,
 +};
 +
-+struct attribute_group thunder_uncore_attr_group = {
-+	.attrs = thunder_uncore_attrs,
++static struct attribute_group thunder_lmc_format_group = {
++	.name = "format",
++	.attrs = thunder_lmc_format_attr,
 +};
 +
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page)
++static struct attribute *thunder_lmc_events_attr[] = {
++	UC_EVENT_ENTRY(ifb_cnt, 0),
++	UC_EVENT_ENTRY(ops_cnt, 1),
++	UC_EVENT_ENTRY(dclk_cnt, 2),
++	UC_EVENT_ENTRY(bank_conflict1, 3),
++	UC_EVENT_ENTRY(bank_conflict2, 4),
++	NULL,
++};
++
++static struct attribute_group thunder_lmc_events_group = {
++	.name = "events",
++	.attrs = thunder_lmc_events_attr,
++};
++
++static const struct attribute_group *thunder_lmc_attr_groups[] = {
++	&thunder_uncore_attr_group,
++	&thunder_lmc_format_group,
++	&thunder_lmc_events_group,
++	NULL,
++};
++
++struct pmu thunder_lmc_pmu = {
++	.name		= "thunder_lmc",
++	.task_ctx_nr    = perf_invalid_context,
++	.event_init	= thunder_uncore_event_init,
++	.add		= thunder_uncore_add_lmc,
++	.del		= thunder_uncore_del,
++	.start		= thunder_uncore_start,
++	.stop		= thunder_uncore_stop,
++	.read		= thunder_uncore_read,
++	.attr_groups	= thunder_lmc_attr_groups,
++};
++
++static bool event_valid(u64 config)
 +{
-+	struct perf_pmu_events_attr *pmu_attr =
-+		container_of(attr, struct perf_pmu_events_attr, attr);
++	if (config < ARRAY_SIZE(lmc_events))
++		return true;
 +
-+	if (pmu_attr->event_str)
-+		return sprintf(page, "%s", pmu_attr->event_str);
-+
-+	return 0;
++	return false;
 +}
 +
-+/* node attribute depending on number of NUMA nodes */
-+static ssize_t node_show(struct device *dev, struct device_attribute *attr,
-+			 char *page)
++int __init thunder_uncore_lmc_setup(void)
 +{
-+	if (NODES_SHIFT)
-+		return sprintf(page, "config:16-%d\n", 16 + NODES_SHIFT - 1);
-+	else
-+		return sprintf(page, "config:16\n");
-+}
++	int ret = -ENOMEM;
 +
-+struct device_attribute format_attr_node = __ATTR_RO(node);
++	thunder_uncore_lmc = kzalloc(sizeof(*thunder_uncore_lmc), GFP_KERNEL);
++	if (!thunder_uncore_lmc)
++		goto fail_nomem;
 +
-+/*
-+ * Thunder uncore events are independent from CPUs. Provide a cpumask
-+ * nevertheless to prevent perf from adding the event per-cpu and just
-+ * set the mask to one online CPU. Use the same cpumask for all uncore
-+ * devices.
-+ *
-+ * There is a performance penalty for accessing a device from a CPU on
-+ * another socket, but we do not care (yet).
-+ */
-+static int thunder_uncore_offline_cpu(unsigned int old_cpu, struct hlist_node *node)
-+{
-+	struct thunder_uncore *uncore = hlist_entry_safe(node, struct thunder_uncore, node);
-+	int new_cpu;
-+
-+	if (!cpumask_test_and_clear_cpu(old_cpu, &uncore->active_mask))
-+		return 0;
-+	new_cpu = cpumask_any_but(cpu_online_mask, old_cpu);
-+	if (new_cpu >= nr_cpu_ids)
-+		return 0;
-+	perf_pmu_migrate_context(&uncore->pmu, old_cpu, new_cpu);
-+	cpumask_set_cpu(new_cpu, &uncore->active_mask);
-+	return 0;
-+}
-+
-+static struct thunder_uncore_node * __init alloc_node(struct thunder_uncore *uncore,
-+						      int node_id, int counters)
-+{
-+	struct thunder_uncore_node *node;
-+
-+	node = kzalloc(sizeof(*node), GFP_KERNEL);
-+	if (!node)
-+		return NULL;
-+	node->num_counters = counters;
-+	INIT_LIST_HEAD(&node->unit_list);
-+	return node;
-+}
-+
-+int __init thunder_uncore_setup(struct thunder_uncore *uncore, int device_id,
-+				struct pmu *pmu, int counters)
-+{
-+	unsigned int vendor_id = PCI_VENDOR_ID_CAVIUM;
-+	struct thunder_uncore_unit  *unit, *tmp;
-+	struct thunder_uncore_node *node;
-+	struct pci_dev *pdev = NULL;
-+	int ret, node_id, found = 0;
-+
-+	/* detect PCI devices */
-+	while ((pdev = pci_get_device(vendor_id, device_id, pdev))) {
-+		if (!pdev)
-+			break;
-+
-+		node_id = dev_to_node(&pdev->dev);
-+
-+		/* allocate node if necessary */
-+		if (!uncore->nodes[node_id])
-+			uncore->nodes[node_id] = alloc_node(uncore, node_id, counters);
-+
-+		node = uncore->nodes[node_id];
-+		if (!node) {
-+			ret = -ENOMEM;
-+			goto fail;
-+		}
-+
-+		unit = kzalloc(sizeof(*unit), GFP_KERNEL);
-+		if (!unit) {
-+			ret = -ENOMEM;
-+			goto fail;
-+		}
-+
-+		unit->pdev = pdev;
-+		unit->map = ioremap(pci_resource_start(pdev, 0),
-+				    pci_resource_len(pdev, 0));
-+		list_add(&unit->entry, &node->unit_list);
-+		node->nr_units++;
-+		found++;
-+	}
-+
-+	if (!found)
-+		return -ENODEV;
-+
-+	cpuhp_state_add_instance_nocalls(CPUHP_AP_UNCORE_CAVIUM_ONLINE,
-+                                         &uncore->node);
-+
-+	/*
-+	 * perf PMU is CPU dependent in difference to our uncore devices.
-+	 * Just pick a CPU and migrate away if it goes offline.
-+	 */
-+	cpumask_set_cpu(smp_processor_id(), &uncore->active_mask);
-+
-+	uncore->pmu = *pmu;
-+	ret = perf_pmu_register(&uncore->pmu, uncore->pmu.name, -1);
++	ret = thunder_uncore_setup(thunder_uncore_lmc, 0xa022,
++				   &thunder_lmc_pmu,
++				   ARRAY_SIZE(lmc_events));
 +	if (ret)
 +		goto fail;
 +
++	thunder_uncore_lmc->event_valid = event_valid;
 +	return 0;
 +
 +fail:
-+	node_id = 0;
-+	while (uncore->nodes[node_id]) {
-+		node = uncore->nodes[node_id];
-+
-+		list_for_each_entry_safe(unit, tmp, &node->unit_list, entry) {
-+			if (unit->pdev) {
-+				if (unit->map)
-+					iounmap(unit->map);
-+				pci_dev_put(unit->pdev);
-+			}
-+			kfree(unit);
-+		}
-+		kfree(uncore->nodes[node_id]);
-+		node_id++;
-+	}
++	kfree(thunder_uncore_lmc);
++fail_nomem:
 +	return ret;
 +}
-+
-+static int __init thunder_uncore_init(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	int ret;
-+
-+	if (implementor != ARM_CPU_IMP_CAVIUM)
-+		return -ENODEV;
-+
-+	ret = cpuhp_setup_state_multi(CPUHP_AP_UNCORE_CAVIUM_ONLINE,
-+				      "AP_PERF_UNCORE_CAVIUM_ONLINE", NULL,
-+				      thunder_uncore_offline_cpu);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+late_initcall(thunder_uncore_init);
-diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
-new file mode 100644
-index 0000000..b5d64b5
---- /dev/null
-+++ b/drivers/perf/uncore/uncore_cavium.h
-@@ -0,0 +1,71 @@
-+#include <linux/io.h>
-+#include <linux/list.h>
-+#include <linux/pci.h>
-+#include <linux/perf_event.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt)     "thunderx_uncore: " fmt
-+
-+#define to_uncore(x) container_of((x), struct thunder_uncore, pmu)
-+
-+#define UNCORE_EVENT_ID_MASK		0xffff
-+#define UNCORE_EVENT_ID_SHIFT		16
-+
-+/* maximum number of parallel hardware counters for all uncore parts */
-+#define MAX_COUNTERS			64
-+
-+struct thunder_uncore_unit {
-+	struct list_head entry;
-+	void __iomem *map;
-+	struct pci_dev *pdev;
-+};
-+
-+struct thunder_uncore_node {
-+	int nr_units;
-+	int num_counters;
-+	struct list_head unit_list;
-+	struct perf_event *events[MAX_COUNTERS];
-+};
-+
-+/* generic uncore struct for different pmu types */
-+struct thunder_uncore {
-+	struct pmu pmu;
-+	bool (*event_valid)(u64);
-+	struct hlist_node node;
-+	struct thunder_uncore_node *nodes[MAX_NUMNODES];
-+	cpumask_t active_mask;
-+};
-+
-+#define UC_EVENT_ENTRY(_name, _id)							\
-+	&((struct perf_pmu_events_attr[]) {						\
-+		{									\
-+			__ATTR(_name, S_IRUGO, thunder_events_sysfs_show, NULL),	\
-+			0,								\
-+			"event=" __stringify(_id),					\
-+		}									\
-+	})[0].attr.attr
-+
-+static inline struct thunder_uncore_node *get_node(u64 config,
-+				   struct thunder_uncore *uncore)
-+{
-+	return uncore->nodes[config >> UNCORE_EVENT_ID_SHIFT];
-+}
-+
-+#define get_id(config) (config & UNCORE_EVENT_ID_MASK)
-+
-+extern struct attribute_group thunder_uncore_attr_group;
-+extern struct device_attribute format_attr_node;
-+
-+/* Prototypes */
-+void thunder_uncore_read(struct perf_event *event);
-+int thunder_uncore_add(struct perf_event *event, int flags, u64 config_base,
-+		       u64 event_base);
-+void thunder_uncore_del(struct perf_event *event, int flags);
-+void thunder_uncore_start(struct perf_event *event, int flags);
-+void thunder_uncore_stop(struct perf_event *event, int flags);
-+int thunder_uncore_event_init(struct perf_event *event);
-+int thunder_uncore_setup(struct thunder_uncore *uncore, int id,
-+			 struct pmu *pmu, int counters);
-+ssize_t thunder_events_sysfs_show(struct device *dev,
-+				  struct device_attribute *attr,
-+				  char *page);
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index afe641c..973f2bb 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -118,6 +118,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_ARM_CCI_ONLINE,
- 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
- 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
-+	CPUHP_AP_UNCORE_CAVIUM_ONLINE,
- 	CPUHP_AP_WORKQUEUE_ONLINE,
- 	CPUHP_AP_RCUTREE_ONLINE,
- 	CPUHP_AP_NOTIFY_ONLINE,
 -- 
 2.9.0.rc0.21.g7777322
