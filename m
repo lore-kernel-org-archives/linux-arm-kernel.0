@@ -1,57 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 29 Oct 2016 11:09:55 +0100
-Subject: [PATCH 2/2] MAINTAINERS: add ARM and arm64 EFI specific files to
- EFI subsystem
-In-Reply-To: <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1474472114-12973-1-git-send-email-ard.biesheuvel@linaro.org>
- <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9B7X3CDVZrxZQFVsn3U2CT0A2Z3Owj7BQuFXPjk5Ln4Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 29 Oct 2016 12:22:20 +0200
+Subject: [PATCH 1/2] ABI: rtc-ab8500: fix rtc_calibration documentation
+In-Reply-To: <364a36215c44e0c2785911e9d9259cd866283cb9.1477735797.git.mchehab@s-opensource.com>
+References: <364a36215c44e0c2785911e9d9259cd866283cb9.1477735797.git.mchehab@s-opensource.com>
+Message-ID: <CACRpkdb39Gp4ErqcnxenicgKJ6aSHS0AdC5MzY1xgHzMToF-iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 September 2016 at 16:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Since I will be co-maintaining the EFI subsystem, it makes sense to
-> mention the ARM and arm64 EFI bits in the EFI section in MAINTAINERS
-> so that Matt, the list and I get cc'ed on proposed changes.
+On Sat, Oct 29, 2016 at 12:10 PM, Mauro Carvalho Chehab
+<mchehab@s-opensource.com> wrote:
+
+> The "What:" field at the ABI should describe the location of
+> the ABI, e. g. the position under a mounted sysfs.
 >
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  MAINTAINERS | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+> Fix it.
 >
+> Cc: Mark Godfrey <mark.godfrey@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alessandro Zummo <a.zummo@towertech.it>
+> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: rtc-linux at googlegroups.com
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 
-Russell,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-do you have an objections to this change?
-
-Thanks,
-Ard.
-
-
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 224518556a84..cc8b36699f94 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4562,12 +4562,14 @@ L:      linux-efi at vger.kernel.org
->  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/efi/efi.git
->  S:     Maintained
->  F:     Documentation/efi-stub.txt
-> -F:     arch/ia64/kernel/efi.c
-> +F:     arch/*/kernel/efi.c
->  F:     arch/x86/boot/compressed/eboot.[ch]
-> -F:     arch/x86/include/asm/efi.h
-> +F:     arch/*/include/asm/efi.h
->  F:     arch/x86/platform/efi/
->  F:     drivers/firmware/efi/
->  F:     include/linux/efi*.h
-> +F:     arch/arm/boot/compressed/efi-header.S
-> +F:     arch/arm64/kernel/efi-entry.S
->
->  EFI VARIABLE FILESYSTEM
->  M:     Matthew Garrett <matthew.garrett@nebula.com>
-> --
-> 2.7.4
->
+Yours,
+Linus Walleij
