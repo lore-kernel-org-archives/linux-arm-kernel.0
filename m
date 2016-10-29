@@ -1,45 +1,79 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 29 Oct 2016 19:06:09 +0800
-Subject: [PATCH v3 0/2] ARM: dts: sun6i: hummingbird-a31: Enable display
- output through VGA bridge
-Message-ID: <20161029110611.28951-1-wens@csie.org>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 29 Oct 2016 13:12:29 +0200
+Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external imprecise
+ aborts
+Message-ID: <20161029111229.26875-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-This is v3 of my sun6i DRM/KMS display enablement series. Most of the
-patches in v2 were merged, leaving only the dumb-vga-dac patch and the
-hummingbird-a31 VGA output patch.
+Since early BCM5301X days we got abort handler that was removed by
+commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
+fault handler"). It assumed we need to deal only with pending aborts
+left by the bootloader. Unfortunately this isn't true for BCM5301X.
 
-A few things were changed, mainly the DAC enable method from a GPIO
-to a regulator supply.
+When probing PCI config space (device enumeration) it is expected to
+have master aborts on the PCI bus. Most bridges don't forward (or they
+allow disabling it) these errors onto the AXI/AMBA bus but not the
+Northstar (BCM5301X) one.
 
-Changes since v2:
+iProc PCIe controller on Northstar seems to be some older one, without
+a control register for errors forwarding. It means we need to workaround
+this at platform level. All newer platforms are not affected by this
+issue.
 
-  - Changed the enable-gpio of dumb-vga-dac to vdd-supply regulator.
-    This better matches the hardware that I have: the DAC has a fixed
-    regulator dropping the voltage from the board-wide 5V to 3.3V the
-    DAC uses. The regulator is controlled through a GPIO pin.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/mach-bcm/bcm_5301x.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-  - Renamed the node of the VGA connector from "vga" to "vga-connector".
-
-  - Renamed the node of the VGA DAC from "bridge" to "vga-dac".
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  drm/bridge: dumb-vga-dac: Support a VDD regulator supply
-  ARM: dts: sun6i: hummingbird-a31: Enable display output through VGA
-    bridge
-
- .../bindings/display/bridge/dumb-vga-dac.txt       |  2 +
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts        | 76 ++++++++++++++++++++++
- drivers/gpu/drm/bridge/dumb-vga-dac.c              | 35 ++++++++++
- 3 files changed, 113 insertions(+)
-
+diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+index c8830a2..fe067f6 100644
+--- a/arch/arm/mach-bcm/bcm_5301x.c
++++ b/arch/arm/mach-bcm/bcm_5301x.c
+@@ -9,14 +9,42 @@
+ #include <asm/hardware/cache-l2x0.h>
+ 
+ #include <asm/mach/arch.h>
++#include <asm/siginfo.h>
++#include <asm/signal.h>
++
++#define FSR_EXTERNAL		(1 << 12)
++#define FSR_READ		(0 << 10)
++#define FSR_IMPRECISE		0x0406
+ 
+ static const char *const bcm5301x_dt_compat[] __initconst = {
+ 	"brcm,bcm4708",
+ 	NULL,
+ };
+ 
++static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
++				  struct pt_regs *regs)
++{
++	/*
++	 * We want to ignore aborts forwarded from the PCIe bus that are
++	 * expected and shouldn't really be passed by the PCIe controller.
++	 * The biggest disadvantage is the same FSR code may be reported when
++	 * reading non-existing APB register and we shouldn't ignore that.
++	 */
++	if (fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE))
++		return 0;
++
++	return 1;
++}
++
++static void __init bcm5301x_init_early(void)
++{
++	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
++			"imprecise external abort");
++}
++
+ DT_MACHINE_START(BCM5301X, "BCM5301X")
+ 	.l2c_aux_val	= 0,
+ 	.l2c_aux_mask	= ~0,
+ 	.dt_compat	= bcm5301x_dt_compat,
++	.init_early	= bcm5301x_init_early,
+ MACHINE_END
 -- 
 2.9.3
