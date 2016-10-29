@@ -1,64 +1,61 @@
 From: jglauber@cavium.com (Jan Glauber)
-Date: Sat, 29 Oct 2016 13:55:33 +0200
-Subject: [PATCH v4 5/5] arm64: perf: Cavium ThunderX OCX TLK uncore support
+Date: Sat, 29 Oct 2016 13:55:30 +0200
+Subject: [PATCH v4 2/5] arm64: perf: Cavium ThunderX L2C TAD uncore support
 In-Reply-To: <cover.1477741719.git.jglauber@cavium.com>
 References: <cover.1477741719.git.jglauber@cavium.com>
-Message-ID: <0f403ada1733462cff9730a9a327ae3f32722134.1477741719.git.jglauber@cavium.com>
+Message-ID: <4ca15d0c3911412dbf21aa7173631500a15e13e2.1477741719.git.jglauber@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for the OCX transmit link counters.
+Support counters of the L2 Cache tag and data units.
 
 Signed-off-by: Jan Glauber <jglauber@cavium.com>
 ---
  drivers/perf/uncore/Makefile                |   3 +-
  drivers/perf/uncore/uncore_cavium.c         |   1 +
  drivers/perf/uncore/uncore_cavium.h         |   1 +
- drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 344 ++++++++++++++++++++++++++++
- 4 files changed, 348 insertions(+), 1 deletion(-)
- create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+ drivers/perf/uncore/uncore_cavium_l2c_tad.c | 379 ++++++++++++++++++++++++++++
+ 4 files changed, 383 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_tad.c
 
 diff --git a/drivers/perf/uncore/Makefile b/drivers/perf/uncore/Makefile
-index ef04a2b9..7e2e8e5 100644
+index 6130e18..90850a2 100644
 --- a/drivers/perf/uncore/Makefile
 +++ b/drivers/perf/uncore/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o		\
- 				   uncore_cavium_l2c_tad.o	\
- 				   uncore_cavium_l2c_cbc.o	\
--				   uncore_cavium_lmc.o
-+				   uncore_cavium_lmc.o		\
-+				   uncore_cavium_ocx_tlk.o
+@@ -1 +1,2 @@
+-obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o
++obj-$(CONFIG_UNCORE_PMU_CAVIUM) += uncore_cavium.o		\
++				   uncore_cavium_l2c_tad.o
 diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
-index fd9e49e..46ced45 100644
+index a7b4277..15e1aec 100644
 --- a/drivers/perf/uncore/uncore_cavium.c
 +++ b/drivers/perf/uncore/uncore_cavium.c
-@@ -349,6 +349,7 @@ static int __init thunder_uncore_init(void)
- 	thunder_uncore_l2c_tad_setup();
- 	thunder_uncore_l2c_cbc_setup();
- 	thunder_uncore_lmc_setup();
-+	thunder_uncore_ocx_tlk_setup();
+@@ -346,6 +346,7 @@ static int __init thunder_uncore_init(void)
+ 	if (ret)
+ 		return ret;
+ 
++	thunder_uncore_l2c_tad_setup();
  	return 0;
  }
  late_initcall(thunder_uncore_init);
 diff --git a/drivers/perf/uncore/uncore_cavium.h b/drivers/perf/uncore/uncore_cavium.h
-index 3897586..43ab426 100644
+index b5d64b5..70a8214 100644
 --- a/drivers/perf/uncore/uncore_cavium.h
 +++ b/drivers/perf/uncore/uncore_cavium.h
-@@ -72,3 +72,4 @@ ssize_t thunder_events_sysfs_show(struct device *dev,
- int thunder_uncore_l2c_tad_setup(void);
- int thunder_uncore_l2c_cbc_setup(void);
- int thunder_uncore_lmc_setup(void);
-+int thunder_uncore_ocx_tlk_setup(void);
-diff --git a/drivers/perf/uncore/uncore_cavium_ocx_tlk.c b/drivers/perf/uncore/uncore_cavium_ocx_tlk.c
+@@ -69,3 +69,4 @@ int thunder_uncore_setup(struct thunder_uncore *uncore, int id,
+ ssize_t thunder_events_sysfs_show(struct device *dev,
+ 				  struct device_attribute *attr,
+ 				  char *page);
++int thunder_uncore_l2c_tad_setup(void);
+diff --git a/drivers/perf/uncore/uncore_cavium_l2c_tad.c b/drivers/perf/uncore/uncore_cavium_l2c_tad.c
 new file mode 100644
-index 0000000..b4fc32b
+index 0000000..b97ba33
 --- /dev/null
-+++ b/drivers/perf/uncore/uncore_cavium_ocx_tlk.c
-@@ -0,0 +1,344 @@
++++ b/drivers/perf/uncore/uncore_cavium_l2c_tad.c
+@@ -0,0 +1,379 @@
 +/*
 + * Cavium Thunder uncore PMU support,
-+ * CCPI interface controller (OCX) Transmit link (TLK) counters.
++ * L2 Cache tag-and-data-units (L2C TAD) counters.
 + *
 + * Copyright 2016 Cavium Inc.
 + * Author: Jan Glauber <jan.glauber@cavium.com>
@@ -69,334 +66,369 @@ index 0000000..b4fc32b
 +
 +#include "uncore_cavium.h"
 +
-+struct thunder_uncore *thunder_uncore_ocx_tlk;
++struct thunder_uncore *thunder_uncore_l2c_tad;
 +
-+#define OCX_TLK_NR_UNITS			3
-+#define OCX_TLK_UNIT_OFFSET			0x2000
-+#define OCX_TLK_STAT_CTL			0x10040
-+#define OCX_TLK_STAT_OFFSET			0x10400
-+
-+#define OCX_TLK_STAT_ENABLE_BIT			BIT_ULL(0)
-+#define OCX_TLK_STAT_RESET_BIT			BIT_ULL(1)
-+
-+/* OCX TLK event list */
-+#define OCX_TLK_EVENT_STAT_IDLE_CNT		0x00
-+#define OCX_TLK_EVENT_STAT_DATA_CNT		0x08
-+#define OCX_TLK_EVENT_STAT_SYNC_CNT		0x10
-+#define OCX_TLK_EVENT_STAT_RETRY_CNT		0x18
-+#define OCX_TLK_EVENT_STAT_ERR_CNT		0x20
-+#define OCX_TLK_EVENT_STAT_MAT0_CNT		0x40
-+#define OCX_TLK_EVENT_STAT_MAT1_CNT		0x48
-+#define OCX_TLK_EVENT_STAT_MAT2_CNT		0x50
-+#define OCX_TLK_EVENT_STAT_MAT3_CNT		0x58
-+#define OCX_TLK_EVENT_STAT_VC0_CMD		0x80
-+#define OCX_TLK_EVENT_STAT_VC1_CMD		0x88
-+#define OCX_TLK_EVENT_STAT_VC2_CMD		0x90
-+#define OCX_TLK_EVENT_STAT_VC3_CMD		0x98
-+#define OCX_TLK_EVENT_STAT_VC4_CMD		0xa0
-+#define OCX_TLK_EVENT_STAT_VC5_CMD		0xa8
-+#define OCX_TLK_EVENT_STAT_VC0_PKT		0x100
-+#define OCX_TLK_EVENT_STAT_VC1_PKT		0x108
-+#define OCX_TLK_EVENT_STAT_VC2_PKT		0x110
-+#define OCX_TLK_EVENT_STAT_VC3_PKT		0x118
-+#define OCX_TLK_EVENT_STAT_VC4_PKT		0x120
-+#define OCX_TLK_EVENT_STAT_VC5_PKT		0x128
-+#define OCX_TLK_EVENT_STAT_VC6_PKT		0x130
-+#define OCX_TLK_EVENT_STAT_VC7_PKT		0x138
-+#define OCX_TLK_EVENT_STAT_VC8_PKT		0x140
-+#define OCX_TLK_EVENT_STAT_VC9_PKT		0x148
-+#define OCX_TLK_EVENT_STAT_VC10_PKT		0x150
-+#define OCX_TLK_EVENT_STAT_VC11_PKT		0x158
-+#define OCX_TLK_EVENT_STAT_VC12_PKT		0x160
-+#define OCX_TLK_EVENT_STAT_VC13_PKT		0x168
-+#define OCX_TLK_EVENT_STAT_VC0_CON		0x180
-+#define OCX_TLK_EVENT_STAT_VC1_CON		0x188
-+#define OCX_TLK_EVENT_STAT_VC2_CON		0x190
-+#define OCX_TLK_EVENT_STAT_VC3_CON		0x198
-+#define OCX_TLK_EVENT_STAT_VC4_CON		0x1a0
-+#define OCX_TLK_EVENT_STAT_VC5_CON		0x1a8
-+#define OCX_TLK_EVENT_STAT_VC6_CON		0x1b0
-+#define OCX_TLK_EVENT_STAT_VC7_CON		0x1b8
-+#define OCX_TLK_EVENT_STAT_VC8_CON		0x1c0
-+#define OCX_TLK_EVENT_STAT_VC9_CON		0x1c8
-+#define OCX_TLK_EVENT_STAT_VC10_CON		0x1d0
-+#define OCX_TLK_EVENT_STAT_VC11_CON		0x1d8
-+#define OCX_TLK_EVENT_STAT_VC12_CON		0x1e0
-+#define OCX_TLK_EVENT_STAT_VC13_CON		0x1e8
-+
-+static int ocx_tlk_events[] = {
-+	OCX_TLK_EVENT_STAT_IDLE_CNT,
-+	OCX_TLK_EVENT_STAT_DATA_CNT,
-+	OCX_TLK_EVENT_STAT_SYNC_CNT,
-+	OCX_TLK_EVENT_STAT_RETRY_CNT,
-+	OCX_TLK_EVENT_STAT_ERR_CNT,
-+	OCX_TLK_EVENT_STAT_MAT0_CNT,
-+	OCX_TLK_EVENT_STAT_MAT1_CNT,
-+	OCX_TLK_EVENT_STAT_MAT2_CNT,
-+	OCX_TLK_EVENT_STAT_MAT3_CNT,
-+	OCX_TLK_EVENT_STAT_VC0_CMD,
-+	OCX_TLK_EVENT_STAT_VC1_CMD,
-+	OCX_TLK_EVENT_STAT_VC2_CMD,
-+	OCX_TLK_EVENT_STAT_VC3_CMD,
-+	OCX_TLK_EVENT_STAT_VC4_CMD,
-+	OCX_TLK_EVENT_STAT_VC5_CMD,
-+	OCX_TLK_EVENT_STAT_VC0_PKT,
-+	OCX_TLK_EVENT_STAT_VC1_PKT,
-+	OCX_TLK_EVENT_STAT_VC2_PKT,
-+	OCX_TLK_EVENT_STAT_VC3_PKT,
-+	OCX_TLK_EVENT_STAT_VC4_PKT,
-+	OCX_TLK_EVENT_STAT_VC5_PKT,
-+	OCX_TLK_EVENT_STAT_VC6_PKT,
-+	OCX_TLK_EVENT_STAT_VC7_PKT,
-+	OCX_TLK_EVENT_STAT_VC8_PKT,
-+	OCX_TLK_EVENT_STAT_VC9_PKT,
-+	OCX_TLK_EVENT_STAT_VC10_PKT,
-+	OCX_TLK_EVENT_STAT_VC11_PKT,
-+	OCX_TLK_EVENT_STAT_VC12_PKT,
-+	OCX_TLK_EVENT_STAT_VC13_PKT,
-+	OCX_TLK_EVENT_STAT_VC0_CON,
-+	OCX_TLK_EVENT_STAT_VC1_CON,
-+	OCX_TLK_EVENT_STAT_VC2_CON,
-+	OCX_TLK_EVENT_STAT_VC3_CON,
-+	OCX_TLK_EVENT_STAT_VC4_CON,
-+	OCX_TLK_EVENT_STAT_VC5_CON,
-+	OCX_TLK_EVENT_STAT_VC6_CON,
-+	OCX_TLK_EVENT_STAT_VC7_CON,
-+	OCX_TLK_EVENT_STAT_VC8_CON,
-+	OCX_TLK_EVENT_STAT_VC9_CON,
-+	OCX_TLK_EVENT_STAT_VC10_CON,
-+	OCX_TLK_EVENT_STAT_VC11_CON,
-+	OCX_TLK_EVENT_STAT_VC12_CON,
-+	OCX_TLK_EVENT_STAT_VC13_CON,
-+};
++#define L2C_TAD_NR_COUNTERS             4
++#define L2C_TAD_PRF_OFFSET		0x10000
++#define L2C_TAD_PFC_OFFSET		0x10100
 +
 +/*
-+ * The OCX devices have a single device per node, therefore picking the
-+ * first device from the list is correct.
++ * Counters are selected via L2C_TAD(x)_PRF:
++ *
++ *   63					    32
++ *   +---------------------------------------+
++ *   |  Reserved			     |
++ *   +---------------------------------------+
++ *   | CNT3SEL | CNT2SEL | CNT1SEL | CNT0SEL |
++ *   +---------------------------------------+
++ *   31       24	16	  8	     0
++ *
++ * config_base contains the offset of the selected CNTxSEL in the mapped BAR.
++ *
++ * Counters are read via L2C_TAD(x)_PFC(0..3).
++ * event_base contains the associated address to read the counter.
 + */
-+static inline void __iomem *map_offset(struct thunder_uncore_node *node,
-+				       unsigned long addr, int offset, int nr)
++
++/* L2C TAD event list */
++#define L2C_TAD_EVENTS_DISABLED			0x00
++#define L2C_TAD_EVENT_L2T_HIT			0x01
++#define L2C_TAD_EVENT_L2T_MISS			0x02
++#define L2C_TAD_EVENT_L2T_NOALLOC		0x03
++#define L2C_TAD_EVENT_L2_VIC			0x04
++#define L2C_TAD_EVENT_SC_FAIL			0x05
++#define L2C_TAD_EVENT_SC_PASS			0x06
++#define L2C_TAD_EVENT_LFB_OCC			0x07
++#define L2C_TAD_EVENT_WAIT_LFB			0x08
++#define L2C_TAD_EVENT_WAIT_VAB			0x09
++#define L2C_TAD_EVENT_OPEN_CCPI			0x0a
++#define L2C_TAD_EVENT_LOOKUP			0x40
++#define L2C_TAD_EVENT_LOOKUP_XMC_LCL		0x41
++#define L2C_TAD_EVENT_LOOKUP_XMC_RMT		0x42
++#define L2C_TAD_EVENT_LOOKUP_MIB		0x43
++#define L2C_TAD_EVENT_LOOKUP_ALL		0x44
++#define L2C_TAD_EVENT_TAG_ALC_HIT		0x48
++#define L2C_TAD_EVENT_TAG_ALC_MISS		0x49
++#define L2C_TAD_EVENT_TAG_ALC_NALC		0x4a
++#define L2C_TAD_EVENT_TAG_NALC_HIT		0x4b
++#define L2C_TAD_EVENT_TAG_NALC_MISS		0x4c
++#define L2C_TAD_EVENT_LMC_WR			0x4e
++#define L2C_TAD_EVENT_LMC_SBLKDTY		0x4f
++#define L2C_TAD_EVENT_TAG_ALC_RTG_HIT		0x50
++#define L2C_TAD_EVENT_TAG_ALC_RTG_HITE		0x51
++#define L2C_TAD_EVENT_TAG_ALC_RTG_HITS		0x52
++#define L2C_TAD_EVENT_TAG_ALC_RTG_MISS		0x53
++#define L2C_TAD_EVENT_TAG_NALC_RTG_HIT		0x54
++#define L2C_TAD_EVENT_TAG_NALC_RTG_MISS		0x55
++#define L2C_TAD_EVENT_TAG_NALC_RTG_HITE		0x56
++#define L2C_TAD_EVENT_TAG_NALC_RTG_HITS		0x57
++#define L2C_TAD_EVENT_TAG_ALC_LCL_EVICT		0x58
++#define L2C_TAD_EVENT_TAG_ALC_LCL_CLNVIC	0x59
++#define L2C_TAD_EVENT_TAG_ALC_LCL_DTYVIC	0x5a
++#define L2C_TAD_EVENT_TAG_ALC_RMT_EVICT		0x5b
++#define L2C_TAD_EVENT_TAG_ALC_RMT_VIC		0x5c
++#define L2C_TAD_EVENT_RTG_ALC			0x5d
++#define L2C_TAD_EVENT_RTG_ALC_HIT		0x5e
++#define L2C_TAD_EVENT_RTG_ALC_HITWB		0x5f
++#define L2C_TAD_EVENT_STC_TOTAL			0x60
++#define L2C_TAD_EVENT_STC_TOTAL_FAIL		0x61
++#define L2C_TAD_EVENT_STC_RMT			0x62
++#define L2C_TAD_EVENT_STC_RMT_FAIL		0x63
++#define L2C_TAD_EVENT_STC_LCL			0x64
++#define L2C_TAD_EVENT_STC_LCL_FAIL		0x65
++#define L2C_TAD_EVENT_OCI_RTG_WAIT		0x68
++#define L2C_TAD_EVENT_OCI_FWD_CYC_HIT		0x69
++#define L2C_TAD_EVENT_OCI_FWD_RACE		0x6a
++#define L2C_TAD_EVENT_OCI_HAKS			0x6b
++#define L2C_TAD_EVENT_OCI_FLDX_TAG_E_NODAT	0x6c
++#define L2C_TAD_EVENT_OCI_FLDX_TAG_E_DAT	0x6d
++#define L2C_TAD_EVENT_OCI_RLDD			0x6e
++#define L2C_TAD_EVENT_OCI_RLDD_PEMD		0x6f
++#define L2C_TAD_EVENT_OCI_RRQ_DAT_CNT		0x70
++#define L2C_TAD_EVENT_OCI_RRQ_DAT_DMASK		0x71
++#define L2C_TAD_EVENT_OCI_RSP_DAT_CNT		0x72
++#define L2C_TAD_EVENT_OCI_RSP_DAT_DMASK		0x73
++#define L2C_TAD_EVENT_OCI_RSP_DAT_VICD_CNT	0x74
++#define L2C_TAD_EVENT_OCI_RSP_DAT_VICD_DMASK	0x75
++#define L2C_TAD_EVENT_OCI_RTG_ALC_EVICT		0x76
++#define L2C_TAD_EVENT_OCI_RTG_ALC_VIC		0x77
++#define L2C_TAD_EVENT_QD0_IDX			0x80
++#define L2C_TAD_EVENT_QD0_RDAT			0x81
++#define L2C_TAD_EVENT_QD0_BNKS			0x82
++#define L2C_TAD_EVENT_QD0_WDAT			0x83
++#define L2C_TAD_EVENT_QD1_IDX			0x90
++#define L2C_TAD_EVENT_QD1_RDAT			0x91
++#define L2C_TAD_EVENT_QD1_BNKS			0x92
++#define L2C_TAD_EVENT_QD1_WDAT			0x93
++#define L2C_TAD_EVENT_QD2_IDX			0xa0
++#define L2C_TAD_EVENT_QD2_RDAT			0xa1
++#define L2C_TAD_EVENT_QD2_BNKS			0xa2
++#define L2C_TAD_EVENT_QD2_WDAT			0xa3
++#define L2C_TAD_EVENT_QD3_IDX			0xb0
++#define L2C_TAD_EVENT_QD3_RDAT			0xb1
++#define L2C_TAD_EVENT_QD3_BNKS			0xb2
++#define L2C_TAD_EVENT_QD3_WDAT			0xb3
++#define L2C_TAD_EVENT_QD4_IDX			0xc0
++#define L2C_TAD_EVENT_QD4_RDAT			0xc1
++#define L2C_TAD_EVENT_QD4_BNKS			0xc2
++#define L2C_TAD_EVENT_QD4_WDAT			0xc3
++#define L2C_TAD_EVENT_QD5_IDX			0xd0
++#define L2C_TAD_EVENT_QD5_RDAT			0xd1
++#define L2C_TAD_EVENT_QD5_BNKS			0xd2
++#define L2C_TAD_EVENT_QD5_WDAT			0xd3
++#define L2C_TAD_EVENT_QD6_IDX			0xe0
++#define L2C_TAD_EVENT_QD6_RDAT			0xe1
++#define L2C_TAD_EVENT_QD6_BNKS			0xe2
++#define L2C_TAD_EVENT_QD6_WDAT			0xe3
++#define L2C_TAD_EVENT_QD7_IDX			0xf0
++#define L2C_TAD_EVENT_QD7_RDAT			0xf1
++#define L2C_TAD_EVENT_QD7_BNKS			0xf2
++#define L2C_TAD_EVENT_QD7_WDAT			0xf3
++
++static void thunder_uncore_start_l2c_tad(struct perf_event *event, int flags)
 +{
++	struct thunder_uncore *uncore = to_uncore(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	struct thunder_uncore_node *node;
 +	struct thunder_uncore_unit *unit;
++	int id;
 +
-+	unit = list_first_entry(&node->unit_list, struct thunder_uncore_unit,
-+				entry);
-+	return (void __iomem *)(addr + unit->map + nr * offset);
-+}
-+
-+static void __iomem *map_offset_ocx_tlk(struct thunder_uncore_node *node,
-+					unsigned long addr, int nr)
-+{
-+	return (void __iomem *)map_offset(node, addr, nr, OCX_TLK_UNIT_OFFSET);
-+}
-+
-+/*
-+ * The OCX TLK counters can only be enabled/disabled as a set so we do
-+ * this in pmu_enable/disable instead of start/stop.
-+ */
-+static void thunder_uncore_pmu_enable_ocx_tlk(struct pmu *pmu)
-+{
-+	struct thunder_uncore *uncore =
-+		container_of(pmu, struct thunder_uncore, pmu);
-+	int node = 0, i;
-+
-+	while (uncore->nodes[node++]) {
-+		for (i = 0; i < OCX_TLK_NR_UNITS; i++) {
-+			/* reset all TLK counters to zero */
-+			writeb(OCX_TLK_STAT_RESET_BIT,
-+			       map_offset_ocx_tlk(uncore->nodes[node],
-+						  OCX_TLK_STAT_CTL, i));
-+			/* enable all TLK counters */
-+			writeb(OCX_TLK_STAT_ENABLE_BIT,
-+			       map_offset_ocx_tlk(uncore->nodes[node],
-+						  OCX_TLK_STAT_CTL, i));
-+		}
-+	}
-+}
-+
-+/*
-+ * The OCX TLK counters can only be enabled/disabled as a set so we do
-+ * this in pmu_enable/disable instead of start/stop.
-+ */
-+static void thunder_uncore_pmu_disable_ocx_tlk(struct pmu *pmu)
-+{
-+	struct thunder_uncore *uncore =
-+		container_of(pmu, struct thunder_uncore, pmu);
-+	int node = 0, i;
-+
-+	while (uncore->nodes[node++]) {
-+		for (i = 0; i < OCX_TLK_NR_UNITS; i++) {
-+			/* disable all TLK counters */
-+			writeb(0, map_offset_ocx_tlk(uncore->nodes[node],
-+						     OCX_TLK_STAT_CTL, i));
-+		}
-+	}
-+}
-+
-+/*
-+ * Summarize counters across all TLK's. Different from the other uncore
-+ * PMUs because all TLK's are on one PCI device.
-+ */
-+static void thunder_uncore_read_ocx_tlk(struct perf_event *event)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	u64 new = 0;
-+	int i;
-+
-+	/* read counter values from all units */
 +	node = get_node(hwc->config, uncore);
-+	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
-+		new += readq(map_offset_ocx_tlk(node, hwc->event_base, i));
++	id = get_id(hwc->config);
 +
-+	local64_add(new, &hwc->prev_count);
-+	local64_add(new, &event->count);
-+}
++	/* reset counter values to zero */
++	if (flags & PERF_EF_RELOAD)
++		list_for_each_entry(unit, &node->unit_list, entry)
++			writeq(0, hwc->event_base + unit->map);
 +
-+static void thunder_uncore_start_ocx_tlk(struct perf_event *event, int flags)
-+{
-+	struct thunder_uncore *uncore = to_uncore(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	struct thunder_uncore_node *node;
-+	u64 new = 0;
-+	int i;
-+
-+	/* read counter values from all units on the node */
-+	node = get_node(hwc->config, uncore);
-+	for (i = 0; i < OCX_TLK_NR_UNITS; i++)
-+		new += readq(map_offset_ocx_tlk(node, hwc->event_base, i));
-+	local64_set(&hwc->prev_count, new);
++	/* start counters on all units on the node */
++	list_for_each_entry(unit, &node->unit_list, entry)
++		writeb(id, hwc->config_base + unit->map);
 +
 +	hwc->state = 0;
 +	perf_event_update_userpage(event);
 +}
 +
-+static int thunder_uncore_add_ocx_tlk(struct perf_event *event, int flags)
++static void thunder_uncore_stop_l2c_tad(struct perf_event *event, int flags)
 +{
++	struct thunder_uncore *uncore = to_uncore(event->pmu);
 +	struct hw_perf_event *hwc = &event->hw;
++	struct thunder_uncore_node *node;
++	struct thunder_uncore_unit *unit;
 +
-+	return thunder_uncore_add(event, flags,
-+				  OCX_TLK_STAT_CTL,
-+				  OCX_TLK_STAT_OFFSET + ocx_tlk_events[get_id(hwc->config)]);
++	node = get_node(hwc->config, uncore);
++
++	/* disable counters for all units on the node */
++	list_for_each_entry(unit, &node->unit_list, entry)
++		writeb(L2C_TAD_EVENTS_DISABLED, hwc->config_base + unit->map);
++	hwc->state |= PERF_HES_STOPPED;
++
++	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
++		thunder_uncore_read(event);
++		hwc->state |= PERF_HES_UPTODATE;
++	}
 +}
 +
-+PMU_FORMAT_ATTR(event, "config:0-5");
++static int thunder_uncore_add_l2c_tad(struct perf_event *event, int flags)
++{
++	struct thunder_uncore *uncore = to_uncore(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	struct thunder_uncore_node *node;
++	int i;
 +
-+static struct attribute *thunder_ocx_tlk_format_attr[] = {
++	node = get_node(hwc->config, uncore);
++
++	/* take the first available counter */
++	for (i = 0; i < node->num_counters; i++) {
++		if (!cmpxchg(&node->events[i], NULL, event)) {
++			hwc->idx = i;
++			break;
++		}
++	}
++
++	if (hwc->idx == -1)
++		return -EBUSY;
++
++	/* see comment at beginning of file */
++	hwc->config_base = L2C_TAD_PRF_OFFSET + hwc->idx;
++	hwc->event_base = L2C_TAD_PFC_OFFSET + hwc->idx * sizeof(u64);
++
++	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
++	if (flags & PERF_EF_START)
++		thunder_uncore_start(event, PERF_EF_RELOAD);
++	return 0;
++}
++
++PMU_FORMAT_ATTR(event, "config:0-7");
++
++static struct attribute *thunder_l2c_tad_format_attr[] = {
 +	&format_attr_event.attr,
 +	&format_attr_node.attr,
 +	NULL,
 +};
 +
-+static struct attribute_group thunder_ocx_tlk_format_group = {
++static struct attribute_group thunder_l2c_tad_format_group = {
 +	.name = "format",
-+	.attrs = thunder_ocx_tlk_format_attr,
++	.attrs = thunder_l2c_tad_format_attr,
 +};
 +
-+static struct attribute *thunder_ocx_tlk_events_attr[] = {
-+	UC_EVENT_ENTRY(idle_cnt,	0),
-+	UC_EVENT_ENTRY(data_cnt,	1),
-+	UC_EVENT_ENTRY(sync_cnt,	2),
-+	UC_EVENT_ENTRY(retry_cnt,	3),
-+	UC_EVENT_ENTRY(err_cnt,		4),
-+	UC_EVENT_ENTRY(mat0_cnt,	5),
-+	UC_EVENT_ENTRY(mat1_cnt,	6),
-+	UC_EVENT_ENTRY(mat2_cnt,	7),
-+	UC_EVENT_ENTRY(mat3_cnt,	8),
-+	UC_EVENT_ENTRY(vc0_cmd,		9),
-+	UC_EVENT_ENTRY(vc1_cmd,		10),
-+	UC_EVENT_ENTRY(vc2_cmd,		11),
-+	UC_EVENT_ENTRY(vc3_cmd,		12),
-+	UC_EVENT_ENTRY(vc4_cmd,		13),
-+	UC_EVENT_ENTRY(vc5_cmd,		14),
-+	UC_EVENT_ENTRY(vc0_pkt,		15),
-+	UC_EVENT_ENTRY(vc1_pkt,		16),
-+	UC_EVENT_ENTRY(vc2_pkt,		17),
-+	UC_EVENT_ENTRY(vc3_pkt,		18),
-+	UC_EVENT_ENTRY(vc4_pkt,		19),
-+	UC_EVENT_ENTRY(vc5_pkt,		20),
-+	UC_EVENT_ENTRY(vc6_pkt,		21),
-+	UC_EVENT_ENTRY(vc7_pkt,		22),
-+	UC_EVENT_ENTRY(vc8_pkt,		23),
-+	UC_EVENT_ENTRY(vc9_pkt,		24),
-+	UC_EVENT_ENTRY(vc10_pkt,	25),
-+	UC_EVENT_ENTRY(vc11_pkt,	26),
-+	UC_EVENT_ENTRY(vc12_pkt,	27),
-+	UC_EVENT_ENTRY(vc13_pkt,	28),
-+	UC_EVENT_ENTRY(vc0_con,		29),
-+	UC_EVENT_ENTRY(vc1_con,		30),
-+	UC_EVENT_ENTRY(vc2_con,		31),
-+	UC_EVENT_ENTRY(vc3_con,		32),
-+	UC_EVENT_ENTRY(vc4_con,		33),
-+	UC_EVENT_ENTRY(vc5_con,		34),
-+	UC_EVENT_ENTRY(vc6_con,		35),
-+	UC_EVENT_ENTRY(vc7_con,		36),
-+	UC_EVENT_ENTRY(vc8_con,		37),
-+	UC_EVENT_ENTRY(vc9_con,		38),
-+	UC_EVENT_ENTRY(vc10_con,	39),
-+	UC_EVENT_ENTRY(vc11_con,	40),
-+	UC_EVENT_ENTRY(vc12_con,	41),
-+	UC_EVENT_ENTRY(vc13_con,	42),
++static struct attribute *thunder_l2c_tad_events_attr[] = {
++	UC_EVENT_ENTRY(l2t_hit,			L2C_TAD_EVENT_L2T_HIT),
++	UC_EVENT_ENTRY(l2t_miss,		L2C_TAD_EVENT_L2T_MISS),
++	UC_EVENT_ENTRY(l2t_noalloc,		L2C_TAD_EVENT_L2T_NOALLOC),
++	UC_EVENT_ENTRY(l2_vic,			L2C_TAD_EVENT_L2_VIC),
++	UC_EVENT_ENTRY(sc_fail,			L2C_TAD_EVENT_SC_FAIL),
++	UC_EVENT_ENTRY(sc_pass,			L2C_TAD_EVENT_SC_PASS),
++	UC_EVENT_ENTRY(lfb_occ,			L2C_TAD_EVENT_LFB_OCC),
++	UC_EVENT_ENTRY(wait_lfb,		L2C_TAD_EVENT_WAIT_LFB),
++	UC_EVENT_ENTRY(wait_vab,		L2C_TAD_EVENT_WAIT_VAB),
++	UC_EVENT_ENTRY(open_ccpi,		L2C_TAD_EVENT_OPEN_CCPI),
++	UC_EVENT_ENTRY(lookup,			L2C_TAD_EVENT_LOOKUP),
++	UC_EVENT_ENTRY(lookup_xmc_lcl,		L2C_TAD_EVENT_LOOKUP_XMC_LCL),
++	UC_EVENT_ENTRY(lookup_xmc_rmt,		L2C_TAD_EVENT_LOOKUP_XMC_RMT),
++	UC_EVENT_ENTRY(lookup_mib,		L2C_TAD_EVENT_LOOKUP_MIB),
++	UC_EVENT_ENTRY(lookup_all,		L2C_TAD_EVENT_LOOKUP_ALL),
++	UC_EVENT_ENTRY(tag_alc_hit,		L2C_TAD_EVENT_TAG_ALC_HIT),
++	UC_EVENT_ENTRY(tag_alc_miss,		L2C_TAD_EVENT_TAG_ALC_MISS),
++	UC_EVENT_ENTRY(tag_alc_nalc,		L2C_TAD_EVENT_TAG_ALC_NALC),
++	UC_EVENT_ENTRY(tag_nalc_hit,		L2C_TAD_EVENT_TAG_NALC_HIT),
++	UC_EVENT_ENTRY(tag_nalc_miss,		L2C_TAD_EVENT_TAG_NALC_MISS),
++	UC_EVENT_ENTRY(lmc_wr,			L2C_TAD_EVENT_LMC_WR),
++	UC_EVENT_ENTRY(lmc_sblkdty,		L2C_TAD_EVENT_LMC_SBLKDTY),
++	UC_EVENT_ENTRY(tag_alc_rtg_hit,		L2C_TAD_EVENT_TAG_ALC_RTG_HIT),
++	UC_EVENT_ENTRY(tag_alc_rtg_hite,	L2C_TAD_EVENT_TAG_ALC_RTG_HITE),
++	UC_EVENT_ENTRY(tag_alc_rtg_hits,	L2C_TAD_EVENT_TAG_ALC_RTG_HITS),
++	UC_EVENT_ENTRY(tag_alc_rtg_miss,	L2C_TAD_EVENT_TAG_ALC_RTG_MISS),
++	UC_EVENT_ENTRY(tag_alc_nalc_rtg_hit,	L2C_TAD_EVENT_TAG_NALC_RTG_HIT),
++	UC_EVENT_ENTRY(tag_nalc_rtg_miss,	L2C_TAD_EVENT_TAG_NALC_RTG_MISS),
++	UC_EVENT_ENTRY(tag_nalc_rtg_hite,	L2C_TAD_EVENT_TAG_NALC_RTG_HITE),
++	UC_EVENT_ENTRY(tag_nalc_rtg_hits,	L2C_TAD_EVENT_TAG_NALC_RTG_HITS),
++	UC_EVENT_ENTRY(tag_alc_lcl_evict,	L2C_TAD_EVENT_TAG_ALC_LCL_EVICT),
++	UC_EVENT_ENTRY(tag_alc_lcl_clnvic,	L2C_TAD_EVENT_TAG_ALC_LCL_CLNVIC),
++	UC_EVENT_ENTRY(tag_alc_lcl_dtyvic,	L2C_TAD_EVENT_TAG_ALC_LCL_DTYVIC),
++	UC_EVENT_ENTRY(tag_alc_rmt_evict,	L2C_TAD_EVENT_TAG_ALC_RMT_EVICT),
++	UC_EVENT_ENTRY(tag_alc_rmt_vic,		L2C_TAD_EVENT_TAG_ALC_RMT_VIC),
++	UC_EVENT_ENTRY(rtg_alc,			L2C_TAD_EVENT_RTG_ALC),
++	UC_EVENT_ENTRY(rtg_alc_hit,		L2C_TAD_EVENT_RTG_ALC_HIT),
++	UC_EVENT_ENTRY(rtg_alc_hitwb,		L2C_TAD_EVENT_RTG_ALC_HITWB),
++	UC_EVENT_ENTRY(stc_total,		L2C_TAD_EVENT_STC_TOTAL),
++	UC_EVENT_ENTRY(stc_total_fail,		L2C_TAD_EVENT_STC_TOTAL_FAIL),
++	UC_EVENT_ENTRY(stc_rmt,			L2C_TAD_EVENT_STC_RMT),
++	UC_EVENT_ENTRY(stc_rmt_fail,		L2C_TAD_EVENT_STC_RMT_FAIL),
++	UC_EVENT_ENTRY(stc_lcl,			L2C_TAD_EVENT_STC_LCL),
++	UC_EVENT_ENTRY(stc_lcl_fail,		L2C_TAD_EVENT_STC_LCL_FAIL),
++	UC_EVENT_ENTRY(oci_rtg_wait,		L2C_TAD_EVENT_OCI_RTG_WAIT),
++	UC_EVENT_ENTRY(oci_fwd_cyc_hit,		L2C_TAD_EVENT_OCI_FWD_CYC_HIT),
++	UC_EVENT_ENTRY(oci_fwd_race,		L2C_TAD_EVENT_OCI_FWD_RACE),
++	UC_EVENT_ENTRY(oci_haks,		L2C_TAD_EVENT_OCI_HAKS),
++	UC_EVENT_ENTRY(oci_fldx_tag_e_nodat,	L2C_TAD_EVENT_OCI_FLDX_TAG_E_NODAT),
++	UC_EVENT_ENTRY(oci_fldx_tag_e_dat,	L2C_TAD_EVENT_OCI_FLDX_TAG_E_DAT),
++	UC_EVENT_ENTRY(oci_rldd,		L2C_TAD_EVENT_OCI_RLDD),
++	UC_EVENT_ENTRY(oci_rldd_pemd,		L2C_TAD_EVENT_OCI_RLDD_PEMD),
++	UC_EVENT_ENTRY(oci_rrq_dat_cnt,		L2C_TAD_EVENT_OCI_RRQ_DAT_CNT),
++	UC_EVENT_ENTRY(oci_rrq_dat_dmask,	L2C_TAD_EVENT_OCI_RRQ_DAT_DMASK),
++	UC_EVENT_ENTRY(oci_rsp_dat_cnt,		L2C_TAD_EVENT_OCI_RSP_DAT_CNT),
++	UC_EVENT_ENTRY(oci_rsp_dat_dmaks,	L2C_TAD_EVENT_OCI_RSP_DAT_DMASK),
++	UC_EVENT_ENTRY(oci_rsp_dat_vicd_cnt,	L2C_TAD_EVENT_OCI_RSP_DAT_VICD_CNT),
++	UC_EVENT_ENTRY(oci_rsp_dat_vicd_dmask,	L2C_TAD_EVENT_OCI_RSP_DAT_VICD_DMASK),
++	UC_EVENT_ENTRY(oci_rtg_alc_evict,	L2C_TAD_EVENT_OCI_RTG_ALC_EVICT),
++	UC_EVENT_ENTRY(oci_rtg_alc_vic,		L2C_TAD_EVENT_OCI_RTG_ALC_VIC),
++	UC_EVENT_ENTRY(qd0_idx,			L2C_TAD_EVENT_QD0_IDX),
++	UC_EVENT_ENTRY(qd0_rdat,		L2C_TAD_EVENT_QD0_RDAT),
++	UC_EVENT_ENTRY(qd0_bnks,		L2C_TAD_EVENT_QD0_BNKS),
++	UC_EVENT_ENTRY(qd0_wdat,		L2C_TAD_EVENT_QD0_WDAT),
++	UC_EVENT_ENTRY(qd1_idx,			L2C_TAD_EVENT_QD1_IDX),
++	UC_EVENT_ENTRY(qd1_rdat,		L2C_TAD_EVENT_QD1_RDAT),
++	UC_EVENT_ENTRY(qd1_bnks,		L2C_TAD_EVENT_QD1_BNKS),
++	UC_EVENT_ENTRY(qd1_wdat,		L2C_TAD_EVENT_QD1_WDAT),
++	UC_EVENT_ENTRY(qd2_idx,			L2C_TAD_EVENT_QD2_IDX),
++	UC_EVENT_ENTRY(qd2_rdat,		L2C_TAD_EVENT_QD2_RDAT),
++	UC_EVENT_ENTRY(qd2_bnks,		L2C_TAD_EVENT_QD2_BNKS),
++	UC_EVENT_ENTRY(qd2_wdat,		L2C_TAD_EVENT_QD2_WDAT),
++	UC_EVENT_ENTRY(qd3_idx,			L2C_TAD_EVENT_QD3_IDX),
++	UC_EVENT_ENTRY(qd3_rdat,		L2C_TAD_EVENT_QD3_RDAT),
++	UC_EVENT_ENTRY(qd3_bnks,		L2C_TAD_EVENT_QD3_BNKS),
++	UC_EVENT_ENTRY(qd3_wdat,		L2C_TAD_EVENT_QD3_WDAT),
++	UC_EVENT_ENTRY(qd4_idx,			L2C_TAD_EVENT_QD4_IDX),
++	UC_EVENT_ENTRY(qd4_rdat,		L2C_TAD_EVENT_QD4_RDAT),
++	UC_EVENT_ENTRY(qd4_bnks,		L2C_TAD_EVENT_QD4_BNKS),
++	UC_EVENT_ENTRY(qd4_wdat,		L2C_TAD_EVENT_QD4_WDAT),
++	UC_EVENT_ENTRY(qd5_idx,			L2C_TAD_EVENT_QD5_IDX),
++	UC_EVENT_ENTRY(qd5_rdat,		L2C_TAD_EVENT_QD5_RDAT),
++	UC_EVENT_ENTRY(qd5_bnks,		L2C_TAD_EVENT_QD5_BNKS),
++	UC_EVENT_ENTRY(qd5_wdat,		L2C_TAD_EVENT_QD5_WDAT),
++	UC_EVENT_ENTRY(qd6_idx,			L2C_TAD_EVENT_QD6_IDX),
++	UC_EVENT_ENTRY(qd6_rdat,		L2C_TAD_EVENT_QD6_RDAT),
++	UC_EVENT_ENTRY(qd6_bnks,		L2C_TAD_EVENT_QD6_BNKS),
++	UC_EVENT_ENTRY(qd6_wdat,		L2C_TAD_EVENT_QD6_WDAT),
++	UC_EVENT_ENTRY(qd7_idx,			L2C_TAD_EVENT_QD7_IDX),
++	UC_EVENT_ENTRY(qd7_rdat,		L2C_TAD_EVENT_QD7_RDAT),
++	UC_EVENT_ENTRY(qd7_bnks,		L2C_TAD_EVENT_QD7_BNKS),
++	UC_EVENT_ENTRY(qd7_wdat,		L2C_TAD_EVENT_QD7_WDAT),
 +	NULL,
 +};
 +
-+static struct attribute_group thunder_ocx_tlk_events_group = {
++static struct attribute_group thunder_l2c_tad_events_group = {
 +	.name = "events",
-+	.attrs = thunder_ocx_tlk_events_attr,
++	.attrs = thunder_l2c_tad_events_attr,
 +};
 +
-+static const struct attribute_group *thunder_ocx_tlk_attr_groups[] = {
++static const struct attribute_group *thunder_l2c_tad_attr_groups[] = {
 +	&thunder_uncore_attr_group,
-+	&thunder_ocx_tlk_format_group,
-+	&thunder_ocx_tlk_events_group,
++	&thunder_l2c_tad_format_group,
++	&thunder_l2c_tad_events_group,
 +	NULL,
 +};
 +
-+struct pmu thunder_ocx_tlk_pmu = {
-+	.name		= "thunder_ocx_tlk",
++struct pmu thunder_l2c_tad_pmu = {
++	.name		= "thunder_l2c_tad",
 +	.task_ctx_nr    = perf_invalid_context,
-+	.pmu_enable	= thunder_uncore_pmu_enable_ocx_tlk,
-+	.pmu_disable	= thunder_uncore_pmu_disable_ocx_tlk,
 +	.event_init	= thunder_uncore_event_init,
-+	.add		= thunder_uncore_add_ocx_tlk,
++	.add		= thunder_uncore_add_l2c_tad,
 +	.del		= thunder_uncore_del,
-+	.start		= thunder_uncore_start_ocx_tlk,
-+	.stop		= thunder_uncore_stop,
-+	.read		= thunder_uncore_read_ocx_tlk,
-+	.attr_groups	= thunder_ocx_tlk_attr_groups,
++	.start		= thunder_uncore_start_l2c_tad,
++	.stop		= thunder_uncore_stop_l2c_tad,
++	.read		= thunder_uncore_read,
++	.attr_groups	= thunder_l2c_tad_attr_groups,
 +};
 +
-+static bool event_valid(u64 config)
++static bool event_valid(u64 c)
 +{
-+	if (config < ARRAY_SIZE(ocx_tlk_events))
++	if ((c > 0 &&
++	     c <= L2C_TAD_EVENT_OPEN_CCPI) ||
++	    (c >= L2C_TAD_EVENT_LOOKUP &&
++	     c <= L2C_TAD_EVENT_LOOKUP_ALL) ||
++	    (c >= L2C_TAD_EVENT_TAG_ALC_HIT &&
++	     c <= L2C_TAD_EVENT_TAG_NALC_MISS) ||
++	    (c >= L2C_TAD_EVENT_LMC_WR &&
++	     c <= L2C_TAD_EVENT_STC_LCL_FAIL) ||
++	    (c >= L2C_TAD_EVENT_OCI_RTG_WAIT &&
++	     c <= L2C_TAD_EVENT_OCI_RTG_ALC_VIC) ||
++	    /* L2C_TAD_EVENT_QD[0..7] IDX,RDAT,BNKS,WDAT => 0x80 .. 0xf3 */
++	    ((c & 0x80) && ((c & 0xf) <= 3)))
 +		return true;
 +
 +	return false;
 +}
 +
-+int __init thunder_uncore_ocx_tlk_setup(void)
++int __init thunder_uncore_l2c_tad_setup(void)
 +{
-+	int ret;
++	int ret = -ENOMEM;
 +
-+	thunder_uncore_ocx_tlk = kzalloc(sizeof(*thunder_uncore_ocx_tlk),
++	thunder_uncore_l2c_tad = kzalloc(sizeof(*thunder_uncore_l2c_tad),
 +					 GFP_KERNEL);
-+	if (!thunder_uncore_ocx_tlk) {
-+		ret = -ENOMEM;
++	if (!thunder_uncore_l2c_tad)
 +		goto fail_nomem;
-+	}
 +
-+	ret = thunder_uncore_setup(thunder_uncore_ocx_tlk, 0xa013,
-+				   &thunder_ocx_tlk_pmu,
-+				   ARRAY_SIZE(ocx_tlk_events));
++	ret = thunder_uncore_setup(thunder_uncore_l2c_tad, 0xa02e,
++				   &thunder_l2c_tad_pmu, L2C_TAD_NR_COUNTERS);
 +	if (ret)
 +		goto fail;
 +
-+	thunder_uncore_ocx_tlk->event_valid = event_valid;
++	thunder_uncore_l2c_tad->event_valid = event_valid;
 +	return 0;
 +
 +fail:
-+	kfree(thunder_uncore_ocx_tlk);
++	kfree(thunder_uncore_l2c_tad);
 +fail_nomem:
 +	return ret;
 +}
