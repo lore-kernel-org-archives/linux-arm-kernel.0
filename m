@@ -1,37 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Oct 2016 11:08:48 -0700
-Subject: [GIT PULL] i.MX fixes for 4.9
-In-Reply-To: <20161024140622.GM30578@tiger>
-References: <20161024140622.GM30578@tiger>
-Message-ID: <20161029180848.GB4195@localhost>
+Date: Sat, 29 Oct 2016 11:44:11 -0700
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.10
+In-Reply-To: <20161028113104.GE12241@e107155-lin>
+References: <20161028113104.GE12241@e107155-lin>
+Message-ID: <20161029184411.GH4195@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 24, 2016 at 10:06:22PM +0800, Shawn Guo wrote:
+On Fri, Oct 28, 2016 at 12:31:04PM +0100, Sudeep Holla wrote:
+> Hi ARM SoC Team,
+> 
+> Please pull.
+> 
+> --
+> Regards,
+> Sudeep
+> 
 > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
 >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.9
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-dt-4.10
 > 
-> for you to fetch changes up to 4edd601c5a9c5094daa714e65063e623826f3bcc:
+> for you to fetch changes up to c1ab65b24065ab04bdb0bc4e89d88784d38dc644:
 > 
->   ARM: imx: mach-imx6q: Fix the PHY ID mask for AR8031 (2016-10-24 21:26:01 +0800)
+>   arm64: dts: juno: add cpu capacity-dmips-mhz information to R2 boards (2016-10-17 17:43:22 +0100)
 > 
 > ----------------------------------------------------------------
-> The i.MX fixes for 4.9:
->  - A couple of patches from Fabio to fix the GPC power domain regression
->    which is caused by PM Domain core change 0159ec670763dd
->    ("PM / Domains: Verify the PM domain is present when adding a
->    provider"), and a related kernel crash seen with multi_v7_defconfig
->    build.
->  - Correct the PHY ID mask for AR8031 to match phy driver code.
->  - Apply new added timer erratum A008585 for LS1043A and LS2080A SoC.
->  - Correct vf610 global timer IRQ flag to avoid warning from gic driver
->    after commit 992345a58e0c ("irqchip/gic: WARN if setting the
->    interrupt type for a PPI fails").
+> ARMv8 Vexpress/Juno DT updates for v4.10
+> 
+> 1. Addition of SMMU(MMU-401) device nodes mainly to assist other
+>    developments and testing
+> 
+> 2. Addition of CPU dmips/capacity information on all the Juno boards
+> 
 
 Merged, thanks.
 
