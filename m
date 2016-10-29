@@ -1,80 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 29 Oct 2016 12:19:01 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic: Prevent VGIC_ADDR_TO_INTID from emiting
- divisions
-Message-ID: <20161029111901.16668-1-marc.zyngier@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 29 Oct 2016 13:44:14 +0200 (CEST)
+Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
+In-Reply-To: <20161023133134.GI1041@n2100.armlinux.org.uk>
+References: <315017958.66634.5d4fc19c-31cd-4900-8613-af4cadec5da4.open-xchange@email.1und1.de>
+ <20161023133134.GI1041@n2100.armlinux.org.uk>
+Message-ID: <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using non-constant number of bits for VGIC_ADDR_TO_INTID() leads
-to gcc 6.1 emiting calls to __aeabi_uldivmod, which the kernel
-does not implement.
+Hi Russell,
 
-As we really don't want to implement complex division in the kernel,
-the only other option is to prove to the compiler that there is only
-a few values that are possible for the number of bits per IRQ, and
-that they are all power of 2.
+> Russell King - ARM Linux <linux@armlinux.org.uk> hat am 23. Oktober 2016 um
+> 15:31 geschrieben:
+> 
+> 
+> On Sun, Oct 23, 2016 at 11:19:26AM +0200, Stefan Wahren wrote:
+> > Hi,
+> > 
+> > i'm faced with the issue that on i.MX28 the console is unable to wake up
+> > from
+> > freeze ( suspend to idle). I tested it with Linux 4.9-rc1, 4.8 and 3.18 (
+> > cmdline has
+> > no_console_suspend=1 ) and also with a i.MX23 with the same result. The
+> > suspend
+> > seems to work, but there is no reaction to the console after the freeze
+> > except
+> > an hung task warning after some time:
+> 
+> I bet if you remove "no_console_suspend" (it's not =1) then it'll work.
 
-We turn the VGIC_ADDR_TO_INTID macro into a switch that looks for
-the supported set of values (1, 2, 8, 64), and perform the computation
-accordingly. When "bits" is a constant, the compiler optimizes
-away the other cases. If not, we end-up with a small number of cases
-that GCC optimises reasonably well. Out of range values are detected
-both at build time (constants) and at run time (variables).
+unfortunately not:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
+
+echo mem > /sys/power/state
+
+Result: Able to wakeup via Debug UART
+Expected result: Able to wakeup via Debug UART
+
 ---
-This should be applied *before* Andre's patch fixing out of bound SPIs.
 
- virt/kvm/arm/vgic/vgic-mmio.h | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 4c34d39..a457282 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -57,10 +57,41 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
-  * multiplication with the inverted fraction, and scale up both the
-  * numerator and denominator with 8 to support at most 64 bits per IRQ:
-  */
--#define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
-+#define __VGIC_ADDR_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
- 					64 / (bits) / 8)
- 
- /*
-+ * Perform the same computation, but also handle non-constant number
-+ * of bits. We only care about the few cases that are required by
-+ * GICv2/v3.
-+ */
-+#define VGIC_ADDR_TO_INTID(addr, bits)				\
-+	({							\
-+		u32 __v;					\
-+		switch((bits)) {				\
-+		case 1:						\
-+			__v = __VGIC_ADDR_INTID((addr), 1);	\
-+			break;					\
-+		case 2:						\
-+			__v = __VGIC_ADDR_INTID((addr), 2);	\
-+			break;					\
-+		case 8:						\
-+			__v = __VGIC_ADDR_INTID((addr), 8);	\
-+			break;					\
-+		case 64:					\
-+			__v = __VGIC_ADDR_INTID((addr), 64);	\
-+			break;					\
-+		default:					\
-+			if (__builtin_constant_p((bits)))	\
-+				BUILD_BUG();			\
-+			else					\
-+				BUG();				\
-+		}						\
-+								\
-+		__v;						\
-+	})
-+
-+/*
-  * Some VGIC registers store per-IRQ information, with a different number
-  * of bits per IRQ. For those registers this macro is used.
-  * The _WITH_LENGTH version instantiates registers with a fixed length
--- 
-2.9.3
+echo freeze > /sys/power/state
+
+Result: Unable to wakeup via Debug UART (no hung task warning)
+Expected result: Able to wakeup via Debug UART
+
+---
+
+Setting: no_console_suspend in cmdline, Debug UART as wakeup source enabled
+
+echo mem > /sys/power/state
+
+Result: Able to wakeup via Debug UART
+Expected result: Able to wakeup via Debug UART
+
+---
+
+Setting: no_console_suspend in cmdline, Debug UART as wake source enabled
+
+echo freeze > /sys/power/state
+
+Result: Unable to wakeup via Debug UART (hung task warning after some minutes)
+Expected result: Able to wakeup Debug via UART
+
+---
+
+Setting: no_console_suspend in cmdline, Debug UART as wake source disabled
+
+echo mem > /sys/power/state
+
+Result: Able to wakeup via Debug UART
+Expected result: Able to wakeup via Debug UART
+
+---
+
+Setting: no_console_suspend in cmdline, Debug UART as wake source disabled
+
+echo freeze > /sys/power/state
+
+Result: Unable to wakeup via UART (hung task warning after some minutes)
+Expected result: Able to wakeup via Debug UART
+
+---
+
+Here some more relevant information about the setup:
+
+The console is operating on Debug UART which is a ARM PL011. The following
+kernel configs are set:
+
+CONFIG_PM_SLEEP=y
+CONFIG_SUSPEND=y
+CONFIG_SUSPEND_FREEZER=y
+CONFIG_PM=y
