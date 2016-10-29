@@ -1,18 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 29 Oct 2016 11:39:51 -0700
-Subject: [GIT PULL] firmware: SCPI updates for v4.10
-In-Reply-To: <20161028112920.GB12241@e107155-lin>
-References: <20161028112920.GB12241@e107155-lin>
-Message-ID: <20161029183951.GE4195@localhost>
+Date: Sat, 29 Oct 2016 11:41:11 -0700
+Subject: [GIT PULL] ARM: vexpress: fixes for v4.10
+In-Reply-To: <20161028113003.GC12241@e107155-lin>
+References: <20161028113003.GC12241@e107155-lin>
+Message-ID: <20161029184111.GF4195@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-On Fri, Oct 28, 2016 at 12:29:20PM +0100, Sudeep Holla wrote:
-> Hi ARM-SoC Team,
+On Fri, Oct 28, 2016 at 12:30:03PM +0100, Sudeep Holla wrote:
+> Hi ARM SoC team,
 > 
-> Please pull !
+> These couple of fixes help to boot TC2 in HYP mode with CONFIG_MCPM
+> enabled. This was not supported directly before and hence targeting for
+> v4.10. Currently those who want to boot in HYP mode have to disable
+> MCPM config in the build.
+> 
+> Please pull.
 > 
 > --
 > Regards,
@@ -24,30 +27,13 @@ On Fri, Oct 28, 2016 at 12:29:20PM +0100, Sudeep Holla wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scpi-updates-4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/vexpress-fixes-4.10
 > 
-> for you to fetch changes up to a9e0192d8b35c6ab115a154ed1499ff39a0e5b06:
+> for you to fetch changes up to 801f33be8e902d8cea75cb7ac056d07c4fdd25f8:
 > 
->   firmware: arm_scpi: add support for legacy match table on Amlogic GXBB SoC (2016-10-19 15:17:28 +0100)
-> 
-> ----------------------------------------------------------------
-> SCPI updates for v4.10
-> 
-> 1. Adds support for Legacy SCPI(pre- SCPI v1.0) protocol
-> 
-> 2. Adds support for SCPI used on Amlogic GXBB SoC using the legacy
->    SCPI protocol
-> 
-> ----------------------------------------------------------------
-> Neil Armstrong (5):
->       dt-bindings: Add support for Amlogic GXBB SCPI Interface
+>   drivers: cci: add missing CCI port availability firmware check (2016-10-17 14:27:54 +0100)
 
-I had comments on this patch, just emailed as follow-up to it.
-
-Also, you didn't sign off on it when applying it, seems like a mistake.
-
-Please respin, ideally with the other changes also done (i.e. splitting off
-Juno stuff from arm,scpi.txt).
+Merged, thanks.
 
 
 -Olof
