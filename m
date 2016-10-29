@@ -1,90 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 29 Oct 2016 11:08:36 +0100
-Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
-In-Reply-To: <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Sat, 29 Oct 2016 08:10:02 -0200
+Subject: [PATCH 1/2] ABI: rtc-ab8500: fix rtc_calibration documentation
+Message-ID: <364a36215c44e0c2785911e9d9259cd866283cb9.1477735797.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Wire up the generic support for exposing CPU feature bits via the
-> modalias in /sys/device/system/cpu. This allows udev to automatically
-> load modules for things like crypto algorithms that are implemented
-> using optional instructions.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/Kconfig                  |  1 +
->  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
->  2 files changed, 33 insertions(+)
->
+The "What:" field at the ABI should describe the location of
+the ABI, e. g. the position under a mounted sysfs.
 
-Russell,
+Fix it.
 
-do you have any concerns regarding this patch? If not, I will drop it
-into the patch system.
+Cc: Mark Godfrey <mark.godfrey@stericsson.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: rtc-linux at googlegroups.com
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
+---
+ .../ABI/testing/sysfs-class-rtc-rtc0-device-rtc_calibration          | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Herbert,
-
-I will resend the followup patches in this series to linux-crypto@
-once this prerequisite is in place
-
-Thanks,
-Ard.
-
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index b5d529fdffab..1a0c6a486a9c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -21,6 +21,7 @@ config ARM
->         select GENERIC_ALLOCATOR
->         select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
->         select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> +       select GENERIC_CPU_AUTOPROBE
->         select GENERIC_EARLY_IOREMAP
->         select GENERIC_IDLE_POLL_SETUP
->         select GENERIC_IRQ_PROBE
-> diff --git a/arch/arm/include/asm/cpufeature.h b/arch/arm/include/asm/cpufeature.h
-> new file mode 100644
-> index 000000000000..19c3dddd901a
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cpufeature.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (C) 2016 Linaro Ltd. <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_CPUFEATURE_H
-> +#define __ASM_CPUFEATURE_H
-> +
-> +#include <asm/hwcap.h>
-> +
-> +/*
-> + * Due to the fact that ELF_HWCAP is a 32-bit type on ARM, and given the number
-> + * of optional CPU features it defines, ARM's CPU capability bits have been
-> + * divided across separate elf_hwcap and elf_hwcap2 variables, each of which
-> + * covers a subset of the available CPU features.
-> + *
-> + * Currently, only a few of those are suitable for automatic module loading
-> + * (which is the primary use case of this facility) and those happen to be all
-> + * covered by HWCAP2. So let's only expose those via the CPU modalias for now.
-> + */
-> +#define MAX_CPU_FEATURES       (8 * sizeof(elf_hwcap2))
-> +#define cpu_feature(x)         ilog2(HWCAP2_ ## x)
-> +
-> +static inline bool cpu_have_feature(unsigned int num)
-> +{
-> +       return elf_hwcap2 & (1UL << num);
-> +}
-> +
-> +#endif
-> --
-> 2.7.4
->
+diff --git a/Documentation/ABI/testing/sysfs-class-rtc-rtc0-device-rtc_calibration b/Documentation/ABI/testing/sysfs-class-rtc-rtc0-device-rtc_calibration
+index 4cf1e72222d9..ec950c93e5c6 100644
+--- a/Documentation/ABI/testing/sysfs-class-rtc-rtc0-device-rtc_calibration
++++ b/Documentation/ABI/testing/sysfs-class-rtc-rtc0-device-rtc_calibration
+@@ -1,8 +1,9 @@
+-What:           Attribute for calibrating ST-Ericsson AB8500 Real Time Clock
++What:           /sys/class/rtc/rtc0/device/rtc_calibration
+ Date:           Oct 2011
+ KernelVersion:  3.0
+ Contact:        Mark Godfrey <mark.godfrey@stericsson.com>
+-Description:    The rtc_calibration attribute allows the userspace to
++Description:    Attribute for calibrating ST-Ericsson AB8500 Real Time Clock
++		The rtc_calibration attribute allows the userspace to
+                 calibrate the AB8500.s 32KHz Real Time Clock.
+                 Every 60 seconds the AB8500 will correct the RTC's value
+                 by adding to it the value of this attribute.
+-- 
+2.7.4
