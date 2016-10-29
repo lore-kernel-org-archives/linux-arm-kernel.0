@@ -1,49 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 29 Oct 2016 13:56:30 +0200
-Subject: [PATCH v2] ARM: pxa: remove duplicated include from spitz.c
-Message-ID: <1477742190-3300-1-git-send-email-robert.jarzmik@free.fr>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 29 Oct 2016 14:15:24 +0200 (CEST)
+Subject: [PATCH v3] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
+In-Reply-To: <20161027165246.23936-1-eric@anholt.net>
+References: <20161027165246.23936-1-eric@anholt.net>
+Message-ID: <2009597620.98560.11cdcb7c-b46d-43f0-a853-b742fde3546a.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyj.lk@gmail.com>
+Hi Eric,
 
-This partially reverts commit 12beb346710b ("Merge tag 'pxa-fixes-v4.8'
-of https://github.com/rjarzmik/linux into randconfig-4.8").
+> Eric Anholt <eric@anholt.net> hat am 27. Oktober 2016 um 18:52 geschrieben:
+> 
+> 
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The idea is to give useful names to GPIO lines that an implementer
+> will be using from userspace, e.g. for maker type projects.  These are
+> user-visible using tools/gpio/lsgpio.c
 
-This former patch introduced accidentally a double include of module.h.
+sorry for the late feedback, but did you check your patch against the Firmware
+DTS [1]?
 
-Signed-off-by: Wei Yongjun <weiyj.lk@gmail.com>
-Acked-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-[amended commit message and 2 comments]
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- arch/arm/mach-pxa/corgi.c | 1 -
- arch/arm/mach-pxa/spitz.c | 1 -
- 2 files changed, 2 deletions(-)
+As an example the GPIO38 is connected and named as USB_LIMIT_1A2 since Raspberry
+Pi 1 B Plus.
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 10bfdb169366..183cd3446f25 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -35,7 +35,6 @@
- #include <linux/mtd/sharpsl.h>
- #include <linux/input/matrix_keypad.h>
- #include <linux/gpio_keys.h>
--#include <linux/module.h>
- #include <linux/memblock.h>
- #include <video/w100fb.h>
- 
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 2c150bfc0cd5..67d66c702574 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -31,7 +31,6 @@
- #include <linux/input/matrix_keypad.h>
- #include <linux/regulator/machine.h>
- #include <linux/io.h>
--#include <linux/module.h>
- #include <linux/reboot.h>
- #include <linux/memblock.h>
- 
--- 
-2.1.4
+[1] -
+https://github.com/raspberrypi/documentation/blob/master/configuration/images/dt-blob.dts
