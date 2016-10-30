@@ -1,22 +1,30 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 30 Oct 2016 14:24:46 +0000
-Subject: [PATCH] arm64/kprobes: Tidy up sign-extension usage
-In-Reply-To: <f25b75bf250827113d4269614ba7936e870b0646.1476794661.git.robin.murphy@arm.com>
-References: <f25b75bf250827113d4269614ba7936e870b0646.1476794661.git.robin.murphy@arm.com>
-Message-ID: <20161030142446.zwttspvrzapnjax5@localhost>
+Date: Sun, 30 Oct 2016 14:22:46 +0000
+Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for
+ heterogeneous systems
+In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
+References: <20161017154650.18779-1-juri.lelli@arm.com>
+Message-ID: <20161030142246.od5skjzegyp62hma@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 01:46:27PM +0100, Robin Murphy wrote:
-> Kprobes does not need its own homebrewed (and frankly inscrutable) sign
-> extension macro; just use the standard kernel functions instead. Since
-> the compiler actually recognises the sign-extension idiom of the latter,
-> we also get the small bonus of some nicer codegen, as each displacement
-> calculation helper then compiles to a single optimal SBFX instruction.
+On Mon, Oct 17, 2016 at 04:46:41PM +0100, Juri Lelli wrote:
+> I'm thus now assuming that everybody is OK with the patches and that they can
+> be queued for 4.10 (we certainly need this plumbing at this point). Please
+> speak if my assumption is wrong (and provide feedback! :).
+> Otherwise I'm going to:
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>  - use Russell's patching system for patches 2 and 8
+>  - ask Sudeep to pull patches 3,5,6 and 7
+>  - ask Catalin/Will to pull patches 1,4 and 9
 
-Queued for 4.10. Thanks.
+I'm happy to queue patches 1, 4 and 9 for 4.10 (though it might have
+been easier for the whole series to go through arm-soc).
+
+> Do you think we might get into trouble splitting the merge process this way?
+
+Probably not. The only minor downside is that I have to grab a new DT
+for Juno from Sudeep to test the patches. Not an issue, though.
 
 -- 
 Catalin
