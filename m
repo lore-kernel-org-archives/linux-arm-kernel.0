@@ -1,45 +1,58 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 30 Oct 2016 06:45:39 +0200
-Subject: [PATCH -next] i2c: digicolor: use clk_disable_unprepare instead
- of clk_unprepare
-In-Reply-To: <1477758677-7831-1-git-send-email-weiyj.lk@gmail.com>
-References: <1477758677-7831-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20161030044539.whnwlup6aetqbe6p@tarshish>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 30 Oct 2016 07:16:26 +0100
+Subject: [PATCH 01/14] dma: sun6i-dma: Add burst case of 4
+In-Reply-To: <CAGb2v67SSZF6XL-HXv83nuwTKpJc53h8gsrb2r2V98LNZBzqEA@mail.gmail.com>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <3a2404510b5f8b16ae3bb193982d70f158700b2b.1475571575.git.mylene.josserand@free-electrons.com>
+ <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
+ <20161004165553.GS5228@lukather>
+ <20161023183107.5b75b6aad62853378713299f@free.fr>
+ <20161027175154.v4kuhyvm3r5n6tdo@lukather>
+ <CAGb2v67SSZF6XL-HXv83nuwTKpJc53h8gsrb2r2V98LNZBzqEA@mail.gmail.com>
+Message-ID: <20161030071626.8d67fd9febfd355620a58c4d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei Yongjun,
+On Sun, 30 Oct 2016 10:06:20 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-On Sat, Oct 29, 2016 at 04:31:17PM +0000, Wei Yongjun wrote:
-> From: Wei Yongjun <weiyongjun1@huawei.com>
+> >> Yes, I know that the burst size is always a power of 2.
+> >> The best way to check it would be to change the {src,dts}_maxburst to a
+> >> bitmap of the possible bursts as 0x0d for 1,4 and 8 bytes. But this
+> >> asks for a lot of changes...
+> >
+> > To be honest, I'm not really a big fan of those tree wide changes
+> > without any way to maintain compatibility. It ends up in a single,
+> > huge patch if we want to maintain bisectability that just isn't
+> > reviewable.
 > 
-> since clk_prepare_enable() is used to get i2c->clk, we should
-> use clk_disable_unprepare() to release it for the error path.
+> Looking at the dmaengine API, I believe we got it wrong.
 > 
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-
-Thanks,
-baruch
-
->  drivers/i2c/busses/i2c-digicolor.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> max_burst in dma_slave_config denotes the largest amount of data
+> a single transfer should be, as described in dmaengine.h:
 > 
-> diff --git a/drivers/i2c/busses/i2c-digicolor.c b/drivers/i2c/busses/i2c-digicolor.c
-> index 49f2084..50813a2 100644
-> --- a/drivers/i2c/busses/i2c-digicolor.c
-> +++ b/drivers/i2c/busses/i2c-digicolor.c
-> @@ -347,7 +347,7 @@ static int dc_i2c_probe(struct platform_device *pdev)
->  
->  	ret = i2c_add_adapter(&i2c->adap);
->  	if (ret < 0) {
-> -		clk_unprepare(i2c->clk);
-> +		clk_disable_unprepare(i2c->clk);
->  		return ret;
->  	}
+>  * @src_maxburst: the maximum number of words (note: words, as in
+>  * units of the src_addr_width member, not bytes) that can be sent
+>  * in one burst to the device. Typically something like half the
+>  * FIFO depth on I/O peripherals so you don't overflow it. This
+>  * may or may not be applicable on memory sources.
+>  * @dst_maxburst: same as src_maxburst but for destination target
+>  * mutatis mutandis.
+> 
+> The DMA engine driver should be free to select whatever burst size
+> that doesn't exceed this. So for max_burst = 4, the driver can select
+> burst = 4 for controllers that do support it, or burst = 1 for those
+> that don't, and do more bursts.
+> 
+> This also means we can increase max_burst for the audio codec, as
+> the FIFO is 64 samples deep for stereo, or 128 samples for mono.
+> 
+> 
+> If we agree on the above I can send some patches for this.
+
+That's fine to me, but this does not solve the main problem which is
+how/where are defined the possible bursts of a SoC.
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
