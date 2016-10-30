@@ -1,37 +1,175 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 30 Oct 2016 17:22:19 +0000
-Subject: =?UTF-8?q?=5BPATCH=20V2=202/2=5D=20ARM=3A=20dts=3A=20bcm283x=3A=20fix=20typo=20in=20mailbox=20address?=
-In-Reply-To: <6b13e96d-78d1-fcab-4273-803310ae4da6@suse.de>
-References: <6b13e96d-78d1-fcab-4273-803310ae4da6@suse.de>
-Message-ID: <1477848139-32267-1-git-send-email-stefan.wahren@i2se.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Sun, 30 Oct 2016 11:12:03 -0700
+Subject: [RFC] fpga: Pull checks for supported operations into framework
+Message-ID: <1477851123-17686-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The address of the mailbox node in the bcm283x.dtsi also has a typo.
-So fix it accordingly.
+Most of the drivers only support a subset of {PARTIAL, FULL}
+reconfiguration.
+Pull duplicate checks in each driver into the framework.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-Fixes: 05b682b7a3b2 ("ARM: bcm2835: dt: Add the mailbox to the device tree")
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+Cc: Alan Tull <atull@opensource.altera.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 ---
-Changes in V2:
-  * fixed commit message as reported by Andreas
+Hi all,
 
- arch/arm/boot/dts/bcm283x.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+with the new drivers (ice40, altera-ps-spi) being submitted I've noticed
+we're duplicating this check over and over again,
+so I figured we might as well pull it into the framework.
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 46d46d8..74dd21b 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -104,7 +104,7 @@
- 			reg = <0x7e104000 0x10>;
- 		};
+I'm not sure if there are gonna be other 'flags' we need to support
+in the short term (we talked about byte-swapping ...)
+
+Note: This patch goes on top of greg's char-misc-testing  that already
+contains Alan's latest changes to support the A10 and won't apply 
+to master.
+
+Cheers,
+
+Moritz
+
+---
+ drivers/fpga/fpga-mgr.c       | 12 ++++++++++++
+ drivers/fpga/socfpga-a10.c    |  4 +++-
+ drivers/fpga/socfpga.c        |  3 ++-
+ drivers/fpga/zynq-fpga.c      |  3 ++-
+ include/linux/fpga/fpga-mgr.h |  9 +++++++--
+ 5 files changed, 26 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+index c58b4c4..85f17d8 100644
+--- a/drivers/fpga/fpga-mgr.c
++++ b/drivers/fpga/fpga-mgr.c
+@@ -49,6 +49,11 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
+ 	struct device *dev = &mgr->dev;
+ 	int ret;
  
--		mailbox: mailbox at 7e00b800 {
-+		mailbox: mailbox at 7e00b880 {
- 			compatible = "brcm,bcm2835-mbox";
- 			reg = <0x7e00b880 0x40>;
- 			interrupts = <0 1>;
++	if (!(mgr->supported_flags & info->flags)) {
++		dev_err(dev, "Unsupported flags passed\n");
++		return -ENOTSUPP;
++	}
++
+ 	/*
+ 	 * Call the low level driver's write_init function.  This will do the
+ 	 * device-specific things to get the FPGA into the state where it is
+@@ -252,6 +257,7 @@ EXPORT_SYMBOL_GPL(fpga_mgr_put);
+  */
+ int fpga_mgr_register(struct device *dev, const char *name,
+ 		      const struct fpga_manager_ops *mops,
++		      u32 supported_flags,
+ 		      void *priv)
+ {
+ 	struct fpga_manager *mgr;
+@@ -268,6 +274,11 @@ int fpga_mgr_register(struct device *dev, const char *name,
+ 		return -EINVAL;
+ 	}
+ 
++	if (!supported_flags) {
++		dev_err(dev, "Attempt to register with no supported flags\n");
++		return -EINVAL;
++	}
++
+ 	mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
+ 	if (!mgr)
+ 		return -ENOMEM;
+@@ -282,6 +293,7 @@ int fpga_mgr_register(struct device *dev, const char *name,
+ 
+ 	mgr->name = name;
+ 	mgr->mops = mops;
++	mgr->supported_flags = supported_flags;
+ 	mgr->priv = priv;
+ 
+ 	/*
+diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
+index ccd9fb2..e7c82ff 100644
+--- a/drivers/fpga/socfpga-a10.c
++++ b/drivers/fpga/socfpga-a10.c
+@@ -519,7 +519,9 @@ static int socfpga_a10_fpga_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
+-				 &socfpga_a10_fpga_mgr_ops, priv);
++				 &socfpga_a10_fpga_mgr_ops,
++				 FPGA_MGR_PARTIAL_RECONFIG,
++				 priv);
+ }
+ 
+ static int socfpga_a10_fpga_remove(struct platform_device *pdev)
+diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+index b6672e6..3285b7d 100644
+--- a/drivers/fpga/socfpga.c
++++ b/drivers/fpga/socfpga.c
+@@ -582,7 +582,8 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
+-				 &socfpga_fpga_ops, priv);
++				 &socfpga_fpga_ops, FPGA_MGR_FULL_RECONFIG,
++				 priv);
+ }
+ 
+ static int socfpga_fpga_remove(struct platform_device *pdev)
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index 249682e..1dabd25 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -413,6 +413,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ 	struct zynq_fpga_priv *priv;
+ 	struct resource *res;
+ 	int err;
++	u32 flags = FPGA_MGR_FULL_RECONFIG | FPGA_MGR_PARTIAL_RECONFIG;
+ 
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv)
+@@ -465,7 +466,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ 	clk_disable(priv->clk);
+ 
+ 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+-				&zynq_fpga_ops, priv);
++				&zynq_fpga_ops, flags, priv);
+ 	if (err) {
+ 		dev_err(dev, "unable to register FPGA manager");
+ 		clk_unprepare(priv->clk);
+diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+index 040b86d..4f4bcf2 100644
+--- a/include/linux/fpga/fpga-mgr.h
++++ b/include/linux/fpga/fpga-mgr.h
+@@ -64,9 +64,12 @@ enum fpga_mgr_states {
+ 
+ /*
+  * FPGA Manager flags
++ * FPGA_MGR_FULL_RECONFIG: do full reconfiguration if supported
+  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
+  */
+-#define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
++#define FPGA_MGR_FULL_RECONFIG		BIT(0)
++#define FPGA_MGR_PARTIAL_RECONFIG	BIT(1)
++#define FPGA_MGR_EXTERNAL_CONFIG	BIT(2)
+ 
+ /**
+  * struct fpga_image_info - information specific to a FPGA image
+@@ -119,6 +122,7 @@ struct fpga_manager {
+ 	enum fpga_mgr_states state;
+ 	const struct fpga_manager_ops *mops;
+ 	void *priv;
++	u32 supported_flags;
+ };
+ 
+ #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
+@@ -135,7 +139,8 @@ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
+ void fpga_mgr_put(struct fpga_manager *mgr);
+ 
+ int fpga_mgr_register(struct device *dev, const char *name,
+-		      const struct fpga_manager_ops *mops, void *priv);
++		      const struct fpga_manager_ops *mops, u32 supported_flags,
++		      void *priv);
+ 
+ void fpga_mgr_unregister(struct device *dev);
+ 
 -- 
-1.7.9.5
+2.4.11
