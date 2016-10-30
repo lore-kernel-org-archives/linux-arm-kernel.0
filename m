@@ -1,37 +1,28 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 30 Oct 2016 09:31:39 -0400
-Subject: [PATCH 5/5] tty: amba-pl011: Add earlycon support for SBSA UART
-In-Reply-To: <bdd495a9-fa54-9049-ed08-22e03a898323@huawei.com>
-References: <1474708465-38958-1-git-send-email-wangkefeng.wang@huawei.com>
- <1474708465-38958-6-git-send-email-wangkefeng.wang@huawei.com>
- <20160927105748.GA3847@kroah.com>
- <281fb262-d9b8-9543-e35e-5db41fcea5d1@huawei.com>
- <7edb183d-2376-0f09-a3ea-3bf78971609d@huawei.com>
- <20161027151849.GB32284@kroah.com>
- <bdd495a9-fa54-9049-ed08-22e03a898323@huawei.com>
-Message-ID: <20161030133139.GA1595@kroah.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sun, 30 Oct 2016 16:26:48 +0100
+Subject: [PATCH 1/2] DT: binding: bcm2835-mbox: fix address typo in example
+In-Reply-To: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
+References: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <b387fb23-8ebe-bd12-631f-4b6e42a5ecde@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2016 at 04:49:30PM +0800, Kefeng Wang wrote:
+Am 26.10.2016 um 20:13 schrieb Stefan Wahren:
+> The address of the mailbox node in the example has a typo.
+> So fix it accordingly.
 > 
-> 
-> On 2016/10/27 23:18, Greg Kroah-Hartman wrote:
-> > On Mon, Oct 24, 2016 at 11:59:20AM +0800, Kefeng Wang wrote:
-> >> Hi Greg, any more comments, thanks.
-> > 
-> > Never wait, just resend if you have comments and you know you have to
-> > fix them up...
-> > 
-> 
-> Hi Greg, as I mentioned in previous mail, compatible "arm,sbsa-uart" need
-> be provided by adding a new OF_EARLYCON_DECLARE(), this is the patch's point.
-> 
-> And I no further update, could this patch be acceptable and be picked up?
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: d4b5c782b9f4 ("dt/bindings: Add binding for the BCM2835 mailbox driver")
+> ---
+>  .../bindings/mailbox/brcm,bcm2835-mbox.txt         |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-It's long gone from my queue, please resend it if you think it should be
-applied.
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-thanks,
+Regards,
+Andreas
 
-greg k-h
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
