@@ -1,30 +1,49 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 30 Oct 2016 15:41:26 -0500
-Subject: [RFC PATCH 01/13] pinctrl: meson: Add GXL pinctrl definitions
-In-Reply-To: <1477060838-14164-2-git-send-email-narmstrong@baylibre.com>
-References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
- <1477060838-14164-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20161030204126.adj4bo7arpxxqtpf@rob-hp-laptop>
+Date: Sun, 30 Oct 2016 15:42:02 -0500
+Subject: [PATCH/RFT v2 09/17] regulator: fixed: Add over current event
+In-Reply-To: <20161024164634.4330-10-ahaslam@baylibre.com>
+References: <20161024164634.4330-1-ahaslam@baylibre.com>
+ <20161024164634.4330-10-ahaslam@baylibre.com>
+Message-ID: <20161030204202.7t6qcwin7b5qi2ia@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 04:40:26PM +0200, Neil Armstrong wrote:
-> Add support for the Amlogic Meson GXL SoC, this is a partially complete
-> definition only based on the Amlogic Vendor tree.
+On Mon, Oct 24, 2016 at 06:46:26PM +0200, ahaslam at baylibre.com wrote:
+> From: Axel Haslam <ahaslam@baylibre.com>
 > 
-> This definition differs a lot from the GXBB and needs a separate entry.
+> Some regulator supplies have an over-current pin that is
+> activated when the hw detects an over current condition.
+> When this happens, the hardware enters a current limited
+> mode.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Extend the fixed regulator driver with the ability
+> to handle irq's from the over-current pin and report
+> an over current event to the consumers via a regulator
+> notifier. Also, add device tree bindings to allow to
+> pass a gpio for over current monitoring.
+> 
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 > ---
->  .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |   2 +
+>  .../bindings/regulator/fixed-regulator.txt         |  4 ++
+>  drivers/regulator/fixed.c                          | 64 ++++++++++++++++++++++
+>  include/linux/regulator/consumer.h                 |  5 ++
+>  include/linux/regulator/fixed.h                    |  3 +
+>  4 files changed, 76 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/fixed-regulator.txt b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> index 4fae41d..d20bf67 100644
+> --- a/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/fixed-regulator.txt
+> @@ -11,6 +11,8 @@ If this property is missing, the default assumed is Active low.
+>  - gpio-open-drain: GPIO is open drain type.
+>    If this property is missing then default assumption is false.
+>  -vin-supply: Input supply name.
+> +- oc-gpio: Input gpio that signals an over current condition
 
-Acked-by: Rob Herring <robh@kernel.org>
+"-gpios" is the preferred form. So "oc-gpios".
 
->  drivers/pinctrl/meson/Makefile                     |   3 +-
->  drivers/pinctrl/meson/pinctrl-meson-gxl.c          | 589 +++++++++++++++++++++
->  drivers/pinctrl/meson/pinctrl-meson.c              |   8 +
->  drivers/pinctrl/meson/pinctrl-meson.h              |   2 +
->  include/dt-bindings/gpio/meson-gxl-gpio.h          | 131 +++++
->  6 files changed, 734 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/pinctrl/meson/pinctrl-meson-gxl.c
->  create mode 100644 include/dt-bindings/gpio/meson-gxl-gpio.h
+> +- oc-active-high: The polarity of the over current pin is high
+
+This should be specified in the gpio flags cell.
+
+Rob
