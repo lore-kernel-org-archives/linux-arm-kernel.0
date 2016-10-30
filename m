@@ -1,30 +1,27 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 30 Oct 2016 14:22:46 +0000
-Subject: [PATCH v7 REPOST 0/9] CPUs capacity information for
- heterogeneous systems
-In-Reply-To: <20161017154650.18779-1-juri.lelli@arm.com>
-References: <20161017154650.18779-1-juri.lelli@arm.com>
-Message-ID: <20161030142246.od5skjzegyp62hma@localhost>
+Date: Sun, 30 Oct 2016 12:50:38 +0000
+Subject: [PATCH] arm64: qcom: enable GPIOLIB in Kconfig
+In-Reply-To: <20161021175608.19073-1-michael.scott@linaro.org>
+References: <20161021175608.19073-1-michael.scott@linaro.org>
+Message-ID: <20161030125038.qp55gvscygvdiiym@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 04:46:41PM +0100, Juri Lelli wrote:
-> I'm thus now assuming that everybody is OK with the patches and that they can
-> be queued for 4.10 (we certainly need this plumbing at this point). Please
-> speak if my assumption is wrong (and provide feedback! :).
-> Otherwise I'm going to:
+On Fri, Oct 21, 2016 at 10:56:08AM -0700, Michael Scott wrote:
+> While debugging a kernel image size issue, I discovered that if all
+> non ARCH_QCOM configs in the ARM64 defconfig are disabled, the QCOM
+> pinctrl drivers will not be built.
 > 
->  - use Russell's patching system for patches 2 and 8
->  - ask Sudeep to pull patches 3,5,6 and 7
->  - ask Catalin/Will to pull patches 1,4 and 9
+> The QCOM pinctrl drivers have a dependency on GPIOLIB which was being
+> selected when other ARCH configs were enabled, but ARCH_QCOM doesn't
+> select GPIOLIB directly.  Let's select GPIOLIB here to ensure the pinctrl
+> drivers are built for QCOM platforms.
+> 
+> Signed-off-by: Michael Scott <michael.scott@linaro.org>
+> ---
+>  arch/arm64/Kconfig.platforms | 1 +
 
-I'm happy to queue patches 1, 4 and 9 for 4.10 (though it might have
-been easier for the whole series to go through arm-soc).
-
-> Do you think we might get into trouble splitting the merge process this way?
-
-Probably not. The only minor downside is that I have to grab a new DT
-for Juno from Sudeep to test the patches. Not an issue, though.
+Such patches are normally handled by arm-soc (cc'ed).
 
 -- 
 Catalin
