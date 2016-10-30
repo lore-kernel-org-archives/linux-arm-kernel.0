@@ -1,20 +1,21 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 30 Oct 2016 15:03:07 +0000
-Subject: [PATCHv4 0/4] WX checking for arm64
-In-Reply-To: <1477585654-8908-1-git-send-email-labbott@redhat.com>
-References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
-Message-ID: <20161030150307.33vc2m7y5y6wzbqc@localhost>
+Date: Sun, 30 Oct 2016 14:38:58 +0000
+Subject: [PATCH] arm64: mm: fix __page_to_voff definition
+In-Reply-To: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
+References: <1477040326-21260-1-git-send-email-neeraju@codeaurora.org>
+Message-ID: <20161030143858.vhmnibvvwf5qjvqj@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 09:27:30AM -0700, Laura Abbott wrote:
-> Laura Abbott (4):
->   arm64: dump: Make ptdump debugfs a separate option
->   arm64: dump: Make the page table dumping seq_file optional
->   arm64: dump: Remove max_addr
->   arm64: dump: Add checking for writable and exectuable pages
+On Fri, Oct 21, 2016 at 02:28:46PM +0530, Neeraj Upadhyay wrote:
+> Fix parameter name for __page_to_voff, to match its definition.
+> At present, we don't see any issue, as page_to_virt's caller
+> declares 'page'.
+> 
+> Fixes: 9f2875912dac ("arm64: mm: restrict virt_to_page() to the linear mapping")
+> Signed-off-by: Neeraj Upadhyay <neeraju@codeaurora.org>
 
-Queued for 4.10. Thanks.
+I'll queue this patch for 4.10. Thanks.
 
 -- 
 Catalin
