@@ -1,65 +1,452 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Sun, 30 Oct 2016 00:06:07 +0100
-Subject: [PATCH] asm-generic: Drop getrlimit and setrlimit syscalls from
- default list
-In-Reply-To: <20161029214541.GA20037@yury-N73SV>
-References: <1477138444-14993-1-git-send-email-ynorov@caviumnetworks.com>
- <2502005.4risrb1P1I@wuerfel> <20161029214541.GA20037@yury-N73SV>
-Message-ID: <0B167874-4C33-4FEC-80AA-DC936AA56E4D@imgtec.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sat, 29 Oct 2016 20:00:30 -0400
+Subject: [PATCH] pinctrl: sunxi: make bool drivers explicitly non-modular
+Message-ID: <20161030000030.9394-1-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2016 22:45:41 BST, Yury Norov <ynorov@caviumnetworks.com> wrote:
->On Sat, Oct 29, 2016 at 11:02:40PM +0200, Arnd Bergmann wrote:
->> On Saturday, October 22, 2016 3:14:04 PM CEST Yury Norov wrote:
->> > The newer prlimit64 syscall provides all the functionality provided
->by
->> > the getrlimit and setrlimit syscalls and adds the pid of target
->process,
->> > so future architectures won't need to include getrlimit and
->setrlimit.
->> > 
->> > Therefore drop getrlimit and setrlimit syscalls from the generic
->syscall
->> > list unless __ARCH_WANT_SET_GET_RLIMIT is defined by the
->architecture's
->> > unistd.h prior to including asm-generic/unistd.h, and adjust all
->> > architectures using the generic syscall list to define it so that
->no
->> > in-tree architectures are affected.
->> 
->> The patch looks good, but shouldn't we also hide the actual syscall
->> implementation if the symbol is not set? It's just dead code
->otherwise
->> for new architectures.
->
->I was thinking on it. The patch of James Hogan, b0da6d4415
->(asm-generic:
->Drop renameat syscall from default list) doesn't do it for renameat(),
->so
->I decided not to do it too. It's not so easy to disable syscalls
->because arch
->may support few ABIs, and some of them may require the syscall. For
->example,
->arm64 supports lp64, aarch32 and ilp32, and first two ABIs need
->renameat()
->and getrlimit/setrlimit.
->
->At now there's no arches that doesn't need renameat() and
->getrlimit/setrlimit,
->and there will be no such arch in nearest future. So there will be no
->dead code.
->
->But I agree with you that we need make that implementations 
->conditional. If I understand it correctly, we need something like
->__ARCH_WANT_SET_GET_RLIMIT in all existing Kconfigs, correct?
->
->I think this patch may be applied as is, and if needed I can send
->another patch that disables renameat() and getrlimit/setrlimit soon.
->
->James, what do you think?
+None of the Kconfigs for any of these drivers are tristate,
+meaning that they currently are not being built as a module by anyone.
 
-For renameat my main concern was the ABI, and I didn't think it was worth the effort or slightly increased complexity to ifdef the implementation since it was such a trivial wrapper around renameat2. Getrlimit and setrlimit aren't much more complex, just a user copy in addition to the standard doprlimit, so i probably wouldn't have bothered for them either.
+Lets remove the modular code that is essentially orphaned, so that
+when reading the drivers there is no doubt they are builtin-only.  All
+drivers get essentially the same change, so they are handled in batch.
 
-cheers
-James Hogan
+Changes are (1) use builtin_platform_driver, (2) use init.h header
+(3) delete module_exit related code, (4) delete MODULE_DEVICE_TABLE,
+and (5) delete MODULE_LICENCE/MODULE_AUTHOR and associated tags.
+
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We do delete the MODULE_LICENSE etc. tags since all that information
+is already contained at the top of each file in the comments.
+
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
+Cc: Hans de Goede <hdegoede@redhat.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Patrice Chotard <patrice.chotard@st.com>
+Cc: Hongzhou Yang <hongzhou.yang@mediatek.com>
+Cc: Fabian Frederick <fabf@skynet.be>
+Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Vishnu Patekar <vishnupatekar0510@gmail.com>
+Cc: Mylene Josserand <mylene.josserand@free-electrons.com>
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-gr8.c b/drivers/pinctrl/sunxi/pinctrl-gr8.c
+index 2904d2b7378b..2f232c3a0579 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-gr8.c
++++ b/drivers/pinctrl/sunxi/pinctrl-gr8.c
+@@ -12,7 +12,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -525,7 +525,6 @@ static const struct of_device_id sun5i_gr8_pinctrl_match[] = {
+ 	{ .compatible = "nextthing,gr8-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun5i_gr8_pinctrl_match);
+ 
+ static struct platform_driver sun5i_gr8_pinctrl_driver = {
+ 	.probe	= sun5i_gr8_pinctrl_probe,
+@@ -534,8 +533,4 @@ static struct platform_driver sun5i_gr8_pinctrl_driver = {
+ 		.of_match_table	= sun5i_gr8_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun5i_gr8_pinctrl_driver);
+-
+-MODULE_AUTHOR("Mylene Josserand <mylene.josserand@free-electrons.com");
+-MODULE_DESCRIPTION("NextThing GR8 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun5i_gr8_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+index 862a096c5dba..fb30b86a97ee 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -1035,7 +1035,6 @@ static const struct of_device_id sun4i_a10_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun4i_a10_pinctrl_match);
+ 
+ static struct platform_driver sun4i_a10_pinctrl_driver = {
+ 	.probe	= sun4i_a10_pinctrl_probe,
+@@ -1044,8 +1043,4 @@ static struct platform_driver sun4i_a10_pinctrl_driver = {
+ 		.of_match_table	= sun4i_a10_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun4i_a10_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A10 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun4i_a10_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+index f9a3f8f446f7..a5b57fdff9e1 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a10s.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -674,7 +674,6 @@ static const struct of_device_id sun5i_a10s_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun5i-a10s-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun5i_a10s_pinctrl_match);
+ 
+ static struct platform_driver sun5i_a10s_pinctrl_driver = {
+ 	.probe	= sun5i_a10s_pinctrl_probe,
+@@ -683,8 +682,4 @@ static struct platform_driver sun5i_a10s_pinctrl_driver = {
+ 		.of_match_table	= sun5i_a10s_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun5i_a10s_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A10s pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun5i_a10s_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+index 2bb07b38834f..8575f3f6d3dd 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun5i-a13.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -392,7 +392,6 @@ static const struct of_device_id sun5i_a13_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun5i-a13-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun5i_a13_pinctrl_match);
+ 
+ static struct platform_driver sun5i_a13_pinctrl_driver = {
+ 	.probe	= sun5i_a13_pinctrl_probe,
+@@ -401,8 +400,4 @@ static struct platform_driver sun5i_a13_pinctrl_driver = {
+ 		.of_match_table	= sun5i_a13_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun5i_a13_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A13 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun5i_a13_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+index d4bc4f0e8be0..a22bd88a1f03 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+@@ -12,7 +12,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -136,7 +136,6 @@ static const struct of_device_id sun6i_a31_r_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-r-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun6i_a31_r_pinctrl_match);
+ 
+ static struct platform_driver sun6i_a31_r_pinctrl_driver = {
+ 	.probe	= sun6i_a31_r_pinctrl_probe,
+@@ -145,9 +144,4 @@ static struct platform_driver sun6i_a31_r_pinctrl_driver = {
+ 		.of_match_table	= sun6i_a31_r_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun6i_a31_r_pinctrl_driver);
+-
+-MODULE_AUTHOR("Boris Brezillon <boris.brezillon at free-electrons.com");
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A31 R_PIO pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun6i_a31_r_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+index 022863ab0c58..508ec54897ae 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -926,7 +926,6 @@ static const struct of_device_id sun6i_a31_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun6i_a31_pinctrl_match);
+ 
+ static struct platform_driver sun6i_a31_pinctrl_driver = {
+ 	.probe	= sun6i_a31_pinctrl_probe,
+@@ -935,8 +934,4 @@ static struct platform_driver sun6i_a31_pinctrl_driver = {
+ 		.of_match_table	= sun6i_a31_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun6i_a31_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A31 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun6i_a31_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31s.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31s.c
+index e570d5c93ecc..231a746a5356 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31s.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31s.c
+@@ -11,7 +11,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -798,7 +798,6 @@ static const struct of_device_id sun6i_a31s_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31s-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun6i_a31s_pinctrl_match);
+ 
+ static struct platform_driver sun6i_a31s_pinctrl_driver = {
+ 	.probe	= sun6i_a31s_pinctrl_probe,
+@@ -807,8 +806,4 @@ static struct platform_driver sun6i_a31s_pinctrl_driver = {
+ 		.of_match_table	= sun6i_a31s_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun6i_a31s_pinctrl_driver);
+-
+-MODULE_AUTHOR("Hans de Goede <hdegoede@redhat.com>");
+-MODULE_DESCRIPTION("Allwinner A31s pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun6i_a31s_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+index 435ad30f45db..b6f4c68ffb39 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun7i-a20.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -1045,7 +1045,6 @@ static const struct of_device_id sun7i_a20_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun7i-a20-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun7i_a20_pinctrl_match);
+ 
+ static struct platform_driver sun7i_a20_pinctrl_driver = {
+ 	.probe	= sun7i_a20_pinctrl_probe,
+@@ -1054,8 +1053,4 @@ static struct platform_driver sun7i_a20_pinctrl_driver = {
+ 		.of_match_table	= sun7i_a20_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun7i_a20_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A20 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun7i_a20_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+index 056287635873..2292e05a397b 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+@@ -15,7 +15,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -123,7 +123,6 @@ static const struct of_device_id sun8i_a23_r_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a23-r-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun8i_a23_r_pinctrl_match);
+ 
+ static struct platform_driver sun8i_a23_r_pinctrl_driver = {
+ 	.probe	= sun8i_a23_r_pinctrl_probe,
+@@ -132,10 +131,4 @@ static struct platform_driver sun8i_a23_r_pinctrl_driver = {
+ 		.of_match_table	= sun8i_a23_r_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun8i_a23_r_pinctrl_driver);
+-
+-MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+-MODULE_AUTHOR("Boris Brezillon <boris.brezillon at free-electrons.com");
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A23 R_PIO pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun8i_a23_r_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+index 55083d278bb1..29d307b3c3ec 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23.c
+@@ -14,7 +14,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -575,7 +575,6 @@ static const struct of_device_id sun8i_a23_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a23-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun8i_a23_pinctrl_match);
+ 
+ static struct platform_driver sun8i_a23_pinctrl_driver = {
+ 	.probe	= sun8i_a23_pinctrl_probe,
+@@ -584,9 +583,4 @@ static struct platform_driver sun8i_a23_pinctrl_driver = {
+ 		.of_match_table	= sun8i_a23_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun8i_a23_pinctrl_driver);
+-
+-MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com");
+-MODULE_DESCRIPTION("Allwinner A23 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun8i_a23_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+index 8b381d69df86..d4fdd643920d 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a33.c
+@@ -12,7 +12,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -498,7 +498,6 @@ static const struct of_device_id sun8i_a33_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a33-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun8i_a33_pinctrl_match);
+ 
+ static struct platform_driver sun8i_a33_pinctrl_driver = {
+ 	.probe	= sun8i_a33_pinctrl_probe,
+@@ -507,8 +506,4 @@ static struct platform_driver sun8i_a33_pinctrl_driver = {
+ 		.of_match_table	= sun8i_a33_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun8i_a33_pinctrl_driver);
+-
+-MODULE_AUTHOR("Vishnu Patekar <vishnupatekar0510@gmail.com>");
+-MODULE_DESCRIPTION("Allwinner a33 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun8i_a33_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+index 90b973e15982..9aec1d2232dd 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a83t.c
+@@ -12,7 +12,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -587,7 +587,6 @@ static const struct of_device_id sun8i_a83t_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun8i-a83t-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun8i_a83t_pinctrl_match);
+ 
+ static struct platform_driver sun8i_a83t_pinctrl_driver = {
+ 	.probe	= sun8i_a83t_pinctrl_probe,
+@@ -596,8 +595,4 @@ static struct platform_driver sun8i_a83t_pinctrl_driver = {
+ 		.of_match_table	= sun8i_a83t_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun8i_a83t_pinctrl_driver);
+-
+-MODULE_AUTHOR("Vishnu Patekar <vishnupatekar0510@gmail.com>");
+-MODULE_DESCRIPTION("Allwinner a83t pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun8i_a83t_pinctrl_driver);
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c b/drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c
+index 1b580ba76453..bc14e954d7a2 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun9i-a80.c
+@@ -10,7 +10,7 @@
+  * warranty of any kind, whether express or implied.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+@@ -733,7 +733,6 @@ static const struct of_device_id sun9i_a80_pinctrl_match[] = {
+ 	{ .compatible = "allwinner,sun9i-a80-pinctrl", },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sun9i_a80_pinctrl_match);
+ 
+ static struct platform_driver sun9i_a80_pinctrl_driver = {
+ 	.probe	= sun9i_a80_pinctrl_probe,
+@@ -742,8 +741,4 @@ static struct platform_driver sun9i_a80_pinctrl_driver = {
+ 		.of_match_table	= sun9i_a80_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(sun9i_a80_pinctrl_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+-MODULE_DESCRIPTION("Allwinner A80 pinctrl driver");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun9i_a80_pinctrl_driver);
+-- 
+2.7.4
