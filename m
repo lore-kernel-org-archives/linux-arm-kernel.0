@@ -1,63 +1,42 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 29 Oct 2016 21:24:39 -0400
-Subject: [PATCH 5/6] mfd: ab8500: make sysctrl explicitly non-modular
-In-Reply-To: <20161030012440.10495-1-paul.gortmaker@windriver.com>
-References: <20161030012440.10495-1-paul.gortmaker@windriver.com>
-Message-ID: <20161030012440.10495-6-paul.gortmaker@windriver.com>
+Date: Sat, 29 Oct 2016 21:24:34 -0400
+Subject: [PATCH 0/6] mfd: audit and demodule drivers/mfd/ab* drivers
+Message-ID: <20161030012440.10495-1-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+Nothing new here ; just another instance where we had modular remove
+and exit functions -- but the Makefile/Kconfig limited the use case to
+being always built-in; hence the code is useless and needs removing.
 
-drivers/mfd/Kconfig:config AB8500_CORE
-drivers/mfd/Kconfig:    bool "ST-Ericsson AB8500 Mixed Signal Power Management chip"
+So we remove the dead code and the misleading hints of modularity from
+these drivers, hoping that we manage to prevent some new drivers from
+copying these same old mistakes into pending new drivers.
 
-...meaning that it currently is not being built as a module by anyone.
-
-Lets remove the couple traces of modular infrastructure use, so that
-when reading the driver there is no doubt it is builtin-only.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-was (or is now) contained at the top of the file in the comments.
-
-We replace module.h with init.h and export.h -- the latter since the file
-does make use of EXPORT_SYMBOL.
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Paul.
 ---
- drivers/mfd/ab8500-sysctrl.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
-index 207cc497958a..80c0efa66ac1 100644
---- a/drivers/mfd/ab8500-sysctrl.c
-+++ b/drivers/mfd/ab8500-sysctrl.c
-@@ -1,11 +1,14 @@
- /*
-+ * AB8500 system control driver
-+ *
-  * Copyright (C) ST-Ericsson SA 2010
-  * Author: Mattias Nilsson <mattias.i.nilsson@stericsson.com> for ST Ericsson.
-  * License terms: GNU General Public License (GPL) version 2
-  */
- 
- #include <linux/err.h>
--#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/export.h>
- #include <linux/platform_device.h>
- #include <linux/pm.h>
- #include <linux/reboot.h>
-@@ -158,7 +161,3 @@ static int __init ab8500_sysctrl_init(void)
- 	return platform_driver_register(&ab8500_sysctrl_driver);
- }
- arch_initcall(ab8500_sysctrl_init);
--
--MODULE_AUTHOR("Mattias Nilsson <mattias.i.nilsson@stericsson.com");
--MODULE_DESCRIPTION("AB8500 system control driver");
--MODULE_LICENSE("GPL v2");
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Mattias Wallin <mattias.wallin@stericsson.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+
+Paul Gortmaker (6):
+  mfd: ab3100-core: Make it explicitly non-modular
+  mfd: ab8500-core: Make it explicitly non-modular
+  mfd: ab8500-debugfs: Make it explicitly non-modular
+  mfd: ab8500-gpadc: Make it explicitly non-modular
+  mfd: ab8500: make sysctrl explicitly non-modular
+  mfd: abx500-core: drop unused MODULE_ tags from non-modular code
+
+ drivers/mfd/ab3100-core.c    | 39 +++------------------------------------
+ drivers/mfd/ab8500-core.c    | 37 ++++++-------------------------------
+ drivers/mfd/ab8500-debugfs.c | 21 ++-------------------
+ drivers/mfd/ab8500-gpadc.c   | 19 ++-----------------
+ drivers/mfd/ab8500-sysctrl.c |  9 ++++-----
+ drivers/mfd/abx500-core.c    |  7 ++-----
+ 6 files changed, 19 insertions(+), 113 deletions(-)
+
 -- 
 2.10.1
