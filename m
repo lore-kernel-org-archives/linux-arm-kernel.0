@@ -1,33 +1,30 @@
 From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Sun, 30 Oct 2016 09:10:10 +0100
-Subject: [PATCH] ARM: zx: Fix error handling
-Message-ID: <20161030081010.14735-1-christophe.jaillet@wanadoo.fr>
+Date: Sun, 30 Oct 2016 09:49:26 +0100
+Subject: [PATCH] drm/sun4i: Fix error handling
+Message-ID: <20161030084926.15303-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'devm_ioremap_resource()' returns an error pointer in case of error, not
+'sun4i_layers_init()' returns an error pointer in case of error, not
 NULL. So test it with IS_ERR.
 
 Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
-'return -EIO;' could also be turned into 'return PTR_ERR(pcubase);' in
-order to propagate the error value.
----
- arch/arm/mach-zx/zx296702-pm-domain.c | 2 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-index e08574d4e2ca..79dcf2549267 100644
---- a/arch/arm/mach-zx/zx296702-pm-domain.c
-+++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-@@ -169,7 +169,7 @@ static int zx296702_pd_probe(struct platform_device *pdev)
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 9776f0305834..628712e6edd6 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -143,7 +143,7 @@ static int sun4i_drv_bind(struct device *dev)
  
- 	pcubase = devm_ioremap_resource(&pdev->dev, res);
--	if (!pcubase) {
-+	if (IS_ERR(pcubase)) {
- 		dev_err(&pdev->dev, "ioremap fail.\n");
- 		return -EIO;
- 	}
+ 	/* Create our layers */
+ 	drv->layers = sun4i_layers_init(drm);
+-	if (!drv->layers) {
++	if (IS_ERR(drv->layers)) {
+ 		dev_err(drm->dev, "Couldn't create the planes\n");
+ 		ret = -EINVAL;
+ 		goto free_drm;
 -- 
 2.9.3
