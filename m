@@ -1,51 +1,87 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 30 Oct 2016 14:01:24 +0100
-Subject: Build regressions/improvements in v4.9-rc3
-In-Reply-To: <1477829325-4495-1-git-send-email-geert@linux-m68k.org>
-References: <1477829325-4495-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdUU0h1w5p_p54G8gZa7vmJU5cSWGg8MP0HBADBf6FSFiQ@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sun, 30 Oct 2016 06:35:57 -0700
+Subject: [PATCH v3 2/4] usb: musb: core: added helper function for parsing
+ DT
+In-Reply-To: <1477560847-8929-3-git-send-email-abailon@baylibre.com>
+ (Alexandre Bailon's message of "Thu, 27 Oct 2016 11:34:05 +0200")
+References: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
+ <1477560847-8929-3-git-send-email-abailon@baylibre.com>
+Message-ID: <m2wpgq2c3m.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2016 at 1:08 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Below is the list of build error/warning regressions/improvements in
-> v4.9-rc3[1] compared to v4.8[2].
+Alexandre Bailon <abailon@baylibre.com> writes:
+
+> From: Petr Kulhavy <petr@barix.com>
 >
-> Summarized:
->   - build errors: +176/-3
+> This adds the function musb_get_mode() to get the DT property "dr_mode"
+>
+> Signed-off-by: Petr Kulhavy <petr@barix.com>
+> Acked-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> Tested-by: David Lechner <david@lechnology.com>
+> ---
+>  drivers/usb/musb/musb_core.c | 19 +++++++++++++++++++
+>  drivers/usb/musb/musb_core.h |  5 +++++
+>  2 files changed, 24 insertions(+)
+>
+> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+> index 27dadc0..bba07e7 100644
+> --- a/drivers/usb/musb/musb_core.c
+> +++ b/drivers/usb/musb/musb_core.c
+> @@ -100,6 +100,7 @@
+>  #include <linux/io.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/usb.h>
+> +#include <linux/usb/of.h>
+>  
+>  #include "musb_core.h"
+>  #include "musb_trace.h"
+> @@ -130,6 +131,24 @@ static inline struct musb *dev_to_musb(struct device *dev)
+>  	return dev_get_drvdata(dev);
+>  }
+>  
+> +enum musb_mode musb_get_mode(struct device *dev)
+> +{
+> +	enum usb_dr_mode mode;
+> +
+> +	mode = usb_get_dr_mode(dev);
+> +	switch (mode) {
+> +	case USB_DR_MODE_HOST:
+> +		return MUSB_HOST;
+> +	case USB_DR_MODE_PERIPHERAL:
+> +		return MUSB_PERIPHERAL;
+> +	case USB_DR_MODE_OTG:
+> +	case USB_DR_MODE_UNKNOWN:
+> +	default:
+> +		return MUSB_OTG;
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(musb_get_mode);
+> +
+>  /*-------------------------------------------------------------------------*/
+>  
+>  #ifndef CONFIG_BLACKFIN
+> diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+> index 2cb88a49..a406468 100644
+> --- a/drivers/usb/musb/musb_core.h
+> +++ b/drivers/usb/musb/musb_core.h
+> @@ -617,4 +617,9 @@ static inline void musb_platform_post_root_reset_end(struct musb *musb)
+>  		musb->ops->post_root_reset_end(musb);
+>  }
+>  
+> +/* gets the "dr_mode" property from DT and converts it into musb_mode
+> + * if the property is not found or not recognized returns MUSB_OTG
+> + */
 
-  + /home/kisskb/slave/src/arch/arc/include/asm/atomic.h: Error: bad
-instruction `llock r2,[r0]':  => 184, 185
-  + /home/kisskb/slave/src/arch/arc/include/asm/atomic.h: Error: bad
-instruction `scond r2,[r0]':  => 186, 187
-    [...]
-  + /home/kisskb/slave/src/include/uapi/linux/swab.h: Error: bad
-instruction `swape r3,r3':  => 58
-  + /home/kisskb/slave/src/include/uapi/linux/swab.h: Error: bad
-instruction `swape r4,r4':  => 58
+nit: multi-line comment style
 
-arcompact/axs101_defconfig
+> +extern enum musb_mode musb_get_mode(struct device *dev);
+> +
+>  #endif	/* __MUSB_CORE_H__ */
 
-  + /home/kisskb/slave/src/drivers/pci/host/pci-rcar-gen2.c: error:
-implicit declaration of function 'of_n_addr_cells'
-[-Werror=implicit-function-declaration]:  => 303:2
+Otherwise,
 
-arm-randconfig
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 
-See https://patchwork.kernel.org/patch/4289161/ and
-https://patchwork.kernel.org/patch/8209431/
-
-> [1] http://kisskb.ellerman.id.au/kisskb/head/11140/ (all 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/11104/ (all 262 configs)
-
-Gr{oetje,eeting}s,
-
-                         Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Kevin
