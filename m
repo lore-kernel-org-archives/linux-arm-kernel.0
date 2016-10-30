@@ -1,42 +1,38 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 29 Oct 2016 21:24:34 -0400
-Subject: [PATCH 0/6] mfd: audit and demodule drivers/mfd/ab* drivers
-Message-ID: <20161030012440.10495-1-paul.gortmaker@windriver.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Sun, 30 Oct 2016 01:53:10 +0000
+Subject: [PATCH -next] [media] c8sectpfe: fix error return code in
+ c8sectpfe_probe()
+Message-ID: <1477792390-24533-1-git-send-email-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing new here ; just another instance where we had modular remove
-and exit functions -- but the Makefile/Kconfig limited the use case to
-being always built-in; hence the code is useless and needs removing.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-So we remove the dead code and the misleading hints of modularity from
-these drivers, hoping that we manage to prevent some new drivers from
-copying these same old mistakes into pending new drivers.
+Fix to return error code -ENODEV from the error handling
+case instead of 0, as done elsewhere in this function.
 
-Paul.
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Mattias Wallin <mattias.wallin@stericsson.com>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
-
-Paul Gortmaker (6):
-  mfd: ab3100-core: Make it explicitly non-modular
-  mfd: ab8500-core: Make it explicitly non-modular
-  mfd: ab8500-debugfs: Make it explicitly non-modular
-  mfd: ab8500-gpadc: Make it explicitly non-modular
-  mfd: ab8500: make sysctrl explicitly non-modular
-  mfd: abx500-core: drop unused MODULE_ tags from non-modular code
-
- drivers/mfd/ab3100-core.c    | 39 +++------------------------------------
- drivers/mfd/ab8500-core.c    | 37 ++++++-------------------------------
- drivers/mfd/ab8500-debugfs.c | 21 ++-------------------
- drivers/mfd/ab8500-gpadc.c   | 19 ++-----------------
- drivers/mfd/ab8500-sysctrl.c |  9 ++++-----
- drivers/mfd/abx500-core.c    |  7 ++-----
- 6 files changed, 19 insertions(+), 113 deletions(-)
-
--- 
-2.10.1
+diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+index 42b123f..69d9a16 100644
+--- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
++++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+@@ -813,6 +813,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 		i2c_bus = of_parse_phandle(child, "i2c-bus", 0);
+ 		if (!i2c_bus) {
+ 			dev_err(&pdev->dev, "No i2c-bus found\n");
++			ret = -ENODEV;
+ 			goto err_clk_disable;
+ 		}
+ 		tsin->i2c_adapter =
+@@ -820,6 +821,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+ 		if (!tsin->i2c_adapter) {
+ 			dev_err(&pdev->dev, "No i2c adapter found\n");
+ 			of_node_put(i2c_bus);
++			ret = -ENODEV;
+ 			goto err_clk_disable;
+ 		}
+ 		of_node_put(i2c_bus);
