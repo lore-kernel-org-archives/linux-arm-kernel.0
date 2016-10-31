@@ -1,48 +1,49 @@
-From: matt@ranostay.consulting (Matt Ranostay)
-Date: Mon, 31 Oct 2016 13:22:18 -0700
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval property
- query
-In-Reply-To: <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
-References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
- <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
- <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
- <20161024201443.GB5989@amd>
- <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
-Message-ID: <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 31 Oct 2016 22:22:54 +0200
+Subject: [PATCH v2 4/5] ARM: dts: da850-lcdk: enable mstpri and ddrctl
+ nodes
+In-Reply-To: <1477925138-23457-5-git-send-email-bgolaszewski@baylibre.com>
+References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477925138-23457-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <12222113.L5elJM2tqN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 11:47 AM, Matt Ranostay <mranostay@gmail.com> wrote:
-> On Mon, Oct 24, 2016 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
->>> Pavel + Sebastian this is the patchset that need I some input on :)
->>
->> Better then previous one.
->>
->> But my version of bq27xxx_battery.c already contains this:
->
-> This is for allowing udev rule to set the properties as well.
-> otherwise a kinda crude RUN = " echo value >
-> /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
+Hi Bartosz,
 
-Any thoughts on this?
+Thank you for the patch.
 
-Thanks,
+On Monday 31 Oct 2016 15:45:37 Bartosz Golaszewski wrote:
+> Enable the MSTPRI configuration and DDR2/mDDR memory controller
+> nodes on da850-lcdk. This is needed in order to adjust the memory
+> throughput constraints for better tilcdc support.
 
-Matt
+Is there a reason not to enable these unconditionally in da850.dtsi (or rather 
+not disabling them) instead of handling it per board ?
 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
+> b/arch/arm/boot/dts/da850-lcdk.dts index 4747629..b39796e 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -243,3 +243,11 @@
+>  		};
+>  	};
+>  };
+> +
+> +&mstpri {
+> +	status = "okay";
+> +};
+> +
+> +&ddrctl {
+> +	status = "okay";
+> +};
 
->
->>
->> static const struct kernel_param_ops param_ops_poll_interval = {
->>         .get = param_get_uint,
->>         .set = poll_interval_param_set,
->> };
->>
->> ...so it should be possible to set poll interval already.
->>
->>                                                                         Pavel
->>
->> --
->> (english) http://www.livejournal.com/~pavelmachek
->> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- 
+Regards,
+
+Laurent Pinchart
