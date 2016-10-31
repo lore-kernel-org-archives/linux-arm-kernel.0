@@ -1,50 +1,48 @@
-From: yangbo.lu@nxp.com (Y.B. Lu)
-Date: Mon, 31 Oct 2016 09:28:56 +0000
-Subject: [v15, 6/7] base: soc: introduce soc_device_match() interface
-In-Reply-To: <2572890.e6aV4hmMEL@wuerfel>
-References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
- <1477637418-38938-7-git-send-email-yangbo.lu@nxp.com>
- <2572890.e6aV4hmMEL@wuerfel>
-Message-ID: <DB6PR0401MB2536CAD001BF3CAB4EDB15DCF8AE0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 31 Oct 2016 10:31:44 +0100
+Subject: [PATCH v3] clkdev: Detect errors in clk_hw_register_clkdev() for
+ mass registration
+In-Reply-To: <20161031092223.GW1041@n2100.armlinux.org.uk>
+References: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
+ <20161031092223.GW1041@n2100.armlinux.org.uk>
+Message-ID: <CAMuHMdW8V2v7na1c4B=w2qzN=qVF0QUA3fcqaUXdTEVB20JREg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, October 28, 2016 6:48 PM
-> To: linuxppc-dev at lists.ozlabs.org
-> Cc: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Scott
-> Wood; Mark Rutland; Greg Kroah-Hartman; X.B. Xie; M.H. Lian; linux-
-> i2c at vger.kernel.org; linux-clk at vger.kernel.org; Qiang Zhao; Russell King;
-> Bhupesh Sharma; Joerg Roedel; Claudiu Manoil; devicetree at vger.kernel.org;
-> Rob Herring; Santosh Shilimkar; linux-arm-kernel at lists.infradead.org;
-> netdev at vger.kernel.org; linux-kernel at vger.kernel.org; Leo Li;
-> iommu at lists.linux-foundation.org; Kumar Gala; Geert Uytterhoeven
-> Subject: Re: [v15, 6/7] base: soc: introduce soc_device_match() interface
-> 
-> On Friday, October 28, 2016 2:50:17 PM CEST Yangbo Lu wrote:
-> > +
-> > +static int soc_device_match_one(struct device *dev, void *arg) {
-> > +       struct soc_device *soc_dev = container_of(dev, struct
-> soc_device, dev);
-> > +       const struct soc_device_attribute *match = arg;
-> > +
-> > +       if (match->machine &&
-> > +           !glob_match(match->machine, soc_dev->attr->machine))
-> > +               return 0;
-> > +
-> > +       if (match->family &&
-> > +           !glob_match(match->family, soc_dev->attr->family))
-> > +               return 0;
-> > +
-> >
-> 
-> Geert found a bug in my code, and submitted a fix at
-> https://patchwork.kernel.org/patch/9361395/
-> 
-> I think you should include that one in your series.
-> 
+Hi Russell,
 
-[Lu Yangbo-B47093] Ok, no problem. Thanks :)
+On Mon, Oct 31, 2016 at 10:22 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Oct 21, 2016 at 09:02:38AM +0200, Geert Uytterhoeven wrote:
+>> Unlike clk_register_clkdev(), clk_hw_register_clkdev() doesn't check for
+>> passed error objects from a previous registration call. Hence the caller
+>> of clk_hw_register_*() has to check for errors before calling
+>> clk_hw_register_clkdev*().
+>>
+>> Make clk_hw_register_clkdev() more similar to clk_register_clkdev() by
+>> adding this error check, removing the burden from callers that do mass
+>> registration.
+>>
+>> Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
+>> Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
+>> Fixes: 44ce9a9ae977736f ("MIPS: TXx9: Convert to Common Clock Framework")
+>> Fixes: f48d947a162dfa9d ("clk: clps711x: Migrate to clk_hw based OF and registration APIs")
+>> Fixes: b4626a7f489238a5 ("CLK: Add Loongson1C clock support")
+>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>
+> Please put this in the patch system, thanks.
 
-> 	Arnd
+Done. I hope it went through, the "new" README predates git-send-email.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
