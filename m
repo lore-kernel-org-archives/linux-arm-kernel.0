@@ -1,43 +1,38 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 31 Oct 2016 14:01:23 -0700
-Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
- imprecise aborts
-In-Reply-To: <6e252703-0010-83ae-fa14-57352add007a@hauke-m.de>
-References: <20161029111229.26875-1-zajec5@gmail.com>
- <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
- <6e252703-0010-83ae-fa14-57352add007a@hauke-m.de>
-Message-ID: <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 31 Oct 2016 14:02:03 -0700
+Subject: [PATCH v2] staging: vc04_services: setup DMA and coherent mask
+Message-ID: <20161031210203.2089-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2016 01:59 PM, Hauke Mehrtens wrote:
-> 
-> 
-> On 10/31/2016 07:08 PM, Scott Branden wrote:
->> Hi Rafal,
->>
->>
->> On 16-10-29 04:12 AM, Rafa? Mi?ecki wrote:
->>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>
->>> Since early BCM5301X days we got abort handler that was removed by
->>> commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
->>> fault handler"). It assumed we need to deal only with pending aborts
->>> left by the bootloader. Unfortunately this isn't true for BCM5301X.
->>>
->>> When probing PCI config space (device enumeration) it is expected to
->>> have master aborts on the PCI bus. Most bridges don't forward (or they
->>> allow disabling it) these errors onto the AXI/AMBA bus but not the
->>> Northstar (BCM5301X) one.
->> Should we only add this workaround code if CONFIG_PCI is on then?
-> 
-> I think all the supported northstar devices have a PCIe controller. We
-> could add such a CONFIG_PCI check, but I do not see a big advantage.
+VCHI messages between the CPU and firmware use 32-bit
+bus addresses. Explicitly set the DMA mask and coherent
+on all platforms.
 
-Actually, I do see a couple disadvantages if we gate this with
-CONFIG_PCI: if this problem shows up irrespective of your kernel
-configuration, you want the error handler to clear it, not rely on
-CONFIG_PCI to be enabled for the error to go away and also, without an
-additional ifdef, additional compiler coverage.
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ .../staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c   | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+index a5afcc5..ba77fd8 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+@@ -97,6 +97,15 @@ int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
+ 	int slot_mem_size, frag_mem_size;
+ 	int err, irq, i;
+ 
++	/*
++	 * VCHI messages between the CPU and firmware use
++	 * 32-bit bus addresses.
++	 */
++	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++
++	if (err < 0)
++		return err;
++
+ 	(void)of_property_read_u32(dev->of_node, "cache-line-size",
+ 				   &g_cache_line_size);
+ 	g_fragments_size = 2 * g_cache_line_size;
 -- 
-Florian
+2.10.1
