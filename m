@@ -1,104 +1,72 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 31 Oct 2016 15:45:38 +0100
-Subject: [PATCH v2 5/5] ARM: dts: da850-lcdk: add tilcdc panel node
-In-Reply-To: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1477925138-23457-6-git-send-email-bgolaszewski@baylibre.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon, 31 Oct 2016 09:48:26 -0500
+Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
+In-Reply-To: <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
+References: <1477418044-24603-1-git-send-email-david@lechnology.com>
+ <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
+Message-ID: <3fd93d1b-8ba2-5440-e37d-0c55928e7e51@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tilcdc driver is not yet ready for working together with the
-dumb-vga-dac drm bridge. While the work on enabling drm_bridge
-support in tilcdc continues, enable the VGA connector on da850-lcdk
-with the following workaround: use the tilcdc-panel driver with
-a set of common (and tested) resolutions.
+On 10/31/2016 05:18 AM, Sekhar Nori wrote:
+> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
+>> This fixes pwm name matching for DA850 familiy devices. When using device
+>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
+>> same name, which caused errors when trying to register the devices.
+>>
+>> The names for clock matching in da850_clks[] also have to be updated to
+>> to exactly match in order for the clock lookup to work correctly.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>
+>> Tested working on LEGO MINDSTORMS EV3.
+>>
+>>
+>>  arch/arm/mach-davinci/da850.c    | 10 +++++++---
+>>  arch/arm/mach-davinci/da8xx-dt.c | 10 +++++-----
+>>  2 files changed, 12 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index ed3d0e9..6b78a8f 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -510,9 +510,13 @@ static struct clk_lookup da850_clks[] = {
+>>  	CLK("vpif",		NULL,		&vpif_clk),
+>>  	CLK("ahci_da850",		NULL,		&sata_clk),
+>>  	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
+>> -	CLK("ehrpwm",		"fck",		&ehrpwm_clk),
+>> -	CLK("ehrpwm",		"tbclk",	&ehrpwm_tbclk),
+>> -	CLK("ecap",		"fck",		&ecap_clk),
+>> +	CLK("ehrpwm.0",		"fck",		&ehrpwm_clk),
+>> +	CLK("ehrpwm.0",		"tbclk",	&ehrpwm_tbclk),
+>> +	CLK("ehrpwm.1",		"fck",		&ehrpwm_clk),
+>> +	CLK("ehrpwm.1",		"tbclk",	&ehrpwm_tbclk),
+>> +	CLK("ecap.0",		"fck",		&ecap_clk),
+>> +	CLK("ecap.1",		"fck",		&ecap_clk),
+>> +	CLK("ecap.2",		"fck",		&ecap_clk),
+>
+> This has exposed a limitation of DaVinci clock framework. The struct clk
+> are stored as a linked list themselves. So a node repeating in the table
+> above will create a loop in the linked list. This is easily seen on the
+> LCDK board. davinci_clk_disable_unused() never returns. PWMs are unused
+> on that board.
+>
+> There is no "simple" solution to this AFAICS. One solution is to
+> separate the iterator from the clock hardware structure and use struct
+> clk_hw available in struct clk_lookup.
+>
+> Or move DaVinci to common clock framework. This is of course preferred
+> but much more involved as all 6 supported SoCs have to be moved together.
+>
+> Thanks,
+> Sekhar
+>
+>
 
-Once the drm bridge support is complete, we'll remove the node added
-by this patch and use the correct solution. This change will be
-transparent for the user.
+The simple solution for now could be to make child clocks for each of 
+these that simply enable the parent clock. e.g. ehrpwm0_clk and 
+ehpwm1_clk are children of ehrpwm_clk, etc.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850-lcdk.dts | 63 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index b39796e..df582c6 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -62,6 +62,65 @@
- 		regulator-max-microvolt = <5000000>;
- 	};
- 
-+	/*
-+	 * Remove this node once the tilcdc driver gets support for
-+	 * drm bridge modules.
-+	 */
-+	panel {
-+		compatible = "ti,tilcdc,panel";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		status = "okay";
-+
-+		panel-info {
-+			ac-bias = <0>;
-+			ac-bias-intrpt = <0>;
-+			dma-burst-sz = <16>;
-+			bpp = <16>;
-+			fdd = <255>;
-+			sync-edge = <0>;
-+			sync-ctrl = <0>;
-+			raster-order = <0>;
-+			fifo-th = <5>;
-+		};
-+
-+		display-timings {
-+			native-mode = <&svga_timings>;
-+			vga_timings: 640x480 at 60 {
-+				clock-frequency = <27500000>;
-+				hactive = <640>;
-+				hback-porch = <90>;
-+				hfront-porch = <40>;
-+				hsync-len = <128>;
-+				vactive = <480>;
-+				vback-porch = <23>;
-+				vfront-porch = <1>;
-+				vsync-len = <4>;
-+			};
-+			vga_timings_hf: 640x480 at 75 {
-+				clock-frequency = <34000000>;
-+				hactive = <640>;
-+				hback-porch = <90>;
-+				hfront-porch = <40>;
-+				hsync-len = <128>;
-+				vactive = <480>;
-+				vback-porch = <23>;
-+				vfront-porch = <1>;
-+				vsync-len = <4>;
-+			};
-+			svga_timings: 800x600 at 56 {
-+				clock-frequency = <37500000>;
-+				hactive = <800>;
-+				hback-porch = <140>;
-+				hfront-porch = <40>;
-+				hsync-len = <128>;
-+				vactive = <600>;
-+				vback-porch = <23>;
-+				vfront-porch = <1>;
-+				vsync-len = <4>;
-+			};
-+		};
-+	};
- };
- 
- &pmx_core {
-@@ -251,3 +310,7 @@
- &ddrctl {
- 	status = "okay";
- };
-+
-+&display {
-+	status = "okay";
-+};
--- 
-2.9.3
+Looking at da830.c, it looks like the solution was to make multiple 
+clocks that use the same LPSC, but this does not seem right to me.
