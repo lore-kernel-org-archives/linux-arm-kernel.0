@@ -1,84 +1,58 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 30 Oct 2016 21:42:32 -0500
-Subject: [PATCH 2/6] arm: dts: ls1021a: update MSI node
-In-Reply-To: <1477398945-22774-2-git-send-email-Minghuan.Lian@nxp.com>
-References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
- <1477398945-22774-2-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20161031024232.wqvfrcinrp2aqgxu@rob-hp-laptop>
+Date: Sun, 30 Oct 2016 21:50:53 -0500
+Subject: [PATCH 3/4] dt-bindings: Update domain-idle-state binding to use
+ correct compatibles
+In-Reply-To: <68dc67d1-b443-f7b1-6229-0ac54e403d61@arm.com>
+References: <1477409199-52182-1-git-send-email-lina.iyer@linaro.org>
+ <1477409199-52182-4-git-send-email-lina.iyer@linaro.org>
+ <7hh980taqp.fsf@baylibre.com>
+ <68dc67d1-b443-f7b1-6229-0ac54e403d61@arm.com>
+Message-ID: <20161031025053.t2nxazou35vnna7y@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 08:35:41PM +0800, Minghuan Lian wrote:
-> 1. Change compatible to "fsl,ls-scfg-msi"
-
-That is obvious from the diff. Write your commit message to answer the 
-question Why?
-
-This also breaks compatibility with old DTBs.
-
-> 2. Move two MSI dts node into the parent node "msi-controller".
-> So a PCIe device can request the MSI from the two MSI controllers.
+On Wed, Oct 26, 2016 at 09:57:35AM +0100, Sudeep Holla wrote:
 > 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> ---
->  arch/arm/boot/dts/ls1021a.dtsi | 28 ++++++++++++++++------------
->  1 file changed, 16 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 368e219..7a3b510 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -119,18 +119,22 @@
->  
->  		};
->  
-> -		msi1: msi-controller at 1570e00 {
-> -			compatible = "fsl,1s1021a-msi";
-> -			reg = <0x0 0x1570e00 0x0 0x8>;
-> +		msi: msi-controller {
-> +			compatible = "fsl,ls-scfg-msi";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			ranges;
->  			msi-controller;
-> -			interrupts =  <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
-> -		};
->  
-> -		msi2: msi-controller at 1570e08 {
-> -			compatible = "fsl,1s1021a-msi";
-> -			reg = <0x0 0x1570e08 0x0 0x8>;
-> -			msi-controller;
-> -			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
-> +			msi0 at 1570e00 {
-> +				reg = <0x0 0x1570e00 0x0 0x8>;
-> +				interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			msi1 at 1570e08 {
-> +				reg = <0x0 0x1570e08 0x0 0x8>;
-> +				interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
->  		};
->  
->  		ifc: ifc at 1530000 {
-> @@ -643,7 +647,7 @@
->  			bus-range = <0x0 0xff>;
->  			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
->  				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-> -			msi-parent = <&msi1>;
-> +			msi-parent = <&msi>;
->  			#interrupt-cells = <1>;
->  			interrupt-map-mask = <0 0 0 7>;
->  			interrupt-map = <0000 0 0 1 &gic GIC_SPI 91  IRQ_TYPE_LEVEL_HIGH>,
-> @@ -666,7 +670,7 @@
->  			bus-range = <0x0 0xff>;
->  			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
->  				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
-> -			msi-parent = <&msi2>;
-> +			msi-parent = <&msi>;
->  			#interrupt-cells = <1>;
->  			interrupt-map-mask = <0 0 0 7>;
->  			interrupt-map = <0000 0 0 1 &gic GIC_SPI 92  IRQ_TYPE_LEVEL_HIGH>,
-> -- 
-> 1.9.1
+> On 25/10/16 21:49, Kevin Hilman wrote:
+> > Lina Iyer <lina.iyer@linaro.org> writes:
+> > 
+> > > Update domain-idle-state binding to use "domain-idle-state" compatible
+> > > from Documentation/devicetree/bindings/arm/idle-states.txt.
+> > > 
+> > > Cc: <devicetree@vger.kernel.org>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+> > > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/power/power_domain.txt | 9 +++++----
+> > >  1 file changed, 5 insertions(+), 4 deletions(-)
+> > 
+> > With no current users for this, I don't see the point of adding a
+> > compatible now.
+> > 
+> > IMO, this should wait and be added with the identified user we can
+> > discuss it then.
+> > 
 > 
+> No, IMO it needs to be used for the proposed SoC idle/genpd solution.
+> 
+> I understand the nodes that are "arm,idle-state" compatible can be used
+> for this new SoC hierarchical idle management, but it was never defined
+> for that use originally. So this new feature must be advertised by the
+> firmware with the presence of "domain-idle-state".
+> 
+> Yes we might have other ways to detect that but I have already seen that
+> broken on the reference platform, so we need alternate/DT way to specify
+> that.
+> 
+> Not all existing "arm,idle-state" compatible nodes will be capable of
+> supporting this new SoC idle feature. It's just better and safer for a
+> new feature getting added that relies on DT to have a new compatible.
+
+Or perhaps you should describe something new rather than trying to 
+graft in what's there. This combination of compatible strings looks a 
+bit odd to me. Though, I've not really spent much time thinking about 
+this.
+
+Rob
