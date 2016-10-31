@@ -1,105 +1,59 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 31 Oct 2016 17:50:09 +0900
-Subject: Memory range end be inclusive or exclusive? Re: [PATCH v1 1/4]
- kexec: (bugfix) calc correct end address of memory ranges in device tree
-In-Reply-To: <20160906002958.GB16712@linaro.org>
-References: <cover.1468970114.git.geoff@infradead.org>
- <3562841.ROYbCgkeeq@hactar>
- <20160727232331.GY1041@n2100.armlinux.org.uk>
- <1860371.lT9GInp2C3@hactar>
- <20160729082714.GA1041@n2100.armlinux.org.uk>
- <1469812346.16559.40.camel@infradead.org>
- <20160729172356.GD1041@n2100.armlinux.org.uk>
- <20160801045240.GD7995@linaro.org>
- <20160906002958.GB16712@linaro.org>
-Message-ID: <20161031085008.GF19531@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Oct 2016 08:42:34 +0000
+Subject: [PATCH 0/5] drm/sun4i: Handle TV overscan
+In-Reply-To: <20161018100349.qm2f554oiwyjwrsi@lukather>
+References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <20161018092422.GJ1041@n2100.armlinux.org.uk>
+ <20161018100349.qm2f554oiwyjwrsi@lukather>
+Message-ID: <20161031084233.GS1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
+On Tue, Oct 18, 2016 at 12:03:49PM +0200, Maxime Ripard wrote:
+> The first one is that this overscanning should be reported by the
+> connector I guess? but this is really TV specific, so we need one way
+> to let the user tell how the image is displayed on its side, and we
+> cannot really autodetect it, and this needs to be done at runtime so
+> that we can present some shiny interface to let it select which
+> overscan ratio works for him/her.
 
-On Tue, Sep 06, 2016 at 09:29:59AM +0900, AKASHI Takahiro wrote:
-> Simon,
+See xbmc... they go through a nice shiny setup which includes adjusting
+the visible area.  From what I remember, it has pointers on each corner
+which you can adjust to be just visible on the screen, so xbmc knows
+how much overscan there is, and xbmc itself reduces down to the user
+set size.
+
+> The second one is that we still need to expose the reduced modes to
+> userspace, and not only the displayed size, so that the applications
+> know what they must draw on. But I guess this could be adjusted by the
+> core too.
 > 
-> What is your opinion on this issue?
+> In order to work consistently, I think all planes should be adjusted
+> that way, so that relative coordinates are from the primary plane
+> origin, and not the display origin. But that could be adjusted too by
+> the core I guess.
 
-Pinged you several times so far.
+I'm not sure about that - we want the graphics to be visible, but that
+may not be appropriate for an video overlay frame.  It's quite common
+for (eg) broadcast video to contain dead pixels or other artifacts on
+the right hand side, and the broadcast video expects overscan to be
+present.
 
-Can you please give me your comment?
-(attached below is the original patch.)
+I know this because I have run my TV with overscan disabled, even for
+broadcast TV.
 
--Takahiro AKASHI
+> The fourth one being the major one. Every time I raised the issue on
+> IRC, the answer basically was "we don't care about analog", so I'm a
+> bit pessimistic about whether dealing with this in the core would be
+> accepted, hence why I chose to deal with this at the driver level.
 
-> 
-> On Mon, Aug 01, 2016 at 01:52:40PM +0900, AKASHI Takahiro wrote:
-> > On Fri, Jul 29, 2016 at 06:23:56PM +0100, Russell King - ARM Linux wrote:
-> > > On Fri, Jul 29, 2016 at 10:12:26AM -0700, Geoff Levand wrote:
-> > > > On Fri, 2016-07-29 at 09:27 +0100, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > So, these functions are a mess and need fixing.
-> > > > 
-> > > > Since this change isn't really related to arm64 support, I'll
-> > > > drop this patch from my series.
-> > > 
-> > > Do you have a case which triggers bugs in this code?
-> > 
-> > Actually, this patch was necessary when my kdump used "usable-memory"
-> > properties in "memory" nodes, as on ppc64, to limit the usable memory
-> > regions that can be used by crash dump kernel.
-> > Since then, I've moved to the approach of using "mem=" kernel parameter,
-> > then introducing a new property, "linux,usable-memory-range," under /chosen
-> > and now we don't need this patch any more.
-> > 
-> > So, we can drop it but I still believe that it is buggy.
-> 
-> Due to the discussions[1], I may want to re-enable "usable-memory"
-> property on arm64. In addition, I would like to add a function,
-> dtb_add_usable_memory_properties(), a variant of
-> add_usable_memory_properties(), to kexec/dt-ops.c.
-> So this issue is quite crucial now.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452685.html
-> 
-> -Takahiro AKASHI
-> 
-> > Thanks,
-> > -Takahiro AKASHI
-> > 
-> > > -- 
-> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> > > according to speedtest.net.
-===8<===
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Yea, that's quite sad, "analog" has become a dirty word, but really
+this has nothing to do with "analog" at all - there are LCD TVs (and
+some monitors) out there which take HDMI signals but refuse to
+disable overscan no matter what you do to them if you provide them
+with a "broadcast"  mode - so the analog excuse is very poor.
 
-The end address of "reg" attribute in device tree's memory should be
-inclusive.
----
- kexec/fs2dt.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
-index 79aa0f3..953f78a 100644
---- a/kexec/fs2dt.c
-+++ b/kexec/fs2dt.c
-@@ -236,7 +236,8 @@ static void add_dyn_reconf_usable_mem_property__(int fd)
- 						    ranges_size*8);
- 				}
- 				ranges[rlen++] = cpu_to_be64(loc_base);
--				ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
-+				ranges[rlen++] = cpu_to_be64(loc_end
-+								- loc_base + 1);
- 				rngs_cnt++;
- 			}
- 		}
-@@ -350,7 +351,7 @@ static void add_usable_mem_property(int fd, size_t len)
- 					    ranges_size*sizeof(*ranges));
- 			}
- 			ranges[rlen++] = cpu_to_be64(loc_base);
--			ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
-+			ranges[rlen++] = cpu_to_be64(loc_end - loc_base + 1);
- 		}
- 	}
- 
 -- 
-2.10.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
