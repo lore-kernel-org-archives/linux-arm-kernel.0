@@ -1,307 +1,75 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 31 Oct 2016 13:24:14 -0500
-Subject: [PATCH v12 RESEND 0/4] generic TEE subsystem
-In-Reply-To: <20161029094641.GA23362@ermac>
-References: <1477649984-16777-1-git-send-email-jens.wiklander@linaro.org>
- <1e532aeb-4944-62e4-c8c4-1e23438b92cd@ti.com> <20161029094641.GA23362@ermac>
-Message-ID: <573b8fff-eeb7-3656-6f32-de69d906a966@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 31 Oct 2016 19:24:46 +0100
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <2291876.8LAt3RcuXX@amdc3058>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <20161031154622.GB1041@n2100.armlinux.org.uk> <2291876.8LAt3RcuXX@amdc3058>
+Message-ID: <1512445.DtnT51NQqg@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2016 04:46 AM, Jens Wiklander wrote:
-> On Fri, Oct 28, 2016 at 10:43:24AM -0500, Andrew F. Davis wrote:
->> On 10/28/2016 05:19 AM, Jens Wiklander wrote:
->>> Hi,
->>>
->>> This patch set introduces a generic TEE subsystem. The TEE subsystem will
->>> contain drivers for various TEE implementations. A TEE (Trusted Execution
->>> Environment) is a trusted OS running in some secure environment, for
->>> example, TrustZone on ARM CPUs, or a separate secure co-processor etc.
->>>
->>> Regarding use cases, TrustZone has traditionally been used for
->>> offloading secure tasks to the secure world. Examples include: 
->>> - Secure key handling where the OS may or may not have direct access to key
->>>   material.
->>> - E-commerce and payment technologies. Credentials, credit card numbers etc
->>>   could be stored in a more secure environment.
->>> - Trusted User Interface (TUI) to ensure that no-one can snoop PIN-codes
->>>   etc.
->>> - Secure boot to ensure that loaded binaries haven?t been tampered with.
->>>   It?s not strictly needed for secure boot, but you could enhance security
->>>   by leveraging a TEE during boot.
->>> - Digital Rights Management (DRM), the studios provides content with
->>>   different resolution depending on the security of the device. Higher
->>>   security means higher resolution.
->>>
->>> A TEE could also be used in existing and new technologies. For example IMA
->>> (Integrity Measurement Architecture) which has been in the kernel for quite
->>> a while. Today you can enhance security by using a TPM-chip to sign the IMA
->>> measurement list. This is something that you also could do by leveraging a
->>> TEE.
->>>
->>> Another example could be in 2-factor authentication which is becoming
->>> increasingly more important. FIDO (https://fidoalliance.org) for example
->>> are using public key cryptography in their 2-factor authentication standard
->>> (U2F). With FIDO, a private and public key pair will be generated for every
->>> site you visit and the private key should never leave the local device.
->>> This is an example where you could use secure storage in a TEE for the
->>> private key.
->>>
->>> Today you will find a quite a few different out of tree implementations of
->>> TEE drivers which tends to fragment the TEE ecosystem and development. We
->>> think it would be a good idea to have a generic TEE driver integrated in
->>> the kernel which would serve as a base for several different TEE solutions,
->>> no matter if they are on-chip like TrustZone or if they are on a separate
->>> crypto co-processor.
->>>
->>> To develop this TEE subsystem we have been using the open source TEE called
->>> OP-TEE (https://github.com/OP-TEE/optee_os) and therefore this would be the
->>> first TEE solution supported by this new subsystem. OP-TEE is a
->>> GlobalPlatform compliant TEE, however this TEE subsystem is not limited to
->>> only GlobalPlatform TEEs, instead we have tried to design it so that it
->>> should work with other TEE solutions also.
->>>
->>
->> The above is my biggest concern with this whole subsystem, to me it
->> still feels very OPTEE specific. As much as I would love to believe
->> OPTEE will be the end-all TEE, I'm sure we soon will start to see wider
->> use of vendor TEEs (like TI's own legacy Trustzone thing we are hoping
->> to depreciate with OPTEE moving forward), possibly Google's Trusty TEE,
->> and whatever Intel/AMD are cooking up for x86.
+On Monday, October 31, 2016 07:14:13 PM Bartlomiej Zolnierkiewicz wrote:
 > 
-> I'd rather say that it's slightly GlobalPlatform specific, but a bit
-> more flexible.
+> Hi,
 > 
->>
->> As we all know when things are upstreamed we lose the ability to make
->> radical changes easily, especially to full subsystems. What happens when
->> this framework, built with only one existing TEE, built by the one
->> existing TEE's devs, is not as flexible as we need when other TEEs start
->> rolling out?
+> On Monday, October 31, 2016 03:46:22 PM Russell King - ARM Linux wrote:
+> > On Wed, Oct 26, 2016 at 07:01:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > > 
+> > > Hi,
+> > > 
+> > > On Wednesday, July 13, 2016 04:37:31 PM Arnd Bergmann wrote:
+> > > > On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > > > > 
+> > > > > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+> > > > > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > > > > > > This patch disables deprecated IDE subsystem in assabet_defconfig
+> > > > > > > (no IDE host drivers are selected in this config so there is no
+> > > > > > > valid reason to enable IDE subsystem itself).
+> > > > > > > 
+> > > > > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > > > > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > > > > 
+> > > > > > I think the series makes a lot of sense. I have checked your assertions
+> > > > > > in the changelogs and found no flaws in your logic, so I think we should
+> > > > > > take them all through arm-soc unless there are other concerns.
+> > > > > 
+> > > > > Thank you.
+> > > > > 
+> > > > > Should I resend everything or just patches that were not reposted yet
+> > > > > (the ones that were marked as RFT initially and got no feedback)?
+> > > > 
+> > > > I'd be fine with just getting a pull request with all the patches that
+> > > > had no negative feedback and that were not already applied (if any).
+> > > 
+> > > Here it is (sorry for taking so long).
+> > 
+> > I've just been digging in the dmesg logs from when I was using the
+> > Assabet+Neponset as my firewall, and it was having to use the IDE
+> > ide-cs driver rather than the pata pcmcia driver.
+> > 
+> > I don't recall whether the pata pcmcia driver was a problem or not,
+> > as the PCMCIA interface can't cope with _any_ 32-bit accesses.  I
+> > think PATA tries to use the "highest" possible access size by
+> > default...
 > 
-> Initially the TEE subsystem was much more flexible and was criticized
-> for that.
-> 
+> It doesn't actually - it defaults to 16-bits for PIO data access and
+> you must explicitly enable 32-bits using ATA_PFLAG_PIO32 port flag
+> (pata_pcmcia doesn't set it so it should be okay).  Also taskfile
+> registers are accessed using 8-bits access by default transport
+> functions (which are used by pata_pcmcia).
 
-That's rather strange, I haven't been following this from the start so I
-will just take your word that this is where the community wants this
-subsystem to go.
+Please also note that:
 
->>
->> Do we see this as a chicken and egg situation, or is there any harm
->> beyond the pains of supporting an out-of-tree driver for a while, to
->> wait until we have at least one other TEE to add to this subsystem
->> before merging?
-> 
-> This proposal is the bare minimum to have something useful. On top of
-> this there's more things we'd like to add, for example an in-kernel API
-> for accessing the TEE and secure buffer handling. The way we're dealing
-> with shared memory need to be improved to better support multiple guests
-> communicating with one TEE.
-> 
-> What we can do now with the subsystem now is somewhat limited by the
-> fact that we're trying to upstream it and want to do that it in
-> manageable increments.
-> 
+- assebet_defconfig currently doesn't even enable ide-cs
+  (CONFIG_BLK_DEV_IDECS) in the mainline kernel
 
-Fair enough.
+- neponset_defconfig doesn't even enable IDE (CONFIG_IDE)
+  in the mainline kernel
 
-For now this series is being used in our production SDKs so it has at
-least some basic testing from us, so for the whole series:
+so there is no risk of breaking anything.. :-)
 
-Tested-by: Andrew F. Davis <afd@ti.com>
-
-> Thanks,
-> Jens
-> 
->>
->> This may also help with the perceived lack of reviewers for this series.
->>
->> Thanks,
->> Andrew
->>
->>> "tee: generic TEE subsystem" brings in the generic TEE subsystem which
->>> helps when writing a driver for a specific TEE, for example, OP-TEE.
->>>
->>> "tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
->>> its work.
->>>
->>> This patch set has been prepared in cooperation with Javier Gonz?lez who
->>> proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
->>> https://lwn.net/Articles/623380/ . We've since then changed the scope to
->>> TEE instead of TrustZone.
->>>
->>> We have discussed the design on tee-dev at lists.linaro.org (archive at
->>> https://lists.linaro.org/pipermail/tee-dev/) with people from other
->>> companies, including Valentin Manea <valentin.manea@huawei.com>,
->>> Emmanuel MICHEL <emmanuel.michel@st.com>,
->>> Jean-michel DELORME <jean-michel.delorme@st.com>,
->>> and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
->>> agree on something that is generic enough to support many different
->>> TEEs while still keeping the interface together.
->>>
->>> v12-resend:
->>> * Rebased on v4.9-rc2
->>>
->>> v12:
->>> * Rebased on v4.8-rc5
->>> * Addressed review comments from Andrew F. Davis
->>> * Removed Acked-by: Andreas Dannenberg <dannenberg@ti.com> as the
->>>   mail bounces
->>> * Bugfix possible null dereference in error cleanup path of
->>>   optee_probe().
->>> * Bugfix optee_from_msg_param() when calculating offset of memref
->>>   into a shared memory object
->>>
->>> v11:
->>> * Rebased on v4.8-rc3
->>> * Addressed review comments from Nishanth Menon
->>> * Made the TEE framework available as a loadable module.
->>> * Reviewed-by: Javier Gonz?lez <javier@javigon.com>
->>> * Zeroes shared memory on allocation to avoid information leakage
->>> * Links shared memory objects to context to avoid stealing of shared memory
->>>   object from an unrelated process
->>> * Allow RPC interruption if supplicant is unavailable
->>>
->>> v10:
->>> * Rebased on v4.7-rc1
->>> * Addressed private review comments from Nishanth Menon
->>> * Optee driver only accepts one supplicant process on the privileged device
->>> * Optee driver avoids long delayed releases of shm objects
->>> * Added more comments on functions and structs
->>>
->>> v9:
->>> * Rebased on v4.6-rc1
->>> * Acked-by: Andreas Dannenberg <dannenberg@ti.com>
->>> * Addressed comments from Al Viro how file descriptors are passed to
->>>   user space
->>> * Addressed comments from Randy Dunlap on documentation
->>> * Changed license for include/uapi/linux/tee.h
->>>
->>> v8:
->>> * Rebased on v4.5-rc3
->>> * dt/bindings: add bindings for optee
->>>   Acked-by: Rob Herring <robh@kernel.org>
->>> * Fixes build error for X86
->>> * Fixes spell error in "dt/bindings: add bindings for optee"
->>>
->>> v7:
->>> * Rebased on v4.5-rc2
->>> * Moved the ARM SMC Calling Convention support into a separate patch
->>>   set, which is now merged
->>>
->>> v6:
->>> * Rebased on v4.3-rc7
->>> * Changed smccc interface to let the compiler marshal most of the
->>>   parameters
->>> * Added ARCH64 capability for smccc interface
->>> * Changed the PSCI firmware calls (both arm and arm64) to use the new
->>>   generic smccc interface instead instead of own assembly functions.
->>> * Move optee DT bindings to below arm/firmware
->>> * Defines method for OP-TEE driver to call secure world in DT, smc or hvc
->>> * Exposes implementation id of a TEE driver in sysfs
->>>   to easily spawn corresponding tee-supplicant when device is ready
->>> * Update OP-TEE Message Protocol to better cope with fragmented physical
->>>   memory
->>> * Read time directly from OP-TEE driver instead of forwarding the RPC
->>>   request to tee-supplicant
->>>
->>> v5:
->>> * Replaced kref reference counting for the device with a size_t instead as
->>>   the counter is always protected by a mutex
->>>
->>> v4:
->>> * Rebased on 4.1
->>> * Redesigned the synchronization around entry exit of normal SMC
->>> * Replaced rwsem on the driver instance with kref and completion since
->>>   rwsem wasn't intended to be used in this way
->>> * Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
->>>   future additional parameter types
->>> * Documents TEE subsystem and OP-TEE driver
->>> * Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
->>>   TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
->>> * DT bindings in a separate patch
->>> * Assembly parts moved to arch/arm and arch/arm64 respectively, in a
->>>   separate patch
->>> * Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
->>> * Removed CMA usage to limit the scope of the patch set
->>>
->>> v3:
->>> * Rebased on 4.1-rc3 (dma_buf_export() API change)
->>> * A couple of small sparse fixes
->>> * Documents bindings for OP-TEE driver
->>> * Updated MAINTAINERS
->>>
->>> v2:
->>> * Replaced the stubbed OP-TEE driver with a real OP-TEE driver
->>> * Removed most APIs not needed by OP-TEE in current state
->>> * Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
->>> * Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
->>> * Moved tee.h into include/uapi/linux/
->>> * Redefined tee.h IOCTL macros to be directly based on _IOR and friends
->>> * Removed version info on the API to user space, a data blob which
->>>   can contain an UUID is left for user space to be able to tell which
->>>   protocol to use in TEE_IOC_CMD
->>> * Changed user space exposed structures to only have types with __ prefix
->>> * Dropped THIS_MODULE from tee_fops
->>> * Reworked how the driver is registered and ref counted:
->>>   - moved from using an embedded struct miscdevice to an embedded struct
->>>     device.
->>>   - uses an struct rw_semaphore as synchronization for driver detachment
->>>   - uses alloc/register pattern from TPM
->>>
->>> Thanks,
->>> Jens
->>>
->>> Jens Wiklander (4):
->>>   dt/bindings: add bindings for optee
->>>   tee: generic TEE subsystem
->>>   tee: add OP-TEE driver
->>>   Documentation: tee subsystem and op-tee driver
->>>
->>>  Documentation/00-INDEX                             |   2 +
->>>  .../bindings/arm/firmware/linaro,optee-tz.txt      |  31 +
->>>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->>>  Documentation/ioctl/ioctl-number.txt               |   1 +
->>>  Documentation/tee.txt                              | 118 +++
->>>  MAINTAINERS                                        |  13 +
->>>  drivers/Kconfig                                    |   2 +
->>>  drivers/Makefile                                   |   1 +
->>>  drivers/tee/Kconfig                                |  18 +
->>>  drivers/tee/Makefile                               |   5 +
->>>  drivers/tee/optee/Kconfig                          |   7 +
->>>  drivers/tee/optee/Makefile                         |   5 +
->>>  drivers/tee/optee/call.c                           | 435 ++++++++++
->>>  drivers/tee/optee/core.c                           | 598 ++++++++++++++
->>>  drivers/tee/optee/optee_msg.h                      | 435 ++++++++++
->>>  drivers/tee/optee/optee_private.h                  | 185 +++++
->>>  drivers/tee/optee/optee_smc.h                      | 446 ++++++++++
->>>  drivers/tee/optee/rpc.c                            | 404 +++++++++
->>>  drivers/tee/optee/supp.c                           | 273 +++++++
->>>  drivers/tee/tee_core.c                             | 901 +++++++++++++++++++++
->>>  drivers/tee/tee_private.h                          | 129 +++
->>>  drivers/tee/tee_shm.c                              | 357 ++++++++
->>>  drivers/tee/tee_shm_pool.c                         | 158 ++++
->>>  include/linux/tee_drv.h                            | 278 +++++++
->>>  include/uapi/linux/tee.h                           | 403 +++++++++
->>>  25 files changed, 5206 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
->>>  create mode 100644 Documentation/tee.txt
->>>  create mode 100644 drivers/tee/Kconfig
->>>  create mode 100644 drivers/tee/Makefile
->>>  create mode 100644 drivers/tee/optee/Kconfig
->>>  create mode 100644 drivers/tee/optee/Makefile
->>>  create mode 100644 drivers/tee/optee/call.c
->>>  create mode 100644 drivers/tee/optee/core.c
->>>  create mode 100644 drivers/tee/optee/optee_msg.h
->>>  create mode 100644 drivers/tee/optee/optee_private.h
->>>  create mode 100644 drivers/tee/optee/optee_smc.h
->>>  create mode 100644 drivers/tee/optee/rpc.c
->>>  create mode 100644 drivers/tee/optee/supp.c
->>>  create mode 100644 drivers/tee/tee_core.c
->>>  create mode 100644 drivers/tee/tee_private.h
->>>  create mode 100644 drivers/tee/tee_shm.c
->>>  create mode 100644 drivers/tee/tee_shm_pool.c
->>>  create mode 100644 include/linux/tee_drv.h
->>>  create mode 100644 include/uapi/linux/tee.h
->>>
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
