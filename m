@@ -1,78 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 31 Oct 2016 09:19:24 +0100
-Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for
- obtaining mode pin state
-In-Reply-To: <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
-Message-ID: <20161031081923.GF18195@verge.net.au>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 31 Oct 2016 08:18:27 +0000
+Subject: [PATCH 1/2] ARM: oxnas: Add OX820 SMP support
+In-Reply-To: <9124cda0-d16b-0992-2552-8a617aeb5d40@baylibre.com>
+References: <20161017084303.20078-1-narmstrong@baylibre.com>
+ <20161017084303.20078-2-narmstrong@baylibre.com>
+ <14513531.isB50DxNJf@wuerfel>
+ <9124cda0-d16b-0992-2552-8a617aeb5d40@baylibre.com>
+Message-ID: <20161031081827.GQ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 02:00:24PM +0200, Geert Uytterhoeven wrote:
-> Hi Mike, Stephen,
+On Mon, Oct 17, 2016 at 11:34:32AM +0200, Neil Armstrong wrote:
+> On 10/17/2016 11:06 AM, Arnd Bergmann wrote:
+> > On Monday, October 17, 2016 10:43:02 AM CEST Neil Armstrong wrote:
+> > This seems to have been copied from plat-versatile, but is really
+> > not needed here since you apparently have proper hardware support for
+> > starting up the CPUs.
+> Yes it seems.
 > 
-> On Fri, Oct 21, 2016 at 3:17 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
-> > Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
-> > state of the mode pins either by a call from the platform code, or
-> > directly by using a hardcoded register access. This is a bit messy, and
-> > creates a dependency between driver and platform code.
-> >
-> > This patch series converts the various Renesas R-Car clock drivers
-> > and support code from reading the mode pin states using a hardcoded
-> > register access to using a new minimalistic R-Car RST driver.
-> >
-> > All R-Car clock drivers will rely on the presence in DT of a device node
-> > for the RST module.  Backwards compatibility with old DTBs is retained
-> > only for R-Car Gen2, which has fallback code using its own private copy
-> > of rcar_gen2_read_mode_pins().
-> >
-> > After this, there is still one remaining user of
-> > rcar_gen2_read_mode_pins() left in platform code. A patch series to
-> > remove that user has already been posted, though ("[PATCH/RFT 0/4] ARM:
-> > shmobile: R-Car Gen2: Allow booting secondary CPU cores in debug mode").
-> > Since v3, the other user has been removed in commit 9f5ce39ddb8f68b3
-> > ("ARM: shmobile: rcar-gen2: Obtain extal frequency from DT").
-> >
-> > This series consists of 5 parts:
-> >   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
-> >      driver,
-> >   B. Patches 3-11 add device nodes for the RST modules to the R-Car DTS
-> >      files,
-> >   C. Patches 12-17 convert the clock drivers to call into the new R-Car
-> >      RST driver,
-> >   D. Patches 18-20 remove passing mode pin state to the clock drivers
-> >      from the platform code,
-> >   E. Patches 21-23 remove dead code from the clock drivers.
-> >
-> > As is usually the case with moving functionality from platform code to
-> > DT, there are lots of hard dependencies:
-> >   - The DT updates in Part B can be merged as soon as the DT bindings in
-> >     Part A have been approved,
-> >   - The clock driver updates in Part C depend functionally on the driver
-> >     code in Part A, and on the DT updates in Part B,
-> >   - The board code cleanups in Part D depend on the clock driver updates
-> >     in Part C,
-> >   - The block driver cleanups in part E depend on the board code
-> >     cleanups in part D.
-> >
-> > Hence to maintain the required lockstep between SoC driver, clock
-> > drivers, shmobile platform code, and shmobile DT, I propose to queue up
-> > all patches in a single branch against v4.9-rc1, and send pull requests
-> > to both Mike/Stephen (clock) and Simon (rest).
-> >
-> > ***
-> 
-> >   - Mike/Stephen/Simon/Magnus: Are you OK with the suggested merge
-> >     approach above?
-> 
-> Is this OK for you?
-> 
-> I'd like to move forward with this, as this is a prerequisite for adding
-> support for new SoCs (RZ/G) without adding more copies of
-> rcar_gen2_read_mode_pins(), and removing that function from platform code
-> for good.
+> > 
+> > Any reason you can't just write to the cpu_ctrl register
+> > once and keep going without that whole holding_pen loop
+> > and spinlock?
+> I suppose but I did not find any good examples except the plat-versatile code.
+> I will try some simpler code.
 
-This seems reasonable to me but likely the ARM SoC maintainers will want to
-know about this plan before it is executed.
+There's plenty of examples - most ARM SMP platforms in the kernel now
+do not blindly copy the versatile code.  You only have to go looking
+for arch/arm/*/platsmp.c files to find them.
+
+I'm not sure what you'd call a "good example" - maybe the imx code?
+arch/arm/mach-imx/platsmp.c can't be simpler:
+
+static int imx_boot_secondary(unsigned int cpu, struct task_struct *idle)
+{
+        imx_set_cpu_jump(cpu, v7_secondary_startup);
+        imx_enable_cpu(cpu, true);
+        return 0;
+}
+
+I guess the difficult thing is to understand what each of those called
+functions does... though the function names give a very accurate clue
+there.
+
+and because plat-versatile is almost entirely software-based, it's
+easy to understand and follow, _despite_ being completely broken
+for things like PM and kexec (which, the platform does not support.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
