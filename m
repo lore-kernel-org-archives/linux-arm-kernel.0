@@ -1,49 +1,82 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 17:56:22 +0100
-Subject: [RFC PATCH v2 0/5] ARM64: Add Internal PHY support for Meson GXL
-Message-ID: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 31 Oct 2016 17:56:25 +0100
+Subject: [RFC PATCH v2 3/5] ARM64: dts: meson-gxl: Add ethernet nodes with
+ internal PHY
+In-Reply-To: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
+References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1477932987-27871-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
-external RGMII pins.
+Add Ethernet node with Internal PHY selection for the Amlogic GXL SoCs
 
-In order to support switching between the two PHYs links, extended registers
-size for mdio-mux-mmioreg must be added.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 45 ++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-Finally, the internal PHY is added in the GXL dtsi and support for each
-board is added in intermediate board family dtsi or final dts.
-
-This patchset depends on ARM64 dts patch at [1]
-
-Changes since original RFC patchset at : [2]
- - Remove meson8b experimental phy switching
- - Switch to mdio-mux-mmioreg with extennded size support
- - Add internal phy support for S905x and p231
- - Add external PHY support for p230
-
-[1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
-
-Neil Armstrong (5):
-  net: mdio-mux-mmioreg: Add support for 16bit and 32bit register sizes
-  net: phy: Add Meson GXL Internal PHY driver
-  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
-  ARM64: dts: meson-gxl-p23x: Enable ethernet
-  ARM64: dts: meson-gxl-s905x: Enable internal ethernet PHY
-
- .../devicetree/bindings/net/mdio-mux-mmioreg.txt   |  4 +-
- .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 16 +++++
- .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  6 ++
- .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  4 ++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  6 ++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 45 ++++++++++++
- drivers/net/phy/Kconfig                            |  5 ++
- drivers/net/phy/Makefile                           |  1 +
- drivers/net/phy/mdio-mux-mmioreg.c                 | 60 ++++++++++++----
- drivers/net/phy/meson-gxl.c                        | 81 ++++++++++++++++++++++
- 10 files changed, 213 insertions(+), 15 deletions(-)
- create mode 100644 drivers/net/phy/meson-gxl.c
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index d1bf381..71670c3 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -47,6 +47,24 @@
+ 
+ / {
+ 	compatible = "amlogic,meson-gxl";
++
++
++};
++
++&ethmac {
++	reg = <0x0 0xc9410000 0x0 0x10000
++	       0x0 0xc8834540 0x0 0x4>;
++
++	clocks = <&clkc CLKID_ETH>,
++		 <&clkc CLKID_FCLK_DIV2>,
++		 <&clkc CLKID_MPLL2>;
++	clock-names = "stmmaceth", "clkin0", "clkin1";
++
++	mdio0: mdio0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++	};
+ };
+ 
+ &aobus {
+@@ -214,6 +232,33 @@
+ 			};
+ 		};
+ 	};
++
++	eth-phy-mux {
++		compatible = "mdio-mux-mmioreg", "mdio-mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x55c 0x0 0x4>;
++		mux-mask = <0xffffffff>;
++		mdio-parent-bus = <&mdio0>;
++
++		internal_mdio: mdio at e40908ff {
++			reg = <0xe40908ff>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			internal_phy: ethernet-phy at 8 {
++				compatible = "ethernet-phy-id0181.4400", "ethernet-phy-ieee802.3-c22";
++				reg = <8>;
++				max-speed = <100>;
++			};
++		};
++
++		external_mdio: mdio at 2009087f {
++			reg = <0x2009087f>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
+ };
+ 
+ &hiubus {
 -- 
 1.9.1
