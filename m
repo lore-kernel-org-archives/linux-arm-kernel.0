@@ -1,44 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 16:20:27 +0000
-Subject: [PATCH] ARM: zx: Fix error handling
-In-Reply-To: <20161030081010.14735-1-christophe.jaillet@wanadoo.fr>
-References: <20161030081010.14735-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <20161031162027.GK1041@n2100.armlinux.org.uk>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 31 Oct 2016 10:23:27 -0600
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161029000926.GA30169@live.com>
+References: <20161027143937.GC6818@obsidianresearch.com>
+ <8bed213a-96e3-1891-a46a-234253a2561e@suse.com>
+ <20161028154740.GC10441@obsidianresearch.com>
+ <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
+ <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+ <20161028210015.GA19901@live.com>
+ <20161028220546.GA19693@obsidianresearch.com>
+ <20161029000926.GA30169@live.com>
+Message-ID: <20161031162327.GA28817@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Same as the other fix...
+On Fri, Oct 28, 2016 at 05:09:26PM -0700, Moritz Fischer wrote:
+> It's not a single command but rather a sequence of steps we take to
+> create an image that works (using write_cfgmem instead of write_binfile)
 
-On Sun, Oct 30, 2016 at 09:10:10AM +0100, Christophe JAILLET wrote:
-> 'devm_ioremap_resource()' returns an error pointer in case of error, not
-> NULL. So test it with IS_ERR.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
-> 'return -EIO;' could also be turned into 'return PTR_ERR(pcubase);' in
-> order to propagate the error value.
-> ---
->  arch/arm/mach-zx/zx296702-pm-domain.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-> index e08574d4e2ca..79dcf2549267 100644
-> --- a/arch/arm/mach-zx/zx296702-pm-domain.c
-> +++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-> @@ -169,7 +169,7 @@ static int zx296702_pd_probe(struct platform_device *pdev)
->  	}
->  
->  	pcubase = devm_ioremap_resource(&pdev->dev, res);
-> -	if (!pcubase) {
-> +	if (IS_ERR(pcubase)) {
->  		dev_err(&pdev->dev, "ioremap fail.\n");
->  		return -EIO;
->  	}
-> -- 
-> 2.9.3
-> 
+Ah, and it relies on newer Vivado features too.. Never had a use for
+write_cfgmem before, and wouldn't have thought it did this.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I always do these transform externally and we tack our own header onto
+the bitfile as well..
+
+> > So, the question still remains, should the driver require the header
+> > be stripped (eg the sync word is the first 4 bytes), or should it
+> > search the first bit for an aligned sync word?
+> 
+> So currently we don't require it to be stripped, changing it so it does
+> require stripping would break people's setups that already use the
+> current implementation.
+
+Considering there is a way to produce an acceptable bitfile via
+write_cfgmem I think we should stick with that and allow the header to
+be present, otherwise all users need yet another tool.
+
+I'll send another patch when I get back from the plumbers conference.
+
+> > Either requirement is acceptable to the hardware. My patch does the
+> > former, I suspect you need the later?
+> 
+> For my usecases I could deal with either way, looking at backwards
+> compat the latter one would be preferential I supose ...
+
+Well, there are no in-kernel users, and no uapi, so it isn't such a
+big deal. I'm actually surprised this got merged without users ..
+
+Jason
