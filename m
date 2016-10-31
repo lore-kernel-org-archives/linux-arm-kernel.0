@@ -1,47 +1,90 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Mon, 31 Oct 2016 23:16:20 +0100
-Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
- imprecise aborts
-In-Reply-To: <3847db9f-a8e1-b7fe-c2fa-19ea893bae5f@broadcom.com>
-References: <20161029111229.26875-1-zajec5@gmail.com>
- <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
- <6e252703-0010-83ae-fa14-57352add007a@hauke-m.de>
- <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
- <dcb21fe4-672f-4545-5b47-d764f390e741@broadcom.com>
- <18db27c7-1055-ff3c-0b0b-eeeaf5f3f5e0@gmail.com>
- <3847db9f-a8e1-b7fe-c2fa-19ea893bae5f@broadcom.com>
-Message-ID: <CACna6ryMbF8kVUYOfhre4qtZp5haa2Shijcv40AXsjL_jZL=JQ@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 31 Oct 2016 15:20:29 -0700
+Subject: [PATCH v3] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
+In-Reply-To: <1477473794-26030-1-git-send-email-linus.walleij@linaro.org>
+References: <1477473794-26030-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161031222029.GG25787@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2016 at 23:05, Scott Branden <scott.branden@broadcom.com> wrote:
-> On 16-10-31 02:56 PM, Florian Fainelli wrote:
->> - fixups the aborts in the kernel, look where they come from, by using
->> some bit of magic, looking at PCIe registers and whatnot (provided that
->> is even possible), not too hard, but can take a while, and is error prone
->
-> Option 4 sounds like the proper solution - check the range the abort is due
-> to the PCI device enumeration and only ignore those aborts.
+On Wed 26 Oct 02:23 PDT 2016, Linus Walleij wrote:
 
-This was already suggested by Arnd:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/422873.html
-and Ray was checking some internal datasheets, but I'm afraid he never
-found info on checking if error was caused by PCIe controller.
+> This adds the MPU-3050 gyroscope and the KXSD9 accelerometer to
+> the Qualcomm APQ8060 Dragonboard. The KXSD9 is mounted beyond the
+> MPU-3050 and appear as a subdevice beyond it. We set up the
+> required GPIO and interrupt lines to make the devices work.
+> 
 
-Maybe we could think about some BCM5301X API (extra symbol exported by
-arch code) for starting ignoring aborts and stopping that. We could
-ignore aborts during scanning only but honestly it sounds like a bit
-hacky solution to me.
+I'm concerned about the interrupt below, but apart from that
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Should be fine to apply now: all bindings and requirements are
+>   merged.
+> ChangeLog v1->v2:
+> - Use the new I2C mux gate bindings from Peter Rosin (merged to
+>   the I2C subsystem)
+> ---
+>  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+[..]
+> +				mpu3050 at 68 {
+> +					compatible = "invensense,mpu3050";
+> +					reg = <0x68>;
+> +					/*
+> +					 * GPIO17 has interrupt 208 on the
+> +					 * PM8058, it is pulled high by a 10k
+> +					 * resistor to VLOGIC so needs to be
+> +					 * active low/falling edge.
+> +					 */
+> +					interrupt-parent = <&pm8058_gpio>;
+> +					interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
+
+To remove the need of resetting the interrupt-parent in each child you
+can use the following form:
+
+    interrupts-extended = <&pm8058_gpio 208 IRQ_TYPE_EDGE_FALLING>;
 
 
->> I can certainly advocate that option 3 is the one that gives a working
->> device, and this is what matters from a distribution perspective like
->> LEDE/OpenWrt.
->>
-> Since I don't use BCM5301x option 3 is fine by me.
 
-So for it seems like the best solution to me, but I'm open for changes
-if someone points another that is clean & better one.
+But, if we correct the ssbi gpio driver then this would no longer be
+interrupt 208 in this parent, right?. I believe that if you say
+<&pmicintc 208 IRQ_TYPE_EDGE_FALLING> instead, which should work even
+after we correct the gpio translation.
 
--- 
-Rafa?
+(Which probably means we need to get that redesigned, before we
+introduce to many of these)
+
+> +					pinctrl-names = "default";
+> +					pinctrl-0 = <&dragon_mpu3050_gpios>;
+> +					vlogic-supply = <&pm8058_lvs0>; // 1.8V
+> +					vdd-supply = <&pm8058_l14>; // 2.85V
+> +
+> +					/*
+> +					 * The MPU-3050 acts as a hub for the
+> +					 * accelerometer.
+> +					 */
+> +					i2c-gate {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +
+> +						kxsd9 at 18 {
+> +							compatible = "kionix,kxsd9";
+> +							reg = <0x18>;
+> +							interrupt-parent = <&tlmm>;
+> +							interrupts = <57 IRQ_TYPE_EDGE_FALLING>;
+> +							pinctrl-names = "default";
+> +							pinctrl-0 = <&dragon_kxsd9_gpios>;
+> +							iovdd-supply = <&pm8058_lvs0>; // 1.8V
+> +							vdd-supply = <&pm8058_l14>; // 2.85V
+> +						};
+> +					};
+> +				};
+
+Regards,
+Bjorn
