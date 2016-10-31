@@ -1,146 +1,49 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 17:44:45 +0100
-Subject: [PATCH 7/8] ARM64: dts: meson-gxl-p23x: Add SD/SDIO/MMC and PWM nodes
-In-Reply-To: <1477932286-27482-1-git-send-email-narmstrong@baylibre.com>
-References: <1477932286-27482-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1477932286-27482-8-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 31 Oct 2016 17:56:22 +0100
+Subject: [RFC PATCH v2 0/5] ARM64: Add Internal PHY support for Meson GXL
+Message-ID: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SD/SDIO/MMC nodes and PWM 32768Hz clock configuration to provide
-storage and WiFi functionality on the p23x boards.
+The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
+external RGMII pins.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 112 +++++++++++++++++++++
- 1 file changed, 112 insertions(+)
+In order to support switching between the two PHYs links, extended registers
+size for mdio-mux-mmioreg must be added.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-index 666fe2b..7830809 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-@@ -56,6 +56,46 @@
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
-+
-+	vddio_boot: regulator-vddio_boot {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_BOOT";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddao_3v3: regulator-vddao_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDAO_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_3v3: regulator-vcc_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	wifi32k: wifi32k {
-+		compatible = "pwm-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-+		clocks = <&wifi32k>;
-+		clock-names = "ext_clock";
-+	};
- };
- 
- /* This UART is brought out to the DB9 connector */
-@@ -64,3 +104,75 @@
- 	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
- };
-+
-+/* Wireless SDIO Module */
-+&sd_emmc_a {
-+	status = "okay";
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-names = "default";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+
-+	non-removable;
-+	disable-wp;
-+
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+
-+	brcmf: bcrmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+	};
-+};
-+
-+/* SD card */
-+&sd_emmc_b {
-+	status = "okay";
-+	pinctrl-0 = <&sdcard_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+	disable-wp;
-+
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+/* eMMC */
-+&sd_emmc_c {
-+	status = "okay";
-+	pinctrl-0 = <&emmc_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <8>;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
-+	max-frequency = <200000000>;
-+	non-removable;
-+	disable-wp;
-+	mmc-ddr-1_8v;
-+	mmc-hs200-1_8v;
-+
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+	vmmc-supply = <&vcc_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+&pwm_ef {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
+Finally, the internal PHY is added in the GXL dtsi and support for each
+board is added in intermediate board family dtsi or final dts.
+
+This patchset depends on ARM64 dts patch at [1]
+
+Changes since original RFC patchset at : [2]
+ - Remove meson8b experimental phy switching
+ - Switch to mdio-mux-mmioreg with extennded size support
+ - Add internal phy support for S905x and p231
+ - Add external PHY support for p230
+
+[1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (5):
+  net: mdio-mux-mmioreg: Add support for 16bit and 32bit register sizes
+  net: phy: Add Meson GXL Internal PHY driver
+  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
+  ARM64: dts: meson-gxl-p23x: Enable ethernet
+  ARM64: dts: meson-gxl-s905x: Enable internal ethernet PHY
+
+ .../devicetree/bindings/net/mdio-mux-mmioreg.txt   |  4 +-
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 16 +++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  6 ++
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  4 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  6 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 45 ++++++++++++
+ drivers/net/phy/Kconfig                            |  5 ++
+ drivers/net/phy/Makefile                           |  1 +
+ drivers/net/phy/mdio-mux-mmioreg.c                 | 60 ++++++++++++----
+ drivers/net/phy/meson-gxl.c                        | 81 ++++++++++++++++++++++
+ 10 files changed, 213 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/net/phy/meson-gxl.c
+
 -- 
 1.9.1
