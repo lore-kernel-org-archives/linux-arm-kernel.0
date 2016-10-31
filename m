@@ -1,37 +1,69 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 15:52:05 +0000
-Subject: MAINTAINERS entry for ARM/CLKDEV SUPPORT
-In-Reply-To: <663e5d47-c2b5-c76f-01b4-0fb9a792acf6@codeaurora.org>
-References: <20161010140810.GA30609@mwanda>
- <20161010141819.GA1041@n2100.armlinux.org.uk>
- <20161026191938.GT4418@mwanda>
- <663e5d47-c2b5-c76f-01b4-0fb9a792acf6@codeaurora.org>
-Message-ID: <20161031155204.GC1041@n2100.armlinux.org.uk>
+Date: Mon, 31 Oct 2016 15:56:28 +0000
+Subject: [PATCH v2 1/8] drm/bridge: rgb-to-vga: Support an enable GPIO
+In-Reply-To: <20161026221724.55yufeql6s5nd5gq@lukather>
+References: <20161020034344.14154-1-wens@csie.org>
+ <20161020034344.14154-2-wens@csie.org>
+ <20161026221346.tdpmbrwca4jehch2@rob-hp-laptop>
+ <20161026221724.55yufeql6s5nd5gq@lukather>
+Message-ID: <20161031155628.GD1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 02:31:31PM -0700, Stephen Boyd wrote:
-> On 10/26/2016 12:19 PM, Dan Carpenter wrote:
-> > On Mon, Oct 10, 2016 at 03:18:19PM +0100, Russell King - ARM Linux wrote:
-> >> On Mon, Oct 10, 2016 at 05:08:10PM +0300, Dan Carpenter wrote:
-> >>> Hello Stephen Boyd,
-> >> Okay, that's really not nice.
-> >>
-> >> This is _not_ a question for Stephen.  Stephen does _not_ co-maintain
-> >> clkdev or the clk API, but co-maintains CCF.  I've no idea why you are
-> >> addressing this to Stephen when this is clearly a question for me to
-> >> answer.
-> >>
-> > Sorry, I didn't mean to offend.  He's the one who deleted the clkdev.h
-> > file though so I thought he might know if it should still be listed or
-> > if it was gone for good.
-> >
+On Thu, Oct 27, 2016 at 12:17:24AM +0200, Maxime Ripard wrote:
+> Hi Rob,
 > 
-> Yes, the arm version isn't coming back. We should delete
-> arch/arm/include/asm/clkdev.h from the maintainers file and perhaps
-> replace it with the asm-generic one.
+> On Wed, Oct 26, 2016 at 05:13:46PM -0500, Rob Herring wrote:
+> > On Thu, Oct 20, 2016 at 11:43:37AM +0800, Chen-Yu Tsai wrote:
+> > > Some rgb-to-vga bridges have an enable GPIO, either directly tied to
+> > > an enable pin on the bridge IC, or indirectly controlling a power
+> > > switch.
+> > > 
+> > > Add support for it.
+> > > 
+> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > > ---
+> > >  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+> > >  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 28 ++++++++++++++++++++++
+> > >  2 files changed, 30 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> > > index 003bc246a270..d3484822bf77 100644
+> > > --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> > > +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
+> > > @@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
+> > >  - Video port 0 for RGB input
+> > >  - Video port 1 for VGA output
+> > >  
+> > > +Optional properties:
+> > > +- enable-gpios: GPIO pin to enable or disable the bridge
+> > 
+> > This should also define the active state.
+> > 
+> > > +static void dumb_vga_enable(struct drm_bridge *bridge)
+> > > +{
+> > > +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
+> > > +
+> > > +	if (vga->enable_gpio)
+> > > +		gpiod_set_value_cansleep(vga->enable_gpio, 1);
+> > 
+> > So the driver should allow either active high or low.
+> 
+> You mean like having a enable-active-high property? Isn't that
+> redundant with the GPIO flags?
 
-I disagree.  See my reply to the original mail for the reasons.
+Correct - the gpiod APIs remove the need for drivers to know the
+polarity of the signal, handling it inside the GPIO subsystem
+instead, controlled either from the gpiod lookup tables in legacy
+board files, or the DT specification for the GPIO.
+
+So, in drivers, gpiod_set_value*(, 1) means "set gpio to active
+level" and gpiod_set_value*(, 0) means "set gpio to inactive level".
+
+Far nicer than all the bugs we've had with the legacy GPIO interfaces
+with random different drivers implementing random different ways to
+invert the signal, with all the pain that brings with it when a
+platform comes along with a different inversion state.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
