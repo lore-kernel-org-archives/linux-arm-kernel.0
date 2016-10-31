@@ -1,70 +1,158 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 31 Oct 2016 07:24:45 -0700
-Subject: [PATCH 0/3] ARM: dts: oxnas: Update support for OX820 and use
- dt-bindings
-In-Reply-To: <fce063fd-6aaa-8d30-1588-e656e93bdebc@baylibre.com>
-References: <20161021151037.20112-1-narmstrong@baylibre.com>
- <fce063fd-6aaa-8d30-1588-e656e93bdebc@baylibre.com>
-Message-ID: <CAOesGMjsjYPKyH2CD4siZmB3F64h+c7vndfjFdniTDLB4Eh4Pw@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Oct 2016 15:25:29 +0100
+Subject: [RFC PATCH 09/13] net: phy: Add Meson GXL Internal PHY driver
+In-Reply-To: <0ea5a7a8-3913-0e6a-6ff2-9f34015ea071@gmail.com>
+References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+ <1477060838-14164-10-git-send-email-narmstrong@baylibre.com>
+ <0ea5a7a8-3913-0e6a-6ff2-9f34015ea071@gmail.com>
+Message-ID: <eb0b2cb7-6730-f74a-ca18-460dcb57697e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 31, 2016 at 2:58 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> On 10/21/2016 05:10 PM, Neil Armstrong wrote:
->> This patchset updates the ARM DTS for the Oxnas platform by :
->> - Add support for the Oxford Semicondutor OX820 and the PogoPlug V3
->> - Update the OX810SE to use the dt-bindings includes files introduced in [1] and [2]
->> - Fix the MAINTAINERS entry and add the PogoPlug V3 file maintainance
+On 10/21/2016 10:56 PM, Florian Fainelli wrote:
+> On 10/21/2016 07:40 AM, Neil Armstrong wrote:
+>> Add driver for the Internal RMII PHY found in the Amlogic Meson GXL SoCs.
 >>
->> This patchset depends on dt-bindings include headers posted at [1] and [2],
->> that were accepted/merged in the subsystem trees.
+>> This PHY seems to only implement some standard registers and need some
+>> workarounds to provide autoneg values from vendor registers.
 >>
->> How could I manage this dependency for 4.10 ?
+>> Some magic values are currently used to configure the PHY, and this a
+>> temporary setup until clarification about these registers names and
+>> registers fields are provided by Amlogic.
 >>
->> [1] https://listengine.tuxfamily.org/lists.tuxfamily.org/linux-oxnas/2016/10/msg00008.html
->> [2] https://listengine.tuxfamily.org/lists.tuxfamily.org/linux-oxnas/2016/10/msg00007.html
->>
->> Neil Armstrong (3):
->>   ARM: dts: Add support for OX820 and Pogoplug V3
->>   ARM: dts: OX810: Update with dt-bindings includes
->>   MAINTAINERS: oxnas: Add new files definitions
->>
->>  Documentation/devicetree/bindings/arm/oxnas.txt    |   5 +
->>  MAINTAINERS                                        |   3 +-
->>  arch/arm/boot/dts/Makefile                         |   3 +-
->>  .../boot/dts/cloudengines-pogoplug-series-3.dts    |  94 +++++++
->>  arch/arm/boot/dts/ox810se.dtsi                     |  10 +-
->>  arch/arm/boot/dts/ox820.dtsi                       | 298 +++++++++++++++++++++
->>  6 files changed, 407 insertions(+), 6 deletions(-)
->>  create mode 100644 arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
->>  create mode 100644 arch/arm/boot/dts/ox820.dtsi
->>
->
-> Hi,
->
-> I'm ready to send a pull request for arm-soc-dt, but I need to understand how this dependency
-> should be worked out.
->
-> Should this be sent as a late pull request ?
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>> +
+>> +static int meson_gxl_config_init(struct phy_device *phydev)
+>> +{
+>> +	int val;
+>> +	u32 features;
+>> +
+>> +	meson_gxl_phy_config(phydev);
+>> +
+>> +	features = SUPPORTED_MII;
+> 
+> This does not really belong in the PHY driver, and this is statically
+> assigned, I would just drop this.
+> 
 
+Ok
 
-The need for dt-include changes is one of my pet peeves these days,
-since they require coordination between trees.
+>> +
+>> +	/* Do we support autonegotiation? */
+>> +	val = phy_read(phydev, MII_BMSR);
+>> +	if (val < 0)
+>> +		return val;
+>> +
+>> +	if (val & BMSR_ANEGCAPABLE)
+>> +		features |= SUPPORTED_Autoneg;
+>> +	if (val & BMSR_100FULL)
+>> +		features |= SUPPORTED_100baseT_Full;
+>> +	if (val & BMSR_100HALF)
+>> +		features |= SUPPORTED_100baseT_Half;
+>> +	if (val & BMSR_10FULL)
+>> +		features |= SUPPORTED_10baseT_Full;
+>> +	if (val & BMSR_10HALF)
+>> +		features |= SUPPORTED_10baseT_Half;
+>> +
+>> +	phydev->supported = features;
+>> +	phydev->advertising = features;
+> 
+> This is redundant with what PHYLIB will determine for the PHY.
+> 
+ok
 
-There's two ways to solve this:
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int meson_gxl_phy_read_status(struct phy_device *phydev)
+>> +{
+>> +	int err;
+>> +
+>> +	/* Update the link, but return if there was an error */
+>> +	err = genphy_update_link(phydev);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	phydev->lp_advertising = 0;
+>> +	phydev->pause = 0;
+>> +	phydev->asym_pause = 0;
+>> +
+>> +	if (phydev->autoneg == AUTONEG_ENABLE) {
+>> +		unsigned int speed;
+>> +		int reg = phy_read(phydev, GXL_REG_ANEG);
+> 
+> Is all of this really necessary? This should all be reflected in the
+> standard BMSR register, is not this the case here that we have to read
+> this non-standard register?
+> 
 
-1) Make sure that the branches you sent to other maintainers are
-stable, that they merge them as-is and don't rebase. This is a
-three-way handshake (we want to be cc:d on it). Then base your branch
-on top of those two branches.
+This is what I understood from the original driver code, but I will make some further tests
+and see if the BMSR returns some good data.
 
-or:
+> You use genphy_config_aneg(), so surely, the standard auto-negotiation
+> part works somehow?
 
-2) Avoid using the includes now, using numerical constants instead.
-Then, after next merge window, follow up with a patch that converts to
-symbols.
+Yes, and the BMSR is also used in the config_init here...
 
+> 
+>> +
+>> +		if (reg < 0)
+>> +			return reg;
+>> +
+>> +		speed = reg & REG_ANEG_SPEED_MASK;
+>> +
+>> +		if (reg & REG_ANEG_FDUPLEX)
+>> +			phydev->duplex = DUPLEX_FULL;
+>> +		else
+>> +			phydev->duplex = DUPLEX_HALF;
+>> +
+>> +		if ((reg & REG_ANEG_SPEED_MASK) == REG_ANEG_SPEED10)
+>> +			phydev->speed = SPEED_10;
+>> +		else if ((reg & REG_ANEG_SPEED_MASK) == REG_ANEG_SPEED100)
+>> +			phydev->speed = SPEED_100;
+>> +	} else {
+>> +		int bmcr = phy_read(phydev, MII_BMCR);
+>> +
+>> +		if (bmcr < 0)
+>> +			return bmcr;
+>> +
+>> +		if (bmcr & BMCR_FULLDPLX)
+>> +			phydev->duplex = DUPLEX_FULL;
+>> +		else
+>> +			phydev->duplex = DUPLEX_HALF;
+>> +
+>> +		if (bmcr & BMCR_SPEED1000)
+>> +			phydev->speed = SPEED_1000;
+>> +		else if (bmcr & BMCR_SPEED100)
+>> +			phydev->speed = SPEED_100;
+>> +		else
+>> +			phydev->speed = SPEED_10;
+>> +	}
+> 
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct phy_driver meson_gxl_phy = {
+>> +	.phy_id		= 0x01814400,
+>> +	.name		= "Meson GXL Internal PHY",
+>> +	.phy_id_mask	= 0x0fffffff,
+> 
+> Usually the last 4 bits are 0, since that's where the revision part is
+> located.
+> 
 
--Olof
+Fixed
+
+>> +	.features	= 0,
+> 
+> You should set PHY_GBIT_FEATURES and set .flags to PHY_IS_INTERNAL since
+> this is an internal PHY?
+> 
+
+Ok
+
+Thanks,
+Neil
