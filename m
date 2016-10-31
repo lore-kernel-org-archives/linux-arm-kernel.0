@@ -1,65 +1,48 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Mon, 31 Oct 2016 13:12:43 -0700
-Subject: [PATCH v1 1/3] dt-bindings: Document Broadcom OTP controller
- driver
-In-Reply-To: <20161031013848.4vi2544tb5cs65nk@rob-hp-laptop>
-References: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
- <1477336324-10543-2-git-send-email-jonathan.richardson@broadcom.com>
- <20161031013848.4vi2544tb5cs65nk@rob-hp-laptop>
-Message-ID: <350b2f50-29dd-6a96-62af-b5c973322298@broadcom.com>
+From: matt@ranostay.consulting (Matt Ranostay)
+Date: Mon, 31 Oct 2016 13:22:18 -0700
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval property
+ query
+In-Reply-To: <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
+References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
+ <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
+ <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
+ <20161024201443.GB5989@amd>
+ <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
+Message-ID: <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 16-10-30 06:38 PM, Rob Herring wrote:
-> On Mon, Oct 24, 2016 at 12:12:02PM -0700, Jonathan Richardson wrote:
->> From: Jonathan Richardson <jonathar@broadcom.com>
+On Tue, Oct 25, 2016 at 11:47 AM, Matt Ranostay <mranostay@gmail.com> wrote:
+> On Mon, Oct 24, 2016 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
+>>> Pavel + Sebastian this is the patchset that need I some input on :)
 >>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
->> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Oza Pawandeep <oza@broadcom.com>
->> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
->> ---
->>  Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
+>> Better then previous one.
 >>
->> diff --git a/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
->> new file mode 100644
->> index 0000000..6462e12
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
->> @@ -0,0 +1,17 @@
->> +Broadcom OTP memory controller
->> +
->> +Required Properties:
->> +- compatible: "brcm,ocotp" for the first generation Broadcom OTPC which is used
->> +  in Cygnus and supports 32 bit read/write. Use "brcm,ocotp-v2" for the second
->> +  generation Broadcom OTPC which is used in SoC's such as Stingray and supports
->> +  64-bit read/write.
-> 
-> These should be SoC specific. While I'd guess this block is simple 
-> enough, having the SoC can define what all the bits are. Yes, there is a 
-> binding to define those, but you may not use that.
+>> But my version of bq27xxx_battery.c already contains this:
+>
+> This is for allowing udev rule to set the properties as well.
+> otherwise a kinda crude RUN = " echo value >
+> /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
 
-Hi Rob. This block isn't SoC specific. It is used on multiple SoC's.
-There are older SoC's using v1 that we may upstream drivers for in the
-future. v1 isn't specific to cygnus/iproc and v2 isn't specific to stingray.
+Any thoughts on this?
 
-> 
-> 
->> +- reg: Base address of the OTP controller.
->> +- brcm,ocotp-size: Amount of memory available, in 32 bit words
->> +
->> +Example:
->> +
->> +otp: otp at 0301c800 {
->> +	compatible = "brcm,ocotp";
->> +	reg = <0x0301c800 0x2c>;
->> +	brcm,ocotp-size = <2048>;
->> +};
->> -- 
->> 1.9.1
+Thanks,
+
+Matt
+
+
+>
 >>
+>> static const struct kernel_param_ops param_ops_poll_interval = {
+>>         .get = param_get_uint,
+>>         .set = poll_interval_param_set,
+>> };
+>>
+>> ...so it should be possible to set poll interval already.
+>>
+>>                                                                         Pavel
+>>
+>> --
+>> (english) http://www.livejournal.com/~pavelmachek
+>> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
