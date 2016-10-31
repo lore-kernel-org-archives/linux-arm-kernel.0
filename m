@@ -1,94 +1,44 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 31 Oct 2016 00:29:55 -0500
-Subject: [PATCH V3 3/6] dt/bindings: Add bindings for Tegra GMI controller
-In-Reply-To: <1477576872-2665-4-git-send-email-mirza.krak@gmail.com>
-References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
- <1477576872-2665-4-git-send-email-mirza.krak@gmail.com>
-Message-ID: <20161031052955.m44pwdbaynbli5b5@rob-hp-laptop>
+Date: Mon, 31 Oct 2016 00:36:04 -0500
+Subject: [PATCHv2 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+ <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20161031053604.3rjbuk7maabzbwq7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 04:01:09PM +0200, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+On Thu, Oct 27, 2016 at 03:00:23PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> Document the devicetree bindings for the Generic Memory Interface (GMI)
-> bus driver found on Tegra SOCs.
+> Add the Arria10 DevKit System Resource Chip register and state
+> monitoring module to the MFD.
 > 
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
+> Note: This needs to be applied to the bindings document that
+> was Acked & Applied but didn't reach the for-next branch.
+> See https://patchwork.ozlabs.org/patch/629397/
+> ---
+> v2  Change compatible string -mon to -monitor for clarity
+> ---
+>  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
-> Changes in v2:
-> - Updated examples and some information based on comments from Jon Hunter.
-> 
-> Changes in v3:
-> - Updates ranges description based on comments from Rob Herring
-> 
->  .../devicetree/bindings/bus/nvidia,tegra20-gmi.txt | 132 +++++++++++++++++++++
->  1 file changed, 132 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> new file mode 100644
-> index 0000000..49bda2f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/nvidia,tegra20-gmi.txt
-> @@ -0,0 +1,132 @@
-> +Device tree bindings for NVIDIA Tegra Generic Memory Interface bus
-> +
-> +The Generic Memory Interface bus enables memory transfers between internal and
-> +external memory. Can be used to attach various high speed devices such as
-> +synchronous/asynchronous NOR, FPGA, UARTS and more.
-> +
-> +The actual devices are instantiated from the child nodes of a GMI node.
-> +
-> +Required properties:
-> + - compatible : Should contain one of the following:
-> +        For Tegra20 must contain "nvidia,tegra20-gmi".
-> +        For Tegra30 must contain "nvidia,tegra30-gmi".
-> + - reg: Should contain GMI controller registers location and length.
-> + - clocks: Must contain an entry for each entry in clock-names.
-> + - clock-names: Must include the following entries: "gmi"
-> + - resets : Must contain an entry for each entry in reset-names.
-> + - reset-names : Must include the following entries: "gmi"
-> + - #address-cells: The number of cells used to represent physical base
-> +   addresses in the GMI address space. Should be 2.
-> + - #size-cells: The number of cells used to represent the size of an address
-> +   range in the GMI address space. Should be 1.
-> + - ranges: Must be set up to reflect the memory layout with three integer values
-> +   for each chip-select line in use (only one entry is supported, see below
-> +   comments):
-> +   <cs-number> <offset> <physical address of mapping> <size>
-> +
-> +Note that the GMI controller does not have any internal chip-select address
-> +decoding, because of that chip-selects either need to be managed via software
-> +or by employing external chip-select decoding logic.
-> +
-> +If external chip-select logic is used to support multiple devices it is assumed
-> +that the devices use the same timing and so are probably the same type. It also
-> +assumes that they can fit in the 256MB address range. In this case only one
-> +child device is supported which represents the active chip-select line, see
-> +examples for more insight.
-> +
-> +The chip-select number is decoded from the child nodes second address cell of
-> +'ranges' property, if 'ranges' property is not present or empty chip-select will
-> +then be decoded from the first cell of the 'reg' property.
-> +
-> +Optional child cs node properties:
-> +
-> + - nvidia,snor-data-width-32bit: Use 32bit data-bus, default is 16bit.
-> + - nvidia,snor-mux-mode: Enable address/data MUX mode.
-> + - nvidia,snor-rdy-active-before-data: Assert RDY signal one cycle before data.
-> +   If omitted it will be asserted with data.
-> + - nvidia,snor-rdy-inv: RDY signal is active high
-> + - nvidia,snor-adv-inv: ADV signal is active high
-> + - nvidia,snor-oe-inv: WE/OE signal is active high
-> + - nvidia,snor-cs-inv: CS signal is active high
+> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> index ea151f2..c47be28 100644
+> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
+>  Device                   Description
+>  ------                   ----------
+>  a10sr_gpio               GPIO Controller
 
-Inverted is meaningless unless I know what not inverted state is. Name 
-the properties using "active high".
+This should be just "gpio" BTW.
 
-With that,
+> +a10sr_monitor            Register and State Monitoring
 
-Acked-by: Rob Herring <robh@kernel.org>
+s/_/-/ or maybe just "monitor". Not really a generic node name to use 
+for this.
+
+Rob
