@@ -1,68 +1,56 @@
 From: david@lechnology.com (David Lechner)
-Date: Mon, 31 Oct 2016 15:47:18 -0500
-Subject: [PATCH v8 0/3] da8xx USB PHY platform devices and clocks
-Message-ID: <1477946841-16126-1-git-send-email-david@lechnology.com>
+Date: Mon, 31 Oct 2016 15:47:19 -0500
+Subject: [PATCH v8 1/3] ARM: dts: da850: Add cfgchip syscon node
+In-Reply-To: <1477946841-16126-1-git-send-email-david@lechnology.com>
+References: <1477946841-16126-1-git-send-email-david@lechnology.com>
+Message-ID: <1477946841-16126-2-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I reworked the "[PATCH v6 4/5] ARM: DTS: da850: Add cfgchip syscon node" and
-"[PATCH v6 5/5] ARM: DTS: da850: Add usb phy node" patches that were dropped
-from linux-davinci into the new "ARM: dts: da850: Add cfgchip syscon node"
-patch. This should be OK unless it is decided that the BayLibre guys should
-rework it so that the entire SYSCFG0 is a single syscon device. I don't see
-any compelling reason to do that though.
+Add a syscon node for the SoC CFGCHIPn registers. It includes a child node
+for the USB PHY that is part of this range of registers.
 
-v8 changes:
-* Dropped v7 patches that have been accepted into linux-davinci already
-* New patch for CFGCHIP syscon/USB PHY DT node
-* Rebased other patches
+Also have to add OF_DEV_AUXDATA() entry so that clock lookup will work for
+the the USB PHY driver.
 
-v7 changes:
-* Dropped v6 patches that have been accepted into linux-davinci already
-* New patch for adding device names to clock lookup tables
-* Picked up related patch from Axel Haslam for registering USB PHY clocks on
-  device tree boards and added error checking to to that patch
-* Rebased on latest linux-davinci + linux-next
-* Added devices instead of NULL in clk_get() where appropriate usb-da8xx.c
-* Re-ordered patches so that they apply/build cleanly
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/boot/dts/da850.dtsi     | 10 ++++++++++
+ arch/arm/mach-davinci/da8xx-dt.c |  1 +
+ 2 files changed, 11 insertions(+)
 
-v6 changes:
-
-* Combine "ARM: davinci: da8xx: Enable the usb20 "per" clk on phy_clk_enable"
-  from the "[PATCH/RFT v2 00/17] Add DT support for ohci-da8xx" series with
-  the "ARM: davinci: da8xx: add usb phy clocks" patch in this series.
-* Change the syscon and da8xx-usb-phy device ids to -1.
-
-v5 changes: renamed "usbphy" to "usb_phy" or "usb-phy" as appropriate
-
-v4 changes: fix strict checkpatch complaint
-
-v3 changes:
-
-* Fixed the davinci device tree declarations to use the preferred DT address
-  convention so that the items I have added can be correct too.
-* Moved that davinci clock init so that we don't have to call ioremap in the
-  clock mux functions.
-* Added a new "syscon" device for the CFGCHIP registers. This is used by the
-  USB PHY driver and will be used in the future in common clock framework
-  drivers.
-* USB clocks are moved to a common file instead of having duplicated code.
-* PHY driver uses syscon for CFGCHIP registers instead of using them directly.
-
-Axel Haslam (1):
-  ARM: davinci: da8xx: register USB PHY clocks in the DT file
-
-David Lechner (2):
-  ARM: dts: da850: Add cfgchip syscon node
-  ARM: davinci: da8xx: add usb phy clocks
-
- arch/arm/boot/dts/da850.dtsi                |  10 ++
- arch/arm/mach-davinci/board-da830-evm.c     |  31 +---
- arch/arm/mach-davinci/board-omapl138-hawk.c |  15 +-
- arch/arm/mach-davinci/da8xx-dt.c            |  12 ++
- arch/arm/mach-davinci/include/mach/da8xx.h  |   3 +
- arch/arm/mach-davinci/usb-da8xx.c           | 267 ++++++++++++++++++++++++++--
- 6 files changed, 296 insertions(+), 42 deletions(-)
-
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 4c83613..2534aab 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -209,6 +209,16 @@
+ 			};
+ 
+ 		};
++		cfgchip: chip-controller at 1417c {
++			compatible = "ti,da830-cfgchip", "syscon", "simple-mfd";
++			reg = <0x1417c 0x14>;
++
++			usb_phy: usb-phy {
++				compatible = "ti,da830-usb-phy";
++				#phy-cells = <1>;
++				status = "disabled";
++			};
++		};
+ 		edma0: edma at 0 {
+ 			compatible = "ti,edma3-tpcc";
+ 			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index aec569f9..20fa842 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -41,6 +41,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,da850-tilcdc", 0x01e13000, "da8xx_lcdc.0", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
++	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
+ 	{}
+ };
+ 
 -- 
 2.7.4
