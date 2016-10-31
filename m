@@ -1,33 +1,93 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 31 Oct 2016 10:04:19 +0800
-Subject: [PATCH RESEND] tty: amba-pl011: Add earlycon support for SBSA UART
-In-Reply-To: <20161030133139.GA1595@kroah.com>
-References: <20161030133139.GA1595@kroah.com>
-Message-ID: <1477879459-62421-1-git-send-email-wangkefeng.wang@huawei.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 31 Oct 2016 10:08:22 +0800
+Subject: [PATCH v9 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
+In-Reply-To: <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
+References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1476953798-23263-3-git-send-email-jamesjj.liao@mediatek.com>
+ <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
+Message-ID: <1477879702.6649.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare an OF early console for SBSA UART so that the early console device
-can be specified via the "stdout-path" property in device-tree.
+On Mon, 2016-10-31 at 01:08 +0100, Matthias Brugger wrote:
+> Hi James,
+> 
+> On 10/20/2016 10:56 AM, James Liao wrote:
+> > Some power domain comsumers may init before module_init.
+> > So the power domain provider (scpsys) need to be initialized
+> > earlier too.
+> >
+> > Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
+> > between IOMMU and multimedia HW. SMI is responsible to
+> > enable/disable iommu and help transfer data for each multimedia
+> > HW. Both of them have to wait until the power and clocks are
+> > enabled.
+> >
+> > So scpsys driver should be initialized before SMI, and SMI should
+> > be initialized before IOMMU, and then init IOMMU consumers
+> > (display/vdec/venc/camera etc.).
+> >
+> > IOMMU is subsys_init by default. So we need to init scpsys driver
+> > before subsys_init.
+> >
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> > ---
+> 
+> I didn't applied this patch for now.
+> I answered you in v7 of this series [1]. I would prefer to see if we can 
+> fix that otherwise.
+> 
+> Would be great if you or Yong could provide some feedback.
+> 
+> Thanks,
+> Matthias
+> 
+> [1] https://patchwork.kernel.org/patch/9397405/
+> 
+> >  drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
+> >  1 file changed, 18 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> > index fa9ee69..dd7a07d 100644
+> > --- a/drivers/soc/mediatek/mtk-scpsys.c
+> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> > @@ -613,4 +613,21 @@ static int scpsys_probe(struct platform_device *pdev)
+> >  		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
+> >  	},
+> >  };
+> > -builtin_platform_driver(scpsys_drv);
+> > +
+> > +static int __init scpsys_drv_init(void)
+> > +{
+> > +	return platform_driver_register(&scpsys_drv);
+> > +}
+> > +
+> > +/*
+> > + * There are some Mediatek drivers which depend on the power domain driver need
+> > + * to probe in earlier initcall levels. So scpsys driver also need to probe
+> > + * earlier.
+> > + *
+> > + * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
+> > + * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
+> > + * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
+> > + * IOMMU drivers are initialized during subsys_init by default, so we need to
+> > + * move SMI and scpsys drivers to subsys_init or earlier init levels.
+> > + */
+> > +subsys_initcall(scpsys_drv_init);
+> >
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/tty/serial/amba-pl011.c | 1 +
- 1 file changed, 1 insertion(+)
+Hi Matthias,
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index e2c33b9..a4a0b3d 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2357,6 +2357,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-+OF_EARLYCON_DECLARE(pl011, "arm,sbsa-uart", pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
--- 
-1.7.12.4
+I got it, thanks.
+
+
+Hi Yong,
+
+Is this patch still needed on latest kernel for IOMMU driver? Or we have
+other solutions for IOMMU driver init?
+
+
+Best regards,
+
+James
