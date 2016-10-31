@@ -1,31 +1,121 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 17:56:27 +0100
-Subject: [RFC PATCH v2 5/5] ARM64: dts: meson-gxl-s905x: Enable internal
- ethernet PHY
-In-Reply-To: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
-References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1477932987-27871-6-git-send-email-narmstrong@baylibre.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 31 Oct 2016 17:21:37 +0000
+Subject: [PATCH v2] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
+Message-ID: <20161031172137.30807-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+In our VGIC implementation we limit the number of SPIs to a number
+that the userland application told us. Accordingly we limit the
+allocation of memory for virtual IRQs to that number.
+However in our MMIO dispatcher we didn't check if we ever access an
+IRQ beyond that limit, leading to out-of-bound accesses.
+Add a test against the number of allocated SPIs in check_region().
+Adjust the VGIC_ADDR_TO_INTID macro to avoid an actual division, which
+is not implemented on ARM(32).
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-index 07f0e0b..08237ee 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-@@ -46,3 +46,9 @@
- / {
- 	compatible = "amlogic,s905x", "amlogic,meson-gxl";
- };
+[maz: cleaned-up original patch]
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Hi Marc,
+
+does the last hunk fix the GCC issue that your recent fix addresses
+as well? ilog2 seems to be pretty cheap on ARM and ARM64, so I wonder
+if this version of the fix is better, since smaller?
+
+Cheers,
+Andre.
+
+Changes v1 .. v2:
+- fix compilation for 32-bit ARM
+
+ virt/kvm/arm/vgic/vgic-mmio.c | 41 +++++++++++++++++++++++++++--------------
+ virt/kvm/arm/vgic/vgic-mmio.h |  2 +-
+ 2 files changed, 28 insertions(+), 15 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index e18b30d..ebe1b9f 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -453,17 +453,33 @@ struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
+ 	return container_of(dev, struct vgic_io_device, dev);
+ }
+ 
+-static bool check_region(const struct vgic_register_region *region,
++static bool check_region(const struct kvm *kvm,
++			 const struct vgic_register_region *region,
+ 			 gpa_t addr, int len)
+ {
+-	if ((region->access_flags & VGIC_ACCESS_8bit) && len == 1)
+-		return true;
+-	if ((region->access_flags & VGIC_ACCESS_32bit) &&
+-	    len == sizeof(u32) && !(addr & 3))
+-		return true;
+-	if ((region->access_flags & VGIC_ACCESS_64bit) &&
+-	    len == sizeof(u64) && !(addr & 7))
+-		return true;
++	int flags, nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
 +
-+/* S905X Only has access to its internal PHY */
-+&ethmac {
-+	phy-mode = "rmii";
-+	phy-handle = <&internal_phy>;
-+};
++	switch (len) {
++	case sizeof(u8):
++		flags = VGIC_ACCESS_8bit;
++		break;
++	case sizeof(u32):
++		flags = VGIC_ACCESS_32bit;
++		break;
++	case sizeof(u64):
++		flags = VGIC_ACCESS_64bit;
++		break;
++	default:
++		return false;
++	}
++
++	if ((region->access_flags & flags) && IS_ALIGNED(addr, len)) {
++		if (!region->bits_per_irq)
++			return true;
++
++		/* Do we access a non-allocated IRQ? */
++		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
++	}
+ 
+ 	return false;
+ }
+@@ -477,7 +493,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 
+ 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+ 				       addr - iodev->base_addr);
+-	if (!region || !check_region(region, addr, len)) {
++	if (!region || !check_region(vcpu->kvm, region, addr, len)) {
+ 		memset(val, 0, len);
+ 		return 0;
+ 	}
+@@ -510,10 +526,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 
+ 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+ 				       addr - iodev->base_addr);
+-	if (!region)
+-		return 0;
+-
+-	if (!check_region(region, addr, len))
++	if (!region || !check_region(vcpu->kvm, region, addr, len))
+ 		return 0;
+ 
+ 	switch (iodev->iodev_type) {
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 4c34d39..dacd1155 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -58,7 +58,7 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+  * numerator and denominator with 8 to support at most 64 bits per IRQ:
+  */
+ #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
+-					64 / (bits) / 8)
++					64 >> (ilog2(bits) + 3))
+ 
+ /*
+  * Some VGIC registers store per-IRQ information, with a different number
 -- 
-1.9.1
+2.9.0
