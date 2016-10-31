@@ -1,82 +1,71 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 17:56:25 +0100
-Subject: [RFC PATCH v2 3/5] ARM64: dts: meson-gxl: Add ethernet nodes with
- internal PHY
+Date: Mon, 31 Oct 2016 17:56:26 +0100
+Subject: [RFC PATCH v2 4/5] ARM64: dts: meson-gxl-p23x: Enable ethernet
 In-Reply-To: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
 References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1477932987-27871-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1477932987-27871-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet node with Internal PHY selection for the Amlogic GXL SoCs
+Enable Ethernet on the p23x board, pinctrl attribute is only added for
+the p230 board since the p231 only uses the Internal PHY.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 45 ++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts  | 16 ++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts  |  6 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi |  4 ++++
+ 3 files changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index d1bf381..71670c3 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -47,6 +47,24 @@
- 
- / {
- 	compatible = "amlogic,meson-gxl";
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+index 3dfaa37..a569286 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+@@ -49,3 +49,19 @@
+ 	compatible = "amlogic,p230", "amlogic,s905d", "amlogic,meson-gxl";
+ 	model = "Amlogic Meson GXL (S905D) P230 Development Board";
+ };
 +
++/* P230 has exclusive choice between internal or external PHY */
++&ethmac {
++	pinctrl-0 = <&eth_pins>;
++	pinctrl-names = "default";
 +
++	phy-handle = <&external_phy>;
 +};
 +
++&external_mdio {
++	external_phy: ethernet-phy at 0 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++		max-speed = <1000>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
+index ade8d29..1cc8d49 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
+@@ -49,3 +49,9 @@
+ 	compatible = "amlogic,p231", "amlogic,s905d", "amlogic,meson-gxl";
+ 	model = "Amlogic Meson GXL (S905D) P231 Development Board";
+ };
++
++/* P231 has only internal PHY port */
 +&ethmac {
-+	reg = <0x0 0xc9410000 0x0 0x10000
-+	       0x0 0xc8834540 0x0 0x4>;
-+
-+	clocks = <&clkc CLKID_ETH>,
-+		 <&clkc CLKID_FCLK_DIV2>,
-+		 <&clkc CLKID_MPLL2>;
-+	clock-names = "stmmaceth", "clkin0", "clkin1";
-+
-+	mdio0: mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+	};
++	phy-mode = "rmii";
++	phy-handle = <&internal_phy>;
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+index bbe46a2..622ffbe 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+@@ -182,3 +182,7 @@
+ 	clocks = <&clkc CLKID_FCLK_DIV4>;
+ 	clock-names = "clkin0";
  };
- 
- &aobus {
-@@ -214,6 +232,33 @@
- 			};
- 		};
- 	};
 +
-+	eth-phy-mux {
-+		compatible = "mdio-mux-mmioreg", "mdio-mux";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x0 0x55c 0x0 0x4>;
-+		mux-mask = <0xffffffff>;
-+		mdio-parent-bus = <&mdio0>;
-+
-+		internal_mdio: mdio at e40908ff {
-+			reg = <0xe40908ff>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			internal_phy: ethernet-phy at 8 {
-+				compatible = "ethernet-phy-id0181.4400", "ethernet-phy-ieee802.3-c22";
-+				reg = <8>;
-+				max-speed = <100>;
-+			};
-+		};
-+
-+		external_mdio: mdio at 2009087f {
-+			reg = <0x2009087f>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
- };
- 
- &hiubus {
++&ethmac {
++	status = "okay";
++};
 -- 
 1.9.1
