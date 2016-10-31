@@ -1,58 +1,67 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 15:30:29 +0100
-Subject: [PATCH 0/3] ARM: dts: oxnas: Update support for OX820 and use
- dt-bindings
-In-Reply-To: <CAOesGMjsjYPKyH2CD4siZmB3F64h+c7vndfjFdniTDLB4Eh4Pw@mail.gmail.com>
-References: <20161021151037.20112-1-narmstrong@baylibre.com>
- <fce063fd-6aaa-8d30-1588-e656e93bdebc@baylibre.com>
- <CAOesGMjsjYPKyH2CD4siZmB3F64h+c7vndfjFdniTDLB4Eh4Pw@mail.gmail.com>
-Message-ID: <70b8ca3b-3756-05ba-0821-f8fd5b51dc62@baylibre.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 31 Oct 2016 15:45:33 +0100
+Subject: [PATCH v2 0/5] ARM: da850: new drivers for better LCDC support
+Message-ID: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+This series adds two new drivers in order to better support the LCDC
+rev1 present on the da850 boards.
 
-On 10/31/2016 03:24 PM, Olof Johansson wrote:
-> Hi,
->>
->> Hi,
->>
->> I'm ready to send a pull request for arm-soc-dt, but I need to understand how this dependency
->> should be worked out.
->>
->> Should this be sent as a late pull request ?
-> 
-> 
-> The need for dt-include changes is one of my pet peeves these days,
-> since they require coordination between trees.
-> 
-> There's two ways to solve this:
-> 
-> 1) Make sure that the branches you sent to other maintainers are
-> stable, that they merge them as-is and don't rebase. This is a
-> three-way handshake (we want to be cc:d on it). Then base your branch
-> on top of those two branches.
+The first patch adds a new memory driver which allows to write to the
+DDR2/mDDR memory controller present on the da8xx SoCs.
 
-It may be possible, at least from the clock tree.
+The second patch adds a new bus driver which allows to interact with
+the MSTPRI registers of the SYSCFG0 module
 
-Anyway, it's good to know, if I had a single tree to synchronize with,
-I'll eventually select this option...
+As is mentioned in the comments: we don't want to commit to supporting
+stable interfaces (DT bindings or sysfs attributes) so we hardcode the
+settings required by some boards (for now only da850-lcdk) with the
+hope that linux gets an appropriate framework for performance knobs
+in the future.
 
-> 
-> or:
-> 
-> 2) Avoid using the includes now, using numerical constants instead.
-> Then, after next merge window, follow up with a patch that converts to
-> symbols.
+Potential extensions of these drivers should be straightforward in the
+future.
 
-I will select this option for now, my ultimate goal is to have something booting
-for 4.10, cleanup can really wait 4.11...
+Subsequent patches add DT nodes for the new drivers: disabled nodes
+in da850.dtsi and enabled in da850-lcdk.dts.
 
-> 
-> -Olof
-> 
+The last patch adds a workaround for current lack of support for drm
+bridges in tilcdc.
 
+Tested on a da850-lcdk with a display connected over VGA and two
+additional patches for tilcdc (sent to linux-drm): ran simple modetest
+for supported resolutions, used X.org and fluxbox as graphical
+environment, played video with mplayer.
 
-Thanks,
+v1 -> v2:
+- used regular readl()/writel() instead of __raw_** versions
+- used resource_size() instead of calculating the size by hand
+- used ioremap instead of syscon in patch [2/5]
+- added the DT nodes in patches [3/5]-[5/5]
 
-Neil
+Bartosz Golaszewski (5):
+  ARM: memory: da8xx-ddrctl: new driver
+  ARM: bus: da8xx-mstpri: new driver
+  ARM: dts: da850: add the mstpri and ddrctl nodes
+  ARM: dts: da850-lcdk: enable mstpri and ddrctl nodes
+  ARM: dts: da850-lcdk: add tilcdc panel node
+
+ .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
+ .../memory-controllers/ti-da8xx-ddrctl.txt         |  20 ++
+ arch/arm/boot/dts/da850-lcdk.dts                   |  71 ++++++
+ arch/arm/boot/dts/da850.dtsi                       |  11 +
+ drivers/bus/Kconfig                                |   9 +
+ drivers/bus/Makefile                               |   2 +
+ drivers/bus/da8xx-mstpri.c                         | 269 +++++++++++++++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/da8xx-ddrctl.c                      | 175 ++++++++++++++
+ 10 files changed, 586 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/ti-da8xx-ddrctl.txt
+ create mode 100644 drivers/bus/da8xx-mstpri.c
+ create mode 100644 drivers/memory/da8xx-ddrctl.c
+
+-- 
+2.9.3
