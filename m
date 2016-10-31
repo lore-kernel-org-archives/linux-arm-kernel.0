@@ -1,35 +1,37 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 16:13:19 +0000
-Subject: [PATCH 1/5] ARM: wire up HWCAP2 feature bits to the CPU modalias
-In-Reply-To: <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
-References: <1476787939-21889-1-git-send-email-ard.biesheuvel@linaro.org>
- <1476787939-21889-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu_y7e=sJT+7FNj846NczgpNOdVx53SDC7dupmN-3ztNwA@mail.gmail.com>
-Message-ID: <20161031161319.GF1041@n2100.armlinux.org.uk>
+Date: Mon, 31 Oct 2016 16:14:00 +0000
+Subject: [PATCH 2/2] MAINTAINERS: add ARM and arm64 EFI specific files to
+ EFI subsystem
+In-Reply-To: <CAKv+Gu9B7X3CDVZrxZQFVsn3U2CT0A2Z3Owj7BQuFXPjk5Ln4Q@mail.gmail.com>
+References: <1474472114-12973-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
+ <CAKv+Gu9B7X3CDVZrxZQFVsn3U2CT0A2Z3Owj7BQuFXPjk5Ln4Q@mail.gmail.com>
+Message-ID: <20161031161400.GG1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 11:08:36AM +0100, Ard Biesheuvel wrote:
-> On 18 October 2016 at 11:52, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > Wire up the generic support for exposing CPU feature bits via the
-> > modalias in /sys/device/system/cpu. This allows udev to automatically
-> > load modules for things like crypto algorithms that are implemented
-> > using optional instructions.
+On Sat, Oct 29, 2016 at 11:09:55AM +0100, Ard Biesheuvel wrote:
+> On 21 September 2016 at 16:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > Since I will be co-maintaining the EFI subsystem, it makes sense to
+> > mention the ARM and arm64 EFI bits in the EFI section in MAINTAINERS
+> > so that Matt, the list and I get cc'ed on proposed changes.
 > >
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Russell King <rmk+kernel@armlinux.org.uk>
 > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > > ---
-> >  arch/arm/Kconfig                  |  1 +
-> >  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
-> >  2 files changed, 33 insertions(+)
+> >  MAINTAINERS | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
 > >
 > 
 > Russell,
 > 
-> do you have any concerns regarding this patch? If not, I will drop it
-> into the patch system.
+> do you have an objections to this change?
 
-It's still something I need to look at... I've been offline last week,
-and sort-of offline the previous week, so I'm catching up.
+Looks fine, thanks.
+
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
