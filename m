@@ -1,49 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 31 Oct 2016 22:22:54 +0200
-Subject: [PATCH v2 4/5] ARM: dts: da850-lcdk: enable mstpri and ddrctl
- nodes
-In-Reply-To: <1477925138-23457-5-git-send-email-bgolaszewski@baylibre.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
- <1477925138-23457-5-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <12222113.L5elJM2tqN@avalon>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 31 Oct 2016 21:30:20 +0100
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval property
+ query
+In-Reply-To: <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
+References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
+ <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
+ <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
+Message-ID: <201610312130.20261@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
-
-Thank you for the patch.
-
-On Monday 31 Oct 2016 15:45:37 Bartosz Golaszewski wrote:
-> Enable the MSTPRI configuration and DDR2/mDDR memory controller
-> nodes on da850-lcdk. This is needed in order to adjust the memory
-> throughput constraints for better tilcdc support.
-
-Is there a reason not to enable these unconditionally in da850.dtsi (or rather 
-not disabling them) instead of handling it per board ?
-
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
+On Monday 31 October 2016 21:22:18 Matt Ranostay wrote:
+> On Tue, Oct 25, 2016 at 11:47 AM, Matt Ranostay <mranostay@gmail.com>
+> wrote:
+> > On Mon, Oct 24, 2016 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> >> On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
+> >>> Pavel + Sebastian this is the patchset that need I some input on
+> >>> :)
+> >> 
+> >> Better then previous one.
+> > 
+> >> But my version of bq27xxx_battery.c already contains this:
+> > This is for allowing udev rule to set the properties as well.
+> > otherwise a kinda crude RUN = " echo value >
+> > /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
 > 
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts
-> b/arch/arm/boot/dts/da850-lcdk.dts index 4747629..b39796e 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -243,3 +243,11 @@
->  		};
->  	};
->  };
-> +
-> +&mstpri {
-> +	status = "okay";
-> +};
-> +
-> +&ddrctl {
-> +	status = "okay";
-> +};
+> Any thoughts on this?
+
+Isn't sysfs /sys/module/bq27xxx_battery/parameters/poll_interval 
+attribute what should be used to change module parameters like 
+poll_interval?
 
 -- 
-Regards,
-
-Laurent Pinchart
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161031/aa2d9abc/attachment.sig>
