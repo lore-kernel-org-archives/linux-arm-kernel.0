@@ -1,39 +1,22 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 16:18:20 +0000
-Subject: [PATCH] ARM: spear: Fix error handling
-In-Reply-To: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
-References: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <20161031161820.GI1041@n2100.armlinux.org.uk>
+Date: Mon, 31 Oct 2016 16:19:19 +0000
+Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
+In-Reply-To: <CAK7LNAQfZ86_V6ZC5nnCB7Y4EvOPtFBUDM+Kfm9UNyE9h6MA4Q@mail.gmail.com>
+References: <1476880777-5068-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNAQfZ86_V6ZC5nnCB7Y4EvOPtFBUDM+Kfm9UNyE9h6MA4Q@mail.gmail.com>
+Message-ID: <20161031161919.GJ1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the spear or arm-soc guys to deal with...
+On Sun, Oct 30, 2016 at 12:31:04AM +0900, Masahiro Yamada wrote:
+> Hi.
+> 
+> If there is no objection to this patch,
+> I will put it into Russell's patch tracker.
 
-On Sat, Oct 29, 2016 at 03:58:39PM +0200, Christophe JAILLET wrote:
-> 'clk_get_sys()' returns an error pointer in case of error, not NULL. So
-> test it with IS_ERR.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
->  arch/arm/mach-spear/time.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
-> index 9ccffc1d0f28..4878ba90026d 100644
-> --- a/arch/arm/mach-spear/time.c
-> +++ b/arch/arm/mach-spear/time.c
-> @@ -233,7 +233,7 @@ void __init spear_setup_of_timer(void)
->  	}
->  
->  	gpt_clk = clk_get_sys("gpt0", NULL);
-> -	if (!gpt_clk) {
-> +	if (IS_ERR(gpt_clk)) {
->  		pr_err("%s:couldn't get clk for gpt\n", __func__);
->  		goto err_iomap;
->  	}
-> -- 
-> 2.9.3
-> 
+I don't think I have any objection, it's following the same pattern
+that we have for 64-byte cache lines, and this is about the only way
+to deal with it.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
