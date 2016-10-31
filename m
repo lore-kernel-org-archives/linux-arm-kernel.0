@@ -1,24 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 31 Oct 2016 00:10:39 -0500
-Subject: [PATCH v2 1/4] arm64: arch_timer: Add device tree binding for
- hisilicon-161601 erratum
-In-Reply-To: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
-References: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20161031051039.vkuykdc4sgrh6scz@rob-hp-laptop>
+Date: Mon, 31 Oct 2016 00:14:36 -0500
+Subject: [PATCH v3 1/4] dt/bindings: Add binding for the DA8xx MUSB driver
+In-Reply-To: <1477560847-8929-2-git-send-email-abailon@baylibre.com>
+References: <1477560847-8929-1-git-send-email-abailon@baylibre.com>
+ <1477560847-8929-2-git-send-email-abailon@baylibre.com>
+Message-ID: <20161031051436.erbbxxz5swj4i5hq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 03:34:08PM +0800, Ding Tianhong wrote:
-> This erratum describes a bug in logic outside the core, so MIDR can't be
-> used to identify its presence, and reading an SoC-specific revision
-> register from common arch timer code would be awkward.  So, describe it
-> in the device tree.
+On Thu, Oct 27, 2016 at 11:34:04AM +0200, Alexandre Bailon wrote:
+> From: Petr Kulhavy <petr@barix.com>
 > 
-> v2: Use the new erratum name and update the description.
+> DT binding for the TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver.
 > 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> Signed-off-by: Petr Kulhavy <petr@barix.com>
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
 > ---
->  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  .../devicetree/bindings/usb/da8xx-usb.txt          | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/da8xx-usb.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
