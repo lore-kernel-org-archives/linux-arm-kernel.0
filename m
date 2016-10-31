@@ -1,120 +1,90 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 30 Oct 2016 22:02:22 -0500
-Subject: [PATCH 01/10] Documentation: dt-bindings: Document STM32 ADC DT
- bindings
-In-Reply-To: <1477412722-24061-2-git-send-email-fabrice.gasnier@st.com>
-References: <1477412722-24061-1-git-send-email-fabrice.gasnier@st.com>
- <1477412722-24061-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20161031030222.vjxcxklpaua3o77d@rob-hp-laptop>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 31 Oct 2016 11:31:30 +0800
+Subject: [PATCH v7, 0/8] Add MediaTek USB3 DRD Driver
+In-Reply-To: <28f6db69-88ca-4715-1e46-6d5e5efb949c@gmail.com>
+References: <1476844107-31087-1-git-send-email-chunfeng.yun@mediatek.com>
+ <28f6db69-88ca-4715-1e46-6d5e5efb949c@gmail.com>
+Message-ID: <1477884690.4516.35.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 06:25:13PM +0200, Fabrice Gasnier wrote:
-> This patch adds documentation of device tree bindings for the STM32 ADC.
+On Fri, 2016-10-28 at 12:37 +0200, Matthias Brugger wrote:
+> Hi Chunfeng,
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 78 ++++++++++++++++++++++
->  1 file changed, 78 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> On 10/19/2016 04:28 AM, Chunfeng Yun wrote:
+> > These patches introduce the MediaTek USB3 dual-role controller
+> > driver.
+> >
+> > The driver can be configured as Dual-Role Device (DRD),
+> > Peripheral Only and Host Only (xHCI) modes. It works well
+> > with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
+> > tested on MT8173 platform which only contains USB2.0 device IP,
+> > and on MT6290 platform which contains USB3.0 device IP.
+[...]
+> >
+> > Change in v2:
+> > 1. modify binding docs according to suggestions
+> > 2. modify some comments and remove some dummy blank lines
+> > 3. fix memory leakage
+> >
+> >
+> > Chunfeng Yun (8):
+> >   dt-bindings: mt8173-xhci: support host side of dual-role mode
+> >   dt-bindings: mt8173-mtu3: add devicetree bindings
+> >   usb: xhci-mtk: make IPPC register optional
+> >   usb: Add MediaTek USB3 DRD driver
+> >   usb: mtu3: Super-Speed Peripheral mode support
+> >   usb: mtu3: host only mode support
+> >   usb: mtu3: dual-role mode support
+> >   arm64: dts: mediatek: add USB3 DRD driver
+> >
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> new file mode 100644
-> index 0000000..a9a8b3c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
-> @@ -0,0 +1,78 @@
-> +STMicroelectronics STM32 ADC device driver
-> +
-> +STM32 ADC is a successive approximation analog-to-digital converter.
-> +It has several multiplexed input channels. Conversions can be performed
-> +in single, continuous, scan or discontinuous mode. Result of the ADC is
-> +stored in a left-aligned or right-aligned 32-bit data register.
-> +Conversions can be launched in software or using hardware triggers.
-> +
-> +The analog watchdog feature allows the application to detect if the input
-> +voltage goes beyond the user-defined, higher or lower thresholds.
-> +
-> +Each STM32 ADC block can have up to 3 ADC instances.
-> +
-> +Each instance supports two contexts to manage conversions, each one has its
-> +own configurable sequence and trigger:
-> +- regular conversion can be done in sequence, running in background
-> +- injected conversions have higher priority, and so have the ability to
-> +  interrupt regular conversion sequence (either triggered in SW or HW).
-> +  Regular sequence is resumed, in case it has been interrupted.
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32f4-adc".
-> +- reg: Offset and length of the ADC block register set.
-> +- interrupts: Must contain the interrupt for ADC.
-> +- clocks: Clock for the analog circuitry (common to all ADCs).
-> +- clock-names: Must be "adc".
-> +- vref-supply: Phandle to the vref input analog reference voltage.
-> +- #address-cells = <1>;
-> +- #size-cells = <0>;
-> +
-> +Optional properties:
-> +- A pinctrl state named "default" for each ADC channel may be defined to set
-> +  inX ADC pins in mode of operation for analog input on external pin.
-> +- gpios: Array of gpios that may be configured as EXTi trigger sources.
-> +
-> +Example:
-
-This should be last.
-
-> +	adc: adc at 40012000 {
-> +		compatible = "st,stm32f4-adc";
-> +		reg = <0x40012000 0x400>;
-> +		interrupts = <18>;
-> +		clocks = <&rcc 0 168>;
-> +		clock-names = "adc";
-> +		vref-supply = <&reg_vref>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&adc3_in8_pin>;
-> +		gpios = <&gpioa 11 0>,
-> +			<&gpioa 15 0>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		adc1: adc1-master at 0 {
-
-adc at 0 sufficient?
-
-> +			#io-channel-cells = <1>;
-> +			reg = <0x0>;
-> +			clocks = <&rcc 0 168>;
-> +			st,adc-channels = <8>;
-> +		};
-> +		...
-> +		other adc child nodes follow...
-> +	};
-> +
-> +Contents of a stm32 adc child node:
-> +-----------------------------------
-> +An ADC block node should contain at least one subnode, representing an
-> +ADC instance available on the machine.
-> +
-> +Required properties:
-> +- reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
-> +- st,adc-channels: List of single-ended channels muxed for this ADC.
-
-How many? What are valid values?
-
-> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
-> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
-> +
-> +Optional properties:
-> +- clocks: Input clock private to this ADC instance.
-> +- st,injected: Use injected conversion sequence on an ADC, rather than regular.
-
-Not sure about this one. Seems like this would either be a user choice 
-or depend on what's connected to the ADC.
-
-> +- dmas: Phandle to dma channel for this ADC instance, only for regular
-> +  conversions. See ../../dma/dma.txt for details.
-> +- dma-names: Must be "rx" when dmas property is being used.
-> -- 
-> 1.9.1
+> I tried the driver with my mt8173-evb, but wasn't able to get USB 
+> working (no usb stick detected when adding to the usb port).
 > 
+Can you test it again by USB3.0 type-A port? If it works, then
+regulators of vusb33 and vbus are got after PROBE_DEFER of
+mt6397-regulator driver;
+
+For OTG port, need cherry pick a patch:
+
+https://patchwork.kernel.org/patch/9055261/
+
+which is abandoned because GPIO driver owner wants to fix all pins with
+the same problem.
+
+Then device will be recognized well when connected to PC with OTG cable.
+
+But it is a trouble for OTG host mode, due to vbus 5.5V of OTG port is
+originally provided by charger driver which is not upstreamed on EVB
+board, we need rework the board to control vbus by gpio.
+There is a simple way, you can plug in a self-powered hub to test OTG
+host mode.
+
+
+> # dmesg |grep mtu
+> [    0.428420] mtu3 11271000.usb: failed to get vusb33
+> [    0.510570] mtu3 11271000.usb: failed to get vbus
+> [    0.592103] mtu3 11271000.usb: failed to get vbus
+> 
+> 
+> Relevant config options:
+> CONFIG_USB_MTU3=y
+> CONFIG_USB_MTU3_HOST=y
+> CONFIG_USB_MTU3_DEBUG=y
+> CONFIG_PHY_MT65XX_USB3=y
+> 
+> 
+> Looks like an error in the device tree. I can see that the mt6397 
+> regulater get's initialized *after* the mtu3 driver:
+> [    0.505166] mt6397-regulator mt6397-regulator: Chip ID = 0x4097
+> 
+> Not sure if this is related.
+> Any idea whats going wrong here?
+> 
+as above.
+
+Sorry for inconvenience
+
+> Cheers,
+> Matthias
