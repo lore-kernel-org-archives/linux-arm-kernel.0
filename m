@@ -1,42 +1,39 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 31 Oct 2016 10:53:15 -0700
-Subject: [PATCH v3] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
-In-Reply-To: <2009597620.98560.11cdcb7c-b46d-43f0-a853-b742fde3546a.open-xchange@email.1und1.de>
-References: <20161027165246.23936-1-eric@anholt.net>
- <2009597620.98560.11cdcb7c-b46d-43f0-a853-b742fde3546a.open-xchange@email.1und1.de>
-Message-ID: <877f8os8vo.fsf@eliezer.anholt.net>
+Date: Mon, 31 Oct 2016 10:58:51 -0700
+Subject: [PATCH v2] irqchip/bcm2836: Prevent spurious interrupts
+In-Reply-To: <alpine.DEB.2.20.1610282141030.5053@nanos>
+References: <20161027182038.11312-1-eric@anholt.net>
+ <alpine.DEB.2.20.1610281257230.4896@nanos>
+ <87bmy4qxnb.fsf@eliezer.anholt.net>
+ <alpine.DEB.2.20.1610282141030.5053@nanos>
+Message-ID: <8737jcs8mc.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Thomas Gleixner <tglx@linutronix.de> writes:
 
-> Hi Eric,
+> On Fri, 28 Oct 2016, Eric Anholt wrote:
 >
->> Eric Anholt <eric@anholt.net> hat am 27. Oktober 2016 um 18:52 geschrieben:
+>> Thomas Gleixner <tglx@linutronix.de> writes:
+>> > This is missing a fixes tag. I have no idea when that problem was
+>> > introduced, so I have no way to decide whether this needs to be tagged
+>> > stable or not.
 >> 
+>> This code has been there since introduction of the driver, so:
 >> 
->> From: Linus Walleij <linus.walleij@linaro.org>
->> 
->> The idea is to give useful names to GPIO lines that an implementer
->> will be using from userspace, e.g. for maker type projects.  These are
->> user-visible using tools/gpio/lsgpio.c
+>> Fixes: 1a15aaa998dc ("irqchip: Add bcm2836 interrupt controller for Raspberry Pi 2")
 >
-> sorry for the late feedback, but did you check your patch against the Firmware
-> DTS [1]?
->
-> As an example the GPIO38 is connected and named as USB_LIMIT_1A2 since Raspberry
-> Pi 1 B Plus.
->
-> [1] -
-> https://github.com/raspberrypi/documentation/blob/master/configuration/images/dt-blob.dts
+> So it want's a stable tag, right?
 
-I did use the dt-blob sometimes for cross-checking, but these are
-written against the schematics, not the dt-blob.  If you've got things
-you'd like changed, could you send a patch?
+I'm not the author here, and I was just trying to provide an assist with
+upstreaming, so I'm not going to get too involved.  I'd say this is an
+edge case for being a stable tree candidate (it's produces a scary dmesg
+warning but no other functional problems that I know of), and I didn't
+add a fixes tag myself because of that.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 800 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161031/f5aa89db/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161031/9eb0eb34/attachment.sig>
