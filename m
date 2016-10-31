@@ -1,76 +1,26 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 31 Oct 2016 01:08:08 +0100
-Subject: [PATCH v9 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <1476953798-23263-3-git-send-email-jamesjj.liao@mediatek.com>
-References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
- <1476953798-23263-3-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
+Date: Mon, 31 Oct 2016 01:15:53 +0100
+Subject: [PATCH] arm64: dts: mt8173: Fix auxadc node
+In-Reply-To: <20161026141500.27105-1-matthias.bgg@gmail.com>
+References: <20161026141500.27105-1-matthias.bgg@gmail.com>
+Message-ID: <c283e582-68d2-fc9d-956f-bc99d78a5736@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
 
-On 10/20/2016 10:56 AM, James Liao wrote:
-> Some power domain comsumers may init before module_init.
-> So the power domain provider (scpsys) need to be initialized
-> earlier too.
+
+On 10/26/2016 04:15 PM, Matthias Brugger wrote:
+> The devicetree node for mt8173-auxadc lacks the clock and
+> io-channel-cells property. This leads to a non-working driver.
 >
-> Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
-> between IOMMU and multimedia HW. SMI is responsible to
-> enable/disable iommu and help transfer data for each multimedia
-> HW. Both of them have to wait until the power and clocks are
-> enabled.
+> 	mt6577-auxadc 11001000.auxadc: failed to get auxadc clock
+> 	mt6577-auxadc: probe of 11001000.auxadc failed with error -2
 >
-> So scpsys driver should be initialized before SMI, and SMI should
-> be initialized before IOMMU, and then init IOMMU consumers
-> (display/vdec/venc/camera etc.).
+> Fix these fields to get the device up and running.
 >
-> IOMMU is subsys_init by default. So we need to init scpsys driver
-> before subsys_init.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> Fixes: 748c7d4de46a ("ARM64: dts: mt8173: Add thermal/auxadc device
+> nodes")
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
 
-I didn't applied this patch for now.
-I answered you in v7 of this series [1]. I would prefer to see if we can 
-fix that otherwise.
-
-Would be great if you or Yong could provide some feedback.
-
-Thanks,
-Matthias
-
-[1] https://patchwork.kernel.org/patch/9397405/
-
->  drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> index fa9ee69..dd7a07d 100644
-> --- a/drivers/soc/mediatek/mtk-scpsys.c
-> +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> @@ -613,4 +613,21 @@ static int scpsys_probe(struct platform_device *pdev)
->  		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
->  	},
->  };
-> -builtin_platform_driver(scpsys_drv);
-> +
-> +static int __init scpsys_drv_init(void)
-> +{
-> +	return platform_driver_register(&scpsys_drv);
-> +}
-> +
-> +/*
-> + * There are some Mediatek drivers which depend on the power domain driver need
-> + * to probe in earlier initcall levels. So scpsys driver also need to probe
-> + * earlier.
-> + *
-> + * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
-> + * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
-> + * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
-> + * IOMMU drivers are initialized during subsys_init by default, so we need to
-> + * move SMI and scpsys drivers to subsys_init or earlier init levels.
-> + */
-> +subsys_initcall(scpsys_drv_init);
->
+Applied.
