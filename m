@@ -1,119 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 31 Oct 2016 01:28:36 -0500
-Subject: [PATCH v3 1/2] drm/bridge: dumb-vga-dac: Support a VDD regulator
- supply
-In-Reply-To: <20161029110611.28951-2-wens@csie.org>
-References: <20161029110611.28951-1-wens@csie.org>
- <20161029110611.28951-2-wens@csie.org>
-Message-ID: <20161031062836.mnzdprqfezrfkx4g@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 31 Oct 2016 14:42:09 +0800
+Subject: [PATCH] ASoC: sun4i-codec: return error code instead of NULL when
+ create_card fails
+Message-ID: <20161031064209.12241-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 07:06:10PM +0800, Chen-Yu Tsai wrote:
-> Some dumb VGA DACs are active components which require external power.
-> Add support for specifying a regulator as its power supply.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
+When sun4i_codec_create_card fails, we do not assign a proper error
+code to the return value. The return value would be 0 from the previous
+function call, or we would have bailed out sooner. This would confuse
+the driver core into thinking the device probe succeeded, when in fact
+it didn't, leaving various devres based resources lingering.
 
-For the binding,
+Make the create_card function pass back a meaningful error code, and
+assign it to the return value.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip codec on
+		      early Allwinner SoCs")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-One code comment below...
+In practice this should be really hard to hit, as the only failures in
+create_card are memory allocation failures.
 
->  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 35 ++++++++++++++++++++++
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> index 003bc246a270..164cbb15f04c 100644
-> --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> @@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
->  - Video port 0 for RGB input
->  - Video port 1 for VGA output
->  
-> +Optional properties:
-> +- vdd-supply: Power supply for DAC
->  
->  Example
->  -------
-> diff --git a/drivers/gpu/drm/bridge/dumb-vga-dac.c b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> index afec232185a7..59781e031220 100644
-> --- a/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> +++ b/drivers/gpu/drm/bridge/dumb-vga-dac.c
-> @@ -12,6 +12,7 @@
->  
->  #include <linux/module.h>
->  #include <linux/of_graph.h>
-> +#include <linux/regulator/consumer.h>
->  
->  #include <drm/drmP.h>
->  #include <drm/drm_atomic_helper.h>
-> @@ -23,6 +24,7 @@ struct dumb_vga {
->  	struct drm_connector	connector;
->  
->  	struct i2c_adapter	*ddc;
-> +	struct regulator	*vdd;
->  };
->  
->  static inline struct dumb_vga *
-> @@ -124,8 +126,33 @@ static int dumb_vga_attach(struct drm_bridge *bridge)
->  	return 0;
->  }
->  
-> +static void dumb_vga_enable(struct drm_bridge *bridge)
-> +{
-> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
-> +	int ret;
-> +
-> +	if (!IS_ERR(vga->vdd)) {
+Should we mark this for stable?
 
-if (IS_ERR())
-	return;
+---
+ sound/soc/sunxi/sun4i-codec.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-...will save some intentation.
-
-> +		ret = regulator_enable(vga->vdd);
-> +
-> +		if (ret) {
-> +			DRM_ERROR("Failed to enable vdd regulator: %d\n", ret);
-> +			return;
-> +		}
-> +	}
-> +}
-> +
-> +static void dumb_vga_disable(struct drm_bridge *bridge)
-> +{
-> +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
-> +
-> +	if (!IS_ERR(vga->vdd))
-> +		regulator_disable(vga->vdd);
-> +}
-> +
->  static const struct drm_bridge_funcs dumb_vga_bridge_funcs = {
->  	.attach		= dumb_vga_attach,
-> +	.enable		= dumb_vga_enable,
-> +	.disable	= dumb_vga_disable,
->  };
->  
->  static struct i2c_adapter *dumb_vga_retrieve_ddc(struct device *dev)
-> @@ -169,6 +196,14 @@ static int dumb_vga_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	platform_set_drvdata(pdev, vga);
->  
-> +	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
-> +	if (IS_ERR(vga->vdd)) {
-> +		ret = PTR_ERR(vga->vdd);
-> +		if (ret == -EPROBE_DEFER)
-> +			return -EPROBE_DEFER;
-> +		dev_dbg(&pdev->dev, "No vdd regulator found: %d\n", ret);
-> +	}
-> +
->  	vga->ddc = dumb_vga_retrieve_ddc(&pdev->dev);
->  	if (IS_ERR(vga->ddc)) {
->  		if (PTR_ERR(vga->ddc) == -ENODEV) {
-> -- 
-> 2.9.3
-> 
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index e047ec06d538..a60707761abf 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -765,11 +765,11 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+ 
+ 	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
+ 	if (!card)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	card->dai_link = sun4i_codec_create_link(dev, &card->num_links);
+ 	if (!card->dai_link)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	card->dev		= dev;
+ 	card->name		= "sun4i-codec";
+@@ -876,7 +876,8 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	card = sun4i_codec_create_card(&pdev->dev);
+-	if (!card) {
++	if (IS_ERR(card)) {
++		ret = PTR_ERR(card);
+ 		dev_err(&pdev->dev, "Failed to create our card\n");
+ 		goto err_unregister_codec;
+ 	}
+-- 
+2.10.1
