@@ -1,50 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 31 Oct 2016 22:38:46 +0100
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
- property query
-In-Reply-To: <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
-References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
- <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
- <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
- <20161024201443.GB5989@amd>
- <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
- <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
-Message-ID: <20161031213846.GA21014@amd>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Mon, 31 Oct 2016 14:46:28 -0700
+Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
+ imprecise aborts
+In-Reply-To: <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
+References: <20161029111229.26875-1-zajec5@gmail.com>
+ <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
+ <6e252703-0010-83ae-fa14-57352add007a@hauke-m.de>
+ <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
+Message-ID: <dcb21fe4-672f-4545-5b47-d764f390e741@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-10-31 13:22:18, Matt Ranostay wrote:
-> On Tue, Oct 25, 2016 at 11:47 AM, Matt Ranostay <mranostay@gmail.com> wrote:
-> > On Mon, Oct 24, 2016 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> >> On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
-> >>> Pavel + Sebastian this is the patchset that need I some input on :)
-> >>
-> >> Better then previous one.
-> >>
-> >> But my version of bq27xxx_battery.c already contains this:
-> >
-> > This is for allowing udev rule to set the properties as well.
-> > otherwise a kinda crude RUN = " echo value >
-> > /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
-> 
-> Any thoughts on this?
- 
-I'd say  echo value >
-/sys/module/bq27xxx_battery/parameters/poll_interval .. is quite
-adequate solution...?
 
-Alternatively, convince us that something else is useful for everyone,
-and we can do the right thing (poll more often when battery is nearly
-empty), automatically...
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161031/bb28809e/attachment.sig>
+On 16-10-31 02:01 PM, Florian Fainelli wrote:
+> On 10/31/2016 01:59 PM, Hauke Mehrtens wrote:
+>>
+>>
+>> On 10/31/2016 07:08 PM, Scott Branden wrote:
+>>> Hi Rafal,
+>>>
+>>>
+>>> On 16-10-29 04:12 AM, Rafa? Mi?ecki wrote:
+>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>
+>>>> Since early BCM5301X days we got abort handler that was removed by
+>>>> commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
+>>>> fault handler"). It assumed we need to deal only with pending aborts
+>>>> left by the bootloader. Unfortunately this isn't true for BCM5301X.
+>>>>
+>>>> When probing PCI config space (device enumeration) it is expected to
+>>>> have master aborts on the PCI bus. Most bridges don't forward (or they
+>>>> allow disabling it) these errors onto the AXI/AMBA bus but not the
+>>>> Northstar (BCM5301X) one.
+>>> Should we only add this workaround code if CONFIG_PCI is on then?
+>>
+>> I think all the supported northstar devices have a PCIe controller. We
+>> could add such a CONFIG_PCI check, but I do not see a big advantage.
+>
+> Actually, I do see a couple disadvantages if we gate this with
+> CONFIG_PCI: if this problem shows up irrespective of your kernel
+> configuration, you want the error handler to clear it, not rely on
+> CONFIG_PCI to be enabled for the error to go away and also, without an
+> additional ifdef, additional compiler coverage.
+>
+A problem with reintroducing this change is that all imprecise data 
+aborts are ignored, not just PCI.  So if you don't actually use PCI in 
+your system and want to debug other aborts you are unable to.  I don't 
+know if we care about such situation.
