@@ -1,37 +1,39 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 16:17:00 +0000
-Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
-In-Reply-To: <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
-References: <315017958.66634.5d4fc19c-31cd-4900-8613-af4cadec5da4.open-xchange@email.1und1.de>
- <20161023133134.GI1041@n2100.armlinux.org.uk>
- <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
-Message-ID: <20161031161700.GH1041@n2100.armlinux.org.uk>
+Date: Mon, 31 Oct 2016 16:18:20 +0000
+Subject: [PATCH] ARM: spear: Fix error handling
+In-Reply-To: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
+References: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <20161031161820.GI1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 01:44:14PM +0200, Stefan Wahren wrote:
-> unfortunately not:
-> 
-> Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
-> 
-> echo mem > /sys/power/state
-> 
-> Result: Able to wakeup via Debug UART
-> Expected result: Able to wakeup via Debug UART
-> 
-> ---
-> 
-> Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
-> 
-> echo freeze > /sys/power/state
-> 
-> Result: Unable to wakeup via Debug UART (no hung task warning)
-> Expected result: Able to wakeup via Debug UART
+For the spear or arm-soc guys to deal with...
 
-Okay - I know that certain actions are bypassed when no_console_suspend
-is set, which has detrimental effects on some ARM platforms, so it was
-worth testing - iirc, working no_console_suspend is reliant on the boot
-loader re-setting up the serial port after its lost state.
+On Sat, Oct 29, 2016 at 03:58:39PM +0200, Christophe JAILLET wrote:
+> 'clk_get_sys()' returns an error pointer in case of error, not NULL. So
+> test it with IS_ERR.
+> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>  arch/arm/mach-spear/time.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+> index 9ccffc1d0f28..4878ba90026d 100644
+> --- a/arch/arm/mach-spear/time.c
+> +++ b/arch/arm/mach-spear/time.c
+> @@ -233,7 +233,7 @@ void __init spear_setup_of_timer(void)
+>  	}
+>  
+>  	gpt_clk = clk_get_sys("gpt0", NULL);
+> -	if (!gpt_clk) {
+> +	if (IS_ERR(gpt_clk)) {
+>  		pr_err("%s:couldn't get clk for gpt\n", __func__);
+>  		goto err_iomap;
+>  	}
+> -- 
+> 2.9.3
+> 
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
