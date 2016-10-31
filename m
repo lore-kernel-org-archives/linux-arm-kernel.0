@@ -1,58 +1,91 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 31 Oct 2016 22:58:12 +0300
-Subject: [PATCH v6 5/7] ARM: dts: r8a7743: add IRQC support
+Date: Mon, 31 Oct 2016 22:59:03 +0300
+Subject: [PATCH v6 6/7] ARM: dts: sk-rzg1m: initial device tree
 In-Reply-To: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
 References: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
-Message-ID: <13318488.bgd30fnLeg@wasted.cogentembedded.com>
+Message-ID: <1998205.AQp008AmfM@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the IRQC interrupt controller in the R8A7743 device tree.
+Add the initial device  tree for the R8A7743 SoC based SK-RZG1M board.
+The board has one debug serial port (SCIF0); include support for it, so
+that  the serial  console  can work.
+
+Based on the original (and large) patch by Dmitry Shifrin
+<dmitry.shifrin@cogentembedded.com>.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 4:
-- refreshed the patch;
-- added Geert's tag.
+- refreshed the patch.
 
 Changes in version 3:
-- updated the "clocks" property for the CPG/MSSR driver.
+- added Geert's tag.
 
-Changes in version 2:
-- new patch.
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a7743-sk-rzg1m.dts |   44 +++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
- arch/arm/boot/dts/r8a7743.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
+Index: renesas/arch/arm/boot/dts/Makefile
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-@@ -62,6 +62,25 @@
- 						 IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		irqc: interrupt-controller at e61c0000 {
-+			compatible = "renesas,irqc-r8a7743", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+		};
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -677,6 +677,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r7s72100-rskrza1.dtb \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
++	r8a7743-sk-rzg1m.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7743-sk-rzg1m.dts
+@@ -0,0 +1,44 @@
++/*
++ * Device Tree Source for the SK-RZG1M board
++ *
++ * Copyright (C) 2016 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++/dts-v1/;
++#include "r8a7743.dtsi"
++
++/ {
++	model = "SK-RZG1M";
++	compatible = "renesas,sk-rzg1m", "renesas,r8a7743";
++
++	aliases {
++		serial0 = &scif0;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++
++	memory at 200000000 {
++		device_type = "memory";
++		reg = <2 0x00000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif0 {
++	status = "okay";
++};
