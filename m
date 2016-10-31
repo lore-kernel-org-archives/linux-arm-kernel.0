@@ -1,93 +1,84 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 31 Oct 2016 10:08:22 +0800
-Subject: [PATCH v9 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
-References: <1476953798-23263-1-git-send-email-jamesjj.liao@mediatek.com>
- <1476953798-23263-3-git-send-email-jamesjj.liao@mediatek.com>
- <14a1ebb2-fda2-278b-b2f0-8f9c6ff6a83d@gmail.com>
-Message-ID: <1477879702.6649.4.camel@mtksdaap41>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 30 Oct 2016 21:42:32 -0500
+Subject: [PATCH 2/6] arm: dts: ls1021a: update MSI node
+In-Reply-To: <1477398945-22774-2-git-send-email-Minghuan.Lian@nxp.com>
+References: <1477398945-22774-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1477398945-22774-2-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <20161031024232.wqvfrcinrp2aqgxu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-10-31 at 01:08 +0100, Matthias Brugger wrote:
-> Hi James,
+On Tue, Oct 25, 2016 at 08:35:41PM +0800, Minghuan Lian wrote:
+> 1. Change compatible to "fsl,ls-scfg-msi"
+
+That is obvious from the diff. Write your commit message to answer the 
+question Why?
+
+This also breaks compatibility with old DTBs.
+
+> 2. Move two MSI dts node into the parent node "msi-controller".
+> So a PCIe device can request the MSI from the two MSI controllers.
 > 
-> On 10/20/2016 10:56 AM, James Liao wrote:
-> > Some power domain comsumers may init before module_init.
-> > So the power domain provider (scpsys) need to be initialized
-> > earlier too.
-> >
-> > Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
-> > between IOMMU and multimedia HW. SMI is responsible to
-> > enable/disable iommu and help transfer data for each multimedia
-> > HW. Both of them have to wait until the power and clocks are
-> > enabled.
-> >
-> > So scpsys driver should be initialized before SMI, and SMI should
-> > be initialized before IOMMU, and then init IOMMU consumers
-> > (display/vdec/venc/camera etc.).
-> >
-> > IOMMU is subsys_init by default. So we need to init scpsys driver
-> > before subsys_init.
-> >
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > ---
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 28 ++++++++++++++++------------
+>  1 file changed, 16 insertions(+), 12 deletions(-)
 > 
-> I didn't applied this patch for now.
-> I answered you in v7 of this series [1]. I would prefer to see if we can 
-> fix that otherwise.
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index 368e219..7a3b510 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -119,18 +119,22 @@
+>  
+>  		};
+>  
+> -		msi1: msi-controller at 1570e00 {
+> -			compatible = "fsl,1s1021a-msi";
+> -			reg = <0x0 0x1570e00 0x0 0x8>;
+> +		msi: msi-controller {
+> +			compatible = "fsl,ls-scfg-msi";
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges;
+>  			msi-controller;
+> -			interrupts =  <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
+> -		};
+>  
+> -		msi2: msi-controller at 1570e08 {
+> -			compatible = "fsl,1s1021a-msi";
+> -			reg = <0x0 0x1570e08 0x0 0x8>;
+> -			msi-controller;
+> -			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
+> +			msi0 at 1570e00 {
+> +				reg = <0x0 0x1570e00 0x0 0x8>;
+> +				interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+> +
+> +			msi1 at 1570e08 {
+> +				reg = <0x0 0x1570e08 0x0 0x8>;
+> +				interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
+> +			};
+>  		};
+>  
+>  		ifc: ifc at 1530000 {
+> @@ -643,7 +647,7 @@
+>  			bus-range = <0x0 0xff>;
+>  			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
+>  				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> -			msi-parent = <&msi1>;
+> +			msi-parent = <&msi>;
+>  			#interrupt-cells = <1>;
+>  			interrupt-map-mask = <0 0 0 7>;
+>  			interrupt-map = <0000 0 0 1 &gic GIC_SPI 91  IRQ_TYPE_LEVEL_HIGH>,
+> @@ -666,7 +670,7 @@
+>  			bus-range = <0x0 0xff>;
+>  			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
+>  				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> -			msi-parent = <&msi2>;
+> +			msi-parent = <&msi>;
+>  			#interrupt-cells = <1>;
+>  			interrupt-map-mask = <0 0 0 7>;
+>  			interrupt-map = <0000 0 0 1 &gic GIC_SPI 92  IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 1.9.1
 > 
-> Would be great if you or Yong could provide some feedback.
-> 
-> Thanks,
-> Matthias
-> 
-> [1] https://patchwork.kernel.org/patch/9397405/
-> 
-> >  drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
-> >  1 file changed, 18 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-> > index fa9ee69..dd7a07d 100644
-> > --- a/drivers/soc/mediatek/mtk-scpsys.c
-> > +++ b/drivers/soc/mediatek/mtk-scpsys.c
-> > @@ -613,4 +613,21 @@ static int scpsys_probe(struct platform_device *pdev)
-> >  		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
-> >  	},
-> >  };
-> > -builtin_platform_driver(scpsys_drv);
-> > +
-> > +static int __init scpsys_drv_init(void)
-> > +{
-> > +	return platform_driver_register(&scpsys_drv);
-> > +}
-> > +
-> > +/*
-> > + * There are some Mediatek drivers which depend on the power domain driver need
-> > + * to probe in earlier initcall levels. So scpsys driver also need to probe
-> > + * earlier.
-> > + *
-> > + * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
-> > + * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
-> > + * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
-> > + * IOMMU drivers are initialized during subsys_init by default, so we need to
-> > + * move SMI and scpsys drivers to subsys_init or earlier init levels.
-> > + */
-> > +subsys_initcall(scpsys_drv_init);
-> >
-
-Hi Matthias,
-
-I got it, thanks.
-
-
-Hi Yong,
-
-Is this patch still needed on latest kernel for IOMMU driver? Or we have
-other solutions for IOMMU driver init?
-
-
-Best regards,
-
-James
