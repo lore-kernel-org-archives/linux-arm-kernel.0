@@ -1,89 +1,65 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 31 Oct 2016 11:08:47 -0700
-Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
- imprecise aborts
-In-Reply-To: <20161029111229.26875-1-zajec5@gmail.com>
-References: <20161029111229.26875-1-zajec5@gmail.com>
-Message-ID: <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 31 Oct 2016 19:14:13 +0100
+Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
+In-Reply-To: <20161031154622.GB1041@n2100.armlinux.org.uk>
+References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20161031154643eucas1p16e74053f4947f9a945f7029a52914154@eucas1p1.samsung.com>
+ <20161031154622.GB1041@n2100.armlinux.org.uk>
+Message-ID: <2291876.8LAt3RcuXX@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
 
+Hi,
 
-On 16-10-29 04:12 AM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
->
-> Since early BCM5301X days we got abort handler that was removed by
-> commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
-> fault handler"). It assumed we need to deal only with pending aborts
-> left by the bootloader. Unfortunately this isn't true for BCM5301X.
->
-> When probing PCI config space (device enumeration) it is expected to
-> have master aborts on the PCI bus. Most bridges don't forward (or they
-> allow disabling it) these errors onto the AXI/AMBA bus but not the
-> Northstar (BCM5301X) one.
-Should we only add this workaround code if CONFIG_PCI is on then?
+On Monday, October 31, 2016 03:46:22 PM Russell King - ARM Linux wrote:
+> On Wed, Oct 26, 2016 at 07:01:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Wednesday, July 13, 2016 04:37:31 PM Arnd Bergmann wrote:
+> > > On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > > > 
+> > > > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
+> > > > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
+> > > > > > This patch disables deprecated IDE subsystem in assabet_defconfig
+> > > > > > (no IDE host drivers are selected in this config so there is no
+> > > > > > valid reason to enable IDE subsystem itself).
+> > > > > > 
+> > > > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> > > > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > > > > 
+> > > > > I think the series makes a lot of sense. I have checked your assertions
+> > > > > in the changelogs and found no flaws in your logic, so I think we should
+> > > > > take them all through arm-soc unless there are other concerns.
+> > > > 
+> > > > Thank you.
+> > > > 
+> > > > Should I resend everything or just patches that were not reposted yet
+> > > > (the ones that were marked as RFT initially and got no feedback)?
+> > > 
+> > > I'd be fine with just getting a pull request with all the patches that
+> > > had no negative feedback and that were not already applied (if any).
+> > 
+> > Here it is (sorry for taking so long).
+> 
+> I've just been digging in the dmesg logs from when I was using the
+> Assabet+Neponset as my firewall, and it was having to use the IDE
+> ide-cs driver rather than the pata pcmcia driver.
+> 
+> I don't recall whether the pata pcmcia driver was a problem or not,
+> as the PCMCIA interface can't cope with _any_ 32-bit accesses.  I
+> think PATA tries to use the "highest" possible access size by
+> default...
 
->
-> iProc PCIe controller on Northstar seems to be some older one, without
-> a control register for errors forwarding. It means we need to workaround
-> this at platform level. All newer platforms are not affected by this
-> issue.
->
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> ---
->  arch/arm/mach-bcm/bcm_5301x.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-> index c8830a2..fe067f6 100644
-> --- a/arch/arm/mach-bcm/bcm_5301x.c
-> +++ b/arch/arm/mach-bcm/bcm_5301x.c
-> @@ -9,14 +9,42 @@
->  #include <asm/hardware/cache-l2x0.h>
->
->  #include <asm/mach/arch.h>
-> +#include <asm/siginfo.h>
-> +#include <asm/signal.h>
-> +
-> +#define FSR_EXTERNAL		(1 << 12)
-> +#define FSR_READ		(0 << 10)
-> +#define FSR_IMPRECISE		0x0406
->
->  static const char *const bcm5301x_dt_compat[] __initconst = {
->  	"brcm,bcm4708",
->  	NULL,
->  };
->
-> +static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
-> +				  struct pt_regs *regs)
-> +{
-> +	/*
-> +	 * We want to ignore aborts forwarded from the PCIe bus that are
-> +	 * expected and shouldn't really be passed by the PCIe controller.
-> +	 * The biggest disadvantage is the same FSR code may be reported when
-> +	 * reading non-existing APB register and we shouldn't ignore that.
-> +	 */
-> +	if (fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE))
-> +		return 0;
-> +
-> +	return 1;
-> +}
-> +
-> +static void __init bcm5301x_init_early(void)
-> +{
-> +	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
-> +			"imprecise external abort");
-> +}
-> +
->  DT_MACHINE_START(BCM5301X, "BCM5301X")
->  	.l2c_aux_val	= 0,
->  	.l2c_aux_mask	= ~0,
->  	.dt_compat	= bcm5301x_dt_compat,
-> +	.init_early	= bcm5301x_init_early,
->  MACHINE_END
->
+It doesn't actually - it defaults to 16-bits for PIO data access and
+you must explicitly enable 32-bits using ATA_PFLAG_PIO32 port flag
+(pata_pcmcia doesn't set it so it should be okay).  Also taskfile
+registers are accessed using 8-bits access by default transport
+functions (which are used by pata_pcmcia).
 
-Regards,
-Scott
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
