@@ -1,56 +1,34 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 31 Oct 2016 10:40:07 +0100
-Subject: [PATCH 2/2] ARM: bus: da8xx-mstpri: new driver
-In-Reply-To: <20161031043015.74ppaship5nqfaqt@rob-hp-laptop>
-References: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
- <1477503355-2600-3-git-send-email-bgolaszewski@baylibre.com>
- <20161031043015.74ppaship5nqfaqt@rob-hp-laptop>
-Message-ID: <CAMpxmJW85TQObLdoGW2ApnkM8OiM4d1ZDd=9eyGmeVXXwqByPQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Oct 2016 10:40:24 +0100
+Subject: [RFC PATCH 01/13] pinctrl: meson: Add GXL pinctrl definitions
+In-Reply-To: <CACRpkdZ5VG2NGRh5CmYcYzwCp0LYSsgxHogCFa+6W7BDDBXOYg@mail.gmail.com>
+References: <1477060838-14164-1-git-send-email-narmstrong@baylibre.com>
+ <1477060838-14164-2-git-send-email-narmstrong@baylibre.com>
+ <CACRpkdZ5VG2NGRh5CmYcYzwCp0LYSsgxHogCFa+6W7BDDBXOYg@mail.gmail.com>
+Message-ID: <b80010f7-196a-abeb-e4a2-5009f3b7f13b@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-31 5:30 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Wed, Oct 26, 2016 at 07:35:55PM +0200, Bartosz Golaszewski wrote:
->> Create the driver for the da8xx master peripheral priority
->> configuration and implement support for writing to the three
->> Master Priority registers on da850 SoCs.
+On 10/24/2016 03:03 AM, Linus Walleij wrote:
+> On Fri, Oct 21, 2016 at 4:40 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> 
+>> Add support for the Amlogic Meson GXL SoC, this is a partially complete
+>> definition only based on the Amlogic Vendor tree.
 >>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
->>  drivers/bus/Kconfig                                |   9 +
->>  drivers/bus/Makefile                               |   2 +
->>  drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
->>  4 files changed, 297 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>  create mode 100644 drivers/bus/da8xx-mstpri.c
+>> This definition differs a lot from the GXBB and needs a separate entry.
 >>
->> diff --git a/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->> new file mode 100644
->> index 0000000..225af09
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->> @@ -0,0 +1,20 @@
->> +* Device tree bindings for Texas Instruments da8xx master peripheral
->> +  priority driver
->> +
->> +DA8XX SoCs feature a set of registers allowing to change the priority of all
->> +peripherals classified as masters.
->> +
->> +Documentation:
->> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
->> +
->> +Required properties:
->> +
->> +- compatible:                "ti,da850-mstpri", "syscon" - for da850 based boards
->
-> Drop syscon. Doesn't look like it is needed and the example doesn't
-> match.
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> 
+> Looks good to me. Tell me when I may apply it, it looks orthogonal
+> to the rest of the patches.
+> 
+> Yours,
+> Linus Walleij
+> 
 
-Hi Rob,
+Hi Linus,
 
-it is needed: syscon_regmap_lookup_by_compatible() fails without it. I
-fixed the example instead.
+I'm ok to have it applied as soon as possible, but I can send a clean non-rfc patch if needed.
 
 Thanks,
-Bartosz Golaszewski
+Neil
