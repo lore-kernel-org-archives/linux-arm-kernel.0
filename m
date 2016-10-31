@@ -1,58 +1,89 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 31 Oct 2016 11:06:47 -0700
-Subject: [PATCH v14 1/4] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <1477896558.5376.13.camel@mtksdaap41>
-References: <1477020742-13889-1-git-send-email-erin.lo@mediatek.com>
- <1477020742-13889-2-git-send-email-erin.lo@mediatek.com>
- <20161028011753.GS26139@codeaurora.org>
- <1477896558.5376.13.camel@mtksdaap41>
-Message-ID: <20161031180647.GR16026@codeaurora.org>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Mon, 31 Oct 2016 11:08:47 -0700
+Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
+ imprecise aborts
+In-Reply-To: <20161029111229.26875-1-zajec5@gmail.com>
+References: <20161029111229.26875-1-zajec5@gmail.com>
+Message-ID: <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31, James Liao wrote:
-> On Thu, 2016-10-27 at 18:17 -0700, Stephen Boyd wrote:
-> > On 10/21, Erin Lo wrote:
-> > > @@ -244,3 +256,31 @@ void mtk_clk_register_composites(const struct mtk_composite *mcs,
-> > >  			clk_data->clks[mc->id] = clk;
-> > >  	}
-> > >  }
-> > > +
-> > > +void mtk_clk_register_dividers(const struct mtk_clk_divider *mcds,
-> > > +			int num, void __iomem *base, spinlock_t *lock,
-> > > +				struct clk_onecell_data *clk_data)
-> > > +{
-> > > +	struct clk *clk;
-> > > +	int i;
-> > > +
-> > > +	for (i = 0; i <  num; i++) {
-> > > +		const struct mtk_clk_divider *mcd = &mcds[i];
-> > > +
-> > > +		if (clk_data && !IS_ERR_OR_NULL(clk_data->clks[mcd->id]))
-> > 
-> > NULL is a valid clk. IS_ERR_OR_NULL is usually wrong.
-> 
-> Why NULL is a valid clk?
+Hi Rafal,
 
-Perhaps at some point we'll want to return a NULL pointer to
-clk_get() callers so that they can handle things like optional
-clocks easily without having any storage requirements. I don't
-know if we'll ever do that, but that's just a possibility.
 
-> 
-> clk_data is designed for multiple initialization from different clock
-> types, such as infra_clk_data in clk-mt2701.c. So it will ignore valid
-> clocks to avoid duplicated clock registration. Here I assume a clock
-> pointer with error code or NULL to be an invalid (not initialized)
-> clock.
-> 
+On 16-10-29 04:12 AM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> Since early BCM5301X days we got abort handler that was removed by
+> commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
+> fault handler"). It assumed we need to deal only with pending aborts
+> left by the bootloader. Unfortunately this isn't true for BCM5301X.
+>
+> When probing PCI config space (device enumeration) it is expected to
+> have master aborts on the PCI bus. Most bridges don't forward (or they
+> allow disabling it) these errors onto the AXI/AMBA bus but not the
+> Northstar (BCM5301X) one.
+Should we only add this workaround code if CONFIG_PCI is on then?
 
-Ok. Would it be possible to initialize the array with all error
-pointers? That would make things less error prone, but it
-probably doesn't matter at all anyway because this is done during
-registration time. IS_ERR_OR_NULL makes me take a second look
-each time, because it's usually wrong.
+>
+> iProc PCIe controller on Northstar seems to be some older one, without
+> a control register for errors forwarding. It means we need to workaround
+> this at platform level. All newer platforms are not affected by this
+> issue.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
+>  arch/arm/mach-bcm/bcm_5301x.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+> index c8830a2..fe067f6 100644
+> --- a/arch/arm/mach-bcm/bcm_5301x.c
+> +++ b/arch/arm/mach-bcm/bcm_5301x.c
+> @@ -9,14 +9,42 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>
+>  #include <asm/mach/arch.h>
+> +#include <asm/siginfo.h>
+> +#include <asm/signal.h>
+> +
+> +#define FSR_EXTERNAL		(1 << 12)
+> +#define FSR_READ		(0 << 10)
+> +#define FSR_IMPRECISE		0x0406
+>
+>  static const char *const bcm5301x_dt_compat[] __initconst = {
+>  	"brcm,bcm4708",
+>  	NULL,
+>  };
+>
+> +static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
+> +				  struct pt_regs *regs)
+> +{
+> +	/*
+> +	 * We want to ignore aborts forwarded from the PCIe bus that are
+> +	 * expected and shouldn't really be passed by the PCIe controller.
+> +	 * The biggest disadvantage is the same FSR code may be reported when
+> +	 * reading non-existing APB register and we shouldn't ignore that.
+> +	 */
+> +	if (fsr == (FSR_EXTERNAL | FSR_READ | FSR_IMPRECISE))
+> +		return 0;
+> +
+> +	return 1;
+> +}
+> +
+> +static void __init bcm5301x_init_early(void)
+> +{
+> +	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
+> +			"imprecise external abort");
+> +}
+> +
+>  DT_MACHINE_START(BCM5301X, "BCM5301X")
+>  	.l2c_aux_val	= 0,
+>  	.l2c_aux_mask	= ~0,
+>  	.dt_compat	= bcm5301x_dt_compat,
+> +	.init_early	= bcm5301x_init_early,
+>  MACHINE_END
+>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Scott
