@@ -1,132 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 31 Oct 2016 18:36:43 +0000
-Subject: SMR masking and PCI
-In-Reply-To: <HE1PR04MB1321DED0E75BD607BB52889EFFAE0@HE1PR04MB1321.eurprd04.prod.outlook.com>
-References: <VI1PR0401MB26389CC8820C9654337B578E8DAA0@VI1PR0401MB2638.eurprd04.prod.outlook.com>
- <c39b785a-0f18-fc0a-ce08-7ebe3cfaf8c5@arm.com>
- <HE1PR04MB1321DED0E75BD607BB52889EFFAE0@HE1PR04MB1321.eurprd04.prod.outlook.com>
-Message-ID: <851032d7-6b04-3930-b5c6-04ad97b52d3d@arm.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 31 Oct 2016 11:40:58 -0700
+Subject: [PATCH] staging: vc04_services: setup DMA and coherent mask
+In-Reply-To: <87twbsqsb4.fsf@eliezer.anholt.net>
+References: <20161028171159.23973-1-mzoran@crowfest.net>
+ <87twbsqsb4.fsf@eliezer.anholt.net>
+Message-ID: <1477939258.30971.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/16 15:57, Diana Madalina Craciun wrote:
-> Hi Robin,
+On Mon, 2016-10-31 at 11:36 -0700, Eric Anholt wrote:
+> Michael Zoran <mzoran@crowfest.net> writes:
 > 
-> On 10/28/2016 07:16 PM, Robin Murphy wrote:
->> Hi Stuart,
->>
->> On 27/10/16 18:10, Stuart Yoder wrote:
->>> Hi Robin,
->>>
->>> A question about how the SMR masking defined in the arm,smmu binding
->>> relates to the PCI iommu-map.
->>>
->>> The #iommu-cells property defines the number of cells an "IOMMU specifier"
->>> takes and 2 is specified to be:
->>>
->>>    SMMUs with stream matching support and complex masters
->>>    may use a value of 2, where the second cell represents
->>>    an SMR mask to combine with the ID in the first cell.
->>>
->>> An iommu-map entry is defined as:
->>>
->>>    (rid-base,iommu,iommu-base,length)
->>>
->>> What seems to be currently missing in the iommu-map support is
->>> the possibility the case where #iommu-cells=<2>.
->> Indeed. The bindings have so far rather implicitly assumed the case of
->> #{msi,iommu}-cells = 1, and the code has followed suit.
->>
->>> In this case iommu-base which is an IOMMU specifier should
->>> occupy 2 cells.  For example on an ls2085a we would want:
->>>
->>> 	iommu-map = <0x0   0x6 0x7 0x3ff 0x1
->>> 		       0x100 0x6 0x8 0x3ff 0x1>;
->>>
->>> ...to mask our stream IDs to 10 bits.
->>>
->>> This should work in theory and comply with the bindings, no?
->> In theory, but now consider:
->>
->> 	iommu-map = <0x0 0x6 0x7 0x3ff 0x2>;
->>
->> faced with ID 1. The input base is 0, the output base is the 2-cell
->> value 0x7000003ff, so the final ID value should be 0x700000400, right?
->>
->>> of_pci_map_rid() seems to have a hardcoded assumption that
->>> each field in the map is 4 bytes.
->> It does. I guess we should explicitly check that #{msi,iommu}-cells = 1
->> on the target node, and maybe clarify in the binding that that cell
->> should represent a plain linear ID value (although that's pretty obvious
->> from context IMO).
->>
->>> (Also, I guess that msi-map is not affected by this since it
->>> is not related to the IOMMU...but we do have common code
->>> handling both maps.)
->> I'd say it's definitely affected, since #msi-cells can equally be more
->> than 1, and encodes an equally opaque value.
->>
->> It seems pretty reasonable to me that we could extend the binding to
->> accommodate #cells > 1 iff length == 1. Mark?
->>
->> That said, is there a concrete need for this, i.e. do you actually have
->> one device with a single requester ID, which maps to multiple output IDs
->> (which differ only in the upper bits) in a non-predictable manner?
->>
-> Actually in the example presented by Stuart, the SMR mask should be
-> 0x7C00 (as 0 means that the bit is relevant for matching). So, we have
-> the stream ID 7, but the SMMU 500 is appending the TBU bits which makes
-> the stream ID look like 0x1407 (TBU 5). In our platform the relationship
-> device-TBU is not exposed and documented.
-
-To be fair, that's only the fault of the folks who neglected to document
-it (and if this really was the anticipated use-case, possibly also the
-integration folks for not simply using the 15-bit Stream ID
-configuration and tying any extra bits off). The TBU IDs are still an
-undeniable property of the hardware, and not exactly difficult to
-discover either. For instance, an LS2085a has been running with the
-following map for PCIe for quite some time:
-
-	/* Squash 8:5:3 BDF down to 2:2:3 */
-	iommu-map-mask = <0x031f>;
-	iommu-map = <0x000 &smmu 0x1400 0x20>,
-		    <0x100 &smmu 0x1420 0x20>,
-		    <0x200 &smmu 0x1440 0x20>,
-		    <0x300 &smmu 0x1460 0x20>;
-
-(with the obligatory hacks to program the PEX LUT entries to match, and
-the SATA ICIDs not to alias as they apparently go through the same TBU).
-
-> The SMMU-500 ref manual
-> describes this case:
+> > Setting the DMA mask is optional on 32 bit but
+> > is mandatory on 64 bit.??Set the DMA mask and coherent
+> > to force all DMA to be in the 32 bit address space.
+> > 
+> > This is considered a "good practice" and most drivers
+> > already do this.
+> > 
+> > Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> > ---
+> > ?.../staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c |
+> > 10 ++++++++++
+> > ?1 file changed, 10 insertions(+)
+> > 
+> > diff --git
+> > a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.
+> > c
+> > b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.
+> > c
+> > index a5afcc5..6fa2b5a 100644
+> > ---
+> > a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.
+> > c
+> > +++
+> > b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.
+> > c
+> > @@ -97,6 +97,16 @@ int vchiq_platform_init(struct platform_device
+> > *pdev, VCHIQ_STATE_T *state)
+> > ?	int slot_mem_size, frag_mem_size;
+> > ?	int err, irq, i;
+> > ?
+> > +	/*
+> > +	?* Setting the DMA mask is necessary in the 64 bit
+> > environment.
+> > +	?* It isn't necessary in a 32 bit environment but is
+> > considered
+> > +	?* a good practice.
+> > +	?*/
+> > +	err = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
 > 
-> "If the Stream ID presented to each TBU is already unique, and the TBU
-> ID addition is not required, then you must ensure that the TBU ID field
-> is masked in the SMR."
+> I think a better comment here would be simply:
 > 
-> This is the reason that we need the SMR mask, to mask the TBU bits in
-> the SMR.
+> /* VCHI messages between the CPU and firmware use 32-bit bus
+> addresses. */
+> 
+> explaining why the value is chosen (once you know that the 32 bit
+> restriction exists, reporting it is obviously needed).??I'm curious,
+> though: what failed when you didn't set it?
+> 
 
-The PCIe example might be a reason to *want* masking, in order to work
-around inadequate documentation, but it certainly isn't a *need*.
+The comment is easy to change.
 
-Fortunately, Stuart's description of the DPAA complex mastering through
-multiple TBUs such that a single device's ICID may map to multiple
-stream IDs *is* a compelling justification, because iommu-map isn't
-designed for one-to-many mappings. You just need to be very careful the
-ICIDs really are completely unique system-wide once you start masking,
-or the aliasing will result in weird, and possibly impractical, group
-assignment.
+I don't have the log available ATM, but if I remember the DMA API's
+bugcheck the first time that are used.  
 
-Anyway, from the SMMU driver perspective SMR masking does work nicely
-now, so I'm happy to review patches to of_pci_map_rid() ;)
+I think this was a policy decision or something because the information
+should be available in the dma-ranges.
 
-Robin.
+If it's important, I can setup a test again without the change and e-
+mail the logs.
 
-> 
-> Thank you,
-> 
-> Diana
-> 
-> 
-> 
+If you look at the DWC2 driver you will see that it also sets this
+mask.
