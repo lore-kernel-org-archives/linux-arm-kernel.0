@@ -1,159 +1,105 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 31 Oct 2016 14:10:43 +0530
-Subject: [PATCH V2 6/6] arm64: Add uprobe support
-In-Reply-To: <20161030140901.h6mdxbb4pgqpqs7j@localhost>
-References: <cover.1474960629.git.panand@redhat.com>
- <41cc70043792e65cbc3b4cc4ad7fbf6379afa550.1474960629.git.panand@redhat.com>
- <20161030140901.h6mdxbb4pgqpqs7j@localhost>
-Message-ID: <CAHB_Gup2-yWbKK7QpMjJv7M6oNdV8Mz10wxWaS8ojzR4s8wv=g@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 31 Oct 2016 17:50:09 +0900
+Subject: Memory range end be inclusive or exclusive? Re: [PATCH v1 1/4]
+ kexec: (bugfix) calc correct end address of memory ranges in device tree
+In-Reply-To: <20160906002958.GB16712@linaro.org>
+References: <cover.1468970114.git.geoff@infradead.org>
+ <3562841.ROYbCgkeeq@hactar>
+ <20160727232331.GY1041@n2100.armlinux.org.uk>
+ <1860371.lT9GInp2C3@hactar>
+ <20160729082714.GA1041@n2100.armlinux.org.uk>
+ <1469812346.16559.40.camel@infradead.org>
+ <20160729172356.GD1041@n2100.armlinux.org.uk>
+ <20160801045240.GD7995@linaro.org>
+ <20160906002958.GB16712@linaro.org>
+Message-ID: <20161031085008.GF19531@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Simon,
 
-On Sun, Oct 30, 2016 at 7:39 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Sep 27, 2016 at 01:18:00PM +0530, Pratyush Anand wrote:
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes/uprobes.c
->> @@ -0,0 +1,221 @@
->> +/*
->> + * Copyright (C) 2014-2016 Pratyush Anand <panand@redhat.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#include <linux/highmem.h>
->> +#include <linux/ptrace.h>
->> +#include <linux/uprobes.h>
->> +#include <asm/cacheflush.h>
->> +
->> +#include "decode-insn.h"
->> +
->> +#define UPROBE_INV_FAULT_CODE        UINT_MAX
->> +
->> +bool is_trap_insn(uprobe_opcode_t *insn)
->> +{
->> +     return false;
->> +}
->
-> On the previous series, I had a comment left unanswered with regards to
-> always returning false in is_trap_insn():
->
-> Looking at handle_swbp(), if we hit a breakpoint for which we don't have
-> a valid uprobe, this function currently sends a SIGTRAP. But if
-> is_trap_insn() returns false always, is_trap_at_addr() would return 0 in
-> this case so the SIGTRAP is never issued.
+On Tue, Sep 06, 2016 at 09:29:59AM +0900, AKASHI Takahiro wrote:
+> Simon,
+> 
+> What is your opinion on this issue?
 
-A agreed on this that the older implementation i.e. the default one of
-is_trap_insn() is better for the time being.
+Pinged you several times so far.
 
-probably 'strtle r0, [r0], #160' would have the closest matching
-aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-seems a bad instruction. So, there might not be any aarch32
-instruction which will match to uprobe BRK instruction.
+Can you please give me your comment?
+(attached below is the original patch.)
 
+-Takahiro AKASHI
 
-Therefore, if I send a V3 by removing aacrh64
-Hi Catalin,
+> 
+> On Mon, Aug 01, 2016 at 01:52:40PM +0900, AKASHI Takahiro wrote:
+> > On Fri, Jul 29, 2016 at 06:23:56PM +0100, Russell King - ARM Linux wrote:
+> > > On Fri, Jul 29, 2016 at 10:12:26AM -0700, Geoff Levand wrote:
+> > > > On Fri, 2016-07-29 at 09:27 +0100, Russell King - ARM Linux wrote:
+> > > > 
+> > > > > So, these functions are a mess and need fixing.
+> > > > 
+> > > > Since this change isn't really related to arm64 support, I'll
+> > > > drop this patch from my series.
+> > > 
+> > > Do you have a case which triggers bugs in this code?
+> > 
+> > Actually, this patch was necessary when my kdump used "usable-memory"
+> > properties in "memory" nodes, as on ppc64, to limit the usable memory
+> > regions that can be used by crash dump kernel.
+> > Since then, I've moved to the approach of using "mem=" kernel parameter,
+> > then introducing a new property, "linux,usable-memory-range," under /chosen
+> > and now we don't need this patch any more.
+> > 
+> > So, we can drop it but I still believe that it is buggy.
+> 
+> Due to the discussions[1], I may want to re-enable "usable-memory"
+> property on arm64. In addition, I would like to add a function,
+> dtb_add_usable_memory_properties(), a variant of
+> add_usable_memory_properties(), to kexec/dt-ops.c.
+> So this issue is quite crucial now.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-August/452685.html
+> 
+> -Takahiro AKASHI
+> 
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> > > -- 
+> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> > > according to speedtest.net.
+===8<===
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-On Sun, Oct 30, 2016 at 7:39 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Sep 27, 2016 at 01:18:00PM +0530, Pratyush Anand wrote:
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes/uprobes.c
->> @@ -0,0 +1,221 @@
->> +/*
->> + * Copyright (C) 2014-2016 Pratyush Anand <panand@redhat.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#include <linux/highmem.h>
->> +#include <linux/ptrace.h>
->> +#include <linux/uprobes.h>
->> +#include <asm/cacheflush.h>
->> +
->> +#include "decode-insn.h"
->> +
->> +#define UPROBE_INV_FAULT_CODE        UINT_MAX
->> +
->> +bool is_trap_insn(uprobe_opcode_t *insn)
->> +{
->> +     return false;
->> +}
->
-> On the previous series, I had a comment left unanswered with regards to
-> always returning false in is_trap_insn():
->
-> Looking at handle_swbp(), if we hit a breakpoint for which we don't have
-> a valid uprobe, this function currently sends a SIGTRAP. But if
-> is_trap_insn() returns false always, is_trap_at_addr() would return 0 in
-> this case so the SIGTRAP is never issued.
+The end address of "reg" attribute in device tree's memory should be
+inclusive.
+---
+ kexec/fs2dt.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-A agreed on this that the older implementation i.e. the default one of
-is_trap_insn() is better for the time being.
-
-probably 'strtle r0, [r0], #160' would have the closest matching
-aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-seems a bad instruction. So, there might not be any aarch32
-instruction which will match to uprobe BRK instruction.
-
-
-Therefore, if I send a V3 by removing aacrh64
-Hi Catalin,
-
-On Sun, Oct 30, 2016 at 7:39 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Sep 27, 2016 at 01:18:00PM +0530, Pratyush Anand wrote:
->> --- /dev/null
->> +++ b/arch/arm64/kernel/probes/uprobes.c
->> @@ -0,0 +1,221 @@
->> +/*
->> + * Copyright (C) 2014-2016 Pratyush Anand <panand@redhat.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#include <linux/highmem.h>
->> +#include <linux/ptrace.h>
->> +#include <linux/uprobes.h>
->> +#include <asm/cacheflush.h>
->> +
->> +#include "decode-insn.h"
->> +
->> +#define UPROBE_INV_FAULT_CODE        UINT_MAX
->> +
->> +bool is_trap_insn(uprobe_opcode_t *insn)
->> +{
->> +     return false;
->> +}
->
-> On the previous series, I had a comment left unanswered with regards to
-> always returning false in is_trap_insn():
->
-> Looking at handle_swbp(), if we hit a breakpoint for which we don't have
-> a valid uprobe, this function currently sends a SIGTRAP. But if
-> is_trap_insn() returns false always, is_trap_at_addr() would return 0 in
-> this case so the SIGTRAP is never issued.
-
-A agreed on this that the older implementation i.e. the default one of
-is_trap_insn() is better for the time being. I sent out V2 before your
-last comment on it in V1 :(.
-
-probably 'strtle r0, [r0], #160' would have the closest matching
-aarch32 instruction wrt BRK64_OPCODE_UPROBES(0xd42000A0). But that too
-seems a bad aarch32 instruction. So, there might not be any aarch32
-instruction which will match to uprobe BRK instruction.
-
-
-Therefore, if I send a V3 by removing aacrh64 is_trap_insn(), would
-that be acceptable, or do you see any other issue with this patch
-series? If there is anything else, I would address that in V3 as well.
-
-Thanks for your review.
-
-~Pratyush
+diff --git a/kexec/fs2dt.c b/kexec/fs2dt.c
+index 79aa0f3..953f78a 100644
+--- a/kexec/fs2dt.c
++++ b/kexec/fs2dt.c
+@@ -236,7 +236,8 @@ static void add_dyn_reconf_usable_mem_property__(int fd)
+ 						    ranges_size*8);
+ 				}
+ 				ranges[rlen++] = cpu_to_be64(loc_base);
+-				ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
++				ranges[rlen++] = cpu_to_be64(loc_end
++								- loc_base + 1);
+ 				rngs_cnt++;
+ 			}
+ 		}
+@@ -350,7 +351,7 @@ static void add_usable_mem_property(int fd, size_t len)
+ 					    ranges_size*sizeof(*ranges));
+ 			}
+ 			ranges[rlen++] = cpu_to_be64(loc_base);
+-			ranges[rlen++] = cpu_to_be64(loc_end - loc_base);
++			ranges[rlen++] = cpu_to_be64(loc_end - loc_base + 1);
+ 		}
+ 	}
+ 
+-- 
+2.10.0
