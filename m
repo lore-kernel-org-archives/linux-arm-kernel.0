@@ -1,52 +1,69 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Oct 2016 22:15:39 +0900
-Subject: [PATCH] ARM: mediatek: clean up mach-mediatek/Makefile
-In-Reply-To: <1474222273-23116-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1474222273-23116-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQbaQ38RZqgmJJW+BHOthrK5tPZ5JPPh9N9ry58YZ=kdg@mail.gmail.com>
+Date: Mon, 31 Oct 2016 22:32:53 +0900
+Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
+Message-ID: <1477920773-12908-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+The UniPhier outer cache (arch/arm/mm/cache-uniphier.c) has 128 byte
+line length and its tags are also managed per 128 byte line.  This
+is very unfortunate, but the current 64 byte alignment for kmalloc()
+causes sharing problems on DMA if used with this outer cache.
+
+This commit adds ARM_L1_CACHE_SHIFT_7 to increase the DMA minimum
+alignment to 128 byte if CACHE_UNIPHIER is enabled.  There are
+several drivers that assume aligning to L1_CACHE_BYTES will be DMA
+safe, so this commit also changes the L1_CACHE_BYTES for safety.
+
+Having said that, I hesitate to align all the other SoCs in Multi
+platform to the UniPhier's requirement.  So, I am disabling the
+CONFIG_CACHE_UNIPHIER by default, so that multi_v7_defconfig will
+still stay with CONFIG_ARM_L1_CACHE_SHIFT=6.  With this commit,
+UniPhier SoCs will become slower, but it is much better than system
+crash.  If desired, the outer-cache can be enabled by merge_config
+or something.
+
+Note:
+The UniPhier PH1-Pro5 SoC is equipped also with L3 cache with 256
+byte line size but its tags are managed per 128 byte sub-line.
+So, ARM_L1_CACHE_SHIFT_7 should be fine for all the UniPhier SoCs.
+
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+Kernel Version: 4.9-rc1
 
 
-Can you pick up this for your next pull request?
+ arch/arm/mm/Kconfig | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-
-
-2016-09-19 3:11 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Kbuild descends into arch/arm/mach-mediatek/Makefile only when
-> CONFIG_ARCH_MEDIATEK is enabled.  So, obj-$(CONFIG_ARCH_MEDIATEK)
-> is always equivalent to obj-y in this Makefile.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
->  arch/arm/mach-mediatek/Makefile | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
-> index 2116460..dadae67 100644
-> --- a/arch/arm/mach-mediatek/Makefile
-> +++ b/arch/arm/mach-mediatek/Makefile
-> @@ -1,4 +1,2 @@
-> -ifeq ($(CONFIG_SMP),y)
-> -obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o
-> -endif
-> -obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
-> +obj-$(CONFIG_SMP)      += platsmp.o
-> +obj-y                  += mediatek.o
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index c1799dd..f68e8ec 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -991,7 +991,7 @@ config CACHE_TAUROS2
+ config CACHE_UNIPHIER
+ 	bool "Enable the UniPhier outer cache controller"
+ 	depends on ARCH_UNIPHIER
+-	default y
++	select ARM_L1_CACHE_SHIFT_7
+ 	select OUTER_CACHE
+ 	select OUTER_CACHE_SYNC
+ 	help
+@@ -1012,8 +1012,14 @@ config ARM_L1_CACHE_SHIFT_6
+ 	help
+ 	  Setting ARM L1 cache line size to 64 Bytes.
+ 
++config ARM_L1_CACHE_SHIFT_7
++	bool
++	help
++	  Setting ARM L1 cache line size to 128 Bytes.
++
+ config ARM_L1_CACHE_SHIFT
+ 	int
++	default 7 if ARM_L1_CACHE_SHIFT_7
+ 	default 6 if ARM_L1_CACHE_SHIFT_6
+ 	default 5
+ 
 -- 
-Best Regards
-Masahiro Yamada
+1.9.1
