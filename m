@@ -1,283 +1,131 @@
-From: bruherrera@gmail.com (Bruno Herrera)
-Date: Mon, 31 Oct 2016 08:27:48 -0200
-Subject: [PATCH] ARM: DT: stm32: move dma translation to board files
-In-Reply-To: <CAFvLkMQGVygLb9SQ8o+2Q=bg7vvRjpHypmSyjRyLkdcHypoFHw@mail.gmail.com>
-References: <CAF3+Tqd2MGmz+8XhLXhaZiEc78QOwHSpVrQA65-p1AcfT+_xgg@mail.gmail.com>
- <404315f0-fc9e-93e2-54df-f85e484d9389@st.com>
- <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
- <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
- <CAF3+TqcxVj9f7kcSQTKDercVfvDdLzAXGpUU1oAxeNBFZx73nQ@mail.gmail.com>
- <CAFvLkMQGVygLb9SQ8o+2Q=bg7vvRjpHypmSyjRyLkdcHypoFHw@mail.gmail.com>
-Message-ID: <CAF3+TqcFnXENmX4OpG9jzhPhuaq-EqNsRhhjKgFjHA96DLqK5g@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 31 Oct 2016 11:30:05 +0100
+Subject: [PATCH/RFC 4/4] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <7122001.MSFYYEpnBs@wuerfel>
+References: <1475572167-29581-1-git-send-email-geert+renesas@glider.be>
+ <12094567.68HcWl4d5O@wuerfel>
+ <CAMuHMdUwS=F-803_i=Zour+jo1T43KFO=t53XgcPBeiuF7e7DQ@mail.gmail.com>
+ <7122001.MSFYYEpnBs@wuerfel>
+Message-ID: <CAMuHMdVTP4YqwWjPQAvJJYqX7F3uviGC62GEop1zeLn8RDTuXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 5:09 AM, Rados?aw Pietrzyk
-<radoslaw.pietrzyk@gmail.com> wrote:
-> Have you defined your sdio node within soc node ?
+Hi Arnd,
 
-It is in the SOC node of the DSTI file.
+On Sat, Oct 29, 2016 at 11:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Saturday, October 22, 2016 9:44:11 AM CEST Geert Uytterhoeven wrote:
+>> On Fri, Oct 21, 2016 at 11:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Friday, October 21, 2016 8:16:00 PM CEST Geert Uytterhoeven wrote:
+>> >> On Wed, Oct 19, 2016 at 12:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > On Wednesday, October 19, 2016 10:02:57 AM CEST Geert Uytterhoeven wrote:
+>> >> >> On Mon, Oct 10, 2016 at 4:23 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> >> > I'd prefer seeing a separate soc driver for that one.
+>> >> >> Some SoCs have only CCCR, others have only PRR, some have both.
+>> >> >> On some SoCs one of them can be accessed from the RealTime CPU
+>> >> >> core (SH) only.
+>> >> >> On some SoCs the register is not documented, but present.
+>> >> >> If the PRR exists, it's a better choice, as it contains additional information
+>> >> >> in the high order bits (representing the presence of each big (CA15/CA57),
+>> >> >> little (CA7/CA53), and RT (CR7) CPU core). Currently we don't use that
+>> >> >> information, though.
+>> >> >>
+>> >> >> Grouping them in some other way means we would loose the family name,
+>> >> >> which is exposed through soc_dev_attr->family.
+>> >> >> The usefulness of family names is debatable though, as this is more an
+>> >> >> issue of marketing business.
+>> >> >
+>> >> > How about having a table to look up the family name by the value
+>> >> > of the PRR or CCCR then?
+>> >>
+>> >> Unfortunately there exist SoCs from different families using the same
+>> >> product ID.
+>> >>
+>> >> And different SoCs from the same family may have a revision register
+>> >> or not (e.g. R-Car H1 has, M1A hasn't).
+>> >
+>> > Is this something we expect to see more of in the future, or can
+>> > we expect future chips to handle this more consistently?
+>>
+>> I expect to see more of these in the future.
+>>
+>> Perhaps I just should forget about the product IDs and (marketing) families,
+>> and just stick the CCCR/PRR addresses in the of_device_ids?
+>> Then we'll have SoC names (e.g. "r8a7791") and (optional) revisions
+>> (e.g. "ES1.0") to match on.
+>
+> I don't think listing the marketing names is a problem if we need a
+> full list of all chips in of_device_ids anyway.
 
+I'm removing the marketing names. We don't match them anyway (and probably
+shouldn't, as we don't control them anyway, cfr.
+https://www.renesas.com/en-us/solutions/automotive/products.html).
+
+> I'm still hoping to be able to limit the need for specifying the
+> register addresses in the driver instead.
+
+Adding DT binding...
+
+>> >> > How about this:
+>> >> >
+>> >> > The driver could report the hardcoded strings for the SoCs it already
+>> >> > knows about (you have the table anyway) and not report the revision
+>> >> > unless there is a regmap containing the CCCR or the PRR, in which
+>> >> > case you use that. Future SoCs will provide the PRR (I assume
+>> >> > CCCR is only used on the older ones) through a syscon regmap
+>> >> > that we can use to find out the exact revision as well.
+>> >> >
+>> >> > The existing DT files can gain the syscon device so you can report
+>> >> > the revision on those machines as well, unless you use an old DTB.
+>> >>
+>> >> Hmm... That means that if we have to add a driver quirk to distinguish
+>> >> between different revisions of the same SoC, we have to update the
+>> >> DTB anyway, to add the CCCR/PRR device node.
+>> >> We might as well just change the compatible value in that DTB for the
+>> >> device that needs the quirk. Which is what we'd like to avoid in the
+>> >> first place.
+>> >
+>> > Do you have a specific example in mind? If this is only a theoretical
+>> > problem, we can worry about it when we get there, and then decide
+>> > if we add a hardcoded register after all.
+>>
+>> For R-Car H3, there are small differences between ES1.0 and ES1.1,
+>> and more and larger differences between ES1.x and ES2.0, which
+>> need different handling (patches already floating around).
+>>
+>> For (old) R-Car H1, the SATA driver already handles "renesas,sata-r8a7790-es1",
+>> but so far there didn't exist an established process to specify how that
+>> compatible value would end up in the DTB (the in-kernel DTS doesn't have it).
+>>
+>> There may be more differences I'm not aware of.
 >
-> 2016-10-27 14:57 GMT+02:00 Bruno Herrera <bruherrera@gmail.com>:
->>
->> Hi Alex,
->>
->> On Thu, Oct 27, 2016 at 10:21 AM, Alexandre Torgue
->> <alexandre.torgue@st.com> wrote:
->> > Hi Bruno,
->> >
->> >
->> > On 10/27/2016 12:43 PM, Bruno Herrera wrote:
->> >>
->> >> Hi Alex,
->> >>
->> >> On Wed, Oct 26, 2016 at 7:09 AM, Alexandre Torgue
->> >> <alexandre.torgue@st.com> wrote:
->> >>>
->> >>> Hi Bruno,
->> >>>
->> >>> On 10/25/2016 11:06 PM, Bruno Herrera wrote:
->> >>>>
->> >>>>
->> >>>> Hi Alexandre,
->> >>>>
->> >>>>>
->> >>>>> stm32f469-disco and stm32f429-eval boards use SDRAM start address
->> >>>>> remapping
->> >>>>> (to @0) to boost performances. A DMA translation through
->> >>>>> "dma-ranges"
->> >>>>> property was needed for other masters than the M4 CPU.
->> >>>>> stm32f429-disco doesn't use remapping so doesn't need this DMA
->> >>>>> translation.
->> >>>>> This patches moves this DMA translation definition from stm32f429
->> >>>>> soc
->> >>>>> file
->> >>>>> to board files.
->> >>>>>
->> >>>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->> >>>>>
->> >>>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>>> index 13c7cd2..a763c15 100644
->> >>>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>>> @@ -82,6 +82,10 @@
->> >>>>>                 };
->> >>>>>         };
->> >>>>>
->> >>>>> +       soc {
->> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->> >>>>> +       };
->> >>>>> +
->> >>>>>         usbotg_hs_phy: usbphy {
->> >>>>>                 #phy-cells = <0>;
->> >>>>>                 compatible = "usb-nop-xceiv";
->> >>>>
->> >>>>
->> >>>>
->> >>>> Shouldn't also the peripheral dma-ranges property move to board
->> >>>> specific
->> >>>> too?
->> >>>> I  had this patch for while but I didn't had the time to submit:
->> >>>
->> >>>
->> >>>
->> >>> Well spot I forgot it. Actually, discussing with Arnd ysterday on
->> >>> IIRC,
->> >>> empty dma-ranges is not needed. Can you test on your side by removing
->> >>> dma-ranges in usb node please ?
->> >>
->> >> Unfortunately will take a time for me to set up this environment on
->> >> the STM32F4-EVAL board.
->> >> And on the discovery boards we dont have this scenario. That was the
->> >> main reason I did not submit the patch right away.
->> >> My conclusion and I might be wrong but is based on the my tests with
->> >> SDIO device at STM32F469I-DISCO board.
->> >>
->> >> I started this issue as discussion at ST Forum but Maxime gave me the
->> >> hint.
->> >>
->> >>
->> >>
->> >> https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44
->> >>
->> >>> I will push a v2 by removing empty dma-ranges if tests are ok in your
->> >>> side.
->> >>
->> >>
->> >> From my understating/conclusion is: when empty property(dma-ranges) is
->> >> the device node, the mapping will be taken in consideration when using
->> >> DMA otherwise the mapping is ignored.
->> >> And in the SDIO case it is needed for DEV->MEM(SDRAM) and
->> >> MEM(SDRAM)->DEV. If it is not the case for the devices in question so
->> >> I suppose it can work without the property.
->> >
->> >
->> > For sure translation has to be done but I'm not sure that an empty
->> > "dma-ranges" is needed in device node to activate it. For Ethernet empty
->> > "dma-ranges" is not needed. I will try with usb.
->>
->> In the case of SDIO it is needed. As example this is my working SDIO node:
->>
->> sdio: sdio at 40012c00 {
->> compatible = "arm,pl18x", "arm,primecell";
->> arm,primecell-periphid = <0x00480181>;
->> reg = <0x40012c00 0x400>;
->> dmas =  <&dma2 6 4 0x10400 0x3>, /* Logical - DevToMem */
->> <&dma2 3 4 0x10400 0x3>; /* Logical - MemToDev */
->> dma-names = "rx", "tx";
->> clocks = <&rcc 0 171>;
->> clock-names = "apb_pclk";
->> interrupts = <49>;
->> status = "disabled";
->> };
->>
->> &sdio {
->> status = "okay";
->> vmmc-supply = <&wlan_en>;
->> bus-width = <4>;
->> max-frequency = <24000000>;
->> pinctrl-names = "default";
->> pinctrl-0 = <&sdio_pins>;
->> ti,non-removable;
->> ti,needs-special-hs-handling;
->> dma-ranges;
->> cap-power-off-card;
->> keep-power-in-suspend;
->>
->> #address-cells = <1>;
->> #size-cells = <0>;
->> wlcore: wlcore at 0 {
->> compatible = "ti,wl1835";
->> reg = <2>;
->> interrupt-parent = <&gpioa>;
->> interrupts = <8 IRQ_TYPE_EDGE_RISING>;
->> };
->> };
->>
->> >
->> > alex
->> >
->> >
->> >>
->> >>>
->> >>> Thanks in advance
->> >>> Alex
->> >>>
->> >>>
->> >>>>
->> >>>> Author: Bruno Herrera <bruherrera@gmail.com>
->> >>>> Date:   Sun Oct 16 14:50:00 2016 -0200
->> >>>>
->> >>>>     ARM: DT: STM32: Use dma-ranges property per board not at dtsi
->> >>>> file
->> >>>>
->> >>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>> index 6bfc595..2a22a82 100644
->> >>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->> >>>> @@ -52,6 +52,10 @@
->> >>>>         model = "STMicroelectronics STM32429i-EVAL board";
->> >>>>         compatible = "st,stm32429i-eval", "st,stm32f429";
->> >>>>
->> >>>> +       soc {
->> >>>> +               dma-ranges = <0xC0000000 0x0 0x10000000>;
->> >>>> +       };
->> >>>> +
->> >>>>         chosen {
->> >>>>                 bootargs = "root=/dev/ram rdinit=/linuxrc";
->> >>>>                 stdout-path = "serial0:115200n8";
->> >>>> @@ -96,6 +100,7 @@
->> >>>>
->> >>>>  &ethernet0 {
->> >>>>         status = "okay";
->> >>>> +       dma-ranges;
->> >>>>         pinctrl-0       = <&ethernet0_mii>;
->> >>>>         pinctrl-names   = "default";
->> >>>>         phy-mode        = "mii-id";
->> >>>> @@ -116,6 +121,7 @@
->> >>>>  };
->> >>>>
->> >>>>  &usbotg_hs {
->> >>>> +       dma-ranges;
->> >>>>         dr_mode = "host";
->> >>>>         phys = <&usbotg_hs_phy>;
->> >>>>         phy-names = "usb2-phy";
->> >>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->> >>>> b/arch/arm/boot/dts/stm32f429.dtsi
->> >>>> index 7d624a2..697a133 100644
->> >>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> >>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> >>>> @@ -59,7 +59,6 @@
->> >>>>         };
->> >>>>
->> >>>>         soc {
->> >>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->> >>>>
->> >>>>                 timer2: timer at 40000000 {
->> >>>>                         compatible = "st,stm32-timer";
->> >>>> @@ -472,13 +471,11 @@
->> >>>>                         st,syscon = <&syscfg 0x4>;
->> >>>>                         snps,pbl = <8>;
->> >>>>                         snps,mixed-burst;
->> >>>> -                       dma-ranges;
->> >>>>                         status = "disabled";
->> >>>>                 };
->> >>>>
->> >>>>                 usbotg_hs: usb at 40040000 {
->> >>>>                         compatible = "snps,dwc2";
->> >>>> -                       dma-ranges;
->> >>>>                         reg = <0x40040000 0x40000>;
->> >>>>                         interrupts = <77>;
->> >>>>                         clocks = <&rcc 0 29>;
->> >>>>
->> >>>>
->> >>>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->> >>>>> b/arch/arm/boot/dts/stm32f429.dtsi
->> >>>>> index 0596d60..3a1cfdd 100644
->> >>>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> >>>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> >>>>> @@ -59,8 +59,6 @@
->> >>>>>         };
->> >>>>>
->> >>>>>         soc {
->> >>>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->> >>>>> -
->> >>>>>                 timer2: timer at 40000000 {
->> >>>>>                         compatible = "st,stm32-timer";
->> >>>>>                         reg = <0x40000000 0x400>;
->> >>>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
->> >>>>> b/arch/arm/boot/dts/stm32f469-disco.dts
->> >>>>> index 9e73656..c2213c0 100644
->> >>>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
->> >>>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
->> >>>>> @@ -64,6 +64,10 @@
->> >>>>>         aliases {
->> >>>>>                 serial0 = &usart3;
->> >>>>>         };
->> >>>>> +
->> >>>>> +       soc {
->> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->> >>>>> +       };
->> >>>>>  };
->> >>>>>
->> >>>>>  &clk_hse {
->> >>>>> --
->> >>>>
->> >>>>
->> >>>>
->> >>>>
->> >>>> Br.,
->> >>>> Bruno
->> >>>>
->> >>>
->> >
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Ok, so for R-Car H1, I assume we don't need the driver, it would just
+> be a way to replace the current workaround with a different one, right?
 >
->
+> For R-Car H3, do we just require driver changes to work with ES2.0,
+> or also DT changes? If the new chip version already implies a new DT,
+> we can require the presence of a device node that has the correct
+> register number.
+
+H3 also needs DT changes for some features (e.g. different number of USB
+channels, different topology for graphics).
+
+soc_device_match() would mostly (only?) be used to handle limitations and
+quirks in early revisions. These are intended to be removed once production
+has been ramped up, and there's no longer a need to support them.
+However, that also means soc_device_match() would be used to match against
+early revisions, not against late revisions. I.e. the early SoCs need the chip
+ID registers declared, not the new ones.
+
+Stay tuned for v2...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
