@@ -1,72 +1,193 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 31 Oct 2016 09:48:26 -0500
-Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
-In-Reply-To: <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
-References: <1477418044-24603-1-git-send-email-david@lechnology.com>
- <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
-Message-ID: <3fd93d1b-8ba2-5440-e37d-0c55928e7e51@lechnology.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Mon, 31 Oct 2016 08:09:21 -0700
+Subject: [RFC] fpga: Pull checks for supported operations into framework
+In-Reply-To: <1477851123-17686-1-git-send-email-moritz.fischer@ettus.com>
+References: <1477851123-17686-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <CAAtXAHeXZi1EM=Z7TNcO-Og+5-QGb5QR=KjGRUG0fAOfksaB8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2016 05:18 AM, Sekhar Nori wrote:
-> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
->> This fixes pwm name matching for DA850 familiy devices. When using device
->> tree, the da850_auxdata_lookup[] table caused pwm devices to have the exact
->> same name, which caused errors when trying to register the devices.
->>
->> The names for clock matching in da850_clks[] also have to be updated to
->> to exactly match in order for the clock lookup to work correctly.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>
->> Tested working on LEGO MINDSTORMS EV3.
->>
->>
->>  arch/arm/mach-davinci/da850.c    | 10 +++++++---
->>  arch/arm/mach-davinci/da8xx-dt.c | 10 +++++-----
->>  2 files changed, 12 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index ed3d0e9..6b78a8f 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -510,9 +510,13 @@ static struct clk_lookup da850_clks[] = {
->>  	CLK("vpif",		NULL,		&vpif_clk),
->>  	CLK("ahci_da850",		NULL,		&sata_clk),
->>  	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
->> -	CLK("ehrpwm",		"fck",		&ehrpwm_clk),
->> -	CLK("ehrpwm",		"tbclk",	&ehrpwm_tbclk),
->> -	CLK("ecap",		"fck",		&ecap_clk),
->> +	CLK("ehrpwm.0",		"fck",		&ehrpwm_clk),
->> +	CLK("ehrpwm.0",		"tbclk",	&ehrpwm_tbclk),
->> +	CLK("ehrpwm.1",		"fck",		&ehrpwm_clk),
->> +	CLK("ehrpwm.1",		"tbclk",	&ehrpwm_tbclk),
->> +	CLK("ecap.0",		"fck",		&ecap_clk),
->> +	CLK("ecap.1",		"fck",		&ecap_clk),
->> +	CLK("ecap.2",		"fck",		&ecap_clk),
+Found a couple of issues, will resubmit after cleaning up. Feel free to add
+general feedback on the idea anyways in the meantime. Sorry for double post.
+
+On Sun, Oct 30, 2016 at 11:12 AM, Moritz Fischer
+<moritz.fischer@ettus.com> wrote:
+> Most of the drivers only support a subset of {PARTIAL, FULL}
+> reconfiguration.
+> Pull duplicate checks in each driver into the framework.
 >
-> This has exposed a limitation of DaVinci clock framework. The struct clk
-> are stored as a linked list themselves. So a node repeating in the table
-> above will create a loop in the linked list. This is easily seen on the
-> LCDK board. davinci_clk_disable_unused() never returns. PWMs are unused
-> on that board.
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Cc: Alan Tull <atull@opensource.altera.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> Hi all,
 >
-> There is no "simple" solution to this AFAICS. One solution is to
-> separate the iterator from the clock hardware structure and use struct
-> clk_hw available in struct clk_lookup.
+> with the new drivers (ice40, altera-ps-spi) being submitted I've noticed
+> we're duplicating this check over and over again,
+> so I figured we might as well pull it into the framework.
 >
-> Or move DaVinci to common clock framework. This is of course preferred
-> but much more involved as all 6 supported SoCs have to be moved together.
+> I'm not sure if there are gonna be other 'flags' we need to support
+> in the short term (we talked about byte-swapping ...)
 >
-> Thanks,
-> Sekhar
+> Note: This patch goes on top of greg's char-misc-testing  that already
+> contains Alan's latest changes to support the A10 and won't apply
+> to master.
 >
+> Cheers,
+>
+> Moritz
+>
+> ---
+>  drivers/fpga/fpga-mgr.c       | 12 ++++++++++++
+>  drivers/fpga/socfpga-a10.c    |  4 +++-
+>  drivers/fpga/socfpga.c        |  3 ++-
+>  drivers/fpga/zynq-fpga.c      |  3 ++-
+>  include/linux/fpga/fpga-mgr.h |  9 +++++++--
+>  5 files changed, 26 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
+> index c58b4c4..85f17d8 100644
+> --- a/drivers/fpga/fpga-mgr.c
+> +++ b/drivers/fpga/fpga-mgr.c
+> @@ -49,6 +49,11 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
+>         struct device *dev = &mgr->dev;
+>         int ret;
+>
+> +       if (!(mgr->supported_flags & info->flags)) {
+> +               dev_err(dev, "Unsupported flags passed\n");
+> +               return -ENOTSUPP;
+> +       }
+
+That condition is obviously garbage ...
+> +
+>         /*
+>          * Call the low level driver's write_init function.  This will do the
+>          * device-specific things to get the FPGA into the state where it is
+> @@ -252,6 +257,7 @@ EXPORT_SYMBOL_GPL(fpga_mgr_put);
+>   */
+>  int fpga_mgr_register(struct device *dev, const char *name,
+>                       const struct fpga_manager_ops *mops,
+> +                     u32 supported_flags,
+>                       void *priv)
+>  {
+>         struct fpga_manager *mgr;
+> @@ -268,6 +274,11 @@ int fpga_mgr_register(struct device *dev, const char *name,
+>                 return -EINVAL;
+>         }
+>
+> +       if (!supported_flags) {
+> +               dev_err(dev, "Attempt to register with no supported flags\n");
+> +               return -EINVAL;
+> +       }
+> +
+>         mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
+>         if (!mgr)
+>                 return -ENOMEM;
+> @@ -282,6 +293,7 @@ int fpga_mgr_register(struct device *dev, const char *name,
+>
+>         mgr->name = name;
+>         mgr->mops = mops;
+> +       mgr->supported_flags = supported_flags;
+>         mgr->priv = priv;
+>
+>         /*
+> diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
+> index ccd9fb2..e7c82ff 100644
+> --- a/drivers/fpga/socfpga-a10.c
+> +++ b/drivers/fpga/socfpga-a10.c
+> @@ -519,7 +519,9 @@ static int socfpga_a10_fpga_probe(struct platform_device *pdev)
+>         }
+>
+>         return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
+> -                                &socfpga_a10_fpga_mgr_ops, priv);
+> +                                &socfpga_a10_fpga_mgr_ops,
+> +                                FPGA_MGR_PARTIAL_RECONFIG,
+> +                                priv);
+>  }
+>
+>  static int socfpga_a10_fpga_remove(struct platform_device *pdev)
+> diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+> index b6672e6..3285b7d 100644
+> --- a/drivers/fpga/socfpga.c
+> +++ b/drivers/fpga/socfpga.c
+> @@ -582,7 +582,8 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
+>                 return ret;
+>
+>         return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
+> -                                &socfpga_fpga_ops, priv);
+> +                                &socfpga_fpga_ops, FPGA_MGR_FULL_RECONFIG,
+> +                                priv);
+>  }
+>
+>  static int socfpga_fpga_remove(struct platform_device *pdev)
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 249682e..1dabd25 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -413,6 +413,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>         struct zynq_fpga_priv *priv;
+>         struct resource *res;
+>         int err;
+> +       u32 flags = FPGA_MGR_FULL_RECONFIG | FPGA_MGR_PARTIAL_RECONFIG;
+>
+>         priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>         if (!priv)
+> @@ -465,7 +466,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>         clk_disable(priv->clk);
+>
+>         err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+> -                               &zynq_fpga_ops, priv);
+> +                               &zynq_fpga_ops, flags, priv);
+>         if (err) {
+>                 dev_err(dev, "unable to register FPGA manager");
+>                 clk_unprepare(priv->clk);
+> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
+> index 040b86d..4f4bcf2 100644
+> --- a/include/linux/fpga/fpga-mgr.h
+> +++ b/include/linux/fpga/fpga-mgr.h
+> @@ -64,9 +64,12 @@ enum fpga_mgr_states {
+>
+>  /*
+>   * FPGA Manager flags
+> + * FPGA_MGR_FULL_RECONFIG: do full reconfiguration if supported
+>   * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
+>   */
+> -#define FPGA_MGR_PARTIAL_RECONFIG      BIT(0)
+> +#define FPGA_MGR_FULL_RECONFIG         BIT(0)
+> +#define FPGA_MGR_PARTIAL_RECONFIG      BIT(1)
+> +#define FPGA_MGR_EXTERNAL_CONFIG       BIT(2)
+
+On second thought the FULL_RECONFIG is the same as !PARTIAL_RECONFIG,
+so useless ..
+
+>
+>  /**
+>   * struct fpga_image_info - information specific to a FPGA image
+> @@ -119,6 +122,7 @@ struct fpga_manager {
+>         enum fpga_mgr_states state;
+>         const struct fpga_manager_ops *mops;
+>         void *priv;
+> +       u32 supported_flags;
+>  };
+>
+>  #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
+> @@ -135,7 +139,8 @@ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
+>  void fpga_mgr_put(struct fpga_manager *mgr);
+>
+>  int fpga_mgr_register(struct device *dev, const char *name,
+> -                     const struct fpga_manager_ops *mops, void *priv);
+> +                     const struct fpga_manager_ops *mops, u32 supported_flags,
+> +                     void *priv);
+>
+>  void fpga_mgr_unregister(struct device *dev);
+>
+> --
+> 2.4.11
 >
 
-The simple solution for now could be to make child clocks for each of 
-these that simply enable the parent clock. e.g. ehrpwm0_clk and 
-ehpwm1_clk are children of ehrpwm_clk, etc.
+Cheers,
 
-Looking at da830.c, it looks like the solution was to make multiple 
-clocks that use the same LPSC, but this does not seem right to me.
+Moritz
