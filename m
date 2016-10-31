@@ -1,34 +1,102 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Oct 2016 09:26:02 +0100
-Subject: [PATCH 0/6] mfd: audit and demodule drivers/mfd/ab* drivers
-In-Reply-To: <20161030012440.10495-1-paul.gortmaker@windriver.com>
-References: <20161030012440.10495-1-paul.gortmaker@windriver.com>
-Message-ID: <CACRpkdafpokbaY13cDj4zoC-OO-zApswCNmrjwzT3QxbPn_fAg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 31 Oct 2016 09:32:55 +0100
+Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for obtaining
+ mode pin state
+In-Reply-To: <20161031081923.GF18195@verge.net.au>
+References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
+ <20161031081923.GF18195@verge.net.au>
+Message-ID: <CAMuHMdXA-hemOT=ZysEfettei9=HsDddGhqddkw38hwRrdeagw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 30, 2016 at 2:24 AM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
+Hi Mike, Stephen, Arnd, Olof, Kevin,
 
-> Nothing new here ; just another instance where we had modular remove
-> and exit functions -- but the Makefile/Kconfig limited the use case to
-> being always built-in; hence the code is useless and needs removing.
+Is the merge strategy [see ##### below] OK for you?
+Thanks a lot!
+
+On Mon, Oct 31, 2016 at 9:19 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Oct 26, 2016 at 02:00:24PM +0200, Geert Uytterhoeven wrote:
+>> On Fri, Oct 21, 2016 at 3:17 PM, Geert Uytterhoeven
+>> <geert+renesas@glider.be> wrote:
+>> > Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
+>> > state of the mode pins either by a call from the platform code, or
+>> > directly by using a hardcoded register access. This is a bit messy, and
+>> > creates a dependency between driver and platform code.
+>> >
+>> > This patch series converts the various Renesas R-Car clock drivers
+>> > and support code from reading the mode pin states using a hardcoded
+>> > register access to using a new minimalistic R-Car RST driver.
+>> >
+>> > All R-Car clock drivers will rely on the presence in DT of a device node
+>> > for the RST module.  Backwards compatibility with old DTBs is retained
+>> > only for R-Car Gen2, which has fallback code using its own private copy
+>> > of rcar_gen2_read_mode_pins().
+>> >
+>> > After this, there is still one remaining user of
+>> > rcar_gen2_read_mode_pins() left in platform code. A patch series to
+>> > remove that user has already been posted, though ("[PATCH/RFT 0/4] ARM:
+>> > shmobile: R-Car Gen2: Allow booting secondary CPU cores in debug mode").
+>> > Since v3, the other user has been removed in commit 9f5ce39ddb8f68b3
+>> > ("ARM: shmobile: rcar-gen2: Obtain extal frequency from DT").
+>> >
+>> > This series consists of 5 parts:
+>> >   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
+>> >      driver,
+>> >   B. Patches 3-11 add device nodes for the RST modules to the R-Car DTS
+>> >      files,
+>> >   C. Patches 12-17 convert the clock drivers to call into the new R-Car
+>> >      RST driver,
+>> >   D. Patches 18-20 remove passing mode pin state to the clock drivers
+>> >      from the platform code,
+>> >   E. Patches 21-23 remove dead code from the clock drivers.
+>> >
+>> > As is usually the case with moving functionality from platform code to
+>> > DT, there are lots of hard dependencies:
+>> >   - The DT updates in Part B can be merged as soon as the DT bindings in
+>> >     Part A have been approved,
+>> >   - The clock driver updates in Part C depend functionally on the driver
+>> >     code in Part A, and on the DT updates in Part B,
+>> >   - The board code cleanups in Part D depend on the clock driver updates
+>> >     in Part C,
+>> >   - The block driver cleanups in part E depend on the board code
+>> >     cleanups in part D.
+>> >
+>> > Hence to maintain the required lockstep between SoC driver, clock
+>> > drivers, shmobile platform code, and shmobile DT, I propose to queue up
+>> > all patches in a single branch against v4.9-rc1, and send pull requests
+>> > to both Mike/Stephen (clock) and Simon (rest).
+>> >
+>> > ***
+>>
+>> >   - Mike/Stephen/Simon/Magnus: Are you OK with the suggested merge
+>> >     approach above?
+>>
+>> Is this OK for you?
+
+#####
+
+(link to the full series at
+ https://groups.google.com/forum/#!topic/linux.kernel/fLSFsjOgPT8)
+
+>>
+>> I'd like to move forward with this, as this is a prerequisite for adding
+>> support for new SoCs (RZ/G) without adding more copies of
+>> rcar_gen2_read_mode_pins(), and removing that function from platform code
+>> for good.
 >
-> So we remove the dead code and the misleading hints of modularity from
-> these drivers, hoping that we manage to prevent some new drivers from
-> copying these same old mistakes into pending new drivers.
-(...)
-> Paul Gortmaker (6):
->   mfd: ab3100-core: Make it explicitly non-modular
->   mfd: ab8500-core: Make it explicitly non-modular
->   mfd: ab8500-debugfs: Make it explicitly non-modular
->   mfd: ab8500-gpadc: Make it explicitly non-modular
->   mfd: ab8500: make sysctrl explicitly non-modular
->   mfd: abx500-core: drop unused MODULE_ tags from non-modular code
+> This seems reasonable to me but likely the ARM SoC maintainers will want to
+> know about this plan before it is executed.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+OK, adding more people in the loop...
 
-For the whole series.
+Gr{oetje,eeting}s,
 
-Yours,
-Linus Walleij
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
