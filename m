@@ -1,50 +1,88 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 31 Oct 2016 14:46:28 -0700
-Subject: [PATCH] ARM: BCM5301X: Add back handler ignoring external
- imprecise aborts
-In-Reply-To: <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
-References: <20161029111229.26875-1-zajec5@gmail.com>
- <a491509e-5cfc-fc7d-0011-dfcab3c884ea@broadcom.com>
- <6e252703-0010-83ae-fa14-57352add007a@hauke-m.de>
- <fb2c36cb-6f85-1a6d-160a-c50e22d6c46b@gmail.com>
-Message-ID: <dcb21fe4-672f-4545-5b47-d764f390e741@broadcom.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 31 Oct 2016 16:48:33 -0500
+Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
+In-Reply-To: <20160921223805.21652-1-cov@codeaurora.org>
+References: <20160921173129.GA20006@localhost>
+ <20160921223805.21652-1-cov@codeaurora.org>
+Message-ID: <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Sep 21, 2016 at 06:38:05PM -0400, Christopher Covington wrote:
+> The Qualcomm Technologies QDF2432 SoC does not support accesses smaller
+> than 32 bits to the PCI configuration space. Register the appropriate
+> quirk.
+> 
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
 
+Hi Christopher,
 
-On 16-10-31 02:01 PM, Florian Fainelli wrote:
-> On 10/31/2016 01:59 PM, Hauke Mehrtens wrote:
->>
->>
->> On 10/31/2016 07:08 PM, Scott Branden wrote:
->>> Hi Rafal,
->>>
->>>
->>> On 16-10-29 04:12 AM, Rafa? Mi?ecki wrote:
->>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
->>>>
->>>> Since early BCM5301X days we got abort handler that was removed by
->>>> commit 937b12306ea79 ("ARM: BCM5301X: remove workaround imprecise abort
->>>> fault handler"). It assumed we need to deal only with pending aborts
->>>> left by the bootloader. Unfortunately this isn't true for BCM5301X.
->>>>
->>>> When probing PCI config space (device enumeration) it is expected to
->>>> have master aborts on the PCI bus. Most bridges don't forward (or they
->>>> allow disabling it) these errors onto the AXI/AMBA bus but not the
->>>> Northstar (BCM5301X) one.
->>> Should we only add this workaround code if CONFIG_PCI is on then?
->>
->> I think all the supported northstar devices have a PCIe controller. We
->> could add such a CONFIG_PCI check, but I do not see a big advantage.
->
-> Actually, I do see a couple disadvantages if we gate this with
-> CONFIG_PCI: if this problem shows up irrespective of your kernel
-> configuration, you want the error handler to clear it, not rely on
-> CONFIG_PCI to be enabled for the error to go away and also, without an
-> additional ifdef, additional compiler coverage.
->
-A problem with reintroducing this change is that all imprecise data 
-aborts are ignored, not just PCI.  So if you don't actually use PCI in 
-your system and want to debug other aborts you are unable to.  I don't 
-know if we care about such situation.
+Can you rebase this against v4.9-rc1?  It no longer applies to my tree.
+
+Note that this hardware is not spec-compliant since it doesn't support
+sub-32 bit config writes.  I just proposed a patch to warn about that
+[1], so if/when we merge that patch and this one, you'll start seeing
+those warnings.
+
+[1] http://lkml.kernel.org/r/20161031213902.6340.96123.stgit at bhelgaas-glaptop.roam.corp.google.com
+
+> ---
+>  drivers/acpi/pci_mcfg.c  |  8 ++++++++
+>  drivers/pci/ecam.c       | 10 ++++++++++
+>  include/linux/pci-ecam.h |  1 +
+>  3 files changed, 19 insertions(+)
+> 
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> index 245b79f..212334f 100644
+> --- a/drivers/acpi/pci_mcfg.c
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -96,6 +96,14 @@ static struct mcfg_fixup mcfg_quirks[] = {
+>  	THUNDER_ECAM_MCFG(2, 12),
+>  	THUNDER_ECAM_MCFG(2, 13),
+>  #endif
+> +	{ "QCOM  ", "QDF2432 ", 1, 0, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 1, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 2, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 3, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 4, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 5, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 6, MCFG_BUS_ANY, &pci_32b_ops },
+> +	{ "QCOM  ", "QDF2432 ", 1, 7, MCFG_BUS_ANY, &pci_32b_ops },
+>  };
+>  
+>  static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+> index 43ed08d..c3b3063 100644
+> --- a/drivers/pci/ecam.c
+> +++ b/drivers/pci/ecam.c
+> @@ -162,3 +162,13 @@ struct pci_ecam_ops pci_generic_ecam_ops = {
+>  		.write		= pci_generic_config_write,
+>  	}
+>  };
+> +
+> +/* ops for 32 bit config space access quirk */
+> +struct pci_ecam_ops pci_32b_ops = {
+> +	.bus_shift	= 20,
+> +	.pci_ops	= {
+> +		.map_bus	= pci_ecam_map_bus,
+> +		.read		= pci_generic_config_read32,
+> +		.write		= pci_generic_config_write32,
+> +	}
+> +};
+> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+> index 35f0e81..a6cffb8 100644
+> --- a/include/linux/pci-ecam.h
+> +++ b/include/linux/pci-ecam.h
+> @@ -65,6 +65,7 @@ extern struct pci_ecam_ops pci_thunder_pem_ops;
+>  #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
+>  extern struct pci_ecam_ops pci_thunder_ecam_ops;
+>  #endif
+> +extern struct pci_ecam_ops pci_32b_ops;
+>  
+>  #ifdef CONFIG_PCI_HOST_GENERIC
+>  /* for DT-based PCI controllers that support ECAM */
+> -- 
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+> Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+> Forum, a Linux Foundation Collaborative Project.
+> 
