@@ -1,61 +1,56 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 31 Oct 2016 12:09:57 +0100
-Subject: [PATCH 8/10] arm64: dts: marvell: add eMMC support for Armada 37xx
+Date: Mon, 31 Oct 2016 12:09:50 +0100
+Subject: [PATCH 1/10] mmc: sdhci: Export sdhci_set_ios() from sdhci.c
 In-Reply-To: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
 References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
-Message-ID: <8050f9869c91cf62b7a6193d294f25fea342146a.1477911954.git-series.gregory.clement@free-electrons.com>
+Message-ID: <beb9b84b12ccc6dfc931dbd8cb7706195cdaa490.1477911954.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the eMMC support for Armada 37xx SoC and enable it in the Armada 3720
-DB board.
+From: Ziji Hu <huziji@marvell.com>
 
+Export sdhci_set_ios() in sdhci.c.
+Thus vendor sdhci driver can implement its own set_ios() routine.
+
+Signed-off-by: Hu Ziji <huziji@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-3720-db.dts |  8 ++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 11 +++++++++++
- 2 files changed, 19 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sdhci.c | 3 ++-
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-index 1372e9a6aaa4..9107dd3e2a44 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
-@@ -72,6 +72,14 @@
- 	status = "okay";
- };
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 71654b90227f..ea06faf8a437 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1563,7 +1563,7 @@ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
+ }
+ EXPORT_SYMBOL_GPL(sdhci_set_uhs_signaling);
  
-+&sdhci0 {
-+	non-removable;
-+	bus-width = <8>;
-+	marvell,xenon-emmc;
-+	marvell,pad-type = "fixed-1-8v";
-+	status = "okay";
-+};
-+
- /* CON31 */
- &usb3 {
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c4762538ec01..0c4cafe92e66 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -161,6 +161,17 @@
- 				};
- 			};
+-static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct sdhci_host *host = mmc_priv(mmc);
+ 	unsigned long flags;
+@@ -1723,6 +1723,7 @@ static void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mmiowb();
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
++EXPORT_SYMBOL_GPL(sdhci_set_ios);
  
-+			sdhci0: sdhci at d8000 {
-+				compatible = "marvell,armada-3700-sdhci",
-+				"marvell,sdhci-xenon";
-+				reg = <0xd8000 0x300
-+				       0x17808 0x4>;
-+				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&nb_perih_clk 0>;
-+				clock-names = "core";
-+				status = "disabled";
-+			};
-+
- 			sata: sata at e0000 {
- 				compatible = "marvell,armada-3700-ahci";
- 				reg = <0xe0000 0x2000>;
+ static int sdhci_get_cd(struct mmc_host *mmc)
+ {
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 766df17fb7eb..37771de4cafa 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -688,6 +688,7 @@ void sdhci_set_power_noreg(struct sdhci_host *host, unsigned char mode,
+ void sdhci_set_bus_width(struct sdhci_host *host, int width);
+ void sdhci_reset(struct sdhci_host *host, u8 mask);
+ void sdhci_set_uhs_signaling(struct sdhci_host *host, unsigned timing);
++void sdhci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
+ 
+ #ifdef CONFIG_PM
+ extern int sdhci_suspend_host(struct sdhci_host *host);
 -- 
 git-series 0.8.10
