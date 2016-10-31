@@ -1,26 +1,56 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 31 Oct 2016 01:15:53 +0100
-Subject: [PATCH] arm64: dts: mt8173: Fix auxadc node
-In-Reply-To: <20161026141500.27105-1-matthias.bgg@gmail.com>
-References: <20161026141500.27105-1-matthias.bgg@gmail.com>
-Message-ID: <c283e582-68d2-fc9d-956f-bc99d78a5736@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 30 Oct 2016 20:38:48 -0500
+Subject: [PATCH v1 1/3] dt-bindings: Document Broadcom OTP controller
+ driver
+In-Reply-To: <1477336324-10543-2-git-send-email-jonathan.richardson@broadcom.com>
+References: <1477336324-10543-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1477336324-10543-2-git-send-email-jonathan.richardson@broadcom.com>
+Message-ID: <20161031013848.4vi2544tb5cs65nk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/26/2016 04:15 PM, Matthias Brugger wrote:
-> The devicetree node for mt8173-auxadc lacks the clock and
-> io-channel-cells property. This leads to a non-working driver.
->
-> 	mt6577-auxadc 11001000.auxadc: failed to get auxadc clock
-> 	mt6577-auxadc: probe of 11001000.auxadc failed with error -2
->
-> Fix these fields to get the device up and running.
->
-> Fixes: 748c7d4de46a ("ARM64: dts: mt8173: Add thermal/auxadc device
-> nodes")
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+On Mon, Oct 24, 2016 at 12:12:02PM -0700, Jonathan Richardson wrote:
+> From: Jonathan Richardson <jonathar@broadcom.com>
+> 
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Oza Pawandeep <oza@broadcom.com>
+> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
 > ---
+>  Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
+> new file mode 100644
+> index 0000000..6462e12
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/brcm,ocotp.txt
+> @@ -0,0 +1,17 @@
+> +Broadcom OTP memory controller
+> +
+> +Required Properties:
+> +- compatible: "brcm,ocotp" for the first generation Broadcom OTPC which is used
+> +  in Cygnus and supports 32 bit read/write. Use "brcm,ocotp-v2" for the second
+> +  generation Broadcom OTPC which is used in SoC's such as Stingray and supports
+> +  64-bit read/write.
 
-Applied.
+These should be SoC specific. While I'd guess this block is simple 
+enough, having the SoC can define what all the bits are. Yes, there is a 
+binding to define those, but you may not use that.
+
+
+> +- reg: Base address of the OTP controller.
+> +- brcm,ocotp-size: Amount of memory available, in 32 bit words
+> +
+> +Example:
+> +
+> +otp: otp at 0301c800 {
+> +	compatible = "brcm,ocotp";
+> +	reg = <0x0301c800 0x2c>;
+> +	brcm,ocotp-size = <2048>;
+> +};
+> -- 
+> 1.9.1
+> 
