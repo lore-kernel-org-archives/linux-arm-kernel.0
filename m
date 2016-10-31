@@ -1,44 +1,69 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 10:52:53 +0100
-Subject: [GIT PULL] ARM: OXNAS SoC updates for 4.10
-Message-ID: <1305c61f-b1ef-7caf-7788-67e2b907e873@baylibre.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 31 Oct 2016 10:54:55 +0100
+Subject: [PATCH 2/2] ARM: bus: da8xx-mstpri: new driver
+In-Reply-To: <0cac724d-1aee-dfa7-9b78-8366fd6fceff@ti.com>
+References: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477503355-2600-3-git-send-email-bgolaszewski@baylibre.com>
+ <20161031043015.74ppaship5nqfaqt@rob-hp-laptop>
+ <CAMpxmJW85TQObLdoGW2ApnkM8OiM4d1ZDd=9eyGmeVXXwqByPQ@mail.gmail.com>
+ <0cac724d-1aee-dfa7-9b78-8366fd6fceff@ti.com>
+Message-ID: <CAMpxmJX7SjE1zs926Fn-=jsZhPsOK6ey0hHM8LBhNS1nuSuFFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+2016-10-31 10:52 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> Hi Bartosz,
+>
+> On Monday 31 October 2016 03:10 PM, Bartosz Golaszewski wrote:
+>> 2016-10-31 5:30 GMT+01:00 Rob Herring <robh@kernel.org>:
+>>> On Wed, Oct 26, 2016 at 07:35:55PM +0200, Bartosz Golaszewski wrote:
+>>>> Create the driver for the da8xx master peripheral priority
+>>>> configuration and implement support for writing to the three
+>>>> Master Priority registers on da850 SoCs.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>>>  .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
+>>>>  drivers/bus/Kconfig                                |   9 +
+>>>>  drivers/bus/Makefile                               |   2 +
+>>>>  drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
+>>>>  4 files changed, 297 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
+>>>>  create mode 100644 drivers/bus/da8xx-mstpri.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
+>>>> new file mode 100644
+>>>> index 0000000..225af09
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
+>>>> @@ -0,0 +1,20 @@
+>>>> +* Device tree bindings for Texas Instruments da8xx master peripheral
+>>>> +  priority driver
+>>>> +
+>>>> +DA8XX SoCs feature a set of registers allowing to change the priority of all
+>>>> +peripherals classified as masters.
+>>>> +
+>>>> +Documentation:
+>>>> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
+>>>> +
+>>>> +Required properties:
+>>>> +
+>>>> +- compatible:                "ti,da850-mstpri", "syscon" - for da850 based boards
+>>>
+>>> Drop syscon. Doesn't look like it is needed and the example doesn't
+>>> match.
+>>
+>> Hi Rob,
+>>
+>> it is needed: syscon_regmap_lookup_by_compatible() fails without it. I
+>> fixed the example instead.
+>
+> Why are master priority registers under syscon? This driver should be
+> the only entity touching them. So do we need an MFD driver?
+>
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.10
-
-for you to fetch changes up to b3cdb3c5ef514687891f03442f2677850340bcfa:
-
-  ARM: oxnas: Add OX820 config and makefile entry (2016-10-31 10:41:33 +0100)
-
-----------------------------------------------------------------
-- Add SMP support for the Oxford Semiconductor OX820 SoC
-from http://lkml.kernel.org/r/20161021085848.1754-1-narmstrong at baylibre.com
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      ARM: oxnas: Add OX820 SMP support
-      ARM: oxnas: Add OX820 config and makefile entry
-
- arch/arm/Makefile             |   1 +
- arch/arm/mach-oxnas/Kconfig   |  30 +++++++++++++++++++---------
- arch/arm/mach-oxnas/Makefile  |   2 ++
- arch/arm/mach-oxnas/headsmp.S |  28 ++++++++++++++++++++++++++
- arch/arm/mach-oxnas/hotplug.c | 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-oxnas/platsmp.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 267 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/mach-oxnas/Makefile
- create mode 100644 arch/arm/mach-oxnas/headsmp.S
- create mode 100644 arch/arm/mach-oxnas/hotplug.c
- create mode 100644 arch/arm/mach-oxnas/platsmp.c
+It should, but syscfg0 registers are mapped all over the place. I
+thought it would be safer to put them under syscon and Kevin agreed.
 
 Thanks,
-Neil
+Bartosz Golaszewski
