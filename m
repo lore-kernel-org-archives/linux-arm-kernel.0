@@ -1,44 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 31 Oct 2016 00:36:04 -0500
-Subject: [PATCHv2 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
-In-Reply-To: <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
-References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
- <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20161031053604.3rjbuk7maabzbwq7@rob-hp-laptop>
+Date: Mon, 31 Oct 2016 00:57:03 -0500
+Subject: [PATCH v2 2/3] dt-bindings: reset: Add K2G reset definitions
+In-Reply-To: <20161027214941.24641-3-afd@ti.com>
+References: <20161027214941.24641-1-afd@ti.com>
+ <20161027214941.24641-3-afd@ti.com>
+Message-ID: <20161031055703.y55nqcoplfopspkd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 03:00:23PM -0500, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Thu, Oct 27, 2016 at 04:49:40PM -0500, Andrew F. Davis wrote:
+> Add identifiers for the K2G resets managed by the PMMC.
 > 
-> Add the Arria10 DevKit System Resource Chip register and state
-> monitoring module to the MFD.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
 > ---
-> Note: This needs to be applied to the bindings document that
-> was Acked & Applied but didn't reach the for-next branch.
-> See https://patchwork.ozlabs.org/patch/629397/
-> ---
-> v2  Change compatible string -mon to -monitor for clarity
-> ---
->  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> index ea151f2..c47be28 100644
-> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
->  Device                   Description
->  ------                   ----------
->  a10sr_gpio               GPIO Controller
+>  MAINTAINERS                     |  1 +
+>  include/dt-bindings/reset/k2g.h | 22 ++++++++++++++++++++++
+>  2 files changed, 23 insertions(+)
+>  create mode 100644 include/dt-bindings/reset/k2g.h
 
-This should be just "gpio" BTW.
-
-> +a10sr_monitor            Register and State Monitoring
-
-s/_/-/ or maybe just "monitor". Not really a generic node name to use 
-for this.
+This belongs with the previous patch. It is part of the binding 
+definition.
 
 Rob
