@@ -1,20 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 30 Oct 2016 23:31:29 -0500
-Subject: [PATCH 1/2] DT: binding: bcm2835-mbox: fix address typo in example
-In-Reply-To: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
-References: <1477505640-26658-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <20161031043129.jotjvcxmtmpzn33d@rob-hp-laptop>
+Date: Mon, 31 Oct 2016 00:10:39 -0500
+Subject: [PATCH v2 1/4] arm64: arch_timer: Add device tree binding for
+ hisilicon-161601 erratum
+In-Reply-To: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
+References: <1477553651-13428-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20161031051039.vkuykdc4sgrh6scz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 06:13:59PM +0000, Stefan Wahren wrote:
-> The address of the mailbox node in the example has a typo.
-> So fix it accordingly.
+On Thu, Oct 27, 2016 at 03:34:08PM +0800, Ding Tianhong wrote:
+> This erratum describes a bug in logic outside the core, so MIDR can't be
+> used to identify its presence, and reading an SoC-specific revision
+> register from common arch timer code would be awkward.  So, describe it
+> in the device tree.
 > 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Fixes: d4b5c782b9f4 ("dt/bindings: Add binding for the BCM2835 mailbox driver")
+> v2: Use the new erratum name and update the description.
+> 
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > ---
->  .../bindings/mailbox/brcm,bcm2835-mbox.txt         |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
