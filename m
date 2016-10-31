@@ -1,69 +1,28 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Oct 2016 22:37:13 +0900
-Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
-Message-ID: <1477921033-13584-1-git-send-email-yamada.masahiro@socionext.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 31 Oct 2016 14:43:04 +0100
+Subject: [PATCH] ARM: shmobile: r8a7779/marzen: Add board part number to DT
+ bindings
+Message-ID: <1477921384-1812-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UniPhier outer cache (arch/arm/mm/cache-uniphier.c) has 128 byte
-line length and its tags are also managed per 128 byte line.  This
-is very unfortunate, but the current 64 byte alignment for kmalloc()
-causes sharing problems on DMA if used with this outer cache.
-
-This commit adds ARM_L1_CACHE_SHIFT_7 to increase the DMA minimum
-alignment to 128 byte if CACHE_UNIPHIER is enabled.  There are
-several drivers that assume aligning to L1_CACHE_BYTES will be DMA
-safe, so this commit also changes the L1_CACHE_BYTES for safety.
-
-Having said that, I hesitate to align all the other SoCs in Multi
-platform to the UniPhier's requirement.  So, I am disabling the
-CONFIG_CACHE_UNIPHIER by default, so that multi_v7_defconfig will
-still stay with CONFIG_ARM_L1_CACHE_SHIFT=6.  With this commit,
-UniPhier SoCs will become slower, but it is much better than system
-crash.  If desired, the outer-cache can be enabled by merge_config
-or something.
-
-Note:
-The UniPhier PH1-Pro5 SoC is equipped also with L3 cache with 256
-byte line size but its tags are managed per 128 byte sub-line.
-So, ARM_L1_CACHE_SHIFT_7 should be fine for all the UniPhier SoCs.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-KernelVersion: 4.9-rc1
-
-
- arch/arm/mm/Kconfig | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index c1799dd..f68e8ec 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -991,7 +991,7 @@ config CACHE_TAUROS2
- config CACHE_UNIPHIER
- 	bool "Enable the UniPhier outer cache controller"
- 	depends on ARCH_UNIPHIER
--	default y
-+	select ARM_L1_CACHE_SHIFT_7
- 	select OUTER_CACHE
- 	select OUTER_CACHE_SYNC
- 	help
-@@ -1012,8 +1012,14 @@ config ARM_L1_CACHE_SHIFT_6
- 	help
- 	  Setting ARM L1 cache line size to 64 Bytes.
- 
-+config ARM_L1_CACHE_SHIFT_7
-+	bool
-+	help
-+	  Setting ARM L1 cache line size to 128 Bytes.
-+
- config ARM_L1_CACHE_SHIFT
- 	int
-+	default 7 if ARM_L1_CACHE_SHIFT_7
- 	default 6 if ARM_L1_CACHE_SHIFT_6
- 	default 5
- 
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 44b3129a8ded539b..d2e408795889fbec 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -63,7 +63,7 @@ Boards:
+     compatible = "renesas,kzm9g", "renesas,sh73a0"
+   - Lager (RTP0RC7790SEB00010S)
+     compatible = "renesas,lager", "renesas,r8a7790"
+-  - Marzen
++  - Marzen (R0P7779A00010S)
+     compatible = "renesas,marzen", "renesas,r8a7779"
+   - Porter (M2-LCDP)
+     compatible = "renesas,porter", "renesas,r8a7791"
 -- 
 1.9.1
