@@ -1,60 +1,40 @@
-From: radioconfusion@gmail.com (radioconfusion at gmail.com)
-Date: Mon, 31 Oct 2016 15:59:55 +0200
-Subject: [crypto] [marvell-cesa] Possible regression after Linux 4.7
-Message-ID: <58174e5d.233ac20a.a4335.5656@mx.google.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 31 Oct 2016 15:19:25 +0100
+Subject: [PATCH v5 0/2] drm: tilcdc: improved support for rev1
+Message-ID: <1477923567-1610-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-Fri, 09 Sep 2016 10:24:50 +0300, radioconfusion at gmail.com wrote:
-> Thu,  8 Sep 2016 16:52:16 +0200, Romain Perier wrote:
-> > > Hello,
-> > >
-> > > I'm testing the marvell-cesa -driver on Armada 385 board and I think I've found
-> > > a regression between Linux 4.7 and 4.8-rc4.
-> > > I want to accelerate my curl connections. So I compiled the 4.8-rc4 with
-> > > marvell-cesa enabled and HEAD revision of cryptodev-linux.
-> > >
-> > > Here is my output:
-> > >
-> > > ~# uname -r
-> > > 4.8.0-rc4
-> > > ~# modprobe cryptodev
-> > > ~# modprobe marvell-cesa
-> > > ~# curl -k --ciphers AES256-SHA256 https://myserver/myfile >/dev/null
-> > >    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-> > >                                   Dload  Upload   Total   Spent    Left  Speed
-> > >   19  200M   19 39.7M    0     0  16.2M      0  0:00:12  0:00:02  0:00:10 16.2M
-> > > curl: (56) SSL read: error:1408F119:SSL routines:SSL3_GET_RECORD:decryption
-> > > failed or bad record mac, errno 0
-> > >
-> --- snip ---
-> >
-> > Thank you for your feedbacks.
-> > I can reproduce the issue with and without multiple engines.
+This series contains two patches needed to support revision 1 of the
+LCD controller on da850 SoCs.
 
-I can still reproduce the issue with Linux 4.9-rc3 (2a26d99b251b8625d27aed14e97fc10707a3a81f)
+The first one implements palette loading - this is a resend of v4 of
+the stand-alone patch.
 
-> > However, I have found an interesting thing, If I use only --ciphers
-> > AES256, it works perfectly fine, could you confirm this ?
->
-> Yes, I can confirm. And I have found the reason too.
-> Most of available ciphers will not be accelerated at all.
-> Only these ones I have verified to be accelerated by cesa:
-> AES256-SHA256
-> AES256-SHA
-> AES128-SHA256
-> AES128-SHA
->
-> When cesa is working, I can see "irq/42-f1090000" on process list of top(1) and
-> curl doesn't take all of available cpu.
->
---- snip ---
+The second resets the input FIFO in the DMA controller if a sync lost
+error occurs and disables the interrupt completely if we're being
+flooded with these errors.
 
-> > In any case, I will investigate.
+v1 -> v2:
+- only allocate dma memory for revision 1
 
-Do you have any improvement for the issue?
-Please let me know if you need any help to resolve it.
+v2 -> v3:
+- use devres managed API for dma memory allocation
 
-Best Regards,
-Jussi
+v3 -> v4:
+- reinit the palette completion in tilcdc_crtc_disable()
+
+v4 -> v5:
+- add a second patch clearing the sync lost bit in case of a sync lost
+  error due to insufficient bandwidth
+
+Bartosz Golaszewski (2):
+  drm: tilcdc: implement palette loading for rev1
+  drm: tilcdc: clear the sync lost bit in crtc isr
+
+ drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 138 +++++++++++++++++++++++++++++++----
+ drivers/gpu/drm/tilcdc/tilcdc_regs.h |   1 +
+ 2 files changed, 124 insertions(+), 15 deletions(-)
+
+-- 
+2.9.3
