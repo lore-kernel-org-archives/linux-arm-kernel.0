@@ -1,7 +1,7 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Oct 2016 22:32:53 +0900
+Date: Mon, 31 Oct 2016 22:37:13 +0900
 Subject: [PATCH] ARM: mm: add ARM_L1_CACHE_SHIFT_7 for UniPhier outer cache
-Message-ID: <1477920773-12908-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1477921033-13584-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -31,7 +31,7 @@ So, ARM_L1_CACHE_SHIFT_7 should be fine for all the UniPhier SoCs.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
-Kernel Version: 4.9-rc1
+KernelVersion: 4.9-rc1
 
 
  arch/arm/mm/Kconfig | 8 +++++++-
