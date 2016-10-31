@@ -1,73 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 09:22:23 +0000
-Subject: [PATCH v3] clkdev: Detect errors in clk_hw_register_clkdev() for
- mass registration
-In-Reply-To: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
-References: <1477033358-7934-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20161031092223.GW1041@n2100.armlinux.org.uk>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Mon, 31 Oct 2016 09:28:56 +0000
+Subject: [v15, 6/7] base: soc: introduce soc_device_match() interface
+In-Reply-To: <2572890.e6aV4hmMEL@wuerfel>
+References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+ <1477637418-38938-7-git-send-email-yangbo.lu@nxp.com>
+ <2572890.e6aV4hmMEL@wuerfel>
+Message-ID: <DB6PR0401MB2536CAD001BF3CAB4EDB15DCF8AE0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 21, 2016 at 09:02:38AM +0200, Geert Uytterhoeven wrote:
-> Unlike clk_register_clkdev(), clk_hw_register_clkdev() doesn't check for
-> passed error objects from a previous registration call. Hence the caller
-> of clk_hw_register_*() has to check for errors before calling
-> clk_hw_register_clkdev*().
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, October 28, 2016 6:48 PM
+> To: linuxppc-dev at lists.ozlabs.org
+> Cc: Y.B. Lu; linux-mmc at vger.kernel.org; ulf.hansson at linaro.org; Scott
+> Wood; Mark Rutland; Greg Kroah-Hartman; X.B. Xie; M.H. Lian; linux-
+> i2c at vger.kernel.org; linux-clk at vger.kernel.org; Qiang Zhao; Russell King;
+> Bhupesh Sharma; Joerg Roedel; Claudiu Manoil; devicetree at vger.kernel.org;
+> Rob Herring; Santosh Shilimkar; linux-arm-kernel at lists.infradead.org;
+> netdev at vger.kernel.org; linux-kernel at vger.kernel.org; Leo Li;
+> iommu at lists.linux-foundation.org; Kumar Gala; Geert Uytterhoeven
+> Subject: Re: [v15, 6/7] base: soc: introduce soc_device_match() interface
 > 
-> Make clk_hw_register_clkdev() more similar to clk_register_clkdev() by
-> adding this error check, removing the burden from callers that do mass
-> registration.
+> On Friday, October 28, 2016 2:50:17 PM CEST Yangbo Lu wrote:
+> > +
+> > +static int soc_device_match_one(struct device *dev, void *arg) {
+> > +       struct soc_device *soc_dev = container_of(dev, struct
+> soc_device, dev);
+> > +       const struct soc_device_attribute *match = arg;
+> > +
+> > +       if (match->machine &&
+> > +           !glob_match(match->machine, soc_dev->attr->machine))
+> > +               return 0;
+> > +
+> > +       if (match->family &&
+> > +           !glob_match(match->family, soc_dev->attr->family))
+> > +               return 0;
+> > +
+> >
 > 
-> Fixes: e4f1b49bda6d6aa2 ("clkdev: Add clk_hw based registration APIs")
-> Fixes: 944b9a41e004534f ("clk: ls1x: Migrate to clk_hw based OF and registration APIs")
-> Fixes: 44ce9a9ae977736f ("MIPS: TXx9: Convert to Common Clock Framework")
-> Fixes: f48d947a162dfa9d ("clk: clps711x: Migrate to clk_hw based OF and registration APIs")
-> Fixes: b4626a7f489238a5 ("CLK: Add Loongson1C clock support")
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-
-Please put this in the patch system, thanks.
-
-> ---
-> v3:
->   - Add more Fixes tags for drivers not checking errors in v4.9-rc1,
+> Geert found a bug in my code, and submitted a fix at
+> https://patchwork.kernel.org/patch/9361395/
 > 
-> v2:
->   - Correct wrong function references
->     s/clkdev_{,hw_}create/clk_{,hw_}register_clkdev/
-> ---
->  drivers/clk/clkdev.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-> index 97ae60fa15849954..bb8a77a5985f8627 100644
-> --- a/drivers/clk/clkdev.c
-> +++ b/drivers/clk/clkdev.c
-> @@ -448,12 +448,20 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
->   *
->   * con_id or dev_id may be NULL as a wildcard, just as in the rest of
->   * clkdev.
-> + *
-> + * To make things easier for mass registration, we detect error clk_hws
-> + * from a previous clk_hw_register_*() call, and return the error code for
-> + * those.  This is to permit this function to be called immediately
-> + * after clk_hw_register_*().
->   */
->  int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
->  	const char *dev_id)
->  {
->  	struct clk_lookup *cl;
->  
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +
->  	/*
->  	 * Since dev_id can be NULL, and NULL is handled specially, we must
->  	 * pass it as either a NULL format string, or with "%s".
-> -- 
-> 1.9.1
+> I think you should include that one in your series.
 > 
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+[Lu Yangbo-B47093] Ok, no problem. Thanks :)
+
+> 	Arnd
