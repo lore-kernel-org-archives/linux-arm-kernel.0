@@ -1,71 +1,89 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 15:56:28 +0000
-Subject: [PATCH v2 1/8] drm/bridge: rgb-to-vga: Support an enable GPIO
-In-Reply-To: <20161026221724.55yufeql6s5nd5gq@lukather>
-References: <20161020034344.14154-1-wens@csie.org>
- <20161020034344.14154-2-wens@csie.org>
- <20161026221346.tdpmbrwca4jehch2@rob-hp-laptop>
- <20161026221724.55yufeql6s5nd5gq@lukather>
-Message-ID: <20161031155628.GD1041@n2100.armlinux.org.uk>
+From: diana.craciun@nxp.com (Diana Madalina Craciun)
+Date: Mon, 31 Oct 2016 15:57:46 +0000
+Subject: SMR masking and PCI
+References: <VI1PR0401MB26389CC8820C9654337B578E8DAA0@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+ <c39b785a-0f18-fc0a-ce08-7ebe3cfaf8c5@arm.com>
+Message-ID: <HE1PR04MB1321DED0E75BD607BB52889EFFAE0@HE1PR04MB1321.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 12:17:24AM +0200, Maxime Ripard wrote:
-> Hi Rob,
-> 
-> On Wed, Oct 26, 2016 at 05:13:46PM -0500, Rob Herring wrote:
-> > On Thu, Oct 20, 2016 at 11:43:37AM +0800, Chen-Yu Tsai wrote:
-> > > Some rgb-to-vga bridges have an enable GPIO, either directly tied to
-> > > an enable pin on the bridge IC, or indirectly controlling a power
-> > > switch.
-> > > 
-> > > Add support for it.
-> > > 
-> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > >  .../bindings/display/bridge/dumb-vga-dac.txt       |  2 ++
-> > >  drivers/gpu/drm/bridge/dumb-vga-dac.c              | 28 ++++++++++++++++++++++
-> > >  2 files changed, 30 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> > > index 003bc246a270..d3484822bf77 100644
-> > > --- a/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> > > +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga-dac.txt
-> > > @@ -16,6 +16,8 @@ graph bindings specified in Documentation/devicetree/bindings/graph.txt.
-> > >  - Video port 0 for RGB input
-> > >  - Video port 1 for VGA output
-> > >  
-> > > +Optional properties:
-> > > +- enable-gpios: GPIO pin to enable or disable the bridge
-> > 
-> > This should also define the active state.
-> > 
-> > > +static void dumb_vga_enable(struct drm_bridge *bridge)
-> > > +{
-> > > +	struct dumb_vga *vga = drm_bridge_to_dumb_vga(bridge);
-> > > +
-> > > +	if (vga->enable_gpio)
-> > > +		gpiod_set_value_cansleep(vga->enable_gpio, 1);
-> > 
-> > So the driver should allow either active high or low.
-> 
-> You mean like having a enable-active-high property? Isn't that
-> redundant with the GPIO flags?
+Hi Robin,
 
-Correct - the gpiod APIs remove the need for drivers to know the
-polarity of the signal, handling it inside the GPIO subsystem
-instead, controlled either from the gpiod lookup tables in legacy
-board files, or the DT specification for the GPIO.
+On 10/28/2016 07:16 PM, Robin Murphy wrote:
+> Hi Stuart,
+>
+> On 27/10/16 18:10, Stuart Yoder wrote:
+>> Hi Robin,
+>>
+>> A question about how the SMR masking defined in the arm,smmu binding
+>> relates to the PCI iommu-map.
+>>
+>> The #iommu-cells property defines the number of cells an "IOMMU specifier"
+>> takes and 2 is specified to be:
+>>
+>>    SMMUs with stream matching support and complex masters
+>>    may use a value of 2, where the second cell represents
+>>    an SMR mask to combine with the ID in the first cell.
+>>
+>> An iommu-map entry is defined as:
+>>
+>>    (rid-base,iommu,iommu-base,length)
+>>
+>> What seems to be currently missing in the iommu-map support is
+>> the possibility the case where #iommu-cells=<2>.
+> Indeed. The bindings have so far rather implicitly assumed the case of
+> #{msi,iommu}-cells = 1, and the code has followed suit.
+>
+>> In this case iommu-base which is an IOMMU specifier should
+>> occupy 2 cells.  For example on an ls2085a we would want:
+>>
+>> 	iommu-map = <0x0   0x6 0x7 0x3ff 0x1
+>> 		       0x100 0x6 0x8 0x3ff 0x1>;
+>>
+>> ...to mask our stream IDs to 10 bits.
+>>
+>> This should work in theory and comply with the bindings, no?
+> In theory, but now consider:
+>
+> 	iommu-map = <0x0 0x6 0x7 0x3ff 0x2>;
+>
+> faced with ID 1. The input base is 0, the output base is the 2-cell
+> value 0x7000003ff, so the final ID value should be 0x700000400, right?
+>
+>> of_pci_map_rid() seems to have a hardcoded assumption that
+>> each field in the map is 4 bytes.
+> It does. I guess we should explicitly check that #{msi,iommu}-cells = 1
+> on the target node, and maybe clarify in the binding that that cell
+> should represent a plain linear ID value (although that's pretty obvious
+> from context IMO).
+>
+>> (Also, I guess that msi-map is not affected by this since it
+>> is not related to the IOMMU...but we do have common code
+>> handling both maps.)
+> I'd say it's definitely affected, since #msi-cells can equally be more
+> than 1, and encodes an equally opaque value.
+>
+> It seems pretty reasonable to me that we could extend the binding to
+> accommodate #cells > 1 iff length == 1. Mark?
+>
+> That said, is there a concrete need for this, i.e. do you actually have
+> one device with a single requester ID, which maps to multiple output IDs
+> (which differ only in the upper bits) in a non-predictable manner?
+>
+Actually in the example presented by Stuart, the SMR mask should be
+0x7C00 (as 0 means that the bit is relevant for matching). So, we have
+the stream ID 7, but the SMMU 500 is appending the TBU bits which makes
+the stream ID look like 0x1407 (TBU 5). In our platform the relationship
+device-TBU is not exposed and documented. The SMMU-500 ref manual
+describes this case:
 
-So, in drivers, gpiod_set_value*(, 1) means "set gpio to active
-level" and gpiod_set_value*(, 0) means "set gpio to inactive level".
+"If the Stream ID presented to each TBU is already unique, and the TBU
+ID addition is not required, then you must ensure that the TBU ID field
+is masked in the SMR."
 
-Far nicer than all the bugs we've had with the legacy GPIO interfaces
-with random different drivers implementing random different ways to
-invert the signal, with all the pain that brings with it when a
-platform comes along with a different inversion state.
+This is the reason that we need the SMR mask, to mask the TBU bits in
+the SMR.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thank you,
+
+Diana
