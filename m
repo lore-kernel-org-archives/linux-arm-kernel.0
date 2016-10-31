@@ -1,43 +1,71 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 31 Oct 2016 16:03:27 -0500
-Subject: [PATCH v3 1/3] PM / OPP: Expose _of_get_opp_desc_node as
- dev_pm_opp API
-In-Reply-To: <20161028040507.GJ10423@vireshk-i7>
-References: <20161027214131.1725-1-d-gerlach@ti.com>
- <20161027214131.1725-2-d-gerlach@ti.com> <20161028040507.GJ10423@vireshk-i7>
-Message-ID: <a8a4253a-8558-c10f-817e-7cd6975b82ce@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 31 Oct 2016 14:06:20 -0700
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1477363675.2298.2.camel@intel.com>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+ <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+ <87eg35snvg.fsf@eliezer.anholt.net>
+ <1190898538.120930.02d69662-0b1a-447d-9c29-782aec7a1189.open-xchange@email.1und1.de>
+ <1477363675.2298.2.camel@intel.com>
+Message-ID: <87h97sut2r.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2016 11:05 PM, Viresh Kumar wrote:
-> On 27-10-16, 16:41, Dave Gerlach wrote:
->> Move _of_get_opp_desc_node into include/linux/pm_opp.h and rename it
->> dev_pm_opp_of_get_opp_desc_node to allow other drivers, such as platform
->> OPP and cpufreq drivers, to make use of it.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->>  drivers/base/power/opp/of.c  | 8 ++++----
->>  drivers/base/power/opp/opp.h | 1 -
->>  include/linux/pm_opp.h       | 6 ++++++
->>  3 files changed, 10 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/base/power/opp/of.c b/drivers/base/power/opp/of.c
->> index 5552211e6fcd..215f5a538c78 100644
->> --- a/drivers/base/power/opp/of.c
->> +++ b/drivers/base/power/opp/of.c
->> @@ -198,7 +198,7 @@ void dev_pm_opp_of_remove_table(struct device *dev)
->>  EXPORT_SYMBOL_GPL(dev_pm_opp_of_remove_table);
->>
->>  /* Returns opp descriptor node for a device, caller must do of_node_put() */
->> -struct device_node *_of_get_opp_desc_node(struct device *dev)
->> +struct device_node *dev_pm_opp_of_get_opp_desc_node(struct device *dev)
->
-> Export as well ?
->
+Zhang Rui <rui.zhang@intel.com> writes:
 
-Whoops, yes will need to do that. I'll give some time for comments on 
-any other patches before sending v3.
+> On Mon, 2016-10-24 at 20:25 +0200, Stefan Wahren wrote:
+>> > 
+>> > Eric Anholt <eric@anholt.net> hat am 24. Oktober 2016 um 18:38
+>> > geschrieben:
+>> > 
+>> > 
+>> > Stefan Wahren <stefan.wahren@i2se.com> writes:
+>> > 
+>> > > 
+>> > > Hi Martin,
+>> > > 
+>> > > Am 28.09.2016 um 23:10 schrieb Eric Anholt:
+>> > > > 
+>> > > > kernel at martin.sperl.org writes:
+>> > > > 
+>> > > > > 
+>> > > > > From: Martin Sperl <kernel@martin.sperl.org>
+>> > > > > 
+>> > > > > Add basic thermal driver for bcm2835 SOC.
+>> > > > > 
+>> > > > > This driver currently relies on the firmware setting up the
+>> > > > > tsense HW block and does not set it up itself.
+>> > > > > 
+>> > > > > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> > > > > Acked-by: Eric Anholt <eric@anholt.net>
+>> > > > > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> > > > What's the status of merging this one???I'd like to merge the
+>> > > > other
+>> > > > patches.
+>> > > i think it's necessary to rebase the whole series. Maybe we could
+>> > > get it
+>> > > into 4.10.
+>> > Why would it need to be rebased???The status, as far as I know, is
+>> > that
+>> > we're still waiting for the subsystem maintainer to respond.
+>> Since at least this patch won't apply anymore, but feedback from
+>> maintainer is
+>> still good :-)
+>> 
+>> Sorry for this impatience, but i'm afraid that we possibly miss 4.10.
+>
+> Eduardo,
+>
+> any comments on this patchset?
 
-Thanks,
-Dave
+It's been a month on v7 of this patch.  Can we please merge it?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161031/4847b7b1/attachment.sig>
