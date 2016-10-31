@@ -1,69 +1,100 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 31 Oct 2016 10:54:55 +0100
-Subject: [PATCH 2/2] ARM: bus: da8xx-mstpri: new driver
-In-Reply-To: <0cac724d-1aee-dfa7-9b78-8366fd6fceff@ti.com>
-References: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
- <1477503355-2600-3-git-send-email-bgolaszewski@baylibre.com>
- <20161031043015.74ppaship5nqfaqt@rob-hp-laptop>
- <CAMpxmJW85TQObLdoGW2ApnkM8OiM4d1ZDd=9eyGmeVXXwqByPQ@mail.gmail.com>
- <0cac724d-1aee-dfa7-9b78-8366fd6fceff@ti.com>
-Message-ID: <CAMpxmJX7SjE1zs926Fn-=jsZhPsOK6ey0hHM8LBhNS1nuSuFFQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Oct 2016 10:55:39 +0100
+Subject: [PATCH] net: stmmac: Add OXNAS Glue Driver
+In-Reply-To: <20161030204110.otvjlanmi7dv7fox@rob-hp-laptop>
+References: <20161021084445.24989-1-narmstrong@baylibre.com>
+ <20161030204110.otvjlanmi7dv7fox@rob-hp-laptop>
+Message-ID: <04b8ed79-8efa-cc10-a9a3-fdee10e0723c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-10-31 10:52 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> Hi Bartosz,
->
-> On Monday 31 October 2016 03:10 PM, Bartosz Golaszewski wrote:
->> 2016-10-31 5:30 GMT+01:00 Rob Herring <robh@kernel.org>:
->>> On Wed, Oct 26, 2016 at 07:35:55PM +0200, Bartosz Golaszewski wrote:
->>>> Create the driver for the da8xx master peripheral priority
->>>> configuration and implement support for writing to the three
->>>> Master Priority registers on da850 SoCs.
->>>>
->>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>> ---
->>>>  .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
->>>>  drivers/bus/Kconfig                                |   9 +
->>>>  drivers/bus/Makefile                               |   2 +
->>>>  drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
->>>>  4 files changed, 297 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>>  create mode 100644 drivers/bus/da8xx-mstpri.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>> new file mode 100644
->>>> index 0000000..225af09
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>> @@ -0,0 +1,20 @@
->>>> +* Device tree bindings for Texas Instruments da8xx master peripheral
->>>> +  priority driver
->>>> +
->>>> +DA8XX SoCs feature a set of registers allowing to change the priority of all
->>>> +peripherals classified as masters.
->>>> +
->>>> +Documentation:
->>>> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
->>>> +
->>>> +Required properties:
->>>> +
->>>> +- compatible:                "ti,da850-mstpri", "syscon" - for da850 based boards
->>>
->>> Drop syscon. Doesn't look like it is needed and the example doesn't
->>> match.
+On 10/30/2016 09:41 PM, Rob Herring wrote:
+> On Fri, Oct 21, 2016 at 10:44:45AM +0200, Neil Armstrong wrote:
+>> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
 >>
->> Hi Rob,
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  .../devicetree/bindings/net/oxnas-dwmac.txt        |  44 +++++
+> 
+> It's preferred that bindings are a separate patch.
+
+OK
+
+> 
+>>  drivers/net/ethernet/stmicro/stmmac/Kconfig        |  11 ++
+>>  drivers/net/ethernet/stmicro/stmmac/Makefile       |   1 +
+>>  drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c  | 219 +++++++++++++++++++++
+>>  4 files changed, 275 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+>>  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-oxnas.c
 >>
->> it is needed: syscon_regmap_lookup_by_compatible() fails without it. I
->> fixed the example instead.
->
-> Why are master priority registers under syscon? This driver should be
-> the only entity touching them. So do we need an MFD driver?
->
+>> Changes since RFC at https://patchwork.kernel.org/patch/9387257 :
+>>  - Drop init/exit callbacks
+>>  - Implement proper remove and PM callback
+>>  - Call init from probe
+>>  - Disable/Unprepare clock if stmmac probe fails
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/oxnas-dwmac.txt b/Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+>> new file mode 100644
+>> index 0000000..5d2696c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/oxnas-dwmac.txt
+>> @@ -0,0 +1,44 @@
+>> +* Oxford Semiconductor OXNAS DWMAC Ethernet controller
+>> +
+>> +The device inherits all the properties of the dwmac/stmmac devices
+>> +described in the file stmmac.txt in the current directory with the
+>> +following changes.
+>> +
+>> +Required properties on all platforms:
+>> +
+>> +- compatible:	Depending on the platform this should be one of:
+>> +			- "oxsemi,ox820-dwmac"
+>> +		Additionally "snps,dwmac" and any applicable more
+>> +		detailed version number described in net/stmmac.txt
+>> +		should be used.
+> 
+> You should be explicit what version applies to ox820. "snps,dwmac" 
+> should probably be deprecated IMO. There are so many variations of DW 
+> h/w.
 
-It should, but syscfg0 registers are mapped all over the place. I
-thought it would be safer to put them under syscon and Kevin agreed.
+Well, to be honest I have absolutely no idea ! But I will try to find out...
 
-Thanks,
-Bartosz Golaszewski
+> 
+>> +
+>> +- reg:	The first register range should be the one of the DWMAC
+>> +	controller.
+> 
+> This is worded like there's a 2nd range?
+
+OK, will rephrase.
+
+> 
+>> +
+>> +- clocks: Should contain phandles to the following clocks
+>> +- clock-names:	Should contain the following:
+>> +		- "stmmaceth" - see stmmac.txt
+>> +		- "gmac" - peripheral gate clock
+>> +
+>> +- oxsemi,sys-ctrl: a phandle to the system controller syscon node
+>> +
+>> +Example :
+>> +
+>> +etha: ethernet at 40400000 {
+>> +	compatible = "oxsemi,ox820-dwmac", "snps,dwmac";
+>> +	reg = <0x40400000 0x2000>;
+>> +	interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
+>> +		     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
+>> +	interrupt-names = "macirq", "eth_wake_irq";
+>> +	mac-address = [000000000000]; /* Filled in by U-Boot */
+>> +	phy-mode = "rgmii";
+>> +
+>> +	clocks = <&stdclk CLK_820_ETHA>, <&gmacclk>;
+>> +	clock-names = "gmac", "stmmaceth";
+>> +	resets = <&reset RESET_MAC>;
+>> +
+>> +	/* Regmap for sys registers */
+>> +	oxsemi,sys-ctrl = <&sys>;
+>> +
+>> +	status = "disabled";
+>> +};
