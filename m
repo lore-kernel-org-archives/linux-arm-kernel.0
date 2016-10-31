@@ -1,314 +1,107 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 31 Oct 2016 22:55:39 +0300
-Subject: [PATCH v6 3/7] ARM: dts: r8a7743: add [H]SCIF{A|B} support
-In-Reply-To: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
-References: <1746536.qobnGdHRfV@wasted.cogentembedded.com>
-Message-ID: <29562553.JmvzVUkhx3@wasted.cogentembedded.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 31 Oct 2016 12:57:32 -0700
+Subject: [PATCH] staging: vc04_services: setup DMA and coherent mask
+In-Reply-To: <1477943593.30971.3.camel@crowfest.net>
+References: <20161028171159.23973-1-mzoran@crowfest.net>
+ <87twbsqsb4.fsf@eliezer.anholt.net> <1477939258.30971.1.camel@crowfest.net>
+ <1477943593.30971.3.camel@crowfest.net>
+Message-ID: <1477943852.30971.5.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe [H]SCIF{|A|B} ports in the R8A7743 device tree.
-
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
----
-Changes in version 5:
-- refreshed the patch.
-
-Changes in version 4:
-- corrected RBNF in the patch description/subject;
-- used the R-Car gen2 bindings instead of the RZ/G family ones;
-- refreshed the patch;
-- added Geert's tag.
-
-Changes in version 3:
-- resolved  a reject;
-- updated the "clocks" properties for the CPG/MSSR driver;
-- renamed the patch.
-
-Changes in version 2:
-- used  the new RZ/G family "compatible" prop values, reformatting where needed;
-- fixed the size cells of the SCIFB device nodes' "reg" properties;
-- changed the size cells of the "reg" properties to hexadecimal;
-- indented the SCIFA1 device node's closing brace correctly
-- adjusted the patch description, renamed the patch.
-
- arch/arm/boot/dts/r8a7743.dtsi |  261 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 261 insertions(+)
-
-Index: renesas/arch/arm/boot/dts/r8a7743.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7743.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7743.dtsi
-@@ -157,6 +157,267 @@
- 			#dma-cells = <1>;
- 			dma-channels = <15>;
- 		};
-+
-+		scifa0: serial at e6c40000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c40000 0 0x40>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 204>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-+			       <&dmac1 0x21>, <&dmac1 0x22>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifa1: serial at e6c50000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c50000 0 0x40>;
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 203>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x25>, <&dmac0 0x26>,
-+			       <&dmac1 0x25>, <&dmac1 0x26>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifa2: serial at e6c60000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c60000 0 0x40>;
-+			interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 202>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x27>, <&dmac0 0x28>,
-+			       <&dmac1 0x27>, <&dmac1 0x28>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifa3: serial at e6c70000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c70000 0 0x40>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 1106>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x1b>, <&dmac0 0x1c>,
-+			       <&dmac1 0x1b>, <&dmac1 0x1c>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifa4: serial at e6c78000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c78000 0 0x40>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 1107>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x1f>, <&dmac0 0x20>,
-+			       <&dmac1 0x1f>, <&dmac1 0x20>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifa5: serial at e6c80000 {
-+			compatible = "renesas,scifa-r8a7743",
-+				     "renesas,rcar-gen2-scifa", "renesas,scifa";
-+			reg = <0 0xe6c80000 0 0x40>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 1108>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x23>, <&dmac0 0x24>,
-+			       <&dmac1 0x23>, <&dmac1 0x24>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifb0: serial at e6c20000 {
-+			compatible = "renesas,scifb-r8a7743",
-+				     "renesas,rcar-gen2-scifb", "renesas,scifb";
-+			reg = <0 0xe6c20000 0 0x100>;
-+			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 206>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x3d>, <&dmac0 0x3e>,
-+		       <&dmac1 0x3d>, <&dmac1 0x3e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifb1: serial at e6c30000 {
-+			compatible = "renesas,scifb-r8a7743",
-+				     "renesas,rcar-gen2-scifb", "renesas,scifb";
-+			reg = <0 0xe6c30000 0 0x100>;
-+			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 207>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x19>, <&dmac0 0x1a>,
-+			       <&dmac1 0x19>, <&dmac1 0x1a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scifb2: serial at e6ce0000 {
-+			compatible = "renesas,scifb-r8a7743",
-+				     "renesas,rcar-gen2-scifb", "renesas,scifb";
-+			reg = <0 0xe6ce0000 0 0x100>;
-+			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 216>;
-+			clock-names = "fck";
-+			dmas = <&dmac0 0x1d>, <&dmac0 0x1e>,
-+			       <&dmac1 0x1d>, <&dmac1 0x1e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif0: serial at e6e60000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 0x40>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 721>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
-+			       <&dmac1 0x29>, <&dmac1 0x2a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif1: serial at e6e68000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e68000 0 0x40>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 720>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
-+			       <&dmac1 0x2d>, <&dmac1 0x2e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif2: serial at e6e58000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e58000 0 0x40>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 719>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
-+			       <&dmac1 0x2b>, <&dmac1 0x2c>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif3: serial at e6ea8000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6ea8000 0 0x40>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 718>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2f>, <&dmac0 0x30>,
-+			       <&dmac1 0x2f>, <&dmac1 0x30>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif4: serial at e6ee0000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6ee0000 0 0x40>;
-+			interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 715>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0xfb>, <&dmac0 0xfc>,
-+			       <&dmac1 0xfb>, <&dmac1 0xfc>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif5: serial at e6ee8000 {
-+			compatible = "renesas,scif-r8a7743",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6ee8000 0 0x40>;
-+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 714>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0xfd>, <&dmac0 0xfe>,
-+			       <&dmac1 0xfd>, <&dmac1 0xfe>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		hscif0: serial at e62c0000 {
-+			compatible = "renesas,hscif-r8a7743",
-+				     "renesas,rcar-gen2-hscif", "renesas,hscif";
-+			reg = <0 0xe62c0000 0 0x60>;
-+			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 717>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x39>, <&dmac0 0x3a>,
-+			       <&dmac1 0x39>, <&dmac1 0x3a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		hscif1: serial at e62c8000 {
-+			compatible = "renesas,hscif-r8a7743",
-+				     "renesas,rcar-gen2-hscif", "renesas,hscif";
-+			reg = <0 0xe62c8000 0 0x60>;
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 716>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x4d>, <&dmac0 0x4e>,
-+			       <&dmac1 0x4d>, <&dmac1 0x4e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		hscif2: serial at e62d0000 {
-+			compatible = "renesas,hscif-r8a7743",
-+				     "renesas,rcar-gen2-hscif", "renesas,hscif";
-+			reg = <0 0xe62d0000 0 0x60>;
-+			interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 713>,
-+			         <&cpg CPG_CORE R8A7743_CLK_ZS>, <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x3b>, <&dmac0 0x3c>,
-+			       <&dmac1 0x3b>, <&dmac1 0x3c>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	/* External root clock */
+On Mon, 2016-10-31 at 12:53 -0700, Michael Zoran wrote:
+> On Mon, 2016-10-31 at 11:40 -0700, Michael Zoran wrote:
+> > On Mon, 2016-10-31 at 11:36 -0700, Eric Anholt wrote:
+> > > Michael Zoran <mzoran@crowfest.net> writes:
+> > > 
+> > > > Setting the DMA mask is optional on 32 bit but
+> > > > is mandatory on 64 bit.??Set the DMA mask and coherent
+> > > > to force all DMA to be in the 32 bit address space.
+> > > > 
+> > > > This is considered a "good practice" and most drivers
+> > > > already do this.
+> > > > 
+> > > > Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> > > > ---
+> > > > ?.../staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
+> > > > |
+> > > > 10 ++++++++++
+> > > > ?1 file changed, 10 insertions(+)
+> > > > 
+> > > > diff --git
+> > > > a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_
+> > > > ar
+> > > > m.
+> > > > c
+> > > > b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_
+> > > > ar
+> > > > m.
+> > > > c
+> > > > index a5afcc5..6fa2b5a 100644
+> > > > ---
+> > > > a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_
+> > > > ar
+> > > > m.
+> > > > c
+> > > > +++
+> > > > b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_
+> > > > ar
+> > > > m.
+> > > > c
+> > > > @@ -97,6 +97,16 @@ int vchiq_platform_init(struct
+> > > > platform_device
+> > > > *pdev, VCHIQ_STATE_T *state)
+> > > > ?	int slot_mem_size, frag_mem_size;
+> > > > ?	int err, irq, i;
+> > > > ?
+> > > > +	/*
+> > > > +	?* Setting the DMA mask is necessary in the 64 bit
+> > > > environment.
+> > > > +	?* It isn't necessary in a 32 bit environment but is
+> > > > considered
+> > > > +	?* a good practice.
+> > > > +	?*/
+> > > > +	err = dma_set_mask_and_coherent(dev,
+> > > > DMA_BIT_MASK(32));
+> > > 
+> > > I think a better comment here would be simply:
+> > > 
+> > > /* VCHI messages between the CPU and firmware use 32-bit bus
+> > > addresses. */
+> > > 
+> > > explaining why the value is chosen (once you know that the 32 bit
+> > > restriction exists, reporting it is obviously needed).??I'm
+> > > curious,
+> > > though: what failed when you didn't set it?
+> > > 
+> > 
+> > The comment is easy to change.
+> > 
+> > I don't have the log available ATM, but if I remember the DMA API's
+> > bugcheck the first time that are used.??
+> > 
+> > I think this was a policy decision or something because the
+> > information
+> > should be available in the dma-ranges.
+> > 
+> > If it's important, I can setup a test again without the change and
+> > e-
+> > mail the logs.
+> > 
+> > If you look at the DWC2 driver you will see that it also sets this
+> > mask.
+> 
+> OK, I'm begging to understand this.??It appears the architecture
+> specific paths are very different.
+> 
+> In arm the mask and coherent is set to DMA_BIT_MASK(32) in mm/dma-
+> mapping.c the first time the dma APIs are used.??On arm64, it appears
+> this variable is uninitialized and will contain random crude.
+> 
+> Like I said, I don't know if this is a policy decision or if it just
+> slipped through the cracks.
+> 
+Actually, I'm getting confused here.   If I need to prove this is
+needed, is their anybody I can send e-mail to that has a deep
+understanding of the two different architecture paths.   Perhaps they
+can explain exactly why arm64 is not defaulting to 32 bit DMA.
