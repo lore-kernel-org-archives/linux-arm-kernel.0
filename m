@@ -1,54 +1,89 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 15:46:22 +0000
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <1913139.FJW82OAuEF@amdc3058>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <4818149.nzRaU7vJQE@amdc1976> <4264651.gPKphdYuCx@wuerfel>
- <1913139.FJW82OAuEF@amdc3058>
-Message-ID: <20161031154622.GB1041@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 31 Oct 2016 09:49:25 -0600
+Subject: Applied "ASoC: sun4i-codec: return error code instead of NULL when
+ create_card fails" to the asoc tree
+In-Reply-To: <20161031064209.12241-1-wens@csie.org>
+Message-ID: <E1c1Epx-0000n0-CM@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 26, 2016 at 07:01:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Wednesday, July 13, 2016 04:37:31 PM Arnd Bergmann wrote:
-> > On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > 
-> > > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
-> > > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > > > This patch disables deprecated IDE subsystem in assabet_defconfig
-> > > > > (no IDE host drivers are selected in this config so there is no
-> > > > > valid reason to enable IDE subsystem itself).
-> > > > > 
-> > > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > > 
-> > > > I think the series makes a lot of sense. I have checked your assertions
-> > > > in the changelogs and found no flaws in your logic, so I think we should
-> > > > take them all through arm-soc unless there are other concerns.
-> > > 
-> > > Thank you.
-> > > 
-> > > Should I resend everything or just patches that were not reposted yet
-> > > (the ones that were marked as RFT initially and got no feedback)?
-> > 
-> > I'd be fine with just getting a pull request with all the patches that
-> > had no negative feedback and that were not already applied (if any).
-> 
-> Here it is (sorry for taking so long).
+The patch
 
-I've just been digging in the dmesg logs from when I was using the
-Assabet+Neponset as my firewall, and it was having to use the IDE
-ide-cs driver rather than the pata pcmcia driver.
+   ASoC: sun4i-codec: return error code instead of NULL when create_card fails
 
-I don't recall whether the pata pcmcia driver was a problem or not,
-as the PCMCIA interface can't cope with _any_ 32-bit accesses.  I
-think PATA tries to use the "highest" possible access size by
-default...
+has been applied to the asoc tree at
 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 85915b63ad8b796848f431b66c9ba5e356e722e5 Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 31 Oct 2016 14:42:09 +0800
+Subject: [PATCH] ASoC: sun4i-codec: return error code instead of NULL when
+ create_card fails
+
+When sun4i_codec_create_card fails, we do not assign a proper error
+code to the return value. The return value would be 0 from the previous
+function call, or we would have bailed out sooner. This would confuse
+the driver core into thinking the device probe succeeded, when in fact
+it didn't, leaving various devres based resources lingering.
+
+Make the create_card function pass back a meaningful error code, and
+assign it to the return value.
+
+Fixes: 45fb6b6f2aa3 ("ASoC: sunxi: add support for the on-chip codec on
+		      early Allwinner SoCs")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index e047ec06d538..a60707761abf 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -765,11 +765,11 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+ 
+ 	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
+ 	if (!card)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	card->dai_link = sun4i_codec_create_link(dev, &card->num_links);
+ 	if (!card->dai_link)
+-		return NULL;
++		return ERR_PTR(-ENOMEM);
+ 
+ 	card->dev		= dev;
+ 	card->name		= "sun4i-codec";
+@@ -876,7 +876,8 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	card = sun4i_codec_create_card(&pdev->dev);
+-	if (!card) {
++	if (IS_ERR(card)) {
++		ret = PTR_ERR(card);
+ 		dev_err(&pdev->dev, "Failed to create our card\n");
+ 		goto err_unregister_codec;
+ 	}
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.1
