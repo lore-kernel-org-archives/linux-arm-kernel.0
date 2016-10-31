@@ -1,52 +1,67 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 31 Oct 2016 20:54:54 +0100
-Subject: [PATCH v3 2/4] ARM: dts: pxa: add pxa25x cpu operating points
+Date: Mon, 31 Oct 2016 20:54:55 +0100
+Subject: [PATCH v3 3/4] ARM: dts: pxa: add pxa27x cpu operating points
 In-Reply-To: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
 References: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1477943696-23477-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1477943696-23477-4-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the relevant data taken from the PXA 25x Electrical, Mechanical, and
+Add the relevant data taken from the PXA27x Electrical, Mechanical, and
 Thermal Specfication. This will be input data for cpufreq-dt driver.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
 Since v2: opp definition amended as per Viresh's comment
 ---
- arch/arm/boot/dts/pxa25x.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/pxa27x.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
-index 0d1e012178c4..f9f4726396a0 100644
---- a/arch/arm/boot/dts/pxa25x.dtsi
-+++ b/arch/arm/boot/dts/pxa25x.dtsi
-@@ -89,4 +89,29 @@
- 		clocks = <&clktimer>;
+diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
+index 9e73dc6b3ed3..e0fab48ba6fa 100644
+--- a/arch/arm/boot/dts/pxa27x.dtsi
++++ b/arch/arm/boot/dts/pxa27x.dtsi
+@@ -137,4 +137,44 @@
+ 		clocks = <&clks CLK_OSTIMER>;
  		status = "okay";
  	};
 +
-+	pxa250_opp_table: opp_table0 {
++	pxa270_opp_table: opp_table0 {
 +		compatible = "operating-points-v2";
 +
-+		opp at 99532800 {
-+			opp-hz = /bits/ 64 <99532800>;
-+			opp-microvolt = <1000000 950000 1650000>;
++		opp at 104000000 {
++			opp-hz = /bits/ 64 <104000000>;
++			opp-microvolt = <900000 900000 1705000>;
 +			clock-latency-ns = <20>;
 +		};
-+		opp at 199065600 {
-+			opp-hz = /bits/ 64 <199065600>;
-+			opp-microvolt = <1000000 950000 1650000>;
++		opp at 156000000 {
++			opp-hz = /bits/ 64 <156000000>;
++			opp-microvolt = <1000000 1000000 1705000>;
 +			clock-latency-ns = <20>;
 +		};
-+		opp at 298598400 {
-+			opp-hz = /bits/ 64 <298598400>;
-+			opp-microvolt = <1100000 1045000 1650000>;
++		opp at 208000000 {
++			opp-hz = /bits/ 64 <208000000>;
++			opp-microvolt = <1180000 1180000 1705000>;
 +			clock-latency-ns = <20>;
 +		};
-+		opp at 398131200 {
-+			opp-hz = /bits/ 64 <398131200>;
-+			opp-microvolt = <1300000 1235000 1650000>;
++		opp at 312000000 {
++			opp-hz = /bits/ 64 <312000000>;
++			opp-microvolt = <1250000 1250000 1705000>;
++			clock-latency-ns = <20>;
++		};
++		opp at 416000000 {
++			opp-hz = /bits/ 64 <416000000>;
++			opp-microvolt = <1350000 1350000 1705000>;
++			clock-latency-ns = <20>;
++		};
++		opp at 520000000 {
++			opp-hz = /bits/ 64 <520000000>;
++			opp-microvolt = <1450000 1450000 1705000>;
++			clock-latency-ns = <20>;
++		};
++		opp at 624000000 {
++			opp-hz = /bits/ 64 <624000000>;
++			opp-microvolt = <1550000 1550000 1705000>;
 +			clock-latency-ns = <20>;
 +		};
 +	};
