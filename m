@@ -1,65 +1,45 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 31 Oct 2016 19:14:13 +0100
-Subject: [RESEND PATCH] arm: assabet_defconfig: disable IDE subsystem
-In-Reply-To: <20161031154622.GB1041@n2100.armlinux.org.uk>
-References: <1467991490-24895-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20161031154643eucas1p16e74053f4947f9a945f7029a52914154@eucas1p1.samsung.com>
- <20161031154622.GB1041@n2100.armlinux.org.uk>
-Message-ID: <2291876.8LAt3RcuXX@amdc3058>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 31 Oct 2016 12:16:12 -0600 (MDT)
+Subject: [PATCH v2] irqchip/bcm2836: Prevent spurious interrupts
+In-Reply-To: <8737jcs8mc.fsf@eliezer.anholt.net>
+References: <20161027182038.11312-1-eric@anholt.net>
+ <alpine.DEB.2.20.1610281257230.4896@nanos>
+ <87bmy4qxnb.fsf@eliezer.anholt.net>
+ <alpine.DEB.2.20.1610282141030.5053@nanos>
+ <8737jcs8mc.fsf@eliezer.anholt.net>
+Message-ID: <alpine.DEB.2.20.1610311213460.10522@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Monday, October 31, 2016 03:46:22 PM Russell King - ARM Linux wrote:
-> On Wed, Oct 26, 2016 at 07:01:12PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Wednesday, July 13, 2016 04:37:31 PM Arnd Bergmann wrote:
-> > > On Wednesday, July 13, 2016 12:59:23 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > > 
-> > > > On Friday, July 08, 2016 10:23:48 PM Arnd Bergmann wrote:
-> > > > > On Friday, July 8, 2016 5:24:41 PM CEST Bartlomiej Zolnierkiewicz wrote:
-> > > > > > This patch disables deprecated IDE subsystem in assabet_defconfig
-> > > > > > (no IDE host drivers are selected in this config so there is no
-> > > > > > valid reason to enable IDE subsystem itself).
-> > > > > > 
-> > > > > > Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> > > > > > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > > > > 
-> > > > > I think the series makes a lot of sense. I have checked your assertions
-> > > > > in the changelogs and found no flaws in your logic, so I think we should
-> > > > > take them all through arm-soc unless there are other concerns.
-> > > > 
-> > > > Thank you.
-> > > > 
-> > > > Should I resend everything or just patches that were not reposted yet
-> > > > (the ones that were marked as RFT initially and got no feedback)?
-> > > 
-> > > I'd be fine with just getting a pull request with all the patches that
-> > > had no negative feedback and that were not already applied (if any).
-> > 
-> > Here it is (sorry for taking so long).
+On Mon, 31 Oct 2016, Eric Anholt wrote:
+> Thomas Gleixner <tglx@linutronix.de> writes:
 > 
-> I've just been digging in the dmesg logs from when I was using the
-> Assabet+Neponset as my firewall, and it was having to use the IDE
-> ide-cs driver rather than the pata pcmcia driver.
+> > On Fri, 28 Oct 2016, Eric Anholt wrote:
+> >
+> >> Thomas Gleixner <tglx@linutronix.de> writes:
+> >> > This is missing a fixes tag. I have no idea when that problem was
+> >> > introduced, so I have no way to decide whether this needs to be tagged
+> >> > stable or not.
+> >> 
+> >> This code has been there since introduction of the driver, so:
+> >> 
+> >> Fixes: 1a15aaa998dc ("irqchip: Add bcm2836 interrupt controller for Raspberry Pi 2")
+> >
+> > So it want's a stable tag, right?
 > 
-> I don't recall whether the pata pcmcia driver was a problem or not,
-> as the PCMCIA interface can't cope with _any_ 32-bit accesses.  I
-> think PATA tries to use the "highest" possible access size by
-> default...
+> I'm not the author here, and I was just trying to provide an assist with
+> upstreaming, so I'm not going to get too involved.  I'd say this is an
+> edge case for being a stable tree candidate (it's produces a scary dmesg
+> warning but no other functional problems that I know of), and I didn't
+> add a fixes tag myself because of that.
 
-It doesn't actually - it defaults to 16-bits for PIO data access and
-you must explicitly enable 32-bits using ATA_PFLAG_PIO32 port flag
-(pata_pcmcia doesn't set it so it should be okay).  Also taskfile
-registers are accessed using 8-bits access by default transport
-functions (which are used by pata_pcmcia).
+A fixes tag is not the same as a stable tag, I really want to see Fixes
+tags on patches which are bug fixes as it makes it simple to see the
+context in which a bug was introduced.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+vs. the stable tag: scary warnings tend to confuse users and cause people
+to send bug reports. So in this case I'd add one.
+
+Thanks,
+
+	tglx
