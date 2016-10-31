@@ -1,37 +1,37 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 31 Oct 2016 16:14:00 +0000
-Subject: [PATCH 2/2] MAINTAINERS: add ARM and arm64 EFI specific files to
- EFI subsystem
-In-Reply-To: <CAKv+Gu9B7X3CDVZrxZQFVsn3U2CT0A2Z3Owj7BQuFXPjk5Ln4Q@mail.gmail.com>
-References: <1474472114-12973-1-git-send-email-ard.biesheuvel@linaro.org>
- <1474472114-12973-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9B7X3CDVZrxZQFVsn3U2CT0A2Z3Owj7BQuFXPjk5Ln4Q@mail.gmail.com>
-Message-ID: <20161031161400.GG1041@n2100.armlinux.org.uk>
+Date: Mon, 31 Oct 2016 16:17:00 +0000
+Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
+In-Reply-To: <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+References: <315017958.66634.5d4fc19c-31cd-4900-8613-af4cadec5da4.open-xchange@email.1und1.de>
+ <20161023133134.GI1041@n2100.armlinux.org.uk>
+ <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+Message-ID: <20161031161700.GH1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 11:09:55AM +0100, Ard Biesheuvel wrote:
-> On 21 September 2016 at 16:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > Since I will be co-maintaining the EFI subsystem, it makes sense to
-> > mention the ARM and arm64 EFI bits in the EFI section in MAINTAINERS
-> > so that Matt, the list and I get cc'ed on proposed changes.
-> >
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  MAINTAINERS | 6 ++++--
-> >  1 file changed, 4 insertions(+), 2 deletions(-)
-> >
+On Sat, Oct 29, 2016 at 01:44:14PM +0200, Stefan Wahren wrote:
+> unfortunately not:
 > 
-> Russell,
+> Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
 > 
-> do you have an objections to this change?
+> echo mem > /sys/power/state
+> 
+> Result: Able to wakeup via Debug UART
+> Expected result: Able to wakeup via Debug UART
+> 
+> ---
+> 
+> Setting: no_console_suspend not in cmdline, Debug UART wakeup source enabled
+> 
+> echo freeze > /sys/power/state
+> 
+> Result: Unable to wakeup via Debug UART (no hung task warning)
+> Expected result: Able to wakeup via Debug UART
 
-Looks fine, thanks.
-
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Okay - I know that certain actions are bypassed when no_console_suspend
+is set, which has detrimental effects on some ARM platforms, so it was
+worth testing - iirc, working no_console_suspend is reliant on the boot
+loader re-setting up the serial port after its lost state.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
