@@ -1,70 +1,35 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 31 Oct 2016 20:54:55 +0100
-Subject: [PATCH v3 3/4] ARM: dts: pxa: add pxa27x cpu operating points
-In-Reply-To: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
-References: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1477943696-23477-4-git-send-email-robert.jarzmik@free.fr>
+Date: Mon, 31 Oct 2016 20:54:52 +0100
+Subject: [PATCH v3 0/4] PXA cpufreq conversion to clock API
+Message-ID: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the relevant data taken from the PXA27x Electrical, Mechanical, and
-Thermal Specfication. This will be input data for cpufreq-dt driver.
+Hi,
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
-Since v2: opp definition amended as per Viresh's comment
----
- arch/arm/boot/dts/pxa27x.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+This serie is a preparation to shift the cpufreq of pxa2xx platforms to clocks
+API, next iteration.
 
-diff --git a/arch/arm/boot/dts/pxa27x.dtsi b/arch/arm/boot/dts/pxa27x.dtsi
-index 9e73dc6b3ed3..e0fab48ba6fa 100644
---- a/arch/arm/boot/dts/pxa27x.dtsi
-+++ b/arch/arm/boot/dts/pxa27x.dtsi
-@@ -137,4 +137,44 @@
- 		clocks = <&clks CLK_OSTIMER>;
- 		status = "okay";
- 	};
-+
-+	pxa270_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+
-+		opp at 104000000 {
-+			opp-hz = /bits/ 64 <104000000>;
-+			opp-microvolt = <900000 900000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 156000000 {
-+			opp-hz = /bits/ 64 <156000000>;
-+			opp-microvolt = <1000000 1000000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 208000000 {
-+			opp-hz = /bits/ 64 <208000000>;
-+			opp-microvolt = <1180000 1180000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 312000000 {
-+			opp-hz = /bits/ 64 <312000000>;
-+			opp-microvolt = <1250000 1250000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 416000000 {
-+			opp-hz = /bits/ 64 <416000000>;
-+			opp-microvolt = <1350000 1350000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 520000000 {
-+			opp-hz = /bits/ 64 <520000000>;
-+			opp-microvolt = <1450000 1450000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+		opp at 624000000 {
-+			opp-hz = /bits/ 64 <624000000>;
-+			opp-microvolt = <1550000 1550000 1705000>;
-+			clock-latency-ns = <20>;
-+		};
-+	};
- };
+The first 3 patches are review and merge material :
+ - patch 1/4 for Viresh and Rafael
+ - patches 2/4 and 3/4 for me
+
+The 4th on is for review but not merge, as the clock changes must be fully
+reviewed and go in first as a prequisite
+
+Since previous iteration, 2 and 3 were amended per Viresh's suggestion.
+
+Robert Jarzmik (4):
+  cpufreq: pxa: use generic platdev driver for device-tree
+  ARM: dts: pxa: add pxa25x cpu operating points
+  ARM: dts: pxa: add pxa27x cpu operating points
+  cpufreq: pxa: convert to clock API
+
+ arch/arm/boot/dts/pxa25x.dtsi        |  25 +++++
+ arch/arm/boot/dts/pxa27x.dtsi        |  40 ++++++++
+ drivers/cpufreq/cpufreq-dt-platdev.c |   2 +
+ drivers/cpufreq/pxa2xx-cpufreq.c     | 191 +++++++----------------------------
+ 4 files changed, 106 insertions(+), 152 deletions(-)
+
 -- 
 2.1.4
