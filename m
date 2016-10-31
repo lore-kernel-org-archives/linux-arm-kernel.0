@@ -1,7 +1,9 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 31 Oct 2016 10:58:28 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6sx-sdb: update TX D_CAL for USBPHY
-Message-ID: <1477882709-2518-1-git-send-email-peter.chen@nxp.com>
+Date: Mon, 31 Oct 2016 10:58:29 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6ul-14x14-evk: update TX D_CAL for USBPHY
+In-Reply-To: <1477882709-2518-1-git-send-email-peter.chen@nxp.com>
+References: <1477882709-2518-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1477882709-2518-2-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +13,14 @@ can patch the eye-diagram test on this board.
 
 Signed-off-by: Peter Chen <peter.chen@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 8 ++++++++
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index 85f56a5..4933c56 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -317,6 +317,14 @@
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 53f0cf8..1867c69 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -233,6 +233,14 @@
  	status = "okay";
  };
  
@@ -30,8 +32,8 @@ index 85f56a5..4933c56 100644
 +	fsl,tx-d-cal = <106>;
 +};
 +
- &usdhc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc2>;
+ &usdhc1 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
 -- 
 2.7.4
