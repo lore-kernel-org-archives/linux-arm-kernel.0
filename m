@@ -1,193 +1,68 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 31 Oct 2016 08:09:21 -0700
-Subject: [RFC] fpga: Pull checks for supported operations into framework
-In-Reply-To: <1477851123-17686-1-git-send-email-moritz.fischer@ettus.com>
-References: <1477851123-17686-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <CAAtXAHeXZi1EM=Z7TNcO-Og+5-QGb5QR=KjGRUG0fAOfksaB8A@mail.gmail.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 31 Oct 2016 10:28:26 -0500
+Subject: [PATCHv2 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <20161031053604.3rjbuk7maabzbwq7@rob-hp-laptop>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+ <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
+ <20161031053604.3rjbuk7maabzbwq7@rob-hp-laptop>
+Message-ID: <895cf1ec-929a-8c41-c74a-948efcb89222@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Found a couple of issues, will resubmit after cleaning up. Feel free to add
-general feedback on the idea anyways in the meantime. Sorry for double post.
+Hi Rob,
 
-On Sun, Oct 30, 2016 at 11:12 AM, Moritz Fischer
-<moritz.fischer@ettus.com> wrote:
-> Most of the drivers only support a subset of {PARTIAL, FULL}
-> reconfiguration.
-> Pull duplicate checks in each driver into the framework.
+On 10/31/2016 12:36 AM, Rob Herring wrote:
+> On Thu, Oct 27, 2016 at 03:00:23PM -0500, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the Arria10 DevKit System Resource Chip register and state
+>> monitoring module to the MFD.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> Note: This needs to be applied to the bindings document that
+>> was Acked & Applied but didn't reach the for-next branch.
+>> See https://patchwork.ozlabs.org/patch/629397/
+>> ---
+>> v2  Change compatible string -mon to -monitor for clarity
+>> ---
+>>  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>> index ea151f2..c47be28 100644
+>> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
+>>  Device                   Description
+>>  ------                   ----------
+>>  a10sr_gpio               GPIO Controller
 >
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Cc: Alan Tull <atull@opensource.altera.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
-> Hi all,
->
-> with the new drivers (ice40, altera-ps-spi) being submitted I've noticed
-> we're duplicating this check over and over again,
-> so I figured we might as well pull it into the framework.
->
-> I'm not sure if there are gonna be other 'flags' we need to support
-> in the short term (we talked about byte-swapping ...)
->
-> Note: This patch goes on top of greg's char-misc-testing  that already
-> contains Alan's latest changes to support the A10 and won't apply
-> to master.
->
-> Cheers,
->
-> Moritz
->
-> ---
->  drivers/fpga/fpga-mgr.c       | 12 ++++++++++++
->  drivers/fpga/socfpga-a10.c    |  4 +++-
->  drivers/fpga/socfpga.c        |  3 ++-
->  drivers/fpga/zynq-fpga.c      |  3 ++-
->  include/linux/fpga/fpga-mgr.h |  9 +++++++--
->  5 files changed, 26 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-> index c58b4c4..85f17d8 100644
-> --- a/drivers/fpga/fpga-mgr.c
-> +++ b/drivers/fpga/fpga-mgr.c
-> @@ -49,6 +49,11 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, struct fpga_image_info *info,
->         struct device *dev = &mgr->dev;
->         int ret;
->
-> +       if (!(mgr->supported_flags & info->flags)) {
-> +               dev_err(dev, "Unsupported flags passed\n");
-> +               return -ENOTSUPP;
-> +       }
+> This should be just "gpio" BTW.
 
-That condition is obviously garbage ...
-> +
->         /*
->          * Call the low level driver's write_init function.  This will do the
->          * device-specific things to get the FPGA into the state where it is
-> @@ -252,6 +257,7 @@ EXPORT_SYMBOL_GPL(fpga_mgr_put);
->   */
->  int fpga_mgr_register(struct device *dev, const char *name,
->                       const struct fpga_manager_ops *mops,
-> +                     u32 supported_flags,
->                       void *priv)
->  {
->         struct fpga_manager *mgr;
-> @@ -268,6 +274,11 @@ int fpga_mgr_register(struct device *dev, const char *name,
->                 return -EINVAL;
->         }
->
-> +       if (!supported_flags) {
-> +               dev_err(dev, "Attempt to register with no supported flags\n");
-> +               return -EINVAL;
-> +       }
-> +
->         mgr = kzalloc(sizeof(*mgr), GFP_KERNEL);
->         if (!mgr)
->                 return -ENOMEM;
-> @@ -282,6 +293,7 @@ int fpga_mgr_register(struct device *dev, const char *name,
->
->         mgr->name = name;
->         mgr->mops = mops;
-> +       mgr->supported_flags = supported_flags;
->         mgr->priv = priv;
->
->         /*
-> diff --git a/drivers/fpga/socfpga-a10.c b/drivers/fpga/socfpga-a10.c
-> index ccd9fb2..e7c82ff 100644
-> --- a/drivers/fpga/socfpga-a10.c
-> +++ b/drivers/fpga/socfpga-a10.c
-> @@ -519,7 +519,9 @@ static int socfpga_a10_fpga_probe(struct platform_device *pdev)
->         }
->
->         return fpga_mgr_register(dev, "SoCFPGA Arria10 FPGA Manager",
-> -                                &socfpga_a10_fpga_mgr_ops, priv);
-> +                                &socfpga_a10_fpga_mgr_ops,
-> +                                FPGA_MGR_PARTIAL_RECONFIG,
-> +                                priv);
->  }
->
->  static int socfpga_a10_fpga_remove(struct platform_device *pdev)
-> diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
-> index b6672e6..3285b7d 100644
-> --- a/drivers/fpga/socfpga.c
-> +++ b/drivers/fpga/socfpga.c
-> @@ -582,7 +582,8 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
->                 return ret;
->
->         return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
-> -                                &socfpga_fpga_ops, priv);
-> +                                &socfpga_fpga_ops, FPGA_MGR_FULL_RECONFIG,
-> +                                priv);
->  }
->
->  static int socfpga_fpga_remove(struct platform_device *pdev)
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 249682e..1dabd25 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -413,6 +413,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
->         struct zynq_fpga_priv *priv;
->         struct resource *res;
->         int err;
-> +       u32 flags = FPGA_MGR_FULL_RECONFIG | FPGA_MGR_PARTIAL_RECONFIG;
->
->         priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
->         if (!priv)
-> @@ -465,7 +466,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
->         clk_disable(priv->clk);
->
->         err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
-> -                               &zynq_fpga_ops, priv);
-> +                               &zynq_fpga_ops, flags, priv);
->         if (err) {
->                 dev_err(dev, "unable to register FPGA manager");
->                 clk_unprepare(priv->clk);
-> diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-> index 040b86d..4f4bcf2 100644
-> --- a/include/linux/fpga/fpga-mgr.h
-> +++ b/include/linux/fpga/fpga-mgr.h
-> @@ -64,9 +64,12 @@ enum fpga_mgr_states {
->
->  /*
->   * FPGA Manager flags
-> + * FPGA_MGR_FULL_RECONFIG: do full reconfiguration if supported
->   * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
->   */
-> -#define FPGA_MGR_PARTIAL_RECONFIG      BIT(0)
-> +#define FPGA_MGR_FULL_RECONFIG         BIT(0)
-> +#define FPGA_MGR_PARTIAL_RECONFIG      BIT(1)
-> +#define FPGA_MGR_EXTERNAL_CONFIG       BIT(2)
+I reason I preprend a10sr_ is to distinguish this GPIO from the other 
+GPIOs when binding to our LEDs (see below). I think the LEDs need a 
+unique node name (unless I'm not understanding something).
 
-On second thought the FULL_RECONFIG is the same as !PARTIAL_RECONFIG,
-so useless ..
+A less important reason I use a10sr_gpio on the node name is that I can 
+cat the /sys/class/gpio/gpioxxx/label and see that it is associated with 
+the a10sr instead of one of our other general GPIOs. Is there a better 
+way to distinguish these?
 
 >
->  /**
->   * struct fpga_image_info - information specific to a FPGA image
-> @@ -119,6 +122,7 @@ struct fpga_manager {
->         enum fpga_mgr_states state;
->         const struct fpga_manager_ops *mops;
->         void *priv;
-> +       u32 supported_flags;
->  };
+>> +a10sr_monitor            Register and State Monitoring
 >
->  #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
-> @@ -135,7 +139,8 @@ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
->  void fpga_mgr_put(struct fpga_manager *mgr);
->
->  int fpga_mgr_register(struct device *dev, const char *name,
-> -                     const struct fpga_manager_ops *mops, void *priv);
-> +                     const struct fpga_manager_ops *mops, u32 supported_flags,
-> +                     void *priv);
->
->  void fpga_mgr_unregister(struct device *dev);
->
-> --
-> 2.4.11
+> s/_/-/ or maybe just "monitor". Not really a generic node name to use
+> for this.
 >
 
-Cheers,
+The reason I use _ for the node name is that the DTC fails if I 
+reference a node name with "-" but works OK for "_". For instance, I get 
+an error if the LEDs reference "a10sr-gpio" but "a10sr_gpio" compiles ok.
 
-Moritz
+Thanks for reviewing!
+
+Thor
+
+> Rob
+>
