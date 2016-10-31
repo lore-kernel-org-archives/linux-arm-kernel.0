@@ -1,90 +1,60 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 31 Oct 2016 15:20:29 -0700
-Subject: [PATCH v3] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
-In-Reply-To: <1477473794-26030-1-git-send-email-linus.walleij@linaro.org>
-References: <1477473794-26030-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161031222029.GG25787@tuxbot>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 31 Oct 2016 17:31:48 -0500
+Subject: [PATCHv2 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
+In-Reply-To: <20161031080222.GM13127@dell>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+ <1477598426-28125-4-git-send-email-tthayer@opensource.altera.com>
+ <20161031080222.GM13127@dell>
+Message-ID: <39faa26d-ca05-d68d-a50a-03d09d445b77@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 26 Oct 02:23 PDT 2016, Linus Walleij wrote:
+Hi Lee,
 
-> This adds the MPU-3050 gyroscope and the KXSD9 accelerometer to
-> the Qualcomm APQ8060 Dragonboard. The KXSD9 is mounted beyond the
-> MPU-3050 and appear as a subdevice beyond it. We set up the
-> required GPIO and interrupt lines to make the devices work.
-> 
+On 10/31/2016 03:02 AM, Lee Jones wrote:
+> On Thu, 27 Oct 2016, tthayer at opensource.altera.com wrote:
+>
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Add the Altera Arria10 DevKit System Resource Monitor functionality
+>> to the MFD device.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2  Change from -mon to -monitor for clarity
+>> ---
+>>  drivers/mfd/altera-a10sr.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+>> index 06e1f7f..30de652 100644
+>> --- a/drivers/mfd/altera-a10sr.c
+>> +++ b/drivers/mfd/altera-a10sr.c
+>> @@ -33,6 +33,10 @@
+>>  		.name = "altr_a10sr_gpio",
+>>  		.of_compatible = "altr,a10sr-gpio",
+>>  	},
+>> +	{
+>> +		.name = "altr_a10sr_monitor",
+>> +		.of_compatible = "altr,a10sr-monitor",
+>
+> So long as you use whichever compatible you agree on with Rob:
+>
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+>
+I'm getting a "Non-standard signature" warning for this (even if I make 
+everything lower-case).
 
-I'm concerned about the interrupt below, but apart from that
+Would you prefer I submit it with the warning or should I change it to 
+"Acked-by"?
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Thanks for reviewing!
 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - Should be fine to apply now: all bindings and requirements are
->   merged.
-> ChangeLog v1->v2:
-> - Use the new I2C mux gate bindings from Peter Rosin (merged to
->   the I2C subsystem)
-> ---
->  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-[..]
-> +				mpu3050 at 68 {
-> +					compatible = "invensense,mpu3050";
-> +					reg = <0x68>;
-> +					/*
-> +					 * GPIO17 has interrupt 208 on the
-> +					 * PM8058, it is pulled high by a 10k
-> +					 * resistor to VLOGIC so needs to be
-> +					 * active low/falling edge.
-> +					 */
-> +					interrupt-parent = <&pm8058_gpio>;
-> +					interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
+Thor
 
-To remove the need of resetting the interrupt-parent in each child you
-can use the following form:
-
-    interrupts-extended = <&pm8058_gpio 208 IRQ_TYPE_EDGE_FALLING>;
-
-
-
-But, if we correct the ssbi gpio driver then this would no longer be
-interrupt 208 in this parent, right?. I believe that if you say
-<&pmicintc 208 IRQ_TYPE_EDGE_FALLING> instead, which should work even
-after we correct the gpio translation.
-
-(Which probably means we need to get that redesigned, before we
-introduce to many of these)
-
-> +					pinctrl-names = "default";
-> +					pinctrl-0 = <&dragon_mpu3050_gpios>;
-> +					vlogic-supply = <&pm8058_lvs0>; // 1.8V
-> +					vdd-supply = <&pm8058_l14>; // 2.85V
-> +
-> +					/*
-> +					 * The MPU-3050 acts as a hub for the
-> +					 * accelerometer.
-> +					 */
-> +					i2c-gate {
-> +						#address-cells = <1>;
-> +						#size-cells = <0>;
-> +
-> +						kxsd9 at 18 {
-> +							compatible = "kionix,kxsd9";
-> +							reg = <0x18>;
-> +							interrupt-parent = <&tlmm>;
-> +							interrupts = <57 IRQ_TYPE_EDGE_FALLING>;
-> +							pinctrl-names = "default";
-> +							pinctrl-0 = <&dragon_kxsd9_gpios>;
-> +							iovdd-supply = <&pm8058_lvs0>; // 1.8V
-> +							vdd-supply = <&pm8058_l14>; // 2.85V
-> +						};
-> +					};
-> +				};
-
-Regards,
-Bjorn
+>> +	},
+>>  };
+>>
+>>  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
+>
