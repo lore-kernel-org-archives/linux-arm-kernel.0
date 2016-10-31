@@ -1,31 +1,205 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 31 Oct 2016 12:09:59 +0100
-Subject: [PATCH 10/10] arm64: configs: enable SDHCI driver for Xenon
+Date: Mon, 31 Oct 2016 12:09:54 +0100
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD Host
+ Controller
 In-Reply-To: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
 References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
-Message-ID: <0b7d2e802794d18ed16ab0983f5ba1f02d035be5.1477911954.git-series.gregory.clement@free-electrons.com>
+Message-ID: <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the driver for the SDHCI controller found on the
-Marvell Armada 3700 and 7K/8K ARM64 SoCs.
+From: Ziji Hu <huziji@marvell.com>
 
+Marvell Xenon SDHC can support eMMC/SD/SDIO.
+Add Xenon-specific properties.
+Also add properties for Xenon PHY setting.
+
+Signed-off-by: Hu Ziji <huziji@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+), 0 deletions(-)
+ Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 161 +++++++-
+ MAINTAINERS                                                   |   1 +-
+ 2 files changed, 162 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index dab2cb0c1f1c..2d1f5ee62b18 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -353,6 +353,7 @@ CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_SDHCI_XENON=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
+diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+new file mode 100644
+index 000000000000..0d2d139494d3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+@@ -0,0 +1,161 @@
++Marvell's Xenon SDHCI Controller device tree bindings
++This file documents differences between the core mmc properties
++described by mmc.txt and the properties used by the Xenon implementation.
++
++A single Xenon IP can support multiple slots.
++Each slot acts as an independent SDHC. It owns independent resources, such
++as register sets clock and PHY.
++Each slot should have an independent device tree node.
++
++Required Properties:
++- compatible: should be one of the following
++  - "marvell,armada-3700-sdhci": For controllers on Armada-3700 SOC.
++  Must provide a second register area and marvell,pad-type.
++  - "marvell,xenon-sdhci": For controllers on all the SOCs, other than
++  Armada-3700.
++
++- clocks:
++  Array of clocks required for SDHCI.
++  Requires at least one for Xenon IP core.
++  Some SOCs require additional clock for AXI bus.
++
++- clock-names:
++  Array of names corresponding to clocks property.
++  The input clock for Xenon IP core should be named as "core".
++  The optional AXI clock should be named as "axi".
++
++- reg:
++  * For "marvell,xenon-sdhci", one register area for Xenon IP.
++
++  * For "marvell,armada-3700-sdhci", two register areas.
++    The first one for Xenon IP register. The second one for the Armada 3700 SOC
++    PHY PAD Voltage Control register.
++    Please follow the examples with compatible "marvell,armada-3700-sdhci"
++    in below.
++    Please also check property marvell,pad-type in below.
++
++Optional Properties:
++- marvell,xenon-slotno:
++  Indicate the corresponding bit index of current Xenon SDHC slot in
++  SDHC System Operation Control Register Bit[7:0].
++  Set/clear the corresponding bit to enable/disable current Xenon SDHC
++  slot.
++  If this property is not provided, Xenon IP should contain only one
++  slot.
++
++- marvell,xenon-phy-type:
++  Xenon support mutilple types of PHYs.
++  To select eMMC 5.1 PHY, set:
++  marvell,xenon-phy-type = "emmc 5.1 phy"
++  eMMC 5.1 PHY is the default choice if this property is not provided.
++  To select eMMC 5.0 PHY, set:
++  marvell,xenon-phy-type = "emmc 5.0 phy"
++  To select SDH PHY, set:
++  marvell,xenon-phy-type = "sdh phy"
++  Please note that eMMC PHY is a general PHY for eMMC/SD/SDIO, other than for
++  eMMC only.
++
++- marvell,xenon-phy-znr:
++  Set PHY ZNR value.
++  Only available for eMMC PHY 5.1 and eMMC PHY 5.0.
++  valid range = [0:0x1F].
++  ZNR is set as 0xF by default if this property is not provided.
++
++- marvell,xenon-phy-zpr:
++  Set PHY ZPR value.
++  Only available for eMMC PHY 5.1 and eMMC PHY 5.0.
++  valid range = [0:0x1F].
++  ZPR is set as 0xF by default if this property is not provided.
++
++- marvell,xenon-phy-nr-success-tun:
++  Set the number of required consecutive successful sampling points used to
++  identify a valid sampling window, in tuning process.
++  Valid range = [1:7]. Set as 0x4 by default if this property is not provided.
++
++- marvell,xenon-phy-tun-step-divider:
++  Set the divider for calculating TUN_STEP.
++  Set as 64 by default if this property is not provided.
++
++- marvell,xenon-phy-slow-mode:
++  Force PHY into slow mode.
++  Only available when bus frequency lower than 50MHz in SDR mde.
++  Disabled by default. Please do not enable it unless it is necessary.
++
++- marvell,xenon-mask-conflict-err:
++  Mask Conflict Error alert on some SOC. Disabled by default.
++
++- marvell,xenon-tun-count:
++  Xenon SDHC SOC usually doesn't provide re-tuning counter in
++  Capabilities Register 3 Bit[11:8].
++  This property provides the re-tuning counter.
++  If this property is not set, default re-tuning counter will
++  be set as 0x9 in driver.
++
++- marvell,pad-type:
++  Type of Armada 3700 SOC PHY PAD Voltiage Controller register.
++  Only valid when "marvell,armada-3700-sdhci" is selected.
++  Two types: "sd" and "fixed-1-8v".
++  If "sd" is slected, SOC PHY PAD is set as 3.3V at the beginning and is
++  switched to 1.8V when SD in UHS-I.
++  If "fixed-1-8v" is slected, SOC PHY PAD is fixed 1.8V, such as for eMMC.
++  Please follow the examples with compatible "marvell,armada-3700-sdhci"
++  in below.
++
++Example:
++- For eMMC slot:
++
++	sdhci at aa0000 {
++		compatible = "marvell,xenon-sdhci";
++		reg = <0xaa0000 0x1000>;
++		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
++		clocks = <&emmc_clk>, <&axi_clock>;
++		clock-names = "core", "axi";
++		bus-width = <8>;
++		marvell,xenon-emmc;
++		marvell,xenon-slotno = <0>;
++		marvell,xenon-phy-type = "emmc 5.1 phy";
++		marvell,xenon-tun-count = <11>;
++	};
++
++- For SD/SDIO slot:
++
++	sdhci at ab0000 {
++		compatible = "marvell,xenon-sdhci";
++		reg = <0xab0000 0x1000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
++		vqmmc-supply = <&sd_regulator>;
++		clocks = <&sdclk>;
++		clock-names = "core";
++		bus-width = <4>;
++		marvell,xenon-tun-count = <9>;
++	};
++
++- For eMMC slot with compatible "marvell,armada-3700-sdhci":
++
++	sdhci at aa0000 {
++		compatible = "marvell,armada-3700-sdhci";
++		reg = <0xaa0000 0x1000>,
++		      <phy_addr 0x4>;
++		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
++		clocks = <&emmcclk>;
++		clock-names = "core";
++		bus-width = <8>;
++		marvell,xenon-emmc;
++
++		marvell,pad-type = "fixed-1-8v";
++	};
++
++- For SD/SDIO slot with compatible "marvell,armada-3700-sdhci":
++
++	sdhci at ab0000 {
++		compatible = "marvell,armada-3700-sdhci";
++		reg = <0xab0000 0x1000>,
++		      <phy_addr 0x4>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
++		vqmmc-supply = <&sd_regulator>;
++		clocks = <&sdclk>;
++		clock-names = "core";
++		bus-width = <4>;
++
++		marvell,pad-type = "sd";
++	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1a5c4c30ea24..850a0afb0c8d 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7608,6 +7608,7 @@ MARVELL XENON MMC/SD/SDIO HOST CONTROLLER DRIVER
+ M:	Ziji Hu <huziji@marvell.com>
+ L:	linux-mmc at vger.kernel.org
+ S:	Supported
++F:	Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+ 
+ MATROX FRAMEBUFFER DRIVER
+ L:	linux-fbdev at vger.kernel.org
 -- 
 git-series 0.8.10
