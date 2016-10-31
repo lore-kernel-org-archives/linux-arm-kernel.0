@@ -1,35 +1,37 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 31 Oct 2016 20:54:52 +0100
-Subject: [PATCH v3 0/4] PXA cpufreq conversion to clock API
-Message-ID: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
+Date: Mon, 31 Oct 2016 20:54:53 +0100
+Subject: [PATCH v3 1/4] cpufreq: pxa: use generic platdev driver for
+ device-tree
+In-Reply-To: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
+References: <1477943696-23477-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1477943696-23477-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For device-tree based pxa25x and pxa27x platforms, cpufreq-dt driver is
+doing the job as well as pxa2xx-cpufreq, so add these platforms to the
+compatibility list.
 
-This serie is a preparation to shift the cpufreq of pxa2xx platforms to clocks
-API, next iteration.
+This won't work for legacy non device-tree platforms where
+pxa2xx-cpufreq is still required.
 
-The first 3 patches are review and merge material :
- - patch 1/4 for Viresh and Rafael
- - patches 2/4 and 3/4 for me
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/cpufreq/cpufreq-dt-platdev.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The 4th on is for review but not merge, as the clock changes must be fully
-reviewed and go in first as a prequisite
-
-Since previous iteration, 2 and 3 were amended per Viresh's suggestion.
-
-Robert Jarzmik (4):
-  cpufreq: pxa: use generic platdev driver for device-tree
-  ARM: dts: pxa: add pxa25x cpu operating points
-  ARM: dts: pxa: add pxa27x cpu operating points
-  cpufreq: pxa: convert to clock API
-
- arch/arm/boot/dts/pxa25x.dtsi        |  25 +++++
- arch/arm/boot/dts/pxa27x.dtsi        |  40 ++++++++
- drivers/cpufreq/cpufreq-dt-platdev.c |   2 +
- drivers/cpufreq/pxa2xx-cpufreq.c     | 191 +++++++----------------------------
- 4 files changed, 106 insertions(+), 152 deletions(-)
-
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 71267626456b..bc683d6feca8 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -34,6 +34,8 @@ static const struct of_device_id machines[] __initconst = {
+ 	{ .compatible = "fsl,imx7d", },
+ 
+ 	{ .compatible = "marvell,berlin", },
++	{ .compatible = "marvell,pxa250", },
++	{ .compatible = "marvell,pxa270", },
+ 
+ 	{ .compatible = "samsung,exynos3250", },
+ 	{ .compatible = "samsung,exynos4210", },
 -- 
 2.1.4
