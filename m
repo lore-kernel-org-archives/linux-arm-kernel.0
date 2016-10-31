@@ -1,71 +1,138 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Oct 2016 17:56:26 +0100
-Subject: [RFC PATCH v2 4/5] ARM64: dts: meson-gxl-p23x: Enable ethernet
+Date: Mon, 31 Oct 2016 17:56:23 +0100
+Subject: [RFC PATCH v2 1/5] net: mdio-mux-mmioreg: Add support for 16bit and
+ 32bit register sizes
 In-Reply-To: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
 References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1477932987-27871-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1477932987-27871-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Ethernet on the p23x board, pinctrl attribute is only added for
-the p230 board since the p231 only uses the Internal PHY.
+In order to support PHY switching on Amlogic GXL SoCs, add support for
+16bit and 32bit registers sizes.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts  | 16 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts  |  6 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi |  4 ++++
- 3 files changed, 26 insertions(+)
+ .../devicetree/bindings/net/mdio-mux-mmioreg.txt   |  4 +-
+ drivers/net/phy/mdio-mux-mmioreg.c                 | 60 +++++++++++++++++-----
+ 2 files changed, 49 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-index 3dfaa37..a569286 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
-@@ -49,3 +49,19 @@
- 	compatible = "amlogic,p230", "amlogic,s905d", "amlogic,meson-gxl";
- 	model = "Amlogic Meson GXL (S905D) P230 Development Board";
+diff --git a/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt b/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
+index 8516929..065e8bd 100644
+--- a/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
++++ b/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
+@@ -3,7 +3,7 @@ Properties for an MDIO bus multiplexer controlled by a memory-mapped device
+ This is a special case of a MDIO bus multiplexer.  A memory-mapped device,
+ like an FPGA, is used to control which child bus is connected.  The mdio-mux
+ node must be a child of the memory-mapped device.  The driver currently only
+-supports devices with eight-bit registers.
++supports devices with 8, 16 or 32-bit registers.
+ 
+ Required properties in addition to the generic multiplexer properties:
+ 
+@@ -11,7 +11,7 @@ Required properties in addition to the generic multiplexer properties:
+ 
+ - reg : integer, contains the offset of the register that controls the bus
+ 	multiplexer.  The size field in the 'reg' property is the size of
+-	register, and must therefore be 1.
++	register, and must therefore be 1, 2, or 4.
+ 
+ - mux-mask : integer, contains an eight-bit mask that specifies which
+ 	bits in the register control the actual bus multiplexer.  The
+diff --git a/drivers/net/phy/mdio-mux-mmioreg.c b/drivers/net/phy/mdio-mux-mmioreg.c
+index d0bed52..6a33646 100644
+--- a/drivers/net/phy/mdio-mux-mmioreg.c
++++ b/drivers/net/phy/mdio-mux-mmioreg.c
+@@ -21,7 +21,8 @@
+ struct mdio_mux_mmioreg_state {
+ 	void *mux_handle;
+ 	phys_addr_t phys;
+-	uint8_t mask;
++	unsigned int iosize;
++	unsigned int mask;
  };
+ 
+ /*
+@@ -47,17 +48,47 @@ static int mdio_mux_mmioreg_switch_fn(int current_child, int desired_child,
+ 	struct mdio_mux_mmioreg_state *s = data;
+ 
+ 	if (current_child ^ desired_child) {
+-		void __iomem *p = ioremap(s->phys, 1);
+-		uint8_t x, y;
+-
++		void __iomem *p = ioremap(s->phys, s->iosize);
+ 		if (!p)
+ 			return -ENOMEM;
+ 
+-		x = ioread8(p);
+-		y = (x & ~s->mask) | desired_child;
+-		if (x != y) {
+-			iowrite8((x & ~s->mask) | desired_child, p);
+-			pr_debug("%s: %02x -> %02x\n", __func__, x, y);
++		switch (s->iosize) {
++		case sizeof(uint8_t): {
++			uint8_t x, y;
 +
-+/* P230 has exclusive choice between internal or external PHY */
-+&ethmac {
-+	pinctrl-0 = <&eth_pins>;
-+	pinctrl-names = "default";
++			x = ioread8(p);
++			y = (x & ~s->mask) | desired_child;
++			if (x != y) {
++				iowrite8((x & ~s->mask) | desired_child, p);
++				pr_debug("%s: %02x -> %02x\n", __func__, x, y);
++			}
 +
-+	phy-handle = <&external_phy>;
-+};
++			break;
++		}
++		case sizeof(uint16_t): {
++			uint16_t x, y;
 +
-+&external_mdio {
-+	external_phy: ethernet-phy at 0 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+		max-speed = <1000>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
-index ade8d29..1cc8d49 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts
-@@ -49,3 +49,9 @@
- 	compatible = "amlogic,p231", "amlogic,s905d", "amlogic,meson-gxl";
- 	model = "Amlogic Meson GXL (S905D) P231 Development Board";
- };
++			x = ioread16(p);
++			y = (x & ~s->mask) | desired_child;
++			if (x != y) {
++				iowrite16((x & ~s->mask) | desired_child, p);
++				pr_debug("%s: %04x -> %04x\n", __func__, x, y);
++			}
 +
-+/* P231 has only internal PHY port */
-+&ethmac {
-+	phy-mode = "rmii";
-+	phy-handle = <&internal_phy>;
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-index bbe46a2..622ffbe 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
-@@ -182,3 +182,7 @@
- 	clocks = <&clkc CLKID_FCLK_DIV4>;
- 	clock-names = "clkin0";
- };
++			break;
++		}
++		case sizeof(uint32_t): {
++			uint32_t x, y;
 +
-+&ethmac {
-+	status = "okay";
-+};
++			x = ioread32(p);
++			y = (x & ~s->mask) | desired_child;
++			if (x != y) {
++				iowrite32((x & ~s->mask) | desired_child, p);
++				pr_debug("%s: %08x -> %08x\n", __func__, x, y);
++			}
++
++			break;
++		}
+ 		}
+ 
+ 		iounmap(p);
+@@ -88,8 +119,11 @@ static int mdio_mux_mmioreg_probe(struct platform_device *pdev)
+ 	}
+ 	s->phys = res.start;
+ 
+-	if (resource_size(&res) != sizeof(uint8_t)) {
+-		dev_err(&pdev->dev, "only 8-bit registers are supported\n");
++	s->iosize = resource_size(&res);
++	if (s->iosize != sizeof(uint8_t) &&
++	    s->iosize != sizeof(uint16_t) &&
++	    s->iosize != sizeof(uint32_t)) {
++		dev_err(&pdev->dev, "only 8/16/32-bit registers are supported\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -98,8 +132,8 @@ static int mdio_mux_mmioreg_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "missing or invalid mux-mask property\n");
+ 		return -ENODEV;
+ 	}
+-	if (be32_to_cpup(iprop) > 255) {
+-		dev_err(&pdev->dev, "only 8-bit registers are supported\n");
++	if (be32_to_cpup(iprop) >= BIT(s->iosize * 8)) {
++		dev_err(&pdev->dev, "only 8/16/32-bit registers are supported\n");
+ 		return -EINVAL;
+ 	}
+ 	s->mask = be32_to_cpup(iprop);
 -- 
 1.9.1
