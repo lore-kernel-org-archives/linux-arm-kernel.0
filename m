@@ -1,92 +1,88 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 31 Oct 2016 12:22:23 -0600
-Subject: [PATCH 2/2] ARM: bus: da8xx-mstpri: new driver
-In-Reply-To: <0d5d1e41-b8e6-5d60-6da1-5b6ddd9bc07e@ti.com> (Sekhar Nori's
- message of "Mon, 31 Oct 2016 16:01:09 +0530")
-References: <1477503355-2600-1-git-send-email-bgolaszewski@baylibre.com>
- <1477503355-2600-3-git-send-email-bgolaszewski@baylibre.com>
- <20161031043015.74ppaship5nqfaqt@rob-hp-laptop>
- <CAMpxmJW85TQObLdoGW2ApnkM8OiM4d1ZDd=9eyGmeVXXwqByPQ@mail.gmail.com>
- <0cac724d-1aee-dfa7-9b78-8366fd6fceff@ti.com>
- <CAMpxmJX7SjE1zs926Fn-=jsZhPsOK6ey0hHM8LBhNS1nuSuFFQ@mail.gmail.com>
- <0d5d1e41-b8e6-5d60-6da1-5b6ddd9bc07e@ti.com>
-Message-ID: <m2bmy02xb4.fsf@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 31 Oct 2016 13:22:08 -0500
+Subject: [PATCHv2 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <895cf1ec-929a-8c41-c74a-948efcb89222@opensource.altera.com>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+ <1477598426-28125-2-git-send-email-tthayer@opensource.altera.com>
+ <20161031053604.3rjbuk7maabzbwq7@rob-hp-laptop>
+ <895cf1ec-929a-8c41-c74a-948efcb89222@opensource.altera.com>
+Message-ID: <CAL_JsqJYUdwFB4Bi-i56ZMSH4xKMiSq_D1pU6on3_4aQ0V_1Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar Nori <nsekhar@ti.com> writes:
-
-> On Monday 31 October 2016 03:24 PM, Bartosz Golaszewski wrote:
->> 2016-10-31 10:52 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
->>> Hi Bartosz,
+On Mon, Oct 31, 2016 at 10:28 AM, Thor Thayer
+<tthayer@opensource.altera.com> wrote:
+> Hi Rob,
+>
+> On 10/31/2016 12:36 AM, Rob Herring wrote:
+>>
+>> On Thu, Oct 27, 2016 at 03:00:23PM -0500, tthayer at opensource.altera.com
+>> wrote:
 >>>
->>> On Monday 31 October 2016 03:10 PM, Bartosz Golaszewski wrote:
->>>> 2016-10-31 5:30 GMT+01:00 Rob Herring <robh@kernel.org>:
->>>>> On Wed, Oct 26, 2016 at 07:35:55PM +0200, Bartosz Golaszewski wrote:
->>>>>> Create the driver for the da8xx master peripheral priority
->>>>>> configuration and implement support for writing to the three
->>>>>> Master Priority registers on da850 SoCs.
->>>>>>
->>>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>>>> ---
->>>>>>  .../devicetree/bindings/bus/ti,da850-mstpri.txt    |  20 ++
->>>>>>  drivers/bus/Kconfig                                |   9 +
->>>>>>  drivers/bus/Makefile                               |   2 +
->>>>>>  drivers/bus/da8xx-mstpri.c                         | 266 +++++++++++++++++++++
->>>>>>  4 files changed, 297 insertions(+)
->>>>>>  create mode 100644 Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>>>>  create mode 100644 drivers/bus/da8xx-mstpri.c
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..225af09
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/bus/ti,da850-mstpri.txt
->>>>>> @@ -0,0 +1,20 @@
->>>>>> +* Device tree bindings for Texas Instruments da8xx master peripheral
->>>>>> +  priority driver
->>>>>> +
->>>>>> +DA8XX SoCs feature a set of registers allowing to change the priority of all
->>>>>> +peripherals classified as masters.
->>>>>> +
->>>>>> +Documentation:
->>>>>> +OMAP-L138 (DA850) - http://www.ti.com/lit/ug/spruh82c/spruh82c.pdf
->>>>>> +
->>>>>> +Required properties:
->>>>>> +
->>>>>> +- compatible:                "ti,da850-mstpri", "syscon" - for da850 based boards
->>>>>
->>>>> Drop syscon. Doesn't look like it is needed and the example doesn't
->>>>> match.
->>>>
->>>> Hi Rob,
->>>>
->>>> it is needed: syscon_regmap_lookup_by_compatible() fails without it. I
->>>> fixed the example instead.
+>>> From: Thor Thayer <tthayer@opensource.altera.com>
 >>>
->>> Why are master priority registers under syscon? This driver should be
->>> the only entity touching them. So do we need an MFD driver?
+>>> Add the Arria10 DevKit System Resource Chip register and state
+>>> monitoring module to the MFD.
 >>>
->> 
->> It should, but syscfg0 registers are mapped all over the place. I
+>>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>>> ---
+>>> Note: This needs to be applied to the bindings document that
+>>> was Acked & Applied but didn't reach the for-next branch.
+>>> See https://patchwork.ozlabs.org/patch/629397/
+>>> ---
+>>> v2  Change compatible string -mon to -monitor for clarity
+>>> ---
+>>>  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 9 +++++++++
+>>>  1 file changed, 9 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>>> b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>>> index ea151f2..c47be28 100644
+>>> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>>> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+>>> @@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
+>>>  Device                   Description
+>>>  ------                   ----------
+>>>  a10sr_gpio               GPIO Controller
+>>
+>>
+>> This should be just "gpio" BTW.
 >
-> Not sure what you mean by this. Yes, the sysconfig module has many
-> functionalities. But the registers for a given functionality are all
-> grouped together AFAICS (except CHIPCFGn, see below).
 >
-> Pinmux registers are part of syscfg module, but don't use syscon.
->
-> In the work going on for OHCI support, chipcfg registers are being put
-> under a syscon node. But that makes sense, I think, because chipcfg
-> registers are catering to really diverse functionality like PLL and EDMA
-> related stuff being placed in the same register - CHIPCFG0.
->
->> thought it would be safer to put them under syscon and Kevin agreed.
->
-> Before using syscon for the whole syscfg space, I think we need some
-> analysis as to where the likely races are going to be.
+> I reason I preprend a10sr_ is to distinguish this GPIO from the other GPIOs
+> when binding to our LEDs (see below). I think the LEDs need a unique node
+> name (unless I'm not understanding something).
 
-I'm OK with that for now.  It makes the most sense to use sycon only for
-the register (ranges) that will actually be shared.
+You are confusing DTS labels and node names. Labels are global and
+just convenience for the DTS source only instead of using full paths
+(and can be anything you want). The node name is local to the level it
+is at.
 
-Kevin
+> A less important reason I use a10sr_gpio on the node name is that I can cat
+> the /sys/class/gpio/gpioxxx/label and see that it is associated with the
+> a10sr instead of one of our other general GPIOs. Is there a better way to
+> distinguish these?
+
+label should come from the label property I think. This is one of the
+problems with the GPIO sysfs interface and why it is being replaced
+with the char dev interface.
+
+Rob
+
+>
+>>
+>>> +a10sr_monitor            Register and State Monitoring
+>>
+>>
+>> s/_/-/ or maybe just "monitor". Not really a generic node name to use
+>> for this.
+>>
+>
+> The reason I use _ for the node name is that the DTC fails if I reference a
+> node name with "-" but works OK for "_". For instance, I get an error if the
+> LEDs reference "a10sr-gpio" but "a10sr_gpio" compiles ok.
+
+Again, I'm talking node names. You are talking labels. And yes, DTS
+labels can't use '-'.
+
+Rob
