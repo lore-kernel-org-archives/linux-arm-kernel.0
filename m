@@ -1,67 +1,48 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue,  1 Nov 2016 11:10:57 -0600
-Subject: [RFC v2 3/7] arm64: Use unsigned long for VDSO
-In-Reply-To: <20161101171101.24704-1-cov@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 1 Nov 2016 17:18:33 +0000
+Subject: [RFC v2 2/7] arm: Use generic VDSO unmap and remap
+In-Reply-To: <20161101171101.24704-2-cov@codeaurora.org>
 References: <20161101171101.24704-1-cov@codeaurora.org>
-Message-ID: <20161101171101.24704-3-cov@codeaurora.org>
+ <20161101171101.24704-2-cov@codeaurora.org>
+Message-ID: <20161101171833.GS1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use an unsigned long type for the base address of the VDSO in order to be
-compatible with the new generic VDSO remap and unmap functions originating
-from PowerPC and now also used by 32-bit ARM.
+You know, on its own, this patch is totally meaningless.  Sorry, there's
+nothing more I can say about this.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
----
- arch/arm64/include/asm/mmu.h | 2 +-
- arch/arm64/kernel/vdso.c     | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+On Tue, Nov 01, 2016 at 11:10:56AM -0600, Christopher Covington wrote:
+> Checkpoint/Restore In Userspace (CRIU) needs to be able to unmap and remap
+> the VDSO to successfully checkpoint and restore applications in the face of
+> changing VDSO addresses due to Address Space Layout Randomization (ASLR,
+> randmaps). Previously, this was implemented in architecture-specific code
+> for PowerPC and x86. However, a generic version based on Laurent Dufour's
+> PowerPC implementation is now available, so begin using it on ARM.
+> 
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> ---
+>  arch/arm/mm/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index c1799dd..1d3312b 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -845,6 +845,7 @@ config VDSO
+>  	depends on AEABI && MMU && CPU_V7
+>  	default y if ARM_ARCH_TIMER
+>  	select GENERIC_TIME_VSYSCALL
+> +	select GENERIC_VDSO
+>  	help
+>  	  Place in the process address space an ELF shared object
+>  	  providing fast implementations of gettimeofday and
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 8d9fce0..5b00198 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -18,7 +18,7 @@
- 
- typedef struct {
- 	atomic64_t	id;
--	void		*vdso;
-+	unsigned long	vdso;
- } mm_context_t;
- 
- /*
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index a2c2478..4b10e72 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -97,7 +97,7 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- 
- 	if (down_write_killable(&mm->mmap_sem))
- 		return -EINTR;
--	current->mm->context.vdso = (void *)addr;
-+	current->mm->context.vdso = addr;
- 
- 	/* Map vectors page at the high address. */
- 	ret = _install_special_mapping(mm, addr, PAGE_SIZE,
-@@ -178,7 +178,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 		goto up_fail;
- 
- 	vdso_base += PAGE_SIZE;
--	mm->context.vdso = (void *)vdso_base;
-+	mm->context.vdso = vdso_base;
- 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
- 				       VM_READ|VM_EXEC|
- 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-@@ -191,7 +191,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 	return 0;
- 
- up_fail:
--	mm->context.vdso = NULL;
-+	mm->context.vdso = 0;
- 	up_write(&mm->mmap_sem);
- 	return PTR_ERR(ret);
- }
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
