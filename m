@@ -1,27 +1,27 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue,  1 Nov 2016 18:10:04 +0100
-Subject: [PATCH v2 3/5] ARM: dts: imx6qdl-nitrogen6x: use hyphens for nodes
+Date: Tue,  1 Nov 2016 18:10:06 +0100
+Subject: [PATCH v2 5/5] ARM: dts: imx6qdl-nitrogen6_max: use hyphens for nodes
  name
 In-Reply-To: <20161101171006.24594-1-gary.bisson@boundarydevices.com>
 References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
  <20161101171006.24594-1-gary.bisson@boundarydevices.com>
-Message-ID: <20161101171006.24594-4-gary.bisson@boundarydevices.com>
+Message-ID: <20161101171006.24594-6-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also aligning the panel nodes name across all platforms.
+Therefore aligning the panel nodes name across all platforms.
 
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-index db868bc..e476d01 100644
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
-@@ -167,7 +167,7 @@
- 		mux-ext-port = <3>;
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+index b0b3220..34887a1 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+@@ -229,7 +229,7 @@
+ 		};
  	};
  
 -	backlight_lcd: backlight_lcd {
@@ -29,34 +29,61 @@ index db868bc..e476d01 100644
  		compatible = "pwm-backlight";
  		pwms = <&pwm1 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -176,7 +176,7 @@
+@@ -238,7 +238,7 @@
  		status = "okay";
  	};
  
--	backlight_lvds: backlight_lvds {
-+	backlight_lvds: backlight-lvds {
+-	backlight_lvds0: backlight_lvds0 {
++	backlight_lvds0: backlight-lvds0 {
  		compatible = "pwm-backlight";
  		pwms = <&pwm4 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -211,7 +211,7 @@
+@@ -247,7 +247,7 @@
+ 		status = "okay";
+ 	};
+ 
+-	backlight_lvds1: backlight_lvds1 {
++	backlight_lvds1: backlight-lvds1 {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm2 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -282,7 +282,7 @@
  		};
  	};
  
--	lcd_panel {
+-	panel_lcd {
 +	panel-lcd {
  		compatible = "okaya,rs800480t-7x0gp";
  		backlight = <&backlight_lcd>;
  
-@@ -222,7 +222,7 @@
+@@ -293,7 +293,7 @@
  		};
  	};
  
--	panel {
+-	panel_lvds0 {
 +	panel-lvds0 {
  		compatible = "hannstar,hsd100pxn1";
- 		backlight = <&backlight_lvds>;
+ 		backlight = <&backlight_lvds0>;
  
-@@ -413,7 +413,7 @@
+@@ -304,7 +304,7 @@
+ 		};
+ 	};
+ 
+-	panel_lvds1 {
++	panel-lvds1 {
+ 		compatible = "hannstar,hsd100pxn1";
+ 		backlight = <&backlight_lvds1>;
+ 
+@@ -447,7 +447,7 @@
+ };
+ 
+ &iomuxc {
+-	imx6q-nitrogen6_max {
++	imx6q-nitrogen6-max {
+ 		pinctrl_audmux: audmuxgrp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
+@@ -504,7 +504,7 @@
  			>;
  		};
  
@@ -65,7 +92,7 @@ index db868bc..e476d01 100644
  			fsl,pins = <
  				/* Power Button */
  				MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
-@@ -561,7 +561,7 @@
+@@ -720,7 +720,7 @@
  			>;
  		};
  
