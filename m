@@ -1,10 +1,10 @@
 From: jsarha@ti.com (Jyri Sarha)
-Date: Tue, 1 Nov 2016 16:22:16 +0200
+Date: Tue, 1 Nov 2016 16:25:03 +0200
 Subject: [PATCH v5 2/2] drm: tilcdc: clear the sync lost bit in crtc isr
 In-Reply-To: <1477923567-1610-3-git-send-email-bgolaszewski@baylibre.com>
 References: <1477923567-1610-1-git-send-email-bgolaszewski@baylibre.com>
  <1477923567-1610-3-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <e469128f-c860-1994-e6ca-4804eebd2e8e@ti.com>
+Message-ID: <f26ad056-8cf7-41b8-c80b-1c564ebe51a3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,26 +24,6 @@ On 10/31/16 16:19, Bartosz Golaszewski wrote:
 > DMA controller unless a sync lost flood is detected in which case
 > disable the interrupt.
 > 
-
-I don't think the current behaviour after detecting a sync lost flood is
-really good for ver2 either. The flood is an indication of an error
-situation on LCDC IP and the picture on the screen may be corrupted.
-Simply turning off the interrupt does not make the problem (specifically
-the screen corruption) to go away.
-
-I have a patch for an alternative approach that turns off the display
-and resets the LCDC and turns it back on again. It fixes the sync lost
-flood and the screen corruption (usually shifting to right and rolling
-over to left hand side). According to my experiments the toggling of
-raster to off and back on again does not fix the the flood or the the
-screen corruption.
-
-I think it is about time for me the send my sync lost flood patch
-forward. Then you could extend it to work also on rev1 LCDC.
-
-Best regards,
-Jyri
-
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
 >  drivers/gpu/drm/tilcdc/tilcdc_crtc.c | 50 ++++++++++++++++++++++++++----------
@@ -94,6 +74,10 @@ Jyri
 >  		 * completed, see 13.3.6.1.6 in AM335x TRM.
 >  		 */
 >  		tilcdc_write(dev, LCDC_END_OF_INT_IND_REG, 0);
+
+Oh, I think this should the last thing done in the irq routine, thought
+I do not really know what it does :).
+
 >  	}
 >  
 > +	if (stat & LCDC_SYNC_LOST) {
