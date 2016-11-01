@@ -1,107 +1,78 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue,  1 Nov 2016 18:10:05 +0100
-Subject: [PATCH v2 4/5] ARM: dts: imx6qdl-nit6xlite: use hyphens for nodes name
+Date: Tue,  1 Nov 2016 18:10:04 +0100
+Subject: [PATCH v2 3/5] ARM: dts: imx6qdl-nitrogen6x: use hyphens for nodes
+ name
 In-Reply-To: <20161101171006.24594-1-gary.bisson@boundarydevices.com>
 References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
  <20161101171006.24594-1-gary.bisson@boundarydevices.com>
-Message-ID: <20161101171006.24594-5-gary.bisson@boundarydevices.com>
+Message-ID: <20161101171006.24594-4-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Therefore aligning the panel nodes name across all platforms.
-
-Also removing the bt_rfkill node since the mainline rfkill-gpio driver
-doesn't support device trees.
+Also aligning the panel nodes name across all platforms.
 
 Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 ---
- arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi | 32 +++++---------------------------
- 1 file changed, 5 insertions(+), 27 deletions(-)
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-index 880bd78..63acd54 100644
---- a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
-@@ -97,15 +97,6 @@
- 		};
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index db868bc..e476d01 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -167,7 +167,7 @@
+ 		mux-ext-port = <3>;
  	};
  
--	bt_rfkill {
--		compatible = "rfkill-gpio";
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_bt_rfkill>;
--		gpios = <&gpio6 8 GPIO_ACTIVE_HIGH>;
--		name = "bt_rfkill";
--		type = <2>;
--	};
--
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
-@@ -160,7 +151,7 @@
- 		};
- 	};
- 
--	backlight_lcd {
-+	backlight-lcd {
+-	backlight_lcd: backlight_lcd {
++	backlight_lcd: backlight-lcd {
  		compatible = "pwm-backlight";
  		pwms = <&pwm1 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -169,7 +160,7 @@
+@@ -176,7 +176,7 @@
  		status = "okay";
  	};
  
--	backlight_lvds0: backlight_lvds0 {
-+	backlight_lvds0: backlight-lvds0 {
+-	backlight_lvds: backlight_lvds {
++	backlight_lvds: backlight-lvds {
  		compatible = "pwm-backlight";
  		pwms = <&pwm4 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -178,7 +169,7 @@
- 		status = "okay";
+@@ -211,7 +211,7 @@
+ 		};
  	};
  
--	panel_lvds0 {
+-	lcd_panel {
++	panel-lcd {
+ 		compatible = "okaya,rs800480t-7x0gp";
+ 		backlight = <&backlight_lcd>;
+ 
+@@ -222,7 +222,7 @@
+ 		};
+ 	};
+ 
+-	panel {
 +	panel-lvds0 {
  		compatible = "hannstar,hsd100pxn1";
- 		backlight = <&backlight_lvds0>;
+ 		backlight = <&backlight_lvds>;
  
-@@ -328,19 +319,6 @@
- 			>;
- 		};
- 
--		pinctrl_bt_rfkill: bt_rfkillgrp {
--			fsl,pins = <
--				/* BT wake */
--				MX6QDL_PAD_NANDF_D2__GPIO2_IO02		0x1b0b0
--				/* BT reset */
--				MX6QDL_PAD_NANDF_ALE__GPIO6_IO08	0x0b0b0
--				/* BT reg en */
--				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0
--				/* BT host wake irq */
--				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16	0x100b0
--			>;
--		};
--
- 		pinctrl_ecspi1: ecspi1grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-@@ -374,7 +352,7 @@
+@@ -413,7 +413,7 @@
  			>;
  		};
  
 -		pinctrl_gpio_keys: gpio_keysgrp {
 +		pinctrl_gpio_keys: gpio-keysgrp {
  			fsl,pins = <
- 				/* Home Button: J14 pin 5 */
- 				MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x1b0b0
-@@ -457,7 +435,7 @@
+ 				/* Power Button */
+ 				MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
+@@ -561,7 +561,7 @@
  			>;
  		};
  
 -		pinctrl_wlan_vmmc: wlan_vmmcgrp {
 +		pinctrl_wlan_vmmc: wlan-vmmcgrp {
  			fsl,pins = <
- 				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07	0x030b0
- 			>;
+ 				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11	0x100b0
+ 				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x000b0
 -- 
 2.9.3
