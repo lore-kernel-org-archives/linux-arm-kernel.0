@@ -1,103 +1,29 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue,  1 Nov 2016 15:56:52 -0500
-Subject: [PATCHv2] ARM: dts: socfpga: add specific compatible strings for
- boards
-Message-ID: <20161101205652.26384-1-dinguyen@kernel.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 1 Nov 2016 16:59:14 -0400
+Subject: [PATCH v4 2/7] Documentation: devicetree: add PHY lane swap
+ binding
+In-Reply-To: <20161101204826.GA21010@lunn.ch>
+References: <1478030682-27012-1-git-send-email-jon.mason@broadcom.com>
+ <1478030682-27012-3-git-send-email-jon.mason@broadcom.com>
+ <20161101204826.GA21010@lunn.ch>
+Message-ID: <20161101205913.GA27191@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a more specific board compatible entry for all of the SOCFPGA
-Cyclone 5 based boards.
+On Tue, Nov 01, 2016 at 09:48:26PM +0100, Andrew Lunn wrote:
+> > +- enet-phy-lane-swap: If set, indicates the PHY device requires swapping the
+> > +  TX/RX lanes to function properly.
+> 
+> Is 'requires' the right word here? The PHY performs the actual swap of
+> the Tx/Rx lanes.
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
-v2: remove extra space and add a comma between compatible entries
----
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts  | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+What I'm trying to say here is that without the lane swapping, the PHY
+will not function properly.  Thus, those PHYs require this parameter
+to work.  I am open to suggestions to reword the sentence to make it
+clearer.
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index afea364..5ecd2ef 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -18,7 +18,7 @@
- 
- / {
- 	model = "Terasic DE-0(Atlas)";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "terasic,de0-atlas", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-index 424523b..e5a98e5 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Aries/DENX MCV EVK";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "denx,mcvevk", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	aliases {
- 		ethernet0 = &gmac0;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 15e43f4..b0577c1 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "altr,socdk", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 02e22f5..c5623a7 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Terasic SoCkit";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "terasic,sockit", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-index 9aaf413..5b7e3c2 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-@@ -21,7 +21,7 @@
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "macnica,sodia", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-index b844473..363ee62 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -51,7 +51,7 @@
- 
- / {
- 	model = "samtec VIN|ING FPGA";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "samtec,vining", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "console=ttyS0,115200";
--- 
-2.8.3
+Thanks,
+Jon
+
+> 
+>     Andrew
