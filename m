@@ -1,149 +1,140 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue,  1 Nov 2016 13:51:33 -0400
-Subject: [PATCH v3 5/6] net: ethernet: bgmac: add NS2 support
-In-Reply-To: <1478022694-25308-1-git-send-email-jon.mason@broadcom.com>
-References: <1478022694-25308-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1478022694-25308-6-git-send-email-jon.mason@broadcom.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue,  1 Nov 2016 18:00:08 +0000
+Subject: [PATCH v3] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
+Message-ID: <20161101180008.6956-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the variant of amac hardware present in the Broadcom
-Northstar2 based SoCs.  Northstar2 requires an additional register to be
-configured with the port speed/duplexity (NICPM).  This can be added to
-the link callback to hide it from the instances that do not use this.
-Also, clearing of the pending interrupts on init is required due to
-observed issues on some platforms.
+In our VGIC implementation we limit the number of SPIs to a number
+that the userland application told us. Accordingly we limit the
+allocation of memory for virtual IRQs to that number.
+However in our MMIO dispatcher we didn't check if we ever access an
+IRQ beyond that limit, leading to out-of-bound accesses.
+Add a test against the number of allocated SPIs in check_region().
+Adjust the VGIC_ADDR_TO_INT macro to avoid an actual division, which
+is not implemented on ARM(32).
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+[maz: cleaned-up original patch]
+
+Cc: stable at vger.kernel.org
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/net/ethernet/broadcom/bgmac-platform.c | 56 +++++++++++++++++++++++++-
- drivers/net/ethernet/broadcom/bgmac.c          |  3 ++
- drivers/net/ethernet/broadcom/bgmac.h          |  1 +
- 3 files changed, 58 insertions(+), 2 deletions(-)
+Hi,
 
-diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
-index aed5dc5..f6d48c7 100644
---- a/drivers/net/ethernet/broadcom/bgmac-platform.c
-+++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
-@@ -14,12 +14,21 @@
- #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
- 
- #include <linux/bcma/bcma.h>
-+#include <linux/brcmphy.h>
- #include <linux/etherdevice.h>
- #include <linux/of_address.h>
- #include <linux/of_mdio.h>
- #include <linux/of_net.h>
- #include "bgmac.h"
- 
-+#define NICPM_IOMUX_CTRL		0x00000008
-+
-+#define NICPM_IOMUX_CTRL_INIT_VAL	0x3196e000
-+#define NICPM_IOMUX_CTRL_SPD_SHIFT	10
-+#define NICPM_IOMUX_CTRL_SPD_10M	0
-+#define NICPM_IOMUX_CTRL_SPD_100M	1
-+#define NICPM_IOMUX_CTRL_SPD_1000M	2
-+
- static u32 platform_bgmac_read(struct bgmac *bgmac, u16 offset)
- {
- 	return readl(bgmac->plat.base + offset);
-@@ -87,12 +96,46 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
- 	WARN_ON(1);
+I checked that the old and new VGIC_ADDR_TO_INTID() algorithm give
+identical results by moving it into a small userland unit-test, using
+all <bits> values we use in the VGIC and calling it with quite some test
+addresses. No differences were found.
+
+Cheers,
+Andre.
+
+Changelog v2 .. v3:
+- further simplify VGIC_ADDR_TO_INTID
+- adjust VGIC_ADDR_TO_INTID comment
+
+Changelog v1 .. v2:
+- fix compilation for 32-bit ARM
+
+ virt/kvm/arm/vgic/vgic-mmio.c | 41 +++++++++++++++++++++++++++--------------
+ virt/kvm/arm/vgic/vgic-mmio.h | 14 +++++++-------
+ 2 files changed, 34 insertions(+), 21 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index e18b30d..ebe1b9f 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -453,17 +453,33 @@ struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
+ 	return container_of(dev, struct vgic_io_device, dev);
  }
  
-+static void bgmac_nicpm_speed_set(struct net_device *net_dev)
-+{
-+	struct bgmac *bgmac = netdev_priv(net_dev);
-+	u32 val;
+-static bool check_region(const struct vgic_register_region *region,
++static bool check_region(const struct kvm *kvm,
++			 const struct vgic_register_region *region,
+ 			 gpa_t addr, int len)
+ {
+-	if ((region->access_flags & VGIC_ACCESS_8bit) && len == 1)
+-		return true;
+-	if ((region->access_flags & VGIC_ACCESS_32bit) &&
+-	    len == sizeof(u32) && !(addr & 3))
+-		return true;
+-	if ((region->access_flags & VGIC_ACCESS_64bit) &&
+-	    len == sizeof(u64) && !(addr & 7))
+-		return true;
++	int flags, nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
 +
-+	if (!bgmac->plat.nicpm_base)
-+		return;
-+
-+	val = NICPM_IOMUX_CTRL_INIT_VAL;
-+	switch (bgmac->net_dev->phydev->speed) {
++	switch (len) {
++	case sizeof(u8):
++		flags = VGIC_ACCESS_8bit;
++		break;
++	case sizeof(u32):
++		flags = VGIC_ACCESS_32bit;
++		break;
++	case sizeof(u64):
++		flags = VGIC_ACCESS_64bit;
++		break;
 +	default:
-+		pr_err("Unsupported speed.  Defaulting to 1000Mb\n");
-+	case SPEED_1000:
-+		val |= NICPM_IOMUX_CTRL_SPD_1000M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
-+	case SPEED_100:
-+		val |= NICPM_IOMUX_CTRL_SPD_100M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
-+	case SPEED_10:
-+		val |= NICPM_IOMUX_CTRL_SPD_10M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
++		return false;
 +	}
 +
-+	writel(val, bgmac->plat.nicpm_base + NICPM_IOMUX_CTRL);
++	if ((region->access_flags & flags) && IS_ALIGNED(addr, len)) {
++		if (!region->bits_per_irq)
++			return true;
 +
-+	bgmac_adjust_link(bgmac->net_dev);
-+}
-+
- static int platform_phy_connect(struct bgmac *bgmac)
- {
- 	struct phy_device *phy_dev;
- 
--	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
--					 bgmac_adjust_link);
-+	if (bgmac->plat.nicpm_base)
-+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-+						 bgmac->dev->of_node,
-+						 bgmac_nicpm_speed_set);
-+	else
-+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-+						 bgmac->dev->of_node,
-+						 bgmac_adjust_link);
- 	if (!phy_dev) {
- 		dev_err(bgmac->dev, "Phy connect failed\n");
- 		return -ENODEV;
-@@ -182,6 +225,14 @@ static int bgmac_probe(struct platform_device *pdev)
- 	if (IS_ERR(bgmac->plat.idm_base))
- 		return PTR_ERR(bgmac->plat.idm_base);
- 
-+	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nicpm_base");
-+	if (regs) {
-+		bgmac->plat.nicpm_base = devm_ioremap_resource(&pdev->dev,
-+							       regs);
-+		if (IS_ERR(bgmac->plat.nicpm_base))
-+			return PTR_ERR(bgmac->plat.nicpm_base);
++		/* Do we access a non-allocated IRQ? */
++		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
 +	}
-+
- 	bgmac->read = platform_bgmac_read;
- 	bgmac->write = platform_bgmac_write;
- 	bgmac->idm_read = platform_bgmac_idm_read;
-@@ -213,6 +264,7 @@ static int bgmac_remove(struct platform_device *pdev)
- static const struct of_device_id bgmac_of_enet_match[] = {
- 	{.compatible = "brcm,amac",},
- 	{.compatible = "brcm,nsp-amac",},
-+	{.compatible = "brcm,ns2-amac",},
- 	{},
- };
  
-diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
-index 4584958..a805cc8 100644
---- a/drivers/net/ethernet/broadcom/bgmac.c
-+++ b/drivers/net/ethernet/broadcom/bgmac.c
-@@ -1082,6 +1082,9 @@ static void bgmac_enable(struct bgmac *bgmac)
- /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipinit */
- static void bgmac_chip_init(struct bgmac *bgmac)
- {
-+	/* Clear any erroneously pending interrupts */
-+	bgmac_write(bgmac, BGMAC_INT_STATUS, ~0);
-+
- 	/* 1 interrupt per received frame */
- 	bgmac_write(bgmac, BGMAC_INT_RECV_LAZY, 1 << BGMAC_IRL_FC_SHIFT);
+ 	return false;
+ }
+@@ -477,7 +493,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
  
-diff --git a/drivers/net/ethernet/broadcom/bgmac.h b/drivers/net/ethernet/broadcom/bgmac.h
-index ea52ac3..b1820ea 100644
---- a/drivers/net/ethernet/broadcom/bgmac.h
-+++ b/drivers/net/ethernet/broadcom/bgmac.h
-@@ -463,6 +463,7 @@ struct bgmac {
- 		struct {
- 			void *base;
- 			void *idm_base;
-+			void *nicpm_base;
- 		} plat;
- 		struct {
- 			struct bcma_device *core;
+ 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+ 				       addr - iodev->base_addr);
+-	if (!region || !check_region(region, addr, len)) {
++	if (!region || !check_region(vcpu->kvm, region, addr, len)) {
+ 		memset(val, 0, len);
+ 		return 0;
+ 	}
+@@ -510,10 +526,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+ 
+ 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+ 				       addr - iodev->base_addr);
+-	if (!region)
+-		return 0;
+-
+-	if (!check_region(region, addr, len))
++	if (!region || !check_region(vcpu->kvm, region, addr, len))
+ 		return 0;
+ 
+ 	switch (iodev->iodev_type) {
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 4c34d39..84961b4 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -50,15 +50,15 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+ #define VGIC_ADDR_IRQ_MASK(bits) (((bits) * 1024 / 8) - 1)
+ 
+ /*
+- * (addr & mask) gives us the byte offset for the INT ID, so we want to
+- * divide this with 'bytes per irq' to get the INT ID, which is given
+- * by '(bits) / 8'.  But we do this with fixed-point-arithmetic and
+- * take advantage of the fact that division by a fraction equals
+- * multiplication with the inverted fraction, and scale up both the
+- * numerator and denominator with 8 to support at most 64 bits per IRQ:
++ * (addr & mask) gives us the _byte_ offset for the INT ID.
++ * We multiply this by 8 the get the _bit_ offset, then divide this by
++ * the number of bits to learn the actual INT ID.
++ * But instead of a division (which requires a "long long div" implementation),
++ * we shift by the binary logarithm of <bits>.
++ * This assumes that <bits> is a power of two.
+  */
+ #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
+-					64 / (bits) / 8)
++					8 >> ilog2(bits))
+ 
+ /*
+  * Some VGIC registers store per-IRQ information, with a different number
 -- 
-2.7.4
+2.9.0
