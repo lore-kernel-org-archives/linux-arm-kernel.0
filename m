@@ -1,48 +1,93 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 1 Nov 2016 17:18:33 +0000
-Subject: [RFC v2 2/7] arm: Use generic VDSO unmap and remap
-In-Reply-To: <20161101171101.24704-2-cov@codeaurora.org>
-References: <20161101171101.24704-1-cov@codeaurora.org>
- <20161101171101.24704-2-cov@codeaurora.org>
-Message-ID: <20161101171833.GS1041@n2100.armlinux.org.uk>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Tue, 1 Nov 2016 20:22:14 +0300
+Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
+Message-ID: <20161101172214.2938-1-dsafonov@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-You know, on its own, this patch is totally meaningless.  Sorry, there's
-nothing more I can say about this.
+  Add vdso_mremap hook which will fix context.vdso pointer after mremap()
+on vDSO vma. This is needed for correct landing after syscall execution.
+Primary goal of this is for CRIU on arm - we need to restore vDSO image
+at the exactly same place where the vma was in dumped application. With
+the help of this hook we'll move vDSO at the new position.
+  The CRIU code handles situations like when vDSO of dumped application
+was different from vDSO on restoring system. This usally happens when
+some new symbols are being added to vDSO. In these situations CRIU
+inserts jump trampolines from old vDSO blob to new vDSO on restore.
+By that reason even if on restore vDSO blob lies on the same address as
+blob in dumped application - we still need to move it if it differs.
 
-On Tue, Nov 01, 2016 at 11:10:56AM -0600, Christopher Covington wrote:
-> Checkpoint/Restore In Userspace (CRIU) needs to be able to unmap and remap
-> the VDSO to successfully checkpoint and restore applications in the face of
-> changing VDSO addresses due to Address Space Layout Randomization (ASLR,
-> randmaps). Previously, this was implemented in architecture-specific code
-> for PowerPC and x86. However, a generic version based on Laurent Dufour's
-> PowerPC implementation is now available, so begin using it on ARM.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  arch/arm/mm/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index c1799dd..1d3312b 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -845,6 +845,7 @@ config VDSO
->  	depends on AEABI && MMU && CPU_V7
->  	default y if ARM_ARCH_TIMER
->  	select GENERIC_TIME_VSYSCALL
-> +	select GENERIC_VDSO
->  	help
->  	  Place in the process address space an ELF shared object
->  	  providing fast implementations of gettimeofday and
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
+  There was previously attempt to add this functionality for arm64 by
+arch_mremap hook [1], while this patch introduces this with minimal
+effort - the same way I've added it to x86:
+commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
 
+  At this moment, vdso restoring code is disabled for arm/arm64 arch
+in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
+is aimed to fix that.
+  The same hook may be introduced for arm64 kernel, but at this moment
+arm64 vdso code is actively reworked by Kevin, so we can do it on top.
+  Separately, I've refactored arch_remap hook out from ppc64 [3].
+
+[1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
+[2]: https://github.com/xemul/criu/blob/master/Makefile#L39
+[3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
+
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Christopher Covington <cov@codeaurora.org>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Oleg Nesterov <oleg@redhat.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mm at kvack.org
+Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+---
+ arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index 53cf86cf2d1a..d1001f87c2f6 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
+ 	.pages = &vdso_data_page,
+ };
+ 
++static int vdso_mremap(const struct vm_special_mapping *sm,
++		struct vm_area_struct *new_vma);
+ static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+ 	.name = "[vdso]",
++	.mremap = vdso_mremap,
+ };
+ 
+ struct elfinfo {
+@@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+ 		mm->context.vdso = addr;
+ }
+ 
++static int vdso_mremap(const struct vm_special_mapping *sm,
++		struct vm_area_struct *new_vma)
++{
++	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
++	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
++
++	/* Disallow partial vDSO blob remap */
++	if (vdso_size != new_size)
++		return -EINVAL;
++
++	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
++		return -EFAULT;
++
++	current->mm->context.vdso = new_vma->vm_start;
++
++	return 0;
++}
++
+ static void vdso_write_begin(struct vdso_data *vdata)
+ {
+ 	++vdso_data->seq_count;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.10.2
