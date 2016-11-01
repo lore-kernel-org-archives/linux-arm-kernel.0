@@ -1,69 +1,50 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 1 Nov 2016 09:11:02 -0500
-Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
-In-Reply-To: <CAOesGMgkVWNZ0Nq0c-GZXbJETVBKOo2m5gZ1u8gUtb0tUDeqjQ@mail.gmail.com>
-References: <20160924235945.32128-1-iwamatsu@nigauri.org>
- <CAOesGMgkVWNZ0Nq0c-GZXbJETVBKOo2m5gZ1u8gUtb0tUDeqjQ@mail.gmail.com>
-Message-ID: <8ca09198-dfb8-0a2a-ed2b-d75577f13955@opensource.altera.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 1 Nov 2016 22:13:39 +0800
+Subject: [PATCH 1/5] ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2
+ support
+In-Reply-To: <20161025211955.5345-2-gary.bisson@boundarydevices.com>
+References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+ <20161025211955.5345-2-gary.bisson@boundarydevices.com>
+Message-ID: <20161101141338.GC9807@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Oct 25, 2016 at 11:19:51PM +0200, Gary Bisson wrote:
+> SoM based on i.MX6 Quad with 1GB of DDR3.
+> 
+> https://boundarydevices.com/product/nit6x-som-v2/
+> 
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> ---
+>  arch/arm/boot/dts/Makefile                    |   1 +
+>  arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
+>  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
+>  3 files changed, 824 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
+>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
 
+<snip>
 
-On 10/27/2016 07:23 PM, Olof Johansson wrote:
-> Hi,
-> 
-> Saw this when looking at the patch when merging it.
-> 
-> Please fix up with incremental patch. Dinh, this goes for other
-> platforms under socfpga too, several have this problem:
-> 
-> On Sat, Sep 24, 2016 at 4:59 PM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
->> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
->> new file mode 100644
->> index 0000000..9aaf413
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
->> @@ -0,0 +1,123 @@
->> +/*
->> + *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include "socfpga_cyclone5.dtsi"
->> +#include <dt-bindings/gpio/gpio.h>
->> +#include <dt-bindings/input/input.h>
->> +
->> +/ {
->> +       model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
->> +       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> 
-> You should add a compatible entry for your specific board. Compatible
-> goes from specific to generic, so something like:
-> 
-> compatible = "altr,macnica-sodia", "latr,socfpga-cyclone5", "altr,socfpga";
-> 
-> You can even add entries for the specific rev (if there are
-> differences). But at the very least, add one for the board.
-> 
-> 
-> Dinh, please follow up for other boards as well. I've still merged the
-> pull request you sent (email about that separately).
-> 
+> +/ {
+> +	chosen {
+> +		stdout-path = &uart2;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	backlight_lcd: backlight_lcd {
 
-Thanks for noticing this. I'll send a patch to fix this shortly.
+Please use hyphen instead of underscore in node name.  Please check
+through the patch series.
 
-Dinh
+Shawn
+
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm1 0 5000000>;
+> +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> +		default-brightness-level = <7>;
+> +		power-supply = <&reg_3p3v>;
+> +		status = "okay";
+> +	};
