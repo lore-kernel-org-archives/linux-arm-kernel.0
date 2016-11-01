@@ -1,58 +1,52 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue, 1 Nov 2016 15:54:31 +0100
-Subject: [PATCH 1/5] ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2
- support
-In-Reply-To: <20161101141338.GC9807@dragon>
-References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
- <20161025211955.5345-2-gary.bisson@boundarydevices.com>
- <20161101141338.GC9807@dragon>
-Message-ID: <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 1 Nov 2016 14:54:11 +0000
+Subject: [PATCH 2/3] KVM: arm/arm64: Add ARM arch timer interrupts ABI
+In-Reply-To: <20161101145019.GB13677@cbox>
+References: <20160927190806.22988-1-christoffer.dall@linaro.org>
+ <20160927190806.22988-3-christoffer.dall@linaro.org>
+ <CAFEAcA8x9Rt7SwXfqC8QOuXUEysrGBvYZW_=9ZA+pNgYu7HbTA@mail.gmail.com>
+ <20161101145019.GB13677@cbox>
+Message-ID: <CAFEAcA_mdrTUBBDV91X3Zo6pNzVaukQ7foN+cPt_41+ouBdEfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On 1 November 2016 at 14:50, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Tue, Nov 01, 2016 at 11:26:54AM +0000, Peter Maydell wrote:
+>> Possible current and future outbound interrupt lines (some of these
+>> would only show up in some unlikely or lots-of-implementation-needed
+>> cases, I'm just trying to produce an exhaustive list):
+>>  * virtual timer
+>>  * physical timer
+>>  * hyp timer (nested virtualization case)
+>>  * secure timer (unlikely but maybe if EL3 is ever supported inside a VM)
+>>  * gic maintenance interrupt (nested virt again)
+>>  * PMU interrupt
+>
+> Thanks for the list, that's good to have around for the future.
+>
+> There's also the potential of the EL2 virtual timer for nested VHE
+> support, right?
 
-On Tue, Nov 1, 2016 at 3:13 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Oct 25, 2016 at 11:19:51PM +0200, Gary Bisson wrote:
->> SoM based on i.MX6 Quad with 1GB of DDR3.
+That's the one I meant by "hyp timer".
+
+>> The kernel doesn't know which interrupt number these would be wired
+>> up to, so they're all just arbitrary outputs, and you could put them
+>> in one field or split them up into multiple fields, it doesn't make
+>> much difference.
 >>
->> https://boundarydevices.com/product/nit6x-som-v2/
->>
->> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
->> ---
->>  arch/arm/boot/dts/Makefile                    |   1 +
->>  arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
->>  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
->>  3 files changed, 824 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
->>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
 >
-> <snip>
->
->> +/ {
->> +     chosen {
->> +             stdout-path = &uart2;
->> +     };
->> +
->> +     memory {
->> +             reg = <0x10000000 0x40000000>;
->> +     };
->> +
->> +     backlight_lcd: backlight_lcd {
->
-> Please use hyphen instead of underscore in node name.  Please check
-> through the patch series.
+> So if we keep this we're kind of suggesting that we'll have a field per
+> device type later on.  Since this is a u8 and we are talking about up 5
+> 5 timers already,
 
-Sorry about that, forgot (again). Just to make sure, the label can
-have underscore but not the name right? Or is it better to have hypens
-everywhere?
+4.
 
-So I guess I need to make a pass on current boards as well. Some
-patches in my series rename the panel to panel_lvdsX to match the
-current Nitrogen6_MAX naming[1] but this would need to be changed to
-panel-lvdsX as well.
+> there's not much waste currently, and we have plenty
+> of padding.  I suppose we an always add a 'other_devices' thing later,
+> so I prefer just sticking with this one for now.
 
-Regards,
-Gary
+Yeah, it's not a big deal either way.
 
-[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi#n296
+thanks
+-- PMM
