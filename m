@@ -1,86 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 Nov 2016 16:01:30 +0530
-Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
-In-Reply-To: <3fd93d1b-8ba2-5440-e37d-0c55928e7e51@lechnology.com>
-References: <1477418044-24603-1-git-send-email-david@lechnology.com>
- <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
- <3fd93d1b-8ba2-5440-e37d-0c55928e7e51@lechnology.com>
-Message-ID: <b5da35a5-de11-0aff-9107-1640f5f164cf@ti.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 1 Nov 2016 12:38:36 +0200
+Subject: [PATCH v2 5/5] ARM: dts: da850-lcdk: add tilcdc panel node
+In-Reply-To: <3e8671aa-e59d-4595-c323-af9e6a0ad615@ti.com>
+References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
+ <1477925138-23457-6-git-send-email-bgolaszewski@baylibre.com>
+ <3e8671aa-e59d-4595-c323-af9e6a0ad615@ti.com>
+Message-ID: <b7ab6df6-a2ff-a0a6-576e-b1f6821a51d5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 October 2016 08:18 PM, David Lechner wrote:
-> On 10/31/2016 05:18 AM, Sekhar Nori wrote:
->> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
->>> This fixes pwm name matching for DA850 familiy devices. When using
->>> device
->>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the
->>> exact
->>> same name, which caused errors when trying to register the devices.
->>>
->>> The names for clock matching in da850_clks[] also have to be updated to
->>> to exactly match in order for the clock lookup to work correctly.
->>>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>>
->>> Tested working on LEGO MINDSTORMS EV3.
->>>
->>>
->>>  arch/arm/mach-davinci/da850.c    | 10 +++++++---
->>>  arch/arm/mach-davinci/da8xx-dt.c | 10 +++++-----
->>>  2 files changed, 12 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/da850.c
->>> b/arch/arm/mach-davinci/da850.c
->>> index ed3d0e9..6b78a8f 100644
->>> --- a/arch/arm/mach-davinci/da850.c
->>> +++ b/arch/arm/mach-davinci/da850.c
->>> @@ -510,9 +510,13 @@ static struct clk_lookup da850_clks[] = {
->>>      CLK("vpif",        NULL,        &vpif_clk),
->>>      CLK("ahci_da850",        NULL,        &sata_clk),
->>>      CLK("davinci-rproc.0",    NULL,        &dsp_clk),
->>> -    CLK("ehrpwm",        "fck",        &ehrpwm_clk),
->>> -    CLK("ehrpwm",        "tbclk",    &ehrpwm_tbclk),
->>> -    CLK("ecap",        "fck",        &ecap_clk),
->>> +    CLK("ehrpwm.0",        "fck",        &ehrpwm_clk),
->>> +    CLK("ehrpwm.0",        "tbclk",    &ehrpwm_tbclk),
->>> +    CLK("ehrpwm.1",        "fck",        &ehrpwm_clk),
->>> +    CLK("ehrpwm.1",        "tbclk",    &ehrpwm_tbclk),
->>> +    CLK("ecap.0",        "fck",        &ecap_clk),
->>> +    CLK("ecap.1",        "fck",        &ecap_clk),
->>> +    CLK("ecap.2",        "fck",        &ecap_clk),
+On 01/11/16 12:26, Sekhar Nori wrote:
+> On Monday 31 October 2016 08:15 PM, Bartosz Golaszewski wrote:
+>> The tilcdc driver is not yet ready for working together with the
+>> dumb-vga-dac drm bridge. While the work on enabling drm_bridge
+>> support in tilcdc continues, enable the VGA connector on da850-lcdk
+>> with the following workaround: use the tilcdc-panel driver with
+>> a set of common (and tested) resolutions.
 >>
->> This has exposed a limitation of DaVinci clock framework. The struct clk
->> are stored as a linked list themselves. So a node repeating in the table
->> above will create a loop in the linked list. This is easily seen on the
->> LCDK board. davinci_clk_disable_unused() never returns. PWMs are unused
->> on that board.
+>> Once the drm bridge support is complete, we'll remove the node added
+>> by this patch and use the correct solution. This change will be
+>> transparent for the user.
 >>
->> There is no "simple" solution to this AFAICS. One solution is to
->> separate the iterator from the clock hardware structure and use struct
->> clk_hw available in struct clk_lookup.
->>
->> Or move DaVinci to common clock framework. This is of course preferred
->> but much more involved as all 6 supported SoCs have to be moved together.
->>
->> Thanks,
->> Sekhar
->>
->>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> The simple solution for now could be to make child clocks for each of
-> these that simply enable the parent clock. e.g. ehrpwm0_clk and
-> ehpwm1_clk are children of ehrpwm_clk, etc.
+> I dont think this can be applied. If this goes in v4.10, then the DT
+> blob becomes an ABI and driver will have to support tilcdc-panel driver
+> for DA850 forever.
+> 
+> Its probably better to wait for the proper driver support to arrive.
 
-That sounds good. I saw the v2 patch you sent and it looks good. I
-noticed that aemif clock is repeated in da850.c too. That needs fixing.
+Agreed, NAK for this.
 
-> Looking at da830.c, it looks like the solution was to make multiple
-> clocks that use the same LPSC, but this does not seem right to me.
+ Tomi
 
-The PWM clock definitions there are definitely wrong. It should be
-fixed. Looks like its been like that forever.
-
-Thanks,
-Sekhar
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/c00353af/attachment.sig>
