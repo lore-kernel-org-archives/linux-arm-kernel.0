@@ -1,56 +1,38 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 01 Nov 2016 09:16:26 -0700
-Subject: [PATCH v3] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
-In-Reply-To: <529927781.27121.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
-References: <20161027165246.23936-1-eric@anholt.net>
- <2009597620.98560.11cdcb7c-b46d-43f0-a853-b742fde3546a.open-xchange@email.1und1.de>
- <877f8os8vo.fsf@eliezer.anholt.net>
- <529927781.27121.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
-Message-ID: <87pomfi3ad.fsf@eliezer.anholt.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 1 Nov 2016 17:26:48 +0100
+Subject: [PATCH v2 2/6] net: phy: broadcom: Add BCM54810 PHY entry
+In-Reply-To: <20161101155950.GA19378@broadcom.com>
+References: <1477688219-3871-1-git-send-email-jon.mason@broadcom.com>
+ <1477688219-3871-3-git-send-email-jon.mason@broadcom.com>
+ <20161029081839.GA32579@lunn.ch>
+ <20161101155950.GA19378@broadcom.com>
+Message-ID: <20161101162648.GG10785@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+> > > +	if (of_property_read_bool(np, "brcm,enet-phy-lane-swap")) {
+> > > +		/* Lane Swap - Undocumented register...magic! */
+> > > +		ret = bcm_phy_write_exp(phydev, MII_BCM54XX_EXP_SEL_ER + 0x9,
+> > > +					0x11B);
+> > > +		if (ret < 0)
+> > > +			return ret;
+> > > +	}
+> > > +
+> > 
+> > I wounder if this property could be made generic? What exactly are you
+> > swapping? Rx and Tx lanes? Maybe we should add it to phy.txt?
+> 
+> Are you envisioning adding a DT check (similar to the
+> of_property_read_bool above, only with a more generic string) in
+> phy_device_create(), which will then set a PHY device flag?  This flag
+> would then be checked for in the PHY driver and the appropriate action
+> taken (in this case the bcm_phy_write_exp above).
 
->> Eric Anholt <eric@anholt.net> hat am 31. Oktober 2016 um 18:53 geschrieben:
->> 
->> 
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->> 
->> > Hi Eric,
->> >
->> >> Eric Anholt <eric@anholt.net> hat am 27. Oktober 2016 um 18:52 geschrieben:
->> >> 
->> >> 
->> >> From: Linus Walleij <linus.walleij@linaro.org>
->> >> 
->> >> The idea is to give useful names to GPIO lines that an implementer
->> >> will be using from userspace, e.g. for maker type projects.  These are
->> >> user-visible using tools/gpio/lsgpio.c
->> >
->> > sorry for the late feedback, but did you check your patch against the
->> > Firmware
->> > DTS [1]?
->> >
->> > As an example the GPIO38 is connected and named as USB_LIMIT_1A2 since
->> > Raspberry
->> > Pi 1 B Plus.
->> >
->> > [1] -
->> > https://github.com/raspberrypi/documentation/blob/master/configuration/images/dt-blob.dts
->> 
->> I did use the dt-blob sometimes for cross-checking, but these are
->> written against the schematics, not the dt-blob.  If you've got things
->> you'd like changed, could you send a patch?
->
-> A patch against your v3 or my own v4 based on your patch?
+I would keep the parsing of the property in the driver. But if we
+think other PHYs could also support this feature, it would be good to
+avoid having "brcm,enet-phy-lane-swap", "marvell,enet-phy-lane-swap",
+"davicom,enet-phy-lane-swap", etc. It would be better to have one well
+defined property documented in phy.txt which any PHY is free to
+implement.
 
-A followon patch is great, then the changes are obvious and we can
-either squash or commit as appropriate.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/e9cfffda/attachment.sig>
+	Andrew
