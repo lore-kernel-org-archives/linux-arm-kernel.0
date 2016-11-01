@@ -1,49 +1,56 @@
 From: youlin.pei@mediatek.com (Youlin Pei)
-Date: Tue, 1 Nov 2016 19:51:59 +0800
-Subject: [PATCH v2 0/3] Add Mediatek CIRQ interrupt controller
-Message-ID: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+Date: Tue, 1 Nov 2016 19:52:00 +0800
+Subject: [PATCH v2 1/3] binding: irqchip: mtk-cirq: Add binding document
+In-Reply-To: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+References: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+Message-ID: <1478001122-8664-2-git-send-email-youlin.pei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
-works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
+This commit adds the device tree binding document for
+the mediatek cirq.
 
-The CIRQ controller is integrated in between MCUSYS and interrupt sources
-as the second level interrupt controller. The external interrupts which 
-outside MCUSYS will feed through CIRQ then bypass to GIC.
-
-In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
-will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
-is power downed. CIRQ will be enabled and monitor all edge trigger
-interrupts(only edge trigger interrupts will be lost in this scenario).
-When an edge interrupt is triggered, CIRQ will record the status and
-generated a pulse signal to GIC when flush command is executed. 
-
-With CIRQ, MCUSYS can be completely turned off to improve the system 
-power consumption without losing interrupts.
-
-change in v2:
-1. fix coding style issue.
-2. change the compatible string.
-3. resolve IRQ offset at alloc time.
-4. clear irq status in irq_eoi function.
-5. rebase on 4.9-rc1.
-
-v1:
-http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007213.html
-
-Youlin Pei (3):
-  binding: irqchip: mtk-cirq: Add binding document
-  irqchip: mtk-cirq: Add mediatek mtk-cirq implement
-  ARM: dts: mt2701: Add mtk-cirq node for mt2701
-
- .../interrupt-controller/mediatek,cirq.txt         |  30 +++
- arch/arm/boot/dts/mt2701.dtsi                      |  11 +-
- drivers/irqchip/Makefile                           |   2 +-
- drivers/irqchip/irq-mtk-cirq.c                     | 262 +++++++++++++++++++++
- 4 files changed, 303 insertions(+), 2 deletions(-)
+Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+---
+ .../interrupt-controller/mediatek,cirq.txt         |   30 ++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
- create mode 100644 drivers/irqchip/irq-mtk-cirq.c
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+new file mode 100644
+index 0000000..84e8123
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+@@ -0,0 +1,30 @@
++* Mediatek 27xx cirq
++
++In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
++works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
++The external interrupts (outside MCUSYS) will feed through CIRQ and connect
++to GIC in MCUSYS. When CIRQ is enabled, it will record the edge-sensitive
++interrupts and generated a pulse signal to parent interrupt controller when
++flush command is executed. With CIRQ, MCUSYS can be completely turned off
++to improve the system power consumption without losing interrupts.
++
++Required properties:
++- compatible: should be: "mediatek,mtk-cirq".
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
++- interrupt-parent: phandle of irq parent for cirq. The parent must
++  use the same interrupt-cells format as GIC.
++- reg: Physical base address of the cirq registers and length of memory
++  mapped region.
++- mediatek,ext-irq-start: Identifies external irq start number in different
++  SOCs.
++
++Example:
++	cirq: interrupt-controller at 10204000 {
++		compatible = "mediatek,mtk-cirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&sysirq>;
++		reg = <0 0x10204000 0 0x4000>;
++		mediatek,ext-irq-start = <32>;
++	};
 -- 
-1.9.1 
+1.7.9.5
