@@ -1,41 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 1 Nov 2016 21:35:58 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6ul-14x14-evk: add USB dual-role support
-In-Reply-To: <CAL411-p_T9DP61kVJ8yTf3v5tduAgTgPaKa1dBCPDo+RhP7igw@mail.gmail.com>
-References: <1470128903-942-1-git-send-email-peter.chen@nxp.com>
- <CAL411-p_T9DP61kVJ8yTf3v5tduAgTgPaKa1dBCPDo+RhP7igw@mail.gmail.com>
-Message-ID: <20161101133556.GA9807@dragon>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 1 Nov 2016 13:46:26 +0000
+Subject: [PATCH 01/14] dma: sun6i-dma: Add burst case of 4
+In-Reply-To: <CAGb2v67SSZF6XL-HXv83nuwTKpJc53h8gsrb2r2V98LNZBzqEA@mail.gmail.com>
+References: <cover.1475569400.git.mylene.josserand@free-electrons.com>
+ <3a2404510b5f8b16ae3bb193982d70f158700b2b.1475571575.git.mylene.josserand@free-electrons.com>
+ <20161004124011.d7f5754a082d5f17d5185fc4@free.fr>
+ <20161004165553.GS5228@lukather>
+ <20161023183107.5b75b6aad62853378713299f@free.fr>
+ <20161027175154.v4kuhyvm3r5n6tdo@lukather>
+ <CAGb2v67SSZF6XL-HXv83nuwTKpJc53h8gsrb2r2V98LNZBzqEA@mail.gmail.com>
+Message-ID: <1477922460.2837.5.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 05:17:24PM +0800, Peter Chen wrote:
-> On Tue, Aug 2, 2016 at 5:08 PM, Peter Chen <peter.chen@nxp.com> wrote:
-> > With commit 851ce932242d ("usb: chipidea: otg: don't wait vbus
-> > drops below BSV when starts host"), the driver can support
-> > enabling vbus output without software control, so this board
-> > (control vbus output through ID pin) can support dual-role now.
-> >
-> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > ---
-> >  arch/arm/boot/dts/imx6ul-14x14-evk.dts | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > index e281d50..c5cf942 100644
-> > --- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > @@ -225,7 +225,7 @@
-> >  };
-> >
-> >  &usbotg1 {
-> > -       dr_mode = "peripheral";
-> > +       dr_mode = "otg";
-> >         status = "okay";
-> >  };
-> >
+On Sun, 2016-10-30 at 10:06 +0800, Chen-Yu Tsai wrote:
+> Looking at the dmaengine API, I believe we got it wrong.
 > 
-> Ping....
+> max_burst in dma_slave_config denotes the largest amount of data
+> a single transfer should be, as described in dmaengine.h:
 
-Applied, thanks.  Sorry for missing the patch in the first place.
+Not a single transfer but smallest transaction within a transfer of a
+block. So dmaengines transfer data in bursts from source to destination,
+this parameter decides the size of that bursts
 
-Shawn
+> 
+> ?* @src_maxburst: the maximum number of words (note: words, as in
+> ?* units of the src_addr_width member, not bytes) that can be sent
+> ?* in one burst to the device. Typically something like half the
+> ?* FIFO depth on I/O peripherals so you don't overflow it. This
+> ?* may or may not be applicable on memory sources.
+> ?* @dst_maxburst: same as src_maxburst but for destination target
+> ?* mutatis mutandis.
+> 
+> The DMA engine driver should be free to select whatever burst size
+> that doesn't exceed this. So for max_burst = 4, the driver can select
+> burst = 4 for controllers that do support it, or burst = 1 for those
+> that don't, and do more bursts.
+
+Nope, the client configures these parameters and dmaengine driver
+validates and programs
+
+> 
+> This also means we can increase max_burst for the audio codec, as
+> the FIFO is 64 samples deep for stereo, or 128 samples for mono.
+
+Beware that higher bursts means chance of underrun of FIFO. This value
+is selected with consideration of power and performance required. Lazy
+allocation would be half of FIFO size..
+
+--?
+~Vinod
