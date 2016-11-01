@@ -1,49 +1,68 @@
 From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Tue,  1 Nov 2016 18:10:01 +0100
-Subject: [PATCH v2 0/5] ARM: dts: imx: update Boundary Devices boards support
-In-Reply-To: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+Date: Tue,  1 Nov 2016 18:10:03 +0100
+Subject: [PATCH v2 2/5] ARM: dts: imx6qdl-sabrelite: use hyphens for nodes name
+In-Reply-To: <20161101171006.24594-1-gary.bisson@boundarydevices.com>
 References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
-Message-ID: <20161101171006.24594-1-gary.bisson@boundarydevices.com>
+ <20161101171006.24594-1-gary.bisson@boundarydevices.com>
+Message-ID: <20161101171006.24594-3-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Also aligning the panel nodes name across all platforms.
 
-This series includes several patches to update the support for our platforms.
+Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+---
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Here are the main goals of this series:
-1- Adding support for our latest SOM (SOM2)
-2- Replace underscores in nodes name
-3- Fix panel naming consistency across the boards
-
-Changelog v1->v2:
-- Drop the USB PHY reset changes, waiting for Peter's series [1] to get in.
-- Replace underscores in nodes name
-
-Let me know if you have any question.
-
-Regards,
-Gary
-
-[1] https://www.spinics.net/lists/arm-kernel/msg536105.html
-
-Gary Bisson (5):
-  ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2 support
-  ARM: dts: imx6qdl-sabrelite: use hyphens for nodes name
-  ARM: dts: imx6qdl-nitrogen6x: use hyphens for nodes name
-  ARM: dts: imx6qdl-nit6xlite: use hyphens for nodes name
-  ARM: dts: imx6qdl-nitrogen6_max: use hyphens for nodes name
-
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
- arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi      |  32 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi  |  18 +-
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi     |  12 +-
- arch/arm/boot/dts/imx6qdl-sabrelite.dtsi      |  10 +-
- 7 files changed, 849 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index 81dd6cd..1f9076e 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -153,7 +153,7 @@
+ 		mux-ext-port = <4>;
+ 	};
+ 
+-	backlight_lcd: backlight_lcd {
++	backlight_lcd: backlight-lcd {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm1 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -162,7 +162,7 @@
+ 		status = "okay";
+ 	};
+ 
+-	backlight_lvds: backlight_lvds {
++	backlight_lvds: backlight-lvds {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm4 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -197,7 +197,7 @@
+ 		};
+ 	};
+ 
+-	lcd_panel {
++	panel-lcd {
+ 		compatible = "okaya,rs800480t-7x0gp";
+ 		backlight = <&backlight_lcd>;
+ 
+@@ -208,7 +208,7 @@
+ 		};
+ 	};
+ 
+-	panel {
++	panel-lvds0 {
+ 		compatible = "hannstar,hsd100pxn1";
+ 		backlight = <&backlight_lvds>;
+ 
+@@ -378,7 +378,7 @@
+ 			>;
+ 		};
+ 
+-		pinctrl_gpio_keys: gpio_keysgrp {
++		pinctrl_gpio_keys: gpio-keysgrp {
+ 			fsl,pins = <
+ 				/* Power Button */
+ 				MX6QDL_PAD_NANDF_D3__GPIO2_IO03		0x1b0b0
 -- 
 2.9.3
