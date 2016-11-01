@@ -1,57 +1,28 @@
-From: mranostay@gmail.com (Matt Ranostay)
-Date: Tue, 1 Nov 2016 12:58:57 -0700
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval property
- query
-In-Reply-To: <20161031213846.GA21014@amd>
-References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
- <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
- <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
- <20161024201443.GB5989@amd>
- <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
- <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
- <20161031213846.GA21014@amd>
-Message-ID: <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue, 1 Nov 2016 15:59:48 -0400
+Subject: [PATCH v3 2/6] net: phy: broadcom: Add BCM54810 PHY entry
+In-Reply-To: <20161101184639.GI10785@lunn.ch>
+References: <1478022694-25308-1-git-send-email-jon.mason@broadcom.com>
+ <1478022694-25308-3-git-send-email-jon.mason@broadcom.com>
+ <20161101184639.GI10785@lunn.ch>
+Message-ID: <20161101195946.GA26962@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 2:38 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> On Mon 2016-10-31 13:22:18, Matt Ranostay wrote:
->> On Tue, Oct 25, 2016 at 11:47 AM, Matt Ranostay <mranostay@gmail.com> wrote:
->> > On Mon, Oct 24, 2016 at 1:14 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> >> On Mon 2016-10-24 12:58:25, Matt Ranostay wrote:
->> >>> Pavel + Sebastian this is the patchset that need I some input on :)
->> >>
->> >> Better then previous one.
->> >>
->> >> But my version of bq27xxx_battery.c already contains this:
->> >
->> > This is for allowing udev rule to set the properties as well.
->> > otherwise a kinda crude RUN = " echo value >
->> > /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
->>
->> Any thoughts on this?
->
-> I'd say  echo value >
-> /sys/module/bq27xxx_battery/parameters/poll_interval .. is quite
-> adequate solution...?
->
-> Alternatively, convince us that something else is useful for everyone,
-> and we can do the right thing (poll more often when battery is nearly
-> empty), automatically...
+On Tue, Nov 01, 2016 at 07:46:39PM +0100, Andrew Lunn wrote:
+> Hi Jon
+> 
+> > @@ -56,6 +57,8 @@
+> >  #define PHY_BRCM_EXT_IBND_TX_ENABLE	0x00002000
+> >  #define PHY_BRCM_CLEAR_RGMII_MODE	0x00004000
+> >  #define PHY_BRCM_DIS_TXCRXC_NOENRGY	0x00008000
+> > +#define PHY_BRCM_EXP_LANE_SWAP		0x00010000
+> > +
+> 
+> You define this, but don't use it...
 
-Ok should have had the patchset set it per device, and not use the
-global poll_interval. Of need to add some logic to see if uses the
-global poll_interval or it's own setting.
+Good catch.  Cruft from the last patch.  I'll sendout a quick v4 to
+address this and the missing Documentation patch.
 
-There are times where you could have multiple batteries connected to
-multiple fuel gauges, and want to up the polling interval on certain
-ones that are discharging at different rates.
-
-But of course I'll let you guys let me know if this seems useful at all.
-
-
->
->                                                                         Pavel
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+>     Andrew
