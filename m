@@ -1,60 +1,36 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 1 Nov 2016 12:48:06 +0300
-Subject: [RFC PATCH v2 3/5] ARM64: dts: meson-gxl: Add ethernet nodes with
- internal PHY
-In-Reply-To: <1477932987-27871-4-git-send-email-narmstrong@baylibre.com>
-References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
- <1477932987-27871-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <52cb99f1-93ef-ea53-63c1-a661c2790538@cogentembedded.com>
+From: Nicolae_Rosia@mentor.com (Nicolae Rosia)
+Date: Tue, 1 Nov 2016 11:49:25 +0200
+Subject: [PATCH] ARM: OMAP2+: avoid NULL pointer dereference
+Message-ID: <1477993765-9980-1-git-send-email-Nicolae_Rosia@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+For OMAP4, volt_data is set in omap44xx_voltagedomains_init.
+If the SoC is neither OMAP443X or OMAP446X, we end up with a
+NULL in volt_data which causes a kernel oops.
+This is the case when booting OMAP4470.
 
-On 10/31/2016 7:56 PM, Neil Armstrong wrote:
+Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+---
+ arch/arm/mach-omap2/voltage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-> Add Ethernet node with Internal PHY selection for the Amlogic GXL SoCs
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 45 ++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index d1bf381..71670c3 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -47,6 +47,24 @@
->
->  / {
->  	compatible = "amlogic,meson-gxl";
-> +
-> +
-
-    No need for these empty lines.
-
-> +};
-> +
-> +&ethmac {
-> +	reg = <0x0 0xc9410000 0x0 0x10000
-> +	       0x0 0xc8834540 0x0 0x4>;
-> +
-> +	clocks = <&clkc CLKID_ETH>,
-> +		 <&clkc CLKID_FCLK_DIV2>,
-> +		 <&clkc CLKID_MPLL2>;
-> +	clock-names = "stmmaceth", "clkin0", "clkin1";
-> +
-> +	mdio0: mdio0 {
-
-    Should be "mdio0: mdio {" in oprder to comply woth the DT spec.
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "snps,dwmac-mdio";
-> +	};
->  };
->
->  &aobus {
-[...]
-
-MBR, Sergei
+diff --git a/arch/arm/mach-omap2/voltage.c b/arch/arm/mach-omap2/voltage.c
+index cba8cad..cd15dbd 100644
+--- a/arch/arm/mach-omap2/voltage.c
++++ b/arch/arm/mach-omap2/voltage.c
+@@ -87,6 +87,12 @@ int voltdm_scale(struct voltagedomain *voltdm,
+ 		return -ENODATA;
+ 	}
+ 
++	if (!voltdm->volt_data) {
++		pr_err("%s: No voltage data defined for vdd_%s\n",
++			__func__, voltdm->name);
++		return -ENODATA;
++	}
++
+ 	/* Adjust voltage to the exact voltage from the OPP table */
+ 	for (i = 0; voltdm->volt_data[i].volt_nominal != 0; i++) {
+ 		if (voltdm->volt_data[i].volt_nominal >= target_volt) {
+-- 
+2.5.5
