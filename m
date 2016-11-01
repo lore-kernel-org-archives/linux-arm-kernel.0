@@ -1,119 +1,194 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 1 Nov 2016 16:50:26 +0000
-Subject: [PATCH] KVM: arm/arm64: vgic: Prevent VGIC_ADDR_TO_INTID from
- emiting divisions
-In-Reply-To: <20161101152849.GC13677@cbox>
-References: <20161029111901.16668-1-marc.zyngier@arm.com>
- <20161101152849.GC13677@cbox>
-Message-ID: <a0336267-4180-5c1d-2122-d76e23120939@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 1 Nov 2016 17:55:44 +0100
+Subject: [PATCH] arm64: mm: Fix memmap to be initialized for the entire
+ section
+In-Reply-To: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
+References: <1475747527-32387-1-git-send-email-rrichter@cavium.com>
+Message-ID: <20161101165544.GP22012@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hej,
-
-On 01/11/16 15:28, Christoffer Dall wrote:
-> On Sat, Oct 29, 2016 at 12:19:01PM +0100, Marc Zyngier wrote:
->> Using non-constant number of bits for VGIC_ADDR_TO_INTID() leads
->> to gcc 6.1 emiting calls to __aeabi_uldivmod, which the kernel
->> does not implement.
->>
->> As we really don't want to implement complex division in the kernel,
->> the only other option is to prove to the compiler that there is only
->> a few values that are possible for the number of bits per IRQ, and
->> that they are all power of 2.
->>
->> We turn the VGIC_ADDR_TO_INTID macro into a switch that looks for
->> the supported set of values (1, 2, 8, 64), and perform the computation
->> accordingly. When "bits" is a constant, the compiler optimizes
->> away the other cases. If not, we end-up with a small number of cases
->> that GCC optimises reasonably well. Out of range values are detected
->> both at build time (constants) and at run time (variables).
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->> This should be applied *before* Andre's patch fixing out of bound SPIs.
->>
->>  virt/kvm/arm/vgic/vgic-mmio.h | 33 ++++++++++++++++++++++++++++++++-
->>  1 file changed, 32 insertions(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
->> index 4c34d39..a457282 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.h
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
->> @@ -57,10 +57,41 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
->>   * multiplication with the inverted fraction, and scale up both the
->>   * numerator and denominator with 8 to support at most 64 bits per IRQ:
->>   */
->> -#define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
->> +#define __VGIC_ADDR_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
->>  					64 / (bits) / 8)
-
-I remember we discussed this in length some months ago, but I was
-wondering if this isn't simply:
-	((addr & mask) * 8) / bits
-and thus can be written as:
-	((addr & mask) * 8) >> ilog2(bits)
-We require <bits> to be a power of two anyway for the MASK macro.
-
-ilog2(constant) is nicely optimized at compile time, but even at runtime
-on both ARM variants it boils down to "31 - clz(bits)", which are two or
-three instructions AFAICS.
-
-Does that make sense or am I missing something here?
-
-I changed this in my patch and adjusted the comment, quick testing seems
-to be fine on Midway and Juno.
-
-Will send it out in a minute, if no-one objects.
-
-Cheers,
-Andre.
-
->>  
->>  /*
->> + * Perform the same computation, but also handle non-constant number
->> + * of bits. We only care about the few cases that are required by
->> + * GICv2/v3.
->> + */
->> +#define VGIC_ADDR_TO_INTID(addr, bits)				\
->> +	({							\
->> +		u32 __v;					\
->> +		switch((bits)) {				\
->> +		case 1:						\
->> +			__v = __VGIC_ADDR_INTID((addr), 1);	\
->> +			break;					\
->> +		case 2:						\
->> +			__v = __VGIC_ADDR_INTID((addr), 2);	\
->> +			break;					\
->> +		case 8:						\
->> +			__v = __VGIC_ADDR_INTID((addr), 8);	\
->> +			break;					\
->> +		case 64:					\
->> +			__v = __VGIC_ADDR_INTID((addr), 64);	\
->> +			break;					\
->> +		default:					\
->> +			if (__builtin_constant_p((bits)))	\
->> +				BUILD_BUG();			\
->> +			else					\
->> +				BUG();				\
->> +		}						\
->> +								\
->> +		__v;						\
->> +	})
->> +
->> +/*
->>   * Some VGIC registers store per-IRQ information, with a different number
->>   * of bits per IRQ. For those registers this macro is used.
->>   * The _WITH_LENGTH version instantiates registers with a fixed length
->> -- 
->> 2.9.3
->>
+On 06.10.16 11:52:07, Robert Richter wrote:
+> There is a memory setup problem on ThunderX systems with certain
+> memory configurations. The symptom is
 > 
-> Looks functionally correct, just wondering if it's cleaner to turn the
-> whole thing into a static inline, or if it can be rewritten to use
-> shifts with any benefit.
+>  kernel BUG at mm/page_alloc.c:1848!
 > 
-> In any case, if you like this version:
+> This happens for some configs with 64k page size enabled. The bug
+> triggers for page zones with some pages in the zone not assigned to
+> this particular zone. In my case some pages that are marked as nomap
+> were not reassigned to the new zone of node 1, so those are still
+> assigned to node 0.
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> The reason for the mis-configuration is a change in pfn_valid() which
+> reports pages marked nomap as invalid:
 > 
+>  68709f45385a arm64: only consider memblocks with NOMAP cleared for linear mapping
+> 
+> This causes pages marked as nomap being no long reassigned to the new
+> zone in memmap_init_zone() by calling __init_single_pfn().
+> 
+> Fixing this by restoring the old behavior of pfn_valid() to use
+> memblock_is_memory(). Also changing users of pfn_valid() in arm64 code
+> to use memblock_is_map_memory() where necessary. This only affects
+> code in ioremap.c. The code in mmu.c still can use the new version of
+> pfn_valid().
+
+Below a reproducer for non-numa systems. Note that invalidating the
+node id just simulates a different node in reality.
+
+The patch injects a (pageblock_order) unaligned NOMAP mem range at the
+end of a memory block and then tries to free that area. This causes a
+BUG_ON() (log attached).
+
+-Robert
+
+
+
+>From 20d853e300c99be5420c7ee3f072c318804cac1b Mon Sep 17 00:00:00 2001
+From: root <root@10.18.240.201>
+Date: Tue, 1 Nov 2016 15:04:43 +0000
+Subject: [PATCH] mm-fault-reproducer
+
+Signed-off-by: root <root@10.18.240.201>
+---
+ arch/arm64/mm/init.c | 78 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ mm/page_alloc.c      |  4 ++-
+ 2 files changed, 81 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 21c489bdeb4e..feaa7ab97551 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -36,6 +36,7 @@
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
+ #include <linux/vmalloc.h>
++#include <linux/page-isolation.h>
+ 
+ #include <asm/boot.h>
+ #include <asm/fixmap.h>
+@@ -301,6 +302,80 @@ void __init arm64_memblock_init(void)
+ 	memblock_allow_resize();
+ }
+ 
++static struct page *inject_pageblock;
++
++static void __init inject_nomap_create(void)
++{
++	phys_addr_t start, end;
++	unsigned long start_pfn, end_pfn;
++	u64 i;
++	int ret = -ENOMEM;
++
++	pr_info("%s: PAGES_PER_SECTION=%08lx pageblock_nr_pages=%08lx PAGE_SIZE=%08lx\n",
++		__func__, PAGES_PER_SECTION, pageblock_nr_pages, PAGE_SIZE);
++
++	/*
++	 * find a mem range with a complet pageblock in it
++	 */
++	for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE, &start, &end, NULL) {
++		start_pfn = PFN_DOWN(start);
++		end_pfn = PFN_UP(end);
++		if  (end_pfn - (start_pfn & ~(pageblock_nr_pages-1)) > 2 * pageblock_nr_pages)
++			break;
++	}
++
++	if (i == ULLONG_MAX)
++		goto fail;
++
++	start = PFN_PHYS(start_pfn);
++	end = PFN_PHYS(end_pfn) - 1;
++
++	pr_info("%s: Injecting into range: [%pa-%pa]\n", __func__, &start, &end);
++
++	/* mark the upper 5 pages nomap of a complete pageblock */
++	start_pfn = end_pfn & ~(pageblock_nr_pages-1);
++	start_pfn -= 5;			/* unalign by 5 pages */
++
++	start = PFN_PHYS(start_pfn);
++	end = PFN_PHYS(end_pfn) - 1;
++
++	ret = memblock_mark_nomap(start, end - start + 1);
++	if (ret)
++		goto fail;
++
++	inject_pageblock = pfn_to_page(start_pfn & ~(pageblock_nr_pages-1));
++
++	pr_info("%s: Injected nomap range at: [%pa-%pa] zones: %p %p\n", __func__,
++		&start, &end, page_zone(inject_pageblock),
++		page_zone(inject_pageblock + pageblock_nr_pages - 1));
++
++	return;
++fail:
++	pr_err("%s: Could not inject_unaligned_range: %d\n", __func__, ret);
++}
++
++static void __init inject_nomap_move(void)
++{
++	phys_addr_t start, end;
++	int ret;
++
++	if (!inject_pageblock)
++		return;
++
++	start = PFN_PHYS(page_to_pfn(inject_pageblock));
++	end = PFN_PHYS(page_to_pfn(inject_pageblock) + pageblock_nr_pages) - 1;
++
++	pr_info("%s: Moving [%pa-%pa] zones: %p %p\n", __func__,
++		&start, &end, page_zone(inject_pageblock),
++		page_zone(inject_pageblock + pageblock_nr_pages - 1));
++
++	ret = move_freepages_block(page_zone(inject_pageblock),
++				inject_pageblock,
++				gfpflags_to_migratetype(GFP_KERNEL));
++
++	pr_info("%s: Moved %d pages\n", __func__, ret);
++}
++
+ void __init bootmem_init(void)
+ {
+ 	unsigned long min, max;
+@@ -320,6 +395,7 @@ void __init bootmem_init(void)
+ 	arm64_memory_present();
+ 
+ 	sparse_init();
++	inject_nomap_create();
+ 	zone_sizes_init(min, max);
+ 
+ 	high_memory = __va((max << PAGE_SHIFT) - 1) + 1;
+@@ -479,6 +555,8 @@ void __init mem_init(void)
+ 		 */
+ 		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
+ 	}
++
++	inject_nomap_move();
+ }
+ 
+ void free_initmem(void)
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 2b3bf6767d54..19d74637e242 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5077,8 +5077,10 @@ void __meminit memmap_init_zone(unsigned long size, int nid, unsigned long zone,
+ 		if (context != MEMMAP_EARLY)
+ 			goto not_early;
+ 
+-		if (!early_pfn_valid(pfn))
++		if (!early_pfn_valid(pfn)) {
++			set_page_node(pfn_to_page(pfn), NUMA_NO_NODE);
+ 			continue;
++		}
+ 		if (!early_pfn_in_nid(pfn, nid))
+ 			continue;
+ 		if (!update_defer_init(pgdat, pfn, end_pfn, &nr_initialised))
+-- 
+2.9.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: typescript-crb2s-test21-201611010941-trigger-mm-fault.xz
+Type: application/x-xz
+Size: 10420 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/7eae9153/attachment-0001.xz>
