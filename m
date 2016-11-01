@@ -1,56 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 1 Nov 2016 23:04:28 +0800
-Subject: [PATCH/RESEND V4 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <1478006926-240933-3-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <201611012314.dvKdVJNf%fengguang.wu@intel.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Tue,  1 Nov 2016 08:21:14 -0700
+Subject: [PATCH] staging: vc04_services: parse_rx_slots() - Fix compiler
+ warning
+Message-ID: <20161101152114.19394-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhichang.yuan,
+vc04_services contains a debug logging mechanism.  The log is
+maintained in a shared memory area between the kernel and the
+firmware.  Changing the sizes of the data in this area would
+require a firmware change which is distributed independently
+from the kernel binary.
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.9-rc3 next-20161028]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
+One of the items logged is the address of received messages.
+This address is a pointer, but the debugging slot used to store
+the information is a 32 bit integer.
 
-url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/ARM64-LPC-legacy-ISA-I-O-support/20161101-211425
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: openrisc-or1ksim_defconfig (attached as .config)
-compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=openrisc 
+Luckily, this value is never interpreted by anything other
+then debug tools and it is expected that a human debugging
+the kernel interpret it.
 
-All errors (new ones prefixed by >>):
+This change adds a cast to long before the original cast
+to int to silence the warning.
 
-   drivers/of/address.c: In function '__of_address_to_resource':
->> drivers/of/address.c:733:40: error: 'PCIBIOS_MIN_IO' undeclared (first use in this function)
-   drivers/of/address.c:733:40: note: each undeclared identifier is reported only once for each function it appears in
-
-vim +/PCIBIOS_MIN_IO +733 drivers/of/address.c
-
-   727		if ((flags & (IORESOURCE_IO | IORESOURCE_MEM)) == 0)
-   728			return -EINVAL;
-   729		taddr = of_translate_address(dev, addrp);
-   730		if (taddr == OF_BAD_ADDR)
-   731			return -EINVAL;
-   732		memset(r, 0, sizeof(struct resource));
- > 733		if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
-   734			unsigned long port;
-   735	
-   736			port = pci_address_to_pio(taddr);
-
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 7206 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/dc5720b1/attachment-0001.gz>
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+index f3e1000..c187719 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
+@@ -1619,7 +1619,7 @@ parse_rx_slots(VCHIQ_STATE_T *state)
+ 
+ 		header = (VCHIQ_HEADER_T *)(state->rx_data +
+ 			(state->rx_pos & VCHIQ_SLOT_MASK));
+-		DEBUG_VALUE(PARSE_HEADER, (int)header);
++		DEBUG_VALUE(PARSE_HEADER, (int)(long)header);
+ 		msgid = header->msgid;
+ 		DEBUG_VALUE(PARSE_MSGID, msgid);
+ 		size = header->size;
+-- 
+2.10.2
