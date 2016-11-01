@@ -1,17 +1,71 @@
-From: shawnguo2@vip.163.com (Shawn Guo)
-Date: Tue, 1 Nov 2016 16:50:09 +0800
-Subject: [PATCH v2 0/4] ARM: imx31: clock initialization fixes
-In-Reply-To: <1474848223-19728-1-git-send-email-vz@mleia.com>
-References: <1474848223-19728-1-git-send-email-vz@mleia.com>
-Message-ID: <20161101085009.GA23220@tiger>
+From: Songjun.Wu@microchip.com (Wu, Songjun)
+Date: Tue, 1 Nov 2016 17:02:34 +0800
+Subject: [PATCH] [media] atmel-isc: release the filehandle if it's not the
+ only one.
+In-Reply-To: <c90098d4-4d53-d2e1-2d3e-e38e7d548f45@xs4all.nl>
+References: <1477987726-4257-1-git-send-email-songjun.wu@microchip.com>
+ <c90098d4-4d53-d2e1-2d3e-e38e7d548f45@xs4all.nl>
+Message-ID: <b2c97492-7750-38b0-610a-70781b80a81a@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 26, 2016 at 03:03:39AM +0300, Vladimir Zapolskiy wrote:
-> Vladimir Zapolskiy (4):
->   ARM: dts: imx31: fix clock control module interrupts description
->   ARM: dts: imx31: move CCM device node to AIPS2 bus devices
->   clk: imx31: fix rewritten input argument of mx31_clocks_init()
->   ARM: clk: imx31: properly init clocks for machines with DT
+Sorry, my mistake, the device should be able to opened multiple times.
+It's a wrong patch.
 
-Applied all, thanks.
+On 11/1/2016 16:52, Hans Verkuil wrote:
+> On 01/11/16 09:08, Songjun Wu wrote:
+>> Release the filehandle in 'isc_open' if it's not the only filehandle
+>> opened for the associated video_device.
+>
+> What's wrong with that? You should always be able to open the device
+> multiple times. v4l2-compliance will fail after this patch. I'm not sure
+> what you intended to do here, but this patch is wrong.
+>
+> Regards,
+>
+>     Hans
+>
+>>
+>> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+>> ---
+>>
+>>  drivers/media/platform/atmel/atmel-isc.c | 18 +++++++++---------
+>>  1 file changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/atmel/atmel-isc.c
+>> b/drivers/media/platform/atmel/atmel-isc.c
+>> index 8e25d3f..5e08404 100644
+>> --- a/drivers/media/platform/atmel/atmel-isc.c
+>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+>> @@ -926,21 +926,21 @@ static int isc_open(struct file *file)
+>>      if (ret < 0)
+>>          goto unlock;
+>>
+>> -    if (!v4l2_fh_is_singular_file(file))
+>> -        goto unlock;
+>> +    ret = !v4l2_fh_is_singular_file(file);
+>> +    if (ret)
+>> +        goto fh_rel;
+>>
+>>      ret = v4l2_subdev_call(sd, core, s_power, 1);
+>> -    if (ret < 0 && ret != -ENOIOCTLCMD) {
+>> -        v4l2_fh_release(file);
+>> -        goto unlock;
+>> -    }
+>> +    if (ret < 0 && ret != -ENOIOCTLCMD)
+>> +        goto fh_rel;
+>>
+>>      ret = isc_set_fmt(isc, &isc->fmt);
+>> -    if (ret) {
+>> +    if (ret)
+>>          v4l2_subdev_call(sd, core, s_power, 0);
+>> -        v4l2_fh_release(file);
+>> -    }
+>>
+>> +fh_rel:
+>> +    if (ret)
+>> +        v4l2_fh_release(file);
+>>  unlock:
+>>      mutex_unlock(&isc->lock);
+>>      return ret;
+>>
