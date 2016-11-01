@@ -1,100 +1,61 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue,  1 Nov 2016 10:38:17 -0500
-Subject: [PATCH] ARM: dts: socfpga: add specific compatible strings for boards
-Message-ID: <20161101153817.6977-1-dinguyen@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 1 Nov 2016 23:40:00 +0800
+Subject: [PATCH/RESEND V4 2/3] ARM64 LPC: Add missing range exception for
+ special ISA
+In-Reply-To: <1478006926-240933-3-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <201611012326.goMprgAU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a more specific board compatible entry for all of the SOCFPGA
-Cyclone 5 based boards.
+Hi zhichang.yuan,
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.9-rc3 next-20161028]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
+[Check https://git-scm.com/docs/git-format-patch for more information]
+
+url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/ARM64-LPC-legacy-ISA-I-O-support/20161101-211425
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm-efm32_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `__of_address_to_resource':
+>> drivers/of/address.c:748: undefined reference to `pcibios_min_io'
+
+vim +748 drivers/of/address.c
+
+1f5bef30 Grant Likely   2010-06-08  742  		r->start = taddr;
+1f5bef30 Grant Likely   2010-06-08  743  		r->end = taddr + size - 1;
+1f5bef30 Grant Likely   2010-06-08  744  	}
+1f5bef30 Grant Likely   2010-06-08  745  	r->flags = flags;
+35f3da32 Benoit Cousson 2011-12-05  746  	r->name = name ? name : dev->full_name;
+35f3da32 Benoit Cousson 2011-12-05  747  
+1f5bef30 Grant Likely   2010-06-08 @748  	return 0;
+1f5bef30 Grant Likely   2010-06-08  749  }
+1f5bef30 Grant Likely   2010-06-08  750  
+1f5bef30 Grant Likely   2010-06-08  751  /**
+
+:::::: The code at line 748 was first introduced by commit
+:::::: 1f5bef30cf6c66f097ea5dfc580a41924df888d1 of/address: merge of_address_to_resource()
+
+:::::: TO: Grant Likely <grant.likely@secretlab.ca>
+:::::: CC: Grant Likely <grant.likely@secretlab.ca>
+
 ---
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts  | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index afea364..5ecd2ef 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -18,7 +18,7 @@
- 
- / {
- 	model = "Terasic DE-0(Atlas)";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "terasic,de0-atlas", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-index 424523b..668d77c 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Aries/DENX MCV EVK";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "denx, mcvevk", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	aliases {
- 		ethernet0 = &gmac0;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 15e43f4..b0577c1 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "altr,socdk", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 02e22f5..c5623a7 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -19,7 +19,7 @@
- 
- / {
- 	model = "Terasic SoCkit";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "terasic,sockit", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-index 9aaf413..992ae49 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-@@ -21,7 +21,7 @@
- 
- / {
- 	model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "macnica, sodia", "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "earlyprintk";
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-index b844473..78b187e 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -51,7 +51,7 @@
- 
- / {
- 	model = "samtec VIN|ING FPGA";
--	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+	compatible = "samtec,vining". "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
- 		bootargs = "console=ttyS0,115200";
--- 
-2.8.3
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 10888 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/12b0bc75/attachment.gz>
