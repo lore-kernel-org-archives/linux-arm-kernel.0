@@ -1,53 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 1 Nov 2016 16:35:49 +0300
-Subject: [PATCH v4 20/23] ARM: shmobile: rcar-gen2: Stop passing mode pins
- state to clock driver
-In-Reply-To: <1477055857-17936-21-git-send-email-geert+renesas@glider.be>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
- <1477055857-17936-21-git-send-email-geert+renesas@glider.be>
-Message-ID: <722d91fe-574a-8613-34ff-d44be19157be@cogentembedded.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 1 Nov 2016 21:35:58 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6ul-14x14-evk: add USB dual-role support
+In-Reply-To: <CAL411-p_T9DP61kVJ8yTf3v5tduAgTgPaKa1dBCPDo+RhP7igw@mail.gmail.com>
+References: <1470128903-942-1-git-send-email-peter.chen@nxp.com>
+ <CAL411-p_T9DP61kVJ8yTf3v5tduAgTgPaKa1dBCPDo+RhP7igw@mail.gmail.com>
+Message-ID: <20161101133556.GA9807@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 04:17 PM, Geert Uytterhoeven wrote:
+On Fri, Oct 28, 2016 at 05:17:24PM +0800, Peter Chen wrote:
+> On Tue, Aug 2, 2016 at 5:08 PM, Peter Chen <peter.chen@nxp.com> wrote:
+> > With commit 851ce932242d ("usb: chipidea: otg: don't wait vbus
+> > drops below BSV when starts host"), the driver can support
+> > enabling vbus output without software control, so this board
+> > (control vbus output through ID pin) can support dual-role now.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > ---
+> >  arch/arm/boot/dts/imx6ul-14x14-evk.dts | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> > index e281d50..c5cf942 100644
+> > --- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> > +++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+> > @@ -225,7 +225,7 @@
+> >  };
+> >
+> >  &usbotg1 {
+> > -       dr_mode = "peripheral";
+> > +       dr_mode = "otg";
+> >         status = "okay";
+> >  };
+> >
+> 
+> Ping....
 
-> Now the R-Car Gen2 CPG clock driver obtains the state of the mode pins
-> from the R-Car RST driver, there's no longer a need to pass this state
-> explicitly. Hence we can just call of_clk_init() instead.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
-> ---
-> v4:
->   - Add Acked-by,
->   - Rebase on top of "ARM: shmobile: rcar-gen2: Obtain extal frequency
->     from DT",
->   - Remove the call to rcar_gen2_read_mode_pins(),
->
-> v3:
->   - Drop "select MFD_SYSCON", as the clock driver no longer uses syscon,
->
-> v2:
->   - Kill compiler warning if CONFIG_ARM_ARCH_TIMER is not enabled.
-> ---
->  arch/arm/mach-shmobile/setup-rcar-gen2.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> index afb9fdcd3d9084e2..b527258e0a62e806 100644
-> --- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-[...]
-> @@ -130,7 +129,7 @@ void __init rcar_gen2_timer_init(void)
->  	iounmap(base);
->  #endif /* CONFIG_ARM_ARCH_TIMER */
->
-> -	rcar_gen2_clocks_init(mode);
-> +	of_clk_init(NULL);
->  	clocksource_probe();
->  }
->
+Applied, thanks.  Sorry for missing the patch in the first place.
 
-   This hunk no longer applies to devel.
-
-MBR, Sergei
+Shawn
