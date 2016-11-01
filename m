@@ -1,31 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 1 Nov 2016 15:56:17 +0530
-Subject: [PATCH v2 5/5] ARM: dts: da850-lcdk: add tilcdc panel node
-In-Reply-To: <1477925138-23457-6-git-send-email-bgolaszewski@baylibre.com>
-References: <1477925138-23457-1-git-send-email-bgolaszewski@baylibre.com>
- <1477925138-23457-6-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <3e8671aa-e59d-4595-c323-af9e6a0ad615@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 1 Nov 2016 08:29:56 -0200
+Subject: [PATCH 2/3] ARM: imx: mach-imx6ul: add imx6ull support
+In-Reply-To: <1477969343-19887-3-git-send-email-peter.chen@nxp.com>
+References: <1477969343-19887-1-git-send-email-peter.chen@nxp.com>
+ <1477969343-19887-3-git-send-email-peter.chen@nxp.com>
+Message-ID: <CAOMZO5AsF8s9Ff2NHQ+j2_xSBNEzGY6bGLK-kgvx-aST+K2PNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 31 October 2016 08:15 PM, Bartosz Golaszewski wrote:
-> The tilcdc driver is not yet ready for working together with the
-> dumb-vga-dac drm bridge. While the work on enabling drm_bridge
-> support in tilcdc continues, enable the VGA connector on da850-lcdk
-> with the following workaround: use the tilcdc-panel driver with
-> a set of common (and tested) resolutions.
-> 
-> Once the drm bridge support is complete, we'll remove the node added
-> by this patch and use the correct solution. This change will be
-> transparent for the user.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Tue, Nov 1, 2016 at 1:02 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> imx6ull is derived SoC from imx6ul.
+>
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6ul.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index 58a2b88..0b24630 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -89,10 +89,11 @@ static void __init imx6ul_init_late(void)
+>
+>  static const char * const imx6ul_dt_compat[] __initconst = {
+>         "fsl,imx6ul",
+> +       "fsl,imx6ull",
+>         NULL,
+>  };
+>
+> -DT_MACHINE_START(IMX6UL, "Freescale i.MX6 Ultralite (Device Tree)")
+> +DT_MACHINE_START(IMX6UL, "Freescale i.MX6 UltraLite (Device Tree)")
 
-I dont think this can be applied. If this goes in v4.10, then the DT
-blob becomes an ABI and driver will have to support tilcdc-panel driver
-for DA850 forever.
-
-Its probably better to wait for the proper driver support to arrive.
-
-Thanks,
-Sekhar
+Is this change really needed?
