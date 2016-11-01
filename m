@@ -1,22 +1,56 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 01 Nov 2016 12:05:44 -0400 (EDT)
-Subject: [PATCH net-next 0/2] drivers: net: xgene: Fix coalescing bugs
-In-Reply-To: <1477954827-9951-1-git-send-email-isubramanian@apm.com>
-References: <1477954827-9951-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20161101.120544.1150664206040874267.davem@davemloft.net>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 01 Nov 2016 09:16:26 -0700
+Subject: [PATCH v3] ARM: bcm2835: Add names for the Raspberry Pi GPIO lines
+In-Reply-To: <529927781.27121.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
+References: <20161027165246.23936-1-eric@anholt.net>
+ <2009597620.98560.11cdcb7c-b46d-43f0-a853-b742fde3546a.open-xchange@email.1und1.de>
+ <877f8os8vo.fsf@eliezer.anholt.net>
+ <529927781.27121.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
+Message-ID: <87pomfi3ad.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Mon, 31 Oct 2016 16:00:25 -0700
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-> This patch set fixes the following,
-> 
->      1. Since ethernet v1 hardware has a bug related to coalescing,
-> 	disabling this feature
->      2. Fixing ethernet v2 hardware, interrupt trigger region
-> 	id to 2, to kickoff coalescing
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Eric Anholt <eric@anholt.net> hat am 31. Oktober 2016 um 18:53 geschrieben:
+>> 
+>> 
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>> 
+>> > Hi Eric,
+>> >
+>> >> Eric Anholt <eric@anholt.net> hat am 27. Oktober 2016 um 18:52 geschrieben:
+>> >> 
+>> >> 
+>> >> From: Linus Walleij <linus.walleij@linaro.org>
+>> >> 
+>> >> The idea is to give useful names to GPIO lines that an implementer
+>> >> will be using from userspace, e.g. for maker type projects.  These are
+>> >> user-visible using tools/gpio/lsgpio.c
+>> >
+>> > sorry for the late feedback, but did you check your patch against the
+>> > Firmware
+>> > DTS [1]?
+>> >
+>> > As an example the GPIO38 is connected and named as USB_LIMIT_1A2 since
+>> > Raspberry
+>> > Pi 1 B Plus.
+>> >
+>> > [1] -
+>> > https://github.com/raspberrypi/documentation/blob/master/configuration/images/dt-blob.dts
+>> 
+>> I did use the dt-blob sometimes for cross-checking, but these are
+>> written against the schematics, not the dt-blob.  If you've got things
+>> you'd like changed, could you send a patch?
+>
+> A patch against your v3 or my own v4 based on your patch?
 
-Series applied, thanks.
+A followon patch is great, then the changes are obvious and we can
+either squash or commit as appropriate.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161101/e9cfffda/attachment.sig>
