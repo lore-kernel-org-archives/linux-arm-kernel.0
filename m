@@ -1,71 +1,256 @@
-From: Songjun.Wu@microchip.com (Wu, Songjun)
-Date: Tue, 1 Nov 2016 17:02:34 +0800
-Subject: [PATCH] [media] atmel-isc: release the filehandle if it's not the
- only one.
-In-Reply-To: <c90098d4-4d53-d2e1-2d3e-e38e7d548f45@xs4all.nl>
-References: <1477987726-4257-1-git-send-email-songjun.wu@microchip.com>
- <c90098d4-4d53-d2e1-2d3e-e38e7d548f45@xs4all.nl>
-Message-ID: <b2c97492-7750-38b0-610a-70781b80a81a@microchip.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Nov 2016 10:04:08 +0100
+Subject: [PATCH v2] arm/arm64: KVM: Perform local TLB invalidation when
+ multiplexing vcpus on a single CPU
+In-Reply-To: <1477650470-19104-1-git-send-email-marc.zyngier@arm.com>
+References: <1477650470-19104-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20161101090408.GA13677@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, my mistake, the device should be able to opened multiple times.
-It's a wrong patch.
+On Fri, Oct 28, 2016 at 11:27:50AM +0100, Marc Zyngier wrote:
+> Architecturally, TLBs are private to the (physical) CPU they're
+> associated with. But when multiple vcpus from the same VM are
+> being multiplexed on the same CPU, the TLBs are not private
+> to the vcpus (and are actually shared across the VMID).
+> 
+> Let's consider the following scenario:
+> 
+> - vcpu-0 maps PA to VA
+> - vcpu-1 maps PA' to VA
+> 
+> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
+> by vcpu-0 accesses, and access the wrong physical page.
+> 
+> The solution to this is to keep a per-VM map of which vcpu ran last
+> on each given physical CPU, and invalidate local TLBs when switching
+> to a different vcpu from the same VM.
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Fixed comments, added Mark's RB.
+> 
+>  arch/arm/include/asm/kvm_host.h   | 11 ++++++++++-
+>  arch/arm/include/asm/kvm_hyp.h    |  1 +
+>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++++-
+>  arch/arm/kvm/hyp/switch.c         |  9 +++++++++
+>  arch/arm64/include/asm/kvm_host.h | 11 ++++++++++-
+>  arch/arm64/kvm/hyp/switch.c       |  8 ++++++++
+>  6 files changed, 72 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 2d19e02..7290de6 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -57,6 +57,9 @@ struct kvm_arch {
+>  	/* VTTBR value associated with below pgd and vmid */
+>  	u64    vttbr;
+>  
+> +	/* The last vcpu id that ran on each physical CPU */
+> +	int __percpu *last_vcpu_ran;
+> +
+>  	/* Timer */
+>  	struct arch_timer_kvm	timer;
+>  
+> @@ -174,6 +177,13 @@ struct kvm_vcpu_arch {
+>  	/* vcpu power-off state */
+>  	bool power_off;
+>  
+> +	/*
+> +	 * Local TLBs potentially contain conflicting entries from
+> +	 * another vCPU within this VMID. All entries for this VMID must
+> +	 * be invalidated from (local) TLBs before we run this vCPU.
+> +	 */
+> +	bool tlb_vmid_stale;
+> +
+>  	 /* Don't run the guest (internal implementation need) */
+>  	bool pause;
+>  
+> @@ -292,7 +302,6 @@ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> -static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+>  
+>  static inline void kvm_arm_init_debug(void) {}
+> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+> index 343135e..5850890 100644
+> --- a/arch/arm/include/asm/kvm_hyp.h
+> +++ b/arch/arm/include/asm/kvm_hyp.h
+> @@ -71,6 +71,7 @@
+>  #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
+>  #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
+>  #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
+> +#define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
+>  #define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
+>  #define PRRR		__ACCESS_CP15(c10, 0, c2, 0)
+>  #define NMRR		__ACCESS_CP15(c10, 0, c2, 1)
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 08bb84f..e0d93cd 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -114,11 +114,18 @@ void kvm_arch_check_processor_compat(void *rtn)
+>   */
+>  int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+>  {
+> -	int ret = 0;
+> +	int ret, cpu;
+>  
+>  	if (type)
+>  		return -EINVAL;
+>  
+> +	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
+> +	if (!kvm->arch.last_vcpu_ran)
+> +		return -ENOMEM;
+> +
+> +	for_each_possible_cpu(cpu)
+> +		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
+> +
+>  	ret = kvm_alloc_stage2_pgd(kvm);
+>  	if (ret)
+>  		goto out_fail_alloc;
+> @@ -141,6 +148,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+>  out_free_stage2_pgd:
+>  	kvm_free_stage2_pgd(kvm);
+>  out_fail_alloc:
+> +	free_percpu(kvm->arch.last_vcpu_ran);
+> +	kvm->arch.last_vcpu_ran = NULL;
+>  	return ret;
+>  }
+>  
+> @@ -168,6 +177,9 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+>  {
+>  	int i;
+>  
+> +	free_percpu(kvm->arch.last_vcpu_ran);
+> +	kvm->arch.last_vcpu_ran = NULL;
+> +
+>  	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
+>  		if (kvm->vcpus[i]) {
+>  			kvm_arch_vcpu_free(kvm->vcpus[i]);
+> @@ -310,6 +322,27 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  	return 0;
+>  }
+>  
+> +void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
+> +{
 
-On 11/1/2016 16:52, Hans Verkuil wrote:
-> On 01/11/16 09:08, Songjun Wu wrote:
->> Release the filehandle in 'isc_open' if it's not the only filehandle
->> opened for the associated video_device.
->
-> What's wrong with that? You should always be able to open the device
-> multiple times. v4l2-compliance will fail after this patch. I'm not sure
-> what you intended to do here, but this patch is wrong.
->
-> Regards,
->
->     Hans
->
->>
->> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
->> ---
->>
->>  drivers/media/platform/atmel/atmel-isc.c | 18 +++++++++---------
->>  1 file changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/media/platform/atmel/atmel-isc.c
->> b/drivers/media/platform/atmel/atmel-isc.c
->> index 8e25d3f..5e08404 100644
->> --- a/drivers/media/platform/atmel/atmel-isc.c
->> +++ b/drivers/media/platform/atmel/atmel-isc.c
->> @@ -926,21 +926,21 @@ static int isc_open(struct file *file)
->>      if (ret < 0)
->>          goto unlock;
->>
->> -    if (!v4l2_fh_is_singular_file(file))
->> -        goto unlock;
->> +    ret = !v4l2_fh_is_singular_file(file);
->> +    if (ret)
->> +        goto fh_rel;
->>
->>      ret = v4l2_subdev_call(sd, core, s_power, 1);
->> -    if (ret < 0 && ret != -ENOIOCTLCMD) {
->> -        v4l2_fh_release(file);
->> -        goto unlock;
->> -    }
->> +    if (ret < 0 && ret != -ENOIOCTLCMD)
->> +        goto fh_rel;
->>
->>      ret = isc_set_fmt(isc, &isc->fmt);
->> -    if (ret) {
->> +    if (ret)
->>          v4l2_subdev_call(sd, core, s_power, 0);
->> -        v4l2_fh_release(file);
->> -    }
->>
->> +fh_rel:
->> +    if (ret)
->> +        v4l2_fh_release(file);
->>  unlock:
->>      mutex_unlock(&isc->lock);
->>      return ret;
->>
+why is calling this from here sufficient?
+
+You only get a notification from preempt notifiers if you were preempted
+while running (or rather while the vcpu was loaded).  I think this needs
+to go in kvm_arch_vcpu_load, but be aware that the vcpu_load gets called
+for other vcpu ioctls and doesn't necessarily imply that the vcpu will
+actually run, which is also the case for the sched_in notification, btw.
+The worst that will happen in that case is a bit of extra TLB
+invalidation, so sticking with kvm_arch_vcpu_load is probably fine.
+
+> +	int *last_ran;
+> +
+> +	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
+> +
+> +	/*
+> +	 * We might get preempted before the vCPU actually runs, but
+> +	 * this is fine. Our TLBI stays pending until we actually make
+> +	 * it to __activate_vm, so we won't miss a TLBI. If another
+> +	 * vCPU gets scheduled, it will see our vcpu_id in last_ran,
+> +	 * and pend a TLBI for itself.
+> +	 */
+> +	if (*last_ran != vcpu->vcpu_id) {
+> +		if (*last_ran != -1)
+> +			vcpu->arch.tlb_vmid_stale = true;
+> +
+> +		*last_ran = vcpu->vcpu_id;
+> +	}
+> +}
+> +
+>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  {
+>  	vcpu->cpu = cpu;
+> diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> index 92678b7..a411762 100644
+> --- a/arch/arm/kvm/hyp/switch.c
+> +++ b/arch/arm/kvm/hyp/switch.c
+> @@ -75,6 +75,15 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+>  	write_sysreg(kvm->arch.vttbr, VTTBR);
+> +	if (vcpu->arch.tlb_vmid_stale) {
+> +		/* Force vttbr to be written */
+> +		isb();
+> +		/* Local invalidate only for this VMID */
+> +		write_sysreg(0, TLBIALL);
+> +		dsb(nsh);
+> +		vcpu->arch.tlb_vmid_stale = false;
+> +	}
+> +
+
+why not call this directly when you notice it via kvm_call_hyp as
+opposed to adding another conditional in the critical path?
+
+>  	write_sysreg(vcpu->arch.midr, VPIDR);
+>  }
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index bd94e67..0f62829 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -62,6 +62,9 @@ struct kvm_arch {
+>  	/* VTTBR value associated with above pgd and vmid */
+>  	u64    vttbr;
+>  
+> +	/* The last vcpu id that ran on each physical CPU */
+> +	int __percpu *last_vcpu_ran;
+> +
+>  	/* The maximum number of vCPUs depends on the used GIC model */
+>  	int max_vcpus;
+>  
+> @@ -252,6 +255,13 @@ struct kvm_vcpu_arch {
+>  	/* vcpu power-off state */
+>  	bool power_off;
+>  
+> +	/*
+> +	 * Local TLBs potentially contain conflicting entries from
+> +	 * another vCPU within this VMID. All entries for this VMID must
+> +	 * be invalidated from (local) TLBs before we run this vCPU.
+> +	 */
+> +	bool tlb_vmid_stale;
+> +
+>  	/* Don't run the guest (internal implementation need) */
+>  	bool pause;
+>  
+> @@ -368,7 +378,6 @@ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> -static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+>  
+>  void kvm_arm_init_debug(void);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 83037cd..99d0f33 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -131,6 +131,14 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +	if (vcpu->arch.tlb_vmid_stale) {
+> +		/* Force vttbr_el2 to be written */
+> +		isb();
+> +		/* Local invalidate only for this VMID */
+> +		asm volatile("tlbi vmalle1" : : );
+> +		dsb(nsh);
+> +		vcpu->arch.tlb_vmid_stale = false;
+> +	}
+>  }
+>  
+>  static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+> -- 
+> 2.1.4
+> 
+
+Thanks,
+-Christoffer
