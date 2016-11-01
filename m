@@ -1,28 +1,49 @@
-From: adouglas@cadence.com (Alan Douglas)
-Date: Tue, 1 Nov 2016 11:47:46 +0000
-Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS MAPD?
-Message-ID: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Tue, 1 Nov 2016 19:51:59 +0800
+Subject: [PATCH v2 0/3] Add Mediatek CIRQ interrupt controller
+Message-ID: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am using a Cadence PCIe Root Port in an ECAM setup with A53 and GICv3 with ITS, and have configured the host-generic driver to use MSI, using Device Tree.
-Setup works well and the bus is correctly enumerated.  However, to get MSI/MSI-X working correctly I needed to make a change in drivers/irqchip/irq-gic-v3-its.c
+In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
+works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
 
-The PCI setup I am currently testing is:
-# lspci -t
--[0000:00]---00.0-[01-04]----00.0-[02-04]--+-03.0-[03]----00.0
-                                           \-07.0-[04]----00.0
+The CIRQ controller is integrated in between MCUSYS and interrupt sources
+as the second level interrupt controller. The external interrupts which 
+outside MCUSYS will feed through CIRQ then bypass to GIC.
 
-Device 00:00.0 is a pci-bridge, and claims 1 MSI interrupt.
-       01:00.0 is a pci-bridge, 1 MSI interrupt
-       02:03.0 is a pci-bridge, 1 MSI interrupt
-       02:03.0 is a pci-bridge, 1 MSI interrupt
-       03:00.0 is a USB controller with 2 MSI-X interrupts
-       04:00.0 is a SATA controller with 1 MSI interrupt
+In normal mode(where MCUSYS is active), CIRQ is disabled and interrupts
+will directly issue to MCUSYS. When MCUSYS enters sleep mode, where GIC
+is power downed. CIRQ will be enabled and monitor all edge trigger
+interrupts(only edge trigger interrupts will be lost in this scenario).
+When an edge interrupt is triggered, CIRQ will record the status and
+generated a pulse signal to GIC when flush command is executed. 
 
-When setting up bus 0, the ITS device is created, and its_build_map_cmd() sets the size of the ITS MAPD based on the number of interrupts claimed by bus 0.  When subsequent buses are enumerated, the ITS device will be reused, however we do not increase the number of supported interrupts to allow for the additional interrupts claimed by the additional devices being enumerated.  (This can be seen in its_msi_prepare(), which is called for each device which has MSI/MSI-X enabled, and will reuse an existing ITS. )
+With CIRQ, MCUSYS can be completely turned off to improve the system 
+power consumption without losing interrupts.
 
-The solution I have implemented is in its_alloc_device_irq(), if the offset into the LPI table for the allocated interrupt is greater than the ITS MAPD, I reallocate the itt area, and resize the ITS MAPD.  I'm looking for comments as to whether this is a suitable solution and I should submit as a patch, is there some other recommendation or am I missing something regarding reuse of the ITS?
+change in v2:
+1. fix coding style issue.
+2. change the compatible string.
+3. resolve IRQ offset at alloc time.
+4. clear irq status in irq_eoi function.
+5. rebase on 4.9-rc1.
 
-Regards
-Alan Douglas
+v1:
+http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007213.html
+
+Youlin Pei (3):
+  binding: irqchip: mtk-cirq: Add binding document
+  irqchip: mtk-cirq: Add mediatek mtk-cirq implement
+  ARM: dts: mt2701: Add mtk-cirq node for mt2701
+
+ .../interrupt-controller/mediatek,cirq.txt         |  30 +++
+ arch/arm/boot/dts/mt2701.dtsi                      |  11 +-
+ drivers/irqchip/Makefile                           |   2 +-
+ drivers/irqchip/irq-mtk-cirq.c                     | 262 +++++++++++++++++++++
+ 4 files changed, 303 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+ create mode 100644 drivers/irqchip/irq-mtk-cirq.c
+
+-- 
+1.9.1 
