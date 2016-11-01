@@ -1,44 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Nov 2016 12:31:30 +0100
-Subject: [PATCH v3] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
-In-Reply-To: <20161031222029.GG25787@tuxbot>
-References: <1477473794-26030-1-git-send-email-linus.walleij@linaro.org>
- <20161031222029.GG25787@tuxbot>
-Message-ID: <CACRpkdbipgysCjQDgvBhex7SewVaV379gL-wsZuHCY4Mz1p-aw@mail.gmail.com>
+From: Nicolae_Rosia@mentor.com (Nicolae Rosia)
+Date: Tue, 1 Nov 2016 13:36:41 +0200
+Subject: [PATCH 0/5] ARM: OMAP: dead code removal
+Message-ID: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 11:20 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
+Hi,
 
->> +                                     interrupt-parent = <&pm8058_gpio>;
->> +                                     interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
->
-> To remove the need of resetting the interrupt-parent in each child you
-> can use the following form:
->
->     interrupts-extended = <&pm8058_gpio 208 IRQ_TYPE_EDGE_FALLING>;
->
-> But, if we correct the ssbi gpio driver then this would no longer be
-> interrupt 208 in this parent, right?. I believe that if you say
-> <&pmicintc 208 IRQ_TYPE_EDGE_FALLING> instead, which should work even
-> after we correct the gpio translation.
+I have identified some dead code which can be removed.
 
-Yes. It should be fixed everywhere but is not related to this
-patch. But I can do a two-patch series first fixing this and then
-adding the gyro+accelerometer on top referencing the MFD
-pmicintc as parent.
+Nicolae Rosia (5):
+  ARM: OMAP4: kill omap4_pmic_init and omap4_pmic_get_config
+  ARM: OMAP3: kill omap3_pmic_get_config and twl_{get,set}_voltage
+  ARM: OMAP3: kill omap3_pmic_init
+  ARM: OMAP2: kill omap2_pmic_init
+  ARM: OMAP: kill omap_pmic_init
 
-> (Which probably means we need to get that redesigned, before we
-> introduce to many of these)
+ arch/arm/mach-omap2/twl-common.c | 483 ---------------------------------------
+ arch/arm/mach-omap2/twl-common.h |  24 --
+ 2 files changed, 507 deletions(-)
 
-What needs to happen is for the SSBI and SPMI GPIO to use a
-hierarchical irqdomain so their GPIO local line offset and hwirq
-are the same. Then we can reference the GPIO IRQ lines directly
-in a correct manner.
-
-You are not alone with this mess. A lot of hierarchical GPIOs
-are wrong. My fail as GPIO maintainer I guess, ouch.
-
-Yours,
-Linus Walleij
+-- 
+2.5.5
