@@ -1,113 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Nov 2016 15:50:19 +0100
-Subject: [PATCH 2/3] KVM: arm/arm64: Add ARM arch timer interrupts ABI
-In-Reply-To: <CAFEAcA8x9Rt7SwXfqC8QOuXUEysrGBvYZW_=9ZA+pNgYu7HbTA@mail.gmail.com>
-References: <20160927190806.22988-1-christoffer.dall@linaro.org>
- <20160927190806.22988-3-christoffer.dall@linaro.org>
- <CAFEAcA8x9Rt7SwXfqC8QOuXUEysrGBvYZW_=9ZA+pNgYu7HbTA@mail.gmail.com>
-Message-ID: <20161101145019.GB13677@cbox>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Tue, 1 Nov 2016 15:54:31 +0100
+Subject: [PATCH 1/5] ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2
+ support
+In-Reply-To: <20161101141338.GC9807@dragon>
+References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+ <20161025211955.5345-2-gary.bisson@boundarydevices.com>
+ <20161101141338.GC9807@dragon>
+Message-ID: <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 11:26:54AM +0000, Peter Maydell wrote:
-> On 27 September 2016 at 20:08, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > From: Alexander Graf <agraf@suse.de>
-> >
-> > We have 2 modes for dealing with interrupts in the ARM world. We can
-> > either handle them all using hardware acceleration through the vgic or
-> > we can emulate a gic in user space and only drive CPU IRQ pins from
-> > there.
-> >
-> > Unfortunately, when driving IRQs from user space, we never tell user
-> > space about timer events that may result in interrupt line state
-> > changes, so we lose out on timer events if we run with user space gic
-> > emulation.
-> >
-> > Define an ABI to publish the timer output level to userspace.
-> >
-> > Signed-off-by: Alexander Graf <agraf@suse.de>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  Documentation/virtual/kvm/api.txt | 29 +++++++++++++++++++++++++++++
-> >  arch/arm/include/uapi/asm/kvm.h   |  2 ++
-> >  arch/arm64/include/uapi/asm/kvm.h |  2 ++
-> >  include/uapi/linux/kvm.h          |  6 ++++++
-> >  4 files changed, 39 insertions(+)
-> >
-> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> > index 739db9a..2adf600 100644
-> > --- a/Documentation/virtual/kvm/api.txt
-> > +++ b/Documentation/virtual/kvm/api.txt
-> > @@ -3928,3 +3928,32 @@ In order to use SynIC, it has to be activated by setting this
-> >  capability via KVM_ENABLE_CAP ioctl on the vcpu fd. Note that this
-> >  will disable the use of APIC hardware virtualization even if supported
-> >  by the CPU, as it's incompatible with SynIC auto-EOI behavior.
-> > +
-> > +8.3 KVM_CAP_ARM_TIMER
-> > +
-> > +Architectures: arm, arm64
-> > +This capability, if KVM_CHECK_EXTENSION indicates that it is available, means
-> > +that if userspace creates a VM without an in-kernel interrupt controller, it
-> > +will be notified of changes to the output level of ARM architected timers
-> > +presented to the VM.  For such VMs, on every return to userspace, the kernel
-> > +updates the vcpu's run->s.regs.timer_irq_level field to represent the actual
-> > +output level of the timers.
-> > +
-> > +Whenever kvm detects a change in the timer output level, kvm guarantees at
-> > +least one return to userspace before running the VM.  This exit could either
-> > +be a KVM_EXIT_INTR or any other exit event, like KVM_EXIT_MMIO. This way,
-> > +userspace can always sample the timer output level and re-compute the state of
-> > +the userspace interrupt controller.  Userspace should always check the state
-> > +of run->s.regs.timer_irq_level on every kvm exit.  The value in
-> > +run->s.regs.timer_irq_level should be considered a level triggered interrupt
-> > +signal.
-> > +
-> > +The field run->s.regs.timer_irq_level is available independent of
-> > +run->kvm_valid_regs or run->kvm_dirty_regs bits.
-> > +
-> > +Currently the following bits are defined for the timer_irq_level bitmap:
-> > +
-> > +    KVM_ARM_TIMER_VTIMER  -  virtual timer
-> > +
-> > +Future versions of kvm may implement additional timer events. These will get
-> > +indicated by additional KVM_CAP extensions.
-> 
-> This API looks good to me generally. My only question is whether we
-> want to name the struct fields so they're not specifically talking
-> about timer interrupts. For instance we probably want to expose the
-> vPMU interrupt line to userspace too. We could do that by adding another
-> struct field pmu_irq_level, but we could equally just assign it a bit
-> in the existing irq_level field.
-> 
-> Possible current and future outbound interrupt lines (some of these
-> would only show up in some unlikely or lots-of-implementation-needed
-> cases, I'm just trying to produce an exhaustive list):
->  * virtual timer
->  * physical timer
->  * hyp timer (nested virtualization case)
->  * secure timer (unlikely but maybe if EL3 is ever supported inside a VM)
->  * gic maintenance interrupt (nested virt again)
->  * PMU interrupt
+Hi Shawn,
 
-Thanks for the list, that's good to have around for the future.
+On Tue, Nov 1, 2016 at 3:13 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Oct 25, 2016 at 11:19:51PM +0200, Gary Bisson wrote:
+>> SoM based on i.MX6 Quad with 1GB of DDR3.
+>>
+>> https://boundarydevices.com/product/nit6x-som-v2/
+>>
+>> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile                    |   1 +
+>>  arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
+>>  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
+>>  3 files changed, 824 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
+>>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+>
+> <snip>
+>
+>> +/ {
+>> +     chosen {
+>> +             stdout-path = &uart2;
+>> +     };
+>> +
+>> +     memory {
+>> +             reg = <0x10000000 0x40000000>;
+>> +     };
+>> +
+>> +     backlight_lcd: backlight_lcd {
+>
+> Please use hyphen instead of underscore in node name.  Please check
+> through the patch series.
 
-There's also the potential of the EL2 virtual timer for nested VHE
-support, right?
+Sorry about that, forgot (again). Just to make sure, the label can
+have underscore but not the name right? Or is it better to have hypens
+everywhere?
 
-> 
-> The kernel doesn't know which interrupt number these would be wired
-> up to, so they're all just arbitrary outputs, and you could put them
-> in one field or split them up into multiple fields, it doesn't make
-> much difference.
-> 
+So I guess I need to make a pass on current boards as well. Some
+patches in my series rename the panel to panel_lvdsX to match the
+current Nitrogen6_MAX naming[1] but this would need to be changed to
+panel-lvdsX as well.
 
-So if we keep this we're kind of suggesting that we'll have a field per
-device type later on.  Since this is a u8 and we are talking about up 5
-5 timers already, there's not much waste currently, and we have plenty
-of padding.  I suppose we an always add a 'other_devices' thing later,
-so I prefer just sticking with this one for now.
+Regards,
+Gary
 
-Thanks,
--Christoffer
+[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi#n296
