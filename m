@@ -1,93 +1,65 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Tue, 1 Nov 2016 20:22:14 +0300
-Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
-Message-ID: <20161101172214.2938-1-dsafonov@virtuozzo.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 1 Nov 2016 11:32:07 -0600
+Subject: [GIT PULL] firmware: SCPI updates for v4.10
+In-Reply-To: <20161029183951.GE4195@localhost>
+References: <20161028112920.GB12241@e107155-lin>
+ <20161029183951.GE4195@localhost>
+Message-ID: <20161101173207.GA772@e106835-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Add vdso_mremap hook which will fix context.vdso pointer after mremap()
-on vDSO vma. This is needed for correct landing after syscall execution.
-Primary goal of this is for CRIU on arm - we need to restore vDSO image
-at the exactly same place where the vma was in dumped application. With
-the help of this hook we'll move vDSO at the new position.
-  The CRIU code handles situations like when vDSO of dumped application
-was different from vDSO on restoring system. This usally happens when
-some new symbols are being added to vDSO. In these situations CRIU
-inserts jump trampolines from old vDSO blob to new vDSO on restore.
-By that reason even if on restore vDSO blob lies on the same address as
-blob in dumped application - we still need to move it if it differs.
+On Sat, Oct 29, 2016 at 11:39:51AM -0700, Olof Johansson wrote:
+> Hi Sudeep,
+> 
+> On Fri, Oct 28, 2016 at 12:29:20PM +0100, Sudeep Holla wrote:
+> > Hi ARM-SoC Team,
+> > 
+> > Please pull !
+> > 
+> > --
+> > Regards,
+> > Sudeep
+> > 
+> > The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> > 
+> >   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/scpi-updates-4.10
+> > 
+> > for you to fetch changes up to a9e0192d8b35c6ab115a154ed1499ff39a0e5b06:
+> > 
+> >   firmware: arm_scpi: add support for legacy match table on Amlogic GXBB SoC (2016-10-19 15:17:28 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > SCPI updates for v4.10
+> > 
+> > 1. Adds support for Legacy SCPI(pre- SCPI v1.0) protocol
+> > 
+> > 2. Adds support for SCPI used on Amlogic GXBB SoC using the legacy
+> >    SCPI protocol
+> > 
+> > ----------------------------------------------------------------
+> > Neil Armstrong (5):
+> >       dt-bindings: Add support for Amlogic GXBB SCPI Interface
+> 
+> I had comments on this patch, just emailed as follow-up to it.
+>
 
-  There was previously attempt to add this functionality for arm64 by
-arch_mremap hook [1], while this patch introduces this with minimal
-effort - the same way I've added it to x86:
-commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+Thanks for having a look, will address it.
 
-  At this moment, vdso restoring code is disabled for arm/arm64 arch
-in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
-is aimed to fix that.
-  The same hook may be introduced for arm64 kernel, but at this moment
-arm64 vdso code is actively reworked by Kevin, so we can do it on top.
-  Separately, I've refactored arch_remap hook out from ppc64 [3].
+> Also, you didn't sign off on it when applying it, seems like a mistake.
+>
 
-[1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
-[2]: https://github.com/xemul/criu/blob/master/Makefile#L39
-[3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
+Ah, yes that was stupid mistake as I pulled that last minute.
 
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Christopher Covington <cov@codeaurora.org>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Oleg Nesterov <oleg@redhat.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mm at kvack.org
-Cc: Cyrill Gorcunov <gorcunov@openvz.org>
-Cc: Pavel Emelyanov <xemul@virtuozzo.com>
-Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
----
- arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> Please respin, ideally with the other changes also done (i.e. splitting off
+> Juno stuff from arm,scpi.txt).
+>
 
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index 53cf86cf2d1a..d1001f87c2f6 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
- 	.pages = &vdso_data_page,
- };
- 
-+static int vdso_mremap(const struct vm_special_mapping *sm,
-+		struct vm_area_struct *new_vma);
- static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
- 	.name = "[vdso]",
-+	.mremap = vdso_mremap,
- };
- 
- struct elfinfo {
-@@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
- 		mm->context.vdso = addr;
- }
- 
-+static int vdso_mremap(const struct vm_special_mapping *sm,
-+		struct vm_area_struct *new_vma)
-+{
-+	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
-+	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
-+
-+	/* Disallow partial vDSO blob remap */
-+	if (vdso_size != new_size)
-+		return -EINVAL;
-+
-+	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
-+		return -EFAULT;
-+
-+	current->mm->context.vdso = new_vma->vm_start;
-+
-+	return 0;
-+}
-+
- static void vdso_write_begin(struct vdso_data *vdata)
- {
- 	++vdso_data->seq_count;
--- 
-2.10.2
+OK.
+
+--
+Regards,
+Sudeep
