@@ -1,57 +1,35 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 1 Nov 2016 15:38:12 -0200
-Subject: [PATCH] ARM: dts: imx6sx-udoo: Add board specific compatible strings
-Message-ID: <1478021892-18344-1-git-send-email-fabio.estevam@nxp.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 1 Nov 2016 18:48:42 +0100
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161101153326.GA6193@obsidianresearch.com>
+References: <20161028154740.GC10441@obsidianresearch.com>
+ <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
+ <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+ <20161028210015.GA19901@live.com>
+ <20161028220546.GA19693@obsidianresearch.com>
+ <20161029000926.GA30169@live.com>
+ <20161031162327.GA28817@obsidianresearch.com>
+ <7117d821-a1b1-7c07-806a-483be99131e6@xilinx.com>
+ <20161101153326.GA6193@obsidianresearch.com>
+Message-ID: <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible entry for the specific board versions.
+On 1.11.2016 16:33, Jason Gunthorpe wrote:
+> On Tue, Nov 01, 2016 at 07:39:22AM +0100, Michal Simek wrote:
+> 
+>> Regarding BIT and BIN format. This support is in vivado for a long time
+>> and it is up2you what you want to support. We have removed that BIT
+>> support and not doing any swap by saying only BIN format is supported.
+> 
+> BIN is not supported, it needs a swap as well.
+> 
+> Moritz has it right, you have to use vivado to create a PROM image to be
+> compatible with the driver.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts    | 2 +-
- arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts | 2 +-
- arch/arm/boot/dts/imx6sx-udoo-neo-full.dts     | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+hm than that's bad.
 
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-index 0b88878..0c1fc1a 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-basic.dts
-@@ -46,7 +46,7 @@
- 
- / {
- 	model = "UDOO Neo Basic";
--	compatible = "fsl,imx6sx";
-+	compatible = "udoo,neobasic", "fsl,imx6sx";
- 
- 	memory {
- 		reg = <0x80000000 0x20000000>;
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
-index d6fdd17..5d6c227 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-extended.dts
-@@ -46,7 +46,7 @@
- 
- / {
- 	model = "UDOO Neo Extended";
--	compatible = "fsl,imx6sx";
-+	compatible = "udoo,neoextended", "fsl,imx6sx";
- 
- 	memory {
- 		reg = <0x80000000 0x40000000>;
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
-index d8c3577..653ceb2 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo-full.dts
-@@ -46,7 +46,7 @@
- 
- / {
- 	model = "UDOO Neo Full";
--	compatible = "fsl,imx6sx";
-+	compatible = "udoo,neofull", "fsl,imx6sx";
- 
- 	memory {
- 		reg = <0x80000000 0x40000000>;
--- 
-2.7.4
+Thanks,
+Michal
