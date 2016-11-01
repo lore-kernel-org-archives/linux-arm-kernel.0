@@ -1,79 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 1 Nov 2016 14:03:59 +0000
-Subject: [PATCH v2 2/3] arm64: Add hypervisor safe helper for checking
- constant capabilities
-In-Reply-To: <1477929825-5907-3-git-send-email-suzuki.poulose@arm.com>
-References: <1477929825-5907-1-git-send-email-suzuki.poulose@arm.com>
- <1477929825-5907-3-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20161101140359.GF22791@arm.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 1 Nov 2016 09:11:02 -0500
+Subject: [PATCH v2] ARM: dts: socfpga: Add Macnica sodia board
+In-Reply-To: <CAOesGMgkVWNZ0Nq0c-GZXbJETVBKOo2m5gZ1u8gUtb0tUDeqjQ@mail.gmail.com>
+References: <20160924235945.32128-1-iwamatsu@nigauri.org>
+ <CAOesGMgkVWNZ0Nq0c-GZXbJETVBKOo2m5gZ1u8gUtb0tUDeqjQ@mail.gmail.com>
+Message-ID: <8ca09198-dfb8-0a2a-ed2b-d75577f13955@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 04:03:44PM +0000, Suzuki K Poulose wrote:
-> The hypervisor may not have full access to the kernel data structures
-> and hence cannot safely use cpus_have_cap() helper for checking the
-> system capability. Add a safe helper for hypervisors to check a constant
-> system capability, which *doesn't* fall back to checking the bitmap
-> maintained by the kernel.
+Hi Olof,
+
+
+On 10/27/2016 07:23 PM, Olof Johansson wrote:
+> Hi,
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
+> Saw this when looking at the patch when merging it.
 > 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 758d74f..ae5e994 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -9,8 +9,6 @@
->  #ifndef __ASM_CPUFEATURE_H
->  #define __ASM_CPUFEATURE_H
->  
-> -#include <linux/jump_label.h>
-> -
->  #include <asm/hwcap.h>
->  #include <asm/sysreg.h>
->  
-> @@ -45,6 +43,8 @@
->  
->  #ifndef __ASSEMBLY__
->  
-> +#include <linux/bug.h>
-> +#include <linux/jump_label.h>
->  #include <linux/kernel.h>
->  
->  /* CPU feature register tracking */
-> @@ -122,6 +122,16 @@ static inline bool cpu_have_feature(unsigned int num)
->  	return elf_hwcap & (1UL << num);
->  }
->  
-> +/* System capability check for constant caps */
-> +static inline bool cpus_have_const_cap(int num)
-> +{
-> +	if (__builtin_constant_p(num))
-> +		return static_branch_unlikely(&cpu_hwcap_keys[num]);
-> +	BUILD_BUG();
+> Please fix up with incremental patch. Dinh, this goes for other
+> platforms under socfpga too, several have this problem:
+> 
+> On Sat, Sep 24, 2016 at 4:59 PM, Nobuhiro Iwamatsu <iwamatsu@nigauri.org> wrote:
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+>> new file mode 100644
+>> index 0000000..9aaf413
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+>> @@ -0,0 +1,123 @@
+>> +/*
+>> + *  Copyright (C) 2016 Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include "socfpga_cyclone5.dtsi"
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/input/input.h>
+>> +
+>> +/ {
+>> +       model = "Altera SOCFPGA Cyclone V SoC Macnica Sodia board";
+>> +       compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+> 
+> You should add a compatible entry for your specific board. Compatible
+> goes from specific to generic, so something like:
+> 
+> compatible = "altr,macnica-sodia", "latr,socfpga-cyclone5", "altr,socfpga";
+> 
+> You can even add entries for the specific rev (if there are
+> differences). But at the very least, add one for the board.
+> 
+> 
+> Dinh, please follow up for other boards as well. I've still merged the
+> pull request you sent (email about that separately).
+> 
 
-I think you'll already get a build failure if you pass a non-const num
-to static_branch_unlikely, so this seems unnecessary. Furthermore, if
-we're going to introduce a "const-only" version of this function, maybe
-it's best to kill the __builtin_constant_p checks altogether, including
-in the existing cpus_have_cap code? That way, the caller can make the
-decision about whether or not they want to use static keys.
+Thanks for noticing this. I'll send a patch to fix this shortly.
 
-> +	/* unreachable */
-> +	return false;
-> +}
-> +
->  static inline bool cpus_have_cap(unsigned int num)
->  {
->  	if (num >= ARM64_NCAPS)
-
-It seems odd to check aginst ARM64_NCAPS here, but not in your new function.
-Is the check actually necessary in either case? If so, we should probably
-duplicate it for consistency.
-
-Will
+Dinh
