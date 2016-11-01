@@ -1,74 +1,138 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 01 Nov 2016 18:27:32 +0000
-Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS
- MAPD?
-In-Reply-To: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
- (Alan Douglas's message of "Tue, 1 Nov 2016 11:47:46 +0000")
-References: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
-Message-ID: <861syvkqcr.fsf@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Nov 2016 19:28:43 +0100
+Subject: [PATCH v2] arm/arm64: KVM: Perform local TLB invalidation when
+ multiplexing vcpus on a single CPU
+In-Reply-To: <86ins7kvcu.fsf@arm.com>
+References: <1477650470-19104-1-git-send-email-marc.zyngier@arm.com>
+ <20161101090408.GA13677@cbox> <86ins7kvcu.fsf@arm.com>
+Message-ID: <20161101182843.GE13677@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Tue, Nov 01, 2016 at 04:39:29PM +0000, Marc Zyngier wrote:
+> [messed up my initial reply, resending]
+> 
+> On Tue, Nov 01 2016 at 09:04:08 AM, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
+> > On Fri, Oct 28, 2016 at 11:27:50AM +0100, Marc Zyngier wrote:
+> >> Architecturally, TLBs are private to the (physical) CPU they're
+> >> associated with. But when multiple vcpus from the same VM are
+> >> being multiplexed on the same CPU, the TLBs are not private
+> >> to the vcpus (and are actually shared across the VMID).
+> >> 
+> >> Let's consider the following scenario:
+> >> 
+> >> - vcpu-0 maps PA to VA
+> >> - vcpu-1 maps PA' to VA
+> >> 
+> >> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
+> >> by vcpu-0 accesses, and access the wrong physical page.
+> >> 
+> >> The solution to this is to keep a per-VM map of which vcpu ran last
+> >> on each given physical CPU, and invalidate local TLBs when switching
+> >> to a different vcpu from the same VM.
+> >> 
+> >> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >> Fixed comments, added Mark's RB.
+> >> 
+> >>  arch/arm/include/asm/kvm_host.h   | 11 ++++++++++-
+> >>  arch/arm/include/asm/kvm_hyp.h    |  1 +
+> >>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++++-
+> >>  arch/arm/kvm/hyp/switch.c         |  9 +++++++++
+> >>  arch/arm64/include/asm/kvm_host.h | 11 ++++++++++-
+> >>  arch/arm64/kvm/hyp/switch.c       |  8 ++++++++
+> >>  6 files changed, 72 insertions(+), 3 deletions(-)
+> >> 
+> 
+> [...]
+> 
+> >> @@ -310,6 +322,27 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
+> >> +{
+> >
+> > why is calling this from here sufficient?
+> >
+> > You only get a notification from preempt notifiers if you were preempted
+> > while running (or rather while the vcpu was loaded).  I think this
+> > needs
+> 
+> Arghh. I completely miss-read the code when writing that patch.
+> 
+> > to go in kvm_arch_vcpu_load, but be aware that the vcpu_load gets called
+> > for other vcpu ioctls and doesn't necessarily imply that the vcpu will
+> > actually run, which is also the case for the sched_in notification, btw.
+> > The worst that will happen in that case is a bit of extra TLB
+> > invalidation, so sticking with kvm_arch_vcpu_load is probably fine.
+> 
+> Indeed. I don't mind the extra invalidation, as long as it is rare
+> enough. Another possibility would be to do this test on the entry path,
+> once preemption is disabled.
+> 
+> >
+> >> +	int *last_ran;
+> >> +
+> >> +	last_ran = per_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran, cpu);
+> >> +
+> >> +	/*
+> >> +	 * We might get preempted before the vCPU actually runs, but
+> >> +	 * this is fine. Our TLBI stays pending until we actually make
+> >> +	 * it to __activate_vm, so we won't miss a TLBI. If another
+> >> +	 * vCPU gets scheduled, it will see our vcpu_id in last_ran,
+> >> +	 * and pend a TLBI for itself.
+> >> +	 */
+> >> +	if (*last_ran != vcpu->vcpu_id) {
+> >> +		if (*last_ran != -1)
+> >> +			vcpu->arch.tlb_vmid_stale = true;
+> >> +
+> >> +		*last_ran = vcpu->vcpu_id;
+> >> +	}
+> >> +}
+> >> +
+> >>  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+> >>  {
+> >>  	vcpu->cpu = cpu;
+> >> diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> >> index 92678b7..a411762 100644
+> >> --- a/arch/arm/kvm/hyp/switch.c
+> >> +++ b/arch/arm/kvm/hyp/switch.c
+> >> @@ -75,6 +75,15 @@ static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+> >>  {
+> >>  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> >>  	write_sysreg(kvm->arch.vttbr, VTTBR);
+> >> +	if (vcpu->arch.tlb_vmid_stale) {
+> >> +		/* Force vttbr to be written */
+> >> +		isb();
+> >> +		/* Local invalidate only for this VMID */
+> >> +		write_sysreg(0, TLBIALL);
+> >> +		dsb(nsh);
+> >> +		vcpu->arch.tlb_vmid_stale = false;
+> >> +	}
+> >> +
+> >
+> > why not call this directly when you notice it via kvm_call_hyp as
+> > opposed to adding another conditional in the critical path?
+> 
+> Because the cost of a hypercall is very likely to be a lot higher than
+> that of testing a variable. Not to mention that at this point we're
+> absolutely sure that we're going to run the guest, while the hook in
+> vcpu_load is only probabilistic.
+> 
+Hmmm, I think for for performance workloads you care about, you will pin
+VCPUs, so you'd rather take this hit in the case where your're bouncing
+VCPUs all over the place, as opposed to the situation where you care
+about being able to quickly exit, for example to take an interrupt for a
+passthrough device.
 
-On Tue, Nov 01 2016 at 11:47:46 AM, Alan Douglas <adouglas@cadence.com> wrote:
-> I am using a Cadence PCIe Root Port in an ECAM setup with A53 and
-> GICv3 with ITS, and have configured the host-generic driver to use
-> MSI, using Device Tree.  Setup works well and the bus is correctly
-> enumerated.  However, to get MSI/MSI-X working correctly I needed to
-> make a change in drivers/irqchip/irq-gic-v3-its.c
->
-> The PCI setup I am currently testing is:
-> # lspci -t
-> -[0000:00]---00.0-[01-04]----00.0-[02-04]--+-03.0-[03]----00.0
->                                            \-07.0-[04]----00.0
->
-> Device 00:00.0 is a pci-bridge, and claims 1 MSI interrupt.
->        01:00.0 is a pci-bridge, 1 MSI interrupt
->        02:03.0 is a pci-bridge, 1 MSI interrupt
->        02:03.0 is a pci-bridge, 1 MSI interrupt
->        03:00.0 is a USB controller with 2 MSI-X interrupts
->        04:00.0 is a SATA controller with 1 MSI interrupt
->
-> When setting up bus 0, the ITS device is created, and
-> its_build_map_cmd() sets the size of the ITS MAPD based on the number
-> of interrupts claimed by bus 0.  When subsequent buses are enumerated,
-> the ITS device will be reused, however we do not increase the number
-> of supported interrupts to allow for the additional interrupts claimed
-> by the additional devices being enumerated.  (This can be seen in
-> its_msi_prepare(), which is called for each device which has MSI/MSI-X
-> enabled, and will reuse an existing ITS. )
+As a comparison, the many-many debug flag checks and function calls we
+currently take costs us over 150 cycles for each save/restore on both
+Seattle and Mustang, so I don't think the conditionals are free.
 
-Am I right in understanding that all the PCIe devices in your system
-end-up aliasing to the same RequesterID? If so, that's a major
-issue. The ITS is designed so that each device exposes its *own* RID,
-and have its own Interrupt Translation Table (ITT).
+I think doing this in the non-preemptible load_vcpu part is just fine,
+and it's in line with the other tlbi stuff we do.
 
-In your case, you seem to first discover the root port, which is not
-upstream of anything, so it doesn't alias with anything at that
-point. We allocate the corresponding ITT, and it's all fine. Until we
-start probing the rest, and ugly things happen.
-
-> The solution I have implemented is in its_alloc_device_irq(), if the
-> offset into the LPI table for the allocated interrupt is greater than
-> the ITS MAPD, I reallocate the itt area, and resize the ITS MAPD.  I'm
-> looking for comments as to whether this is a suitable solution and I
-> should submit as a patch, is there some other recommendation or am I
-> missing something regarding reuse of the ITS?
-
-Not seeing the patch doesn't help, but in general reallocating an ITT
-implies unmapping everything at the ITS level (LPIs, devices),
-recreating the ITT, remapping everything, and then replaying fake
-interrupts to cater for anything that you;ve missed in between. Not
-exactly fun.
-
-So before we have to introduce all of this, it would be good to find out
-*why* are all the devices aliased together. Because this completely
-screws all the ITS isolation, and makes device assignment to guest VM
-completely insecure.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+-Christoffer
