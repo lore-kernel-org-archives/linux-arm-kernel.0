@@ -1,52 +1,48 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 2 Nov 2016 16:25:07 -0500
-Subject: [PATCH] ARM: socfpga: updates for socfpga_defconfig
-In-Reply-To: <1478044484-2331-1-git-send-email-atull@opensource.altera.com>
-References: <1478044484-2331-1-git-send-email-atull@opensource.altera.com>
-Message-ID: <182cb9e2-df52-b655-0d69-b623985b4137@opensource.altera.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Nov 2016 21:27:48 +0000
+Subject: [PATCH] arm64: errata: Check for --fix-cortex-a53-843419 and
+ --fix-cortex-a53
+In-Reply-To: <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
+References: <20161031194414.61287-1-code@mmayer.net>
+ <20161102210331.GJ22791@arm.com>
+ <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
+Message-ID: <20161102212747.GL22791@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 02, 2016 at 02:07:17PM -0700, Markus Mayer wrote:
+> On 2 November 2016 at 14:03, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Oct 31, 2016 at 12:44:14PM -0700, Markus Mayer wrote:
+> >> From: Markus Mayer <mmayer@broadcom.com>
+> >>
+> >> The new errata check leads to a warning with some older versions of the
+> >> linker that do know how to work around the errata, but still use the
+> >> original name of the command line option: --fix-cortex-a53. The commit
+> >> in question that changed the name of the option can be found at [1].
+> >> It looks like only "gold" is affected by this rename. Traditional "ld"
+> >> isn't. (There, the argument was always called --fix-cortex-a53-843419.)
+> >>
+> >> To allow older versions of gold to properly handle the erratum if they
+> >> can, check whether ld supports the old name of this option in addition
+> >> to checking the new one.
+> >>
+> >> [1] https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;a=commitdiff;h=7a2a1c793578a8468604e661dda025ecb8d0bd20;hp=cfbf0e3c5b637d66b2b1aeadecae9c187b825b2f
+> >>
+> >> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> >
+> > If newer versions of gold accept the correct option name, why do we care?
+> 
+> Because Documentation/Changes states that the minimum requirement for
+> binutils is 2.12. Right now, that is not really true. And not
+> everybody can always use the newest toolchain, for various reasons.
 
+Well the kernel still builds, right? Can binutils 2.12 even work around
+843419? For people who can't use a recent toolchain, then they don't get
+erratum workaround and we warn them about it.
 
-On 11/01/2016 06:54 PM, Alan Tull wrote:
-> This patch enables the following in the
-> socfpga_defconfig:
-> 
-> +CONFIG_OF_OVERLAY=y
->   Enable support for Device Tree Overlays
-> 
-> +CONFIG_FPGA_REGION=y
->   Enable device tree overlay support for FPGA
->   programming
-> 
-> +CONFIG_FPGA_MGR_SOCFPGA_A10=y
->   Enable partial reconfiguration for Altera
->   Arria 10 FPGA
-> 
-> +CONFIG_FPGA_BRIDGE=y
->   Enable the FPGA Bridges framework
-> 
-> +CONFIG_SOCFPGA_FPGA_BRIDGE=y
->   Enable support for SoCFPGA hardware
->   bridges
-> 
-> +CONFIG_ALTERA_FREEZE_BRIDGE=y
->   Enable support for the Altera Soft IP
->   Freeze bridges
-> 
-> Signed-off-by: Alan Tull <atull@opensource.altera.com>
-> ---
->  arch/arm/configs/socfpga_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> index f5b9bc5..18d3ec1 100644
-> --- a/arch/arm/configs/socfpga_defconfig
-> +++ b/arch/arm/configs/socfpga_defconfig
-> @@ -54,6 +54,7 @@ CONFIG_DEVTMPFS_MOUNT=y
+> The question I am asking is: What do we have to lose by supporting both options?
 
-Applied!
+We end up passing "--fix-cortex-a53" to the linker, without knowing what it
+might do in the future.
 
-Thanks,
-Dinh
+Will
