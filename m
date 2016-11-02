@@ -1,31 +1,20 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  2 Nov 2016 17:31:32 +0000
-Subject: [PATCH] iommu/arm-smmu: Check that iommu_fwspecs are ours
-Message-ID: <b3680f58498efd0914c5d7887737a7ef9b733982.1478107892.git.robin.murphy@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Nov 2016 18:39:30 +0100
+Subject: [PATCH v5 2/7] Documentation: devicetree: add PHY lane swap
+ binding
+In-Reply-To: <1478106488-11779-3-git-send-email-jon.mason@broadcom.com>
+References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
+ <1478106488-11779-3-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20161102173930.GG384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We seem to have forgotten to check that iommu_fwspecs actually belong to
-us before we go ahead and dereference their private data. Oops.
+On Wed, Nov 02, 2016 at 01:08:03PM -0400, Jon Mason wrote:
+> Add the documentation for PHY lane swapping.  This is a boolean entry to
+> notify the phy device drivers that the TX/RX lanes need to be swapped.
+> 
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-Fixes: 021bb8420d44 ("iommu/arm-smmu: Wire up generic configuration support")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ef978db2bb54..ef0f8d635a3b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1390,7 +1390,7 @@ static int arm_smmu_add_device(struct device *dev)
- 		fwspec = dev->iommu_fwspec;
- 		if (ret)
- 			goto out_free;
--	} else if (fwspec) {
-+	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
- 		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
- 	} else {
- 		return -ENODEV;
--- 
-2.10.2.dirty
+    Andrew
