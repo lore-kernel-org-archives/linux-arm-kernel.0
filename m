@@ -1,59 +1,33 @@
-From: wulf@rock-chips.com (William Wu)
-Date: Wed,  2 Nov 2016 15:42:18 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: add usb2-phy otg-port support for
- rk3399
-In-Reply-To: <1478072538-32081-1-git-send-email-wulf@rock-chips.com>
-References: <1478072538-32081-1-git-send-email-wulf@rock-chips.com>
-Message-ID: <1478072538-32081-3-git-send-email-wulf@rock-chips.com>
+From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
+Date: Wed,  2 Nov 2016 08:57:03 +0100
+Subject: [PATCH 0/3] ipmi/bt-bmc: fix compatible node and add a request expiry
+ list
+Message-ID: <1478073426-3714-1-git-send-email-clg@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add otg-port nodes for both u2phy0 and u2phy1. The otg-port can
-be used for USB2.0 part of USB3.0 OTG controller.
+Hello Corey,
 
-Signed-off-by: William Wu <wulf@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Here is a short serie fixing the name of the device tree 'compatible'
+node of the ipmi/bt-bmc driver and adding a request expiry list to the
+driver.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index b65c193..ea2df51 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1095,6 +1095,17 @@
- 			clock-output-names = "clk_usbphy0_480m";
- 			status = "disabled";
- 
-+			u2phy0_otg: otg-port {
-+				#phy-cells = <0>;
-+				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH 0>,
-+					     <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH 0>,
-+					     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH 0>;
-+				interrupt-names = "otg-bvalid", "otg-id",
-+						  "linestate";
-+				status = "disabled";
-+			};
-+
-+
- 			u2phy0_host: host-port {
- 				#phy-cells = <0>;
- 				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH 0>;
-@@ -1112,6 +1123,16 @@
- 			clock-output-names = "clk_usbphy1_480m";
- 			status = "disabled";
- 
-+			u2phy1_otg: otg-port {
-+				#phy-cells = <0>;
-+				interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH 0>,
-+					     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH 0>,
-+					     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH 0>;
-+				interrupt-names = "otg-bvalid", "otg-id",
-+						  "linestate";
-+				status = "disabled";
-+			};
-+
- 			u2phy1_host: host-port {
- 				#phy-cells = <0>;
- 				interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH 0>;
+The first patch should be considered as a 4.9 fix, if possible.
+
+Thanks,
+
+C.
+
+
+C?dric Le Goater (3):
+  ipmi/bt-bmc: change compatible node to 'aspeed,ast2400-ibt-bmc'
+  ipmi/bt-bmc: maintain a request expiry list
+  ipmi/bt-bmc: add a sysfs file to configure a maximum response time
+
+ ...t2400-bt-bmc.txt => aspeed,ast2400-ibt-bmc.txt} |   4 +-
+ drivers/char/ipmi/bt-bmc.c                         | 167 ++++++++++++++++++++-
+ 2 files changed, 167 insertions(+), 4 deletions(-)
+ rename Documentation/devicetree/bindings/ipmi/{aspeed,ast2400-bt-bmc.txt => aspeed,ast2400-ibt-bmc.txt} (85%)
+
 -- 
-2.0.0
+2.7.4
