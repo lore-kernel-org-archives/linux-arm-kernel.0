@@ -1,60 +1,68 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 2 Nov 2016 22:52:07 +0300
-Subject: [PATCH v5 4/7] Documentation: devicetree: net: add NS2 bindings
- to amac
-In-Reply-To: <20161102172456.GA11881@broadcom.com>
-References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
- <1478106488-11779-5-git-send-email-jon.mason@broadcom.com>
- <ab064a45-0172-fa28-4ac6-0d3159a26506@cogentembedded.com>
- <20161102172456.GA11881@broadcom.com>
-Message-ID: <16b4fb52-ed13-c9d9-d82d-862ae34ce850@cogentembedded.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 2 Nov 2016 14:28:02 -0600
+Subject: [RFC][PATCH] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <CAKv+Gu8GjehaCrKv2CQbPRg_r6mK3vtFnsuHAJyDkS2n8STEkA@mail.gmail.com>
+References: <1477613892-26076-1-git-send-email-labbott@redhat.com>
+ <20161028144951.GI5806@leverpostej>
+ <4911a788-602f-6ad0-b8e7-53f9de9fa8c5@redhat.com>
+ <6a76edf2-3f80-fb18-4fc1-2e0b1f085d20@redhat.com>
+ <CAKv+Gu8GjehaCrKv2CQbPRg_r6mK3vtFnsuHAJyDkS2n8STEkA@mail.gmail.com>
+Message-ID: <58b065d6-839c-7ec0-5594-741a72851edb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2016 08:24 PM, Jon Mason wrote:
-
->>> Clean-up the documentation to the bgmac-amac driver, per suggestion by
->>> Rob Herring, and add details for NS2 support.
+On 10/29/2016 02:39 AM, Ard Biesheuvel wrote:
+> On 28 October 2016 at 23:07, Laura Abbott <labbott@redhat.com> wrote:
+>>>>> diff --git a/arch/arm64/mm/physaddr.c b/arch/arm64/mm/physaddr.c
+>>>>> new file mode 100644
+>>>>> index 0000000..6c271e2
+>>>>> --- /dev/null
+>>>>> +++ b/arch/arm64/mm/physaddr.c
+>>>>> @@ -0,0 +1,17 @@
+>>>>> +#include <linux/mm.h>
+>>>>> +
+>>>>> +#include <asm/memory.h>
+>>>>> +
+>>>>> +unsigned long __virt_to_phys(unsigned long x)
+>>>>> +{
+>>>>> +    phys_addr_t __x = (phys_addr_t)x;
+>>>>> +
+>>>>> +    if (__x & BIT(VA_BITS - 1)) {
+>>>>> +        /* The bit check ensures this is the right range */
+>>>>> +        return (__x & ~PAGE_OFFSET) + PHYS_OFFSET;
+>>>>> +    } else {
+>>>>> +        VIRTUAL_BUG_ON(x < kimage_vaddr || x > (unsigned long)_end);
+>>>>
+>>>>
+>>>> IIUC, in (3) you were asking if the last check should be '>' or '>='?
+>>>>
+>>>> To match high_memory, I suspect the latter, as _end doesn't fall within
+>>>> the mapped virtual address space.
+>>>>
 >>>
->>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
->>> ---
->>> Documentation/devicetree/bindings/net/brcm,amac.txt | 16 +++++++++++-----
->>> 1 file changed, 11 insertions(+), 5 deletions(-)
+>>> I was actually concerned about if _end would be correct with KASLR.
+>>> Ard confirmed that it gets fixed up to be correct. I'll change the
+>>> check to check for >=.
 >>>
->>> diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> index ba5ecc1..2fefa1a 100644
->>> --- a/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> +++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
->>> @@ -2,11 +2,17 @@ Broadcom AMAC Ethernet Controller Device Tree Bindings
->>> -------------------------------------------------------------
->>>
->>> Required properties:
->>> - - compatible:	"brcm,amac" or "brcm,nsp-amac"
->>> - - reg:		Address and length of the GMAC registers,
->>> -		Address and length of the GMAC IDM registers
->>> - - reg-names:	Names of the registers.  Must have both "amac_base" and
->>> -		"idm_base"
->>> + - compatible:	"brcm,amac"
->>> +		"brcm,nsp-amac"
->>> +		"brcm,ns2-amac"
->>> + - reg:		Address and length of the register set for the device. It
->>> +		contains the information of registers in the same order as
->>> +		described by reg-names
->>> + - reg-names:	Names of the registers.
->>> +		"amac_base":	Address and length of the GMAC registers
->>> +		"idm_base":	Address and length of the GMAC IDM registers
->>> +		"nicpm_base":	Address and length of the NIC Port Manager
->>> +				registers (required for Northstar2)
 >>
->>   Why this "_base" suffix? It looks redundant...
+>> While testing this, I found two places with __pa(_end) to get bounds,
+>> one in arm64 code and one in memblock code. x86 gets away with this
+>> because memblock is actually __pa_symbol and x86 does image placement
+>> different and can check against the maximum image size. I think
+>> including _end in __pa_symbol but excluding it from the generic
+>> __virt_to_phys makes sense. It's a bit nicer than doing _end - 1 +
+>> 1 everywhere.
+>>
 >
-> Yes.  Rob Herring pointed out the same thing.  It is ugly, but follows
-> the existing binding.
+> Could we redefine __pa_symbol() under CONFIG_DEBUG_VIRTUAL to
+> something that checks (x >= kimage_vaddr + TEXT_OFFSET || x <=
+> (unsigned long)_end), i.e., reject linear virtual addresses? (Assuming
+> my understanding of the meaning of __pa_symbol() is correct)
+>
 
-    Sorry, I didn't realize you're reformatting the existing bindings while 
-adding some new text...
+Yes, that's going to be my approach. I originally prototyped this
+with just x >= kimage_vaddr but kimage_vaddr + TEXT_OFFSET is
+a tighter bound.
 
-> Thanks,
-> Jon
-
-MBR, Sergei
+Thanks,
+Laura
