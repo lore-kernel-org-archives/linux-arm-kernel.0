@@ -1,96 +1,37 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 2 Nov 2016 09:36:06 +0100
-Subject: [PATCH v1] iio: adc: at91: add suspend and resume callback
-In-Reply-To: <1478054417-7520-1-git-send-email-wenyou.yang@atmel.com>
-References: <1478054417-7520-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20161102083606.y53bgtfwmig63e45@rfolt0960.corp.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 2 Nov 2016 09:44:58 +0100
+Subject: [PATCH] ASoC: sun4i-codec: Enable bus clock after getting GPIO
+In-Reply-To: <20161101063155.15826-1-wens@csie.org>
+References: <20161101063155.15826-1-wens@csie.org>
+Message-ID: <20161102084458.xhuwy5bsmacgs2wm@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 10:40:16AM +0800, Wenyou Yang wrote:
-> Add suspend/resume callback, support the pinctrl sleep state when
-> the system suspend as well.
+On Tue, Nov 01, 2016 at 02:31:55PM +0800, Chen-Yu Tsai wrote:
+> In the current probe function the GPIO is acquired after the codec's
+> bus clock is enabled. However if it fails to acquire the GPIO due to
+> a deferred probe, it does not disable the bus clock before bailing out.
+> This would result in the clock being enabled multiple times.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> ---
+> Move the code that enables the bus clock after the part that gets the
+> GPIO, maintaining a separation between resource acquisition and device
+> enablement in the probe function.
 > 
->  drivers/iio/adc/at91_adc.c | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index bbdac07..ffa81a1 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -30,6 +30,7 @@
->  #include <linux/iio/trigger.h>
->  #include <linux/iio/trigger_consumer.h>
->  #include <linux/iio/triggered_buffer.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  /* Registers */
->  #define AT91_ADC_CR		0x00		/* Control Register */
-> @@ -1347,6 +1348,39 @@ static int at91_adc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I would use CONFIG_PM_SLEEP
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> +static int at91_adc_suspend(struct device *dev)
-> +{
-> +	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-> +	struct at91_adc_state *st = iio_priv(idev);
-> +
-> +	pinctrl_pm_select_sleep_state(dev);
-> +	clk_disable_unprepare(st->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int at91_adc_resume(struct device *dev)
-> +{
-> +	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-> +	struct at91_adc_state *st = iio_priv(idev);
-> +
-> +	clk_prepare_enable(st->clk);
-> +	pinctrl_pm_select_default_state(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops at91_adc_pm_ops = {
-> +	.suspend = at91_adc_suspend,
-> +	.resume = at91_adc_resume,
-> +};
-> +
-> +#define AT91_ADC_PM_OPS (&at91_adc_pm_ops)
-> +#else
-> +#define AT91_ADC_PM_OPS NULL
-> +#endif
-> +
+Thanks,
+Maxime
 
-and this macro: SET_SYSTEM_SLEEP_PM_OPS
-
-Regards
-
-Ludovic
-
->  static struct at91_adc_caps at91sam9260_caps = {
->  	.calc_startup_ticks = calc_startup_ticks_9260,
->  	.num_channels = 4,
-> @@ -1441,6 +1475,7 @@ static struct platform_driver at91_adc_driver = {
->  	.driver = {
->  		   .name = DRIVER_NAME,
->  		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
-> +		.pm = AT91_ADC_PM_OPS,
->  	},
->  };
->  
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/24a18996/attachment.sig>
