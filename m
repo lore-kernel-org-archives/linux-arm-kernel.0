@@ -1,110 +1,155 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Wed,  2 Nov 2016 11:42:47 -0400
-Subject: [PATCH v1 04/11] Documentation: perf: hisi: Documentation for
- HIP05/06/07 PMU event counting.
+Date: Wed,  2 Nov 2016 11:42:48 -0400
+Subject: [PATCH v1 05/11] dt-bindings: perf: hisi: Add Devicetree bindings for
+ Hisilicon SoC PMU
 In-Reply-To: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
 References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <1478101374-18778-5-git-send-email-anurup.m@huawei.com>
+Message-ID: <1478101374-18778-6-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Documentation for perf usage and Hisilicon SoC PMU uncore events.
-	The Hisilicon SOC has event counters for hardware modules like
-	L3 cache, Miscellaneous node, DDR cntroller etc. These events are
-	all uncore.
+	1) Device tree bindings for Hisilicon SoC PMU.
+	2) Add example for Hisilicon L3 cache, MN and DDRC PMU.
 
 Signed-off-by: Anurup M <anurup.m@huawei.com>
 Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 ---
- Documentation/perf/hisi-pmu.txt | 80 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
- create mode 100644 Documentation/perf/hisi-pmu.txt
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      | 127 +++++++++++++++++++++
+ 1 file changed, 127 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
 
-diff --git a/Documentation/perf/hisi-pmu.txt b/Documentation/perf/hisi-pmu.txt
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
 new file mode 100644
-index 0000000..670a9df
+index 0000000..e7b35e0
 --- /dev/null
-+++ b/Documentation/perf/hisi-pmu.txt
-@@ -0,0 +1,80 @@
-+Hisilicon SoC PMU (Performance Monitoring Unit)
-+================================================
-+The Hisilicon SoC hip05/06/07 chips consist of varous independent system
-+device PMU's such as L3 cache(L3C), Miscellaneous Nodes(MN) and DDR
-+controllers. These PMU devices are independent and have hardware logic to
++++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+@@ -0,0 +1,127 @@
++Hisilicon SoC hip05/06/07 ARMv8 PMU
++===================================
++
++The Hisilicon SoC chips like hip05/06/07 etc. consist of varous independent
++system device PMU's such as L3 cache (L3C), Miscellaneous Nodes(MN) and DDR
++comtroller. These PMU devices are independent and have hardware logic to
 +gather statistics and performance information.
 +
-+Hip0x chips are encapsulated by multiple CPU and IO die's. The CPU die is
-+called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
++HiSilicon SoC chip is encapsulated by multiple CPU and IO die's. The CPU die
++is called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
 +is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
-+Each SCCL has 1 L3 cache and 1 MN units.
++e.g. In the case of hip05/06/07, each SCCL has 1 L3 cache and 1 MN PMU device.
 +
-+The L3 cache is shared by all CPU cores in a CPU die. The L3C has four banks
-+(or instances). Each bank or instance of L3C has Eight 32-bit counter
-+registers. The hip05/06 chip L3 cache has 22 statistics events. The hip07
-+chip has 66 statistics events. These events are very useful for debugging.
++The Hisilicon SoC PMU DT node bindigs for uncore PMU devices are as below.
++For PMU devices like L3 cache. MN etc. which are accessed using the djtag,
++the parent node will be the djtag node of the corresponding CPU die(SCCL).
 +
-+The MN module is also shared by all CPU cores in a CPU die. It receives
-+barriers and DVM(Distributed Virtual Memory) messages from cpu or smmu, and
-+perform the required actions and return response messages. These events are
-+very useful for debugging. The MN has total 9 statistics events and support
-+four 32-bit counter registers in hip05/06/07 chips.
++For uncore PMU devices there are some common required properties as detailed
++below.
 +
-+The DDR conroller supports various statistics events. Every SCCL has fot 2
-+DDR channels and hence 2 DDR controllers. The Hip05/06/07 has support for a
-+total of 13 statistics events.
++Required properties:
++	- compatible : This field contain two values. The first value is
++		always "hisilicon" and second value is the Module type as shown
++		in below examples:
++		(a) "hisilicon,hisi-pmu-l3c-v1" for Hisilicon SoC L3C PMU
++			device (Version 1)
++		(b) "hisilicon,hisi-pmu-mn-v1" for Hisilicon SoC MN PMU
++			device (Version 1)
++		(c) "hisilicon,hisi-pmu-ddrc-v1" for Hisilicon SoC DDRC PMU
++			device (Version 1)
++		The hip05/06/07 chips have v1 hardware for L3C, MN and DDRC.
 +
-+There is no memory mapping for L3 cache and MN registers. It can be accessed
-+by using the Hisilicon djtag interface. The Djtag in a SCCL is an independent
-+module which connects with some modules in the SoC by Debug Bus.
++	- scl-id : The Super Cluster ID. This can be the ID of the CPU die
++		   or IO die in the chip.
 +
-+Hisilicon SoC (hip05/06/07) PMU driver
-+--------------------------------------
-+The hip0x PMU driver shall register perf PMU drivers like L3 cache, MN, DDRC
-+etc.
-+Separate PMU shall be registered for L3 cache and MN for each Super CPU
-+cluster.
-+For DRR controller separate PMU shall be registered for each channel in a
-+Super CPU cluster.
++	- num-events : No of events supported by this PMU device.
 +
-+The available events and configuration options shall be described in the sysfs.
-+The "perf list" shall list the available events from sysfs.
-+eg. hisi_l3c2/read_allocate/ [kernel PMU event]
++	- num-counters : No of hardware counters available for counting.
 +
-+The Super Cluster ID will be the number suffix to PMU name
-+e.g. hisi_l3c2. Here Super cluster ID is 2 and so hisi_l3c2/read_allocate
-+is the event for read_allocate of SCCL #2.
++L3 cache
++--------
++The L3 cache is dedicated for each SCCL and hence there are separate DT nodes
++for L3 cache for each SCCL. For L3 cache PMU the additional required properties
++are
++	- counter-reg : Counter register offset.
 +
-+For DDRC the channel number will be suffix at the end.
-+eg: hisi_ddrc2_0/flux_read/. Here Super cluster ID is 2 and the channel number
-+is 0 for the event flux_read.
++	- evtype-reg : Event select register offset.
 +
-+The event code is represented by 12 bits.
-+	i) event 0-11
-+		The event code will be represented using the LSB 12 bits.
++	- evctrl-reg : Event counting control(LAUCTRL) register offset.
 +
-+The driver also provides a "cpumask" sysfs attribute, which shows the CPU core
-+ID used to count the uncore PMU event.
++	- event-en : Event enable value.
 +
-+Example usage of perf:
-+$# perf list
-+hisi_l3c2/read_hit/ [kernel PMU event]
-+hisi_l3c2/write_hit/ [kernel PMU event]
-+------------------------------------------
-+hisi_l3c1/read_hit/ [kernel PMU event]
-+hisi_l3c1/write_hit/ [kernel PMU event]
-+------------------------------------------
-+hisi_mn2/read_req/ [kernel PMU event]
-+hisi_mn2/write_req/ [kernel PMU event]
-+------------------------------------------
-+hisi_ddrc2_0/flux_read/ [kernel PMU event]
-+------------------------------------------
++	- module-id : Module ID to input for djtag. This property is an array of
++		      module_id for each L3 cache banks.
 +
-+$# perf stat -a -e hisi_l3c2/read_allocate/ sleep 5
++	- num-banks : Number of banks or instances of the device.
 +
-+The current driver doesnot support sampling. so "perf record" is unsupported.
-+Also attach to a task is unsupported as the events are all uncore.
++	- cfgen-map : Config enable array to select the bank.
 +
-+Note: Please contact the maintainer for a complete list of events supported for
-+the PMU devices in the SoC and its information if needed.
++Miscellaneous Node
++-------------------
++The MN is dedicated for each SCCL and hence there are separate DT nodes for MN
++for each SCCL. For MN PMU the additional required properties are
++	- counter-reg : Counter register offset.
++
++	- evtype-reg : Event select register offset.
++
++	- evctrl-reg : Event counting control register offset.
++
++	- module-id : Module ID to input for djtag. As MN doesnot have multiple banks
++		      this property is a single value.
++
++	- cfgen-map : Config enable to select the bank. For MN it is a single value
++
++	- event-en : Event enable value.
++
++Example:
++
++	djtag0: djtag at 0 {
++		compatible = "hisilicon,hip05-cpu-djtag-v1";
++		pmul3c0 {
++			compatible = "hisilicon,hisi-pmu-l3c-v1";
++			scl-id = <0x02>;
++			num-events = <0x16>;
++			num-counters = <0x08>;
++			module-id = <0x04 0x04 0x04 0x04>;
++			num-banks = <0x04>;
++			cfgen-map = <0x02 0x04 0x01 0x08>;
++			counter-reg = <0x170>;
++			evctrl-reg = <0x04>;
++			event-en = <0x1000000>;
++			evtype-reg = <0x140>;
++		};
++
++		pmumn0 {
++			compatible = "hisilicon,hisi-pmu-mn-v1";
++			scl-id = <0x02>;
++			num-events = <0x09>;
++			num-counters = <0x04>;
++			module-id = <0x0b>;
++			cfgen-map = <0x01>;
++			counter-reg = <0x30>;
++			evctrl-reg = <0x40>;
++			event-en = <0x01>;
++			evtype-reg = <0x48>;
++		};
++	};
++
++DDR controller
++--------------
++Each SCCL in Hip05/06/07 chips have 2 DDR channels and hence 2 DDR controllers.
++There are separate DT nodes for each DDR channel.
++For DDRC PMU the additional required properties are
++
++	- ch-id : DDRC Channel ID.
++	- reg : Register base address and range for the DDRC channel.
++
++Example:
++	/* DDRC for CPU die scl #2 Channel #1 for hip05 */
++	pmu_sccl0_ddrc1: pmu_ddrc1 at 80358000 {
++		 compatible = "hisilicon,hisi-pmu-ddrc-v1";
++		 scl-id = <0x02>;
++		 ch-id = <0x1>;
++		 num-events = <0x0D>;
++		 num-counters = <0x04>;
++		 reg = <0x80358000 0x10000>; /* TOTEMC DDRC1 */
++	 };
 -- 
 2.1.4
