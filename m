@@ -1,69 +1,68 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Wed,  2 Nov 2016 08:57:06 +0100
-Subject: [PATCH 3/3] ipmi/bt-bmc: add a sysfs file to configure a maximum
- response time
-In-Reply-To: <1478073426-3714-1-git-send-email-clg@kaod.org>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
-Message-ID: <1478073426-3714-4-git-send-email-clg@kaod.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 2 Nov 2016 08:01:39 +0000
+Subject: [PATCHv2 3/4] mfd: altr-a10sr: Add Arria10 SR Monitor
+In-Reply-To: <39faa26d-ca05-d68d-a50a-03d09d445b77@opensource.altera.com>
+References: <1477598426-28125-1-git-send-email-tthayer@opensource.altera.com>
+ <1477598426-28125-4-git-send-email-tthayer@opensource.altera.com>
+ <20161031080222.GM13127@dell>
+ <39faa26d-ca05-d68d-a50a-03d09d445b77@opensource.altera.com>
+Message-ID: <20161102080138.GQ13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We could also use an ioctl for that purpose. sysfs seems a better
-approach.
+On Mon, 31 Oct 2016, Thor Thayer wrote:
+> On 10/31/2016 03:02 AM, Lee Jones wrote:
+> > On Thu, 27 Oct 2016, tthayer at opensource.altera.com wrote:
+> > 
+> > > From: Thor Thayer <tthayer@opensource.altera.com>
+> > > 
+> > > Add the Altera Arria10 DevKit System Resource Monitor functionality
+> > > to the MFD device.
+> > > 
+> > > Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> > > ---
+> > > v2  Change from -mon to -monitor for clarity
+> > > ---
+> > >  drivers/mfd/altera-a10sr.c | 4 ++++
+> > >  1 file changed, 4 insertions(+)
+> > > 
+> > > diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+> > > index 06e1f7f..30de652 100644
+> > > --- a/drivers/mfd/altera-a10sr.c
+> > > +++ b/drivers/mfd/altera-a10sr.c
+> > > @@ -33,6 +33,10 @@
+> > >  		.name = "altr_a10sr_gpio",
+> > >  		.of_compatible = "altr,a10sr-gpio",
+> > >  	},
+> > > +	{
+> > > +		.name = "altr_a10sr_monitor",
+> > > +		.of_compatible = "altr,a10sr-monitor",
+> > 
+> > So long as you use whichever compatible you agree on with Rob:
+> > 
+> > For my own reference:
+> >   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> I'm getting a "Non-standard signature" warning for this (even if I make
+> everything lower-case).
+> 
+> Would you prefer I submit it with the warning or should I change it to
+> "Acked-by"?
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
----
- drivers/char/ipmi/bt-bmc.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Please submit it as you see it.  I will amend when applying.
 
-diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
-index e751e4a754b7..d7146f0e900e 100644
---- a/drivers/char/ipmi/bt-bmc.c
-+++ b/drivers/char/ipmi/bt-bmc.c
-@@ -84,6 +84,33 @@ struct bt_bmc {
- 
- static atomic_t open_count = ATOMIC_INIT(0);
- 
-+static ssize_t bt_bmc_show_response_time(struct device *dev,
-+					 struct device_attribute *attr,
-+					 char *buf)
-+{
-+	struct bt_bmc *bt_bmc = dev_get_drvdata(dev);
-+
-+	return snprintf(buf, PAGE_SIZE - 1, "%d\n", bt_bmc->response_time);
-+}
-+
-+static ssize_t bt_bmc_set_response_time(struct device *dev,
-+					struct device_attribute *attr,
-+					const char *buf, size_t count)
-+{
-+	struct bt_bmc *bt_bmc = dev_get_drvdata(dev);
-+	unsigned long val;
-+	int err;
-+
-+	err = kstrtoul(buf, 0, &val);
-+	if (err)
-+		return err;
-+	bt_bmc->response_time = val;
-+	return count;
-+}
-+
-+static DEVICE_ATTR(response_time, 0644,
-+		   bt_bmc_show_response_time, bt_bmc_set_response_time);
-+
- static u8 bt_inb(struct bt_bmc *bt_bmc, int reg)
- {
- 	return ioread8(bt_bmc->base + reg);
-@@ -572,6 +599,10 @@ static int bt_bmc_probe(struct platform_device *pdev)
- 	bt_bmc_config_irq(bt_bmc, pdev);
- 
- 	bt_bmc->response_time = BT_BMC_RESPONSE_TIME;
-+	rc = device_create_file(&pdev->dev, &dev_attr_response_time);
-+	if (rc)
-+		dev_warn(&pdev->dev, "can't create response_time file\n");
-+
- 
- 	if (bt_bmc->irq) {
- 		dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
+> Thanks for reviewing!
+> 
+> Thor
+> 
+> > > +	},
+> > >  };
+> > > 
+> > >  static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
+> > 
+
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
