@@ -1,30 +1,60 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Wed, 2 Nov 2016 11:14:35 +0100
-Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <87eg35snvg.fsf@eliezer.anholt.net>
-References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
- <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
- <87twczg27x.fsf@eliezer.anholt.net>
- <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
- <87eg35snvg.fsf@eliezer.anholt.net>
-Message-ID: <F7D54C7C-FD75-4F66-AF67-CD5C302EEECC@martin.sperl.org>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 2 Nov 2016 15:44:36 +0530
+Subject: [PATCH V3 2/6] arm64: kgdb_step_brk_fn: ignore other's exception
+In-Reply-To: <CAMNZz5Bjr1f-uzgCx-svFXV_u8xfKudChURVULAqFzu158cxfg@mail.gmail.com>
+References: <cover.1478068479.git.panand@redhat.com>
+ <9d2c9444762f1623e75b7de9e5783a94a257a00d.1478068479.git.panand@redhat.com>
+ <CAMNZz5Bjr1f-uzgCx-svFXV_u8xfKudChURVULAqFzu158cxfg@mail.gmail.com>
+Message-ID: <2afdd880-86a0-4029-6c2f-091c5939fa95@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 24.10.2016, at 18:38, Eric Anholt <eric@anholt.net> wrote:
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
->> Hi Martin,
->> 
->> i think it's necessary to rebase the whole series. Maybe we could get it
->> into 4.10.
-> 
-> Why would it need to be rebased?  The status, as far as I know, is that
-> we're still waiting for the subsystem maintainer to respond.
 
-Sending out a rebased version 8 (specifically needed for patch 2 and 6).
+On Wednesday 02 November 2016 03:30 PM, Sandeepa Prabhu wrote:
+>
+>
+> On Wed, Nov 2, 2016 at 2:40 PM, Pratyush Anand <panand@redhat.com
+> <mailto:panand@redhat.com>> wrote:
+>
+>     ARM64 step exception does not have any syndrome information. So, it is
+>     responsibility of exception handler to take care that they handle it
+>     only if exception was raised for them.
+>
+>     Since kgdb_step_brk_fn() always returns 0, therefore we might have
+>     problem
+>     when we will have other step handler registered as well.
+>
+>     This patch fixes kgdb_step_brk_fn() to return error in case of step
+>     handler
+>     was not meant for kgdb.
+>
+>     Signed-off-by: Pratyush Anand <panand@redhat.com
+>     <mailto:panand@redhat.com>>
+>     ---
+>      arch/arm64/kernel/kgdb.c | 3 +++
+>      1 file changed, 3 insertions(+)
+>
+>     diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+>     index e017a9493b92..d217c9e95b06 100644
+>     --- a/arch/arm64/kernel/kgdb.c
+>     +++ b/arch/arm64/kernel/kgdb.c
+>     @@ -247,6 +247,9 @@ NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
+>
+>      static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+>      {
+>     +       if (!kgdb_single_step)
+>     +               return DBG_HOOK_ERROR;
+>     +
+>
+> ?This is needed. So, single stepping in kprobes working all these days
+> because kprobes handler was registered earlier to kgdb handler!?
 
-Martin
+Actually kprobe_single_step_handler() is not called through 
+call_step_hook(), so it is always safe.
+
+We had discussed here (https://lkml.org/lkml/2016/9/7/6) that why we can 
+not register kprobe_single_step_handler() via register_set_hook()
+and only invoke call_step_hook().
+
+~Pratyush
