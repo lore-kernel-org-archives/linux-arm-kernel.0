@@ -1,88 +1,73 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 2 Nov 2016 12:36:16 -0400
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <3fd26a0d-a5c2-c385-866e-b957dffb7dda@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Nov 2016 10:40:39 -0600
+Subject: flush_dcache_page() in ARM vs ARM64
+In-Reply-To: <20161102132714.GA1326@lnxartpec.se.axis.com>
+References: <20161102132714.GA1326@lnxartpec.se.axis.com>
+Message-ID: <20161102164039.oddouqv3wwtm357t@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Wed, Nov 02, 2016 at 02:27:14PM +0100, Rabin Vincent wrote:
+> ARMv7-A and ARMv8-A are, as far as I can see, identical in which cache
+> behaviours they support.  The data cache has to behave as PIPT while for
+> the instruction cache, PIPT, VIPT, and ASIC-tagged VIVT behaviours are
+> supported.  See section B3.11 of the ARMv7-A ARM and section D4.9 of the
+> ARMv8-A ARM.
+> 
+> Both ARMv7-A with Multiprocessing Extensions and ARMv8-A broadcast cache
+> maintenance operations to other cores.  See B2.2.5 of the ARMv7-A ARM
+> and D7.2.57 of the ARMv8-A ARM.
+> 
+> Both arch/arm/ (for ARMv6+) and arch/arm64/ define PG_arch_1 to be
+> PG_dcache_clean and use it to postpone flushing from flush_dcache_page()
+> to set_pte_at().  See arch/{arm,arm64}/mm/flush.c.
+> 
+> However, arch/arm64/'s flush_dcache_page() is implemented like this:
+> 
+> 	void flush_dcache_page(struct page *page)
+> 	{
+> 		if (test_bit(PG_dcache_clean, &page->flags))
+> 			clear_bit(PG_dcache_clean, &page->flags);
+> 	}
 
-On 11/2/2016 12:08 PM, Bjorn Helgaas wrote:
-> On Tue, Nov 01, 2016 at 07:06:31AM -0600, cov at codeaurora.org wrote:
->> Hi Bjorn,
->>
->> On 2016-10-31 15:48, Bjorn Helgaas wrote:
->>> On Wed, Sep 21, 2016 at 06:38:05PM -0400, Christopher Covington wrote:
->>>> The Qualcomm Technologies QDF2432 SoC does not support accesses
->>>> smaller
->>>> than 32 bits to the PCI configuration space. Register the appropriate
->>>> quirk.
->>>>
->>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->>>
->>> Hi Christopher,
->>>
->>> Can you rebase this against v4.9-rc1?  It no longer applies to my tree.
->>
->> I apologize for not being clearer. This patch depends on:
->>
->> PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
->> PCI/ACPI: Check platform-specific ECAM quirks
->>
->> These patches from Tomasz Nowicki were previously in your pci/ecam-v6
->> branch, but that seems to have come and gone. How would you like to
->> proceed?
-> 
-> Oh yes, that's right, I forgot that connection.  I'm afraid I kind of
-> dropped the ball on that thread, so I went back and read through it
-> again.
-> 
-> I *think* the current state is:
-> 
->   - I'm OK with the first two patches that add the quirk
->     infrastructure.
-> 
->   - My issue with the last three patches that add ThunderX quirks is
->     that there's no generic description of the ECAM address space.
-> 
-> So if I understand correctly, your Qualcomm patch depends only on the
-> first two patches.
-> 
-> Then the question is how the Qualcomm ECAM address space is described.
-> Your quirk overrides the default pci_generic_ecam_ops with the
-> &pci_32b_ops, but it doesn't touch the address space part, so I assume
-> the bus ranges and corresponding address space in your MCFG is
-> correct.  So far, so good.
+arm64 had a similar implementation to arm until commit b5b6c9e9149d
+("arm64: Avoid cache flushing in flush_dcache_page()").
 
-Qualcomm ECAM space includes both the root port and the endpoint address
-space with a single contiguous 256 MB address space described in MCFG table.
-There is no need to describe additional resources like PNP0C02.
+> Why does arch/arm/ flush the data cache area in flush_dcache_page() for
+> the (!mapping || page_mapcount(page)) case even on ARMv7+ME, while
+> arch/arm64/ doesn't for ARMv8?
 
-The only thing we missed was 8/16 bits access support on the root port.
-That's why, we need Cov's patch.
+IIRC, the reason was D-cache aliases which have disappeared from ARMv7.
 
-> 
-> Is there also an ACPI device that contains that space in _CRS?  I
-> think we concluded that the standard solution is to describe this with
-> a PNP0C02 device.
-> 
-> Would you mind opening a bugzilla at bugzilla.kernel.org and attaching
-> the dmesg log, /proc/iomem, and maybe a DSDT dump?  I'd like to have
-> something to point at to say "if you need an MCFG quirk, you need the
-> MCFG bit and *also* these other related ACPI device bits, and here's
-> how it should be done."
-> 
-> Bjorn
-> 
+> Why does arch/arm/ invalidate the instruction cache in
+> flush_dcache_page() for the (mapping && page_count(page)) case even for
+> ARMv7+ME, while arch/arm64/ doesn't for ARMv8?
 
+I guess no-one updated it for non-aliasing caches.
+
+> What would break with the following patch?
+> 
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 3cced84..f1e6190 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -327,6 +327,12 @@ void flush_dcache_page(struct page *page)
+>  	if (page == ZERO_PAGE(0))
+>  		return;
+>  
+> +	if (!cache_ops_need_broadcast() && cache_is_vipt_nonaliasing()) {
+> +		if (test_bit(PG_dcache_clean, &page->flags))
+> +			clear_bit(PG_dcache_clean, &page->flags);
+> +		return;
+> +	}
+> +
+>  	mapping = page_mapping(page);
+>  
+>  	if (!cache_ops_need_broadcast() &&
+
+This should work. Note that the test_bit() is just an optimisation I
+borrowed from powerpc, not sure it has any noticeable impact (you could
+as well just do the clear_bit()).
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Catalin
