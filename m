@@ -1,136 +1,149 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Nov 2016 10:02:53 +0100
-Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for obtaining
- mode pin state
-In-Reply-To: <20161031232537.GT16026@codeaurora.org>
-References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
- <20161031081923.GF18195@verge.net.au>
- <CAMuHMdXA-hemOT=ZysEfettei9=HsDddGhqddkw38hwRrdeagw@mail.gmail.com>
- <20161031232537.GT16026@codeaurora.org>
-Message-ID: <CAMuHMdXOW4Ubafu=x9pCw_W-MtLGe3N974dbfHCH5TJuUAeYrQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 2 Nov 2016 10:03:27 +0100
+Subject: [PATCH v3] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
+In-Reply-To: <20161101180008.6956-1-andre.przywara@arm.com>
+References: <20161101180008.6956-1-andre.przywara@arm.com>
+Message-ID: <20161102090327.GA4487@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Tue, Nov 01, 2016 at 06:00:08PM +0000, Andre Przywara wrote:
+> In our VGIC implementation we limit the number of SPIs to a number
+> that the userland application told us. Accordingly we limit the
+> allocation of memory for virtual IRQs to that number.
+> However in our MMIO dispatcher we didn't check if we ever access an
+> IRQ beyond that limit, leading to out-of-bound accesses.
+> Add a test against the number of allocated SPIs in check_region().
+> Adjust the VGIC_ADDR_TO_INT macro to avoid an actual division, which
+> is not implemented on ARM(32).
+> 
+> [maz: cleaned-up original patch]
+> 
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Thanks for your answers!
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-On Tue, Nov 1, 2016 at 12:25 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 10/31, Geert Uytterhoeven wrote:
->> Hi Mike, Stephen, Arnd, Olof, Kevin,
->>
->> Is the merge strategy [see ##### below] OK for you?
->> Thanks a lot!
->>
->> On Mon, Oct 31, 2016 at 9:19 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Wed, Oct 26, 2016 at 02:00:24PM +0200, Geert Uytterhoeven wrote:
->> >> On Fri, Oct 21, 2016 at 3:17 PM, Geert Uytterhoeven
->> >> <geert+renesas@glider.be> wrote:
->> >> > Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
->> >> > state of the mode pins either by a call from the platform code, or
->> >> > directly by using a hardcoded register access. This is a bit messy, and
->> >> > creates a dependency between driver and platform code.
->> >> >
->> >> > This patch series converts the various Renesas R-Car clock drivers
->> >> > and support code from reading the mode pin states using a hardcoded
->> >> > register access to using a new minimalistic R-Car RST driver.
->> >> >
->> >> > All R-Car clock drivers will rely on the presence in DT of a device node
->> >> > for the RST module.  Backwards compatibility with old DTBs is retained
->> >> > only for R-Car Gen2, which has fallback code using its own private copy
->> >> > of rcar_gen2_read_mode_pins().
->> >> >
->> >> > After this, there is still one remaining user of
->> >> > rcar_gen2_read_mode_pins() left in platform code. A patch series to
->> >> > remove that user has already been posted, though ("[PATCH/RFT 0/4] ARM:
->> >> > shmobile: R-Car Gen2: Allow booting secondary CPU cores in debug mode").
->> >> > Since v3, the other user has been removed in commit 9f5ce39ddb8f68b3
->> >> > ("ARM: shmobile: rcar-gen2: Obtain extal frequency from DT").
->> >> >
->> >> > This series consists of 5 parts:
->> >> >   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
->> >> >      driver,
->> >> >   B. Patches 3-11 add device nodes for the RST modules to the R-Car DTS
->> >> >      files,
->> >> >   C. Patches 12-17 convert the clock drivers to call into the new R-Car
->> >> >      RST driver,
->> >> >   D. Patches 18-20 remove passing mode pin state to the clock drivers
->> >> >      from the platform code,
->> >> >   E. Patches 21-23 remove dead code from the clock drivers.
->> >> >
->> >> > As is usually the case with moving functionality from platform code to
->> >> > DT, there are lots of hard dependencies:
->> >> >   - The DT updates in Part B can be merged as soon as the DT bindings in
->> >> >     Part A have been approved,
->> >> >   - The clock driver updates in Part C depend functionally on the driver
->> >> >     code in Part A, and on the DT updates in Part B,
->> >> >   - The board code cleanups in Part D depend on the clock driver updates
->> >> >     in Part C,
->> >> >   - The block driver cleanups in part E depend on the board code
->> >> >     cleanups in part D.
->> >> >
->> >> > Hence to maintain the required lockstep between SoC driver, clock
->> >> > drivers, shmobile platform code, and shmobile DT, I propose to queue up
->> >> > all patches in a single branch against v4.9-rc1, and send pull requests
->> >> > to both Mike/Stephen (clock) and Simon (rest).
->> >> >
->> >> > ***
->> >>
->> >> >   - Mike/Stephen/Simon/Magnus: Are you OK with the suggested merge
->> >> >     approach above?
->> >>
->> >> Is this OK for you?
->>
->> #####
->>
->> (link to the full series at
->>  https://groups.google.com/forum/#!topic/linux.kernel/fLSFsjOgPT8)
->
-> Would the pull requests for clk also have dts changes at the base
-> of the tree? Perhaps clk side can just ack the clk patches and
+> ---
+> Hi,
+> 
+> I checked that the old and new VGIC_ADDR_TO_INTID() algorithm give
+> identical results by moving it into a small userland unit-test, using
+> all <bits> values we use in the VGIC and calling it with quite some test
+> addresses. No differences were found.
 
-Yes they would: this is moving functionality from platform code to DT.
-Without the DT updates, it will break bisection (except for R-Car Gen2,
-where we have fallback code to handle old DTBs).
+nice.
 
-> then have it all routed through arm-soc? The only worry I have is
-> if we need to make some sort of change in clk side that conflicts
-> with these changes. I don't usually like taking dts changes
-> through clk tree, so I'd like to avoid that if possible.
+-Christoffer
 
-Everything could go through arm-soc only with your Acked-by.
-However, there are new clock drivers pending on this series.
-Either they have to go through arm-soc, too, or this series would
-be pulled into the clk tree with these new clock drivers.
-
-> Part E could happen anytime after everything else happens, so
-> that doesn't seem like a concern.
-
-Part E can indeed by postponed.
-But if parts A-D are applied together, there's no reason to postpone part E.
-
-> Part C could also be made to
-> only call into the new reset drivers if the reset dts nodes are
-> present? If that's done then we could merge clk patches anytime
-> and remove the dead code and the node search at some later time
-> when everything has settled?
-
-That would require adding more backwards compatibility code for
-old DTBs, even for platform where we're not interested in maintaining
-that. In addition, Part C depends on the header file for the reset driver
-to compile the clock driver, even if you would add some DT detection,
-and on the reset driver to link. So I'm afraid this is not feasible.
-
-Thanks again!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+> Changelog v2 .. v3:
+> - further simplify VGIC_ADDR_TO_INTID
+> - adjust VGIC_ADDR_TO_INTID comment
+> 
+> Changelog v1 .. v2:
+> - fix compilation for 32-bit ARM
+> 
+>  virt/kvm/arm/vgic/vgic-mmio.c | 41 +++++++++++++++++++++++++++--------------
+>  virt/kvm/arm/vgic/vgic-mmio.h | 14 +++++++-------
+>  2 files changed, 34 insertions(+), 21 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index e18b30d..ebe1b9f 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -453,17 +453,33 @@ struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
+>  	return container_of(dev, struct vgic_io_device, dev);
+>  }
+>  
+> -static bool check_region(const struct vgic_register_region *region,
+> +static bool check_region(const struct kvm *kvm,
+> +			 const struct vgic_register_region *region,
+>  			 gpa_t addr, int len)
+>  {
+> -	if ((region->access_flags & VGIC_ACCESS_8bit) && len == 1)
+> -		return true;
+> -	if ((region->access_flags & VGIC_ACCESS_32bit) &&
+> -	    len == sizeof(u32) && !(addr & 3))
+> -		return true;
+> -	if ((region->access_flags & VGIC_ACCESS_64bit) &&
+> -	    len == sizeof(u64) && !(addr & 7))
+> -		return true;
+> +	int flags, nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
+> +
+> +	switch (len) {
+> +	case sizeof(u8):
+> +		flags = VGIC_ACCESS_8bit;
+> +		break;
+> +	case sizeof(u32):
+> +		flags = VGIC_ACCESS_32bit;
+> +		break;
+> +	case sizeof(u64):
+> +		flags = VGIC_ACCESS_64bit;
+> +		break;
+> +	default:
+> +		return false;
+> +	}
+> +
+> +	if ((region->access_flags & flags) && IS_ALIGNED(addr, len)) {
+> +		if (!region->bits_per_irq)
+> +			return true;
+> +
+> +		/* Do we access a non-allocated IRQ? */
+> +		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
+> +	}
+>  
+>  	return false;
+>  }
+> @@ -477,7 +493,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  
+>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+>  				       addr - iodev->base_addr);
+> -	if (!region || !check_region(region, addr, len)) {
+> +	if (!region || !check_region(vcpu->kvm, region, addr, len)) {
+>  		memset(val, 0, len);
+>  		return 0;
+>  	}
+> @@ -510,10 +526,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
+>  
+>  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
+>  				       addr - iodev->base_addr);
+> -	if (!region)
+> -		return 0;
+> -
+> -	if (!check_region(region, addr, len))
+> +	if (!region || !check_region(vcpu->kvm, region, addr, len))
+>  		return 0;
+>  
+>  	switch (iodev->iodev_type) {
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 4c34d39..84961b4 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -50,15 +50,15 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
+>  #define VGIC_ADDR_IRQ_MASK(bits) (((bits) * 1024 / 8) - 1)
+>  
+>  /*
+> - * (addr & mask) gives us the byte offset for the INT ID, so we want to
+> - * divide this with 'bytes per irq' to get the INT ID, which is given
+> - * by '(bits) / 8'.  But we do this with fixed-point-arithmetic and
+> - * take advantage of the fact that division by a fraction equals
+> - * multiplication with the inverted fraction, and scale up both the
+> - * numerator and denominator with 8 to support at most 64 bits per IRQ:
+> + * (addr & mask) gives us the _byte_ offset for the INT ID.
+> + * We multiply this by 8 the get the _bit_ offset, then divide this by
+> + * the number of bits to learn the actual INT ID.
+> + * But instead of a division (which requires a "long long div" implementation),
+> + * we shift by the binary logarithm of <bits>.
+> + * This assumes that <bits> is a power of two.
+>   */
+>  #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
+> -					64 / (bits) / 8)
+> +					8 >> ilog2(bits))
+>  
+>  /*
+>   * Some VGIC registers store per-IRQ information, with a different number
+> -- 
+> 2.9.0
+> 
