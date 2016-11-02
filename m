@@ -1,53 +1,31 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 2 Nov 2016 20:18:51 +0300
-Subject: [PATCH v5 4/7] Documentation: devicetree: net: add NS2 bindings
- to amac
-In-Reply-To: <1478106488-11779-5-git-send-email-jon.mason@broadcom.com>
-References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
- <1478106488-11779-5-git-send-email-jon.mason@broadcom.com>
-Message-ID: <ab064a45-0172-fa28-4ac6-0d3159a26506@cogentembedded.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  2 Nov 2016 17:31:32 +0000
+Subject: [PATCH] iommu/arm-smmu: Check that iommu_fwspecs are ours
+Message-ID: <b3680f58498efd0914c5d7887737a7ef9b733982.1478107892.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+We seem to have forgotten to check that iommu_fwspecs actually belong to
+us before we go ahead and dereference their private data. Oops.
 
-On 11/02/2016 08:08 PM, Jon Mason wrote:
+Fixes: 021bb8420d44 ("iommu/arm-smmu: Wire up generic configuration support")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Clean-up the documentation to the bgmac-amac driver, per suggestion by
-> Rob Herring, and add details for NS2 support.
->
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> ---
->  Documentation/devicetree/bindings/net/brcm,amac.txt | 16 +++++++++++-----
->  1 file changed, 11 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/net/brcm,amac.txt b/Documentation/devicetree/bindings/net/brcm,amac.txt
-> index ba5ecc1..2fefa1a 100644
-> --- a/Documentation/devicetree/bindings/net/brcm,amac.txt
-> +++ b/Documentation/devicetree/bindings/net/brcm,amac.txt
-> @@ -2,11 +2,17 @@ Broadcom AMAC Ethernet Controller Device Tree Bindings
->  -------------------------------------------------------------
->
->  Required properties:
-> - - compatible:	"brcm,amac" or "brcm,nsp-amac"
-> - - reg:		Address and length of the GMAC registers,
-> -		Address and length of the GMAC IDM registers
-> - - reg-names:	Names of the registers.  Must have both "amac_base" and
-> -		"idm_base"
-> + - compatible:	"brcm,amac"
-> +		"brcm,nsp-amac"
-> +		"brcm,ns2-amac"
-> + - reg:		Address and length of the register set for the device. It
-> +		contains the information of registers in the same order as
-> +		described by reg-names
-> + - reg-names:	Names of the registers.
-> +		"amac_base":	Address and length of the GMAC registers
-> +		"idm_base":	Address and length of the GMAC IDM registers
-> +		"nicpm_base":	Address and length of the NIC Port Manager
-> +				registers (required for Northstar2)
-
-   Why this "_base" suffix? It looks redundant...
-
-[...]
-
-MBR, Sergei
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ef978db2bb54..ef0f8d635a3b 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1390,7 +1390,7 @@ static int arm_smmu_add_device(struct device *dev)
+ 		fwspec = dev->iommu_fwspec;
+ 		if (ret)
+ 			goto out_free;
+-	} else if (fwspec) {
++	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+ 		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
+ 	} else {
+ 		return -ENODEV;
+-- 
+2.10.2.dirty
