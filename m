@@ -1,54 +1,75 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 2 Nov 2016 17:19:54 +0800
-Subject: [PATCH 1/2] phy: rockchip-inno-usb2: support otg-port for rk3399
-In-Reply-To: <1478072538-32081-2-git-send-email-wulf@rock-chips.com>
-Message-ID: <201611021755.Bfdw4dfz%fengguang.wu@intel.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 2 Nov 2016 17:21:48 +0800
+Subject: [PATCH v2] iio: adc: at91: add suspend and resume callback
+Message-ID: <1478078508-24541-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi William,
+Add suspend/resume callback, support the pinctrl sleep state when
+the system suspend as well.
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.9-rc3 next-20161028]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-[Suggest to use git(>=2.9.0) format-patch --base=<commit> (or --base=auto for convenience) to record what (public, well-known) commit your patch series was built on]
-[Check https://git-scm.com/docs/git-format-patch for more information]
-
-url:    https://github.com/0day-ci/linux/commits/William-Wu/support-USB2-PHY-OTG-port-for-rk3399/20161102-160006
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> drivers/phy/phy-rockchip-inno-usb2.c:39:28: fatal error: linux/wakelock.h: No such file or directory
-    #include <linux/wakelock.h>
-                               ^
-   compilation terminated.
-
-vim +39 drivers/phy/phy-rockchip-inno-usb2.c
-
-    33	#include <linux/platform_device.h>
-    34	#include <linux/power_supply.h>
-    35	#include <linux/regmap.h>
-    36	#include <linux/mfd/syscon.h>
-    37	#include <linux/usb/of.h>
-    38	#include <linux/usb/otg.h>
-  > 39	#include <linux/wakelock.h>
-    40	
-    41	#define BIT_WRITEABLE_SHIFT	16
-    42	#define SCHEDULE_DELAY		(60 * HZ)
-
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56829 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/746fb699/attachment-0001.gz>
+
+Changes in v2:
+ - Use CONFIG_PM_SLEEP.
+ - Use SIMPLE_DEV_PM_OPS macro.
+
+ drivers/iio/adc/at91_adc.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index bbdac07..34b928c 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -30,6 +30,7 @@
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/trigger_consumer.h>
+ #include <linux/iio/triggered_buffer.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ /* Registers */
+ #define AT91_ADC_CR		0x00		/* Control Register */
+@@ -1347,6 +1348,32 @@ static int at91_adc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int at91_adc_suspend(struct device *dev)
++{
++	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
++	struct at91_adc_state *st = iio_priv(idev);
++
++	pinctrl_pm_select_sleep_state(dev);
++	clk_disable_unprepare(st->clk);
++
++	return 0;
++}
++
++static int at91_adc_resume(struct device *dev)
++{
++	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
++	struct at91_adc_state *st = iio_priv(idev);
++
++	clk_prepare_enable(st->clk);
++	pinctrl_pm_select_default_state(dev);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
++
+ static struct at91_adc_caps at91sam9260_caps = {
+ 	.calc_startup_ticks = calc_startup_ticks_9260,
+ 	.num_channels = 4,
+@@ -1441,6 +1468,7 @@ static struct platform_driver at91_adc_driver = {
+ 	.driver = {
+ 		   .name = DRIVER_NAME,
+ 		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
++		   .pm = &at91_adc_pm_ops,
+ 	},
+ };
+ 
+-- 
+2.7.4
