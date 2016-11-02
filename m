@@ -1,59 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Nov 2016 15:35:37 +0800
-Subject: [PATCH 1/5] ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2
- support
-In-Reply-To: <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
-References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
- <20161025211955.5345-2-gary.bisson@boundarydevices.com>
- <20161101141338.GC9807@dragon>
- <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
-Message-ID: <20161102073533.GA19126@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  2 Nov 2016 15:36:01 +0800
+Subject: [PATCH v2 4/4] ASoC: dapm: Introduce DAPM_DOUBLE_R dual channel dual
+ register control type
+In-Reply-To: <20161102073601.8659-1-wens@csie.org>
+References: <20161102073601.8659-1-wens@csie.org>
+Message-ID: <20161102073601.8659-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 03:54:31PM +0100, Gary Bisson wrote:
-> Hi Shawn,
-> 
-> On Tue, Nov 1, 2016 at 3:13 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Tue, Oct 25, 2016 at 11:19:51PM +0200, Gary Bisson wrote:
-> >> SoM based on i.MX6 Quad with 1GB of DDR3.
-> >>
-> >> https://boundarydevices.com/product/nit6x-som-v2/
-> >>
-> >> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> >> ---
-> >>  arch/arm/boot/dts/Makefile                    |   1 +
-> >>  arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
-> >>  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
-> >>  3 files changed, 824 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
-> >>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
-> >
-> > <snip>
-> >
-> >> +/ {
-> >> +     chosen {
-> >> +             stdout-path = &uart2;
-> >> +     };
-> >> +
-> >> +     memory {
-> >> +             reg = <0x10000000 0x40000000>;
-> >> +     };
-> >> +
-> >> +     backlight_lcd: backlight_lcd {
-> >
-> > Please use hyphen instead of underscore in node name.  Please check
-> > through the patch series.
-> 
-> Sorry about that, forgot (again). Just to make sure, the label can
-> have underscore but not the name right? Or is it better to have hypens
-> everywhere?
+A DAPM_DOUBLE_R control type can be used for dual channel mixer input
+selectors / mute controls across 2 registers, possibly toggling both
+channels together.
 
-Hyphen cannot be used in labels.  Otherwise, DTC will complain.
+The control is meant to be shared by 2 widgets, 1 for each channel,
+such that the mixer control exposed to userspace remains a combined
+stereo control.
 
-> So I guess I need to make a pass on current boards as well.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ include/sound/soc-dapm.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-I'm fine with the current boards and only expect it to be right with the
-boards to be added.
-
-Shawn
+diff --git a/include/sound/soc-dapm.h b/include/sound/soc-dapm.h
+index f74ec19687f8..a466f4bdc835 100644
+--- a/include/sound/soc-dapm.h
++++ b/include/sound/soc-dapm.h
+@@ -277,6 +277,11 @@ struct device;
+ 	.info = snd_soc_info_volsw, \
+ 	.get = snd_soc_dapm_get_volsw, .put = snd_soc_dapm_put_volsw, \
+ 	.private_value = SOC_DOUBLE_VALUE(reg, lshift, rshift, max, invert, 0) }
++#define SOC_DAPM_DOUBLE_R(xname, lreg, rreg, shift, max, invert) \
++{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
++	.info = snd_soc_info_volsw, \
++	.get = snd_soc_dapm_get_volsw, .put = snd_soc_dapm_put_volsw, \
++	.private_value = SOC_DOUBLE_R_VALUE(lreg, rreg, shift, max, invert) }
+ #define SOC_DAPM_SINGLE(xname, reg, shift, max, invert) \
+ {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+ 	.info = snd_soc_info_volsw, \
+-- 
+2.10.2
