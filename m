@@ -1,457 +1,63 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  2 Nov 2016 15:18:49 +0100
-Subject: [PATCH v2 1/2] ARM: dts: Add support for OX820 and Pogoplug V3
-In-Reply-To: <20161102141850.25164-1-narmstrong@baylibre.com>
-References: <20161102141850.25164-1-narmstrong@baylibre.com>
-Message-ID: <20161102141850.25164-2-narmstrong@baylibre.com>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Wed, 2 Nov 2016 09:32:55 -0500
+Subject: [PATCHv3 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <1478097178-24341-1-git-send-email-tthayer@opensource.altera.com>
+References: <1478097178-24341-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1478097178-24341-2-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree for the Oxford Seminconductor OX820 SoC and the
-Cloud Engines PogoPlug v3 board.
-Add the SoC and board compatible strings to oxnas bindings.
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Add the Arria10 DevKit System Resource Chip register and state
+monitoring module to the MFD.
+
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
- Documentation/devicetree/bindings/arm/oxnas.txt    |   5 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- .../boot/dts/cloudengines-pogoplug-series-3.dts    |  94 +++++++
- arch/arm/boot/dts/ox820.dtsi                       | 296 +++++++++++++++++++++
- 4 files changed, 397 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
- create mode 100644 arch/arm/boot/dts/ox820.dtsi
+Note: This needs to be applied to the bindings document that
+was Acked & Applied but didn't reach the for-next branch.
+See https://patchwork.ozlabs.org/patch/629397/
+---
+v2  Change compatible string -mon to -monitor for clarity
+v3  Replace node name a10sr_monitor with just monitor.
+    Replace node name a10sr_gpio with just gpio.
+---
+ Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
-index b9e4971..ac64e60 100644
---- a/Documentation/devicetree/bindings/arm/oxnas.txt
-+++ b/Documentation/devicetree/bindings/arm/oxnas.txt
-@@ -5,5 +5,10 @@ Boards with the OX810SE SoC shall have the following properties:
-   Required root node property:
-     compatible: "oxsemi,ox810se"
+diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+index ea151f2..69243d2 100644
+--- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
++++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+@@ -17,7 +17,8 @@ The A10SR consists of these sub-devices:
  
-+Boards with the OX820 SoC shall have the following properties:
-+  Required root node property:
-+    compatible: "oxsemi,ox820"
+ Device                   Description
+ ------                   ----------
+-a10sr_gpio               GPIO Controller
++gpio                     GPIO Controller
++monitor                  Register and State Monitoring
+ 
+ Arria10 GPIO
+ Required Properties:
+@@ -27,6 +28,10 @@ Required Properties:
+                       the second cell is used to specify flags.
+                       See ../gpio/gpio.txt for more information.
+ 
++Arria10 Register and State Monitor
++Required Properties:
++- compatible        : Should be "altr,a10sr-monitor"
 +
- Board compatible values:
-   - "wd,mbwe" (OX810SE)
-+  - "cloudengines,pogoplugv3" (OX820)
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd26..3b0c74f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -604,7 +604,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
- dtb-$(CONFIG_ARCH_PRIMA2) += \
- 	prima2-evb.dtb
- dtb-$(CONFIG_ARCH_OXNAS) += \
--	wd-mbwe.dtb
-+	wd-mbwe.dtb \
-+	cloudengines-pogoplug-series-3.dtb
- dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-apq8060-dragonboard.dtb \
- 	qcom-apq8064-arrow-sd-600eval.dtb \
-diff --git a/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts b/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
-new file mode 100644
-index 0000000..bfde32e
---- /dev/null
-+++ b/arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
-@@ -0,0 +1,94 @@
-+/*
-+ * cloudengines-pogoplug-series-3.dtsi - Device tree file for Cloud Engines PogoPlug Series 3
-+ *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
+ Example:
+ 
+         resource-manager at 0 {
+@@ -43,4 +48,8 @@ Example:
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+ 		};
 +
-+/dts-v1/;
-+#include "ox820.dtsi"
-+
-+/ {
-+	model = "Cloud Engines PogoPlug Series 3";
-+
-+	compatible = "cloudengines,pogoplugv3", "oxsemi,ox820";
-+
-+	chosen {
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		/* 128Mbytes DDR */
-+		reg = <0x60000000 0x8000000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+		gpio0 = &gpio0;
-+		gpio1 = &gpio1;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue {
-+			label = "pogoplug:blue";
-+			gpios = <&gpio0 2 0>;
-+			default-state = "keep";
++		monitor {
++			compatible = "altr,a10sr-monitor";
 +		};
-+
-+		orange {
-+			label = "pogoplug:orange";
-+			gpios = <&gpio1 16 1>;
-+			default-state = "keep";
-+		};
-+
-+		green {
-+			label = "pogoplug:green";
-+			gpios = <&gpio1 17 1>;
-+			default-state = "keep";
-+		};
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart0>;
-+};
-+
-+&nandc {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nand>;
-+
-+	nand at 0 {
-+		reg = <0>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		nand-ecc-mode = "soft";
-+		nand-ecc-algo = "hamming";
-+
-+		partition at 0 {
-+			label = "boot";
-+			reg = <0x00000000 0x00e00000>;
-+			read-only;
-+		};
-+
-+		partition at e00000 {
-+			label = "ubi";
-+			reg = <0x00e00000 0x07200000>;
-+		};
-+	};
-+};
-+
-+&etha {
-+	status = "okay";
-+
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_etha_mdio>;
-+};
-diff --git a/arch/arm/boot/dts/ox820.dtsi b/arch/arm/boot/dts/ox820.dtsi
-new file mode 100644
-index 0000000..e40f282
---- /dev/null
-+++ b/arch/arm/boot/dts/ox820.dtsi
-@@ -0,0 +1,296 @@
-+/*
-+ * ox820.dtsi - Device tree file for Oxford Semiconductor OX820 SoC
-+ *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * Licensed under GPLv2 or later
-+ */
-+
-+/include/ "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "oxsemi,ox820";
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "oxsemi,ox820-smp";
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,arm11mpcore";
-+			clocks = <&armclk>;
-+			reg = <0>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,arm11mpcore";
-+			clocks = <&armclk>;
-+			reg = <1>;
-+		};
-+	};
-+
-+	memory {
-+		/* Max 512MB @ 0x60000000 */
-+		reg = <0x60000000 0x20000000>;
-+	};
-+
-+	clocks {
-+		osc: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		gmacclk: gmacclk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <125000000>;
-+		};
-+
-+		sysclk: sysclk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <4>;
-+			clock-mult = <1>;
-+			clocks = <&osc>;
-+		};
-+
-+		plla: plla {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <850000000>;
-+		};
-+
-+		armclk: armclk {
-+			compatible = "fixed-factor-clock";
-+			#clock-cells = <0>;
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&plla>;
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		ranges;
-+		interrupt-parent = <&gic>;
-+
-+		nandc: nand-controller at 41000000 {
-+			compatible = "oxsemi,ox820-nand";
-+			reg = <0x41000000 0x100000>;
-+			clocks = <&stdclk 11>;
-+			resets = <&reset 15>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		etha: ethernet at 40400000 {
-+			compatible = "oxsemi,ox820-dwmac", "snps,dwmac";
-+			reg = <0x40400000 0x2000>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq", "eth_wake_irq";
-+			mac-address = [000000000000]; /* Filled in by U-Boot */
-+			phy-mode = "rgmii";
-+
-+			clocks = <&stdclk 9>, <&gmacclk>;
-+			clock-names = "gmac", "stmmaceth";
-+			resets = <&reset 6>;
-+
-+			/* Regmap for sys registers */
-+			oxsemi,sys-ctrl = <&sys>;
-+
-+			status = "disabled";
-+		};
-+
-+		apb-bridge at 44000000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			ranges = <0 0x44000000 0x1000000>;
-+
-+			pinctrl: pinctrl {
-+				compatible = "oxsemi,ox820-pinctrl";
-+
-+				/* Regmap for sys registers */
-+				oxsemi,sys-ctrl = <&sys>;
-+
-+				pinctrl_uart0: uart0 {
-+					uart0 {
-+						pins = "gpio30", "gpio31";
-+						function = "fct5";
-+					};
-+				};
-+
-+				pinctrl_uart0_modem: uart0_modem {
-+					uart0_modem_a {
-+						pins = "gpio24", "gpio24", "gpio26", "gpio27";
-+						function = "fct4";
-+					};
-+					uart0_modem_b {
-+						pins = "gpio28", "gpio29";
-+						function = "fct5";
-+					};
-+				};
-+
-+				pinctrl_uart1: uart1 {
-+					uart1 {
-+						pins = "gpio7", "gpio8";
-+						function = "fct4";
-+					};
-+				};
-+
-+				pinctrl_uart1_modem: uart1_modem {
-+					uart1_modem {
-+						pins = "gpio5", "gpio6", "gpio40", "gpio41", "gpio42", "gpio43";
-+						function = "fct4";
-+					};
-+				};
-+
-+				pinctrl_etha_mdio: etha_mdio {
-+					etha_mdio {
-+						pins = "gpio3", "gpio4";
-+						function = "fct1";
-+					};
-+				};
-+
-+				pinctrl_nand: nand {
-+					nand {
-+						pins = "gpio12", "gpio13", "gpio14", "gpio15",
-+						     "gpio16", "gpio17", "gpio18", "gpio19",
-+						     "gpio20", "gpio21", "gpio22", "gpio23",
-+						     "gpio24";
-+						function = "fct1";
-+					};
-+				};
-+			};
-+
-+			gpio0: gpio at 000000 {
-+				compatible = "oxsemi,ox820-gpio";
-+				reg = <0x000000 0x100000>;
-+				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				ngpios = <32>;
-+				oxsemi,gpio-bank = <0>;
-+				gpio-ranges = <&pinctrl 0 0 32>;
-+			};
-+
-+			gpio1: gpio at 100000 {
-+				compatible = "oxsemi,ox820-gpio";
-+				reg = <0x100000 0x100000>;
-+				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+				#gpio-cells = <2>;
-+				gpio-controller;
-+				interrupt-controller;
-+				#interrupt-cells = <2>;
-+				ngpios = <18>;
-+				oxsemi,gpio-bank = <1>;
-+				gpio-ranges = <&pinctrl 0 32 18>;
-+			};
-+
-+			uart0: serial at 200000 {
-+			       compatible = "ns16550a";
-+			       reg = <0x200000 0x100000>;
-+			       interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       clocks = <&sysclk>;
-+			       resets = <&reset 17>;
-+			};
-+
-+			uart1: serial at 300000 {
-+			       compatible = "ns16550a";
-+			       reg = <0x200000 0x100000>;
-+			       interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-+			       reg-shift = <0>;
-+			       fifo-size = <16>;
-+			       reg-io-width = <1>;
-+			       current-speed = <115200>;
-+			       no-loopback-test;
-+			       status = "disabled";
-+			       clocks = <&sysclk>;
-+			       resets = <&reset 18>;
-+			};
-+
-+			rps at 400000 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "simple-bus";
-+				ranges = <0 0x400000 0x100000>;
-+
-+				intc: interrupt-controller at 0 {
-+					compatible = "oxsemi,ox820-rps-irq", "oxsemi,ox810se-rps-irq";
-+					interrupt-controller;
-+					reg = <0 0x200>;
-+					interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+					#interrupt-cells = <1>;
-+					valid-mask = <0xFFFFFFFF>;
-+					clear-mask = <0>;
-+				};
-+
-+				timer0: timer at 200 {
-+					compatible = "oxsemi,ox820-rps-timer";
-+					reg = <0x200 0x40>;
-+					clocks = <&sysclk>;
-+					interrupt-parent = <&intc>;
-+					interrupts = <4>;
-+				};
-+			};
-+
-+			sys: sys-ctrl at e00000 {
-+				compatible = "oxsemi,ox820-sys-ctrl", "syscon", "simple-mfd";
-+				reg = <0xe00000 0x200000>;
-+
-+				reset: reset-controller {
-+					compatible = "oxsemi,ox820-reset", "oxsemi,ox810se-reset";
-+					#reset-cells = <1>;
-+				};
-+
-+				stdclk: stdclk {
-+					compatible = "oxsemi,ox820-stdclk", "oxsemi,ox810se-stdclk";
-+					#clock-cells = <1>;
-+				};
-+			};
-+		};
-+
-+		apb-bridge at 47000000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "simple-bus";
-+			ranges = <0 0x47000000 0x1000000>;
-+
-+			scu: scu at 0 {
-+				compatible = "arm,arm11mp-scu";
-+				reg = <0x0 0x100>;
-+			};
-+
-+			local-timer at 600 {
-+				compatible = "arm,arm11mp-twd-timer";
-+				reg = <0x600 0x20>;
-+				interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(3)|IRQ_TYPE_LEVEL_HIGH)>;
-+				clocks = <&armclk>;
-+			};
-+
-+			gic: gic at 1000 {
-+				compatible = "arm,arm11mp-gic";
-+				interrupt-controller;
-+				#interrupt-cells = <3>;
-+				reg = <0x1000 0x1000>,
-+				      <0x100 0x500>;
-+			};
-+		};
-+	};
-+};
+ 	};
 -- 
-2.7.0
+1.9.1
