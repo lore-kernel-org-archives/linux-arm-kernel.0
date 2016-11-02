@@ -1,78 +1,27 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 2 Nov 2016 10:40:16 +0800
-Subject: [PATCH v1] iio: adc: at91: add suspend and resume callback
-Message-ID: <1478054417-7520-1-git-send-email-wenyou.yang@atmel.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 1 Nov 2016 23:43:06 -0300
+Subject: [PATCH] drm/exynos: gsc: fix spelling mistakes
+In-Reply-To: <20161102022336.32299-1-colin.king@canonical.com>
+References: <20161102022336.32299-1-colin.king@canonical.com>
+Message-ID: <d2185e98-044a-9742-265a-3b431dcd5a0f@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend/resume callback, support the pinctrl sleep state when
-the system suspend as well.
+Hello Colin,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+On 11/01/2016 11:23 PM, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Trivial fixes to spelling mistakes "precalser" to "prescaler"
+> in dev_err messages
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> ---
 
- drivers/iio/adc/at91_adc.c | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index bbdac07..ffa81a1 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -30,6 +30,7 @@
- #include <linux/iio/trigger.h>
- #include <linux/iio/trigger_consumer.h>
- #include <linux/iio/triggered_buffer.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /* Registers */
- #define AT91_ADC_CR		0x00		/* Control Register */
-@@ -1347,6 +1348,39 @@ static int at91_adc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int at91_adc_suspend(struct device *dev)
-+{
-+	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-+	struct at91_adc_state *st = iio_priv(idev);
-+
-+	pinctrl_pm_select_sleep_state(dev);
-+	clk_disable_unprepare(st->clk);
-+
-+	return 0;
-+}
-+
-+static int at91_adc_resume(struct device *dev)
-+{
-+	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-+	struct at91_adc_state *st = iio_priv(idev);
-+
-+	clk_prepare_enable(st->clk);
-+	pinctrl_pm_select_default_state(dev);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops at91_adc_pm_ops = {
-+	.suspend = at91_adc_suspend,
-+	.resume = at91_adc_resume,
-+};
-+
-+#define AT91_ADC_PM_OPS (&at91_adc_pm_ops)
-+#else
-+#define AT91_ADC_PM_OPS NULL
-+#endif
-+
- static struct at91_adc_caps at91sam9260_caps = {
- 	.calc_startup_ticks = calc_startup_ticks_9260,
- 	.num_channels = 4,
-@@ -1441,6 +1475,7 @@ static struct platform_driver at91_adc_driver = {
- 	.driver = {
- 		   .name = DRIVER_NAME,
- 		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
-+		.pm = AT91_ADC_PM_OPS,
- 	},
- };
- 
+Best regards,
 -- 
-2.7.4
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
