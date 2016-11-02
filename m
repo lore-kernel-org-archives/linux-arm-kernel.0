@@ -1,29 +1,50 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Wed, 02 Nov 2016 05:51:37 -0700
-Subject: [PATCH 0/5] ARM: OMAP: dead code removal
-In-Reply-To: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
-References: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
-Message-ID: <5171695.W4AFPtEAdE@diplodocus>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 2 Nov 2016 14:07:09 +0100
+Subject: [PATCH -next] [media] c8sectpfe: fix error return code in
+ c8sectpfe_probe()
+In-Reply-To: <1477792390-24533-1-git-send-email-weiyj.lk@gmail.com>
+References: <1477792390-24533-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <331417b4-9924-6bd4-8c13-ad6ff9fba19f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 01, 2016 01:36:41 PM Nicolae Rosia wrote:
-> Hi,
+
+
+On 10/30/2016 02:53 AM, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> I have identified some dead code which can be removed.
+> Fix to return error code -ENODEV from the error handling
+> case instead of 0, as done elsewhere in this function.
 > 
-> Nicolae Rosia (5):
->   ARM: OMAP4: kill omap4_pmic_init and omap4_pmic_get_config
->   ARM: OMAP3: kill omap3_pmic_get_config and twl_{get,set}_voltage
->   ARM: OMAP3: kill omap3_pmic_init
->   ARM: OMAP2: kill omap2_pmic_init
->   ARM: OMAP: kill omap_pmic_init
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> ---
+>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
->  arch/arm/mach-omap2/twl-common.c | 483 ---------------------------------------
->  arch/arm/mach-omap2/twl-common.h |  24 --
->  2 files changed, 507 deletions(-)
+> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> index 42b123f..69d9a16 100644
+> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> @@ -813,6 +813,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+>  		i2c_bus = of_parse_phandle(child, "i2c-bus", 0);
+>  		if (!i2c_bus) {
+>  			dev_err(&pdev->dev, "No i2c-bus found\n");
+> +			ret = -ENODEV;
+>  			goto err_clk_disable;
+>  		}
+>  		tsin->i2c_adapter =
+> @@ -820,6 +821,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+>  		if (!tsin->i2c_adapter) {
+>  			dev_err(&pdev->dev, "No i2c adapter found\n");
+>  			of_node_put(i2c_bus);
+> +			ret = -ENODEV;
+>  			goto err_clk_disable;
+>  		}
+>  		of_node_put(i2c_bus);
 > 
-> 
-I think the commit logs for these patches
-need a little detail on why the code is
-no longer needed. For posterity. 
+
+Hi Wei
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Thanks
