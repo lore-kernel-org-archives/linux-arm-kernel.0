@@ -1,46 +1,20 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue,  1 Nov 2016 20:23:36 -0600
-Subject: [PATCH] drm/exynos: gsc: fix spelling mistakes
-Message-ID: <20161102022336.32299-1-colin.king@canonical.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 2 Nov 2016 07:55:53 +0530
+Subject: [PATCH] ARM: spear: Fix error handling
+In-Reply-To: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
+References: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <CAOh2x=kiECTSiSk0+R63gDbm8_NM6wDm=03RJKEyznnHfOZuDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Sat, Oct 29, 2016 at 7:28 PM, Christophe JAILLET
+<christophe.jaillet@wanadoo.fr> wrote:
+> 'clk_get_sys()' returns an error pointer in case of error, not NULL. So
+> test it with IS_ERR.
+>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>  arch/arm/mach-spear/time.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Trivial fixes to spelling mistakes "precalser" to "prescaler"
-in dev_err messages
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/gpu/drm/exynos/exynos_drm_fimc.c | 2 +-
- drivers/gpu/drm/exynos/exynos_drm_gsc.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimc.c b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-index 147ef0d..9587157 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fimc.c
-@@ -1433,7 +1433,7 @@ static int fimc_ippdrv_start(struct device *dev, enum drm_exynos_ipp_cmd cmd)
- 		&img_pos[EXYNOS_DRM_OPS_SRC],
- 		&img_pos[EXYNOS_DRM_OPS_DST]);
- 	if (ret) {
--		dev_err(dev, "failed to set precalser.\n");
-+		dev_err(dev, "failed to set prescaler.\n");
- 		return ret;
- 	}
- 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gsc.c b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-index 52a9d26..bef5798 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gsc.c
-@@ -1610,7 +1610,7 @@ static int gsc_ippdrv_start(struct device *dev, enum drm_exynos_ipp_cmd cmd)
- 		&img_pos[EXYNOS_DRM_OPS_SRC],
- 		&img_pos[EXYNOS_DRM_OPS_DST]);
- 	if (ret) {
--		dev_err(dev, "failed to set precalser.\n");
-+		dev_err(dev, "failed to set prescaler.\n");
- 		return ret;
- 	}
- 
--- 
-2.9.3
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
