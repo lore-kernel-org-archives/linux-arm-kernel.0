@@ -1,19 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 1 Nov 2016 17:32:50 -0700
-Subject: [PATCH] clk: nxp: clk-lpc18xx-ccu: Unmap region obtained by
- of_iomap
-In-Reply-To: <1474367987-15808-1-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1474367987-15808-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20161102003250.GI16026@codeaurora.org>
+Date: Tue, 1 Nov 2016 17:37:50 -0700
+Subject: [PATCH v4 1/1] clk: mvebu: migrate CP110 system controller to
+ clk_hw API and registration
+In-Reply-To: <1474789673-3837-2-git-send-email-mw@semihalf.com>
+References: <1474789673-3837-1-git-send-email-mw@semihalf.com>
+ <1474789673-3837-2-git-send-email-mw@semihalf.com>
+Message-ID: <20161102003750.GL16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/20, Arvind Yadav wrote:
-> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+On 09/25, Marcin Wojtas wrote:
+> Now that we have clk_hw based provider APIs to register clks, we
+> can get rid of struct clk pointers while registering clks in Armada
+> CP110 system controller driver. This commit introduces new
+> API and registration for all clocks in CP110 HW blocks.
 > 
-> Free memory mapping, if lpc18xx_ccu_init is not successful.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 > ---
 
 Applied to clk-next
