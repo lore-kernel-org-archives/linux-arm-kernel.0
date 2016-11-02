@@ -1,57 +1,68 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Wed, 02 Nov 2016 09:14:49 +0100
-Subject: Low network throughput on i.MX28
-In-Reply-To: <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
- <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
- <1477696028.31471.3.camel@embedded.rocks>
- <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
-Message-ID: <1478074489.19127.7.camel@embedded.rocks>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 2 Nov 2016 09:22:06 +0100
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
+ property query
+In-Reply-To: <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
+References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
+ <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
+ <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
+ <20161024201443.GB5989@amd>
+ <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
+ <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
+ <20161031213846.GA21014@amd>
+ <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
+Message-ID: <20161102082206.GE21488@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-10-29 at 11:08 +0200, Stefan Wahren wrote:
-> > J?rg Krause <joerg.krause@embedded.rocks> hat am 29. Oktober 2016
-> > um 01:07
-> > geschrieben:
-> > 
-> > 
-> > You mentioned [1] an optimization in the Freescale vendor Linux
-> > kernel
-> > [2]. I would really like to see this optimization in the mainline
-> > kernel.
-> > 
-> > Did you ever tried to port this code from Freescale to mainline?
+Hi!
+
+> >> >> Better then previous one.
+> >> >>
+> >> >> But my version of bq27xxx_battery.c already contains this:
+> >> >
+> >> > This is for allowing udev rule to set the properties as well.
+> >> > otherwise a kinda crude RUN = " echo value >
+> >> > /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
+> >>
+> >> Any thoughts on this?
+> >
+> > I'd say  echo value >
+> > /sys/module/bq27xxx_battery/parameters/poll_interval .. is quite
+> > adequate solution...?
+> >
+> > Alternatively, convince us that something else is useful for everyone,
+> > and we can do the right thing (poll more often when battery is nearly
+> > empty), automatically...
 > 
-> Yes, i tried once but i was frustrated soon because of the lot of
-> required
-> changes and resulting issues.
-
-I got the PIO mode working for the mxs-mmc driver. For this I ported
-the PIO code from the vendor kernel and removed the usage of the DMA
-engine entirely.
-
-Testing network bandwidth with iperf, I get about ~10Mbit/sec with PIO
-mode compared to ~6.5Mbit/sec with DMA mode for UDP and about
-~6.5Mbit/sec compared to ~4.5Mbit/sec with DMA mode for TCP.
-
-Note, that the vendor kernel implements a switch between PIO and DMA
-mode for the ADTC command type depending on the data size. For this
-test, I removed this switch and used PIO mode solely.
-
-> > 
-> > Is it even possible, as the mainline driver uses the DMA engine?
+> Ok should have had the patchset set it per device, and not use the
+> global poll_interval. Of need to add some logic to see if uses the
+> global poll_interval or it's own setting.
 > 
-> I think the more important part would be analyse why the Mainline
-> driver is slowlier. I mean to exactly identify the bottleneck.
+> There are times where you could have multiple batteries connected to
+> multiple fuel gauges, and want to up the polling interval on certain
+> ones that are discharging at different rates.
+> 
+> But of course I'll let you guys let me know if this seems useful at all.
 
-I will further investigate this issue.
+I agree per-device polling would be cleaner.
+
+But unless you have hardware with more than one bq27xxx, I'd avoid the
+work...
+
+Now... its also possible that poll_interval should change itself
+(within kernel) to do the right thing.
 
 Best regards,
-J?rg Krause
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/5f5fae4c/attachment.sig>
