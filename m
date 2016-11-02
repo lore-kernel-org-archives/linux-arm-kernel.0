@@ -1,88 +1,121 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 02 Nov 2016 10:50:48 -0600
-Subject: Applied "ASoC: sun4i-codec: Enable bus clock after getting GPIO" to
- the asoc tree
-In-Reply-To: <20161101063155.15826-1-wens@csie.org>
-Message-ID: <E1c1ykS-0006Gt-1N@finisterre>
+From: Frank.Li@nxp.com (Frank Li)
+Date: Wed, 2 Nov 2016 13:00:03 -0500
+Subject: [PATCH v2 1/2] ARM: imx: mmdc perf function support i.MX6QP
+Message-ID: <1478109604-18323-1-git-send-email-Frank.Li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+i.MX6QP added new reigster bit PROFILE_SEL in MADPCR0.
+need set it at perf start.
 
-   ASoC: sun4i-codec: Enable bus clock after getting GPIO
-
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 3716a891d65cc04217da1af5f2bccb7eaf6092c2 Mon Sep 17 00:00:00 2001
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Tue, 1 Nov 2016 14:31:55 +0800
-Subject: [PATCH] ASoC: sun4i-codec: Enable bus clock after getting GPIO
-
-In the current probe function the GPIO is acquired after the codec's
-bus clock is enabled. However if it fails to acquire the GPIO due to
-a deferred probe, it does not disable the bus clock before bailing out.
-This would result in the clock being enabled multiple times.
-
-Move the code that enables the bus clock after the part that gets the
-GPIO, maintaining a separation between resource acquisition and device
-enablement in the probe function.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Frank Li <Frank.Li@nxp.com>
 ---
- sound/soc/sunxi/sun4i-codec.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+V1 to V2: remove fsl_mmdc_devtype
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index a60707761abf..56ed9472e89f 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -829,12 +829,6 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return PTR_ERR(scodec->clk_module);
- 	}
+ arch/arm/mach-imx/mmdc.c | 38 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 32 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+index d82d14c..032cbe0 100644
+--- a/arch/arm/mach-imx/mmdc.c
++++ b/arch/arm/mach-imx/mmdc.c
+@@ -44,6 +44,7 @@
+ #define DBG_RST			0x2
+ #define PRF_FRZ			0x4
+ #define CYC_OVF			0x8
++#define PROFILE_SEL		0x10
  
--	/* Enable the bus clock */
--	if (clk_prepare_enable(scodec->clk_apb)) {
--		dev_err(&pdev->dev, "Failed to enable the APB clock\n");
--		return -EINVAL;
--	}
--
- 	scodec->gpio_pa = devm_gpiod_get_optional(&pdev->dev, "allwinner,pa",
- 						  GPIOD_OUT_LOW);
- 	if (IS_ERR(scodec->gpio_pa)) {
-@@ -844,6 +838,12 @@ static int sun4i_codec_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ #define MMDC_MADPCR0	0x410
+ #define MMDC_MADPSR0	0x418
+@@ -55,10 +56,29 @@
  
-+	/* Enable the bus clock */
-+	if (clk_prepare_enable(scodec->clk_apb)) {
-+		dev_err(&pdev->dev, "Failed to enable the APB clock\n");
-+		return -EINVAL;
-+	}
+ #define MMDC_NUM_COUNTERS	6
+ 
++#define FSL_MMDC_QUIRK_PROFILE_SEL	0x1
 +
- 	/* DMA configuration for TX FIFO */
- 	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
- 	scodec->playback_dma_data.maxburst = 4;
+ #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
+ 
+ static int ddr_type;
+ 
++struct fsl_mmdc_devtype_data {
++	int driver_data;
++};
++
++static struct fsl_mmdc_devtype_data imx6q_data = {
++};
++
++static struct fsl_mmdc_devtype_data imx6qp_data = {
++	.driver_data = FSL_MMDC_QUIRK_PROFILE_SEL,
++};
++
++static const struct of_device_id imx_mmdc_dt_ids[] = {
++	{ .compatible = "fsl,imx6q-mmdc", .data = (void *)&imx6q_data},
++	{ .compatible = "fsl,imx6qp-mmdc", .data = (void *)&imx6qp_data},
++	{ /* sentinel */ }
++};
++
+ #ifdef CONFIG_PERF_EVENTS
+ 
+ static DEFINE_IDA(mmdc_ida);
+@@ -83,6 +103,7 @@ struct mmdc_pmu {
+ 	struct device *dev;
+ 	struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
+ 	struct hlist_node node;
++	struct fsl_mmdc_devtype_data *devtype_data;
+ };
+ 
+ /*
+@@ -307,6 +328,7 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+ 	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	void __iomem *mmdc_base, *reg;
++	int val;
+ 
+ 	mmdc_base = pmu_mmdc->mmdc_base;
+ 	reg = mmdc_base + MMDC_MADPCR0;
+@@ -321,7 +343,12 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+ 	local64_set(&hwc->prev_count, 0);
+ 
+ 	writel(DBG_RST, reg);
+-	writel(DBG_EN, reg);
++
++	val = DBG_EN;
++	if (pmu_mmdc->devtype_data->driver_data & FSL_MMDC_QUIRK_PROFILE_SEL)
++		val |= PROFILE_SEL;
++
++	writel(val, reg);
+ }
+ 
+ static int mmdc_pmu_event_add(struct perf_event *event, int flags)
+@@ -436,6 +463,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+ 	char *name;
+ 	int mmdc_num;
+ 	int ret;
++	const struct of_device_id *of_id =
++		of_match_device(imx_mmdc_dt_ids, &pdev->dev);
+ 
+ 	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
+ 	if (!pmu_mmdc) {
+@@ -450,6 +479,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+ 		name = devm_kasprintf(&pdev->dev,
+ 				GFP_KERNEL, "mmdc%d", mmdc_num);
+ 
++	pmu_mmdc->devtype_data = (struct fsl_mmdc_devtype_data *)of_id->data;
++
+ 	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
+ 			HRTIMER_MODE_REL);
+ 	pmu_mmdc->hrtimer.function = mmdc_pmu_timer_handler;
+@@ -524,11 +555,6 @@ int imx_mmdc_get_ddr_type(void)
+ 	return ddr_type;
+ }
+ 
+-static const struct of_device_id imx_mmdc_dt_ids[] = {
+-	{ .compatible = "fsl,imx6q-mmdc", },
+-	{ /* sentinel */ }
+-};
+-
+ static struct platform_driver imx_mmdc_driver = {
+ 	.driver		= {
+ 		.name	= "imx-mmdc",
 -- 
-2.10.1
+2.5.2
