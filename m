@@ -1,80 +1,139 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 02 Nov 2016 17:02:37 +0100
-Subject: [PATCH v7 RESEND 1/2] ASoC: samsung: Add DT bindings documentation for
- TM2 sound subsystem
-Message-ID: <1478102558-12524-1-git-send-email-s.nawrocki@samsung.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 2 Nov 2016 11:03:13 -0500
+Subject: [PATCH v3 2/3] Documentation: dt: add bindings for ti-cpufreq
+In-Reply-To: <20161102035941.GA10786@vireshk-i7>
+References: <20161027214131.1725-1-d-gerlach@ti.com>
+ <20161027214131.1725-3-d-gerlach@ti.com> <20161102035941.GA10786@vireshk-i7>
+Message-ID: <9a185460-a241-4876-2915-6975c57527ca@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT binding documentation for Exnos5433 based TM2
-and TM2E boards sound subsystem.
+Hi,
+On 11/01/2016 10:59 PM, Viresh Kumar wrote:
+> On 27-10-16, 16:41, Dave Gerlach wrote:
+>> Add the device tree bindings document for the TI CPUFreq/OPP driver
+>> on AM33xx and AM43xx SoCs. The operating-points-v2 binding allows us
+>> to provide an opp-supported-hw property for each OPP to define when
+>> it is available. This driver is responsible for reading and parsing
+>> registers to determine which OPPs can be selectively enabled based
+>> on the specific SoC in use by matching against the opp-supported-hw
+>> data.
+>>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> v2->v3:
+>> - Move ti,syscon-* properties under opp table instead of cpu node, as
+>>   that is a better location for them.
+>> - For the opp table do not use platform specific compatible strings
+>>   but instead a operating-points-v2-ti-cpu
+>>
+>>  .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 132 +++++++++++++++++++++
+>>  1 file changed, 132 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+>> new file mode 100644
+>> index 000000000000..467ad29c75c9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+>> @@ -0,0 +1,132 @@
+>> +TI CPUFreq and OPP bindings
+>> +================================
+>> +
+>> +Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
+>> +families support different OPPs depending on the silicon variant in use.
+>> +The ti_cpufreq driver can use revision and an efuse value from the SoC to
+>> +provide the OPP framework with supported hardware information. This is
+>> +used to determine which OPPs from the operating-points-v2 table get enabled
+>> +when it is parsed by the OPP framework.
+>> +
+>> +Required properties:
+>> +--------------------
+>> +In 'cpus' nodes:
+>> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
+>> +
+>> +In 'operating-points-v2' table:
+>> +- compatible: Should be 'operating-points-v2-ti-cpu' for am335x, am43xx,
+>> +	      and dra7xx/am57xx SoCs
+>> +- ti,syscon-efuse: Syscon phandle, offset to efuse register, efuse register
+>> +		   mask, and efuse register shift to get the relevant bits
+>> +		   that describe OPP availability.
+>> +- ti,syscon-rev: Syscon and offset used to look up revision value on SoC.
+>> +
+>> +Optional properties:
+>> +--------------------
+>> +For each opp entry in 'operating-points-v2' table:
+>> +- opp-supported-hw: Two bitfields indicating:
+>> +	1. Which revision of the SoC the OPP is supported by
+>> +	2. Which eFuse bits indicate this OPP is available
+>> +
+>> +	A bitwise AND is performed against these values and if any bit
+>> +	matches, the OPP gets enabled. Not providing the property for an
+>> +	entry indicates that an OPP is always supported.
+>> +
+>> +Example:
+>> +--------
+>> +
+>> +/* From arch/arm/boot/dts/am33xx.dtsi */
+>> +cpus {
+>> +	#address-cells = <1>;
+>> +	#size-cells = <0>;
+>> +	cpu at 0 {
+>> +		compatible = "arm,cortex-a8";
+>> +		device_type = "cpu";
+>> +		reg = <0>;
+>> +
+>> +		operating-points-v2 = <&cpu0_opp_table>;
+>> +
+>> +		clocks = <&dpll_mpu_ck>;
+>> +		clock-names = "cpu";
+>> +
+>> +		clock-latency = <300000>; /* From omap-cpufreq driver */
+>> +	};
+>> +};
+>> +
+>> +/*
+>> + * cpu0 has different OPPs depending on SoC revision and some on revisions
+>> + * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
+>> + */
+>> +cpu0_opp_table: opp_table0 {
+>> +	compatible = "operating-points-v2-ti-am3352-cpu";
+>> +	ti,syscon-efuse = <&scm_conf 0x7fc 0x1fff 0>;
+>> +	ti,syscon-rev = <&scm_conf 0x600>;
+>> +
+>> +	/*
+>> +	 * The three following nodes are marked with opp-suspend
+>> +	 * because they can not be enabled simultaneously on a
+>> +	 * single SoC.
+>> +	 */
+>> +	opp50 at 300000000 {
+>> +		opp-hz = /bits/ 64 <300000000>;
+>> +		opp-microvolt = <950000 931000 969000>;
+>> +		opp-supported-hw = <0x06 0x0010>;
+>> +		opp-suspend;
+>> +	};
+>> +
+>> +	opp100 at 275000000 {
+>> +		opp-hz = /bits/ 64 <275000000>;
+>> +		opp-microvolt = <1100000 1078000 1122000>;
+>> +		opp-supported-hw = <0x01 0x00FF>;
+>> +		opp-suspend;
+>> +	};
+>> +
+>> +	opp100 at 300000000 {
+>> +		opp-hz = /bits/ 64 <300000000>;
+>> +		opp-microvolt = <1100000 1078000 1122000>;
+>> +		opp-supported-hw = <0x06 0x0020>;
+>> +		opp-suspend;
+>
+> Only one OPP in the table can be marked as suspend OPP.
+>
 
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes since v5:
- - none.
+Does that still apply when opp-supported-hw is involved? Based on the 
+comment at the start of the table, those OPPs are all mutually exclusive 
+and will not ever be enabled on the same piece of silicon, they 
+represent the lowest OPP for each of three different supported-hw 
+configurations.
 
-Changes since v4:
- - indentation changes.
-
-Changes since v2:
- - none.
-
-Changes since initial version:
- - dropped clocks, clock-names properties, instead properties from
-   the CODEC node will be used,
- - property renames: 'samsung,model' -> 'model', 'samsung,i2s-controller'
-   -> 'i2s-controller', 'samsung,speaker-amplifier' -> 'audio-amplifier',
- - added 'audio-codec' property.
----
- .../bindings/sound/samsung,tm2-audio.txt           | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/samsung,tm2-audio.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/samsung,tm2-audio.txt b/Documentation/devicetree/bindings/sound/samsung,tm2-audio.txt
-new file mode 100644
-index 0000000..94442e5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/samsung,tm2-audio.txt
-@@ -0,0 +1,38 @@
-+Samsung Exynos5433 TM2(E) audio complex with WM5110 codec
-+
-+Required properties:
-+
-+ - compatible		 : "samsung,tm2-audio"
-+ - model		 : the user-visible name of this sound complex
-+ - audio-codec		 : the phandle of the wm5110 audio codec node,
-+			   as described in ../mfd/arizona.txt
-+ - i2s-controller	 : the phandle of the I2S controller
-+ - audio-amplifier	 : the phandle of the MAX98504 amplifier
-+ - samsung,audio-routing : a list of the connections between audio components;
-+			   each entry is a pair of strings, the first being the
-+			   connection's sink, the second being the connection's
-+			   source; valid names for sources and sinks are the
-+			   WM5110's and MAX98504's pins and the jacks on the
-+			   board: HP, SPK, Main Mic, Sub Mic, Third Mic,
-+			   Headset Mic
-+ - mic-bias-gpios	 : GPIO pin that enables the Main Mic bias regulator
-+
-+
-+Example:
-+
-+sound {
-+	compatible = "samsung,tm2-audio";
-+	audio-codec = <&wm5110>;
-+	i2s-controller = <&i2s0>;
-+	audio-amplifier = <&max98504>;
-+	mic-bias-gpios = <&gpr3 2 0>;
-+	model = "wm5110";
-+	samsung,audio-routing =
-+		"HP", "HPOUT1L",
-+		"HP", "HPOUT1R",
-+		"SPK", "SPKOUT",
-+		"SPKOUT", "HPOUT2L",
-+		"SPKOUT", "HPOUT2R",
-+		"Main Mic", "MICBIAS2",
-+		"IN1R", "Main Mic";
-+};
---
-1.9.1
+Regards,
+Dave
