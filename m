@@ -1,37 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 2 Nov 2016 14:15:50 +0100
-Subject: [PATCH 1/3] ipmi/bt-bmc: change compatible node to 'aspeed,
- ast2400-ibt-bmc'
-In-Reply-To: <1478073426-3714-2-git-send-email-clg@kaod.org>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <1478073426-3714-2-git-send-email-clg@kaod.org>
-Message-ID: <201611021415.51081.arnd@arndb.de>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 2 Nov 2016 14:22:17 +0100
+Subject: [PATCH 3/5] ARM: multi_v7_defconfig: Remove
+ CONFIG_ST_THERMAL_MEMMAP Kconfig symbol
+In-Reply-To: <20161024101408.GA10440@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
+ <1477065443-10668-4-git-send-email-patrice.chotard@st.com>
+ <20161024101408.GA10440@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <4e1a0a27-d50e-b577-f617-025d55588157@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 02 November 2016, C?dric Le Goater wrote:
-> The Aspeed SoCs have two BT interfaces : one is IPMI compliant and the
-> other is H8S/2168 compliant.
+
+
+On 10/24/2016 12:14 PM, Peter Griffin wrote:
+> Hi Patrice,
 > 
-> The current ipmi/bt-bmc driver implements the IPMI version and we
-> should reflect its nature in the compatible node name using
-> 'aspeed,ast2400-ibt-bmc' instead of 'aspeed,ast2400-bt-bmc'. The
-> latter should be used for a H8S interface driver if it is implemented
-> one day.
+> On Fri, 21 Oct 2016, patrice.chotard at st.com wrote:
 > 
-> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+>> From: Patrice Chotard <patrice.chotard@st.com>
+>>
+>> Driver code has been already removed, see
+>> http://www.spinics.net/lists/devicetree/msg143322.html
+>> Remove the multi_v7_defconfig part
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> Cc: <rui.zhang@intel.com>
+>> Cc: <edubezval@gmail.com>
+>> ---
+>>  arch/arm/configs/multi_v7_defconfig | 1 -
+>>  1 file changed, 1 deletion(-)
+>>
+>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+>> index 15b2f99..45e252b 100644
+>> --- a/arch/arm/configs/multi_v7_defconfig
+>> +++ b/arch/arm/configs/multi_v7_defconfig
+>> @@ -450,7 +450,6 @@ CONFIG_RCAR_THERMAL=y
+>>  CONFIG_ARMADA_THERMAL=y
+>>  CONFIG_DAVINCI_WATCHDOG=m
+>>  CONFIG_EXYNOS_THERMAL=m
+>> -CONFIG_ST_THERMAL_MEMMAP=y
+> 
 
-We generally try to avoid changing the compatible strings after the
-fact, but it's probably ok in this case.
+Hi Peter
 
-I don't understand who decides which of the two interfaces is used:
-is it the same register set that can be driven by either one or the
-other driver, or do you expect to have two drivers that can both
-be active in the same system and talk to different hardware once
-you get there?
+> Are you sure you want to remove this?
 
-If the first one of these is true, it seems a little awkward to
-use the DT compatible string to decide which driver to use rather
-than making the decision in the OS.
+Well spotted, you are right. It must be kept.
 
-	Arnd
+Thanks
+
+> 
+> This Kconfig symbol is still used for the stih407 family
+> thermal parts in drivers/thermal/st/st_thermal_memmap.c?
+> 
+> My patch only removed the stih415/6 parts from the driver.
+> 
+> regards,
+> 
+> Peter.
+> 
