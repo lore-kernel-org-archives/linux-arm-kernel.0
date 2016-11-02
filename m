@@ -1,149 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 2 Nov 2016 10:03:27 +0100
-Subject: [PATCH v3] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
-In-Reply-To: <20161101180008.6956-1-andre.przywara@arm.com>
-References: <20161101180008.6956-1-andre.przywara@arm.com>
-Message-ID: <20161102090327.GA4487@cbox>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Wed,  2 Nov 2016 10:08:16 +0100
+Subject: [PATCH] ARM: dts: am335x-baltos: don't reset gpio3 block
+Message-ID: <1478077696-21003-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 06:00:08PM +0000, Andre Przywara wrote:
-> In our VGIC implementation we limit the number of SPIs to a number
-> that the userland application told us. Accordingly we limit the
-> allocation of memory for virtual IRQs to that number.
-> However in our MMIO dispatcher we didn't check if we ever access an
-> IRQ beyond that limit, leading to out-of-bound accesses.
-> Add a test against the number of allocated SPIs in check_region().
-> Adjust the VGIC_ADDR_TO_INT macro to avoid an actual division, which
-> is not implemented on ARM(32).
-> 
-> [maz: cleaned-up original patch]
-> 
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+This change is needed in order to enable some hardware components
+from bootloader.
 
-> ---
-> Hi,
-> 
-> I checked that the old and new VGIC_ADDR_TO_INTID() algorithm give
-> identical results by moving it into a small userland unit-test, using
-> all <bits> values we use in the VGIC and calling it with quite some test
-> addresses. No differences were found.
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ arch/arm/boot/dts/am335x-baltos.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-nice.
-
--Christoffer
-
-> 
-> Changelog v2 .. v3:
-> - further simplify VGIC_ADDR_TO_INTID
-> - adjust VGIC_ADDR_TO_INTID comment
-> 
-> Changelog v1 .. v2:
-> - fix compilation for 32-bit ARM
-> 
->  virt/kvm/arm/vgic/vgic-mmio.c | 41 +++++++++++++++++++++++++++--------------
->  virt/kvm/arm/vgic/vgic-mmio.h | 14 +++++++-------
->  2 files changed, 34 insertions(+), 21 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index e18b30d..ebe1b9f 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -453,17 +453,33 @@ struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
->  	return container_of(dev, struct vgic_io_device, dev);
->  }
->  
-> -static bool check_region(const struct vgic_register_region *region,
-> +static bool check_region(const struct kvm *kvm,
-> +			 const struct vgic_register_region *region,
->  			 gpa_t addr, int len)
->  {
-> -	if ((region->access_flags & VGIC_ACCESS_8bit) && len == 1)
-> -		return true;
-> -	if ((region->access_flags & VGIC_ACCESS_32bit) &&
-> -	    len == sizeof(u32) && !(addr & 3))
-> -		return true;
-> -	if ((region->access_flags & VGIC_ACCESS_64bit) &&
-> -	    len == sizeof(u64) && !(addr & 7))
-> -		return true;
-> +	int flags, nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +
-> +	switch (len) {
-> +	case sizeof(u8):
-> +		flags = VGIC_ACCESS_8bit;
-> +		break;
-> +	case sizeof(u32):
-> +		flags = VGIC_ACCESS_32bit;
-> +		break;
-> +	case sizeof(u64):
-> +		flags = VGIC_ACCESS_64bit;
-> +		break;
-> +	default:
-> +		return false;
-> +	}
-> +
-> +	if ((region->access_flags & flags) && IS_ALIGNED(addr, len)) {
-> +		if (!region->bits_per_irq)
-> +			return true;
-> +
-> +		/* Do we access a non-allocated IRQ? */
-> +		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
-> +	}
->  
->  	return false;
->  }
-> @@ -477,7 +493,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  
->  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
->  				       addr - iodev->base_addr);
-> -	if (!region || !check_region(region, addr, len)) {
-> +	if (!region || !check_region(vcpu->kvm, region, addr, len)) {
->  		memset(val, 0, len);
->  		return 0;
->  	}
-> @@ -510,10 +526,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
->  
->  	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
->  				       addr - iodev->base_addr);
-> -	if (!region)
-> -		return 0;
-> -
-> -	if (!check_region(region, addr, len))
-> +	if (!region || !check_region(vcpu->kvm, region, addr, len))
->  		return 0;
->  
->  	switch (iodev->iodev_type) {
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 4c34d39..84961b4 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -50,15 +50,15 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
->  #define VGIC_ADDR_IRQ_MASK(bits) (((bits) * 1024 / 8) - 1)
->  
->  /*
-> - * (addr & mask) gives us the byte offset for the INT ID, so we want to
-> - * divide this with 'bytes per irq' to get the INT ID, which is given
-> - * by '(bits) / 8'.  But we do this with fixed-point-arithmetic and
-> - * take advantage of the fact that division by a fraction equals
-> - * multiplication with the inverted fraction, and scale up both the
-> - * numerator and denominator with 8 to support at most 64 bits per IRQ:
-> + * (addr & mask) gives us the _byte_ offset for the INT ID.
-> + * We multiply this by 8 the get the _bit_ offset, then divide this by
-> + * the number of bits to learn the actual INT ID.
-> + * But instead of a division (which requires a "long long div" implementation),
-> + * we shift by the binary logarithm of <bits>.
-> + * This assumes that <bits> is a power of two.
->   */
->  #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
-> -					64 / (bits) / 8)
-> +					8 >> ilog2(bits))
->  
->  /*
->   * Some VGIC registers store per-IRQ information, with a different number
-> -- 
-> 2.9.0
-> 
+diff --git a/arch/arm/boot/dts/am335x-baltos.dtsi b/arch/arm/boot/dts/am335x-baltos.dtsi
+index dd45d17..09b9541 100644
+--- a/arch/arm/boot/dts/am335x-baltos.dtsi
++++ b/arch/arm/boot/dts/am335x-baltos.dtsi
+@@ -406,3 +406,7 @@
+ &gpio0 {
+ 	ti,no-reset-on-init;
+ };
++
++&gpio3 {
++	ti,no-reset-on-init;
++};
+-- 
+2.1.4
