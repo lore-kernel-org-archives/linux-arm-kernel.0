@@ -1,32 +1,33 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  2 Nov 2016 15:18:48 +0100
-Subject: [PATCH v2 0/3] ARM: dts: oxnas: Update support for OX820 and use
- dt-bindings
-Message-ID: <20161102141850.25164-1-narmstrong@baylibre.com>
+Date: Wed,  2 Nov 2016 15:18:50 +0100
+Subject: [PATCH v2 2/2] MAINTAINERS: oxnas: Add new files definitions
+In-Reply-To: <20161102141850.25164-1-narmstrong@baylibre.com>
+References: <20161102141850.25164-1-narmstrong@baylibre.com>
+Message-ID: <20161102141850.25164-3-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset updates the ARM DTS for the Oxnas platform by :
-- Add support for the Oxford Semicondutor OX820 and the PogoPlug V3
-- Fix the MAINTAINERS entry and add the PogoPlug V3 file maintainance
+Fix the dts files maintained by the OXNAS platform, add a new board.
 
-Changes since v1 at http://lkml.kernel.org/r/20161021151037.20112-1-narmstrong at baylibre.com :
- - Due to a dt-bindings include dependency from clk and reset, the includes
- 	are removed for the next release, and will be re-introduced after next
-	merge window.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Neil Armstrong (2):
-  ARM: dts: Add support for OX820 and Pogoplug V3
-  MAINTAINERS: oxnas: Add new files definitions
-
- Documentation/devicetree/bindings/arm/oxnas.txt    |   5 +
- MAINTAINERS                                        |   3 +-
- arch/arm/boot/dts/Makefile                         |   3 +-
- .../boot/dts/cloudengines-pogoplug-series-3.dts    |  94 +++++++
- arch/arm/boot/dts/ox820.dtsi                       | 296 +++++++++++++++++++++
- 5 files changed, 399 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
- create mode 100644 arch/arm/boot/dts/ox820.dtsi
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1cd38a7..29d8853 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1478,8 +1478,9 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-oxnas at lists.tuxfamily.org (moderated for non-subscribers)
+ S:	Maintained
+ F:	arch/arm/mach-oxnas/
+-F:	arch/arm/boot/dts/oxnas*
++F:	arch/arm/boot/dts/ox8*.dtsi
+ F:	arch/arm/boot/dts/wd-mbwe.dts
++F:	arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
+ N:	oxnas
+ 
+ ARM/Mediatek RTC DRIVER
 -- 
 2.7.0
