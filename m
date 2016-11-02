@@ -1,54 +1,35 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 1 Nov 2016 17:07:41 -0700
-Subject: [PATCH v3 1/2] clk: imx: fix integer overflow in AV PLL round rate
-In-Reply-To: <CAOMZO5CLMtyZStgDzdiSHo9s8BhXyiapWqDx1L_TmMpH13043g@mail.gmail.com>
-References: <cover.1476267249.git.emil@limesaudio.com>
- <4d2e3a91dfb74209735c940b51d7efc9ba2ed69b.1476267249.git.emil@limesaudio.com>
- <20161028014127.GD16026@codeaurora.org>
- <CAOMZO5Co32XUpNFz4Hd2DEmNnMBvD5fKmsyjcmsgawea4dJR9g@mail.gmail.com>
- <20161028181316.GI16026@codeaurora.org>
- <CAOMZO5CLMtyZStgDzdiSHo9s8BhXyiapWqDx1L_TmMpH13043g@mail.gmail.com>
-Message-ID: <20161102000741.GY16026@codeaurora.org>
+Date: Tue, 1 Nov 2016 17:12:05 -0700
+Subject: [PATCH 3/3] clk: imx: clk-imx6ul: add clk support for imx6ull
+In-Reply-To: <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
+References: <1477969343-19887-1-git-send-email-peter.chen@nxp.com>
+ <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <20161102001205.GA16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28, Fabio Estevam wrote:
-> On Fri, Oct 28, 2016 at 4:13 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > The clk-fixes branch is for patches that fix problems in code
-> > merged during the merge window as well as small one-liners and
-> > things that are causing great pain for people on the latest
-> > release. Given that this fixes a regression in v4.8 and we're
-> > trying to stabilize v4.9 it looked like it could wait until
-> > v4.10.
-> 
-> The regression affects 4.8 and 4.9.
-> 
-> > So is there something going on here where the pain is too much to
-> > wait for the next merge window? If so the commit text should
-> 
-> Yes, people reported HDMI issues because of this bug:
-> https://www.spinics.net/lists/arm-kernel/msg535304.html
-> 
-> > mention something about what's causing that pain. Perhaps by
-> > referencing the commit that merged outside of clk tree that
-> > caused problems.
-> 
-> This patch clearly states that the problem is caused by ba7f4f557eb6
-> ("clk: imx: correct AV PLL rate formula").
+On 11/01, Peter Chen wrote:
+>  	clks[IMX6UL_CLK_USDHC1]		= imx_clk_gate2("usdhc1",	"usdhc1_podf",	 base + 0x80,	2);
+>  	clks[IMX6UL_CLK_USDHC2]		= imx_clk_gate2("usdhc2",	"usdhc2_podf",	 base + 0x80,	4);
+> -	clks[IMX6UL_CLK_SIM1]		= imx_clk_gate2("sim1",		"sim_sel",	 base + 0x80,	6);
+> -	clks[IMX6UL_CLK_SIM2]		= imx_clk_gate2("sim2",		"sim_sel",	 base + 0x80,	8);
+> +	if (clk_on_imx6ul()) {
+> +		clks[IMX6UL_CLK_SIM1]		= imx_clk_gate2("sim1",		"sim_sel",	 base + 0x80,	6);
+> +		clks[IMX6UL_CLK_SIM2]		= imx_clk_gate2("sim2",		"sim_sel",	 base + 0x80,	8);
+> +	}
+>  	clks[IMX6UL_CLK_EIM]		= imx_clk_gate2("eim",		"eim_slow_podf", base + 0x80,	10);
+>  	clks[IMX6UL_CLK_PWM8]		= imx_clk_gate2("pwm8",		"perclk",	 base + 0x80,	16);
+>  	clks[IMX6UL_CLK_UART8_IPG]	= imx_clk_gate2("uart8_ipg",	"ipg",		 base + 0x80,	14);
+> @@ -430,6 +478,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+>  	clk_set_rate(clks[IMX6UL_CLK_ENET_REF], 50000000);
+>  	clk_set_rate(clks[IMX6UL_CLK_ENET2_REF], 50000000);
+>  	clk_set_rate(clks[IMX6UL_CLK_CSI], 24000000);
+> +	clk_set_rate(clks[IMX6UL_CLK_PLL3_PFD2], 320000000);
 
-That commit isn't outside of clk tree :(
+Can you use assigned clock rates for this instead?
 
-> 
-> Since this is a regression, I don't understand why we need to wait
-> until 4.10 to get it applied.
-
-Because we're stabilizing the 4.9-rc series and not the 4.8-rc
-series and the assumption is people tested code no 4.8 before it
-was released. But in cases where that doesn't happen and the bugs
-cause problems with testing the latest rc series we just apply
-the patch. It sounds like in this case that happened, so I'll
-move this patch over to fixes.
+>  
+>  	/* keep all the clks on just for bringup */
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
