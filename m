@@ -1,66 +1,19 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed,  2 Nov 2016 13:08:08 -0400
-Subject: [PATCH v5 7/7] arm64: dts: NS2: add AMAC ethernet support
-In-Reply-To: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Wed, 2 Nov 2016 10:11:29 -0700
+Subject: [PATCH v5 1/7] net: phy: broadcom: add bcm54xx_auxctl_read
+In-Reply-To: <1478106488-11779-2-git-send-email-jon.mason@broadcom.com>
 References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1478106488-11779-8-git-send-email-jon.mason@broadcom.com>
+ <1478106488-11779-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <996f1a15-02ad-cc6f-4889-e4fe6a311639@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the AMAC ethernet to the Broadcom Northstar2 SoC device
-tree
+On 11/02/2016 10:08 AM, Jon Mason wrote:
+> Add a helper function to read the AUXCTL register for the BCM54xx.  This
+> mirrors the bcm54xx_auxctl_write function already present in the code.
+> 
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts |  5 +++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 12 ++++++++++++
- 2 files changed, 17 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index 2d7872a..2e4d90d 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -56,6 +56,10 @@
- 	};
- };
- 
-+&enet {
-+	status = "ok";
-+};
-+
- &pci_phy0 {
- 	status = "ok";
- };
-@@ -172,6 +176,7 @@
- &mdio_mux_iproc {
- 	mdio at 10 {
- 		gphy0: eth-phy at 10 {
-+			enet-phy-lane-swap;
- 			reg = <0x10>;
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index d95dc40..773ed59 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -191,6 +191,18 @@
- 
- 		#include "ns2-clock.dtsi"
- 
-+		enet: ethernet at 61000000 {
-+			compatible = "brcm,ns2-amac";
-+			reg = <0x61000000 0x1000>,
-+			      <0x61090000 0x1000>,
-+			      <0x61030000 0x100>;
-+			reg-names = "amac_base", "idm_base", "nicpm_base";
-+			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
-+			phy-handle = <&gphy0>;
-+			phy-mode = "rgmii";
-+			status = "disabled";
-+		};
-+
- 		dma0: dma at 61360000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x61360000 0x1000>;
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
-2.7.4
+Florian
