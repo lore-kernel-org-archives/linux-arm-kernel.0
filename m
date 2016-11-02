@@ -1,103 +1,31 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  2 Nov 2016 11:54:07 +0000
-Subject: [PATCH v1 5/6] ARM: gic-v3-its: Add 32bit support to GICv3 ITS
-In-Reply-To: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
-References: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1478087648-5346-6-git-send-email-vladimir.murzin@arm.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Wed,  2 Nov 2016 13:44:32 +0100
+Subject: [PATCH 0/3] fix ohci phy name
+Message-ID: <20161102124435.31777-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire-up flush_dcache, readq- and writeq-like gic-v3-its assessors, so
-GICv3 ITS gets all it needs to be built and run.
+The usb ohci clock match is not working because the usb clock
+is registered as "ohci" instead of "ohci.0"
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/include/asm/arch_gicv3.h |   54 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 47 insertions(+), 7 deletions(-)
+But since there is only a single ohci instance, lets pass -1 to
+the platform data id parameter and avoid the extra ".0" matching.
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index a808829..2747590 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -22,6 +22,7 @@
- 
- #include <linux/io.h>
- #include <asm/barrier.h>
-+#include <asm/cacheflush.h>
- #include <asm/cp15.h>
- 
- #define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
-@@ -230,19 +231,14 @@ static inline void gic_write_bpr1(u32 val)
-  * AArch32, since the syndrome register doesn't provide any information for
-  * them.
-  * Consequently, the following IO helpers use 32bit accesses.
-- *
-- * There are only two registers that need 64bit accesses in this driver:
-- * - GICD_IROUTERn, contain the affinity values associated to each interrupt.
-- *   The upper-word (aff3) will always be 0, so there is no need for a lock.
-- * - GICR_TYPER is an ID register and doesn't need atomicity.
-  */
--static inline void gic_write_irouter(u64 val, volatile void __iomem *addr)
-+static inline void __gic_writeq_nonatomic(u64 val, volatile void __iomem *addr)
- {
- 	writel_relaxed((u32)val, addr);
- 	writel_relaxed((u32)(val >> 32), addr + 4);
- }
- 
--static inline u64 gic_read_typer(const volatile void __iomem *addr)
-+static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
- {
- 	u64 val;
- 
-@@ -251,5 +247,49 @@ static inline u64 gic_read_typer(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define gic_flush_dcache_to_poc(a,l)    __cpuc_flush_dcache_area((a), (l))
-+
-+/*
-+ *  GICD_IROUTERn, contain the affinity values associated to each interrupt.
-+ *  The upper-word (aff3) will always be 0, so there is no need for a lock.
-+ */
-+#define gic_write_irouter(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GICR_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gic_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_BASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_baser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_baser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GICR_PENDBASER and GICR_PROPBASE are changed with LPIs disabled, so they
-+ * won't be being used during any updates and can be changed non-atomically
-+ */
-+#define gicr_read_propbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_propbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+#define gicr_read_pendbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_pendbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gits_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_CBASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_cbaser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_cbaser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_CWRITER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
-+
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
+while we are fixing this, rename the driver to "ohci-da8xx" to be
+consistent with davinci musb and other usb drivers.
+
+Axel Haslam (3):
+  ARM: davinci: da8xx: Fix ohci driver name
+  phy: da8xx-usb: rename the ohci device to ohci-da8xx
+  usb: ohci-da8xx: rename driver to ohci-da8xx
+
+ arch/arm/mach-davinci/da830.c     | 2 +-
+ arch/arm/mach-davinci/da850.c     | 2 +-
+ arch/arm/mach-davinci/da8xx-dt.c  | 2 +-
+ arch/arm/mach-davinci/usb-da8xx.c | 4 ++--
+ drivers/phy/phy-da8xx-usb.c       | 5 +++--
+ drivers/usb/host/ohci-da8xx.c     | 2 +-
+ 6 files changed, 9 insertions(+), 8 deletions(-)
+
 -- 
-1.7.9.5
+2.10.1
