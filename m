@@ -1,84 +1,78 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  2 Nov 2016 13:51:53 +0900
-Subject: [PATCH v27 1/9] memblock: add memblock_cap_memory_range()
+Date: Wed,  2 Nov 2016 13:52:43 +0900
+Subject: [PATCH v27 2/9] arm64: limit memory regions based on DT property,
+ usable-memory-range
 In-Reply-To: <20161102044959.11954-1-takahiro.akashi@linaro.org>
 References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
-Message-ID: <20161102045153.12008-1-takahiro.akashi@linaro.org>
+Message-ID: <20161102045249.12058-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add memblock_cap_memory_range() which will remove all the memblock regions
-except the range specified in the arguments.
+Crash dump kernel utilizes only a subset of available memory as System RAM.
+On arm64 kdump, This memory range is advertized to crash dump kernel via
+a device-tree property under /chosen,
+   linux,usable-memory-range = <BASE SIZE>
 
-This function, like memblock_mem_limit_remove_map(), will not remove
-memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
-later as "device memory."
-See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
-address the mem limit issue").
-
-This function is used, in a succeeding patch in the series of arm64 kdump
-suuport, to limit the range of usable memory, System RAM, on crash dump
-kernel.
-(Please note that "mem=" parameter is of little use for this purpose.)
+Crash dump kernel reads this property at boot time and calls
+memblock_cap_memory_range() to limit usable memory ranges which are
+described as entries in UEFI memory map table or "memory" nodes in
+a device tree blob.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: linux-mm at kvack.org
-Cc: Andrew Morton <akpm@linux-foundation.org>
+Reviewed-by: Geoff Levand <geoff@infradead.org>
 ---
- include/linux/memblock.h |  1 +
- mm/memblock.c            | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arch/arm64/mm/init.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-index 5b759c9..0e770af 100644
---- a/include/linux/memblock.h
-+++ b/include/linux/memblock.h
-@@ -334,6 +334,7 @@ phys_addr_t memblock_start_of_DRAM(void);
- phys_addr_t memblock_end_of_DRAM(void);
- void memblock_enforce_memory_limit(phys_addr_t memory_limit);
- void memblock_mem_limit_remove_map(phys_addr_t limit);
-+void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
- bool memblock_is_memory(phys_addr_t addr);
- int memblock_is_map_memory(phys_addr_t addr);
- int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
-diff --git a/mm/memblock.c b/mm/memblock.c
-index 7608bc3..eb53876 100644
---- a/mm/memblock.c
-+++ b/mm/memblock.c
-@@ -1544,6 +1544,34 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
- 			      (phys_addr_t)ULLONG_MAX);
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 212c4d1..65f1241 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -187,10 +187,45 @@ static int __init early_mem(char *p)
  }
+ early_param("mem", early_mem);
  
-+void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
++static int __init early_init_dt_scan_usablemem(unsigned long node,
++		const char *uname, int depth, void *data)
 +{
-+	int start_rgn, end_rgn;
-+	int i, ret;
++	struct memblock_region *usablemem = (struct memblock_region *)data;
++	const __be32 *reg;
++	int len;
 +
-+	if (!size)
-+		return;
++	usablemem->size = 0;
 +
-+	ret = memblock_isolate_range(&memblock.memory, base, size,
-+						&start_rgn, &end_rgn);
-+	if (ret)
-+		return;
++	if (depth != 1 || strcmp(uname, "chosen") != 0)
++		return 0;
 +
-+	/* remove all the MAP regions */
-+	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
-+		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-+			memblock_remove_region(&memblock.memory, i);
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
++	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
++		return 1;
 +
-+	for (i = start_rgn - 1; i >= 0; i--)
-+		if (!memblock_is_nomap(&memblock.memory.regions[i]))
-+			memblock_remove_region(&memblock.memory, i);
++	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
 +
-+	/* truncate the reserved regions */
-+	memblock_remove_range(&memblock.reserved, 0, base);
-+	memblock_remove_range(&memblock.reserved,
-+			base + size, (phys_addr_t)ULLONG_MAX);
++	return 1;
 +}
 +
- static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
++static void __init fdt_enforce_memory_region(void)
++{
++	struct memblock_region reg;
++
++	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
++
++	if (reg.size)
++		memblock_cap_memory_range(reg.base, reg.size);
++}
++
+ void __init arm64_memblock_init(void)
  {
- 	unsigned int left = 0, right = type->cnt;
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+ 
++	/* Handle linux,usable-memory-range property */
++	fdt_enforce_memory_region();
++
+ 	/*
+ 	 * Ensure that the linear region takes up exactly half of the kernel
+ 	 * virtual address space. This way, we can distinguish a linear address
 -- 
 2.10.0
