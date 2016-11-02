@@ -1,21 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Nov 2016 10:46:47 +0100
-Subject: [PATCH 01/11] ARM: shmobile: r8a7745: add power domain index
- macros
-In-Reply-To: <1645729.DjklObBkNM@wasted.cogentembedded.com>
+Date: Wed, 2 Nov 2016 10:49:08 +0100
+Subject: [PATCH 03/11] ARM: shmobile: r8a7745: basic SoC support
+In-Reply-To: <1638480.5pJxF7pUnz@wasted.cogentembedded.com>
 References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
- <1645729.DjklObBkNM@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdV+9LPmp5QL_sQ_Ob2H5NzcRASkeA6DoAP0TcrSS44nLA@mail.gmail.com>
+ <1638480.5pJxF7pUnz@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUGHET+b7eoyTeGo8vebxNvFWJsre-cLnk_i4BvgwjK_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 12:07 AM, Sergei Shtylyov
+On Sat, Oct 29, 2016 at 12:16 AM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add macros usable by the device tree sources to reference R8A7745 SYSC power
-> domains by index.
->
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
+> Add minimal support for the RZ/G1E (R8A7745) SoC.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
