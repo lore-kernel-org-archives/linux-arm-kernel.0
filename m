@@ -1,133 +1,54 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  2 Nov 2016 11:54:03 +0000
-Subject: [PATCH v1 1/6] irqchip/gic-v3-its: Change unsigned types for AArch32
- compatibility
+Date: Wed,  2 Nov 2016 11:54:04 +0000
+Subject: [PATCH v1 2/6] irqchip/gic-v3-its: Narrow down Entry Size when used
+ as a divider
 In-Reply-To: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
 References: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1478087648-5346-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1478087648-5346-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that constants which are supposed to be applied on 64-bit
-data is actually unsigned long long, so they won't be truncated when
-used in 32-bit mode.
+GITS_BASER<n>'s Entry Size is much smaller than 64-bit, but when it
+used as a divider it forces compiler to generate __aeabi_uldivmod if
+build in 32-bit mode. So, casting it to int (like it is done in other
+places) where used as a divider would give a hint to compiler that
+32-bit division can be used.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   |   28 ++++++++++++++--------------
- include/linux/irqchip/arm-gic-v3.h |    4 ++--
- 2 files changed, 16 insertions(+), 16 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c5dee30..bca125e 100644
+index bca125e..312dd55 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -196,7 +196,7 @@ struct its_cmd_block {
+@@ -948,7 +948,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
  
- static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
- {
--	cmd->raw_cmd[0] &= ~0xffUL;
-+	cmd->raw_cmd[0] &= ~0xffULL;
- 	cmd->raw_cmd[0] |= cmd_nr;
- }
- 
-@@ -208,43 +208,43 @@ static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
- 
- static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
- {
--	cmd->raw_cmd[1] &= ~0xffffffffUL;
-+	cmd->raw_cmd[1] &= ~0xffffffffULL;
- 	cmd->raw_cmd[1] |= id;
- }
- 
- static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
- {
--	cmd->raw_cmd[1] &= 0xffffffffUL;
-+	cmd->raw_cmd[1] &= 0xffffffffULL;
- 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
- }
- 
- static void its_encode_size(struct its_cmd_block *cmd, u8 size)
- {
--	cmd->raw_cmd[1] &= ~0x1fUL;
-+	cmd->raw_cmd[1] &= ~0x1fULL;
- 	cmd->raw_cmd[1] |= size & 0x1f;
- }
- 
- static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
- {
--	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
--	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
-+	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
-+	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
- }
- 
- static void its_encode_valid(struct its_cmd_block *cmd, int valid)
- {
--	cmd->raw_cmd[2] &= ~(1UL << 63);
-+	cmd->raw_cmd[2] &= ~(1ULL << 63);
- 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
- }
- 
- static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
- {
--	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
--	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
-+	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
-+	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
- }
- 
- static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
- {
--	cmd->raw_cmd[2] &= ~0xffffUL;
-+	cmd->raw_cmd[2] &= ~0xffffULL;
- 	cmd->raw_cmd[2] |= col;
- }
- 
-@@ -657,8 +657,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	its = its_dev->its;
- 	addr = its->phys_base + GITS_TRANSLATER;
- 
--	msg->address_lo		= addr & ((1UL << 32) - 1);
--	msg->address_hi		= addr >> 32;
-+	msg->address_lo		= lower_32_bits(addr);
-+	msg->address_hi		= upper_32_bits(addr);
- 	msg->data		= its_get_event_id(d);
- 
- 	iommu_dma_map_msi_msg(d->irq, msg);
-@@ -935,9 +935,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+-		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / tmp),
++		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+ 		its_base_type_string[type],
+ 		(unsigned long)virt_to_phys(base),
+ 		indirect ? "indirect" : "flat", (int)esz,
+@@ -983,7 +983,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 			 * which is reported by ITS hardware times lvl1 table
+ 			 * entry size.
+ 			 */
+-			ids -= ilog2(psz / esz);
++			ids -= ilog2(psz / (int)esz);
+ 			esz = GITS_LVL1_ENTRY_SIZE;
+ 		}
  	}
- 
- 	if (val != tmp) {
--		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
-+		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
- 		       &its->phys_base, its_base_type_string[type],
--		       (unsigned long) val, (unsigned long) tmp);
-+		       val, tmp);
- 		free_pages((unsigned long)base, order);
- 		return -ENXIO;
+@@ -998,7 +998,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 	new_order = max_t(u32, get_order(esz << ids), new_order);
+ 	if (new_order >= MAX_ORDER) {
+ 		new_order = MAX_ORDER - 1;
+-		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / esz);
++		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
+ 		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
+ 			&its->phys_base, its->device_ids, ids);
  	}
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index b7e3431..5118d3a 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -239,7 +239,7 @@
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
- 
--#define GITS_CBASER_VALID			(1UL << 63)
-+#define GITS_CBASER_VALID			(1ULL << 63)
- #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
- #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
- #define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
-@@ -265,7 +265,7 @@
- 
- #define GITS_BASER_NR_REGS		8
- 
--#define GITS_BASER_VALID			(1UL << 63)
-+#define GITS_BASER_VALID			(1ULL << 63)
- #define GITS_BASER_INDIRECT			(1ULL << 62)
- 
- #define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
 -- 
 1.7.9.5
