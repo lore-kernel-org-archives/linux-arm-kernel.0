@@ -1,20 +1,24 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 2 Nov 2016 15:40:35 +0800
-Subject: [PATCH v2 0/5] ARM: dts: imx: update Boundary Devices boards
- support
-In-Reply-To: <20161101171006.24594-1-gary.bisson@boundarydevices.com>
-References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
- <20161101171006.24594-1-gary.bisson@boundarydevices.com>
-Message-ID: <20161102074032.GB19126@dragon>
+From: wulf@rock-chips.com (William Wu)
+Date: Wed,  2 Nov 2016 15:42:16 +0800
+Subject: [PATCH 0/2] support USB2 PHY OTG port for rk3399
+Message-ID: <1478072538-32081-1-git-send-email-wulf@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 06:10:01PM +0100, Gary Bisson wrote:
-> Gary Bisson (5):
->   ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2 support
->   ARM: dts: imx6qdl-sabrelite: use hyphens for nodes name
->   ARM: dts: imx6qdl-nitrogen6x: use hyphens for nodes name
->   ARM: dts: imx6qdl-nit6xlite: use hyphens for nodes name
->   ARM: dts: imx6qdl-nitrogen6_max: use hyphens for nodes name
+This series add support for rk3399 USB2 PHY0 and PHY1 OTG port.
+rk3399 has two USB2 PHYs, and each USB2 PHY is comprised of one
+Host port and one OTG port. We have supported Host port before,
+and try to support OTG port now.
 
-Applied all, thanks.
+Test on rk3399-evb board.
+
+William Wu (2):
+  phy: rockchip-inno-usb2: support otg-port for rk3399
+  arm64: dts: rockchip: add usb2-phy otg-port support for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi |  21 ++
+ drivers/phy/phy-rockchip-inno-usb2.c     | 609 +++++++++++++++++++++++++++++--
+ 2 files changed, 599 insertions(+), 31 deletions(-)
+
+-- 
+2.0.0
