@@ -1,75 +1,35 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Wed, 2 Nov 2016 17:21:48 +0800
-Subject: [PATCH v2] iio: adc: at91: add suspend and resume callback
-Message-ID: <1478078508-24541-1-git-send-email-wenyou.yang@atmel.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  2 Nov 2016 10:23:40 +0100
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.10
+Message-ID: <cover.1478078567.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend/resume callback, support the pinctrl sleep state when
-the system suspend as well.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
+Please consider these Renesas ARM64 based SoC defconfig updates for v4.10.
 
-Changes in v2:
- - Use CONFIG_PM_SLEEP.
- - Use SIMPLE_DEV_PM_OPS macro.
 
- drivers/iio/adc/at91_adc.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-index bbdac07..34b928c 100644
---- a/drivers/iio/adc/at91_adc.c
-+++ b/drivers/iio/adc/at91_adc.c
-@@ -30,6 +30,7 @@
- #include <linux/iio/trigger.h>
- #include <linux/iio/trigger_consumer.h>
- #include <linux/iio/triggered_buffer.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /* Registers */
- #define AT91_ADC_CR		0x00		/* Control Register */
-@@ -1347,6 +1348,32 @@ static int at91_adc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int at91_adc_suspend(struct device *dev)
-+{
-+	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-+	struct at91_adc_state *st = iio_priv(idev);
-+
-+	pinctrl_pm_select_sleep_state(dev);
-+	clk_disable_unprepare(st->clk);
-+
-+	return 0;
-+}
-+
-+static int at91_adc_resume(struct device *dev)
-+{
-+	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-+	struct at91_adc_state *st = iio_priv(idev);
-+
-+	clk_prepare_enable(st->clk);
-+	pinctrl_pm_select_default_state(dev);
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
-+
- static struct at91_adc_caps at91sam9260_caps = {
- 	.calc_startup_ticks = calc_startup_ticks_9260,
- 	.num_channels = 4,
-@@ -1441,6 +1468,7 @@ static struct platform_driver at91_adc_driver = {
- 	.driver = {
- 		   .name = DRIVER_NAME,
- 		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
-+		   .pm = &at91_adc_pm_ops,
- 	},
- };
- 
--- 
-2.7.4
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.10
+
+for you to fetch changes up to 833c97254724a620d1d9fb9a580681fb52536fbf:
+
+  arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules (2016-10-27 09:07:35 +0200)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC Defconfig Updates for v4.10
+
+* Enable R-Car DU and related drivers as modules in defconfig
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules
+
+ arch/arm64/configs/defconfig | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
