@@ -1,57 +1,137 @@
-From: adouglas@cadence.com (Alan Douglas)
-Date: Wed, 2 Nov 2016 09:36:14 +0000
-Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS
- MAPD?
-In-Reply-To: <861syvkqcr.fsf@arm.com>
-References: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
- <861syvkqcr.fsf@arm.com>
-Message-ID: <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 2 Nov 2016 09:37:13 +0000
+Subject: [PATCH v2 2/3] efi/libstub: add random.c to ARM build
+In-Reply-To: <1476962486-18368-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1476962486-18368-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1476962486-18368-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_=et=2zHBTYOr9thz2kS0cXHHYg96oWGRdD3D10fqXtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 20 October 2016 at 12:21, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Make random.c build for ARM by moving the fallback definition of
+> EFI_ALLOC_ALIGN to efistub.h
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/libstub/Makefile          | 4 ++--
+>  drivers/firmware/efi/libstub/efi-stub-helper.c | 9 ---------
+>  drivers/firmware/efi/libstub/efistub.h         | 9 +++++++++
+>  3 files changed, 11 insertions(+), 11 deletions(-)
+>
 
-> > When setting up bus 0, the ITS device is created, and
-> > its_build_map_cmd() sets the size of the ITS MAPD based on the number
-> > of interrupts claimed by bus 0.  When subsequent buses are enumerated,
-> > the ITS device will be reused, however we do not increase the number
-> > of supported interrupts to allow for the additional interrupts claimed
-> > by the additional devices being enumerated.  (This can be seen in
-> > its_msi_prepare(), which is called for each device which has MSI/MSI-X
-> > enabled, and will reuse an existing ITS. )
-> 
-> Am I right in understanding that all the PCIe devices in your system end-up
-> aliasing to the same RequesterID? If so, that's a major issue. The ITS is
-> designed so that each device exposes its *own* RID, and have its own
-> Interrupt Translation Table (ITT).
-> 
-> In your case, you seem to first discover the root port, which is not upstream
-> of anything, so it doesn't alias with anything at that point. We allocate the
-> corresponding ITT, and it's all fine. Until we start probing the rest, and ugly
-> things happen.
-> 
-Yes, your understanding is correct.  I will dig into this a bit further to see what
-is wrong then send an update.  I suspect my DTS msi mapping.
+I need the following hunks on top to make this build on ARM:
 
-> > The solution I have implemented is in its_alloc_device_irq(), if the
-> > offset into the LPI table for the allocated interrupt is greater than
-> > the ITS MAPD, I reallocate the itt area, and resize the ITS MAPD.  I'm
-> > looking for comments as to whether this is a suitable solution and I
-> > should submit as a patch, is there some other recommendation or am I
-> > missing something regarding reuse of the ITS?
-> 
-> Not seeing the patch doesn't help, but in general reallocating an ITT implies
-> unmapping everything at the ITS level (LPIs, devices), recreating the ITT,
-> remapping everything, and then replaying fake interrupts to cater for
-> anything that you;ve missed in between. Not exactly fun.
-> 
-> So before we have to introduce all of this, it would be good to find out
-> *why* are all the devices aliased together. Because this completely screws
-> all the ITS isolation, and makes device assignment to guest VM completely
-> insecure.
-OK, understood.  My current patch doesn't deal with all the issues you point out,
-but I will concentrate on avoiding the re-use instead.   Thanks for clarifying that
-this re-use is not expected in my case.
+""
+--- a/drivers/firmware/efi/libstub/random.c
++++ b/drivers/firmware/efi/libstub/random.c
+@@ -8,6 +8,7 @@
+  */
+
+ #include <linux/efi.h>
++#include <linux/log2.h>
+ #include <asm/efi.h>
+
+ #include "efistub.h"
+@@ -41,8 +42,9 @@
+  */
+ static unsigned long get_entry_num_slots(efi_memory_desc_t *md,
+                                         unsigned long size,
+-                                        unsigned long align)
++                                        unsigned long align_shift)
+ {
++       unsigned long align = 1UL << align_shift;
+        u64 start, end;
+
+        if (md->type != EFI_CONVENTIONAL_MEMORY)
+@@ -55,7 +57,7 @@
+        if (start > end)
+                return 0;
+
+-       return (end - start + 1) / align;
++       return (end - start + 1) >> align_shift;
+ }
+
+ /*
+@@ -98,7 +100,7 @@
+                efi_memory_desc_t *md = (void *)memory_map + map_offset;
+                unsigned long slots;
+
+-               slots = get_entry_num_slots(md, size, align);
++               slots = get_entry_num_slots(md, size, ilog2(align));
+                MD_NUM_SLOTS(md) = slots;
+                total_slots += slots;
+        }
+"""
+
+This is because ARM does not have a division routine in the
+decompressor, and the fact that the division by 'align' should always
+involve a power of 2 is not visible to the compiler.
+
+If nobody objects, I will fold this in when applying
 
 Thanks,
-Alan
+Ard.
+
+
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index c06945160a41..40ddf8f763a8 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -36,11 +36,11 @@ arm-deps := fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c sort.c
+>  $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
+>         $(call if_changed_rule,cc_o_c)
+>
+> -lib-$(CONFIG_EFI_ARMSTUB)      += arm-stub.o fdt.o string.o \
+> +lib-$(CONFIG_EFI_ARMSTUB)      += arm-stub.o fdt.o string.o random.o \
+>                                    $(patsubst %.c,lib-%.o,$(arm-deps))
+>
+>  lib-$(CONFIG_ARM)              += arm32-stub.o
+> -lib-$(CONFIG_ARM64)            += arm64-stub.o random.o
+> +lib-$(CONFIG_ARM64)            += arm64-stub.o
+>  CFLAGS_arm64-stub.o            := -DTEXT_OFFSET=$(TEXT_OFFSET)
+>
+>  #
+> diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> index aded10662020..3c2fe209bbfe 100644
+> --- a/drivers/firmware/efi/libstub/efi-stub-helper.c
+> +++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+> @@ -32,15 +32,6 @@
+>
+>  static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
+>
+> -/*
+> - * Allow the platform to override the allocation granularity: this allows
+> - * systems that have the capability to run with a larger page size to deal
+> - * with the allocations for initrd and fdt more efficiently.
+> - */
+> -#ifndef EFI_ALLOC_ALIGN
+> -#define EFI_ALLOC_ALIGN                EFI_PAGE_SIZE
+> -#endif
+> -
+>  #define EFI_MMAP_NR_SLACK_SLOTS        8
+>
+>  struct file_info {
+> diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+> index ee49cd23ee63..fe1f22584c69 100644
+> --- a/drivers/firmware/efi/libstub/efistub.h
+> +++ b/drivers/firmware/efi/libstub/efistub.h
+> @@ -15,6 +15,15 @@
+>   */
+>  #undef __init
+>
+> +/*
+> + * Allow the platform to override the allocation granularity: this allows
+> + * systems that have the capability to run with a larger page size to deal
+> + * with the allocations for initrd and fdt more efficiently.
+> + */
+> +#ifndef EFI_ALLOC_ALIGN
+> +#define EFI_ALLOC_ALIGN                EFI_PAGE_SIZE
+> +#endif
+> +
+>  void efi_char16_printk(efi_system_table_t *, efi_char16_t *);
+>
+>  efi_status_t efi_open_volume(efi_system_table_t *sys_table_arg, void *__image,
+> --
+> 2.7.4
+>
