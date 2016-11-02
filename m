@@ -1,88 +1,39 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  2 Nov 2016 13:54:25 +0900
-Subject: [PATCH v27 9/9] Documentation: dt: chosen properties for arm64 kdump
-In-Reply-To: <20161102044959.11954-1-takahiro.akashi@linaro.org>
-References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
-Message-ID: <20161102045425.12126-1-takahiro.akashi@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 2 Nov 2016 13:28:20 +0800
+Subject: [PATCH v2] ARM: at91/dt: add dts file for sama5d36ek CMP board
+In-Reply-To: <1478055958-8463-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <201611021345.WcgqcfPD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Hi Wenyou,
 
-Add documentation for
-	linux,crashkernel-base and crashkernel-size,
-	linux,usable-memory-range
-	linux,elfcorehdr
-used by arm64 kdump to decribe the kdump reserved area, and
-the elfcorehdr's location within it.
+[auto build test ERROR on at91/at91-next]
+[also build test ERROR on v4.9-rc3 next-20161028]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: James Morse <james.morse@arm.com>
-[takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+url:    https://github.com/0day-ci/linux/commits/Wenyou-Yang/ARM-at91-dt-add-dts-file-for-sama5d36ek-CMP-board/20161102-111152
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/sama5d3xmb_cmp.dtsi:143.17-18 syntax error
+   FATAL ERROR: Unable to parse input tree
+
 ---
- Documentation/devicetree/bindings/chosen.txt | 50 ++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-index 6ae9d82..7b11516 100644
---- a/Documentation/devicetree/bindings/chosen.txt
-+++ b/Documentation/devicetree/bindings/chosen.txt
-@@ -52,3 +52,53 @@ This property is set (currently only on PowerPC, and only needed on
- book3e) by some versions of kexec-tools to tell the new kernel that it
- is being booted by kexec, as the booting environment may differ (e.g.
- a different secondary CPU release mechanism)
-+
-+linux,crashkernel-base
-+linux,crashkernel-size
-+----------------------
-+
-+These properties (currently used on PowerPC and arm64) indicates
-+the base address and the size, respectively, of the reserved memory
-+range for crash dump kernel.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,crashkernel-base = <0x9 0xf0000000>;
-+		linux,crashkernel-size = <0x0 0x10000000>;
-+	};
-+};
-+
-+linux,usable-memory-range
-+-------------------------
-+
-+This property (currently used only on arm64) holds the memory range,
-+the base address and the size, which can be used as system ram on
-+the *current* kernel. Note that, if this property is present, any memory
-+regions under "memory" nodes in DT blob or ones marked as "conventional
-+memory" in EFI memory map should be ignored.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
-+	};
-+};
-+
-+The main usage is for crash dump kernel to identify its own usable
-+memory and exclude, at its boot time, any other memory areas that are
-+part of the panicked kernel's memory.
-+
-+linux,elfcorehdr
-+----------------
-+
-+This property (currently used only on arm64) holds the memory range,
-+the address and the size, of the elf core header which mainly describes
-+the panicked kernel's memory layout as PT_LOAD segments of elf format.
-+e.g.
-+
-+/ {
-+	chosen {
-+		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
-+	};
-+};
--- 
-2.10.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21326 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/e70be8e1/attachment-0001.gz>
