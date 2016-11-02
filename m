@@ -1,28 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 1 Nov 2016 17:30:58 -0700
-Subject: [PATCH] clk: lpc32xx: add a quirk for PWM and MS clock dividers
-In-Reply-To: <1475803015-4067-1-git-send-email-vz@mleia.com>
-References: <1475803015-4067-1-git-send-email-vz@mleia.com>
-Message-ID: <20161102003058.GH16026@codeaurora.org>
+Date: Tue, 1 Nov 2016 17:32:50 -0700
+Subject: [PATCH] clk: nxp: clk-lpc18xx-ccu: Unmap region obtained by
+ of_iomap
+In-Reply-To: <1474367987-15808-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1474367987-15808-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20161102003250.GI16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07, Vladimir Zapolskiy wrote:
-> In common clock framework CLK_DIVIDER_ONE_BASED or'ed with
-> CLK_DIVIDER_ALLOW_ZERO flags indicates that
-> 1) a divider clock may be set to zero value,
-> 2) divider's zero value is interpreted as a non-divided clock.
+On 09/20, Arvind Yadav wrote:
+> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > 
-> On the LPC32xx platform clock dividers of PWM and memory card clocks
-> comply with the first condition, but zero value means a gated clock,
-> thus it may happen that the divider value is not updated when
-> the clock is enabled and the clock remains gated.
+> Free memory mapping, if lpc18xx_ccu_init is not successful.
 > 
-> The change adds one-shot quirks, which check for zero value of divider
-> on initialization and set it to a non-zero value, therefore in runtime
-> a gate clock will work as expected.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
 
 Applied to clk-next
