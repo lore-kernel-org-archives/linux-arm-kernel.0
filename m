@@ -1,51 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Nov 2016 11:12:11 +0100
-Subject: [PATCH 06/11] ARM: dts: r8a7745: add [H]SCIF{A|B} support
-In-Reply-To: <2366203.iKt2DUneo7@wasted.cogentembedded.com>
-References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
- <2366203.iKt2DUneo7@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUZULyFwAoteXf+g=RWP=gBs0jDMVGpNUT_A=kPdDwSYQ@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Wed, 2 Nov 2016 11:14:35 +0100
+Subject: [PATCH V7 2/6] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <87eg35snvg.fsf@eliezer.anholt.net>
+References: <1474446227-1147-1-git-send-email-kernel@martin.sperl.org>
+ <1474446227-1147-3-git-send-email-kernel@martin.sperl.org>
+ <87twczg27x.fsf@eliezer.anholt.net>
+ <eaff4043-5a62-da2d-cee1-9962b8c4783a@i2se.com>
+ <87eg35snvg.fsf@eliezer.anholt.net>
+Message-ID: <F7D54C7C-FD75-4F66-AF67-CD5C302EEECC@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 12:19 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe [H]SCIF{|A|B} ports in the R8A7745 device tree.
->
-> Based on the original (and large) patch by Dmitry Shifrin
-> <dmitry.shifrin@cogentembedded.com>.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-After you've fixed the family-specific compatible values:
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> On 24.10.2016, at 18:38, Eric Anholt <eric@anholt.net> wrote:
+> 
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+> 
+>> Hi Martin,
+>> 
+>> i think it's necessary to rebase the whole series. Maybe we could get it
+>> into 4.10.
+> 
+> Why would it need to be rebased?  The status, as far as I know, is that
+> we're still waiting for the subsystem maintainer to respond.
 
-> ---
->  arch/arm/boot/dts/r8a7745.dtsi |  261 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 261 insertions(+)
->
-> Index: renesas/arch/arm/boot/dts/r8a7745.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7745.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7745.dtsi
-> @@ -157,6 +157,267 @@
->                         #dma-cells = <1>;
->                         dma-channels = <15>;
->                 };
-> +
-> +               scifa0: serial at e6c40000 {
-> +                       compatible = "renesas,scifa-r8a7745",
-> +                                    "renesas,rzg-scifa", "renesas,scifa";
+Sending out a rebased version 8 (specifically needed for patch 2 and 6).
 
-s/renesas,rzg-/renesas,rcar-gen2-/g
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Martin
