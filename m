@@ -1,73 +1,176 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 02 Nov 2016 10:47:03 -0600
-Subject: Applied "ASoC: dapm: Introduce DAPM_DOUBLE dual channel control type"
- to the asoc tree
-In-Reply-To: <20161003110804.28235-4-wens@csie.org>
-Message-ID: <E1c1ygp-00069E-3q@finisterre>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 2 Nov 2016 12:53:20 -0400
+Subject: [PATCH v4 6/7] net: ethernet: bgmac: add NS2 support
+In-Reply-To: <20161101210512.GB27191@broadcom.com>
+References: <1478030682-27012-1-git-send-email-jon.mason@broadcom.com>
+ <1478030682-27012-7-git-send-email-jon.mason@broadcom.com>
+ <711f4964-e655-4007-9804-f45bd47fed73@broadcom.com>
+ <20161101210512.GB27191@broadcom.com>
+Message-ID: <20161102164952.GA11677@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Tue, Nov 01, 2016 at 05:05:13PM -0400, Jon Mason wrote:
+> On Tue, Nov 01, 2016 at 01:34:30PM -0700, Scott Branden wrote:
+> > One change in this patch
+> > 
+> > On 16-11-01 01:04 PM, Jon Mason wrote:
+> > >Add support for the variant of amac hardware present in the Broadcom
+> > >Northstar2 based SoCs.  Northstar2 requires an additional register to be
+> > >configured with the port speed/duplexity (NICPM).  This can be added to
+> > >the link callback to hide it from the instances that do not use this.
+> > >Also, clearing of the pending interrupts on init is required due to
+> > >observed issues on some platforms.
+> > >
+> > >Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> > >---
+> > > drivers/net/ethernet/broadcom/bgmac-platform.c | 56 +++++++++++++++++++++++++-
+> > > drivers/net/ethernet/broadcom/bgmac.c          |  3 ++
+> > > drivers/net/ethernet/broadcom/bgmac.h          |  1 +
+> > > 3 files changed, 58 insertions(+), 2 deletions(-)
+> > >
+> > >diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
+> > >index aed5dc5..f6d48c7 100644
+> > >--- a/drivers/net/ethernet/broadcom/bgmac-platform.c
+> > >+++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
+> > >@@ -14,12 +14,21 @@
+> > > #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
+> > >
+> > > #include <linux/bcma/bcma.h>
+> > >+#include <linux/brcmphy.h>
+> > > #include <linux/etherdevice.h>
+> > > #include <linux/of_address.h>
+> > > #include <linux/of_mdio.h>
+> > > #include <linux/of_net.h>
+> > > #include "bgmac.h"
+> > >
+> > >+#define NICPM_IOMUX_CTRL		0x00000008
+> > >+
+> > >+#define NICPM_IOMUX_CTRL_INIT_VAL	0x3196e000
+> > >+#define NICPM_IOMUX_CTRL_SPD_SHIFT	10
+> > >+#define NICPM_IOMUX_CTRL_SPD_10M	0
+> > >+#define NICPM_IOMUX_CTRL_SPD_100M	1
+> > >+#define NICPM_IOMUX_CTRL_SPD_1000M	2
+> > >+
+> > > static u32 platform_bgmac_read(struct bgmac *bgmac, u16 offset)
+> > > {
+> > > 	return readl(bgmac->plat.base + offset);
+> > >@@ -87,12 +96,46 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
+> > > 	WARN_ON(1);
+> > > }
+> > >
+> > >+static void bgmac_nicpm_speed_set(struct net_device *net_dev)
+> > >+{
+> > >+	struct bgmac *bgmac = netdev_priv(net_dev);
+> > >+	u32 val;
+> > >+
+> > >+	if (!bgmac->plat.nicpm_base)
+> > >+		return;
+> > >+
+> > >+	val = NICPM_IOMUX_CTRL_INIT_VAL;
+> > >+	switch (bgmac->net_dev->phydev->speed) {
+> > >+	default:
+> > >+		pr_err("Unsupported speed.  Defaulting to 1000Mb\n");
+> > This should be dev_err
+> 
+> It should probably be netdev_err (and there are a few instances below
+> that should probably be changed to netdev_err as well).
 
-   ASoC: dapm: Introduce DAPM_DOUBLE dual channel control type
+Actually, the other instances I referenced above should not be
+netdev_err, as they are enountered before the netdev is created.  So,
+dev_err is correct for them.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+That being said, the original pr_err that Scott referenced should be
+netdev_err (as it is encountered after the netdev is created).  v5 will
+make that change.
 
 Thanks,
-Mark
+Jon
 
->From 9ee7ef31b5a07cdca88cae023c613e045af935b9 Mon Sep 17 00:00:00 2001
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Wed, 2 Nov 2016 15:36:00 +0800
-Subject: [PATCH] ASoC: dapm: Introduce DAPM_DOUBLE dual channel control type
-
-A DAPM_DOUBLE control type can be used for dual channel mixer input
-selectors / mute controls in one register, possibly toggling both
-channels together.
-
-The control is meant to be shared by 2 widgets, 1 for each channel,
-such that the mixer control exposed to userspace remains a combined
-stereo control.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- include/sound/soc-dapm.h | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/include/sound/soc-dapm.h b/include/sound/soc-dapm.h
-index d5f4677776ce..f74ec19687f8 100644
---- a/include/sound/soc-dapm.h
-+++ b/include/sound/soc-dapm.h
-@@ -272,6 +272,11 @@ struct device;
- 
- 
- /* dapm kcontrol types */
-+#define SOC_DAPM_DOUBLE(xname, reg, lshift, rshift, max, invert) \
-+{	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
-+	.info = snd_soc_info_volsw, \
-+	.get = snd_soc_dapm_get_volsw, .put = snd_soc_dapm_put_volsw, \
-+	.private_value = SOC_DOUBLE_VALUE(reg, lshift, rshift, max, invert, 0) }
- #define SOC_DAPM_SINGLE(xname, reg, shift, max, invert) \
- {	.iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
- 	.info = snd_soc_info_volsw, \
--- 
-2.10.1
+> 
+> Thanks,
+> Jon
+> 
+> > >+	case SPEED_1000:
+> > >+		val |= NICPM_IOMUX_CTRL_SPD_1000M << NICPM_IOMUX_CTRL_SPD_SHIFT;
+> > >+		break;
+> > >+	case SPEED_100:
+> > >+		val |= NICPM_IOMUX_CTRL_SPD_100M << NICPM_IOMUX_CTRL_SPD_SHIFT;
+> > >+		break;
+> > >+	case SPEED_10:
+> > >+		val |= NICPM_IOMUX_CTRL_SPD_10M << NICPM_IOMUX_CTRL_SPD_SHIFT;
+> > >+		break;
+> > >+	}
+> > >+
+> > >+	writel(val, bgmac->plat.nicpm_base + NICPM_IOMUX_CTRL);
+> > >+
+> > >+	bgmac_adjust_link(bgmac->net_dev);
+> > >+}
+> > >+
+> > > static int platform_phy_connect(struct bgmac *bgmac)
+> > > {
+> > > 	struct phy_device *phy_dev;
+> > >
+> > >-	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
+> > >-					 bgmac_adjust_link);
+> > >+	if (bgmac->plat.nicpm_base)
+> > >+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
+> > >+						 bgmac->dev->of_node,
+> > >+						 bgmac_nicpm_speed_set);
+> > >+	else
+> > >+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
+> > >+						 bgmac->dev->of_node,
+> > >+						 bgmac_adjust_link);
+> > > 	if (!phy_dev) {
+> > > 		dev_err(bgmac->dev, "Phy connect failed\n");
+> > > 		return -ENODEV;
+> > >@@ -182,6 +225,14 @@ static int bgmac_probe(struct platform_device *pdev)
+> > > 	if (IS_ERR(bgmac->plat.idm_base))
+> > > 		return PTR_ERR(bgmac->plat.idm_base);
+> > >
+> > >+	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nicpm_base");
+> > >+	if (regs) {
+> > >+		bgmac->plat.nicpm_base = devm_ioremap_resource(&pdev->dev,
+> > >+							       regs);
+> > >+		if (IS_ERR(bgmac->plat.nicpm_base))
+> > >+			return PTR_ERR(bgmac->plat.nicpm_base);
+> > >+	}
+> > >+
+> > > 	bgmac->read = platform_bgmac_read;
+> > > 	bgmac->write = platform_bgmac_write;
+> > > 	bgmac->idm_read = platform_bgmac_idm_read;
+> > >@@ -213,6 +264,7 @@ static int bgmac_remove(struct platform_device *pdev)
+> > > static const struct of_device_id bgmac_of_enet_match[] = {
+> > > 	{.compatible = "brcm,amac",},
+> > > 	{.compatible = "brcm,nsp-amac",},
+> > >+	{.compatible = "brcm,ns2-amac",},
+> > > 	{},
+> > > };
+> > >
+> > >diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
+> > >index 4584958..a805cc8 100644
+> > >--- a/drivers/net/ethernet/broadcom/bgmac.c
+> > >+++ b/drivers/net/ethernet/broadcom/bgmac.c
+> > >@@ -1082,6 +1082,9 @@ static void bgmac_enable(struct bgmac *bgmac)
+> > > /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipinit */
+> > > static void bgmac_chip_init(struct bgmac *bgmac)
+> > > {
+> > >+	/* Clear any erroneously pending interrupts */
+> > >+	bgmac_write(bgmac, BGMAC_INT_STATUS, ~0);
+> > >+
+> > > 	/* 1 interrupt per received frame */
+> > > 	bgmac_write(bgmac, BGMAC_INT_RECV_LAZY, 1 << BGMAC_IRL_FC_SHIFT);
+> > >
+> > >diff --git a/drivers/net/ethernet/broadcom/bgmac.h b/drivers/net/ethernet/broadcom/bgmac.h
+> > >index ea52ac3..b1820ea 100644
+> > >--- a/drivers/net/ethernet/broadcom/bgmac.h
+> > >+++ b/drivers/net/ethernet/broadcom/bgmac.h
+> > >@@ -463,6 +463,7 @@ struct bgmac {
+> > > 		struct {
+> > > 			void *base;
+> > > 			void *idm_base;
+> > >+			void *nicpm_base;
+> > > 		} plat;
+> > > 		struct {
+> > > 			struct bcma_device *core;
+> > >
