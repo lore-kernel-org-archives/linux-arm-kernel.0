@@ -1,64 +1,55 @@
-From: atull@opensource.altera.com (Alan Tull)
-Date: Tue, 1 Nov 2016 18:54:44 -0500
-Subject: [PATCH] ARM: socfpga: updates for socfpga_defconfig
-Message-ID: <1478044484-2331-1-git-send-email-atull@opensource.altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 1 Nov 2016 17:07:41 -0700
+Subject: [PATCH v3 1/2] clk: imx: fix integer overflow in AV PLL round rate
+In-Reply-To: <CAOMZO5CLMtyZStgDzdiSHo9s8BhXyiapWqDx1L_TmMpH13043g@mail.gmail.com>
+References: <cover.1476267249.git.emil@limesaudio.com>
+ <4d2e3a91dfb74209735c940b51d7efc9ba2ed69b.1476267249.git.emil@limesaudio.com>
+ <20161028014127.GD16026@codeaurora.org>
+ <CAOMZO5Co32XUpNFz4Hd2DEmNnMBvD5fKmsyjcmsgawea4dJR9g@mail.gmail.com>
+ <20161028181316.GI16026@codeaurora.org>
+ <CAOMZO5CLMtyZStgDzdiSHo9s8BhXyiapWqDx1L_TmMpH13043g@mail.gmail.com>
+Message-ID: <20161102000741.GY16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the following in the
-socfpga_defconfig:
+On 10/28, Fabio Estevam wrote:
+> On Fri, Oct 28, 2016 at 4:13 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > The clk-fixes branch is for patches that fix problems in code
+> > merged during the merge window as well as small one-liners and
+> > things that are causing great pain for people on the latest
+> > release. Given that this fixes a regression in v4.8 and we're
+> > trying to stabilize v4.9 it looked like it could wait until
+> > v4.10.
+> 
+> The regression affects 4.8 and 4.9.
+> 
+> > So is there something going on here where the pain is too much to
+> > wait for the next merge window? If so the commit text should
+> 
+> Yes, people reported HDMI issues because of this bug:
+> https://www.spinics.net/lists/arm-kernel/msg535304.html
+> 
+> > mention something about what's causing that pain. Perhaps by
+> > referencing the commit that merged outside of clk tree that
+> > caused problems.
+> 
+> This patch clearly states that the problem is caused by ba7f4f557eb6
+> ("clk: imx: correct AV PLL rate formula").
 
-+CONFIG_OF_OVERLAY=y
-  Enable support for Device Tree Overlays
+That commit isn't outside of clk tree :(
 
-+CONFIG_FPGA_REGION=y
-  Enable device tree overlay support for FPGA
-  programming
+> 
+> Since this is a regression, I don't understand why we need to wait
+> until 4.10 to get it applied.
 
-+CONFIG_FPGA_MGR_SOCFPGA_A10=y
-  Enable partial reconfiguration for Altera
-  Arria 10 FPGA
+Because we're stabilizing the 4.9-rc series and not the 4.8-rc
+series and the assumption is people tested code no 4.8 before it
+was released. But in cases where that doesn't happen and the bugs
+cause problems with testing the latest rc series we just apply
+the patch. It sounds like in this case that happened, so I'll
+move this patch over to fixes.
 
-+CONFIG_FPGA_BRIDGE=y
-  Enable the FPGA Bridges framework
-
-+CONFIG_SOCFPGA_FPGA_BRIDGE=y
-  Enable support for SoCFPGA hardware
-  bridges
-
-+CONFIG_ALTERA_FREEZE_BRIDGE=y
-  Enable support for the Altera Soft IP
-  Freeze bridges
-
-Signed-off-by: Alan Tull <atull@opensource.altera.com>
----
- arch/arm/configs/socfpga_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-index f5b9bc5..18d3ec1 100644
---- a/arch/arm/configs/socfpga_defconfig
-+++ b/arch/arm/configs/socfpga_defconfig
-@@ -54,6 +54,7 @@ CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_MTD=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_SPI_CADENCE_QUADSPI=y
-+CONFIG_OF_OVERLAY=y
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_COUNT=2
- CONFIG_BLK_DEV_RAM_SIZE=8192
-@@ -105,7 +106,12 @@ CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
- CONFIG_DMATEST=m
- CONFIG_FPGA=y
-+CONFIG_FPGA_REGION=y
- CONFIG_FPGA_MGR_SOCFPGA=y
-+CONFIG_FPGA_MGR_SOCFPGA_A10=y
-+CONFIG_FPGA_BRIDGE=y
-+CONFIG_SOCFPGA_FPGA_BRIDGE=y
-+CONFIG_ALTERA_FREEZE_BRIDGE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
