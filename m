@@ -1,49 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 02 Nov 2016 20:59:59 +0000
-Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS
- MAPD?
-In-Reply-To: <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
- (Alan Douglas's message of "Wed, 2 Nov 2016 09:36:14 +0000")
-References: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
- <861syvkqcr.fsf@arm.com>
- <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
-Message-ID: <8637j9iomo.fsf@arm.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed,  2 Nov 2016 15:00:48 -0600
+Subject: [PATCHv2 0/6] CONFIG_DEBUG_VIRTUAL for arm64
+Message-ID: <20161102210054.16621-1-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02 2016 at 09:36:14 AM, Alan Douglas <adouglas@cadence.com> wrote:
-> Hi Marc,
->
->> > When setting up bus 0, the ITS device is created, and
->> > its_build_map_cmd() sets the size of the ITS MAPD based on the number
->> > of interrupts claimed by bus 0.  When subsequent buses are enumerated,
->> > the ITS device will be reused, however we do not increase the number
->> > of supported interrupts to allow for the additional interrupts claimed
->> > by the additional devices being enumerated.  (This can be seen in
->> > its_msi_prepare(), which is called for each device which has MSI/MSI-X
->> > enabled, and will reuse an existing ITS. )
->> 
->> Am I right in understanding that all the PCIe devices in your system end-up
->> aliasing to the same RequesterID? If so, that's a major issue. The ITS is
->> designed so that each device exposes its *own* RID, and have its own
->> Interrupt Translation Table (ITT).
->> 
->> In your case, you seem to first discover the root port, which is not upstream
->> of anything, so it doesn't alias with anything at that point. We allocate the
->> corresponding ITT, and it's all fine. Until we start probing the rest, and ugly
->> things happen.
->> 
-> Yes, your understanding is correct.  I will dig into this a bit
-> further to see what is wrong then send an update.  I suspect my DTS
-> msi mapping.
+Hi,
 
-Right. That would explain a lot of what you're seeing. In general, and
-unless you have some funky remapping going on, you're better off having
-a very straightforward msi-map property in your RC node (such as example
-#1 in Documentation/devicetree/bindings/pci/pci-msi.txt).
+This is v2 of the series to add CONFIG_DEBUG_VIRTUAL support from arm64. This
+has been split out into a number of patches:
+
+Patch #1 Adds ARCH_HAS_DEBUG_VIRTUAL to avoid the need for adding arch
+dependencies for DEBUG_VIRTUAL. This touches arch/x86/Kconfig
+
+Patch #2 Cleans up cma to not rely on __pa_nodebug and have an #ifdef inline
+in the function.
+
+Patch #3 Adjust some macros in arm64 memory.h to be under __ASSEMBLY__
+protection
+
+Patch #4 Adds a cast for virt_to_pfn since __virt_to_phys for DEBUG_VIRTUAL no
+longer has a cast.
+
+Patch #5 Switches to using __pa_symbol for _end to avoid erroneously triggering
+a bounds error with the debugging.
+
+Patch #6 is the actual implementation of DEBUG_VIRTUAL. The biggest change from
+the RFCv1 is the addition of __phys_addr_symbol. This is to handle several
+places where the physical address of _end is needed. x86 avoids this problem by
+doing its bounds check based on the entire possible image space which is well
+beyond where _end would end up.
+
+There are a few dependencies outside of arm64, so I don't know if
+it will be easier for this to eventually go through arm64 or the mm tree.
 
 Thanks,
+Laura
 
-	M.
+
+
+
+Laura Abbott (6):
+  lib/Kconfig.debug: Add ARCH_HAS_DEBUG_VIRTUAL
+  mm/cma: Cleanup highmem check
+  arm64: Move some macros under #ifndef __ASSEMBLY__
+  arm64: Add cast for virt_to_pfn
+  arm64: Use __pa_symbol for _end
+  arm64: Add support for CONFIG_DEBUG_VIRTUAL
+
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/include/asm/memory.h | 50 ++++++++++++++++++++++++-----------------
+ arch/arm64/mm/Makefile          |  2 ++
+ arch/arm64/mm/init.c            |  4 ++--
+ arch/arm64/mm/physaddr.c        | 34 ++++++++++++++++++++++++++++
+ arch/x86/Kconfig                |  1 +
+ lib/Kconfig.debug               |  5 ++++-
+ mm/cma.c                        | 15 +++++--------
+ 8 files changed, 79 insertions(+), 33 deletions(-)
+ create mode 100644 arch/arm64/mm/physaddr.c
+
 -- 
-Jazz is not dead. It just smells funny.
+2.10.1
