@@ -1,201 +1,100 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Wed, 2 Nov 2016 22:05:09 +0000
-Subject: [PATCH v6 4/4] arm64: dts: add Pine64 support
-In-Reply-To: <45ddd059d22233c3e07852f4f71ee7ad7ed48542.1478123413.git-series.maxime.ripard@free-electrons.com>
-References: <cover.6088b64645bde9b847d2fede5ecb15a0e204a9dd.1478123413.git-series.maxime.ripard@free-electrons.com>
- <45ddd059d22233c3e07852f4f71ee7ad7ed48542.1478123413.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <83b8ff39-91f0-4e5c-61a5-e21f31c909ff@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 2 Nov 2016 16:20:50 -0600
+Subject: [PATCH v4 6/8] dt-bindings: Add support for Amlogic GXBB SCPI
+ Interface
+In-Reply-To: <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
+References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
+ <1475652814-30619-7-git-send-email-narmstrong@baylibre.com>
+ <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
+Message-ID: <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/16 21:50, Maxime Ripard wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
+On Sat, Oct 29, 2016 at 11:39:05AM -0700, Olof Johansson wrote:
+> Hi,
 > 
-> The Pine64 is a cost-efficient development board based on the
-> Allwinner A64 SoC.
-> There are three models: the basic version with Fast Ethernet and
-> 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-> feature Gigabit Ethernet and additional connectors for touchscreens
-> and a camera. Or as my son put it: "Those are smaller and these are
-> missing." ;-)
-> The two Pine64+ models just differ in the amount of DRAM
-> (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-> patches the DT accordingly we just need to provide one DT for the
-> Pine64+.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> [Maxime: Removed the common DTSI and include directly the pine64 DTS]
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm64/boot/dts/Makefile                             |  1 +-
->  arch/arm64/boot/dts/allwinner/Makefile                   |  5 +-
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 50 ++++++-
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 74 +++++++++-
->  4 files changed, 130 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+> On Wed, Oct 5, 2016 at 12:33 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
+> >  1 file changed, 5 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> > index faa4b44..04bc171 100644
+> > --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> > +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> > @@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
+> >
+> >  Required properties:
+> >
+> > -- compatible : should be "arm,scpi"
+> > +- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
 > 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 6684f97c2722..080232b0270e 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,4 +1,5 @@
->  dts-dirs += al
-> +dts-dirs += allwinner
->  dts-dirs += altera
->  dts-dirs += amd
->  dts-dirs += amlogic
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> new file mode 100644
-> index 000000000000..1e29a5ae8282
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> new file mode 100644
-> index 000000000000..790d14daaa6a
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> @@ -0,0 +1,50 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "sun50i-a64-pine64.dts"
-> +
-> +/ {
-> +	model = "Pine64+";
-> +	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
-> +
-> +	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
-> +};
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> new file mode 100644
-> index 000000000000..9f127b3d0e33
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -0,0 +1,74 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sun50i-a64.dtsi"
-> +
-> +/ {
-> +	model = "Pine64";
-> +	compatible = "pine64,pine64", "allwinner,sun50i-a64";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1_pins {
-> +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> This doesn't seem right to document here. If anything you might want
+> to have a table of more-specific-compatibles for specific
+> implementations, but "arm,scpi" should still be the compatible of the
+> node (just not the most specific one).
+> 
 
-which should translate to:
-	bias-pull-up;
-in the generic binding, right?
+I completely agree with you and I was pushing for a generic "arm,legacy-scpi"
+compatible until this binding was acked by Rob.
 
-Cheers,
-Andre.
+Anyways, I will add the generic compatible and post the changes.
+
+> Also, documenting it here indiciates that non-amlogic implementations
+> can/should use that compatible, which is misleading.
+>
+
+Agreed, it's better to keep them out of this generic binding document.
+
+> >  - mboxes: List of phandle and mailbox channel specifiers
+> >           All the channels reserved by remote SCP firmware for use by
+> >           SCPI message protocol should be specified in any order
+> > @@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
+> >  processors and SCP.
+> >
+> >  Required properties:
+> > -- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
+> > +- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
+> > +               or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
+> 
+> Maybe you'd be better of with a meson-specific document that refers to
+> these but with different compatible values.
+> 
+> Come to think of it, the Juno-specific one maybe shouldn't be in
+> arm,scpi at all, since that adds confusion here.
+> 
+> It's somewhat confusing that ARM is both a platform, architecture and
+> in some cases implementer of specific systems. :)
+> 
+
+Sorry for that, I will move all juno specific references in the binding
+out of this document(except the examples, which I assume should be fine)
+
+> >  The rest of the properties should follow the generic mmio-sram description
+> >  found in ../../sram/sram.txt
+> > @@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
+> >  Required sub-node properties:
+> >  - reg : The base offset and size of the reserved area with the SRAM
+> >  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+> > -              shared memory on Juno platforms
+> > +              shared memory on Juno platforms or
+> > +              "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
+> 
+> Same here. It won't scale if all vendors are expected to add an entry here.
+> 
+
+I will rework the patches to address the concerns as I too did share same
+concern.
+
+
+Hi Neil,
+
+You may need to rework the DTS files based on that, please be aware of
+that and make the necessary changes.
+
+--
+Regards,
+Sudeep
