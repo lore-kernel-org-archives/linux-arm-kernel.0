@@ -1,49 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 2 Nov 2016 23:28:54 +0000
-Subject: arm64 build failure with CONFIG_ARM64_LSE_ATOMICS=y
-In-Reply-To: <20161102164427.GB24243@shodan.usersys.redhat.com>
-References: <20161102164427.GB24243@shodan.usersys.redhat.com>
-Message-ID: <20161102232854.GO22791@arm.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 2 Nov 2016 17:56:42 -0600
+Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
+In-Reply-To: <20161102225241.GA19591@remoulade>
+References: <20161102210054.16621-1-labbott@redhat.com>
+ <20161102210054.16621-6-labbott@redhat.com>
+ <20161102225241.GA19591@remoulade>
+Message-ID: <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+On 11/02/2016 04:52 PM, Mark Rutland wrote:
+> On Wed, Nov 02, 2016 at 03:00:53PM -0600, Laura Abbott wrote:
+>>
+>> __pa_symbol is technically the marco that should be used for kernel
+>> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL.
+>
+> Nit: s/marco/macro/
+>
+> I see there are some other uses of __pa() that look like they could/should be
+> __pa_symbol(), e.g. in mark_rodata_ro().
+>
+> I guess strictly speaking those need to be updated to? Or is there a reason
+> that we should not?
+>
 
-On Wed, Nov 02, 2016 at 05:44:27PM +0100, Artem Savkov wrote:
-> Hello Catalin,
-> 
-> Looks like your patch "efd9e03 arm64: Use static keys for CPU features"
-> breaks arm64 build with "CONFIG_ARM64_LSE_ATOMICS=y" because it creates a
-> circular dependency for asm/lse.h through jump_label.h:
-> 
->   CC      arch/arm64/kernel/asm-offsets.s
-> In file included from ./arch/arm64/include/asm/atomic.h:34:0,
->                  from ./include/linux/atomic.h:4,
->                  from ./include/linux/jump_label.h:169,
->                  from ./arch/arm64/include/asm/cpufeature.h:12,
->                  from ./arch/arm64/include/asm/alternative.h:4,
->                  from ./arch/arm64/include/asm/lse.h:7,
->                  from ./arch/arm64/include/asm/spinlock.h:19,
->                  from ./include/linux/spinlock.h:87,
->                  from ./include/linux/seqlock.h:35,
->                  from ./include/linux/time.h:5,
->                  from ./include/uapi/linux/timex.h:56,
->                  from ./include/linux/timex.h:56,
->                  from ./include/linux/sched.h:19,
->                  from arch/arm64/kernel/asm-offsets.c:21:
-> ./arch/arm64/include/asm/atomic_lse.h: In function ?atomic_andnot?:
-> ./arch/arm64/include/asm/atomic_lse.h:35:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
->   asm volatile(ARM64_LSE_ATOMIC_INSN(__LL_SC_ATOMIC(op),  \
-> 
-> ...
-> 
-> ./arch/arm64/include/asm/cmpxchg.h: In function ?__xchg_case_1?:
-> ./arch/arm64/include/asm/cmpxchg.h:38:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
->   asm volatile(ARM64_LSE_ATOMIC_INSN(    \
+If the concept of __pa_symbol is okay then yes I think all uses of __pa
+should eventually be converted for consistency and debugging.
 
-I'm unable to reproduce this. I've tried enabling LSE with defconfig and
-mainline, using compilers that both do and don't support the instructions.
-
-What am I missing?
-
-Will
+> Thanks,
+> Mark.
+>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>>  arch/arm64/mm/init.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>> index 212c4d1..3236eb0 100644
+>> --- a/arch/arm64/mm/init.c
+>> +++ b/arch/arm64/mm/init.c
+>> @@ -209,8 +209,8 @@ void __init arm64_memblock_init(void)
+>>  	 * linear mapping. Take care not to clip the kernel which may be
+>>  	 * high in memory.
+>>  	 */
+>> -	memblock_remove(max_t(u64, memstart_addr + linear_region_size, __pa(_end)),
+>> -			ULLONG_MAX);
+>> +	memblock_remove(max_t(u64, memstart_addr + linear_region_size,
+>> +			__pa_symbol(_end)), ULLONG_MAX);
+>>  	if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
+>>  		/* ensure that memstart_addr remains sufficiently aligned */
+>>  		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
+>> --
+>> 2.10.1
+>>
