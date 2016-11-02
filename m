@@ -1,67 +1,59 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Wed, 2 Nov 2016 19:05:14 +0530
-Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching of
- bypass entries
-Message-ID: <1478093714-17219-1-git-send-email-nipun.gupta@nxp.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 2 Nov 2016 15:35:37 +0800
+Subject: [PATCH 1/5] ARM: dts: imx: add Boundary Devices Nitrogen6_SOM2
+ support
+In-Reply-To: <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
+References: <20161025211955.5345-1-gary.bisson@boundarydevices.com>
+ <20161025211955.5345-2-gary.bisson@boundarydevices.com>
+ <20161101141338.GC9807@dragon>
+ <CAAMH-yugLeHjaSwMx9ZoJ9qm44VKXcgO64xdsO=HBj59pj5cUA@mail.gmail.com>
+Message-ID: <20161102073533.GA19126@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SMTNMB_TLBEN in the Auxiliary Configuration Register (ACR) provides an
-option to enable the updation of TLB in case of bypass transactions due to
-no stream match in the stream match table. This reduces the latencies of
-the subsequent transactions with the same stream-id which bypasses the SMMU.
-This provides a significant performance benefit for certain networking
-workloads.
+On Tue, Nov 01, 2016 at 03:54:31PM +0100, Gary Bisson wrote:
+> Hi Shawn,
+> 
+> On Tue, Nov 1, 2016 at 3:13 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Tue, Oct 25, 2016 at 11:19:51PM +0200, Gary Bisson wrote:
+> >> SoM based on i.MX6 Quad with 1GB of DDR3.
+> >>
+> >> https://boundarydevices.com/product/nit6x-som-v2/
+> >>
+> >> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> >> ---
+> >>  arch/arm/boot/dts/Makefile                    |   1 +
+> >>  arch/arm/boot/dts/imx6q-nitrogen6_som2.dts    |  53 ++
+> >>  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 770 ++++++++++++++++++++++++++
+> >>  3 files changed, 824 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/imx6q-nitrogen6_som2.dts
+> >>  create mode 100644 arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi
+> >
+> > <snip>
+> >
+> >> +/ {
+> >> +     chosen {
+> >> +             stdout-path = &uart2;
+> >> +     };
+> >> +
+> >> +     memory {
+> >> +             reg = <0x10000000 0x40000000>;
+> >> +     };
+> >> +
+> >> +     backlight_lcd: backlight_lcd {
+> >
+> > Please use hyphen instead of underscore in node name.  Please check
+> > through the patch series.
+> 
+> Sorry about that, forgot (again). Just to make sure, the label can
+> have underscore but not the name right? Or is it better to have hypens
+> everywhere?
 
-Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
----
- drivers/iommu/arm-smmu.c | 21 +++++++++++++++------
- 1 file changed, 15 insertions(+), 6 deletions(-)
+Hyphen cannot be used in labels.  Otherwise, DTC will complain.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ce2a9d4..7010a5c 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -246,6 +246,7 @@ enum arm_smmu_s2cr_privcfg {
- 
- #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
- 
-+#define ACR_SMTNMB_TLBEN		(1 << 8)
- #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
- 
- #define CB_PAR_F			(1 << 0)
-@@ -1569,18 +1570,26 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
- 	for (i = 0; i < smmu->num_mapping_groups; ++i)
- 		arm_smmu_write_sme(smmu, i);
- 
-+	/* Get the major rev required for configuring ACR */
-+	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
-+	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
-+
- 	/*
- 	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
- 	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
- 	 * bit is only present in MMU-500r2 onwards.
- 	 */
--	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
--	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
--	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
--		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-+	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-+	if ((smmu->model == ARM_MMU500) && (major >= 2))
- 		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
--		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
--	}
-+
-+	/*
-+	 * Set the SMTNMB_TLBEN in ACR so that the transactions which
-+	 * bypass with SMMU due to no stream match found in the SMR table
-+	 * are updated in the TLB's.
-+	 */
-+	reg |= ACR_SMTNMB_TLBEN;
-+	writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
- 
- 	/* Make sure all context banks are disabled and clear CB_FSR  */
- 	for (i = 0; i < smmu->num_context_banks; ++i) {
--- 
-1.9.1
+> So I guess I need to make a pass on current boards as well.
+
+I'm fine with the current boards and only expect it to be right with the
+boards to be added.
+
+Shawn
