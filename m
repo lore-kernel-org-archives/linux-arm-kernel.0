@@ -1,33 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Nov 2016 10:23:54 +0100
-Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_CGROUPS
-In-Reply-To: <cover.1478078446.git.horms+renesas@verge.net.au>
-References: <cover.1478078446.git.horms+renesas@verge.net.au>
-Message-ID: <a604a37d46b80899d5a09d937fdd670e93af690d.1478078446.git.horms+renesas@verge.net.au>
+Date: Wed,  2 Nov 2016 10:24:05 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.10
+Message-ID: <cover.1478077617.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Enable support for CONFIG_CGROUPS in shmobile_defconfig.
+Please consider these Renesas ARM based SoC drivers updates for v4.10.
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index baa07a46a88b..1b0f8ae36fb3 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -2,6 +2,7 @@ CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
-+CONFIG_CGROUPS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_SYSCTL_SYSCALL=y
--- 
-2.7.0.rc3.207.g0ac5344
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.10
+
+for you to fetch changes up to 603311ba979fa5bbbf6a8961e5f7a27deafce1b4:
+
+  soc: renesas: rcar-sysc: add R8A7743 support (2016-10-17 08:21:20 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Drivers Updates for v4.10
+
+* Add support for the r8a7743 SoC to rcar-sysc
+
+----------------------------------------------------------------
+Sergei Shtylyov (2):
+      ARM: shmobile: r8a7743: add power domain index macros
+      soc: renesas: rcar-sysc: add R8A7743 support
+
+ .../bindings/power/renesas,rcar-sysc.txt           |  7 +++--
+ drivers/soc/renesas/Makefile                       |  1 +
+ drivers/soc/renesas/r8a7743-sysc.c                 | 32 ++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c                    |  3 ++
+ drivers/soc/renesas/rcar-sysc.h                    |  1 +
+ include/dt-bindings/power/r8a7743-sysc.h           | 25 +++++++++++++++++
+ 6 files changed, 66 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/soc/renesas/r8a7743-sysc.c
+ create mode 100644 include/dt-bindings/power/r8a7743-sysc.h
