@@ -1,389 +1,315 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 2 Nov 2016 17:14:03 +0100
-Subject: [PATCH] ARM: DT: stm32: move dma translation to board files
-In-Reply-To: <CAF3+TqeiPjtG7Fs1-cpbcHGxxtSS1UOGD=S=sggpaZahFLJhEQ@mail.gmail.com>
-References: <CAF3+Tqd2MGmz+8XhLXhaZiEc78QOwHSpVrQA65-p1AcfT+_xgg@mail.gmail.com>
- <404315f0-fc9e-93e2-54df-f85e484d9389@st.com>
- <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
- <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
- <CAF3+TqcxVj9f7kcSQTKDercVfvDdLzAXGpUU1oAxeNBFZx73nQ@mail.gmail.com>
- <CAFvLkMQGVygLb9SQ8o+2Q=bg7vvRjpHypmSyjRyLkdcHypoFHw@mail.gmail.com>
- <CAF3+TqcFnXENmX4OpG9jzhPhuaq-EqNsRhhjKgFjHA96DLqK5g@mail.gmail.com>
- <CAFvLkMQ6YMg4sf2Ug8x4-YshwnjbLz3aVzm+JpKP6zG9r-WU4Q@mail.gmail.com>
- <CAF3+Tqdz+92yxuSwZHdQ01d-G-bBNtzayKyP2-_On2APvFyLNA@mail.gmail.com>
- <CAFvLkMTCkRcwbRc8GVNBoJFAvKWHYDjOPabueQPjTseZrucadA@mail.gmail.com>
- <3e854414-f51d-3e59-6cee-142106cef40f@st.com>
- <CAF3+TqeiPjtG7Fs1-cpbcHGxxtSS1UOGD=S=sggpaZahFLJhEQ@mail.gmail.com>
-Message-ID: <edf05ad5-924d-87d8-fd8d-57e8e0a72052@st.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Wed, 2 Nov 2016 17:15:23 +0100
+Subject: [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
+In-Reply-To: <452b773f-826b-61cd-55e3-018ecb34b503@arm.com>
+References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
+ <20161020173224.GA32544@arm.com>
+ <8132b350-59ff-0bfb-9539-e98e63d1adb6@redhat.com>
+ <452b773f-826b-61cd-55e3-018ecb34b503@arm.com>
+Message-ID: <aa1ff0e9-3ba3-bff6-770a-faff81c183c5@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Robin,
+On 24/10/2016 21:39, Robin Murphy wrote:
+> On 21/10/16 10:26, Auger Eric wrote:
+>> Hi Will,
+>>
+>> On 20/10/2016 19:32, Will Deacon wrote:
+>>> Hi Eric,
+>>>
+>>> Thanks for posting this.
+>>>
+>>> On Wed, Oct 12, 2016 at 01:22:08PM +0000, Eric Auger wrote:
+>>>> This is the second respin on top of Robin's series [1], addressing Alex' comments.
+>>>>
+>>>> Major changes are:
+>>>> - MSI-doorbell API now is moved to DMA IOMMU API following Alex suggestion
+>>>>   to put all API pieces at the same place (so eventually in the IOMMU
+>>>>   subsystem)
+>>>> - new iommu_domain_msi_resv struct and accessor through DOMAIN_ATTR_MSI_RESV
+>>>>   domain with mirror VFIO capability
+>>>> - more robustness I think in the VFIO layer
+>>>> - added "iommu/iova: fix __alloc_and_insert_iova_range" since with the current
+>>>>   code I failed allocating an IOVA page in a single page domain with upper part
+>>>>   reserved
+>>>>
+>>>> IOVA range exclusion will be handled in a separate series
+>>>>
+>>>> The priority really is to discuss and freeze the API and especially the MSI
+>>>> doorbell's handling. Do we agree to put that in DMA IOMMU?
+>>>>
+>>>> Note: the size computation does not take into account possible page overlaps
+>>>> between doorbells but it would add quite a lot of complexity i think.
+>>>>
+>>>> Tested on AMD Overdrive (single GICv2m frame) with I350 VF assignment.
+>>>
+>>> Marc, Robin and I sat down and had a look at the series and, whilst it's
+>>> certainly addressing a problem that we desperately want to see fixed, we
+>>> think that it's slightly over-engineering in places and could probably
+>>> be simplified in the interest of getting something upstream that can be
+>>> used as a base, on which the ABI can be extended as concrete use-cases
+>>> become clear.
+>>>
+>>> Stepping back a minute, we're trying to reserve some of the VFIO virtual
+>>> address space so that it can be used by devices to map their MSI doorbells
+>>> using the SMMU. With your patches, this requires that (a) the kernel
+>>> tells userspace about the size and alignment of the doorbell region
+>>> (MSI_RESV) and (b) userspace tells the kernel the VA-range that can be
+>>> used (RESERVED_MSI_IOVA).
+>>>
+>>> However, this is all special-cased for MSI doorbells and there are
+>>> potentially other regions of the VFIO address space that are reserved
+>>> and need to be communicated to userspace as well. We already know of
+>>> hardware where the PCI RC intercepts p2p accesses before they make it
+>>> to the SMMU, and other hardware where the MSI doorbell is at a fixed
+>>> address. This means that we need a mechanism to communicate *fixed*
+>>> regions of virtual address space that are reserved by VFIO. I don't
+>>> even particularly care if VFIO_MAP_DMA enforces that, but we do need
+>>> a way to tell userspace "hey, you don't want to put memory here because
+>>> it won't work well with devices".
+>>
+>> I think we all agree on this. Exposing an API to the user space
+>> reporting *fixed* reserved IOVA ranges is a requirement anyway. The
+>> problem was quite clearly stated by Alex in
+>> http://lkml.iu.edu/hypermail/linux/kernel/1610.0/03308.html
+>> (VFIO_IOMMU_TYPE1_INFO_CAP_IOVA_RANGE)
+>>
+>> I started working on this VFIO_IOMMU_TYPE1_INFO_CAP_IOVA_RANGE
+>> capability but to me and I think according to Alex, it was a different
+>> API from MSI_RESV.
+>>
+>>>
+>>> In that case, we end up with something like your MSI_RESV capability,
+>>> but actually specifying a virtual address range that is simply not to
+>>> be used by MAP_DMA -- we don't say anything about MSIs. Now, taking this
+>>> to its logical conclusion, we no longer need to distinguish between
+>>> remappable reserved regions and fixed reserved regions in the ABI.
+>>> Instead, we can have the kernel allocate the virtual address space for
+>>> the remappable reserved regions (probably somewhere in the bottom 4GB)
+>>> and expose them via the capability.
+>>
+>>
+>> If I understand correctly you want the host to arbitrarily choose where
+>> it puts the iovas reserved for MSI and not ask the userspace.
+>>
+>> Well so we are back to the discussions we had in Dec 2015 (see Marc's
+>> answer in http://thread.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858).
+> 
+> To an extent, yes, however the difference is that we now know we
+> definitely have to deal with situations in which userspace *cannot* be
+> in total control of the memory map, and that changes the game:
+> 
+>     _________
+>    /         \
+>   /  Fixed    \
+>  /  things (A) \
+> (   _________   )
+>  \ /   MSI   \ /
+>   X doorbells X
+>  / \___(B)___/ \
+> (               )
+>  \ Remappable  /
+>   \ things (C)/
+>    \_________/
+> 
+> In the absence of A, then B == C so it was very hard to not want to
+> implement C. As soon as A *has* to be implemented for other reasons,
+> then that is also sufficient to encompass B. C can still be implemented
+> later as a nice-to-have, but is not necessary to get B off the ground.
+> 
+>> - So I guess you will init an iova_domain seomewhere below the 4GB to
+>> allocate the MSIs. what size are you going to choose. Don't you have the
+>> same need to dimension the iova range.
+>> - we still need to assess the MSI assignment safety. How will we compute
+>> safety for VFIO?
+> 
+> Absolutely. We're talking in general terms of the userspace ABI here,
+> although that can't help but colour the underlying implementation
+> decisions.
 
+Sorry for the delay I was out of the office last week.
 
-On 11/02/2016 05:07 PM, Bruno Herrera wrote:
-> Hi
->
-> On Wed, Nov 2, 2016 at 12:32 PM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> Hi
+The userspace ABI to retrieve reserved regions is the *easy* part. It is
+based on VFIO capability chain and I have an RFC ready.
+
+ Of course the VFIO internals still have to handle the
+> specific case of MSIs, but that's basically no more than this:
+> 
+>   static bool msi_isolation = true; /* until proven otherwise */
+>   static unsigned long msi_remap_virt_base = 0x08000000; /* fits QEMU */
+>   static size_t msi_remap_size;
+> 
+>   vfio_msi_thing_callback(thing) {
+>   	msi_remap_size += thing->info.size;
+>   	msi_isolation &= thing->info.flags & PROVIDES_ISOLATION;
+>   }
+> 
+>   vfio_msi_init(...) {
+>   	...
+>   #ifdef CONFIG_X86
+>   	msi_remap_virt_base = 0xfee00000;
+>   	msi_remap_size = 0x100000;
+>   	msi_isolation = irq_remapping_enabled;
+>   #else
+>   	irq_for_each_msi_thing(vfio_msi_thing_callback);
+>   #endif
+>   	...
+>   }
+> 
+>   vfio_attach_group(...) {
+>   	...
+>   	if (!msi_isolation && !allow_unsafe_interrupts)
+>   		return -ENOWAY;
+>   	...
+>   	get_msi_region_cookie(domain, msi_remap_base, msi_remap_size);
+>   	...
+>   }
+I doubt Alex will accept to put that code in VFIO. He suggested in the
+past to use the IOMMU API to retrieve the reserved region(s).
+
+what about adding a reserved_regions list in iommu_domain and add a new
+iommu_ops, something like
+void add_reserved_regions(struct iommu_domain *, struct device *dev)
+whose role would be to populate the list. This add_reserved_regions()
+would be called on __iommu_attach_device. The list would be emptied on
+iommu_domain_free().
+
+arm-smmu cb implementation would be in charge of
+- computing non ACS PCI host bridge windows from @dev,
+- computing msi_rebase_map/size computation
+
+on x86, cb would simply populate the MSI window.
+
+vfio would lookup the iommu domain reserved_regions list on
+VFIO_IOMMU_GET_INFO
+
+Drawback of this approach is the security aspect is not handled by the
+IOMMU API.
+
+Note that combining v14 series and this one would implement everything I
+think + giving the flexibility for the userspace to choose where it put
+things. But well, LPC discussions will bring the last word obviously.
+> 
+> And when a well-behaved userspace queries the reserved regions, that
+> base address and size is just one of potentially several that it should
+> get back. It's that "querying the reserved regions" bit that needs to be
+> gotten right first time.
+> 
+> Note that at this point I'm no longer even overly bothered about the
+> details of irq_for_each_msi_thing(), as it's an internal kernel
+> interface and thus malleable, although obviously the simpler the better.
+> I have to say Punit's idea of iterating irq_domains does actually look
+> really neat and tidy as a proof-of-concept, and also makes me think off
+> on a tangent that it would be sweet to be able to retrieve base+size
+> from dev->msi_domain to pre-allocate MSI pages in default domains, and
+> obviate the compose 'failure' case.
+
+As Punit mentionned, the natural place where the msi doorbell base,
+size and irq_remapping can be retrieved looks to be the irqchip itself.
+It works perfectly fine for v2m and its. Hence my first attempt to use a
+cb at this level (irqchip msi_doorbell_info up to v11).
+
+Adding a cb at irq_domain level looks quite impractical to me to
+retrieve the info. Actually I don't see how to manage that without
+adding new fields in irq_domain struct. If you have any suggestion,
+please let me know.
+
+Thanks
+
+Eric
+
+> 
+>>  This simplifies things in the
+>>> following ways:
+>>>
+>>>   * You don't need to keep track of MSI vs DMA addresses in the VFIO rbtree
+>> right: I guess you rely on iommu_map to return an error in case the iova
+>> is already mapped somewhere else.
+>>>   * You don't need to try collapsing doorbells into a single region
+>> why? at host level I guess you will init a single iova domain?
+> 
+> Yeah, right now this one goes either way - as things stand, it does make
+> life easier on the host side to make a single region to hang off the
+> back of the current iova_cookie magic, and as illustrated above it's
+> possibly the most trivial part of the whole thing, but the point is we
+> still don't *need* to. Since a userspace ABI for generic reservations
+> has to be able handle more than one region for the sake of non-MSI
+> things, we'd be free to change the kernel-side implementation in future
+> to just report multiple doorbells as individual regions - for starters,
+> if and when we add dynamic reservations and userspace gets to pick its
+> own IOVAs for those, it'll be a damn sight easier *not* to coalesce
+> everything.
+> 
+>>>   * You don't need a special MAP flavour to map MSI doorbells
+>> right
+>>>   * The ABI is reusable for PCI p2p and fixed doorbells
+>> right
 >>
->> On 10/31/2016 07:58 PM, Rados?aw Pietrzyk wrote:
->>>
->>> I think wlcore driver searches dma-ranges in its parent that's why sdio
->>> node needs it.
+>> Aren't we moving the issue at user-space? Currently QEMU mach-virt
+>> address space is fully static. Adapting mach-virt to adjust to host
+>> constraints is not straightforward. It is simple to reject the
+>> assignment in case of collision but more difficult to react positively.
+> 
+> The point is that we *have* to move at least some of the issue to
+> userspace, and by then I'm struggling to see any real difference between
+> these situations:
+> 
+> a) QEMU asks VFIO to map some pages for DMA, gets an error back because
+> VFIO detects it conflicts with a reserved region, and gives up.
+> b) QEMU starts by asking VFIO what regions are reserved, realises they
+> will overlap with its hard-coded RAM address, and gives up.
+> 
+> where (a) requires a bunch of kernel machinery to second-guess
+> userspace, while (b) simply relies on userspace not being broken. And if
+> userspace fails at not being broken, then we simply retain the behaviour
+> which actually happens right now:
+> 
+> c) QEMU maps some pages for DMA at the same address as PCI config space
+> on the underlying hardware. Hilarity ensues.
+> 
+> Of course, userspace could be anything other than QEMU as well, so it's
+> not necessarily second-guessable at all; maybe we make the arbitrary
+> msi_remap_virt_base a VFIO module parameter to be more accommodating.
+> Who knows, maybe it turns out that's enough to keep users happy and we
+> never need to implement fully dynamic reservations.
+> 
+> Robin.
+> 
+>>> I really think it would make your patch series both generally useful and
+>>> an awful lot smaller, whilst leaving the door open to ABI extension on
+>>> a case-by-case basis when we determine that it's really needed.
 >>
+>> I would like to have a better understanding of how you assess the
+>> security and dimension the iova domain. This is the purpose of msi
+>> doorbell registration, which is not neat at all I acknowledge but well I
+>> did not find any other solution and did not get any other suggestion.
+>> Besides I think the per-cpu thing is over-engineered and this can
+>> definitively be simplified.
 >>
->> Yes I agree. In this case it is needed as you have subnode in sdio node.
->> So IMO empty dma-ranges could be removed from ethernet and usb node, but
->> kept in future sdio subnode.
->
-> Now it is clear.
-Nice. Can I add your tested-by ?
->
+>> VFIO part was reviewed by Alex and I don't have the impression that this
+>> is the blocking part. besides there is on iova.c fix,
+>> IOMMU_CAP_INTR_REMAP removal; so is it really over-complicated?
 >>
->> Bruno,
->> Do you plan to push sdio support ?
->
-> Yes I do, but I'm not sure how long it will take. The I had to
-> change(and hack) the mmci code because I could not get the ID from
-> STM32 SDIO IP.
-> My current WIP is at @
-> https://github.com/mcoquelin-stm32/afboot-stm32/pull/4#issuecomment-247571615
-> I know Andrea Merello is also working on that (and he probably has a
-> more complete patch).
->
+>> Thanks
 >>
->>
+>> Eric
 >>
 >>>
->>> 2016-10-31 17:41 GMT+01:00 Bruno Herrera <bruherrera@gmail.com
->>> <mailto:bruherrera@gmail.com>>:
+>>> Thoughts?
 >>>
->>>     On Mon, Oct 31, 2016 at 12:14 PM, Rados?aw Pietrzyk
->>>     <radoslaw.pietrzyk at gmail.com <mailto:radoslaw.pietrzyk@gmail.com>>
->>>     wrote:
->>>     > This is weird because dma ddresses are recalculated using parent's
->>>     > dma-ranges property and soc already has it so there should be
->>> absolutely no
->>>     > problem.
+>>> Will
 >>>
->>>     These are my DTS and DTSI file.
->>>     >
->>>     > 2016-10-31 11:27 GMT+01:00 Bruno Herrera <bruherrera@gmail.com
->>>     <mailto:bruherrera@gmail.com>>:
->>>     >>
->>>     >> On Fri, Oct 28, 2016 at 5:09 AM, Rados?aw Pietrzyk
->>>     >> <radoslaw.pietrzyk@gmail.com
->>>     <mailto:radoslaw.pietrzyk@gmail.com>> wrote:
->>>     >> > Have you defined your sdio node within soc node ?
->>>     >>
->>>     >> It is in the SOC node of the DSTI file.
->>>     >>
->>>     >> >
->>>     >> > 2016-10-27 14:57 GMT+02:00 Bruno Herrera <bruherrera@gmail.com
->>>     <mailto:bruherrera@gmail.com>>:
->>>     >> >>
->>>     >> >> Hi Alex,
->>>     >> >>
->>>     >> >> On Thu, Oct 27, 2016 at 10:21 AM, Alexandre Torgue
->>>     >> >> <alexandre.torgue at st.com <mailto:alexandre.torgue@st.com>>
->>> wrote:
->>>     >> >> > Hi Bruno,
->>>     >> >> >
->>>     >> >> >
->>>     >> >> > On 10/27/2016 12:43 PM, Bruno Herrera wrote:
->>>     >> >> >>
->>>     >> >> >> Hi Alex,
->>>     >> >> >>
->>>     >> >> >> On Wed, Oct 26, 2016 at 7:09 AM, Alexandre Torgue
->>>     >> >> >> <alexandre.torgue at st.com <mailto:alexandre.torgue@st.com>>
->>>     wrote:
->>>     >> >> >>>
->>>     >> >> >>> Hi Bruno,
->>>     >> >> >>>
->>>     >> >> >>> On 10/25/2016 11:06 PM, Bruno Herrera wrote:
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>> Hi Alexandre,
->>>     >> >> >>>>
->>>     >> >> >>>>>
->>>     >> >> >>>>> stm32f469-disco and stm32f429-eval boards use SDRAM
->>>     start address
->>>     >> >> >>>>> remapping
->>>     >> >> >>>>> (to @0) to boost performances. A DMA translation through
->>>     >> >> >>>>> "dma-ranges"
->>>     >> >> >>>>> property was needed for other masters than the M4 CPU.
->>>     >> >> >>>>> stm32f429-disco doesn't use remapping so doesn't need
->>>     this DMA
->>>     >> >> >>>>> translation.
->>>     >> >> >>>>> This patches moves this DMA translation definition from
->>>     stm32f429
->>>     >> >> >>>>> soc
->>>     >> >> >>>>> file
->>>     >> >> >>>>> to board files.
->>>     >> >> >>>>>
->>>     >> >> >>>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com
->>>     <mailto:alexandre.torgue@st.com>>
->>>
->>>     >> >> >>>>>
->>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>>> index 13c7cd2..a763c15 100644
->>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>>> @@ -82,6 +82,10 @@
->>>     >> >> >>>>>                 };
->>>     >> >> >>>>>         };
->>>     >> >> >>>>>
->>>     >> >> >>>>> +       soc {
->>>     >> >> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>     >> >> >>>>> +       };
->>>     >> >> >>>>> +
->>>     >> >> >>>>>         usbotg_hs_phy: usbphy {
->>>     >> >> >>>>>                 #phy-cells = <0>;
->>>     >> >> >>>>>                 compatible = "usb-nop-xceiv";
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>> Shouldn't also the peripheral dma-ranges property move to
->>>     board
->>>     >> >> >>>> specific
->>>     >> >> >>>> too?
->>>     >> >> >>>> I  had this patch for while but I didn't had the time to
->>>     submit:
->>>     >> >> >>>
->>>     >> >> >>>
->>>     >> >> >>>
->>>     >> >> >>> Well spot I forgot it. Actually, discussing with Arnd
->>>     ysterday on
->>>     >> >> >>> IIRC,
->>>     >> >> >>> empty dma-ranges is not needed. Can you test on your side by
->>>     >> >> >>> removing
->>>     >> >> >>> dma-ranges in usb node please ?
->>>     >> >> >>
->>>     >> >> >> Unfortunately will take a time for me to set up this
->>>     environment on
->>>     >> >> >> the STM32F4-EVAL board.
->>>     >> >> >> And on the discovery boards we dont have this scenario.
->>>     That was the
->>>     >> >> >> main reason I did not submit the patch right away.
->>>     >> >> >> My conclusion and I might be wrong but is based on the my
->>>     tests with
->>>     >> >> >> SDIO device at STM32F469I-DISCO board.
->>>     >> >> >>
->>>     >> >> >> I started this issue as discussion at ST Forum but Maxime
->>>     gave me
->>>     >> >> >> the
->>>     >> >> >> hint.
->>>     >> >> >>
->>>     >> >> >>
->>>     >> >> >>
->>>     >> >> >>
->>>     >> >> >>
->>>
->>> https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44
->>>
->>> <https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44>
->>>     >> >> >>
->>>     >> >> >>> I will push a v2 by removing empty dma-ranges if tests are
->>>     ok in
->>>     >> >> >>> your
->>>     >> >> >>> side.
->>>     >> >> >>
->>>     >> >> >>
->>>     >> >> >> From my understating/conclusion is: when empty
->>>     property(dma-ranges)
->>>     >> >> >> is
->>>     >> >> >> the device node, the mapping will be taken in consideration
->>>     when
->>>     >> >> >> using
->>>     >> >> >> DMA otherwise the mapping is ignored.
->>>     >> >> >> And in the SDIO case it is needed for DEV->MEM(SDRAM) and
->>>     >> >> >> MEM(SDRAM)->DEV. If it is not the case for the devices in
->>>     question
->>>     >> >> >> so
->>>     >> >> >> I suppose it can work without the property.
->>>     >> >> >
->>>     >> >> >
->>>     >> >> > For sure translation has to be done but I'm not sure that an
->>>     empty
->>>     >> >> > "dma-ranges" is needed in device node to activate it. For
->>>     Ethernet
->>>     >> >> > empty
->>>     >> >> > "dma-ranges" is not needed. I will try with usb.
->>>     >> >>
->>>     >> >> In the case of SDIO it is needed. As example this is my
->>>     working SDIO
->>>     >> >> node:
->>>     >> >>
->>>     >> >> sdio: sdio at 40012c00 {
->>>     >> >> compatible = "arm,pl18x", "arm,primecell";
->>>     >> >> arm,primecell-periphid = <0x00480181>;
->>>     >> >> reg = <0x40012c00 0x400>;
->>>     >> >> dmas =  <&dma2 6 4 0x10400 0x3>, /* Logical - DevToMem */
->>>     >> >> <&dma2 3 4 0x10400 0x3>; /* Logical - MemToDev */
->>>     >> >> dma-names = "rx", "tx";
->>>     >> >> clocks = <&rcc 0 171>;
->>>     >> >> clock-names = "apb_pclk";
->>>     >> >> interrupts = <49>;
->>>     >> >> status = "disabled";
->>>     >> >> };
->>>     >> >>
->>>     >> >> &sdio {
->>>     >> >> status = "okay";
->>>     >> >> vmmc-supply = <&wlan_en>;
->>>     >> >> bus-width = <4>;
->>>     >> >> max-frequency = <24000000>;
->>>     >> >> pinctrl-names = "default";
->>>     >> >> pinctrl-0 = <&sdio_pins>;
->>>     >> >> ti,non-removable;
->>>     >> >> ti,needs-special-hs-handling;
->>>     >> >> dma-ranges;
->>>     >> >> cap-power-off-card;
->>>     >> >> keep-power-in-suspend;
->>>     >> >>
->>>     >> >> #address-cells = <1>;
->>>     >> >> #size-cells = <0>;
->>>     >> >> wlcore: wlcore at 0 {
->>>     >> >> compatible = "ti,wl1835";
->>>     >> >> reg = <2>;
->>>     >> >> interrupt-parent = <&gpioa>;
->>>     >> >> interrupts = <8 IRQ_TYPE_EDGE_RISING>;
->>>     >> >> };
->>>     >> >> };
->>>     >> >>
->>>     >> >> >
->>>     >> >> > alex
->>>     >> >> >
->>>     >> >> >
->>>     >> >> >>
->>>     >> >> >>>
->>>     >> >> >>> Thanks in advance
->>>     >> >> >>> Alex
->>>     >> >> >>>
->>>     >> >> >>>
->>>     >> >> >>>>
->>>     >> >> >>>> Author: Bruno Herrera <bruherrera@gmail.com
->>>     <mailto:bruherrera@gmail.com>>
->>>
->>>     >> >> >>>> Date:   Sun Oct 16 14:50:00 2016 -0200
->>>     >> >> >>>>
->>>     >> >> >>>>     ARM: DT: STM32: Use dma-ranges property per board not
->>>     at dtsi
->>>     >> >> >>>> file
->>>     >> >> >>>>
->>>     >> >> >>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>> b/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>> index 6bfc595..2a22a82 100644
->>>     >> >> >>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
->>>     >> >> >>>> @@ -52,6 +52,10 @@
->>>     >> >> >>>>         model = "STMicroelectronics STM32429i-EVAL board";
->>>     >> >> >>>>         compatible = "st,stm32429i-eval", "st,stm32f429";
->>>     >> >> >>>>
->>>     >> >> >>>> +       soc {
->>>     >> >> >>>> +               dma-ranges = <0xC0000000 0x0 0x10000000>;
->>>     >> >> >>>> +       };
->>>     >> >> >>>> +
->>>     >> >> >>>>         chosen {
->>>     >> >> >>>>                 bootargs = "root=/dev/ram rdinit=/linuxrc";
->>>     >> >> >>>>                 stdout-path = "serial0:115200n8";
->>>     >> >> >>>> @@ -96,6 +100,7 @@
->>>     >> >> >>>>
->>>     >> >> >>>>  &ethernet0 {
->>>     >> >> >>>>         status = "okay";
->>>     >> >> >>>> +       dma-ranges;
->>>     >> >> >>>>         pinctrl-0       = <&ethernet0_mii>;
->>>     >> >> >>>>         pinctrl-names   = "default";
->>>     >> >> >>>>         phy-mode        = "mii-id";
->>>     >> >> >>>> @@ -116,6 +121,7 @@
->>>     >> >> >>>>  };
->>>     >> >> >>>>
->>>     >> >> >>>>  &usbotg_hs {
->>>     >> >> >>>> +       dma-ranges;
->>>     >> >> >>>>         dr_mode = "host";
->>>     >> >> >>>>         phys = <&usbotg_hs_phy>;
->>>     >> >> >>>>         phy-names = "usb2-phy";
->>>     >> >> >>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>> b/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>> index 7d624a2..697a133 100644
->>>     >> >> >>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>> @@ -59,7 +59,6 @@
->>>     >> >> >>>>         };
->>>     >> >> >>>>
->>>     >> >> >>>>         soc {
->>>     >> >> >>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>     >> >> >>>>
->>>     >> >> >>>>                 timer2: timer at 40000000 {
->>>     >> >> >>>>                         compatible = "st,stm32-timer";
->>>     >> >> >>>> @@ -472,13 +471,11 @@
->>>     >> >> >>>>                         st,syscon = <&syscfg 0x4>;
->>>     >> >> >>>>                         snps,pbl = <8>;
->>>     >> >> >>>>                         snps,mixed-burst;
->>>     >> >> >>>> -                       dma-ranges;
->>>     >> >> >>>>                         status = "disabled";
->>>     >> >> >>>>                 };
->>>     >> >> >>>>
->>>     >> >> >>>>                 usbotg_hs: usb at 40040000 {
->>>     >> >> >>>>                         compatible = "snps,dwc2";
->>>     >> >> >>>> -                       dma-ranges;
->>>     >> >> >>>>                         reg = <0x40040000 0x40000>;
->>>     >> >> >>>>                         interrupts = <77>;
->>>     >> >> >>>>                         clocks = <&rcc 0 29>;
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>>> b/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>>> index 0596d60..3a1cfdd 100644
->>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->>>     >> >> >>>>> @@ -59,8 +59,6 @@
->>>     >> >> >>>>>         };
->>>     >> >> >>>>>
->>>     >> >> >>>>>         soc {
->>>     >> >> >>>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>     >> >> >>>>> -
->>>     >> >> >>>>>                 timer2: timer at 40000000 {
->>>     >> >> >>>>>                         compatible = "st,stm32-timer";
->>>     >> >> >>>>>                         reg = <0x40000000 0x400>;
->>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
->>>     >> >> >>>>> b/arch/arm/boot/dts/stm32f469-disco.dts
->>>     >> >> >>>>> index 9e73656..c2213c0 100644
->>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
->>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
->>>     >> >> >>>>> @@ -64,6 +64,10 @@
->>>     >> >> >>>>>         aliases {
->>>     >> >> >>>>>                 serial0 = &usart3;
->>>     >> >> >>>>>         };
->>>     >> >> >>>>> +
->>>     >> >> >>>>> +       soc {
->>>     >> >> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
->>>     >> >> >>>>> +       };
->>>     >> >> >>>>>  };
->>>     >> >> >>>>>
->>>     >> >> >>>>>  &clk_hse {
->>>     >> >> >>>>> --
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>>
->>>     >> >> >>>> Br.,
->>>     >> >> >>>> Bruno
->>>     >> >> >>>>
->>>     >> >> >>>
->>>     >> >> >
->>>     >> >>
->>>     >> >> _______________________________________________
->>>     >> >> linux-arm-kernel mailing list
->>>     >> >> linux-arm-kernel at lists.infradead.org
->>>     <mailto:linux-arm-kernel@lists.infradead.org>
->>>     >> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>     <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
->>>     >> >
->>>     >> >
->>>     >
->>>     >
->>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >>>
 >>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
