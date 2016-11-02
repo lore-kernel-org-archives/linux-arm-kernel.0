@@ -1,100 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 2 Nov 2016 16:20:50 -0600
-Subject: [PATCH v4 6/8] dt-bindings: Add support for Amlogic GXBB SCPI
- Interface
-In-Reply-To: <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
-References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
- <1475652814-30619-7-git-send-email-narmstrong@baylibre.com>
- <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
-Message-ID: <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 2 Nov 2016 22:52:42 +0000
+Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
+In-Reply-To: <20161102210054.16621-6-labbott@redhat.com>
+References: <20161102210054.16621-1-labbott@redhat.com>
+ <20161102210054.16621-6-labbott@redhat.com>
+Message-ID: <20161102225241.GA19591@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 11:39:05AM -0700, Olof Johansson wrote:
-> Hi,
+On Wed, Nov 02, 2016 at 03:00:53PM -0600, Laura Abbott wrote:
 > 
+> __pa_symbol is technically the marco that should be used for kernel
+> symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL.
+
+Nit: s/marco/macro/
+
+I see there are some other uses of __pa() that look like they could/should be
+__pa_symbol(), e.g. in mark_rodata_ro().
+
+I guess strictly speaking those need to be updated to? Or is there a reason
+that we should not?
+
+Thanks,
+Mark.
+
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+>  arch/arm64/mm/init.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> On Wed, Oct 5, 2016 at 12:33 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
-> >  1 file changed, 5 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> > index faa4b44..04bc171 100644
-> > --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> > +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> > @@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
-> >
-> >  Required properties:
-> >
-> > -- compatible : should be "arm,scpi"
-> > +- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 212c4d1..3236eb0 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -209,8 +209,8 @@ void __init arm64_memblock_init(void)
+>  	 * linear mapping. Take care not to clip the kernel which may be
+>  	 * high in memory.
+>  	 */
+> -	memblock_remove(max_t(u64, memstart_addr + linear_region_size, __pa(_end)),
+> -			ULLONG_MAX);
+> +	memblock_remove(max_t(u64, memstart_addr + linear_region_size,
+> +			__pa_symbol(_end)), ULLONG_MAX);
+>  	if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
+>  		/* ensure that memstart_addr remains sufficiently aligned */
+>  		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
+> -- 
+> 2.10.1
 > 
-> This doesn't seem right to document here. If anything you might want
-> to have a table of more-specific-compatibles for specific
-> implementations, but "arm,scpi" should still be the compatible of the
-> node (just not the most specific one).
-> 
-
-I completely agree with you and I was pushing for a generic "arm,legacy-scpi"
-compatible until this binding was acked by Rob.
-
-Anyways, I will add the generic compatible and post the changes.
-
-> Also, documenting it here indiciates that non-amlogic implementations
-> can/should use that compatible, which is misleading.
->
-
-Agreed, it's better to keep them out of this generic binding document.
-
-> >  - mboxes: List of phandle and mailbox channel specifiers
-> >           All the channels reserved by remote SCP firmware for use by
-> >           SCPI message protocol should be specified in any order
-> > @@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
-> >  processors and SCP.
-> >
-> >  Required properties:
-> > -- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
-> > +- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
-> > +               or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
-> 
-> Maybe you'd be better of with a meson-specific document that refers to
-> these but with different compatible values.
-> 
-> Come to think of it, the Juno-specific one maybe shouldn't be in
-> arm,scpi at all, since that adds confusion here.
-> 
-> It's somewhat confusing that ARM is both a platform, architecture and
-> in some cases implementer of specific systems. :)
-> 
-
-Sorry for that, I will move all juno specific references in the binding
-out of this document(except the examples, which I assume should be fine)
-
-> >  The rest of the properties should follow the generic mmio-sram description
-> >  found in ../../sram/sram.txt
-> > @@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
-> >  Required sub-node properties:
-> >  - reg : The base offset and size of the reserved area with the SRAM
-> >  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
-> > -              shared memory on Juno platforms
-> > +              shared memory on Juno platforms or
-> > +              "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
-> 
-> Same here. It won't scale if all vendors are expected to add an entry here.
-> 
-
-I will rework the patches to address the concerns as I too did share same
-concern.
-
-
-Hi Neil,
-
-You may need to rework the DTS files based on that, please be aware of
-that and make the necessary changes.
-
---
-Regards,
-Sudeep
