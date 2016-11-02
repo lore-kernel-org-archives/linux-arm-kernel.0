@@ -1,37 +1,66 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 2 Nov 2016 09:44:58 +0100
-Subject: [PATCH] ASoC: sun4i-codec: Enable bus clock after getting GPIO
-In-Reply-To: <20161101063155.15826-1-wens@csie.org>
-References: <20161101063155.15826-1-wens@csie.org>
-Message-ID: <20161102084458.xhuwy5bsmacgs2wm@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 2 Nov 2016 09:50:47 +0100
+Subject: [PATCH] ARM: dts: r8a7794: remove Z clock
+In-Reply-To: <2289596.xFBEUD1OgK@wasted.cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+ <2289596.xFBEUD1OgK@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdV11DuFQDciovvk9LH=Gu845ci+3-WJj5Biu16M84K3jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 02:31:55PM +0800, Chen-Yu Tsai wrote:
-> In the current probe function the GPIO is acquired after the codec's
-> bus clock is enabled. However if it fails to acquire the GPIO due to
-> a deferred probe, it does not disable the bus clock before bailing out.
-> This would result in the clock being enabled multiple times.
-> 
-> Move the code that enables the bus clock after the part that gets the
-> GPIO, maintaining a separation between resource acquisition and device
-> enablement in the probe function.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Sat, Oct 29, 2016 at 11:31 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> R8A7794 doesn't have Cortex-A15 CPUs, thus there's no Z clock...
+>
+> Fixes: 0dce5454d5c2 ("ARM: shmobile: Initial r8a7794 SoC device tree")
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-Maxime
+> ---
+> The patch is against the 'master' branch of Simon Horman's 'renesas.git' repo.
+>
+>  arch/arm/boot/dts/r8a7794.dtsi            |    3 +--
+>  include/dt-bindings/clock/r8a7794-clock.h |    3 +--
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -1025,8 +1025,7 @@
+>                         clocks = <&extal_clk &usb_extal_clk>;
+>                         #clock-cells = <1>;
+>                         clock-output-names = "main", "pll0", "pll1", "pll3",
+> -                                            "lb", "qspi", "sdh", "sd0", "z",
+> -                                            "rcan";
+> +                                            "lb", "qspi", "sdh", "sd0", "rcan";
+>                         #power-domain-cells = <0>;
+>                 };
+>                 /* Variable factor clocks */
+> Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
+> ===================================================================
+> --- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
+> +++ renesas/include/dt-bindings/clock/r8a7794-clock.h
+> @@ -20,8 +20,7 @@
+>  #define R8A7794_CLK_QSPI               5
+>  #define R8A7794_CLK_SDH                        6
+>  #define R8A7794_CLK_SD0                        7
+> -#define R8A7794_CLK_Z                  8
+> -#define R8A7794_CLK_RCAN               9
+> +#define R8A7794_CLK_RCAN               8
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/24a18996/attachment.sig>
+JFTR, this changes the bindings file, but the values are solely used
+for indexing
+the clock-output-names array, so this is fine.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
