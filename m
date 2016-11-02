@@ -1,68 +1,48 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 2 Nov 2016 09:22:06 +0100
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
- property query
-In-Reply-To: <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
-References: <1475092512-30555-1-git-send-email-matt@ranostay.consulting>
- <1475092512-30555-3-git-send-email-matt@ranostay.consulting>
- <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
- <20161024201443.GB5989@amd>
- <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
- <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
- <20161031213846.GA21014@amd>
- <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
-Message-ID: <20161102082206.GE21488@amd>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 2 Nov 2016 10:24:40 +0200
+Subject: [PATCH] video: ARM CLCD: fix Vexpress regression
+In-Reply-To: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+References: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <6e29bcec-e8c5-d00f-4257-4ec14e90fae1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> >> >> Better then previous one.
-> >> >>
-> >> >> But my version of bq27xxx_battery.c already contains this:
-> >> >
-> >> > This is for allowing udev rule to set the properties as well.
-> >> > otherwise a kinda crude RUN = " echo value >
-> >> > /sys/module/bq27xxx_battery/parameters/poll_interval" is required.
-> >>
-> >> Any thoughts on this?
-> >
-> > I'd say  echo value >
-> > /sys/module/bq27xxx_battery/parameters/poll_interval .. is quite
-> > adequate solution...?
-> >
-> > Alternatively, convince us that something else is useful for everyone,
-> > and we can do the right thing (poll more often when battery is nearly
-> > empty), automatically...
+On 20/10/16 09:46, Linus Walleij wrote:
+> The CLCD does not come up on Versatile Express as it does not
+> (currently) have a syscon node for controlling the block apart
+> from the CLCD itself. Make sure the .init() function can bail
+> out without an error making it probe again.
 > 
-> Ok should have had the patchset set it per device, and not use the
-> global poll_interval. Of need to add some logic to see if uses the
-> global poll_interval or it's own setting.
+> Reported-by: Amit Pundir <amit.pundir@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/video/fbdev/amba-clcd-versatile.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> There are times where you could have multiple batteries connected to
-> multiple fuel gauges, and want to up the polling interval on certain
-> ones that are discharging at different rates.
+> diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+> index 19ad8645d93c..d909b7dda14d 100644
+> --- a/drivers/video/fbdev/amba-clcd-versatile.c
+> +++ b/drivers/video/fbdev/amba-clcd-versatile.c
+> @@ -527,7 +527,8 @@ int versatile_clcd_init_panel(struct clcd_fb *fb,
+>  					     &clcd_id);
+>  	if (!np) {
+>  		dev_err(dev, "no Versatile syscon node\n");
+> -		return -ENODEV;
+> +		/* Vexpress does not have this */
+> +		return 0;
+>  	}
+>  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
+>  
 > 
-> But of course I'll let you guys let me know if this seems useful at all.
 
-I agree per-device polling would be cleaner.
+Thanks, queued for 4.9 fixes.
 
-But unless you have hardware with more than one bq27xxx, I'd avoid the
-work...
+ Tomi
 
-Now... its also possible that poll_interval should change itself
-(within kernel) to do the right thing.
-
-Best regards,
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/5f5fae4c/attachment.sig>
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/46980a9e/attachment.sig>
