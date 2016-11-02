@@ -1,58 +1,41 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 2 Nov 2016 11:41:50 -0500
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20161102164150.GA10528@bhelgaas-glaptop.roam.corp.google.com>
+From: asavkov@redhat.com (Artem Savkov)
+Date: Wed, 2 Nov 2016 17:44:27 +0100
+Subject: arm64 build failure with CONFIG_ARM64_LSE_ATOMICS=y
+Message-ID: <20161102164427.GB24243@shodan.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 11:08:20AM -0500, Bjorn Helgaas wrote:
-> On Tue, Nov 01, 2016 at 07:06:31AM -0600, cov at codeaurora.org wrote:
-> > Hi Bjorn,
-> > 
-> > On 2016-10-31 15:48, Bjorn Helgaas wrote:
-> > >On Wed, Sep 21, 2016 at 06:38:05PM -0400, Christopher Covington wrote:
-> > >>The Qualcomm Technologies QDF2432 SoC does not support accesses
-> > >>smaller
-> > >>than 32 bits to the PCI configuration space. Register the appropriate
-> > >>quirk.
-> > >>
-> > >>Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> > >
-> > >Hi Christopher,
-> > >
-> > >Can you rebase this against v4.9-rc1?  It no longer applies to my tree.
-> > 
-> > I apologize for not being clearer. This patch depends on:
-> > 
-> > PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
-> > PCI/ACPI: Check platform-specific ECAM quirks
-> > 
-> > These patches from Tomasz Nowicki were previously in your pci/ecam-v6
-> > branch, but that seems to have come and gone. How would you like to
-> > proceed?
-> 
-> Oh yes, that's right, I forgot that connection.  I'm afraid I kind of
-> dropped the ball on that thread, so I went back and read through it
-> again.
-> 
-> I *think* the current state is:
-> 
->   - I'm OK with the first two patches that add the quirk
->     infrastructure.
-> 
->   - My issue with the last three patches that add ThunderX quirks is
->     that there's no generic description of the ECAM address space.
-> 
-> So if I understand correctly, your Qualcomm patch depends only on the
-> first two patches.
+Hello Catalin,
 
-I put those first two patches and yours on pci/ecam-v6 and pushed it
-again, so you can check it out.
+Looks like your patch "efd9e03 arm64: Use static keys for CPU features"
+breaks arm64 build with "CONFIG_ARM64_LSE_ATOMICS=y" because it creates a
+circular dependency for asm/lse.h through jump_label.h:
 
-Bjorn
+  CC      arch/arm64/kernel/asm-offsets.s
+In file included from ./arch/arm64/include/asm/atomic.h:34:0,
+                 from ./include/linux/atomic.h:4,
+                 from ./include/linux/jump_label.h:169,
+                 from ./arch/arm64/include/asm/cpufeature.h:12,
+                 from ./arch/arm64/include/asm/alternative.h:4,
+                 from ./arch/arm64/include/asm/lse.h:7,
+                 from ./arch/arm64/include/asm/spinlock.h:19,
+                 from ./include/linux/spinlock.h:87,
+                 from ./include/linux/seqlock.h:35,
+                 from ./include/linux/time.h:5,
+                 from ./include/uapi/linux/timex.h:56,
+                 from ./include/linux/timex.h:56,
+                 from ./include/linux/sched.h:19,
+                 from arch/arm64/kernel/asm-offsets.c:21:
+./arch/arm64/include/asm/atomic_lse.h: In function ?atomic_andnot?:
+./arch/arm64/include/asm/atomic_lse.h:35:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
+  asm volatile(ARM64_LSE_ATOMIC_INSN(__LL_SC_ATOMIC(op),  \
+
+...
+
+./arch/arm64/include/asm/cmpxchg.h: In function ?__xchg_case_1?:
+./arch/arm64/include/asm/cmpxchg.h:38:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
+  asm volatile(ARM64_LSE_ATOMIC_INSN(    \
+
+-- 
+Regards,
+  Artem
