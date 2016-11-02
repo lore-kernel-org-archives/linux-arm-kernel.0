@@ -1,39 +1,67 @@
-From: Frank.Li@nxp.com (Frank Li)
-Date: Wed, 2 Nov 2016 13:00:04 -0500
-Subject: [PATCH V2 2/2] ARM: dts: add new compatible stream for i.MX6QP mmdc
-In-Reply-To: <1478109604-18323-1-git-send-email-Frank.Li@nxp.com>
-References: <1478109604-18323-1-git-send-email-Frank.Li@nxp.com>
-Message-ID: <1478109604-18323-2-git-send-email-Frank.Li@nxp.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed,  2 Nov 2016 13:08:01 -0400
+Subject: [PATCH v5 0/7] add NS2 support to bgmac
+Message-ID: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mmdc of i.MX6QP are little difference with i.MX6Q.
-added new compatible stream fsl,imx6qp-mmdc
+Changes in v5:
+* Change a pr_err to netdev_err (per Scott Branden)
+* Reword the lane swap binding documentation (per Andrew Lunn)
 
-Signed-off-by: Frank Li <Frank.Li@nxp.com>
----
-No change for this patch.
-suspend resume code need fsl,imx6q-mmdc
 
- arch/arm/boot/dts/imx6qp.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+Changes in v4:
+* Actually send out the lane swap binding doc patch (Per Scott Branden)
+* Remove unused #define (Per Andrew Lunn)
 
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 886dbf2..e0fdd0f 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -85,5 +85,12 @@
- 		pcie: pcie at 0x01000000 {
- 			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
- 		};
-+
-+		aips-bus at 02100000 {
-+			mmdc0: mmdc at 021b0000 { /* MMDC0 */
-+				compatible = "fsl,imx6qp-mmdc", "fsl,imx6q-mmdc";
-+				reg = <0x021b0000 0x4000>;
-+			};
-+		};
- 	};
- };
+
+Changes in v3:
+* Clean-up the bgmac DT binding doc (per Rob Herring)
+* Document the lane swap binding and make it generic (Per Andrew Lunn)
+
+
+Changes in v2:
+* Remove the PHY power-on (per Andrew Lunn)
+* Misc PHY clean-ups regarding comments and #defines (per Andrew Lunn)
+  This results on none of the original PHY code from Vikas being
+  present.  So, I'm removing him as an author and giving him
+  "Inspired-by" credit.
+* Move PHY lane swapping to PHY driver (per Andrew Lunn and Florian
+  Fainelli)
+* Remove bgmac sleep (per Florian Fainelli)
+* Re-add bgmac chip reset (per Florian Fainelli and Ray Jui)
+* Rebased on latest net-next
+* Added patch for bcm54xx_auxctl_read, which is used in the BCM54810
+
+
+Add support for the amac found in the Broadcom Northstar2 SoC to the
+bgmac driver.  This necessitates adding support to connect to an
+externally defined phy (as described in the device tree) in the driver.
+These phy changes are in addition to the changes necessary to get NS2
+working.
+
+
+Jon Mason (7):
+  net: phy: broadcom: add bcm54xx_auxctl_read
+  Documentation: devicetree: add PHY lane swap binding
+  net: phy: broadcom: Add BCM54810 PHY entry
+  Documentation: devicetree: net: add NS2 bindings to amac
+  net: ethernet: bgmac: device tree phy enablement
+  net: ethernet: bgmac: add NS2 support
+  arm64: dts: NS2: add AMAC ethernet support
+
+ .../devicetree/bindings/net/brcm,amac.txt          |  16 ++--
+ Documentation/devicetree/bindings/net/phy.txt      |   4 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |   5 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  12 +++
+ drivers/net/ethernet/broadcom/bgmac-bcma.c         |  48 ++++++++++
+ drivers/net/ethernet/broadcom/bgmac-platform.c     | 100 ++++++++++++++++++++-
+ drivers/net/ethernet/broadcom/bgmac.c              |  55 ++----------
+ drivers/net/ethernet/broadcom/bgmac.h              |   8 ++
+ drivers/net/phy/Kconfig                            |   2 +-
+ drivers/net/phy/broadcom.c                         |  68 +++++++++++++-
+ include/linux/brcmphy.h                            |  10 +++
+ 11 files changed, 271 insertions(+), 57 deletions(-)
+
 -- 
-2.5.2
+2.7.4
