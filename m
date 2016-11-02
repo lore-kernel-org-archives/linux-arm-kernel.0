@@ -1,61 +1,84 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 2 Nov 2016 14:22:17 +0100
-Subject: [PATCH 3/5] ARM: multi_v7_defconfig: Remove
- CONFIG_ST_THERMAL_MEMMAP Kconfig symbol
-In-Reply-To: <20161024101408.GA10440@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1477065443-10668-1-git-send-email-patrice.chotard@st.com>
- <1477065443-10668-4-git-send-email-patrice.chotard@st.com>
- <20161024101408.GA10440@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <4e1a0a27-d50e-b577-f617-025d55588157@st.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 2 Nov 2016 14:27:14 +0100
+Subject: flush_dcache_page() in ARM vs ARM64
+Message-ID: <20161102132714.GA1326@lnxartpec.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARMv7-A and ARMv8-A are, as far as I can see, identical in which cache
+behaviours they support.  The data cache has to behave as PIPT while for
+the instruction cache, PIPT, VIPT, and ASIC-tagged VIVT behaviours are
+supported.  See section B3.11 of the ARMv7-A ARM and section D4.9 of the
+ARMv8-A ARM.
 
+Both ARMv7-A with Multiprocessing Extensions and ARMv8-A broadcast cache
+maintenance operations to other cores.  See B2.2.5 of the ARMv7-A ARM
+and D7.2.57 of the ARMv8-A ARM.
 
-On 10/24/2016 12:14 PM, Peter Griffin wrote:
-> Hi Patrice,
-> 
-> On Fri, 21 Oct 2016, patrice.chotard at st.com wrote:
-> 
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> Driver code has been already removed, see
->> http://www.spinics.net/lists/devicetree/msg143322.html
->> Remove the multi_v7_defconfig part
->>
->> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
->> Cc: <rui.zhang@intel.com>
->> Cc: <edubezval@gmail.com>
->> ---
->>  arch/arm/configs/multi_v7_defconfig | 1 -
->>  1 file changed, 1 deletion(-)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index 15b2f99..45e252b 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -450,7 +450,6 @@ CONFIG_RCAR_THERMAL=y
->>  CONFIG_ARMADA_THERMAL=y
->>  CONFIG_DAVINCI_WATCHDOG=m
->>  CONFIG_EXYNOS_THERMAL=m
->> -CONFIG_ST_THERMAL_MEMMAP=y
-> 
+Both arch/arm/ (for ARMv6+) and arch/arm64/ define PG_arch_1 to be
+PG_dcache_clean and use it to postpone flushing from flush_dcache_page()
+to set_pte_at().  See arch/{arm,arm64}/mm/flush.c.
 
-Hi Peter
+However, arch/arm64/'s flush_dcache_page() is implemented like this:
 
-> Are you sure you want to remove this?
+	void flush_dcache_page(struct page *page)
+	{
+		if (test_bit(PG_dcache_clean, &page->flags))
+			clear_bit(PG_dcache_clean, &page->flags);
+	}
 
-Well spotted, you are right. It must be kept.
+while arch/arm/ has this:
 
-Thanks
+	void flush_dcache_page(struct page *page)
+	{
+		struct address_space *mapping;
+	
+		/*
+		 * The zero page is never written to, so never has any dirty
+		 * cache lines, and therefore never needs to be flushed.
+		 */
+		if (page == ZERO_PAGE(0))
+			return;
+	
+		mapping = page_mapping(page);
+	
+		if (!cache_ops_need_broadcast() &&
+		    mapping && !page_mapcount(page))
+			clear_bit(PG_dcache_clean, &page->flags);
+		else {
+			__flush_dcache_page(mapping, page);
+			if (mapping && cache_is_vivt())
+				__flush_dcache_aliases(mapping, page);
+			else if (mapping)
+				__flush_icache_all();
+			set_bit(PG_dcache_clean, &page->flags);
+		}
+	}
 
-> 
-> This Kconfig symbol is still used for the stih407 family
-> thermal parts in drivers/thermal/st/st_thermal_memmap.c?
-> 
-> My patch only removed the stih415/6 parts from the driver.
-> 
-> regards,
-> 
-> Peter.
-> 
+Why does arch/arm/ flush the data cache area in flush_dcache_page() for
+the (!mapping || page_mapcount(page)) case even on ARMv7+ME, while
+arch/arm64/ doesn't for ARMv8?
+
+Why does arch/arm/ invalidate the instruction cache in
+flush_dcache_page() for the (mapping && page_count(page)) case even for
+ARMv7+ME, while arch/arm64/ doesn't for ARMv8?
+
+What would break with the following patch?
+
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 3cced84..f1e6190 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -327,6 +327,12 @@ void flush_dcache_page(struct page *page)
+ 	if (page == ZERO_PAGE(0))
+ 		return;
+ 
++	if (!cache_ops_need_broadcast() && cache_is_vipt_nonaliasing()) {
++		if (test_bit(PG_dcache_clean, &page->flags))
++			clear_bit(PG_dcache_clean, &page->flags);
++		return;
++	}
++
+ 	mapping = page_mapping(page);
+ 
+ 	if (!cache_ops_need_broadcast() &&
