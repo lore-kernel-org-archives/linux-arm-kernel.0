@@ -1,20 +1,78 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 2 Nov 2016 07:55:53 +0530
-Subject: [PATCH] ARM: spear: Fix error handling
-In-Reply-To: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
-References: <20161029135839.6388-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <CAOh2x=kiECTSiSk0+R63gDbm8_NM6wDm=03RJKEyznnHfOZuDg@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 2 Nov 2016 10:40:16 +0800
+Subject: [PATCH v1] iio: adc: at91: add suspend and resume callback
+Message-ID: <1478054417-7520-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 7:28 PM, Christophe JAILLET
-<christophe.jaillet@wanadoo.fr> wrote:
-> 'clk_get_sys()' returns an error pointer in case of error, not NULL. So
-> test it with IS_ERR.
->
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
->  arch/arm/mach-spear/time.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Add suspend/resume callback, support the pinctrl sleep state when
+the system suspend as well.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
+
+ drivers/iio/adc/at91_adc.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
+index bbdac07..ffa81a1 100644
+--- a/drivers/iio/adc/at91_adc.c
++++ b/drivers/iio/adc/at91_adc.c
+@@ -30,6 +30,7 @@
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/trigger_consumer.h>
+ #include <linux/iio/triggered_buffer.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ /* Registers */
+ #define AT91_ADC_CR		0x00		/* Control Register */
+@@ -1347,6 +1348,39 @@ static int at91_adc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int at91_adc_suspend(struct device *dev)
++{
++	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
++	struct at91_adc_state *st = iio_priv(idev);
++
++	pinctrl_pm_select_sleep_state(dev);
++	clk_disable_unprepare(st->clk);
++
++	return 0;
++}
++
++static int at91_adc_resume(struct device *dev)
++{
++	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
++	struct at91_adc_state *st = iio_priv(idev);
++
++	clk_prepare_enable(st->clk);
++	pinctrl_pm_select_default_state(dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops at91_adc_pm_ops = {
++	.suspend = at91_adc_suspend,
++	.resume = at91_adc_resume,
++};
++
++#define AT91_ADC_PM_OPS (&at91_adc_pm_ops)
++#else
++#define AT91_ADC_PM_OPS NULL
++#endif
++
+ static struct at91_adc_caps at91sam9260_caps = {
+ 	.calc_startup_ticks = calc_startup_ticks_9260,
+ 	.num_channels = 4,
+@@ -1441,6 +1475,7 @@ static struct platform_driver at91_adc_driver = {
+ 	.driver = {
+ 		   .name = DRIVER_NAME,
+ 		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
++		.pm = AT91_ADC_PM_OPS,
+ 	},
+ };
+ 
+-- 
+2.7.4
