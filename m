@@ -1,48 +1,49 @@
-From: wei@redhat.com (Wei Huang)
-Date: Wed,  2 Nov 2016 15:55:32 -0500
-Subject: [PATCH 1/1] KVM: ARM64: Fix the issues when PMCCFILTR is configured
-Message-ID: <1478120132-9928-1-git-send-email-wei@redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 02 Nov 2016 20:59:59 +0000
+Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS
+ MAPD?
+In-Reply-To: <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
+ (Alan Douglas's message of "Wed, 2 Nov 2016 09:36:14 +0000")
+References: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
+ <861syvkqcr.fsf@arm.com>
+ <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
+Message-ID: <8637j9iomo.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
-But this function can't deals with PMCCFILTR correctly because the evtCount
-bit of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
-type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, KVM
-shouldn't return immediately, but instead it needs to check further if
-select_idx is ARMV8_PMU_CYCLE_IDX.
+On Wed, Nov 02 2016 at 09:36:14 AM, Alan Douglas <adouglas@cadence.com> wrote:
+> Hi Marc,
+>
+>> > When setting up bus 0, the ITS device is created, and
+>> > its_build_map_cmd() sets the size of the ITS MAPD based on the number
+>> > of interrupts claimed by bus 0.  When subsequent buses are enumerated,
+>> > the ITS device will be reused, however we do not increase the number
+>> > of supported interrupts to allow for the additional interrupts claimed
+>> > by the additional devices being enumerated.  (This can be seen in
+>> > its_msi_prepare(), which is called for each device which has MSI/MSI-X
+>> > enabled, and will reuse an existing ITS. )
+>> 
+>> Am I right in understanding that all the PCIe devices in your system end-up
+>> aliasing to the same RequesterID? If so, that's a major issue. The ITS is
+>> designed so that each device exposes its *own* RID, and have its own
+>> Interrupt Translation Table (ITT).
+>> 
+>> In your case, you seem to first discover the root port, which is not upstream
+>> of anything, so it doesn't alias with anything at that point. We allocate the
+>> corresponding ITT, and it's all fine. Until we start probing the rest, and ugly
+>> things happen.
+>> 
+> Yes, your understanding is correct.  I will dig into this a bit
+> further to see what is wrong then send an update.  I suspect my DTS
+> msi mapping.
 
-Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
-directly to attr.config. Istead it shoudl convert the request to
-perf_event of type 0x11 (i.e. the "cpu cycle" event type).
+Right. That would explain a lot of what you're seeing. In general, and
+unless you have some funky remapping going on, you're better off having
+a very straightforward msi-map property in your RC node (such as example
+#1 in Documentation/devicetree/bindings/pci/pci-msi.txt).
 
-Signed-off-by: Wei Huang <wei@redhat.com>
----
- virt/kvm/arm/pmu.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Thanks,
 
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 6e9c40e..13cc812 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
- 
- 	/* Software increment event does't need to be backed by a perf event */
--	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
-+	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR &&
-+	    select_idx != ARMV8_PMU_CYCLE_IDX)
- 		return;
- 
- 	memset(&attr, 0, sizeof(struct perf_event_attr));
-@@ -391,7 +392,7 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u64 data,
- 	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
- 	attr.exclude_hv = 1; /* Don't count EL2 events */
- 	attr.exclude_host = 1; /* Don't count host events */
--	attr.config = eventsel;
-+	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ? 0x011 : eventsel;
- 
- 	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
- 	/* The initial sample period (overflow count) of an event. */
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny.
