@@ -1,29 +1,33 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 2 Nov 2016 15:09:35 +0530
-Subject: [PATCH v27 0/9] arm64: add kdump support
-In-Reply-To: <20161102044959.11954-1-takahiro.akashi@linaro.org>
-References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
-Message-ID: <e9d49b0b-f4e6-13af-f963-5e42191cb24e@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 2 Nov 2016 10:46:47 +0100
+Subject: [PATCH 01/11] ARM: shmobile: r8a7745: add power domain index
+ macros
+In-Reply-To: <1645729.DjklObBkNM@wasted.cogentembedded.com>
+References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
+ <1645729.DjklObBkNM@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdV+9LPmp5QL_sQ_Ob2H5NzcRASkeA6DoAP0TcrSS44nLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 02 November 2016 10:19 AM, AKASHI Takahiro wrote:
->     v27-specific note: In this version, the change made in v26 was reverted
->     because I've got a comment that /reserved-memory DT property should
->     not be used on UEFI/ACPI systems, even though it is workable under
->     the current implementation. I've also confirmed that Rob doesn't argue
->     any more against using "linux,usable-memory-range".
->     So v27 is essentially the same as v25.
+On Sat, Oct 29, 2016 at 12:07 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add macros usable by the device tree sources to reference R8A7745 SYSC power
+> domains by index.
 >
-> This patch series adds kdump support on arm64.
+> Based on the original (and large) patch by Dmitry Shifrin
+> <dmitry.shifrin@cogentembedded.com>.
 >
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools[1] are also needed. Please use the latest one, v4 [2].
->
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->   - crash utility (v7.1.6 or later) [3]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Tested with mustang and seattle.
-Tested-by: Pratyush Anand <panand@redhat.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
