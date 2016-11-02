@@ -1,23 +1,19 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 2 Nov 2016 16:41:46 -0500
-Subject: [PATCH 2/3] phy: da8xx-usb: rename the ohci device to ohci-da8xx
-In-Reply-To: <20161102124435.31777-3-ahaslam@baylibre.com>
-References: <20161102124435.31777-1-ahaslam@baylibre.com>
- <20161102124435.31777-3-ahaslam@baylibre.com>
-Message-ID: <dc1c5a39-8e89-81b3-d0ae-1da91ac6c758@lechnology.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 02 Nov 2016 22:41:45 +0100
+Subject: [PATCH 1/3] ARM: pxa: mioa701: use the new pxa_camera
+ platform_data
+In-Reply-To: <1474662654-23263-1-git-send-email-robert.jarzmik@free.fr>
+ (Robert Jarzmik's message of "Fri, 23 Sep 2016 22:30:52 +0200")
+References: <1474662654-23263-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87twbpzhie.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2016 07:44 AM, Axel Haslam wrote:
-> There is only one ohci on the da8xx series of chips,
-> so remove the ".0" when creating the phy. Also add
-> the "-da8xx" postfix to be consistent across davinci
-> usb drivers.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-It would be more accurate to say that the device name is being changed 
-in the mach board configuration files, so it is being changed here in 
-the lookup table to match the new name.
+> pxa_camera has transitioned from a soc_camera driver to a standalone
+> v4l2 driver. Amend the device declaration accordingly.
+Queued to pxa/for-next.
 
->
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
-> ---
+--
+Robert
