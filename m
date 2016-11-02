@@ -1,35 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  2 Nov 2016 10:23:53 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.10
-Message-ID: <cover.1478078446.git.horms+renesas@verge.net.au>
+Date: Wed,  2 Nov 2016 10:23:54 +0100
+Subject: [PATCH] ARM: shmobile: defconfig: Enable CONFIG_CGROUPS
+In-Reply-To: <cover.1478078446.git.horms+renesas@verge.net.au>
+References: <cover.1478078446.git.horms+renesas@verge.net.au>
+Message-ID: <a604a37d46b80899d5a09d937fdd670e93af690d.1478078446.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.10.
+Enable support for CONFIG_CGROUPS in shmobile_defconfig.
 
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.10
-
-for you to fetch changes up to a604a37d46b80899d5a09d937fdd670e93af690d:
-
-  ARM: shmobile: defconfig: Enable CONFIG_CGROUPS (2016-10-17 08:24:41 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.10
-
-* Enable cgroups in shmobile_defconfig
-
-----------------------------------------------------------------
-Niklas S?derlund (1):
-      ARM: shmobile: defconfig: Enable CONFIG_CGROUPS
-
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/configs/shmobile_defconfig | 1 +
  1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index baa07a46a88b..1b0f8ae36fb3 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -2,6 +2,7 @@ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
++CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+ CONFIG_SYSCTL_SYSCALL=y
+-- 
+2.7.0.rc3.207.g0ac5344
