@@ -1,66 +1,49 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Wed, 02 Nov 2016 09:30:18 +0100
-Subject: Low network throughput on i.MX28
-In-Reply-To: <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
- <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
- <1477696028.31471.3.camel@embedded.rocks>
- <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
- <1478074489.19127.7.camel@embedded.rocks>
- <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
-Message-ID: <1478075418.19127.9.camel@embedded.rocks>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 2 Nov 2016 10:34:00 +0200
+Subject: [PATCH] video: ARM CLCD: fix Vexpress regression
+In-Reply-To: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+References: <1476945992-5164-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <f95e05ef-e8e0-c5f4-9635-ae392c1812a3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-02 at 09:24 +0100, Stefan Wahren wrote:
-> Am 02.11.2016 um 09:14 schrieb J?rg Krause:
-> > On Sat, 2016-10-29 at 11:08 +0200, Stefan Wahren wrote:
-> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 29. Oktober
-> > > > 2016
-> > > > um 01:07
-> > > > geschrieben:
-> > > > 
-> > > > 
-> > > > You mentioned [1] an optimization in the Freescale vendor Linux
-> > > > kernel
-> > > > [2]. I would really like to see this optimization in the
-> > > > mainline
-> > > > kernel.
-> > > > 
-> > > > Did you ever tried to port this code from Freescale to
-> > > > mainline?
-> > > 
-> > > Yes, i tried once but i was frustrated soon because of the lot of
-> > > required
-> > > changes and resulting issues.
-> > 
-> > I got the PIO mode working for the mxs-mmc driver. For this I
-> > ported
-> > the PIO code from the vendor kernel and removed the usage of the
-> > DMA
-> > engine entirely.
+On 20/10/16 09:46, Linus Walleij wrote:
+> The CLCD does not come up on Versatile Express as it does not
+> (currently) have a syscon node for controlling the block apart
+> from the CLCD itself. Make sure the .init() function can bail
+> out without an error making it probe again.
 > 
-> Good job
-
-Thanks!
-
-> > 
-> > Testing network bandwidth with iperf, I get about ~10Mbit/sec with
-> > PIO
-> > mode compared to ~6.5Mbit/sec with DMA mode for UDP and about
-> > ~6.5Mbit/sec compared to ~4.5Mbit/sec with DMA mode for TCP.
+> Reported-by: Amit Pundir <amit.pundir@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/video/fbdev/amba-clcd-versatile.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> And how about MMC / sd card performance?
+> diff --git a/drivers/video/fbdev/amba-clcd-versatile.c b/drivers/video/fbdev/amba-clcd-versatile.c
+> index 19ad8645d93c..d909b7dda14d 100644
+> --- a/drivers/video/fbdev/amba-clcd-versatile.c
+> +++ b/drivers/video/fbdev/amba-clcd-versatile.c
+> @@ -527,7 +527,8 @@ int versatile_clcd_init_panel(struct clcd_fb *fb,
+>  					     &clcd_id);
+>  	if (!np) {
+>  		dev_err(dev, "no Versatile syscon node\n");
+> -		return -ENODEV;
+> +		/* Vexpress does not have this */
+> +		return 0;
+>  	}
+>  	versatile_clcd_type = (enum versatile_clcd)clcd_id->data;
 
-Can't tell as my custom i.MX28 board does not have a SD card interface.
+Actually, the above doesn't look correct. If this is not an error, then
+the driver shouldn't print an error.
 
-I will share the code after doing some cleanups and further tests so
-you might test it as well.
+Shall I just remove the print?
 
-J?rg
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/6b56b131/attachment.sig>
