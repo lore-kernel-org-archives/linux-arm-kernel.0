@@ -1,41 +1,133 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed,  2 Nov 2016 11:54:02 +0000
-Subject: [PATCH v1 0/6] Support GICv3 ITS in 32-bit mode
-Message-ID: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
+Date: Wed,  2 Nov 2016 11:54:03 +0000
+Subject: [PATCH v1 1/6] irqchip/gic-v3-its: Change unsigned types for AArch32
+ compatibility
+In-Reply-To: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
+References: <1478087648-5346-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1478087648-5346-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Make sure that constants which are supposed to be applied on 64-bit
+data is actually unsigned long long, so they won't be truncated when
+used in 32-bit mode.
 
-This series introduces GICv3 ITS to 32-bit world. Since I'm limited
-with real world 32-bit platforms which uses ITS it was tested with
-help of vITS on 64-bit host running 32-bit guest.
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   |   28 ++++++++++++++--------------
+ include/linux/irqchip/arm-gic-v3.h |    4 ++--
+ 2 files changed, 16 insertions(+), 16 deletions(-)
 
-I used Andrea's its/v8 branch at [1] with following option passed to
-kvmtool: --aarch32 --irqchip=gicv3-its --force-pci
-
-[1] git://www.linux-arm.org/kvmtool.git
-
-Changelog:
-
-    RFC -> v1
-        - rebased on 4.9-rc2,  gits_read_typer() has been dropped
-	- spilt ITS and vITS in separate patch sets
-	
-Vladimir Murzin (6):
-  irqchip/gic-v3-its: Change unsigned types for AArch32 compatibility
-  irqchip/gic-v3-its: Narrow down Entry Size when used as a divider
-  irqchip/gicv3-its: Specialise flush_dcache operation
-  irqchip/gicv3-its: Specialise readq and writeq accesses
-  ARM: gic-v3-its: Add 32bit support to GICv3 ITS
-  ARM: virt: Select ARM_GIC_V3_ITS
-
- arch/arm/Kconfig                    |    1 +
- arch/arm/include/asm/arch_gicv3.h   |   54 +++++++++++++++++++++----
- arch/arm64/include/asm/arch_gicv3.h |   17 ++++++++
- drivers/irqchip/irq-gic-v3-its.c    |   75 +++++++++++++++++------------------
- include/linux/irqchip/arm-gic-v3.h  |    4 +-
- 5 files changed, 104 insertions(+), 47 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index c5dee30..bca125e 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -196,7 +196,7 @@ struct its_cmd_block {
+ 
+ static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
+ {
+-	cmd->raw_cmd[0] &= ~0xffUL;
++	cmd->raw_cmd[0] &= ~0xffULL;
+ 	cmd->raw_cmd[0] |= cmd_nr;
+ }
+ 
+@@ -208,43 +208,43 @@ static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
+ 
+ static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
+ {
+-	cmd->raw_cmd[1] &= ~0xffffffffUL;
++	cmd->raw_cmd[1] &= ~0xffffffffULL;
+ 	cmd->raw_cmd[1] |= id;
+ }
+ 
+ static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
+ {
+-	cmd->raw_cmd[1] &= 0xffffffffUL;
++	cmd->raw_cmd[1] &= 0xffffffffULL;
+ 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
+ }
+ 
+ static void its_encode_size(struct its_cmd_block *cmd, u8 size)
+ {
+-	cmd->raw_cmd[1] &= ~0x1fUL;
++	cmd->raw_cmd[1] &= ~0x1fULL;
+ 	cmd->raw_cmd[1] |= size & 0x1f;
+ }
+ 
+ static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+ {
+-	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
+-	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
++	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
++	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
+ }
+ 
+ static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+ {
+-	cmd->raw_cmd[2] &= ~(1UL << 63);
++	cmd->raw_cmd[2] &= ~(1ULL << 63);
+ 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
+ }
+ 
+ static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+ {
+-	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
+-	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
++	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
++	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
+ }
+ 
+ static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+ {
+-	cmd->raw_cmd[2] &= ~0xffffUL;
++	cmd->raw_cmd[2] &= ~0xffffULL;
+ 	cmd->raw_cmd[2] |= col;
+ }
+ 
+@@ -657,8 +657,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	its = its_dev->its;
+ 	addr = its->phys_base + GITS_TRANSLATER;
+ 
+-	msg->address_lo		= addr & ((1UL << 32) - 1);
+-	msg->address_hi		= addr >> 32;
++	msg->address_lo		= lower_32_bits(addr);
++	msg->address_hi		= upper_32_bits(addr);
+ 	msg->data		= its_get_event_id(d);
+ 
+ 	iommu_dma_map_msi_msg(d->irq, msg);
+@@ -935,9 +935,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	}
+ 
+ 	if (val != tmp) {
+-		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
++		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+ 		       &its->phys_base, its_base_type_string[type],
+-		       (unsigned long) val, (unsigned long) tmp);
++		       val, tmp);
+ 		free_pages((unsigned long)base, order);
+ 		return -ENXIO;
+ 	}
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index b7e3431..5118d3a 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -239,7 +239,7 @@
+ #define GITS_TYPER_PTA			(1UL << 19)
+ #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+ 
+-#define GITS_CBASER_VALID			(1UL << 63)
++#define GITS_CBASER_VALID			(1ULL << 63)
+ #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
+ #define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
+@@ -265,7 +265,7 @@
+ 
+ #define GITS_BASER_NR_REGS		8
+ 
+-#define GITS_BASER_VALID			(1UL << 63)
++#define GITS_BASER_VALID			(1ULL << 63)
+ #define GITS_BASER_INDIRECT			(1ULL << 62)
+ 
+ #define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
 -- 
 1.7.9.5
