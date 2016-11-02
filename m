@@ -1,35 +1,32 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 1 Nov 2016 17:12:05 -0700
-Subject: [PATCH 3/3] clk: imx: clk-imx6ul: add clk support for imx6ull
-In-Reply-To: <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
-References: <1477969343-19887-1-git-send-email-peter.chen@nxp.com>
- <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
-Message-ID: <20161102001205.GA16026@codeaurora.org>
+Date: Tue, 1 Nov 2016 17:27:54 -0700
+Subject: [PATCH] clk: qoriq: Don't allow CPU clocks higher than starting
+ value
+In-Reply-To: <1476729743-15563-1-git-send-email-oss@buserror.net>
+References: <1476729743-15563-1-git-send-email-oss@buserror.net>
+Message-ID: <20161102002754.GF16026@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01, Peter Chen wrote:
->  	clks[IMX6UL_CLK_USDHC1]		= imx_clk_gate2("usdhc1",	"usdhc1_podf",	 base + 0x80,	2);
->  	clks[IMX6UL_CLK_USDHC2]		= imx_clk_gate2("usdhc2",	"usdhc2_podf",	 base + 0x80,	4);
-> -	clks[IMX6UL_CLK_SIM1]		= imx_clk_gate2("sim1",		"sim_sel",	 base + 0x80,	6);
-> -	clks[IMX6UL_CLK_SIM2]		= imx_clk_gate2("sim2",		"sim_sel",	 base + 0x80,	8);
-> +	if (clk_on_imx6ul()) {
-> +		clks[IMX6UL_CLK_SIM1]		= imx_clk_gate2("sim1",		"sim_sel",	 base + 0x80,	6);
-> +		clks[IMX6UL_CLK_SIM2]		= imx_clk_gate2("sim2",		"sim_sel",	 base + 0x80,	8);
-> +	}
->  	clks[IMX6UL_CLK_EIM]		= imx_clk_gate2("eim",		"eim_slow_podf", base + 0x80,	10);
->  	clks[IMX6UL_CLK_PWM8]		= imx_clk_gate2("pwm8",		"perclk",	 base + 0x80,	16);
->  	clks[IMX6UL_CLK_UART8_IPG]	= imx_clk_gate2("uart8_ipg",	"ipg",		 base + 0x80,	14);
-> @@ -430,6 +478,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
->  	clk_set_rate(clks[IMX6UL_CLK_ENET_REF], 50000000);
->  	clk_set_rate(clks[IMX6UL_CLK_ENET2_REF], 50000000);
->  	clk_set_rate(clks[IMX6UL_CLK_CSI], 24000000);
-> +	clk_set_rate(clks[IMX6UL_CLK_PLL3_PFD2], 320000000);
+On 10/17, Scott Wood wrote:
+> The boot-time frequency of a CPU is considered its rated maximum, as we
+> have no other source of such information.  However, this was previously
+> only used for chips with 80% restrictions on secondary PLLs.  This
+> usually wasn't a problem because most chips/configs boot with a divider
+> of /1, with other dividers being used only for dynamic frequency
+> reduction.  However, at least one config (LS1021A at less than 1 GHz)
+> uses a different divider for top speed.  This was causing cpufreq to set
+> a frequency beyond the chip's rated speed.
+> 
+> This is fixed by applying a 100%-of-initial-speed limit to all CPU PLLs,
+> similar to the existing 80% limit that only applied to some.
+> 
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> Cc: stable at vger.kernel.org
+> ---
 
-Can you use assigned clock rates for this instead?
-
->  
->  	/* keep all the clks on just for bringup */
+All silence, so I applied to clk-fixes because presumably this is
+some sort of badness we need to fix quickly.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
