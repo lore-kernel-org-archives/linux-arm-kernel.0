@@ -1,51 +1,56 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 2 Nov 2016 14:54:51 +0100
-Subject: [PATCH v2 1/2] net: stmmac: Add OXNAS Glue Driver
-In-Reply-To: <CAGhQ9VyAaqUy06kb_Mxewo+BbJnxe=e6=x8pFsVSY0Z6C-h=cg@mail.gmail.com>
-References: <20161031105345.16711-1-narmstrong@baylibre.com>
- <20161031105442.17228-1-narmstrong@baylibre.com>
- <CAGhQ9VyAaqUy06kb_Mxewo+BbJnxe=e6=x8pFsVSY0Z6C-h=cg@mail.gmail.com>
-Message-ID: <dd54dc6a-85ba-b9b9-be52-36212405de66@baylibre.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 2 Nov 2016 13:54:58 +0000
+Subject: Tegra baseline test results for v4.9-rc1
+In-Reply-To: <ff60cb86-a8e3-dc25-ac86-b6e3ccf7ea17@nvidia.com>
+References: <ff60cb86-a8e3-dc25-ac86-b6e3ccf7ea17@nvidia.com>
+Message-ID: <78f0138e-e447-f777-bdcb-3c39fcccf335@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2016 12:12 PM, Joachim Eastwood wrote:
-> Hi Neil,
-> 
-> On 31 October 2016 at 11:54, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> Add Synopsys Designware MAC Glue layer for the Oxford Semiconductor OX820.
->>
->> Acked-by: Joachim Eastwood <manabian@gmail.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->> +static int oxnas_dwmac_init(struct oxnas_dwmac *dwmac)
->> +{
->> +       unsigned int value;
->> +       int ret;
->> +
->> +       /* Reset HW here before changing the glue configuration */
->> +       ret = device_reset(dwmac->dev);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = clk_prepare_enable(dwmac->clk);
->> +       if (ret)
->> +               return ret;
->> +
->> +       ret = regmap_read(dwmac->regmap, OXNAS_DWMAC_CTRL_REGOFFSET, &value);
->> +       if (ret < 0)
->> +               return ret;
-> 
-> If regmap reading fails here, the clock will be left on as probe fails.
-> 
 
-Indeed, thanks.
+On 02/11/16 13:39, Jon Hunter wrote:
+> Here are some basic Tegra test results for Linux v4.9-rc1.
+> Logs and other details at:
+>
+>     https://nvtb.github.io//linux/test_v4.9-rc1/20161102045959/
+>
+>
+> Test summary
+> ------------
+>
+> Build: zImage:
+>     FAIL: ( 1/ 2): multi_v7_defconfig
 
-Neil
+This issue was exposed by commit 3f0958d8aea7 ("ARM: multi_v7_defconfig: 
+enable CONFIG_EFI") because our builder is using an older version on 
+bin-utils. This has been fixed by commit b0dddf6c147e ("efi/arm: Fix 
+absolute relocation detection for older toolchains").
 
-[...]
-> 
-> 
-> regards,
-> Joachim Eastwood
-> 
+>     Pass: ( 1/ 2): tegra_defconfig
+>
+> Build: Image:
+>     Pass: ( 1/ 1): defconfig
+>
+> Boot to userspace: defconfig:
+>     Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+> 		   tegra210-p2371-0000, tegra210-smaug
+>
+> Boot to userspace: tegra_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+>
+> PM: System suspend: tegra_defconfig:
+>     FAIL: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+These failures are not true/hard failures as suspend is still working. 
+Commit 4bcc595ccd80 ("printk: reinstate KERN_CONT for printing 
+continuation lines") exposed a issue with one of the messages seen in 
+suspend (which we look for when testing suspend) and caused the suspend 
+test to report a failure. This has been fixed by commit 1adb469b9b76 
+("PM / suspend: Fix missing KERN_CONT for suspend message").
+
+Jon
+
+-- 
+nvpublic
