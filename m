@@ -1,145 +1,87 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 2 Nov 2016 10:19:15 -0500
-Subject: [PATCH 1/2] ARM: imx: mmdc perf function support i.MX6QP
-In-Reply-To: <20161102144008.GC19126@dragon>
-References: <1477430817-20381-1-git-send-email-Frank.Li@nxp.com>
- <20161102144008.GC19126@dragon>
-Message-ID: <CAHrpEqQ2NDmdAMLpMjZgNj9NqGf+LPfAwo-rzaa5cwwTcP_Etw@mail.gmail.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed,  2 Nov 2016 11:42:43 -0400
+Subject: [PATCH v1 00/11] perf: arm64: Support for Hisilicon SoC Hardware
+ event counters
+Message-ID: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 2, 2016 at 9:40 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Oct 25, 2016 at 04:26:56PM -0500, Frank Li wrote:
->> i.MX6QP added new reigster bit PROFILE_SEL in MADPCR0.
->> need set it at perf start.
->>
->> Signed-off-by: Frank Li <Frank.Li@nxp.com>
->> ---
->>  arch/arm/mach-imx/mmdc.c | 45 +++++++++++++++++++++++++++++++++++++++------
->>  1 file changed, 39 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
->> index d82d14c..d833b87 100644
->> --- a/arch/arm/mach-imx/mmdc.c
->> +++ b/arch/arm/mach-imx/mmdc.c
->> @@ -44,6 +44,7 @@
->>  #define DBG_RST                      0x2
->>  #define PRF_FRZ                      0x4
->>  #define CYC_OVF                      0x8
->> +#define PROFILE_SEL          0x10
->>
->>  #define MMDC_MADPCR0 0x410
->>  #define MMDC_MADPSR0 0x418
->> @@ -55,10 +56,36 @@
->>
->>  #define MMDC_NUM_COUNTERS    6
->>
->> +#define FSL_MMDC_QUIRK_PROFILE_SEL   0x1
->> +
->>  #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
->>
->>  static int ddr_type;
->>
->> +enum fsl_mmdc_devtype {
->> +     FSL_MMDC_IMX6Q,
->> +     FSL_MMDC_IMX6QP,
->> +};
->> +
->> +struct fsl_mmdc_devtype_data {
->> +     enum fsl_mmdc_devtype devtype;
->> +     int driver_data;
->> +};
->> +
->> +static struct fsl_mmdc_devtype_data imx6q_data = {
->> +     .devtype = FSL_MMDC_IMX6Q,
->> +};
->> +
->> +static struct fsl_mmdc_devtype_data imx6qp_data = {
->> +     .driver_data = FSL_MMDC_QUIRK_PROFILE_SEL,
->> +};
->> +
->> +static const struct of_device_id imx_mmdc_dt_ids[] = {
->> +     { .compatible = "fsl,imx6q-mmdc", .data = (void *)&imx6q_data},
->> +     { .compatible = "fsl,imx6qp-mmdc", .data = (void *)&imx6qp_data},
->> +     { /* sentinel */ }
->> +};
->> +
->>  #ifdef CONFIG_PERF_EVENTS
->>
->>  static DEFINE_IDA(mmdc_ida);
->> @@ -83,6 +110,7 @@ struct mmdc_pmu {
->>       struct device *dev;
->>       struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
->>       struct hlist_node node;
->> +     struct fsl_mmdc_devtype_data *devtype_data;
->>  };
->>
->>  /*
->> @@ -307,6 +335,7 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
->>       struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
->>       struct hw_perf_event *hwc = &event->hw;
->>       void __iomem *mmdc_base, *reg;
->> +     int val;
->>
->>       mmdc_base = pmu_mmdc->mmdc_base;
->>       reg = mmdc_base + MMDC_MADPCR0;
->> @@ -321,7 +350,12 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
->>       local64_set(&hwc->prev_count, 0);
->>
->>       writel(DBG_RST, reg);
->> -     writel(DBG_EN, reg);
->> +
->> +     val = DBG_EN;
->> +     if (pmu_mmdc->devtype_data->driver_data & FSL_MMDC_QUIRK_PROFILE_SEL)
->
-> Shouldn't it be good enough to have the flag telling different
-> programming model between variants?  That said, I do not see the point
-> of introducing enum fsl_mmdc_devtype.
+Provide Support for Hisilicon SoC(Hip05/06/07) Hardware event counters.
+The Hisilicon SoC Hip0x series has many uncore or non-CPU performance
+events and counters units.
 
-Okay, I can remove enum fsl_mmdc_devtype
+This initial patch series is implemented refering to arm-cci, Intel/AMD uncore and
+also the cavium thunderX and xgene uncore pmu patches.
 
-best regards
-Frank Li
+Support for Hisilicon L3 cache(L3C), MN and DDR hardware events and
+counters are added in this implementation.
 
->
-> Shawn
->
->> +             val |= PROFILE_SEL;
->> +
->> +     writel(val, reg);
->>  }
->>
->>  static int mmdc_pmu_event_add(struct perf_event *event, int flags)
->> @@ -436,6 +470,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
->>       char *name;
->>       int mmdc_num;
->>       int ret;
->> +     const struct of_device_id *of_id =
->> +             of_match_device(imx_mmdc_dt_ids, &pdev->dev);
->>
->>       pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
->>       if (!pmu_mmdc) {
->> @@ -450,6 +486,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
->>               name = devm_kasprintf(&pdev->dev,
->>                               GFP_KERNEL, "mmdc%d", mmdc_num);
->>
->> +     pmu_mmdc->devtype_data = (struct fsl_mmdc_devtype_data *)of_id->data;
->> +
->>       hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
->>                       HRTIMER_MODE_REL);
->>       pmu_mmdc->hrtimer.function = mmdc_pmu_timer_handler;
->> @@ -524,11 +562,6 @@ int imx_mmdc_get_ddr_type(void)
->>       return ddr_type;
->>  }
->>
->> -static const struct of_device_id imx_mmdc_dt_ids[] = {
->> -     { .compatible = "fsl,imx6q-mmdc", },
->> -     { /* sentinel */ }
->> -};
->> -
->>  static struct platform_driver imx_mmdc_driver = {
->>       .driver         = {
->>               .name   = "imx-mmdc",
->> --
->> 2.5.2
->>
+The Hisilicon uncore PMUs can be found under /sys/bus/event_source/devices.
+The counters are exported via sysfs in the corresponding events files
+under the PMU directory so the perf tool can list the event names.
+
+ToDo:
+	1) The counter overflow handling is currently unsupported in this
+	   patch series.
+	2) ACPI support.
+
+Anurup M (8):
+  arm64: MAINTAINERS: hisi: Add hisilicon SoC PMU support
+  Documentation: perf: hisi: Documentation for HIP05/06/07 PMU event
+    counting.
+  dt-bindings: perf: hisi: Add Devicetree bindings for Hisilicon SoC PMU
+  perf: hisi: Update Kconfig for Hisilicon PMU support
+  perf: hisi: Add support for Hisilicon SoC event counters
+  perf: hisi: Add sysfs attributes for L3 cache(L3C) PMU
+  perf: hisi: Support for Hisilicon DDRC PMU.
+  dts: arm64: hip06: Add Hisilicon SoC PMU support
+
+Shaokun Zhang (1):
+  perf: hisi: Miscellanous node(MN) event counting in perf
+
+Tan Xiaojun (2):
+  dt-bindings: hisi: Add Hisilicon HiP05/06/07 Sysctrl and Djtag dts
+    bindings
+  drivers: soc: hisi: Add support for Hisilicon Djtag driver
+
+ .../bindings/arm/hisilicon/hisilicon.txt           |  82 +++
+ .../devicetree/bindings/arm/hisilicon/pmu.txt      | 127 ++++
+ Documentation/perf/hisi-pmu.txt                    |  80 +++
+ MAINTAINERS                                        |  10 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 116 ++++
+ drivers/perf/Kconfig                               |   9 +
+ drivers/perf/Makefile                              |   1 +
+ drivers/perf/hisilicon/Makefile                    |   1 +
+ drivers/perf/hisilicon/hisi_uncore_ddrc.c          | 444 ++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_ddrc.h          |  73 +++
+ drivers/perf/hisilicon/hisi_uncore_l3c.c           | 628 ++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c.h           |  67 +++
+ drivers/perf/hisilicon/hisi_uncore_mn.c            | 571 ++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_mn.h            |  68 +++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c           | 371 ++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h           | 130 +++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/hisilicon/Kconfig                      |  12 +
+ drivers/soc/hisilicon/Makefile                     |   1 +
+ drivers/soc/hisilicon/djtag.c                      | 639 +++++++++++++++++++++
+ include/linux/soc/hisilicon/djtag.h                |  38 ++
+ 22 files changed, 3470 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_mn.h
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+ create mode 100644 drivers/soc/hisilicon/Kconfig
+ create mode 100644 drivers/soc/hisilicon/Makefile
+ create mode 100644 drivers/soc/hisilicon/djtag.c
+ create mode 100644 include/linux/soc/hisilicon/djtag.h
+
+-- 
+2.1.4
