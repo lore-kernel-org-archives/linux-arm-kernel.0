@@ -1,659 +1,384 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 02 Nov 2016 17:05:45 +0100
-Subject: [PATCH v7 RESEND 2/2] ASoC: samsung: Add machine driver for Exynos5433
- based TM2 board
-Message-ID: <1478102745-12675-1-git-send-email-s.nawrocki@samsung.com>
+From: bruherrera@gmail.com (Bruno Herrera)
+Date: Wed, 2 Nov 2016 14:07:53 -0200
+Subject: [PATCH] ARM: DT: stm32: move dma translation to board files
+In-Reply-To: <3e854414-f51d-3e59-6cee-142106cef40f@st.com>
+References: <CAF3+Tqd2MGmz+8XhLXhaZiEc78QOwHSpVrQA65-p1AcfT+_xgg@mail.gmail.com>
+ <404315f0-fc9e-93e2-54df-f85e484d9389@st.com>
+ <CAF3+TqdzESUNbkmAVv42pNv13wuyuPgGgksK3pJbORYw2a8ZFQ@mail.gmail.com>
+ <65096fbe-3f06-c8db-fbe8-29f0be28cb61@st.com>
+ <CAF3+TqcxVj9f7kcSQTKDercVfvDdLzAXGpUU1oAxeNBFZx73nQ@mail.gmail.com>
+ <CAFvLkMQGVygLb9SQ8o+2Q=bg7vvRjpHypmSyjRyLkdcHypoFHw@mail.gmail.com>
+ <CAF3+TqcFnXENmX4OpG9jzhPhuaq-EqNsRhhjKgFjHA96DLqK5g@mail.gmail.com>
+ <CAFvLkMQ6YMg4sf2Ug8x4-YshwnjbLz3aVzm+JpKP6zG9r-WU4Q@mail.gmail.com>
+ <CAF3+Tqdz+92yxuSwZHdQ01d-G-bBNtzayKyP2-_On2APvFyLNA@mail.gmail.com>
+ <CAFvLkMTCkRcwbRc8GVNBoJFAvKWHYDjOPabueQPjTseZrucadA@mail.gmail.com>
+ <3e854414-f51d-3e59-6cee-142106cef40f@st.com>
+Message-ID: <CAF3+TqeiPjtG7Fs1-cpbcHGxxtSS1UOGD=S=sggpaZahFLJhEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the sound machine driver for the TM2 and TM2E boards.
-Speaker and headphone playback, Main Mic capture, Bluetooth, Voice
-call and external accessory are supported.
+Hi
 
-Signed-off-by: Inha Song <ideal.song@samsung.com>
-[k.kozlowski: rebased on 4.1]
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-[s.nawrocki: rebased to 4.7, adjustment to the ASoC core changes,
- removed unused ops and direct calls to the max98504 function,
- added parsing of "audio-amplifier" and "audio-codec"
- properties, added TDM API calls, switched to gpiod API]
-Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Reviewed-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
----
+On Wed, Nov 2, 2016 at 12:32 PM, Alexandre Torgue
+<alexandre.torgue@st.com> wrote:
+> Hi
+>
+> On 10/31/2016 07:58 PM, Rados?aw Pietrzyk wrote:
+>>
+>> I think wlcore driver searches dma-ranges in its parent that's why sdio
+>> node needs it.
+>
+>
+> Yes I agree. In this case it is needed as you have subnode in sdio node.
+> So IMO empty dma-ranges could be removed from ethernet and usb node, but
+> kept in future sdio subnode.
 
-Changes since v6:
- - removed unused variables.
+Now it is clear.
 
-Changes since v5:
- - dropped requesting and managing of the CODEC's clocks,
- - removed driver remove() handler,
- - changed pm_ops to use prepare/complete rather than
-   late_suspend/early_resume.
+>
+> Bruno,
+> Do you plan to push sdio support ?
 
-Changes since v4 (addressing review comments from Charles):
- - changed the order of WM5110_FLL{1,2}, WM5110_FLL{1,2}_REFCLK setting,
- - ARIZONA_CLK_SYSCLK, ARIZONA_CLK_ASYNCCLK setting moved to late_probe,
- - added tm2_aif2_hw_free callback for disabling FLL2,
- - removed unneded card->dapm.bias_level assignment in tm2_mic_bias callback,
- - suspend_late, resume_early dev_pm_ops used instead of suspend_post,
-   resume_pre struct snd_soc_card callbacks.
+Yes I do, but I'm not sure how long it will take. The I had to
+change(and hack) the mmci code because I could not get the ID from
+STM32 SDIO IP.
+My current WIP is at @
+https://github.com/mcoquelin-stm32/afboot-stm32/pull/4#issuecomment-247571615
+I know Andrea Merello is also working on that (and he probably has a
+more complete patch).
 
-Changes since v3:
- - removed SND_SOC_SAMSUNG_AUDSS from Kconfig.
-
-Changes since v2:
- - added missing Kconfig dependencies.
-
-Changes since initial version:
- - added PDM Tx channels setup through TDM API
- - adaptation to renamed 'samsung,model', 'samsung,i2s-controller',
-   'samsung,speaker-amplifier' properties,
- - removed some dev_dbg() calls,
- - cleaned up mic-bias GPIO handling and switched to gpiod API,
- - added parsing of 'audio-codec' property,
- - initialized codec_of_node of dai_link instead of codec_name,
- - switched to using clock, clock-names properties from the wm5110
-   codec node,
- - fixed error paths in probe() (of_node reference counting).
-
- sound/soc/samsung/Kconfig      |   9 +
- sound/soc/samsung/Makefile     |   2 +
- sound/soc/samsung/tm2_wm5110.c | 552 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 563 insertions(+)
- create mode 100644 sound/soc/samsung/tm2_wm5110.c
-
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index f6023b4..6b5b048 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -229,4 +229,13 @@ config SND_SOC_ARNDALE_RT5631_ALC5631
-         select SND_SAMSUNG_I2S
-         select SND_SOC_RT5631
-
-+config SND_SOC_SAMSUNG_TM2_WM5110
-+	tristate "SoC I2S Audio support for WM5110 on TM2 board"
-+	depends on SND_SOC_SAMSUNG && MFD_ARIZONA && I2C && SPI_MASTER
-+	select SND_SOC_MAX98504
-+	select SND_SOC_WM5110
-+	select SND_SAMSUNG_I2S
-+	help
-+	  Say Y if you want to add support for SoC audio on the TM2 board.
-+
- endif #SND_SOC_SAMSUNG
-diff --git a/sound/soc/samsung/Makefile b/sound/soc/samsung/Makefile
-index 5d03f5c..4444b9f 100644
---- a/sound/soc/samsung/Makefile
-+++ b/sound/soc/samsung/Makefile
-@@ -44,6 +44,7 @@ snd-soc-lowland-objs := lowland.o
- snd-soc-littlemill-objs := littlemill.o
- snd-soc-bells-objs := bells.o
- snd-soc-arndale-rt5631-objs := arndale_rt5631.o
-+snd-soc-tm2-wm5110-objs := tm2_wm5110.o
-
- obj-$(CONFIG_SND_SOC_SAMSUNG_JIVE_WM8750) += snd-soc-jive-wm8750.o
- obj-$(CONFIG_SND_SOC_SAMSUNG_NEO1973_WM8753) += snd-soc-neo1973-wm8753.o
-@@ -69,3 +70,4 @@ obj-$(CONFIG_SND_SOC_LOWLAND) += snd-soc-lowland.o
- obj-$(CONFIG_SND_SOC_LITTLEMILL) += snd-soc-littlemill.o
- obj-$(CONFIG_SND_SOC_BELLS) += snd-soc-bells.o
- obj-$(CONFIG_SND_SOC_ARNDALE_RT5631_ALC5631) += snd-soc-arndale-rt5631.o
-+obj-$(CONFIG_SND_SOC_SAMSUNG_TM2_WM5110) += snd-soc-tm2-wm5110.o
-diff --git a/sound/soc/samsung/tm2_wm5110.c b/sound/soc/samsung/tm2_wm5110.c
-new file mode 100644
-index 0000000..5cdf7d1
---- /dev/null
-+++ b/sound/soc/samsung/tm2_wm5110.c
-@@ -0,0 +1,552 @@
-+/*
-+ * Copyright (C) 2015 - 2016 Samsung Electronics Co., Ltd.
-+ *
-+ * Authors: Inha Song <ideal.song@samsung.com>
-+ *          Sylwester Nawrocki <s.nawrocki@samsung.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/gpio.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <sound/pcm_params.h>
-+#include <sound/soc.h>
-+
-+#include "i2s.h"
-+#include "../codecs/wm5110.h"
-+
-+/*
-+ * The source clock is XCLKOUT with its mux set to the external fixed rate
-+ * oscillator (XXTI).
-+ */
-+#define MCLK_RATE	24000000U
-+
-+#define TM2_DAI_AIF1	0
-+#define TM2_DAI_AIF2	1
-+
-+struct tm2_machine_priv {
-+	struct snd_soc_codec *codec;
-+	unsigned int sysclk_rate;
-+	struct gpio_desc *gpio_mic_bias;
-+};
-+
-+static int tm2_start_sysclk(struct snd_soc_card *card)
-+{
-+	struct tm2_machine_priv *priv = snd_soc_card_get_drvdata(card);
-+	struct snd_soc_codec *codec = priv->codec;
-+	int ret;
-+
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL1_REFCLK,
-+				    ARIZONA_FLL_SRC_MCLK1,
-+				    MCLK_RATE,
-+				    priv->sysclk_rate);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to set FLL1 source: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL1,
-+				    ARIZONA_FLL_SRC_MCLK1,
-+				    MCLK_RATE,
-+				    priv->sysclk_rate);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to start FLL1: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_codec_set_sysclk(codec, ARIZONA_CLK_SYSCLK,
-+				       ARIZONA_CLK_SRC_FLL1,
-+				       priv->sysclk_rate,
-+				       SND_SOC_CLOCK_IN);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to set SYSCLK source: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int tm2_stop_sysclk(struct snd_soc_card *card)
-+{
-+	struct tm2_machine_priv *priv = snd_soc_card_get_drvdata(card);
-+	struct snd_soc_codec *codec = priv->codec;
-+	int ret;
-+
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL1, 0, 0, 0);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to stop FLL1: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_codec_set_sysclk(codec, ARIZONA_CLK_SYSCLK,
-+				       ARIZONA_CLK_SRC_FLL1, 0, 0);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to stop SYSCLK: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int tm2_aif1_hw_params(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_codec *codec = rtd->codec;
-+	struct tm2_machine_priv *priv = snd_soc_card_get_drvdata(rtd->card);
-+
-+	switch (params_rate(params)) {
-+	case 4000:
-+	case 8000:
-+	case 12000:
-+	case 16000:
-+	case 24000:
-+	case 32000:
-+	case 48000:
-+	case 96000:
-+	case 192000:
-+		/* Highest possible SYSCLK frequency: 147.456MHz */
-+		priv->sysclk_rate = 147456000U;
-+		break;
-+	case 11025:
-+	case 22050:
-+	case 44100:
-+	case 88200:
-+	case 176400:
-+		/* Highest possible SYSCLK frequency: 135.4752 MHz */
-+		priv->sysclk_rate = 135475200U;
-+		break;
-+	default:
-+		dev_err(codec->dev, "Not supported sample rate: %d\n",
-+			params_rate(params));
-+		return -EINVAL;
-+	}
-+
-+	return tm2_start_sysclk(rtd->card);
-+}
-+
-+static struct snd_soc_ops tm2_aif1_ops = {
-+	.hw_params = tm2_aif1_hw_params,
-+};
-+
-+static int tm2_aif2_hw_params(struct snd_pcm_substream *substream,
-+				struct snd_pcm_hw_params *params)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_codec *codec = rtd->codec;
-+	unsigned int asyncclk_rate;
-+	int ret;
-+
-+	switch (params_rate(params)) {
-+	case 8000:
-+	case 12000:
-+	case 16000:
-+		/* Highest possible ASYNCCLK frequency: 49.152MHz */
-+		asyncclk_rate = 49152000U;
-+		break;
-+	case 11025:
-+		/* Highest possible ASYNCCLK frequency: 45.1584 MHz */
-+		asyncclk_rate = 45158400U;
-+		break;
-+	default:
-+		dev_err(codec->dev, "Not supported sample rate: %d\n",
-+			params_rate(params));
-+		return -EINVAL;
-+	}
-+
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL2_REFCLK,
-+				    ARIZONA_FLL_SRC_MCLK1,
-+				    MCLK_RATE,
-+				    asyncclk_rate);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to set FLL2 source: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL2,
-+				    ARIZONA_FLL_SRC_MCLK1,
-+				    MCLK_RATE,
-+				    asyncclk_rate);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to start FLL2: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_codec_set_sysclk(codec, ARIZONA_CLK_ASYNCCLK,
-+				       ARIZONA_CLK_SRC_FLL2,
-+				       asyncclk_rate,
-+				       SND_SOC_CLOCK_IN);
-+	if (ret < 0) {
-+		dev_err(codec->dev, "Failed to set ASYNCCLK source: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int tm2_aif2_hw_free(struct snd_pcm_substream *substream)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct snd_soc_codec *codec = rtd->codec;
-+	int ret;
-+
-+	/* disable FLL2 */
-+	ret = snd_soc_codec_set_pll(codec, WM5110_FLL2, ARIZONA_FLL_SRC_MCLK1,
-+				    0, 0);
-+	if (ret < 0)
-+		dev_err(codec->dev, "Failed to stop FLL2: %d\n", ret);
-+
-+	return ret;
-+}
-+
-+static struct snd_soc_ops tm2_aif2_ops = {
-+	.hw_params = tm2_aif2_hw_params,
-+	.hw_free = tm2_aif2_hw_free,
-+};
-+
-+static int tm2_mic_bias(struct snd_soc_dapm_widget *w,
-+				struct snd_kcontrol *kcontrol, int event)
-+{
-+	struct snd_soc_card *card = w->dapm->card;
-+	struct tm2_machine_priv *priv = snd_soc_card_get_drvdata(card);
-+
-+	switch (event) {
-+	case SND_SOC_DAPM_PRE_PMU:
-+		gpiod_set_value_cansleep(priv->gpio_mic_bias,  1);
-+		break;
-+	case SND_SOC_DAPM_POST_PMD:
-+		gpiod_set_value_cansleep(priv->gpio_mic_bias,  0);
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static int tm2_set_bias_level(struct snd_soc_card *card,
-+				struct snd_soc_dapm_context *dapm,
-+				enum snd_soc_bias_level level)
-+{
-+	struct snd_soc_pcm_runtime *rtd;
-+
-+	rtd = snd_soc_get_pcm_runtime(card, card->dai_link[0].name);
-+
-+	if (dapm->dev != rtd->codec_dai->dev)
-+		return 0;
-+
-+	switch (level) {
-+	case SND_SOC_BIAS_STANDBY:
-+		if (card->dapm.bias_level == SND_SOC_BIAS_OFF)
-+			tm2_start_sysclk(card);
-+		break;
-+	case SND_SOC_BIAS_OFF:
-+		tm2_stop_sysclk(card);
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct snd_soc_aux_dev tm2_speaker_amp_dev;
-+
-+static int tm2_late_probe(struct snd_soc_card *card)
-+{
-+	struct tm2_machine_priv *priv = snd_soc_card_get_drvdata(card);
-+	struct snd_soc_dai_link_component dlc = { 0 };
-+	unsigned int ch_map[] = { 0, 1 };
-+	struct snd_soc_dai *amp_pdm_dai;
-+	struct snd_soc_pcm_runtime *rtd;
-+	struct snd_soc_dai *aif1_dai;
-+	struct snd_soc_dai *aif2_dai;
-+	int ret;
-+
-+	rtd = snd_soc_get_pcm_runtime(card, card->dai_link[TM2_DAI_AIF1].name);
-+	aif1_dai = rtd->codec_dai;
-+	priv->codec = rtd->codec;
-+
-+	ret = snd_soc_dai_set_sysclk(aif1_dai, ARIZONA_CLK_SYSCLK, 0, 0);
-+	if (ret < 0) {
-+		dev_err(aif1_dai->dev, "Failed to set SYSCLK: %d\n", ret);
-+		return ret;
-+	}
-+
-+	rtd = snd_soc_get_pcm_runtime(card, card->dai_link[TM2_DAI_AIF2].name);
-+	aif2_dai = rtd->codec_dai;
-+
-+	ret = snd_soc_dai_set_sysclk(aif2_dai, ARIZONA_CLK_ASYNCCLK, 0, 0);
-+	if (ret < 0) {
-+		dev_err(aif2_dai->dev, "Failed to set ASYNCCLK: %d\n", ret);
-+		return ret;
-+	}
-+
-+	dlc.of_node = tm2_speaker_amp_dev.codec_of_node;
-+	amp_pdm_dai = snd_soc_find_dai(&dlc);
-+	if (!amp_pdm_dai)
-+		return -ENODEV;
-+
-+	/* Set the MAX98504 V/I sense PDM Tx DAI channel mapping */
-+	ret = snd_soc_dai_set_channel_map(amp_pdm_dai, ARRAY_SIZE(ch_map),
-+					  ch_map, 0, NULL);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = snd_soc_dai_set_tdm_slot(amp_pdm_dai, 0x3, 0x0, 2, 16);
-+	if (ret < 0)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static const struct snd_kcontrol_new tm2_controls[] = {
-+	SOC_DAPM_PIN_SWITCH("HP"),
-+	SOC_DAPM_PIN_SWITCH("SPK"),
-+	SOC_DAPM_PIN_SWITCH("RCV"),
-+	SOC_DAPM_PIN_SWITCH("VPS"),
-+	SOC_DAPM_PIN_SWITCH("HDMI"),
-+
-+	SOC_DAPM_PIN_SWITCH("Main Mic"),
-+	SOC_DAPM_PIN_SWITCH("Sub Mic"),
-+	SOC_DAPM_PIN_SWITCH("Third Mic"),
-+
-+	SOC_DAPM_PIN_SWITCH("Headset Mic"),
-+};
-+
-+const struct snd_soc_dapm_widget tm2_dapm_widgets[] = {
-+	SND_SOC_DAPM_HP("HP", NULL),
-+	SND_SOC_DAPM_SPK("SPK", NULL),
-+	SND_SOC_DAPM_SPK("RCV", NULL),
-+	SND_SOC_DAPM_LINE("VPS", NULL),
-+	SND_SOC_DAPM_LINE("HDMI", NULL),
-+
-+	SND_SOC_DAPM_MIC("Main Mic", tm2_mic_bias),
-+	SND_SOC_DAPM_MIC("Sub Mic", NULL),
-+	SND_SOC_DAPM_MIC("Third Mic", NULL),
-+
-+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
-+};
-+
-+static const struct snd_soc_component_driver tm2_component = {
-+	.name	= "tm2-audio",
-+};
-+
-+static struct snd_soc_dai_driver tm2_ext_dai[] = {
-+	{
-+		.name = "Voice call",
-+		.playback = {
-+			.channels_min = 1,
-+			.channels_max = 4,
-+			.rate_min = 8000,
-+			.rate_max = 48000,
-+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
-+					SNDRV_PCM_RATE_48000),
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+		.capture = {
-+			.channels_min = 1,
-+			.channels_max = 4,
-+			.rate_min = 8000,
-+			.rate_max = 48000,
-+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |
-+					SNDRV_PCM_RATE_48000),
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+	},
-+	{
-+		.name = "Bluetooth",
-+		.playback = {
-+			.channels_min = 1,
-+			.channels_max = 4,
-+			.rate_min = 8000,
-+			.rate_max = 16000,
-+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000),
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+		.capture = {
-+			.channels_min = 1,
-+			.channels_max = 2,
-+			.rate_min = 8000,
-+			.rate_max = 16000,
-+			.rates = (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000),
-+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
-+		},
-+	},
-+};
-+
-+static struct snd_soc_dai_link tm2_dai_links[] = {
-+	{
-+		.name		= "WM5110 AIF1",
-+		.stream_name	= "HiFi Primary",
-+		.codec_dai_name = "wm5110-aif1",
-+		.ops		= &tm2_aif1_ops,
-+		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM,
-+	}, {
-+		.name		= "WM5110 Voice",
-+		.stream_name	= "Voice call",
-+		.codec_dai_name = "wm5110-aif2",
-+		.ops		= &tm2_aif2_ops,
-+		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM,
-+		.ignore_suspend = 1,
-+	}, {
-+		.name		= "WM5110 BT",
-+		.stream_name	= "Bluetooth",
-+		.codec_dai_name = "wm5110-aif3",
-+		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+				  SND_SOC_DAIFMT_CBM_CFM,
-+		.ignore_suspend = 1,
-+	}
-+};
-+
-+static struct snd_soc_card tm2_card = {
-+	.owner			= THIS_MODULE,
-+
-+	.dai_link		= tm2_dai_links,
-+	.num_links		= ARRAY_SIZE(tm2_dai_links),
-+	.controls		= tm2_controls,
-+	.num_controls		= ARRAY_SIZE(tm2_controls),
-+	.dapm_widgets		= tm2_dapm_widgets,
-+	.num_dapm_widgets	= ARRAY_SIZE(tm2_dapm_widgets),
-+	.aux_dev		= &tm2_speaker_amp_dev,
-+	.num_aux_devs		= 1,
-+
-+	.late_probe		= tm2_late_probe,
-+	.set_bias_level		= tm2_set_bias_level,
-+};
-+
-+static int tm2_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct snd_soc_card *card = &tm2_card;
-+	struct tm2_machine_priv *priv;
-+	struct device_node *cpu_dai_node, *codec_dai_node;
-+	int ret, i;
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	snd_soc_card_set_drvdata(card, priv);
-+	card->dev = dev;
-+
-+	priv->gpio_mic_bias = devm_gpiod_get(dev, "mic-bias",
-+						GPIOF_OUT_INIT_LOW);
-+	if (IS_ERR(priv->gpio_mic_bias)) {
-+		dev_err(dev, "Failed to get mic bias gpio\n");
-+		return PTR_ERR(priv->gpio_mic_bias);
-+	}
-+
-+	ret = snd_soc_of_parse_card_name(card, "model");
-+	if (ret < 0) {
-+		dev_err(dev, "Card name is not specified\n");
-+		return ret;
-+	}
-+
-+	ret = snd_soc_of_parse_audio_routing(card, "samsung,audio-routing");
-+	if (ret < 0) {
-+		dev_err(dev, "Audio routing is not specified or invalid\n");
-+		return ret;
-+	}
-+
-+	card->aux_dev[0].codec_of_node = of_parse_phandle(dev->of_node,
-+							"audio-amplifier", 0);
-+	if (!card->aux_dev[0].codec_of_node) {
-+		dev_err(dev, "audio-amplifier property invalid or missing\n");
-+		return -EINVAL;
-+	}
-+
-+	cpu_dai_node = of_parse_phandle(dev->of_node, "i2s-controller", 0);
-+	if (!cpu_dai_node) {
-+		dev_err(dev, "i2s-controllers property invalid or missing\n");
-+		ret = -EINVAL;
-+		goto amp_node_put;
-+	}
-+
-+	codec_dai_node = of_parse_phandle(dev->of_node, "audio-codec", 0);
-+	if (!codec_dai_node) {
-+		dev_err(dev, "audio-codec property invalid or missing\n");
-+		ret = -EINVAL;
-+		goto cpu_dai_node_put;
-+	}
-+
-+	for (i = 0; i < card->num_links; i++) {
-+		card->dai_link[i].cpu_dai_name = NULL;
-+		card->dai_link[i].cpu_name = NULL;
-+		card->dai_link[i].platform_name = NULL;
-+		card->dai_link[i].codec_of_node = codec_dai_node;
-+		card->dai_link[i].cpu_of_node = cpu_dai_node;
-+		card->dai_link[i].platform_of_node = cpu_dai_node;
-+	}
-+
-+	ret = devm_snd_soc_register_component(dev, &tm2_component,
-+				tm2_ext_dai, ARRAY_SIZE(tm2_ext_dai));
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to register component: %d\n", ret);
-+		goto codec_dai_node_put;
-+	}
-+
-+	ret = devm_snd_soc_register_card(dev, card);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to register card: %d\n", ret);
-+		goto codec_dai_node_put;
-+	}
-+
-+codec_dai_node_put:
-+	of_node_put(codec_dai_node);
-+cpu_dai_node_put:
-+	of_node_put(cpu_dai_node);
-+amp_node_put:
-+	of_node_put(card->aux_dev[0].codec_of_node);
-+	return ret;
-+}
-+
-+static int tm2_pm_prepare(struct device *dev)
-+{
-+	struct snd_soc_card *card = dev_get_drvdata(dev);
-+
-+	return tm2_stop_sysclk(card);
-+}
-+
-+static void tm2_pm_complete(struct device *dev)
-+{
-+	struct snd_soc_card *card = dev_get_drvdata(dev);
-+
-+	tm2_start_sysclk(card);
-+}
-+
-+const struct dev_pm_ops tm2_pm_ops = {
-+	.prepare	= tm2_pm_prepare,
-+	.suspend	= snd_soc_suspend,
-+	.resume		= snd_soc_resume,
-+	.complete	= tm2_pm_complete,
-+	.freeze		= snd_soc_suspend,
-+	.thaw		= snd_soc_resume,
-+	.poweroff	= snd_soc_poweroff,
-+	.restore	= snd_soc_resume,
-+};
-+
-+static const struct of_device_id tm2_of_match[] = {
-+	{ .compatible = "samsung,tm2-audio" },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, tm2_of_match);
-+
-+static struct platform_driver tm2_driver = {
-+	.driver = {
-+		.name		= "tm2-audio",
-+		.pm		= &tm2_pm_ops,
-+		.of_match_table	= tm2_of_match,
-+	},
-+	.probe	= tm2_probe,
-+};
-+module_platform_driver(tm2_driver);
-+
-+MODULE_AUTHOR("Inha Song <ideal.song@samsung.com>");
-+MODULE_DESCRIPTION("ALSA SoC Exynos TM2 Audio Support");
-+MODULE_LICENSE("GPL v2");
---
-1.9.1
+>
+>
+>
+>>
+>> 2016-10-31 17:41 GMT+01:00 Bruno Herrera <bruherrera@gmail.com
+>> <mailto:bruherrera@gmail.com>>:
+>>
+>>     On Mon, Oct 31, 2016 at 12:14 PM, Rados?aw Pietrzyk
+>>     <radoslaw.pietrzyk at gmail.com <mailto:radoslaw.pietrzyk@gmail.com>>
+>>     wrote:
+>>     > This is weird because dma ddresses are recalculated using parent's
+>>     > dma-ranges property and soc already has it so there should be
+>> absolutely no
+>>     > problem.
+>>
+>>     These are my DTS and DTSI file.
+>>     >
+>>     > 2016-10-31 11:27 GMT+01:00 Bruno Herrera <bruherrera@gmail.com
+>>     <mailto:bruherrera@gmail.com>>:
+>>     >>
+>>     >> On Fri, Oct 28, 2016 at 5:09 AM, Rados?aw Pietrzyk
+>>     >> <radoslaw.pietrzyk@gmail.com
+>>     <mailto:radoslaw.pietrzyk@gmail.com>> wrote:
+>>     >> > Have you defined your sdio node within soc node ?
+>>     >>
+>>     >> It is in the SOC node of the DSTI file.
+>>     >>
+>>     >> >
+>>     >> > 2016-10-27 14:57 GMT+02:00 Bruno Herrera <bruherrera@gmail.com
+>>     <mailto:bruherrera@gmail.com>>:
+>>     >> >>
+>>     >> >> Hi Alex,
+>>     >> >>
+>>     >> >> On Thu, Oct 27, 2016 at 10:21 AM, Alexandre Torgue
+>>     >> >> <alexandre.torgue at st.com <mailto:alexandre.torgue@st.com>>
+>> wrote:
+>>     >> >> > Hi Bruno,
+>>     >> >> >
+>>     >> >> >
+>>     >> >> > On 10/27/2016 12:43 PM, Bruno Herrera wrote:
+>>     >> >> >>
+>>     >> >> >> Hi Alex,
+>>     >> >> >>
+>>     >> >> >> On Wed, Oct 26, 2016 at 7:09 AM, Alexandre Torgue
+>>     >> >> >> <alexandre.torgue at st.com <mailto:alexandre.torgue@st.com>>
+>>     wrote:
+>>     >> >> >>>
+>>     >> >> >>> Hi Bruno,
+>>     >> >> >>>
+>>     >> >> >>> On 10/25/2016 11:06 PM, Bruno Herrera wrote:
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>> Hi Alexandre,
+>>     >> >> >>>>
+>>     >> >> >>>>>
+>>     >> >> >>>>> stm32f469-disco and stm32f429-eval boards use SDRAM
+>>     start address
+>>     >> >> >>>>> remapping
+>>     >> >> >>>>> (to @0) to boost performances. A DMA translation through
+>>     >> >> >>>>> "dma-ranges"
+>>     >> >> >>>>> property was needed for other masters than the M4 CPU.
+>>     >> >> >>>>> stm32f429-disco doesn't use remapping so doesn't need
+>>     this DMA
+>>     >> >> >>>>> translation.
+>>     >> >> >>>>> This patches moves this DMA translation definition from
+>>     stm32f429
+>>     >> >> >>>>> soc
+>>     >> >> >>>>> file
+>>     >> >> >>>>> to board files.
+>>     >> >> >>>>>
+>>     >> >> >>>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com
+>>     <mailto:alexandre.torgue@st.com>>
+>>
+>>     >> >> >>>>>
+>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>>> b/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>>> index 13c7cd2..a763c15 100644
+>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>>> @@ -82,6 +82,10 @@
+>>     >> >> >>>>>                 };
+>>     >> >> >>>>>         };
+>>     >> >> >>>>>
+>>     >> >> >>>>> +       soc {
+>>     >> >> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
+>>     >> >> >>>>> +       };
+>>     >> >> >>>>> +
+>>     >> >> >>>>>         usbotg_hs_phy: usbphy {
+>>     >> >> >>>>>                 #phy-cells = <0>;
+>>     >> >> >>>>>                 compatible = "usb-nop-xceiv";
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>> Shouldn't also the peripheral dma-ranges property move to
+>>     board
+>>     >> >> >>>> specific
+>>     >> >> >>>> too?
+>>     >> >> >>>> I  had this patch for while but I didn't had the time to
+>>     submit:
+>>     >> >> >>>
+>>     >> >> >>>
+>>     >> >> >>>
+>>     >> >> >>> Well spot I forgot it. Actually, discussing with Arnd
+>>     ysterday on
+>>     >> >> >>> IIRC,
+>>     >> >> >>> empty dma-ranges is not needed. Can you test on your side by
+>>     >> >> >>> removing
+>>     >> >> >>> dma-ranges in usb node please ?
+>>     >> >> >>
+>>     >> >> >> Unfortunately will take a time for me to set up this
+>>     environment on
+>>     >> >> >> the STM32F4-EVAL board.
+>>     >> >> >> And on the discovery boards we dont have this scenario.
+>>     That was the
+>>     >> >> >> main reason I did not submit the patch right away.
+>>     >> >> >> My conclusion and I might be wrong but is based on the my
+>>     tests with
+>>     >> >> >> SDIO device at STM32F469I-DISCO board.
+>>     >> >> >>
+>>     >> >> >> I started this issue as discussion at ST Forum but Maxime
+>>     gave me
+>>     >> >> >> the
+>>     >> >> >> hint.
+>>     >> >> >>
+>>     >> >> >>
+>>     >> >> >>
+>>     >> >> >>
+>>     >> >> >>
+>>
+>> https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44
+>>
+>> <https://my.st.com/public/STe2ecommunities/mcu/Lists/cortex_mx_stm32/Flat.aspx?RootFolder=https%3a%2f%2fmy%2est%2ecom%2fpublic%2fSTe2ecommunities%2fmcu%2fLists%2fcortex_mx_stm32%2fDMA2%20and%20SYSCFG_MEMRMP%20relationship&FolderCTID=0x01200200770978C69A1141439FE559EB459D7580009C4E14902C3CDE46A77F0FFD06506F5B&currentviews=44>
+>>     >> >> >>
+>>     >> >> >>> I will push a v2 by removing empty dma-ranges if tests are
+>>     ok in
+>>     >> >> >>> your
+>>     >> >> >>> side.
+>>     >> >> >>
+>>     >> >> >>
+>>     >> >> >> From my understating/conclusion is: when empty
+>>     property(dma-ranges)
+>>     >> >> >> is
+>>     >> >> >> the device node, the mapping will be taken in consideration
+>>     when
+>>     >> >> >> using
+>>     >> >> >> DMA otherwise the mapping is ignored.
+>>     >> >> >> And in the SDIO case it is needed for DEV->MEM(SDRAM) and
+>>     >> >> >> MEM(SDRAM)->DEV. If it is not the case for the devices in
+>>     question
+>>     >> >> >> so
+>>     >> >> >> I suppose it can work without the property.
+>>     >> >> >
+>>     >> >> >
+>>     >> >> > For sure translation has to be done but I'm not sure that an
+>>     empty
+>>     >> >> > "dma-ranges" is needed in device node to activate it. For
+>>     Ethernet
+>>     >> >> > empty
+>>     >> >> > "dma-ranges" is not needed. I will try with usb.
+>>     >> >>
+>>     >> >> In the case of SDIO it is needed. As example this is my
+>>     working SDIO
+>>     >> >> node:
+>>     >> >>
+>>     >> >> sdio: sdio at 40012c00 {
+>>     >> >> compatible = "arm,pl18x", "arm,primecell";
+>>     >> >> arm,primecell-periphid = <0x00480181>;
+>>     >> >> reg = <0x40012c00 0x400>;
+>>     >> >> dmas =  <&dma2 6 4 0x10400 0x3>, /* Logical - DevToMem */
+>>     >> >> <&dma2 3 4 0x10400 0x3>; /* Logical - MemToDev */
+>>     >> >> dma-names = "rx", "tx";
+>>     >> >> clocks = <&rcc 0 171>;
+>>     >> >> clock-names = "apb_pclk";
+>>     >> >> interrupts = <49>;
+>>     >> >> status = "disabled";
+>>     >> >> };
+>>     >> >>
+>>     >> >> &sdio {
+>>     >> >> status = "okay";
+>>     >> >> vmmc-supply = <&wlan_en>;
+>>     >> >> bus-width = <4>;
+>>     >> >> max-frequency = <24000000>;
+>>     >> >> pinctrl-names = "default";
+>>     >> >> pinctrl-0 = <&sdio_pins>;
+>>     >> >> ti,non-removable;
+>>     >> >> ti,needs-special-hs-handling;
+>>     >> >> dma-ranges;
+>>     >> >> cap-power-off-card;
+>>     >> >> keep-power-in-suspend;
+>>     >> >>
+>>     >> >> #address-cells = <1>;
+>>     >> >> #size-cells = <0>;
+>>     >> >> wlcore: wlcore at 0 {
+>>     >> >> compatible = "ti,wl1835";
+>>     >> >> reg = <2>;
+>>     >> >> interrupt-parent = <&gpioa>;
+>>     >> >> interrupts = <8 IRQ_TYPE_EDGE_RISING>;
+>>     >> >> };
+>>     >> >> };
+>>     >> >>
+>>     >> >> >
+>>     >> >> > alex
+>>     >> >> >
+>>     >> >> >
+>>     >> >> >>
+>>     >> >> >>>
+>>     >> >> >>> Thanks in advance
+>>     >> >> >>> Alex
+>>     >> >> >>>
+>>     >> >> >>>
+>>     >> >> >>>>
+>>     >> >> >>>> Author: Bruno Herrera <bruherrera@gmail.com
+>>     <mailto:bruherrera@gmail.com>>
+>>
+>>     >> >> >>>> Date:   Sun Oct 16 14:50:00 2016 -0200
+>>     >> >> >>>>
+>>     >> >> >>>>     ARM: DT: STM32: Use dma-ranges property per board not
+>>     at dtsi
+>>     >> >> >>>> file
+>>     >> >> >>>>
+>>     >> >> >>>> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>> b/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>> index 6bfc595..2a22a82 100644
+>>     >> >> >>>> --- a/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
+>>     >> >> >>>> @@ -52,6 +52,10 @@
+>>     >> >> >>>>         model = "STMicroelectronics STM32429i-EVAL board";
+>>     >> >> >>>>         compatible = "st,stm32429i-eval", "st,stm32f429";
+>>     >> >> >>>>
+>>     >> >> >>>> +       soc {
+>>     >> >> >>>> +               dma-ranges = <0xC0000000 0x0 0x10000000>;
+>>     >> >> >>>> +       };
+>>     >> >> >>>> +
+>>     >> >> >>>>         chosen {
+>>     >> >> >>>>                 bootargs = "root=/dev/ram rdinit=/linuxrc";
+>>     >> >> >>>>                 stdout-path = "serial0:115200n8";
+>>     >> >> >>>> @@ -96,6 +100,7 @@
+>>     >> >> >>>>
+>>     >> >> >>>>  &ethernet0 {
+>>     >> >> >>>>         status = "okay";
+>>     >> >> >>>> +       dma-ranges;
+>>     >> >> >>>>         pinctrl-0       = <&ethernet0_mii>;
+>>     >> >> >>>>         pinctrl-names   = "default";
+>>     >> >> >>>>         phy-mode        = "mii-id";
+>>     >> >> >>>> @@ -116,6 +121,7 @@
+>>     >> >> >>>>  };
+>>     >> >> >>>>
+>>     >> >> >>>>  &usbotg_hs {
+>>     >> >> >>>> +       dma-ranges;
+>>     >> >> >>>>         dr_mode = "host";
+>>     >> >> >>>>         phys = <&usbotg_hs_phy>;
+>>     >> >> >>>>         phy-names = "usb2-phy";
+>>     >> >> >>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>> b/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>> index 7d624a2..697a133 100644
+>>     >> >> >>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>> @@ -59,7 +59,6 @@
+>>     >> >> >>>>         };
+>>     >> >> >>>>
+>>     >> >> >>>>         soc {
+>>     >> >> >>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
+>>     >> >> >>>>
+>>     >> >> >>>>                 timer2: timer at 40000000 {
+>>     >> >> >>>>                         compatible = "st,stm32-timer";
+>>     >> >> >>>> @@ -472,13 +471,11 @@
+>>     >> >> >>>>                         st,syscon = <&syscfg 0x4>;
+>>     >> >> >>>>                         snps,pbl = <8>;
+>>     >> >> >>>>                         snps,mixed-burst;
+>>     >> >> >>>> -                       dma-ranges;
+>>     >> >> >>>>                         status = "disabled";
+>>     >> >> >>>>                 };
+>>     >> >> >>>>
+>>     >> >> >>>>                 usbotg_hs: usb at 40040000 {
+>>     >> >> >>>>                         compatible = "snps,dwc2";
+>>     >> >> >>>> -                       dma-ranges;
+>>     >> >> >>>>                         reg = <0x40040000 0x40000>;
+>>     >> >> >>>>                         interrupts = <77>;
+>>     >> >> >>>>                         clocks = <&rcc 0 29>;
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>>> b/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>>> index 0596d60..3a1cfdd 100644
+>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32f429.dtsi
+>>     >> >> >>>>> @@ -59,8 +59,6 @@
+>>     >> >> >>>>>         };
+>>     >> >> >>>>>
+>>     >> >> >>>>>         soc {
+>>     >> >> >>>>> -               dma-ranges = <0xc0000000 0x0 0x10000000>;
+>>     >> >> >>>>> -
+>>     >> >> >>>>>                 timer2: timer at 40000000 {
+>>     >> >> >>>>>                         compatible = "st,stm32-timer";
+>>     >> >> >>>>>                         reg = <0x40000000 0x400>;
+>>     >> >> >>>>> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts
+>>     >> >> >>>>> b/arch/arm/boot/dts/stm32f469-disco.dts
+>>     >> >> >>>>> index 9e73656..c2213c0 100644
+>>     >> >> >>>>> --- a/arch/arm/boot/dts/stm32f469-disco.dts
+>>     >> >> >>>>> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+>>     >> >> >>>>> @@ -64,6 +64,10 @@
+>>     >> >> >>>>>         aliases {
+>>     >> >> >>>>>                 serial0 = &usart3;
+>>     >> >> >>>>>         };
+>>     >> >> >>>>> +
+>>     >> >> >>>>> +       soc {
+>>     >> >> >>>>> +               dma-ranges = <0xc0000000 0x0 0x10000000>;
+>>     >> >> >>>>> +       };
+>>     >> >> >>>>>  };
+>>     >> >> >>>>>
+>>     >> >> >>>>>  &clk_hse {
+>>     >> >> >>>>> --
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>>
+>>     >> >> >>>> Br.,
+>>     >> >> >>>> Bruno
+>>     >> >> >>>>
+>>     >> >> >>>
+>>     >> >> >
+>>     >> >>
+>>     >> >> _______________________________________________
+>>     >> >> linux-arm-kernel mailing list
+>>     >> >> linux-arm-kernel at lists.infradead.org
+>>     <mailto:linux-arm-kernel@lists.infradead.org>
+>>     >> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>     <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>
+>>     >> >
+>>     >> >
+>>     >
+>>     >
+>>
+>>
+>
