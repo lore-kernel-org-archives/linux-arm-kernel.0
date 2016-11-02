@@ -1,18 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 2 Nov 2016 11:26:14 +0100
-Subject: [PATCH 10/12] ARM: dts: sk-rzg1e: initial device tree
-In-Reply-To: <17390303.uDhVlFKVKX@wasted.cogentembedded.com>
+Date: Wed, 2 Nov 2016 11:26:53 +0100
+Subject: [PATCH 11/12] ARM: dts: sk-rzg1e: add Ether support
+In-Reply-To: <1653044.nY120UqMZW@wasted.cogentembedded.com>
 References: <4121805.SRTmqJtRfv@wasted.cogentembedded.com>
- <17390303.uDhVlFKVKX@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWtAtALtfpKiVf7sZSd=91v-9gy33apU=gYxT+g66s+GA@mail.gmail.com>
+ <1653044.nY120UqMZW@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUXPouB=+ZxXLxvVB+pbR=BpCR6DYOm90h2b8cDkgPkOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 29, 2016 at 12:29 AM, Sergei Shtylyov
+On Sat, Oct 29, 2016 at 12:31 AM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add the initial  device tree for the R8A7745 SoC based SK-RZG1E board.
-> The board has 1  debug  serial  port (SCIF2); include support for it,
-> so that the serial console can  work.
+> Define the SK-RZG1E board dependent part of the Ether device node.
+> Enable DHCP and NFS root  for the kernel booting.
 >
 > Based on the original (and large) patch by Dmitry Shifrin
 > <dmitry.shifrin@cogentembedded.com>.
