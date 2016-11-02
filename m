@@ -1,33 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 2 Nov 2016 19:36:04 +0100
-Subject: [PATCH v2 2/4] ARM: dts: sun8i: Add SPI controller node in H3
-In-Reply-To: <20161028065412.23008-3-woogyom.kim@gmail.com>
-References: <20161028065412.23008-1-woogyom.kim@gmail.com>
- <20161028065412.23008-3-woogyom.kim@gmail.com>
-Message-ID: <20161102183604.b3zqtf6rdavvdlvh@lukather>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Nov 2016 19:37:14 +0100
+Subject: [PATCH v5 3/7] net: phy: broadcom: Add BCM54810 PHY entry
+In-Reply-To: <1478106488-11779-4-git-send-email-jon.mason@broadcom.com>
+References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
+ <1478106488-11779-4-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20161102183714.GH384@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1;4600;0c
-On Fri, Oct 28, 2016 at 03:54:10PM +0900, Milo Kim wrote:
-> H3 SPI subsystem is almost same as A31 SPI except buffer size, so those
-> DT properties are reusable.
+On Wed, Nov 02, 2016 at 01:08:04PM -0400, Jon Mason wrote:
+> The BCM54810 PHY requires some semi-unique configuration, which results
+> in some additional configuration in addition to the standard config.
+> Also, some users of the BCM54810 require the PHY lanes to be swapped.
+> Since there is no way to detect this, add a device tree query to see if
+> it is applicable.
 > 
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+> Inspired-by: Vikas Soni <vsoni@broadcom.com>
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 
-Applied both, thanks!
-Maxime
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161102/ea817932/attachment.sig>
+    Andrew
