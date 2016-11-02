@@ -1,44 +1,29 @@
-From: ahaslam@baylibre.com (Axel Haslam)
-Date: Wed,  2 Nov 2016 13:44:34 +0100
-Subject: [PATCH 2/3] phy: da8xx-usb: rename the ohci device to ohci-da8xx
-In-Reply-To: <20161102124435.31777-1-ahaslam@baylibre.com>
-References: <20161102124435.31777-1-ahaslam@baylibre.com>
-Message-ID: <20161102124435.31777-3-ahaslam@baylibre.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Wed, 02 Nov 2016 05:51:37 -0700
+Subject: [PATCH 0/5] ARM: OMAP: dead code removal
+In-Reply-To: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
+References: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
+Message-ID: <5171695.W4AFPtEAdE@diplodocus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one ohci on the da8xx series of chips,
-so remove the ".0" when creating the phy. Also add
-the "-da8xx" postfix to be consistent across davinci
-usb drivers.
-
-Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
----
- drivers/phy/phy-da8xx-usb.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/phy/phy-da8xx-usb.c b/drivers/phy/phy-da8xx-usb.c
-index 32ae78c..c85fb0b 100644
---- a/drivers/phy/phy-da8xx-usb.c
-+++ b/drivers/phy/phy-da8xx-usb.c
-@@ -198,7 +198,8 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
- 	} else {
- 		int ret;
- 
--		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
-+		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy",
-+					"ohci-da8xx");
- 		if (ret)
- 			dev_warn(dev, "Failed to create usb11 phy lookup\n");
- 		ret = phy_create_lookup(d_phy->usb20_phy, "usb-phy",
-@@ -216,7 +217,7 @@ static int da8xx_usb_phy_remove(struct platform_device *pdev)
- 
- 	if (!pdev->dev.of_node) {
- 		phy_remove_lookup(d_phy->usb20_phy, "usb-phy", "musb-da8xx");
--		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
-+		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci-da8xx");
- 	}
- 
- 	return 0;
--- 
-2.10.1
+On Tuesday, November 01, 2016 01:36:41 PM Nicolae Rosia wrote:
+> Hi,
+> 
+> I have identified some dead code which can be removed.
+> 
+> Nicolae Rosia (5):
+>   ARM: OMAP4: kill omap4_pmic_init and omap4_pmic_get_config
+>   ARM: OMAP3: kill omap3_pmic_get_config and twl_{get,set}_voltage
+>   ARM: OMAP3: kill omap3_pmic_init
+>   ARM: OMAP2: kill omap2_pmic_init
+>   ARM: OMAP: kill omap_pmic_init
+> 
+>  arch/arm/mach-omap2/twl-common.c | 483 ---------------------------------------
+>  arch/arm/mach-omap2/twl-common.h |  24 --
+>  2 files changed, 507 deletions(-)
+> 
+> 
+I think the commit logs for these patches
+need a little detail on why the code is
+no longer needed. For posterity. 
