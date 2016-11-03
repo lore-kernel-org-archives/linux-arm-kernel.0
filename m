@@ -1,36 +1,33 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu,  3 Nov 2016 11:15:59 +0100
-Subject: [PATCH v7 1/3] input: touchscreen: TOUCHSCREEN_SUN4I depends on
- !SUN4I_GPADC
+Date: Thu,  3 Nov 2016 11:16:00 +0100
+Subject: [PATCH v7 2/3] ARM: sunxi_defconfig: Add CONFIG_THERMAL_OF
 In-Reply-To: <20161103101601.24529-1-quentin.schulz@free-electrons.com>
 References: <20161103101601.24529-1-quentin.schulz@free-electrons.com>
-Message-ID: <20161103101601.24529-2-quentin.schulz@free-electrons.com>
+Message-ID: <20161103101601.24529-3-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SUN4I_GPADC and TOUCHSCREEN_SUN4I are incompatible (both are drivers
-for Allwinner SoCs' ADC). This makes sure TOUCHSCREEN_SUN4I isn't
-enabled while SUN4I_GPADC is enabled.
+This enables CONFIG_THERMAL_OF by default for sunxi_defconfig.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
 
 added in v7
 
- drivers/input/touchscreen/Kconfig | 1 +
+ arch/arm/configs/sunxi_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-index efca013..c618cb9 100644
---- a/drivers/input/touchscreen/Kconfig
-+++ b/drivers/input/touchscreen/Kconfig
-@@ -1120,6 +1120,7 @@ config TOUCHSCREEN_SUN4I
- 	depends on ARCH_SUNXI || COMPILE_TEST
- 	depends on HWMON
- 	depends on THERMAL || !THERMAL_OF
-+	depends on !SUN4I_GPADC
- 	help
- 	  This selects support for the resistive touchscreen controller
- 	  found on Allwinner sunxi SoCs.
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index 714da33..8aaeae3 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -83,6 +83,7 @@ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_AXP20X_POWER=y
+ CONFIG_THERMAL=y
++CONFIG_THERMAL_OF=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
 -- 
 2.9.3
