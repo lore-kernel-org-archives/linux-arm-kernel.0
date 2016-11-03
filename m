@@ -1,46 +1,51 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 3 Nov 2016 22:11:21 +0200
-Subject: [PATCH v3 5/5] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2E board
-In-Reply-To: <1478155149-28527-6-git-send-email-cw00.choi@samsung.com>
-References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
- <1478155149-28527-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20161103201121.GC9379@kozik-lap>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu,  3 Nov 2016 20:23:03 +0000
+Subject: [PATCHv2 01/11] arm64: thread_info remove stale items
+In-Reply-To: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
+References: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1478204593-29145-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 03:39:09PM +0900, Chanwoo Choi wrote:
-> This patch adds the Device Tree source for Exynos5433-based Samsung TM2E
-> board. TM2E board is the most similar with TM2 board. The exynos5433-tm2e.dts
-> include the difference between TM2 and TM2E.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
->  .../bindings/arm/samsung/samsung-boards.txt        |  1 +
->  arch/arm64/boot/dts/exynos/Makefile                |  1 +
->  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 41 ++++++++++++++++++++++
->  3 files changed, 43 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> 
+We have a comment claiming __switch_to() cares about where cpu_context
+is located relative to cpu_domain in thread_info. However arm64 has
+never had a thread_info::cpu_domain field, and neither __switch_to nor
+cpu_switch_to care where the cpu_context field is relative to others.
 
-Thanks, applied.
+Additionally, the init_thread_info alias is never used anywhere in the
+kernel, and will shortly become problematic when thread_info is moved
+into task_struct.
 
-Best regards,
-Krzysztof
+This patch removes both.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Laura Abbott <labbott@redhat.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/thread_info.h | 2 --
+ 1 file changed, 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index e9ea5a6..76a9559 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -42,7 +42,6 @@ typedef unsigned long mm_segment_t;
+ 
+ /*
+  * low level task data that entry.S needs immediate access to.
+- * __switch_to() assumes cpu_context follows immediately after cpu_domain.
+  */
+ struct thread_info {
+ 	unsigned long		flags;		/* low level flags */
+@@ -60,7 +59,6 @@ struct thread_info {
+ 	.addr_limit	= KERNEL_DS,					\
+ }
+ 
+-#define init_thread_info	(init_thread_union.thread_info)
+ #define init_stack		(init_thread_union.stack)
+ 
+ /*
+-- 
+2.7.4
