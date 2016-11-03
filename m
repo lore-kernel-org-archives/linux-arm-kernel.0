@@ -1,117 +1,40 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Thu,  3 Nov 2016 14:54:35 -0700
-Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
-In-Reply-To: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
-References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 4 Nov 2016 03:55:45 +0530
+Subject: [PATCH V3 0/8] IOMMU probe deferral support
+References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
+ <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
+ <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
+ <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
+Message-ID: <003801d23621$3cb91970$b62b4c50$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-using idle state definition provided by arm,idle-state for domain
-idle states creates a lot of confusion and limits further evolution of
-the domain idle definition. To keep things clear and simple, define a
-idle states for domain using a new compatible "domain-idle-state".
+Hi Robin,
 
-Fix existing PM domains code to look for the newly defined compatible.
+>>>> [   39.901592] iommu: Removing device 0000:08:00.0 from group 0
+>>
+>>Yikes, on second look, that definitely shouldn't be happening.
+>>Everything below is probably the resulting fallout.
+>
+>[   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
+>
+>I think the above print which says "failed to setup iommu_ops"
+>because the call ops->add_device failed in of_pci_iommu_configure
+>is the reason for the failure, in my case i simply do not get this even with
+>your scripts. ops->add_device succeeds in the rebind as well. So still
+>checking what could be happening in your case.
 
-Cc: <devicetree@vger.kernel.org>
-Cc: Rob Herring <robh@kernel.org>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
- .../devicetree/bindings/power/power_domain.txt     |  8 +++---
- drivers/base/power/domain.c                        |  2 +-
- 3 files changed, 38 insertions(+), 5 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
+I was looking at your code base from [1].The ops->add_device
+callback from of_pci_iommu_configure on the rebind is the
+one which is causing the failure. But not able to spot out
+from code which point is causing the failure. It would be very helpful
+if i can know which is the return value from the add_device callback
+or point inside add_device callback which fails in your setup.
 
-diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-new file mode 100644
-index 0000000..eefc7ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-@@ -0,0 +1,33 @@
-+PM Domain Idle State Node:
-+
-+A domain idle state node represents the state parameters that will be used to
-+select the state when there are no active components in the domain.
-+
-+The state node has the following parameters -
-+
-+- compatible:
-+	Usage: Required
-+	Value type: <string>
-+	Definition: Must be "domain-idle-state".
-+
-+- entry-latency-us
-+	Usage: Required
-+	Value type: <prop-encoded-array>
-+	Definition: u32 value representing worst case latency in
-+		    microseconds required to enter the idle state.
-+		    The exit-latency-us duration may be guaranteed
-+		    only after entry-latency-us has passed.
-+
-+- exit-latency-us
-+	Usage: Required
-+	Value type: <prop-encoded-array>
-+	Definition: u32 value representing worst case latency
-+		    in microseconds required to exit the idle state.
-+
-+- min-residency-us
-+	Usage: Required
-+	Value type: <prop-encoded-array>
-+	Definition: u32 value representing minimum residency duration
-+		    in microseconds after which the idle state will yield
-+		    power benefits after overcoming the overhead in entering
-+i		    the idle state.
-diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-index e165036..723e1ad 100644
---- a/Documentation/devicetree/bindings/power/power_domain.txt
-+++ b/Documentation/devicetree/bindings/power/power_domain.txt
-@@ -31,7 +31,7 @@ Optional properties:
- 
- - domain-idle-states : A phandle of an idle-state that shall be soaked into a
-                 generic domain power state. The idle state definitions are
--                compatible with arm,idle-state specified in [1].
-+                compatible with domain-idle-state specified in [1].
-   The domain-idle-state property reflects the idle state of this PM domain and
-   not the idle states of the devices or sub-domains in the PM domain. Devices
-   and sub-domains have their own idle-states independent of the parent
-@@ -85,7 +85,7 @@ Example 3:
- 	};
- 
- 	DOMAIN_RET: state at 0 {
--		compatible = "arm,idle-state";
-+		compatible = "domain-idle-state";
- 		reg = <0x0>;
- 		entry-latency-us = <1000>;
- 		exit-latency-us = <2000>;
-@@ -93,7 +93,7 @@ Example 3:
- 	};
- 
- 	DOMAIN_PWR_DN: state at 1 {
--		compatible = "arm,idle-state";
-+		compatible = "domain-idle-state";
- 		reg = <0x1>;
- 		entry-latency-us = <5000>;
- 		exit-latency-us = <8000>;
-@@ -118,4 +118,4 @@ The node above defines a typical PM domain consumer device, which is located
- inside a PM domain with index 0 of a power controller represented by a node
- with the label "power".
- 
--[1]. Documentation/devicetree/bindings/arm/idle-states.txt
-+[1]. Documentation/devicetree/bindings/power/domain-idle-state.txt
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 661737c..f0bc672 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2048,7 +2048,7 @@ int genpd_dev_pm_attach(struct device *dev)
- EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
- 
- static const struct of_device_id idle_state_match[] = {
--	{ .compatible = "arm,idle-state", },
-+	{ .compatible = "domain-idle-state", },
- 	{ }
- };
- 
--- 
-2.7.4
+
+[1] git://linux-arm.org/linux-rm iommu/misc
+>
+>
+>Regards,
+>  Sricharan
+>
