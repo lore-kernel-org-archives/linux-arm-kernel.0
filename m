@@ -1,77 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Nov 2016 15:55:45 +0800
-Subject: [PATCH v2 03/14] ASoC: sun4i-codec: Revise comments for register
- definition macros
+Date: Thu,  3 Nov 2016 15:55:46 +0800
+Subject: [PATCH v2 04/14] ASoC: sun4i-codec: Increase DMA max burst to 8
 In-Reply-To: <20161103075556.29018-1-wens@csie.org>
 References: <20161103075556.29018-1-wens@csie.org>
-Message-ID: <20161103075556.29018-4-wens@csie.org>
+Message-ID: <20161103075556.29018-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This revises existing comments in the register definition macros
-section, and adds a few more, so that readers can clearly identify
-the types of control registers.
+According to the DMA engine API documentation, maxburst denotes the
+largest possible size of a single transfer, so as not to overflow
+destination FIFOs as explained in this excerpt from dmaengine.h
 
+ * @src_maxburst: the maximum number of words (note: words, as in
+ * units of the src_addr_width member, not bytes) that can be sent
+ * in one burst to the device. Typically something like half the
+ * FIFO depth on I/O peripherals so you don't overflow it. This
+ * may or may not be applicable on memory sources.
+ * @dst_maxburst: same as src_maxburst but for destination target
+ * mutatis mutandis.
+
+The TX FIFO is 64 samples deep for stereo, and the RX FIFO is 16
+samples deep. So maxburst could be 32 and 8 for TX and RX respectively.
+
+Unfortunately the sunxi DMA controller driver takes maxburst as
+the requested burst size, rather than a limit, and returns an error
+for unsupported values. The original value was 4, but some later
+SoCs do not officially support this burst size.
+
+This patch increases maxburst on the TX side to 8, which is supported
+by all variants of the sunxi DMA controller.
+
+Cc: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index dbb47f255bd8..61ae502a5061 100644
+index 61ae502a5061..d867b96d367b 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -40,7 +40,7 @@
- #include <sound/initval.h>
- #include <sound/dmaengine_pcm.h>
+@@ -886,12 +886,12 @@ static int sun4i_codec_probe(struct platform_device *pdev)
  
--/* Codec DAC register offsets and bit fields */
-+/* Codec DAC digital controls and FIFO registers */
- #define SUN4I_CODEC_DAC_DPC			(0x00)
- #define SUN4I_CODEC_DAC_DPC_EN_DA			(31)
- #define SUN4I_CODEC_DAC_DPC_DVOL			(12)
-@@ -57,6 +57,8 @@
- #define SUN4I_CODEC_DAC_FIFOC_FIFO_FLUSH		(0)
- #define SUN4I_CODEC_DAC_FIFOS			(0x08)
- #define SUN4I_CODEC_DAC_TXDATA			(0x0c)
-+
-+/* Codec DAC side analog signal controls */
- #define SUN4I_CODEC_DAC_ACTL			(0x10)
- #define SUN4I_CODEC_DAC_ACTL_DACAENR			(31)
- #define SUN4I_CODEC_DAC_ACTL_DACAENL			(30)
-@@ -71,7 +73,7 @@
- #define SUN4I_CODEC_DAC_TUNE			(0x14)
- #define SUN4I_CODEC_DAC_DEBUG			(0x18)
+ 	/* DMA configuration for TX FIFO */
+ 	scodec->playback_dma_data.addr = res->start + quirks->reg_dac_txdata;
+-	scodec->playback_dma_data.maxburst = 4;
++	scodec->playback_dma_data.maxburst = 8;
+ 	scodec->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
  
--/* Codec ADC register offsets and bit fields */
-+/* Codec ADC digital controls and FIFO registers */
- #define SUN4I_CODEC_ADC_FIFOC			(0x1c)
- #define SUN4I_CODEC_ADC_FIFOC_ADC_FS			(29)
- #define SUN4I_CODEC_ADC_FIFOC_EN_AD			(28)
-@@ -83,6 +85,8 @@
- #define SUN4I_CODEC_ADC_FIFOC_FIFO_FLUSH		(0)
- #define SUN4I_CODEC_ADC_FIFOS			(0x20)
- #define SUN4I_CODEC_ADC_RXDATA			(0x24)
-+
-+/* Codec ADC side analog signal controls */
- #define SUN4I_CODEC_ADC_ACTL			(0x28)
- #define SUN4I_CODEC_ADC_ACTL_ADC_R_EN			(31)
- #define SUN4I_CODEC_ADC_ACTL_ADC_L_EN			(30)
-@@ -95,10 +99,14 @@
- #define SUN4I_CODEC_ADC_ACTL_DDE			(3)
- #define SUN4I_CODEC_ADC_DEBUG			(0x2c)
+ 	/* DMA configuration for RX FIFO */
+ 	scodec->capture_dma_data.addr = res->start + quirks->reg_adc_rxdata;
+-	scodec->capture_dma_data.maxburst = 4;
++	scodec->capture_dma_data.maxburst = 8;
+ 	scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
  
--/* Other various ADC registers */
-+/* FIFO counters */
- #define SUN4I_CODEC_DAC_TXCNT			(0x30)
- #define SUN4I_CODEC_ADC_RXCNT			(0x34)
-+
-+/* Calibration register (sun7i only) */
- #define SUN7I_CODEC_AC_DAC_CAL			(0x38)
-+
-+/* Microphone controls (sun7i only) */
- #define SUN7I_CODEC_AC_MIC_PHONE_CAL		(0x3c)
- 
- struct sun4i_codec {
+ 	ret = snd_soc_register_codec(&pdev->dev, quirks->codec,
 -- 
 2.10.2
