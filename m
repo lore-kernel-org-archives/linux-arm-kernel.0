@@ -1,25 +1,35 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Thu, 3 Nov 2016 20:57:26 +0000
-Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
- caching of bypass entries
-In-Reply-To: <1478219244-7815-1-git-send-email-nipun.gupta@nxp.com>
-References: <1478219244-7815-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <VI1PR0401MB263890564BC836B7BBE744018DA30@VI1PR0401MB2638.eurprd04.prod.outlook.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 3 Nov 2016 22:03:54 +0100
+Subject: [PATCHv2] ARM: OMAP3: Fix formatting of features printed
+In-Reply-To: <20161103173439.20657-1-tony@atomide.com>
+References: <20161103173439.20657-1-tony@atomide.com>
+Message-ID: <20161103210354.qtf4ljbcmcgtvo6j@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, Nov 03, 2016 at 10:34:39AM -0700, Tony Lindgren wrote:
+> With the printk cleanups merged into v4.9-rc1, we now get the omap
+> revision printed on multiple lines. Let's fix that and also remove the
+> extra empty space at the end of the features. And let's update things
+> to use scnprintf as suggested by Ivaylo Dimitrov
+> <ivo.g.dimitrov.75@gmail.com>.
+> 
+> Reported-by: Adam Ford <aford173@gmail.com>
+> Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/id.c | 16 +++++++++++-----
+>  1 file changed, 11 insertions(+), 5 deletions(-)
 
-> -----Original Message-----
-> From: Nipun Gupta [mailto:nipun.gupta at nxp.com]
-> Sent: Thursday, November 03, 2016 7:27 PM
-> To: robin.murphy at arm.com; will.deacon at arm.com; linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
-> foundation.org
-> Cc: Stuart Yoder <stuart.yoder@nxp.com>; Nipun Gupta <nipun.gupta@nxp.com>
-> Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching of bypass entries
+Reviewed-By: Sebastian Reichel <sre@kernel.org>
 
-When you respin a patch, put the version number in the patch subject:
-
-   [PATCH v2] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching of bypass entries
-
-Stuart
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/cb911b5c/attachment.sig>
