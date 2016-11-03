@@ -1,128 +1,150 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Nov 2016 15:55:52 +0800
-Subject: [PATCH v2 10/14] ASoC: sun4i-codec: Add support for A31 ADC capture
- path
+Date: Thu,  3 Nov 2016 15:55:51 +0800
+Subject: [PATCH v2 09/14] ASoC: sun4i-codec: Add support for A31 analog
+ microphone inputs
 In-Reply-To: <20161103075556.29018-1-wens@csie.org>
 References: <20161103075556.29018-1-wens@csie.org>
-Message-ID: <20161103075556.29018-11-wens@csie.org>
+Message-ID: <20161103075556.29018-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A31's internal codec capture path has a mixer in front of the ADC
-for each channel, capable of selecting various inputs, including
-microphones, line in, phone in, and the main output mixer.
+The A31 internal codec has 3 microphone outputs, of which MIC2 and MIC3
+are muxed internally. The resulting two microphone inputs have separate
+gain controls and mixer inputs.
 
-This patch adds the various controls, widgets and routes needed for
-audio capture from the already supported inputs on the A31.
+The codec also has 2 microphone bias pins. HBIAS is specifically for the
+headphone jack, which also supports headphone detection and control
+buttons. These extra functions are not supported yet. The other, MBIAS,
+is for all other analog microphones.
+
+There is also mention of digital microphone support, but documentation
+is scarce, and no hardware with it is available.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 65 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 70 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index a0fedb059f1b..0cb728964ff0 100644
+index 8ba7804a68ed..a0fedb059f1b 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -788,6 +788,30 @@ static const struct snd_kcontrol_new sun6i_codec_mixer_controls[] = {
- 			SUN6I_CODEC_OM_DACA_CTRL_RMIX_MIC2, 1, 0),
+@@ -778,6 +778,14 @@ static const struct snd_kcontrol_new sun6i_codec_mixer_controls[] = {
+ 			SUN6I_CODEC_OM_DACA_CTRL,
+ 			SUN6I_CODEC_OM_DACA_CTRL_LMIX_LINEINL,
+ 			SUN6I_CODEC_OM_DACA_CTRL_RMIX_LINEINR, 1, 0),
++	SOC_DAPM_DOUBLE("Mic1 Playback Switch",
++			SUN6I_CODEC_OM_DACA_CTRL,
++			SUN6I_CODEC_OM_DACA_CTRL_LMIX_MIC1,
++			SUN6I_CODEC_OM_DACA_CTRL_RMIX_MIC1, 1, 0),
++	SOC_DAPM_DOUBLE("Mic2 Playback Switch",
++			SUN6I_CODEC_OM_DACA_CTRL,
++			SUN6I_CODEC_OM_DACA_CTRL_LMIX_MIC2,
++			SUN6I_CODEC_OM_DACA_CTRL_RMIX_MIC2, 1, 0),
  };
  
-+/* ADC mixer controls */
-+static const struct snd_kcontrol_new sun6i_codec_adc_mixer_controls[] = {
-+	SOC_DAPM_DOUBLE("Mixer Capture Switch",
-+			SUN6I_CODEC_ADC_ACTL,
-+			SUN6I_CODEC_ADC_ACTL_LADCMIX_OMIXL,
-+			SUN6I_CODEC_ADC_ACTL_RADCMIX_OMIXR, 1, 0),
-+	SOC_DAPM_DOUBLE("Mixer Reversed Capture Switch",
-+			SUN6I_CODEC_ADC_ACTL,
-+			SUN6I_CODEC_ADC_ACTL_LADCMIX_OMIXR,
-+			SUN6I_CODEC_ADC_ACTL_RADCMIX_OMIXL, 1, 0),
-+	SOC_DAPM_DOUBLE("Line In Capture Switch",
-+			SUN6I_CODEC_ADC_ACTL,
-+			SUN6I_CODEC_ADC_ACTL_LADCMIX_LINEINL,
-+			SUN6I_CODEC_ADC_ACTL_RADCMIX_LINEINR, 1, 0),
-+	SOC_DAPM_DOUBLE("Mic1 Capture Switch",
-+			SUN6I_CODEC_ADC_ACTL,
-+			SUN6I_CODEC_ADC_ACTL_LADCMIX_MIC1,
-+			SUN6I_CODEC_ADC_ACTL_RADCMIX_MIC1, 1, 0),
-+	SOC_DAPM_DOUBLE("Mic2 Capture Switch",
-+			SUN6I_CODEC_ADC_ACTL,
-+			SUN6I_CODEC_ADC_ACTL_LADCMIX_MIC2,
-+			SUN6I_CODEC_ADC_ACTL_RADCMIX_MIC2, 1, 0),
+ /* headphone controls */
+@@ -796,6 +804,21 @@ static const struct snd_kcontrol_new sun6i_codec_hp_src[] = {
+ 		      sun6i_codec_hp_src_enum),
+ };
+ 
++/* microphone controls */
++static const char * const sun6i_codec_mic2_src_enum_text[] = {
++	"Mic2", "Mic3",
 +};
 +
- /* headphone controls */
- static const char * const sun6i_codec_hp_src_enum_text[] = {
- 	"DAC", "Mixer",
-@@ -887,6 +911,10 @@ static const struct snd_kcontrol_new sun6i_codec_codec_widgets[] = {
- 	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN6I_CODEC_MIC_CTRL,
- 		       SUN6I_CODEC_MIC_CTRL_MIC2BOOST, 0x7, 0,
- 		       sun6i_codec_mic_gain_scale),
-+	SOC_DOUBLE_TLV("ADC Capture Volume",
-+		       SUN6I_CODEC_ADC_ACTL, SUN6I_CODEC_ADC_ACTL_ADCLG,
-+		       SUN6I_CODEC_ADC_ACTL_ADCRG, 0x7, 0,
-+		       sun6i_codec_out_mixer_pregain_scale),
++static SOC_ENUM_SINGLE_DECL(sun6i_codec_mic2_src_enum,
++			    SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_MIC2SLT,
++			    sun6i_codec_mic2_src_enum_text);
++
++static const struct snd_kcontrol_new sun6i_codec_mic2_src[] = {
++	SOC_DAPM_ENUM("Mic2 Amplifier Source Route",
++		      sun6i_codec_mic2_src_enum),
++};
++
+ /* line out controls */
+ static const char * const sun6i_codec_lineout_src_enum_text[] = {
+ 	"Stereo", "Mono Differential",
+@@ -821,6 +844,10 @@ static const DECLARE_TLV_DB_RANGE(sun6i_codec_lineout_vol_scale,
+ 	0, 1, TLV_DB_SCALE_ITEM(TLV_DB_GAIN_MUTE, 0, 1),
+ 	2, 31, TLV_DB_SCALE_ITEM(-4350, 150, 0),
+ );
++static const DECLARE_TLV_DB_RANGE(sun6i_codec_mic_gain_scale,
++	0, 0, TLV_DB_SCALE_ITEM(0, 0, 0),
++	1, 7, TLV_DB_SCALE_ITEM(2400, 300, 0),
++);
+ 
+ static const struct snd_kcontrol_new sun6i_codec_codec_widgets[] = {
+ 	SOC_SINGLE_TLV("DAC Playback Volume", SUN4I_CODEC_DAC_DPC,
+@@ -846,9 +873,42 @@ static const struct snd_kcontrol_new sun6i_codec_codec_widgets[] = {
+ 	SOC_SINGLE_TLV("Line In Playback Volume",
+ 		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_LINEING,
+ 		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++	SOC_SINGLE_TLV("Mic1 Playback Volume",
++		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_MIC1G,
++		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++	SOC_SINGLE_TLV("Mic2 Playback Volume",
++		       SUN6I_CODEC_OM_PA_CTRL, SUN6I_CODEC_OM_PA_CTRL_MIC2G,
++		       0x7, 0, sun6i_codec_out_mixer_pregain_scale),
++
++	/* Microphone Amp boost gains */
++	SOC_SINGLE_TLV("Mic1 Boost Volume", SUN6I_CODEC_MIC_CTRL,
++		       SUN6I_CODEC_MIC_CTRL_MIC1BOOST, 0x7, 0,
++		       sun6i_codec_mic_gain_scale),
++	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN6I_CODEC_MIC_CTRL,
++		       SUN6I_CODEC_MIC_CTRL_MIC2BOOST, 0x7, 0,
++		       sun6i_codec_mic_gain_scale),
  };
  
  static const struct snd_soc_dapm_widget sun6i_codec_codec_dapm_widgets[] = {
-@@ -912,6 +940,23 @@ static const struct snd_soc_dapm_widget sun6i_codec_codec_dapm_widgets[] = {
++	/* Microphone inputs */
++	SND_SOC_DAPM_INPUT("MIC1"),
++	SND_SOC_DAPM_INPUT("MIC2"),
++	SND_SOC_DAPM_INPUT("MIC3"),
++
++	/* Microphone Bias */
++	SND_SOC_DAPM_SUPPLY("HBIAS", SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_HBIASEN, 0, NULL, 0),
++	SND_SOC_DAPM_SUPPLY("MBIAS", SUN6I_CODEC_MIC_CTRL,
++			    SUN6I_CODEC_MIC_CTRL_MBIASEN, 0, NULL, 0),
++
++	/* Mic input path */
++	SND_SOC_DAPM_MUX("Mic2 Amplifier Source Route",
++			 SND_SOC_NOPM, 0, 0, sun6i_codec_mic2_src),
++	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN6I_CODEC_MIC_CTRL,
++			 SUN6I_CODEC_MIC_CTRL_MIC1AMPEN, 0, NULL, 0),
++	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN6I_CODEC_MIC_CTRL,
++			 SUN6I_CODEC_MIC_CTRL_MIC2AMPEN, 0, NULL, 0),
++
  	/* Line In */
  	SND_SOC_DAPM_INPUT("LINEIN"),
  
-+	/* Digital parts of the ADCs */
-+	SND_SOC_DAPM_SUPPLY("ADC Enable", SUN6I_CODEC_ADC_FIFOC,
-+			    SUN6I_CODEC_ADC_FIFOC_EN_AD, 0,
-+			    NULL, 0),
-+
-+	/* Analog parts of the ADCs */
-+	SND_SOC_DAPM_ADC("Left ADC", "Codec Capture", SUN6I_CODEC_ADC_ACTL,
-+			 SUN6I_CODEC_ADC_ACTL_ADCLEN, 0),
-+	SND_SOC_DAPM_ADC("Right ADC", "Codec Capture", SUN6I_CODEC_ADC_ACTL,
-+			 SUN6I_CODEC_ADC_ACTL_ADCREN, 0),
-+
-+	/* ADC Mixers */
-+	SOC_MIXER_ARRAY("Left ADC Mixer", SND_SOC_NOPM, 0, 0,
-+			sun6i_codec_adc_mixer_controls),
-+	SOC_MIXER_ARRAY("Right ADC Mixer", SND_SOC_NOPM, 0, 0,
-+			sun6i_codec_adc_mixer_controls),
-+
- 	/* Digital parts of the DACs */
- 	SND_SOC_DAPM_SUPPLY("DAC Enable", SUN4I_CODEC_DAC_DPC,
- 			    SUN4I_CODEC_DAC_DPC_EN_DA, 0,
-@@ -975,6 +1020,20 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
- 	{ "Right Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
- 	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+@@ -895,15 +955,25 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
+ 	{ "Left DAC", NULL, "DAC Enable" },
+ 	{ "Right DAC", NULL, "DAC Enable" },
  
-+	/* Left ADC Mixer Routes */
-+	{ "Left ADC Mixer", "Mixer Capture Switch", "Left Mixer" },
-+	{ "Left ADC Mixer", "Mixer Reversed Capture Switch", "Right Mixer" },
-+	{ "Left ADC Mixer", "Line In Capture Switch", "LINEIN" },
-+	{ "Left ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
-+	{ "Left ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
++	/* Microphone Routes */
++	{ "Mic1 Amplifier", NULL, "MIC1"},
++	{ "Mic2 Amplifier Source Route", "Mic2", "MIC2" },
++	{ "Mic2 Amplifier Source Route", "Mic3", "MIC3" },
++	{ "Mic2 Amplifier", NULL, "Mic2 Amplifier Source Route"},
 +
-+	/* Right ADC Mixer Routes */
-+	{ "Right ADC Mixer", "Mixer Capture Switch", "Right Mixer" },
-+	{ "Right ADC Mixer", "Mixer Reversed Capture Switch", "Left Mixer" },
-+	{ "Right ADC Mixer", "Line In Capture Switch", "LINEIN" },
-+	{ "Right ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
-+	{ "Right ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
-+
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
+ 	{ "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
+ 	{ "Left Mixer", "Line In Playback Switch", "LINEIN" },
++	{ "Left Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
++	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right Mixer Routes */
+ 	{ "Right Mixer", "DAC Playback Switch", "Right DAC" },
+ 	{ "Right Mixer", "DAC Reversed Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Line In Playback Switch", "LINEIN" },
++	{ "Right Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
++	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
  	/* Headphone Routes */
  	{ "Headphone Source Playback Route", "DAC", "Left DAC" },
- 	{ "Headphone Source Playback Route", "DAC", "Right DAC" },
-@@ -989,6 +1048,12 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
- 	{ "Line Out Source Playback Route", "Stereo", "Right Mixer" },
- 	{ "Line Out Source Playback Route", "Mono Differential", "Left Mixer" },
- 	{ "LINEOUT", NULL, "Line Out Source Playback Route" },
-+
-+	/* ADC Routes */
-+	{ "Left ADC", NULL, "ADC Enable" },
-+	{ "Right ADC", NULL, "ADC Enable" },
-+	{ "Left ADC", NULL, "Left ADC Mixer" },
-+	{ "Right ADC", NULL, "Right ADC Mixer" },
- };
- 
- static struct snd_soc_codec_driver sun6i_codec_codec = {
 -- 
 2.10.2
