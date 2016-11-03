@@ -1,38 +1,74 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 3 Nov 2016 09:48:26 +0100
-Subject: [PATCH v4 6/8] dt-bindings: Add support for Amlogic GXBB SCPI
- Interface
-In-Reply-To: <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
-References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
- <1475652814-30619-7-git-send-email-narmstrong@baylibre.com>
- <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
- <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
-Message-ID: <f9db6bdd-a494-0b5d-2081-e26f02b8ba78@baylibre.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Thu, 03 Nov 2016 10:42:59 +0200
+Subject: [linux-sunxi] [PATCH v2 04/14] ASoC: sun4i-codec: Increase DMA
+ max burst to 8
+In-Reply-To: <20161103075556.29018-5-wens@csie.org>
+References: <20161103075556.29018-1-wens@csie.org>
+ <20161103075556.29018-5-wens@csie.org>
+Message-ID: <1478162579.8841.1.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2016 11:20 PM, Sudeep Holla wrote:
-> On Sat, Oct 29, 2016 at 11:39:05AM -0700, Olof Johansson wrote:
+On Thu, 2016-11-03 at 15:55 +0800, Chen-Yu Tsai wrote:
+> According to the DMA engine API documentation, maxburst denotes the
+> largest possible size of a single transfer, so as not to overflow
+> destination FIFOs as explained in this excerpt from dmaengine.h
 > 
-> I will rework the patches to address the concerns as I too did share same
-> concern.
-> 
-> 
-> Hi Neil,
-> 
-> You may need to rework the DTS files based on that, please be aware of
-> that and make the necessary changes.
+> ?* @src_maxburst: the maximum number of words (note: words, as in
+> ?* units of the src_addr_width member, not bytes) that can be sent
+> ?* in one burst to the device. Typically something like half the
+> ?* FIFO depth on I/O peripherals so you don't overflow it. This
+> ?* may or may not be applicable on memory sources.
+> ?* @dst_maxburst: same as src_maxburst but for destination target
 
+> ?* mutatis mutandis.
 
-Hi,
-
-I will post the necessary changes since kevin already applied the previous patches.
-
-Thanks,
-Neil
+^^ :)
 
 > 
-> --
-> Regards,
-> Sudeep
+> The TX FIFO is 64 samples deep for stereo, and the RX FIFO is 16
+> samples deep. So maxburst could be 32 and 8 for TX and RX
+> respectively.
+> 
+> Unfortunately the sunxi DMA controller driver takes maxburst as
+> the requested burst size, rather than a limit, and returns an error
+> for unsupported values. The original value was 4, but some later
+> SoCs do not officially support this burst size.
+> 
+> This patch increases maxburst on the TX side to 8, which is supported
+> by all variants of the sunxi DMA controller.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> ?sound/soc/sunxi/sun4i-codec.c | 4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-
+> codec.c
+> index 61ae502a5061..d867b96d367b 100644
+> --- a/sound/soc/sunxi/sun4i-codec.c
+> +++ b/sound/soc/sunxi/sun4i-codec.c
+> @@ -886,12 +886,12 @@ static int sun4i_codec_probe(struct
+> platform_device *pdev)
+> ?
+> ?	/* DMA configuration for TX FIFO */
+> ?	scodec->playback_dma_data.addr = res->start + quirks-
+> >reg_dac_txdata;
+> -	scodec->playback_dma_data.maxburst = 4;
+> +	scodec->playback_dma_data.maxburst = 8;
+> ?	scodec->playback_dma_data.addr_width =
+> DMA_SLAVE_BUSWIDTH_2_BYTES;
+> ?
+> ?	/* DMA configuration for RX FIFO */
+> ?	scodec->capture_dma_data.addr = res->start + quirks-
+> >reg_adc_rxdata;
+> -	scodec->capture_dma_data.maxburst = 4;
+> +	scodec->capture_dma_data.maxburst = 8;
+> ?	scodec->capture_dma_data.addr_width =
+> DMA_SLAVE_BUSWIDTH_2_BYTES;
+> ?
+> ?	ret = snd_soc_register_codec(&pdev->dev, quirks->codec,
+> --?
+> 2.10.2
 > 
