@@ -1,62 +1,112 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 2 Nov 2016 22:37:27 -0500
-Subject: [PATCH v2] of, numa: Return NUMA_NO_NODE from disable
- of_node_to_nid() if nid not possible.
-In-Reply-To: <1477689302-32671-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1477689302-32671-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <CAL_JsqKnXk99SUa1cjC2QFA9rizjn4=JHZh3ua_gvcOtpGx8jg@mail.gmail.com>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Thu,  3 Nov 2016 11:38:53 +0800
+Subject: [PATCH] clk: rockchip: remove more CLK_IGNORE_UNUSED for rk3399
+ clocktree
+Message-ID: <1478144333-13436-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 4:15 PM, David Daney <ddaney.cavm@gmail.com> wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> On arm64 NUMA kernels we can pass "numa=off" on the command line to
-> disable NUMA.  A side effect of this is that kmalloc_node() calls to
-> non-zero nodes will crash the system with an OOPS:
->
-> [    0.000000] ITS at 0x0000901000020000: allocated 2097152 Devices @10002000000 (flat, esz 8, psz 64K, shr 1)
-> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00001680
-> [    0.000000] pgd = fffffc0009470000
-> [    0.000000] [00001680] *pgd=0000010ffff90003, *pud=0000010ffff90003, *pmd=0000010ffff90003, *pte=0000000000000000
-> [    0.000000] Internal error: Oops: 96000006 [#1] SMP
-> .
-> .
-> .
-> [    0.000000] [<fffffc00081c8950>] __alloc_pages_nodemask+0xa4/0xe68
-> [    0.000000] [<fffffc000821fa70>] new_slab+0xd0/0x564
-> [    0.000000] [<fffffc0008221e24>] ___slab_alloc+0x2e4/0x514
-> [    0.000000] [<fffffc0008239498>] __slab_alloc+0x48/0x58
-> [    0.000000] [<fffffc0008222c20>] __kmalloc_node+0xd0/0x2dc
-> [    0.000000] [<fffffc0008115374>] __irq_domain_add+0x7c/0x164
-> [    0.000000] [<fffffc0008b461dc>] its_probe+0x784/0x81c
-> [    0.000000] [<fffffc0008b462bc>] its_init+0x48/0x1b0
-> [    0.000000] [<fffffc0008b4543c>] gic_init_bases+0x228/0x360
-> [    0.000000] [<fffffc0008b456bc>] gic_of_init+0x148/0x1cc
-> [    0.000000] [<fffffc0008b5aec8>] of_irq_init+0x184/0x298
-> [    0.000000] [<fffffc0008b43f9c>] irqchip_init+0x14/0x38
-> [    0.000000] [<fffffc0008b12d60>] init_IRQ+0xc/0x30
-> [    0.000000] [<fffffc0008b10a3c>] start_kernel+0x240/0x3b8
-> [    0.000000] [<fffffc0008b101c4>] __primary_switched+0x30/0x6c
-> [    0.000000] Code: 912ec2a0 b9403809 0a0902fb 37b007db (f9400300)
-> .
-> .
-> .
->
-> This is caused by code like this in kernel/irq/irqdomain.c
->
->     domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
->                   GFP_KERNEL, of_node_to_nid(of_node));
->
-> When NUMA is disabled, the concept of a node is really undefined, so
-> of_node_to_nid() should unconditionally return NUMA_NO_NODE.
->
-> Fix by returning NUMA_NO_NODE when the nid is not in the set of
-> possible nodes.
->
-> Reported-by: Gilbert Netzer <noname@pdc.kth.se>
-> Signed-off-by: David Daney <david.daney@cavium.com>
+Optimize rk3399 clocktree by removing CLK_IGNORE_UNUSED of some clocks.
 
-Does this need to go in 4.9? stable? If so, since what kernel version?
+clocks will managered by usb:
+- clk_usbphy0_480m_src
+- clk_usbphy1_480m_src
+- clk_usbphy_480m
 
-Rob
+clocks will be managered by pvtm:
+- clk_pvtm_core_l
+- clk_pvtm_core_b
+- clk_pvtm_ddr
+
+clocks will be managered by dfi:
+- pclk_ddr_mon
+- clk_dfimon0_timer
+- clk_dfimon1_timer
+- aclk_dcf
+- pclk_dcf
+
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+ drivers/clk/rockchip/clk-rk3399.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index b3df2c6..fc29f99 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -410,11 +410,11 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	GATE(SCLK_USB2PHY1_REF, "clk_usb2phy1_ref", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(6), 6, GFLAGS),
+ 
+-	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", CLK_IGNORE_UNUSED,
++	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", 0,
+ 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
+-	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", CLK_IGNORE_UNUSED,
++	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", 0,
+ 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
+-	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, CLK_IGNORE_UNUSED,
++	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, 0,
+ 			RK3399_CLKSEL_CON(14), 6, 1, MFLAGS),
+ 
+ 	MUX(0, "upll", mux_pll_src_24m_usbphy480m_p, 0,
+@@ -498,7 +498,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKGATE_CON(14), 10, GFLAGS),
+ 	GATE(ACLK_GIC_ADB400_CORE_L_2_GIC, "aclk_core_adb400_core_l_2_gic", "armclkl", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(14), 11, GFLAGS),
+-	GATE(SCLK_PVTM_CORE_L, "clk_pvtm_core_l", "xin24m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_PVTM_CORE_L, "clk_pvtm_core_l", "xin24m", 0,
+ 			RK3399_CLKGATE_CON(0), 7, GFLAGS),
+ 
+ 	/* big core */
+@@ -539,7 +539,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	GATE(0, "pclk_dbg_cxcs_pd_core_b", "pclk_dbg_core_b", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(14), 2, GFLAGS),
+ 
+-	GATE(SCLK_PVTM_CORE_B, "clk_pvtm_core_b", "xin24m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_PVTM_CORE_B, "clk_pvtm_core_b", "xin24m", 0,
+ 			RK3399_CLKGATE_CON(1), 7, GFLAGS),
+ 
+ 	/* gmac */
+@@ -675,18 +675,18 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 
+ 	GATE(PCLK_CENTER_MAIN_NOC, "pclk_center_main_noc", "pclk_ddr", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(18), 10, GFLAGS),
+-	GATE(PCLK_DDR_MON, "pclk_ddr_mon", "pclk_ddr", CLK_IGNORE_UNUSED,
++	GATE(PCLK_DDR_MON, "pclk_ddr_mon", "pclk_ddr", 0,
+ 			RK3399_CLKGATE_CON(18), 12, GFLAGS),
+ 	GATE(PCLK_CIC, "pclk_cic", "pclk_ddr", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(18), 15, GFLAGS),
+ 	GATE(PCLK_DDR_SGRF, "pclk_ddr_sgrf", "pclk_ddr", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(19), 2, GFLAGS),
+ 
+-	GATE(SCLK_PVTM_DDR, "clk_pvtm_ddr", "xin24m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_PVTM_DDR, "clk_pvtm_ddr", "xin24m", 0,
+ 			RK3399_CLKGATE_CON(4), 11, GFLAGS),
+-	GATE(SCLK_DFIMON0_TIMER, "clk_dfimon0_timer", "xin24m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_DFIMON0_TIMER, "clk_dfimon0_timer", "xin24m", 0,
+ 			RK3399_CLKGATE_CON(3), 5, GFLAGS),
+-	GATE(SCLK_DFIMON1_TIMER, "clk_dfimon1_timer", "xin24m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_DFIMON1_TIMER, "clk_dfimon1_timer", "xin24m", 0,
+ 			RK3399_CLKGATE_CON(3), 6, GFLAGS),
+ 
+ 	/* cci */
+@@ -966,7 +966,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	GATE(SCLK_INTMEM3, "clk_intmem3", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 5, GFLAGS),
+ 	GATE(SCLK_INTMEM4, "clk_intmem4", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 6, GFLAGS),
+ 	GATE(SCLK_INTMEM5, "clk_intmem5", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 7, GFLAGS),
+-	GATE(ACLK_DCF, "aclk_dcf", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 8, GFLAGS),
++	GATE(ACLK_DCF, "aclk_dcf", "aclk_perilp0", 0, RK3399_CLKGATE_CON(23), 8, GFLAGS),
+ 	GATE(ACLK_DMAC0_PERILP, "aclk_dmac0_perilp", "aclk_perilp0", 0, RK3399_CLKGATE_CON(25), 5, GFLAGS),
+ 	GATE(ACLK_DMAC1_PERILP, "aclk_dmac1_perilp", "aclk_perilp0", 0, RK3399_CLKGATE_CON(25), 6, GFLAGS),
+ 	GATE(ACLK_PERILP0_NOC, "aclk_perilp0_noc", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(25), 7, GFLAGS),
+@@ -980,7 +980,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 	GATE(HCLK_PERILP0_NOC, "hclk_perilp0_noc", "hclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(25), 8, GFLAGS),
+ 
+ 	/* pclk_perilp0 gates */
+-	GATE(PCLK_DCF, "pclk_dcf", "pclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 9, GFLAGS),
++	GATE(PCLK_DCF, "pclk_dcf", "pclk_perilp0", 0, RK3399_CLKGATE_CON(23), 9, GFLAGS),
+ 
+ 	/* crypto */
+ 	COMPOSITE(SCLK_CRYPTO0, "clk_crypto0", mux_pll_src_cpll_gpll_ppll_p, 0,
+-- 
+1.9.1
