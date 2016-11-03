@@ -1,110 +1,78 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 3 Nov 2016 14:37:03 -0700
-Subject: [PATCH v10 01/11] remoteproc: st_slim_rproc: add a slimcore
- rproc driver
-In-Reply-To: <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
-References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
- <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20161103213703.GA15449@tuxbot>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu,  3 Nov 2016 21:39:30 +0000
+Subject: [RFC 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 (Alt II)
+Message-ID: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 18 Oct 02:39 PDT 2016, Peter Griffin wrote:
+Following Will & Robin's suggestions, this series attempts to propose
+an alternative to [1] where the host would arbitrarily decide the
+location of the IOVA MSI window and would be able to report to the
+userspace the list of reserved IOVA regions that cannot be used
+along with VFIO_IOMMU_MAP_DMA. This would allow the userspace to react
+in case of conflict.
 
-> slim core is used as a basis for many IPs in the STi
-> chipsets such as fdma and demux. To avoid duplicating
-> the elf loading code in each device driver a slim
-> rproc driver has been created.
-> 
-> This driver is designed to be used by other device drivers
-> such as fdma, or demux whose IP is based around a slim core.
-> The device driver can call slim_rproc_alloc() to allocate
-> a slim rproc and slim_rproc_put() when finished.
-> 
-> This driver takes care of ioremapping the slim
-> registers (dmem, imem, slimcore, peripherals), whose offsets
-> and sizes can change between IP's. It also obtains and enables
-> any clocks used by the device. This approach avoids having
-> a double mapping of the registers as slim_rproc does not register
-> its own platform device. It also maps well to device tree
-> abstraction as it allows us to have one dt node for the whole
-> device.
-> 
-> All of the generic rproc elf loading code can be reused, and
-> we provide start() stop() hooks to start and stop the slim
-> core once the firmware has been loaded. This has been tested
-> successfully with fdma driver.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  drivers/remoteproc/Kconfig               |   7 +-
->  drivers/remoteproc/Makefile              |   1 +
->  drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
->  include/linux/remoteproc/st_slim_rproc.h |  58 +++++
->  4 files changed, 428 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/remoteproc/st_slim_rproc.c
->  create mode 100644 include/linux/remoteproc/st_slim_rproc.h
-> 
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index f396bfe..9270c8e 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-> @@ -58,7 +58,6 @@ config DA8XX_REMOTEPROC
->  	tristate "DA8xx/OMAP-L13x remoteproc support"
->  	depends on ARCH_DAVINCI_DA8XX
->  	select CMA if MMU
-> -	select REMOTEPROC
+Userspace can retrieve all the reserved regions through the VFIO_IOMMU_GET_INFO
+IOCTL by querying the new RESV_IOVA_RANGE chained capability. Each reserved
+IOVA range is put in a separate capability.
 
-No, this is an unrelated change to this patch.
+At IOMMU level, the reserved regions are stored in an iommu_domain list
+which is populated on each device attachment. An IOMMU add_reserved_regions
+callback specializes the registration of the reserved regions.
 
->  	select RPMSG_VIRTIO
->  	help
->  	  Say y here to support DA8xx/OMAP-L13x remote processors via the
-> @@ -99,10 +98,10 @@ config QCOM_WCNSS_PIL
->  	tristate "Qualcomm WCNSS Peripheral Image Loader"
->  	depends on OF && ARCH_QCOM
->  	depends on QCOM_SMEM
-> +	depends on REMOTEPROC
->  	select QCOM_MDT_LOADER
->  	select QCOM_SCM
->  	select QCOM_WCNSS_IRIS
-> -	select REMOTEPROC
+On x86, the [FEE0_0000h - FEF0_000h] MSI window is registered (NOT tested).
 
-Dito.
+On ARM, the PCI host bridge windows (ACS check to be added?) + the MSI IOVA
+reserved regions are populated by the arm-smmu driver. Currently the MSI
+IOVA region is arbitrarily located at 0x8000000 and 1MB sized.  An IOVA domain
+is created in add_reserved_regions callback. Then MSIs are transparently
+mapped using this IOVA domain.
+
+This series currently does not address some features addressed in [1]:
+- MSI IOVA size requirement computation
+- IRQ safety assessment
+
+This RFC was just tested on ARM Overdrive with QEMU and is sent to help
+potential discussions at LPC. Additionnal development + testing is needed.
+
+2 tentative fixes may be submitted separately:
+- vfio: fix vfio_info_cap_add/shift
+- iommu/iova: fix __alloc_and_insert_iova_range
+
+Best Regards
+
+Eric
+
+[1] [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
+https://lkml.org/lkml/2016/10/12/347
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.9-rc3-reserved-rfc
 
 
-As you now make changes to the entire remoteproc Kconfig file, rather
-than simply add a Kconfig symbol we can't bring this in via Vinod's tree
-without providing Linus with a messy merge conflict.
+Eric Auger (7):
+  vfio: fix vfio_info_cap_add/shift
+  iommu/iova: fix __alloc_and_insert_iova_range
+  iommu: Add a list of iommu_reserved_region in iommu_domain
+  vfio/type1: Introduce RESV_IOVA_RANGE capability
+  iommu: Handle the list of reserved regions
+  iommu/vt-d: Implement add_reserved_regions callback
+  iommu/arm-smmu: implement add_reserved_regions callback
 
-So the remoteproc parts now has to go through my tree.
+Robin Murphy (1):
+  iommu/dma: Allow MSI-only cookies
 
->  	help
->  	  Say y here to support the Peripheral Image Loader for the Qualcomm
->  	  Wireless Connectivity Subsystem.
-> @@ -116,4 +115,8 @@ config ST_REMOTEPROC
->  	  processor framework.
->  	  This can be either built-in or a loadable module.
->  
-> +config ST_SLIM_REMOTEPROC
-> +	tristate
-> +	select REMOTEPROC
-> +
->  endmenu
-[..]
-> diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
-[..]
-> +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
-> +				char *fw_name)
-> +{
-[..]
-> +	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
-> +			fw_name, sizeof(*slim_rproc));
-[..]
-> +	rproc_put(rproc);
+ drivers/iommu/arm-smmu.c        | 63 +++++++++++++++++++++++++++++++++++++++++
+ drivers/iommu/dma-iommu.c       | 39 +++++++++++++++++++++++++
+ drivers/iommu/intel-iommu.c     | 48 ++++++++++++++++++++++---------
+ drivers/iommu/iommu.c           | 25 ++++++++++++++++
+ drivers/iommu/iova.c            |  2 +-
+ drivers/vfio/vfio.c             |  5 ++--
+ drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++++++++-
+ include/linux/dma-iommu.h       |  9 ++++++
+ include/linux/iommu.h           | 23 +++++++++++++++
+ include/uapi/linux/vfio.h       | 16 ++++++++++-
+ 10 files changed, 275 insertions(+), 18 deletions(-)
 
-As of v4.9 you need to rproc_free() rather than rproc_put() to undo
-rproc_alloc().
-
-Regards,
-Bjorn
+-- 
+1.9.1
