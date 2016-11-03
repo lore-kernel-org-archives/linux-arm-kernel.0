@@ -1,45 +1,68 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Nov 2016 18:34:13 +0100
-Subject: [PATCH v2 02/14] ASoC: sun4i-codec: Expand quirks to handle
- register offsets and card creation
-In-Reply-To: <20161103075556.29018-3-wens@csie.org>
-References: <20161103075556.29018-1-wens@csie.org>
- <20161103075556.29018-3-wens@csie.org>
-Message-ID: <20161103173413.xoljqlfpqlfaeiyj@lukather>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  3 Nov 2016 10:34:39 -0700
+Subject: [PATCHv2] ARM: OMAP3: Fix formatting of features printed
+Message-ID: <20161103173439.20657-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 03:55:44PM +0800, Chen-Yu Tsai wrote:
-> The A31 has a similar codec to the A10/A20. The PCM parts are very
-> similar, with just different register offsets. The analog paths are
-> very different. There are more inputs and outputs.
-> 
-> The A31s, A23, and H3 have a similar PCM interface, again with register
-> offsets slightly rearranged. The analog path controls, while very
-> similar between them and the A31, have been moved a separate bus which
-> is accessed through a message box like interface in the PRCM address
-> range. This would be handled by a separate auxiliary device tied in
-> through the device tree in its supporting create_card function.
-> 
-> The quirks structure is expanded to include different register offsets
-> and separate callbacks for creating the ASoC card. The regmap_config,
-> quirks, and of_device_match tables have been moved to facilitate this.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+With the printk cleanups merged into v4.9-rc1, we now get the omap
+revision printed on multiple lines. Let's fix that and also remove the
+extra empty space at the end of the features. And let's update things
+to use scnprintf as suggested by Ivaylo Dimitrov
+<ivo.g.dimitrov.75@gmail.com>.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Reported-by: Adam Ford <aford173@gmail.com>
+Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/id.c | 16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-Thanks!
-Maxime
-
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -205,11 +205,15 @@ void __init omap2xxx_check_revision(void)
+ 
+ #define OMAP3_SHOW_FEATURE(feat)		\
+ 	if (omap3_has_ ##feat())		\
+-		printk(#feat" ");
++		n += scnprintf(buf + n, sizeof(buf) - n, #feat " ");
+ 
+ static void __init omap3_cpuinfo(void)
+ {
+ 	const char *cpu_name;
++	char buf[64];
++	int n = 0;
++
++	memset(buf, 0, sizeof(buf));
+ 
+ 	/*
+ 	 * OMAP3430 and OMAP3530 are assumed to be same.
+@@ -241,10 +245,10 @@ static void __init omap3_cpuinfo(void)
+ 		cpu_name = "OMAP3503";
+ 	}
+ 
+-	sprintf(soc_name, "%s", cpu_name);
++	scnprintf(soc_name, sizeof(soc_name), "%s", cpu_name);
+ 
+ 	/* Print verbose information */
+-	pr_info("%s %s (", soc_name, soc_rev);
++	n += scnprintf(buf, sizeof(buf) - n, "%s %s (", soc_name, soc_rev);
+ 
+ 	OMAP3_SHOW_FEATURE(l2cache);
+ 	OMAP3_SHOW_FEATURE(iva);
+@@ -252,8 +256,10 @@ static void __init omap3_cpuinfo(void)
+ 	OMAP3_SHOW_FEATURE(neon);
+ 	OMAP3_SHOW_FEATURE(isp);
+ 	OMAP3_SHOW_FEATURE(192mhz_clk);
+-
+-	printk(")\n");
++	if (*(buf + n - 1) == ' ')
++		n--;
++	n += scnprintf(buf + n, sizeof(buf) - n, ")\n");
++	pr_info("%s", buf);
+ }
+ 
+ #define OMAP3_CHECK_FEATURE(status,feat)				\
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/a5744aaa/attachment.sig>
+2.10.2
