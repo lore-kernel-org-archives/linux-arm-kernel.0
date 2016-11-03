@@ -1,19 +1,34 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 03 Nov 2016 16:02:44 -0400 (EDT)
-Subject: [PATCH v5 0/7] add NS2 support to bgmac
-In-Reply-To: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
-References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20161103.160244.678792221354219550.davem@davemloft.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 3 Nov 2016 22:10:21 +0200
+Subject: [PATCH v3 3/5] arm64: dts: exynos: Add dts files for Samsung
+ Exynos5433 64bit SoC
+In-Reply-To: <20161103194716.GC12945@kozik-lap>
+References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
+ <1478155149-28527-4-git-send-email-cw00.choi@samsung.com>
+ <20161103194716.GC12945@kozik-lap>
+Message-ID: <20161103201021.GA9379@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jon.mason@broadcom.com>
-Date: Wed,  2 Nov 2016 13:08:01 -0400
+On Thu, Nov 03, 2016 at 09:47:16PM +0200, Krzysztof Kozlowski wrote:
+> On Thu, Nov 03, 2016 at 03:39:07PM +0900, Chanwoo Choi wrote:
+> > This patch adds new Exynos5433 dtsi to support 64-bit Exynos5433 SoC based on
+> > Octa-core CPUs (quad Cortex-A57 and quad Cortex-A53). And Exynos5433 supports
+> > PSCI (Power State Coordination Interface) v0.1.
+> > 
+> > This patch includes following Device Tree node to support Exynos5433 SoC:
+> > 1. Octa cores for big.LITTLE architecture
+> > - Cortex-A53 LITTLE Quad-core
+> > - Cortex-A57 big Quad-core
+> > - Support PSCI v0.1
+> > 
+> 
+> Patch looks good to me. The GIC interrupt flags will have to be fixed
+> someday (e.f. https://patchwork.kernel.org/patch/9336553/) but this may
+> wait... It is violating the GIC since ancient times so I guess we can
+> violate it some more till someone will be annoyed enough to fix it. :)
 
-> Add support for the amac found in the Broadcom Northstar2 SoC to the
-> bgmac driver.  This necessitates adding support to connect to an
-> externally defined phy (as described in the device tree) in the driver.
-> These phy changes are in addition to the changes necessary to get NS2
-> working.
+Thanks, applied.
 
-This does not apply cleanly to the net-next, please respin.
+Best regards,
+Krzysztof
