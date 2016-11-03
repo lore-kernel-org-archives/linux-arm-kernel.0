@@ -1,49 +1,71 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Thu, 3 Nov 2016 16:52:48 +0800
-Subject: [PATCH] clk: rockchip: fix some clocks' name to be more standard
- style
-In-Reply-To: <1478070296-23080-1-git-send-email-jay.xu@rock-chips.com>
-References: <1478070296-23080-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <763cad68-a068-9a4b-e26d-2c459c2d4808@rock-chips.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Thu, 3 Nov 2016 09:57:16 +0100
+Subject: [PATCH v2 0/6] STM32F4 Add RTC & QSPI clocks
+In-Reply-To: <68855ca8-a74f-7c76-342f-de0aeec51ca1@st.com>
+References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
+ <68855ca8-a74f-7c76-342f-de0aeec51ca1@st.com>
+Message-ID: <d4a5cc5f-c91b-dc52-d7a1-7f579792382c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/2 15:04, Jianqun Xu wrote:
-> Fix aclk_emmcgrf to aclk_emmc_grf, and fix aclk_emmccore to be
-> aclk_emmc_core.
+Hi Alexandre,
+
+
+On 11/03/2016 09:52 AM, Alexandre Torgue wrote:
+> Hi Gabriel,
 >
-
-What is the standard style should be?
-
-TRM uses aclk_emmccore but not aclk_emmc_core, so should it be more
-standrad to keep it as-is?
-
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
-> ---
->  drivers/clk/rockchip/clk-rk3399.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> On 10/14/2016 11:18 AM, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> v2:
+>>  - rename compatible property "st,stm32f46xx-rcc" into 
+>> "st,stm32f469-rcc"
+>>  - cosmetic: remove bad copy/paste
+>>
+>> This patch-set introduce RTC and QSPI clocks for STM32F4 socs
+>> RTC clock has 3 parents clock oscillators (lsi/lse/hse_rtc)
+>>
+>> example to use rtc clock:
+>>
+>>         rtc: rtc at 40002800 {
+>>             compatible = "st,stm32-rtc";
+>>             reg = <0x40002800 0x400>;
+>>             ...
+>>             clocks = <&rcc 1 CLK_RTC>;
+>>
+>>             assigned-clocks =  <&rcc 1 CLK_RTC>;
+>>             assigned-clock-parents = <&rcc 1 CLK_LSE>;
+>>             ...
+>>         };
+>>
+>> Gabriel Fernandez (6):
+>>   clk: stm32f4: Add LSI & LSE clocks
+>>   ARM: dts: stm32f429: add LSI and LSE clocks
+>>   arm: stmf32: Enable SYSCON
+>>   clk: stm32f4: Add RTC clock
+>>   clk: stm32f469: Add QSPI clock
+>>   ARM: dts: stm32f429: Add QSPI clock
 >
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-> index 2c7cba7..b3df2c6 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -935,11 +935,11 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
->  			RK3399_CLKGATE_CON(6), 13, GFLAGS),
->  	COMPOSITE_NOGATE(ACLK_EMMC, "aclk_emmc", mux_aclk_emmc_p, CLK_IGNORE_UNUSED,
->  			RK3399_CLKSEL_CON(21), 7, 1, MFLAGS, 0, 5, DFLAGS),
-> -	GATE(ACLK_EMMC_CORE, "aclk_emmccore", "aclk_emmc", CLK_IGNORE_UNUSED,
-> +	GATE(ACLK_EMMC_CORE, "aclk_emmc_core", "aclk_emmc", CLK_IGNORE_UNUSED,
->  			RK3399_CLKGATE_CON(32), 8, GFLAGS),
->  	GATE(ACLK_EMMC_NOC, "aclk_emmc_noc", "aclk_emmc", CLK_IGNORE_UNUSED,
->  			RK3399_CLKGATE_CON(32), 9, GFLAGS),
-> -	GATE(ACLK_EMMC_GRF, "aclk_emmcgrf", "aclk_emmc", CLK_IGNORE_UNUSED,
-> +	GATE(ACLK_EMMC_GRF, "aclk_emmc_grf", "aclk_emmc", CLK_IGNORE_UNUSED,
->  			RK3399_CLKGATE_CON(32), 10, GFLAGS),
+> You sent a V3 without DT patches. Should I take DT patches from this 
+> V2 patchset ?
 >
->  	/* perilp0 */
+> Regards
+> Alex
 >
+Yes, no problem
 
+Thanks !
 
--- 
-Best Regards
-Shawn Lin
+BR.
+
+Gabriel
+>
+>>
+>>  .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
+>>  arch/arm/boot/dts/stm32f429.dtsi                   |  18 +
+>>  arch/arm/boot/dts/stm32f469-disco.dts              |   4 +
+>>  arch/arm/configs/stm32_defconfig                   |   1 +
+>>  drivers/clk/clk-stm32f4.c                          | 442 
+>> ++++++++++++++++++++-
+>>  5 files changed, 447 insertions(+), 22 deletions(-)
+>>
