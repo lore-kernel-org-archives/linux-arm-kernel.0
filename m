@@ -1,37 +1,54 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:35 +0900
-Subject: [PATCH 13/13] Documentation: synopsys-dw-mshc: remove the unused
- properties
-In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
-References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-14-jh80.chung@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 3 Nov 2016 22:41:01 +0800
+Subject: [PATCH v2 1/2] PM/devfreq: add suspend frequency support
+In-Reply-To: <1478153770-8433-2-git-send-email-hl@rock-chips.com>
+Message-ID: <201611032234.VsTMOxrp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"support-highspeed" was the obsoleted property.
-And "broken-cd" is not synopsys specific property.
-It can be referred to mmc.txt binding Documentation.
+Hi Lin,
 
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.9-rc3 next-20161028]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Lin-Huang/set-specific-ddr-frequency-when-stop-ddr-dvfs/20161103-142055
+config: x86_64-randconfig-x015-201644 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+   drivers/devfreq/devfreq.c: In function 'devfreq_monitor_suspend':
+>> drivers/devfreq/devfreq.c:368:3: error: too many arguments to function 'update_devfreq'
+      update_devfreq(devfreq, devfreq->suspend_freq);
+      ^~~~~~~~~~~~~~
+   drivers/devfreq/devfreq.c:228:5: note: declared here
+    int update_devfreq(struct devfreq *devfreq)
+        ^~~~~~~~~~~~~~
+
+vim +/update_devfreq +368 drivers/devfreq/devfreq.c
+
+   362		if (devfreq->stop_polling) {
+   363			mutex_unlock(&devfreq->lock);
+   364			return;
+   365		}
+   366	
+   367		if (devfreq->suspend_freq)
+ > 368			update_devfreq(devfreq, devfreq->suspend_freq);
+   369		else
+   370			devfreq_update_status(devfreq, devfreq->previous_freq);
+   371		devfreq->stop_polling = true;
+
 ---
- Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 21c8251..3dd2849 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -68,11 +68,6 @@ Optional properties:
- * card-detect-delay: Delay in milli-seconds before detecting card after card
-   insert event. The default value is 0.
- 
--* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
--			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
--
--* broken-cd: as documented in mmc core bindings.
--
- * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
-   specified we'll defer probe until we can find this regulator.
- 
--- 
-2.10.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23592 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/9251898a/attachment-0001.gz>
