@@ -1,35 +1,37 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:25 +0900
-Subject: [PATCH 03/13] mmc: dw_mmc: change the DW_MCI_FREQ_MIN from 400K to
- 100K
+Date: Thu, 03 Nov 2016 15:21:26 +0900
+Subject: [PATCH 04/13] mmc: dw_mmc: use the hold register when send stop
+ command
 In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
 References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-4-jh80.chung@samsung.com>
+Message-ID: <20161103062135.10697-5-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If there is no property "clock-freq-min-max", mmc->f_min should be set
-to 400K by default. But Some SoC can be used 100K.
-When 100K is used, MMC core will try to check from 400K to 100K.
+If DW_MMC_CARD_NO_USE_HOLD isn't set, it's usesd by default.
+Enve if SDMMC_CMD_USB_HOLD_REG is set in prepare_command(), but it
+doesn't set in pre_stop_abort().
 
-Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
+To maintain the consistency, add the checking condition for this.
+
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- drivers/mmc/host/dw_mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/dw_mmc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 1e71fd4..6ccb817 100644
+index 6ccb817..23fc505 100644
 --- a/drivers/mmc/host/dw_mmc.c
 +++ b/drivers/mmc/host/dw_mmc.c
-@@ -54,7 +54,7 @@
- #define DW_MCI_DMA_THRESHOLD	16
+@@ -337,6 +337,9 @@ static u32 dw_mci_prep_stop_abort(struct dw_mci *host, struct mmc_command *cmd)
+ 	cmdr = stop->opcode | SDMMC_CMD_STOP |
+ 		SDMMC_CMD_RESP_CRC | SDMMC_CMD_RESP_EXP;
  
- #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
--#define DW_MCI_FREQ_MIN	400000		/* unit: HZ */
-+#define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
++	if (!test_bit(DW_MMC_CARD_NO_USE_HOLD, &host->cur_slot->flags))
++		cmdr |= SDMMC_CMD_USE_HOLD_REG;
++
+ 	return cmdr;
+ }
  
- #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
- 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
 -- 
 2.10.1
