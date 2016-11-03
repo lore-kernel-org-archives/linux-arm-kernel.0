@@ -1,53 +1,106 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 3 Nov 2016 10:12:29 +0100
-Subject: [PATCH 0/8] firmware: arm_scpi: add support for legacy SCPI
- protocol
-In-Reply-To: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
-References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <3a1824cc-83b4-a7ae-4a72-03f83bc2348f@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu,  3 Nov 2016 10:13:08 +0100
+Subject: [PATCH 1/3] ARM: dts: rename MSM8660/APQ8060 pmicintc to pm8058
+Message-ID: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2016 05:52 AM, Sudeep Holla wrote:
-> Hi,
-> 
-> This is minor rework of the series[1] from Neil Armstrong's to support
-> legacy SCPI protocol to make DT bindings more generic and move out all
-> the platform specific bindings out of the generic binding document.
-> 
-> --
-> Regards,
-> Sudeep
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg534999.html
-> 
-> Neil Armstrong (4):
->   firmware: arm_scpi: increase MAX_DVFS_OPPS to 16 entries
->   firmware: arm_scpi: add alternative legacy structures, functions and
->     macros
->   firmware: arm_scpi: allow firmware with get_capabilities not
->     implemented
->   Documentation: bindings: Add support for Amlogic GXBB SCPI protocol
-> 
-> Sudeep Holla (4):
->   firmware: arm_scpi: add command indirection to support legacy commands
->   Documentation: bindings: decouple juno specific details from generic
->     binding
->   Documentation: bindings: add compatible specific to legacy SCPI
->     protocol
->   firmware: arm_scpi: add support for legacy SCPI compatible
-> 
->  .../devicetree/bindings/arm/amlogic,scpi.txt       |  20 ++
->  Documentation/devicetree/bindings/arm/arm,scpi.txt |  24 +-
->  .../devicetree/bindings/arm/juno,scpi.txt          |  26 ++
->  drivers/firmware/arm_scpi.c                        | 276 ++++++++++++++++++---
->  4 files changed, 300 insertions(+), 46 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/amlogic,scpi.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/juno,scpi.txt
-> 
+The name "pmicintc" is ambiguous: there is a second power
+management IC named PM8901 on these systems, and it is also
+an interrupt controller. To make things clear, just name the
+node alias "pm8058", this in unambigous and has all information
+we need.
 
-Hi Sudeep,
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts |  2 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts        |  2 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi            | 12 ++++++------
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-Ok for me, I submitted the fix for the GXBB dtsi.
-
-Neil
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 4b8872cc8bf9..4a532ddab53a 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -412,7 +412,7 @@
+ 				 * The second interrupt is the PME interrupt
+ 				 * for network wakeup, connected to the TLMM.
+ 				 */
+-				interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
++				interrupts-extended = <&pm8058 198 IRQ_TYPE_EDGE_FALLING>,
+ 						    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
+ 				reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
+ 				vdd33a-supply = <&dragon_veth>;
+diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+index 23de764558ab..1adc04978a47 100644
+--- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
++++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+@@ -48,7 +48,7 @@
+ 	};
+ };
+ 
+-&pmicintc {
++&pm8058 {
+ 	keypad at 148 {
+ 		linux,keymap = <
+ 			MATRIX_KEY(0, 0, KEY_FN_F1)
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 4d828f810746..91c9a62ae725 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -163,7 +163,7 @@
+ 			reg = <0x500000 0x1000>;
+ 			qcom,controller-type = "pmic-arbiter";
+ 
+-			pmicintc: pmic at 0 {
++			pm8058: pmic at 0 {
+ 				compatible = "qcom,pm8058";
+ 				interrupt-parent = <&tlmm>;
+ 				interrupts = <88 8>;
+@@ -176,7 +176,7 @@
+ 					compatible = "qcom,pm8058-gpio",
+ 						     "qcom,ssbi-gpio";
+ 					reg = <0x150>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <192 IRQ_TYPE_NONE>,
+ 						     <193 IRQ_TYPE_NONE>,
+ 						     <194 IRQ_TYPE_NONE>,
+@@ -232,7 +232,7 @@
+ 					reg = <0x50>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts =
+ 					<128 IRQ_TYPE_NONE>,
+ 					<129 IRQ_TYPE_NONE>,
+@@ -251,7 +251,7 @@
+ 				pwrkey at 1c {
+ 					compatible = "qcom,pm8058-pwrkey";
+ 					reg = <0x1c>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <50 1>, <51 1>;
+ 					debounce = <15625>;
+ 					pull-up;
+@@ -260,7 +260,7 @@
+ 				keypad at 148 {
+ 					compatible = "qcom,pm8058-keypad";
+ 					reg = <0x148>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <74 1>, <75 1>;
+ 					debounce = <15>;
+ 					scan-delay = <32>;
+@@ -270,7 +270,7 @@
+ 				rtc at 1e8 {
+ 					compatible = "qcom,pm8058-rtc";
+ 					reg = <0x1e8>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <39 1>;
+ 					allow-set-time;
+ 				};
+-- 
+2.7.4
