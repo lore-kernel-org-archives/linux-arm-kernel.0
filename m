@@ -1,112 +1,101 @@
-From: jay.xu@rock-chips.com (Jianqun Xu)
-Date: Thu,  3 Nov 2016 11:38:53 +0800
-Subject: [PATCH] clk: rockchip: remove more CLK_IGNORE_UNUSED for rk3399
- clocktree
-Message-ID: <1478144333-13436-1-git-send-email-jay.xu@rock-chips.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 2 Nov 2016 22:51:02 -0500
+Subject: [PATCH v4 6/8] dt-bindings: Add support for Amlogic GXBB SCPI
+ Interface
+In-Reply-To: <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
+References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
+ <1475652814-30619-7-git-send-email-narmstrong@baylibre.com>
+ <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
+ <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
+Message-ID: <CAL_JsqJWABnX1-6SHZL8SOSt4OSPbTyXrCqTYCkXgxuO87gN-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimize rk3399 clocktree by removing CLK_IGNORE_UNUSED of some clocks.
+On Wed, Nov 2, 2016 at 5:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On Sat, Oct 29, 2016 at 11:39:05AM -0700, Olof Johansson wrote:
+>> Hi,
+>>
+>>
+>> On Wed, Oct 5, 2016 at 12:33 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+>> > Acked-by: Rob Herring <robh@kernel.org>
+>> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
+>> >  1 file changed, 5 insertions(+), 3 deletions(-)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> > index faa4b44..04bc171 100644
+>> > --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> > +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> > @@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
+>> >
+>> >  Required properties:
+>> >
+>> > -- compatible : should be "arm,scpi"
+>> > +- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
+>>
+>> This doesn't seem right to document here. If anything you might want
+>> to have a table of more-specific-compatibles for specific
+>> implementations, but "arm,scpi" should still be the compatible of the
+>> node (just not the most specific one).
+>>
+>
+> I completely agree with you and I was pushing for a generic "arm,legacy-scpi"
+> compatible until this binding was acked by Rob.
 
-clocks will managered by usb:
-- clk_usbphy0_480m_src
-- clk_usbphy1_480m_src
-- clk_usbphy_480m
+Just because I ack something, that doesn't mean don't review or
+comment on it further.
 
-clocks will be managered by pvtm:
-- clk_pvtm_core_l
-- clk_pvtm_core_b
-- clk_pvtm_ddr
+>
+> Anyways, I will add the generic compatible and post the changes.
+>
+>> Also, documenting it here indiciates that non-amlogic implementations
+>> can/should use that compatible, which is misleading.
+>>
+>
+> Agreed, it's better to keep them out of this generic binding document.
+>
+>> >  - mboxes: List of phandle and mailbox channel specifiers
+>> >           All the channels reserved by remote SCP firmware for use by
+>> >           SCPI message protocol should be specified in any order
+>> > @@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
+>> >  processors and SCP.
+>> >
+>> >  Required properties:
+>> > -- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
+>> > +- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
+>> > +               or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
+>>
+>> Maybe you'd be better of with a meson-specific document that refers to
+>> these but with different compatible values.
+>>
+>> Come to think of it, the Juno-specific one maybe shouldn't be in
+>> arm,scpi at all, since that adds confusion here.
+>>
+>> It's somewhat confusing that ARM is both a platform, architecture and
+>> in some cases implementer of specific systems. :)
+>>
+>
+> Sorry for that, I will move all juno specific references in the binding
+> out of this document(except the examples, which I assume should be fine)
+>
+>> >  The rest of the properties should follow the generic mmio-sram description
+>> >  found in ../../sram/sram.txt
+>> > @@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
+>> >  Required sub-node properties:
+>> >  - reg : The base offset and size of the reserved area with the SRAM
+>> >  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+>> > -              shared memory on Juno platforms
+>> > +              shared memory on Juno platforms or
+>> > +              "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
+>>
+>> Same here. It won't scale if all vendors are expected to add an entry here.
+>>
+>
+> I will rework the patches to address the concerns as I too did share same
+> concern.
 
-clocks will be managered by dfi:
-- pclk_ddr_mon
-- clk_dfimon0_timer
-- clk_dfimon1_timer
-- aclk_dcf
-- pclk_dcf
+Guess I was optimistic that *every* platform wouldn't be different in
+some way. I should know better by now...
 
-Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
----
- drivers/clk/rockchip/clk-rk3399.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index b3df2c6..fc29f99 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -410,11 +410,11 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(SCLK_USB2PHY1_REF, "clk_usb2phy1_ref", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(6), 6, GFLAGS),
- 
--	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", CLK_IGNORE_UNUSED,
-+	GATE(0, "clk_usbphy0_480m_src", "clk_usbphy0_480m", 0,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
--	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", CLK_IGNORE_UNUSED,
-+	GATE(0, "clk_usbphy1_480m_src", "clk_usbphy1_480m", 0,
- 			RK3399_CLKGATE_CON(13), 12, GFLAGS),
--	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, CLK_IGNORE_UNUSED,
-+	MUX(0, "clk_usbphy_480m", mux_usbphy_480m_p, 0,
- 			RK3399_CLKSEL_CON(14), 6, 1, MFLAGS),
- 
- 	MUX(0, "upll", mux_pll_src_24m_usbphy480m_p, 0,
-@@ -498,7 +498,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 			RK3399_CLKGATE_CON(14), 10, GFLAGS),
- 	GATE(ACLK_GIC_ADB400_CORE_L_2_GIC, "aclk_core_adb400_core_l_2_gic", "armclkl", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(14), 11, GFLAGS),
--	GATE(SCLK_PVTM_CORE_L, "clk_pvtm_core_l", "xin24m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_PVTM_CORE_L, "clk_pvtm_core_l", "xin24m", 0,
- 			RK3399_CLKGATE_CON(0), 7, GFLAGS),
- 
- 	/* big core */
-@@ -539,7 +539,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(0, "pclk_dbg_cxcs_pd_core_b", "pclk_dbg_core_b", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(14), 2, GFLAGS),
- 
--	GATE(SCLK_PVTM_CORE_B, "clk_pvtm_core_b", "xin24m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_PVTM_CORE_B, "clk_pvtm_core_b", "xin24m", 0,
- 			RK3399_CLKGATE_CON(1), 7, GFLAGS),
- 
- 	/* gmac */
-@@ -675,18 +675,18 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 
- 	GATE(PCLK_CENTER_MAIN_NOC, "pclk_center_main_noc", "pclk_ddr", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(18), 10, GFLAGS),
--	GATE(PCLK_DDR_MON, "pclk_ddr_mon", "pclk_ddr", CLK_IGNORE_UNUSED,
-+	GATE(PCLK_DDR_MON, "pclk_ddr_mon", "pclk_ddr", 0,
- 			RK3399_CLKGATE_CON(18), 12, GFLAGS),
- 	GATE(PCLK_CIC, "pclk_cic", "pclk_ddr", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(18), 15, GFLAGS),
- 	GATE(PCLK_DDR_SGRF, "pclk_ddr_sgrf", "pclk_ddr", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(19), 2, GFLAGS),
- 
--	GATE(SCLK_PVTM_DDR, "clk_pvtm_ddr", "xin24m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_PVTM_DDR, "clk_pvtm_ddr", "xin24m", 0,
- 			RK3399_CLKGATE_CON(4), 11, GFLAGS),
--	GATE(SCLK_DFIMON0_TIMER, "clk_dfimon0_timer", "xin24m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_DFIMON0_TIMER, "clk_dfimon0_timer", "xin24m", 0,
- 			RK3399_CLKGATE_CON(3), 5, GFLAGS),
--	GATE(SCLK_DFIMON1_TIMER, "clk_dfimon1_timer", "xin24m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_DFIMON1_TIMER, "clk_dfimon1_timer", "xin24m", 0,
- 			RK3399_CLKGATE_CON(3), 6, GFLAGS),
- 
- 	/* cci */
-@@ -966,7 +966,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(SCLK_INTMEM3, "clk_intmem3", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 5, GFLAGS),
- 	GATE(SCLK_INTMEM4, "clk_intmem4", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 6, GFLAGS),
- 	GATE(SCLK_INTMEM5, "clk_intmem5", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 7, GFLAGS),
--	GATE(ACLK_DCF, "aclk_dcf", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 8, GFLAGS),
-+	GATE(ACLK_DCF, "aclk_dcf", "aclk_perilp0", 0, RK3399_CLKGATE_CON(23), 8, GFLAGS),
- 	GATE(ACLK_DMAC0_PERILP, "aclk_dmac0_perilp", "aclk_perilp0", 0, RK3399_CLKGATE_CON(25), 5, GFLAGS),
- 	GATE(ACLK_DMAC1_PERILP, "aclk_dmac1_perilp", "aclk_perilp0", 0, RK3399_CLKGATE_CON(25), 6, GFLAGS),
- 	GATE(ACLK_PERILP0_NOC, "aclk_perilp0_noc", "aclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(25), 7, GFLAGS),
-@@ -980,7 +980,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(HCLK_PERILP0_NOC, "hclk_perilp0_noc", "hclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(25), 8, GFLAGS),
- 
- 	/* pclk_perilp0 gates */
--	GATE(PCLK_DCF, "pclk_dcf", "pclk_perilp0", CLK_IGNORE_UNUSED, RK3399_CLKGATE_CON(23), 9, GFLAGS),
-+	GATE(PCLK_DCF, "pclk_dcf", "pclk_perilp0", 0, RK3399_CLKGATE_CON(23), 9, GFLAGS),
- 
- 	/* crypto */
- 	COMPOSITE(SCLK_CRYPTO0, "clk_crypto0", mux_pll_src_cpll_gpll_ppll_p, 0,
--- 
-1.9.1
+Rob
