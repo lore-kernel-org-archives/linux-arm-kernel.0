@@ -1,68 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  3 Nov 2016 10:34:39 -0700
-Subject: [PATCHv2] ARM: OMAP3: Fix formatting of features printed
-Message-ID: <20161103173439.20657-1-tony@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Nov 2016 18:36:02 +0100
+Subject: [PATCH v2 06/14] ASoC: sun4i-codec: Add support for A31 playback
+ through headphone output
+In-Reply-To: <20161103075556.29018-7-wens@csie.org>
+References: <20161103075556.29018-1-wens@csie.org>
+ <20161103075556.29018-7-wens@csie.org>
+Message-ID: <20161103173602.zchyciwj66zdibc7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the printk cleanups merged into v4.9-rc1, we now get the omap
-revision printed on multiple lines. Let's fix that and also remove the
-extra empty space at the end of the features. And let's update things
-to use scnprintf as suggested by Ivaylo Dimitrov
-<ivo.g.dimitrov.75@gmail.com>.
+Hi,
 
-Reported-by: Adam Ford <aford173@gmail.com>
-Cc: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/id.c | 16 +++++++++++-----
- 1 file changed, 11 insertions(+), 5 deletions(-)
+On Thu, Nov 03, 2016 at 03:55:48PM +0800, Chen-Yu Tsai wrote:
+> +/* headphone controls */
+> +static const char * const sun6i_codec_hp_src_enum_text[] = {
+> +	"DAC", "Mixer",
+> +};
+> +
+> +static SOC_ENUM_DOUBLE_DECL(sun6i_codec_hp_src_enum,
+> +			    SUN6I_CODEC_OM_DACA_CTRL,
+> +			    SUN6I_CODEC_OM_DACA_CTRL_LHPIS,
+> +			    SUN6I_CODEC_OM_DACA_CTRL_RHPIS,
+> +			    sun6i_codec_hp_src_enum_text);
+> +
+> +static const struct snd_kcontrol_new sun6i_codec_hp_src[] = {
+> +	SOC_DAPM_ENUM("Headphone Source Playback Route",
+> +		      sun6i_codec_hp_src_enum),
+> +};
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -205,11 +205,15 @@ void __init omap2xxx_check_revision(void)
- 
- #define OMAP3_SHOW_FEATURE(feat)		\
- 	if (omap3_has_ ##feat())		\
--		printk(#feat" ");
-+		n += scnprintf(buf + n, sizeof(buf) - n, #feat " ");
- 
- static void __init omap3_cpuinfo(void)
- {
- 	const char *cpu_name;
-+	char buf[64];
-+	int n = 0;
-+
-+	memset(buf, 0, sizeof(buf));
- 
- 	/*
- 	 * OMAP3430 and OMAP3530 are assumed to be same.
-@@ -241,10 +245,10 @@ static void __init omap3_cpuinfo(void)
- 		cpu_name = "OMAP3503";
- 	}
- 
--	sprintf(soc_name, "%s", cpu_name);
-+	scnprintf(soc_name, sizeof(soc_name), "%s", cpu_name);
- 
- 	/* Print verbose information */
--	pr_info("%s %s (", soc_name, soc_rev);
-+	n += scnprintf(buf, sizeof(buf) - n, "%s %s (", soc_name, soc_rev);
- 
- 	OMAP3_SHOW_FEATURE(l2cache);
- 	OMAP3_SHOW_FEATURE(iva);
-@@ -252,8 +256,10 @@ static void __init omap3_cpuinfo(void)
- 	OMAP3_SHOW_FEATURE(neon);
- 	OMAP3_SHOW_FEATURE(isp);
- 	OMAP3_SHOW_FEATURE(192mhz_clk);
--
--	printk(")\n");
-+	if (*(buf + n - 1) == ' ')
-+		n--;
-+	n += scnprintf(buf + n, sizeof(buf) - n, ")\n");
-+	pr_info("%s", buf);
- }
- 
- #define OMAP3_CHECK_FEATURE(status,feat)				\
+What is that route exactly? A muxer?
+
+Thanks,
+Maxime
+
 -- 
-2.10.2
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/7eabc1f5/attachment.sig>
