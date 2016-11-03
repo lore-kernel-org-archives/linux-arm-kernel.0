@@ -1,47 +1,47 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 03 Nov 2016 16:55:45 +0100
-Subject: [PATCH 2/6] pinctrl: rockchip: add support for rk1108
-In-Reply-To: <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
-References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
- <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <3450255.c5nv6dGt3I@diego>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 3 Nov 2016 15:57:54 +0000
+Subject: [PATCHv2 6/6] arm64: Add support for CONFIG_DEBUG_VIRTUAL
+In-Reply-To: <a77c2162-6eb9-09c8-e84f-03a207b59c6b@redhat.com>
+References: <20161102210054.16621-1-labbott@redhat.com>
+ <20161102210054.16621-7-labbott@redhat.com>
+ <20161102230642.GB19591@remoulade>
+ <a77c2162-6eb9-09c8-e84f-03a207b59c6b@redhat.com>
+Message-ID: <20161103155753.GG25852@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 3. November 2016, 20:34:30 schrieb Andy Yan:
-> Add basic support for rk1108 soc
+On Wed, Nov 02, 2016 at 06:05:38PM -0600, Laura Abbott wrote:
+> On 11/02/2016 05:06 PM, Mark Rutland wrote:
+> >On Wed, Nov 02, 2016 at 03:00:54PM -0600, Laura Abbott wrote:
+> >>+CFLAGS_physaddr.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> >>+obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+
+> >>+	/*
+> >>+	 * This is intentionally different than above to be a tighter check
+> >>+	 * for symbols.
+> >>+	 */
+> >>+	VIRTUAL_BUG_ON(x < kimage_vaddr + TEXT_OFFSET || x > (unsigned long) _end);
+> >
+> >Can't we use _text instead of kimage_vaddr + TEXT_OFFSET? That way we don't
+> >need CFLAGS_physaddr.o.
+> >
+> >Or KERNEL_START / KERNEL_END from <asm/memory.h>?
+> >
+> >Otherwise, this looks good to me (though I haven't grokked the need for
+> >__pa_symbol() yet).
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> I guess it's a question of what's clearer. I like kimage_vaddr +
+> TEXT_OFFSET because it clearly states we are checking from the
+> start of the kernel image vs. _text only shows the start of the
+> text region. Yes, it's technically the same but a little less
+> obvious. I suppose that could be solved with some more elaboration
+> in the comment.
 
-nice when support for a new soc is that easy in a driver :-)
+Sure, it's arguable either way.
 
-There are two small issues below and with those fixed
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+I do think that KERNEL_START/KERNEL_END are a better choice, with the comment
+you suggest, and/or renamed to KERNEL_IMAGE_*. They already describe the bounds
+of the image (though the naming doesn't make that entirely clear).
 
-> ---
-> 
->  drivers/pinctrl/pinctrl-rockchip.c | 27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
-
-missing devicetree binding update for the new compatible
-
-> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
-> b/drivers/pinctrl/pinctrl-rockchip.c index 49bf7dc..9f324b1 100644
-> --- a/drivers/pinctrl/pinctrl-rockchip.c
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-
-[...]
-
-> +static struct rockchip_pin_ctrl rk1108_pin_ctrl = {
-> +	.pin_banks		= rk1108_pin_banks,
-> +	.nr_banks		= ARRAY_SIZE(rk1108_pin_banks),
-> +	.label			= "RK1108-GPIO",
-> +	.type			= RK1108,
-> +	.grf_mux_offset		= 0x10,
-> +	.pmu_mux_offset		= 0x0,
-> +	.pull_calc_reg          = rk3288_calc_pull_reg_and_bit,
-
-this last line has spaces instead of tabs between .pull_calc_reg and the "="
-
-
-Heiko
+Thanks,
+Mark.
