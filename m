@@ -1,370 +1,207 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 3 Nov 2016 12:50:34 -0500
-Subject: [PATCH v2 3/3] reset: Add the TI SCI reset driver
-In-Reply-To: <1477647364.3010.28.camel@pengutronix.de>
-References: <20161027214941.24641-1-afd@ti.com>
- <20161027214941.24641-4-afd@ti.com> <1477647364.3010.28.camel@pengutronix.de>
-Message-ID: <6c5a77b0-fc1f-33c8-ff1d-83e198e4acda@ti.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Thu, 3 Nov 2016 18:24:11 +0000
+Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
+ caching of bypass entries
+In-Reply-To: <05d13b82-6fb6-95c0-8e64-54bcf57b3221@arm.com>
+References: <1478093714-17219-1-git-send-email-nipun.gupta@nxp.com>
+ <d1c89f6f-1b7a-6180-a376-27505d3b6c9f@arm.com>
+ <DB6PR0402MB26942C3D65D70A1C1C84F746E6A00@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+ <05d13b82-6fb6-95c0-8e64-54bcf57b3221@arm.com>
+Message-ID: <DB6PR0402MB269456E0BF6CE5AF96A8271EE6A30@DB6PR0402MB2694.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2016 04:36 AM, Philipp Zabel wrote:
-> Hi Andrew,
+Hi Robin,
+
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Thursday, November 03, 2016 16:39
+> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; linux-arm-
+> kernel at lists.infradead.org; iommu at lists.linux-foundation.org
+> Cc: Stuart Yoder <stuart.yoder@nxp.com>
+> Subject: Re: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
+> caching of bypass entries
 > 
-> is there (going to be) as stable branch I can base these on, or should I
-> just wait until the prerequisite patches appear in arm-soc/for-next?
+> On 02/11/16 19:26, Nipun Gupta wrote:
+> >
+> > Hi Robin,
+> >
+> >> -----Original Message-----
+> >> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> >> Sent: Wednesday, November 02, 2016 16:51
+> >> To: Nipun Gupta <nipun.gupta@nxp.com>; will.deacon at arm.com; linux-arm-
+> >> kernel at lists.infradead.org; iommu at lists.linux-foundation.org
+> >> Cc: Stuart Yoder <stuart.yoder@nxp.com>
+> >> Subject: Re: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to
+> enable
+> >> caching of bypass entries
+> >>
+> >> Hi Nipun,
+> >>
+> >> On 02/11/16 13:35, Nipun Gupta wrote:
+> >>> The SMTNMB_TLBEN in the Auxiliary Configuration Register (ACR)
+> >>> provides an option to enable the updation of TLB in case of bypass
+> >>> transactions due to no stream match in the stream match table. This
+> >>> reduces the latencies of the subsequent transactions with the same stream-
+> id
+> >> which bypasses the SMMU.
+> >>> This provides a significant performance benefit for certain networking
+> >>> workloads.
+> >>
+> >> ...at the cost of increased TLB contention against other workloads.
+> >> However, in the general case we'd expect the system to be fully described, so
+> if
+> >> there aren't any unmatched Stream IDs there hopefully shouldn't be an
+> impact
+> >> to leaving this switched on. I'd be interested to see some actual performance
+> >> numbers, though - you already know my opinion about unsubstantiated
+> quotes
+> >> from the MMU-500 TRM.
+> >
+> > With this change we have seen substantial performance improvement of ~9-
+> 10%
+> > with DPDK l3fwd application
+> (http://dpdk.org/doc/guides/sample_app_ug/l3_forward.html)
+> > on NXP's LS2088a platform (single core as well as multi-core). Also, with ODP
+> reflector application
+> > (loopback mode - NXP in-house) we have seen 5% improvement in
+> performance on
+> > LS1088 platform.
+> >
+> > W.r.t. the read latencies, they are reduced to avg. ~50 platform cycles from
+> avg. ~140
+> > platform cycles per memory read transactions which follow this bypass path
+> (on LS2088
+> > with DPDK l3fwd application).
+> >
+> > (Apologies, I cannot share the DPDK/ODP exact performance numbers on the
+> mailing list).
 > 
-> Am Donnerstag, den 27.10.2016, 16:49 -0500 schrieb Andrew F. Davis:
->> Some TI Keystone family of SoCs contain a system controller (like the
->> Power Management Micro Controller (PMMC) on K2G SoCs) that manage the
->> low-level device control (like clocks, resets etc) for the various
->> hardware modules present on the SoC. These device control operations
->> are provided to the host processor OS through a communication protocol
->> called the TI System Control Interface (TI SCI) protocol.
->>
->> This patch adds a reset driver that communicates to the system
->> controller over the TI SCI protocol for performing reset management
->> of various devices present on the SoC. Various reset functionalities
->> are achieved by the means of different TI SCI device operations
->> provided by the TI SCI framework.
->>
->> Signed-off-by: Andrew F. Davis <afd@ti.com>
->> [s-anna at ti.com: documentation changes, revised commit message]
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>  MAINTAINERS                  |   1 +
->>  drivers/reset/Kconfig        |   9 ++
->>  drivers/reset/Makefile       |   1 +
->>  drivers/reset/reset-ti-sci.c | 262 +++++++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 273 insertions(+)
->>  create mode 100644 drivers/reset/reset-ti-sci.c
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index accf991..b93d91a 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -11901,6 +11901,7 @@ F:	include/dt-bindings/clock/k2g.h
->>  F:	drivers/clk/keystone/sci-clk.c
->>  F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
->>  F:	include/dt-bindings/reset/k2g.h
->> +F:	drivers/reset/reset-ti-sci.c
->>  
->>  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
->>  M:	Hans Verkuil <hverkuil@xs4all.nl>
->> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->> index 06d9fa2..4c21c9d 100644
->> --- a/drivers/reset/Kconfig
->> +++ b/drivers/reset/Kconfig
->> @@ -66,6 +66,15 @@ config RESET_SUNXI
->>  	help
->>  	  This enables the reset driver for Allwinner SoCs.
->>  
->> +config RESET_TI_SCI
->> +	tristate "TI System Control Interface (TI-SCI) reset driver"
->> +	depends on RESET_CONTROLLER
->> +	depends on TI_SCI_PROTOCOL
->> +	help
->> +	  This enables the reset driver support over TI System Control Interface
->> +	  available on some new TI SoCs. If you wish to use reset resources
->> +	  managed by the TI System Controller, say Y here. Otherwise, say N.
->> +
->>  config TI_SYSCON_RESET
->>  	tristate "TI SYSCON Reset Driver"
->>  	depends on HAS_IOMEM
->> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
->> index bbe7026..36321f2 100644
->> --- a/drivers/reset/Makefile
->> +++ b/drivers/reset/Makefile
->> @@ -10,6 +10,7 @@ obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
->>  obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
->>  obj-$(CONFIG_RESET_STM32) += reset-stm32.o
->>  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->> +obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
->>  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->>  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
->>  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
->> diff --git a/drivers/reset/reset-ti-sci.c b/drivers/reset/reset-ti-sci.c
->> new file mode 100644
->> index 0000000..42ccf12
->> --- /dev/null
->> +++ b/drivers/reset/reset-ti-sci.c
->> @@ -0,0 +1,262 @@
->> +/*
->> + * Texas Instrument's System Control Interface (TI-SCI) reset driver
->> + *
->> + * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
->> + *	Andrew F. Davis <afd@ti.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/idr.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/reset-controller.h>
->> +#include <linux/soc/ti/ti_sci_protocol.h>
->> +
->> +/**
->> + * struct ti_sci_reset_control - reset control structure
->> + * @dev_id: SoC-specific device identifier
->> + * @reset_mask: reset mask to use for toggling reset
->> + */
->> +struct ti_sci_reset_control {
->> +	u32 dev_id;
->> +	u32 reset_mask;
->> +};
->> +
->> +/**
->> + * struct ti_sci_reset_data - reset controller information structure
->> + * @rcdev: reset controller entity
->> + * @dev: reset controller device pointer
->> + * @sci: TI SCI handle used for communication with system controller
->> + * @idr: idr structure for mapping ids to reset control structures
->> + */
->> +struct ti_sci_reset_data {
->> +	struct reset_controller_dev rcdev;
->> +	struct device *dev;
->> +	const struct ti_sci_handle *sci;
->> +	struct idr idr;
->> +};
->> +
->> +#define to_ti_sci_reset_data(p)	\
->> +	container_of((p), struct ti_sci_reset_data, rcdev)
->> +
->> +/**
->> + * ti_sci_reset_set() - program a device's reset
->> + * @rcdev: reset controller entity
->> + * @id: ID of the reset to toggle
->> + * @assert: boolean flag to indicate assert or deassert
->> + *
->> + * This is a common internal function used to assert or deassert a device's
->> + * reset using the TI SCI protocol. The device's reset is asserted if the
->> + * @assert argument is true, or deasserted if @assert argument is false.
->> + * The mechanism itself is a read-modify-write procedure, the current device
->> + * reset register is read using a TI SCI device operation, the new value is
->> + * set or un-set using the reset's mask, and the new reset value written by
->> + * using another TI SCI device operation.
->> + *
->> + * Return: 0 for successful request, else a corresponding error value
->> + */
->> +static int ti_sci_reset_set(struct reset_controller_dev *rcdev,
->> +			    unsigned long id, bool assert)
->> +{
->> +	struct ti_sci_reset_data *data = to_ti_sci_reset_data(rcdev);
->> +	const struct ti_sci_handle *sci = data->sci;
->> +	const struct ti_sci_dev_ops *dev_ops = &sci->ops.dev_ops;
->> +	struct ti_sci_reset_control *control;
->> +	u32 reset_state;
->> +	int ret;
->> +
->> +	control = idr_find(&data->idr, id);
->> +	if (!control)
->> +		return -EINVAL;
->> +
->> +	ret = dev_ops->get_device_resets(sci, control->dev_id,
->> +					 &reset_state);
->> +	if (ret)
->> +		return ret;
->> +
->> +	if (assert)
->> +		reset_state |= control->reset_mask;
->> +	else
->> +		reset_state &= ~control->reset_mask;
->> +
->> +	return dev_ops->set_device_resets(sci, control->dev_id,
->> +					  reset_state);
+> That's understandable, and I'm not sure I'd know how to interpret them
+> anyway ;) I reckon the percentages make a sufficiently compelling
+> qualification of the improvement, so it would be good to have that
+> summarised in the commit log.
+
+Sure, I'll add a part of it in the commit log.
+
 > 
-> Without any locking? Maybe the read-modify-write could just be moved one
-> level down with an update_bits type of callback in the ti_sci_dev_ops.
+> >>
+> >>> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+> >>> ---
+> >>>  drivers/iommu/arm-smmu.c | 21 +++++++++++++++------
+> >>>  1 file changed, 15 insertions(+), 6 deletions(-)
+> >>>
+> >>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c index
+> >>> ce2a9d4..7010a5c 100644
+> >>> --- a/drivers/iommu/arm-smmu.c
+> >>> +++ b/drivers/iommu/arm-smmu.c
+> >>> @@ -246,6 +246,7 @@ enum arm_smmu_s2cr_privcfg {
+> >>>
+> >>>  #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+> >>>
+> >>> +#define ACR_SMTNMB_TLBEN		(1 << 8)
+> >>
+> >> ACR is entirely implementation-defined, so there are no generic field names.
+> >> Please follow the naming convention handily demonstrated in the subsequent
+> >> context line.
+> >>
+> >>>  #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
+> >>
+> >> Actually, can we also please keep these in descending order of bit position
+> like
+> >> everything else?
+> >>
+> >>>  #define CB_PAR_F			(1 << 0)
+> >>> @@ -1569,18 +1570,26 @@ static void arm_smmu_device_reset(struct
+> >> arm_smmu_device *smmu)
+> >>>  	for (i = 0; i < smmu->num_mapping_groups; ++i)
+> >>>  		arm_smmu_write_sme(smmu, i);
+> >>>
+> >>> +	/* Get the major rev required for configuring ACR */
+> >>
+> >> That comment is nonsense.
+> >>
+> >>> +	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
+> >>> +	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+> >>> +
+> >>>  	/*
+> >>>  	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
+> >>>  	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
+> >>>  	 * bit is only present in MMU-500r2 onwards.
+> >>>  	 */
+> >>> -	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
+> >>> -	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+> >>> -	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
+> >>> -		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+> >>> +	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+> >>> +	if ((smmu->model == ARM_MMU500) && (major >= 2))
+> >>>  		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
+> >>> -		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+> >>> -	}
+> >>> +
+> >>> +	/*
+> >>> +	 * Set the SMTNMB_TLBEN in ACR so that the transactions which
+> >>> +	 * bypass with SMMU due to no stream match found in the SMR table
+> >>> +	 * are updated in the TLB's.
+> >>
+> >> Or simply, e.g. "Allow unmatched Stream IDs to allocate bypass TLB entries
+> for
+> >> reduced latency". It's already clear from the code what bit's being set where,
+> we
+> >> only need to remember *why*.
+> >>
+> >>> +	 */
+> >>> +	reg |= ACR_SMTNMB_TLBEN;
+> >>> +	writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+> >>
+> >> Are you sure it's perfectly fine to set that implementation-defined bit on any
+> >> SMMU implementation other than the two-and-a-half ARM Ltd. ones which
+> >> happen to share the same meaning? I'm certainly not.
+> >>
+> >> The correct flow would be something like this:
+> >>
+> >> 	if (smmu->model == ARM_MMU500) {
+> >> 		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
+> >> 		major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+> >> 		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+> >> 		if (major >= 2)
+> >> 	  		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
+> >> 		reg |= ACR_SMTNMB_TLBEN;
+> >> 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+> >> 	}
+> >>
+> >> The shape of the current code avoids an extra level of indentation, but once
+> you
+> >> have to have the nested conditional anyway, it might as well all be predicated
+> >> appropriately.
+> >>
+> >
+> > Thank you for providing the useful comments. I would incorporate them all in
+> next version :).
+> 
+> Cool. Just for clarity (I realise I was thinking it, but never said it
+> outright), whilst MMU-40x do share the same feature with the same ACR
+> bit definition as MMU-500, I'd be inclined not to bother with them.
+> Since the monolithic microarchitecture means there's normally a separate
+> MMU-40x per device, if you don't want translation for that device you
+> can simply not probe the thing to turn it on in the first place.
 > 
 
-That may be useful to add at some point, for now I want to work with the
-existing framework, it can always be moved later. I'll add some
-per-control locks for v3.
+This seems a pretty decent reason to have this bit set only for MMU-500.
+I'll send a patch v2 soon.
 
 Thanks,
-Andrew
+Nipun
 
->> +}
->> +
->> +/**
->> + * ti_sci_reset_assert() - assert device reset
->> + * @rcdev: reset controller entity
->> + * @id: ID of the reset to be asserted
->> + *
->> + * This function implements the reset driver op to assert a device's reset
->> + * using the TI SCI protocol. This invokes the function ti_sci_reset_set()
->> + * with the corresponding parameters as passed in, but with the @assert
->> + * argument set to true for asserting the reset.
->> + *
->> + * Return: 0 for successful request, else a corresponding error value
->> + */
->> +static int ti_sci_reset_assert(struct reset_controller_dev *rcdev,
->> +			       unsigned long id)
->> +{
->> +	return ti_sci_reset_set(rcdev, id, true);
->> +}
->> +
->> +/**
->> + * ti_sci_reset_deassert() - deassert device reset
->> + * @rcdev: reset controller entity
->> + * @id: ID of the reset to be deasserted
->> + *
->> + * This function implements the reset driver op to deassert a device's reset
->> + * using the TI SCI protocol. This invokes the function ti_sci_reset_set()
->> + * with the corresponding parameters as passed in, but with the @assert
->> + * argument set to false for deasserting the reset.
->> + *
->> + * Return: 0 for successful request, else a corresponding error value
->> + */
->> +static int ti_sci_reset_deassert(struct reset_controller_dev *rcdev,
->> +				 unsigned long id)
->> +{
->> +	return ti_sci_reset_set(rcdev, id, false);
->> +}
->> +
->> +/**
->> + * ti_sci_reset_status() - check device reset status
->> + * @rcdev: reset controller entity
->> + * @id: ID of reset to be checked
->> + *
->> + * This function implements the reset driver op to return the status of a
->> + * device's reset using the TI SCI protocol. The reset register value is read
->> + * by invoking the TI SCI device opertation .get_device_resets(), and the
->> + * status of the specific reset is extracted and returned using this reset's
->> + * reset mask.
->> + *
->> + * Return: 0 if reset is deasserted, or a non-zero value if reset is asserted
->> + */
->> +static int ti_sci_reset_status(struct reset_controller_dev *rcdev,
->> +			       unsigned long id)
->> +{
->> +	struct ti_sci_reset_data *data = to_ti_sci_reset_data(rcdev);
->> +	const struct ti_sci_handle *sci = data->sci;
->> +	const struct ti_sci_dev_ops *dev_ops = &sci->ops.dev_ops;
->> +	struct ti_sci_reset_control *control;
->> +	u32 reset_state;
->> +	int ret;
->> +
->> +	control = idr_find(&data->idr, id);
->> +	if (!control)
->> +		return -EINVAL;
->> +
->> +	ret = dev_ops->get_device_resets(sci, control->dev_id,
->> +					 &reset_state);
->> +	if (ret)
->> +		return ret;
->> +
->> +	return reset_state & control->reset_mask;
->> +}
->> +
->> +static struct reset_control_ops ti_sci_reset_ops = {
->> +	.assert		= ti_sci_reset_assert,
->> +	.deassert	= ti_sci_reset_deassert,
->> +	.status		= ti_sci_reset_status,
->> +};
->> +
->> +/**
->> + * ti_sci_reset_of_xlate() - translate a set of OF arguments to a reset ID
->> + * @rcdev: reset controller entity
->> + * @reset_spec: OF reset argument specifier
->> + *
->> + * This function performs the translation of the reset argument specifier
->> + * values defined in a reset consumer device node. The function allocates a
->> + * reset control structure for that device reset, and will be used by the
->> + * driver for performing any reset functions on that reset. An idr structure
->> + * is allocated and used to map to the reset control structure. This idr
->> + * is used by the driver to do reset lookups.
->> + *
->> + * Return: 0 for successful request, else a corresponding error value
->> + */
->> +static int ti_sci_reset_of_xlate(struct reset_controller_dev *rcdev,
->> +				 const struct of_phandle_args *reset_spec)
->> +{
->> +	struct ti_sci_reset_data *data = to_ti_sci_reset_data(rcdev);
->> +	struct ti_sci_reset_control *control;
->> +
->> +	if (WARN_ON(reset_spec->args_count != rcdev->of_reset_n_cells))
->> +		return -EINVAL;
->> +
->> +	control = devm_kzalloc(data->dev, sizeof(*control), GFP_KERNEL);
->> +	if (!control)
->> +		return -ENOMEM;
->> +
->> +	control->dev_id = reset_spec->args[0];
->> +	control->reset_mask = reset_spec->args[1];
->> +
->> +	return idr_alloc(&data->idr, control, 0, 0, GFP_KERNEL);
->> +}
->> +
->> +static const struct of_device_id ti_sci_reset_of_match[] = {
->> +	{ .compatible = "ti,sci-reset", },
->> +	{ /* sentinel */ },
->> +};
->> +MODULE_DEVICE_TABLE(of, ti_sci_reset_of_match);
->> +
->> +static int ti_sci_reset_probe(struct platform_device *pdev)
->> +{
->> +	struct ti_sci_reset_data *data;
->> +
->> +	if (!pdev->dev.of_node)
->> +		return -ENODEV;
->> +
->> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
->> +	if (!data)
->> +		return -ENOMEM;
->> +
->> +	data->sci = devm_ti_sci_get_handle(&pdev->dev);
->> +	if (IS_ERR(data->sci))
->> +		return PTR_ERR(data->sci);
->> +
->> +	data->rcdev.ops = &ti_sci_reset_ops;
->> +	data->rcdev.owner = THIS_MODULE;
->> +	data->rcdev.of_node = pdev->dev.of_node;
->> +	data->rcdev.of_reset_n_cells = 2;
->> +	data->rcdev.of_xlate = ti_sci_reset_of_xlate;
->> +	data->dev = &pdev->dev;
->> +	idr_init(&data->idr);
->> +
->> +	platform_set_drvdata(pdev, data);
->> +
->> +	return reset_controller_register(&data->rcdev);
->> +}
->> +
->> +static int ti_sci_reset_remove(struct platform_device *pdev)
->> +{
->> +	struct ti_sci_reset_data *data = platform_get_drvdata(pdev);
->> +
->> +	reset_controller_unregister(&data->rcdev);
->> +
->> +	idr_destroy(&data->idr);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct platform_driver ti_sci_reset_driver = {
->> +	.probe = ti_sci_reset_probe,
->> +	.remove = ti_sci_reset_remove,
->> +	.driver = {
->> +		.name = "ti-sci-reset",
->> +		.of_match_table = ti_sci_reset_of_match,
->> +	},
->> +};
->> +module_platform_driver(ti_sci_reset_driver);
->> +
->> +MODULE_AUTHOR("Andrew F. Davis <afd@ti.com>");
->> +MODULE_DESCRIPTION("TI System Control Interface (TI SCI) Reset driver");
->> +MODULE_LICENSE("GPL v2");
+> Robin.
 > 
-> regards
-> Philipp
-> 
+> >
+> > Regards,
+> > Nipun
+> >
+> >> Robin.
+> >>
+> >>>  	/* Make sure all context banks are disabled and clear CB_FSR  */
+> >>>  	for (i = 0; i < smmu->num_context_banks; ++i) {
+> >>>
+> >
