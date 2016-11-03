@@ -1,106 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  3 Nov 2016 10:13:08 +0100
-Subject: [PATCH 1/3] ARM: dts: rename MSM8660/APQ8060 pmicintc to pm8058
-Message-ID: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu,  3 Nov 2016 10:13:09 +0100
+Subject: [PATCH 2/3] ARM: dts: reference PM8058 as IRQ parent
+In-Reply-To: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
+References: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1478164390-21613-2-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The name "pmicintc" is ambiguous: there is a second power
-management IC named PM8901 on these systems, and it is also
-an interrupt controller. To make things clear, just name the
-node alias "pm8058", this in unambigous and has all information
-we need.
+Some nodes are referencing the pm8058_gpio as IRQ parent, but
+the HW IRQ offset they are supplying is actually that for the
+parent to that controller: the PM8058 itself. Since that is the
+proper parent, reference it directly.
+
+We can switch this to the pm8058_gpio and the proper offset
+once we have fixed the SSBI GPIO driver to properly deal with
+the hierarchical IRQ domain and get proper local offset
+translation.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts |  2 +-
- arch/arm/boot/dts/qcom-msm8660-surf.dts        |  2 +-
- arch/arm/boot/dts/qcom-msm8660.dtsi            | 12 ++++++------
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 4b8872cc8bf9..4a532ddab53a 100644
+index 4a532ddab53a..ea660ffa03ea 100644
 --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
 +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -412,7 +412,7 @@
- 				 * The second interrupt is the PME interrupt
- 				 * for network wakeup, connected to the TLMM.
- 				 */
--				interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
-+				interrupts-extended = <&pm8058 198 IRQ_TYPE_EDGE_FALLING>,
- 						    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
- 				reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
- 				vdd33a-supply = <&dragon_veth>;
-diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-index 23de764558ab..1adc04978a47 100644
---- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
-+++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
-@@ -48,7 +48,7 @@
- 	};
- };
- 
--&pmicintc {
-+&pm8058 {
- 	keypad at 148 {
- 		linux,keymap = <
- 			MATRIX_KEY(0, 0, KEY_FN_F1)
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 4d828f810746..91c9a62ae725 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -163,7 +163,7 @@
- 			reg = <0x500000 0x1000>;
- 			qcom,controller-type = "pmic-arbiter";
- 
--			pmicintc: pmic at 0 {
-+			pm8058: pmic at 0 {
- 				compatible = "qcom,pm8058";
- 				interrupt-parent = <&tlmm>;
- 				interrupts = <88 8>;
-@@ -176,7 +176,7 @@
- 					compatible = "qcom,pm8058-gpio",
- 						     "qcom,ssbi-gpio";
- 					reg = <0x150>;
--					interrupt-parent = <&pmicintc>;
+@@ -369,8 +369,8 @@
+ 				ak8975 at 0c {
+ 					compatible = "asahi-kasei,ak8975";
+ 					reg = <0x0c>;
+-					/* GPIO33 has interrupt 224 on the PM8058 */
+-					interrupt-parent = <&pm8058_gpio>;
++					/* FIXME: GPIO33 has interrupt 224 on the PM8058 */
 +					interrupt-parent = <&pm8058>;
- 					interrupts = <192 IRQ_TYPE_NONE>,
- 						     <193 IRQ_TYPE_NONE>,
- 						     <194 IRQ_TYPE_NONE>,
-@@ -232,7 +232,7 @@
- 					reg = <0x50>;
- 					gpio-controller;
- 					#gpio-cells = <2>;
--					interrupt-parent = <&pmicintc>;
+ 					interrupts = <224 IRQ_TYPE_EDGE_RISING>;
+ 					pinctrl-names = "default";
+ 					pinctrl-0 = <&dragon_ak8975_gpios>;
+@@ -380,8 +380,8 @@
+ 				bmp085 at 77 {
+ 					compatible = "bosch,bmp085";
+ 					reg = <0x77>;
+-					/* GPIO16 has interrupt 207 on the PM8058 */
+-					interrupt-parent = <&pm8058_gpio>;
++					/* FIXME: GPIO16 has interrupt 207 on the PM8058 */
 +					interrupt-parent = <&pm8058>;
- 					interrupts =
- 					<128 IRQ_TYPE_NONE>,
- 					<129 IRQ_TYPE_NONE>,
-@@ -251,7 +251,7 @@
- 				pwrkey at 1c {
- 					compatible = "qcom,pm8058-pwrkey";
- 					reg = <0x1c>;
--					interrupt-parent = <&pmicintc>;
-+					interrupt-parent = <&pm8058>;
- 					interrupts = <50 1>, <51 1>;
- 					debounce = <15625>;
- 					pull-up;
-@@ -260,7 +260,7 @@
- 				keypad at 148 {
- 					compatible = "qcom,pm8058-keypad";
- 					reg = <0x148>;
--					interrupt-parent = <&pmicintc>;
-+					interrupt-parent = <&pm8058>;
- 					interrupts = <74 1>, <75 1>;
- 					debounce = <15>;
- 					scan-delay = <32>;
-@@ -270,7 +270,7 @@
- 				rtc at 1e8 {
- 					compatible = "qcom,pm8058-rtc";
- 					reg = <0x1e8>;
--					interrupt-parent = <&pmicintc>;
-+					interrupt-parent = <&pm8058>;
- 					interrupts = <39 1>;
- 					allow-set-time;
- 				};
+ 					interrupts = <207 IRQ_TYPE_EDGE_RISING>;
+ 					reset-gpios = <&tlmm 86 GPIO_ACTIVE_LOW>;
+ 					pinctrl-names = "default";
 -- 
 2.7.4
