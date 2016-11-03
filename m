@@ -1,77 +1,66 @@
 From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu,  3 Nov 2016 16:59:10 +0100
-Subject: [PATCH v4 2/4] usb: musb: core: added helper function for parsing DT
+Date: Thu,  3 Nov 2016 16:59:12 +0100
+Subject: [PATCH v4 4/4] ARM: dts: da850: Add the usb otg device node
 In-Reply-To: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
 References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1478188752-22447-3-git-send-email-abailon@baylibre.com>
+Message-ID: <1478188752-22447-5-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Petr Kulhavy <petr@barix.com>
+This adds the device tree node for the usb otg
+controller present in the da850 family of SoC's.
+This also enables the otg usb controller for the lcdk board.
 
-This adds the function musb_get_mode() to get the DT property "dr_mode"
-
-Signed-off-by: Petr Kulhavy <petr@barix.com>
-Acked-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-Tested-by: David Lechner <david@lechnology.com>
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 ---
- drivers/usb/musb/musb_core.c | 19 +++++++++++++++++++
- drivers/usb/musb/musb_core.h |  6 ++++++
- 2 files changed, 25 insertions(+)
+ arch/arm/boot/dts/da850-lcdk.dts |  8 ++++++++
+ arch/arm/boot/dts/da850.dtsi     | 15 +++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-index 27dadc0..bba07e7 100644
---- a/drivers/usb/musb/musb_core.c
-+++ b/drivers/usb/musb/musb_core.c
-@@ -100,6 +100,7 @@
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb.h>
-+#include <linux/usb/of.h>
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21..9f5040c 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -158,6 +158,14 @@
+ 	rx-num-evt = <32>;
+ };
  
- #include "musb_core.h"
- #include "musb_trace.h"
-@@ -130,6 +131,24 @@ static inline struct musb *dev_to_musb(struct device *dev)
- 	return dev_get_drvdata(dev);
- }
- 
-+enum musb_mode musb_get_mode(struct device *dev)
-+{
-+	enum usb_dr_mode mode;
++&usb_phy {
++	status = "okay";
++	};
 +
-+	mode = usb_get_dr_mode(dev);
-+	switch (mode) {
-+	case USB_DR_MODE_HOST:
-+		return MUSB_HOST;
-+	case USB_DR_MODE_PERIPHERAL:
-+		return MUSB_PERIPHERAL;
-+	case USB_DR_MODE_OTG:
-+	case USB_DR_MODE_UNKNOWN:
-+	default:
-+		return MUSB_OTG;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(musb_get_mode);
++&usb0 {
++	status = "okay";
++};
 +
- /*-------------------------------------------------------------------------*/
- 
- #ifndef CONFIG_BLACKFIN
-diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-index 2cb88a49..76f00f6 100644
---- a/drivers/usb/musb/musb_core.h
-+++ b/drivers/usb/musb/musb_core.h
-@@ -617,4 +617,10 @@ static inline void musb_platform_post_root_reset_end(struct musb *musb)
- 		musb->ops->post_root_reset_end(musb);
- }
- 
-+/*
-+ * gets the "dr_mode" property from DT and converts it into musb_mode
-+ * if the property is not found or not recognized returns MUSB_OTG
-+ */
-+extern enum musb_mode musb_get_mode(struct device *dev);
-+
- #endif	/* __MUSB_CORE_H__ */
+ &aemif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&nand_pins>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index f79e1b9..322a31a 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -372,6 +372,21 @@
+ 					>;
+ 			status = "disabled";
+ 		};
++		usb_phy: usb-phy {
++			compatible = "ti,da830-usb-phy";
++			#phy-cells = <1>;
++			status = "disabled";
++		};
++		usb0: usb at 200000 {
++			compatible = "ti,da830-musb";
++			reg = <0x200000 0x10000>;
++			interrupts = <58>;
++			interrupt-names = "mc";
++			dr_mode = "otg";
++			phys = <&usb_phy 0>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
+ 		gpio: gpio at 226000 {
+ 			compatible = "ti,dm6441-gpio";
+ 			gpio-controller;
 -- 
 2.7.3
