@@ -1,114 +1,76 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:29 +0900
-Subject: [PATCH 07/13] mmc: dw_mmc: use the cookie's enum values for
- post/pre_req()
+Date: Thu, 03 Nov 2016 15:21:32 +0900
+Subject: [PATCH 10/13] ARM: dts: exynos: replace to "max-frequecy" instead of
+ "clock-freq-min-max"
 In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
 References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-8-jh80.chung@samsung.com>
+Message-ID: <20161103062135.10697-11-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removed the meaningless value. Instead, use the cookie's enum
-values for executing correctly.
+In drivers/mmc/core/host.c, there is "max-frequency" property.
+It should be same behavior. So Use the "max-frequency" instead of
+"clock-freq-min-max".
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- drivers/mmc/host/dw_mmc.c | 39 +++++++++++++++++++--------------------
- 1 file changed, 19 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/exynos3250-artik5-eval.dts | 2 +-
+ arch/arm/boot/dts/exynos3250-artik5.dtsi     | 2 +-
+ arch/arm/boot/dts/exynos3250-monk.dts        | 2 +-
+ arch/arm/boot/dts/exynos3250-rinato.dts      | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 16df93b..df151c8 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -414,12 +414,13 @@ static void dw_mci_dma_cleanup(struct dw_mci *host)
- {
- 	struct mmc_data *data = host->data;
- 
--	if (data)
--		if (!data->host_cookie)
--			dma_unmap_sg(host->dev,
--				     data->sg,
--				     data->sg_len,
--				     dw_mci_get_dma_dir(data));
-+	if (data && data->host_cookie == COOKIE_MAPPED) {
-+		dma_unmap_sg(host->dev,
-+			     data->sg,
-+			     data->sg_len,
-+			     dw_mci_get_dma_dir(data));
-+		data->host_cookie = COOKIE_UNMAPPED;
-+	}
- }
- 
- static void dw_mci_idmac_reset(struct dw_mci *host)
-@@ -850,13 +851,13 @@ static const struct dw_mci_dma_ops dw_mci_edmac_ops = {
- 
- static int dw_mci_pre_dma_transfer(struct dw_mci *host,
- 				   struct mmc_data *data,
--				   bool next)
-+				   int cookie)
- {
- 	struct scatterlist *sg;
- 	unsigned int i, sg_len;
- 
--	if (!next && data->host_cookie)
--		return data->host_cookie;
-+	if (data->host_cookie == COOKIE_PRE_MAPPED)
-+		return data->sg_len;
- 
- 	/*
- 	 * We don't do DMA on "complex" transfers, i.e. with
-@@ -881,8 +882,7 @@ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
- 	if (sg_len == 0)
- 		return -EINVAL;
- 
--	if (next)
--		data->host_cookie = sg_len;
-+	data->host_cookie = cookie;
- 
- 	return sg_len;
- }
-@@ -897,13 +897,12 @@ static void dw_mci_pre_req(struct mmc_host *mmc,
- 	if (!slot->host->use_dma || !data)
- 		return;
- 
--	if (data->host_cookie) {
--		data->host_cookie = 0;
--		return;
--	}
-+	/* This data might be unmapped at this time */
-+	data->host_cookie = COOKIE_UNMAPPED;
- 
--	if (dw_mci_pre_dma_transfer(slot->host, mrq->data, 1) < 0)
--		data->host_cookie = 0;
-+	if (dw_mci_pre_dma_transfer(slot->host, mrq->data,
-+				COOKIE_PRE_MAPPED) < 0)
-+		data->host_cookie = COOKIE_UNMAPPED;
- }
- 
- static void dw_mci_post_req(struct mmc_host *mmc,
-@@ -916,12 +915,12 @@ static void dw_mci_post_req(struct mmc_host *mmc,
- 	if (!slot->host->use_dma || !data)
- 		return;
- 
--	if (data->host_cookie)
-+	if (data->host_cookie != COOKIE_UNMAPPED)
- 		dma_unmap_sg(slot->host->dev,
- 			     data->sg,
- 			     data->sg_len,
- 			     dw_mci_get_dma_dir(data));
--	data->host_cookie = 0;
-+	data->host_cookie = COOKIE_UNMAPPED;
- }
- 
- static void dw_mci_adjust_fifoth(struct dw_mci *host, struct mmc_data *data)
-@@ -1027,7 +1026,7 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
- 	if (!host->use_dma)
- 		return -ENODEV;
- 
--	sg_len = dw_mci_pre_dma_transfer(host, data, 0);
-+	sg_len = dw_mci_pre_dma_transfer(host, data, COOKIE_MAPPED);
- 	if (sg_len < 0) {
- 		host->dma_ops->stop(host);
- 		return sg_len;
+diff --git a/arch/arm/boot/dts/exynos3250-artik5-eval.dts b/arch/arm/boot/dts/exynos3250-artik5-eval.dts
+index be4d6aa..4bd2ee8 100644
+--- a/arch/arm/boot/dts/exynos3250-artik5-eval.dts
++++ b/arch/arm/boot/dts/exynos3250-artik5-eval.dts
+@@ -28,7 +28,7 @@
+ 	vqmmc-supply = <&ldo3_reg>;
+ 	card-detect-delay = <200>;
+ 	clock-frequency = <100000000>;
+-	clock-freq-min-max = <400000 100000000>;
++	max-frequency = <100000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
+diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+index a70819b..59c89d7 100644
+--- a/arch/arm/boot/dts/exynos3250-artik5.dtsi
++++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
+@@ -310,7 +310,7 @@
+ 	card-detect-delay = <200>;
+ 	vmmc-supply = <&ldo12_reg>;
+ 	clock-frequency = <100000000>;
+-	clock-freq-min-max = <400000 100000000>;
++	max-frequency = <100000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
+diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+index 66f04f6..cccfe4b 100644
+--- a/arch/arm/boot/dts/exynos3250-monk.dts
++++ b/arch/arm/boot/dts/exynos3250-monk.dts
+@@ -435,7 +435,7 @@
+ 	card-detect-delay = <200>;
+ 	vmmc-supply = <&vemmc_reg>;
+ 	clock-frequency = <100000000>;
+-	clock-freq-min-max = <400000 100000000>;
++	max-frequency = <100000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
+diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+index 3967ee5..548413e 100644
+--- a/arch/arm/boot/dts/exynos3250-rinato.dts
++++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+@@ -649,7 +649,7 @@
+ 	card-detect-delay = <200>;
+ 	vmmc-supply = <&ldo12_reg>;
+ 	clock-frequency = <100000000>;
+-	clock-freq-min-max = <400000 100000000>;
++	max-frequency = <100000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
 -- 
 2.10.1
