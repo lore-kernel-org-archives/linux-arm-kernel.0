@@ -1,32 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri,  4 Nov 2016 07:57:58 +0900
-Subject: [PATCH] ARM: cache-uniphier: include <linux/errno.h> instead of
- <linux/types.h>
-Message-ID: <1478213878-15416-1-git-send-email-yamada.masahiro@socionext.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 4 Nov 2016 09:29:32 +1030
+Subject: [PATCH v2 1/6] pinctrl-aspeed-g5: Never set SCU90[6]
+In-Reply-To: <1478097481-14895-2-git-send-email-andrew@aj.id.au>
+References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
+ <1478097481-14895-2-git-send-email-andrew@aj.id.au>
+Message-ID: <CACPK8Xcbv5VjE9deETV6zC4cPSfeBSgP96QYqV_ebAgtB9Jwtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing in this header file depends on <linux/types.h>.
-Rather, <linux/errno.h> should be included for -ENODEV.
+On Thu, Nov 3, 2016 at 1:07 AM, Andrew Jeffery <andrew@aj.id.au> wrote:
+> If a pin depending on bit 6 in SCU90 is requested for GPIO, the export
+> will succeed but changes to the GPIO's value will not be accepted by the
+> hardware. This is because the pinmux driver has misconfigured the SCU by
+> writing 1 to the reserved bit.
+>
+> The description of SCU90[6] from the datasheet is 'Reserved, must keep
+> at value ?0?'. The fix is to switch pinmux from the bit-flipping macro
+> to explicitly configuring the .enable and .disable values to zero.
+>
+> The patch has been tested on an AST2500 EVB.
+>
+> Fixes: 56e57cb6c07f (pinctrl: Add pinctrl-aspeed-g5 driver)
+> Reported-by: Uma Yadlapati <yadlapat@us.ibm.com>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Reviewed-by: Joel Stanley <joel@jms.id.au>
 
- arch/arm/include/asm/hardware/cache-uniphier.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+And tested-by.
 
-diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
-index eaa60da..0ef42ae 100644
---- a/arch/arm/include/asm/hardware/cache-uniphier.h
-+++ b/arch/arm/include/asm/hardware/cache-uniphier.h
-@@ -16,7 +16,7 @@
- #ifndef __CACHE_UNIPHIER_H
- #define __CACHE_UNIPHIER_H
- 
--#include <linux/types.h>
-+#include <linux/errno.h>
- 
- #ifdef CONFIG_CACHE_UNIPHIER
- int uniphier_cache_init(void);
--- 
-1.9.1
+> This patch should be applied for 4.9.
+
+In the future I think we should send fixes separately from the rest of
+the series, so it's clear to Linus where we expect patches to end up.
+
+Perhaps Linus can share his preference with us?
+
+Cheers,
+
+Joel
+
+
+>  drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> index c8c72e8259d3..87b46390b695 100644
+> --- a/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> +++ b/drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c
+> @@ -26,7 +26,7 @@
+>
+>  #define ASPEED_G5_NR_PINS 228
+>
+> -#define COND1          SIG_DESC_BIT(SCU90, 6, 0)
+> +#define COND1          { SCU90, BIT(6), 0, 0 }
+>  #define COND2          { SCU94, GENMASK(1, 0), 0, 0 }
+>
+>  #define B14 0
+> --
+> 2.7.4
+>
