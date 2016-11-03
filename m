@@ -1,44 +1,35 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:23 +0900
-Subject: [PATCH 01/13] mmc: dw_mmc: display the real register value on debugfs
+Date: Thu, 03 Nov 2016 15:21:25 +0900
+Subject: [PATCH 03/13] mmc: dw_mmc: change the DW_MCI_FREQ_MIN from 400K to
+ 100K
 In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
 References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-2-jh80.chung@samsung.com>
+Message-ID: <20161103062135.10697-4-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Developer wants to see the real register value, not register offset.
-This patch fixed to display the real value of register.
+If there is no property "clock-freq-min-max", mmc->f_min should be set
+to 400K by default. But Some SoC can be used 100K.
+When 100K is used, MMC core will try to check from 400K to 100K.
 
+Reported-by: Shawn Lin <shawn.lin@rock-chips.com>
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- drivers/mmc/host/dw_mmc.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 1c9ee36..b87dd07 100644
+index 1e71fd4..6ccb817 100644
 --- a/drivers/mmc/host/dw_mmc.c
 +++ b/drivers/mmc/host/dw_mmc.c
-@@ -165,12 +165,14 @@ static const struct file_operations dw_mci_req_fops = {
+@@ -54,7 +54,7 @@
+ #define DW_MCI_DMA_THRESHOLD	16
  
- static int dw_mci_regs_show(struct seq_file *s, void *v)
- {
--	seq_printf(s, "STATUS:\t0x%08x\n", SDMMC_STATUS);
--	seq_printf(s, "RINTSTS:\t0x%08x\n", SDMMC_RINTSTS);
--	seq_printf(s, "CMD:\t0x%08x\n", SDMMC_CMD);
--	seq_printf(s, "CTRL:\t0x%08x\n", SDMMC_CTRL);
--	seq_printf(s, "INTMASK:\t0x%08x\n", SDMMC_INTMASK);
--	seq_printf(s, "CLKENA:\t0x%08x\n", SDMMC_CLKENA);
-+	struct dw_mci *host = s->private;
-+
-+	seq_printf(s, "STATUS:\t0x%08x\n", mci_readl(host, STATUS));
-+	seq_printf(s, "RINTSTS:\t0x%08x\n", mci_readl(host, RINTSTS));
-+	seq_printf(s, "CMD:\t0x%08x\n", mci_readl(host, CMD));
-+	seq_printf(s, "CTRL:\t0x%08x\n", mci_readl(host, CTRL));
-+	seq_printf(s, "INTMASK:\t0x%08x\n", mci_readl(host, INTMASK));
-+	seq_printf(s, "CLKENA:\t0x%08x\n", mci_readl(host, CLKENA));
+ #define DW_MCI_FREQ_MAX	200000000	/* unit: HZ */
+-#define DW_MCI_FREQ_MIN	400000		/* unit: HZ */
++#define DW_MCI_FREQ_MIN	100000		/* unit: HZ */
  
- 	return 0;
- }
+ #define IDMAC_INT_CLR		(SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI | \
+ 				 SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU | \
 -- 
 2.10.1
