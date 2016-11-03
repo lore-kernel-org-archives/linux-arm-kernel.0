@@ -1,30 +1,73 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 03 Nov 2016 15:32:13 +0100
-Subject: [PATCH] clk: rockchip: fix some clocks' name to be more standard
- style
-In-Reply-To: <763cad68-a068-9a4b-e26d-2c459c2d4808@rock-chips.com>
-References: <1478070296-23080-1-git-send-email-jay.xu@rock-chips.com>
- <763cad68-a068-9a4b-e26d-2c459c2d4808@rock-chips.com>
-Message-ID: <44798035.VNVnDcOLnj@diego>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 3 Nov 2016 14:39:23 +0000
+Subject: [PATCHv3 1/4] dt-bindings: mfd: Add Altera Arria10 SR Monitor
+In-Reply-To: <1478097178-24341-2-git-send-email-tthayer@opensource.altera.com>
+References: <1478097178-24341-1-git-send-email-tthayer@opensource.altera.com>
+ <1478097178-24341-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20161103143923.GZ13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 3. November 2016, 16:52:48 schrieb Shawn Lin:
-> On 2016/11/2 15:04, Jianqun Xu wrote:
-> > Fix aclk_emmcgrf to aclk_emmc_grf, and fix aclk_emmccore to be
-> > aclk_emmc_core.
+On Wed, 02 Nov 2016, tthayer at opensource.altera.com wrote:
+
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> What is the standard style should be?
+> Add the Arria10 DevKit System Resource Chip register and state
+> monitoring module to the MFD.
 > 
-> TRM uses aclk_emmccore but not aclk_emmc_core, so should it be more
-> standrad to keep it as-is?
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> Note: This needs to be applied to the bindings document that
+> was Acked & Applied but didn't reach the for-next branch.
+> See https://patchwork.ozlabs.org/patch/629397/
+> ---
+> v2  Change compatible string -mon to -monitor for clarity
+> v3  Replace node name a10sr_monitor with just monitor.
+>     Replace node name a10sr_gpio with just gpio.
+> ---
+>  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 
-I tend to agree with Shawn. While it looks like the missing "_" is some sort 
-of mistake, we should strive to follow TRM naming, so grepping so it becomes 
-easier to look for informations in these things in the TRM.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Same reason for naming our regulators and pinctrl after the names used in 
-device schematics, if available.
+> diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> index ea151f2..69243d2 100644
+> --- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> +++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
+> @@ -17,7 +17,8 @@ The A10SR consists of these sub-devices:
+>  
+>  Device                   Description
+>  ------                   ----------
+> -a10sr_gpio               GPIO Controller
+> +gpio                     GPIO Controller
+> +monitor                  Register and State Monitoring
+>  
+>  Arria10 GPIO
+>  Required Properties:
+> @@ -27,6 +28,10 @@ Required Properties:
+>                        the second cell is used to specify flags.
+>                        See ../gpio/gpio.txt for more information.
+>  
+> +Arria10 Register and State Monitor
+> +Required Properties:
+> +- compatible        : Should be "altr,a10sr-monitor"
+> +
+>  Example:
+>  
+>          resource-manager at 0 {
+> @@ -43,4 +48,8 @@ Example:
+>  			gpio-controller;
+>  			#gpio-cells = <2>;
+>  		};
+> +
+> +		monitor {
+> +			compatible = "altr,a10sr-monitor";
+> +		};
+>  	};
 
-
-Heiko
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
