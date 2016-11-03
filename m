@@ -1,37 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 3 Nov 2016 16:22:04 +0000
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-In-Reply-To: <20161103161407.GR3541@8bytes.org>
-References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
- <20161103160006.GS22791@arm.com> <20161103161407.GR3541@8bytes.org>
-Message-ID: <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Nov 2016 17:26:45 +0100
+Subject: [PATCH] ASoC: sun4i-i2s: Implement capture support
+In-Reply-To: <20161103153218.fibbz7y7pqwqyo7r@sirena.org.uk>
+References: <20161103102048.17125-1-maxime.ripard@free-electrons.com>
+ <20161103153218.fibbz7y7pqwqyo7r@sirena.org.uk>
+Message-ID: <20161103162645.qrfrvp7hkawi5g4h@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/16 16:14, Joerg Roedel wrote:
-> On Thu, Nov 03, 2016 at 04:00:06PM +0000, Will Deacon wrote:
->> We're basically doing that already, since the bus_set_iommu call happens in
->> the probe routine, which won't run unless an SMMUv3 has been found in the
->> DT. The issue we're trying to avoid is failing the probe of a second SMMUv3
->> in the system, because the bus will already have the iommu ops set by the
->> first SMMUv3 that probed.
->>
->> I suppose we could go and compare bus->iommu_ops with &arm_smmu_ops, but
->> given that we can't support different IOMMU types on a single bus, I don't
->> think we gain anything from that.
+On Thu, Nov 03, 2016 at 09:32:18AM -0600, Mark Brown wrote:
+> On Thu, Nov 03, 2016 at 11:20:48AM +0100, Maxime Ripard wrote:
+> > The i2s driver was only implementing playback for now. Implement capture to
+> > make sure that's not a limitation anymore.
 > 
-> Can you instead check whether there is already another smmu probed and
-> skip the bus_set_iommu call then?
+> This doesn't apply against current code, please check and resend.
 
-But bus_set_iommu() is already checking whether another SMMU (in this
-case) has probed, by virtue of bus->iommu_ops being non-NULL, and
-returning without doing anything if so. What's the value of adding a
-whole  bunch more code to effectively duplicate that in a less elegant
-manner?
+Argh, yes, sorry.
 
-Robin.
+I'll send a new version.
 
-> 
-> 
-> 	Joerg
-> 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/4a5d247c/attachment-0001.sig>
