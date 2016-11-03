@@ -1,75 +1,124 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Thu,  3 Nov 2016 20:42:21 +0800
-Subject: [PATCH 5/6] ARM: add low level debug uart for rk1108
+Date: Thu,  3 Nov 2016 20:43:59 +0800
+Subject: [PATCH 6/6] ARM: dts: rockchip: add rockchip RK1108 Evaluation board
 In-Reply-To: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
 References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1478176941-12188-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1478177039-12257-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK1108 UARTs are Synopsis DesignWare 8250 compatible.
-Only with different register addresses.
+RK1108EVB is designed by Rockchip for CVR field.
+This patch add basic support for it, which can boot with
+initramfs into shell.
 
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 ---
 
- arch/arm/Kconfig.debug | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ Documentation/devicetree/bindings/arm/rockchip.txt |  3 +
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/rk1108-evb.dts                   | 69 ++++++++++++++++++++++
+ 3 files changed, 73 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d83f7c3..408540f 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -776,6 +776,30 @@ choice
- 		  their output to the standard serial port on the RealView
- 		  PB1176 platform.
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 10b92b5..8670181 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -1,5 +1,8 @@
+ Rockchip platforms device tree bindings
+ ---------------------------------------
++- Rockchip RK1108 Evaluation board
++    Required root node properties:
++      - compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
  
-+	config DEBUG_RK1108_UART0
-+		bool "Kernel low-level debugging messages via Rockchip RK1108 UART0"
-+		depends on ARCH_ROCKCHIP
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+                  on Rockchip RK1108 based platforms.
+ - Kylin RK3036 board:
+     Required root node properties:
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e49476a..249dca9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -635,6 +635,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pba8.dtb \
+ 	arm-realview-pbx-a9.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk1108-evb.dtb \
+ 	rk3036-evb.dtb \
+ 	rk3036-kylin.dtb \
+ 	rk3066a-bqcurie2.dtb \
+diff --git a/arch/arm/boot/dts/rk1108-evb.dts b/arch/arm/boot/dts/rk1108-evb.dts
+new file mode 100644
+index 0000000..3956cff
+--- /dev/null
++++ b/arch/arm/boot/dts/rk1108-evb.dts
+@@ -0,0 +1,69 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	config DEBUG_RK1108_UART1
-+		bool "Kernel low-level debugging messages via Rockchip RK1108 UART1"
-+		depends on ARCH_ROCKCHIP
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Rockchip RK1108 based platforms.
++/dts-v1/;
 +
-+	config DEBUG_RK1108_UART2
-+		bool "Kernel low-level debugging messages via Rockchip RK1108 UART2"
-+		depends on ARCH_ROCKCHIP
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on Rockchip RK1108 based platforms.
++#include "rk1108.dtsi"
 +
- 	config DEBUG_RK29_UART0
- 		bool "Kernel low-level debugging messages via Rockchip RK29 UART0"
- 		depends on ARCH_ROCKCHIP
-@@ -1465,6 +1489,9 @@ config DEBUG_UART_PHYS
- 	default 0x10126000 if DEBUG_RK3X_UART1
- 	default 0x101f1000 if DEBUG_VERSATILE
- 	default 0x101fb000 if DEBUG_NOMADIK_UART
-+	default 0x10210000 if DEBUG_RK1108_UART2
-+	default 0x10220000 if DEBUG_RK1108_UART1
-+	default 0x10230000 if DEBUG_RK1108_UART0
- 	default 0x11002000 if DEBUG_MT8127_UART0
- 	default 0x11006000 if DEBUG_MT6589_UART0
- 	default 0x11009000 if DEBUG_MT8135_UART3
-@@ -1563,6 +1590,9 @@ config DEBUG_UART_PHYS
- 
- config DEBUG_UART_VIRT
- 	hex "Virtual base address of debug UART"
-+	default 0xc881f000 if DEBUG_RK1108_UART2
-+	default 0xc8821000 if DEBUG_RK1108_UART1
-+	default 0xc8912000 if DEBUG_RK1108_UART0
- 	default 0xe0000a00 if DEBUG_NETX_UART
- 	default 0xe0010fe0 if ARCH_RPC
- 	default 0xf0000be0 if ARCH_EBSA110
++/ {
++	model = "Rockchip RK1108 Evaluation board";
++	compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
++
++	memory at 60000000 {
++		device_type = "memory";
++		reg = <0x60000000 0x08000000>;
++	};
++
++	chosen {
++		stdout-path = "serial2:1500000n8";
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
 -- 
 2.7.4
