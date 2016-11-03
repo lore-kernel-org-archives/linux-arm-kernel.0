@@ -1,77 +1,53 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 03 Nov 2016 15:39:04 +0900
-Subject: [PATCH v3 0/5] arm64: dts: Add the dts file for Exynos5433 and TM/TM2E
- board
-Message-ID: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 03 Nov 2016 15:39:06 +0900
+Subject: [PATCH v3 2/5] pinctrl: samsung: Add GPF support for Exynos5433
+In-Reply-To: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
+References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1478155149-28527-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the Device Tree file for Samsung 64-bit Exynos5433 SoC
-and TM/TM2E board based on Exynos5433. The Exynos5433 has Octa-core CPUs
-(quad Cortex-A57 and quad Cortex-A53). The TM2 and TM2E are the Samsung board
-based on Exynos5433 SoC.
+This patch add the support of GPF[1-5] pin of Exynos5433 SoC. The GPFx need
+to support the multiple memory map because the registers of GPFx are located
+in the different domain.
 
-I tested the display controller by using the modetest tool.
-But, Samsung s6e3ha2 panel driver has not yet posted. So, the TM2 dts file
-don't include the panel Device Tree node. I'll post the s6e3ha2 panel driver
-on separate patch with a dt patch.
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-gpio at vger.kernel.org
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Changes from v2:
-(https://lkml.org/lkml/2016/8/24/426)
-- Add new pctl_base and eint_base instead of virt_base on patch1.
-- Modify the documentation of pinctrl-samsung.txt on patch1.
-- Modify the cooling level for big.LITTLE cores.
-- Use the GIC_SPI definition on dtsi file.
-- Removes the unneeded 'regulator-always-on' property.
-- Fix the kbuild report of the compatible string for TM2/TM2E patches.
-- Two patches(exynos-mct, exynos5433-pmu) were merged.
-- Add the reviewed-by tag of Javier Martinez Canillas on patch3/4/5
-- Add the reviewed-by tag of Krzysztof Kozlowski on patch4/5
-- Add the acked-by tag of Rob Herring on patch5
-- Fix the minor issues.
-
-Changes from v1:
-(https://lkml.org/lkml/2016/8/16/61)
-- Merge the cpufreq patch for exynos5433[3] on PM/cpufreq tree.
-- Add new patch to support the multiple IORESOURCE_MAP for samsung pinctrl driver.
-- Drop the SYSMMU Device-Tree node which will be posted by Marek Szyprowski.
-- Fix the code clean issue by Krzysztof Kozlowski and Rob Herring's comment.
-- Delete the unnecessary alias from exynos5433-tm2.dts.
-- Expand the range of cooling level of CPU device.
-- Update the binding method of 'Exynos5433 audio subsystem'
-
-Depends on:
-This patchset are based on v4.9-rc3.
-
-Chanwoo Choi (5):
-  pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank
-  pinctrl: samsung: Add GPF support for Exynos5433
-  arm64: dts: exynos: Add dts files for Samsung Exynos5433 64bit SoC
-  arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board
-  arm64: dts: exynos: Add dts file for Exynos5433-based TM2E board
-
- .../bindings/arm/samsung/samsung-boards.txt        |    2 +
- .../bindings/pinctrl/samsung-pinctrl.txt           |   19 +
- arch/arm64/boot/dts/exynos/Makefile                |    5 +-
- arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  794 ++++++++++++
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  974 ++++++++++++++
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |   41 +
- .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |   23 +
- .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |   22 +
- arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     |  296 +++++
- arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1356 ++++++++++++++++++++
- drivers/pinctrl/samsung/pinctrl-exynos.c           |   45 +-
- drivers/pinctrl/samsung/pinctrl-exynos.h           |   11 +
- drivers/pinctrl/samsung/pinctrl-samsung.c          |   40 +-
- drivers/pinctrl/samsung/pinctrl-samsung.h          |   10 +-
- 14 files changed, 3598 insertions(+), 40 deletions(-)
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
- create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
-
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index d657b52dfdb5..12f7d1eb65bc 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -1339,6 +1339,11 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x060, "gpa3", 0x0c),
++	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x020, "gpf1", 0x1004, 1),
++	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x040, "gpf2", 0x1008, 1),
++	EXYNOS_PIN_BANK_EINTW_EXT(4, 0x060, "gpf3", 0x100c, 1),
++	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x080, "gpf4", 0x1010, 1),
++	EXYNOS_PIN_BANK_EINTW_EXT(8, 0x0a0, "gpf5", 0x1014, 1),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - AUD */
+@@ -1420,6 +1425,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 		.eint_wkup_init = exynos_eint_wkup_init,
+ 		.suspend	= exynos_pinctrl_suspend,
+ 		.resume		= exynos_pinctrl_resume,
++		.nr_ext_resources = 1,
+ 	}, {
+ 		/* pin-controller instance 1 data */
+ 		.pin_banks	= exynos5433_pin_banks1,
 -- 
 1.9.1
