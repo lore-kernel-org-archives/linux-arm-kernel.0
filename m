@@ -1,218 +1,110 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu,  3 Nov 2016 15:27:28 -0600
-Subject: [RFC] fpga mgr: Introduce FPGA capabilities
-Message-ID: <20161103212728.9908-1-moritz.fischer@ettus.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 3 Nov 2016 14:37:03 -0700
+Subject: [PATCH v10 01/11] remoteproc: st_slim_rproc: add a slimcore
+ rproc driver
+In-Reply-To: <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
+References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+ <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20161103213703.GA15449@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FPGA capabilities as a way to express the capabilities
-of a given FPGA manager.
+On Tue 18 Oct 02:39 PDT 2016, Peter Griffin wrote:
 
-Removes code duplication by comparing the low-level driver's
-capabilities at the framework level rather than having each driver
-check for supported operations in the write_init() callback.
+> slim core is used as a basis for many IPs in the STi
+> chipsets such as fdma and demux. To avoid duplicating
+> the elf loading code in each device driver a slim
+> rproc driver has been created.
+> 
+> This driver is designed to be used by other device drivers
+> such as fdma, or demux whose IP is based around a slim core.
+> The device driver can call slim_rproc_alloc() to allocate
+> a slim rproc and slim_rproc_put() when finished.
+> 
+> This driver takes care of ioremapping the slim
+> registers (dmem, imem, slimcore, peripherals), whose offsets
+> and sizes can change between IP's. It also obtains and enables
+> any clocks used by the device. This approach avoids having
+> a double mapping of the registers as slim_rproc does not register
+> its own platform device. It also maps well to device tree
+> abstraction as it allows us to have one dt node for the whole
+> device.
+> 
+> All of the generic rproc elf loading code can be reused, and
+> we provide start() stop() hooks to start and stop the slim
+> core once the firmware has been loaded. This has been tested
+> successfully with fdma driver.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/remoteproc/Kconfig               |   7 +-
+>  drivers/remoteproc/Makefile              |   1 +
+>  drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
+>  include/linux/remoteproc/st_slim_rproc.h |  58 +++++
+>  4 files changed, 428 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/remoteproc/st_slim_rproc.c
+>  create mode 100644 include/linux/remoteproc/st_slim_rproc.h
+> 
+> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> index f396bfe..9270c8e 100644
+> --- a/drivers/remoteproc/Kconfig
+> +++ b/drivers/remoteproc/Kconfig
+> @@ -58,7 +58,6 @@ config DA8XX_REMOTEPROC
+>  	tristate "DA8xx/OMAP-L13x remoteproc support"
+>  	depends on ARCH_DAVINCI_DA8XX
+>  	select CMA if MMU
+> -	select REMOTEPROC
 
-This allows for extending with additional capabilities, similar
-to the the dmaengine framework's implementation.
+No, this is an unrelated change to this patch.
 
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-Cc: Alan Tull <atull@opensource.altera.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
-Hi all,
+>  	select RPMSG_VIRTIO
+>  	help
+>  	  Say y here to support DA8xx/OMAP-L13x remote processors via the
+> @@ -99,10 +98,10 @@ config QCOM_WCNSS_PIL
+>  	tristate "Qualcomm WCNSS Peripheral Image Loader"
+>  	depends on OF && ARCH_QCOM
+>  	depends on QCOM_SMEM
+> +	depends on REMOTEPROC
+>  	select QCOM_MDT_LOADER
+>  	select QCOM_SCM
+>  	select QCOM_WCNSS_IRIS
+> -	select REMOTEPROC
 
-this is another RFC (this one is against mainline) implementing
-fpga capabilities to centralize the checks for different operations.
+Dito.
 
-If we agree this is the way forward, I'll rebase it on top of Alan's
-series once that went in (and add potential drivers we added by then.
 
-Cheers,
+As you now make changes to the entire remoteproc Kconfig file, rather
+than simply add a Kconfig symbol we can't bring this in via Vinod's tree
+without providing Linus with a messy merge conflict.
 
-Moritz
+So the remoteproc parts now has to go through my tree.
 
-PS: I'm not sure if the checkpatch warning is a false positive ...
----
- drivers/fpga/fpga-mgr.c       | 14 +++++++++++++
- drivers/fpga/socfpga.c        | 10 +++++-----
- drivers/fpga/zynq-fpga.c      |  7 ++++++-
- include/linux/fpga/fpga-mgr.h | 46 ++++++++++++++++++++++++++++++++++++++++++-
- 4 files changed, 70 insertions(+), 7 deletions(-)
+>  	help
+>  	  Say y here to support the Peripheral Image Loader for the Qualcomm
+>  	  Wireless Connectivity Subsystem.
+> @@ -116,4 +115,8 @@ config ST_REMOTEPROC
+>  	  processor framework.
+>  	  This can be either built-in or a loadable module.
+>  
+> +config ST_SLIM_REMOTEPROC
+> +	tristate
+> +	select REMOTEPROC
+> +
+>  endmenu
+[..]
+> diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+[..]
+> +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
+> +				char *fw_name)
+> +{
+[..]
+> +	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
+> +			fw_name, sizeof(*slim_rproc));
+[..]
+> +	rproc_put(rproc);
 
-diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-index 953dc91..21c508a 100644
---- a/drivers/fpga/fpga-mgr.c
-+++ b/drivers/fpga/fpga-mgr.c
-@@ -49,6 +49,18 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
- 	struct device *dev = &mgr->dev;
- 	int ret;
- 
-+	if (flags & FPGA_MGR_PARTIAL_RECONFIG &&
-+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_PARTIAL_RECONF, mgr->caps)) {
-+		dev_err(dev, "Partial reconfiguration not supported\n");
-+		return -ENOTSUPP;
-+	}
-+
-+	if (flags & FPGA_MGR_FULL_RECONFIG &&
-+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_FULL_RECONF, mgr->caps)) {
-+		dev_err(dev, "Full reconfiguration not supported\n");
-+		return -ENOTSUPP;
-+	}
-+
- 	/*
- 	 * Call the low level driver's write_init function.  This will do the
- 	 * device-specific things to get the FPGA into the state where it is
-@@ -245,12 +257,14 @@ EXPORT_SYMBOL_GPL(fpga_mgr_put);
-  * @dev:	fpga manager device from pdev
-  * @name:	fpga manager name
-  * @mops:	pointer to structure of fpga manager ops
-+ * @caps:	fpga manager capabilites
-  * @priv:	fpga manager private data
-  *
-  * Return: 0 on success, negative error code otherwise.
-  */
- int fpga_mgr_register(struct device *dev, const char *name,
- 		      const struct fpga_manager_ops *mops,
-+		      fpga_mgr_cap_mask_t caps,
- 		      void *priv)
- {
- 	struct fpga_manager *mgr;
-diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
-index 27d2ff2..fd9760c 100644
---- a/drivers/fpga/socfpga.c
-+++ b/drivers/fpga/socfpga.c
-@@ -413,10 +413,6 @@ static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
- 	struct socfpga_fpga_priv *priv = mgr->priv;
- 	int ret;
- 
--	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
--		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
--		return -EINVAL;
--	}
- 	/* Steps 1 - 5: Reset the FPGA */
- 	ret = socfpga_fpga_reset(mgr);
- 	if (ret)
-@@ -555,6 +551,7 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct socfpga_fpga_priv *priv;
- 	struct resource *res;
-+	fpga_mgr_cap_mask_t caps;
- 	int ret;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-@@ -580,8 +577,11 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	fpga_mgr_cap_zero(&caps);
-+	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
-+
- 	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
--				 &socfpga_fpga_ops, priv);
-+				 &socfpga_fpga_ops, caps, priv);
- }
- 
- static int socfpga_fpga_remove(struct platform_device *pdev)
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index c2fb412..1d37ff0 100644
---- a/drivers/fpga/zynq-fpga.c
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -410,6 +410,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct zynq_fpga_priv *priv;
- 	struct resource *res;
-+	fpga_mgr_cap_mask_t caps;
- 	int err;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-@@ -461,9 +462,13 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
- 
- 	clk_disable(priv->clk);
-+	fpga_mgr_cap_zero(&caps);
-+	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
-+	fpga_mgr_cap_set(FPGA_MGR_CAP_PARTIAL_RECONF, caps);
-+
- 
- 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
--				&zynq_fpga_ops, priv);
-+				&zynq_fpga_ops, caps, priv);
- 	if (err) {
- 		dev_err(dev, "unable to register FPGA manager");
- 		clk_unprepare(priv->clk);
-diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-index 0940bf4..a0bf750 100644
---- a/include/linux/fpga/fpga-mgr.h
-+++ b/include/linux/fpga/fpga-mgr.h
-@@ -67,6 +67,47 @@ enum fpga_mgr_states {
-  * FPGA_MGR_PARTIAL_RECONFIG: do partial reconfiguration if supported
-  */
- #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
-+#define FPGA_MGR_FULL_RECONFIG		BIT(1)
-+
-+enum fpga_manager_capability {
-+	FPGA_MGR_CAP_PARTIAL_RECONF,
-+	FPGA_MGR_CAP_FULL_RECONF,
-+
-+/* last capability type for creation of the capabilities mask */
-+	FPGA_MGR_CAP_END,
-+};
-+
-+typedef struct { DECLARE_BITMAP(bits, FPGA_MGR_CAP_END); } fpga_mgr_cap_mask_t;
-+
-+#define fpga_mgr_has_cap(cap, mask) __fpga_mgr_has_cap((cap), &(mask))
-+static inline int __fpga_mgr_has_cap(enum fpga_manager_capability cap,
-+				     fpga_mgr_cap_mask_t *mask)
-+{
-+	return test_bit(cap, mask->bits);
-+}
-+
-+#define fpga_mgr_cap_zero(mask) __fpga_mgr_cap_zero(mask)
-+static inline void __fpga_mgr_cap_zero(fpga_mgr_cap_mask_t *mask)
-+{
-+	bitmap_zero(mask->bits, FPGA_MGR_CAP_END);
-+}
-+
-+#define fpga_mgr_cap_clear(cap, mask) __fpga_mgr_cap_clear((cap), &(mask))
-+static inline void __fpga_mgr_cap_clear(enum fpga_manager_capability cap,
-+				       fpga_mgr_cap_mask_t *mask)
-+
-+{
-+	clear_bit(cap, mask->bits);
-+}
-+
-+#define fpga_mgr_cap_set(cap, mask) __fpga_mgr_cap_set((cap), &(mask))
-+static inline void __fpga_mgr_cap_set(enum fpga_manager_capability cap,
-+				      fpga_mgr_cap_mask_t *mask)
-+
-+{
-+	set_bit(cap, mask->bits);
-+}
-+
- 
- /**
-  * struct fpga_manager_ops - ops for low level fpga manager drivers
-@@ -105,6 +146,7 @@ struct fpga_manager {
- 	enum fpga_mgr_states state;
- 	const struct fpga_manager_ops *mops;
- 	void *priv;
-+	fpga_mgr_cap_mask_t caps;
- };
- 
- #define to_fpga_manager(d) container_of(d, struct fpga_manager, dev)
-@@ -120,7 +162,9 @@ struct fpga_manager *of_fpga_mgr_get(struct device_node *node);
- void fpga_mgr_put(struct fpga_manager *mgr);
- 
- int fpga_mgr_register(struct device *dev, const char *name,
--		      const struct fpga_manager_ops *mops, void *priv);
-+		      const struct fpga_manager_ops *mops,
-+		      fpga_mgr_cap_mask_t caps,
-+		      void *priv);
- 
- void fpga_mgr_unregister(struct device *dev);
- 
--- 
-2.10.0
+As of v4.9 you need to rproc_free() rather than rproc_put() to undo
+rproc_alloc().
+
+Regards,
+Bjorn
