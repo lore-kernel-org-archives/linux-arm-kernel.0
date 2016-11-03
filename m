@@ -1,31 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 3 Nov 2016 16:00:06 +0000
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-In-Reply-To: <20161103153303.GA837@8bytes.org>
-References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
-Message-ID: <20161103160006.GS22791@arm.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Thu,  3 Nov 2016 17:03:05 +0100
+Subject: [PATCH v2 0/3] davinci: ohci: fix usb ohci device name
+Message-ID: <20161103160308.29588-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+The usb ohci clock match is not working because the usb clock
+is registered as "ohci" instead of "ohci.0"
 
-On Thu, Nov 03, 2016 at 09:33:04AM -0600, Joerg Roedel wrote:
-> On Fri, Oct 28, 2016 at 05:01:48PM +0100, Will Deacon wrote:
-> >       iommu/arm-smmu: Don't inadvertently reject multiple SMMUv3s
-> 
-> Hmm, this patch is pretty ugly. Wouldn't it be better to have
-> hardware-independent init-routine in the arm-smmu-v3 driver that checks
-> DT whether there is an SMMU at all and if yes, sets the per-bus
-> iommu-ops?
+But since there is only a single ohci instance, lets pass -1 to
+the platform data id parameter and avoid the extra ".0" matching.
 
-We're basically doing that already, since the bus_set_iommu call happens in
-the probe routine, which won't run unless an SMMUv3 has been found in the
-DT. The issue we're trying to avoid is failing the probe of a second SMMUv3
-in the system, because the bus will already have the iommu ops set by the
-first SMMUv3 that probed.
+while we are fixing this, rename the driver from "ohci" to
+"ohci-da8xx" which  is less generic and consistent with other
+usb drivers.
 
-I suppose we could go and compare bus->iommu_ops with &arm_smmu_ops, but
-given that we can't support different IOMMU types on a single bus, I don't
-think we gain anything from that.
+changes form v1 -> v2
+*Reword commit messages (David Lechner)
 
-Will
+Because of the recently accepted patches on the ARM-davinci side,
+This patch series is based on:
+branch: /v4.10/soc of the linux-davinci tree.
+
+It Depends on two accepted usb patches missing on that branch:
+6c21caa USB: OHCI: make ohci-da8xx a separate driver (in next-usb)
+6110c42 usb: ohci-da8xx: Remove code that references mach (in linux-next)
+
+A branch with both patches applied + this series can be found here:
+https://github.com/axelhaslamx/linux-axel/commits/ti-davinci-ohci-rename
+
+
+Axel Haslam (3):
+  ARM: davinci: da8xx: Fix ohci device name
+  phy: da8xx-usb: rename the ohci device to ohci-da8xx
+  usb: ohci-da8xx: rename driver to ohci-da8xx
+
+ arch/arm/mach-davinci/da830.c     | 2 +-
+ arch/arm/mach-davinci/da850.c     | 2 +-
+ arch/arm/mach-davinci/da8xx-dt.c  | 2 +-
+ arch/arm/mach-davinci/usb-da8xx.c | 4 ++--
+ drivers/phy/phy-da8xx-usb.c       | 5 +++--
+ drivers/usb/host/ohci-da8xx.c     | 2 +-
+ 6 files changed, 9 insertions(+), 8 deletions(-)
+
+-- 
+2.10.1
