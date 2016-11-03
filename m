@@ -1,72 +1,77 @@
 From: abailon@baylibre.com (Alexandre Bailon)
-Date: Thu,  3 Nov 2016 16:59:09 +0100
-Subject: [PATCH v4 1/4] dt/bindings: Add binding for the DA8xx MUSB driver
+Date: Thu,  3 Nov 2016 16:59:10 +0100
+Subject: [PATCH v4 2/4] usb: musb: core: added helper function for parsing DT
 In-Reply-To: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
 References: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
-Message-ID: <1478188752-22447-2-git-send-email-abailon@baylibre.com>
+Message-ID: <1478188752-22447-3-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Petr Kulhavy <petr@barix.com>
 
-DT binding for the TI DA8xx/OMAP-L1x/AM17xx/AM18xx MUSB driver.
+This adds the function musb_get_mode() to get the DT property "dr_mode"
 
 Signed-off-by: Petr Kulhavy <petr@barix.com>
+Acked-by: Sergei Shtylyov <sshtylyov@ru.mvista.com>
 Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Tested-by: David Lechner <david@lechnology.com>
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 ---
- .../devicetree/bindings/usb/da8xx-usb.txt          | 43 ++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/da8xx-usb.txt
+ drivers/usb/musb/musb_core.c | 19 +++++++++++++++++++
+ drivers/usb/musb/musb_core.h |  6 ++++++
+ 2 files changed, 25 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/da8xx-usb.txt b/Documentation/devicetree/bindings/usb/da8xx-usb.txt
-new file mode 100644
-index 0000000..ccb844a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/da8xx-usb.txt
-@@ -0,0 +1,43 @@
-+TI DA8xx MUSB
-+~~~~~~~~~~~~~
-+For DA8xx/OMAP-L1x/AM17xx/AM18xx platforms.
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 27dadc0..bba07e7 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -100,6 +100,7 @@
+ #include <linux/io.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/usb.h>
++#include <linux/usb/of.h>
+ 
+ #include "musb_core.h"
+ #include "musb_trace.h"
+@@ -130,6 +131,24 @@ static inline struct musb *dev_to_musb(struct device *dev)
+ 	return dev_get_drvdata(dev);
+ }
+ 
++enum musb_mode musb_get_mode(struct device *dev)
++{
++	enum usb_dr_mode mode;
 +
-+Required properties:
-+~~~~~~~~~~~~~~~~~~~~
-+ - compatible : Should be set to "ti,da830-musb".
++	mode = usb_get_dr_mode(dev);
++	switch (mode) {
++	case USB_DR_MODE_HOST:
++		return MUSB_HOST;
++	case USB_DR_MODE_PERIPHERAL:
++		return MUSB_PERIPHERAL;
++	case USB_DR_MODE_OTG:
++	case USB_DR_MODE_UNKNOWN:
++	default:
++		return MUSB_OTG;
++	}
++}
++EXPORT_SYMBOL_GPL(musb_get_mode);
 +
-+ - reg: Offset and length of the USB controller register set.
+ /*-------------------------------------------------------------------------*/
+ 
+ #ifndef CONFIG_BLACKFIN
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 2cb88a49..76f00f6 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -617,4 +617,10 @@ static inline void musb_platform_post_root_reset_end(struct musb *musb)
+ 		musb->ops->post_root_reset_end(musb);
+ }
+ 
++/*
++ * gets the "dr_mode" property from DT and converts it into musb_mode
++ * if the property is not found or not recognized returns MUSB_OTG
++ */
++extern enum musb_mode musb_get_mode(struct device *dev);
 +
-+ - interrupts: The USB interrupt number.
-+
-+ - interrupt-names: Should be set to "mc".
-+
-+ - dr_mode: The USB operation mode. Should be one of "host", "peripheral" or "otg".
-+
-+ - phys: Phandle for the PHY device
-+
-+ - phy-names: Should be "usb-phy"
-+
-+Optional properties:
-+~~~~~~~~~~~~~~~~~~~~
-+ - vbus-supply: Phandle to a regulator providing the USB bus power.
-+
-+Example:
-+	usb_phy: usb-phy {
-+		compatible = "ti,da830-usb-phy";
-+		#phy-cells = <0>;
-+		status = "okay";
-+	};
-+	usb0: usb at 200000 {
-+		compatible = "ti,da830-musb";
-+		reg =   <0x00200000 0x10000>;
-+		interrupts = <58>;
-+		interrupt-names = "mc";
-+
-+		dr_mode = "host";
-+		vbus-supply = <&usb_vbus>;
-+		phys = <&usb_phy 0>;
-+		phy-names = "usb-phy";
-+
-+		status = "okay";
-+	};
+ #endif	/* __MUSB_CORE_H__ */
 -- 
 2.7.3
