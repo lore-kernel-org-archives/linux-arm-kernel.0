@@ -1,40 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 3 Nov 2016 20:11:12 +0100
-Subject: [PATCH] at91sam9g20.dtsi: set correct USB clock divisors
-In-Reply-To: <1477503811-32697-1-git-send-email-yurovsky@gmail.com>
-References: <1477503811-32697-1-git-send-email-yurovsky@gmail.com>
-Message-ID: <20161103191112.abdqmf7tgmrhsgle@piout.net>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 3 Nov 2016 21:12:46 +0200
+Subject: [PATCH v3 1/5] pinctrl: samsung: Add the support the multiple
+ IORESOURCE_MEM for one pin-bank
+In-Reply-To: <1478155149-28527-2-git-send-email-cw00.choi@samsung.com>
+References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
+ <1478155149-28527-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20161103191246.GA12945@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/2016 at 10:43:31 -0700, Andrey Yurovsky wrote :
-> The AT91SAM9G20 has different clock divisors from the otherwise similar
-> AT91SAM9260. Set them in at91sam9g20.dtsi so that all AT91SAM9G20 users set up
-> the USB host controller clocks correctly.
+On Thu, Nov 03, 2016 at 03:39:05PM +0900, Chanwoo Choi wrote:
+> This patch supports the multiple IORESOURCE_MEM resources for one pin-bank.
+> In the pre-existing Exynos series, the registers of the gpio bank are included
+> in the one memory map. But, some gpio bank need to support the one more memory
+> map (IORESOURCE_MEM) because the registers of gpio bank are separated into
+> the different memory map.
 > 
-> Signed-off-by: Andrey Yurovsky <yurovsky@gmail.com>
+> For example,
+> The both ALIVE and IMEM domain have the different memory base address.
+> The GFP[1-5] of exynos5433 are composed as following:
+> - ALIVE domain : WEINT_* registers
+> - IMEM domain  : CON/DAT/PUD/DRV/CONPDN/PUDPDN register
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-gpio at vger.kernel.org
+> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  arch/arm/boot/dts/at91sam9g20.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+>  .../bindings/pinctrl/samsung-pinctrl.txt           | 19 ++++++++++
+>  drivers/pinctrl/samsung/pinctrl-exynos.c           | 39 +++++++++------------
+>  drivers/pinctrl/samsung/pinctrl-exynos.h           | 11 ++++++
+>  drivers/pinctrl/samsung/pinctrl-samsung.c          | 40 ++++++++++++++--------
+>  drivers/pinctrl/samsung/pinctrl-samsung.h          | 10 ++++--
+>  5 files changed, 80 insertions(+), 39 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9g20.dtsi b/arch/arm/boot/dts/at91sam9g20.dtsi
-> index f593016..6c4488c 100644
-> --- a/arch/arm/boot/dts/at91sam9g20.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20.dtsi
-> @@ -62,6 +62,10 @@
->  					atmel,clk-output-range = <0 133000000>;
->  					atmel,clk-divisors = <1 2 4 6>;
->  				};
-> +
-> +				usb: usbck {
-> +					atmel,clk-divisors = <4 2 0 0>;
-> +				};
 
-Actually, I had a look at the datasheet and it still says the divisors
-are 1, 2 and 4. There are existing board using USB and those divisors.
-Can someone at Atmel confirm?
+Hi,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Best regards,
+Krzysztof
