@@ -1,83 +1,49 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 3 Nov 2016 15:16:54 +0100
-Subject: [PATCH v2] iio: adc: at91: add suspend and resume callback
-In-Reply-To: <1478078508-24541-1-git-send-email-wenyou.yang@atmel.com>
-References: <1478078508-24541-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20161103141654.7oitq25gxqcy7qna@rfolt0960.corp.atmel.com>
+From: adouglas@cadence.com (Alan Douglas)
+Date: Thu, 3 Nov 2016 14:24:15 +0000
+Subject: Use of GICv3/ITS with PCIe host-generic driver - resizing ITS
+ MAPD?
+In-Reply-To: <8637j9iomo.fsf@arm.com>
+References: <CY1PR07MB2506C5C771B446139A743B99D8A10@CY1PR07MB2506.namprd07.prod.outlook.com>
+ <861syvkqcr.fsf@arm.com>
+ <CY1PR07MB2506C9B4133B1CE185AD0260D8A00@CY1PR07MB2506.namprd07.prod.outlook.com>
+ <8637j9iomo.fsf@arm.com>
+Message-ID: <CY1PR07MB250619340531C246B8A87767D8A30@CY1PR07MB2506.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 05:21:48PM +0800, Wenyou Yang wrote:
-> Add suspend/resume callback, support the pinctrl sleep state when
-> the system suspend as well.
+Hi Marc,
+> >> > When setting up bus 0, the ITS device is created, and
+> >> > its_build_map_cmd() sets the size of the ITS MAPD based on the
+> >> > number of interrupts claimed by bus 0.  When subsequent buses are
+> >> > enumerated, the ITS device will be reused, however we do not
+> >> > increase the number of supported interrupts to allow for the
+> >> > additional interrupts claimed by the additional devices being
+> >> > enumerated.  (This can be seen in its_msi_prepare(), which is
+> >> > called for each device which has MSI/MSI-X enabled, and will reuse
+> >> > an existing ITS. )
+> >>
+> >> Am I right in understanding that all the PCIe devices in your system
+> >> end-up aliasing to the same RequesterID? If so, that's a major issue.
+> >> The ITS is designed so that each device exposes its *own* RID, and
+> >> have its own Interrupt Translation Table (ITT).
+> >>
+> >> In your case, you seem to first discover the root port, which is not
+> >> upstream of anything, so it doesn't alias with anything at that
+> >> point. We allocate the corresponding ITT, and it's all fine. Until we
+> >> start probing the rest, and ugly things happen.
+> >>
+> > Yes, your understanding is correct.  I will dig into this a bit
+> > further to see what is wrong then send an update.  I suspect my DTS
+> > msi mapping.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Right. That would explain a lot of what you're seeing. In general, and unless
+> you have some funky remapping going on, you're better off having a very
+> straightforward msi-map property in your RC node (such as example
+> #1 in Documentation/devicetree/bindings/pci/pci-msi.txt).
+The problem was that I had an msi-map-mask specified such that all
+requester IDs were seen as zero.  Now fixed that and checked that the
+requester ID for each device is being correctly provided by HW to the GIC, 
+and all is now working correctly with without any patches required.
+Thanks for your help.
 
-Thanks
-
-> ---
-> 
-> Changes in v2:
->  - Use CONFIG_PM_SLEEP.
->  - Use SIMPLE_DEV_PM_OPS macro.
-> 
->  drivers/iio/adc/at91_adc.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/iio/adc/at91_adc.c b/drivers/iio/adc/at91_adc.c
-> index bbdac07..34b928c 100644
-> --- a/drivers/iio/adc/at91_adc.c
-> +++ b/drivers/iio/adc/at91_adc.c
-> @@ -30,6 +30,7 @@
->  #include <linux/iio/trigger.h>
->  #include <linux/iio/trigger_consumer.h>
->  #include <linux/iio/triggered_buffer.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  /* Registers */
->  #define AT91_ADC_CR		0x00		/* Control Register */
-> @@ -1347,6 +1348,32 @@ static int at91_adc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_PM_SLEEP
-> +static int at91_adc_suspend(struct device *dev)
-> +{
-> +	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-> +	struct at91_adc_state *st = iio_priv(idev);
-> +
-> +	pinctrl_pm_select_sleep_state(dev);
-> +	clk_disable_unprepare(st->clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int at91_adc_resume(struct device *dev)
-> +{
-> +	struct iio_dev *idev = platform_get_drvdata(to_platform_device(dev));
-> +	struct at91_adc_state *st = iio_priv(idev);
-> +
-> +	clk_prepare_enable(st->clk);
-> +	pinctrl_pm_select_default_state(dev);
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(at91_adc_pm_ops, at91_adc_suspend, at91_adc_resume);
-> +
->  static struct at91_adc_caps at91sam9260_caps = {
->  	.calc_startup_ticks = calc_startup_ticks_9260,
->  	.num_channels = 4,
-> @@ -1441,6 +1468,7 @@ static struct platform_driver at91_adc_driver = {
->  	.driver = {
->  		   .name = DRIVER_NAME,
->  		   .of_match_table = of_match_ptr(at91_adc_dt_ids),
-> +		   .pm = &at91_adc_pm_ops,
->  	},
->  };
->  
-> -- 
-> 2.7.4
-> 
+Alan
