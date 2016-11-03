@@ -1,215 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Nov 2016 09:15:16 +0100
-Subject: [PATCH v6 4/4] arm64: dts: add Pine64 support
-In-Reply-To: <83b8ff39-91f0-4e5c-61a5-e21f31c909ff@arm.com>
-References: <cover.6088b64645bde9b847d2fede5ecb15a0e204a9dd.1478123413.git-series.maxime.ripard@free-electrons.com>
- <45ddd059d22233c3e07852f4f71ee7ad7ed48542.1478123413.git-series.maxime.ripard@free-electrons.com>
- <83b8ff39-91f0-4e5c-61a5-e21f31c909ff@arm.com>
-Message-ID: <20161103081516.gvf4mdudarxtyxfj@lukather>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 03 Nov 2016 09:20:15 +0100
+Subject: [PATCH 09/13] mmc: dw_mmc: remove the "clock-freq-min-max"
+ property
+In-Reply-To: <20161103062135.10697-10-jh80.chung@samsung.com>
+References: <20161103062135.10697-1-jh80.chung@samsung.com>
+ <20161103062135.10697-10-jh80.chung@samsung.com>
+Message-ID: <20823767.hqlyMd1aKN@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 10:05:09PM +0000, Andr? Przywara wrote:
-> On 02/11/16 21:50, Maxime Ripard wrote:
-> > From: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > The Pine64 is a cost-efficient development board based on the
-> > Allwinner A64 SoC.
-> > There are three models: the basic version with Fast Ethernet and
-> > 512 MB of DRAM (Pine64) and two Pine64+ versions, which both
-> > feature Gigabit Ethernet and additional connectors for touchscreens
-> > and a camera. Or as my son put it: "Those are smaller and these are
-> > missing." ;-)
-> > The two Pine64+ models just differ in the amount of DRAM
-> > (1GB vs. 2GB). Since U-Boot will figure out the right size for us and
-> > patches the DT accordingly we just need to provide one DT for the
-> > Pine64+.
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > [Maxime: Removed the common DTSI and include directly the pine64 DTS]
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/Makefile                             |  1 +-
-> >  arch/arm64/boot/dts/allwinner/Makefile                   |  5 +-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 50 ++++++-
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 74 +++++++++-
-> >  4 files changed, 130 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm64/boot/dts/allwinner/Makefile
-> >  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> >  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > 
-> > diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> > index 6684f97c2722..080232b0270e 100644
-> > --- a/arch/arm64/boot/dts/Makefile
-> > +++ b/arch/arm64/boot/dts/Makefile
-> > @@ -1,4 +1,5 @@
-> >  dts-dirs += al
-> > +dts-dirs += allwinner
-> >  dts-dirs += altera
-> >  dts-dirs += amd
-> >  dts-dirs += amlogic
-> > diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> > new file mode 100644
-> > index 000000000000..1e29a5ae8282
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> > @@ -0,0 +1,5 @@
-> > +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-> > +
-> > +always		:= $(dtb-y)
-> > +subdir-y	:= $(dts-dirs)
-> > +clean-files	:= *.dtb
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> > new file mode 100644
-> > index 000000000000..790d14daaa6a
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
-> > @@ -0,0 +1,50 @@
-> > +/*
-> > + * Copyright (c) 2016 ARM Ltd.
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This library is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of the
-> > + *     License, or (at your option) any later version.
-> > + *
-> > + *     This library is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
-> > +
-> > +#include "sun50i-a64-pine64.dts"
-> > +
-> > +/ {
-> > +	model = "Pine64+";
-> > +	compatible = "pine64,pine64-plus", "allwinner,sun50i-a64";
-> > +
-> > +	/* TODO: Camera, Ethernet PHY, touchscreen, etc. */
-> > +};
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > new file mode 100644
-> > index 000000000000..9f127b3d0e33
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> > @@ -0,0 +1,74 @@
-> > +/*
-> > + * Copyright (c) 2016 ARM Ltd.
-> > + *
-> > + * This file is dual-licensed: you can use it either under the terms
-> > + * of the GPL or the X11 license, at your option. Note that this dual
-> > + * licensing only applies to this file, and not this project as a
-> > + * whole.
-> > + *
-> > + *  a) This library is free software; you can redistribute it and/or
-> > + *     modify it under the terms of the GNU General Public License as
-> > + *     published by the Free Software Foundation; either version 2 of the
-> > + *     License, or (at your option) any later version.
-> > + *
-> > + *     This library is distributed in the hope that it will be useful,
-> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + *     GNU General Public License for more details.
-> > + *
-> > + * Or, alternatively,
-> > + *
-> > + *  b) Permission is hereby granted, free of charge, to any person
-> > + *     obtaining a copy of this software and associated documentation
-> > + *     files (the "Software"), to deal in the Software without
-> > + *     restriction, including without limitation the rights to use,
-> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> > + *     sell copies of the Software, and to permit persons to whom the
-> > + *     Software is furnished to do so, subject to the following
-> > + *     conditions:
-> > + *
-> > + *     The above copyright notice and this permission notice shall be
-> > + *     included in all copies or substantial portions of the Software.
-> > + *
-> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> > + *     OTHER DEALINGS IN THE SOFTWARE.
-> > + */
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "sun50i-a64.dtsi"
-> > +
-> > +/ {
-> > +	model = "Pine64";
-> > +	compatible = "pine64,pine64", "allwinner,sun50i-a64";
-> > +
-> > +	aliases {
-> > +		serial0 = &uart0;
-> > +	};
-> > +
-> > +	chosen {
-> > +		stdout-path = "serial0:115200n8";
-> > +	};
-> > +};
-> > +
-> > +&uart0 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&uart0_pins_a>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&i2c1 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&i2c1_pins>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&i2c1_pins {
-> > +	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+Hi Jaehoon,
+
+Am Donnerstag, 3. November 2016, 15:21:31 schrieb Jaehoon Chung:
+> Remove the "clock-freq-min-max" property.
+> There is "max-frequency" property in drivers/mmc/core/host.c
+> It can be used for getting maximum frequency.
 > 
-> which should translate to:
-> 	bias-pull-up;
-> in the generic binding, right?
+> And minimum clock value is assigned to 100K by default.
+> Because MMC core should check the initial clock value from
+> 400K to 100K until finding correct value.
+> It's why Minimum value puts 100K by default.
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> ---
+>  Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt |  3 ---
+>  drivers/mmc/host/dw_mmc.c                                  | 13
+> ++++--------- 2 files changed, 4 insertions(+), 12 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt index
+> 4e00e85..21c8251 100644
+> --- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+> @@ -56,9 +56,6 @@ Optional properties:
+>    is specified and the ciu clock is specified then we'll try to set the ciu
+> clock to this at probe time.
+> 
+> -* clock-freq-min-max: Minimum and Maximum clock frequency for card output
+> -  clock(cclk_out). If it's not specified, max is 200MHZ and min is 400KHz
+> by default. -
 
-Fixed and applied, thanks!
-Maxime
+I'd think devicetree people will protest about simply removing this property 
+without deprecating it first - to be backwards compatible with old devicetrees.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/b004eabe/attachment.sig>
+Especially as this property was added already back in 2013, so has been in use 
+for quite some time.
+
+
+Heiko
