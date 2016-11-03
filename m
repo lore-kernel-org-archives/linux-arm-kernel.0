@@ -1,62 +1,112 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 3 Nov 2016 14:53:08 -0700
-Subject: [PATCH 2/3] ARM: dts: reference PM8058 as IRQ parent
-In-Reply-To: <1478164390-21613-2-git-send-email-linus.walleij@linaro.org>
-References: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
- <1478164390-21613-2-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20161103215308.GU25787@tuxbot>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 3 Nov 2016 15:53:47 -0600
+Subject: [RFC PATCH 1/3] ARM64: meson: Add Amlogic Meson GX PM Suspend
+In-Reply-To: <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
+References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
+ <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 03 Nov 02:13 PDT 2016, Linus Walleij wrote:
-
-> Some nodes are referencing the pm8058_gpio as IRQ parent, but
-> the HW IRQ offset they are supplying is actually that for the
-> parent to that controller: the PM8058 itself. Since that is the
-> proper parent, reference it directly.
+On Thu, Nov 03, 2016 at 03:29:23PM +0100, Neil Armstrong wrote:
+> The Amlogic Meson GX SoCs uses a non-standard argument to the
+> PSCI CPU_SUSPEND call to enter system suspend.
 > 
-> We can switch this to the pm8058_gpio and the proper offset
-> once we have fixed the SSBI GPIO driver to properly deal with
-> the hierarchical IRQ domain and get proper local offset
-> translation.
+> Implement such call within platform_suspend_ops.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  drivers/firmware/meson/Kconfig       |  6 +++
+>  drivers/firmware/meson/Makefile      |  1 +
+>  drivers/firmware/meson/meson_gx_pm.c | 86 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 93 insertions(+)
+>  create mode 100644 drivers/firmware/meson/meson_gx_pm.c
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> index 4a532ddab53a..ea660ffa03ea 100644
-> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-> @@ -369,8 +369,8 @@
->  				ak8975 at 0c {
->  					compatible = "asahi-kasei,ak8975";
->  					reg = <0x0c>;
-> -					/* GPIO33 has interrupt 224 on the PM8058 */
-> -					interrupt-parent = <&pm8058_gpio>;
-> +					/* FIXME: GPIO33 has interrupt 224 on the PM8058 */
-> +					interrupt-parent = <&pm8058>;
->  					interrupts = <224 IRQ_TYPE_EDGE_RISING>;
->  					pinctrl-names = "default";
->  					pinctrl-0 = <&dragon_ak8975_gpios>;
-> @@ -380,8 +380,8 @@
->  				bmp085 at 77 {
->  					compatible = "bosch,bmp085";
->  					reg = <0x77>;
-> -					/* GPIO16 has interrupt 207 on the PM8058 */
-> -					interrupt-parent = <&pm8058_gpio>;
-> +					/* FIXME: GPIO16 has interrupt 207 on the PM8058 */
-> +					interrupt-parent = <&pm8058>;
->  					interrupts = <207 IRQ_TYPE_EDGE_RISING>;
->  					reset-gpios = <&tlmm 86 GPIO_ACTIVE_LOW>;
->  					pinctrl-names = "default";
-> -- 
-> 2.7.4
-> 
+> diff --git a/drivers/firmware/meson/Kconfig b/drivers/firmware/meson/Kconfig
+> index 170d7e8..5b3fea3 100644
+> --- a/drivers/firmware/meson/Kconfig
+> +++ b/drivers/firmware/meson/Kconfig
+> @@ -7,3 +7,9 @@ config MESON_SM
+>  	depends on ARM64_4K_PAGES
+>  	help
+>  	  Say y here to enable the Amlogic secure monitor driver
+> +
+> +config MESON_GX_PM
+> +	bool
+> +	default ARCH_MESON if ARM64
+> +	help
+> +	  Say y here to enable the Amlogic GX SoC Power Management
+> diff --git a/drivers/firmware/meson/Makefile b/drivers/firmware/meson/Makefile
+> index 9ab3884..b6e285d 100644
+> --- a/drivers/firmware/meson/Makefile
+> +++ b/drivers/firmware/meson/Makefile
+> @@ -1 +1,2 @@
+>  obj-$(CONFIG_MESON_SM) +=	meson_sm.o
+> +obj-$(CONFIG_MESON_GX_PM) +=	meson_gx_pm.o
+> diff --git a/drivers/firmware/meson/meson_gx_pm.c b/drivers/firmware/meson/meson_gx_pm.c
+> new file mode 100644
+> index 0000000..c104c2e
+> --- /dev/null
+> +++ b/drivers/firmware/meson/meson_gx_pm.c
+> @@ -0,0 +1,86 @@
+> +/*
+> + * Amlogic Meson GX Power Management
+> + *
+> + * Copyright (c) 2016 Baylibre, SAS.
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of version 2 of the GNU General Public License as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/suspend.h>
+> +#include <linux/arm-smccc.h>
+> +
+> +#include <uapi/linux/psci.h>
+> +
+> +#include <asm/suspend.h>
+> +
+> +/*
+> + * The Amlogic GX SoCs uses a special argument value to the
+> + * PSCI CPU_SUSPEND method to enter SUSPEND_MEM.
+> + */
+> +
+> +#define MESON_SUSPEND_PARAM	0x0010000
+> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
+> +
+> +static int meson_gx_suspend_finish(unsigned long arg)
+> +{
+> +	struct arm_smccc_res res;
+> +
+> +	arm_smccc_smc(PSCI_FN_NATIVE(0_2, CPU_SUSPEND), arg,
+> +		      virt_to_phys(cpu_resume), 0, 0, 0, 0, 0, &res);
+> +
+> +	return res.a0;
+> +}
+> +
+> +static int meson_gx_suspend_enter(suspend_state_t state)
+> +{
+> +	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		return cpu_suspend(MESON_SUSPEND_PARAM,
+> +				   meson_gx_suspend_finish);
+
+Short response to this patch: NAK
+
+To be constructive, since this system lacks PSCI system suspend, it just
+can't support. Alternatively, this can be normal cpuidle state and you
+can use suspend to idle to achieve the same and you need not hack/work
+around using platform specific driver.
+
+--
+Regards,
+Sudeep
