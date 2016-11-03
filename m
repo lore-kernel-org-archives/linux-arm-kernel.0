@@ -1,39 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Nov 2016 15:51:07 +0000
-Subject: [PATCHv2 5/6] arm64: Use __pa_symbol for _end
-In-Reply-To: <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
-References: <20161102210054.16621-1-labbott@redhat.com>
- <20161102210054.16621-6-labbott@redhat.com>
- <20161102225241.GA19591@remoulade>
- <3724ea58-3c04-1248-8359-e2927da03aaf@redhat.com>
-Message-ID: <20161103155106.GF25852@remoulade>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 03 Nov 2016 16:55:45 +0100
+Subject: [PATCH 2/6] pinctrl: rockchip: add support for rk1108
+In-Reply-To: <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <3450255.c5nv6dGt3I@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 05:56:42PM -0600, Laura Abbott wrote:
-> On 11/02/2016 04:52 PM, Mark Rutland wrote:
-> >On Wed, Nov 02, 2016 at 03:00:53PM -0600, Laura Abbott wrote:
-> >>
-> >>__pa_symbol is technically the marco that should be used for kernel
-> >>symbols. Switch to this as a pre-requisite for DEBUG_VIRTUAL.
-> >
-> >Nit: s/marco/macro/
-> >
-> >I see there are some other uses of __pa() that look like they could/should be
-> >__pa_symbol(), e.g. in mark_rodata_ro().
-> >
-> >I guess strictly speaking those need to be updated to? Or is there a reason
-> >that we should not?
+Am Donnerstag, 3. November 2016, 20:34:30 schrieb Andy Yan:
+> Add basic support for rk1108 soc
 > 
-> If the concept of __pa_symbol is okay then yes I think all uses of __pa
-> should eventually be converted for consistency and debugging.
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-I have no strong feelings either way about __pa_symbol(); I'm not clear on what
-the purpose of __pa_symbol() is specifically, but I'm happy even if it's just
-for consistency with other architectures.
+nice when support for a new soc is that easy in a driver :-)
 
-However, if we use it I think that we should (attempt to) use it consistently
-from the outset. 
+There are two small issues below and with those fixed
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-Thanks,
-Mark.
+> ---
+> 
+>  drivers/pinctrl/pinctrl-rockchip.c | 27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+
+missing devicetree binding update for the new compatible
+
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> b/drivers/pinctrl/pinctrl-rockchip.c index 49bf7dc..9f324b1 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+
+[...]
+
+> +static struct rockchip_pin_ctrl rk1108_pin_ctrl = {
+> +	.pin_banks		= rk1108_pin_banks,
+> +	.nr_banks		= ARRAY_SIZE(rk1108_pin_banks),
+> +	.label			= "RK1108-GPIO",
+> +	.type			= RK1108,
+> +	.grf_mux_offset		= 0x10,
+> +	.pmu_mux_offset		= 0x0,
+> +	.pull_calc_reg          = rk3288_calc_pull_reg_and_bit,
+
+this last line has spaces instead of tabs between .pull_calc_reg and the "="
+
+
+Heiko
