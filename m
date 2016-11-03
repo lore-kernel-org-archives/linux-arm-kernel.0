@@ -1,36 +1,36 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 3 Nov 2016 16:48:44 +0530
-Subject: [GIT PULL] DaVinci fix for v4.9-rc
-Message-ID: <f57fbfde-89ff-fdac-2a04-e8a4788b4ee5@ti.com>
+Date: Thu, 3 Nov 2016 17:26:49 +0530
+Subject: [PATCH 3/3] usb: ohci-da8xx: rename driver to ohci-da8xx
+In-Reply-To: <20161102124435.31777-4-ahaslam@baylibre.com>
+References: <20161102124435.31777-1-ahaslam@baylibre.com>
+ <20161102124435.31777-4-ahaslam@baylibre.com>
+Message-ID: <a1b45345-ef63-ad6a-a755-57881355049d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit a909d3e636995ba7c349e2ca5dbb528154d4ac30:
+On Wednesday 02 November 2016 06:14 PM, Axel Haslam wrote:
+> To be consistent on the usb driver for the davinci
+> platform follow the example of musb, and add the
+> "-da8xx" postfix to the driver name.
+> 
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> ---
+>  drivers/usb/host/ohci-da8xx.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+> index bd6cf3c..b3de8bc 100644
+> --- a/drivers/usb/host/ohci-da8xx.c
+> +++ b/drivers/usb/host/ohci-da8xx.c
+> @@ -27,7 +27,7 @@
+>  #include "ohci.h"
+>  
+>  #define DRIVER_DESC "DA8XX"
+> -#define DRV_NAME "ohci"
+> +#define DRV_NAME "ohci-da8xx"
 
-  Linux 4.9-rc3 (2016-10-29 13:52:02 -0700)
+To which baseline does this patch apply? I don't see this code in
+linux-next.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.9
-
-for you to fetch changes up to 36173c2d023bad4dbad6ed0e6e886fde10ec8f2f:
-
-  ARM: davinci: da850: Fix pwm name matching (2016-11-01 15:30:03 +0530)
-
-----------------------------------------------------------------
-This patch enables usage of multiple eCAP and eHRPWM devices
-using PWM sysfs entries.
-
-Without this patch, creation of multiple entries fails due
-to name clash.
-
-This is not a v4.9 regression but it will be nice to fix it
-soon.
-
-----------------------------------------------------------------
-David Lechner (1):
-      ARM: davinci: da850: Fix pwm name matching
-
- arch/arm/mach-davinci/da850.c    | 48 +++++++++++++++++++++++++++++++++++++---
- arch/arm/mach-davinci/da8xx-dt.c | 10 ++++-----
- 2 files changed, 50 insertions(+), 8 deletions(-)
+Thanks,
+Sekhar
