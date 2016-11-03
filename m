@@ -1,78 +1,55 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Thu,  3 Nov 2016 21:39:30 +0000
-Subject: [RFC 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 (Alt II)
-Message-ID: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 3 Nov 2016 23:49:00 +0200
+Subject: [PATCHv6] support for AD5820 camera auto-focus coil
+In-Reply-To: <20161103102727.GA10084@amd>
+References: <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
+ <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
+ <20160808214132.GB2946@xo-6d-61-c0.localdomain>
+ <20160810120105.GP3182@valkosipuli.retiisi.org.uk>
+ <20160808232323.GC2946@xo-6d-61-c0.localdomain>
+ <20160811111633.GR3182@valkosipuli.retiisi.org.uk>
+ <20160818104539.GA7427@amd>
+ <20160818202559.GF3182@valkosipuli.retiisi.org.uk>
+ <20161103102727.GA10084@amd>
+Message-ID: <20161103214900.GH3217@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following Will & Robin's suggestions, this series attempts to propose
-an alternative to [1] where the host would arbitrarily decide the
-location of the IOVA MSI window and would be able to report to the
-userspace the list of reserved IOVA regions that cannot be used
-along with VFIO_IOMMU_MAP_DMA. This would allow the userspace to react
-in case of conflict.
+On Thu, Nov 03, 2016 at 11:27:27AM +0100, Pavel Machek wrote:
+> Hi!
+> 
+> > > > > > Yeah. I just compiled it but haven't tested it. I presume it'll work. :-)
+> > > > > 
+> > > > > I'm testing it on n900. I guess simpler hardware with ad5820 would be better for the
+> > > > > test...
+> > > > > 
+> > > > > What hardware do you have?
+> > > > 
+> > > > N900. What else could it be? :-) :-)
+> > > 
+> > > Heh. Basically anything is easier to develop for than n900 :-(.
+> > 
+> > Is it?
+> > 
+> > I actually find the old Nokia devices very practical. It's easy to boot your
+> > own kernel and things just work... until musb broke a bit recently. It
+> > requires reconnecting the usb cable again to function.
+> > 
+> > I have to admit I mostly use an N9.
+> 
+> Well, if you compare that to development on PC, I prefer PC.
+> 
+> Even arm development boards are usually easier, as they don't need too
+> complex userspace, and do have working serial ports.
+> 
+> But I do have a serial adapter for N900 now (thanks, sre), so my main
+> problem now is that N900 takes a lot of time to boot into usable
+> state.
 
-Userspace can retrieve all the reserved regions through the VFIO_IOMMU_GET_INFO
-IOCTL by querying the new RESV_IOVA_RANGE chained capability. Each reserved
-IOVA range is put in a separate capability.
-
-At IOMMU level, the reserved regions are stored in an iommu_domain list
-which is populated on each device attachment. An IOMMU add_reserved_regions
-callback specializes the registration of the reserved regions.
-
-On x86, the [FEE0_0000h - FEF0_000h] MSI window is registered (NOT tested).
-
-On ARM, the PCI host bridge windows (ACS check to be added?) + the MSI IOVA
-reserved regions are populated by the arm-smmu driver. Currently the MSI
-IOVA region is arbitrarily located at 0x8000000 and 1MB sized.  An IOVA domain
-is created in add_reserved_regions callback. Then MSIs are transparently
-mapped using this IOVA domain.
-
-This series currently does not address some features addressed in [1]:
-- MSI IOVA size requirement computation
-- IRQ safety assessment
-
-This RFC was just tested on ARM Overdrive with QEMU and is sent to help
-potential discussions at LPC. Additionnal development + testing is needed.
-
-2 tentative fixes may be submitted separately:
-- vfio: fix vfio_info_cap_add/shift
-- iommu/iova: fix __alloc_and_insert_iova_range
-
-Best Regards
-
-Eric
-
-[1] [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
-https://lkml.org/lkml/2016/10/12/347
-
-Git: complete series available at
-https://github.com/eauger/linux/tree/v4.9-rc3-reserved-rfc
-
-
-Eric Auger (7):
-  vfio: fix vfio_info_cap_add/shift
-  iommu/iova: fix __alloc_and_insert_iova_range
-  iommu: Add a list of iommu_reserved_region in iommu_domain
-  vfio/type1: Introduce RESV_IOVA_RANGE capability
-  iommu: Handle the list of reserved regions
-  iommu/vt-d: Implement add_reserved_regions callback
-  iommu/arm-smmu: implement add_reserved_regions callback
-
-Robin Murphy (1):
-  iommu/dma: Allow MSI-only cookies
-
- drivers/iommu/arm-smmu.c        | 63 +++++++++++++++++++++++++++++++++++++++++
- drivers/iommu/dma-iommu.c       | 39 +++++++++++++++++++++++++
- drivers/iommu/intel-iommu.c     | 48 ++++++++++++++++++++++---------
- drivers/iommu/iommu.c           | 25 ++++++++++++++++
- drivers/iommu/iova.c            |  2 +-
- drivers/vfio/vfio.c             |  5 ++--
- drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++++++++-
- include/linux/dma-iommu.h       |  9 ++++++
- include/linux/iommu.h           | 23 +++++++++++++++
- include/uapi/linux/vfio.h       | 16 ++++++++++-
- 10 files changed, 275 insertions(+), 18 deletions(-)
+Yeah... I just upgraded my Debian installation (armel over NFS) a few major
+numbers and I find it a lot slower than it used to do. I presume that's
+mostly because of systemd...
 
 -- 
-1.9.1
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
