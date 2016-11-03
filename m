@@ -1,773 +1,110 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Thu,  3 Nov 2016 01:41:59 -0400
-Subject: [RESEND PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
+Date: Thu,  3 Nov 2016 01:42:00 -0400
+Subject: [RESEND PATCH v1 04/11] Documentation: perf: hisi: Documentation for
+ HIP05/06/07 PMU event counting.
 In-Reply-To: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
 References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
-Message-ID: <1478151727-20250-4-git-send-email-anurup.m@huawei.com>
+Message-ID: <1478151727-20250-5-git-send-email-anurup.m@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tan Xiaojun <tanxiaojun@huawei.com>
+	Documentation for perf usage and Hisilicon SoC PMU uncore events.
+	The Hisilicon SOC has event counters for hardware modules like
+	L3 cache, Miscellaneous node, DDR cntroller etc. These events are
+	all uncore.
 
-	The Hisilicon Djtag is an independent component which connects
-	with some other components in the SoC by Debug Bus. This driver
-	can be configured to access the registers of connecting components
-	(like L3 cache) during real time debugging.
-
-Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
-Signed-off-by: John Garry <john.garry@huawei.com>
 Signed-off-by: Anurup M <anurup.m@huawei.com>
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 ---
- drivers/soc/Kconfig                 |   1 +
- drivers/soc/Makefile                |   1 +
- drivers/soc/hisilicon/Kconfig       |  12 +
- drivers/soc/hisilicon/Makefile      |   1 +
- drivers/soc/hisilicon/djtag.c       | 639 ++++++++++++++++++++++++++++++++++++
- include/linux/soc/hisilicon/djtag.h |  38 +++
- 6 files changed, 692 insertions(+)
- create mode 100644 drivers/soc/hisilicon/Kconfig
- create mode 100644 drivers/soc/hisilicon/Makefile
- create mode 100644 drivers/soc/hisilicon/djtag.c
- create mode 100644 include/linux/soc/hisilicon/djtag.h
+ Documentation/perf/hisi-pmu.txt | 80 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
+ create mode 100644 Documentation/perf/hisi-pmu.txt
 
-diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-index e6e90e8..89ecd42 100644
---- a/drivers/soc/Kconfig
-+++ b/drivers/soc/Kconfig
-@@ -3,6 +3,7 @@ menu "SOC (System On Chip) specific Drivers"
- source "drivers/soc/bcm/Kconfig"
- source "drivers/soc/fsl/qbman/Kconfig"
- source "drivers/soc/fsl/qe/Kconfig"
-+source "drivers/soc/hisilicon/Kconfig"
- source "drivers/soc/mediatek/Kconfig"
- source "drivers/soc/qcom/Kconfig"
- source "drivers/soc/rockchip/Kconfig"
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index 50c23d0..ce2beb5 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -6,6 +6,7 @@ obj-y				+= bcm/
- obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
-+obj-$(CONFIG_ARCH_HISI)		+= hisilicon/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
- obj-$(CONFIG_ARCH_QCOM)		+= qcom/
- obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
-diff --git a/drivers/soc/hisilicon/Kconfig b/drivers/soc/hisilicon/Kconfig
+diff --git a/Documentation/perf/hisi-pmu.txt b/Documentation/perf/hisi-pmu.txt
 new file mode 100644
-index 0000000..6dd4ba0
+index 0000000..670a9df
 --- /dev/null
-+++ b/drivers/soc/hisilicon/Kconfig
-@@ -0,0 +1,12 @@
-+#
-+# Hisilicon SoC drivers
-+#
-+config HISI_DJTAG
-+	bool "Hisilicon Djtag Support"
-+	depends on ARCH_HISI || COMPILE_TEST
-+	help
-+	  Say y here to enable the Hisilicon Djtag support. It is
-+	  an independent component which connects with some other
-+	  components in the SoC by Debug Bus. This driver can be
-+	  configured to access the registers of connecting
-+	  components during real time debugging.
-diff --git a/drivers/soc/hisilicon/Makefile b/drivers/soc/hisilicon/Makefile
-new file mode 100644
-index 0000000..35a7b4b
---- /dev/null
-+++ b/drivers/soc/hisilicon/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_HISI_DJTAG)	+= djtag.o
-diff --git a/drivers/soc/hisilicon/djtag.c b/drivers/soc/hisilicon/djtag.c
-new file mode 100644
-index 0000000..a87c8b6
---- /dev/null
-+++ b/drivers/soc/hisilicon/djtag.c
-@@ -0,0 +1,639 @@
-+/*
-+ * Driver for Hisilicon Djtag r/w via System Controller.
-+ *
-+ * Copyright (C) 2016 Hisilicon Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/init.h>
-+#include <linux/list.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+#include <asm-generic/delay.h>
-+#include <linux/soc/hisilicon/djtag.h>
-+
-+#define SC_DJTAG_TIMEOUT		100000	/* 100ms */
-+
-+/* for djtag v1 */
-+#define SC_DJTAG_MSTR_EN		0x6800
-+#define DJTAG_NOR_CFG			BIT(1)	/* accelerate R,W */
-+#define DJTAG_MSTR_EN			BIT(0)
-+#define SC_DJTAG_MSTR_START_EN		0x6804
-+#define DJTAG_MSTR_START_EN		0x1
-+#define SC_DJTAG_DEBUG_MODULE_SEL	0x680c
-+#define SC_DJTAG_MSTR_WR		0x6810
-+#define DJTAG_MSTR_W			0x1
-+#define DJTAG_MSTR_R			0x0
-+#define SC_DJTAG_CHAIN_UNIT_CFG_EN	0x6814
-+#define CHAIN_UNIT_CFG_EN		0xFFFF
-+#define SC_DJTAG_MSTR_ADDR		0x6818
-+#define SC_DJTAG_MSTR_DATA		0x681c
-+#define SC_DJTAG_RD_DATA_BASE		0xe800
-+
-+/* for djtag v2 */
-+#define SC_DJTAG_SEC_ACC_EN_EX		0xd800
-+#define DJTAG_SEC_ACC_EN_EX		0x1
-+#define SC_DJTAG_MSTR_CFG_EX		0xd818
-+#define DJTAG_MSTR_RW_SHIFT_EX		29
-+#define DJTAG_MSTR_RD_EX		(0x0 << DJTAG_MSTR_RW_SHIFT_EX)
-+#define DJTAG_MSTR_WR_EX		(0x1 << DJTAG_MSTR_RW_SHIFT_EX)
-+#define DEBUG_MODULE_SEL_SHIFT_EX	16
-+#define CHAIN_UNIT_CFG_EN_EX		0xFFFF
-+#define SC_DJTAG_MSTR_ADDR_EX		0xd810
-+#define SC_DJTAG_MSTR_DATA_EX		0xd814
-+#define SC_DJTAG_MSTR_START_EN_EX	0xd81c
-+#define DJTAG_MSTR_START_EN_EX		0x1
-+#define SC_DJTAG_RD_DATA_BASE_EX	0xe800
-+#define SC_DJTAG_OP_ST_EX		0xe828
-+#define DJTAG_OP_DONE_EX		BIT(8)
-+
-+#define DJTAG_PREFIX "hisi-djtag-dev-"
-+
-+DEFINE_IDR(djtag_hosts_idr);
-+
-+struct hisi_djtag_host {
-+	spinlock_t lock;
-+	int id;
-+	struct device dev;
-+	struct list_head client_list;
-+	void __iomem *sysctl_reg_map;
-+	struct device_node *of_node;
-+	int (*djtag_readwrite)(void __iomem *regs_base, u32 offset,
-+			u32 mod_sel, u32 mod_mask, bool is_w,
-+			u32 wval, int chain_id, u32 *rval);
-+};
-+
-+#define to_hisi_djtag_client(d) container_of(d, struct hisi_djtag_client, dev)
-+#define to_hisi_djtag_driver(d) container_of(d, struct hisi_djtag_driver, \
-+								 driver)
-+#define MODULE_PREFIX "hisi_djtag:"
-+
-+static void djtag_read32_relaxed(void __iomem *regs_base, u32 off, u32 *value)
-+{
-+	void __iomem *reg_addr = regs_base + off;
-+
-+	*value = readl_relaxed(reg_addr);
-+}
-+
-+static void djtag_write32(void __iomem *regs_base, u32 off, u32 val)
-+{
-+	void __iomem *reg_addr = regs_base + off;
-+
-+	writel(val, reg_addr);
-+}
-+
-+/*
-+ * djtag_readwrite_v1/v2: djtag read/write interface
-+ * @reg_base:	djtag register base address
-+ * @offset:	register's offset
-+ * @mod_sel:	module selection
-+ * @mod_mask:	mask to select specific modules for write
-+ * @is_w:	write -> true, read -> false
-+ * @wval:	value to register for write
-+ * @chain_id:	which sub module for read
-+ * @rval:	value in register for read
-+ *
-+ * Return non-zero if error, else return 0.
-+ */
-+static int djtag_readwrite_v1(void __iomem *regs_base, u32 offset, u32 mod_sel,
-+		u32 mod_mask, bool is_w, u32 wval, int chain_id, u32 *rval)
-+{
-+	u32 rd;
-+	int timeout = SC_DJTAG_TIMEOUT;
-+
-+	if (!(mod_mask & CHAIN_UNIT_CFG_EN)) {
-+		pr_warn("djtag: do nothing.\n");
-+		return 0;
-+	}
-+
-+	/* djtag mster enable & accelerate R,W */
-+	djtag_write32(regs_base, SC_DJTAG_MSTR_EN,
-+			DJTAG_NOR_CFG | DJTAG_MSTR_EN);
-+
-+	/* select module */
-+	djtag_write32(regs_base, SC_DJTAG_DEBUG_MODULE_SEL, mod_sel);
-+	djtag_write32(regs_base, SC_DJTAG_CHAIN_UNIT_CFG_EN,
-+				mod_mask & CHAIN_UNIT_CFG_EN);
-+
-+	if (is_w) {
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_WR, DJTAG_MSTR_W);
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_DATA, wval);
-+	} else
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_WR, DJTAG_MSTR_R);
-+
-+	/* address offset */
-+	djtag_write32(regs_base, SC_DJTAG_MSTR_ADDR, offset);
-+
-+	/* start to write to djtag register */
-+	djtag_write32(regs_base, SC_DJTAG_MSTR_START_EN, DJTAG_MSTR_START_EN);
-+
-+	/* ensure the djtag operation is done */
-+	do {
-+		djtag_read32_relaxed(regs_base, SC_DJTAG_MSTR_START_EN, &rd);
-+		if (!(rd & DJTAG_MSTR_EN))
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0) {
-+		pr_err("djtag: %s timeout!\n", is_w ? "write" : "read");
-+		return -EBUSY;
-+	}
-+
-+	if (!is_w)
-+		djtag_read32_relaxed(regs_base,
-+			SC_DJTAG_RD_DATA_BASE + chain_id * 0x4, rval);
-+
-+	return 0;
-+}
-+
-+static int djtag_readwrite_v2(void __iomem *regs_base, u32 offset, u32 mod_sel,
-+		u32 mod_mask, bool is_w, u32 wval, int chain_id, u32 *rval)
-+{
-+	u32 rd;
-+	int timeout = SC_DJTAG_TIMEOUT;
-+
-+	if (!(mod_mask & CHAIN_UNIT_CFG_EN_EX)) {
-+		pr_warn("djtag: do nothing.\n");
-+		return 0;
-+	}
-+
-+	/* djtag mster enable */
-+	djtag_write32(regs_base, SC_DJTAG_SEC_ACC_EN_EX, DJTAG_SEC_ACC_EN_EX);
-+
-+	if (is_w) {
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_CFG_EX, DJTAG_MSTR_WR_EX
-+				| (mod_sel << DEBUG_MODULE_SEL_SHIFT_EX)
-+				| (mod_mask & CHAIN_UNIT_CFG_EN_EX));
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_DATA_EX, wval);
-+	} else
-+		djtag_write32(regs_base, SC_DJTAG_MSTR_CFG_EX, DJTAG_MSTR_RD_EX
-+				| (mod_sel << DEBUG_MODULE_SEL_SHIFT_EX)
-+				| (mod_mask & CHAIN_UNIT_CFG_EN_EX));
-+
-+	/* address offset */
-+	djtag_write32(regs_base, SC_DJTAG_MSTR_ADDR_EX, offset);
-+
-+	/* start to write to djtag register */
-+	djtag_write32(regs_base,
-+		      SC_DJTAG_MSTR_START_EN_EX, DJTAG_MSTR_START_EN_EX);
-+
-+	/* ensure the djtag operation is done */
-+	do {
-+		djtag_read32_relaxed(regs_base, SC_DJTAG_MSTR_START_EN_EX, &rd);
-+
-+		if (!(rd & DJTAG_MSTR_START_EN_EX))
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0)
-+		goto timeout;
-+
-+	timeout = SC_DJTAG_TIMEOUT;
-+	do {
-+		djtag_read32_relaxed(regs_base, SC_DJTAG_OP_ST_EX, &rd);
-+
-+		if (rd & DJTAG_OP_DONE_EX)
-+			break;
-+
-+		udelay(1);
-+	} while (timeout--);
-+
-+	if (timeout < 0)
-+		goto timeout;
-+
-+	if (!is_w)
-+		djtag_read32_relaxed(regs_base,
-+				     SC_DJTAG_RD_DATA_BASE_EX + chain_id * 0x4,
-+									rval);
-+
-+	return 0;
-+
-+timeout:
-+	pr_err("djtag: %s timeout!\n", is_w ? "write" : "read");
-+	return -EBUSY;
-+}
-+
-+
-+/**
-+ * djtag_writel - write registers via djtag
-+ * @node:	djtag node
-+ * @offset:	register's offset
-+ * @mod_sel:	module selection
-+ * @mod_mask:	mask to select specific modules
-+ * @val:	value to write to register
-+ *
-+ * If error return errno, otherwise return 0.
-+ */
-+int hisi_djtag_writel(struct hisi_djtag_client *client, u32 offset, u32 mod_sel,
-+							u32 mod_mask, u32 val)
-+{
-+	void __iomem *reg_map = client->host->sysctl_reg_map;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&client->host->lock, flags);
-+	ret = client->host->djtag_readwrite(reg_map, offset, mod_sel, mod_mask,
-+					true, val, 0, NULL);
-+	if (ret)
-+		pr_err("djtag_writel: error! ret=%d\n", ret);
-+	spin_unlock_irqrestore(&client->host->lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(hisi_djtag_writel);
-+
-+/**
-+ * djtag_readl - read registers via djtag
-+ * @node:	djtag node
-+ * @offset:	register's offset
-+ * @mod_sel:	module type selection
-+ * @chain_id:	chain_id number, mostly is 0
-+ * @val:	register's value
-+ *
-+ * If error return errno, otherwise return 0.
-+ */
-+int hisi_djtag_readl(struct hisi_djtag_client *client, u32 offset, u32 mod_sel,
-+							int chain_id, u32 *val)
-+{
-+	void __iomem *reg_map = client->host->sysctl_reg_map;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	spin_lock_irqsave(&client->host->lock, flags);
-+	ret = client->host->djtag_readwrite(reg_map, offset, mod_sel,
-+			0xffff, false, 0, chain_id, val);
-+	if (ret)
-+		pr_err("djtag_readl: error! ret=%d\n", ret);
-+	spin_unlock_irqrestore(&client->host->lock, flags);
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(hisi_djtag_readl);
-+
-+static const struct of_device_id djtag_of_match[] = {
-+	/* for hip05(D02) cpu die */
-+	{ .compatible = "hisilicon,hip05-cpu-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip05(D02) io die */
-+	{ .compatible = "hisilicon,hip05-io-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip06(D03) cpu die */
-+	{ .compatible = "hisilicon,hip06-cpu-djtag-v1",
-+		.data = (void *)djtag_readwrite_v1 },
-+	/* for hip06(D03) io die */
-+	{ .compatible = "hisilicon,hip06-io-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	/* for hip07(D05) cpu die */
-+	{ .compatible = "hisilicon,hip07-cpu-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	/* for hip07(D05) io die */
-+	{ .compatible = "hisilicon,hip07-io-djtag-v2",
-+		.data = (void *)djtag_readwrite_v2 },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, djtag_of_match);
-+
-+static ssize_t
-+show_modalias(struct device *dev, struct device_attribute *attr, char *buf)
-+{
-+	struct hisi_djtag_client *client = to_hisi_djtag_client(dev);
-+
-+	return sprintf(buf, "%s%s\n", MODULE_PREFIX, client->name);
-+}
-+static DEVICE_ATTR(modalias, 0444, show_modalias, NULL);
-+
-+static struct attribute *hisi_djtag_dev_attrs[] = {
-+	NULL,
-+	/* modalias helps coldplug:  modprobe $(cat .../modalias) */
-+	&dev_attr_modalias.attr,
-+	NULL
-+};
-+ATTRIBUTE_GROUPS(hisi_djtag_dev);
-+
-+static struct device_type hisi_djtag_client_type = {
-+	.groups		= hisi_djtag_dev_groups,
-+};
-+
-+struct hisi_djtag_client *hisi_djtag_verify_client(struct device *dev)
-+{
-+	return (dev->type == &hisi_djtag_client_type)
-+			? to_hisi_djtag_client(dev)
-+			: NULL;
-+}
-+
-+static int hisi_djtag_device_probe(struct device *dev)
-+{
-+	struct hisi_djtag_driver *driver;
-+	struct hisi_djtag_client *client;
-+	int rc;
-+
-+	client = hisi_djtag_verify_client(dev);
-+	if (!client) {
-+		dev_err(dev, "could not find client\n");
-+		return -ENODEV;
-+	}
-+
-+	driver = to_hisi_djtag_driver(dev->driver);
-+	if (!driver) {
-+		dev_err(dev, "could not find driver\n");
-+		return -ENODEV;
-+	}
-+
-+	rc = driver->probe(client);
-+	if (rc < 0) {
-+		dev_err(dev, "client probe failed\n");
-+		return rc;
-+	}
-+
-+	return 0;
-+}
-+
-+static int hisi_djtag_device_remove(struct device *dev)
-+{
-+	struct hisi_djtag_driver *driver;
-+	struct hisi_djtag_client *client;
-+	int rc;
-+
-+	client = hisi_djtag_verify_client(dev);
-+	if (!client) {
-+		dev_err(dev, "could not find client\n");
-+		return -ENODEV;
-+	}
-+
-+	driver = to_hisi_djtag_driver(dev->driver);
-+	if (!driver) {
-+		dev_err(dev, "could not find driver\n");
-+		return -ENODEV;
-+	}
-+
-+	rc = driver->remove(client);
-+	if (rc < 0) {
-+		dev_err(dev, "client probe failed\n");
-+		return rc;
-+	}
-+
-+	return 0;
-+}
-+
-+static int hisi_djtag_device_match(struct device *dev,
-+					struct device_driver *drv)
-+{
-+	const struct of_device_id *p;
-+	struct hisi_djtag_client *client = hisi_djtag_verify_client(dev);
-+
-+	if (!client)
-+		return false;
-+
-+	if (of_driver_match_device(dev, drv))
-+		return true;
-+
-+	p = of_match_device(drv->of_match_table, dev);
-+	if (!p)
-+		return false;
-+
-+	return true;
-+}
-+
-+struct bus_type hisi_djtag_bus = {
-+	.name		= "hisi-djtag",
-+	.match		= hisi_djtag_device_match,
-+	.probe		= hisi_djtag_device_probe,
-+	.remove		= hisi_djtag_device_remove,
-+};
-+
-+struct hisi_djtag_client *hisi_djtag_new_device(struct hisi_djtag_host *host,
-+						struct device_node *node)
-+{
-+	struct hisi_djtag_client *client;
-+	int status;
-+
-+	client = kzalloc(sizeof(*client), GFP_KERNEL);
-+	if (!client)
-+		return NULL;
-+
-+	client->host = host;
-+
-+	client->dev.parent = &client->host->dev;
-+	client->dev.bus = &hisi_djtag_bus;
-+	client->dev.type = &hisi_djtag_client_type;
-+	client->dev.of_node = node;
-+	snprintf(client->name, DJTAG_CLIENT_NAME_LEN, "%s%s",
-+					DJTAG_PREFIX, node->name);
-+	dev_set_name(&client->dev, "%s", client->name);
-+
-+	status = device_register(&client->dev);
-+	if (status < 0) {
-+		pr_err("error adding new device, status=%d\n", status);
-+		kfree(client);
-+		return NULL;
-+	}
-+
-+	return client;
-+}
-+
-+static struct hisi_djtag_client *hisi_djtag_of_register_device(
-+						struct hisi_djtag_host *host,
-+						struct device_node *node)
-+{
-+	struct hisi_djtag_client *client;
-+
-+	client = hisi_djtag_new_device(host, node);
-+	if (client == NULL) {
-+		dev_err(&host->dev, "error registering device %s\n",
-+			node->full_name);
-+		of_node_put(node);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return client;
-+}
-+
-+static void djtag_register_devices(struct hisi_djtag_host *host)
-+{
-+	struct device_node *node;
-+	struct hisi_djtag_client *client;
-+
-+	if (!host->of_node)
-+		return;
-+
-+	for_each_available_child_of_node(host->of_node, node) {
-+		if (of_node_test_and_set_flag(node, OF_POPULATED))
-+			continue;
-+		client = hisi_djtag_of_register_device(host, node);
-+		list_add(&client->next, &host->client_list);
-+	}
-+}
-+
-+static int hisi_djtag_add_host(struct hisi_djtag_host *host)
-+{
-+	int rc;
-+
-+	host->dev.bus = &hisi_djtag_bus;
-+
-+	rc = idr_alloc(&djtag_hosts_idr, host, 0, 0, GFP_KERNEL);
-+	if (rc < 0) {
-+		dev_err(&host->dev, "No available djtag host ID'!s\n");
-+		return rc;
-+	}
-+	host->id = rc;
-+
-+	/* Suffix the unique ID and set djtag hostname */
-+	dev_set_name(&host->dev, "djtag-host-%d", host->id);
-+
-+	rc = device_register(&host->dev);
-+	if (rc < 0) {
-+		dev_err(&host->dev, "add_host dev register failed, rc=%d\n",
-+									rc);
-+		idr_remove(&djtag_hosts_idr, host->id);
-+		return rc;
-+	}
-+
-+	djtag_register_devices(host);
-+
-+	return 0;
-+}
-+
-+static int djtag_host_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct hisi_djtag_host *host;
-+	const struct of_device_id *of_id;
-+	struct resource *res;
-+	int rc;
-+
-+	of_id = of_match_device(djtag_of_match, dev);
-+	if (!of_id)
-+		return -EINVAL;
-+
-+	host = kzalloc(sizeof(*host), GFP_KERNEL);
-+	if (!host)
-+		return -ENOMEM;
-+
-+	host->of_node = dev->of_node;
-+	host->djtag_readwrite = of_id->data;
-+	spin_lock_init(&host->lock);
-+
-+	INIT_LIST_HEAD(&host->client_list);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "No reg resorces!\n");
-+		kfree(host);
-+		return -EINVAL;
-+	}
-+
-+	if (!resource_size(res)) {
-+		dev_err(&pdev->dev, "Zero reg entry!\n");
-+		kfree(host);
-+		return -EINVAL;
-+	}
-+
-+	host->sysctl_reg_map = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(host->sysctl_reg_map)) {
-+		dev_warn(dev, "Unable to map sysctl registers.\n");
-+		kfree(host);
-+		return -EINVAL;
-+	}
-+
-+	platform_set_drvdata(pdev, host);
-+
-+	rc = hisi_djtag_add_host(host);
-+	if (rc) {
-+		dev_err(dev, "add host failed, rc=%d\n", rc);
-+		kfree(host);
-+		return rc;
-+	}
-+
-+	return 0;
-+}
-+
-+static int djtag_host_remove(struct platform_device *pdev)
-+{
-+	struct hisi_djtag_host *host;
-+	struct hisi_djtag_client *client, *tmp;
-+	struct list_head *client_list;
-+
-+	host = platform_get_drvdata(pdev);
-+	client_list = &host->client_list;
-+
-+	list_for_each_entry_safe(client, tmp, client_list, next) {
-+		list_del(&client->next);
-+		kfree(client);
-+	}
-+
-+	device_unregister(&host->dev);
-+	idr_remove(&djtag_hosts_idr, host->id);
-+	kfree(host);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver djtag_dev_driver = {
-+	.driver = {
-+		.name = "hisi-djtag",
-+		.of_match_table = djtag_of_match,
-+	},
-+	.probe = djtag_host_probe,
-+	.remove = djtag_host_remove,
-+};
-+module_platform_driver(djtag_dev_driver);
-+
-+int hisi_djtag_register_driver(struct module *owner,
-+				struct hisi_djtag_driver *driver)
-+{
-+	int rc;
-+
-+	driver->driver.owner = owner;
-+	driver->driver.bus = &hisi_djtag_bus;
-+
-+	rc = driver_register(&driver->driver);
-+	if (rc < 0)
-+		pr_err("%s register failed, rc=%d\n", __func__, rc);
-+
-+	return rc;
-+}
-+
-+void hisi_djtag_unregister_driver(struct hisi_djtag_driver *driver)
-+{
-+	driver->driver.bus = &hisi_djtag_bus;
-+	driver_unregister(&driver->driver);
-+}
-+
-+static int __init hisi_djtag_init(void)
-+{
-+	int rc;
-+
-+	rc = bus_register(&hisi_djtag_bus);
-+	if (rc) {
-+		pr_err("hisi  djtag init failed, rc=%d\n", rc);
-+		return rc;
-+	}
-+
-+	return 0;
-+}
-+module_init(hisi_djtag_init);
-+
-+static void __exit hisi_djtag_exit(void)
-+{
-+	bus_unregister(&hisi_djtag_bus);
-+}
-+module_exit(hisi_djtag_exit);
-+
-+MODULE_DESCRIPTION("Hisilicon djtag driver");
-+MODULE_LICENSE("GPL");
-+MODULE_VERSION("1.0");
-diff --git a/include/linux/soc/hisilicon/djtag.h b/include/linux/soc/hisilicon/djtag.h
-new file mode 100644
-index 0000000..aae3bca
---- /dev/null
-+++ b/include/linux/soc/hisilicon/djtag.h
-@@ -0,0 +1,38 @@
-+/*
-+ * Driver for Hisilicon djtag r/w via System Controller.
-+ *
-+ * Copyright (C) 2016-2017 Hisilicon Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __HISI_DJTAG_H
-+#define __HISI_DJTAG_H
-+
-+#define DJTAG_CLIENT_NAME_LEN 24
-+
-+struct hisi_djtag_client {
-+	struct hisi_djtag_host *host;
-+	struct list_head next;
-+	char name[DJTAG_CLIENT_NAME_LEN];
-+	struct device dev;
-+};
-+
-+struct hisi_djtag_driver {
-+	struct device_driver driver;
-+	int (*probe)(struct hisi_djtag_client *);
-+	int (*remove)(struct hisi_djtag_client *);
-+};
-+
-+extern struct bus_type hisi_djtag_bus;
-+
-+int hisi_djtag_register_driver(struct module *owner,
-+				struct hisi_djtag_driver *driver);
-+void hisi_djtag_unregister_driver(struct hisi_djtag_driver *driver);
-+int hisi_djtag_readl(struct hisi_djtag_client *client, u32 offset,
-+					u32 mod_sel, int chain_id, u32 *val);
-+int hisi_djtag_writel(struct hisi_djtag_client *client, u32 offset,
-+					u32 mod_sel, u32 mod_mask, u32 val);
-+#endif /* __HISI_DJTAG_H */
++++ b/Documentation/perf/hisi-pmu.txt
+@@ -0,0 +1,80 @@
++Hisilicon SoC PMU (Performance Monitoring Unit)
++================================================
++The Hisilicon SoC hip05/06/07 chips consist of varous independent system
++device PMU's such as L3 cache(L3C), Miscellaneous Nodes(MN) and DDR
++controllers. These PMU devices are independent and have hardware logic to
++gather statistics and performance information.
++
++Hip0x chips are encapsulated by multiple CPU and IO die's. The CPU die is
++called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
++is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
++Each SCCL has 1 L3 cache and 1 MN units.
++
++The L3 cache is shared by all CPU cores in a CPU die. The L3C has four banks
++(or instances). Each bank or instance of L3C has Eight 32-bit counter
++registers. The hip05/06 chip L3 cache has 22 statistics events. The hip07
++chip has 66 statistics events. These events are very useful for debugging.
++
++The MN module is also shared by all CPU cores in a CPU die. It receives
++barriers and DVM(Distributed Virtual Memory) messages from cpu or smmu, and
++perform the required actions and return response messages. These events are
++very useful for debugging. The MN has total 9 statistics events and support
++four 32-bit counter registers in hip05/06/07 chips.
++
++The DDR conroller supports various statistics events. Every SCCL has fot 2
++DDR channels and hence 2 DDR controllers. The Hip05/06/07 has support for a
++total of 13 statistics events.
++
++There is no memory mapping for L3 cache and MN registers. It can be accessed
++by using the Hisilicon djtag interface. The Djtag in a SCCL is an independent
++module which connects with some modules in the SoC by Debug Bus.
++
++Hisilicon SoC (hip05/06/07) PMU driver
++--------------------------------------
++The hip0x PMU driver shall register perf PMU drivers like L3 cache, MN, DDRC
++etc.
++Separate PMU shall be registered for L3 cache and MN for each Super CPU
++cluster.
++For DRR controller separate PMU shall be registered for each channel in a
++Super CPU cluster.
++
++The available events and configuration options shall be described in the sysfs.
++The "perf list" shall list the available events from sysfs.
++eg. hisi_l3c2/read_allocate/ [kernel PMU event]
++
++The Super Cluster ID will be the number suffix to PMU name
++e.g. hisi_l3c2. Here Super cluster ID is 2 and so hisi_l3c2/read_allocate
++is the event for read_allocate of SCCL #2.
++
++For DDRC the channel number will be suffix at the end.
++eg: hisi_ddrc2_0/flux_read/. Here Super cluster ID is 2 and the channel number
++is 0 for the event flux_read.
++
++The event code is represented by 12 bits.
++	i) event 0-11
++		The event code will be represented using the LSB 12 bits.
++
++The driver also provides a "cpumask" sysfs attribute, which shows the CPU core
++ID used to count the uncore PMU event.
++
++Example usage of perf:
++$# perf list
++hisi_l3c2/read_hit/ [kernel PMU event]
++hisi_l3c2/write_hit/ [kernel PMU event]
++------------------------------------------
++hisi_l3c1/read_hit/ [kernel PMU event]
++hisi_l3c1/write_hit/ [kernel PMU event]
++------------------------------------------
++hisi_mn2/read_req/ [kernel PMU event]
++hisi_mn2/write_req/ [kernel PMU event]
++------------------------------------------
++hisi_ddrc2_0/flux_read/ [kernel PMU event]
++------------------------------------------
++
++$# perf stat -a -e hisi_l3c2/read_allocate/ sleep 5
++
++The current driver doesnot support sampling. so "perf record" is unsupported.
++Also attach to a task is unsupported as the events are all uncore.
++
++Note: Please contact the maintainer for a complete list of events supported for
++the PMU devices in the SoC and its information if needed.
 -- 
 2.1.4
