@@ -1,96 +1,123 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 3 Nov 2016 09:00:58 -0500
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <3fd26a0d-a5c2-c385-866e-b957dffb7dda@codeaurora.org>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
- <3fd26a0d-a5c2-c385-866e-b957dffb7dda@codeaurora.org>
-Message-ID: <20161103140058.GA31142@bhelgaas-glaptop.roam.corp.google.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 3 Nov 2016 15:14:56 +0100
+Subject: [PATCH v14 14/16] vfio/type1: Check doorbell safety
+In-Reply-To: <HE1PR04MB1321EAD1CE91D2B6FC04BB55FFA30@HE1PR04MB1321.eurprd04.prod.outlook.com>
+References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
+ <1476278544-3397-15-git-send-email-eric.auger@redhat.com>
+ <HE1PR04MB1321EAD1CE91D2B6FC04BB55FFA30@HE1PR04MB1321.eurprd04.prod.outlook.com>
+Message-ID: <ea9b83b0-d591-eeb2-773f-2d76be2a589a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 12:36:16PM -0400, Sinan Kaya wrote:
-> Hi Bjorn,
+Hi Diana,
+
+On 03/11/2016 14:45, Diana Madalina Craciun wrote:
+> Hi Eric,
 > 
-> On 11/2/2016 12:08 PM, Bjorn Helgaas wrote:
-> > On Tue, Nov 01, 2016 at 07:06:31AM -0600, cov at codeaurora.org wrote:
-> >> Hi Bjorn,
-> >>
-> >> On 2016-10-31 15:48, Bjorn Helgaas wrote:
-> >>> On Wed, Sep 21, 2016 at 06:38:05PM -0400, Christopher Covington wrote:
-> >>>> The Qualcomm Technologies QDF2432 SoC does not support accesses
-> >>>> smaller
-> >>>> than 32 bits to the PCI configuration space. Register the appropriate
-> >>>> quirk.
-> >>>>
-> >>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> >>>
-> >>> Hi Christopher,
-> >>>
-> >>> Can you rebase this against v4.9-rc1?  It no longer applies to my tree.
-> >>
-> >> I apologize for not being clearer. This patch depends on:
-> >>
-> >> PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
-> >> PCI/ACPI: Check platform-specific ECAM quirks
-> >>
-> >> These patches from Tomasz Nowicki were previously in your pci/ecam-v6
-> >> branch, but that seems to have come and gone. How would you like to
-> >> proceed?
-> > 
-> > Oh yes, that's right, I forgot that connection.  I'm afraid I kind of
-> > dropped the ball on that thread, so I went back and read through it
-> > again.
-> > 
-> > I *think* the current state is:
-> > 
-> >   - I'm OK with the first two patches that add the quirk
-> >     infrastructure.
-> > 
-> >   - My issue with the last three patches that add ThunderX quirks is
-> >     that there's no generic description of the ECAM address space.
-> > 
-> > So if I understand correctly, your Qualcomm patch depends only on the
-> > first two patches.
-> > 
-> > Then the question is how the Qualcomm ECAM address space is described.
-> > Your quirk overrides the default pci_generic_ecam_ops with the
-> > &pci_32b_ops, but it doesn't touch the address space part, so I assume
-> > the bus ranges and corresponding address space in your MCFG is
-> > correct.  So far, so good.
+> On 10/12/2016 04:23 PM, Eric Auger wrote:
+>> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
+>> by the msi controller.
+>>
+>> Since we currently have no way to detect whether the MSI controller is
+>> upstream or downstream to the IOMMU we rely on the MSI doorbell information
+>> registered by the interrupt controllers. In case at least one doorbell
+>> does not implement proper isolation, we state the assignment is unsafe
+>> with regard to interrupts. This is a coarse assessment but should allow to
+>> wait for a better system description.
+>>
+>> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
+>> removed in next patch.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>> v13 -> v15:
+>> - check vfio_msi_resv before checking whether msi doorbell is safe
+>>
+>> v9 -> v10:
+>> - coarse safety assessment based on MSI doorbell info
+>>
+>> v3 -> v4:
+>> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
+>>   and irq_remapping into safe_irq_domains
+>>
+>> v2 -> v3:
+>> - protect vfio_msi_parent_irq_remapping_capable with
+>>   CONFIG_GENERIC_MSI_IRQ_DOMAIN
+>> ---
+>>  drivers/vfio/vfio_iommu_type1.c | 30 +++++++++++++++++++++++++++++-
+>>  1 file changed, 29 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+>> index e0c97ef..c18ba9d 100644
+>> --- a/drivers/vfio/vfio_iommu_type1.c
+>> +++ b/drivers/vfio/vfio_iommu_type1.c
+>> @@ -442,6 +442,29 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>>  }
+>>  
+>>  /**
+>> + * vfio_msi_resv - Return whether any VFIO iommu domain requires
+>> + * MSI mapping
+>> + *
+>> + * @iommu: vfio iommu handle
+>> + *
+>> + * Return: true of MSI mapping is needed, false otherwise
+>> + */
+>> +static bool vfio_msi_resv(struct vfio_iommu *iommu)
+>> +{
+>> +	struct iommu_domain_msi_resv msi_resv;
+>> +	struct vfio_domain *d;
+>> +	int ret;
+>> +
+>> +	list_for_each_entry(d, &iommu->domain_list, next) {
+>> +		ret = iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_RESV,
+>> +					    &msi_resv);
+>> +		if (!ret)
+>> +			return true;
+>> +	}
+>> +	return false;
+>> +}
+>> +
+>> +/**
+>>   * vfio_set_msi_aperture - Sets the msi aperture on all domains
+>>   * requesting MSI mapping
+>>   *
+>> @@ -945,8 +968,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>>  	INIT_LIST_HEAD(&domain->group_list);
+>>  	list_add(&group->next, &domain->group_list);
+>>  
+>> +	/*
+>> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
+>> +	 * must support IRQ remapping (aka. interrupt translation)
+>> +	 */
+>>  	if (!allow_unsafe_interrupts &&
+>> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
+>> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
+>> +		!(vfio_msi_resv(iommu) && iommu_msi_doorbell_safe()))) {
+>>  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+>>  		       __func__);
+>>  		ret = -EPERM;
 > 
-> Qualcomm ECAM space includes both the root port and the endpoint address
-> space with a single contiguous 256 MB address space described in MCFG table.
-> There is no need to describe additional resources like PNP0C02.
+> I understand from the other discussions that you will respin these
+> series, but anyway I have tested this version with GICV3 + ITS and it
+> stops here. As I have a GICv3 I am not supposed to enable allow unsafe
+> interrupts. What I see is that vfio_msi_resv returns false just because
+> the iommu->domain_list list is empty. The newly created domain is
+> actually added to the domain_list at the end of this function, so it
+> seems normal for the list to be empty at this point.
 
-This is the crucial point I have failed to communicate clearly: the
-PNP0C02 resource is *always* required, even if the MCFG is correct.
+Thanks for reporting the issue. You are fully right. I must have missed
+that test. I should just check the current iommu_domain attribute I think.
 
-The reason is that MCFG is a PCI-specific table, and it should be
-possible to boot a kernel with no PCI support.  That kernel will not
-look at the MCFG.  The PCI hardware will still be present and will
-still consume the ECAM space, so the OS must be able to discover that
-the ECAM space is not available for other devices.
+waiting for a fix, please probe the vfio_iommu_type1 module with
+allow_unsafe_interrupts=1
 
-The usual way to for the OS to discover that would be via the _CRS of
-a PNP0A03 or PNP0A08 host bridge device.  _CRS is what I mean by a
-"generic" way to describe this address space, because the ACPI core
-can interpret _CRS for all ACPI devices, even if the kernel doesn't
-contain drivers for all of those devices.
+Thanks
 
-It turns out that we can't use the _CRS of host bridges because of the
-Producer/Consumer bit screwup [1].  So the fallback is to include the
-ECAM space in the _CRS of a PNP0C02 device.  This is what the PCI
-Firmware spec r3.0, Table 4-2, footnote 2 is talking about.
-
-Bjorn
-
-[1] The original ACPI spec intent was that Consumer resources would be
-space like ECAM that is consumed directly by the bridge, and Producer
-resources would be the windows forwarded down to PCI.  But BIOSes
-didn't use the Producer/Consumer bit consistently, so we have to
-assume that all resources in host bridge _CRS are windows, which
-leaves us no way to describe the Consumer resources.
+Eric
+> 
+> Thanks,
+> 
+> Diana
+> 
+> 
