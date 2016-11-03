@@ -1,83 +1,56 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Thu, 3 Nov 2016 10:51:38 +0800
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 3 Nov 2016 11:13:08 +0800
 Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
-References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+In-Reply-To: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+Message-ID: <201611031100.ggXBvpJr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When testing the gigantic page whose order is too large for the buddy
-allocator, the libhugetlbfs test case "counter.sh" will fail.
+Hi Huang,
 
-The failure is caused by:
- 1) kernel fails to allocate a gigantic page for the surplus case.
-    And the gather_surplus_pages() will return NULL in the end.
+[auto build test ERROR on mmotm/master]
+[also build test ERROR on v4.9-rc3 next-20161028]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
- 2) The condition checks for "over-commit" is wrong.
+url:    https://github.com/0day-ci/linux/commits/Huang-Shijie/mm-hugetlb-rename-some-allocation-functions/20161103-105611
+base:   git://git.cmpxchg.org/linux-mmotm.git master
+config: x86_64-randconfig-x011-201644 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-This patch adds code to allocate the gigantic page in the
-__alloc_huge_page(). After this patch, gather_surplus_pages()
-can return a gigantic page for the surplus case.
+All error/warnings (new ones prefixed by >>):
 
-This patch also changes the condition checks for:
-     return_unused_surplus_pages()
-     nr_overcommit_hugepages_store()
+   mm/hugetlb.c: In function '__alloc_huge_page':
+>> mm/hugetlb.c:1623:10: error: implicit declaration of function 'alloc_gigantic_page' [-Werror=implicit-function-declaration]
+      page = alloc_gigantic_page(nid, huge_page_order(h));
+             ^~~~~~~~~~~~~~~~~~~
+>> mm/hugetlb.c:1623:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+      page = alloc_gigantic_page(nid, huge_page_order(h));
+           ^
+   cc1: some warnings being treated as errors
 
-After this patch, the counter.sh can pass for the gigantic page.
+vim +/alloc_gigantic_page +1623 mm/hugetlb.c
 
-Acked-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+  1617			h->nr_huge_pages++;
+  1618			h->surplus_huge_pages++;
+  1619		}
+  1620		spin_unlock(&hugetlb_lock);
+  1621	
+  1622		if (hstate_is_gigantic(h))  {
+> 1623			page = alloc_gigantic_page(nid, huge_page_order(h));
+  1624			if (page)
+  1625				prep_compound_gigantic_page(page, huge_page_order(h));
+  1626		} else {
+
 ---
- mm/hugetlb.c | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
-
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 0bf4444..2b67aff 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
- 	struct page *page;
- 	unsigned int r_nid;
- 
--	if (hstate_is_gigantic(h))
-+	if (hstate_is_gigantic(h) && !gigantic_page_supported())
- 		return NULL;
- 
- 	/*
-@@ -1619,7 +1619,13 @@ static struct page *__alloc_huge_page(struct hstate *h,
- 	}
- 	spin_unlock(&hugetlb_lock);
- 
--	page = __hugetlb_alloc_buddy_huge_page(h, vma, addr, nid);
-+	if (hstate_is_gigantic(h))  {
-+		page = alloc_gigantic_page(nid, huge_page_order(h));
-+		if (page)
-+			prep_compound_gigantic_page(page, huge_page_order(h));
-+	} else {
-+		page = __hugetlb_alloc_buddy_huge_page(h, vma, addr, nid);
-+	}
- 
- 	spin_lock(&hugetlb_lock);
- 	if (page) {
-@@ -1786,8 +1792,7 @@ static void return_unused_surplus_pages(struct hstate *h,
- 	/* Uncommit the reservation */
- 	h->resv_huge_pages -= unused_resv_pages;
- 
--	/* Cannot return gigantic pages currently */
--	if (hstate_is_gigantic(h))
-+	if (hstate_is_gigantic(h) && !gigantic_page_supported())
- 		return;
- 
- 	nr_pages = min(unused_resv_pages, h->surplus_huge_pages);
-@@ -2439,7 +2444,7 @@ static ssize_t nr_overcommit_hugepages_store(struct kobject *kobj,
- 	unsigned long input;
- 	struct hstate *h = kobj_to_hstate(kobj, NULL);
- 
--	if (hstate_is_gigantic(h))
-+	if (hstate_is_gigantic(h) && !gigantic_page_supported())
- 		return -EINVAL;
- 
- 	err = kstrtoul(buf, 10, &input);
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25105 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/516fb148/attachment-0001.gz>
