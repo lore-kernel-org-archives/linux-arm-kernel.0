@@ -1,123 +1,50 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 3 Nov 2016 15:14:56 +0100
-Subject: [PATCH v14 14/16] vfio/type1: Check doorbell safety
-In-Reply-To: <HE1PR04MB1321EAD1CE91D2B6FC04BB55FFA30@HE1PR04MB1321.eurprd04.prod.outlook.com>
-References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
- <1476278544-3397-15-git-send-email-eric.auger@redhat.com>
- <HE1PR04MB1321EAD1CE91D2B6FC04BB55FFA30@HE1PR04MB1321.eurprd04.prod.outlook.com>
-Message-ID: <ea9b83b0-d591-eeb2-773f-2d76be2a589a@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 3 Nov 2016 14:16:00 +0000
+Subject: [PATCH] arm64: errata: Check for --fix-cortex-a53-843419 and
+ --fix-cortex-a53
+In-Reply-To: <2d72cbbb-df03-267c-53b0-e3083a746175@gmail.com>
+References: <20161031194414.61287-1-code@mmayer.net>
+ <20161102210331.GJ22791@arm.com>
+ <CAGt4E5tKHNQw=eLzFx-+g6yLwJ=xCTQEqNZHFZu6aOVpKm7X7w@mail.gmail.com>
+ <20161102212747.GL22791@arm.com>
+ <CAGt4E5sxMcyizwAjwEZd6zepOAyr05WCgtstoRDfNjkNQtnJCA@mail.gmail.com>
+ <2d72cbbb-df03-267c-53b0-e3083a746175@gmail.com>
+Message-ID: <20161103141559.GQ22791@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Diana,
+On Wed, Nov 02, 2016 at 02:57:26PM -0700, Florian Fainelli wrote:
+> On 11/02/2016 02:41 PM, Markus Mayer wrote:
+> > On 2 November 2016 at 14:27, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Wed, Nov 02, 2016 at 02:07:17PM -0700, Markus Mayer wrote:
+> >>> The question I am asking is: What do we have to lose by supporting both options?
+> >>
+> >> We end up passing "--fix-cortex-a53" to the linker, without knowing what it
+> >> might do in the future.
+> > 
+> > It seems highly unlikely that such a generic option would be added in
+> > the future, both, because the precedent has been set for topic
+> > specific options, and because they know it has been used in the past,
+> > so they wouldn't add a previously used option to do something
+> > completely different. (And if they really did, then that would be a
+> > huge binutils bug.)
+> > 
+> > So, we have a trade-off between a real world problem that does
+> > currently exist and avoiding a theoretical issue that may never
+> > materialize.
+> 
+> Agreed, also the way Markus' patch is designed makes it such that we
+> first try the full and current option name, and if not supported, try
+> the second (and earlier, now obsolete) option name, so I really don't
+> see a lot of room for things to go wrong here...
 
-On 03/11/2016 14:45, Diana Madalina Craciun wrote:
-> Hi Eric,
-> 
-> On 10/12/2016 04:23 PM, Eric Auger wrote:
->> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
->> by the msi controller.
->>
->> Since we currently have no way to detect whether the MSI controller is
->> upstream or downstream to the IOMMU we rely on the MSI doorbell information
->> registered by the interrupt controllers. In case at least one doorbell
->> does not implement proper isolation, we state the assignment is unsafe
->> with regard to interrupts. This is a coarse assessment but should allow to
->> wait for a better system description.
->>
->> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
->> removed in next patch.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> v13 -> v15:
->> - check vfio_msi_resv before checking whether msi doorbell is safe
->>
->> v9 -> v10:
->> - coarse safety assessment based on MSI doorbell info
->>
->> v3 -> v4:
->> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
->>   and irq_remapping into safe_irq_domains
->>
->> v2 -> v3:
->> - protect vfio_msi_parent_irq_remapping_capable with
->>   CONFIG_GENERIC_MSI_IRQ_DOMAIN
->> ---
->>  drivers/vfio/vfio_iommu_type1.c | 30 +++++++++++++++++++++++++++++-
->>  1 file changed, 29 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
->> index e0c97ef..c18ba9d 100644
->> --- a/drivers/vfio/vfio_iommu_type1.c
->> +++ b/drivers/vfio/vfio_iommu_type1.c
->> @@ -442,6 +442,29 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
->>  }
->>  
->>  /**
->> + * vfio_msi_resv - Return whether any VFIO iommu domain requires
->> + * MSI mapping
->> + *
->> + * @iommu: vfio iommu handle
->> + *
->> + * Return: true of MSI mapping is needed, false otherwise
->> + */
->> +static bool vfio_msi_resv(struct vfio_iommu *iommu)
->> +{
->> +	struct iommu_domain_msi_resv msi_resv;
->> +	struct vfio_domain *d;
->> +	int ret;
->> +
->> +	list_for_each_entry(d, &iommu->domain_list, next) {
->> +		ret = iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_RESV,
->> +					    &msi_resv);
->> +		if (!ret)
->> +			return true;
->> +	}
->> +	return false;
->> +}
->> +
->> +/**
->>   * vfio_set_msi_aperture - Sets the msi aperture on all domains
->>   * requesting MSI mapping
->>   *
->> @@ -945,8 +968,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->>  	INIT_LIST_HEAD(&domain->group_list);
->>  	list_add(&group->next, &domain->group_list);
->>  
->> +	/*
->> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
->> +	 * must support IRQ remapping (aka. interrupt translation)
->> +	 */
->>  	if (!allow_unsafe_interrupts &&
->> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
->> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
->> +		!(vfio_msi_resv(iommu) && iommu_msi_doorbell_safe()))) {
->>  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
->>  		       __func__);
->>  		ret = -EPERM;
-> 
-> I understand from the other discussions that you will respin these
-> series, but anyway I have tested this version with GICV3 + ITS and it
-> stops here. As I have a GICv3 I am not supposed to enable allow unsafe
-> interrupts. What I see is that vfio_msi_resv returns false just because
-> the iommu->domain_list list is empty. The newly created domain is
-> actually added to the domain_list at the end of this function, so it
-> seems normal for the list to be empty at this point.
+It's not beyond the realms of possibility that ld will grow a
+"fix-cortex-a53" option in the future, that enables all of the a53
+workarounds. Since ld is the linker supported by the kernel and gold isn't,
+I don't want to pass this option down.
 
-Thanks for reporting the issue. You are fully right. I must have missed
-that test. I should just check the current iommu_domain attribute I think.
+If you can't change toolchain and you want this worked around, why can't you
+either build gold with it enabled by default, or pass the extra flag on the
+command line to the kernel build system?
 
-waiting for a fix, please probe the vfio_iommu_type1 module with
-allow_unsafe_interrupts=1
-
-Thanks
-
-Eric
-> 
-> Thanks,
-> 
-> Diana
-> 
-> 
+Will
