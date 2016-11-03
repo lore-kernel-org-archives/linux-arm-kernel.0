@@ -1,30 +1,56 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 3 Nov 2016 10:06:27 +0000
-Subject: [PATCH V3 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
-In-Reply-To: <1477576872-2665-2-git-send-email-mirza.krak@gmail.com>
+Date: Thu, 3 Nov 2016 10:15:57 +0000
+Subject: [PATCH V3 4/6] ARM: tegra: Add Tegra30 GMI support
+In-Reply-To: <1477576872-2665-5-git-send-email-mirza.krak@gmail.com>
 References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
- <1477576872-2665-2-git-send-email-mirza.krak@gmail.com>
-Message-ID: <df12a1f0-316d-64a4-54fe-f7559742eeca@nvidia.com>
+ <1477576872-2665-5-git-send-email-mirza.krak@gmail.com>
+Message-ID: <d1c2fe5d-fb20-459a-2f85-95df8fb777a2@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mirza,
 
 On 27/10/16 15:01, Mirza Krak wrote:
 > From: Mirza Krak <mirza.krak@gmail.com>
 >
-> Add TEGRA20_CLK_NOR to init table and set default rate to 92 MHz which
-> is max rate.
+> Add a device node for the GMI controller found on Tegra30.
 >
-> The maximum rate value of 92 MHz is pulled from the downstream L4T
-> kernel.
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
+> ---
+>
+> Changes in v2:
+> - added address-cells, size-cells and ranges properties
+>
+> Changes in v3:
+> - no changes
+>
+>  arch/arm/boot/dts/tegra30.dtsi | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+> index 5030065..bbb1c00 100644
+> --- a/arch/arm/boot/dts/tegra30.dtsi
+> +++ b/arch/arm/boot/dts/tegra30.dtsi
+> @@ -439,6 +439,19 @@
+>  		status = "disabled";
+>  	};
+>
+> +	gmi at 70009000 {
+> +		compatible = "nvidia,tegra30-gmi";
+> +		reg = <0x70009000 0x1000>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x48000000 0x7ffffff>;
+> +		clocks = <&tegra_car TEGRA30_CLK_NOR>;
+> +		clock-names = "gmi";
+> +		resets = <&tegra_car 42>;
+> +		reset-names = "gmi";
+> +		status = "disabled";
+> +	};
+> +
 
-Thanks for adding this. I assume that this is from an L4T r16 release 
-with a v3.1 kernel. I had a quick poke through the kernel sources for 
-v3.1 but was unable to see where this is set. Obviously v3.1 did not 
-have CCF and so everything seems to be in the arch/arm/mach-tegra 
-directory for setting up clocks. Can you point me to the appropriate 
-sources so I can ACK this?
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
 
 Cheers
 Jon
