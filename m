@@ -1,137 +1,80 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 3 Nov 2016 12:11:19 +0100
-Subject: [PATCH 01/10] Documentation: dt-bindings: Document STM32 ADC DT
- bindings
-In-Reply-To: <20161031030222.vjxcxklpaua3o77d@rob-hp-laptop>
-References: <1477412722-24061-1-git-send-email-fabrice.gasnier@st.com>
- <1477412722-24061-2-git-send-email-fabrice.gasnier@st.com>
- <20161031030222.vjxcxklpaua3o77d@rob-hp-laptop>
-Message-ID: <37fc7ac7-8b99-9f21-d9d7-de2e217eb4cd@st.com>
+From: asavkov@redhat.com (Artem Savkov)
+Date: Thu, 3 Nov 2016 12:12:38 +0100
+Subject: arm64 build failure with CONFIG_ARM64_LSE_ATOMICS=y
+In-Reply-To: <1efb101a-a8ab-5ad9-f2bd-e7d485c71904@arm.com>
+References: <20161102164427.GB24243@shodan.usersys.redhat.com>
+ <20161102232854.GO22791@arm.com>
+ <1efb101a-a8ab-5ad9-f2bd-e7d485c71904@arm.com>
+Message-ID: <20161103111238.GC24243@shodan.usersys.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2016 04:02 AM, Rob Herring wrote:
-> On Tue, Oct 25, 2016 at 06:25:13PM +0200, Fabrice Gasnier wrote:
->> This patch adds documentation of device tree bindings for the STM32 ADC.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>   .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 78 ++++++++++++++++++++++
->>   1 file changed, 78 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> new file mode 100644
->> index 0000000..a9a8b3c
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> @@ -0,0 +1,78 @@
->> +STMicroelectronics STM32 ADC device driver
->> +
->> +STM32 ADC is a successive approximation analog-to-digital converter.
->> +It has several multiplexed input channels. Conversions can be performed
->> +in single, continuous, scan or discontinuous mode. Result of the ADC is
->> +stored in a left-aligned or right-aligned 32-bit data register.
->> +Conversions can be launched in software or using hardware triggers.
->> +
->> +The analog watchdog feature allows the application to detect if the input
->> +voltage goes beyond the user-defined, higher or lower thresholds.
->> +
->> +Each STM32 ADC block can have up to 3 ADC instances.
->> +
->> +Each instance supports two contexts to manage conversions, each one has its
->> +own configurable sequence and trigger:
->> +- regular conversion can be done in sequence, running in background
->> +- injected conversions have higher priority, and so have the ability to
->> +  interrupt regular conversion sequence (either triggered in SW or HW).
->> +  Regular sequence is resumed, in case it has been interrupted.
->> +
->> +Required properties:
->> +- compatible: Should be "st,stm32f4-adc".
->> +- reg: Offset and length of the ADC block register set.
->> +- interrupts: Must contain the interrupt for ADC.
->> +- clocks: Clock for the analog circuitry (common to all ADCs).
->> +- clock-names: Must be "adc".
->> +- vref-supply: Phandle to the vref input analog reference voltage.
->> +- #address-cells = <1>;
->> +- #size-cells = <0>;
->> +
->> +Optional properties:
->> +- A pinctrl state named "default" for each ADC channel may be defined to set
->> +  inX ADC pins in mode of operation for analog input on external pin.
->> +- gpios: Array of gpios that may be configured as EXTi trigger sources.
->> +
->> +Example:
-> This should be last.
-Hi Rob,
+On Thu, Nov 03, 2016 at 10:39:43AM +0000, Suzuki K Poulose wrote:
+> On 02/11/16 23:28, Will Deacon wrote:
+> > Hi Artem,
+> > 
+> > On Wed, Nov 02, 2016 at 05:44:27PM +0100, Artem Savkov wrote:
+> > > Hello Catalin,
+> > > 
+> > > Looks like your patch "efd9e03 arm64: Use static keys for CPU features"
+> > > breaks arm64 build with "CONFIG_ARM64_LSE_ATOMICS=y" because it creates a
+> > > circular dependency for asm/lse.h through jump_label.h:
+> > > 
+> > >   CC      arch/arm64/kernel/asm-offsets.s
+> > > In file included from ./arch/arm64/include/asm/atomic.h:34:0,
+> > >                  from ./include/linux/atomic.h:4,
+> > >                  from ./include/linux/jump_label.h:169,
+> > >                  from ./arch/arm64/include/asm/cpufeature.h:12,
+> > >                  from ./arch/arm64/include/asm/alternative.h:4,
+> > >                  from ./arch/arm64/include/asm/lse.h:7,
+> > >                  from ./arch/arm64/include/asm/spinlock.h:19,
+> > >                  from ./include/linux/spinlock.h:87,
+> > >                  from ./include/linux/seqlock.h:35,
+> > >                  from ./include/linux/time.h:5,
+> > >                  from ./include/uapi/linux/timex.h:56,
+> > >                  from ./include/linux/timex.h:56,
+> > >                  from ./include/linux/sched.h:19,
+> > >                  from arch/arm64/kernel/asm-offsets.c:21:
+> > > ./arch/arm64/include/asm/atomic_lse.h: In function ?atomic_andnot?:
+> > > ./arch/arm64/include/asm/atomic_lse.h:35:15: error: expected string literal before ?	?
+> > >   asm volatile(ARM64_LSE_ATOMIC_INSN(__LL_SC_ATOMIC(op),  \
+> > > 
+> > > ...
+> > > 
+> > > ./arch/arm64/include/asm/cmpxchg.h: In function ?__xchg_case_1?:
+> > > ./arch/arm64/include/asm/cmpxchg.h:38:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
+> > >   asm volatile(ARM64_LSE_ATOMIC_INSN(    \
+> > 
+> > I'm unable to reproduce this. I've tried enabling LSE with defconfig and
+> > mainline, using compilers that both do and don't support the instructions.
+> 
+> I am not able to reproduce it either. One minor problem I see with the commit could
+> be fixed with the following change : Does it help ?
 
-I'll fix this.
->
->> +	adc: adc at 40012000 {
->> +		compatible = "st,stm32f4-adc";
->> +		reg = <0x40012000 0x400>;
->> +		interrupts = <18>;
->> +		clocks = <&rcc 0 168>;
->> +		clock-names = "adc";
->> +		vref-supply = <&reg_vref>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&adc3_in8_pin>;
->> +		gpios = <&gpioa 11 0>,
->> +			<&gpioa 15 0>;
->> +
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		adc1: adc1-master at 0 {
-> adc at 0 sufficient?
-Yes, if you agree, I'd go for adc1 at 0, adc2 at 100, adc3 at 200, to reflect reg 
-property for child node.
-Is it ok from your point of view ?
+Apparently it fails with an older gcc (4.8.5), but doesn't with 6.2.0.
+The different bit is that with 4.8.5 I don't have CC_HAVE_ASM_GOTO set.
+It is reproducible with 6.2.0 if you manually remove CC_HAVE_ASM_GOTO.
 
->
->> +			#io-channel-cells = <1>;
->> +			reg = <0x0>;
->> +			clocks = <&rcc 0 168>;
->> +			st,adc-channels = <8>;
->> +		};
->> +		...
->> +		other adc child nodes follow...
->> +	};
->> +
->> +Contents of a stm32 adc child node:
->> +-----------------------------------
->> +An ADC block node should contain at least one subnode, representing an
->> +ADC instance available on the machine.
->> +
->> +Required properties:
->> +- reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
->> +- st,adc-channels: List of single-ended channels muxed for this ADC.
-> How many? What are valid values?
-stm32f4 can have up to 19 channels, numbered from 0 to 18 to match with 
-reference manual.
-I'll add this.
->
->> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
->> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
->> +
->> +Optional properties:
->> +- clocks: Input clock private to this ADC instance.
->> +- st,injected: Use injected conversion sequence on an ADC, rather than regular.
-> Not sure about this one. Seems like this would either be a user choice
-> or depend on what's connected to the ADC.
-It's related to ADC sequencer, and the way it's being configured/used 
-(see above paragraph on regular/injected).
-This is not related to what's connected to adc inputs.
-As suggested by Jonathan, I think I'll drop injected support for now, to 
-simplify the driver and review.
+> ----8>-----
+> 
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index 758d74f..62db988 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -9,7 +9,6 @@
+>  #ifndef __ASM_CPUFEATURE_H
+>  #define __ASM_CPUFEATURE_H
+> -#include <linux/jump_label.h>
+>  #include <asm/hwcap.h>
+>  #include <asm/sysreg.h>
+> @@ -45,6 +44,7 @@
+>  #ifndef __ASSEMBLY__
+> +#include <linux/jump_label.h>
+>  #include <linux/kernel.h>
+>  /* CPU feature register tracking */
 
-Thanks,
-Best Regards,
-Fabrice
->
->> +- dmas: Phandle to dma channel for this ADC instance, only for regular
->> +  conversions. See ../../dma/dma.txt for details.
->> +- dma-names: Must be "rx" when dmas property is being used.
->> -- 
->> 1.9.1
->>
+No, this doesn't help.
+
+-- 
+Regards,
+  Artem
