@@ -1,101 +1,63 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 2 Nov 2016 22:51:02 -0500
-Subject: [PATCH v4 6/8] dt-bindings: Add support for Amlogic GXBB SCPI
- Interface
-In-Reply-To: <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
-References: <1475652814-30619-1-git-send-email-narmstrong@baylibre.com>
- <1475652814-30619-7-git-send-email-narmstrong@baylibre.com>
- <CAOesGMjY5_ibP7E9+DBf30nuV+2z2kecLv_ddnHjp3txuq+Kdg@mail.gmail.com>
- <20161102222050.GA32189@e106835-lin.cambridge.arm.com>
-Message-ID: <CAL_JsqJWABnX1-6SHZL8SOSt4OSPbTyXrCqTYCkXgxuO87gN-A@mail.gmail.com>
+From: cov@codeaurora.org (cov at codeaurora.org)
+Date: Wed, 02 Nov 2016 22:11:16 -0600
+Subject: [PATCH 1/1] KVM: ARM64: Fix the issues when PMCCFILTR is
+ configured
+In-Reply-To: <1478120132-9928-1-git-send-email-wei@redhat.com>
+References: <1478120132-9928-1-git-send-email-wei@redhat.com>
+Message-ID: <db2cdc7caf7dc40b0895e1b6f91c7758@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 2, 2016 at 5:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On Sat, Oct 29, 2016 at 11:39:05AM -0700, Olof Johansson wrote:
->> Hi,
->>
->>
->> On Wed, Oct 5, 2016 at 12:33 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> > Acked-by: Rob Herring <robh@kernel.org>
->> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> > ---
->> >  Documentation/devicetree/bindings/arm/arm,scpi.txt | 8 +++++---
->> >  1 file changed, 5 insertions(+), 3 deletions(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> > index faa4b44..04bc171 100644
->> > --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> > +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> > @@ -7,7 +7,7 @@ by Linux to initiate various system control and power operations.
->> >
->> >  Required properties:
->> >
->> > -- compatible : should be "arm,scpi"
->> > +- compatible : should be "arm,scpi" or "amlogic,meson-gxbb-scpi"
->>
->> This doesn't seem right to document here. If anything you might want
->> to have a table of more-specific-compatibles for specific
->> implementations, but "arm,scpi" should still be the compatible of the
->> node (just not the most specific one).
->>
->
-> I completely agree with you and I was pushing for a generic "arm,legacy-scpi"
-> compatible until this binding was acked by Rob.
+Hi Wei,
 
-Just because I ack something, that doesn't mean don't review or
-comment on it further.
+On 2016-11-02 14:55, Wei Huang wrote:
+> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is 
+> configured.
+> But this function can't deals with PMCCFILTR correctly because the 
+> evtCount
+> bit of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
+> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, 
+> KVM
+> shouldn't return immediately, but instead it needs to check further if
+> select_idx is ARMV8_PMU_CYCLE_IDX.
+> 
+> Another issue is that KVM shouldn't copy the eventsel bits of 
+> PMCCFILTER
+> directly to attr.config. Istead it shoudl convert the request to
+> perf_event of type 0x11 (i.e. the "cpu cycle" event type).
+> 
+> Signed-off-by: Wei Huang <wei@redhat.com>
+> ---
+>  virt/kvm/arm/pmu.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 6e9c40e..13cc812 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct
+> kvm_vcpu *vcpu, u64 data,
+>  	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
+> 
+>  	/* Software increment event does't need to be backed by a perf event 
+> */
+> -	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
+> +	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR &&
+> +	    select_idx != ARMV8_PMU_CYCLE_IDX)
+>  		return;
+> 
+>  	memset(&attr, 0, sizeof(struct perf_event_attr));
+> @@ -391,7 +392,7 @@ void kvm_pmu_set_counter_event_type(struct
+> kvm_vcpu *vcpu, u64 data,
+>  	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
+>  	attr.exclude_hv = 1; /* Don't count EL2 events */
+>  	attr.exclude_host = 1; /* Don't count host events */
+> -	attr.config = eventsel;
+> +	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ? 0x011 : eventsel;
 
->
-> Anyways, I will add the generic compatible and post the changes.
->
->> Also, documenting it here indiciates that non-amlogic implementations
->> can/should use that compatible, which is misleading.
->>
->
-> Agreed, it's better to keep them out of this generic binding document.
->
->> >  - mboxes: List of phandle and mailbox channel specifiers
->> >           All the channels reserved by remote SCP firmware for use by
->> >           SCPI message protocol should be specified in any order
->> > @@ -60,7 +60,8 @@ A small area of SRAM is reserved for SCPI communication between application
->> >  processors and SCP.
->> >
->> >  Required properties:
->> > -- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
->> > +- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno,
->> > +               or "amlogic,meson-gxbb-sram" for Amlogic GXBB SoC.
->>
->> Maybe you'd be better of with a meson-specific document that refers to
->> these but with different compatible values.
->>
->> Come to think of it, the Juno-specific one maybe shouldn't be in
->> arm,scpi at all, since that adds confusion here.
->>
->> It's somewhat confusing that ARM is both a platform, architecture and
->> in some cases implementer of specific systems. :)
->>
->
-> Sorry for that, I will move all juno specific references in the binding
-> out of this document(except the examples, which I assume should be fine)
->
->> >  The rest of the properties should follow the generic mmio-sram description
->> >  found in ../../sram/sram.txt
->> > @@ -70,7 +71,8 @@ Each sub-node represents the reserved area for SCPI.
->> >  Required sub-node properties:
->> >  - reg : The base offset and size of the reserved area with the SRAM
->> >  - compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
->> > -              shared memory on Juno platforms
->> > +              shared memory on Juno platforms or
->> > +              "amlogic,meson-gxbb-scp-shmem" for Amlogic GXBB SoC.
->>
->> Same here. It won't scale if all vendors are expected to add an entry here.
->>
->
-> I will rework the patches to address the concerns as I too did share same
-> concern.
+Nit: Is there some way you could use ARMV8_PMUV3_PERFCTR_CPU_CYCLES 
+currently
+defined in arch/arm64/kernel/perf_event.c?
 
-Guess I was optimistic that *every* platform wouldn't be different in
-some way. I should know better by now...
-
-Rob
+Thanks,
+Cov
