@@ -1,106 +1,56 @@
-From: diana.craciun@nxp.com (Diana Madalina Craciun)
-Date: Thu, 3 Nov 2016 13:45:11 +0000
-Subject: [PATCH v14 14/16] vfio/type1: Check doorbell safety
-References: <1476278544-3397-1-git-send-email-eric.auger@redhat.com>
- <1476278544-3397-15-git-send-email-eric.auger@redhat.com>
-Message-ID: <HE1PR04MB1321EAD1CE91D2B6FC04BB55FFA30@HE1PR04MB1321.eurprd04.prod.outlook.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 3 Nov 2016 13:45:04 +0000
+Subject: [PATCH V3 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
+In-Reply-To: <CALw8SCWC7RmNLVv4vxO9xw3jHVkgCaevbL61sJcpcva9CiaAVQ@mail.gmail.com>
+References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
+ <1477576872-2665-2-git-send-email-mirza.krak@gmail.com>
+ <df12a1f0-316d-64a4-54fe-f7559742eeca@nvidia.com>
+ <CALw8SCWyLAw=yZ-W_nAFuDAazpa4HJfZuzqLDKQKYLWjV5JzYw@mail.gmail.com>
+ <CALw8SCWC7RmNLVv4vxO9xw3jHVkgCaevbL61sJcpcva9CiaAVQ@mail.gmail.com>
+Message-ID: <db982af8-28e1-bc63-3272-d40cb640dd45@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
 
-On 10/12/2016 04:23 PM, Eric Auger wrote:
-> On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
-> by the msi controller.
+On 03/11/16 12:30, Mirza Krak wrote:
+> 2016-11-03 13:26 GMT+01:00 Mirza Krak <mirza.krak@gmail.com>:
+>> 2016-11-03 11:06 GMT+01:00 Jon Hunter <jonathanh@nvidia.com>:
+>>> Hi Mirza,
+>>>
+>>> On 27/10/16 15:01, Mirza Krak wrote:
+>>>>
+>>>> From: Mirza Krak <mirza.krak@gmail.com>
+>>>>
+>>>> Add TEGRA20_CLK_NOR to init table and set default rate to 92 MHz which
+>>>> is max rate.
+>>>>
+>>>> The maximum rate value of 92 MHz is pulled from the downstream L4T
+>>>> kernel.
+>>>
+>>>
+>>> Thanks for adding this. I assume that this is from an L4T r16 release with a
+>>> v3.1 kernel. I had a quick poke through the kernel sources for v3.1 but was
+>>> unable to see where this is set. Obviously v3.1 did not have CCF and so
+>>> everything seems to be in the arch/arm/mach-tegra directory for setting up
+>>> clocks. Can you point me to the appropriate sources so I can ACK this?
+>>
+>> I use the kernel sources provided by Toradex, and these sources are
+>> based on L4T r16 release.
+>>
+>> http://git.toradex.com/cgit/linux-toradex.git/tree/arch/arm/mach-tegra/tegra2_clocks.c?h=tegra#n2463
 >
-> Since we currently have no way to detect whether the MSI controller is
-> upstream or downstream to the IOMMU we rely on the MSI doorbell information
-> registered by the interrupt controllers. In case at least one doorbell
-> does not implement proper isolation, we state the assignment is unsafe
-> with regard to interrupts. This is a coarse assessment but should allow to
-> wait for a better system description.
+> Ops, pre-mature send.
 >
-> At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
-> removed in next patch.
+> I also added Marcel from Toradex on CC.
 >
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> The link to the source are [1] for Tegra2 and  [2] for Tegra3.
 >
-> ---
-> v13 -> v15:
-> - check vfio_msi_resv before checking whether msi doorbell is safe
->
-> v9 -> v10:
-> - coarse safety assessment based on MSI doorbell info
->
-> v3 -> v4:
-> - rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
->   and irq_remapping into safe_irq_domains
->
-> v2 -> v3:
-> - protect vfio_msi_parent_irq_remapping_capable with
->   CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> ---
->  drivers/vfio/vfio_iommu_type1.c | 30 +++++++++++++++++++++++++++++-
->  1 file changed, 29 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index e0c97ef..c18ba9d 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -442,6 +442,29 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
->  }
->  
->  /**
-> + * vfio_msi_resv - Return whether any VFIO iommu domain requires
-> + * MSI mapping
-> + *
-> + * @iommu: vfio iommu handle
-> + *
-> + * Return: true of MSI mapping is needed, false otherwise
-> + */
-> +static bool vfio_msi_resv(struct vfio_iommu *iommu)
-> +{
-> +	struct iommu_domain_msi_resv msi_resv;
-> +	struct vfio_domain *d;
-> +	int ret;
-> +
-> +	list_for_each_entry(d, &iommu->domain_list, next) {
-> +		ret = iommu_domain_get_attr(d->domain, DOMAIN_ATTR_MSI_RESV,
-> +					    &msi_resv);
-> +		if (!ret)
-> +			return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +/**
->   * vfio_set_msi_aperture - Sets the msi aperture on all domains
->   * requesting MSI mapping
->   *
-> @@ -945,8 +968,13 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  	INIT_LIST_HEAD(&domain->group_list);
->  	list_add(&group->next, &domain->group_list);
->  
-> +	/*
-> +	 * to advertise safe interrupts either the IOMMU or the MSI controllers
-> +	 * must support IRQ remapping (aka. interrupt translation)
-> +	 */
->  	if (!allow_unsafe_interrupts &&
-> -	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
-> +	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
-> +		!(vfio_msi_resv(iommu) && iommu_msi_doorbell_safe()))) {
->  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
->  		       __func__);
->  		ret = -EPERM;
+> [1]. http://git.toradex.com/cgit/linux-toradex.git/tree/arch/arm/mach-tegra/tegra2_clocks.c?h=tegra#n2463
+> [2]. http://git.toradex.com/cgit/linux-toradex.git/tree/arch/arm/mach-tegra/tegra3_clocks.c?h=tegra#n4353
 
-I understand from the other discussions that you will respin these
-series, but anyway I have tested this version with GICV3 + ITS and it
-stops here. As I have a GICv3 I am not supposed to enable allow unsafe
-interrupts. What I see is that vfio_msi_resv returns false just because
-the iommu->domain_list list is empty. The newly created domain is
-actually added to the domain_list at the end of this function, so it
-seems normal for the list to be empty at this point.
+Great. Yes I see the same. Thanks!
 
-Thanks,
+Jon
 
-Diana
+-- 
+nvpublic
