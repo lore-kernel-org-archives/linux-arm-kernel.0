@@ -1,59 +1,67 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Thu, 3 Nov 2016 10:27:38 +0800
-Subject: [PATCH 1/2] arm64: hugetlb: remove the wrong pmd check in
- find_num_contig()
+Date: Thu, 3 Nov 2016 10:27:39 +0800
+Subject: [PATCH 2/2] arm64: hugetlb: fix the wrong address for several
+ functions
 In-Reply-To: <1478140059-13829-1-git-send-email-shijie.huang@arm.com>
 References: <1478140059-13829-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1478140059-13829-2-git-send-email-shijie.huang@arm.com>
+Message-ID: <1478140059-13829-3-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The find_num_contig() will return 1 when the pmd is not present.
-It will cause a kernel dead loop in the following scenaro:
+The libhugetlbfs meets several failures since the following functions
+do not use the correct address:
+   huge_ptep_get_and_clear()
+   huge_ptep_set_access_flags()
+   huge_ptep_set_wrprotect()
+   huge_ptep_clear_flush()
 
-   1.) pmd entry is not present.
-
-   2.) the page fault occurs:
-       ... hugetlb_fault() --> hugetlb_no_page() --> set_huge_pte_at()
-
-   3.) set_huge_pte_at() will only set the first PMD entry, since the
-       find_num_contig just return 1 in this case. So the PMD entries
-       are all empty except the first one.
-
-   4.) when kernel accesses the address mapped by the second PMD entry,
-       a new page fault occurs:
-       ... hugetlb_fault() --> huge_ptep_set_access_flags()
-
-       The second PMD entry is still empty now.
-
-   5.) When the kernel returns, the access will cause a page fault again.
-       The kernel will run like the "4)" above.
-       We will see a dead loop since here.
-
-The dead loop is caught in the 32M hugetlb page (2M PMD + Contiguous bit).
-
-This patch removes wrong pmd check, and fixes this dead loop.
+This patch fixes the wrong address for them.
 
 Acked-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 ---
- arch/arm64/mm/hugetlbpage.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 2e49bd2..4811ef1 100644
+index 4811ef1..0e9401b 100644
 --- a/arch/arm64/mm/hugetlbpage.c
 +++ b/arch/arm64/mm/hugetlbpage.c
-@@ -61,10 +61,6 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 		return 1;
- 	}
- 	pmd = pmd_offset(pud, addr);
--	if (!pmd_present(*pmd)) {
--		VM_BUG_ON(!pmd_present(*pmd));
--		return 1;
--	}
- 	if ((pte_t *)pmd == ptep) {
- 		*pgsize = PMD_SIZE;
- 		return CONT_PMDS;
+@@ -208,7 +208,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
+ 		/* save the 1st pte to return */
+ 		pte = ptep_get_and_clear(mm, addr, cpte);
+-		for (i = 1; i < ncontig; ++i) {
++		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
+ 			/*
+ 			 * If HW_AFDBM is enabled, then the HW could
+ 			 * turn on the dirty bit for any of the page
+@@ -246,7 +246,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 		pfn = pte_pfn(*cpte);
+ 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+ 					  *cpte, &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte) {
++		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
+ 			changed = ptep_set_access_flags(vma, addr, cpte,
+ 							pfn_pte(pfn,
+ 								hugeprot),
+@@ -269,7 +269,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 
+ 		cpte = huge_pte_offset(mm, addr);
+ 		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte)
++		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+ 			ptep_set_wrprotect(mm, addr, cpte);
+ 	} else {
+ 		ptep_set_wrprotect(mm, addr, ptep);
+@@ -287,7 +287,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 		cpte = huge_pte_offset(vma->vm_mm, addr);
+ 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
+ 					  *cpte, &pgsize);
+-		for (i = 0; i < ncontig; ++i, ++cpte)
++		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
+ 			ptep_clear_flush(vma, addr, cpte);
+ 	} else {
+ 		ptep_clear_flush(vma, addr, ptep);
 -- 
 2.5.5
