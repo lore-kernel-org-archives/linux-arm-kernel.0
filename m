@@ -1,117 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 3 Nov 2016 09:54:45 +0000
-Subject: [PATCH 0/5] drm/sun4i: Handle TV overscan
-In-Reply-To: <20161103090106.dq2bn4z7m2hzhi53@lukather>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <20161018092422.GJ1041@n2100.armlinux.org.uk>
- <20161018100349.qm2f554oiwyjwrsi@lukather>
- <20161031084233.GS1041@n2100.armlinux.org.uk>
- <20161103090106.dq2bn4z7m2hzhi53@lukather>
-Message-ID: <20161103095444.GX1041@n2100.armlinux.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 3 Nov 2016 10:57:58 +0100
+Subject: how to enable suspend to ram for arm-64 bits
+In-Reply-To: <20161019131145.GA11036@leverpostej>
+References: <CADUS3onCMDThNK2ZwSSjGZhPE0M6cybjgCHJR2wVVeK09GC6ng@mail.gmail.com>
+ <06a4f0d7-9022-578d-99e0-ddcde31ed895@arm.com>
+ <CADUS3onUDk_=UpRoZy1m0hV1VGZYSf22ea8D10MpDbqJCfTkqw@mail.gmail.com>
+ <82ddd0e1-9ecc-5e54-e8ee-86f947fc0ecd@arm.com>
+ <20161018100002.GA4347@xo-6d-61-c0.localdomain>
+ <20161018104539.GB15639@leverpostej> <20161019094227.GB1461@amd>
+ <20161019131145.GA11036@leverpostej>
+Message-ID: <20161103095758.GA7973@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 10:01:06AM +0100, Maxime Ripard wrote:
-> Hi Russell,
+On Wed 2016-10-19 14:11:45, Mark Rutland wrote:
+> On Wed, Oct 19, 2016 at 11:42:27AM +0200, Pavel Machek wrote:
+> > On Tue 2016-10-18 11:45:39, Mark Rutland wrote:
 > 
-> On Mon, Oct 31, 2016 at 08:42:34AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Oct 18, 2016 at 12:03:49PM +0200, Maxime Ripard wrote:
-> > > The first one is that this overscanning should be reported by the
-> > > connector I guess? but this is really TV specific, so we need one way
-> > > to let the user tell how the image is displayed on its side, and we
-> > > cannot really autodetect it, and this needs to be done at runtime so
-> > > that we can present some shiny interface to let it select which
-> > > overscan ratio works for him/her.
-> > 
-> > See xbmc... they go through a nice shiny setup which includes adjusting
-> > the visible area.  From what I remember, it has pointers on each corner
-> > which you can adjust to be just visible on the screen, so xbmc knows
-> > how much overscan there is, and xbmc itself reduces down to the user
-> > set size.
-
-I was replying to your comment "so we need one way to let the user tell
-how the image is displayed".
-
-> Yes. And that is an XBMC only solution, that doesn't work with the
-> fbdev emulation and is probably doing an additional composition to
-> scale down and center their frames through OpenGL.
-
-Well, it will have to be doing a scaling step anyway.  If the video
-frame is a different size to the active area, scaling is required
-no matter what.  A 576p SD image needs to be scaled up, and a 1080p
-image would need to be scaled down for a 1080p overscanned display
-with a reduced active area to counter the overscanning - no matter
-how you do it.
-
-For graphics, userspace could add mode(s) with increased porches and
-reduced active area itself to achieve an underscanned display on a
-timing which the display device always overscans - there's no need to
-do that in the kernel, all the APIs are there to be able to do it
-already.
-
-That means your framebuffer will be smaller, but that's the case
-anyway.
-
-> > > The second one is that we still need to expose the reduced modes to
-> > > userspace, and not only the displayed size, so that the applications
-> > > know what they must draw on. But I guess this could be adjusted by the
-> > > core too.
-> > > 
-> > > In order to work consistently, I think all planes should be adjusted
-> > > that way, so that relative coordinates are from the primary plane
-> > > origin, and not the display origin. But that could be adjusted too by
-> > > the core I guess.
-> > 
-> > I'm not sure about that - we want the graphics to be visible, but that
-> > may not be appropriate for an video overlay frame.  It's quite common
-> > for (eg) broadcast video to contain dead pixels or other artifacts on
-> > the right hand side, and the broadcast video expects overscan to be
-> > present.
-> >
-> > I know this because I have run my TV with overscan disabled, even for
-> > broadcast TV.
+> > Either the lowlevel suspend code is stable and bug free, and then
+> > having that code is not a problem.
 > 
-> I know, but on this particular hardware, composite really is just
-> another video output. There's not even a TV receiver in it, so I don't
-> think we have to worry about it.
+> This ignores the cost of maintaining that code. Kernel APIs change over
+> time, and no code is ever completely stable, even if at one point in
+> time it happens to be bug-free.
 
-Whether or not there's a TV receiver is irrelevant - if you can decode
-broadcast video, then you run into the problem.  For example, if you
-plug in a USB DVB stick, stream it across the network, etc.
+Well, kernel interfaces only change when there's good reason for a
+change, and if you force stable binary interface to external
+component, and there _is_ need for a change, we are all screwed.
 
-Remember, you're proposing a generic solution, so making arguments
-about things that are not possible with your specific hardware isn't
-really that relevant to a generic solution.
-
-So, I may want my graphics to appear on an overscanned display such
-that I can see the borders, but I may want the overlaid video to use
-the full active area (including overscan) to hide some of the broadcast
-mess at the edges of the screen.
-
-> > Yea, that's quite sad, "analog" has become a dirty word, but really
-> > this has nothing to do with "analog" at all - there are LCD TVs (and
-> > some monitors) out there which take HDMI signals but refuse to
-> > disable overscan no matter what you do to them if you provide them
-> > with a "broadcast"  mode - so the analog excuse is very poor.
+> > BSD is better than closed source, but it also means that you will not
+> > get the sources from your hw vendor.
 > 
-> I'd agree with you, but I was also told to not turn that into a
-> generic code and deal with that in my driver.
+> That depends on your hardware vendor, as always. There are a number of
+> platform ports in the upstream ATF repo.
+> 
+> It's also worth considering that a number of 32-bit arm parts require
+> closed firmware (as far as I can tell, including the N900).
 
-I guess whoever told you that was wrong.  I used to have a cheap TV
-here which took HDMI, and always overscans broadcast modes, and
-underscans PC modes.  No amount of fiddling with various settings
-(either in the TV or AVI frames) changes that.
+Yeah, but we are trying to remove closed firmware. Don't make people
+add more of it...
 
-I've run into that with a _monitor_ that Andrew Hutton has, which has
-a HDMI input - exactly the same thing - 1080p, 720p etc are all
-unconditionally overscanned, 1024x768 etc are all unconditionally
-underscanned and there's nothing that can be done to change it.
+> > Being separate module means it will be hard to debug, in area where
+> > debugging is already pretty hard.
+> 
+> It can be harder, yes. There are also benefits, given the same code can
+> be tested on a variety of platforms.
 
-The problem is that TVs are at liberty to have this behaviour, so
-the overscaned problem is always going to be there, and each driver
-should not be dealing with it in their own specific ways.
+What benefits? You are able to share code between platforms in kernel,
+too.
 
+> > Can it do advanced stuff like deep powersaving on N900 idle?
+> 
+> Sorry, I don't know precisely what you're referring to.
+> 
+> It can do things like shutting down entire CPU clusters (and IIRC
+> associated interconnect) when all relevant CPUs are idle, if that's what
+> you mean.
+
+I mean equivalent power savings between idle system and system in
+s2ram.
+
+Best regards,
+									Pavel
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/b3b419d1/attachment.sig>
