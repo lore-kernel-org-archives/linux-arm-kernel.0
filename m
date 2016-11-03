@@ -1,63 +1,91 @@
-From: cov@codeaurora.org (cov at codeaurora.org)
-Date: Wed, 02 Nov 2016 22:11:16 -0600
-Subject: [PATCH 1/1] KVM: ARM64: Fix the issues when PMCCFILTR is
- configured
-In-Reply-To: <1478120132-9928-1-git-send-email-wei@redhat.com>
-References: <1478120132-9928-1-git-send-email-wei@redhat.com>
-Message-ID: <db2cdc7caf7dc40b0895e1b6f91c7758@codeaurora.org>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 2 Nov 2016 23:20:42 -0500
+Subject: [PATCH] ARM: davinci: da850: Fix pwm name matching
+In-Reply-To: <b5da35a5-de11-0aff-9107-1640f5f164cf@ti.com>
+References: <1477418044-24603-1-git-send-email-david@lechnology.com>
+ <b4f6970b-5723-d1ed-088e-3c07129a005f@ti.com>
+ <3fd93d1b-8ba2-5440-e37d-0c55928e7e51@lechnology.com>
+ <b5da35a5-de11-0aff-9107-1640f5f164cf@ti.com>
+Message-ID: <4ae45a27-3484-9d2c-4857-83d669851e72@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wei,
+On 11/01/2016 05:31 AM, Sekhar Nori wrote:
+> On Monday 31 October 2016 08:18 PM, David Lechner wrote:
+>> On 10/31/2016 05:18 AM, Sekhar Nori wrote:
+>>> On Tuesday 25 October 2016 11:24 PM, David Lechner wrote:
+>>>> This fixes pwm name matching for DA850 familiy devices. When using
+>>>> device
+>>>> tree, the da850_auxdata_lookup[] table caused pwm devices to have the
+>>>> exact
+>>>> same name, which caused errors when trying to register the devices.
+>>>>
+>>>> The names for clock matching in da850_clks[] also have to be updated to
+>>>> to exactly match in order for the clock lookup to work correctly.
+>>>>
+>>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>>> ---
+>>>>
+>>>> Tested working on LEGO MINDSTORMS EV3.
+>>>>
+>>>>
+>>>>  arch/arm/mach-davinci/da850.c    | 10 +++++++---
+>>>>  arch/arm/mach-davinci/da8xx-dt.c | 10 +++++-----
+>>>>  2 files changed, 12 insertions(+), 8 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-davinci/da850.c
+>>>> b/arch/arm/mach-davinci/da850.c
+>>>> index ed3d0e9..6b78a8f 100644
+>>>> --- a/arch/arm/mach-davinci/da850.c
+>>>> +++ b/arch/arm/mach-davinci/da850.c
+>>>> @@ -510,9 +510,13 @@ static struct clk_lookup da850_clks[] = {
+>>>>      CLK("vpif",        NULL,        &vpif_clk),
+>>>>      CLK("ahci_da850",        NULL,        &sata_clk),
+>>>>      CLK("davinci-rproc.0",    NULL,        &dsp_clk),
+>>>> -    CLK("ehrpwm",        "fck",        &ehrpwm_clk),
+>>>> -    CLK("ehrpwm",        "tbclk",    &ehrpwm_tbclk),
+>>>> -    CLK("ecap",        "fck",        &ecap_clk),
+>>>> +    CLK("ehrpwm.0",        "fck",        &ehrpwm_clk),
+>>>> +    CLK("ehrpwm.0",        "tbclk",    &ehrpwm_tbclk),
+>>>> +    CLK("ehrpwm.1",        "fck",        &ehrpwm_clk),
+>>>> +    CLK("ehrpwm.1",        "tbclk",    &ehrpwm_tbclk),
+>>>> +    CLK("ecap.0",        "fck",        &ecap_clk),
+>>>> +    CLK("ecap.1",        "fck",        &ecap_clk),
+>>>> +    CLK("ecap.2",        "fck",        &ecap_clk),
+>>>
+>>> This has exposed a limitation of DaVinci clock framework. The struct clk
+>>> are stored as a linked list themselves. So a node repeating in the table
+>>> above will create a loop in the linked list. This is easily seen on the
+>>> LCDK board. davinci_clk_disable_unused() never returns. PWMs are unused
+>>> on that board.
+>>>
+>>> There is no "simple" solution to this AFAICS. One solution is to
+>>> separate the iterator from the clock hardware structure and use struct
+>>> clk_hw available in struct clk_lookup.
+>>>
+>>> Or move DaVinci to common clock framework. This is of course preferred
+>>> but much more involved as all 6 supported SoCs have to be moved together.
+>>>
+>>> Thanks,
+>>> Sekhar
+>>>
+>>>
+>>
+>> The simple solution for now could be to make child clocks for each of
+>> these that simply enable the parent clock. e.g. ehrpwm0_clk and
+>> ehpwm1_clk are children of ehrpwm_clk, etc.
+>
+> That sounds good. I saw the v2 patch you sent and it looks good. I
+> noticed that aemif clock is repeated in da850.c too. That needs fixing.
 
-On 2016-11-02 14:55, Wei Huang wrote:
-> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is 
-> configured.
-> But this function can't deals with PMCCFILTR correctly because the 
-> evtCount
-> bit of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
-> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, 
-> KVM
-> shouldn't return immediately, but instead it needs to check further if
-> select_idx is ARMV8_PMU_CYCLE_IDX.
-> 
-> Another issue is that KVM shouldn't copy the eventsel bits of 
-> PMCCFILTER
-> directly to attr.config. Istead it shoudl convert the request to
-> perf_event of type 0x11 (i.e. the "cpu cycle" event type).
-> 
-> Signed-off-by: Wei Huang <wei@redhat.com>
-> ---
->  virt/kvm/arm/pmu.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 6e9c40e..13cc812 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct
-> kvm_vcpu *vcpu, u64 data,
->  	eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
-> 
->  	/* Software increment event does't need to be backed by a perf event 
-> */
-> -	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
-> +	if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR &&
-> +	    select_idx != ARMV8_PMU_CYCLE_IDX)
->  		return;
-> 
->  	memset(&attr, 0, sizeof(struct perf_event_attr));
-> @@ -391,7 +392,7 @@ void kvm_pmu_set_counter_event_type(struct
-> kvm_vcpu *vcpu, u64 data,
->  	attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
->  	attr.exclude_hv = 1; /* Don't count EL2 events */
->  	attr.exclude_host = 1; /* Don't count host events */
-> -	attr.config = eventsel;
-> +	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ? 0x011 : eventsel;
+Same with emac clock.
 
-Nit: Is there some way you could use ARMV8_PMUV3_PERFCTR_CPU_CYCLES 
-currently
-defined in arch/arm64/kernel/perf_event.c?
-
-Thanks,
-Cov
+>> Looking at da830.c, it looks like the solution was to make multiple
+>> clocks that use the same LPSC, but this does not seem right to me.
+>
+> The PWM clock definitions there are definitely wrong. It should be
+> fixed. Looks like its been like that forever.
+>
+> Thanks,
+> Sekhar
+>
