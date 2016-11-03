@@ -1,83 +1,146 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 03 Nov 2016 15:41:02 +0000
-Subject: [PATCH 1/1] KVM: ARM64: Fix the issues when PMCCFILTR is
- configured
-In-Reply-To: <c083c21c-1395-6674-8c66-3fe7d0aa4917@redhat.com> (Wei Huang's
- message of "Thu, 3 Nov 2016 09:29:26 -0500")
-References: <1478120132-9928-1-git-send-email-wei@redhat.com>
- <db2cdc7caf7dc40b0895e1b6f91c7758@codeaurora.org>
- <c083c21c-1395-6674-8c66-3fe7d0aa4917@redhat.com>
-Message-ID: <86wpgkh8q9.fsf@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 03 Nov 2016 09:42:47 -0600
+Subject: Applied "spi: sun6i: Support Allwinner H3 SPI controller" to the spi
+ tree
+In-Reply-To: <20161028065412.23008-5-woogyom.kim@gmail.com>
+Message-ID: <E1c2KAB-0000B9-TX@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03 2016 at 02:29:26 PM, Wei Huang <wei@redhat.com> wrote:
-> On 11/02/2016 11:11 PM, cov at codeaurora.org wrote:
->> Hi Wei,
->> 
->> On 2016-11-02 14:55, Wei Huang wrote:
->>> KVM calls kvm_pmu_set_counter_event_type() when PMCCFILTR is configured.
->>> But this function can't deals with PMCCFILTR correctly because the
->>> evtCount
->>> bit of PMCCFILTR, which is reserved 0, conflits with the SW_INCR event
->>> type of other PMXEVTYPER<n> registers. To fix it, when eventsel == 0, KVM
->>> shouldn't return immediately, but instead it needs to check further if
->>> select_idx is ARMV8_PMU_CYCLE_IDX.
->>>
->>> Another issue is that KVM shouldn't copy the eventsel bits of PMCCFILTER
->>> directly to attr.config. Istead it shoudl convert the request to
->>> perf_event of type 0x11 (i.e. the "cpu cycle" event type).
->>>
->>> Signed-off-by: Wei Huang <wei@redhat.com>
->>> ---
->>>  virt/kvm/arm/pmu.c | 5 +++--
->>>  1 file changed, 3 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
->>> index 6e9c40e..13cc812 100644
->>> --- a/virt/kvm/arm/pmu.c
->>> +++ b/virt/kvm/arm/pmu.c
->>> @@ -379,7 +379,8 @@ void kvm_pmu_set_counter_event_type(struct
->>> kvm_vcpu *vcpu, u64 data,
->>>      eventsel = data & ARMV8_PMU_EVTYPE_EVENT;
->>>
->>>      /* Software increment event does't need to be backed by a perf
->>> event */
->>> -    if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR)
->>> +    if (eventsel == ARMV8_PMU_EVTYPE_EVENT_SW_INCR &&
->>> +        select_idx != ARMV8_PMU_CYCLE_IDX)
->>>          return;
->>>
->>>      memset(&attr, 0, sizeof(struct perf_event_attr));
->>> @@ -391,7 +392,7 @@ void kvm_pmu_set_counter_event_type(struct
->>> kvm_vcpu *vcpu, u64 data,
->>>      attr.exclude_kernel = data & ARMV8_PMU_EXCLUDE_EL1 ? 1 : 0;
->>>      attr.exclude_hv = 1; /* Don't count EL2 events */
->>>      attr.exclude_host = 1; /* Don't count host events */
->>> -    attr.config = eventsel;
->>> +    attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ? 0x011 :
->>> eventsel;
->> 
->> Nit: Is there some way you could use ARMV8_PMUV3_PERFCTR_CPU_CYCLES
->> currently
->> defined in arch/arm64/kernel/perf_event.c?
->
-> The event definitions in perf_event.c are local to this file. To use
-> them, I have to re-factor them out to a header file, which is bigger
-> than this patch intended. How about adding the following line to
-> arch/arm64/include/asm/perf_event.h (i.e. the same file of
-> ARMV8_PMU_EVTYPE_EVENT_SW_INCR)?
->
-> #define ARMV8_PMU_EVTYPE_EVENT_CPU_CYCLES  0x11
+The patch
 
-Patch size is not relevant, and I'd rather avoid both magic numbers and
-duplicate definitions. It would make sense to me to move all the
-required events to this header file, and fix the SW_INCR duplication.
+   spi: sun6i: Support Allwinner H3 SPI controller
 
-Please CC the ARM perf maintainers when you repost this patch.
+has been applied to the spi tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
+Mark
 
-	M.
+>From 10565dfd35488c45826201b4ce28597d6b5de3dd Mon Sep 17 00:00:00 2001
+From: Milo Kim <woogyom.kim@gmail.com>
+Date: Fri, 28 Oct 2016 15:54:12 +0900
+Subject: [PATCH] spi: sun6i: Support Allwinner H3 SPI controller
+
+H3 has two SPI controllers. The size of the buffer is 64 * 8.
+(8 bit transfer by 64 entry FIFO)
+A31 has four controllers. The size of the buffer is 128 * 8.
+(8 bit transfer by 128 entry FIFO)
+
+Register maps are sharable, so sun6i SPI driver is reusable with
+device configuration.
+
+Use the variable, 'fifo_depth' instead of fixed value to support both SPI
+controllers.
+
+Signed-off-by: Milo Kim <woogyom.kim@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-sun6i.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 9918a57a6a6e..e3114832c485 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+@@ -24,6 +25,7 @@
+ #include <linux/spi/spi.h>
+ 
+ #define SUN6I_FIFO_DEPTH		128
++#define SUN8I_FIFO_DEPTH		64
+ 
+ #define SUN6I_GBL_CTL_REG		0x04
+ #define SUN6I_GBL_CTL_BUS_ENABLE		BIT(0)
+@@ -90,6 +92,7 @@ struct sun6i_spi {
+ 	const u8		*tx_buf;
+ 	u8			*rx_buf;
+ 	int			len;
++	unsigned long		fifo_depth;
+ };
+ 
+ static inline u32 sun6i_spi_read(struct sun6i_spi *sspi, u32 reg)
+@@ -155,7 +158,9 @@ static void sun6i_spi_set_cs(struct spi_device *spi, bool enable)
+ 
+ static size_t sun6i_spi_max_transfer_size(struct spi_device *spi)
+ {
+-	return SUN6I_FIFO_DEPTH - 1;
++	struct sun6i_spi *sspi = spi_master_get_devdata(spi->master);
++
++	return sspi->fifo_depth - 1;
+ }
+ 
+ static int sun6i_spi_transfer_one(struct spi_master *master,
+@@ -170,7 +175,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	u32 reg;
+ 
+ 	/* We don't support transfer larger than the FIFO */
+-	if (tfr->len > SUN6I_FIFO_DEPTH)
++	if (tfr->len > sspi->fifo_depth)
+ 		return -EINVAL;
+ 
+ 	reinit_completion(&sspi->done);
+@@ -265,7 +270,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 			SUN6I_BURST_CTL_CNT_STC(tx_len));
+ 
+ 	/* Fill the TX FIFO */
+-	sun6i_spi_fill_fifo(sspi, SUN6I_FIFO_DEPTH);
++	sun6i_spi_fill_fifo(sspi, sspi->fifo_depth);
+ 
+ 	/* Enable the interrupts */
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, SUN6I_INT_CTL_TC);
+@@ -288,7 +293,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 		goto out;
+ 	}
+ 
+-	sun6i_spi_drain_fifo(sspi, SUN6I_FIFO_DEPTH);
++	sun6i_spi_drain_fifo(sspi, sspi->fifo_depth);
+ 
+ out:
+ 	sun6i_spi_write(sspi, SUN6I_INT_CTL_REG, 0);
+@@ -398,6 +403,8 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sspi->master = master;
++	sspi->fifo_depth = (unsigned long)of_device_get_match_data(&pdev->dev);
++
+ 	master->max_speed_hz = 100 * 1000 * 1000;
+ 	master->min_speed_hz = 3 * 1000;
+ 	master->set_cs = sun6i_spi_set_cs;
+@@ -470,7 +477,8 @@ static int sun6i_spi_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id sun6i_spi_match[] = {
+-	{ .compatible = "allwinner,sun6i-a31-spi", },
++	{ .compatible = "allwinner,sun6i-a31-spi", .data = (void *)SUN6I_FIFO_DEPTH },
++	{ .compatible = "allwinner,sun8i-h3-spi",  .data = (void *)SUN8I_FIFO_DEPTH },
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, sun6i_spi_match);
 -- 
-Jazz is not dead. It just smells funny.
+2.10.1
