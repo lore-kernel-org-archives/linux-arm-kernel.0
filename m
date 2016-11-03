@@ -1,31 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 3 Nov 2016 16:57:40 +0000
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-In-Reply-To: <20161103162943.GS3541@8bytes.org>
-References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
- <20161103160006.GS22791@arm.com> <20161103161407.GR3541@8bytes.org>
- <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
- <20161103162943.GS3541@8bytes.org>
-Message-ID: <a6ded15c-5eea-70b8-61a1-b40873af8699@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 3 Nov 2016 19:57:43 +0300
+Subject: [PATCH] ARM: DTS: r8a7794: alt: Fix PCF names for DU
+In-Reply-To: <1478180574-15464-1-git-send-email-jacopo@jmondi.org>
+References: <1478180574-15464-1-git-send-email-jacopo@jmondi.org>
+Message-ID: <085d178c-b0fb-ed42-79ce-590507baeba7@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/16 16:29, Joerg Roedel wrote:
-> On Thu, Nov 03, 2016 at 04:22:04PM +0000, Robin Murphy wrote:
->> But bus_set_iommu() is already checking whether another SMMU (in this
->> case) has probed, by virtue of bus->iommu_ops being non-NULL, and
->> returning without doing anything if so. What's the value of adding a
->> whole  bunch more code to effectively duplicate that in a less elegant
->> manner?
-> 
-> No, bus_set_iommu() checks whether there is _any_ other IOMMU already
-> registered. This doesn't need to be an smmu. So I think the return value
-> of bus_set_iommu shouldn't be generally ignored.
+Hello.
 
-But if it is someone else's ops, then all that means is that the SMMU
-driver isn't going to get notified about devices on that bus, or get
-called with them later, so I still don't see where the problem is. If
-there are devices on that bus which the SMMU *is* supposed to be
-managing, then that system can't be supported with the current API anyway.
+On 11/03/2016 04:42 PM, Jacopo Mondi wrote:
 
-Robin.
+> Update the PCF pin groups and function names of DU interface for
+
+    PFC maybe?
+
+> r8a7794 ALT board.
+>
+> The currently specified pin groups and function names prevented PCF and
+> DU interfaces from being correctly configured:
+>
+> sh-pfc e6060000.pin-controller: function 'du' not supported
+> sh-pfc e6060000.pin-controller: invalid function du in map table
+> sh-pfc e6060000.pin-controller: function 'du' not supported
+> sh-pfc e6060000.pin-controller: invalid function du in map table
+> sh-pfc e6060000.pin-controller: function 'du' not supported
+> sh-pfc e6060000.pin-controller: invalid function du in map table
+> sh-pfc e6060000.pin-controller: function 'du' not supported
+> sh-pfc e6060000.pin-controller: invalid function du in map table
+> rcar-du: probe of feb00000.display failed with error -22
+>
+> Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
+> ---
+>
+> Patch applied against Simon Horman's renesas/master branch.
+> The PCF pin groups and function renaming was introduced by commit 56ed4bb9 and
+> DTS for ALT board has never been update accordingly.
+
+    We didn't care about Alt at the time, the patch was done in the interests 
+of the SILK board. I didn't realize the DU pin groups were used for Alt before 
+the actual support was added for them. Thank you for finally fixing this!
+
+> Tested displaying frames on VGA interface: the rcar-du driver loads correctly.
+
+MBR, Sergei
