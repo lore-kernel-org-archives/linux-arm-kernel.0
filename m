@@ -1,32 +1,32 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 03 Nov 2016 16:35:39 -0600
-Subject: [PATCH 0/2] ARM64: meson-gxbb: SCPI Fixup
-In-Reply-To: <1478164284-24958-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Thu, 3 Nov 2016 10:11:22 +0100")
-References: <1478164284-24958-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2mvhgqjic.fsf@baylibre.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri,  4 Nov 2016 07:57:58 +0900
+Subject: [PATCH] ARM: cache-uniphier: include <linux/errno.h> instead of
+ <linux/types.h>
+Message-ID: <1478213878-15416-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Nothing in this header file depends on <linux/types.h>.
+Rather, <linux/errno.h> should be included for -ENODEV.
 
-> This patchset updates the GXBB dtsi and the ARM64 defconfig in order
-> to make SCPI work following the Legacy SCPI rework from Sudeep Hola at [1].
->
-> The rework introduced a generic "arm,legacy-scpi" compatible string.
-> The second patch enables the necessary Platform MHU in defconfig.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-I folded PATCH 1/2 into the original, and (re)pushed both the amlogic
-v4.10/dt64 branch.
+ arch/arm/include/asm/hardware/cache-uniphier.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Kevin
-
-> [1] http://lkml.kernel.org/r/1478148731-11712-1-git-send-email-sudeep.holla at arm.com
->
-> Neil Armstrong (2):
->   ARM64: dts: meson-gxbb: Add generic legacy scpi compatible
->   ARM64: configs: Add Platform MHU in defconfig
->
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 +-
->  arch/arm64/configs/defconfig                | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
+diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
+index eaa60da..0ef42ae 100644
+--- a/arch/arm/include/asm/hardware/cache-uniphier.h
++++ b/arch/arm/include/asm/hardware/cache-uniphier.h
+@@ -16,7 +16,7 @@
+ #ifndef __CACHE_UNIPHIER_H
+ #define __CACHE_UNIPHIER_H
+ 
+-#include <linux/types.h>
++#include <linux/errno.h>
+ 
+ #ifdef CONFIG_CACHE_UNIPHIER
+ int uniphier_cache_init(void);
+-- 
+1.9.1
