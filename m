@@ -1,43 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 3 Nov 2016 09:23:14 +0100
-Subject: [PATCH v2 01/14] ASoC: sun4i-codec: Move data structures to add
- create_card call to quirks
-In-Reply-To: <20161103075556.29018-2-wens@csie.org>
-References: <20161103075556.29018-1-wens@csie.org>
- <20161103075556.29018-2-wens@csie.org>
-Message-ID: <20161103082314.gtrb42pttayndnbc@lukather>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Thu, 3 Nov 2016 09:24:13 +0100
+Subject: [PATCH 0/3] fix ohci phy name
+In-Reply-To: <20161102124435.31777-1-ahaslam@baylibre.com>
+References: <20161102124435.31777-1-ahaslam@baylibre.com>
+Message-ID: <CAKXjFTPiL6K8g2KuFrq9rKJpViVaGPuBDBFSKk9bjqjY3Zd5Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 03:55:43PM +0800, Chen-Yu Tsai wrote:
-> The audio codec on later Allwinner SoCs have a different layout and
-> audio path compared to the A10/A20. However the PCM parts are still
-> the same.
-> 
-> The different layout and audio paths mean we need a different
-> create_card function for different families, so they can create
-> DAPM endpoint widgets and routes.
-> 
-> This patch moves the regmap configs, quirks and of_device_id
-> structures to just before the probe function, so we can, among other
-> things, include a pointer for the create_card function. None of the
-> lines of code were changed.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Hi Sekhar, David,
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+It might make sense to have this patch series,
+squashed into a single patch, would you agree,
+or do you prefer it as is: one-per-subsystem?
 
-Thanks!
-Maxime
+Regards
+Axel.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/80d51ad8/attachment.sig>
+On Wed, Nov 2, 2016 at 1:44 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
+> The usb ohci clock match is not working because the usb clock
+> is registered as "ohci" instead of "ohci.0"
+>
+> But since there is only a single ohci instance, lets pass -1 to
+> the platform data id parameter and avoid the extra ".0" matching.
+>
+> while we are fixing this, rename the driver to "ohci-da8xx" to be
+> consistent with davinci musb and other usb drivers.
+>
+> Axel Haslam (3):
+>   ARM: davinci: da8xx: Fix ohci driver name
+>   phy: da8xx-usb: rename the ohci device to ohci-da8xx
+>   usb: ohci-da8xx: rename driver to ohci-da8xx
+>
+>  arch/arm/mach-davinci/da830.c     | 2 +-
+>  arch/arm/mach-davinci/da850.c     | 2 +-
+>  arch/arm/mach-davinci/da8xx-dt.c  | 2 +-
+>  arch/arm/mach-davinci/usb-da8xx.c | 4 ++--
+>  drivers/phy/phy-da8xx-usb.c       | 5 +++--
+>  drivers/usb/host/ohci-da8xx.c     | 2 +-
+>  6 files changed, 9 insertions(+), 8 deletions(-)
+>
+> --
+> 2.10.1
+>
