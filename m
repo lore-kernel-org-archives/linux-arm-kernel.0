@@ -1,59 +1,126 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Nov 2016 15:55:46 +0800
-Subject: [PATCH v2 04/14] ASoC: sun4i-codec: Increase DMA max burst to 8
+Date: Thu,  3 Nov 2016 15:55:43 +0800
+Subject: [PATCH v2 01/14] ASoC: sun4i-codec: Move data structures to add
+ create_card call to quirks
 In-Reply-To: <20161103075556.29018-1-wens@csie.org>
 References: <20161103075556.29018-1-wens@csie.org>
-Message-ID: <20161103075556.29018-5-wens@csie.org>
+Message-ID: <20161103075556.29018-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the DMA engine API documentation, maxburst denotes the
-largest possible size of a single transfer, so as not to overflow
-destination FIFOs as explained in this excerpt from dmaengine.h
+The audio codec on later Allwinner SoCs have a different layout and
+audio path compared to the A10/A20. However the PCM parts are still
+the same.
 
- * @src_maxburst: the maximum number of words (note: words, as in
- * units of the src_addr_width member, not bytes) that can be sent
- * in one burst to the device. Typically something like half the
- * FIFO depth on I/O peripherals so you don't overflow it. This
- * may or may not be applicable on memory sources.
- * @dst_maxburst: same as src_maxburst but for destination target
- * mutatis mutandis.
+The different layout and audio paths mean we need a different
+create_card function for different families, so they can create
+DAPM endpoint widgets and routes.
 
-The TX FIFO is 64 samples deep for stereo, and the RX FIFO is 16
-samples deep. So maxburst could be 32 and 8 for TX and RX respectively.
+This patch moves the regmap configs, quirks and of_device_id
+structures to just before the probe function, so we can, among other
+things, include a pointer for the create_card function. None of the
+lines of code were changed.
 
-Unfortunately the sunxi DMA controller driver takes maxburst as
-the requested burst size, rather than a limit, and returns an error
-for unsupported values. The original value was 4, but some later
-SoCs do not officially support this burst size.
-
-This patch increases maxburst on the TX side to 8, which is supported
-by all variants of the sunxi DMA controller.
-
-Cc: Vinod Koul <vinod.koul@intel.com>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- sound/soc/sunxi/sun4i-codec.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/sunxi/sun4i-codec.c | 78 +++++++++++++++++++++----------------------
+ 1 file changed, 39 insertions(+), 39 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index 61ae502a5061..d867b96d367b 100644
+index 56ed9472e89f..249fa5033361 100644
 --- a/sound/soc/sunxi/sun4i-codec.c
 +++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -886,12 +886,12 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+@@ -678,45 +678,6 @@ static struct snd_soc_dai_driver dummy_cpu_dai = {
+ 	 },
+ };
  
- 	/* DMA configuration for TX FIFO */
- 	scodec->playback_dma_data.addr = res->start + quirks->reg_dac_txdata;
--	scodec->playback_dma_data.maxburst = 4;
-+	scodec->playback_dma_data.maxburst = 8;
- 	scodec->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+-static const struct regmap_config sun4i_codec_regmap_config = {
+-	.reg_bits	= 32,
+-	.reg_stride	= 4,
+-	.val_bits	= 32,
+-	.max_register	= SUN4I_CODEC_ADC_RXCNT,
+-};
+-
+-static const struct regmap_config sun7i_codec_regmap_config = {
+-	.reg_bits	= 32,
+-	.reg_stride	= 4,
+-	.val_bits	= 32,
+-	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
+-};
+-
+-struct sun4i_codec_quirks {
+-	const struct regmap_config *regmap_config;
+-};
+-
+-static const struct sun4i_codec_quirks sun4i_codec_quirks = {
+-	.regmap_config = &sun4i_codec_regmap_config,
+-};
+-
+-static const struct sun4i_codec_quirks sun7i_codec_quirks = {
+-	.regmap_config = &sun7i_codec_regmap_config,
+-};
+-
+-static const struct of_device_id sun4i_codec_of_match[] = {
+-	{
+-		.compatible = "allwinner,sun4i-a10-codec",
+-		.data = &sun4i_codec_quirks,
+-	},
+-	{
+-		.compatible = "allwinner,sun7i-a20-codec",
+-		.data = &sun7i_codec_quirks,
+-	},
+-	{}
+-};
+-MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
+-
+ static struct snd_soc_dai_link *sun4i_codec_create_link(struct device *dev,
+ 							int *num_links)
+ {
+@@ -781,6 +742,45 @@ static struct snd_soc_card *sun4i_codec_create_card(struct device *dev)
+ 	return card;
+ };
  
- 	/* DMA configuration for RX FIFO */
- 	scodec->capture_dma_data.addr = res->start + quirks->reg_adc_rxdata;
--	scodec->capture_dma_data.maxburst = 4;
-+	scodec->capture_dma_data.maxburst = 8;
- 	scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
- 
- 	ret = snd_soc_register_codec(&pdev->dev, quirks->codec,
++static const struct regmap_config sun4i_codec_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= SUN4I_CODEC_ADC_RXCNT,
++};
++
++static const struct regmap_config sun7i_codec_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= SUN7I_CODEC_AC_MIC_PHONE_CAL,
++};
++
++struct sun4i_codec_quirks {
++	const struct regmap_config *regmap_config;
++};
++
++static const struct sun4i_codec_quirks sun4i_codec_quirks = {
++	.regmap_config	= &sun4i_codec_regmap_config,
++};
++
++static const struct sun4i_codec_quirks sun7i_codec_quirks = {
++	.regmap_config	= &sun7i_codec_regmap_config,
++};
++
++static const struct of_device_id sun4i_codec_of_match[] = {
++	{
++		.compatible = "allwinner,sun4i-a10-codec",
++		.data = &sun4i_codec_quirks,
++	},
++	{
++		.compatible = "allwinner,sun7i-a20-codec",
++		.data = &sun7i_codec_quirks,
++	},
++	{}
++};
++MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
++
+ static int sun4i_codec_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card;
 -- 
 2.10.2
