@@ -1,19 +1,19 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 3 Nov 2016 20:57:03 +0100
-Subject: [PATCH v2] iommu/arm-smmu: Don't inadvertently reject multiple
- SMMUv3s
-In-Reply-To: <22ac6cba7386e133a97af729526f4e6457745554.1478194747.git.robin.murphy@arm.com>
-References: <22ac6cba7386e133a97af729526f4e6457745554.1478194747.git.robin.murphy@arm.com>
-Message-ID: <20161103195703.GU3541@8bytes.org>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 03 Nov 2016 16:02:44 -0400 (EDT)
+Subject: [PATCH v5 0/7] add NS2 support to bgmac
+In-Reply-To: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
+References: <1478106488-11779-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20161103.160244.678792221354219550.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 05:39:07PM +0000, Robin Murphy wrote:
->  drivers/iommu/arm-smmu-v3.c | 25 +++++++++++++++++--------
->  1 file changed, 17 insertions(+), 8 deletions(-)
+From: Jon Mason <jon.mason@broadcom.com>
+Date: Wed,  2 Nov 2016 13:08:01 -0400
 
-This looks better, thanks. Cherry-picked the other fix from the
-pull-request and applied this on-top.
+> Add support for the amac found in the Broadcom Northstar2 SoC to the
+> bgmac driver.  This necessitates adding support to connect to an
+> externally defined phy (as described in the device tree) in the driver.
+> These phy changes are in addition to the changes necessary to get NS2
+> working.
 
-
-	Joerg
+This does not apply cleanly to the net-next, please respin.
