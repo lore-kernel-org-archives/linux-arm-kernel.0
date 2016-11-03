@@ -1,59 +1,77 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 3 Nov 2016 11:27:27 +0100
-Subject: [PATCHv6] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160818202559.GF3182@valkosipuli.retiisi.org.uk>
-References: <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd> <20160805102611.GA13116@amd>
- <20160808080955.GA3182@valkosipuli.retiisi.org.uk>
- <20160808214132.GB2946@xo-6d-61-c0.localdomain>
- <20160810120105.GP3182@valkosipuli.retiisi.org.uk>
- <20160808232323.GC2946@xo-6d-61-c0.localdomain>
- <20160811111633.GR3182@valkosipuli.retiisi.org.uk>
- <20160818104539.GA7427@amd>
- <20160818202559.GF3182@valkosipuli.retiisi.org.uk>
-Message-ID: <20161103102727.GA10084@amd>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 3 Nov 2016 10:29:14 +0000
+Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
+In-Reply-To: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
+References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
+ <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
+Message-ID: <d8ab8a32-8019-45e6-59b1-8914937e1705@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-> > > > > Yeah. I just compiled it but haven't tested it. I presume it'll work. :-)
-> > > > 
-> > > > I'm testing it on n900. I guess simpler hardware with ad5820 would be better for the
-> > > > test...
-> > > > 
-> > > > What hardware do you have?
-> > > 
-> > > N900. What else could it be? :-) :-)
-> > 
-> > Heh. Basically anything is easier to develop for than n900 :-(.
-> 
-> Is it?
-> 
-> I actually find the old Nokia devices very practical. It's easy to boot your
-> own kernel and things just work... until musb broke a bit recently. It
-> requires reconnecting the usb cable again to function.
-> 
-> I have to admit I mostly use an N9.
+On 27/10/16 15:01, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
+>
+> Add a device node for the GMI controller found on Tegra20.
+>
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
+> ---
+>
+> Changes in v2:
+> - added address-cells, size-cells and ranges properties
+>
+> Changes in v3:
+> - fixed range address which is not the same as Tegra30.
+>
+>  arch/arm/boot/dts/tegra20.dtsi | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> index 2207c08..b22cddb 100644
+> --- a/arch/arm/boot/dts/tegra20.dtsi
+> +++ b/arch/arm/boot/dts/tegra20.dtsi
+> @@ -1,4 +1,4 @@
+> -#include <dt-bindings/clock/tegra20-car.h>
+> +include <dt-bindings/clock/tegra20-car.h>
 
-Well, if you compare that to development on PC, I prefer PC.
+After fixing up this, can you also ...
 
-Even arm development boards are usually easier, as they don't need too
-complex userspace, and do have working serial ports.
+>  #include <dt-bindings/gpio/tegra-gpio.h>
+>  #include <dt-bindings/pinctrl/pinctrl-tegra.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> @@ -376,6 +376,20 @@
+>  		status = "disabled";
+>  	};
+>
+> +
 
-But I do have a serial adapter for N900 now (thanks, sre), so my main
-problem now is that N900 takes a lot of time to boot into usable
-state.
+Drop this additional line?
 
-Best regards,
-									Pavel
+> +	gmi at 70009000 {
+> +		compatible = "nvidia,tegra20-gmi";
+> +		reg = <0x70009000 0x1000>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0xd0000000 0xfffffff>;
+> +		clocks = <&tegra_car TEGRA20_CLK_NOR>;
+> +		clock-names = "gmi";
+> +		resets = < &tegra_car 42>;
+
+Get rid of this additional space?
+
+> +		reset-names = "gmi";
+> +		status = "disabled";
+> +	};
+> +
+
+Otherwise ...
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/fd30267c/attachment.sig>
+nvpublic
