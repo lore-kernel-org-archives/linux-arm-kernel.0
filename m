@@ -1,107 +1,37 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:33 +0900
-Subject: [PATCH 11/13] ARM: dts: rockchip: replace to "max-frequency" instead
- of "clock-freq-min-max"
+Date: Thu, 03 Nov 2016 15:21:35 +0900
+Subject: [PATCH 13/13] Documentation: synopsys-dw-mshc: remove the unused
+ properties
 In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
 References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-12-jh80.chung@samsung.com>
+Message-ID: <20161103062135.10697-14-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In drivers/mmc/core/host.c, there is "max-frequency" property.
-It should be same behavior. So use the "max-frequency" instead of
-"clock-freq-min-max".
+"support-highspeed" was the obsoleted property.
+And "broken-cd" is not synopsys specific property.
+It can be referred to mmc.txt binding Documentation.
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- arch/arm/boot/dts/rk3036.dtsi | 6 +++---
- arch/arm/boot/dts/rk322x.dtsi | 2 +-
- arch/arm/boot/dts/rk3288.dtsi | 8 ++++----
- 3 files changed, 8 insertions(+), 8 deletions(-)
+ Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index a935523..d3fb323 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -244,7 +244,7 @@
- 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x10214000 0x4000>;
- 		clock-frequency = <37500000>;
--		clock-freq-min-max = <400000 37500000>;
-+		max-frequency = <37500000>;
- 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
- 		clock-names = "biu", "ciu";
- 		fifo-depth = <0x100>;
-@@ -255,7 +255,7 @@
- 	sdio: dwmmc at 10218000 {
- 		compatible = "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc";
- 		reg = <0x10218000 0x4000>;
--		clock-freq-min-max = <400000 37500000>;
-+		max-frequency = <37500000>;
- 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>,
- 			 <&cru SCLK_SDIO_DRV>, <&cru SCLK_SDIO_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
-@@ -271,7 +271,7 @@
- 		bus-width = <8>;
- 		cap-mmc-highspeed;
- 		clock-frequency = <37500000>;
--		clock-freq-min-max = <400000 37500000>;
-+		max-frequency = <37500000>;
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
- 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 9e6bf0e..8c2e360 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -402,7 +402,7 @@
- 		reg = <0x30020000 0x4000>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <37500000>;
--		clock-freq-min-max = <400000 37500000>;
-+		max-frequency = <37500000>;
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
- 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 17ec2e2..65b60b7 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -227,7 +227,7 @@
+diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+index 21c8251..3dd2849 100644
+--- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
+@@ -68,11 +68,6 @@ Optional properties:
+ * card-detect-delay: Delay in milli-seconds before detecting card after card
+   insert event. The default value is 0.
  
- 	sdmmc: dwmmc at ff0c0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>,
- 			 <&cru SCLK_SDMMC_DRV>, <&cru SCLK_SDMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
-@@ -239,7 +239,7 @@
+-* supports-highspeed (DEPRECATED): Enables support for high speed cards (up to 50MHz)
+-			   (use "cap-mmc-highspeed" or "cap-sd-highspeed" instead)
+-
+-* broken-cd: as documented in mmc core bindings.
+-
+ * vmmc-supply: The phandle to the regulator to use for vmmc.  If this is
+   specified we'll defer probe until we can find this regulator.
  
- 	sdio0: dwmmc at ff0d0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_SDIO0>, <&cru SCLK_SDIO0>,
- 			 <&cru SCLK_SDIO0_DRV>, <&cru SCLK_SDIO0_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
-@@ -251,7 +251,7 @@
- 
- 	sdio1: dwmmc at ff0e0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_SDIO1>, <&cru SCLK_SDIO1>,
- 			 <&cru SCLK_SDIO1_DRV>, <&cru SCLK_SDIO1_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
-@@ -263,7 +263,7 @@
- 
- 	emmc: dwmmc at ff0f0000 {
- 		compatible = "rockchip,rk3288-dw-mshc";
--		clock-freq-min-max = <400000 150000000>;
-+		max-frequency = <150000000>;
- 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
- 			 <&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
- 		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 -- 
 2.10.1
