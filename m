@@ -1,49 +1,31 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 3 Nov 2016 22:20:01 +0530
-Subject: [PATCH 2/3] phy: da8xx-usb: rename the ohci device to ohci-da8xx
-In-Reply-To: <20161102124435.31777-3-ahaslam@baylibre.com>
-References: <20161102124435.31777-1-ahaslam@baylibre.com>
- <20161102124435.31777-3-ahaslam@baylibre.com>
-Message-ID: <fd6b848d-9740-70ef-6850-7f6a64e66bfb@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 3 Nov 2016 16:57:40 +0000
+Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
+In-Reply-To: <20161103162943.GS3541@8bytes.org>
+References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
+ <20161103160006.GS22791@arm.com> <20161103161407.GR3541@8bytes.org>
+ <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
+ <20161103162943.GS3541@8bytes.org>
+Message-ID: <a6ded15c-5eea-70b8-61a1-b40873af8699@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 02 November 2016 06:14 PM, Axel Haslam wrote:
-> There is only one ohci on the da8xx series of chips,
-> so remove the ".0" when creating the phy. Also add
-> the "-da8xx" postfix to be consistent across davinci
-> usb drivers.
+On 03/11/16 16:29, Joerg Roedel wrote:
+> On Thu, Nov 03, 2016 at 04:22:04PM +0000, Robin Murphy wrote:
+>> But bus_set_iommu() is already checking whether another SMMU (in this
+>> case) has probed, by virtue of bus->iommu_ops being non-NULL, and
+>> returning without doing anything if so. What's the value of adding a
+>> whole  bunch more code to effectively duplicate that in a less elegant
+>> manner?
 > 
-> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> No, bus_set_iommu() checks whether there is _any_ other IOMMU already
+> registered. This doesn't need to be an smmu. So I think the return value
+> of bus_set_iommu shouldn't be generally ignored.
 
-Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/phy/phy-da8xx-usb.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-da8xx-usb.c b/drivers/phy/phy-da8xx-usb.c
-> index 32ae78c..c85fb0b 100644
-> --- a/drivers/phy/phy-da8xx-usb.c
-> +++ b/drivers/phy/phy-da8xx-usb.c
-> @@ -198,7 +198,8 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
->  	} else {
->  		int ret;
->  
-> -		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
-> +		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy",
-> +					"ohci-da8xx");
->  		if (ret)
->  			dev_warn(dev, "Failed to create usb11 phy lookup\n");
->  		ret = phy_create_lookup(d_phy->usb20_phy, "usb-phy",
-> @@ -216,7 +217,7 @@ static int da8xx_usb_phy_remove(struct platform_device *pdev)
->  
->  	if (!pdev->dev.of_node) {
->  		phy_remove_lookup(d_phy->usb20_phy, "usb-phy", "musb-da8xx");
-> -		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
-> +		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci-da8xx");
->  	}
->  
->  	return 0;
-> 
+But if it is someone else's ops, then all that means is that the SMMU
+driver isn't going to get notified about devices on that bus, or get
+called with them later, so I still don't see where the problem is. If
+there are devices on that bus which the SMMU *is* supposed to be
+managing, then that system can't be supported with the current API anyway.
+
+Robin.
