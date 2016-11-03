@@ -1,56 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 3 Nov 2016 11:13:08 +0800
-Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
-Message-ID: <201611031100.ggXBvpJr%fengguang.wu@intel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 2 Nov 2016 22:37:27 -0500
+Subject: [PATCH v2] of, numa: Return NUMA_NO_NODE from disable
+ of_node_to_nid() if nid not possible.
+In-Reply-To: <1477689302-32671-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1477689302-32671-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CAL_JsqKnXk99SUa1cjC2QFA9rizjn4=JHZh3ua_gvcOtpGx8jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+On Fri, Oct 28, 2016 at 4:15 PM, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> On arm64 NUMA kernels we can pass "numa=off" on the command line to
+> disable NUMA.  A side effect of this is that kmalloc_node() calls to
+> non-zero nodes will crash the system with an OOPS:
+>
+> [    0.000000] ITS at 0x0000901000020000: allocated 2097152 Devices @10002000000 (flat, esz 8, psz 64K, shr 1)
+> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00001680
+> [    0.000000] pgd = fffffc0009470000
+> [    0.000000] [00001680] *pgd=0000010ffff90003, *pud=0000010ffff90003, *pmd=0000010ffff90003, *pte=0000000000000000
+> [    0.000000] Internal error: Oops: 96000006 [#1] SMP
+> .
+> .
+> .
+> [    0.000000] [<fffffc00081c8950>] __alloc_pages_nodemask+0xa4/0xe68
+> [    0.000000] [<fffffc000821fa70>] new_slab+0xd0/0x564
+> [    0.000000] [<fffffc0008221e24>] ___slab_alloc+0x2e4/0x514
+> [    0.000000] [<fffffc0008239498>] __slab_alloc+0x48/0x58
+> [    0.000000] [<fffffc0008222c20>] __kmalloc_node+0xd0/0x2dc
+> [    0.000000] [<fffffc0008115374>] __irq_domain_add+0x7c/0x164
+> [    0.000000] [<fffffc0008b461dc>] its_probe+0x784/0x81c
+> [    0.000000] [<fffffc0008b462bc>] its_init+0x48/0x1b0
+> [    0.000000] [<fffffc0008b4543c>] gic_init_bases+0x228/0x360
+> [    0.000000] [<fffffc0008b456bc>] gic_of_init+0x148/0x1cc
+> [    0.000000] [<fffffc0008b5aec8>] of_irq_init+0x184/0x298
+> [    0.000000] [<fffffc0008b43f9c>] irqchip_init+0x14/0x38
+> [    0.000000] [<fffffc0008b12d60>] init_IRQ+0xc/0x30
+> [    0.000000] [<fffffc0008b10a3c>] start_kernel+0x240/0x3b8
+> [    0.000000] [<fffffc0008b101c4>] __primary_switched+0x30/0x6c
+> [    0.000000] Code: 912ec2a0 b9403809 0a0902fb 37b007db (f9400300)
+> .
+> .
+> .
+>
+> This is caused by code like this in kernel/irq/irqdomain.c
+>
+>     domain = kzalloc_node(sizeof(*domain) + (sizeof(unsigned int) * size),
+>                   GFP_KERNEL, of_node_to_nid(of_node));
+>
+> When NUMA is disabled, the concept of a node is really undefined, so
+> of_node_to_nid() should unconditionally return NUMA_NO_NODE.
+>
+> Fix by returning NUMA_NO_NODE when the nid is not in the set of
+> possible nodes.
+>
+> Reported-by: Gilbert Netzer <noname@pdc.kth.se>
+> Signed-off-by: David Daney <david.daney@cavium.com>
 
-[auto build test ERROR on mmotm/master]
-[also build test ERROR on v4.9-rc3 next-20161028]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Does this need to go in 4.9? stable? If so, since what kernel version?
 
-url:    https://github.com/0day-ci/linux/commits/Huang-Shijie/mm-hugetlb-rename-some-allocation-functions/20161103-105611
-base:   git://git.cmpxchg.org/linux-mmotm.git master
-config: x86_64-randconfig-x011-201644 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All error/warnings (new ones prefixed by >>):
-
-   mm/hugetlb.c: In function '__alloc_huge_page':
->> mm/hugetlb.c:1623:10: error: implicit declaration of function 'alloc_gigantic_page' [-Werror=implicit-function-declaration]
-      page = alloc_gigantic_page(nid, huge_page_order(h));
-             ^~~~~~~~~~~~~~~~~~~
->> mm/hugetlb.c:1623:8: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      page = alloc_gigantic_page(nid, huge_page_order(h));
-           ^
-   cc1: some warnings being treated as errors
-
-vim +/alloc_gigantic_page +1623 mm/hugetlb.c
-
-  1617			h->nr_huge_pages++;
-  1618			h->surplus_huge_pages++;
-  1619		}
-  1620		spin_unlock(&hugetlb_lock);
-  1621	
-  1622		if (hstate_is_gigantic(h))  {
-> 1623			page = alloc_gigantic_page(nid, huge_page_order(h));
-  1624			if (page)
-  1625				prep_compound_gigantic_page(page, huge_page_order(h));
-  1626		} else {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25105 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/516fb148/attachment-0001.gz>
+Rob
