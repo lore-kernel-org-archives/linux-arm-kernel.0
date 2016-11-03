@@ -1,118 +1,127 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  3 Nov 2016 20:23:09 +0000
-Subject: [PATCHv2 07/11] arm64: move sp_el0 and tpidr_el1 into cpu_suspend_ctx
+Date: Thu,  3 Nov 2016 20:23:08 +0000
+Subject: [PATCHv2 06/11] arm64: prep stack walkers for THREAD_INFO_IN_TASK
 In-Reply-To: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
 References: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1478204593-29145-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1478204593-29145-7-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When returning from idle, we rely on the fact that thread_info lives at
-the end of the kernel stack, and restore this by masking the saved stack
-pointer. Subsequent patches will sever the relationship between the
-stack and thread_info, and to cater for this we must save/restore sp_el0
-explicitly, storing it in cpu_suspend_ctx.
+When CONFIG_THREAD_INFO_IN_TASK is selected, task stacks may be freed
+before a task is destroyed. To account for this, the stacks are
+refcounted, and when manipulating the stack of another task, it is
+necessary to get/put the stack to ensure it isn't freed and/or re-used
+while we do so.
 
-As cpu_suspend_ctx must be doubleword aligned, this leaves us with an
-extra slot in cpu_suspend_ctx. We can use this to save/restore tpidr_el1
-in the same way, which simplifies the code, avoiding pointer chasing on
-the restore path (as we no longer need to load thread_info::cpu followed
-by the relevant slot in __per_cpu_offset based on this).
-
-This patch stashes both registers in cpu_suspend_ctx.
+This patch reworks the arm64 stack walking code to account for this.
+When CONFIG_THREAD_INFO_IN_TASK is not selected these perform no
+refcounting, and this should only be a structural change that does not
+affect behaviour.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Andy Lutomirski <luto@kernel.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/suspend.h | 2 +-
- arch/arm64/kernel/sleep.S        | 3 ---
- arch/arm64/kernel/suspend.c      | 6 ------
- arch/arm64/mm/proc.S             | 6 ++++++
- 4 files changed, 7 insertions(+), 10 deletions(-)
+ arch/arm64/kernel/process.c    | 20 ++++++++++++++------
+ arch/arm64/kernel/stacktrace.c |  5 +++++
+ arch/arm64/kernel/traps.c      |  5 +++++
+ 3 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-index b8a313f..de5600f 100644
---- a/arch/arm64/include/asm/suspend.h
-+++ b/arch/arm64/include/asm/suspend.h
-@@ -1,7 +1,7 @@
- #ifndef __ASM_SUSPEND_H
- #define __ASM_SUSPEND_H
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 01753cd..ec7b9c0 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -350,27 +350,35 @@ struct task_struct *__switch_to(struct task_struct *prev,
+ unsigned long get_wchan(struct task_struct *p)
+ {
+ 	struct stackframe frame;
+-	unsigned long stack_page;
++	unsigned long stack_page, ret = 0;
+ 	int count = 0;
+ 	if (!p || p == current || p->state == TASK_RUNNING)
+ 		return 0;
  
--#define NR_CTX_REGS 10
-+#define NR_CTX_REGS 12
- #define NR_CALLEE_SAVED_REGS 12
++	stack_page = (unsigned long)try_get_task_stack(p);
++	if (!stack_page)
++		return 0;
++
+ 	frame.fp = thread_saved_fp(p);
+ 	frame.sp = thread_saved_sp(p);
+ 	frame.pc = thread_saved_pc(p);
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	frame.graph = p->curr_ret_stack;
+ #endif
+-	stack_page = (unsigned long)task_stack_page(p);
+ 	do {
+ 		if (frame.sp < stack_page ||
+ 		    frame.sp >= stack_page + THREAD_SIZE ||
+ 		    unwind_frame(p, &frame))
+-			return 0;
+-		if (!in_sched_functions(frame.pc))
+-			return frame.pc;
++			goto out;
++		if (!in_sched_functions(frame.pc)) {
++			ret = frame.pc;
++			goto out;
++		}
+ 	} while (count ++ < 16);
+-	return 0;
++
++out:
++	put_task_stack(p);
++	return ret;
+ }
  
- /*
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 1bec41b..df67652 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -125,9 +125,6 @@ ENTRY(_cpu_resume)
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
- 	mov	sp, x2
--	/* save thread_info */
--	and	x2, x2, #~(THREAD_SIZE - 1)
--	msr	sp_el0, x2
+ unsigned long arch_align_stack(unsigned long sp)
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index d53f99d..8a552a3 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -181,6 +181,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	struct stack_trace_data data;
+ 	struct stackframe frame;
+ 
++	if (!try_get_task_stack(tsk))
++		return;
++
+ 	data.trace = trace;
+ 	data.skip = trace->skip;
+ 
+@@ -202,6 +205,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 	walk_stackframe(tsk, &frame, save_trace, &data);
+ 	if (trace->nr_entries < trace->max_entries)
+ 		trace->entries[trace->nr_entries++] = ULONG_MAX;
++
++	put_task_stack(tsk);
+ }
+ 
+ void save_stack_trace(struct stack_trace *trace)
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 7ac30bf..4731133 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -148,6 +148,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 	if (!tsk)
+ 		tsk = current;
+ 
++	if (!try_get_task_stack(tsk))
++		return;
++
  	/*
- 	 * cpu_do_resume expects x0 to contain context address pointer
- 	 */
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index bb0cd78..1e3be90 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -47,12 +47,6 @@ void notrace __cpu_suspend_exit(void)
- 	cpu_uninstall_idmap();
+ 	 * Switching between stacks is valid when tracing current and in
+ 	 * non-preemptible context.
+@@ -213,6 +216,8 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
+ 				 stack + sizeof(struct pt_regs));
+ 		}
+ 	}
++
++	put_task_stack(tsk);
+ }
  
- 	/*
--	 * Restore per-cpu offset before any kernel
--	 * subsystem relying on it has a chance to run.
--	 */
--	set_my_cpu_offset(per_cpu_offset(cpu));
--
--	/*
- 	 * PSTATE was not saved over suspend/resume, re-enable any detected
- 	 * features that might not have been set correctly.
- 	 */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 352c73b..6a853a8 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -70,11 +70,14 @@ ENTRY(cpu_do_suspend)
- 	mrs	x8, mdscr_el1
- 	mrs	x9, oslsr_el1
- 	mrs	x10, sctlr_el1
-+	mrs	x11, tpidr_el1
-+	mrs	x12, sp_el0
- 	stp	x2, x3, [x0]
- 	stp	x4, xzr, [x0, #16]
- 	stp	x5, x6, [x0, #32]
- 	stp	x7, x8, [x0, #48]
- 	stp	x9, x10, [x0, #64]
-+	stp	x11, x12, [x0, #80]
- 	ret
- ENDPROC(cpu_do_suspend)
- 
-@@ -90,6 +93,7 @@ ENTRY(cpu_do_resume)
- 	ldp	x6, x8, [x0, #32]
- 	ldp	x9, x10, [x0, #48]
- 	ldp	x11, x12, [x0, #64]
-+	ldp	x13, x14, [x0, #80]
- 	msr	tpidr_el0, x2
- 	msr	tpidrro_el0, x3
- 	msr	contextidr_el1, x4
-@@ -112,6 +116,8 @@ ENTRY(cpu_do_resume)
- 	msr	mdscr_el1, x10
- 
- 	msr	sctlr_el1, x12
-+	msr	tpidr_el1, x13
-+	msr	sp_el0, x14
- 	/*
- 	 * Restore oslsr_el1 by writing oslar_el1
- 	 */
+ void show_stack(struct task_struct *tsk, unsigned long *sp)
 -- 
 2.7.4
