@@ -1,112 +1,119 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 3 Nov 2016 15:53:47 -0600
-Subject: [RFC PATCH 1/3] ARM64: meson: Add Amlogic Meson GX PM Suspend
-In-Reply-To: <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
-References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
- <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 3 Nov 2016 14:54:53 -0700
+Subject: [PATCH 3/3] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
+In-Reply-To: <1478164390-21613-3-git-send-email-linus.walleij@linaro.org>
+References: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
+ <1478164390-21613-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161103215453.GV25787@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 03:29:23PM +0100, Neil Armstrong wrote:
-> The Amlogic Meson GX SoCs uses a non-standard argument to the
-> PSCI CPU_SUSPEND call to enter system suspend.
-> 
-> Implement such call within platform_suspend_ops.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/firmware/meson/Kconfig       |  6 +++
->  drivers/firmware/meson/Makefile      |  1 +
->  drivers/firmware/meson/meson_gx_pm.c | 86 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 93 insertions(+)
->  create mode 100644 drivers/firmware/meson/meson_gx_pm.c
-> 
-> diff --git a/drivers/firmware/meson/Kconfig b/drivers/firmware/meson/Kconfig
-> index 170d7e8..5b3fea3 100644
-> --- a/drivers/firmware/meson/Kconfig
-> +++ b/drivers/firmware/meson/Kconfig
-> @@ -7,3 +7,9 @@ config MESON_SM
->  	depends on ARM64_4K_PAGES
->  	help
->  	  Say y here to enable the Amlogic secure monitor driver
-> +
-> +config MESON_GX_PM
-> +	bool
-> +	default ARCH_MESON if ARM64
-> +	help
-> +	  Say y here to enable the Amlogic GX SoC Power Management
-> diff --git a/drivers/firmware/meson/Makefile b/drivers/firmware/meson/Makefile
-> index 9ab3884..b6e285d 100644
-> --- a/drivers/firmware/meson/Makefile
-> +++ b/drivers/firmware/meson/Makefile
-> @@ -1 +1,2 @@
->  obj-$(CONFIG_MESON_SM) +=	meson_sm.o
-> +obj-$(CONFIG_MESON_GX_PM) +=	meson_gx_pm.o
-> diff --git a/drivers/firmware/meson/meson_gx_pm.c b/drivers/firmware/meson/meson_gx_pm.c
-> new file mode 100644
-> index 0000000..c104c2e
-> --- /dev/null
-> +++ b/drivers/firmware/meson/meson_gx_pm.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + * Amlogic Meson GX Power Management
-> + *
-> + * Copyright (c) 2016 Baylibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of version 2 of the GNU General Public License as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/suspend.h>
-> +#include <linux/arm-smccc.h>
-> +
-> +#include <uapi/linux/psci.h>
-> +
-> +#include <asm/suspend.h>
-> +
-> +/*
-> + * The Amlogic GX SoCs uses a special argument value to the
-> + * PSCI CPU_SUSPEND method to enter SUSPEND_MEM.
-> + */
-> +
-> +#define MESON_SUSPEND_PARAM	0x0010000
-> +#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
-> +
-> +static int meson_gx_suspend_finish(unsigned long arg)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(PSCI_FN_NATIVE(0_2, CPU_SUSPEND), arg,
-> +		      virt_to_phys(cpu_resume), 0, 0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static int meson_gx_suspend_enter(suspend_state_t state)
-> +{
-> +	switch (state) {
-> +	case PM_SUSPEND_MEM:
-> +		return cpu_suspend(MESON_SUSPEND_PARAM,
-> +				   meson_gx_suspend_finish);
+On Thu 03 Nov 02:13 PDT 2016, Linus Walleij wrote:
 
-Short response to this patch: NAK
+> This adds the MPU-3050 gyroscope and the KXSD9 accelerometer to
+> the Qualcomm APQ8060 Dragonboard. The KXSD9 is mounted beyond the
+> MPU-3050 and appear as a subdevice beyond it. We set up the
+> required GPIO and interrupt lines to make the devices work.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-To be constructive, since this system lacks PSCI system suspend, it just
-can't support. Alternatively, this can be normal cpuidle state and you
-can use suspend to idle to achieve the same and you need not hack/work
-around using platform specific driver.
+I still would have preferred you using interrupts-extended when you're
+specifying both parent and irq specifier anyways, but I'm ok with this.
 
---
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
 Regards,
-Sudeep
+Bjorn
+
+> ---
+> ChangeLog v2->v3:
+> - Move the interrupt to the pm8058 alias to reflect the two patches
+>   properly specifying the PMIC as interrupt parent.
+> ChangeLog v1->v2:
+> - Use the new I2C mux gate bindings from Peter Rosin (merged to
+>   the I2C subsystem)
+> ---
+>  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> index ea660ffa03ea..c1b99c9cb318 100644
+> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> @@ -220,6 +220,14 @@
+>  					function = "ebi2";
+>  				};
+>  			};
+> +
+> +			/* Interrupt line for the KXSD9 accelerometer */
+> +			dragon_kxsd9_gpios: kxsd9 {
+> +				irq {
+> +					pins = "gpio57"; /* IRQ line */
+> +					bias-pull-up;
+> +				};
+> +			};
+>  		};
+>  
+>  		qcom,ssbi at 500000 {
+> @@ -272,6 +280,15 @@
+>  							power-source = <PM8058_GPIO_S3>;
+>  						};
+>  					};
+> +					dragon_mpu3050_gpios: mpu3050-gpios {
+> +						pinconf {
+> +							pins = "gpio17";
+> +							function = "normal";
+> +							input-enable;
+> +							bias-disable;
+> +							power-source = <PM8058_GPIO_S3>;
+> +						};
+> +					};
+>  					dragon_sdcc3_gpios: sdcc3-gpios {
+>  						pinconf {
+>  							pins = "gpio22";
+> @@ -389,6 +406,42 @@
+>  					vddd-supply = <&pm8058_lvs0>; // 1.8V
+>  					vdda-supply = <&pm8058_l14>; // 2.85V
+>  				};
+> +				mpu3050 at 68 {
+> +					compatible = "invensense,mpu3050";
+> +					reg = <0x68>;
+> +					/*
+> +					 * GPIO17 has interrupt 208 on the
+> +					 * PM8058, it is pulled high by a 10k
+> +					 * resistor to VLOGIC so needs to be
+> +					 * active low/falling edge.
+> +					 */
+> +					interrupt-parent = <&pm8058>;
+> +					interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
+> +					pinctrl-names = "default";
+> +					pinctrl-0 = <&dragon_mpu3050_gpios>;
+> +					vlogic-supply = <&pm8058_lvs0>; // 1.8V
+> +					vdd-supply = <&pm8058_l14>; // 2.85V
+> +
+> +					/*
+> +					 * The MPU-3050 acts as a hub for the
+> +					 * accelerometer.
+> +					 */
+> +					i2c-gate {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +
+> +						kxsd9 at 18 {
+> +							compatible = "kionix,kxsd9";
+> +							reg = <0x18>;
+> +							interrupt-parent = <&tlmm>;
+> +							interrupts = <57 IRQ_TYPE_EDGE_FALLING>;
+> +							pinctrl-names = "default";
+> +							pinctrl-0 = <&dragon_kxsd9_gpios>;
+> +							iovdd-supply = <&pm8058_lvs0>; // 1.8V
+> +							vdd-supply = <&pm8058_l14>; // 2.85V
+> +						};
+> +					};
+> +				};
+>  			};
+>  		};
+>  
+> -- 
+> 2.7.4
+> 
