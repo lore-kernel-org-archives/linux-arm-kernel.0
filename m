@@ -1,47 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 3 Nov 2016 15:57:54 +0000
-Subject: [PATCHv2 6/6] arm64: Add support for CONFIG_DEBUG_VIRTUAL
-In-Reply-To: <a77c2162-6eb9-09c8-e84f-03a207b59c6b@redhat.com>
-References: <20161102210054.16621-1-labbott@redhat.com>
- <20161102210054.16621-7-labbott@redhat.com>
- <20161102230642.GB19591@remoulade>
- <a77c2162-6eb9-09c8-e84f-03a207b59c6b@redhat.com>
-Message-ID: <20161103155753.GG25852@remoulade>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Thu,  3 Nov 2016 16:59:08 +0100
+Subject: [PATCH v4 0/4] Add DT support for DA8xx
+Message-ID: <1478188752-22447-1-git-send-email-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 06:05:38PM -0600, Laura Abbott wrote:
-> On 11/02/2016 05:06 PM, Mark Rutland wrote:
-> >On Wed, Nov 02, 2016 at 03:00:54PM -0600, Laura Abbott wrote:
-> >>+CFLAGS_physaddr.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> >>+obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+Changes in v2:
+* Remove unrelated changes in patch 3
+* Rename the device node in patch 4
 
-> >>+	/*
-> >>+	 * This is intentionally different than above to be a tighter check
-> >>+	 * for symbols.
-> >>+	 */
-> >>+	VIRTUAL_BUG_ON(x < kimage_vaddr + TEXT_OFFSET || x > (unsigned long) _end);
-> >
-> >Can't we use _text instead of kimage_vaddr + TEXT_OFFSET? That way we don't
-> >need CFLAGS_physaddr.o.
-> >
-> >Or KERNEL_START / KERNEL_END from <asm/memory.h>?
-> >
-> >Otherwise, this looks good to me (though I haven't grokked the need for
-> >__pa_symbol() yet).
-> 
-> I guess it's a question of what's clearer. I like kimage_vaddr +
-> TEXT_OFFSET because it clearly states we are checking from the
-> start of the kernel image vs. _text only shows the start of the
-> text region. Yes, it's technically the same but a little less
-> obvious. I suppose that could be solved with some more elaboration
-> in the comment.
+Changes in v3:
+* Fix few mistakes in DT binding sample
+* Only build the device table if DT is enabled
 
-Sure, it's arguable either way.
+Change in v4:
+* Fix a nit
 
-I do think that KERNEL_START/KERNEL_END are a better choice, with the comment
-you suggest, and/or renamed to KERNEL_IMAGE_*. They already describe the bounds
-of the image (though the naming doesn't make that entirely clear).
+Alexandre Bailon (1):
+  ARM: dts: da850: Add the usb otg device node
 
-Thanks,
-Mark.
+Petr Kulhavy (3):
+  dt/bindings: Add binding for the DA8xx MUSB driver
+  usb: musb: core: added helper function for parsing DT
+  usb: musb: da8xx: Add DT support for the DA8xx driver
+
+ .../devicetree/bindings/usb/da8xx-usb.txt          | 43 ++++++++++++++++++++
+ arch/arm/boot/dts/da850-lcdk.dts                   |  8 ++++
+ arch/arm/boot/dts/da850.dtsi                       | 15 +++++++
+ drivers/usb/musb/da8xx.c                           | 46 ++++++++++++++++++++++
+ drivers/usb/musb/musb_core.c                       | 19 +++++++++
+ drivers/usb/musb/musb_core.h                       |  6 +++
+ 6 files changed, 137 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/da8xx-usb.txt
+
+-- 
+2.7.3
