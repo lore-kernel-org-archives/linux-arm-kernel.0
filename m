@@ -1,74 +1,57 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Thu, 03 Nov 2016 10:42:59 +0200
-Subject: [linux-sunxi] [PATCH v2 04/14] ASoC: sun4i-codec: Increase DMA
- max burst to 8
-In-Reply-To: <20161103075556.29018-5-wens@csie.org>
-References: <20161103075556.29018-1-wens@csie.org>
- <20161103075556.29018-5-wens@csie.org>
-Message-ID: <1478162579.8841.1.camel@plaes.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 3 Nov 2016 09:52:38 +0100
+Subject: [PATCH v2 0/6] STM32F4 Add RTC & QSPI clocks
+In-Reply-To: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
+References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <68855ca8-a74f-7c76-342f-de0aeec51ca1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-11-03 at 15:55 +0800, Chen-Yu Tsai wrote:
-> According to the DMA engine API documentation, maxburst denotes the
-> largest possible size of a single transfer, so as not to overflow
-> destination FIFOs as explained in this excerpt from dmaengine.h
-> 
-> ?* @src_maxburst: the maximum number of words (note: words, as in
-> ?* units of the src_addr_width member, not bytes) that can be sent
-> ?* in one burst to the device. Typically something like half the
-> ?* FIFO depth on I/O peripherals so you don't overflow it. This
-> ?* may or may not be applicable on memory sources.
-> ?* @dst_maxburst: same as src_maxburst but for destination target
+Hi Gabriel,
 
-> ?* mutatis mutandis.
+On 10/14/2016 11:18 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> v2:
+>  - rename compatible property "st,stm32f46xx-rcc" into "st,stm32f469-rcc"
+>  - cosmetic: remove bad copy/paste
+>
+> This patch-set introduce RTC and QSPI clocks for STM32F4 socs
+> RTC clock has 3 parents clock oscillators (lsi/lse/hse_rtc)
+>
+> example to use rtc clock:
+>
+> 		rtc: rtc at 40002800 {
+> 			compatible = "st,stm32-rtc";
+> 			reg = <0x40002800 0x400>;
+> 			...
+> 			clocks = <&rcc 1 CLK_RTC>;
+>
+> 			assigned-clocks =  <&rcc 1 CLK_RTC>;
+> 			assigned-clock-parents = <&rcc 1 CLK_LSE>;
+> 			...
+> 		};
+>
+> Gabriel Fernandez (6):
+>   clk: stm32f4: Add LSI & LSE clocks
+>   ARM: dts: stm32f429: add LSI and LSE clocks
+>   arm: stmf32: Enable SYSCON
+>   clk: stm32f4: Add RTC clock
+>   clk: stm32f469: Add QSPI clock
+>   ARM: dts: stm32f429: Add QSPI clock
 
-^^ :)
+You sent a V3 without DT patches. Should I take DT patches from this V2 
+patchset ?
 
-> 
-> The TX FIFO is 64 samples deep for stereo, and the RX FIFO is 16
-> samples deep. So maxburst could be 32 and 8 for TX and RX
-> respectively.
-> 
-> Unfortunately the sunxi DMA controller driver takes maxburst as
-> the requested burst size, rather than a limit, and returns an error
-> for unsupported values. The original value was 4, but some later
-> SoCs do not officially support this burst size.
-> 
-> This patch increases maxburst on the TX side to 8, which is supported
-> by all variants of the sunxi DMA controller.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> ?sound/soc/sunxi/sun4i-codec.c | 4 ++--
-> ?1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-
-> codec.c
-> index 61ae502a5061..d867b96d367b 100644
-> --- a/sound/soc/sunxi/sun4i-codec.c
-> +++ b/sound/soc/sunxi/sun4i-codec.c
-> @@ -886,12 +886,12 @@ static int sun4i_codec_probe(struct
-> platform_device *pdev)
-> ?
-> ?	/* DMA configuration for TX FIFO */
-> ?	scodec->playback_dma_data.addr = res->start + quirks-
-> >reg_dac_txdata;
-> -	scodec->playback_dma_data.maxburst = 4;
-> +	scodec->playback_dma_data.maxburst = 8;
-> ?	scodec->playback_dma_data.addr_width =
-> DMA_SLAVE_BUSWIDTH_2_BYTES;
-> ?
-> ?	/* DMA configuration for RX FIFO */
-> ?	scodec->capture_dma_data.addr = res->start + quirks-
-> >reg_adc_rxdata;
-> -	scodec->capture_dma_data.maxburst = 4;
-> +	scodec->capture_dma_data.maxburst = 8;
-> ?	scodec->capture_dma_data.addr_width =
-> DMA_SLAVE_BUSWIDTH_2_BYTES;
-> ?
-> ?	ret = snd_soc_register_codec(&pdev->dev, quirks->codec,
-> --?
-> 2.10.2
-> 
+Regards
+Alex
+
+
+>
+>  .../devicetree/bindings/clock/st,stm32-rcc.txt     |   4 +-
+>  arch/arm/boot/dts/stm32f429.dtsi                   |  18 +
+>  arch/arm/boot/dts/stm32f469-disco.dts              |   4 +
+>  arch/arm/configs/stm32_defconfig                   |   1 +
+>  drivers/clk/clk-stm32f4.c                          | 442 ++++++++++++++++++++-
+>  5 files changed, 447 insertions(+), 22 deletions(-)
+>
