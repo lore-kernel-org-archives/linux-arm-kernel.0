@@ -1,52 +1,106 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  3 Nov 2016 10:13:09 +0100
-Subject: [PATCH 2/3] ARM: dts: reference PM8058 as IRQ parent
+Date: Thu,  3 Nov 2016 10:13:10 +0100
+Subject: [PATCH 3/3] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
 In-Reply-To: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
 References: <1478164390-21613-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1478164390-21613-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1478164390-21613-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some nodes are referencing the pm8058_gpio as IRQ parent, but
-the HW IRQ offset they are supplying is actually that for the
-parent to that controller: the PM8058 itself. Since that is the
-proper parent, reference it directly.
-
-We can switch this to the pm8058_gpio and the proper offset
-once we have fixed the SSBI GPIO driver to properly deal with
-the hierarchical IRQ domain and get proper local offset
-translation.
+This adds the MPU-3050 gyroscope and the KXSD9 accelerometer to
+the Qualcomm APQ8060 Dragonboard. The KXSD9 is mounted beyond the
+MPU-3050 and appear as a subdevice beyond it. We set up the
+required GPIO and interrupt lines to make the devices work.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ChangeLog v2->v3:
+- Move the interrupt to the pm8058 alias to reflect the two patches
+  properly specifying the PMIC as interrupt parent.
+ChangeLog v1->v2:
+- Use the new I2C mux gate bindings from Peter Rosin (merged to
+  the I2C subsystem)
+---
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 4a532ddab53a..ea660ffa03ea 100644
+index ea660ffa03ea..c1b99c9cb318 100644
 --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
 +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -369,8 +369,8 @@
- 				ak8975 at 0c {
- 					compatible = "asahi-kasei,ak8975";
- 					reg = <0x0c>;
--					/* GPIO33 has interrupt 224 on the PM8058 */
--					interrupt-parent = <&pm8058_gpio>;
-+					/* FIXME: GPIO33 has interrupt 224 on the PM8058 */
+@@ -220,6 +220,14 @@
+ 					function = "ebi2";
+ 				};
+ 			};
++
++			/* Interrupt line for the KXSD9 accelerometer */
++			dragon_kxsd9_gpios: kxsd9 {
++				irq {
++					pins = "gpio57"; /* IRQ line */
++					bias-pull-up;
++				};
++			};
+ 		};
+ 
+ 		qcom,ssbi at 500000 {
+@@ -272,6 +280,15 @@
+ 							power-source = <PM8058_GPIO_S3>;
+ 						};
+ 					};
++					dragon_mpu3050_gpios: mpu3050-gpios {
++						pinconf {
++							pins = "gpio17";
++							function = "normal";
++							input-enable;
++							bias-disable;
++							power-source = <PM8058_GPIO_S3>;
++						};
++					};
+ 					dragon_sdcc3_gpios: sdcc3-gpios {
+ 						pinconf {
+ 							pins = "gpio22";
+@@ -389,6 +406,42 @@
+ 					vddd-supply = <&pm8058_lvs0>; // 1.8V
+ 					vdda-supply = <&pm8058_l14>; // 2.85V
+ 				};
++				mpu3050 at 68 {
++					compatible = "invensense,mpu3050";
++					reg = <0x68>;
++					/*
++					 * GPIO17 has interrupt 208 on the
++					 * PM8058, it is pulled high by a 10k
++					 * resistor to VLOGIC so needs to be
++					 * active low/falling edge.
++					 */
 +					interrupt-parent = <&pm8058>;
- 					interrupts = <224 IRQ_TYPE_EDGE_RISING>;
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&dragon_ak8975_gpios>;
-@@ -380,8 +380,8 @@
- 				bmp085 at 77 {
- 					compatible = "bosch,bmp085";
- 					reg = <0x77>;
--					/* GPIO16 has interrupt 207 on the PM8058 */
--					interrupt-parent = <&pm8058_gpio>;
-+					/* FIXME: GPIO16 has interrupt 207 on the PM8058 */
-+					interrupt-parent = <&pm8058>;
- 					interrupts = <207 IRQ_TYPE_EDGE_RISING>;
- 					reset-gpios = <&tlmm 86 GPIO_ACTIVE_LOW>;
- 					pinctrl-names = "default";
++					interrupts = <208 IRQ_TYPE_EDGE_FALLING>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&dragon_mpu3050_gpios>;
++					vlogic-supply = <&pm8058_lvs0>; // 1.8V
++					vdd-supply = <&pm8058_l14>; // 2.85V
++
++					/*
++					 * The MPU-3050 acts as a hub for the
++					 * accelerometer.
++					 */
++					i2c-gate {
++						#address-cells = <1>;
++						#size-cells = <0>;
++
++						kxsd9 at 18 {
++							compatible = "kionix,kxsd9";
++							reg = <0x18>;
++							interrupt-parent = <&tlmm>;
++							interrupts = <57 IRQ_TYPE_EDGE_FALLING>;
++							pinctrl-names = "default";
++							pinctrl-0 = <&dragon_kxsd9_gpios>;
++							iovdd-supply = <&pm8058_lvs0>; // 1.8V
++							vdd-supply = <&pm8058_l14>; // 2.85V
++						};
++					};
++				};
+ 			};
+ 		};
+ 
 -- 
 2.7.4
