@@ -1,112 +1,233 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Nov 2016 15:55:42 +0800
-Subject: [PATCH v2 00/14] ASoC: sun4i-codec: Add support for A31 Codec
-Message-ID: <20161103075556.29018-1-wens@csie.org>
+Date: Thu,  3 Nov 2016 15:55:44 +0800
+Subject: [PATCH v2 02/14] ASoC: sun4i-codec: Expand quirks to handle register
+ offsets and card creation
+In-Reply-To: <20161103075556.29018-1-wens@csie.org>
+References: <20161103075556.29018-1-wens@csie.org>
+Message-ID: <20161103075556.29018-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The A31 has a similar codec to the A10/A20. The PCM parts are very
+similar, with just different register offsets. The analog paths are
+very different. There are more inputs and outputs.
 
-This is v2 of my Allwinner A31 audio codec support series. The ASoC DAPM
-stereo control patches in v1 were split out and merged already. These
-remaining patches depend on them.
+The A31s, A23, and H3 have a similar PCM interface, again with register
+offsets slightly rearranged. The analog path controls, while very
+similar between them and the A31, have been moved a separate bus which
+is accessed through a message box like interface in the PRCM address
+range. This would be handled by a separate auxiliary device tied in
+through the device tree in its supporting create_card function.
 
-The A31's internal codec is similar (in terms of DMA, interface and
-control layouts) to the one found in the A10/A13/A20 SoCs. However
-it has more external inputs and outputs, the mixer controls are now
-stereo (left/right separated), and it also has some audio processing
-features (not supported yet).
+The quirks structure is expanded to include different register offsets
+and separate callbacks for creating the ASoC card. The regmap_config,
+quirks, and of_device_match tables have been moved to facilitate this.
 
-Changes since v1:
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 87 +++++++++++++++++++++++++++++--------------
+ 1 file changed, 60 insertions(+), 27 deletions(-)
 
-  - Patches 1, 2, 3 and 4 were split out from patch 6.
-
-  - Reworked handling of register offset differences with regmap_field,
-    as suggested by Maxime.
-
-  - Added support for an optional (in the driver) reset control (patch 5)
-
-  - Added required reset control for sun6i-a31-codec
-
-  - Added more comments for sun6i registers
-
-  - Added HPCOM (direct drive mode) support
-
-  - Renamed sun6i audio card name to "A31 Audio Codec"
-
-  - Added example for allwinner,sun6i-a31-codec device tree
-
-  - Fixed line out volume control scale
-
-  - Added external amplifier enable GPIO for Hummingbird A31
-
-  - Added patch to enable audio codec on Sinlinx SinA31s
-
-Patch 1 moves some code around to facilitate patch 2. No code was
-changed
-
-Patch 2 expands the quirks to handle different register offsets for
-
-    - ADC FIFO controls, using regmap_field's
-
-    - RX/TX FIFO addresses, with offsets stored directly, as these
-      are only used to setup DMA and not actually accessed by the
-      driver
-
-    - card setup functions, as the newer codecs have a very different
-      layout
-
-Patch 3 fixes some of the comments in the register definition section,
-so the separation of different functions is clearer.
-
-Patch 4 increases the maximum DMA burst size from 4 to 8. 4 is not
-a valid size on later SoCs.
-
-Patch 5 adds driver support for an optional reset control.
-
-Patches 6 through 11 add support for the A31's internal codec, one
-feature per patch. Hopefully this makes it easier to review. Some
-features, such as PHONE inputs/outputs, audio processing, headset
-jack detection and buttons, aren't supported yet.
-
-Patch 12 adds a device node for the codec to the A31 dtsi.
-
-Patch 13 enables the codec for the Hummingbird A31 board.
-
-Patch 14 enables the codec for the Sinlinx SinA31s board.
-
-
-Please let me know what you think.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (14):
-  ASoC: sun4i-codec: Move data structures to add create_card call to
-    quirks
-  ASoC: sun4i-codec: Expand quirks to handle register offsets and card
-    creation
-  ASoC: sun4i-codec: Revise comments for register definition macros
-  ASoC: sun4i-codec: Increase DMA max burst to 8
-  ASoC: sun4i-codec: Add support for optional reset control to quirks
-  ASoC: sun4i-codec: Add support for A31 playback through headphone
-    output
-  ASoC: sun4i-codec: Add support for A31 Line In playback
-  ASoC: sun4i-codec: Add support for A31 Line Out playback
-  ASoC: sun4i-codec: Add support for A31 analog microphone inputs
-  ASoC: sun4i-codec: Add support for A31 ADC capture path
-  ASoC: sun4i-codec: Add support for A31 board level audio routing
-  ARM: dts: sun6i: Add audio codec device node
-  ARM: dts: sun6i: hummingbird: Enable internal audio codec
-  ARM: dts: sun6i: sina31s: Enable internal audio codec
-
- .../devicetree/bindings/sound/sun4i-codec.txt      |  55 +-
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts        |  20 +
- arch/arm/boot/dts/sun6i-a31.dtsi                   |  13 +
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts           |   8 +
- sound/soc/sunxi/sun4i-codec.c                      | 688 ++++++++++++++++++---
- 5 files changed, 706 insertions(+), 78 deletions(-)
-
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 249fa5033361..dbb47f255bd8 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -3,6 +3,7 @@
+  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
+  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
+  * Copyright 2015 Adam Sampson <ats@offog.org>
++ * Copyright 2016 Chen-Yu Tsai <wens@csie.org>
+  *
+  * Based on the Allwinner SDK driver, released under the GPL.
+  *
+@@ -24,8 +25,9 @@
+ #include <linux/delay.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
+-#include <linux/of_platform.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/of_platform.h>
+ #include <linux/clk.h>
+ #include <linux/regmap.h>
+ #include <linux/gpio/consumer.h>
+@@ -106,6 +108,9 @@ struct sun4i_codec {
+ 	struct clk	*clk_module;
+ 	struct gpio_desc *gpio_pa;
+ 
++	/* ADC_FIFOC register is at different offset on different SoCs */
++	struct regmap_field *reg_adc_fifoc;
++
+ 	struct snd_dmaengine_dai_dma_data	capture_dma_data;
+ 	struct snd_dmaengine_dai_dma_data	playback_dma_data;
+ };
+@@ -134,16 +139,16 @@ static void sun4i_codec_stop_playback(struct sun4i_codec *scodec)
+ static void sun4i_codec_start_capture(struct sun4i_codec *scodec)
+ {
+ 	/* Enable ADC DRQ */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN),
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN));
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN),
++				 BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN));
+ }
+ 
+ static void sun4i_codec_stop_capture(struct sun4i_codec *scodec)
+ {
+ 	/* Disable ADC DRQ */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN), 0);
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 BIT(SUN4I_CODEC_ADC_FIFOC_ADC_DRQ_EN), 0);
+ }
+ 
+ static int sun4i_codec_trigger(struct snd_pcm_substream *substream, int cmd,
+@@ -186,15 +191,15 @@ static int sun4i_codec_prepare_capture(struct snd_pcm_substream *substream,
+ 
+ 
+ 	/* Flush RX FIFO */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_FIFO_FLUSH),
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_FIFO_FLUSH));
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 BIT(SUN4I_CODEC_ADC_FIFOC_FIFO_FLUSH),
++				 BIT(SUN4I_CODEC_ADC_FIFOC_FIFO_FLUSH));
+ 
+ 
+ 	/* Set RX FIFO trigger level */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   0xf << SUN4I_CODEC_ADC_FIFOC_RX_TRIG_LEVEL,
+-			   0x7 << SUN4I_CODEC_ADC_FIFOC_RX_TRIG_LEVEL);
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 0xf << SUN4I_CODEC_ADC_FIFOC_RX_TRIG_LEVEL,
++				 0x7 << SUN4I_CODEC_ADC_FIFOC_RX_TRIG_LEVEL);
+ 
+ 	/*
+ 	 * FIXME: Undocumented in the datasheet, but
+@@ -213,9 +218,9 @@ static int sun4i_codec_prepare_capture(struct snd_pcm_substream *substream,
+ 				   0x1 << 8);
+ 
+ 	/* Fill most significant bits with valid data MSB */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
+-			   BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE),
++				 BIT(SUN4I_CODEC_ADC_FIFOC_RX_FIFO_MODE));
+ 
+ 	return 0;
+ }
+@@ -342,18 +347,19 @@ static int sun4i_codec_hw_params_capture(struct sun4i_codec *scodec,
+ 					 unsigned int hwrate)
+ {
+ 	/* Set ADC sample rate */
+-	regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-			   7 << SUN4I_CODEC_ADC_FIFOC_ADC_FS,
+-			   hwrate << SUN4I_CODEC_ADC_FIFOC_ADC_FS);
++	regmap_field_update_bits(scodec->reg_adc_fifoc,
++				 7 << SUN4I_CODEC_ADC_FIFOC_ADC_FS,
++				 hwrate << SUN4I_CODEC_ADC_FIFOC_ADC_FS);
+ 
+ 	/* Set the number of channels we want to use */
+ 	if (params_channels(params) == 1)
+-		regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-				   BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN),
+-				   BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN));
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++					 BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN),
++					 BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN));
+ 	else
+-		regmap_update_bits(scodec->regmap, SUN4I_CODEC_ADC_FIFOC,
+-				   BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN), 0);
++		regmap_field_update_bits(scodec->reg_adc_fifoc,
++					 BIT(SUN4I_CODEC_ADC_FIFOC_MONO_EN),
++					 0);
+ 
+ 	return 0;
+ }
+@@ -758,14 +764,29 @@ static const struct regmap_config sun7i_codec_regmap_config = {
+ 
+ struct sun4i_codec_quirks {
+ 	const struct regmap_config *regmap_config;
++	const struct snd_soc_codec_driver *codec;
++	struct snd_soc_card * (*create_card)(struct device *dev);
++	struct reg_field reg_adc_fifoc;	/* used for regmap_field */
++	unsigned int reg_dac_txdata;	/* TX FIFO offset for DMA config */
++	unsigned int reg_adc_rxdata;	/* RX FIFO offset for DMA config */
+ };
+ 
+ static const struct sun4i_codec_quirks sun4i_codec_quirks = {
+ 	.regmap_config	= &sun4i_codec_regmap_config,
++	.codec		= &sun4i_codec_codec,
++	.create_card	= sun4i_codec_create_card,
++	.reg_adc_fifoc	= REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
++	.reg_dac_txdata	= SUN4I_CODEC_DAC_TXDATA,
++	.reg_adc_rxdata	= SUN4I_CODEC_ADC_RXDATA,
+ };
+ 
+ static const struct sun4i_codec_quirks sun7i_codec_quirks = {
+ 	.regmap_config	= &sun7i_codec_regmap_config,
++	.codec		= &sun4i_codec_codec,
++	.create_card	= sun4i_codec_create_card,
++	.reg_adc_fifoc	= REG_FIELD(SUN4I_CODEC_ADC_FIFOC, 0, 31),
++	.reg_dac_txdata	= SUN4I_CODEC_DAC_TXDATA,
++	.reg_adc_rxdata	= SUN4I_CODEC_ADC_RXDATA,
+ };
+ 
+ static const struct of_device_id sun4i_codec_of_match[] = {
+@@ -838,6 +859,17 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/* reg_field setup */
++	scodec->reg_adc_fifoc = devm_regmap_field_alloc(&pdev->dev,
++							scodec->regmap,
++							quirks->reg_adc_fifoc);
++	if (IS_ERR(scodec->reg_adc_fifoc)) {
++		ret = PTR_ERR(scodec->reg_adc_fifoc);
++		dev_err(&pdev->dev, "Failed to create regmap fields: %d\n",
++			ret);
++		return ret;
++	}
++
+ 	/* Enable the bus clock */
+ 	if (clk_prepare_enable(scodec->clk_apb)) {
+ 		dev_err(&pdev->dev, "Failed to enable the APB clock\n");
+@@ -845,16 +877,16 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* DMA configuration for TX FIFO */
+-	scodec->playback_dma_data.addr = res->start + SUN4I_CODEC_DAC_TXDATA;
++	scodec->playback_dma_data.addr = res->start + quirks->reg_dac_txdata;
+ 	scodec->playback_dma_data.maxburst = 4;
+ 	scodec->playback_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+ 
+ 	/* DMA configuration for RX FIFO */
+-	scodec->capture_dma_data.addr = res->start + SUN4I_CODEC_ADC_RXDATA;
++	scodec->capture_dma_data.addr = res->start + quirks->reg_adc_rxdata;
+ 	scodec->capture_dma_data.maxburst = 4;
+ 	scodec->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+ 
+-	ret = snd_soc_register_codec(&pdev->dev, &sun4i_codec_codec,
++	ret = snd_soc_register_codec(&pdev->dev, quirks->codec,
+ 				     &sun4i_codec_dai, 1);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to register our codec\n");
+@@ -875,7 +907,7 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 		goto err_unregister_codec;
+ 	}
+ 
+-	card = sun4i_codec_create_card(&pdev->dev);
++	card = quirks->create_card(&pdev->dev);
+ 	if (IS_ERR(card)) {
+ 		ret = PTR_ERR(card);
+ 		dev_err(&pdev->dev, "Failed to create our card\n");
+@@ -926,4 +958,5 @@ MODULE_DESCRIPTION("Allwinner A10 codec driver");
+ MODULE_AUTHOR("Emilio L?pez <emilio@elopez.com.ar>");
+ MODULE_AUTHOR("Jon Smirl <jonsmirl@gmail.com>");
+ MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+ MODULE_LICENSE("GPL");
 -- 
 2.10.2
