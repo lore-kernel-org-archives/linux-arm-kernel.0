@@ -1,26 +1,45 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 3 Nov 2016 18:29:13 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-In-Reply-To: <a6ded15c-5eea-70b8-61a1-b40873af8699@arm.com>
-References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
- <20161103160006.GS22791@arm.com> <20161103161407.GR3541@8bytes.org>
- <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
- <20161103162943.GS3541@8bytes.org>
- <a6ded15c-5eea-70b8-61a1-b40873af8699@arm.com>
-Message-ID: <20161103172913.GT3541@8bytes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 3 Nov 2016 18:34:13 +0100
+Subject: [PATCH v2 02/14] ASoC: sun4i-codec: Expand quirks to handle
+ register offsets and card creation
+In-Reply-To: <20161103075556.29018-3-wens@csie.org>
+References: <20161103075556.29018-1-wens@csie.org>
+ <20161103075556.29018-3-wens@csie.org>
+Message-ID: <20161103173413.xoljqlfpqlfaeiyj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 04:57:40PM +0000, Robin Murphy wrote:
-> But if it is someone else's ops, then all that means is that the SMMU
-> driver isn't going to get notified about devices on that bus, or get
-> called with them later, so I still don't see where the problem is. If
-> there are devices on that bus which the SMMU *is* supposed to be
-> managing, then that system can't be supported with the current API anyway.
+On Thu, Nov 03, 2016 at 03:55:44PM +0800, Chen-Yu Tsai wrote:
+> The A31 has a similar codec to the A10/A20. The PCM parts are very
+> similar, with just different register offsets. The analog paths are
+> very different. There are more inputs and outputs.
+> 
+> The A31s, A23, and H3 have a similar PCM interface, again with register
+> offsets slightly rearranged. The analog path controls, while very
+> similar between them and the A31, have been moved a separate bus which
+> is accessed through a message box like interface in the PRCM address
+> range. This would be handled by a separate auxiliary device tied in
+> through the device tree in its supporting create_card function.
+> 
+> The quirks structure is expanded to include different register offsets
+> and separate callbacks for creating the ASoC card. The regmap_config,
+> quirks, and of_device_match tables have been moved to facilitate this.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-If another IOMMU is already probed and set its iommu_ops, than there is
-no point in probing the smmu anyway, no? The probe function should
-return the failed probe in that case and not proceed silently.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
+Thanks!
+Maxime
 
-	Joerg
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161103/a5744aaa/attachment.sig>
