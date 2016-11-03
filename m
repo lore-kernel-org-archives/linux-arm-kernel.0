@@ -1,84 +1,118 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  3 Nov 2016 20:23:11 +0000
-Subject: [PATCHv2 09/11] arm64: make cpu number a percpu variable
+Date: Thu,  3 Nov 2016 20:23:09 +0000
+Subject: [PATCHv2 07/11] arm64: move sp_el0 and tpidr_el1 into cpu_suspend_ctx
 In-Reply-To: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
 References: <1478204593-29145-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1478204593-29145-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <1478204593-29145-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the absence of CONFIG_THREAD_INFO_IN_TASK, core code maintains
-thread_info::cpu, and low-level architecture code can access this to
-build raw_smp_processor_id(). With CONFIG_THREAD_INFO_IN_TASK, core code
-maintains task_struct::cpu, which for reasons of hte header soup is not
-accessible to low-level arch code.
+When returning from idle, we rely on the fact that thread_info lives at
+the end of the kernel stack, and restore this by masking the saved stack
+pointer. Subsequent patches will sever the relationship between the
+stack and thread_info, and to cater for this we must save/restore sp_el0
+explicitly, storing it in cpu_suspend_ctx.
 
-Instead, we can maintain a percpu variable containing the cpu number.
+As cpu_suspend_ctx must be doubleword aligned, this leaves us with an
+extra slot in cpu_suspend_ctx. We can use this to save/restore tpidr_el1
+in the same way, which simplifies the code, avoiding pointer chasing on
+the restore path (as we no longer need to load thread_info::cpu followed
+by the relevant slot in __per_cpu_offset based on this).
 
-For both the old and new implementation of raw_smp_processor_id(), we
-read a syreg into a GPR, add an offset, and load the result. As the
-offset is now larger, it may not be folded into the load, but otherwise
-the assembly shouldn't change much.
+This patch stashes both registers in cpu_suspend_ctx.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Tested-by: Laura Abbott <labbott@redhat.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/smp.h | 11 ++++++++++-
- arch/arm64/kernel/smp.c      |  5 +++++
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/suspend.h | 2 +-
+ arch/arm64/kernel/sleep.S        | 3 ---
+ arch/arm64/kernel/suspend.c      | 6 ------
+ arch/arm64/mm/proc.S             | 6 ++++++
+ 4 files changed, 7 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 0226447..968b08d 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -29,11 +29,20 @@
+diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
+index b8a313f..de5600f 100644
+--- a/arch/arm64/include/asm/suspend.h
++++ b/arch/arm64/include/asm/suspend.h
+@@ -1,7 +1,7 @@
+ #ifndef __ASM_SUSPEND_H
+ #define __ASM_SUSPEND_H
  
- #ifndef __ASSEMBLY__
+-#define NR_CTX_REGS 10
++#define NR_CTX_REGS 12
+ #define NR_CALLEE_SAVED_REGS 12
  
-+#include <asm/percpu.h>
-+
- #include <linux/threads.h>
- #include <linux/cpumask.h>
- #include <linux/thread_info.h>
- 
--#define raw_smp_processor_id() (current_thread_info()->cpu)
-+DECLARE_PER_CPU_READ_MOSTLY(int, cpu_number);
-+
-+/*
-+ * We don't use this_cpu_read(cpu_number) as that has implicit writes to
-+ * preempt_count, and associated (compiler) barriers, that we'd like to avoid
-+ * the expense of. If we're preemptible, the value can be stale at use anyway.
-+ */
-+#define raw_smp_processor_id() (*this_cpu_ptr(&cpu_number))
- 
- struct seq_file;
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index f64401f..6f42c68 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -58,6 +58,9 @@
- #define CREATE_TRACE_POINTS
- #include <trace/events/ipi.h>
- 
-+DEFINE_PER_CPU_READ_MOSTLY(int, cpu_number);
-+EXPORT_PER_CPU_SYMBOL(cpu_number);
-+
  /*
-  * as from 2.5, kernels no longer have an init_tasks structure
-  * so we need some other way of telling a new secondary core
-@@ -719,6 +722,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
+index 1bec41b..df67652 100644
+--- a/arch/arm64/kernel/sleep.S
++++ b/arch/arm64/kernel/sleep.S
+@@ -125,9 +125,6 @@ ENTRY(_cpu_resume)
+ 	/* load sp from context */
+ 	ldr	x2, [x0, #CPU_CTX_SP]
+ 	mov	sp, x2
+-	/* save thread_info */
+-	and	x2, x2, #~(THREAD_SIZE - 1)
+-	msr	sp_el0, x2
+ 	/*
+ 	 * cpu_do_resume expects x0 to contain context address pointer
  	 */
- 	for_each_possible_cpu(cpu) {
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index bb0cd78..1e3be90 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -47,12 +47,6 @@ void notrace __cpu_suspend_exit(void)
+ 	cpu_uninstall_idmap();
  
-+		per_cpu(cpu_number, cpu) = cpu;
-+
- 		if (cpu == smp_processor_id())
- 			continue;
+ 	/*
+-	 * Restore per-cpu offset before any kernel
+-	 * subsystem relying on it has a chance to run.
+-	 */
+-	set_my_cpu_offset(per_cpu_offset(cpu));
+-
+-	/*
+ 	 * PSTATE was not saved over suspend/resume, re-enable any detected
+ 	 * features that might not have been set correctly.
+ 	 */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 352c73b..6a853a8 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -70,11 +70,14 @@ ENTRY(cpu_do_suspend)
+ 	mrs	x8, mdscr_el1
+ 	mrs	x9, oslsr_el1
+ 	mrs	x10, sctlr_el1
++	mrs	x11, tpidr_el1
++	mrs	x12, sp_el0
+ 	stp	x2, x3, [x0]
+ 	stp	x4, xzr, [x0, #16]
+ 	stp	x5, x6, [x0, #32]
+ 	stp	x7, x8, [x0, #48]
+ 	stp	x9, x10, [x0, #64]
++	stp	x11, x12, [x0, #80]
+ 	ret
+ ENDPROC(cpu_do_suspend)
  
+@@ -90,6 +93,7 @@ ENTRY(cpu_do_resume)
+ 	ldp	x6, x8, [x0, #32]
+ 	ldp	x9, x10, [x0, #48]
+ 	ldp	x11, x12, [x0, #64]
++	ldp	x13, x14, [x0, #80]
+ 	msr	tpidr_el0, x2
+ 	msr	tpidrro_el0, x3
+ 	msr	contextidr_el1, x4
+@@ -112,6 +116,8 @@ ENTRY(cpu_do_resume)
+ 	msr	mdscr_el1, x10
+ 
+ 	msr	sctlr_el1, x12
++	msr	tpidr_el1, x13
++	msr	sp_el0, x14
+ 	/*
+ 	 * Restore oslsr_el1 by writing oslar_el1
+ 	 */
 -- 
 2.7.4
