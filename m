@@ -1,107 +1,77 @@
-From: hl@rock-chips.com (hl)
-Date: Thu, 3 Nov 2016 14:36:28 +0800
-Subject: [PATCH v2 1/2] PM/devfreq: add suspend frequency support
-In-Reply-To: <1478153770-8433-2-git-send-email-hl@rock-chips.com>
-References: <1478153770-8433-1-git-send-email-hl@rock-chips.com>
- <1478153770-8433-2-git-send-email-hl@rock-chips.com>
-Message-ID: <581ADAEC.5020701@rock-chips.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 03 Nov 2016 15:39:04 +0900
+Subject: [PATCH v3 0/5] arm64: dts: Add the dts file for Exynos5433 and TM/TM2E
+ board
+Message-ID: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-     Miss something in this patch, just ignored it, sorry about that.
+This patchset adds the Device Tree file for Samsung 64-bit Exynos5433 SoC
+and TM/TM2E board based on Exynos5433. The Exynos5433 has Octa-core CPUs
+(quad Cortex-A57 and quad Cortex-A53). The TM2 and TM2E are the Samsung board
+based on Exynos5433 SoC.
 
-On 2016?11?03? 14:16, Lin Huang wrote:
-> Add suspend frequency support and if needed set it to
-> the frequency obtained from the suspend opp (can be defined
-> using opp-v2 bindings and is optional).
->
-> Change-Id: Iaa0d3848d63d9ce03f65ea76f263e4685a4c295e
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - use update_devfreq() instead devfreq_update_status()
->
->   drivers/devfreq/devfreq.c | 17 ++++++++++++++++-
->   include/linux/devfreq.h   |  9 +++++++++
->   2 files changed, 25 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-> index bf3ea76..0a76282 100644
-> --- a/drivers/devfreq/devfreq.c
-> +++ b/drivers/devfreq/devfreq.c
-> @@ -364,7 +364,10 @@ void devfreq_monitor_suspend(struct devfreq *devfreq)
->   		return;
->   	}
->   
-> -	devfreq_update_status(devfreq, devfreq->previous_freq);
-> +	if (devfreq->suspend_freq)
-> +		update_devfreq(devfreq, devfreq->suspend_freq);
-> +	else
-> +		devfreq_update_status(devfreq, devfreq->previous_freq);
->   	devfreq->stop_polling = true;
->   	mutex_unlock(&devfreq->lock);
->   	cancel_delayed_work_sync(&devfreq->work);
-> @@ -1251,6 +1254,18 @@ struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->   }
->   EXPORT_SYMBOL(devfreq_recommended_opp);
->   
-> +void devfreq_opp_get_suspend_opp(struct device *dev, struct devfreq *devfreq)
-> +{
-> +	struct dev_pm_opp *suspend_opp;
-> +
-> +	rcu_read_lock();
-> +	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
-> +	if (suspend_opp)
-> +		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
-> +	rcu_read_unlock();
-> +}
-> +EXPORT_SYMBOL(devfreq_opp_get_suspend_opp);
-> +
->   /**
->    * devfreq_register_opp_notifier() - Helper function to get devfreq notified
->    *				   for any changes in the OPP availability
-> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-> index 2de4e2e..c785ad9 100644
-> --- a/include/linux/devfreq.h
-> +++ b/include/linux/devfreq.h
-> @@ -88,6 +88,7 @@ struct devfreq_dev_status {
->    */
->   struct devfreq_dev_profile {
->   	unsigned long initial_freq;
-> +	unsigned long suspend_freq;
->   	unsigned int polling_ms;
->   
->   	int (*target)(struct device *dev, unsigned long *freq, u32 flags);
-> @@ -172,6 +173,7 @@ struct devfreq {
->   	struct delayed_work work;
->   
->   	unsigned long previous_freq;
-> +	unsigned long suspend_freq;
->   	struct devfreq_dev_status last_status;
->   
->   	void *data; /* private data for governors */
-> @@ -214,6 +216,8 @@ extern void devm_devfreq_remove_device(struct device *dev,
->   /* Helper functions for devfreq user device driver with OPP. */
->   extern struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->   					   unsigned long *freq, u32 flags);
-> +extern void devfreq_opp_get_suspend_opp(struct device *dev,
-> +					struct devfreq *devfreq);
->   extern int devfreq_register_opp_notifier(struct device *dev,
->   					 struct devfreq *devfreq);
->   extern int devfreq_unregister_opp_notifier(struct device *dev,
-> @@ -348,6 +352,11 @@ static inline struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->   	return ERR_PTR(-EINVAL);
->   }
->   
-> +static inline void devfreq_opp_get_suspend_opp(struct device *dev,
-> +					       struct devfreq *devfreq)
-> +{
-> +}
-> +
->   static inline int devfreq_register_opp_notifier(struct device *dev,
->   					 struct devfreq *devfreq)
->   {
+I tested the display controller by using the modetest tool.
+But, Samsung s6e3ha2 panel driver has not yet posted. So, the TM2 dts file
+don't include the panel Device Tree node. I'll post the s6e3ha2 panel driver
+on separate patch with a dt patch.
+
+Changes from v2:
+(https://lkml.org/lkml/2016/8/24/426)
+- Add new pctl_base and eint_base instead of virt_base on patch1.
+- Modify the documentation of pinctrl-samsung.txt on patch1.
+- Modify the cooling level for big.LITTLE cores.
+- Use the GIC_SPI definition on dtsi file.
+- Removes the unneeded 'regulator-always-on' property.
+- Fix the kbuild report of the compatible string for TM2/TM2E patches.
+- Two patches(exynos-mct, exynos5433-pmu) were merged.
+- Add the reviewed-by tag of Javier Martinez Canillas on patch3/4/5
+- Add the reviewed-by tag of Krzysztof Kozlowski on patch4/5
+- Add the acked-by tag of Rob Herring on patch5
+- Fix the minor issues.
+
+Changes from v1:
+(https://lkml.org/lkml/2016/8/16/61)
+- Merge the cpufreq patch for exynos5433[3] on PM/cpufreq tree.
+- Add new patch to support the multiple IORESOURCE_MAP for samsung pinctrl driver.
+- Drop the SYSMMU Device-Tree node which will be posted by Marek Szyprowski.
+- Fix the code clean issue by Krzysztof Kozlowski and Rob Herring's comment.
+- Delete the unnecessary alias from exynos5433-tm2.dts.
+- Expand the range of cooling level of CPU device.
+- Update the binding method of 'Exynos5433 audio subsystem'
+
+Depends on:
+This patchset are based on v4.9-rc3.
+
+Chanwoo Choi (5):
+  pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank
+  pinctrl: samsung: Add GPF support for Exynos5433
+  arm64: dts: exynos: Add dts files for Samsung Exynos5433 64bit SoC
+  arm64: dts: exynos: Add dts file for Exynos5433-based TM2 board
+  arm64: dts: exynos: Add dts file for Exynos5433-based TM2E board
+
+ .../bindings/arm/samsung/samsung-boards.txt        |    2 +
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   19 +
+ arch/arm64/boot/dts/exynos/Makefile                |    5 +-
+ arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi |  794 ++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  974 ++++++++++++++
+ arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |   41 +
+ .../dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi |   23 +
+ .../dts/exynos/exynos5433-tmu-sensor-conf.dtsi     |   22 +
+ arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi     |  296 +++++
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         | 1356 ++++++++++++++++++++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           |   45 +-
+ drivers/pinctrl/samsung/pinctrl-exynos.h           |   11 +
+ drivers/pinctrl/samsung/pinctrl-samsung.c          |   40 +-
+ drivers/pinctrl/samsung/pinctrl-samsung.h          |   10 +-
+ 14 files changed, 3598 insertions(+), 40 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-g3d-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos5433.dtsi
 
 -- 
-Lin Huang
+1.9.1
