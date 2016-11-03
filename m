@@ -1,77 +1,77 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 3 Nov 2016 10:29:14 +0000
-Subject: [PATCH V3 5/6] ARM: tegra: Add Tegra20 GMI support
-In-Reply-To: <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
-References: <1477576872-2665-1-git-send-email-mirza.krak@gmail.com>
- <1477576872-2665-6-git-send-email-mirza.krak@gmail.com>
-Message-ID: <d8ab8a32-8019-45e6-59b1-8914937e1705@nvidia.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 3 Nov 2016 10:39:43 +0000
+Subject: arm64 build failure with CONFIG_ARM64_LSE_ATOMICS=y
+In-Reply-To: <20161102232854.GO22791@arm.com>
+References: <20161102164427.GB24243@shodan.usersys.redhat.com>
+ <20161102232854.GO22791@arm.com>
+Message-ID: <1efb101a-a8ab-5ad9-f2bd-e7d485c71904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 27/10/16 15:01, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
+On 02/11/16 23:28, Will Deacon wrote:
+> Hi Artem,
 >
-> Add a device node for the GMI controller found on Tegra20.
+> On Wed, Nov 02, 2016 at 05:44:27PM +0100, Artem Savkov wrote:
+>> Hello Catalin,
+>>
+>> Looks like your patch "efd9e03 arm64: Use static keys for CPU features"
+>> breaks arm64 build with "CONFIG_ARM64_LSE_ATOMICS=y" because it creates a
+>> circular dependency for asm/lse.h through jump_label.h:
+>>
+>>   CC      arch/arm64/kernel/asm-offsets.s
+>> In file included from ./arch/arm64/include/asm/atomic.h:34:0,
+>>                  from ./include/linux/atomic.h:4,
+>>                  from ./include/linux/jump_label.h:169,
+>>                  from ./arch/arm64/include/asm/cpufeature.h:12,
+>>                  from ./arch/arm64/include/asm/alternative.h:4,
+>>                  from ./arch/arm64/include/asm/lse.h:7,
+>>                  from ./arch/arm64/include/asm/spinlock.h:19,
+>>                  from ./include/linux/spinlock.h:87,
+>>                  from ./include/linux/seqlock.h:35,
+>>                  from ./include/linux/time.h:5,
+>>                  from ./include/uapi/linux/timex.h:56,
+>>                  from ./include/linux/timex.h:56,
+>>                  from ./include/linux/sched.h:19,
+>>                  from arch/arm64/kernel/asm-offsets.c:21:
+>> ./arch/arm64/include/asm/atomic_lse.h: In function ?atomic_andnot?:
+>> ./arch/arm64/include/asm/atomic_lse.h:35:15: error: expected string literal before ?	?
+>>   asm volatile(ARM64_LSE_ATOMIC_INSN(__LL_SC_ATOMIC(op),  \
+>>
+>> ...
+>>
+>> ./arch/arm64/include/asm/cmpxchg.h: In function ?__xchg_case_1?:
+>> ./arch/arm64/include/asm/cmpxchg.h:38:15: error: expected string literal before ?ARM64_LSE_ATOMIC_INSN?
+>>   asm volatile(ARM64_LSE_ATOMIC_INSN(    \
 >
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
-> ---
->
-> Changes in v2:
-> - added address-cells, size-cells and ranges properties
->
-> Changes in v3:
-> - fixed range address which is not the same as Tegra30.
->
->  arch/arm/boot/dts/tegra20.dtsi | 16 +++++++++++++++-
->  1 file changed, 15 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-> index 2207c08..b22cddb 100644
-> --- a/arch/arm/boot/dts/tegra20.dtsi
-> +++ b/arch/arm/boot/dts/tegra20.dtsi
-> @@ -1,4 +1,4 @@
-> -#include <dt-bindings/clock/tegra20-car.h>
-> +include <dt-bindings/clock/tegra20-car.h>
+> I'm unable to reproduce this. I've tried enabling LSE with defconfig and
+> mainline, using compilers that both do and don't support the instructions.
 
-After fixing up this, can you also ...
+I am not able to reproduce it either. One minor problem I see with the commit could
+be fixed with the following change : Does it help ?
 
->  #include <dt-bindings/gpio/tegra-gpio.h>
->  #include <dt-bindings/pinctrl/pinctrl-tegra.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> @@ -376,6 +376,20 @@
->  		status = "disabled";
->  	};
->
-> +
+----8>-----
 
-Drop this additional line?
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 758d74f..62db988 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -9,7 +9,6 @@
+  #ifndef __ASM_CPUFEATURE_H
+  #define __ASM_CPUFEATURE_H
+  
+-#include <linux/jump_label.h>
+  
+  #include <asm/hwcap.h>
+  #include <asm/sysreg.h>
+@@ -45,6 +44,7 @@
+  
+  #ifndef __ASSEMBLY__
+  
++#include <linux/jump_label.h>
+  #include <linux/kernel.h>
+  
+  /* CPU feature register tracking */
 
-> +	gmi at 70009000 {
-> +		compatible = "nvidia,tegra20-gmi";
-> +		reg = <0x70009000 0x1000>;
-> +		#address-cells = <2>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0xd0000000 0xfffffff>;
-> +		clocks = <&tegra_car TEGRA20_CLK_NOR>;
-> +		clock-names = "gmi";
-> +		resets = < &tegra_car 42>;
 
-Get rid of this additional space?
 
-> +		reset-names = "gmi";
-> +		status = "disabled";
-> +	};
-> +
-
-Otherwise ...
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
--- 
-nvpublic
+Suzuki
