@@ -1,24 +1,56 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 3 Nov 2016 17:29:43 +0100
-Subject: [GIT PULL] iommu/arm-smmu: Fixes for 4.9
-In-Reply-To: <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
-References: <20161028160148.GD1076@arm.com> <20161103153303.GA837@8bytes.org>
- <20161103160006.GS22791@arm.com> <20161103161407.GR3541@8bytes.org>
- <0dbf2665-4292-d49a-b9e7-688bcdf29c6e@arm.com>
-Message-ID: <20161103162943.GS3541@8bytes.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 3 Nov 2016 17:45:05 +0100
+Subject: [PATCH v2 6/6] ARM: dts: stm32f429: Add QSPI clock
+In-Reply-To: <1476436699-21879-7-git-send-email-gabriel.fernandez@st.com>
+References: <1476436699-21879-1-git-send-email-gabriel.fernandez@st.com>
+ <1476436699-21879-7-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <25482d71-4d19-997c-656a-75fbe1f43131@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 04:22:04PM +0000, Robin Murphy wrote:
-> But bus_set_iommu() is already checking whether another SMMU (in this
-> case) has probed, by virtue of bus->iommu_ops being non-NULL, and
-> returning without doing anything if so. What's the value of adding a
-> whole  bunch more code to effectively duplicate that in a less elegant
-> manner?
+Hi Gabriel,
 
-No, bus_set_iommu() checks whether there is _any_ other IOMMU already
-registered. This doesn't need to be an smmu. So I think the return value
-of bus_set_iommu shouldn't be generally ignored.
+On 10/14/2016 11:18 AM, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> This patch adds the QSPI clock for stm32f469 discovery board.
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  arch/arm/boot/dts/stm32f469-disco.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+> index e911af8..4052023 100644
+> --- a/arch/arm/boot/dts/stm32f469-disco.dts
+> +++ b/arch/arm/boot/dts/stm32f469-disco.dts
+> @@ -66,6 +66,10 @@
+>  	};
+>  };
+>
+> +&rcc {
+> +	compatible = "st,stm32f469-rcc", "st,stm32-rcc";
+> +};
+> +
+
+With this patch, stm32f469-disco doesn't boot if clk drivers patch are 
+not applied.
+Can you please send a new version to keep compatibility with older clk 
+driver.
+
+&rcc {
+ > +	compatible = "st,stm32f469-rcc", "st,stm32-rcc";
+-> compatible = "st,stm32f469-rcc", "st,stm32f42xx-rcc", "st,stm32-rcc";
+ > +};
+ > +
+I will take it in next pull request round.
 
 
-	Joerg
+Regards
+Alex
+
+
+>  &clk_hse {
+>  	clock-frequency = <8000000>;
+>  };
+>
