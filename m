@@ -1,41 +1,137 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  3 Nov 2016 15:29:22 +0100
-Subject: [RFC PATCH 0/3] ARM64: meson-gxbb: Add support for system suspend
-Message-ID: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
+Date: Thu,  3 Nov 2016 15:29:23 +0100
+Subject: [RFC PATCH 1/3] ARM64: meson: Add Amlogic Meson GX PM Suspend
+In-Reply-To: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
+References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thie patchset is a very experiment patchset to support the System Suspend
-feature of the Amlogic Meson GX SoCs.
+The Amlogic Meson GX SoCs uses a non-standard argument to the
+PSCI CPU_SUSPEND call to enter system suspend.
 
-These SoCs implements system suspend using a non-standard PSCI CPU_SUSPEND
-parameter to enter system suspend.
-A small driver is added to properly fill the platform_suspend_ops and make
-to correct SMC call.
+Implement such call within platform_suspend_ops.
 
-In order to wake up from an alarm, these SoCs have a special memory mapped
-register where an alarm time delay in seconds is stored.
-In order to reuse the RTC wakealarm feature, implement a fake RTC device
-that uses the system time to calculate a delay to write to the register.
-
-Note that this RFC is here to seek a better way to handle these platform
-specific features.
-
-Neil Armstrong (3):
-  ARM64: meson: Add Amlogic Meson GX PM Suspend
-  rtc: Add Amlogic Virtual Wake RTC
-  ARM64: dts: meson-gxbb: Add support for PM and Virtual RTC
-
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi |   9 ++
- drivers/firmware/meson/Kconfig              |   6 +
- drivers/firmware/meson/Makefile             |   1 +
- drivers/firmware/meson/meson_gx_pm.c        |  86 +++++++++++++++
- drivers/rtc/Kconfig                         |  10 ++
- drivers/rtc/Makefile                        |   1 +
- drivers/rtc/rtc-meson-vrtc.c                | 164 ++++++++++++++++++++++++++++
- 7 files changed, 277 insertions(+)
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/firmware/meson/Kconfig       |  6 +++
+ drivers/firmware/meson/Makefile      |  1 +
+ drivers/firmware/meson/meson_gx_pm.c | 86 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 93 insertions(+)
  create mode 100644 drivers/firmware/meson/meson_gx_pm.c
- create mode 100644 drivers/rtc/rtc-meson-vrtc.c
 
+diff --git a/drivers/firmware/meson/Kconfig b/drivers/firmware/meson/Kconfig
+index 170d7e8..5b3fea3 100644
+--- a/drivers/firmware/meson/Kconfig
++++ b/drivers/firmware/meson/Kconfig
+@@ -7,3 +7,9 @@ config MESON_SM
+ 	depends on ARM64_4K_PAGES
+ 	help
+ 	  Say y here to enable the Amlogic secure monitor driver
++
++config MESON_GX_PM
++	bool
++	default ARCH_MESON if ARM64
++	help
++	  Say y here to enable the Amlogic GX SoC Power Management
+diff --git a/drivers/firmware/meson/Makefile b/drivers/firmware/meson/Makefile
+index 9ab3884..b6e285d 100644
+--- a/drivers/firmware/meson/Makefile
++++ b/drivers/firmware/meson/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_MESON_SM) +=	meson_sm.o
++obj-$(CONFIG_MESON_GX_PM) +=	meson_gx_pm.o
+diff --git a/drivers/firmware/meson/meson_gx_pm.c b/drivers/firmware/meson/meson_gx_pm.c
+new file mode 100644
+index 0000000..c104c2e
+--- /dev/null
++++ b/drivers/firmware/meson/meson_gx_pm.c
+@@ -0,0 +1,86 @@
++/*
++ * Amlogic Meson GX Power Management
++ *
++ * Copyright (c) 2016 Baylibre, SAS.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ */
++
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/suspend.h>
++#include <linux/arm-smccc.h>
++
++#include <uapi/linux/psci.h>
++
++#include <asm/suspend.h>
++
++/*
++ * The Amlogic GX SoCs uses a special argument value to the
++ * PSCI CPU_SUSPEND method to enter SUSPEND_MEM.
++ */
++
++#define MESON_SUSPEND_PARAM	0x0010000
++#define PSCI_FN_NATIVE(version, name)	PSCI_##version##_FN64_##name
++
++static int meson_gx_suspend_finish(unsigned long arg)
++{
++	struct arm_smccc_res res;
++
++	arm_smccc_smc(PSCI_FN_NATIVE(0_2, CPU_SUSPEND), arg,
++		      virt_to_phys(cpu_resume), 0, 0, 0, 0, 0, &res);
++
++	return res.a0;
++}
++
++static int meson_gx_suspend_enter(suspend_state_t state)
++{
++	switch (state) {
++	case PM_SUSPEND_MEM:
++		return cpu_suspend(MESON_SUSPEND_PARAM,
++				   meson_gx_suspend_finish);
++	}
++
++	return -EINVAL;
++}
++
++static const struct platform_suspend_ops meson_gx_pm_ops = {
++		.enter = meson_gx_suspend_enter,
++		.valid = suspend_valid_only_mem,
++};
++
++static const struct of_device_id meson_gx_pm_match[] = {
++	{ .compatible = "amlogic,meson-gx-pm", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, meson_gx_pm_match);
++
++static int meson_gx_pm_probe(struct platform_device *pdev)
++{
++	suspend_set_ops(&meson_gx_pm_ops);
++
++	return 0;
++}
++
++static struct platform_driver meson_gx_pm_driver = {
++	.probe = meson_gx_pm_probe,
++	.driver = {
++		.name = "meson-gx-pm",
++		.of_match_table = meson_gx_pm_match,
++	},
++};
++
++module_platform_driver(meson_gx_pm_driver);
++
++MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
++MODULE_DESCRIPTION("Amlogic Meson GX PM driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
