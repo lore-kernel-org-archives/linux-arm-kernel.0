@@ -1,121 +1,46 @@
-From: andi.shyti@samsung.com (Andi Shyti)
-Date: Thu, 03 Nov 2016 21:26:33 +0900
-Subject: [PATCH v3 5/5] arm64: dts: exynos: Add dts file for
- Exynos5433-based TM2E board
-In-Reply-To: <1478155149-28527-6-git-send-email-cw00.choi@samsung.com>
-References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
- <CGME20161103063917epcas5p3a9e64a1d49b2ab8ba32762ec2e3cd1f4@epcas5p3.samsung.com>
- <1478155149-28527-6-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20161103122633.jf326x2dixzjhrn4@gangnam.samsung>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu,  3 Nov 2016 20:26:15 +0800
+Subject: [PATCH 0/6] Add basic support for support for Rockchip RK1108 SOC
+Message-ID: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
 
-Tested-by: Andi Shyti <andi.shyti@samsung.com>
+RK1108 is embedded with an ARM Cortex-A7 single core and a DSP core.
+It is designed for varies application scenario such as car DVR, sports
+DV, secure camera and UAV camera.
+This patch series add basic support for it, which can boot a board with
+initramfs into shell.
+More new feathers will come soon.
 
-Andi
 
-On Thu, Nov 03, 2016 at 03:39:09PM +0900, Chanwoo Choi wrote:
-> This patch adds the Device Tree source for Exynos5433-based Samsung TM2E
-> board. TM2E board is the most similar with TM2 board. The exynos5433-tm2e.dts
-> include the difference between TM2 and TM2E.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Inki Dae <inki.dae@samsung.com>
-> Signed-off-by: Jonghwa Lee <jonghwa3.lee@samsung.com>
-> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> Signed-off-by: Jaewon Kim <jaewon02.kim@samsung.com>
-> Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
-> Signed-off-by: Inha Song <ideal.song@samsung.com>
-> Signed-off-by: Ingi kim <ingi2.kim@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Andrzej Hajda <a.hajda@samsung.com>
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
->  .../bindings/arm/samsung/samsung-boards.txt        |  1 +
->  arch/arm64/boot/dts/exynos/Makefile                |  1 +
->  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     | 41 ++++++++++++++++++++++
->  3 files changed, 43 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> index 339af8b9cdc5..c64c7b515777 100644
-> --- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> +++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> @@ -16,6 +16,7 @@ Required root node properties:
->  	- "samsung,smdk5410"	- for Exynos5410-based Samsung SMDK5410 eval board.
->  	- "samsung,smdk5420"	- for Exynos5420-based Samsung SMDK5420 eval board.
->  	- "samsung,tm2"		- for Exynos5433-based Samsung TM2 board.
-> +	- "samsung,tm2e"	- for Exynos5433-based Samsung TM2E board.
->  	- "samsung,sd5v1"	- for Exynos5440-based Samsung board.
->  	- "samsung,ssdk5440"	- for Exynos5440-based Samsung board.
->  
-> diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
-> index 947c750acba1..7ddea53769a7 100644
-> --- a/arch/arm64/boot/dts/exynos/Makefile
-> +++ b/arch/arm64/boot/dts/exynos/Makefile
-> @@ -1,5 +1,6 @@
->  dtb-$(CONFIG_ARCH_EXYNOS) += \
->  	exynos5433-tm2.dtb	\
-> +	exynos5433-tm2e.dtb	\
->  	exynos7-espresso.dtb
->  
->  always		:= $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> new file mode 100644
-> index 000000000000..1db4e7f363a9
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts
-> @@ -0,0 +1,41 @@
-> +/*
-> + * SAMSUNG Exynos5433 TM2E board device tree source
-> + *
-> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-> + *
-> + * Device tree source file for Samsung's TM2E(TM2 EDGE) board which is based on
-> + * Samsung Exynos5433 SoC.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "exynos5433-tm2.dts"
-> +
-> +/ {
-> +	model = "Samsung TM2E board";
-> +	compatible = "samsung,tm2e", "samsung,exynos5433";
-> +};
-> +
-> +&ldo23_reg {
-> +	regulator-name = "CAM_SEN_CORE_1.025V_AP";
-> +	regulator-max-microvolt = <1050000>;
-> +};
-> +
-> +&ldo25_reg {
-> +	regulator-name = "UNUSED_LDO25";
-> +	regulator-always-off;
-> +};
-> +
-> +&ldo31_reg {
-> +	regulator-name = "TSP_VDD_1.8V_AP";
-> +	regulator-min-microvolt = <1800000>;
-> +	regulator-max-microvolt = <1800000>;
-> +};
-> +
-> +&ldo38_reg {
-> +	regulator-name = "VCC_3.3V_MOTOR_AP";
-> +	regulator-min-microvolt = <3300000>;
-> +	regulator-max-microvolt = <3300000>;
-> +};
-> -- 
-> 1.9.1
-> 
+Andy Yan (4):
+  pinctrl: rockchip: add support for rk1108
+  ARM: dts: add basic support for Rockchip RK1108 SOC
+  ARM: add low level debug uart for rk1108
+  ARM: dts: rockchip: add rockchip RK1108 Evaluation board
+
+Shawn Lin (2):
+  dt-bindings: rockchip-dw-mshc: add RK1108 dw-mshc description
+  clk: rockchip: add clock controller for rk1108
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   3 +
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   1 +
+ arch/arm/Kconfig.debug                             |  30 ++
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/rk1108-evb.dts                   |  69 +++
+ arch/arm/boot/dts/rk1108.dtsi                      | 420 +++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |   1 +
+ drivers/clk/rockchip/Makefile                      |   1 +
+ drivers/clk/rockchip/clk-rk1108.c                  | 463 +++++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |  14 +
+ drivers/pinctrl/pinctrl-rockchip.c                 |  27 +-
+ include/dt-bindings/clock/rk1108-cru.h             | 308 ++++++++++++++
+ 12 files changed, 1337 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk1108.dtsi
+ create mode 100644 drivers/clk/rockchip/clk-rk1108.c
+ create mode 100644 include/dt-bindings/clock/rk1108-cru.h
+
+-- 
+2.7.4
