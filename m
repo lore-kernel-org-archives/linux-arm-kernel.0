@@ -1,78 +1,114 @@
 From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Thu, 03 Nov 2016 15:21:31 +0900
-Subject: [PATCH 09/13] mmc: dw_mmc: remove the "clock-freq-min-max" property
+Date: Thu, 03 Nov 2016 15:21:29 +0900
+Subject: [PATCH 07/13] mmc: dw_mmc: use the cookie's enum values for
+ post/pre_req()
 In-Reply-To: <20161103062135.10697-1-jh80.chung@samsung.com>
 References: <20161103062135.10697-1-jh80.chung@samsung.com>
-Message-ID: <20161103062135.10697-10-jh80.chung@samsung.com>
+Message-ID: <20161103062135.10697-8-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the "clock-freq-min-max" property.
-There is "max-frequency" property in drivers/mmc/core/host.c
-It can be used for getting maximum frequency.
-
-And minimum clock value is assigned to 100K by default.
-Because MMC core should check the initial clock value from
-400K to 100K until finding correct value.
-It's why Minimum value puts 100K by default.
+This patch removed the meaningless value. Instead, use the cookie's enum
+values for executing correctly.
 
 Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 ---
- Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt |  3 ---
- drivers/mmc/host/dw_mmc.c                                  | 13 ++++---------
- 2 files changed, 4 insertions(+), 12 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 39 +++++++++++++++++++--------------------
+ 1 file changed, 19 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-index 4e00e85..21c8251 100644
---- a/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-+++ b/Documentation/devicetree/bindings/mmc/synopsys-dw-mshc.txt
-@@ -56,9 +56,6 @@ Optional properties:
-   is specified and the ciu clock is specified then we'll try to set the ciu
-   clock to this at probe time.
- 
--* clock-freq-min-max: Minimum and Maximum clock frequency for card output
--  clock(cclk_out). If it's not specified, max is 200MHZ and min is 400KHz by default.
--
- * num-slots: specifies the number of slots supported by the controller.
-   The number of physical slots actually used could be equal or less than the
-   value specified by num-slots. If this property is not specified, the value
 diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index bd8c5ea..a0c5a85 100644
+index 16df93b..df151c8 100644
 --- a/drivers/mmc/host/dw_mmc.c
 +++ b/drivers/mmc/host/dw_mmc.c
-@@ -2589,7 +2589,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	struct dw_mci_slot *slot;
- 	const struct dw_mci_drv_data *drv_data = host->drv_data;
- 	int ctrl_id, ret;
--	u32 freq[2];
+@@ -414,12 +414,13 @@ static void dw_mci_dma_cleanup(struct dw_mci *host)
+ {
+ 	struct mmc_data *data = host->data;
  
- 	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
- 	if (!mmc)
-@@ -2603,14 +2602,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	host->slot[id] = slot;
+-	if (data)
+-		if (!data->host_cookie)
+-			dma_unmap_sg(host->dev,
+-				     data->sg,
+-				     data->sg_len,
+-				     dw_mci_get_dma_dir(data));
++	if (data && data->host_cookie == COOKIE_MAPPED) {
++		dma_unmap_sg(host->dev,
++			     data->sg,
++			     data->sg_len,
++			     dw_mci_get_dma_dir(data));
++		data->host_cookie = COOKIE_UNMAPPED;
++	}
+ }
  
- 	mmc->ops = &dw_mci_ops;
--	if (of_property_read_u32_array(host->dev->of_node,
--				       "clock-freq-min-max", freq, 2)) {
--		mmc->f_min = DW_MCI_FREQ_MIN;
--		mmc->f_max = DW_MCI_FREQ_MAX;
--	} else {
--		mmc->f_min = freq[0];
--		mmc->f_max = freq[1];
+ static void dw_mci_idmac_reset(struct dw_mci *host)
+@@ -850,13 +851,13 @@ static const struct dw_mci_dma_ops dw_mci_edmac_ops = {
+ 
+ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
+ 				   struct mmc_data *data,
+-				   bool next)
++				   int cookie)
+ {
+ 	struct scatterlist *sg;
+ 	unsigned int i, sg_len;
+ 
+-	if (!next && data->host_cookie)
+-		return data->host_cookie;
++	if (data->host_cookie == COOKIE_PRE_MAPPED)
++		return data->sg_len;
+ 
+ 	/*
+ 	 * We don't do DMA on "complex" transfers, i.e. with
+@@ -881,8 +882,7 @@ static int dw_mci_pre_dma_transfer(struct dw_mci *host,
+ 	if (sg_len == 0)
+ 		return -EINVAL;
+ 
+-	if (next)
+-		data->host_cookie = sg_len;
++	data->host_cookie = cookie;
+ 
+ 	return sg_len;
+ }
+@@ -897,13 +897,12 @@ static void dw_mci_pre_req(struct mmc_host *mmc,
+ 	if (!slot->host->use_dma || !data)
+ 		return;
+ 
+-	if (data->host_cookie) {
+-		data->host_cookie = 0;
+-		return;
 -	}
++	/* This data might be unmapped at this time */
++	data->host_cookie = COOKIE_UNMAPPED;
  
- 	/*if there are external regulators, get them*/
- 	ret = mmc_regulator_get_supply(mmc);
-@@ -2649,6 +2640,10 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
- 	if (ret)
- 		goto err_host_allocated;
+-	if (dw_mci_pre_dma_transfer(slot->host, mrq->data, 1) < 0)
+-		data->host_cookie = 0;
++	if (dw_mci_pre_dma_transfer(slot->host, mrq->data,
++				COOKIE_PRE_MAPPED) < 0)
++		data->host_cookie = COOKIE_UNMAPPED;
+ }
  
-+	mmc->f_min = DW_MCI_FREQ_MIN;
-+	if (!mmc->f_max)
-+		mmc->f_max = DW_MCI_FREQ_MAX;
-+
- 	/* Useful defaults if platform data is unset. */
- 	if (host->use_dma == TRANS_MODE_IDMAC) {
- 		mmc->max_segs = host->ring_size;
+ static void dw_mci_post_req(struct mmc_host *mmc,
+@@ -916,12 +915,12 @@ static void dw_mci_post_req(struct mmc_host *mmc,
+ 	if (!slot->host->use_dma || !data)
+ 		return;
+ 
+-	if (data->host_cookie)
++	if (data->host_cookie != COOKIE_UNMAPPED)
+ 		dma_unmap_sg(slot->host->dev,
+ 			     data->sg,
+ 			     data->sg_len,
+ 			     dw_mci_get_dma_dir(data));
+-	data->host_cookie = 0;
++	data->host_cookie = COOKIE_UNMAPPED;
+ }
+ 
+ static void dw_mci_adjust_fifoth(struct dw_mci *host, struct mmc_data *data)
+@@ -1027,7 +1026,7 @@ static int dw_mci_submit_data_dma(struct dw_mci *host, struct mmc_data *data)
+ 	if (!host->use_dma)
+ 		return -ENODEV;
+ 
+-	sg_len = dw_mci_pre_dma_transfer(host, data, 0);
++	sg_len = dw_mci_pre_dma_transfer(host, data, COOKIE_MAPPED);
+ 	if (sg_len < 0) {
+ 		host->dma_ops->stop(host);
+ 		return sg_len;
 -- 
 2.10.1
