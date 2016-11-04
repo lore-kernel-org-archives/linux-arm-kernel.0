@@ -1,77 +1,38 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Fri, 04 Nov 2016 19:44:57 +0100
-Subject: Low network throughput on i.MX28
-In-Reply-To: <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
- <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
- <1477696028.31471.3.camel@embedded.rocks>
- <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
- <1478074489.19127.7.camel@embedded.rocks>
- <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
-Message-ID: <1478285097.26659.2.camel@embedded.rocks>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Nov 2016 12:46:52 -0600
+Subject: [PATCH V3 0/6] ARM64: Uprobe support added
+In-Reply-To: <20161104174951.vj4il3xkdy7a2ln7@localhost>
+References: <cover.1478068479.git.panand@redhat.com>
+ <20161104174951.vj4il3xkdy7a2ln7@localhost>
+Message-ID: <20161104184652.rxllldll4qfe7qdn@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Wed, 2016-11-02 at 09:24 +0100, Stefan Wahren wrote:
-> Am 02.11.2016 um 09:14 schrieb J?rg Krause:
-> > On Sat, 2016-10-29 at 11:08 +0200, Stefan Wahren wrote:
-> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 29. Oktober
-> > > > 2016
-> > > > um 01:07
-> > > > geschrieben:
-> > > > 
-> > > > 
-> > > > You mentioned [1] an optimization in the Freescale vendor Linux
-> > > > kernel
-> > > > [2]. I would really like to see this optimization in the
-> > > > mainline
-> > > > kernel.
-> > > > 
-> > > > Did you ever tried to port this code from Freescale to
-> > > > mainline?
-> > > 
-> > > Yes, i tried once but i was frustrated soon because of the lot of
-> > > required
-> > > changes and resulting issues.
-> > 
-> > I got the PIO mode working for the mxs-mmc driver. For this I
-> > ported
-> > the PIO code from the vendor kernel and removed the usage of the
-> > DMA
-> > engine entirely.
+On Fri, Nov 04, 2016 at 11:49:51AM -0600, Catalin Marinas wrote:
+> On Wed, Nov 02, 2016 at 02:40:40PM +0530, Pratyush Anand wrote:
+> > Pratyush Anand (6):
+> >   arm64: kprobe: protect/rename few definitions to be reused by uprobe
+> >   arm64: kgdb_step_brk_fn: ignore other's exception
+> >   arm64: Handle TRAP_TRACE for user mode as well
+> >   arm64: Handle TRAP_BRKPT for user mode as well
+> >   arm64: introduce mm context flag to keep 32 bit task information
+> >   arm64: Add uprobe support
 > 
-> Good job
-> 
-> > 
-> > Testing network bandwidth with iperf, I get about ~10Mbit/sec with
-> > PIO
-> > mode compared to ~6.5Mbit/sec with DMA mode for UDP and about
-> > ~6.5Mbit/sec compared to ~4.5Mbit/sec with DMA mode for TCP.
-> 
-> And how about MMC / sd card performance?
+> I queued the patches for 4.10. I will push them into -next sometime next
+> week once I do some testing (I'm currently at the LPC).
 
-I noticed poor performance with the i.MX28 MMC and/or DMA driver using
-the mainline kernel compared to the vendor Freescale kernel 2.6.35.
-I've seen that hou have added the drivers to mainline some years ago.
+I spoke too soon. With these patches on top of 4.9-rc3, defconfig
+together with FTRACE and UPROBE_EVENT enabled I get:
 
-My custom i.MX28 board has a wifi chip attached to the SSP2 interface.
-Comparing the bandwith with iperf I get >20Mbits/sec on the vendor
-kernel and <5Mbits/sec on the mainline kernel.
+In file included from /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/probes/decode-insn.c:20:0:
+/work/Linux/linux-2.6-aarch64/arch/arm64/include/asm/kprobes.h:52:5: error: conflicting types for 'kprobe_fault_handler'
+ int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
+     ^~~~~~~~~~~~~~~~~~~~
+In file included from /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/probes/decode-insn.c:17:0:
+/work/Linux/linux-2.6-aarch64/include/linux/kprobes.h:398:90: note: previous definition of 'kprobe_fault_handler' was here
+ static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
+                                                                                          ^                   
+/work/Linux/linux-2.6-aarch64/scripts/Makefile.build:290: recipe for target 'arch/arm64/kernel/probes/decode-insn.o' failed
 
-My best guess is that there is some kind of bottleneck in the drivers.
-I already started looking at the vendor drivers as well as@the
-mainline drivers, but I need some more investigation to understand the
-complexity.
-
-Do you have any idea what the bottleneck might be?
-
-Best regards,
-J?rg Krause
+-- 
+Catalin
