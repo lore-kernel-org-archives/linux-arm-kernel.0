@@ -1,13 +1,15 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 05 Nov 2016 00:59:37 +0300
-Subject: [PATCH v2 08/11] ARM: dts: r8a7745: add IRQC support
+Date: Sat, 05 Nov 2016 01:04:32 +0300
+Subject: [PATCH v2 10/11] ARM: dts: sk-rzg1e: initial device tree
 In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
 References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-Message-ID: <2945818.yZ5dZgkJFz@wasted.cogentembedded.com>
+Message-ID: <1660435.fA6pHp5lJP@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the IRQC interrupt controller in the R8A7745 device tree.
+Add the initial  device tree for the R8A7745 SoC based SK-RZG1E board.
+The board has 1  debug  serial  port (SCIF2); include support for it,
+so that the serial console can  work.
 
 Based on the original (and large) patch by Dmitry Shifrin
 <dmitry.shifrin@cogentembedded.com>.
@@ -17,39 +19,65 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 ---
 Changes in version 2:
-- added Geert's tag;
-- refreshed the patch.
+- added Geert's tag.
 
- arch/arm/boot/dts/r8a7745.dtsi |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/Makefile             |    1 
+ arch/arm/boot/dts/r8a7745-sk-rzg1e.dts |   39 +++++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-Index: renesas/arch/arm/boot/dts/r8a7745.dtsi
+Index: renesas/arch/arm/boot/dts/Makefile
 ===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7745.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7745.dtsi
-@@ -62,6 +62,25 @@
- 						 IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		irqc: interrupt-controller at e61c0000 {
-+			compatible = "renesas,irqc-r8a7745", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+		};
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -678,6 +678,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a73a4-ape6evm.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7743-sk-rzg1m.dtb \
++	r8a7745-sk-rzg1e.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
+@@ -0,0 +1,39 @@
++/*
++ * Device Tree Source for the SK-RZG1E board
++ *
++ * Copyright (C) 2016 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2. This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- 		timer {
- 			compatible = "arm,armv7-timer";
- 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
++/dts-v1/;
++#include "r8a7745.dtsi"
++
++/ {
++	model = "SK-RZG1E";
++	compatible = "renesas,sk-rzg1e", "renesas,r8a7745";
++
++	aliases {
++		serial0 = &scif2;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&scif2 {
++	status = "okay";
++};
