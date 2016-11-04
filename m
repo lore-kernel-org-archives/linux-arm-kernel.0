@@ -1,8 +1,10 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri,  4 Nov 2016 19:49:20 +0900
-Subject: [PATCH 1/2] i2c: uniphier: rename jump label to follow coding style
+Date: Fri,  4 Nov 2016 19:49:21 +0900
+Subject: [PATCH 2/2] i2c: uniphier-f: rename jump label to follow coding style
  guideline
-Message-ID: <1478256561-7709-1-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1478256561-7709-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1478256561-7709-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1478256561-7709-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +14,14 @@ what the goto does or why the goto exists.
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/i2c/busses/i2c-uniphier.c | 6 +++---
+ drivers/i2c/busses/i2c-uniphier-f.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
-index cc80bb2..abc6770 100644
---- a/drivers/i2c/busses/i2c-uniphier.c
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -373,7 +373,7 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
+diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
+index b54448e..a154cc9 100644
+--- a/drivers/i2c/busses/i2c-uniphier-f.c
++++ b/drivers/i2c/busses/i2c-uniphier-f.c
+@@ -528,7 +528,7 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
  	if (!clk_rate) {
  		dev_err(dev, "input clock rate should not be zero\n");
  		ret = -EINVAL;
@@ -28,8 +30,8 @@ index cc80bb2..abc6770 100644
  	}
  
  	init_completion(&priv->comp);
-@@ -392,11 +392,11 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
- 			       priv);
+@@ -547,11 +547,11 @@ static int uniphier_fi2c_probe(struct platform_device *pdev)
+ 			       pdev->name, priv);
  	if (ret) {
  		dev_err(dev, "failed to request irq %d\n", irq);
 -		goto err;
