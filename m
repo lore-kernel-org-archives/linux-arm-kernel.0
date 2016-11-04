@@ -1,103 +1,82 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 04 Nov 2016 12:20:02 +0100
-Subject: [PATCH 0/10] mmc: Add support to Marvell Xenon SD Host Controller
-In-Reply-To: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Mon, 31 Oct 2016 12:09:49 +0100")
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
-Message-ID: <87h97no5jx.fsf@free-electrons.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Fri,  4 Nov 2016 11:23:58 +0000
+Subject: [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
+Message-ID: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On lun., oct. 31 2016, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+Following Will & Robin's suggestions, this series attempts to propose
+an alternative to [1] where the host would arbitrarily decide the
+location of the IOVA MSI window and would be able to report to the
+userspace the list of reserved IOVA regions that cannot be used
+along with VFIO_IOMMU_MAP_DMA. This would allow the userspace to react
+in case of conflict.
 
-> Hello,
->
-> This the second version of the series adding support for the SDHCI
-> Xenon controller. It can be currently found on the Armada 37xx and the
-> Armada 7K/8K but will be also used in more Marvell SoC (and not only
-> the mvebu ones actually).
->
-> Some of the remarks had been taking into account since the first
-> version, according to Ziji Hu, here are the following chcanges:
-> "Changes in V2:
->   rebase on v4.9-rc2.
->   Re-write Xenon bindings. Ajust Xenon DT property naming.
->   Add a new DT property to indicate eMMC card type, instead of using
->   variable card_candidate.
->   Clear quirks SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12 in Xenon platform data
->   Add support to HS400 retuning."
->
-> I think the main open point which remains is about issuing commands
-> from the ->set_ios() callback (in patch 7).
-> Ulf, could you comment about it?
+Userspace can retrieve all the reserved regions through the VFIO_IOMMU_GET_INFO
+IOCTL by querying the new RESV_IOVA_RANGE chained capability. Each reserved
+IOVA range is put in a separate capability.
 
-A few comments:
+At IOMMU level, the reserved regions are stored in an iommu_domain list
+which is populated on each device attachment. An IOMMU add_reserved_regions
+callback specializes the registration of the reserved regions.
 
-- I forgot to add the v2 prefix on the series I hope it won't be too
-  annoying, if needed I can re-post the series with the correct title.
+On x86, the [FEE0_0000h - FEF0_000h] MSI window is registered (NOT tested).
 
-- I also forgot to add my Reviewed-by flag on the 7 first patches, I
-  will add them back on the v3.
+On ARM, the PCI host bridge windows (ACS check to be added?) + the MSI IOVA
+reserved regions are populated by the arm-smmu driver. Currently the MSI
+IOVA region is arbitrarily located at 0x8000000 and 1MB sized.  An IOVA domain
+is created in add_reserved_regions callback. Then MSIs transparently are
+mapped using this IOVA domain.
 
-- For the ones who want to get the series using git here is the place
-  you can get it here:
+This series currently does not address some features addressed in [1]:
+- MSI IOVA size requirement computation
+- IRQ safety assessment
 
-repository: git at github.com:MISL-EBU-System-SW/mainline-public.git
-branch: sdhci-xenon-v2
+This RFC was just tested on ARM Overdrive with QEMU and is sent to help
+potential discussions at LPC. Additionnal development + testing is needed.
 
-Thanks,
+2 tentative fixes may be submitted separately:
+- vfio: fix vfio_info_cap_add/shift
+- iommu/iova: fix __alloc_and_insert_iova_range
 
-Gregory
+Best Regards
 
->
-> Thanks,
->
-> Gregory
->
-> Gregory CLEMENT (3):
->   arm64: dts: marvell: add eMMC support for Armada 37xx
->   arm64: dts: marvell: add sdhci support for Armada 7K/8K
->   arm64: configs: enable SDHCI driver for Xenon
->
-> Ziji Hu (7):
->   mmc: sdhci: Export sdhci_set_ios() from sdhci.c
->   mmc: sdhci: Export sdhci_start_signal_voltage_switch() in sdhci.c
->   mmc: sdhci: Export sdhci_execute_tuning() in sdhci.c
->   MAINTAINERS: add entry for Marvell Xenon MMC Host Controller drivers
->   dt: bindings: Add bindings for Marvell Xenon SD Host Controller
->   mmc: sdhci-xenon: Add Marvell Xenon SDHC core functionality
->   mmc: sdhci-xenon: Add support to PHYs of Marvell Xenon SDHC
->
->  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt |  161 +-
->  MAINTAINERS                                                   |    7 +-
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts                |    8 +-
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi                  |   11 +-
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts                |    8 +-
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi                 |    9 +-
->  arch/arm64/configs/defconfig                                  |    1 +-
->  drivers/mmc/host/Kconfig                                      |    9 +-
->  drivers/mmc/host/Makefile                                     |    3 +-
->  drivers/mmc/host/sdhci-xenon-phy.c                            | 1181 +++++++-
->  drivers/mmc/host/sdhci-xenon-phy.h                            |  157 +-
->  drivers/mmc/host/sdhci-xenon.c                                |  598 ++++-
->  drivers/mmc/host/sdhci-xenon.h                                |  159 +-
->  drivers/mmc/host/sdhci.c                                      |   11 +-
->  drivers/mmc/host/sdhci.h                                      |    4 +-
->  15 files changed, 2323 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
->  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.c
->  create mode 100644 drivers/mmc/host/sdhci-xenon-phy.h
->  create mode 100644 drivers/mmc/host/sdhci-xenon.c
->  create mode 100644 drivers/mmc/host/sdhci-xenon.h
->
-> base-commit: 9fe68cad6e74967b88d0c6aeca7d9cd6b6e91942
-> -- 
-> git-series 0.8.10
+[1] [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
+https://lkml.org/lkml/2016/10/12/347
+
+Git: complete series available at
+https://github.com/eauger/linux/tree/v4.9-rc3-reserved-rfc-v2
+
+History:
+RFC v1 -> v2:
+- no functional change despite Alex' first feedback:
+  waiting for LPC discussion outcome
+- fix intel_add_reserved_regions
+- add mutex lock/unlock in vfio_iommu_type1
+
+Eric Auger (7):
+  vfio: fix vfio_info_cap_add/shift
+  iommu/iova: fix __alloc_and_insert_iova_range
+  iommu: Add a list of iommu_reserved_region in iommu_domain
+  vfio/type1: Introduce RESV_IOVA_RANGE capability
+  iommu: Handle the list of reserved regions
+  iommu/vt-d: Implement add_reserved_regions callback
+  iommu/arm-smmu: implement add_reserved_regions callback
+
+Robin Murphy (1):
+  iommu/dma: Allow MSI-only cookies
+
+ drivers/iommu/arm-smmu.c        | 66 ++++++++++++++++++++++++++++++++++++++
+ drivers/iommu/dma-iommu.c       | 39 +++++++++++++++++++++++
+ drivers/iommu/intel-iommu.c     | 48 ++++++++++++++++++++--------
+ drivers/iommu/iommu.c           | 25 +++++++++++++++
+ drivers/iommu/iova.c            |  2 +-
+ drivers/vfio/vfio.c             |  5 +--
+ drivers/vfio/vfio_iommu_type1.c | 70 ++++++++++++++++++++++++++++++++++++++++-
+ include/linux/dma-iommu.h       |  9 ++++++
+ include/linux/iommu.h           | 23 ++++++++++++++
+ include/uapi/linux/vfio.h       | 16 +++++++++-
+ 10 files changed, 285 insertions(+), 18 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
