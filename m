@@ -1,150 +1,205 @@
 From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri,  4 Nov 2016 01:11:01 -0400
-Subject: [PATCH v6 6/7] net: ethernet: bgmac: add NS2 support
+Date: Fri,  4 Nov 2016 01:11:00 -0400
+Subject: [PATCH v6 5/7] net: ethernet: bgmac: device tree phy enablement
 In-Reply-To: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
 References: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1478236262-3351-7-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1478236262-3351-6-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the variant of amac hardware present in the Broadcom
-Northstar2 based SoCs.  Northstar2 requires an additional register to be
-configured with the port speed/duplexity (NICPM).  This can be added to
-the link callback to hide it from the instances that do not use this.
-Also, clearing of the pending interrupts on init is required due to
-observed issues on some platforms.
+Change the bgmac driver to allow for phy's defined by the device tree
 
 Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/net/ethernet/broadcom/bgmac-platform.c | 56 +++++++++++++++++++++++++-
- drivers/net/ethernet/broadcom/bgmac.c          |  3 ++
- drivers/net/ethernet/broadcom/bgmac.h          |  1 +
- 3 files changed, 58 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/broadcom/bgmac-bcma.c     | 22 +++++++++++++++++++
+ drivers/net/ethernet/broadcom/bgmac-platform.c | 22 ++++++++++++++++++-
+ drivers/net/ethernet/broadcom/bgmac.c          | 29 +++++---------------------
+ drivers/net/ethernet/broadcom/bgmac.h          |  8 +++++++
+ 4 files changed, 56 insertions(+), 25 deletions(-)
 
+diff --git a/drivers/net/ethernet/broadcom/bgmac-bcma.c b/drivers/net/ethernet/broadcom/bgmac-bcma.c
+index c16ec3a..4a4ffc0 100644
+--- a/drivers/net/ethernet/broadcom/bgmac-bcma.c
++++ b/drivers/net/ethernet/broadcom/bgmac-bcma.c
+@@ -80,6 +80,24 @@ static void bcma_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset, u32 mask,
+ 	bcma_maskset32(bgmac->bcma.cmn, offset, mask, set);
+ }
+ 
++static int bcma_phy_connect(struct bgmac *bgmac)
++{
++	struct phy_device *phy_dev;
++	char bus_id[MII_BUS_ID_SIZE + 3];
++
++	/* Connect to the PHY */
++	snprintf(bus_id, sizeof(bus_id), PHY_ID_FMT, bgmac->mii_bus->id,
++		 bgmac->phyaddr);
++	phy_dev = phy_connect(bgmac->net_dev, bus_id, bgmac_adjust_link,
++			      PHY_INTERFACE_MODE_MII);
++	if (IS_ERR(phy_dev)) {
++		dev_err(bgmac->dev, "PHY connection failed\n");
++		return PTR_ERR(phy_dev);
++	}
++
++	return 0;
++}
++
+ static const struct bcma_device_id bgmac_bcma_tbl[] = {
+ 	BCMA_CORE(BCMA_MANUF_BCM, BCMA_CORE_4706_MAC_GBIT,
+ 		  BCMA_ANY_REV, BCMA_ANY_CLASS),
+@@ -275,6 +293,10 @@ static int bgmac_probe(struct bcma_device *core)
+ 	bgmac->cco_ctl_maskset = bcma_bgmac_cco_ctl_maskset;
+ 	bgmac->get_bus_clock = bcma_bgmac_get_bus_clock;
+ 	bgmac->cmn_maskset32 = bcma_bgmac_cmn_maskset32;
++	if (bgmac->mii_bus)
++		bgmac->phy_connect = bcma_phy_connect;
++	else
++		bgmac->phy_connect = bgmac_phy_connect_direct;
+ 
+ 	err = bgmac_enet_probe(bgmac);
+ 	if (err)
 diff --git a/drivers/net/ethernet/broadcom/bgmac-platform.c b/drivers/net/ethernet/broadcom/bgmac-platform.c
-index 4642940..6f736c1 100644
+index be52f27..4642940 100644
 --- a/drivers/net/ethernet/broadcom/bgmac-platform.c
 +++ b/drivers/net/ethernet/broadcom/bgmac-platform.c
-@@ -14,12 +14,21 @@
- #define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
- 
+@@ -16,6 +16,7 @@
  #include <linux/bcma/bcma.h>
-+#include <linux/brcmphy.h>
  #include <linux/etherdevice.h>
  #include <linux/of_address.h>
- #include <linux/of_mdio.h>
++#include <linux/of_mdio.h>
  #include <linux/of_net.h>
  #include "bgmac.h"
  
-+#define NICPM_IOMUX_CTRL		0x00000008
-+
-+#define NICPM_IOMUX_CTRL_INIT_VAL	0x3196e000
-+#define NICPM_IOMUX_CTRL_SPD_SHIFT	10
-+#define NICPM_IOMUX_CTRL_SPD_10M	0
-+#define NICPM_IOMUX_CTRL_SPD_100M	1
-+#define NICPM_IOMUX_CTRL_SPD_1000M	2
-+
- static u32 platform_bgmac_read(struct bgmac *bgmac, u16 offset)
- {
- 	return readl(bgmac->plat.base + offset);
-@@ -87,12 +96,46 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
+@@ -86,6 +87,20 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
  	WARN_ON(1);
  }
  
-+static void bgmac_nicpm_speed_set(struct net_device *net_dev)
++static int platform_phy_connect(struct bgmac *bgmac)
 +{
-+	struct bgmac *bgmac = netdev_priv(net_dev);
-+	u32 val;
++	struct phy_device *phy_dev;
 +
-+	if (!bgmac->plat.nicpm_base)
-+		return;
-+
-+	val = NICPM_IOMUX_CTRL_INIT_VAL;
-+	switch (bgmac->net_dev->phydev->speed) {
-+	default:
-+		netdev_err(net_dev, "Unsupported speed. Defaulting to 1000Mb\n");
-+	case SPEED_1000:
-+		val |= NICPM_IOMUX_CTRL_SPD_1000M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
-+	case SPEED_100:
-+		val |= NICPM_IOMUX_CTRL_SPD_100M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
-+	case SPEED_10:
-+		val |= NICPM_IOMUX_CTRL_SPD_10M << NICPM_IOMUX_CTRL_SPD_SHIFT;
-+		break;
++	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
++					 bgmac_adjust_link);
++	if (!phy_dev) {
++		dev_err(bgmac->dev, "PHY connection failed\n");
++		return -ENODEV;
 +	}
 +
-+	writel(val, bgmac->plat.nicpm_base + NICPM_IOMUX_CTRL);
-+
-+	bgmac_adjust_link(bgmac->net_dev);
++	return 0;
 +}
 +
- static int platform_phy_connect(struct bgmac *bgmac)
+ static int bgmac_probe(struct platform_device *pdev)
  {
- 	struct phy_device *phy_dev;
- 
--	phy_dev = of_phy_get_and_connect(bgmac->net_dev, bgmac->dev->of_node,
--					 bgmac_adjust_link);
-+	if (bgmac->plat.nicpm_base)
-+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-+						 bgmac->dev->of_node,
-+						 bgmac_nicpm_speed_set);
-+	else
-+		phy_dev = of_phy_get_and_connect(bgmac->net_dev,
-+						 bgmac->dev->of_node,
-+						 bgmac_adjust_link);
- 	if (!phy_dev) {
- 		dev_err(bgmac->dev, "PHY connection failed\n");
- 		return -ENODEV;
-@@ -156,6 +199,14 @@ static int bgmac_probe(struct platform_device *pdev)
- 	if (IS_ERR(bgmac->plat.idm_base))
- 		return PTR_ERR(bgmac->plat.idm_base);
- 
-+	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "nicpm_base");
-+	if (regs) {
-+		bgmac->plat.nicpm_base = devm_ioremap_resource(&pdev->dev,
-+							       regs);
-+		if (IS_ERR(bgmac->plat.nicpm_base))
-+			return PTR_ERR(bgmac->plat.nicpm_base);
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -102,7 +117,6 @@ static int bgmac_probe(struct platform_device *pdev)
+ 	/* Set the features of the 4707 family */
+ 	bgmac->feature_flags |= BGMAC_FEAT_CLKCTLST;
+ 	bgmac->feature_flags |= BGMAC_FEAT_NO_RESET;
+-	bgmac->feature_flags |= BGMAC_FEAT_FORCE_SPEED_2500;
+ 	bgmac->feature_flags |= BGMAC_FEAT_CMDCFG_SR_REV4;
+ 	bgmac->feature_flags |= BGMAC_FEAT_TX_MASK_SETUP;
+ 	bgmac->feature_flags |= BGMAC_FEAT_RX_MASK_SETUP;
+@@ -151,6 +165,12 @@ static int bgmac_probe(struct platform_device *pdev)
+ 	bgmac->cco_ctl_maskset = platform_bgmac_cco_ctl_maskset;
+ 	bgmac->get_bus_clock = platform_bgmac_get_bus_clock;
+ 	bgmac->cmn_maskset32 = platform_bgmac_cmn_maskset32;
++	if (of_parse_phandle(np, "phy-handle", 0)) {
++		bgmac->phy_connect = platform_phy_connect;
++	} else {
++		bgmac->phy_connect = bgmac_phy_connect_direct;
++		bgmac->feature_flags |= BGMAC_FEAT_FORCE_SPEED_2500;
 +	}
-+
- 	bgmac->read = platform_bgmac_read;
- 	bgmac->write = platform_bgmac_write;
- 	bgmac->idm_read = platform_bgmac_idm_read;
-@@ -187,6 +238,7 @@ static int bgmac_remove(struct platform_device *pdev)
- static const struct of_device_id bgmac_of_enet_match[] = {
- 	{.compatible = "brcm,amac",},
- 	{.compatible = "brcm,nsp-amac",},
-+	{.compatible = "brcm,ns2-amac",},
- 	{},
- };
  
+ 	return bgmac_enet_probe(bgmac);
+ }
 diff --git a/drivers/net/ethernet/broadcom/bgmac.c b/drivers/net/ethernet/broadcom/bgmac.c
-index 7f66ea7..a29787f 100644
+index 31ca204..7f66ea7 100644
 --- a/drivers/net/ethernet/broadcom/bgmac.c
 +++ b/drivers/net/ethernet/broadcom/bgmac.c
-@@ -1082,6 +1082,9 @@ static void bgmac_enable(struct bgmac *bgmac)
- /* http://bcm-v4.sipsolutions.net/mac-gbit/gmac/chipinit */
- static void bgmac_chip_init(struct bgmac *bgmac)
- {
-+	/* Clear any erroneously pending interrupts */
-+	bgmac_write(bgmac, BGMAC_INT_STATUS, ~0);
-+
- 	/* 1 interrupt per received frame */
- 	bgmac_write(bgmac, BGMAC_INT_RECV_LAZY, 1 << BGMAC_IRL_FC_SHIFT);
+@@ -1388,7 +1388,7 @@ static const struct ethtool_ops bgmac_ethtool_ops = {
+  * MII
+  **************************************************/
  
+-static void bgmac_adjust_link(struct net_device *net_dev)
++void bgmac_adjust_link(struct net_device *net_dev)
+ {
+ 	struct bgmac *bgmac = netdev_priv(net_dev);
+ 	struct phy_device *phy_dev = net_dev->phydev;
+@@ -1411,8 +1411,9 @@ static void bgmac_adjust_link(struct net_device *net_dev)
+ 		phy_print_status(phy_dev);
+ 	}
+ }
++EXPORT_SYMBOL_GPL(bgmac_adjust_link);
+ 
+-static int bgmac_phy_connect_direct(struct bgmac *bgmac)
++int bgmac_phy_connect_direct(struct bgmac *bgmac)
+ {
+ 	struct fixed_phy_status fphy_status = {
+ 		.link = 1,
+@@ -1437,24 +1438,7 @@ static int bgmac_phy_connect_direct(struct bgmac *bgmac)
+ 
+ 	return err;
+ }
+-
+-static int bgmac_phy_connect(struct bgmac *bgmac)
+-{
+-	struct phy_device *phy_dev;
+-	char bus_id[MII_BUS_ID_SIZE + 3];
+-
+-	/* Connect to the PHY */
+-	snprintf(bus_id, sizeof(bus_id), PHY_ID_FMT, bgmac->mii_bus->id,
+-		 bgmac->phyaddr);
+-	phy_dev = phy_connect(bgmac->net_dev, bus_id, &bgmac_adjust_link,
+-			      PHY_INTERFACE_MODE_MII);
+-	if (IS_ERR(phy_dev)) {
+-		dev_err(bgmac->dev, "PHY connection failed\n");
+-		return PTR_ERR(phy_dev);
+-	}
+-
+-	return 0;
+-}
++EXPORT_SYMBOL_GPL(bgmac_phy_connect_direct);
+ 
+ int bgmac_enet_probe(struct bgmac *info)
+ {
+@@ -1507,10 +1491,7 @@ int bgmac_enet_probe(struct bgmac *info)
+ 
+ 	netif_napi_add(net_dev, &bgmac->napi, bgmac_poll, BGMAC_WEIGHT);
+ 
+-	if (!bgmac->mii_bus)
+-		err = bgmac_phy_connect_direct(bgmac);
+-	else
+-		err = bgmac_phy_connect(bgmac);
++	err = bgmac_phy_connect(bgmac);
+ 	if (err) {
+ 		dev_err(bgmac->dev, "Cannot connect to phy\n");
+ 		goto err_dma_free;
 diff --git a/drivers/net/ethernet/broadcom/bgmac.h b/drivers/net/ethernet/broadcom/bgmac.h
-index bfd9f40..71f493f 100644
+index 80836b4..bfd9f40 100644
 --- a/drivers/net/ethernet/broadcom/bgmac.h
 +++ b/drivers/net/ethernet/broadcom/bgmac.h
-@@ -463,6 +463,7 @@ struct bgmac {
- 		struct {
- 			void *base;
- 			void *idm_base;
-+			void *nicpm_base;
- 		} plat;
- 		struct {
- 			struct bcma_device *core;
+@@ -513,10 +513,13 @@ struct bgmac {
+ 	u32 (*get_bus_clock)(struct bgmac *bgmac);
+ 	void (*cmn_maskset32)(struct bgmac *bgmac, u16 offset, u32 mask,
+ 			      u32 set);
++	int (*phy_connect)(struct bgmac *bgmac);
+ };
+ 
+ int bgmac_enet_probe(struct bgmac *info);
+ void bgmac_enet_remove(struct bgmac *bgmac);
++void bgmac_adjust_link(struct net_device *net_dev);
++int bgmac_phy_connect_direct(struct bgmac *bgmac);
+ 
+ struct mii_bus *bcma_mdio_mii_register(struct bcma_device *core, u8 phyaddr);
+ void bcma_mdio_mii_unregister(struct mii_bus *mii_bus);
+@@ -583,4 +586,9 @@ static inline void bgmac_set(struct bgmac *bgmac, u16 offset, u32 set)
+ {
+ 	bgmac_maskset(bgmac, offset, ~0, set);
+ }
++
++static inline int bgmac_phy_connect(struct bgmac *bgmac)
++{
++	return bgmac->phy_connect(bgmac);
++}
+ #endif /* _BGMAC_H */
 -- 
 2.7.4
