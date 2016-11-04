@@ -1,59 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:20 +0100
-Subject: [PATCH 21/29] ARM: dts: r8a7793: Enable VIN0-VIN2
+Date: Fri,  4 Nov 2016 10:44:25 +0100
+Subject: [PATCH 26/29] ARM: dts: r8a7740: Remove skeleton.dtsi inclusion
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <06b64afa6e981b332dccadcf0b5d52139525b4f6.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <d0b54c54f1a2257017c2501a56df936c6d921585.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
+as deprecated"), including skeleton.dtsi is deprecated.
+
+This fixes the following warning with W=1:
+
+    Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/r8a7740.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index a7d11b9f3555..629d3d60d1cd 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -852,6 +852,33 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 159e04eb1b9e..34159a8349de 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -8,8 +8,6 @@
+  * kind, whether express or implied.
+  */
  
-+	vin0: video at e6ef0000 {
-+		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
-+		reg = <0 0xe6ef0000 0 0x1000>;
-+		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7793_CLK_VIN0>;
-+		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
-+	vin1: video at e6ef1000 {
-+		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
-+		reg = <0 0xe6ef1000 0 0x1000>;
-+		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7793_CLK_VIN1>;
-+		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
-+	vin2: video at e6ef2000 {
-+		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
-+		reg = <0 0xe6ef2000 0 0x1000>;
-+		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7793_CLK_VIN2>;
-+		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
-+		status = "disabled";
-+	};
-+
- 	qspi: spi at e6b10000 {
- 		compatible = "renesas,qspi-r8a7793", "renesas,qspi";
- 		reg = <0 0xe6b10000 0 0x2c>;
+-/include/ "skeleton.dtsi"
+-
+ #include <dt-bindings/clock/r8a7740-clock.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+@@ -17,6 +15,8 @@
+ / {
+ 	compatible = "renesas,r8a7740";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
+ 
+ 	cpus {
+ 		#address-cells = <1>;
 -- 
 2.7.0.rc3.207.g0ac5344
