@@ -1,129 +1,132 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:19 +0100
-Subject: [PATCH 20/29] ARM: dts: koelsch: add HDMI input
-In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
-References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <84e3a74664c52b58cd7f5b6fa381f7f1cd1956e0.1478252309.git.horms+renesas@verge.net.au>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 04 Nov 2016 10:45:53 +0100
+Subject: [PATCH] ARM: S3C24XX: Add DMA slave maps for remaining s3c24xx SoCs
+Message-ID: <1478252753-8231-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans Verkuil <hverkuil@xs4all.nl>
+This patch adds DMA slave map tables for the remaining s3c24xx
+SoC types so the whole platform can be switched to the new API.
+A few devices for which there was no DMA support with current
+code are omitted from the tables.
 
-Add support in the dts for the HDMI input. Based on the Lager dts
-patch from Ulrich Hecht.
-
-Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
-[uli: removed "renesas," prefixes from pfc nodes]
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 68 +++++++++++++++++++++++++++++++++--
- 1 file changed, 66 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c24xx/common.c | 76 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index f17bfa000f73..c457b43deb7d 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -265,12 +265,23 @@
- 		};
- 	};
- 
-+	hdmi-in {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&adv7612_in>;
-+			};
-+		};
-+	};
-+
- 	hdmi-out {
- 		compatible = "hdmi-connector";
- 		type = "a";
- 
- 		port {
--			hdmi_con: endpoint {
-+			hdmi_con_out: endpoint {
- 				remote-endpoint = <&adv7511_out>;
- 			};
- 		};
-@@ -414,6 +425,11 @@
- 		function = "usb1";
- 	};
- 
-+	vin0_pins: vin0 {
-+		groups = "vin0_data24", "vin0_sync", "vin0_clkenb", "vin0_clk";
-+		function = "vin0";
-+	};
-+
- 	vin1_pins: vin1 {
- 		groups = "vin1_data8", "vin1_clk";
- 		function = "vin1";
-@@ -617,7 +633,34 @@
- 			port at 1 {
- 				reg = <1>;
- 				adv7511_out: endpoint {
--					remote-endpoint = <&hdmi_con>;
-+					remote-endpoint = <&hdmi_con_out>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi-in at 4c {
-+		compatible = "adi,adv7612";
-+		reg = <0x4c>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+		default-input = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7612_in: endpoint {
-+					remote-endpoint = <&hdmi_con_in>;
-+				};
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				adv7612_out: endpoint {
-+					remote-endpoint = <&vin0ep2>;
- 				};
- 			};
- 		};
-@@ -699,6 +742,27 @@
- 	cpu0-supply = <&vdd_dvfs>;
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index f6c3f15..b59f4f4 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -345,10 +345,40 @@ struct s3c24xx_uart_resources s3c2410_uart_resources[] __initdata = {
+ 	[DMACH_USB_EP4] = { S3C24XX_DMA_APB, true, S3C24XX_DMA_CHANREQ(4, 3), },
  };
- 
-+/* HDMI video input */
-+&vin0 {
-+	status = "okay";
-+	pinctrl-0 = <&vin0_pins>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		vin0ep2: endpoint {
-+			remote-endpoint = <&adv7612_out>;
-+			bus-width = <24>;
-+			hsync-active = <0>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+			data-active = <1>;
-+		};
-+	};
+
++static const struct dma_slave_map s3c2410_dma_slave_map[] = {
++	{ "s3c2410-sdi", "rx-tx", (void *)DMACH_SDI },
++	{ "s3c2410-spi.0", "rx", (void *)DMACH_SPI0_RX },
++	{ "s3c2410-spi.0", "tx", (void *)DMACH_SPI0_TX },
++	{ "s3c2410-spi.1", "rx", (void *)DMACH_SPI1_RX },
++	{ "s3c2410-spi.1", "tx", (void *)DMACH_SPI1_TX },
++	/*
++	 * The DMA request source[1] (DMACH_UARTx_SRC2) are
++	 * not used in the UART driver.
++	 */
++	{ "s3c2410-uart.0", "rx", (void *)DMACH_UART0 },
++	{ "s3c2410-uart.0", "tx", (void *)DMACH_UART0 },
++	{ "s3c2410-uart.1", "rx", (void *)DMACH_UART1 },
++	{ "s3c2410-uart.1", "tx", (void *)DMACH_UART1 },
++	{ "s3c2410-uart.2", "rx", (void *)DMACH_UART2 },
++	{ "s3c2410-uart.2", "tx", (void *)DMACH_UART2 },
++	{ "s3c24xx-iis", "rx", (void *)DMACH_I2S_IN },
++	{ "s3c24xx-iis", "tx", (void *)DMACH_I2S_OUT },
++	{ "s3c-hsudc", "rx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "tx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "rx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "tx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "rx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "tx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "rx3", (void *)DMACH_USB_EP4 },
++	{ "s3c-hsudc", "tx3", (void *)DMACH_USB_EP4 }
 +};
 +
- /* composite video input */
- &vin1 {
- 	status = "okay";
--- 
-2.7.0.rc3.207.g0ac5344
+ static struct s3c24xx_dma_platdata s3c2410_dma_platdata = {
+ 	.num_phy_channels = 4,
+ 	.channels = s3c2410_dma_channels,
+ 	.num_channels = DMACH_MAX,
++	.slave_map = s3c2410_dma_slave_map,
++	.slavecnt = ARRAY_SIZE(s3c2410_dma_slave_map),
+ };
+
+ struct platform_device s3c2410_device_dma = {
+@@ -388,10 +418,36 @@ struct platform_device s3c2410_device_dma = {
+ 	[DMACH_USB_EP4] = { S3C24XX_DMA_APB, true, 16 },
+ };
+
++static const struct dma_slave_map s3c2412_dma_slave_map[] = {
++	{ "s3c2412-sdi", "rx-tx", (void *)DMACH_SDI },
++	{ "s3c2412-spi.0", "rx", (void *)DMACH_SPI0_RX },
++	{ "s3c2412-spi.0", "tx", (void *)DMACH_SPI0_TX },
++	{ "s3c2412-spi.1", "rx", (void *)DMACH_SPI1_RX },
++	{ "s3c2412-spi.1", "tx", (void *)DMACH_SPI1_TX },
++	{ "s3c2440-uart.0", "rx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.0", "tx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.1", "rx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.1", "tx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.2", "rx", (void *)DMACH_UART2 },
++	{ "s3c2440-uart.2", "tx", (void *)DMACH_UART2 },
++	{ "s3c2412-iis", "rx", (void *)DMACH_I2S_IN },
++	{ "s3c2412-iis", "tx", (void *)DMACH_I2S_OUT },
++	{ "s3c-hsudc", "rx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "tx0", (void *)DMACH_USB_EP1 },
++	{ "s3c-hsudc", "rx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "tx1", (void *)DMACH_USB_EP2 },
++	{ "s3c-hsudc", "rx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "tx2", (void *)DMACH_USB_EP3 },
++	{ "s3c-hsudc", "rx3", (void *)DMACH_USB_EP4 },
++	{ "s3c-hsudc", "tx3", (void *)DMACH_USB_EP4 }
++};
++
+ static struct s3c24xx_dma_platdata s3c2412_dma_platdata = {
+ 	.num_phy_channels = 4,
+ 	.channels = s3c2412_dma_channels,
+ 	.num_channels = DMACH_MAX,
++	.slave_map = s3c2412_dma_slave_map,
++	.slavecnt = ARRAY_SIZE(s3c2412_dma_slave_map),
+ };
+
+ struct platform_device s3c2412_device_dma = {
+@@ -534,10 +590,30 @@ struct platform_device s3c2440_device_dma = {
+ 	[DMACH_MIC_IN] = { S3C24XX_DMA_APB, true, 29 },
+ };
+
++static const struct dma_slave_map s3c2443_dma_slave_map[] = {
++	{ "s3c2440-sdi", "rx-tx", (void *)DMACH_SDI },
++	{ "s3c2443-spi.0", "rx", (void *)DMACH_SPI0_RX },
++	{ "s3c2443-spi.0", "tx", (void *)DMACH_SPI0_TX },
++	{ "s3c2443-spi.1", "rx", (void *)DMACH_SPI1_RX },
++	{ "s3c2443-spi.1", "tx", (void *)DMACH_SPI1_TX },
++	{ "s3c2440-uart.0", "rx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.0", "tx", (void *)DMACH_UART0 },
++	{ "s3c2440-uart.1", "rx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.1", "tx", (void *)DMACH_UART1 },
++	{ "s3c2440-uart.2", "rx", (void *)DMACH_UART2 },
++	{ "s3c2440-uart.2", "tx", (void *)DMACH_UART2 },
++	{ "s3c2440-uart.3", "rx", (void *)DMACH_UART3 },
++	{ "s3c2440-uart.3", "tx", (void *)DMACH_UART3 },
++	{ "s3c24xx-iis", "rx", (void *)DMACH_I2S_IN },
++	{ "s3c24xx-iis", "tx", (void *)DMACH_I2S_OUT },
++};
++
+ static struct s3c24xx_dma_platdata s3c2443_dma_platdata = {
+ 	.num_phy_channels = 6,
+ 	.channels = s3c2443_dma_channels,
+ 	.num_channels = DMACH_MAX,
++	.slave_map = s3c2443_dma_slave_map,
++	.slavecnt = ARRAY_SIZE(s3c2443_dma_slave_map),
+ };
+
+ struct platform_device s3c2443_device_dma = {
+--
+1.9.1
