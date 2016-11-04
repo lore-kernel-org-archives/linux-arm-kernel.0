@@ -1,43 +1,130 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  4 Nov 2016 17:31:55 +0000
-Subject: [PATCH v8 08/16] arm: gic: allow 32-bit compilation
+Date: Fri,  4 Nov 2016 17:31:57 +0000
+Subject: [PATCH v8 10/16] arm: FDT: create MSI controller DT node
 In-Reply-To: <20161104173203.21168-1-andre.przywara@arm.com>
 References: <20161104173203.21168-1-andre.przywara@arm.com>
-Message-ID: <20161104173203.21168-9-andre.przywara@arm.com>
+Message-ID: <20161104173203.21168-11-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GIC code is shared between ARM and arm64, though the header
-files from the Linux kernel are actually different, reflecting the
-different level of GIC emulation support between the two architectures.
-Since it is conceivable that ARM will gain GICv3 (and possibly ITS)
-emulation support too, lets conditionally define those missing
-symbols in the source file until an upcoming ARM header update eventually
-includes those.
+The ARM GICv3 ITS requires a separate device tree node to describe
+the ITS. Add this as a child to the GIC interrupt controller node
+to let a guest discover and use the ITS if the user requests it.
+Since we now need to specify #address-cells for the GIC node, we
+have to add two zeroes to the interrupt map to match that.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/gic.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arm/gic.c         | 23 ++++++++++++++++++++++-
+ arm/pci.c         | 12 ++++++++++--
+ include/kvm/fdt.h |  2 +-
+ 3 files changed, 33 insertions(+), 4 deletions(-)
 
 diff --git a/arm/gic.c b/arm/gic.c
-index 2c1a547..4d12f31 100644
+index ed9016d..44f9365 100644
 --- a/arm/gic.c
 +++ b/arm/gic.c
-@@ -18,6 +18,14 @@
- #define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
- #endif
+@@ -267,7 +267,8 @@ late_init(gic__init_gic)
  
-+#ifndef KVM_VGIC_ITS_ADDR_TYPE
-+#define KVM_VGIC_ITS_ADDR_TYPE 4
-+#endif
+ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
+ {
+-	const char *compatible;
++	const char *compatible, *msi_compatible = NULL;
++	u64 msi_prop[2];
+ 	u64 reg_prop[] = {
+ 		cpu_to_fdt64(ARM_GIC_DIST_BASE), cpu_to_fdt64(ARM_GIC_DIST_SIZE),
+ 		0, 0,				/* to be filled */
+@@ -279,6 +280,9 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
+ 		reg_prop[2] = cpu_to_fdt64(ARM_GIC_CPUI_BASE);
+ 		reg_prop[3] = cpu_to_fdt64(ARM_GIC_CPUI_SIZE);
+ 		break;
++	case IRQCHIP_GICV3_ITS:
++		msi_compatible = "arm,gic-v3-its";
++		/* fall-through */
+ 	case IRQCHIP_GICV3:
+ 		compatible = "arm,gic-v3";
+ 		reg_prop[2] = cpu_to_fdt64(gic_redists_base);
+@@ -294,6 +298,23 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
+ 	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
+ 	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
+ 	_FDT(fdt_property_cell(fdt, "phandle", fdt__get_phandle(PHANDLE_GIC)));
++	_FDT(fdt_property_cell(fdt, "#address-cells", 2));
++	_FDT(fdt_property_cell(fdt, "#size-cells", 2));
 +
-+#ifndef KVM_VGIC_V3_ITS_SIZE
-+#define KVM_VGIC_V3_ITS_SIZE (2 * SZ_64K)
-+#endif
++	if (msi_compatible) {
++		_FDT(fdt_property(fdt, "ranges", NULL, 0));
 +
- static int gic_fd = -1;
- static u64 gic_redists_base;
- static u64 gic_redists_size;
++		_FDT(fdt_begin_node(fdt, "msic"));
++		_FDT(fdt_property_string(fdt, "compatible", msi_compatible));
++		_FDT(fdt_property(fdt, "msi-controller", NULL, 0));
++		_FDT(fdt_property_cell(fdt, "phandle",
++				       fdt__get_phandle(PHANDLE_MSI)));
++		msi_prop[0] = cpu_to_fdt64(gic_msi_base);
++		msi_prop[1] = cpu_to_fdt64(gic_msi_size);
++		_FDT(fdt_property(fdt, "reg", msi_prop, sizeof(msi_prop)));
++		_FDT(fdt_end_node(fdt));
++	}
++
+ 	_FDT(fdt_end_node(fdt));
+ }
+ 
+diff --git a/arm/pci.c b/arm/pci.c
+index 9630657..104349a 100644
+--- a/arm/pci.c
++++ b/arm/pci.c
+@@ -18,6 +18,8 @@ struct of_gic_irq {
+ struct of_interrupt_map_entry {
+ 	struct of_pci_irq_mask		pci_irq_mask;
+ 	u32				gic_phandle;
++	u32				gic_addr_hi;
++	u32				gic_addr_lo;
+ 	struct of_gic_irq		gic_irq;
+ } __attribute__((packed));
+ 
+@@ -26,7 +28,7 @@ void pci__generate_fdt_nodes(void *fdt)
+ 	struct device_header *dev_hdr;
+ 	struct of_interrupt_map_entry irq_map[OF_PCI_IRQ_MAP_MAX];
+ 	unsigned nentries = 0;
+-	u32 gic_phandle = fdt__get_phandle(PHANDLE_GIC);
++	u32 phandle;
+ 	/* Bus range */
+ 	u32 bus_range[] = { cpu_to_fdt32(0), cpu_to_fdt32(1), };
+ 	/* Configuration Space */
+@@ -65,7 +67,11 @@ void pci__generate_fdt_nodes(void *fdt)
+ 	_FDT(fdt_property(fdt, "bus-range", bus_range, sizeof(bus_range)));
+ 	_FDT(fdt_property(fdt, "reg", &cfg_reg_prop, sizeof(cfg_reg_prop)));
+ 	_FDT(fdt_property(fdt, "ranges", ranges, sizeof(ranges)));
++	phandle = fdt__get_phandle(PHANDLE_MSI);
++	if (FDT_IS_VALID_PHANDLE(phandle))
++		_FDT(fdt_property_cell(fdt, "msi-parent", phandle));
+ 
++	phandle = fdt__get_phandle(PHANDLE_GIC);
+ 	/* Generate the interrupt map ... */
+ 	dev_hdr = device__first_dev(DEVICE_BUS_PCI);
+ 	while (dev_hdr && nentries < ARRAY_SIZE(irq_map)) {
+@@ -84,7 +90,9 @@ void pci__generate_fdt_nodes(void *fdt)
+ 				},
+ 				.pci_pin	= cpu_to_fdt32(pin),
+ 			},
+-			.gic_phandle	= cpu_to_fdt32(gic_phandle),
++			.gic_phandle	= cpu_to_fdt32(phandle),
++			.gic_addr_hi	= 0,
++			.gic_addr_lo	= 0,
+ 			.gic_irq = {
+ 				.type	= cpu_to_fdt32(GIC_FDT_IRQ_TYPE_SPI),
+ 				.num	= cpu_to_fdt32(irq - GIC_SPI_IRQ_BASE),
+diff --git a/include/kvm/fdt.h b/include/kvm/fdt.h
+index cd2bb72..8006e8f 100644
+--- a/include/kvm/fdt.h
++++ b/include/kvm/fdt.h
+@@ -11,7 +11,7 @@
+ #define FDT_INVALID_PHANDLE 0
+ #define FDT_IS_VALID_PHANDLE(phandle) ((phandle) != FDT_INVALID_PHANDLE)
+ 
+-enum phandles {PHANDLE_GIC, PHANDLES_MAX};
++enum phandles {PHANDLE_GIC, PHANDLE_MSI, PHANDLES_MAX};
+ 
+ /* Those definitions are generic FDT values for specifying IRQ
+  * types and are used in the Linux kernel internally as well as in
 -- 
 2.9.0
