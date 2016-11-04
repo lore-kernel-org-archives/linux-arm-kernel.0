@@ -1,177 +1,149 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 04 Nov 2016 11:53:16 +0100
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <20160909002432.GE13062@codeaurora.org>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
- <20160909002432.GE13062@codeaurora.org>
- <CGME20161104105318eucas1p2e9458dbe7039f2a81419fae8cf6bc4c8@eucas1p2.samsung.com>
-Message-ID: <7933d51e-92a8-ca6d-84f0-70b22fe17568@samsung.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Fri, 4 Nov 2016 18:54:35 +0800
+Subject: [PATCH 6/6] ARM: dts: rockchip: add rockchip RK1108 Evaluation
+ board
+In-Reply-To: <3057904.hZPZRUIUZe@phil>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1478177039-12257-1-git-send-email-andy.yan@rock-chips.com>
+ <3057904.hZPZRUIUZe@phil>
+Message-ID: <ce6e9d62-75e5-60bc-2775-507aa326e3a2@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Heiko:
 
-Krzysztof has left Samsung, but we would like to continue this task, because
-the ABBA dead-locks related to global prepare lock becomes more and more
-problematic for us to workaround.
 
-On 2016-09-09 02:24, Stephen Boyd wrote:
-> On 08/16, Krzysztof Kozlowski wrote:
->> RFC, please, do not apply, maybe except patch #1 which is harmless.
+On 2016?11?04? 18:03, Heiko Stuebner wrote:
+> Am Donnerstag, 3. November 2016, 20:43:59 CET schrieb Andy Yan:
+>> RK1108EVB is designed by Rockchip for CVR field.
+>> This patch add basic support for it, which can boot with
+>> initramfs into shell.
 >>
->>
->> Introduction
->> ============
->> The patchset brings new entity: clock controller representing a hardware
->> block.  The clock controller comes with its own prepare lock which
->> is used then in many places.  The idea is to fix the deadlock mentioned
->> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
->> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
->> by keeping clock prepared").
->>
->>
->> Disclaimer
->> ==========
->> Request for comments, so:
->> 1. Only exynos_defconfig builds,
->> 2. A lot of FIXME/TODO note still,
->> 3. Checkpatch not run, lines not aligned,
->> 4. Other (non-exynos) drivers not converted,
->> 5. Probably not yet bisectable,
->> 6. Locking became quite complex.
->>     The previous one lock was simple.  Inefficient and dead-lock prone but
->>     simple.  Because of clock hierarchy spanning through controllers, the
->>     new locking became quite complicated.  I don't like it but...
->>
->>
->> Details
->> =======
->> In Exynos-based boards case the deadlock occurs between clock's
->> prepare_lock and regmap-i2c's lock:
->>
->> CPU #0:                             CPU #1:
->> lock(regmap)
->>                                      s2mps11-clk: clk_prepare_lock()
->>
->> i2c-exynos: clk_prepare_lock() - wait
->>                                      lock(regmap) - wait
->>
->> The clk_prepare_lock() on both CPUs come from different clock drivers
->> and components:
->> 1. I2C clock is part of SoC block and is required by i2c-s3c2410/i2c-exynos5
->>     driver,
->> 2. S2MPS11 clock is separate device, however driver uses I2C regmap.
->>
->> The deadlock was reported by lockdep (always) and was happening
->> in 20% of boots of Odroid XU3 with multi_v7 defconfig.  Workaround for
->> deadlock was implemented by removing prepare/unprepare calls from I2C
->> transfers.  However these are just workarounds... which after applying
->> this patch can be reverted.
->>
->> Additionally Marek Szyprowski's work on domains/clocks/pinctrl exposed
->> the deadlock again in different configuration.
->>
-> Per-controller locks seems to be a misnomer. These patches look
-> more like per-clk_register() locks. The clk registrant can decide
-> how fine grained to make the prepare locking scheme. They can
-> decide to have one lock per clk, one lock for the entire tree, or
-> one lock per arbitrary subtree. I'd prefer to drop the controller
-> concept unless it's really done that way, by attaching to the OF
-> clk provider or device pointer.
-
-This was not phrased well but the idea was to let provider/controller
-have ability to define which clocks will use common lock. Probably
-removing the concept of clock controller and moving the lock to
-clk_provider will be much better approach.
-
-> Given that, it seems that conceptually these patches allow clk
-> registrants to carve out a set of clks that they want to be
-> treated as an atomic unit with regards to the prepare lock.
-> TL;DR trees of per-process recursive prepare mutex locks where
-> the locks cover one or more clks.
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> looks good, the only thing I can also change myself is moving the board in the
+> rockchip.txt to the block of Rockchip boards (i.e. sorting by manufacturer and
+> board name).
 >
-> The locks are recursive per-process to simplify the problem where
-> we need to acquire the same lock multiple times while traversing
-> a tree that shares the same lock, right? Otherwise we would need
-> to track which locks we've already grabbed and refcount and we
-> wouldn't be able to re-enter the framework from within the clk
-> ops of the same atomic unit.
 >
-> As long as we can guarantee that we always take the locks in the
-> same order we'll be fine. The burden to ensure that would be
-> placed on the clk registrants though, and verifying that will be
-> left up to humans? That seems fragile and error prone. We can
-> always say that we take the global lock and then traverse the
-> children up to the roots, but we can't be sure that during the
-> tree traversal we don't take locks in different order because of
-> how the clk registrant has structured things.
+> Heiko
+
+     You mean it's better to put it between "Rockchip RK3368 evb" and 
+"Rockchip PX5 Evaluation board"? if so, I will change it in next version.
+>> ---
+>>
+>>   Documentation/devicetree/bindings/arm/rockchip.txt |  3 +
+>>   arch/arm/boot/dts/Makefile                         |  1 +
+>>   arch/arm/boot/dts/rk1108-evb.dts                   | 69
+>> ++++++++++++++++++++++ 3 files changed, 73 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/rk1108-evb.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
+>> b/Documentation/devicetree/bindings/arm/rockchip.txt index 10b92b5..8670181
+>> 100644
+>> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+>> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+>> @@ -1,5 +1,8 @@
+>>   Rockchip platforms device tree bindings
+>>   ---------------------------------------
+>> +- Rockchip RK1108 Evaluation board
+>> +    Required root node properties:
+>> +      - compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
+>>
+>>   - Kylin RK3036 board:
+>>       Required root node properties:
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index e49476a..249dca9 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -635,6 +635,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+>>   	arm-realview-pba8.dtb \
+>>   	arm-realview-pbx-a9.dtb
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>> +	rk1108-evb.dtb \
+>>   	rk3036-evb.dtb \
+>>   	rk3036-kylin.dtb \
+>>   	rk3066a-bqcurie2.dtb \
+>> diff --git a/arch/arm/boot/dts/rk1108-evb.dts
+>> b/arch/arm/boot/dts/rk1108-evb.dts new file mode 100644
+>> index 0000000..3956cff
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/rk1108-evb.dts
+>> @@ -0,0 +1,69 @@
+>> +/*
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
+>> + *
+>> + *  a) This file is free software; you can redistribute it and/or
+>> + *     modify it under the terms of the GNU General Public License as
+>> + *     published by the Free Software Foundation; either version 2 of the
+>> + *     License, or (at your option) any later version.
+>> + *
+>> + *     This file is distributed in the hope that it will be useful,
+>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + *     GNU General Public License for more details.
+>> + *
+>> + *  Or, alternatively,
+>> + *
+>> + *  b) Permission is hereby granted, free of charge, to any person
+>> + *     obtaining a copy of this software and associated documentation
+>> + *     files (the "Software"), to deal in the Software without
+>> + *     restriction, including without limitation the rights to use,
+>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>> + *     sell copies of the Software, and to permit persons to whom the
+>> + *     Software is furnished to do so, subject to the following
+>> + *     conditions:
+>> + *
+>> + *     The above copyright notice and this permission notice shall be
+>> + *     included in all copies or substantial portions of the Software.
+>> + *
+>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "rk1108.dtsi"
+>> +
+>> +/ {
+>> +	model = "Rockchip RK1108 Evaluation board";
+>> +	compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
+>> +
+>> +	memory at 60000000 {
+>> +		device_type = "memory";
+>> +		reg = <0x60000000 0x08000000>;
+>> +	};
+>> +
+>> +	chosen {
+>> +		stdout-path = "serial2:1500000n8";
+>> +	};
+>> +};
+>> +
+>> +&uart0 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&uart1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&uart2 {
+>> +	status = "okay";
+>> +};
 >
-> It would be great if the different clk APIs were listed, with the
-> order of how locks are taken BTW. And really overall just more
-> information about how the locking scheme works. I had to read
-> this patch series quite a few times to come to (hopefully the
-> right) conclusions.
-
-Right, such change requires much more documentation and especially
-that it took significant amount of time to figure out all(?)
-possible use cases and locking schemes.
-
-> So I'm not very fond of this design because the locking scheme is
-> pretty much out of the hands of the framework and can be easily
-> broken.
-
-Well, switching from a single global lock to more granular locking
-is always a good approach. Please note that the global lock sooner
-or later became a serious bottleneck if one wants to make somehow
-more aggressive power management and clock gating.
-
->   I'm biased of course, because I'd prefer we go with my
-> wwmutex design of per-clk locks[1]. Taking locks in any order
-> works fine there, and we resolve quite a few long standing
-> locking problems that we have while improving scalability. The
-> problem there is that we don't get the recursive mutex design
-> (maybe that's a benefit!).
-
-Do you have any plan to continue working on your approach? per-clk
-wwmutex looks like an overkill on the first glance, but that's probably
-the only working solution if you want to get rid of recursive locks.
-I'm still not really convinced that we really need wwmutex here,
-especially if it is possible to guarantee the same order of locking
-operations inside the clock core. This requires a bit of cooperation
-from clock providers (with proper documentation and a list of
-DO/DON'T it shouldn't be that hard).
-
-> Once a clk_op reenters the framework
-> with consumer APIs and tries to grab the same lock we deadlock.
-> This is why I've been slowly splitting consumers from providers
-> so we can easily identify these cases. If we had something like
-> coordinated clk rate switching, we could get rid of clk_ops
-> reentering the framework and avoid this problem (and we really do
-> need to do that).
-
-I'm not sure that this makes really sense split consumers and
-providers. You will get recursive calls to clk core anyway with
-consumers calls if you are implementing i2c clock, for which an i2c
-bus driver does it's own clock gating (i2c controller uses
-consumer clk api).
-
-
-> The one thing I do like about this patch series though is the
-> gradual movement of providers to the new locking scheme. Maybe if
-> we combined that idea with per-clk wwmutex locks we could have
-> the best of both worlds and fix reentrancy later when we need it?
-> There's wwmutex_trylock() that we could use. Perhaps always pass
-> a NULL context if some clk flag isn't set (CLK_USE_PER_CLK_LOCK).
-> Plus we could assign the same wwmutex all over the place when
-> that flag isn't set and allocate a unique wwmutex at clk_register
-> time otherwise. I haven't thought about it deeply, so there may
-> be some glaring problem that I'm missing like when we have half
-> the clks in a tree with the flag set or something. This is where
-> driving home from the office for 45 minutes helps.
 >
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251039.html
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
