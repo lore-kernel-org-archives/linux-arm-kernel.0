@@ -1,81 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 4 Nov 2016 10:02:23 +0100
-Subject: [PATCH v2] ARM: DTS: r8a7794: alt: Fix PFC names for DU
-In-Reply-To: <1478201686-25488-1-git-send-email-jacopo@jmondi.org>
-References: <1478180574-15464-1-git-send-email-jacopo@jmondi.org>
- <1478201686-25488-1-git-send-email-jacopo@jmondi.org>
-Message-ID: <20161104090223.GA4801@verge.net.au>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 4 Nov 2016 10:13:42 +0100
+Subject: [RFC PATCH 1/3] ARM64: meson: Add Amlogic Meson GX PM Suspend
+In-Reply-To: <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
+References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
+ <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
+ <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
+Message-ID: <853a192a-520c-d939-88c3-6684e6e5e902@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/03/2016 10:53 PM, Sudeep Holla wrote:
+> 
+> Short response to this patch: NAK
+> 
+> To be constructive, since this system lacks PSCI system suspend, it just
+> can't support. Alternatively, this can be normal cpuidle state and you
+> can use suspend to idle to achieve the same and you need not hack/work
+> around using platform specific driver.
+> 
+> --
+> Regards,
+> Sudeep
+> 
 
-On Thu, Nov 03, 2016 at 08:34:46PM +0100, Jacopo Mondi wrote:
-> Update the PFC pin groups and function names of DU interface for
-> r8a7794 ALT board.
-> 
-> The currently specified pin groups and function names prevented PFC and
-> DU interfaces from being correctly configured:
-> 
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> rcar-du: probe of feb00000.display failed with error -22
-> 
-> Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
-> ---
-> 
-> v1->v2:
->     - s/PCF/PFC/ in commit message according to Sergei Shtylyov's comment
-> 
-> Patch applied against Simon Horman's renesas/master branch.
-> The PCF pin groups and function renaming was introduced by commit 56ed4bb9 and
-> DTS for ALT board has never been update accordingly.
-> Tested displaying frames on VGA interface: the rcar-du driver loads correctly.
+Hi Mark, Sudeep,
 
-Thanks for noticing this.
+Thanks for your replies.
+First of all, I never intended to have this patchset Acked, I certainly know this is a bad hack !
 
-There is no need to repost to update the subject, but for reference I would
-prefer the prefix to be "ARM: dts: alt:". Assuming there are no other
-changes I can fix that up when queuing up this change.
+But, in the current Linux PSCI implementation, there is no way to handle System Suspend when the
+SoC FW implements PSCI 0.2, except idle-to-suspend which is quite different since the FW does not handle the wakeup.
 
-I am wondering if this should be queued up as a fix for v4.9 and in turn
-v4.8-stable. Or if it should just be queued up for v4.10.
+Don't worry, I'll prefer Amlogic to conform to PSCI 1.0, but like the SCPI, the GXBB was implemented
+using an early version of these FW protocols... and the SoC is here and should be supported somehow.
 
-In the case of the former I'd advocate adding the following tag
-(again no need to repost just to update this):
+I have a simple question : Could it be possible to declare an idle-state to be used exclusively by suspend-to-mem ?
+For example while parsing the idle-states, if we encounter a particular property, the we save the state, don't
+add it to the cpuidle states and register a platform_suspend_ops using this state.
 
-Fixes: 56ed4bb984ac ("pinctrl: sh-pfc: r8a7794: Add DU pin groups")
+Would it be accepted to be able to select a declared DT idle-state and reserve it to suspend-to-mem state ?
 
->  arch/arm/boot/dts/r8a7794-alt.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-> index 8d1b35a..9d65fb3 100644
-> --- a/arch/arm/boot/dts/r8a7794-alt.dts
-> +++ b/arch/arm/boot/dts/r8a7794-alt.dts
-> @@ -165,8 +165,8 @@
->  	pinctrl-names = "default";
->  
->  	du_pins: du {
-> -		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_dotclkout0";
-> -		function = "du";
-> +		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
-> +		function = "du1";
->  	};
->  
->  	scif2_pins: scif2 {
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+In the Amlogic case, their CPU_SUSPEND is partially conform, but since the power_state parameter was left as
+implementation defined, they added a deeper cluster sleep state.
+But potentially, we could need to handle system suspend on PSCI0.2 systems using a particular idle-state ?
+
+Yes, Sudeep mentioned suspend-to-idle, but in our tests the kernel enters each idle-state at boot time and when
+we declare this deep sleep idle state, it makes the whole system enter this system suspend state.
+
+Neil
