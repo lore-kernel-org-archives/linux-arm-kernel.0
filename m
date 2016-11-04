@@ -1,114 +1,402 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 3 Nov 2016 22:02:05 -0600
-Subject: [RFC 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 (Alt II)
-In-Reply-To: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <20161103220205.37715b49@t450s.home>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Fri, 4 Nov 2016 12:42:57 +0800
+Subject: [PATCH v2 2/3] irqchip: mtk-cirq: Add mediatek mtk-cirq implement
+In-Reply-To: <86twbrj586.fsf@arm.com>
+References: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+ <1478001122-8664-3-git-send-email-youlin.pei@mediatek.com>
+ <86twbrj586.fsf@arm.com>
+Message-ID: <1478234577.7975.29.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  3 Nov 2016 21:39:30 +0000
-Eric Auger <eric.auger@redhat.com> wrote:
+On Tue, 2016-11-01 at 20:49 +0000, Marc Zyngier wrote:
+> On Tue, Nov 01 2016 at 11:52:01 AM, Youlin Pei <youlin.pei@mediatek.com> wrote:
+> > In Mediatek SOCs, the CIRQ is a low power interrupt controller
+> > designed to works outside MCUSYS which comprises with Cortex-Ax
+> > cores,CCI and GIC.
+> >
+> > The CIRQ controller is integrated in between MCUSYS( include
+> > Cortex-Ax, CCI and GIC ) and interrupt sources as the second
+> > level interrupt controller. The external interrupts which outside
+> > MCUSYS will feed through CIRQ then bypass to GIC. CIRQ can monitors
+> > all edge trigger interupts. When an edge interrupt is triggered,
+> > CIRQ can record the status and generate a pulse signal to GIC when
+> > flush command executed.
+> >
+> > When system enters sleep mode, MCUSYS will be turned off to improve
+> > power consumption, also GIC is power down. The edge trigger interrupts
+> > will be lost in this scenario without CIRQ.
+> >
+> > This commit provides the CIRQ irqchip implement.
+> >
+> > Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+> > ---
+> >  drivers/irqchip/Makefile       |    2 +-
+> >  drivers/irqchip/irq-mtk-cirq.c |  262 ++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 263 insertions(+), 1 deletion(-)
+> >  create mode 100644 drivers/irqchip/irq-mtk-cirq.c
+> >
+> > diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> > index e4dbfc8..8f33580 100644
+> > --- a/drivers/irqchip/Makefile
+> > +++ b/drivers/irqchip/Makefile
+> > @@ -60,7 +60,7 @@ obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
+> >  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
+> >  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
+> >  obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
+> > -obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
+> > +obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o irq-mtk-cirq.o
+> >  obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
+> >  obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
+> >  obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
+> > diff --git a/drivers/irqchip/irq-mtk-cirq.c b/drivers/irqchip/irq-mtk-cirq.c
+> > new file mode 100644
+> > index 0000000..fc43ef3
+> > --- /dev/null
+> > +++ b/drivers/irqchip/irq-mtk-cirq.c
+> > @@ -0,0 +1,262 @@
+> > +/*
+> > + * Copyright (c) 2016 MediaTek Inc.
+> > + * Author: Youlin.Pei <youlin.pei@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/irq.h>
+> > +#include <linux/irqchip.h>
+> > +#include <linux/irqdomain.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/io.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/syscore_ops.h>
+> > +
+> > +#define CIRQ_ACK	0x40
+> > +#define CIRQ_MASK_SET	0xc0
+> > +#define CIRQ_MASK_CLR	0x100
+> > +#define CIRQ_SENS_SET	0x180
+> > +#define CIRQ_SENS_CLR	0x1c0
+> > +#define CIRQ_POL_SET	0x240
+> > +#define CIRQ_POL_CLR	0x280
+> > +#define CIRQ_CONTROL	0x300
+> > +
+> > +#define CIRQ_EN	0x1
+> > +#define CIRQ_EDGE	0x2
+> > +#define CIRQ_FLUSH	0x4
+> > +
+> > +#define CIRQ_IRQ_NUM    0x200
+> > +
+> > +struct mtk_cirq_chip_data {
+> > +	void __iomem *base;
+> > +	unsigned int ext_irq_start;
+> > +};
+> > +
+> > +static struct mtk_cirq_chip_data *cirq_data;
+> 
+> Are you guaranteed that you'll only ever have a single CIRQ in any
+> system?
 
-> Following Will & Robin's suggestions, this series attempts to propose
-> an alternative to [1] where the host would arbitrarily decide the
-> location of the IOVA MSI window and would be able to report to the
-> userspace the list of reserved IOVA regions that cannot be used
-> along with VFIO_IOMMU_MAP_DMA. This would allow the userspace to react
-> in case of conflict.
-> 
-> Userspace can retrieve all the reserved regions through the VFIO_IOMMU_GET_INFO
-> IOCTL by querying the new RESV_IOVA_RANGE chained capability. Each reserved
-> IOVA range is put in a separate capability.
+In Mediatek's SOC, only hace a single CIRQ.
 
-Doesn't it make more sense to describe the non-holes (ie. what I
-can use for DMA) rather the holes (what I can't use for DMA)?  For
-example on VT-d, the IOMMU not only has the block of MSI addresses
-handled through interrupt remapping, but it also has a maximum address
-width.  Rather than describing the reserved space we could describe the
-usable DMA ranges above and below that reserved block.
+> 
+> > +
+> > +static void mtk_cirq_write_mask(struct irq_data *data, unsigned int offset)
+> > +{
+> > +	struct mtk_cirq_chip_data *chip_data = data->chip_data;
+> > +	unsigned int cirq_num = data->hwirq;
+> > +	u32 mask = 1 << (cirq_num % 32);
+> > +
+> > +	writel(mask, chip_data->base + offset + (cirq_num / 32) * 4);
+> 
+> Why can't you use the relaxed accessors?
 
-Anyway, there's also a pretty harsh problem that I came up with in
-talking to Will.  If the platform describes a fixed IOVA range as
-reserved, that's great for the use case when a VM is instantiated with
-a device attached, but it seems like it nearly excludes the case of
-hotplugging a device.  We can't dynamically decide that a set of RAM
-pages in the VM cannot be used as a DMA target.  Does the user need to
-create the VM with a predefined hole that lines up with the reserved
-regions for this platform?  How do they know the reserved regions for
-this platform?  How would we handle migration where an assigned device
-hot-add might not occur until after we've migrated to a slightly
-different platform from the one we started on, that might have
-different reserved memory requirements?
+It seems that i use wrong function, i will change the writel to
+writel_relaxed in next version.
 
-We can always have QEMU reject hot-adding the device if the reserved
-region overlaps existing guest RAM, but I don't even really see how we
-advise users to give them a reasonable chance of avoiding that
-possibility.  Apparently there are also ARM platforms where MSI pages
-cannot be remapped to support the previous programmable user/VM
-address, is it even worthwhile to support those platforms?  Does that
-decision influence whether user programmable MSI reserved regions are
-really a second class citizen to fixed reserved regions?  I expect
-we'll be talking about this tomorrow morning, but I certainly haven't
-come up with any viable solutions to this.  Thanks,
+> 
+> > +}
+> > +
+> > +static void mtk_cirq_mask(struct irq_data *data)
+> > +{
+> > +	mtk_cirq_write_mask(data, CIRQ_MASK_SET);
+> > +	irq_chip_mask_parent(data);
+> > +}
+> > +
+> > +static void mtk_cirq_unmask(struct irq_data *data)
+> > +{
+> > +	mtk_cirq_write_mask(data, CIRQ_MASK_CLR);
+> > +	irq_chip_unmask_parent(data);
+> > +}
+> > +
+> > +static void mtk_cirq_eoi(struct irq_data *data)
+> > +{
+> > +	mtk_cirq_write_mask(data, CIRQ_ACK);
+> 
+> EOI and ACK have very different semantics. What is this write actually
+> doing? Also, you're now doing an additional MMIO write on each interrupt
+> EOI, doubling its cost. Do you really need to do actually signal the HW
+> that we've EOIed an interrupt? I would have hoped that you'd be able to
+> put it in "bypass" mode as long as you're not suspending...
+> 
 
-Alex
+When external interrupt happened, CIRQ status register record the status
+even CIRQ is not enabled. when execute the flush command, CIRQ will
+resend the signals according to the status. So if don't clear the
+status, CIRQ will resend the wrong signals. the ACK write operation will
+clear the status.
 
-> At IOMMU level, the reserved regions are stored in an iommu_domain list
-> which is populated on each device attachment. An IOMMU add_reserved_regions
-> callback specializes the registration of the reserved regions.
+> > +	irq_chip_eoi_parent(data);
+> > +}
+> > +
+> > +static int mtk_cirq_set_type(struct irq_data *data, unsigned int type)
+> > +{
+> > +	int ret;
+> > +
+> > +	switch (type & IRQ_TYPE_SENSE_MASK) {
+> > +	case IRQ_TYPE_EDGE_FALLING:
+> > +		mtk_cirq_write_mask(data, CIRQ_POL_CLR);
+> > +		mtk_cirq_write_mask(data, CIRQ_SENS_CLR);
+> > +		break;
+> > +	case IRQ_TYPE_EDGE_RISING:
+> > +		mtk_cirq_write_mask(data, CIRQ_POL_SET);
+> > +		mtk_cirq_write_mask(data, CIRQ_SENS_CLR);
+> > +		break;
+> > +	case IRQ_TYPE_LEVEL_LOW:
+> > +		mtk_cirq_write_mask(data, CIRQ_POL_CLR);
+> > +		mtk_cirq_write_mask(data, CIRQ_SENS_SET);
+> > +		break;
+> > +	case IRQ_TYPE_LEVEL_HIGH:
+> > +		mtk_cirq_write_mask(data, CIRQ_POL_SET);
+> > +		mtk_cirq_write_mask(data, CIRQ_SENS_SET);
+> > +		break;
+> > +	default:
+> > +		break;
+> > +	}
+> > +
+> > +	data = data->parent_data;
+> > +	ret = data->chip->irq_set_type(data, type);
+> > +	return ret;
+> > +}
+> > +
+> > +static struct irq_chip mtk_cirq_chip = {
+> > +	.name			= "MT_CIRQ",
+> > +	.irq_mask		= mtk_cirq_mask,
+> > +	.irq_unmask		= mtk_cirq_unmask,
+> > +	.irq_eoi		= mtk_cirq_eoi,
+> > +	.irq_set_type		= mtk_cirq_set_type,
+> > +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
+> > +#ifdef CONFIG_SMP
+> > +	.irq_set_affinity	= irq_chip_set_affinity_parent,
+> > +#endif
+> > +};
+> > +
+> > +static int mtk_cirq_domain_translate(struct irq_domain *d,
+> > +				     struct irq_fwspec *fwspec,
+> > +				     unsigned long *hwirq,
+> > +				     unsigned int *type)
+> > +{
+> > +	if (is_of_node(fwspec->fwnode)) {
+> > +		if (fwspec->param_count != 3)
+> > +			return -EINVAL;
+> > +
+> > +		/* No PPI should point to this domain */
+> > +		if (fwspec->param[0] != 0)
+> > +			return -EINVAL;
+> > +
+> > +		/* cirq support irq number check */
+> > +		if (fwspec->param[1] < cirq_data->ext_irq_start)
+> > +			return -EINVAL;
+> > +
+> > +		*hwirq = fwspec->param[1] - cirq_data->ext_irq_start;
 > 
-> On x86, the [FEE0_0000h - FEF0_000h] MSI window is registered (NOT tested).
+> What if the result is > CIRQ_IRQ_NUM?
+
+will add CIRQ supported irq range in DT, and do range check here in next
+version.
+
 > 
-> On ARM, the PCI host bridge windows (ACS check to be added?) + the MSI IOVA
-> reserved regions are populated by the arm-smmu driver. Currently the MSI
-> IOVA region is arbitrarily located at 0x8000000 and 1MB sized.  An IOVA domain
-> is created in add_reserved_regions callback. Then MSIs are transparently
-> mapped using this IOVA domain.
+> > +		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+> > +		return 0;
+> > +	}
+> > +
+> > +	return -EINVAL;
+> > +}
+> > +
+> > +static int mtk_cirq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> > +				 unsigned int nr_irqs, void *arg)
+> > +{
+> > +	int i;
+> > +	irq_hw_number_t hwirq;
+> > +	struct irq_fwspec *fwspec = arg;
+> > +	struct irq_fwspec parent_fwspec = *fwspec;
+> > +
+> > +	if (fwspec->param_count != 3)
+> > +		return -EINVAL;
+> > +
+> > +	/* cirq doesn't support PPI */
+> > +	if (fwspec->param[0])
+> > +		return -EINVAL;
+> > +
+> > +	if (fwspec->param[1] < cirq_data->ext_irq_start)
+> > +		return -EINVAL;
+> > +
+> > +	hwirq = fwspec->param[1] - cirq_data->ext_irq_start;
 > 
-> This series currently does not address some features addressed in [1]:
-> - MSI IOVA size requirement computation
-> - IRQ safety assessment
+> All this is a pure copy of mtk_cirq_domain_translate(). Please use it.
+
+will fix in next version.
+
+> > +	for (i = 0; i < nr_irqs; i++)
+> > +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> > +					      &mtk_cirq_chip,
+> > +					      domain->host_data);
 > 
-> This RFC was just tested on ARM Overdrive with QEMU and is sent to help
-> potential discussions at LPC. Additionnal development + testing is needed.
+> This is a bit silly. This loop only exists for the benefit of MSI
+> support, which we're not dealing with here. So please stick a
 > 
-> 2 tentative fixes may be submitted separately:
-> - vfio: fix vfio_info_cap_add/shift
-> - iommu/iova: fix __alloc_and_insert_iova_range
+>          if (WARN_ON(nr_irqs != 1))
+>          	return -EINVAL;
 > 
-> Best Regards
+> and drop the loop.
+
+will fix in next version.
+
 > 
-> Eric
+> > +
+> > +	parent_fwspec.fwnode = domain->parent->fwnode;
+> > +	return irq_domain_alloc_irqs_parent(domain, virq, nr_irqs,
+> > +					    &parent_fwspec);
+> > +}
+> > +
+> > +static const struct irq_domain_ops cirq_domain_ops = {
+> > +	.translate	= mtk_cirq_domain_translate,
+> > +	.alloc		= mtk_cirq_domain_alloc,
+> > +	.free		= irq_domain_free_irqs_common,
+> > +};
+> > +
+> > +#ifdef CONFIG_PM_SLEEP
+> > +static int mtk_cirq_suspend(void)
+> > +{
+> > +	u32 value;
+> > +
+> > +	/* set edge_only mode, record edge-triggerd interrupts */
+> > +	/* enable cirq */
+> > +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
+> > +	value |= (CIRQ_EDGE | CIRQ_EN);
+> > +	writel(value, cirq_data->base + CIRQ_CONTROL);
 > 
-> [1] [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
-> https://lkml.org/lkml/2016/10/12/347
+> You're mixing relaxed and non-relaxed accessors. Why?
+
+will change writel to writel_relaxed in next version.
+
 > 
-> Git: complete series available at
-> https://github.com/eauger/linux/tree/v4.9-rc3-reserved-rfc
+> > +	return 0;
+> > +}
+> > +
+> > +static void mtk_cirq_resume(void)
+> > +{
+> > +	u32 value;
+> > +
+> > +	/* flush recored interrupts, will send signals to parent controller */
+> > +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
+> > +	writel(value | CIRQ_FLUSH, cirq_data->base + CIRQ_CONTROL);
 > 
+> Same remark.
+
+will change writel to writel_relaxed in next version.
+
 > 
-> Eric Auger (7):
->   vfio: fix vfio_info_cap_add/shift
->   iommu/iova: fix __alloc_and_insert_iova_range
->   iommu: Add a list of iommu_reserved_region in iommu_domain
->   vfio/type1: Introduce RESV_IOVA_RANGE capability
->   iommu: Handle the list of reserved regions
->   iommu/vt-d: Implement add_reserved_regions callback
->   iommu/arm-smmu: implement add_reserved_regions callback
+> > +
+> > +	/* disable cirq */
+> > +	value = readl_relaxed(cirq_data->base + CIRQ_CONTROL);
+> > +	value &= ~(CIRQ_EDGE | CIRQ_EN);
+> > +	writel(value, cirq_data->base + CIRQ_CONTROL);
 > 
-> Robin Murphy (1):
->   iommu/dma: Allow MSI-only cookies
+> So from this, I infer that CIRQ is not enabled when the kernel is
+> running (not suspended). It really makes me wonder why you need to do
+> anything in the EOI callback.
 > 
->  drivers/iommu/arm-smmu.c        | 63 +++++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/dma-iommu.c       | 39 +++++++++++++++++++++++++
->  drivers/iommu/intel-iommu.c     | 48 ++++++++++++++++++++++---------
->  drivers/iommu/iommu.c           | 25 ++++++++++++++++
->  drivers/iommu/iova.c            |  2 +-
->  drivers/vfio/vfio.c             |  5 ++--
->  drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++++++++-
->  include/linux/dma-iommu.h       |  9 ++++++
->  include/linux/iommu.h           | 23 +++++++++++++++
->  include/uapi/linux/vfio.h       | 16 ++++++++++-
->  10 files changed, 275 insertions(+), 18 deletions(-)
+> > +}
+> > +
+> > +static struct syscore_ops mtk_cirq_syscore_ops = {
+> > +	.suspend	= mtk_cirq_suspend,
+> > +	.resume		= mtk_cirq_resume,
+> > +};
+> > +
+> > +static void mtk_cirq_syscore_init(void)
+> > +{
+> > +	register_syscore_ops(&mtk_cirq_syscore_ops);
+> > +}
+> > +#else
+> > +static inline void mtk_cirq_syscore_init(void) {}
+> > +#endif
+> > +
+> > +static int __init mtk_cirq_of_init(struct device_node *node,
+> > +				   struct device_node *parent)
+> > +{
+> > +	struct irq_domain *domain, *domain_parent;
+> > +	int ret;
+> > +
+> > +	domain_parent = irq_find_host(parent);
+> > +	if (!domain_parent) {
+> > +		pr_err("mtk_cirq: interrupt-parent not found\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	cirq_data = kzalloc(sizeof(*cirq_data), GFP_KERNEL);
+> > +	if (!cirq_data)
+> > +		return -ENOMEM;
+> > +
+> > +	cirq_data->base = of_iomap(node, 0);
+> > +	if (!cirq_data->base) {
+> > +		pr_err("mtk_cirq: unable to map cirq register\n");
+> > +		ret = -ENXIO;
+> > +		goto out_free;
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(node, "mediatek,ext-irq-start",
+> > +				   &cirq_data->ext_irq_start);
+> > +	if (ret)
+> > +		goto out_unmap;
+> > +
+> > +	domain = irq_domain_add_hierarchy(domain_parent, 0, CIRQ_IRQ_NUM, node,
+> > +					  &cirq_domain_ops, cirq_data);
 > 
+> So you support at most 512 interrupts, and yet the GIC supports up to
+> 987 SPIs. What happens for interrupt lines that out of the CIRQ range?
+> Maybe having an explicit range in DT would be a good thing. That also
+> brings back the question of having a single CIRQ in the system...
+> 
+
+In next version, i will add an explicit CIRQ supported range in DT.
+Thanks a lot!
+
+> > +	if (!domain) {
+> > +		ret = -ENOMEM;
+> > +		goto out_unmap;
+> > +	}
+> > +
+> > +	mtk_cirq_syscore_init();
+> > +
+> > +	return 0;
+> > +
+> > +out_unmap:
+> > +	iounmap(cirq_data->base);
+> > +out_free:
+> > +	kfree(cirq_data);
+> > +	return ret;
+> > +}
+> > +
+> > +IRQCHIP_DECLARE(mtk_cirq, "mediatek,mtk-cirq", mtk_cirq_of_init);
+> 
+> Thanks,
+> 
+> 	M.
