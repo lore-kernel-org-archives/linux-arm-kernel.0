@@ -1,42 +1,33 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 04 Nov 2016 19:01:02 +0530
-Subject: [4/4] ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
-In-Reply-To: <1478230764-13748-5-git-send-email-pankaj.dubey@samsung.com>
-References: <1478230764-13748-5-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161104133241epcas4p4808a1670bfe21ad445e6d54eb61b79a7@epcas4p4.samsung.com>
-Message-ID: <581C8D96.4040507@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 4 Nov 2016 14:47:23 +0100
+Subject: [PATCH] ARM: gr8: evb: Enable SPDIF
+In-Reply-To: <CAGb2v67D4mxEP87acuTKgQe8Md1NZyvmQD6+XnL72xqtztFWLg@mail.gmail.com>
+References: <20161103124141.4529-1-maxime.ripard@free-electrons.com>
+ <CAGb2v67D4mxEP87acuTKgQe8Md1NZyvmQD6+XnL72xqtztFWLg@mail.gmail.com>
+Message-ID: <20161104134723.7xtpexdwsvsxmxoh@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Fri, Nov 04, 2016 at 06:41:05PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Nov 3, 2016 at 8:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The GR8-EVB has a SPDIF out connector. Enable it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-On 11/04/2016 09:09 AM, Pankaj Dubey wrote:
-> As no more user of soc_is_exynos{4,5} we can safely remove them.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
+Applied, thanks!
+Maxime
 
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-
-Also I have complied tested this series, looks good.
-
->   arch/arm/mach-exynos/common.h | 5 -----
->   1 file changed, 5 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 9424a8a..d19064b 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -105,11 +105,6 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
->   # define soc_is_exynos5800()	0
->   #endif
->
-> -#define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
-> -			  soc_is_exynos4412())
-> -#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
-> -			  soc_is_exynos5420() || soc_is_exynos5800())
-> -
->   extern u32 cp15_save_diag;
->   extern u32 cp15_save_power;
->
->
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161104/5ee4c3a3/attachment.sig>
