@@ -1,52 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:28 +0100
-Subject: [PATCH 29/29] ARM: dts: r8a7794: remove Z clock
-In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
-References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <68cc085a4daaa32f7138de1e918331c05165a484.1478252309.git.horms+renesas@verge.net.au>
+Date: Fri,  4 Nov 2016 10:44:38 +0100
+Subject: [PATCH 4/9] ARM: shmobile: document SK-RZG1M board
+In-Reply-To: <cover.1478251657.git.horms+renesas@verge.net.au>
+References: <cover.1478251657.git.horms+renesas@verge.net.au>
+Message-ID: <7c1959d6879f29c2b789c572e8f358d77b49d39b.1478251657.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-R8A7794 doesn't have Cortex-A15 CPUs, thus there's no Z clock...
+Document the SK-RZG1M device tree bindings, listing it as a supported board.
 
-Fixes: 0dce5454d5c2 ("ARM: shmobile: Initial r8a7794 SoC device tree")
+This allows to use checkpatch.pl to validate .dts files referring to the
+SK-RZG1M board.
+
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi            | 3 +--
- include/dt-bindings/clock/r8a7794-clock.h | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 44ce62938417..01816ac775a8 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1028,8 +1028,7 @@
- 			clocks = <&extal_clk &usb_extal_clk>;
- 			#clock-cells = <1>;
- 			clock-output-names = "main", "pll0", "pll1", "pll3",
--					     "lb", "qspi", "sdh", "sd0", "z",
--					     "rcan";
-+					     "lb", "qspi", "sdh", "sd0", "rcan";
- 			#power-domain-cells = <0>;
- 		};
- 		/* Variable factor clocks */
-diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
-index 9d02f5317c7c..88e64846cf37 100644
---- a/include/dt-bindings/clock/r8a7794-clock.h
-+++ b/include/dt-bindings/clock/r8a7794-clock.h
-@@ -20,8 +20,7 @@
- #define R8A7794_CLK_QSPI		5
- #define R8A7794_CLK_SDH			6
- #define R8A7794_CLK_SD0			7
--#define R8A7794_CLK_Z			8
--#define R8A7794_CLK_RCAN		9
-+#define R8A7794_CLK_RCAN		8
- 
- /* MSTP0 */
- #define R8A7794_CLK_MSIOF0		0
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 058be8180bc4..785d1f847acb 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -75,5 +75,7 @@ Boards:
+     compatible = "renesas,salvator-x", "renesas,r8a7796";
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
++  - SK-RZG1M (YR8A77430S000BE)
++    compatible = "renesas,sk-rzg1m", "renesas,r8a7743"
+   - Wheat
+     compatible = "renesas,wheat", "renesas,r8a7792"
 -- 
 2.7.0.rc3.207.g0ac5344
