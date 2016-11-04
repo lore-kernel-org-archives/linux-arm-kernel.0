@@ -1,106 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Nov 2016 14:03:21 -0600
-Subject: [RFC PATCH v2 4/8] arm64: compat: Add a 32-bit vDSO
-In-Reply-To: <22ae46f6-f881-63ec-388d-8a7f6cf9934d@arm.com>
-References: <20161027163058.12156-1-kevin.brodsky@arm.com>
- <20161027163058.12156-5-kevin.brodsky@arm.com>
- <20161028110926.0176e0ea@xhacker>
- <22ae46f6-f881-63ec-388d-8a7f6cf9934d@arm.com>
-Message-ID: <20161104200321.li3gzztg6p6xkwuh@localhost>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 4 Nov 2016 21:29:24 +0100
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
+ property query
+In-Reply-To: <20161104145855.GH21430@atomide.com>
+References: <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
+ <20161024201443.GB5989@amd>
+ <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
+ <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
+ <20161031213846.GA21014@amd>
+ <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
+ <20161102082206.GE21488@amd>
+ <CAKzfze8d_MZJzR1a6rbwVXCWhb30C5GqFamUt2Viw1CzvyaQxw@mail.gmail.com>
+ <20161104070955.GA3679@amd> <20161104145855.GH21430@atomide.com>
+Message-ID: <20161104202924.GA6841@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 11:20:07AM +0100, Kevin Brodsky wrote:
-> On 28/10/16 04:09, Jisheng Zhang wrote:
-> > On Thu, 27 Oct 2016 17:30:54 +0100 Kevin Brodsky wrote:
-> > > Provide the files necessary for building a compat (AArch32) vDSO in
-> > > kernel/vdso32.
-> > > 
-> > > This is mostly an adaptation of the arm vDSO. The most significant
-> > > change in vgettimeofday.c is the use of the arm64 vdso_data struct,
-> > > allowing the vDSO data page to be shared between the 32 and 64-bit
-> > > vDSOs.
-> > > 
-> > > In addition to the time functions, sigreturn trampolines are also
-> > > provided, aiming at replacing those in the vector page. To improve
-> > > debugging, CFI and unwinding directives are used, based on glibc's
-> > > implementation. Symbol offsets are made available to the kernel using
-> > > the same method as the 64-bit vDSO.
-> > > 
-> > > There is unfortunately an important caveat to all this: we cannot get
-> > > away with hand-coding 32-bit instructions like in kernel/kuser32.S,
-> > > this time we really need a 32-bit compiler. The compat vDSO Makefile
-> > > relies on CROSS_COMPILE_ARM32 to provide a 32-bit compiler,
-> > > appropriate logic will be added to the arm64 Makefile later on to
-> > > ensure that an attempt to build the compat vDSO is made only if this
-> > > variable has been set properly.
-> > > 
-> > > Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> > > ---
-> > >   arch/arm64/kernel/vdso32/Makefile        | 121 +++++++++++++
-> > >   arch/arm64/kernel/vdso32/sigreturn.S     |  86 +++++++++
-> > >   arch/arm64/kernel/vdso32/vdso.S          |  32 ++++
-> > >   arch/arm64/kernel/vdso32/vdso.lds.S      |  98 +++++++++++
-> > >   arch/arm64/kernel/vdso32/vgettimeofday.c | 294 +++++++++++++++++++++++++++++++
-> > >   5 files changed, 631 insertions(+)
-> > >   create mode 100644 arch/arm64/kernel/vdso32/Makefile
-> > >   create mode 100644 arch/arm64/kernel/vdso32/sigreturn.S
-> > >   create mode 100644 arch/arm64/kernel/vdso32/vdso.S
-> > >   create mode 100644 arch/arm64/kernel/vdso32/vdso.lds.S
-> > >   create mode 100644 arch/arm64/kernel/vdso32/vgettimeofday.c
-> > > 
-> > > diff --git a/arch/arm64/kernel/vdso32/Makefile b/arch/arm64/kernel/vdso32/Makefile
-> > > new file mode 100644
-> > > index 000000000000..38facc870f6e
-> > > --- /dev/null
-> > > +++ b/arch/arm64/kernel/vdso32/Makefile
-> > > @@ -0,0 +1,121 @@
-> > > +#
-> > > +# Building a vDSO image for AArch32.
-> > > +#
-> > > +# Author: Kevin Brodsky <kevin.brodsky@arm.com>
-> > > +# A mix between the arm64 and arm vDSO Makefiles.
-> > > +
-> > > +CC_ARM32 := $(CROSS_COMPILE_ARM32)gcc
-> > > +
-> > > +# Same as cc-ldoption, but using CC_ARM32 instead of CC
-> > > +cc32-ldoption = $(call try-run,\
-> > > +        $(CC_ARM32) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
-> > > +
-> > > +# Borrow vdsomunge.c from the arm vDSO
-> > > +munge := arch/arm/vdso/vdsomunge
-> > > +hostprogs-y := $(srctree)/$(munge)
-> > > +
-> > > +c-obj-vdso := vgettimeofday.o
-> > > +asm-obj-vdso := sigreturn.o
-> > > +
-> > > +# Build rules
-> > > +targets := $(c-obj-vdso) $(asm-obj-vdso) vdso.so vdso.so.dbg vdso.so.raw
-> > > +c-obj-vdso := $(addprefix $(obj)/, $(c-obj-vdso))
-> > > +asm-obj-vdso := $(addprefix $(obj)/, $(asm-obj-vdso))
-> > > +obj-vdso := $(c-obj-vdso) $(asm-obj-vdso)
-> > > +
-> > > +ccflags-y := -fPIC -fno-common -fno-builtin -fno-stack-protector
-> > > +ccflags-y += -DDISABLE_BRANCH_PROFILING
-> > > +
-> > > +# Force -O2 to avoid libgcc dependencies
-> > > +VDSO_CFLAGS := -march=armv8-a -O2
-> > For completeness, bringing 32bit compiler need to check whether the 32bit
-> > toolchain support some options. IIRC, armv8-a support isn't enabled until
-> > gcc 4.8, so old toolchains such gcc-4.7 will complain:
-> >   error: unrecognized argument in option ?-march=armv8-a?
+On Fri 2016-11-04 07:58:55, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [161104 00:10]:
+> > On Thu 2016-11-03 22:00:56, Matt Ranostay wrote:
+> > Do you actually have hardware with more than one bq27xxx?
 > 
-> That's a fair point. I guess -march=armv8-a is not strictly necessary and
-> the produced vDSO should be fine if arch/arm/vdso also compiles fine.
-> However we would still need to pass -march=armv7-a. I'm not sure what to do
-> between:
-> * Checking that the compiler supports -march=armv8-a when inspecting
-> CROSS_COMPILE_ARM32, and if it doesn't vdso32 will not be built.
-> * Checking whether -march=armv8-a is available here, and if it is not fall
-> back to -march=armv7-a.
+> I can at least see the twl4030 battery/charger features
+> being used together with some bq device to monitor the
+> battery state. Not sure if that counts as multiple
+> instances here though :)
 
-Does v8 vs v7 make any difference in the generated code? If not, we
-could just stick to armv7-a permanently.
+I have that, too, but that was not what i was asking.
 
+Matt wanted support for different polling intervals on different
+bq27xxx chips. I'd like to know know if he actually has more than one
+bq27xxx in his device...
+
+Best regards,
+									Pavel
 -- 
-Catalin
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161104/37ee45ee/attachment.sig>
