@@ -1,50 +1,69 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 4 Nov 2016 10:13:42 +0100
-Subject: [RFC PATCH 1/3] ARM64: meson: Add Amlogic Meson GX PM Suspend
-In-Reply-To: <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
-References: <1478183365-23708-1-git-send-email-narmstrong@baylibre.com>
- <1478183365-23708-2-git-send-email-narmstrong@baylibre.com>
- <20161103215347.GA23902@e106835-lin.cambridge.arm.com>
-Message-ID: <853a192a-520c-d939-88c3-6684e6e5e902@baylibre.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  4 Nov 2016 10:44:04 +0100
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.10
+Message-ID: <cover.1478251192.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2016 10:53 PM, Sudeep Holla wrote:
-> 
-> Short response to this patch: NAK
-> 
-> To be constructive, since this system lacks PSCI system suspend, it just
-> can't support. Alternatively, this can be normal cpuidle state and you
-> can use suspend to idle to achieve the same and you need not hack/work
-> around using platform specific driver.
-> 
-> --
-> Regards,
-> Sudeep
-> 
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Hi Mark, Sudeep,
+Please consider these Renesas ARM64 based SoC DT updates for v4.10.
 
-Thanks for your replies.
-First of all, I never intended to have this patchset Acked, I certainly know this is a bad hack !
 
-But, in the current Linux PSCI implementation, there is no way to handle System Suspend when the
-SoC FW implements PSCI 0.2, except idle-to-suspend which is quite different since the FW does not handle the wakeup.
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-Don't worry, I'll prefer Amlogic to conform to PSCI 1.0, but like the SCPI, the GXBB was implemented
-using an early version of these FW protocols... and the SoC is here and should be supported somehow.
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-I have a simple question : Could it be possible to declare an idle-state to be used exclusively by suspend-to-mem ?
-For example while parsing the idle-states, if we encounter a particular property, the we save the state, don't
-add it to the cpuidle states and register a platform_suspend_ops using this state.
+are available in the git repository at:
 
-Would it be accepted to be able to select a declared DT idle-state and reserve it to suspend-to-mem state ?
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.10
 
-In the Amlogic case, their CPU_SUSPEND is partially conform, but since the power_state parameter was left as
-implementation defined, they added a deeper cluster sleep state.
-But potentially, we could need to handle system suspend on PSCI0.2 systems using a particular idle-state ?
+for you to fetch changes up to 935085209343a0c507e3d9a3e01883b25c8f743e:
 
-Yes, Sudeep mentioned suspend-to-idle, but in our tests the kernel enters each idle-state at boot time and when
-we declare this deep sleep idle state, it makes the whole system enter this system suspend state.
+  arm64: renesas: r8a7796: add SYS-DMAC controller nodes (2016-11-04 10:18:07 +0100)
 
-Neil
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.10
+
+Enablement:
+* Enable On-board eMMC
+* Enable SDHI 0 & 3 with UHS
+* Add SYS-DMAC controller nodes to r8a7796 SoC
+* Populate EXTALR on r8a7796/salvator-x board; used by watchdog
+* Add DU LVDS output endpoint on r8a7795/salvator-x board
+* Add bias setting for USB1 pins on r8a7795/salvator-x board
+
+Clean-Up:
+* Remove FCP SoC-specific compatible strings
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      arm64: dts: r8a7796: salvator-x: Populate EXTALR
+
+Laurent Pinchart (3):
+      arm64: dts: r8a7795: salvator-x: Add DU LVDS output endpoint
+      dt-bindings: media: renesas-fcp: Remove SoC-specific compatible strings
+      arm64: dts: r8a7795: Remove FCP SoC-specific compatible strings
+
+Simon Horman (3):
+      arm64: dts: r8a7796: add SDHI nodes
+      arm64: dts: r8a7796: salvator-x: enable SDHI0 & 3
+      arm64: dts: r8a7796: salvator-x: enable UHS for SDHI 0 & 3
+
+Ulrich Hecht (1):
+      arm64: renesas: r8a7796: add SYS-DMAC controller nodes
+
+Wolfram Sang (3):
+      arm64: dts: r8a7795: salvator-x: enable UHS for SDHI 0 & 3
+      arm64: dts: r8a7795: salvator: enable on-board eMMC
+      arm64: dts: r8a7796: salvator: enable on board eMMC
+
+Yoshihiro Shimoda (1):
+      arm64: dts: r8a7795: salvator-x: add bias setting for usb1_pins
+
+ .../devicetree/bindings/media/renesas,fcp.txt      |   8 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  85 +++++++++++-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           |  24 ++--
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 148 +++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 139 +++++++++++++++++++
+ 5 files changed, 381 insertions(+), 23 deletions(-)
