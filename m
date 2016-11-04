@@ -1,104 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:02 +0100
-Subject: [PATCH 03/29] ARM: dts: koelsch: enable UHS for SDHI 0, 1 & 3
+Date: Fri,  4 Nov 2016 10:44:05 +0100
+Subject: [PATCH 06/29] ARM: dts: r8a7790: Correct SCIFB reg properties to
+ cover all registers
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <d3cec922fe2030235588aa6fe53d6470b4e7496f.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <f31fbe837b4213b7371d78e2b48786853faadd31.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Several SCIFB registers reside outside the reported register ranges.
+Fortunately this works (on Linux), due to the PAGE_SIZE granularity of
+ioremap().
+
+Extend the sizes from 64 to 0x100 bytes to fix this, like is done on
+SH/R-Mobile SoCs.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 33 ++++++++++++++++++++++++++++++---
- 1 file changed, 30 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index f8a7d090fd01..f17bfa000f73 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -360,16 +360,37 @@
- 	sdhi0_pins: sd0 {
- 		groups = "sdhi0_data4", "sdhi0_ctrl";
- 		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <1800>;
- 	};
- 
- 	sdhi1_pins: sd1 {
- 		groups = "sdhi1_data4", "sdhi1_ctrl";
- 		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
- 	};
- 
- 	sdhi2_pins: sd2 {
- 		groups = "sdhi2_data4", "sdhi2_ctrl";
- 		function = "sdhi2";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi2_pins_uhs: sd2_uhs {
-+		groups = "sdhi2_data4", "sdhi2_ctrl";
-+		function = "sdhi2";
-+		power-source = <1800>;
- 	};
- 
- 	qspi_pins: qspi {
-@@ -454,33 +475,39 @@
- 
- &sdhi0 {
- 	pinctrl-0 = <&sdhi0_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi0>;
- 	vqmmc-supply = <&vccq_sdhi0>;
- 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi1 {
- 	pinctrl-0 = <&sdhi1_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi1>;
- 	vqmmc-supply = <&vccq_sdhi1>;
- 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
- 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
- &sdhi2 {
- 	pinctrl-0 = <&sdhi2_pins>;
--	pinctrl-names = "default";
-+	pinctrl-1 = <&sdhi2_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
- 
- 	vmmc-supply = <&vcc_sdhi2>;
- 	vqmmc-supply = <&vccq_sdhi2>;
- 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
-+	sd-uhs-sdr50;
- 	status = "okay";
- };
- 
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 351fcc2f87df..a946474be9cf 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -711,7 +711,7 @@
+ 	scifb0: serial at e6c20000 {
+ 		compatible = "renesas,scifb-r8a7790",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6c20000 0 64>;
++		reg = <0 0xe6c20000 0 0x100>;
+ 		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB0>;
+ 		clock-names = "fck";
+@@ -725,7 +725,7 @@
+ 	scifb1: serial at e6c30000 {
+ 		compatible = "renesas,scifb-r8a7790",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6c30000 0 64>;
++		reg = <0 0xe6c30000 0 0x100>;
+ 		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB1>;
+ 		clock-names = "fck";
+@@ -739,7 +739,7 @@
+ 	scifb2: serial at e6ce0000 {
+ 		compatible = "renesas,scifb-r8a7790",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6ce0000 0 64>;
++		reg = <0 0xe6ce0000 0 0x100>;
+ 		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFB2>;
+ 		clock-names = "fck";
 -- 
 2.7.0.rc3.207.g0ac5344
