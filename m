@@ -1,54 +1,64 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 4 Nov 2016 22:43:04 +0100
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
- property query
-In-Reply-To: <CAKzfze_FrerJF6JOjVJ2XdyJgPm9OkEziX+oVOr7Aix3N31anw@mail.gmail.com>
-References: <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
- <CAJ_EiSRzmQHLP2PTfzsLF4uWgYgCiRGsSk=MHbtOC5rgXnnFpw@mail.gmail.com>
- <20161031213846.GA21014@amd>
- <CAKzfze8Bom1XYRfiix_qYFckMggUD0eJm3Fz=GhNi6H_PBFyXA@mail.gmail.com>
- <20161102082206.GE21488@amd>
- <CAKzfze8d_MZJzR1a6rbwVXCWhb30C5GqFamUt2Viw1CzvyaQxw@mail.gmail.com>
- <20161104070955.GA3679@amd> <20161104145855.GH21430@atomide.com>
- <20161104202924.GA6841@amd>
- <CAKzfze_FrerJF6JOjVJ2XdyJgPm9OkEziX+oVOr7Aix3N31anw@mail.gmail.com>
-Message-ID: <20161104214303.GA7938@amd>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 05 Nov 2016 00:49:55 +0300
+Subject: [PATCH v2 03/11] ARM: shmobile: r8a7745: basic SoC support
+In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
+Message-ID: <1611958.qRQu5pdJd3@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-11-04 13:39:19, Matt Ranostay wrote:
-> On Fri, Nov 4, 2016 at 1:29 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> > On Fri 2016-11-04 07:58:55, Tony Lindgren wrote:
-> >> * Pavel Machek <pavel@ucw.cz> [161104 00:10]:
-> >> > On Thu 2016-11-03 22:00:56, Matt Ranostay wrote:
-> >> > Do you actually have hardware with more than one bq27xxx?
-> >>
-> >> I can at least see the twl4030 battery/charger features
-> >> being used together with some bq device to monitor the
-> >> battery state. Not sure if that counts as multiple
-> >> instances here though :)
-> >
-> > I have that, too, but that was not what i was asking.
-> >
-> > Matt wanted support for different polling intervals on different
-> > bq27xxx chips. I'd like to know know if he actually has more than one
-> > bq27xxx in his device...
-> >
-> 
-> Actually only one bq27xxx chip but in theory we could have more.
+Add minimal support for the RZ/G1E (R8A7745) SoC.
 
-Hmm. As we'd have to keep both old and new interfaces to change the
-polling interfaces. Lets not due that unless we really need to, ok?
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-		    	     	      	     	       	    	Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161104/f89a025b/attachment.sig>
+---
+Changes in version 2:
+- added Geert's tag;
+- refreshed the patch.
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
+ arch/arm/mach-shmobile/Kconfig                     |    4 ++++
+ arch/arm/mach-shmobile/setup-rcar-gen2.c           |    1 +
+ 3 files changed, 7 insertions(+)
+
+Index: renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+===================================================================
+--- renesas.orig/Documentation/devicetree/bindings/arm/shmobile.txt
++++ renesas/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -15,6 +15,8 @@ SoCs:
+     compatible = "renesas,r8a7740"
+   - RZ/G1M (R8A77430)
+     compatible = "renesas,r8a7743"
++  - RZ/G1E (R8A77450)
++    compatible = "renesas,r8a7745"
+   - R-Car M1A (R8A77781)
+     compatible = "renesas,r8a7778"
+   - R-Car H1 (R8A77790)
+Index: renesas/arch/arm/mach-shmobile/Kconfig
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/Kconfig
++++ renesas/arch/arm/mach-shmobile/Kconfig
+@@ -73,6 +73,10 @@ config ARCH_R8A7743
+ 	select ARCH_RCAR_GEN2
+ 	select ARM_ERRATA_798181 if SMP
+ 
++config ARCH_R8A7745
++	bool "RZ/G1E (R8A77450)"
++	select ARCH_RCAR_GEN2
++
+ config ARCH_R8A7778
+ 	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_RCAR_GEN1
+Index: renesas/arch/arm/mach-shmobile/setup-rcar-gen2.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-rcar-gen2.c
++++ renesas/arch/arm/mach-shmobile/setup-rcar-gen2.c
+@@ -227,6 +227,7 @@ MACHINE_END
+ 
+ static const char * const rz_g1_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7743",
++	"renesas,r8a7745",
+ 	NULL,
+ };
+ 
