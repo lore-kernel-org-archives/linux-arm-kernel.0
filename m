@@ -1,55 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 05 Nov 2016 01:05:28 +0300
-Subject: [PATCH v2 11/11] ARM: dts: sk-rzg1e: add Ether support
-In-Reply-To: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-References: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
-Message-ID: <1633148.RWrrAXQYR6@wasted.cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 4 Nov 2016 23:07:06 +0100
+Subject: [PATCH] pinctrl: meson: Add GXL pinctrl definitions
+In-Reply-To: <1477931531-27120-1-git-send-email-narmstrong@baylibre.com>
+References: <1477931531-27120-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkday59O7BoEyPOF2ZmUkK=DX=rCMzG7kHZDWH=VOVcy8qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the SK-RZG1E board dependent part of the Ether device node.
-Enable DHCP and NFS root  for the kernel booting.
+On Mon, Oct 31, 2016 at 5:32 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-Based on the original (and large) patch by Dmitry Shifrin
-<dmitry.shifrin@cogentembedded.com>.
+> Add support for the Amlogic Meson GXL SoC, this is a partially complete
+> definition only based on the Amlogic Vendor tree.
+>
+> This definition differs a lot from the GXBB and needs a separate entry.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Patch applied with Kevin's ACK.
 
----
-Changes in version 2:
-- added Geert's tag.
-
- arch/arm/boot/dts/r8a7745-sk-rzg1e.dts |   15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-+++ renesas/arch/arm/boot/dts/r8a7745-sk-rzg1e.dts
-@@ -20,7 +20,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -37,3 +37,16 @@
- &scif2 {
- 	status = "okay";
- };
-+
-+&ether {
-+	phy-handle = <&phy1>;
-+	renesas,ether-link-active-low;
-+	status = "okay";
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+		interrupt-parent = <&irqc>;
-+		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-+		micrel,led-mode = <1>;
-+	};
-+};
+Yours,
+Linus Walleij
