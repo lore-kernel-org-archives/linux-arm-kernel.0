@@ -1,49 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:26 +0100
-Subject: [PATCH 27/29] ARM: dts: sh73a0: Remove skeleton.dtsi inclusion
+Date: Fri,  4 Nov 2016 10:44:28 +0100
+Subject: [PATCH 29/29] ARM: dts: r8a7794: remove Z clock
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <cbdcf396fc862882516d8feeb9af4d8b33a4c7dd.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <68cc085a4daaa32f7138de1e918331c05165a484.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
-as deprecated"), including skeleton.dtsi is deprecated.
+R8A7794 doesn't have Cortex-A15 CPUs, thus there's no Z clock...
 
-This fixes the following warning with W=1:
-
-    Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Fixes: 0dce5454d5c2 ("ARM: shmobile: Initial r8a7794 SoC device tree")
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi            | 3 +--
+ include/dt-bindings/clock/r8a7794-clock.h | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index 032fe2f14b16..e1267590b575 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -8,8 +8,6 @@
-  * kind, whether express or implied.
-  */
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 44ce62938417..01816ac775a8 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -1028,8 +1028,7 @@
+ 			clocks = <&extal_clk &usb_extal_clk>;
+ 			#clock-cells = <1>;
+ 			clock-output-names = "main", "pll0", "pll1", "pll3",
+-					     "lb", "qspi", "sdh", "sd0", "z",
+-					     "rcan";
++					     "lb", "qspi", "sdh", "sd0", "rcan";
+ 			#power-domain-cells = <0>;
+ 		};
+ 		/* Variable factor clocks */
+diff --git a/include/dt-bindings/clock/r8a7794-clock.h b/include/dt-bindings/clock/r8a7794-clock.h
+index 9d02f5317c7c..88e64846cf37 100644
+--- a/include/dt-bindings/clock/r8a7794-clock.h
++++ b/include/dt-bindings/clock/r8a7794-clock.h
+@@ -20,8 +20,7 @@
+ #define R8A7794_CLK_QSPI		5
+ #define R8A7794_CLK_SDH			6
+ #define R8A7794_CLK_SD0			7
+-#define R8A7794_CLK_Z			8
+-#define R8A7794_CLK_RCAN		9
++#define R8A7794_CLK_RCAN		8
  
--/include/ "skeleton.dtsi"
--
- #include <dt-bindings/clock/sh73a0-clock.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-@@ -17,6 +15,8 @@
- / {
- 	compatible = "renesas,sh73a0";
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	cpus {
- 		#address-cells = <1>;
+ /* MSTP0 */
+ #define R8A7794_CLK_MSIOF0		0
 -- 
 2.7.0.rc3.207.g0ac5344
