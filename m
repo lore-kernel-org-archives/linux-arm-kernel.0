@@ -1,90 +1,44 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Fri, 4 Nov 2016 11:16:52 +0100
-Subject: [PATCH 1/2] ARM: dts: stm32f429: add LSI and LSE clocks
-In-Reply-To: <3974b516-d698-ab7f-efba-d768eccbd56f@st.com>
-References: <1478249577-25999-1-git-send-email-gabriel.fernandez@st.com>
- <1478249577-25999-2-git-send-email-gabriel.fernandez@st.com>
- <3974b516-d698-ab7f-efba-d768eccbd56f@st.com>
-Message-ID: <57d580c4-5a3c-4ba3-54f1-a26297796394@st.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 04 Nov 2016 19:21:30 +0900
+Subject: [PATCH 10/13] ARM: dts: exynos: replace to "max-frequecy" instead
+ of "clock-freq-min-max"
+In-Reply-To: <20161103184112.GB11071@kozik-lap>
+References: <20161103062135.10697-1-jh80.chung@samsung.com>
+ <20161103062135.10697-11-jh80.chung@samsung.com>
+ <CGME20161103184120epcas1p3e51865aa2ea7b6073bcb72f5cba5772f@epcas1p3.samsung.com>
+ <20161103184112.GB11071@kozik-lap>
+Message-ID: <ecf4fac2-0ab7-d4c4-69e3-d498ee5b601c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-
-On 11/04/2016 11:15 AM, Alexandre Torgue wrote:
-> Gabriel,
->
-> On 11/04/2016 09:52 AM, gabriel.fernandez at st.com wrote:
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 11/04/2016 03:41 AM, Krzysztof Kozlowski wrote:
+> On Thu, Nov 03, 2016 at 03:21:32PM +0900, Jaehoon Chung wrote:
+>> In drivers/mmc/core/host.c, there is "max-frequency" property.
+>> It should be same behavior. So Use the "max-frequency" instead of
+>> "clock-freq-min-max".
 >>
->> This patch adds lsi / lse oscillators. These clocks can be use by
->> RTC clocks.
->> The clock drivers needs to disable the power domain write protection 
->> using
->> syscon / regmap to enable these clocks.
->>
->
-> Is it the same than you sent in last series ? If yes I will take it 
-> directly as review has already been done.
->
-Yes
-
-BR
-
-Gabriel.
-
-> regards
-> Alex
->
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 >> ---
->>  arch/arm/boot/dts/stm32f429.dtsi | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/stm32f429.dtsi 
->> b/arch/arm/boot/dts/stm32f429.dtsi
->> index 336ee4f..2700449 100644
->> --- a/arch/arm/boot/dts/stm32f429.dtsi
->> +++ b/arch/arm/boot/dts/stm32f429.dtsi
->> @@ -56,6 +56,18 @@
->>              compatible = "fixed-clock";
->>              clock-frequency = <0>;
->>          };
->> +
->> +        clk-lse {
->> +            #clock-cells = <0>;
->> +            compatible = "fixed-clock";
->> +            clock-frequency = <32768>;
->> +        };
->> +
->> +        clk-lsi {
->> +            #clock-cells = <0>;
->> +            compatible = "fixed-clock";
->> +            clock-frequency = <32000>;
->> +        };
->>      };
->>
->>      soc {
->> @@ -185,6 +197,11 @@
->>              interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, 
->> <23>, <40>, <41>, <42>, <62>, <76>;
->>          };
->>
->> +        pwrcfg: power-config at 40007000 {
->> +            compatible = "syscon";
->> +            reg = <0x40007000 0x400>;
->> +        };
->> +
->>          pin-controller {
->>              #address-cells = <1>;
->>              #size-cells = <1>;
->> @@ -340,6 +357,7 @@
->>              compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
->>              reg = <0x40023800 0x400>;
->>              clocks = <&clk_hse>;
->> +            st,syscfg = <&pwrcfg>;
->>          };
->>
->>          dma1: dma-controller at 40026000 {
->>
+>>  arch/arm/boot/dts/exynos3250-artik5-eval.dts | 2 +-
+>>  arch/arm/boot/dts/exynos3250-artik5.dtsi     | 2 +-
+>>  arch/arm/boot/dts/exynos3250-monk.dts        | 2 +-
+>>  arch/arm/boot/dts/exynos3250-rinato.dts      | 2 +-
+>>  4 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> This looks totally independent to rest of patches so it can be applied
+> separately without any functional impact (except lack of minimum
+> frequency). Is that correct?
+
+You're right. I will split the patches. And will resend.
+Thanks!
+
+Best Regards,
+Jaehoon Chung
+
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
+> 
