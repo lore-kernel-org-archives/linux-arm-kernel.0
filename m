@@ -1,81 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 Nov 2016 14:19:53 +0000
-Subject: [PATCH v3] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
- caching of bypass entries
-In-Reply-To: <1478253323-9231-1-git-send-email-nipun.gupta@nxp.com>
-References: <1478253323-9231-1-git-send-email-nipun.gupta@nxp.com>
-Message-ID: <731bb5f6-da13-f8df-87a0-18e1d9851b9a@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 4 Nov 2016 15:31:55 +0100
+Subject: [GIT PULL] STM32 DT changes for v4.10 #1
+Message-ID: <3e65d3ae-6509-6057-64e1-dfc256e535b5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/16 09:55, Nipun Gupta wrote:
-> The SMTNMB_TLBEN in the Auxiliary Configuration Register (ACR) provides an
-> option to enable the updation of TLB in case of bypass transactions due to
-> no stream match in the stream match table. This reduces the latencies of
-> the subsequent transactions with the same stream-id which bypasses the SMMU.
-> This provides a significant performance benefit for certain networking
-> workloads.
-> 
-> With this change substantial performance improvement of ~9% is observed with
-> DPDK l3fwd application (http://dpdk.org/doc/guides/sample_app_ug/l3_forward.html)
-> on NXP's LS2088a platform.
+Hi Olof, Arnd and Kevin,
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Please consider this first round of STM32 DT updates for v4.10:
 
-> Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
-> ---
-> Changes for v2:
->     - Incorporated Robin's comments on v1 related to
-> 	Setting SMTNMB_TLBEN in ACR only for MMU-500 as ACR is implementation dependent
-> 	Code comments and Naming convention
-> Changes for v3:
->     - Added correct patch version
-> 
->  drivers/iommu/arm-smmu.c | 25 ++++++++++++++++---------
->  1 file changed, 16 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index ce2a9d4..05901be 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -247,6 +247,7 @@ enum arm_smmu_s2cr_privcfg {
->  #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
->  
->  #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
-> +#define ARM_MMU500_ACR_SMTNMB_TLBEN	(1 << 8)
->  
->  #define CB_PAR_F			(1 << 0)
->  
-> @@ -1569,16 +1570,22 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  	for (i = 0; i < smmu->num_mapping_groups; ++i)
->  		arm_smmu_write_sme(smmu, i);
->  
-> -	/*
-> -	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-> -	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
-> -	 * bit is only present in MMU-500r2 onwards.
-> -	 */
-> -	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
-> -	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
-> -	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
-> +	if (smmu->model == ARM_MMU500) {
-> +		/*
-> +		 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
-> +		 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
-> +		 * bit is only present in MMU-500r2 onwards.
-> +		 */
-> +		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
-> +		major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
->  		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
-> -		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-> +		if (major >= 2)
-> +			reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
-> +		/*
-> +		 * Allow unmatched Stream IDs to allocate bypass
-> +		 * TLB entries for reduced latency.
-> +		 */
-> +		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN;
->  		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
->  	}
->  
-> 
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-dt-for-v4.10-1
+
+for you to fetch changes up to f6dbbff4f0af1a5c0d6eaf414572b5eff7a73a8b:
+
+   ARM: dts: stm32f429: add LSI and LSE clocks (2016-11-04 15:08:08 +0100)
+
+----------------------------------------------------------------
+STM32 DT updates for v4.10, round 1.
+
+Highlights:
+----------
+  - Add LSI and LSE clocks support for STM32F429
+  - Add GPIO IRQ support for STM32F429
+  - Declare push button as GPIO keys on STM32F429 boards
+  - Add DMA supports on USART1 & USART3 on STM32F429
+  - Add Ethernet fixes
+
+----------------------------------------------------------------
+Alexandre TORGUE (5):
+       ARM: DT: STM32: add dma for usart3 on F429
+       ARM: DT: stm32: move dma translation to board files
+       ARM: dts: stm32f429: Align Ethernet node with new bindings properties
+       ARM: dts: stm32f429: Fix Ethernet node on Eval Board
+       ARM: dts: stm32f429: remove Ethernet wake on Lan support
+
+Gabriel Fernandez (1):
+       ARM: dts: stm32f429: add LSI and LSE clocks
+
+Gerald Baeza (1):
+       ARM: DT: STM32: add dma for usart1 on F429
+
+Maxime Coquelin (2):
+       ARM: dts: Add GPIO irq support to STM32F429
+       ARM: dts: Declare push button as GPIO key on stm32f429 boards
+
+  arch/arm/boot/dts/stm32429i-eval.dts  | 29 ++++++++++++++++++++++---
+  arch/arm/boot/dts/stm32f429-disco.dts | 13 ++++++++++++
+  arch/arm/boot/dts/stm32f429.dtsi      | 40 
++++++++++++++++++++++++++++--------
+  arch/arm/boot/dts/stm32f469-disco.dts |  4 ++++
+  4 files changed, 74 insertions(+), 12 deletions(-)
