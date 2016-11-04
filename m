@@ -1,66 +1,35 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Fri,  4 Nov 2016 01:11:02 -0400
-Subject: [PATCH v6 7/7] arm64: dts: NS2: add AMAC ethernet support
-In-Reply-To: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
-References: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1478236262-3351-8-git-send-email-jon.mason@broadcom.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 4 Nov 2016 11:04:17 +0530
+Subject: [PATCH 2/3] phy: da8xx-usb: rename the ohci device to ohci-da8xx
+In-Reply-To: <fd6b848d-9740-70ef-6850-7f6a64e66bfb@ti.com>
+References: <20161102124435.31777-1-ahaslam@baylibre.com>
+ <20161102124435.31777-3-ahaslam@baylibre.com>
+ <fd6b848d-9740-70ef-6850-7f6a64e66bfb@ti.com>
+Message-ID: <2c3b66c5-b148-252e-36a0-e067bb60191e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the AMAC ethernet to the Broadcom Northstar2 SoC device
-tree
+Hi Kishon,
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2-svk.dts |  5 +++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 12 ++++++++++++
- 2 files changed, 17 insertions(+)
+On Thursday 03 November 2016 10:20 PM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Wednesday 02 November 2016 06:14 PM, Axel Haslam wrote:
+>> There is only one ohci on the da8xx series of chips,
+>> so remove the ".0" when creating the phy. Also add
+>> the "-da8xx" postfix to be consistent across davinci
+>> usb drivers.
+>>
+>> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+> 
+> Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index b09f3bc..c4d5442 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -56,6 +56,10 @@
- 	};
- };
- 
-+&enet {
-+	status = "ok";
-+};
-+
- &pci_phy0 {
- 	status = "ok";
- };
-@@ -174,6 +178,7 @@
- &mdio_mux_iproc {
- 	mdio at 10 {
- 		gphy0: eth-phy at 10 {
-+			enet-phy-lane-swap;
- 			reg = <0x10>;
- 		};
- 	};
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index d95dc40..773ed59 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -191,6 +191,18 @@
- 
- 		#include "ns2-clock.dtsi"
- 
-+		enet: ethernet at 61000000 {
-+			compatible = "brcm,ns2-amac";
-+			reg = <0x61000000 0x1000>,
-+			      <0x61090000 0x1000>,
-+			      <0x61030000 0x100>;
-+			reg-names = "amac_base", "idm_base", "nicpm_base";
-+			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
-+			phy-handle = <&gphy0>;
-+			phy-mode = "rgmii";
-+			status = "disabled";
-+		};
-+
- 		dma0: dma at 61360000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x61360000 0x1000>;
--- 
-2.7.4
+You will have to carry this patch from your tree. I thought I can carry
+the entire series, but the USB patch depends on other patches that Greg
+has already queued. So I think its best if the individual patches go
+through their respective trees.
+
+Note that there is a v2 already submitted.
+
+Thanks,
+Sekhar
