@@ -1,31 +1,52 @@
-From: scott@buserror.net (Scott Wood)
-Date: Fri, 4 Nov 2016 13:20:50 -0500
-Subject: [PATCH v3 2/6] arm64: arch_timer: Introduce a generic erratum
- handing mechanism for fsl-a008585
-In-Reply-To: <1478264794-14652-2-git-send-email-dingtianhong@huawei.com>
-References: <1478264794-14652-1-git-send-email-dingtianhong@huawei.com>
- <1478264794-14652-2-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20161104182050.GA1651@buserror.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  4 Nov 2016 18:36:38 +0000
+Subject: [PATCH 3/3] KVM: arm/arm64: vgic: Kick VCPUs when queueing already
+ pending IRQs
+In-Reply-To: <20161104183638.28137-1-marc.zyngier@arm.com>
+References: <20161104183638.28137-1-marc.zyngier@arm.com>
+Message-ID: <20161104183638.28137-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 09:06:30PM +0800, Ding Tianhong wrote:
-> The workaround for hisilicon,161601 will check the return value of the system counter
-> by different way, in order to distinguish with the fsl-a008585 workaround, introduce
-> a new generic erratum handing mechanism for fsl-a008585 and rename some functions.
-> 
-> v2: Introducing a new generic erratum handling mechanism for fsl erratum a008585.
-> 
-> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
->     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
->     being globally visible. After discussion with Marc and Will, a consensus decision was
->     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
->     and make some generic name more specific, export timer_unstable_counter_workaround
->     for module access.
+From: Shih-Wei Li <shihwei@cs.columbia.edu>
 
-The command line paramter was added at Marc's request to provide a way of
-enbaling the workaround in a KVM guest, until API is added to allow QEMU to
-discover the need to set the property in the guest device tree.  Is there an
-alternative?
+In cases like IPI, we could be queueing an interrupt for a VCPU
+that is already running and is not about to exit, because the
+VCPU has entered the VM with the interrupt pending and would
+not trap on EOI'ing that interrupt. This could result to delays
+in interrupt deliveries or even loss of interrupts.
+To guarantee prompt interrupt injection, here we have to try to
+kick the VCPU.
 
--Scott
+Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 2893d5ba523a..6440b56ec90e 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -273,6 +273,18 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
+ 		 * no more work for us to do.
+ 		 */
+ 		spin_unlock(&irq->irq_lock);
++
++		/*
++		 * We have to kick the VCPU here, because we could be
++		 * queueing an edge-triggered interrupt for which we
++		 * get no EOI maintenance interrupt. In that case,
++		 * while the IRQ is already on the VCPU's AP list, the
++		 * VCPU could have EOI'ed the original interrupt and
++		 * won't see this one until it exits for some other
++		 * reason.
++		 */
++		if (vcpu)
++			kvm_vcpu_kick(vcpu);
+ 		return false;
+ 	}
+ 
+-- 
+2.10.1
