@@ -1,172 +1,58 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:09 +0100
-Subject: [PATCH 10/29] ARM: dts: wheat: add DU support
+Date: Fri,  4 Nov 2016 10:44:08 +0100
+Subject: [PATCH 09/29] ARM: dts: r8a7794: Correct SCIFB reg properties to
+ cover all registers
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <f6eea82a87db2753e2f7c0454f078fb630eb72cd.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <655ea555064251e0b094848d378d4a67e8ebb0ed.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Define  the  Wheat board dependent  part of the DU device node.
-Add the device nodes for the Analog Devices ADV7513 HDMI transmitters
-connected to DU0/1.  Add the necessary subnodes to interconnect DU with
-HDMI transmitters/connectors.
+Several SCIFB registers reside outside the reported register ranges.
+Fortunately this works (on Linux), due to the PAGE_SIZE granularity of
+ioremap().
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Extend the sizes from 64 to 0x100 bytes to fix this, like is done on
+SH/R-Mobile SoCs.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792-wheat.dts | 126 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
+ arch/arm/boot/dts/r8a7794.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7792-wheat.dts b/arch/arm/boot/dts/r8a7792-wheat.dts
-index 6dbb94114a93..c24f26fdab1f 100644
---- a/arch/arm/boot/dts/r8a7792-wheat.dts
-+++ b/arch/arm/boot/dts/r8a7792-wheat.dts
-@@ -86,6 +86,34 @@
- 		gpio = <&gpio11 12 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
-+
-+	hdmi-out0 {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con0: endpoint {
-+				remote-endpoint = <&adv7513_0_out>;
-+			};
-+		};
-+	};
-+
-+	hdmi-out1 {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con1: endpoint {
-+				remote-endpoint = <&adv7513_1_out>;
-+			};
-+		};
-+	};
-+
-+	osc2_clk: osc2 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <74250000>;
-+	};
- };
- 
- &extal_clk {
-@@ -128,6 +156,16 @@
- 		groups = "qspi_ctrl", "qspi_data4";
- 		function = "qspi";
- 	};
-+
-+	du0_pins: du0 {
-+		groups = "du0_rgb888", "du0_sync", "du0_disp";
-+		function = "du0";
-+	};
-+
-+	du1_pins: du1 {
-+		groups = "du1_rgb666", "du1_sync", "du1_disp";
-+		function = "du1";
-+	};
- };
- 
- &scif0 {
-@@ -197,3 +235,91 @@
- 		};
- 	};
- };
-+
-+&i2c4 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	hdmi at 3d {
-+		compatible = "adi,adv7513";
-+		reg = <0x3d>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7513_0_in: endpoint {
-+					remote-endpoint = <&du_out_rgb0>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7513_0_out: endpoint {
-+					remote-endpoint = <&hdmi_con0>;
-+				};
-+			};
-+		};
-+	};
-+
-+	hdmi at 39 {
-+		compatible = "adi,adv7513";
-+		reg = <0x39>;
-+
-+		adi,input-depth = <8>;
-+		adi,input-colorspace = "rgb";
-+		adi,input-clock = "1x";
-+		adi,input-style = <1>;
-+		adi,input-justification = "evenly";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				adv7513_1_in: endpoint {
-+					remote-endpoint = <&du_out_rgb1>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				adv7513_1_out: endpoint {
-+					remote-endpoint = <&hdmi_con1>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&du {
-+	pinctrl-0 = <&du0_pins &du1_pins>;
-+	pinctrl-names = "default";
-+
-+	clocks = <&mstp7_clks R8A7792_CLK_DU0>, <&mstp7_clks R8A7792_CLK_DU1>,
-+		 <&osc2_clk>;
-+	clock-names = "du.0", "du.1", "dclkin.0";
-+	status = "okay";
-+
-+	ports {
-+		port at 0 {
-+			endpoint {
-+				remote-endpoint = <&adv7513_0_in>;
-+			};
-+		};
-+		port at 1 {
-+			endpoint {
-+				remote-endpoint = <&adv7513_1_in>;
-+			};
-+		};
-+	};
-+};
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 57e0d27cb82e..8cfc1385f58a 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -411,7 +411,7 @@
+ 	scifb0: serial at e6c20000 {
+ 		compatible = "renesas,scifb-r8a7794",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6c20000 0 64>;
++		reg = <0 0xe6c20000 0 0x100>;
+ 		interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7794_CLK_SCIFB0>;
+ 		clock-names = "fck";
+@@ -425,7 +425,7 @@
+ 	scifb1: serial at e6c30000 {
+ 		compatible = "renesas,scifb-r8a7794",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6c30000 0 64>;
++		reg = <0 0xe6c30000 0 0x100>;
+ 		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7794_CLK_SCIFB1>;
+ 		clock-names = "fck";
+@@ -439,7 +439,7 @@
+ 	scifb2: serial at e6ce0000 {
+ 		compatible = "renesas,scifb-r8a7794",
+ 			     "renesas,rcar-gen2-scifb", "renesas,scifb";
+-		reg = <0 0xe6ce0000 0 64>;
++		reg = <0 0xe6ce0000 0 0x100>;
+ 		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7794_CLK_SCIFB2>;
+ 		clock-names = "fck";
 -- 
 2.7.0.rc3.207.g0ac5344
