@@ -1,79 +1,74 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 04 Nov 2016 17:14:50 +0100
-Subject: [PATCH RFC 3/7] spi: s3c64xx: Do not use platform_data for DMA
+Date: Fri, 04 Nov 2016 17:14:51 +0100
+Subject: [PATCH RFC 4/7] ASoC: samsung: i2s: Do not use platform_data for DMA
  parameters
 In-Reply-To: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
 References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1478276094-19135-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1478276094-19135-6-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 All related platforms use either devicetree or the DMA slave
-map API for mapping DMA channels to DMA slaves so we can now
+map API for mapping DMA channels to slave devices so we can now
 stop using platform_data for passing DMA details.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/spi/spi-s3c64xx.c | 21 ++++-----------------
- 1 file changed, 4 insertions(+), 17 deletions(-)
+ sound/soc/samsung/i2s.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 3c09e94..28dfdce 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -341,27 +341,20 @@ static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
- static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- {
- 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
--	dma_filter_fn filter = sdd->cntrlr_info->filter;
- 	struct device *dev = &sdd->pdev->dev;
--	dma_cap_mask_t mask;
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 7e32cf4..95a9a3f 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -90,7 +90,6 @@ struct i2s_dai {
+ 	struct snd_dmaengine_dai_dma_data dma_playback;
+ 	struct snd_dmaengine_dai_dma_data dma_capture;
+ 	struct snd_dmaengine_dai_dma_data idma_playback;
+-	dma_filter_fn filter;
+ 	u32	quirks;
+ 	u32	suspend_i2smod;
+ 	u32	suspend_i2scon;
+@@ -1244,7 +1243,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 			return ret;
  
- 	if (is_polling(sdd))
- 		return 0;
- 
--	dma_cap_zero(mask);
--	dma_cap_set(DMA_SLAVE, mask);
--
- 	/* Acquire DMA channels */
--	sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--			   sdd->cntrlr_info->dma_rx, dev, "rx");
-+	sdd->rx_dma.ch = dma_request_slave_channel(dev, "rx");
- 	if (!sdd->rx_dma.ch) {
- 		dev_err(dev, "Failed to get RX DMA channel\n");
- 		return -EBUSY;
+ 		return samsung_asoc_dma_platform_register(&pdev->dev,
+-					sec_dai->filter, "tx-sec", NULL);
++						NULL, "tx-sec", NULL);
  	}
- 	spi->dma_rx = sdd->rx_dma.ch;
  
--	sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--			   sdd->cntrlr_info->dma_tx, dev, "tx");
-+	sdd->tx_dma.ch = dma_request_slave_channel(dev, "tx");
- 	if (!sdd->tx_dma.ch) {
- 		dev_err(dev, "Failed to get TX DMA channel\n");
- 		dma_release_channel(sdd->rx_dma.ch);
-@@ -1091,11 +1084,6 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 	pri_dai = i2s_alloc_dai(pdev, false);
+@@ -1262,10 +1261,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 			return -EINVAL;
+ 		}
  
- 	sdd->cur_bpw = 8;
- 
--	if (!sdd->pdev->dev.of_node && (!sci->dma_tx || !sci->dma_rx)) {
--		dev_warn(&pdev->dev, "Unable to get SPI tx/rx DMA data. Switching to poll mode\n");
--		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
--	}
+-		pri_dai->dma_playback.filter_data = i2s_pdata->dma_playback;
+-		pri_dai->dma_capture.filter_data = i2s_pdata->dma_capture;
+-		pri_dai->filter = i2s_pdata->dma_filter;
 -
- 	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
- 	sdd->rx_dma.direction = DMA_DEV_TO_MEM;
+ 		if (&i2s_pdata->type)
+ 			i2s_cfg = &i2s_pdata->type.i2s;
  
-@@ -1205,9 +1193,8 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+@@ -1327,11 +1322,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 		sec_dai->dma_playback.addr = regs_base + I2STXDS;
+ 		sec_dai->dma_playback.chan_name = "tx-sec";
  
- 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
- 					sdd->port_id, master->num_chipselect);
--	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
--					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
--					sci->dma_rx, sci->dma_tx);
-+	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\n",
-+					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1);
+-		if (!np) {
+-			sec_dai->dma_playback.filter_data = i2s_pdata->dma_play_sec;
+-			sec_dai->filter = i2s_pdata->dma_filter;
+-		}
+-
+ 		sec_dai->dma_playback.addr_width = 4;
+ 		sec_dai->addr = pri_dai->addr;
+ 		sec_dai->clk = pri_dai->clk;
+@@ -1353,7 +1343,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_free_dai;
  
- 	pm_runtime_mark_last_busy(&pdev->dev);
- 	pm_runtime_put_autosuspend(&pdev->dev);
+-	ret = samsung_asoc_dma_platform_register(&pdev->dev, pri_dai->filter,
++	ret = samsung_asoc_dma_platform_register(&pdev->dev, NULL,
+ 						 NULL, NULL);
+ 	if (ret < 0)
+ 		goto err_free_dai;
 -- 
 1.9.1
