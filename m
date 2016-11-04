@@ -1,126 +1,32 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Fri, 4 Nov 2016 11:11:15 +0800
-Subject: [PATCH] mm: hugetlb: rename some allocation functions
-In-Reply-To: <1478141499-13825-2-git-send-email-shijie.huang@arm.com>
-References: <1478141499-13825-2-git-send-email-shijie.huang@arm.com>
-Message-ID: <1478229075-20262-1-git-send-email-shijie.huang@arm.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 04 Nov 2016 09:09:20 +0530
+Subject: [PATCH 0/4] Add SCU device node support for Exynos4
+Message-ID: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a future patch, the __alloc_buddy_huge_page() will not necessarily
-use the buddy allocator.
+This patch series does some cleanup for Exynos4 SoC based boards.
+We are currently statically mapping SCU SFRs in mach-exynos/exynos.c
+which can be avoided and related dependencies can be removed by introduction
+of SCU device node. 
+  
+This patch series is tested on Exynos4210 based Origen board for SMP boot.
 
-So this patch removes the "buddy" from these functions:
-	__alloc_buddy_huge_page -> __alloc_huge_page
-	__alloc_buddy_huge_page_no_mpol -> __alloc_huge_page_no_mpol
-	__alloc_buddy_huge_page_with_mpol -> __alloc_huge_page_with_mpol
+Pankaj Dubey (4):
+  ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
+  ARM: dts: exynos: Add SCU device node to exynos4.dtsi
+  ARM: EXYNOS: Remove static mapping of SCU SFR
+  ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
 
-This patch makes preparation for the later patch.
+ arch/arm/boot/dts/exynos4.dtsi               |  5 +++
+ arch/arm/mach-exynos/common.h                |  5 ---
+ arch/arm/mach-exynos/exynos.c                | 22 -------------
+ arch/arm/mach-exynos/include/mach/map.h      |  2 --
+ arch/arm/mach-exynos/platsmp.c               | 49 +++++++---------------------
+ arch/arm/mach-exynos/pm.c                    | 14 ++++++--
+ arch/arm/mach-exynos/suspend.c               | 15 ++++++---
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ---
+ 8 files changed, 38 insertions(+), 78 deletions(-)
 
-Acked-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
-
-Fix the build error in the x86 platform.
-
----
- mm/hugetlb.c | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
-
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index 32594f1..9fdfc24 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -1163,6 +1163,10 @@ static inline void destroy_compound_gigantic_page(struct page *page,
- 						unsigned int order) { }
- static inline int alloc_fresh_gigantic_page(struct hstate *h,
- 					nodemask_t *nodes_allowed) { return 0; }
-+static struct page *alloc_gigantic_page(int nid, unsigned int order)
-+{
-+	return NULL;
-+}
- #endif
- 
- static void update_and_free_page(struct hstate *h, struct page *page)
-@@ -1568,7 +1572,7 @@ static struct page *__hugetlb_alloc_buddy_huge_page(struct hstate *h,
-  * For (2), we ignore 'vma' and 'addr' and use 'nid' exclusively. This
-  * implies that memory policies will not be taken in to account.
-  */
--static struct page *__alloc_buddy_huge_page(struct hstate *h,
-+static struct page *__alloc_huge_page(struct hstate *h,
- 		struct vm_area_struct *vma, unsigned long addr, int nid)
- {
- 	struct page *page;
-@@ -1649,21 +1653,21 @@ static struct page *__alloc_buddy_huge_page(struct hstate *h,
-  * anywhere.
-  */
- static
--struct page *__alloc_buddy_huge_page_no_mpol(struct hstate *h, int nid)
-+struct page *__alloc_huge_page_no_mpol(struct hstate *h, int nid)
- {
- 	unsigned long addr = -1;
- 
--	return __alloc_buddy_huge_page(h, NULL, addr, nid);
-+	return __alloc_huge_page(h, NULL, addr, nid);
- }
- 
- /*
-  * Use the VMA's mpolicy to allocate a huge page from the buddy.
-  */
- static
--struct page *__alloc_buddy_huge_page_with_mpol(struct hstate *h,
-+struct page *__alloc_huge_page_with_mpol(struct hstate *h,
- 		struct vm_area_struct *vma, unsigned long addr)
- {
--	return __alloc_buddy_huge_page(h, vma, addr, NUMA_NO_NODE);
-+	return __alloc_huge_page(h, vma, addr, NUMA_NO_NODE);
- }
- 
- /*
-@@ -1681,7 +1685,7 @@ struct page *alloc_huge_page_node(struct hstate *h, int nid)
- 	spin_unlock(&hugetlb_lock);
- 
- 	if (!page)
--		page = __alloc_buddy_huge_page_no_mpol(h, nid);
-+		page = __alloc_huge_page_no_mpol(h, nid);
- 
- 	return page;
- }
-@@ -1711,7 +1715,7 @@ static int gather_surplus_pages(struct hstate *h, int delta)
- retry:
- 	spin_unlock(&hugetlb_lock);
- 	for (i = 0; i < needed; i++) {
--		page = __alloc_buddy_huge_page_no_mpol(h, NUMA_NO_NODE);
-+		page = __alloc_huge_page_no_mpol(h, NUMA_NO_NODE);
- 		if (!page) {
- 			alloc_ok = false;
- 			break;
-@@ -1963,7 +1967,7 @@ struct page *alloc_huge_page(struct vm_area_struct *vma,
- 	page = dequeue_huge_page_vma(h, vma, addr, avoid_reserve, gbl_chg);
- 	if (!page) {
- 		spin_unlock(&hugetlb_lock);
--		page = __alloc_buddy_huge_page_with_mpol(h, vma, addr);
-+		page = __alloc_huge_page_with_mpol(h, vma, addr);
- 		if (!page)
- 			goto out_uncharge_cgroup;
- 		if (!avoid_reserve && vma_has_reserves(vma, gbl_chg)) {
-@@ -2221,7 +2225,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
- 	 * First take pages out of surplus state.  Then make up the
- 	 * remaining difference by allocating fresh huge pages.
- 	 *
--	 * We might race with __alloc_buddy_huge_page() here and be unable
-+	 * We might race with __alloc_huge_page() here and be unable
- 	 * to convert a surplus huge page to a normal huge page. That is
- 	 * not critical, though, it just means the overall size of the
- 	 * pool might be one hugepage larger than it needs to be, but
-@@ -2267,7 +2271,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
- 	 * By placing pages into the surplus state independent of the
- 	 * overcommit value, we are allowing the surplus pool size to
- 	 * exceed overcommit. There are few sane options here. Since
--	 * __alloc_buddy_huge_page() is checking the global counter,
-+	 * __alloc_huge_page() is checking the global counter,
- 	 * though, we'll note that we're not allowed to exceed surplus
- 	 * and won't grow the pool anywhere else. Not until one of the
- 	 * sysctls are changed, or the surplus pages go out of use.
 -- 
-2.5.5
+2.7.4
