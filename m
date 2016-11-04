@@ -1,35 +1,34 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Thu,  3 Nov 2016 17:10:35 -0700
-Subject: [PATCH v2 1/3] dt-bindings: firmware: scm: Add MSM8996 DT bindings
-In-Reply-To: <1478218237-1737-1-git-send-email-spjoshi@codeaurora.org>
-References: <1478218237-1737-1-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <1478218237-1737-2-git-send-email-spjoshi@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Nov 2016 18:16:16 -0600
+Subject: [PATCH 1/2] arm64: hugetlb: remove the wrong pmd check in
+ find_num_contig()
+In-Reply-To: <1478140059-13829-2-git-send-email-shijie.huang@arm.com>
+References: <1478140059-13829-1-git-send-email-shijie.huang@arm.com>
+ <1478140059-13829-2-git-send-email-shijie.huang@arm.com>
+Message-ID: <20161104001616.ssjbemliorxi6evl@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SCM DT bindings for Qualcomm's MSM8996 platform.
+On Thu, Nov 03, 2016 at 10:27:38AM +0800, Huang Shijie wrote:
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 2e49bd2..4811ef1 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -61,10 +61,6 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+>  		return 1;
+>  	}
+>  	pmd = pmd_offset(pud, addr);
+> -	if (!pmd_present(*pmd)) {
+> -		VM_BUG_ON(!pmd_present(*pmd));
+> -		return 1;
+> -	}
+>  	if ((pte_t *)pmd == ptep) {
+>  		*pgsize = PMD_SIZE;
+>  		return CONT_PMDS;
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
----
- Documentation/devicetree/bindings/firmware/qcom,scm.txt | 2 ++
- 1 file changed, 2 insertions(+)
+BTW, for the !pud_present() and !pgd_present() cases, shouldn't
+find_num_contig() actually return 0? These are more likely real bugs, so
+no point in setting the huge pte.
 
-diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-index 3b4436e..20f26fb 100644
---- a/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-+++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-@@ -10,8 +10,10 @@ Required properties:
-  * "qcom,scm-apq8064" for APQ8064 platforms
-  * "qcom,scm-msm8660" for MSM8660 platforms
-  * "qcom,scm-msm8690" for MSM8690 platforms
-+ * "qcom,scm-msm8996" for MSM8996 platforms
-  * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
- - clocks: One to three clocks may be required based on compatible.
-+ * No clock required for "qcom,scm-msm8996"
-  * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
-  * Core, iface, and bus clocks required for "qcom,scm"
- - clock-names: Must contain "core" for the core clock, "iface" for the interface
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Catalin
