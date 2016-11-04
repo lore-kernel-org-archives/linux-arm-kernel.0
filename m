@@ -1,75 +1,30 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 04 Nov 2016 18:23:04 +0530
-Subject: [1/4] ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
-In-Reply-To: <1478230764-13748-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1478230764-13748-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161104125452epcas3p42aff8168d48d859e0df0c36b8f3ffb92@epcas3p4.samsung.com>
-Message-ID: <581C84B0.8000305@samsung.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 4 Nov 2016 14:03:59 +0100
+Subject: [PATCH] bus: vexpress-config: fix device reference leak
+In-Reply-To: <1478259746.17152.126.camel@arm.com>
+References: <1477997017-29103-1-git-send-email-johan@kernel.org>
+ <1478259746.17152.126.camel@arm.com>
+Message-ID: <20161104130359.GA8671@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pankaj,
+On Fri, Nov 04, 2016 at 11:42:26AM +0000, Pawel Moll wrote:
+> On Tue, 2016-11-01 at 11:43 +0100, Johan Hovold wrote:
+> > Make sure to drop the reference to the parent device taken by
+> > class_find_device() after populating the bus.
+> > 
+> > Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to
+> > regmap")
+> > Signed-off-by: Johan Hovold <johan@kernel.org>
+> 
+> You're right. May I ask how did you figure it out? The get_device()
+> happening in class_find_device() is a bit obscure, so have you simply
+> followed places where it's being used or used some static (?) analysis
+> tool? If the latter, I'd be very curios to hear what was it :-)
 
-On 11/04/2016 09:09 AM, Pankaj Dubey wrote:
-> We can safely remove exynos_smp_init_cpus() hook from mach-exynos/platsmp.c,
-> as all SMP platforms in mach-exynos can rely on DT for CPU core description
-> instead of determining number of cores from the SCU.
->
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
-Looks good.
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+I stumbled over one of these leaks and grepped and searched for more.
+I've submitted a few patches this week fixing some of the more obvious
+ones, but there are more lurking behind various subsystem wrappers.
 
->   arch/arm/mach-exynos/platsmp.c | 31 -------------------------------
->   1 file changed, 31 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 98ffe1e..a5d6841 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -385,36 +385,6 @@ fail:
->   	return pen_release != -1 ? ret : 0;
->   }
->
-> -/*
-> - * Initialise the CPU possible map early - this describes the CPUs
-> - * which may be present or become present in the system.
-> - */
-> -
-> -static void __init exynos_smp_init_cpus(void)
-> -{
-> -	void __iomem *scu_base = scu_base_addr();
-> -	unsigned int i, ncores;
-> -
-> -	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
-> -		ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-> -	else
-> -		/*
-> -		 * CPU Nodes are passed thru DT and set_cpu_possible
-> -		 * is set by "arm_dt_init_cpu_maps".
-> -		 */
-> -		return;
-> -
-> -	/* sanity check */
-> -	if (ncores > nr_cpu_ids) {
-> -		pr_warn("SMP: %u cores greater than maximum (%u), clipping\n",
-> -			ncores, nr_cpu_ids);
-> -		ncores = nr_cpu_ids;
-> -	}
-> -
-> -	for (i = 0; i < ncores; i++)
-> -		set_cpu_possible(i, true);
-> -}
-> -
->   static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
->   {
->   	int i;
-> @@ -479,7 +449,6 @@ static void exynos_cpu_die(unsigned int cpu)
->   #endif /* CONFIG_HOTPLUG_CPU */
->
->   const struct smp_operations exynos_smp_ops __initconst = {
-> -	.smp_init_cpus		= exynos_smp_init_cpus,
->   	.smp_prepare_cpus	= exynos_smp_prepare_cpus,
->   	.smp_secondary_init	= exynos_secondary_init,
->   	.smp_boot_secondary	= exynos_boot_secondary,
->
+Thanks,
+Johan
