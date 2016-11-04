@@ -1,8 +1,8 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 4 Nov 2016 21:29:24 +0100
-Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval
- property query
-In-Reply-To: <20161104145855.GH21430@atomide.com>
+From: mranostay@gmail.com (Matt Ranostay)
+Date: Fri, 4 Nov 2016 13:39:19 -0700
+Subject: [PATCH v2 2/2] power: bq27xxx_battery: add poll interval property
+ query
+In-Reply-To: <20161104202924.GA6841@amd>
 References: <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
  <20161024201443.GB5989@amd>
  <CAKzfze_rv29gwuBGctwTONyw8Oy6fwE+xcN0HMh-ZPB47HKzuQ@mail.gmail.com>
@@ -12,35 +12,33 @@ References: <CAKzfze9uvMvrF=gWph_HKFk_cH0qzRz6Wa2VJafK+H+wdnP0rg@mail.gmail.com>
  <20161102082206.GE21488@amd>
  <CAKzfze8d_MZJzR1a6rbwVXCWhb30C5GqFamUt2Viw1CzvyaQxw@mail.gmail.com>
  <20161104070955.GA3679@amd> <20161104145855.GH21430@atomide.com>
-Message-ID: <20161104202924.GA6841@amd>
+ <20161104202924.GA6841@amd>
+Message-ID: <CAKzfze_FrerJF6JOjVJ2XdyJgPm9OkEziX+oVOr7Aix3N31anw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2016-11-04 07:58:55, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [161104 00:10]:
-> > On Thu 2016-11-03 22:00:56, Matt Ranostay wrote:
-> > Do you actually have hardware with more than one bq27xxx?
-> 
-> I can at least see the twl4030 battery/charger features
-> being used together with some bq device to monitor the
-> battery state. Not sure if that counts as multiple
-> instances here though :)
+On Fri, Nov 4, 2016 at 1:29 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Fri 2016-11-04 07:58:55, Tony Lindgren wrote:
+>> * Pavel Machek <pavel@ucw.cz> [161104 00:10]:
+>> > On Thu 2016-11-03 22:00:56, Matt Ranostay wrote:
+>> > Do you actually have hardware with more than one bq27xxx?
+>>
+>> I can at least see the twl4030 battery/charger features
+>> being used together with some bq device to monitor the
+>> battery state. Not sure if that counts as multiple
+>> instances here though :)
+>
+> I have that, too, but that was not what i was asking.
+>
+> Matt wanted support for different polling intervals on different
+> bq27xxx chips. I'd like to know know if he actually has more than one
+> bq27xxx in his device...
+>
 
-I have that, too, but that was not what i was asking.
+Actually only one bq27xxx chip but in theory we could have more.
 
-Matt wanted support for different polling intervals on different
-bq27xxx chips. I'd like to know know if he actually has more than one
-bq27xxx in his device...
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161104/37ee45ee/attachment.sig>
+> Best regards,
+>                                                                         Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
