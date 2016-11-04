@@ -1,66 +1,30 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Fri, 4 Nov 2016 09:52:56 +0100
-Subject: [PATCH 1/2] ARM: dts: stm32f429: add LSI and LSE clocks
-In-Reply-To: <1478249577-25999-1-git-send-email-gabriel.fernandez@st.com>
-References: <1478249577-25999-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1478249577-25999-2-git-send-email-gabriel.fernandez@st.com>
+From: c.jayachandran@gmail.com (Jayachandran C)
+Date: Fri,  4 Nov 2016 14:24:33 +0530
+Subject: [PATCH] MAINTAINERS: Update Broadcom Vulcan maintainer email
+Message-ID: <1478249673-8163-1-git-send-email-c.jayachandran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+Update Broadcom Vulcan maintainer's email address, the broadcom.com
+address is no longer valid.
 
-This patch adds lsi / lse oscillators. These clocks can be use by
-RTC clocks.
-The clock drivers needs to disable the power domain write protection using
-syscon / regmap to enable these clocks.
-
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Signed-off-by: Jayachandran C <c.jayachandran@gmail.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 336ee4f..2700449 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -56,6 +56,18 @@
- 			compatible = "fixed-clock";
- 			clock-frequency = <0>;
- 		};
-+
-+		clk-lse {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		clk-lsi {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32000>;
-+		};
- 	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 3d838cf..8bb97e2 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2753,7 +2753,7 @@ S:	Supported
+ F:	drivers/net/ethernet/broadcom/bcmsysport.*
  
- 	soc {
-@@ -185,6 +197,11 @@
- 			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
- 		};
- 
-+		pwrcfg: power-config at 40007000 {
-+			compatible = "syscon";
-+			reg = <0x40007000 0x400>;
-+		};
-+
- 		pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -340,6 +357,7 @@
- 			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
- 			reg = <0x40023800 0x400>;
- 			clocks = <&clk_hse>;
-+			st,syscfg = <&pwrcfg>;
- 		};
- 
- 		dma1: dma-controller at 40026000 {
+ BROADCOM VULCAN ARM64 SOC
+-M:	Jayachandran C. <jchandra@broadcom.com>
++M:	Jayachandran C. <c.jayachandran@gmail.com>
+ M:	bcm-kernel-feedback-list at broadcom.com
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
 -- 
-1.9.1
+2.7.4
