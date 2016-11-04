@@ -1,73 +1,66 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Fri, 4 Nov 2016 10:36:38 +0530
-Subject: [RESEND PATCH v1 05/11] dt-bindings: perf: hisi: Add Devicetree
- bindings for Hisilicon SoC PMU
-In-Reply-To: <20161103182609.GA11071@kozik-lap>
-References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
- <1478151727-20250-6-git-send-email-anurup.m@huawei.com>
- <20161103182609.GA11071@kozik-lap>
-Message-ID: <581C175E.2040805@gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri,  4 Nov 2016 01:10:55 -0400
+Subject: [PATCH v6 0/7] add NS2 support to bgmac
+Message-ID: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes in v6:
+* Use a common bgmac_phy_connect_direct (per Rafal Milecki) 
+* Rebased on latest net-next
+* Added Reviewed-by to the relevant patches
 
 
-On Thursday 03 November 2016 11:56 PM, Krzysztof Kozlowski wrote:
-> On Thu, Nov 03, 2016 at 01:42:01AM -0400, Anurup M wrote:
->> 	1) Device tree bindings for Hisilicon SoC PMU.
->> 	2) Add example for Hisilicon L3 cache, MN and DDRC PMU.
-> Get rid of this weird indentation in all patches.
-Thanks. I shall remove the TAB from the commit message in all patches.
->
->> Signed-off-by: Anurup M <anurup.m@huawei.com>
->> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->> ---
->>   .../devicetree/bindings/arm/hisilicon/pmu.txt      | 127 +++++++++++++++++++++
->>   1 file changed, 127 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->> new file mode 100644
->> index 0000000..e7b35e0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/hisilicon/pmu.txt
->> @@ -0,0 +1,127 @@
->> +Hisilicon SoC hip05/06/07 ARMv8 PMU
->> +===================================
->> +
->> +The Hisilicon SoC chips like hip05/06/07 etc. consist of varous independent
->> +system device PMU's such as L3 cache (L3C), Miscellaneous Nodes(MN) and DDR
->> +comtroller. These PMU devices are independent and have hardware logic to
->> +gather statistics and performance information.
->> +
->> +HiSilicon SoC chip is encapsulated by multiple CPU and IO die's. The CPU die
->> +is called as Super CPU cluster (SCCL) which includes 16 cpu-cores. Every SCCL
->> +is further grouped as CPU clusters (CCL) which includes 4 cpu-cores each.
->> +e.g. In the case of hip05/06/07, each SCCL has 1 L3 cache and 1 MN PMU device.
->> +
->> +The Hisilicon SoC PMU DT node bindigs for uncore PMU devices are as below.
->> +For PMU devices like L3 cache. MN etc. which are accessed using the djtag,
->> +the parent node will be the djtag node of the corresponding CPU die(SCCL).
->> +
->> +For uncore PMU devices there are some common required properties as detailed
->> +below.
->> +
->> +Required properties:
->> +	- compatible : This field contain two values. The first value is
->> +		always "hisilicon" and second value is the Module type as shown
->> +		in below examples:
-> Over-complicated sentence. Just:
->
-> 	- compatible : One of:
-> 		"hisilicon,hisi-pmu-l3c-v1" for Hisilicon SoC L3C PMU
-> 			device (Version 1)
-> 		...
-> 		...
-Thanks. Shall refine it in next version.
-> BTW, No need of CC-ing me. I am not a maintainer of relevant subsystems.
-Sure.
+Changes in v5:
+* Change a pr_err to netdev_err (per Scott Branden)
+* Reword the lane swap binding documentation (per Andrew Lunn)
 
-Thanks,
-Anurup
-> Best regards,
-> Krzysztof
+
+Changes in v4:
+* Actually send out the lane swap binding doc patch (Per Scott Branden)
+* Remove unused #define (Per Andrew Lunn)
+
+
+Changes in v3:
+* Clean-up the bgmac DT binding doc (per Rob Herring)
+* Document the lane swap binding and make it generic (Per Andrew Lunn)
+
+
+Changes in v2:
+* Remove the PHY power-on (per Andrew Lunn)
+* Misc PHY clean-ups regarding comments and #defines (per Andrew Lunn)
+  This results on none of the original PHY code from Vikas being
+  present.  So, I'm removing him as an author and giving him
+  "Inspired-by" credit.
+* Move PHY lane swapping to PHY driver (per Andrew Lunn and Florian
+  Fainelli)
+* Remove bgmac sleep (per Florian Fainelli)
+* Re-add bgmac chip reset (per Florian Fainelli and Ray Jui)
+* Rebased on latest net-next
+* Added patch for bcm54xx_auxctl_read, which is used in the BCM54810
+
+
+Jon Mason (7):
+  net: phy: broadcom: add bcm54xx_auxctl_read
+  Documentation: devicetree: add PHY lane swap binding
+  net: phy: broadcom: Add BCM54810 PHY entry
+  Documentation: devicetree: net: add NS2 bindings to amac
+  net: ethernet: bgmac: device tree phy enablement
+  net: ethernet: bgmac: add NS2 support
+  arm64: dts: NS2: add AMAC ethernet support
+
+ .../devicetree/bindings/net/brcm,amac.txt          | 16 +++--
+ Documentation/devicetree/bindings/net/phy.txt      |  4 ++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  5 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              | 12 ++++
+ drivers/net/ethernet/broadcom/bgmac-bcma.c         | 22 +++++++
+ drivers/net/ethernet/broadcom/bgmac-platform.c     | 74 +++++++++++++++++++++-
+ drivers/net/ethernet/broadcom/bgmac.c              | 32 +++-------
+ drivers/net/ethernet/broadcom/bgmac.h              |  9 +++
+ drivers/net/phy/Kconfig                            |  2 +-
+ drivers/net/phy/broadcom.c                         | 68 +++++++++++++++++++-
+ include/linux/brcmphy.h                            | 10 +++
+ 11 files changed, 222 insertions(+), 32 deletions(-)
+
+-- 
+2.7.4
