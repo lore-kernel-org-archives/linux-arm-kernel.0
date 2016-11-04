@@ -1,36 +1,25 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Nov 2016 12:21:07 +0000
-Subject: [PATCH] bus: vexpress-config: fix device reference leak
-In-Reply-To: <1478259746.17152.126.camel@arm.com>
-References: <1477997017-29103-1-git-send-email-johan@kernel.org>
- <1478259746.17152.126.camel@arm.com>
-Message-ID: <20161104122107.GA1041@n2100.armlinux.org.uk>
+Date: Fri, 4 Nov 2016 12:23:22 +0000
+Subject: [PATCH 2/3] ARM: cache-uniphier: refactor jump label to follow
+ coding style guideline
+In-Reply-To: <1478259816-24965-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1478259816-24965-1-git-send-email-yamada.masahiro@socionext.com>
+ <1478259816-24965-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161104122322.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 11:42:26AM +0000, Pawel Moll wrote:
-> On Tue, 2016-11-01 at 11:43 +0100, Johan Hovold wrote:
-> > Make sure to drop the reference to the parent device taken by
-> > class_find_device() after populating the bus.
-> > 
-> > Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to
-> > regmap")
-> > Signed-off-by: Johan Hovold <johan@kernel.org>
+On Fri, Nov 04, 2016 at 08:43:35PM +0900, Masahiro Yamada wrote:
+> Documentation/CodingStyle recommends to use label names which say
+> what the goto does or why the goto exists.
 > 
-> You're right. May I ask how did you figure it out? The get_device()
-> happening in class_find_device() is a bit obscure,
+> Just in case, split it up into three labels because the CodingStyle
+> says "one err bugs" is a common type of bug (although, I do not
+> believe the current code includes such a bug).
 
-It's not obscure at all - all the functions that find a device do so
-under a lock to ensure that the device does not go away, and they
-take a reference count on the device before returning the pointer for
-exactly the same reason.
-
-If they didn't do that, the find function could locate a struct device
-while another thread is deleting the struct device, and it would then
-return a stale pointer - and dereferencing that pointer would then be
-a use-after-free bug.
-
-So not obscure, but rather fundamentally necessary.
+However, this has the effect of making the code unnecessarily more
+complicated, which is a bad thing.  Avoiding unnecessary code
+complexity wins over style rules.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
