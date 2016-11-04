@@ -1,143 +1,52 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  4 Nov 2016 16:51:23 +0100
-Subject: [PATCH net-next 2/2] net: phy: Add Meson GXL Internal PHY driver
-In-Reply-To: <1478274683-1503-1-git-send-email-narmstrong@baylibre.com>
-References: <1478274683-1503-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1478274683-1503-3-git-send-email-narmstrong@baylibre.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 04 Nov 2016 17:14:46 +0100
+Subject: [PATCH RFC 0/7] DMA: S3C64XX: Conversion to the new channel request
+ API
+Message-ID: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for the Internal RMII PHY found in the Amlogic Meson GXL SoCs.
+This patch series aims to convert the s3c64xx platform to use
+the new universal DMA channel request API, i.e. this is only
+meaningful for non-dt systems using s3c64xx SoCs.
 
-This PHY seems to only implement some standard registers and need some
-workarounds to provide autoneg values from vendor registers.
+I'm sending the whole series as RFC since I didn't test it
+yet, I'm going to prepare smdk6410 for testing this series.
+It would be great if someone else could also test it,
+either SPI or sound functionality verification would be 
+useful.
 
-Some magic values are currently used to configure the PHY, and this a
-temporary setup until clarification about these registers names and
-registers fields are provided by Amlogic.
+Then we could queue the first two patches in this series
+for v4.10-rc1 and the remaining patches for subsequent
+release.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/net/phy/Kconfig     |  5 +++
- drivers/net/phy/Makefile    |  1 +
- drivers/net/phy/meson-gxl.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 87 insertions(+)
- create mode 100644 drivers/net/phy/meson-gxl.c
+The whole series can be pulled from git repository:
+ git://linuxtv.org/snawrocki/samsung.git 
+ branch: for-v4.10/dma/pl080-s3c64xx
 
-diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index 2651c8d..b48943a 100644
---- a/drivers/net/phy/Kconfig
-+++ b/drivers/net/phy/Kconfig
-@@ -264,6 +264,11 @@ config MARVELL_PHY
- 	---help---
- 	  Currently has a driver for the 88E1011S
- 
-+config MESON_GXL_PHY
-+	tristate "Amlogic Meson GXL Internal PHY"
-+	---help---
-+	  Currently has a driver for the Amlogic Meson GXL Internal PHY
-+
- config MICREL_PHY
- 	tristate "Micrel PHYs"
- 	---help---
-diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
-index e58667d..3cd5af7 100644
---- a/drivers/net/phy/Makefile
-+++ b/drivers/net/phy/Makefile
-@@ -41,6 +41,7 @@ obj-$(CONFIG_INTEL_XWAY_PHY)	+= intel-xway.o
- obj-$(CONFIG_LSI_ET1011C_PHY)	+= et1011c.o
- obj-$(CONFIG_LXT_PHY)		+= lxt.o
- obj-$(CONFIG_MARVELL_PHY)	+= marvell.o
-+obj-$(CONFIG_MESON_GXL_PHY)	+= meson-gxl.o
- obj-$(CONFIG_MICREL_KS8995MA)	+= spi_ks8995.o
- obj-$(CONFIG_MICREL_PHY)	+= micrel.o
- obj-$(CONFIG_MICROCHIP_PHY)	+= microchip.o
-diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
-new file mode 100644
-index 0000000..1ea69b7
---- /dev/null
-+++ b/drivers/net/phy/meson-gxl.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Amlogic Meson GXL Internal PHY Driver
-+ *
-+ * Copyright (C) 2015 Amlogic, Inc. All rights reserved.
-+ * Copyright (C) 2016 BayLibre, SAS. All rights reserved.
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ */
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mii.h>
-+#include <linux/ethtool.h>
-+#include <linux/phy.h>
-+#include <linux/netdevice.h>
-+
-+static int meson_gxl_config_init(struct phy_device *phydev)
-+{
-+	/* Enable Analog and DSP register Bank access by */
-+	phy_write(phydev, 0x14, 0x0000);
-+	phy_write(phydev, 0x14, 0x0400);
-+	phy_write(phydev, 0x14, 0x0000);
-+	phy_write(phydev, 0x14, 0x0400);
-+
-+	/* Write Analog register 23 */
-+	phy_write(phydev, 0x17, 0x8E0D);
-+	phy_write(phydev, 0x14, 0x4417);
-+
-+	/* Enable fractional PLL */
-+	phy_write(phydev, 0x17, 0x0005);
-+	phy_write(phydev, 0x14, 0x5C1B);
-+
-+	/* Program fraction FR_PLL_DIV1 */
-+	phy_write(phydev, 0x17, 0x029A);
-+	phy_write(phydev, 0x14, 0x5C1D);
-+
-+	/* Program fraction FR_PLL_DIV1 */
-+	phy_write(phydev, 0x17, 0xAAAA);
-+	phy_write(phydev, 0x14, 0x5C1C);
-+
-+	return 0;
-+}
-+
-+static struct phy_driver meson_gxl_phy[] = {
-+	{
-+		.phy_id		= 0x01814400,
-+		.phy_id_mask	= 0xfffffff0,
-+		.name		= "Meson GXL Internal PHY",
-+		.features	= PHY_BASIC_FEATURES,
-+		.flags		= PHY_IS_INTERNAL,
-+		.config_init	= meson_gxl_config_init,
-+		.config_aneg	= genphy_config_aneg,
-+		.aneg_done      = genphy_aneg_done,
-+		.read_status	= genphy_read_status,
-+		.suspend        = genphy_suspend,
-+		.resume         = genphy_resume,
-+	},
-+};
-+
-+static struct mdio_device_id __maybe_unused meson_gxl_tbl[] = {
-+	{ 0x01814400, 0xfffffff0 },
-+	{ }
-+};
-+
-+module_phy_driver(meson_gxl_phy);
-+
-+MODULE_DEVICE_TABLE(mdio, meson_gxl_tbl);
-+
-+MODULE_DESCRIPTION("Amlogic Meson GXL Internal PHY driver");
-+MODULE_AUTHOR("Baoqi wang");
-+MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
-+MODULE_LICENSE("GPL");
+Thanks.
+
+Sylwester Nawrocki (7):
+  dma: pl08x: Add support for the DMA slave map
+  ARM: S3C64XX: Add DMA slave maps for PL080 devices
+  spi: s3c64xx: Do not use platform_data for DMA parameters
+  ASoC: samsung: i2s: Do not use platform_data for DMA parameters
+  ASoC: samsung: pcm: Do not use platform_data for DMA parameters
+  ARM: S3C64XX: Drop unused DMA fields from struct s3c64xx_spi_csinfo
+  ARM: S3C64XX: Drop initialization of unused struct s3c_audio_pdata
+    fields
+
+ arch/arm/mach-s3c64xx/dev-audio.c         | 19 ------------------
+ arch/arm/mach-s3c64xx/pl080.c             | 32 +++++++++++++++++++++++++++++++
+ arch/arm/plat-samsung/devs.c              |  9 ---------
+ drivers/dma/amba-pl08x.c                  |  3 +++
+ drivers/spi/spi-s3c64xx.c                 | 21 ++++----------------
+ include/linux/amba/pl08x.h                |  4 ++++
+ include/linux/platform_data/asoc-s3c.h    |  5 -----
+ include/linux/platform_data/spi-s3c64xx.h |  3 ---
+ sound/soc/samsung/i2s.c                   | 14 ++------------
+ sound/soc/samsung/pcm.c                   | 14 +++++---------
+ 10 files changed, 50 insertions(+), 74 deletions(-)
+
 -- 
 1.9.1
