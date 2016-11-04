@@ -1,63 +1,29 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 04 Nov 2016 13:51:34 -0700
-Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
- uvent_modalias} to modules
-In-Reply-To: <20161025011632.GA23876@b29397-desktop>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-3-stephen.boyd@linaro.org>
- <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
- <147733850401.29612.2343965740004706258@sboyd-linaro>
- <20161025011632.GA23876@b29397-desktop>
-Message-ID: <147829269430.21688.2345895151880009021@sboyd-linaro>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 05 Nov 2016 00:42:33 +0300
+Subject: [PATCH v2 0/11] Add R8A7745/SK-RZG1E board support
+Message-ID: <2368353.xfo5beGC5E@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-10-24 18:16:32)
-> On Mon, Oct 24, 2016 at 12:48:24PM -0700, Stephen Boyd wrote:
-> > Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
-> > > Hi,
-> > > 
-> > > On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> > > > The ULPI bus can be built as a module, and it will soon be
-> > > > calling these functions when it supports probing devices from DT.
-> > > > Export them so they can be used by the ULPI module.
-> > > >
-> > > > Acked-by: Rob Herring <robh@kernel.org>
-> > > > Cc: <devicetree@vger.kernel.org>
-> > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> > > > ---
-> > > >  drivers/of/device.c | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > >
-> > > > diff --git a/drivers/of/device.c b/drivers/of/device.c
-> > > > index 8a22a253a830..6719ab35b62e 100644
-> > > > --- a/drivers/of/device.c
-> > > > +++ b/drivers/of/device.c
-> > > > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
-> > > >
-> > > >         return tsize;
-> > > >  }
-> > > > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
-> > > >
-> > > >  int of_device_request_module(struct device *dev)
-> > > >  {
-> > > > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
-> > > >         }
-> > > >         mutex_unlock(&of_mutex);
-> > > >  }
-> > > > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
-> > > 
-> > > This is trailing the wrong function.
-> > > 
-> > 
-> > Good catch. Must have been some bad rebase.
-> > 
-> > Peter, can you fix it while applying or should I resend this patch?
-> > 
-> 
-> But, this is device tree patch. I can only get chipidea part and other
-> USB patches if Greg agrees.
-> 
+Hello.
 
-Were you expecting Rob to take the drivers/of/* patches? Sorry I thought
-Rob acked them so they could go through usb with the other changes.
+   Here's the set of 11 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-201611104-v4.9-rc3' tag plus the R8A7743/SK-RZG1M patch series
+posted earlier. I'm adding the device tree support for the R8A7745-based
+SK-RZG1E board. The SoC is close to R8A7794 and the board seems identical to the
+R8A7794/SILK board. The device tree patches depend on the R8A7745 CPG/MSSR
+driver series in order to compile and work.
+
+[01/11] ARM: shmobile: r8a7745: add power domain index macros
+[02/11] soc: renesas: rcar-sysc: add R8A7745 support
+[03/11] ARM: shmobile: r8a7745: basic SoC support
+[04/11] ARM: dts: r8a7745: initial SoC device tree
+[05/11] ARM: dts: r8a7745: add SYS-DMAC support
+[06/11] ARM: dts: r8a7745: add [H]SCIF{|A|B} support
+[07/11] ARM: dts: r8a7745: add Ether support
+[08/11] ARM: dts: r8a7745: add IRQC support
+[09/11] ARM: shmobile: document SK-RZG1E board
+[10/11] ARM: dts: sk-rzg1e: initial device tree
+[11/11] ARM: dts: sk-rzg1e: add Ether support
+
+WBR, Sergei
