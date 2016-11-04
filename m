@@ -1,72 +1,43 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  4 Nov 2016 17:31:52 +0000
-Subject: [PATCH v8 05/16] virtio: fix endianness check for vhost support
+Date: Fri,  4 Nov 2016 17:31:55 +0000
+Subject: [PATCH v8 08/16] arm: gic: allow 32-bit compilation
 In-Reply-To: <20161104173203.21168-1-andre.przywara@arm.com>
 References: <20161104173203.21168-1-andre.przywara@arm.com>
-Message-ID: <20161104173203.21168-6-andre.przywara@arm.com>
+Message-ID: <20161104173203.21168-9-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we deny any VHOST_* functionality if the architecture
-supports guests with different endianness than the host. Most of the
-time even on those architectures the endianness of guest and host are
-the same, though, so we are denying the glory of VHOST needlessly.
-Switch from compile time determination to a run time scheme, which
-takes the actual endianness of the guest into account.
-For this we change the semantics of VIRTIO_ENDIAN_HOST to return the
-actual endianness of the host (the endianness of kvmtool at compile
-time, really). The actual check in vhost_net now compares this against
-the guest endianness.
-This enables vhost support on ARM and ARM64.
+The ARM GIC code is shared between ARM and arm64, though the header
+files from the Linux kernel are actually different, reflecting the
+different level of GIC emulation support between the two architectures.
+Since it is conceivable that ARM will gain GICv3 (and possibly ITS)
+emulation support too, lets conditionally define those missing
+symbols in the source file until an upcoming ARM header update eventually
+includes those.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/virtio.h | 9 +++++++--
- virtio/net.c         | 2 +-
- 2 files changed, 8 insertions(+), 3 deletions(-)
+ arm/gic.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/include/kvm/virtio.h b/include/kvm/virtio.h
-index 768ee96..66530fd 100644
---- a/include/kvm/virtio.h
-+++ b/include/kvm/virtio.h
-@@ -17,10 +17,15 @@
- #define VIRTIO_PCI_O_CONFIG	0
- #define VIRTIO_PCI_O_MSIX	1
- 
--#define VIRTIO_ENDIAN_HOST	0
- #define VIRTIO_ENDIAN_LE	(1 << 0)
- #define VIRTIO_ENDIAN_BE	(1 << 1)
- 
-+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_LE
-+#else
-+#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_BE
-+#endif
-+
- struct virt_queue {
- 	struct vring	vring;
- 	u32		pfn;
-@@ -40,7 +45,7 @@ struct virt_queue {
- #define VIRTIO_RING_ENDIAN VIRTIO_ENDIAN_HOST
+diff --git a/arm/gic.c b/arm/gic.c
+index 2c1a547..4d12f31 100644
+--- a/arm/gic.c
++++ b/arm/gic.c
+@@ -18,6 +18,14 @@
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
  #endif
  
--#if (VIRTIO_RING_ENDIAN & (VIRTIO_ENDIAN_LE | VIRTIO_ENDIAN_BE))
-+#if VIRTIO_RING_ENDIAN != VIRTIO_ENDIAN_HOST
- 
- static inline __u16 __virtio_g2h_u16(u16 endian, __u16 val)
- {
-diff --git a/virtio/net.c b/virtio/net.c
-index 6d1be65..e94e37a 100644
---- a/virtio/net.c
-+++ b/virtio/net.c
-@@ -531,7 +531,7 @@ static int init_vq(struct kvm *kvm, void *dev, u32 vq, u32 page_size, u32 align,
- 	}
- 
- 	if (queue->endian != VIRTIO_ENDIAN_HOST)
--		die_perror("VHOST requires VIRTIO_ENDIAN_HOST");
-+		die_perror("VHOST requires the same endianness in guest and host");
- 
- 	state.num = queue->vring.num;
- 	r = ioctl(ndev->vhost_fd, VHOST_SET_VRING_NUM, &state);
++#ifndef KVM_VGIC_ITS_ADDR_TYPE
++#define KVM_VGIC_ITS_ADDR_TYPE 4
++#endif
++
++#ifndef KVM_VGIC_V3_ITS_SIZE
++#define KVM_VGIC_V3_ITS_SIZE (2 * SZ_64K)
++#endif
++
+ static int gic_fd = -1;
+ static u64 gic_redists_base;
+ static u64 gic_redists_size;
 -- 
 2.9.0
