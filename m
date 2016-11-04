@@ -1,24 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Nov 2016 09:50:39 -0600
-Subject: [RFC PATCH v2 8/8] arm64: Wire up and expose the new compat vDSO
-In-Reply-To: <20161027163058.12156-9-kevin.brodsky@arm.com>
-References: <20161027163058.12156-1-kevin.brodsky@arm.com>
- <20161027163058.12156-9-kevin.brodsky@arm.com>
-Message-ID: <20161104155039.5lxubpyt2dsuqxef@localhost>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  4 Nov 2016 16:51:21 +0100
+Subject: [PATCH net-next 0/2] ARM64: Add Internal PHY support for Meson GXL
+Message-ID: <1478274683-1503-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 05:30:58PM +0100, Kevin Brodsky wrote:
-> * The vDSO page replaces the vector page. The vDSO provides its own
->   sigreturn trampolines, replacing those in the vector page, but the
->   kuser helpers are gone. As a result enabling the compat vDSO will
->   break userspace programs relying on the kuser helpers.
+The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
+external RGMII pins.
 
-I think vDSO and vectors page should not exclude each other. If you want
-to disable the vectors page, let's make it an independent config option
-like the KUSER_HELPERS in arch/arm64/mm/Kconfig. But I would very much
-like to be able to have both the vDSO and the vectors page at the same
-time.
+In order to support switching between the two PHYs links, extended registers
+size for mdio-mux-mmioreg must be added.
+
+The DT related patches submitted as RFC in [3] will be sent in a separate
+patchset due to multiple patchsets and DTSI migrations.
+
+Changes since v2 RFC patchset at : [3]
+ - Change phy Kconfig/Makefile alphabetic order
+ - GXL dtsi cleanup
+
+Changes since original RFC patchset at : [2]
+ - Remove meson8b experimental phy switching
+ - Switch to mdio-mux-mmioreg with extennded size support
+ - Add internal phy support for S905x and p231
+ - Add external PHY support for p230
+
+[1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1477932987-27871-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (2):
+  net: mdio-mux-mmioreg: Add support for 16bit and 32bit register sizes
+  net: phy: Add Meson GXL Internal PHY driver
+
+ .../devicetree/bindings/net/mdio-mux-mmioreg.txt   |  4 +-
+ drivers/net/phy/Kconfig                            |  5 ++
+ drivers/net/phy/Makefile                           |  1 +
+ drivers/net/phy/mdio-mux-mmioreg.c                 | 60 ++++++++++++----
+ drivers/net/phy/meson-gxl.c                        | 81 ++++++++++++++++++++++
+ 5 files changed, 136 insertions(+), 15 deletions(-)
+ create mode 100644 drivers/net/phy/meson-gxl.c
 
 -- 
-Catalin
+1.9.1
