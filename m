@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:05 +0100
-Subject: [PATCH 10/12] arm64: dts: r8a7796: salvator: enable on board eMMC
+Date: Fri,  4 Nov 2016 10:44:04 +0100
+Subject: [PATCH 09/12] arm64: dts: r8a7795: salvator: enable on-board eMMC
 In-Reply-To: <cover.1478251192.git.horms+renesas@verge.net.au>
 References: <cover.1478251192.git.horms+renesas@verge.net.au>
-Message-ID: <38548328fe3ff931063ce81ed3c3b5867c5fb233.1478251192.git.horms+renesas@verge.net.au>
+Message-ID: <7c827d1fda99d4a80e317b1fbb1ba359b082bda2.1478251192.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,15 +12,15 @@ From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 44 +++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-index 08c335afd970..a9c296b1e1b7 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -31,6 +31,24 @@
- 		reg = <0x0 0x48000000 0x0 0x78000000>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index c8f6023c4667..da3e996ba121 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -62,6 +62,24 @@
+ 		clock-frequency = <24576000>;
  	};
  
 +	reg_1p8v: regulator0 {
@@ -44,15 +44,7 @@ index 08c335afd970..a9c296b1e1b7 100644
  	vcc_sdhi0: regulator-vcc-sdhi0 {
  		compatible = "regulator-fixed";
  
-@@ -78,7 +96,6 @@
- 		states = <3300000 1
- 			  1800000 0>;
- 	};
--
- };
- 
- &pfc {
-@@ -106,6 +123,18 @@
+@@ -250,6 +268,18 @@
  		power-source = <1800>;
  	};
  
@@ -71,7 +63,7 @@ index 08c335afd970..a9c296b1e1b7 100644
  	sdhi3_pins: sd3 {
  		groups = "sdhi3_data4", "sdhi3_ctrl";
  		function = "sdhi3";
-@@ -141,6 +170,19 @@
+@@ -401,6 +431,19 @@
  	status = "okay";
  };
  
