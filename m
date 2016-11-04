@@ -1,35 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 4 Nov 2016 14:43:18 +0300
-Subject: [PATCH v2] ARM: DTS: r8a7794: alt: Fix PFC names for DU
-In-Reply-To: <1478201686-25488-1-git-send-email-jacopo@jmondi.org>
-References: <1478180574-15464-1-git-send-email-jacopo@jmondi.org>
- <1478201686-25488-1-git-send-email-jacopo@jmondi.org>
-Message-ID: <c0a3c44b-545c-7af3-feed-857cb20ef698@cogentembedded.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 4 Nov 2016 12:21:07 +0000
+Subject: [PATCH] bus: vexpress-config: fix device reference leak
+In-Reply-To: <1478259746.17152.126.camel@arm.com>
+References: <1477997017-29103-1-git-send-email-johan@kernel.org>
+ <1478259746.17152.126.camel@arm.com>
+Message-ID: <20161104122107.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Nov 04, 2016 at 11:42:26AM +0000, Pawel Moll wrote:
+> On Tue, 2016-11-01 at 11:43 +0100, Johan Hovold wrote:
+> > Make sure to drop the reference to the parent device taken by
+> > class_find_device() after populating the bus.
+> > 
+> > Fixes: 3b9334ac835b ("mfd: vexpress: Convert custom func API to
+> > regmap")
+> > Signed-off-by: Johan Hovold <johan@kernel.org>
+> 
+> You're right. May I ask how did you figure it out? The get_device()
+> happening in class_find_device() is a bit obscure,
 
-On 11/3/2016 10:34 PM, Jacopo Mondi wrote:
+It's not obscure at all - all the functions that find a device do so
+under a lock to ensure that the device does not go away, and they
+take a reference count on the device before returning the pointer for
+exactly the same reason.
 
-> Update the PFC pin groups and function names of DU interface for
-> r8a7794 ALT board.
->
-> The currently specified pin groups and function names prevented PFC and
-> DU interfaces from being correctly configured:
->
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> sh-pfc e6060000.pin-controller: function 'du' not supported
-> sh-pfc e6060000.pin-controller: invalid function du in map table
-> rcar-du: probe of feb00000.display failed with error -22
->
-> Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
+If they didn't do that, the find function could locate a struct device
+while another thread is deleting the struct device, and it would then
+return a stale pointer - and dereferencing that pointer would then be
+a use-after-free bug.
 
-Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+So not obscure, but rather fundamentally necessary.
 
-MBR, Sergei
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
