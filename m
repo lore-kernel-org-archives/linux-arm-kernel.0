@@ -1,73 +1,78 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  4 Nov 2016 17:31:58 +0000
-Subject: [PATCH v8 11/16] add kvm__check_vm_capability
+Date: Fri,  4 Nov 2016 17:32:03 +0000
+Subject: [PATCH v8 16/16] arm: add support for vGICv3 and vITS
 In-Reply-To: <20161104173203.21168-1-andre.przywara@arm.com>
 References: <20161104173203.21168-1-andre.przywara@arm.com>
-Message-ID: <20161104173203.21168-12-andre.przywara@arm.com>
+Message-ID: <20161104173203.21168-17-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM capabilities can be per-VM, in this case the ioctl should be
-issued on the VM file descriptor, not on the system fd.
-Since this feature is guarded by a (system) capability itself, wrap
-the call into a function of its own.
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
+KVM/arm got support for vGICv3 and vITS recently, so make use of it.
+
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/kvm.h |  1 +
- kvm.c             | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ arm/aarch32/arm-cpu.c              | 2 +-
+ arm/aarch32/include/kvm/kvm-arch.h | 3 ---
+ arm/aarch64/include/kvm/kvm-arch.h | 3 ---
+ arm/include/arm-common/kvm-arch.h  | 2 ++
+ 4 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 4a76ec2..a76a25d 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -129,6 +129,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
+diff --git a/arm/aarch32/arm-cpu.c b/arm/aarch32/arm-cpu.c
+index 27a8e17..16bba55 100644
+--- a/arm/aarch32/arm-cpu.c
++++ b/arm/aarch32/arm-cpu.c
+@@ -12,7 +12,7 @@ static void generate_fdt_nodes(void *fdt, struct kvm *kvm)
+ {
+ 	int timer_interrupts[4] = {13, 14, 11, 10};
+ 
+-	gic__generate_fdt_nodes(fdt, IRQCHIP_GICV2);
++	gic__generate_fdt_nodes(fdt, kvm->cfg.arch.irqchip);
+ 	timer__generate_fdt_nodes(fdt, kvm, timer_interrupts);
  }
  
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
+diff --git a/arm/aarch32/include/kvm/kvm-arch.h b/arm/aarch32/include/kvm/kvm-arch.h
+index 1632e3c..cd31e72 100644
+--- a/arm/aarch32/include/kvm/kvm-arch.h
++++ b/arm/aarch32/include/kvm/kvm-arch.h
+@@ -1,9 +1,6 @@
+ #ifndef KVM__KVM_ARCH_H
+ #define KVM__KVM_ARCH_H
  
- static inline void kvm__set_thread_name(const char *name)
- {
-diff --git a/kvm.c b/kvm.c
-index 7fa76f7..665ed14 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
- 	return kvm_dir;
- }
+-#define ARM_GIC_DIST_SIZE	0x1000
+-#define ARM_GIC_CPUI_SIZE	0x2000
+-
+ #define ARM_KERN_OFFSET(...)	0x8000
  
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
-+{
-+	static int supports_vm_ext_check = 0;
-+	int ret;
-+
-+	switch (supports_vm_ext_check) {
-+	case 0:
-+		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
-+			    KVM_CAP_CHECK_EXTENSION_VM);
-+		if (ret <= 0) {
-+			supports_vm_ext_check = -1;
-+			return false;
-+		}
-+		supports_vm_ext_check = 1;
-+		/* fall through */
-+	case 1:
-+		break;
-+	case -1:
-+		return false;
-+	}
-+
-+	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
-+	if (ret < 0)
-+		return false;
-+
-+	return ret;
-+}
-+
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
- {
- 	int ret;
+ #define ARM_MAX_MEMORY(...)	ARM_LOMAP_MAX_MEMORY
+diff --git a/arm/aarch64/include/kvm/kvm-arch.h b/arm/aarch64/include/kvm/kvm-arch.h
+index 4925736..9de623a 100644
+--- a/arm/aarch64/include/kvm/kvm-arch.h
++++ b/arm/aarch64/include/kvm/kvm-arch.h
+@@ -1,9 +1,6 @@
+ #ifndef KVM__KVM_ARCH_H
+ #define KVM__KVM_ARCH_H
+ 
+-#define ARM_GIC_DIST_SIZE	0x10000
+-#define ARM_GIC_CPUI_SIZE	0x20000
+-
+ #define ARM_KERN_OFFSET(kvm)	((kvm)->cfg.arch.aarch32_guest	?	\
+ 				0x8000				:	\
+ 				0x80000)
+diff --git a/arm/include/arm-common/kvm-arch.h b/arm/include/arm-common/kvm-arch.h
+index 0f5fb7f..c83c45f 100644
+--- a/arm/include/arm-common/kvm-arch.h
++++ b/arm/include/arm-common/kvm-arch.h
+@@ -18,6 +18,8 @@
+ #define ARM_GIC_DIST_BASE	(ARM_AXI_AREA - ARM_GIC_DIST_SIZE)
+ #define ARM_GIC_CPUI_BASE	(ARM_GIC_DIST_BASE - ARM_GIC_CPUI_SIZE)
+ #define ARM_GIC_SIZE		(ARM_GIC_DIST_SIZE + ARM_GIC_CPUI_SIZE)
++#define ARM_GIC_DIST_SIZE	0x10000
++#define ARM_GIC_CPUI_SIZE	0x20000
+ 
+ #define ARM_IOPORT_SIZE		(ARM_MMIO_AREA - ARM_IOPORT_AREA)
+ #define ARM_VIRTIO_MMIO_SIZE	(ARM_AXI_AREA - (ARM_MMIO_AREA + ARM_GIC_SIZE))
 -- 
 2.9.0
