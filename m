@@ -1,8 +1,10 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 04 Nov 2016 17:14:46 +0100
+Date: Fri, 04 Nov 2016 17:14:47 +0100
 Subject: [PATCH RFC 0/7] DMA: S3C64XX: Conversion to the new channel request
  API
-Message-ID: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+In-Reply-To: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1478276094-19135-2-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,7 +13,7 @@ the new universal DMA channel request API, i.e. this is only
 meaningful for non-dt systems using s3c64xx SoCs.
 
 I'm sending the whole series as RFC since I didn't test it
-yet, I'm going to prepare smdk6410 for testing this series.
+yet, I'm going to prepare smd6410 for testing this series.
 It would be great if someone else could also test it,
 either SPI or sound functionality verification would be 
 useful.
