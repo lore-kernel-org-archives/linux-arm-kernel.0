@@ -1,72 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  4 Nov 2016 18:17:06 +0000
-Subject: [PATCH] arm64: percpu: kill off final ACCESS_ONCE() uses
-Message-ID: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
+From: scott@buserror.net (Scott Wood)
+Date: Fri, 4 Nov 2016 13:20:50 -0500
+Subject: [PATCH v3 2/6] arm64: arch_timer: Introduce a generic erratum
+ handing mechanism for fsl-a008585
+In-Reply-To: <1478264794-14652-2-git-send-email-dingtianhong@huawei.com>
+References: <1478264794-14652-1-git-send-email-dingtianhong@huawei.com>
+ <1478264794-14652-2-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20161104182050.GA1651@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For several reasons it is preferable to use {READ,WRITE}_ONCE() rather than
-ACCESS_ONCE(). For example, these handle aggregate types, result in shorter
-source code, and better document the intended access (which may be useful for
-instrumentation features such as the upcoming KTSAN).
+On Fri, Nov 04, 2016 at 09:06:30PM +0800, Ding Tianhong wrote:
+> The workaround for hisilicon,161601 will check the return value of the system counter
+> by different way, in order to distinguish with the fsl-a008585 workaround, introduce
+> a new generic erratum handing mechanism for fsl-a008585 and rename some functions.
+> 
+> v2: Introducing a new generic erratum handling mechanism for fsl erratum a008585.
+> 
+> v3: Introducing the erratum_workaround_set_sne generic function for fsl erratum a008585
+>     and make the #define __fsl_a008585_read_reg to be private to the .c file instead of
+>     being globally visible. After discussion with Marc and Will, a consensus decision was
+>     made to remove the commandline parameter for enabling fsl,erratum-a008585 erratum,
+>     and make some generic name more specific, export timer_unstable_counter_workaround
+>     for module access.
 
-Over a number of patches, most uses of ACCESS_ONCE() in arch/arm64 have been
-migrated to {READ,WRITE}_ONCE(). For consistency, and the above reasons, this
-patch migrates the final remaining uses.
+The command line paramter was added at Marc's request to provide a way of
+enbaling the workaround in a KVM guest, until API is added to allow QEMU to
+discover the need to set the property in the guest device tree.  Is there an
+alternative?
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dmitry Vyukov <dvyukov@google.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/percpu.h | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 5394c84..4afb6fc 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -101,16 +101,16 @@ static inline unsigned long __percpu_read(void *ptr, int size)
- 
- 	switch (size) {
- 	case 1:
--		ret = ACCESS_ONCE(*(u8 *)ptr);
-+		ret = READ_ONCE(*(u8 *)ptr);
- 		break;
- 	case 2:
--		ret = ACCESS_ONCE(*(u16 *)ptr);
-+		ret = READ_ONCE(*(u16 *)ptr);
- 		break;
- 	case 4:
--		ret = ACCESS_ONCE(*(u32 *)ptr);
-+		ret = READ_ONCE(*(u32 *)ptr);
- 		break;
- 	case 8:
--		ret = ACCESS_ONCE(*(u64 *)ptr);
-+		ret = READ_ONCE(*(u64 *)ptr);
- 		break;
- 	default:
- 		BUILD_BUG();
-@@ -123,16 +123,16 @@ static inline void __percpu_write(void *ptr, unsigned long val, int size)
- {
- 	switch (size) {
- 	case 1:
--		ACCESS_ONCE(*(u8 *)ptr) = (u8)val;
-+		WRITE_ONCE(*(u8 *)ptr, (u8)val);
- 		break;
- 	case 2:
--		ACCESS_ONCE(*(u16 *)ptr) = (u16)val;
-+		WRITE_ONCE(*(u16 *)ptr, (u16)val);
- 		break;
- 	case 4:
--		ACCESS_ONCE(*(u32 *)ptr) = (u32)val;
-+		WRITE_ONCE(*(u32 *)ptr, (u32)val);
- 		break;
- 	case 8:
--		ACCESS_ONCE(*(u64 *)ptr) = (u64)val;
-+		WRITE_ONCE(*(u64 *)ptr, (u64)val);
- 		break;
- 	default:
- 		BUILD_BUG();
--- 
-2.7.4
+-Scott
