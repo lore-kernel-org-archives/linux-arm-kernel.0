@@ -1,53 +1,59 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:13 +0100
-Subject: [PATCH 14/29] ARM: dts: r7s72100: add sdhi clock to device tree
+Date: Fri,  4 Nov 2016 10:44:20 +0100
+Subject: [PATCH 21/29] ARM: dts: r8a7793: Enable VIN0-VIN2
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <7c8522b7047c77ef598e8b5f9ff6e349c22e0622.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <06b64afa6e981b332dccadcf0b5d52139525b4f6.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 8 ++++++++
- include/dt-bindings/clock/r7s72100-clock.h | 4 ++++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 50f9f3bc109d..eab06701ef11 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -149,6 +149,14 @@
- 			>;
- 			clock-output-names = "spi0", "spi1", "spi2", "spi3", "spi4";
- 		};
-+		mstp12_clks: mstp12_clks at fcfe0444 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0444 4>;
-+			clocks = <&p1_clk>, <&p1_clk>;
-+			clock-indices = <R7S72100_CLK_SDHI1 R7S72100_CLK_SDHI0>;
-+			clock-output-names = "sdhi1", "sdhi0";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index a7d11b9f3555..629d3d60d1cd 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -852,6 +852,33 @@
+ 		status = "disabled";
  	};
  
- 	cpus {
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index 5eaf0fb469c2..29e01ed10e74 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -44,4 +44,8 @@
- #define R7S72100_CLK_SPI3	4
- #define R7S72100_CLK_SPI4	3
- 
-+/* MSTP12 */
-+#define R7S72100_CLK_SDHI0	3
-+#define R7S72100_CLK_SDHI1	2
++	vin0: video at e6ef0000 {
++		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
++		reg = <0 0xe6ef0000 0 0x1000>;
++		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7793_CLK_VIN0>;
++		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
++		status = "disabled";
++	};
 +
- #endif /* __DT_BINDINGS_CLOCK_R7S72100_H__ */
++	vin1: video at e6ef1000 {
++		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
++		reg = <0 0xe6ef1000 0 0x1000>;
++		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7793_CLK_VIN1>;
++		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
++		status = "disabled";
++	};
++
++	vin2: video at e6ef2000 {
++		compatible = "renesas,vin-r8a7793", "renesas,rcar-gen2-vin";
++		reg = <0 0xe6ef2000 0 0x1000>;
++		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7793_CLK_VIN2>;
++		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
++		status = "disabled";
++	};
++
+ 	qspi: spi at e6b10000 {
+ 		compatible = "renesas,qspi-r8a7793", "renesas,qspi";
+ 		reg = <0 0xe6b10000 0 0x2c>;
 -- 
 2.7.0.rc3.207.g0ac5344
