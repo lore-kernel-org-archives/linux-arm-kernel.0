@@ -1,30 +1,46 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Fri,  4 Nov 2016 07:13:52 +0100
-Subject: [PATCH] drm/sun4i: Propagate error to the caller
-Message-ID: <20161104061352.12596-1-christophe.jaillet@wanadoo.fr>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 4 Nov 2016 11:55:32 +0530
+Subject: [GIT PULL 1/4] DaVinci cleanup for v4.10
+Message-ID: <20161104062535.9593-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If 'sun4i_layers_init()' returns an error, propagate it instead of
-returning -EINVAL unconditionally.
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
- drivers/gpu/drm/sun4i/sun4i_drv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 628712e6edd6..ee4e5f987b6f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -145,7 +145,7 @@ static int sun4i_drv_bind(struct device *dev)
- 	drv->layers = sun4i_layers_init(drm);
- 	if (IS_ERR(drv->layers)) {
- 		dev_err(drm->dev, "Couldn't create the planes\n");
--		ret = -EINVAL;
-+		ret = PTR_ERR(drv->layers);
- 		goto free_drm;
- 	}
- 
--- 
-2.9.3
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/cleanup
+
+for you to fetch changes up to 766763dbdc1dca11deabdb00077a1c19e2803f0a:
+
+  ARM: davinci: da8xx: Remove duplicated defines (2016-10-31 16:51:56 +0530)
+
+----------------------------------------------------------------
+Clean-up some unnecessary code from mach-davinci.
+
+- Remove now unneeded dma resources where drivers
+  are already converted to use the dma_slave_map[]
+  structure.
+
+- Remove some duplicated defines related to USB support.
+
+----------------------------------------------------------------
+Alexandre Bailon (1):
+      ARM: davinci: da8xx: Remove duplicated defines
+
+Peter Ujfalusi (4):
+      ARM: davinci: devices-da8xx: Remove DMA resources for MMC and SPI
+      ARM: davinci: devices: Remove DMA resources for MMC
+      ARM: davinci: dm355: Remove DMA resources for SPI
+      ARM: davinci: dm365: Remove DMA resources for SPI
+
+ arch/arm/mach-davinci/board-da830-evm.c     |  5 +++--
+ arch/arm/mach-davinci/board-omapl138-hawk.c |  3 ++-
+ arch/arm/mach-davinci/devices-da8xx.c       | 29 -----------------------------
+ arch/arm/mach-davinci/devices.c             |  3 ---
+ arch/arm/mach-davinci/dm355.c               |  8 --------
+ arch/arm/mach-davinci/dm365.c               |  8 --------
+ include/linux/platform_data/usb-davinci.h   | 23 -----------------------
+ 7 files changed, 5 insertions(+), 74 deletions(-)
