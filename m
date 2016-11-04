@@ -1,40 +1,30 @@
-From: stephan@soliotek.com (=?UTF-8?q?St=C3=A9phan=20Rafin?=)
-Date: Fri,  4 Nov 2016 00:53:56 +0100
-Subject: [PATCH] clk: sunxi: Fix M factor computation for APB1
-Message-ID: <1478217236-12831-1-git-send-email-stephan@soliotek.com>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Thu,  3 Nov 2016 17:10:34 -0700
+Subject: [PATCH v2 0/3] Remove clocks dependency from SCM driver
+Message-ID: <1478218237-1737-1-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit cfa636886033 ("clk: sunxi: factors: Consolidate get_factors
-parameters into a struct") introduced a regression for m factor
-computation in sun4i_get_apb1_factors function.
+On earlier chiptsets (APQ8064, MSM8660, MSM8690, MSM8916,
+APQ8084, MSM8974) crypto operations of TZ were depends on crypto
+clocks controlled by users/clients. However on MSM8996 crypto clocks
+control is handled internally in TZ itself. The current series of
+patches handle this clock dependency in SCM driver.
 
-The old code reassigned the "parent_rate" parameter to the targeted
-divisor value and was buggy for the returned frequency but not for the
-computed factors. Now, returned frequency is good but m factor is
-incorrectly computed (its max value 31 is always set resulting in a
-significantly slower frequency than the requested one...)
+Changes since v1:
+- Added Rob's Acked-by
+- Removed of_device_is_compatible check from probe (Stephen)
+- Modified typecast to take care of 32-bit pointer
 
-This patch simply restores the original proper computation for m while
-keeping the good changes for returned rate.
+Sarangdhar Joshi (3):
+  dt-bindings: firmware: scm: Add MSM8996 DT bindings
+  firmware: qcom: scm: Remove core, iface and bus clocks dependency
+  firmware: qcom: scm: Return PTR_ERR when devm_clk_get fails
 
-Signed-off-by: St?phan Rafin <stephan@soliotek.com>
----
- drivers/clk/sunxi/clk-sunxi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/firmware/qcom,scm.txt      |  2 +
+ drivers/firmware/qcom_scm.c                        | 49 ++++++++++++++++------
+ 2 files changed, 39 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 838b22a..f2c9274 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -373,7 +373,7 @@ static void sun4i_get_apb1_factors(struct factors_request *req)
- 	else
- 		calcp = 3;
- 
--	calcm = (req->parent_rate >> calcp) - 1;
-+	calcm = (div >> calcp) - 1;
- 
- 	req->rate = (req->parent_rate >> calcp) / (calcm + 1);
- 	req->m = calcm;
 -- 
-2.6.6
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
