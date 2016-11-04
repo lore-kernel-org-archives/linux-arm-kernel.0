@@ -1,40 +1,77 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 4 Nov 2016 08:49:40 +0100
-Subject: [PATCH] clk: sunxi: Fix M factor computation for APB1
-In-Reply-To: <1478217236-12831-1-git-send-email-stephan@soliotek.com>
-References: <1478217236-12831-1-git-send-email-stephan@soliotek.com>
-Message-ID: <20161104074940.ak46ghzoa3o3xcie@lukather>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Fri, 4 Nov 2016 15:58:35 +0800
+Subject: [PATCH 5/6] ARM: add low level debug uart for rk1108
+In-Reply-To: <12034481.WHiLii4Pov@phil>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1478176941-12188-1-git-send-email-andy.yan@rock-chips.com>
+ <12034481.WHiLii4Pov@phil>
+Message-ID: <56bcae77-3aed-c183-5e9f-3581cc187a7d@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 12:53:56AM +0100, St?phan Rafin wrote:
-> commit cfa636886033 ("clk: sunxi: factors: Consolidate get_factors
-> parameters into a struct") introduced a regression for m factor
-> computation in sun4i_get_apb1_factors function.
-> 
-> The old code reassigned the "parent_rate" parameter to the targeted
-> divisor value and was buggy for the returned frequency but not for the
-> computed factors. Now, returned frequency is good but m factor is
-> incorrectly computed (its max value 31 is always set resulting in a
-> significantly slower frequency than the requested one...)
-> 
-> This patch simply restores the original proper computation for m while
-> keeping the good changes for returned rate.
-> 
-> Signed-off-by: St?phan Rafin <stephan@soliotek.com>
+Hi Heiko:
 
-Applied (added a Fixes tag), thanks
 
-Maxime
+On 2016?11?04? 15:36, Heiko Stuebner wrote:
+> Am Donnerstag, 3. November 2016, 20:42:21 CET schrieb Andy Yan:
+>> RK1108 UARTs are Synopsis DesignWare 8250 compatible.
+>> Only with different register addresses.
+>>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>> ---
+>>
+>>   arch/arm/Kconfig.debug | 30 ++++++++++++++++++++++++++++++
+>>   1 file changed, 30 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index d83f7c3..408540f 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -776,6 +776,30 @@ choice
+>>   		  their output to the standard serial port on the RealView
+>>   		  PB1176 platform.
+>>
+>> +	config DEBUG_RK1108_UART0
+>> +		bool "Kernel low-level debugging messages via Rockchip RK1108 UART0"
+>> +		depends on ARCH_ROCKCHIP
+>> +		select DEBUG_UART_8250
+>> +		help
+>> +		  Say Y here if you want kernel low-level debugging support
+>> +                  on Rockchip RK1108 based platforms.
+>> +
+>> +	config DEBUG_RK1108_UART1
+>> +		bool "Kernel low-level debugging messages via Rockchip RK1108 UART1"
+>> +		depends on ARCH_ROCKCHIP
+>> +		select DEBUG_UART_8250
+>> +		help
+>> +		  Say Y here if you want kernel low-level debugging support
+>> +		  on Rockchip RK1108 based platforms.
+>> +
+>> +	config DEBUG_RK1108_UART2
+>> +		bool "Kernel low-level debugging messages via Rockchip RK1108 UART2"
+>> +		depends on ARCH_ROCKCHIP
+>> +		select DEBUG_UART_8250
+>> +		help
+>> +		  Say Y here if you want kernel low-level debugging support
+>> +		  on Rockchip RK1108 based platforms.
+>> +
+> are you sure, you need all 3 of them?
+>
+> I.e. most Rockchip SoCs so far had one uart somewhat designated as debug uart.
+> Most likely due to it not having rts/cts and being used in reference
+> schematics, but no one ever used another uart than uart2 on previous socs. So
+> ideally we could check and only add uarts we actually need for now. More can
+> be added later anyway once boards try to use them.
+>
+>
+> Heiko
+>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161104/a56fa6c0/attachment.sig>
+     Actually, I have two boards on my hand, one uses uart0 as debug 
+port and the another uses uart2, so I add all of them here.
+
+    I have a question here, I not very clear how to get the 
+DEBUG_UART_VIRT value here,  I now set the value I got from uart driver 
+and it works , is there some rule or  method to calculate this 
+DEBUG_UART_VIRT value on different platform?
+>
