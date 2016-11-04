@@ -1,63 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 4 Nov 2016 09:55:44 +0000
-Subject: [PATCH v3 0/3] modversions: Fix CRC mangling under
- CONFIG_RELOCATABLE=y
-In-Reply-To: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1477585631-18574-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8Yc9rUacE70mvZSR92g1OY6LYyN6zrd--omwZVqwg3TA@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 04 Nov 2016 11:05:02 +0100
+Subject: [PATCH] media: s5p-mfc include buffer size in error message
+In-Reply-To: <20161018004337.26831-1-shuahkh@osg.samsung.com>
+References: <20161018004337.26831-1-shuahkh@osg.samsung.com>
+ <CGME20161104100504eucas1p196456ab351847ffabb60f51e76eab707@eucas1p1.samsung.com>
+Message-ID: <b1a9fa02-6821-7637-881c-a31719e891c9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2016 at 17:27, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This series is a followup to the single patch 'modversions: treat symbol
-> CRCs as 32 bit quantities on 64 bit archs', of which two versions have
-> been sent out so far [0][1]
->
-> As pointed out by Michael, GNU ld behaves a bit differently between arm64
-> and PowerPC64, and where the former gets rid of all runtime relocations
-> related to CRCs, the latter is not as easily convinced.
->
-> Patch #1 fixes the issue where CRCs are corrupted by the runtime relocation
-> routines for 32-bit PowerPC, for which the original fix was effectively
-> reverted by commit 0e0ed6406e61 ("powerpc/modules: Module CRC relocation fix
-> causes perf issues")
->
-> Patch #2 adds handling of R_PPC64_ADDR32 relocations against the NULL .dynsym
-> symbol entry to the PPC64 runtime relocation routines, so it is prepared to
-> deal with CRCs being emitted as 32-bit quantities.
->
-> Patch #3 is the original patch from the v1 and v2 submissions.
->
-> Changes since v2:
-> - added #1 and #2
-> - updated #3 to deal with CRC entries being emitted from assembler
-> - added Rusty's ack (#3)
->
-> Branch can be found here:
-> https://git.kernel.org/cgit/linux/kernel/git/ardb/linux.git/log/?h=kcrctab-reloc
->
-> [0] http://marc.info/?l=linux-kernel&m=147652300207369&w=2
-> [1] http://marc.info/?l=linux-kernel&m=147695629614409&w=2
->
+On 10/18/2016 02:43 AM, Shuah Khan wrote:
+> Include buffer size in s5p_mfc_alloc_priv_buf() the error message when it
+> fails to allocate the buffer. Remove the debug message that does the same.
+> 
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+> index 1e72502..eee16a1 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+> @@ -40,12 +40,11 @@ void s5p_mfc_init_regs(struct s5p_mfc_dev *dev)
+>  int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
+>  					struct s5p_mfc_priv_buf *b)
+>  {
+> -	mfc_debug(3, "Allocating priv: %zu\n", b->size);
 
-Ping?
+How about keeping this debug message, I think it would be useful
+to leave that information in the debug logs.
 
-> Ard Biesheuvel (3):
->   powerpc/reloc32: fix corrupted modversion CRCs
->   powerpc/reloc64: add support for 32-bit CRC pseudo-symbols
->   modversions: treat symbol CRCs as 32 bit quantities on 64 bit archs
->
->  arch/powerpc/include/asm/module.h |  4 --
->  arch/powerpc/kernel/module_64.c   |  8 ----
->  arch/powerpc/kernel/reloc_32.S    | 36 +++++++++++++--
->  arch/powerpc/kernel/reloc_64.S    | 22 +++++++--
->  arch/powerpc/relocs_check.sh      |  3 +-
->  include/asm-generic/export.h      |  7 +--
->  include/linux/export.h            |  8 ++++
->  include/linux/module.h            | 14 +++---
->  kernel/module.c                   | 47 +++++++-------------
->  9 files changed, 85 insertions(+), 64 deletions(-)
->
-> --
-> 2.7.4
->
+>  	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
+>  
+>  	if (!b->virt) {
+> -		mfc_err("Allocating private buffer failed\n");
+> +		mfc_err("Allocating private buffer of size %zu failed\n",
+> +			b->size);
+>  		return -ENOMEM;
+>  	}
+
+--
+Thanks,
+Sylwester
