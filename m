@@ -1,42 +1,42 @@
-From: jay.xu@rock-chips.com (jay.xu)
-Date: Fri, 4 Nov 2016 08:33:15 +0800
-Subject: [PATCH] clk: rockchip: fix some clocks' name to be more standard
- style
-In-Reply-To: <44798035.VNVnDcOLnj@diego>
-References: <1478070296-23080-1-git-send-email-jay.xu@rock-chips.com>
- <763cad68-a068-9a4b-e26d-2c459c2d4808@rock-chips.com>
- <44798035.VNVnDcOLnj@diego>
-Message-ID: <33f1004e-bbc8-5074-3e67-38cd98d3915c@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Nov 2016 09:08:11 +0800
+Subject: [PATCH v2 06/14] ASoC: sun4i-codec: Add support for A31 playback
+ through headphone output
+In-Reply-To: <20161103173602.zchyciwj66zdibc7@lukather>
+References: <20161103075556.29018-1-wens@csie.org>
+ <20161103075556.29018-7-wens@csie.org>
+ <20161103173602.zchyciwj66zdibc7@lukather>
+Message-ID: <CAGb2v65CZJ+1LTWWk3+vABV8PDgsDta+nZ7o3H2Z--KFPe2kog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko and Shawn:
+On Fri, Nov 4, 2016 at 1:36 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Nov 03, 2016 at 03:55:48PM +0800, Chen-Yu Tsai wrote:
+>> +/* headphone controls */
+>> +static const char * const sun6i_codec_hp_src_enum_text[] = {
+>> +     "DAC", "Mixer",
+>> +};
+>> +
+>> +static SOC_ENUM_DOUBLE_DECL(sun6i_codec_hp_src_enum,
+>> +                         SUN6I_CODEC_OM_DACA_CTRL,
+>> +                         SUN6I_CODEC_OM_DACA_CTRL_LHPIS,
+>> +                         SUN6I_CODEC_OM_DACA_CTRL_RHPIS,
+>> +                         sun6i_codec_hp_src_enum_text);
+>> +
+>> +static const struct snd_kcontrol_new sun6i_codec_hp_src[] = {
+>> +     SOC_DAPM_ENUM("Headphone Source Playback Route",
+>> +                   sun6i_codec_hp_src_enum),
+>> +};
+>
+> What is that route exactly? A muxer?
 
-ok, I agree with you, and the root fix seems to fix it in the TRM first.
-I'll feedback to TRM makers.
+Yup. The following is part of the widgets list later in the code:
 
-Thanks.
++       /* Headphone output path */
++       SND_SOC_DAPM_MUX("Headphone Source Playback Route",
++                        SND_SOC_NOPM, 0, 0, sun6i_codec_hp_src),
 
-On 2016?11?03? 22:32, Heiko St?bner wrote:
-> Am Donnerstag, 3. November 2016, 16:52:48 schrieb Shawn Lin:
->> On 2016/11/2 15:04, Jianqun Xu wrote:
->>> Fix aclk_emmcgrf to aclk_emmc_grf, and fix aclk_emmccore to be
->>> aclk_emmc_core.
->>
->> What is the standard style should be?
->>
->> TRM uses aclk_emmccore but not aclk_emmc_core, so should it be more
->> standrad to keep it as-is?
->
-> I tend to agree with Shawn. While it looks like the missing "_" is some sort
-> of mistake, we should strive to follow TRM naming, so grepping so it becomes
-> easier to look for informations in these things in the TRM.
->
-> Same reason for naming our regulators and pinctrl after the names used in
-> device schematics, if available.
->
->
-> Heiko
->
->
->
+ChenYu
