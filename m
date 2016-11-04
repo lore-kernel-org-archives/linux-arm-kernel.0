@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:25 +0100
-Subject: [PATCH 26/29] ARM: dts: r8a7740: Remove skeleton.dtsi inclusion
+Date: Fri,  4 Nov 2016 10:44:23 +0100
+Subject: [PATCH 24/29] ARM: dts: r8a7778: Remove skeleton.dtsi inclusion
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <d0b54c54f1a2257017c2501a56df936c6d921585.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <3bc313022dbdc96457add1d2c29d81280d6a2b60.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,25 +20,25 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 4 ++--
+ arch/arm/boot/dts/r8a7778.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 159e04eb1b9e..34159a8349de 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -8,8 +8,6 @@
+diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
+index e571d66ea0fe..f3ffe1d31544 100644
+--- a/arch/arm/boot/dts/r8a7778.dtsi
++++ b/arch/arm/boot/dts/r8a7778.dtsi
+@@ -14,8 +14,6 @@
   * kind, whether express or implied.
   */
  
 -/include/ "skeleton.dtsi"
 -
- #include <dt-bindings/clock/r8a7740-clock.h>
+ #include <dt-bindings/clock/r8a7778-clock.h>
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  #include <dt-bindings/interrupt-controller/irq.h>
-@@ -17,6 +15,8 @@
+@@ -23,6 +21,8 @@
  / {
- 	compatible = "renesas,r8a7740";
+ 	compatible = "renesas,r8a7778";
  	interrupt-parent = <&gic>;
 +	#address-cells = <1>;
 +	#size-cells = <1>;
