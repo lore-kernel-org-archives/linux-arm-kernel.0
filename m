@@ -1,140 +1,102 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  4 Nov 2016 17:31:51 +0000
-Subject: [PATCH v8 04/16] MSI-X: update GSI routing after changed MSI-X
- configuration
-In-Reply-To: <20161104173203.21168-1-andre.przywara@arm.com>
-References: <20161104173203.21168-1-andre.przywara@arm.com>
-Message-ID: <20161104173203.21168-5-andre.przywara@arm.com>
+Date: Fri,  4 Nov 2016 17:31:47 +0000
+Subject: [PATCH v8 00/16] kvmtool: arm: ITS emulation and GSI routing support
+Message-ID: <20161104173203.21168-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we set up GSI routing to map MSIs to KVM's GSI numbers, we
-write the current device's MSI setup into the kernel routing table.
-However the device driver in the guest can use PCI configuration space
-accesses to change the MSI configuration (address and/or payload data).
-Whenever this happens after we have setup the routing table already,
-we must amend the previously sent data.
-So when MSI-X PCI config space accesses write address or payload,
-find the associated GSI number and the matching routing table entry
-and update the kernel routing table (only if the data has changed).
+Hi,
 
-This fixes vhost-net, where the queue's IRQFD was setup before the
-MSI vectors.
+this series teaches kvmtool how to support KVM's ITS emulation. Also
+(as this is somewhat related and has been co-developed) it enables GSI
+routing for ARM/ARM64, which allows IRQFDs to be used, for instance
+to use vhost_net. At the moment this is dependent on the guest
+using the ITS emulation, but GICv2M support may be added at a later time.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/kvm/irq.h |  1 +
- irq.c             | 31 +++++++++++++++++++++++++++++++
- virtio/pci.c      | 36 +++++++++++++++++++++++++++++++++---
- 3 files changed, 65 insertions(+), 3 deletions(-)
+The first six patches are generic fixes and refactoring to pave the
+road for the rest of the patches. Most importantly patch 3/16 pulls
+the GSI routing code from x86 into generic code.
+The following six patches add ITS emulation support. They reserve and
+register the required ITS register frame and populate a DT node with
+the necessary data. Also the patches add the device ID to the
+KVM_SIGNAL_MSI ioctl.
+Patches 13 and 14 enable IRQ GSI routing for ARM/ARM64.
+This is needed to use IRQFDs, which is a prerequisite for vhost
+functionality, for instance. The code sets up the (dummy) SPI
+routing table and adds the device ID to the routing entry.
+The last two patches enables the guest ITS support by extending the
+existing --irqchip= parameter to allow "--irqchip=gicv3-its", both
+for ARM64 and ARM (kernel support for this is still pending).
 
-diff --git a/include/kvm/irq.h b/include/kvm/irq.h
-index bb71521..f35eb7e 100644
---- a/include/kvm/irq.h
-+++ b/include/kvm/irq.h
-@@ -21,5 +21,6 @@ int irq__exit(struct kvm *kvm);
- 
- int irq__allocate_routing_entry(void);
- int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
-+void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
- 
- #endif
-diff --git a/irq.c b/irq.c
-index a742aa2..895e5eb 100644
---- a/irq.c
-+++ b/irq.c
-@@ -93,6 +93,37 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
- 	return next_gsi++;
- }
- 
-+static bool update_data(u32 *ptr, u32 newdata)
-+{
-+	if (*ptr == newdata)
-+		return false;
-+
-+	*ptr = newdata;
-+	return true;
-+}
-+
-+void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg)
-+{
-+	struct kvm_irq_routing_msi *entry;
-+	unsigned int i;
-+	bool changed;
-+
-+	for (i = 0; i < irq_routing->nr; i++)
-+		if (gsi == irq_routing->entries[i].gsi)
-+			break;
-+	if (i == irq_routing->nr)
-+		return;
-+
-+	entry = &irq_routing->entries[i].u.msi;
-+
-+	changed  = update_data(&entry->address_hi, msg->address_hi);
-+	changed |= update_data(&entry->address_lo, msg->address_lo);
-+	changed |= update_data(&entry->data, msg->data);
-+
-+	if (changed)
-+		ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
-+}
-+
- int __attribute__((weak)) irq__exit(struct kvm *kvm)
- {
- 	free(irq_routing);
-diff --git a/virtio/pci.c b/virtio/pci.c
-index 072e5b7..b3b4aac 100644
---- a/virtio/pci.c
-+++ b/virtio/pci.c
-@@ -152,6 +152,30 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
- 	return ret;
- }
- 
-+static void update_msix_map(struct virtio_pci *vpci,
-+			    struct msix_table *msix_entry, u32 vecnum)
-+{
-+	u32 gsi, i;
-+
-+	/* Find the GSI number used for that vector */
-+	if (vecnum == vpci->config_vector) {
-+		gsi = vpci->config_gsi;
-+	} else {
-+		for (i = 0; i < VIRTIO_PCI_MAX_VQ; i++)
-+			if (vpci->vq_vector[i] == vecnum)
-+				break;
-+		if (i == VIRTIO_PCI_MAX_VQ)
-+			return;
-+		gsi = vpci->gsis[i];
-+	}
-+
-+	if (gsi == 0)
-+		return;
-+
-+	msix_entry = &msix_entry[vecnum];
-+	irq__update_msix_route(vpci->kvm, gsi, &msix_entry->msg);
-+}
-+
- static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *vdev, u16 port,
- 					void *data, int size, int offset)
- {
-@@ -270,10 +294,16 @@ static void virtio_pci__msix_mmio_callback(struct kvm_cpu *vcpu,
- 		offset	= vpci->msix_io_block;
- 	}
- 
--	if (is_write)
--		memcpy(table + addr - offset, data, len);
--	else
-+	if (!is_write) {
- 		memcpy(data, table + addr - offset, len);
-+		return;
-+	}
-+
-+	memcpy(table + addr - offset, data, len);
-+
-+	/* Did we just update the address or payload? */
-+	if (addr % 0x10 < 0xc)
-+		update_msix_map(vpci, table, (addr - offset) / 16);
- }
- 
- static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci, int vec)
+These patches make use of the recently (4.8-rc) merged KVM kernel
+functionality, both Eric's IRQ routing series and the ITS emulation.
+It can also be found in my kvmtool git repository [1].
+
+Compared to v7 of the series this is mostly bugfixing and updates,
+also adds the 32-bit support provided by Vladimir.
+
+Cheers,
+Andre.
+
+[1] git://linux-arm.org/kvmtool.git (branch: its/v8)
+    http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its/v8
+
+Andre Przywara (15):
+  FDT: introduce global phandle allocation
+  arm: use new phandle allocation functions
+  irq: move IRQ routing into irq.c
+  MSI-X: update GSI routing after changed MSI-X configuration
+  virtio: fix endianness check for vhost support
+  PCI: Only allocate IRQ routing entry when available
+  update public Linux headers for GICv3 ITS emulation
+  arm: gic: allow 32-bit compilation
+  arm: allow creation of an MSI register frame region
+  arm: FDT: create MSI controller DT node
+  add kvm__check_vm_capability
+  PCI: inject PCI device ID on MSI injection
+  arm: setup SPI IRQ routing tables
+  extend GSI IRQ routing to take a device ID
+  arm64: enable GICv3-ITS emulation
+
+Vladimir Murzin (1):
+  arm: add support for vGICv3 and vITS
+
+ Makefile                                 |   5 +-
+ arm/aarch32/arm-cpu.c                    |   4 +-
+ arm/aarch32/include/asm/kvm.h            |   4 +-
+ arm/aarch32/include/kvm/kvm-arch.h       |   3 -
+ arm/aarch64/arm-cpu.c                    |   5 +-
+ arm/aarch64/include/asm/kvm.h            |   2 +
+ arm/aarch64/include/kvm/kvm-arch.h       |   3 -
+ arm/fdt.c                                |   8 +-
+ arm/gic.c                                | 132 ++++++++++++++++++++++++++++-
+ arm/include/arm-common/gic.h             |   3 +-
+ arm/include/arm-common/kvm-arch.h        |   2 +
+ arm/include/arm-common/kvm-config-arch.h |   2 +-
+ arm/include/arm-common/kvm-cpu-arch.h    |   3 +-
+ arm/include/arm-common/pci.h             |   2 +-
+ arm/irq.c                                |   9 --
+ arm/pci.c                                |  13 ++-
+ hw/pci-shmem.c                           |   5 +-
+ include/kvm/fdt.h                        |  10 +--
+ include/kvm/irq.h                        |   8 +-
+ include/kvm/kvm.h                        |   1 +
+ include/kvm/virtio.h                     |   9 +-
+ include/linux/kvm.h                      |  19 ++++-
+ irq.c                                    | 138 +++++++++++++++++++++++++++++++
+ kvm-fdt.c                                |  26 ++++++
+ kvm.c                                    |  28 +++++++
+ mips/irq.c                               |  10 ---
+ powerpc/irq.c                            |  31 -------
+ virtio/net.c                             |   2 +-
+ virtio/pci.c                             |  87 ++++++++++++++++---
+ x86/include/asm/kvm.h                    |   6 +-
+ x86/irq.c                                |  45 ++--------
+ 31 files changed, 480 insertions(+), 145 deletions(-)
+ delete mode 100644 arm/irq.c
+ create mode 100644 kvm-fdt.c
+ delete mode 100644 mips/irq.c
+ delete mode 100644 powerpc/irq.c
+
 -- 
 2.9.0
