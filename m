@@ -1,49 +1,77 @@
 From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Fri, 4 Nov 2016 03:52:16 +0000
-Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
- caching of bypass entries
-In-Reply-To: <VI1PR0401MB263890564BC836B7BBE744018DA30@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-References: <1478219244-7815-1-git-send-email-nipun.gupta@nxp.com>
- <VI1PR0401MB263890564BC836B7BBE744018DA30@VI1PR0401MB2638.eurprd04.prod.outlook.com>
-Message-ID: <DB6PR0402MB269406338DF2031277884F44E6A20@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+Date: Fri, 4 Nov 2016 15:25:23 +0530
+Subject: [PATCH v3] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching
+ of bypass entries
+Message-ID: <1478253323-9231-1-git-send-email-nipun.gupta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The SMTNMB_TLBEN in the Auxiliary Configuration Register (ACR) provides an
+option to enable the updation of TLB in case of bypass transactions due to
+no stream match in the stream match table. This reduces the latencies of
+the subsequent transactions with the same stream-id which bypasses the SMMU.
+This provides a significant performance benefit for certain networking
+workloads.
 
+With this change substantial performance improvement of ~9% is observed with
+DPDK l3fwd application (http://dpdk.org/doc/guides/sample_app_ug/l3_forward.html)
+on NXP's LS2088a platform.
 
-> -----Original Message-----
-> From: Stuart Yoder
-> Sent: Friday, November 04, 2016 2:27
-> To: Nipun Gupta <nipun.gupta@nxp.com>; robin.murphy at arm.com;
-> will.deacon at arm.com; linux-arm-kernel at lists.infradead.org;
-> iommu at lists.linux-foundation.org
-> Cc: Nipun Gupta <nipun.gupta@nxp.com>
-> Subject: RE: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
-> caching of bypass entries
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: Nipun Gupta [mailto:nipun.gupta at nxp.com]
-> > Sent: Thursday, November 03, 2016 7:27 PM
-> > To: robin.murphy at arm.com; will.deacon at arm.com;
-> > linux-arm-kernel at lists.infradead.org; iommu at lists.linux-
-> > foundation.org
-> > Cc: Stuart Yoder <stuart.yoder@nxp.com>; Nipun Gupta
-> > <nipun.gupta@nxp.com>
-> > Subject: [PATCH] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable
-> > caching of bypass entries
-> 
-> When you respin a patch, put the version number in the patch subject:
-> 
->    [PATCH v2] iommu: arm-smmu: Set SMTNMB_TLBEN in ACR to enable caching
-> of bypass entries
+Signed-off-by: Nipun Gupta <nipun.gupta@nxp.com>
+---
+Changes for v2:
+    - Incorporated Robin's comments on v1 related to
+	Setting SMTNMB_TLBEN in ACR only for MMU-500 as ACR is implementation dependent
+	Code comments and Naming convention
+Changes for v3:
+    - Added correct patch version
 
-I added that first, but in the last moment used git format-patch after minor updates
-and somehow missed it in the final patch :/. Re-spinning v3 with correct version number.
+ drivers/iommu/arm-smmu.c | 25 ++++++++++++++++---------
+ 1 file changed, 16 insertions(+), 9 deletions(-)
 
-Thanks,
-Nipun
-
-> 
-> Stuart
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ce2a9d4..05901be 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -247,6 +247,7 @@ enum arm_smmu_s2cr_privcfg {
+ #define ARM_MMU500_ACTLR_CPRE		(1 << 1)
+ 
+ #define ARM_MMU500_ACR_CACHE_LOCK	(1 << 26)
++#define ARM_MMU500_ACR_SMTNMB_TLBEN	(1 << 8)
+ 
+ #define CB_PAR_F			(1 << 0)
+ 
+@@ -1569,16 +1570,22 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	for (i = 0; i < smmu->num_mapping_groups; ++i)
+ 		arm_smmu_write_sme(smmu, i);
+ 
+-	/*
+-	 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
+-	 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
+-	 * bit is only present in MMU-500r2 onwards.
+-	 */
+-	reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
+-	major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+-	if ((smmu->model == ARM_MMU500) && (major >= 2)) {
++	if (smmu->model == ARM_MMU500) {
++		/*
++		 * Before clearing ARM_MMU500_ACTLR_CPRE, need to
++		 * clear CACHE_LOCK bit of ACR first. And, CACHE_LOCK
++		 * bit is only present in MMU-500r2 onwards.
++		 */
++		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID7);
++		major = (reg >> ID7_MAJOR_SHIFT) & ID7_MAJOR_MASK;
+ 		reg = readl_relaxed(gr0_base + ARM_SMMU_GR0_sACR);
+-		reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
++		if (major >= 2)
++			reg &= ~ARM_MMU500_ACR_CACHE_LOCK;
++		/*
++		 * Allow unmatched Stream IDs to allocate bypass
++		 * TLB entries for reduced latency.
++		 */
++		reg |= ARM_MMU500_ACR_SMTNMB_TLBEN;
+ 		writel_relaxed(reg, gr0_base + ARM_SMMU_GR0_sACR);
+ 	}
+ 
+-- 
+1.9.1
