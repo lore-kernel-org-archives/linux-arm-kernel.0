@@ -1,246 +1,177 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Nov 2016 11:47:34 +0100
-Subject: [PATCH v3] arm/arm64: KVM: Perform local TLB invalidation when
- multiplexing vcpus on a single CPU
-In-Reply-To: <20161103222706.24129-1-marc.zyngier@arm.com>
-References: <20161103222706.24129-1-marc.zyngier@arm.com>
-Message-ID: <20161104104734.GC11122@cbox>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 04 Nov 2016 11:53:16 +0100
+Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
+In-Reply-To: <20160909002432.GE13062@codeaurora.org>
+References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
+ <20160909002432.GE13062@codeaurora.org>
+ <CGME20161104105318eucas1p2e9458dbe7039f2a81419fae8cf6bc4c8@eucas1p2.samsung.com>
+Message-ID: <7933d51e-92a8-ca6d-84f0-70b22fe17568@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 10:27:06PM +0000, Marc Zyngier wrote:
-> Architecturally, TLBs are private to the (physical) CPU they're
-> associated with. But when multiple vcpus from the same VM are
-> being multiplexed on the same CPU, the TLBs are not private
-> to the vcpus (and are actually shared across the VMID).
-> 
-> Let's consider the following scenario:
-> 
-> - vcpu-0 maps PA to VA
-> - vcpu-1 maps PA' to VA
-> 
-> If run on the same physical CPU, vcpu-1 can hit TLB entries generated
-> by vcpu-0 accesses, and access the wrong physical page.
-> 
-> The solution to this is to keep a per-VM map of which vcpu ran last
-> on each given physical CPU, and invalidate local TLBs when switching
-> to a different vcpu from the same VM.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Stephen,
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Krzysztof has left Samsung, but we would like to continue this task, because
+the ABBA dead-locks related to global prepare lock becomes more and more
+problematic for us to workaround.
 
-> ---
-> - From v2:
->   * Fixed the horrible sched_in vs load bug
->   * Now performing immediate invalidation instead of defering it
->   * Squashed a buglet in the kern_hyp_va macro
->   * Dropped Mark's RB since the code has substantially changed
->   * Only lightly tested on 32bit (I'm travelling)
-> 
->  arch/arm/include/asm/kvm_asm.h    |  1 +
->  arch/arm/include/asm/kvm_host.h   |  3 +++
->  arch/arm/include/asm/kvm_hyp.h    |  1 +
->  arch/arm/kvm/arm.c                | 27 ++++++++++++++++++++++++++-
->  arch/arm/kvm/hyp/tlb.c            | 15 +++++++++++++++
->  arch/arm64/include/asm/kvm_asm.h  |  1 +
->  arch/arm64/include/asm/kvm_host.h |  3 +++
->  arch/arm64/include/asm/kvm_mmu.h  |  2 +-
->  arch/arm64/kvm/hyp/tlb.c          | 15 +++++++++++++++
->  9 files changed, 66 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index d7ea6bcb29bf..8ef05381984b 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -66,6 +66,7 @@ extern char __kvm_hyp_vector[];
->  extern void __kvm_flush_vm_context(void);
->  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> +extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
->  
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 2d19e02d03fd..d5423ab15ed5 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -57,6 +57,9 @@ struct kvm_arch {
->  	/* VTTBR value associated with below pgd and vmid */
->  	u64    vttbr;
->  
-> +	/* The last vcpu id that ran on each physical CPU */
-> +	int __percpu *last_vcpu_ran;
-> +
->  	/* Timer */
->  	struct arch_timer_kvm	timer;
->  
-> diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-> index 343135ede5fa..58508900c4bb 100644
-> --- a/arch/arm/include/asm/kvm_hyp.h
-> +++ b/arch/arm/include/asm/kvm_hyp.h
-> @@ -71,6 +71,7 @@
->  #define ICIALLUIS	__ACCESS_CP15(c7, 0, c1, 0)
->  #define ATS1CPR		__ACCESS_CP15(c7, 0, c8, 0)
->  #define TLBIALLIS	__ACCESS_CP15(c8, 0, c3, 0)
-> +#define TLBIALL		__ACCESS_CP15(c8, 0, c7, 0)
->  #define TLBIALLNSNHIS	__ACCESS_CP15(c8, 4, c3, 4)
->  #define PRRR		__ACCESS_CP15(c10, 0, c2, 0)
->  #define NMRR		__ACCESS_CP15(c10, 0, c2, 1)
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 08bb84f2ad58..19b5f5c1c0ff 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -114,11 +114,18 @@ void kvm_arch_check_processor_compat(void *rtn)
->   */
->  int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->  {
-> -	int ret = 0;
-> +	int ret, cpu;
->  
->  	if (type)
->  		return -EINVAL;
->  
-> +	kvm->arch.last_vcpu_ran = alloc_percpu(typeof(*kvm->arch.last_vcpu_ran));
-> +	if (!kvm->arch.last_vcpu_ran)
-> +		return -ENOMEM;
-> +
-> +	for_each_possible_cpu(cpu)
-> +		*per_cpu_ptr(kvm->arch.last_vcpu_ran, cpu) = -1;
-> +
->  	ret = kvm_alloc_stage2_pgd(kvm);
->  	if (ret)
->  		goto out_fail_alloc;
-> @@ -141,6 +148,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->  out_free_stage2_pgd:
->  	kvm_free_stage2_pgd(kvm);
->  out_fail_alloc:
-> +	free_percpu(kvm->arch.last_vcpu_ran);
-> +	kvm->arch.last_vcpu_ran = NULL;
->  	return ret;
->  }
->  
-> @@ -168,6 +177,9 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
->  {
->  	int i;
->  
-> +	free_percpu(kvm->arch.last_vcpu_ran);
-> +	kvm->arch.last_vcpu_ran = NULL;
-> +
->  	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
->  		if (kvm->vcpus[i]) {
->  			kvm_arch_vcpu_free(kvm->vcpus[i]);
-> @@ -312,6 +324,19 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
->  
->  void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->  {
-> +	int *last_ran;
-> +
-> +	last_ran = this_cpu_ptr(vcpu->kvm->arch.last_vcpu_ran);
-> +
-> +	/*
-> +	 * We might get preempted before the vCPU actually runs, but
-> +	 * over-invalidation doesn't affect correctness.
-> +	 */
-> +	if (*last_ran != vcpu->vcpu_id) {
-> +		kvm_call_hyp(__kvm_tlb_flush_local_vmid, vcpu);
-> +		*last_ran = vcpu->vcpu_id;
-> +	}
-> +
->  	vcpu->cpu = cpu;
->  	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
->  
-> diff --git a/arch/arm/kvm/hyp/tlb.c b/arch/arm/kvm/hyp/tlb.c
-> index 729652854f90..6d810af2d9fd 100644
-> --- a/arch/arm/kvm/hyp/tlb.c
-> +++ b/arch/arm/kvm/hyp/tlb.c
-> @@ -55,6 +55,21 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
->  	__kvm_tlb_flush_vmid(kvm);
->  }
->  
-> +void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
-> +
-> +	/* Switch to requested VMID */
-> +	write_sysreg(kvm->arch.vttbr, VTTBR);
-> +	isb();
-> +
-> +	write_sysreg(0, TLBIALL);
-> +	dsb(nsh);
-> +	isb();
-> +
-> +	write_sysreg(0, VTTBR);
-> +}
-> +
->  void __hyp_text __kvm_flush_vm_context(void)
->  {
->  	write_sysreg(0, TLBIALLNSNHIS);
-> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> index 18f746551bf6..ec3553eb9349 100644
-> --- a/arch/arm64/include/asm/kvm_asm.h
-> +++ b/arch/arm64/include/asm/kvm_asm.h
-> @@ -54,6 +54,7 @@ extern char __kvm_hyp_vector[];
->  extern void __kvm_flush_vm_context(void);
->  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
-> +extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
->  
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index bd94e6766759..e5050388e062 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -62,6 +62,9 @@ struct kvm_arch {
->  	/* VTTBR value associated with above pgd and vmid */
->  	u64    vttbr;
->  
-> +	/* The last vcpu id that ran on each physical CPU */
-> +	int __percpu *last_vcpu_ran;
-> +
->  	/* The maximum number of vCPUs depends on the used GIC model */
->  	int max_vcpus;
->  
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index a79b969c26fc..6f72fe8b0e3e 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -128,7 +128,7 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
->  	return v;
->  }
->  
-> -#define kern_hyp_va(v) 	(typeof(v))(__kern_hyp_va((unsigned long)(v)))
-> +#define kern_hyp_va(v) 	((typeof(v))(__kern_hyp_va((unsigned long)(v))))
->  
->  /*
->   * We currently only support a 40bit IPA.
-> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-> index 9cc0ea784ae6..88e2f2b938f0 100644
-> --- a/arch/arm64/kvm/hyp/tlb.c
-> +++ b/arch/arm64/kvm/hyp/tlb.c
-> @@ -64,6 +64,21 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
->  	write_sysreg(0, vttbr_el2);
->  }
->  
-> +void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
-> +
-> +	/* Switch to requested VMID */
-> +	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> +	isb();
-> +
-> +	asm volatile("tlbi vmalle1" : : );
-> +	dsb(nsh);
-> +	isb();
-> +
-> +	write_sysreg(0, vttbr_el2);
-> +}
-> +
->  void __hyp_text __kvm_flush_vm_context(void)
->  {
->  	dsb(ishst);
-> -- 
-> 2.10.1
-> 
+On 2016-09-09 02:24, Stephen Boyd wrote:
+> On 08/16, Krzysztof Kozlowski wrote:
+>> RFC, please, do not apply, maybe except patch #1 which is harmless.
+>>
+>>
+>> Introduction
+>> ============
+>> The patchset brings new entity: clock controller representing a hardware
+>> block.  The clock controller comes with its own prepare lock which
+>> is used then in many places.  The idea is to fix the deadlock mentioned
+>> in commit 10ff4c5239a1 ("i2c: exynos5: Fix possible ABBA deadlock by keeping
+>> I2C clock prepared") and commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA deadlock
+>> by keeping clock prepared").
+>>
+>>
+>> Disclaimer
+>> ==========
+>> Request for comments, so:
+>> 1. Only exynos_defconfig builds,
+>> 2. A lot of FIXME/TODO note still,
+>> 3. Checkpatch not run, lines not aligned,
+>> 4. Other (non-exynos) drivers not converted,
+>> 5. Probably not yet bisectable,
+>> 6. Locking became quite complex.
+>>     The previous one lock was simple.  Inefficient and dead-lock prone but
+>>     simple.  Because of clock hierarchy spanning through controllers, the
+>>     new locking became quite complicated.  I don't like it but...
+>>
+>>
+>> Details
+>> =======
+>> In Exynos-based boards case the deadlock occurs between clock's
+>> prepare_lock and regmap-i2c's lock:
+>>
+>> CPU #0:                             CPU #1:
+>> lock(regmap)
+>>                                      s2mps11-clk: clk_prepare_lock()
+>>
+>> i2c-exynos: clk_prepare_lock() - wait
+>>                                      lock(regmap) - wait
+>>
+>> The clk_prepare_lock() on both CPUs come from different clock drivers
+>> and components:
+>> 1. I2C clock is part of SoC block and is required by i2c-s3c2410/i2c-exynos5
+>>     driver,
+>> 2. S2MPS11 clock is separate device, however driver uses I2C regmap.
+>>
+>> The deadlock was reported by lockdep (always) and was happening
+>> in 20% of boots of Odroid XU3 with multi_v7 defconfig.  Workaround for
+>> deadlock was implemented by removing prepare/unprepare calls from I2C
+>> transfers.  However these are just workarounds... which after applying
+>> this patch can be reverted.
+>>
+>> Additionally Marek Szyprowski's work on domains/clocks/pinctrl exposed
+>> the deadlock again in different configuration.
+>>
+> Per-controller locks seems to be a misnomer. These patches look
+> more like per-clk_register() locks. The clk registrant can decide
+> how fine grained to make the prepare locking scheme. They can
+> decide to have one lock per clk, one lock for the entire tree, or
+> one lock per arbitrary subtree. I'd prefer to drop the controller
+> concept unless it's really done that way, by attaching to the OF
+> clk provider or device pointer.
+
+This was not phrased well but the idea was to let provider/controller
+have ability to define which clocks will use common lock. Probably
+removing the concept of clock controller and moving the lock to
+clk_provider will be much better approach.
+
+> Given that, it seems that conceptually these patches allow clk
+> registrants to carve out a set of clks that they want to be
+> treated as an atomic unit with regards to the prepare lock.
+> TL;DR trees of per-process recursive prepare mutex locks where
+> the locks cover one or more clks.
+>
+> The locks are recursive per-process to simplify the problem where
+> we need to acquire the same lock multiple times while traversing
+> a tree that shares the same lock, right? Otherwise we would need
+> to track which locks we've already grabbed and refcount and we
+> wouldn't be able to re-enter the framework from within the clk
+> ops of the same atomic unit.
+>
+> As long as we can guarantee that we always take the locks in the
+> same order we'll be fine. The burden to ensure that would be
+> placed on the clk registrants though, and verifying that will be
+> left up to humans? That seems fragile and error prone. We can
+> always say that we take the global lock and then traverse the
+> children up to the roots, but we can't be sure that during the
+> tree traversal we don't take locks in different order because of
+> how the clk registrant has structured things.
+>
+> It would be great if the different clk APIs were listed, with the
+> order of how locks are taken BTW. And really overall just more
+> information about how the locking scheme works. I had to read
+> this patch series quite a few times to come to (hopefully the
+> right) conclusions.
+
+Right, such change requires much more documentation and especially
+that it took significant amount of time to figure out all(?)
+possible use cases and locking schemes.
+
+> So I'm not very fond of this design because the locking scheme is
+> pretty much out of the hands of the framework and can be easily
+> broken.
+
+Well, switching from a single global lock to more granular locking
+is always a good approach. Please note that the global lock sooner
+or later became a serious bottleneck if one wants to make somehow
+more aggressive power management and clock gating.
+
+>   I'm biased of course, because I'd prefer we go with my
+> wwmutex design of per-clk locks[1]. Taking locks in any order
+> works fine there, and we resolve quite a few long standing
+> locking problems that we have while improving scalability. The
+> problem there is that we don't get the recursive mutex design
+> (maybe that's a benefit!).
+
+Do you have any plan to continue working on your approach? per-clk
+wwmutex looks like an overkill on the first glance, but that's probably
+the only working solution if you want to get rid of recursive locks.
+I'm still not really convinced that we really need wwmutex here,
+especially if it is possible to guarantee the same order of locking
+operations inside the clock core. This requires a bit of cooperation
+from clock providers (with proper documentation and a list of
+DO/DON'T it shouldn't be that hard).
+
+> Once a clk_op reenters the framework
+> with consumer APIs and tries to grab the same lock we deadlock.
+> This is why I've been slowly splitting consumers from providers
+> so we can easily identify these cases. If we had something like
+> coordinated clk rate switching, we could get rid of clk_ops
+> reentering the framework and avoid this problem (and we really do
+> need to do that).
+
+I'm not sure that this makes really sense split consumers and
+providers. You will get recursive calls to clk core anyway with
+consumers calls if you are implementing i2c clock, for which an i2c
+bus driver does it's own clock gating (i2c controller uses
+consumer clk api).
+
+
+> The one thing I do like about this patch series though is the
+> gradual movement of providers to the new locking scheme. Maybe if
+> we combined that idea with per-clk wwmutex locks we could have
+> the best of both worlds and fix reentrancy later when we need it?
+> There's wwmutex_trylock() that we could use. Perhaps always pass
+> a NULL context if some clk flag isn't set (CLK_USE_PER_CLK_LOCK).
+> Plus we could assign the same wwmutex all over the place when
+> that flag isn't set and allocate a unique wwmutex at clk_register
+> time otherwise. I haven't thought about it deeply, so there may
+> be some glaring problem that I'm missing like when we have half
+> the clks in a tree with the flag set or something. This is where
+> driving home from the office for 45 minutes helps.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/251039.html
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
