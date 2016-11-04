@@ -1,82 +1,27 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Fri,  4 Nov 2016 11:23:58 +0000
-Subject: [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
-Message-ID: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri,  4 Nov 2016 20:43:33 +0900
+Subject: [PATCH 0/3] ARM: cache-uniphier: slight cleanups and trivial coding
+ style fix
+Message-ID: <1478259816-24965-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following Will & Robin's suggestions, this series attempts to propose
-an alternative to [1] where the host would arbitrarily decide the
-location of the IOVA MSI window and would be able to report to the
-userspace the list of reserved IOVA regions that cannot be used
-along with VFIO_IOMMU_MAP_DMA. This would allow the userspace to react
-in case of conflict.
+The cache-uniphier is a full-custom outer-cache for
+Socionext UniPhier SoC family.
 
-Userspace can retrieve all the reserved regions through the VFIO_IOMMU_GET_INFO
-IOCTL by querying the new RESV_IOVA_RANGE chained capability. Each reserved
-IOVA range is put in a separate capability.
+This series includes SoC-specific cleanups and
+a trivial coding style fix suggested by Documentation/CodingStyle.
 
-At IOMMU level, the reserved regions are stored in an iommu_domain list
-which is populated on each device attachment. An IOMMU add_reserved_regions
-callback specializes the registration of the reserved regions.
 
-On x86, the [FEE0_0000h - FEF0_000h] MSI window is registered (NOT tested).
 
-On ARM, the PCI host bridge windows (ACS check to be added?) + the MSI IOVA
-reserved regions are populated by the arm-smmu driver. Currently the MSI
-IOVA region is arbitrarily located at 0x8000000 and 1MB sized.  An IOVA domain
-is created in add_reserved_regions callback. Then MSIs transparently are
-mapped using this IOVA domain.
+Masahiro Yamada (3):
+  ARM: cache-uniphier: call kzalloc() after DT property parsing
+  ARM: cache-uniphier: refactor jump label to follow coding style
+    guideline
+  ARM: cache-uniphier: clean up active way setup code
 
-This series currently does not address some features addressed in [1]:
-- MSI IOVA size requirement computation
-- IRQ safety assessment
-
-This RFC was just tested on ARM Overdrive with QEMU and is sent to help
-potential discussions at LPC. Additionnal development + testing is needed.
-
-2 tentative fixes may be submitted separately:
-- vfio: fix vfio_info_cap_add/shift
-- iommu/iova: fix __alloc_and_insert_iova_range
-
-Best Regards
-
-[1] [PATCH v14 00/16] KVM PCIe/MSI passthrough on ARM/ARM64
-https://lkml.org/lkml/2016/10/12/347
-
-Git: complete series available at
-https://github.com/eauger/linux/tree/v4.9-rc3-reserved-rfc-v2
-
-History:
-RFC v1 -> v2:
-- no functional change despite Alex' first feedback:
-  waiting for LPC discussion outcome
-- fix intel_add_reserved_regions
-- add mutex lock/unlock in vfio_iommu_type1
-
-Eric Auger (7):
-  vfio: fix vfio_info_cap_add/shift
-  iommu/iova: fix __alloc_and_insert_iova_range
-  iommu: Add a list of iommu_reserved_region in iommu_domain
-  vfio/type1: Introduce RESV_IOVA_RANGE capability
-  iommu: Handle the list of reserved regions
-  iommu/vt-d: Implement add_reserved_regions callback
-  iommu/arm-smmu: implement add_reserved_regions callback
-
-Robin Murphy (1):
-  iommu/dma: Allow MSI-only cookies
-
- drivers/iommu/arm-smmu.c        | 66 ++++++++++++++++++++++++++++++++++++++
- drivers/iommu/dma-iommu.c       | 39 +++++++++++++++++++++++
- drivers/iommu/intel-iommu.c     | 48 ++++++++++++++++++++--------
- drivers/iommu/iommu.c           | 25 +++++++++++++++
- drivers/iommu/iova.c            |  2 +-
- drivers/vfio/vfio.c             |  5 +--
- drivers/vfio/vfio_iommu_type1.c | 70 ++++++++++++++++++++++++++++++++++++++++-
- include/linux/dma-iommu.h       |  9 ++++++
- include/linux/iommu.h           | 23 ++++++++++++++
- include/uapi/linux/vfio.h       | 16 +++++++++-
- 10 files changed, 285 insertions(+), 18 deletions(-)
+ arch/arm/mm/cache-uniphier.c | 64 ++++++++++++++++++++------------------------
+ 1 file changed, 29 insertions(+), 35 deletions(-)
 
 -- 
 1.9.1
