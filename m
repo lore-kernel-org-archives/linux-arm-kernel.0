@@ -1,36 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:17 +0100
-Subject: [PATCH 18/29] ARM: dts: rskrza1: add sdhi1 DT support
+Date: Fri,  4 Nov 2016 10:44:24 +0100
+Subject: [PATCH 25/29] ARM: dts: r8a7779: Remove skeleton.dtsi inclusion
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <bba1b7ea9a1cfb1478df2c1cbd8ed6736a5f4f98.1478252309.git.horms+renesas@verge.net.au>
+Message-ID: <1cfc0c03602b8e876672ba895377f0ba1445a2d8.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+As of commit 9c0da3cc61f1233c ("ARM: dts: explicitly mark skeleton.dtsi
+as deprecated"), including skeleton.dtsi is deprecated.
+
+This fixes the following warning with W=1:
+
+    Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-index e5dea5bb4032..dd4418195ca6 100644
---- a/arch/arm/boot/dts/r7s72100-rskrza1.dts
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -56,6 +56,11 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 9d5b8fa3da8b..3005308a1807 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -9,8 +9,6 @@
+  * kind, whether express or implied.
+  */
  
-+&sdhi1 {
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &scif2 {
- 	status = "okay";
- };
+-/include/ "skeleton.dtsi"
+-
+ #include <dt-bindings/clock/r8a7779-clock.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+@@ -19,6 +17,8 @@
+ / {
+ 	compatible = "renesas,r8a7779";
+ 	interrupt-parent = <&gic>;
++	#address-cells = <1>;
++	#size-cells = <1>;
+ 
+ 	cpus {
+ 		#address-cells = <1>;
 -- 
 2.7.0.rc3.207.g0ac5344
