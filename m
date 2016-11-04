@@ -1,55 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:00 +0100
-Subject: [PATCH 01/29] ARM: dts: r7s72100: add mmcif clock to device tree
+Date: Fri,  4 Nov 2016 10:44:02 +0100
+Subject: [PATCH 03/29] ARM: dts: koelsch: enable UHS for SDHI 0, 1 & 3
 In-Reply-To: <cover.1478252308.git.horms+renesas@verge.net.au>
 References: <cover.1478252308.git.horms+renesas@verge.net.au>
-Message-ID: <6c35a666566cf48faaa95699b0d79c6b8cad824c.1478252308.git.horms+renesas@verge.net.au>
+Message-ID: <d3cec922fe2030235588aa6fe53d6470b4e7496f.1478252309.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+Add the "1v8" pinctrl state and sd-uhs-sdr50 property to SDHI{0,1,2}.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 9 +++++++++
- include/dt-bindings/clock/r7s72100-clock.h | 3 +++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 33 ++++++++++++++++++++++++++++++---
+ 1 file changed, 30 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index fb9ef9ca120e..e18d4e645d6e 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -117,6 +117,15 @@
- 			clock-output-names = "ether";
- 		};
- 
-+		mstp8_clks: mstp8_clks at fcfe0434 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0434 4>;
-+			clocks = <&p1_clk>;
-+			clock-indices = <R7S72100_CLK_MMCIF>;
-+			clock-output-names = "mmcif";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index f8a7d090fd01..f17bfa000f73 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -360,16 +360,37 @@
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
++		power-source = <3300>;
++	};
 +
- 		mstp9_clks: mstp9_clks at fcfe0438 {
- 			#clock-cells = <1>;
- 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index 3cd813896d08..5eaf0fb469c2 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -28,6 +28,9 @@
- /* MSTP7 */
- #define R7S72100_CLK_ETHER	4
++	sdhi0_pins_uhs: sd0_uhs {
++		groups = "sdhi0_data4", "sdhi0_ctrl";
++		function = "sdhi0";
++		power-source = <1800>;
+ 	};
  
-+/* MSTP8 */
-+#define R7S72100_CLK_MMCIF	4
+ 	sdhi1_pins: sd1 {
+ 		groups = "sdhi1_data4", "sdhi1_ctrl";
+ 		function = "sdhi1";
++		power-source = <3300>;
++	};
 +
- /* MSTP9 */
- #define R7S72100_CLK_I2C0	7
- #define R7S72100_CLK_I2C1	6
++	sdhi1_pins_uhs: sd1_uhs {
++		groups = "sdhi1_data4", "sdhi1_ctrl";
++		function = "sdhi1";
++		power-source = <1800>;
+ 	};
+ 
+ 	sdhi2_pins: sd2 {
+ 		groups = "sdhi2_data4", "sdhi2_ctrl";
+ 		function = "sdhi2";
++		power-source = <3300>;
++	};
++
++	sdhi2_pins_uhs: sd2_uhs {
++		groups = "sdhi2_data4", "sdhi2_ctrl";
++		function = "sdhi2";
++		power-source = <1800>;
+ 	};
+ 
+ 	qspi_pins: qspi {
+@@ -454,33 +475,39 @@
+ 
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
++	pinctrl-1 = <&sdhi0_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&vcc_sdhi0>;
+ 	vqmmc-supply = <&vccq_sdhi0>;
+ 	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+ 	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
++	sd-uhs-sdr50;
+ 	status = "okay";
+ };
+ 
+ &sdhi1 {
+ 	pinctrl-0 = <&sdhi1_pins>;
+-	pinctrl-names = "default";
++	pinctrl-1 = <&sdhi1_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&vcc_sdhi1>;
+ 	vqmmc-supply = <&vccq_sdhi1>;
+ 	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
+ 	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
++	sd-uhs-sdr50;
+ 	status = "okay";
+ };
+ 
+ &sdhi2 {
+ 	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-names = "default";
++	pinctrl-1 = <&sdhi2_pins_uhs>;
++	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&vcc_sdhi2>;
+ 	vqmmc-supply = <&vccq_sdhi2>;
+ 	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
++	sd-uhs-sdr50;
+ 	status = "okay";
+ };
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
