@@ -1,128 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  4 Nov 2016 18:36:37 +0000
-Subject: [PATCH 2/3] KVM: arm/arm64: vgic: Prevent access to invalid SPIs
-In-Reply-To: <20161104183638.28137-1-marc.zyngier@arm.com>
-References: <20161104183638.28137-1-marc.zyngier@arm.com>
-Message-ID: <20161104183638.28137-3-marc.zyngier@arm.com>
+From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
+Date: Fri, 04 Nov 2016 19:44:57 +0100
+Subject: Low network throughput on i.MX28
+In-Reply-To: <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
+References: <1476313753.2065.11.camel@embedded.rocks>
+ <20161013084807.6a231fdb@ipc1.ka-ro>
+ <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
+ <20161014081349.1afb22c6@ipc1.ka-ro>
+ <1476521171.1670.2.camel@embedded.rocks>
+ <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
+ <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
+ <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
+ <1477696028.31471.3.camel@embedded.rocks>
+ <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
+ <1478074489.19127.7.camel@embedded.rocks>
+ <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
+Message-ID: <1478285097.26659.2.camel@embedded.rocks>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+Hi Shawn,
 
-In our VGIC implementation we limit the number of SPIs to a number
-that the userland application told us. Accordingly we limit the
-allocation of memory for virtual IRQs to that number.
-However in our MMIO dispatcher we didn't check if we ever access an
-IRQ beyond that limit, leading to out-of-bound accesses.
-Add a test against the number of allocated SPIs in check_region().
-Adjust the VGIC_ADDR_TO_INT macro to avoid an actual division, which
-is not implemented on ARM(32).
+On Wed, 2016-11-02 at 09:24 +0100, Stefan Wahren wrote:
+> Am 02.11.2016 um 09:14 schrieb J?rg Krause:
+> > On Sat, 2016-10-29 at 11:08 +0200, Stefan Wahren wrote:
+> > > > J?rg Krause <joerg.krause@embedded.rocks> hat am 29. Oktober
+> > > > 2016
+> > > > um 01:07
+> > > > geschrieben:
+> > > > 
+> > > > 
+> > > > You mentioned [1] an optimization in the Freescale vendor Linux
+> > > > kernel
+> > > > [2]. I would really like to see this optimization in the
+> > > > mainline
+> > > > kernel.
+> > > > 
+> > > > Did you ever tried to port this code from Freescale to
+> > > > mainline?
+> > > 
+> > > Yes, i tried once but i was frustrated soon because of the lot of
+> > > required
+> > > changes and resulting issues.
+> > 
+> > I got the PIO mode working for the mxs-mmc driver. For this I
+> > ported
+> > the PIO code from the vendor kernel and removed the usage of the
+> > DMA
+> > engine entirely.
+> 
+> Good job
+> 
+> > 
+> > Testing network bandwidth with iperf, I get about ~10Mbit/sec with
+> > PIO
+> > mode compared to ~6.5Mbit/sec with DMA mode for UDP and about
+> > ~6.5Mbit/sec compared to ~4.5Mbit/sec with DMA mode for TCP.
+> 
+> And how about MMC / sd card performance?
 
-[maz: cleaned-up original patch]
+I noticed poor performance with the i.MX28 MMC and/or DMA driver using
+the mainline kernel compared to the vendor Freescale kernel 2.6.35.
+I've seen that hou have added the drivers to mainline some years ago.
 
-Cc: stable at vger.kernel.org
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-mmio.c | 41 +++++++++++++++++++++++++++--------------
- virt/kvm/arm/vgic/vgic-mmio.h | 14 +++++++-------
- 2 files changed, 34 insertions(+), 21 deletions(-)
+My custom i.MX28 board has a wifi chip attached to the SSP2 interface.
+Comparing the bandwith with iperf I get >20Mbits/sec on the vendor
+kernel and <5Mbits/sec on the mainline kernel.
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index e18b30ddcdce..ebe1b9fa3c4d 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -453,17 +453,33 @@ struct vgic_io_device *kvm_to_vgic_iodev(const struct kvm_io_device *dev)
- 	return container_of(dev, struct vgic_io_device, dev);
- }
- 
--static bool check_region(const struct vgic_register_region *region,
-+static bool check_region(const struct kvm *kvm,
-+			 const struct vgic_register_region *region,
- 			 gpa_t addr, int len)
- {
--	if ((region->access_flags & VGIC_ACCESS_8bit) && len == 1)
--		return true;
--	if ((region->access_flags & VGIC_ACCESS_32bit) &&
--	    len == sizeof(u32) && !(addr & 3))
--		return true;
--	if ((region->access_flags & VGIC_ACCESS_64bit) &&
--	    len == sizeof(u64) && !(addr & 7))
--		return true;
-+	int flags, nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+
-+	switch (len) {
-+	case sizeof(u8):
-+		flags = VGIC_ACCESS_8bit;
-+		break;
-+	case sizeof(u32):
-+		flags = VGIC_ACCESS_32bit;
-+		break;
-+	case sizeof(u64):
-+		flags = VGIC_ACCESS_64bit;
-+		break;
-+	default:
-+		return false;
-+	}
-+
-+	if ((region->access_flags & flags) && IS_ALIGNED(addr, len)) {
-+		if (!region->bits_per_irq)
-+			return true;
-+
-+		/* Do we access a non-allocated IRQ? */
-+		return VGIC_ADDR_TO_INTID(addr, region->bits_per_irq) < nr_irqs;
-+	}
- 
- 	return false;
- }
-@@ -477,7 +493,7 @@ static int dispatch_mmio_read(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
- 				       addr - iodev->base_addr);
--	if (!region || !check_region(region, addr, len)) {
-+	if (!region || !check_region(vcpu->kvm, region, addr, len)) {
- 		memset(val, 0, len);
- 		return 0;
- 	}
-@@ -510,10 +526,7 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 
- 	region = vgic_find_mmio_region(iodev->regions, iodev->nr_regions,
- 				       addr - iodev->base_addr);
--	if (!region)
--		return 0;
--
--	if (!check_region(region, addr, len))
-+	if (!region || !check_region(vcpu->kvm, region, addr, len))
- 		return 0;
- 
- 	switch (iodev->iodev_type) {
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 4c34d39d44a0..84961b4e4422 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -50,15 +50,15 @@ extern struct kvm_io_device_ops kvm_io_gic_ops;
- #define VGIC_ADDR_IRQ_MASK(bits) (((bits) * 1024 / 8) - 1)
- 
- /*
-- * (addr & mask) gives us the byte offset for the INT ID, so we want to
-- * divide this with 'bytes per irq' to get the INT ID, which is given
-- * by '(bits) / 8'.  But we do this with fixed-point-arithmetic and
-- * take advantage of the fact that division by a fraction equals
-- * multiplication with the inverted fraction, and scale up both the
-- * numerator and denominator with 8 to support at most 64 bits per IRQ:
-+ * (addr & mask) gives us the _byte_ offset for the INT ID.
-+ * We multiply this by 8 the get the _bit_ offset, then divide this by
-+ * the number of bits to learn the actual INT ID.
-+ * But instead of a division (which requires a "long long div" implementation),
-+ * we shift by the binary logarithm of <bits>.
-+ * This assumes that <bits> is a power of two.
-  */
- #define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
--					64 / (bits) / 8)
-+					8 >> ilog2(bits))
- 
- /*
-  * Some VGIC registers store per-IRQ information, with a different number
--- 
-2.10.1
+My best guess is that there is some kind of bottleneck in the drivers.
+I already started looking at the vendor drivers as well as@the
+mainline drivers, but I need some more investigation to understand the
+complexity.
+
+Do you have any idea what the bottleneck might be?
+
+Best regards,
+J?rg Krause
