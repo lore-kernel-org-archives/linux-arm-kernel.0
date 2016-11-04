@@ -1,41 +1,236 @@
 From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 04 Nov 2016 18:43:20 +0530
-Subject: [2/4] ARM: dts: exynos: Add SCU device node to exynos4.dtsi
-In-Reply-To: <1478230764-13748-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1478230764-13748-3-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161104131500epcas2p485d63e00d312c4196da62046d1ce7675@epcas2p4.samsung.com>
-Message-ID: <581C8970.8030606@samsung.com>
+Date: Fri, 04 Nov 2016 18:56:39 +0530
+Subject: [3/4] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <1478230764-13748-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1478230764-13748-4-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161104132822epcas3p1e87e73117ab69f4615c220714d73deae@epcas3p1.samsung.com>
+Message-ID: <581C8C8F.5080100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Pankaj,
 
 On 11/04/2016 09:09 AM, Pankaj Dubey wrote:
-> Exynos4 like other Cortex-A9 SoC's has a Snoop Control Unit(SCU)
-> and its SFR are used during SMP boot and S2R. Add SCU node to the device tree.
+> Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based boards.
+> Instead use mapping from device tree node of SCU.
 >
 > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
-
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-
->   arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->   1 file changed, 5 insertions(+)
+>   arch/arm/mach-exynos/exynos.c                | 22 ----------------------
+>   arch/arm/mach-exynos/include/mach/map.h      |  2 --
+>   arch/arm/mach-exynos/platsmp.c               | 18 +++++++++++-------
+>   arch/arm/mach-exynos/pm.c                    | 14 +++++++++++---
+>   arch/arm/mach-exynos/suspend.c               | 15 +++++++++++----
+>   arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
+>   6 files changed, 33 insertions(+), 42 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 5f034eb..6865ca9 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -78,6 +78,11 @@
->   		reg = <0x10000000 0x100>;
->   	};
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 757fc11..fa08ef9 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -28,15 +28,6 @@
 >
-> +	scu: snoop-control-unit at 10500000 {
-> +		compatible = "arm,cortex-a9-scu";
-> +		reg = <0x10500000 0x2000>;
-> +	};
+>   #include "common.h"
+>
+> -static struct map_desc exynos4_iodesc[] __initdata = {
+> -	{
+> -		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
+> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
+> -		.length		= SZ_8K,
+> -		.type		= MT_DEVICE,
+> -	},
+> -};
+> -
+>   static struct platform_device exynos_cpuidle = {
+>   	.name              = "exynos_cpuidle",
+>   #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+> @@ -99,17 +90,6 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+>   	return 1;
+>   }
+>
+> -/*
+> - * exynos_map_io
+> - *
+> - * register the standard cpu IO areas
+> - */
+> -static void __init exynos_map_io(void)
+> -{
+> -	if (soc_is_exynos4())
+> -		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+> -}
+> -
+>   static void __init exynos_init_io(void)
+>   {
+>   	debug_ll_io_init();
+> @@ -118,8 +98,6 @@ static void __init exynos_init_io(void)
+>
+>   	/* detect cpu id and rev. */
+>   	s5p_init_cpu(S5P_VA_CHIPID);
+> -
+> -	exynos_map_io();
+>   }
+>
+>   /*
+> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+> index 5fb0040..0eef407 100644
+> --- a/arch/arm/mach-exynos/include/mach/map.h
+> +++ b/arch/arm/mach-exynos/include/mach/map.h
+> @@ -18,6 +18,4 @@
+>
+>   #define EXYNOS_PA_CHIPID		0x10000000
+>
+> -#define EXYNOS4_PA_COREPERI		0x10500000
+> -
+>   #endif /* __ASM_ARCH_MAP_H */
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+> index a5d6841..553d0d9 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -224,11 +224,6 @@ static void write_pen_release(int val)
+>   	sync_cache_w(&pen_release);
+>   }
+>
+> -static void __iomem *scu_base_addr(void)
+> -{
+> -	return (void __iomem *)(S5P_VA_SCU);
+> -}
+> -
+>   static DEFINE_SPINLOCK(boot_lock);
+>
+>   static void exynos_secondary_init(unsigned int cpu)
+> @@ -387,14 +382,23 @@ fail:
+>
+>   static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>   {
+> +	struct device_node *np;
+> +	void __iomem *scu_base;
+>   	int i;
+>
+>   	exynos_sysram_init();
+>
+>   	exynos_set_delayed_reset_assertion(true);
+>
+> -	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+> -		scu_enable(scu_base_addr());
+> +	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+> +		np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+
+what if of_find_compatible_node() fails? May be add a error check for 
+the same?
+
+> +		scu_base = of_iomap(np, 0);
+> +		if (scu_base) {
+> +			scu_enable(scu_base);
+> +			iounmap(scu_base);
+> +		}
+> +		of_node_put(np);
+> +	}
+>
+>   	/*
+>   	 * Write the address of secondary startup into the
+> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+> index 487295f..60e6827 100644
+> --- a/arch/arm/mach-exynos/pm.c
+> +++ b/arch/arm/mach-exynos/pm.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/cpu_pm.h>
+>   #include <linux/io.h>
+>   #include <linux/of.h>
+> +#include <linux/of_address.h>
+>   #include <linux/soc/samsung/exynos-regs-pmu.h>
+>   #include <linux/soc/samsung/exynos-pmu.h>
+>
+> @@ -26,8 +27,6 @@
+>   #include <asm/suspend.h>
+>   #include <asm/cacheflush.h>
+>
+> -#include <mach/map.h>
+> -
+>   #include "common.h"
+>
+>   static inline void __iomem *exynos_boot_vector_addr(void)
+> @@ -158,6 +157,8 @@ static int exynos_aftr_finisher(unsigned long flags)
+>
+>   void exynos_enter_aftr(void)
+>   {
+> +	struct device_node *np;
+> +	void __iomem *scu_base;
+>   	unsigned int cpuid = smp_processor_id();
+>
+>   	cpu_pm_enter();
+> @@ -177,7 +178,14 @@ void exynos_enter_aftr(void)
+>   	cpu_suspend(0, exynos_aftr_finisher);
+>
+>   	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+> -		scu_enable(S5P_VA_SCU);
+> +		np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+same as above
+
+> +		scu_base = of_iomap(np, 0);
+> +		if (scu_base) {
+> +			scu_enable(scu_base);
+> +			iounmap(scu_base);
+> +		}
+> +		of_node_put(np);
 > +
->   	memory-controller at 12570000 {
->   		compatible = "samsung,exynos4210-srom";
->   		reg = <0x12570000 0x14>;
+>   		if (call_firmware_op(resume) == -ENOSYS)
+>   			exynos_cpu_restore_register();
+>   	}
+> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+> index 06332f6..7ab7e67 100644
+> --- a/arch/arm/mach-exynos/suspend.c
+> +++ b/arch/arm/mach-exynos/suspend.c
+> @@ -34,8 +34,6 @@
+>   #include <asm/smp_scu.h>
+>   #include <asm/suspend.h>
+>
+> -#include <mach/map.h>
+> -
+>   #include <plat/pm-common.h>
+>
+>   #include "common.h"
+> @@ -453,6 +451,8 @@ static void exynos_pm_release_retention(void)
+>
+>   static void exynos_pm_resume(void)
+>   {
+> +	struct device_node *np;
+> +	void __iomem *scu_base;
+>   	u32 cpuid = read_cpuid_part();
+>
+>   	if (exynos_pm_central_resume())
+> @@ -461,8 +461,15 @@ static void exynos_pm_resume(void)
+>   	/* For release retention */
+>   	exynos_pm_release_retention();
+>
+> -	if (cpuid == ARM_CPU_PART_CORTEX_A9)
+> -		scu_enable(S5P_VA_SCU);
+> +	if (cpuid == ARM_CPU_PART_CORTEX_A9) {
+> +		np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+and here otherwise patch looks good.
+
+> +		scu_base = of_iomap(np, 0);
+> +		if (scu_base) {
+> +			scu_enable(scu_base);
+> +			iounmap(scu_base);
+> +		}
+> +		of_node_put(np);
+> +	}
+>
+>   	if (call_firmware_op(resume) == -ENOSYS
+>   	    && cpuid == ARM_CPU_PART_CORTEX_A9)
+> diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+> index 0fe2828..512ed1f 100644
+> --- a/arch/arm/plat-samsung/include/plat/map-s5p.h
+> +++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+> @@ -15,10 +15,6 @@
+>
+>   #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
+>
+> -#define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
+> -#define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
+> -#define S5P_VA_SCU		S5P_VA_COREPERI(0x0)
+> -
+>   #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+>   #define VA_VIC0			VA_VIC(0)
+>   #define VA_VIC1			VA_VIC(1)
 >
