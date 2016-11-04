@@ -1,92 +1,44 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 04 Nov 2016 09:03:19 +0100
-Subject: [PATCH 5/6] ARM: add low level debug uart for rk1108
-In-Reply-To: <56bcae77-3aed-c183-5e9f-3581cc187a7d@rock-chips.com>
+Date: Fri, 04 Nov 2016 09:07:11 +0100
+Subject: [PATCH 4/6] ARM: dts: add basic support for Rockchip RK1108 SOC
+In-Reply-To: <1478176848-12132-1-git-send-email-andy.yan@rock-chips.com>
 References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
- <12034481.WHiLii4Pov@phil>
- <56bcae77-3aed-c183-5e9f-3581cc187a7d@rock-chips.com>
-Message-ID: <82141041.b0Orf57KCy@phil>
+ <1478176848-12132-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <18728215.xtkCC4d9TF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 4. November 2016, 15:58:35 CET schrieb Andy Yan:
-> Hi Heiko:
+Am Donnerstag, 3. November 2016, 20:40:48 CET schrieb Andy Yan:
+> RK1108 is embedded with an ARM Cortex-A7 single core and a DSP core.
+> It is designed for varies application scenario such as car DVR, sports
+> DV, secure camera and UAV camera.
 > 
-> On 2016?11?04? 15:36, Heiko Stuebner wrote:
-> > Am Donnerstag, 3. November 2016, 20:42:21 CET schrieb Andy Yan:
-> >> RK1108 UARTs are Synopsis DesignWare 8250 compatible.
-> >> Only with different register addresses.
-> >> 
-> >> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> >> ---
-> >> 
-> >>   arch/arm/Kconfig.debug | 30 ++++++++++++++++++++++++++++++
-> >>   1 file changed, 30 insertions(+)
-> >> 
-> >> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> >> index d83f7c3..408540f 100644
-> >> --- a/arch/arm/Kconfig.debug
-> >> +++ b/arch/arm/Kconfig.debug
-> >> @@ -776,6 +776,30 @@ choice
-> >> 
-> >>   		  their output to the standard serial port on the RealView
-> >>   		  PB1176 platform.
-> >> 
-> >> +	config DEBUG_RK1108_UART0
-> >> +		bool "Kernel low-level debugging messages via Rockchip RK1108 
-UART0"
-> >> +		depends on ARCH_ROCKCHIP
-> >> +		select DEBUG_UART_8250
-> >> +		help
-> >> +		  Say Y here if you want kernel low-level debugging support
-> >> +                  on Rockchip RK1108 based platforms.
-> >> +
-> >> +	config DEBUG_RK1108_UART1
-> >> +		bool "Kernel low-level debugging messages via Rockchip RK1108 
-UART1"
-> >> +		depends on ARCH_ROCKCHIP
-> >> +		select DEBUG_UART_8250
-> >> +		help
-> >> +		  Say Y here if you want kernel low-level debugging support
-> >> +		  on Rockchip RK1108 based platforms.
-> >> +
-> >> +	config DEBUG_RK1108_UART2
-> >> +		bool "Kernel low-level debugging messages via Rockchip RK1108 
-UART2"
-> >> +		depends on ARCH_ROCKCHIP
-> >> +		select DEBUG_UART_8250
-> >> +		help
-> >> +		  Say Y here if you want kernel low-level debugging support
-> >> +		  on Rockchip RK1108 based platforms.
-> >> +
-> > 
-> > are you sure, you need all 3 of them?
-> > 
-> > I.e. most Rockchip SoCs so far had one uart somewhat designated as debug
-> > uart. Most likely due to it not having rts/cts and being used in
-> > reference schematics, but no one ever used another uart than uart2 on
-> > previous socs. So ideally we could check and only add uarts we actually
-> > need for now. More can be added later anyway once boards try to use them.
-> > 
-> > 
-> > Heiko
+> This patch add basic support for it with DMAC / UART / CRU / pinctrl
+> enabled.
 > 
->      Actually, I have two boards on my hand, one uses uart0 as debug
-> port and the another uses uart2, so I add all of them here.
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> ---
+> 
+>  arch/arm/boot/dts/rk1108.dtsi     | 420
+> ++++++++++++++++++++++++++++++++++++++ arch/arm/mach-rockchip/rockchip.c | 
+>  1 +
+>  2 files changed, 421 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk1108.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/rk1108.dtsi b/arch/arm/boot/dts/rk1108.dtsi
+> new file mode 100644
+> index 0000000..9dccfea
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk1108.dtsi
 
-ok, then this is fine.
+[...]
 
->     I have a question here, I not very clear how to get the
-> DEBUG_UART_VIRT value here,  I now set the value I got from uart driver
-> and it works , is there some rule or  method to calculate this
-> DEBUG_UART_VIRT value on different platform?
+> +	pinctrl: pinctrl {
+> +		compatible = "rockchip,rk1108-pinctrl";
+> +		rockchip,grf = <&grf>;
 
-I don't really know. When I added the old uarts, I always just took the value 
-from the vendor-kernel :-) .
-
-In any case, arm32 now also supports earlycon (like arm64) not needing the 
-bootloader setup of the uart. The one thing debug_ll can do that earlycon 
-cannot is outputting stuff from the kernel decompressor.
+missing rockchip,pmu phandle for gpio0 iomuxes and also syscon declaration for 
+said pmugrf syscon in this file.
 
 
 Heiko
