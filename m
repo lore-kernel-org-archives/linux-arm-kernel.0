@@ -1,43 +1,73 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 4 Nov 2016 11:26:30 +0100
-Subject: [GIT PULL] ARM: OXNAS SoC DT updates for 4.10
-Message-ID: <85ecb958-a6cb-bdd2-10db-873e1b894ad7@baylibre.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri,  4 Nov 2016 19:42:48 +0900
+Subject: [PATCH 00/22] mtd: nand: return error code of nand_scan(_ident,
+ _tail) on error
+Message-ID: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+nand_scan(), nand_scan_ident(), nand_scan_tail() return
+an appropriate negative value on error.
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+Most of drivers return the value from them on error,
+but some of them return the fixed error code -ENXIO
+(and a few return -ENODEV).
 
-are available in the git repository at:
+This series make those drivers return more precise error code.
 
-  https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-dt-for-4.10
 
-for you to fetch changes up to 52c468fb37b663e0826f2bbdea61095bdd4e4b54:
+Masahiro Yamada (22):
+  mtd: nand: ams-delta: return error code of nand_scan() on error
+  mtd: nand: cmx270: return error code of nand_scan() on error
+  mtd: nand: cs553x: return error code of nand_scan() on error
+  mtd: nand: gpio: return error code of nand_scan() on error
+  mtd: nand: mpc5121: return error code of nand_scan() on error
+  mtd: nand: tmio: return error code of nand_scan() on error
+  mtd: nand: orion: return error code of nand_scan() on error
+  mtd: nand: pasemi: return error code of nand_scan() on error
+  mtd: nand: plat_nand: return error code of nand_scan() on error
+  mtd: nand: atmel: return error code of nand_scan_ident/tail() on error
+  mtd: nand: brcmnand: return error code of nand_scan_ident/tail() on
+    error
+  mtd: nand: fsmc: return error code of nand_scan_ident/tail() on error
+  mtd: nand: lpc32xx: return error code of nand_scan_ident/tail() on
+    error
+  mtd: nand: mediatek: return error code of nand_scan_ident/tail() on
+    error
+  mtd: nand: mxc: return error code of nand_scan_ident/tail() on error
+  mtd: nand: omap2: return error code of nand_scan_ident/tail() on error
+  mtd: nand: vf610: return error code of nand_scan_ident/tail() on error
+  mtd: nand: cafe: return error code of nand_scan_ident() on error
+  mtd: nand: hisi504: return error code of nand_scan_ident() on error
+  mtd: nand: pxa3xx: return error code of nand_scan_ident() on error
+  mtd: nand: nandsim: remove unneeded checks for nand_scan_ident/tail()
+  mtd: nand: socrates: use nand_scan() for nand_scan_ident/tail() combo
 
-  MAINTAINERS: oxnas: Add new files definitions (2016-11-04 11:23:21 +0100)
+ drivers/mtd/nand/ams-delta.c         |  5 ++---
+ drivers/mtd/nand/atmel_nand.c        | 10 ++++------
+ drivers/mtd/nand/brcmnand/brcmnand.c | 10 ++++++----
+ drivers/mtd/nand/cafe_nand.c         |  5 ++---
+ drivers/mtd/nand/cmx270_nand.c       |  4 ++--
+ drivers/mtd/nand/cs553x_nand.c       |  5 ++---
+ drivers/mtd/nand/fsmc_nand.c         |  9 ++++-----
+ drivers/mtd/nand/gpio.c              |  5 ++---
+ drivers/mtd/nand/hisi504_nand.c      |  4 +---
+ drivers/mtd/nand/lpc32xx_mlc.c       | 10 ++++------
+ drivers/mtd/nand/lpc32xx_slc.c       |  9 +++------
+ drivers/mtd/nand/mpc5121_nfc.c       |  4 ++--
+ drivers/mtd/nand/mtk_nand.c          |  4 ++--
+ drivers/mtd/nand/mxc_nand.c          | 10 ++++------
+ drivers/mtd/nand/nandsim.c           |  4 ----
+ drivers/mtd/nand/omap2.c             |  9 ++++-----
+ drivers/mtd/nand/orion_nand.c        |  5 ++---
+ drivers/mtd/nand/pasemi_nand.c       |  5 ++---
+ drivers/mtd/nand/plat_nand.c         |  5 ++---
+ drivers/mtd/nand/pxa3xx_nand.c       |  5 +++--
+ drivers/mtd/nand/socrates_nand.c     | 12 ++----------
+ drivers/mtd/nand/tmio_nand.c         |  6 +++---
+ drivers/mtd/nand/vf610_nfc.c         | 10 ++++------
+ 23 files changed, 62 insertions(+), 93 deletions(-)
 
-----------------------------------------------------------------
-- Add DTSI for Oxford Semiconductor OX820
-- Add DTS for Cloud Engines PogoPlug v3 board
-- Fix MAINTAINERS Oxnas entry for dts files
-from http://lkml.kernel.org/r/20161102141850.25164-1-narmstrong at baylibre.com
-
-----------------------------------------------------------------
-Neil Armstrong (2):
-      ARM: dts: Add support for OX820 and Pogoplug V3
-      MAINTAINERS: oxnas: Add new files definitions
-
- Documentation/devicetree/bindings/arm/oxnas.txt      |   5 ++
- MAINTAINERS                                          |   3 +-
- arch/arm/boot/dts/Makefile                           |   3 +-
- arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts |  94 +++++++++++++++++++++++
- arch/arm/boot/dts/ox820.dtsi                         | 296 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 399 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/cloudengines-pogoplug-series-3.dts
- create mode 100644 arch/arm/boot/dts/ox820.dtsi
-
-Thanks,
-Neil
+-- 
+1.9.1
