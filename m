@@ -1,34 +1,35 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 04 Nov 2016 09:09:24 +0530
-Subject: [PATCH 4/4] ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
+Date: Fri, 04 Nov 2016 09:09:22 +0530
+Subject: [PATCH 2/4] ARM: dts: exynos: Add SCU device node to exynos4.dtsi
 In-Reply-To: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1478230764-13748-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478230764-13748-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As no more user of soc_is_exynos{4,5} we can safely remove them.
+Exynos4 like other Cortex-A9 SoC's has a Snoop Control Unit(SCU)
+and its SFR are used during SMP boot and S2R. Add SCU node to the device tree.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- arch/arm/mach-exynos/common.h | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/exynos4.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 9424a8a..d19064b 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -105,11 +105,6 @@ IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
- # define soc_is_exynos5800()	0
- #endif
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 5f034eb..6865ca9 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -78,6 +78,11 @@
+ 		reg = <0x10000000 0x100>;
+ 	};
  
--#define soc_is_exynos4() (soc_is_exynos4210() || soc_is_exynos4212() || \
--			  soc_is_exynos4412())
--#define soc_is_exynos5() (soc_is_exynos5250() || soc_is_exynos5410() || \
--			  soc_is_exynos5420() || soc_is_exynos5800())
--
- extern u32 cp15_save_diag;
- extern u32 cp15_save_power;
- 
++	scu: snoop-control-unit at 10500000 {
++		compatible = "arm,cortex-a9-scu";
++		reg = <0x10500000 0x2000>;
++	};
++
+ 	memory-controller at 12570000 {
+ 		compatible = "samsung,exynos4210-srom";
+ 		reg = <0x12570000 0x14>;
 -- 
 2.7.4
