@@ -1,65 +1,33 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  4 Nov 2016 10:44:42 +0100
-Subject: [PATCH 8/9] ARM: shmobile: select errata 798181 for SoCs with CA15
- cores
+Date: Fri,  4 Nov 2016 10:44:40 +0100
+Subject: [PATCH 6/9] ARM: shmobile: r8a7793/gose: Add board part number to DT
+ bindings
 In-Reply-To: <cover.1478251657.git.horms+renesas@verge.net.au>
 References: <cover.1478251657.git.horms+renesas@verge.net.au>
-Message-ID: <44c1a893820d3ce4806c5248ad0c0fa7ffcbe380.1478251657.git.horms+renesas@verge.net.au>
+Message-ID: <4b8f5955be83c539d2defe0a81313c11c0e3b3ad.1478251657.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select ARM errata 798181 on SoCs cores affected CA15 cores.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/arm/shmobile.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index c48be1d332ed..6fbd9b7d2d67 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -60,6 +60,7 @@ config ARCH_R7S72100
- config ARCH_R8A73A4
- 	bool "R-Mobile APE6 (R8A73A40)"
- 	select ARCH_RMOBILE
-+	select ARM_ERRATA_798181 if SMP
- 	select RENESAS_IRQC
- 
- config ARCH_R8A7740
-@@ -70,6 +71,7 @@ config ARCH_R8A7740
- config ARCH_R8A7743
- 	bool "RZ/G1M (R8A77430)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 
- config ARCH_R8A7778
- 	bool "R-Car M1A (R8A77781)"
-@@ -82,20 +84,24 @@ config ARCH_R8A7779
- config ARCH_R8A7790
- 	bool "R-Car H2 (R8A77900)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7791
- 	bool "R-Car M2-W (R8A77910)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7792
- 	bool "R-Car V2H (R8A77920)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 
- config ARCH_R8A7793
- 	bool "R-Car M2-N (R8A7793)"
- 	select ARCH_RCAR_GEN2
-+	select ARM_ERRATA_798181 if SMP
- 	select I2C
- 
- config ARCH_R8A7794
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 106b542c27c9..15669642b532 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -49,7 +49,7 @@ Boards:
+     compatible = "renesas,bockw", "renesas,r8a7778"
+   - Genmai (RTK772100BC00000BR)
+     compatible = "renesas,genmai", "renesas,r7s72100"
+-  - Gose
++  - Gose (RTP0RC7793SEB00010S)
+     compatible = "renesas,gose", "renesas,r8a7793"
+   - H3ULCB (RTP0RC7795SKB00010S)
+     compatible = "renesas,h3ulcb", "renesas,r8a7795";
 -- 
 2.7.0.rc3.207.g0ac5344
