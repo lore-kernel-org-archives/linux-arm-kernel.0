@@ -1,27 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 4 Nov 2016 12:23:22 +0000
-Subject: [PATCH 2/3] ARM: cache-uniphier: refactor jump label to follow
- coding style guideline
-In-Reply-To: <1478259816-24965-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1478259816-24965-1-git-send-email-yamada.masahiro@socionext.com>
- <1478259816-24965-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161104122322.GB1041@n2100.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 04 Nov 2016 13:33:04 +0100
+Subject: [PATCH] ARM: dts: armada-370-rn102: drop specification of
+ compatible for i2c0
+In-Reply-To: <20161020191527.27679-1-u.kleine-koenig@pengutronix.de> ("Uwe
+ =?utf-8?Q?Kleine-K=C3=B6nig=22's?= message of "Thu, 20 Oct 2016 21:15:27
+ +0200")
+References: <20161020191527.27679-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <87d1ibo267.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 08:43:35PM +0900, Masahiro Yamada wrote:
-> Documentation/CodingStyle recommends to use label names which say
-> what the goto does or why the goto exists.
-> 
-> Just in case, split it up into three labels because the CodingStyle
-> says "one err bugs" is a common type of bug (although, I do not
-> believe the current code includes such a bug).
+Hi Uwe,
+ 
+ On jeu., oct. 20 2016, Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
 
-However, this has the effect of making the code unnecessarily more
-complicated, which is a bad thing.  Avoiding unnecessary code
-complexity wins over style rules.
+> The compatible string is already provided by armada-370.dtsi.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Applied on mvebu/dt
+
+Thanks,
+
+Gregory
+
+> ---
+> Hello,
+>
+> this is the same as commit 43940ce3b089962f97de544d72b783bd146ef362 that
+> currently is in next, just for rn102 instead of rn104.
+>
+> Best regards
+> Uwe
+>
+>  arch/arm/boot/dts/armada-370-netgear-rn102.dts | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-370-netgear-rn102.dts b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> index 39181b3fa90d..3ca6330a1752 100644
+> --- a/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> +++ b/arch/arm/boot/dts/armada-370-netgear-rn102.dts
+> @@ -120,7 +120,6 @@
+>  			};
+>  
+>  			i2c at 11000 {
+> -				compatible = "marvell,mv64xxx-i2c";
+>  				clock-frequency = <100000>;
+>  				status = "okay";
+>  
+> -- 
+> 2.9.3
+>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
