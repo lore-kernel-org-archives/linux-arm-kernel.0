@@ -1,271 +1,153 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Mon, 7 Nov 2016 13:04:43 -0600
-Subject: [PATCH 2/3] ipmi/bt-bmc: maintain a request expiry list
-In-Reply-To: <1478073426-3714-3-git-send-email-clg@kaod.org>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <1478073426-3714-3-git-send-email-clg@kaod.org>
-Message-ID: <a7aea2a7-6cb4-655e-3c69-1a156945e27b@acm.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sat, 05 Nov 2016 17:10:17 -0500
+Subject: [PATCH 7/8] ARM64: dts: meson-gxl-p23x: Add SD/SDIO/MMC and PWM
+ nodes
+In-Reply-To: <1477932286-27482-8-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 31 Oct 2016 17:44:45 +0100")
+References: <1477932286-27482-1-git-send-email-narmstrong@baylibre.com>
+ <1477932286-27482-8-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m21syp8to6.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2016 02:57 AM, C?dric Le Goater wrote:
-> Regarding the response expiration handling, the IPMI spec says :
->
->     The BMC must not return a given response once the corresponding
->     Request-to-Response interval has passed. The BMC can ensure this
->     by maintaining its own internal list of outstanding requests through
->     the interface. The BMC could age and expire the entries in the list
->     by expiring the entries at an interval that is somewhat shorter than
->     the specified Request-to-Response interval....
->
-> To handle such case, we maintain list of received requests using the
-> seq number of the BT message to identify them. The list is updated
-> each time a request is received and a response is sent. The expiration
-> of the reponses is handled at each updates but also with a timer.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-This looks correct, but it seems awfully complicated.
+> Add SD/SDIO/MMC nodes and PWM 32768Hz clock configuration to provide
+> storage and WiFi functionality on the p23x boards.
 
-Why can't you get the current time before the wait_event_interruptible()
-and then compare the time before you do the write?  That would seem to
-accomplish the same thing without any lists or extra locks.
+Just curious... what storage functionality are you referring to here?
 
-Also, if you are going to have multiple writers on this interface, I don't
-think the interface will work correctly.  I think you need to claim the
-mutex first.  Otherwise you might get into a situation where two writers
-will wake up at the same time, the first writes and releases the mutex,
-then the second will find that the interface is busy and fail.
+Kevin
 
-If I am correct, the mutex will need to become interruptible and come
-first, I think.  (And the timing would have to start before the mutex,
-of course.)  This applies to both the read and write interface.
-
-Another thing is that this is request-to-release time.  If a request takes
-a long time to process (say, a write to a flash device) the timeout would
-need to be decreased by the processing time.  It's probably ok to not
-do that for the moment, but you may want to add a note.  Fixing that
-would require adding a timeout for each message.
-
--corey
-
-
-> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->   drivers/char/ipmi/bt-bmc.c | 132 +++++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 132 insertions(+)
+>  .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     | 112 +++++++++++++++++++++
+>  1 file changed, 112 insertions(+)
 >
-> diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
-> index fc9e8891eae3..e751e4a754b7 100644
-> --- a/drivers/char/ipmi/bt-bmc.c
-> +++ b/drivers/char/ipmi/bt-bmc.c
-> @@ -17,6 +17,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/poll.h>
->   #include <linux/sched.h>
-> +#include <linux/slab.h>
->   #include <linux/timer.h>
->   
->   /*
-> @@ -57,6 +58,15 @@
->   
->   #define BT_BMC_BUFFER_SIZE 256
->   
-> +#define BT_BMC_RESPONSE_TIME	5 /* seconds */
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+> index 666fe2b..7830809 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi
+> @@ -56,6 +56,46 @@
+>  		device_type = "memory";
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
 > +
-> +struct ipmi_request {
-> +	struct list_head list;
+> +	vddio_boot: regulator-vddio_boot {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDIO_BOOT";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
 > +
-> +	u8 seq;
-> +	unsigned long expires;
+> +	vddao_3v3: regulator-vddao_3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDAO_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	vcc_3v3: regulator-vcc_3v3 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VCC_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +	};
+> +
+> +	emmc_pwrseq: emmc-pwrseq {
+> +		compatible = "mmc-pwrseq-emmc";
+> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	wifi32k: wifi32k {
+> +		compatible = "pwm-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <32768>;
+> +		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
+> +	};
+> +
+> +	sdio_pwrseq: sdio-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
+> +		clocks = <&wifi32k>;
+> +		clock-names = "ext_clock";
+> +	};
+>  };
+>  
+>  /* This UART is brought out to the DB9 connector */
+> @@ -64,3 +104,75 @@
+>  	pinctrl-0 = <&uart_ao_a_pins>;
+>  	pinctrl-names = "default";
+>  };
+> +
+> +/* Wireless SDIO Module */
+> +&sd_emmc_a {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdio_pins>;
+> +	pinctrl-names = "default";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +
+> +	non-removable;
+> +	disable-wp;
+> +
+> +	mmc-pwrseq = <&sdio_pwrseq>;
+> +
+> +	vmmc-supply = <&vddao_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +
+> +	brcmf: bcrmf at 1 {
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +	};
 > +};
 > +
->   struct bt_bmc {
->   	struct device		dev;
->   	struct miscdevice	miscdev;
-> @@ -65,6 +75,11 @@ struct bt_bmc {
->   	wait_queue_head_t	queue;
->   	struct timer_list	poll_timer;
->   	struct mutex		mutex;
+> +/* SD card */
+> +&sd_emmc_b {
+> +	status = "okay";
+> +	pinctrl-0 = <&sdcard_pins>;
+> +	pinctrl-names = "default";
 > +
-> +	unsigned int		response_time;
-> +	struct timer_list	requests_timer;
-> +	spinlock_t              requests_lock;
-> +	struct list_head        requests;
->   };
->   
->   static atomic_t open_count = ATOMIC_INIT(0);
-> @@ -163,6 +178,94 @@ static int bt_bmc_open(struct inode *inode, struct file *file)
->   }
->   
->   /*
-> + * lock should be held
-> + */
-> +static void drop_expired_requests(struct bt_bmc *bt_bmc)
-> +{
-> +	unsigned long flags = 0;
-> +	struct ipmi_request *req, *next;
-> +	unsigned long next_expires = 0;
-> +	int start_timer = 0;
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	max-frequency = <100000000>;
+> +	disable-wp;
 > +
-> +	spin_lock_irqsave(&bt_bmc->requests_lock, flags);
-> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
-> +		if (time_after_eq(jiffies, req->expires)) {
-> +			pr_warn("BT: request seq:%d has expired. dropping\n",
-> +				req->seq);
-> +			list_del(&req->list);
-> +			kfree(req);
-> +			continue;
-> +		}
-> +		if (!start_timer) {
-> +			start_timer = 1;
-> +			next_expires = req->expires;
-> +		} else {
-> +			next_expires = min(next_expires, req->expires);
-> +		}
-> +	}
-> +	spin_unlock_irqrestore(&bt_bmc->requests_lock, flags);
+> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
 > +
-> +	/* and possibly restart */
-> +	if (start_timer)
-> +		mod_timer(&bt_bmc->requests_timer, next_expires);
-> +}
+> +	vmmc-supply = <&vddao_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
 > +
-> +static void requests_timer(unsigned long data)
-> +{
-> +	struct bt_bmc *bt_bmc = (void *)data;
+> +/* eMMC */
+> +&sd_emmc_c {
+> +	status = "okay";
+> +	pinctrl-0 = <&emmc_pins>;
+> +	pinctrl-names = "default";
 > +
-> +	drop_expired_requests(bt_bmc);
-> +}
+> +	bus-width = <8>;
+> +	cap-sd-highspeed;
+> +	cap-mmc-highspeed;
+> +	max-frequency = <200000000>;
+> +	non-removable;
+> +	disable-wp;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs200-1_8v;
 > +
-> +static int bt_bmc_add_request(struct bt_bmc *bt_bmc, u8 seq)
-> +{
-> +	struct ipmi_request *req;
+> +	mmc-pwrseq = <&emmc_pwrseq>;
+> +	vmmc-supply = <&vcc_3v3>;
+> +	vqmmc-supply = <&vddio_boot>;
+> +};
 > +
-> +	req = kmalloc(sizeof(*req), GFP_KERNEL);
-> +	if (!req)
-> +		return -ENOMEM;
-> +
-> +	req->seq = seq;
-> +	req->expires = jiffies +
-> +		msecs_to_jiffies(bt_bmc->response_time * 1000);
-> +
-> +	spin_lock(&bt_bmc->requests_lock);
-> +	list_add(&req->list, &bt_bmc->requests);
-> +	spin_unlock(&bt_bmc->requests_lock);
-> +
-> +	drop_expired_requests(bt_bmc);
-> +	return 0;
-> +}
-> +
-> +static int bt_bmc_remove_request(struct bt_bmc *bt_bmc, u8 seq)
-> +{
-> +	struct ipmi_request *req, *next;
-> +	int ret = -EBADRQC; /* Invalid request code */
-> +
-> +	spin_lock(&bt_bmc->requests_lock);
-> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
-> +		/*
-> +		 * The sequence number should be unique, so remove the
-> +		 * first matching request found. If there are others,
-> +		 * they should expire
-> +		 */
-> +		if (req->seq == seq) {
-> +			list_del(&req->list);
-> +			kfree(req);
-> +			ret = 0;
-> +			break;
-> +		}
-> +	}
-> +	spin_unlock(&bt_bmc->requests_lock);
-> +
-> +	if (ret)
-> +		pr_warn("BT: request seq:%d is invalid\n", seq);
-> +
-> +	drop_expired_requests(bt_bmc);
-> +	return ret;
-> +}
-> +
-> +/*
->    * The BT (Block Transfer) interface means that entire messages are
->    * buffered by the host before a notification is sent to the BMC that
->    * there is data to be read. The first byte is the length and the
-> @@ -231,6 +334,13 @@ static ssize_t bt_bmc_read(struct file *file, char __user *buf,
->   		len_byte = 0;
->   	}
->   
-> +	if (ret > 0) {
-> +		int ret2 = bt_bmc_add_request(bt_bmc, kbuffer[2]);
-> +
-> +		if (ret2)
-> +			ret = ret2;
-> +	}
-> +
->   	clr_b_busy(bt_bmc);
->   
->   out_unlock:
-> @@ -283,12 +393,20 @@ static ssize_t bt_bmc_write(struct file *file, const char __user *buf,
->   	clr_wr_ptr(bt_bmc);
->   
->   	while (count) {
-> +		int ret2;
-> +
->   		nwritten = min_t(ssize_t, count, sizeof(kbuffer));
->   		if (copy_from_user(&kbuffer, buf, nwritten)) {
->   			ret = -EFAULT;
->   			break;
->   		}
->   
-> +		ret2 = bt_bmc_remove_request(bt_bmc, kbuffer[2]);
-> +		if (ret2) {
-> +			ret = ret2;
-> +			break;
-> +		}
-> +
->   		bt_writen(bt_bmc, kbuffer, nwritten);
->   
->   		count -= nwritten;
-> @@ -438,6 +556,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
->   
->   	mutex_init(&bt_bmc->mutex);
->   	init_waitqueue_head(&bt_bmc->queue);
-> +	INIT_LIST_HEAD(&bt_bmc->requests);
-> +	spin_lock_init(&bt_bmc->requests_lock);
->   
->   	bt_bmc->miscdev.minor	= MISC_DYNAMIC_MINOR,
->   		bt_bmc->miscdev.name	= DEVICE_NAME,
-> @@ -451,6 +571,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
->   
->   	bt_bmc_config_irq(bt_bmc, pdev);
->   
-> +	bt_bmc->response_time = BT_BMC_RESPONSE_TIME;
-> +
->   	if (bt_bmc->irq) {
->   		dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
->   	} else {
-> @@ -468,6 +590,9 @@ static int bt_bmc_probe(struct platform_device *pdev)
->   		  BT_CR0_ENABLE_IBT,
->   		  bt_bmc->base + BT_CR0);
->   
-> +	setup_timer(&bt_bmc->requests_timer, requests_timer,
-> +		    (unsigned long)bt_bmc);
-> +
->   	clr_b_busy(bt_bmc);
->   
->   	return 0;
-> @@ -476,10 +601,17 @@ static int bt_bmc_probe(struct platform_device *pdev)
->   static int bt_bmc_remove(struct platform_device *pdev)
->   {
->   	struct bt_bmc *bt_bmc = dev_get_drvdata(&pdev->dev);
-> +	struct ipmi_request *req, *next;
->   
->   	misc_deregister(&bt_bmc->miscdev);
->   	if (!bt_bmc->irq)
->   		del_timer_sync(&bt_bmc->poll_timer);
-> +
-> +	del_timer_sync(&bt_bmc->requests_timer);
-> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
-> +		list_del(&req->list);
-> +		kfree(req);
-> +	}
->   	return 0;
->   }
->   
+> +&pwm_ef {
+> +	status = "okay";
+> +	pinctrl-0 = <&pwm_e_pins>;
+> +	pinctrl-names = "default";
+> +	clocks = <&clkc CLKID_FCLK_DIV4>;
+> +	clock-names = "clkin0";
+> +};
