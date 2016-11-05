@@ -1,304 +1,44 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sat,  5 Nov 2016 21:38:41 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-Message-ID: <20161105203841.9661-1-uwe@kleine-koenig.org>
+From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
+Date: Sat, 5 Nov 2016 15:01:45 -0600
+Subject: [PATCH v3 0/2] Add TI SCI Reset Driver
+In-Reply-To: <20161104174240.9688-1-afd@ti.com>
+References: <20161104174240.9688-1-afd@ti.com>
+Message-ID: <2a5ddb44-7c6c-1980-5e93-91ef8ff6352a@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This machine is an open hardware router by cz.nic driven by a
-Marvell Armada 385.
 
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
 
-Hello,
-
-the following components are working:
-
- - WAN port
- - eMMC
- - UART0
- - USB
-
-Still missing is support for the switch. Wireless fails to probe, didn't
-debug this up to now. SFP is untested as is UART1.
-
-The device tree on the device doesn't specify a board compatible, I added
-"turris,omnia". Do I need to "register" turris in vendor-prefixes.txt for that?
-@Tomas+Martin: Is this correct at all, or should I better reference cz.nic?
-
-Best regards
-Uwe
-
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 246 ++++++++++++++++++++++++++
- 2 files changed, 247 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-385-turris-omnia.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd2619902..f1d3b9ff257e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -920,6 +920,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
- 	armada-385-db-ap.dtb \
- 	armada-385-linksys-caiman.dtb \
- 	armada-385-linksys-cobra.dtb \
-+	armada-385-turris-omnia.dtb \
- 	armada-388-clearfog.dtb \
- 	armada-388-db.dtb \
- 	armada-388-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-new file mode 100644
-index 000000000000..d3cd8a4d713d
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -0,0 +1,246 @@
-+/*
-+ * Device Tree file for the Turris Omnia
-+ * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
-+ *
-+ * Copyright (C) 2016 Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2.  This program is licensed "as is" without
-+ *     any warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "armada-385.dtsi"
-+
-+/ {
-+	model = "Turris Omnia";
-+	compatible = "turris,omnia", "marvell,armada385", "marvell,armada380";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1024 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+
-+			/* USB part of the eSATA/USB 2.0 port */
-+			usb at 58000 {
-+				status = "okay";
-+			};
-+
-+			sata at a8000 {
-+				status = "okay";
-+			};
-+
-+			sdhci at d8000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&sdhci_pins>;
-+				status = "okay";
-+
-+				bus-width = <8>;
-+				no-1-8-v;
-+				non-removable;
-+			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+			};
-+
-+			usb3 at f8000 {
-+				status = "okay";
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 2,0 {
-+				/* Port 2, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 3,0 {
-+				/* Port 3, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-+
-+&eth0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ge0_rgmii_pins>;
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+};
-+
-+&eth1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ge1_rgmii_pins>;
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+};
-+
-+/* WAN port */
-+&eth2 {
-+	status = "okay";
-+	phy-mode = "sgmii";
-+	phy = <&phy1>;
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+	status = "okay";
-+
-+	i2cmux at 70 {
-+		compatible = "nxp,pca9547";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x70>;
-+		status = "okay";
-+
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			status = "okay";
-+
-+			/* STM32F0 at address 0x2a */
-+			/* leds device at address 0x2b */
-+
-+			eeprom at 54 {
-+				/* holds configuration about RAM, evaluated by bootloader */
-+				compatible = "at,24c64";
-+				reg = <0x54>;
-+			};
-+		};
-+
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+
-+			/* ATSHA204A at address 0x64 */
-+		};
-+
-+		i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+
-+			/* exposed on pin header */
-+		};
-+	};
-+};
-+
-+&mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mdio_pins>;
-+	status = "okay";
-+
-+	phy1: phy at 1 {
-+		status = "okay";
-+		compatible = "marvell,88E1514", "marvell,88E1510", "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+};
-+
-+&pinctrl {
-+	spi0cs1_pins: spi0-pins-0cs1 {
-+		marvell,pins = "mpp26";
-+		marvell,function = "spi0";
-+	};
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins &spi0cs1_pins>;
-+	status = "okay";
-+
-+	spi-nor at 0 {
-+		compatible = "spansion,s25fl164k", "jedec,spi-nor";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+
-+		partition at 0 {
-+			reg = <0x0 0x00100000>;
-+			label = "U-Boot";
-+		};
-+
-+		partition at 1 {
-+			reg = <0x00100000 0x00700000>;
-+			label = "Rescue system";
-+		};
-+	};
-+
-+	/* @1 is on pin header */
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "okay";
-+};
--- 
-2.10.2
+On 11/4/16 11:42 AM, Andrew F. Davis wrote:
+> Hello all,
+>
+> This series adds a reset controller driver that uses the TI SCI
+> protocol to manage resets.
+>
+> The TI SCI protocol is used to communicate with power management
+> controllers used by some SoCs. These controllers manage the various
+> power domains, clocks, and resets available on a SoC.
+>
+> This series is based on drivers for TI SCI and the first two controlled
+> elements above, these series can be found here:
+>
+> TI-SCI: http://www.spinics.net/lists/arm-kernel/msg536851.html
+> PM Domains: http://www.spinics.net/lists/devicetree/msg146621.html
+> Clocks: https://www.spinics.net/lists/linux-clk/msg12785.html
+>
+> Thanks,
+> Andrew
+>
+> Changes from v2:
+>  - Merged DT binding patch and reset header patch
+>  - Added locking for reset bit mask
+>
+> Changes from v1:
+>  - Revised dt binding
+>  - CC Linux ARM list
+>
+> Andrew F. Davis (2):
+>   Documentation: dt: reset: Add TI SCI reset binding
+>   reset: Add the TI SCI reset driver
+>
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
