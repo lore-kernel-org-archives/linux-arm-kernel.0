@@ -1,54 +1,50 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 5 Nov 2016 12:17:11 +0900
-Subject: [PATCH 2/3] ARM: cache-uniphier: refactor jump label to follow
- coding style guideline
-In-Reply-To: <20161104133221.GD1041@n2100.armlinux.org.uk>
-References: <1478259816-24965-1-git-send-email-yamada.masahiro@socionext.com>
- <1478259816-24965-3-git-send-email-yamada.masahiro@socionext.com>
- <20161104122322.GB1041@n2100.armlinux.org.uk>
- <CAK7LNAQKCW2tDXEia7qZ+d9Xy1_ccHSGCat4=w+nfyHiuTHy6w@mail.gmail.com>
- <20161104133221.GD1041@n2100.armlinux.org.uk>
-Message-ID: <CAK7LNAQeCn35s7T+c0YGedYZW5aWijUO2asZ6MFntzrUTdMtYw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Sat, 5 Nov 2016 10:51:13 +0530
+Subject: [PATCH v2 2/3] phy: da8xx-usb: rename the ohci device to
+ ohci-da8xx
+In-Reply-To: <20161103160308.29588-3-ahaslam@baylibre.com>
+References: <20161103160308.29588-1-ahaslam@baylibre.com>
+ <20161103160308.29588-3-ahaslam@baylibre.com>
+Message-ID: <e8bfd316-efe5-5ab5-99ea-b84539fbf8c7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-11-04 22:32 GMT+09:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> On Fri, Nov 04, 2016 at 09:50:56PM +0900, Masahiro Yamada wrote:
->> Hi Russell,
->>
->> 2016-11-04 21:23 GMT+09:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
->> > On Fri, Nov 04, 2016 at 08:43:35PM +0900, Masahiro Yamada wrote:
->> >> Documentation/CodingStyle recommends to use label names which say
->> >> what the goto does or why the goto exists.
->> >>
->> >> Just in case, split it up into three labels because the CodingStyle
->> >> says "one err bugs" is a common type of bug (although, I do not
->> >> believe the current code includes such a bug).
->> >
->> > However, this has the effect of making the code unnecessarily more
->> > complicated, which is a bad thing.  Avoiding unnecessary code
->> > complexity wins over style rules.
->>
->>
->> I thought this patch is stupid, but makes the code more straight-forward;
->> the failure path only calls really needed iounmap/kfree()
->> without exploiting that NULL input makes them no-op.
->
-> ... while making it more fragile, because we're going back to a
-> situation where the right places need to jump to the right label
-> in the cleanup, so that the right functions are called.
->
-> This is a backwards step.
->
-> The reason that iounmap() and kfree() check for NULL pointers is to
-> allow the cleanup paths to be simple, and that's very important as
-> many cleanup paths are simply _not_ tested.
 
 
-OK, fair enough.
+On Thursday 03 November 2016 09:33 PM, Axel Haslam wrote:
+> The ohci device name has changed in the board configuraion files,
+> hence, change the phy lookup table to match the new name.
+> 
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 
+merged, thanks.
 
-
--- 
-Best Regards
-Masahiro Yamada
+-Kishon
+> ---
+>  drivers/phy/phy-da8xx-usb.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-da8xx-usb.c b/drivers/phy/phy-da8xx-usb.c
+> index 32ae78c..c85fb0b 100644
+> --- a/drivers/phy/phy-da8xx-usb.c
+> +++ b/drivers/phy/phy-da8xx-usb.c
+> @@ -198,7 +198,8 @@ static int da8xx_usb_phy_probe(struct platform_device *pdev)
+>  	} else {
+>  		int ret;
+>  
+> -		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
+> +		ret = phy_create_lookup(d_phy->usb11_phy, "usb-phy",
+> +					"ohci-da8xx");
+>  		if (ret)
+>  			dev_warn(dev, "Failed to create usb11 phy lookup\n");
+>  		ret = phy_create_lookup(d_phy->usb20_phy, "usb-phy",
+> @@ -216,7 +217,7 @@ static int da8xx_usb_phy_remove(struct platform_device *pdev)
+>  
+>  	if (!pdev->dev.of_node) {
+>  		phy_remove_lookup(d_phy->usb20_phy, "usb-phy", "musb-da8xx");
+> -		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci.0");
+> +		phy_remove_lookup(d_phy->usb11_phy, "usb-phy", "ohci-da8xx");
+>  	}
+>  
+>  	return 0;
+> 
