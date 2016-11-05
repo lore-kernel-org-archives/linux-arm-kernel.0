@@ -1,189 +1,38 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 5 Nov 2016 13:01:26 +0100 (CET)
-Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
-In-Reply-To: <1478345972.2206.15.camel@intel.com>
-References: <315017958.66634.5d4fc19c-31cd-4900-8613-af4cadec5da4.open-xchange@email.1und1.de>
- <20161023133134.GI1041@n2100.armlinux.org.uk>
- <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <20161031161700.GH1041@n2100.armlinux.org.uk>
- <847975190.29034.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
- <20161101092304.GM1041@n2100.armlinux.org.uk>
- <322177156.158733.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <1478345972.2206.15.camel@intel.com>
-Message-ID: <122295766.159553.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 5 Nov 2016 10:02:23 -0200
+Subject: [GIT PULL] i.MX fixes for 4.9
+In-Reply-To: <CAOMZO5D9uBBwWV8UJOLj-2iwWO6sReB5BAtzdi1q6OqbtvcSOQ@mail.gmail.com>
+References: <20161024140622.GM30578@tiger>
+ <CAOesGMhSHqs_WfxkdUn7yrT_9g1CO1cqXGzQ2Y1Y-+-tY1KNmw@mail.gmail.com>
+ <CAOMZO5D9uBBwWV8UJOLj-2iwWO6sReB5BAtzdi1q6OqbtvcSOQ@mail.gmail.com>
+Message-ID: <CAOMZO5Cna8o0u7bmKdbWxUsGghjc6WQB-HwO2mxuKX0yQhc-5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rui,
+Hi Olof,
 
-> Zhang Rui <rui.zhang@intel.com> hat am 5. November 2016 um 12:39 geschrieben:
-> 
-> 
-> On Sat, 2016-11-05 at 12:07 +0100, Stefan Wahren wrote:
-> > Hi,
-> > 
-> > [add Rui]
-> > 
-> > > 
-> > > Russell King - ARM Linux <linux@armlinux.org.uk> hat am 1. November
-> > > 2016 um
-> > > 10:23 geschrieben:
-> > > 
-> > > 
-> > > On Mon, Oct 31, 2016 at 08:54:33PM +0100, Stefan Wahren wrote:
-> > > > 
-> > > > [??366.696043] INFO: task ext4lazyinit:70 blocked for more than
-> > > > 120 seconds.
-> > > > [??366.703046]???????Not tainted 4.9.0-rc1 #7
-> > > > [??366.707188] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs"
-> > > > disables
-> > > > this
-> > > > message.
-> > > > [??366.715161] ext4lazyinit????D c05aa6ac?????0????70??????2
-> > > > 0x00000000
-> > > This looks like a very different problem - I guess one for ext4
-> > > people.
-> > > 
-> > i investigated the issue more further. This trace wasn't
-> > representative, because
-> > the stacktrace is different in most cases. The "endless loop" is
-> > located in
-> > freeze_enter(). So i added some debug messages:
-> > 
-> is this a regression?
+On Mon, Oct 31, 2016 at 9:29 PM, Fabio Estevam <festevam@gmail.com> wrote:
 
-i've never seen this working on MXS platform, but maybe i hit a corner case. The
-oldest kernel that i tested was 3.18 and this issue was reproducible. Should i
-test an older version?
+> I think this will be fixed with this pcie-designware patch:
+> http://www.spinics.net/lists/linux-pci/msg55244.html
 
-> > 
-> > and repeated the test cases for freeze which shows none the
-> > representative
-> > stacktraces:
-> > 
-> > 1. cmdline contains no_console_suspend
-> > 
-> > * echo freeze > /sys/power/state
-> > 
-> > ...
-> > [??139.371308] PM: suspend of devices complete after 1342.721 msecs
-> > [??139.385203] PM: late suspend of devices complete after 7.668 msecs
-> > [??139.399428] PM: noirq suspend of devices complete after 7.936
-> > msecs
-> > [??139.406639] PM: calling cpuidle_resume()
-> > [??139.410619] PM: calling wake_up_all_idle_cpus()
-> > [??139.415339] PM: suspend-to-idle
-> > 
-> > > 
-> > > > 
-> > > > > 
-> > > > > no reaction to input via Debug UART
-> > [??366.683570] INFO: task bash:373 blocked for more than 120 seconds.
-> > [??366.689814]???????Not tainted 4.9.0-rc1-dirty #14
-> > [??366.694705] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs"
-> > disables this
-> > message.
-> > [??366.702685] bash????????????D c05aa6ec?????0???373????275
-> > 0x00000000
-> > [??366.709227] [<c05aa6ec>] (__schedule) from [<c05aaff8>]
-> > (schedule+0x3c/0xbc)
-> > [??366.716495] [<c05aaff8>] (schedule) from [<c005b588>]
-> > (suspend_devices_and_enter+0x888/0xa78)
-> > [??366.725228] [<c005b588>] (suspend_devices_and_enter) from
-> > [<c005bea4>]
-> > (pm_suspend+0x72c/0x81c)
-> > [??366.734150] [<c005bea4>] (pm_suspend) from [<c005a008>]
-> > (state_store+0x80/0xcc)
-> > [??366.741554] [<c005a008>] (state_store) from [<c02f0270>]
-> > (kobj_attr_store+0x18/0x1c)
-> > [??366.749515] [<c02f0270>] (kobj_attr_store) from [<c01911e8>]
-> > (sysfs_kf_write+0x48/0x4c)
-> > [??366.757735] [<c01911e8>] (sysfs_kf_write) from [<c0190308>]
-> > (kernfs_fop_write+0xfc/0x1d0)
-> > [??366.766130] [<c0190308>] (kernfs_fop_write) from [<c011f578>]
-> > (__vfs_write+0x2c/0x124)
-> > [??366.774255] [<c011f578>] (__vfs_write) from [<c011f724>]
-> > (vfs_write+0xb4/0x1a4)
-> > [??366.781640] [<c011f724>] (vfs_write) from [<c011f8e8>]
-> > (SyS_write+0x44/0x88)
-> > [??366.788890] [<c011f8e8>] (SyS_write) from [<c000a2c0>]
-> > (ret_fast_syscall+0x0/0x1c)
-> > [??366.796627]
-> > [??366.796627] Showing all locks held in the system:
-> > [??366.803011] 2 locks held by khungtaskd/10:
-> > [??366.807149]??#0: [??366.808931]??(
-> > rcu_read_lock[??366.811784] ){......}
-> > , at: [??366.814813] [<c0093a40>] watchdog+0xb4/0x61c
-> > [??366.819128]??#1: [??366.820902]??(
-> > tasklist_lock[??366.823876] ){.+.+..}
-> > , at: [??366.826765] [<c0051dbc>] debug_show_all_locks+0x28/0x1bc
-> > [??366.832151] 4 locks held by bash/373:
-> > [??366.835973]??#0: [??366.837765]??(
-> > sb_writers[??366.840365] #4
-> > ){.+.+.+}[??366.842987] , at:
-> > [??366.845079] [<c011f804>] vfs_write+0x194/0x1a4
-> > [??366.849551]??#1: [??366.851324]??(
-> > &of->mutex[??366.854058] ){+.+.+.}
-> > , at: [??366.856944] [<c01902cc>] kernfs_fop_write+0xc0/0x1d0
-> > [??366.861941]??#2: [??366.863839]??(
-> > s_active[??366.866288] #43
-> > ){.+.+.+}[??366.868877] , at:
-> > [??366.870938] [<c01902d4>] kernfs_fop_write+0xc8/0x1d0
-> > [??366.876053]??#3: [??366.877843]??(
-> > pm_mutex[??366.880272] ){+.+.+.}
-> > , at: [??366.883266] [<c005b808>] pm_suspend+0x90/0x81c
-> > [??366.887757]
-> > [??366.889268] =============================================
-> > [??366.889268]
-> > 
-> > 2. cmdline contains no_console_suspend
-> > 
-> > * echo enabled > /sys/class/tty/ttyAMA0/power/wakeup
-> > * echo freeze > /sys/power/state
-> > 
-> > the same as in 1.
-> > 
-> > 3. cmdline doesn't contains no_console_suspend
-> > 
-> > * echo enabled > /sys/class/tty/ttyAMA0/power/wakeup
-> > * echo freeze > /sys/power/state
-> > 
-> > [??161.093187] PM: Syncing filesystems ... [??161.734413] done.
-> > [??161.793242] Freezing user space processes ... (elapsed 0.008
-> > seconds) done.
-> > [??161.809797] Freezing remaining freezable tasks ... (elapsed 0.004
-> > seconds)
-> > done.
-> > [??161.821953] Suspending console(s) (use no_console_suspend to
-> > debug)
-> > 
-> > >?
-> > > > > > no reaction to Debug UART
-> 
-> Then the system does not have any response? or the system freezes and
-> wakes up as expected?
+Bjorn sent this fix to Linus, so we should be fine now.
 
-The system doesn't react to any input from Debug UART and after 2 minutes i got
-the following stacktrace about hung task. But i didn't get any change to come
-back to the console. Interestingly basic PM debugging tests doesn't show this
-issue. Also "echo mem > /sys/power/state" doesn't cause this issue.
+>
+>> Wandboard, has a peculiar MMC error. First I thought it was just the
+>> card going bad, but now I'm not so sure since multi_v7 boots just fine
+>> on the same hardware:
+>
+> Yes, I have been noticing this mmc error reported in your autobooter
+> and I also thought it was some kind of a bad SD card.
+>
+> This particular error I have never been able to reproduce. Also
+> checked kernelci and do not see this mmc error there.
+>
+> Interesting that it happens only with imx_v6_v7_defconfig and not with
+> multi_v7_defconfig.
 
-> 
-> > I expected that in all 3 cases freeze_wake() will be called. Why not?
-> > 
-> > Here my config again:
-> > 
-> > CONFIG_PM_SLEEP=y
-> > CONFIG_SUSPEND=y
-> > CONFIG_SUSPEND_FREEZER=y
-> > CONFIG_PM=y
-> > CONFIG_CPU_IDLE is not set
-> 
-> hmmm, why not have CONFIG_CPU_IDLE set?
+Today wandboard does not show the mmc error with imx_v6_v7_defconfig:
+http://arm-soc.lixom.net/bootlogs/mainline/v4.9-rc3-376-gfb415f2/wandboard-arm-imx_v6_v7_defconfig.html
 
-I'm using mxs_defconfig which doesn't select the ARM CPU idle. Is this
-necessary?
-
-> 
-> thanks,
-> rui
+Looks like the mmc error come and go?
