@@ -1,86 +1,71 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Sat, 5 Nov 2016 15:45:36 +0000
-Subject: Low network throughput on i.MX28
-In-Reply-To: <1478351681.353.5.camel@embedded.rocks>
-References: <1476313753.2065.11.camel@embedded.rocks>
- <20161013084807.6a231fdb@ipc1.ka-ro>
- <A57BCA39-0977-43C4-B22D-ED60F5E4B06D@embedded.rocks>
- <20161014081349.1afb22c6@ipc1.ka-ro>
- <1476521171.1670.2.camel@embedded.rocks>
- <2131339088.8778.d47a56f6-921e-4d6c-9a5c-2e77bfd5d281.open-xchange@email.1und1.de>
- <8C3BD5BA-252F-4A95-B938-50356A23974E@embedded.rocks>
- <2003579366.391192.0cc5acd0-af27-4ef7-892f-3c2dd86176ba.open-xchange@email.1und1.de>
- <1477696028.31471.3.camel@embedded.rocks>
- <1143135945.89173.6f7a3a9a-5120-4cc2-a76b-92a516ab6500.open-xchange@email.1und1.de>
- <1478074489.19127.7.camel@embedded.rocks>
- <ac897803-47e5-6b0b-5664-6dc165c56c23@i2se.com>
- <1478285097.26659.2.camel@embedded.rocks>
- <1783642995.185945.5e54a2af-ba2c-4901-93f6-1967dd432939.open-xchange@email.1und1.de>
- <1478299359.26659.5.camel@embedded.rocks>
- <963717394.159124.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <1478347610.353.2.camel@embedded.rocks> <1478349578.3405.5.camel@intel.com>
- <1478351681.353.5.camel@embedded.rocks>
-Message-ID: <1478360733.3405.17.camel@intel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 6 Nov 2016 00:45:30 +0900
+Subject: [PATCH v4] ARM: w90x900: let clk_disable() return immediately if
+ clk is NULL
+In-Reply-To: <1474221559-21269-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1474221559-21269-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNARJ647+pmADPO=Q33ie9EsmH_Yu+US3HiwertzEw4CnSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-11-05 at 14:14 +0100, J?rg Krause wrote:
-> On Sat, 2016-11-05 at 12:39 +0000, Koul, Vinod wrote:
-> > 
-> > On Sat, 2016-11-05 at 13:06 +0100, J?rg Krause wrote:
-> > > 
-> > > @ Vinod
-> > > In short, I noticed poor performance in the SSP2 (MMC/SD/SDIO)
-> > > interface on a custom i.MX28 board with a wifi chip attached.
-> > > Comparing
-> > > the bandwith with iperf I get >20Mbits/sec on the vendor kernel
-> > > and
-> > > <5Mbits/sec on the mainline kernel. I am trying to investigate
-> > > what
-> > > the
-> > > bottleneck is.
-> > is this imx-dma or imx-sdma..
-> > 
-> > > 
-> > > 
-> > > @ Stefan, all
-> > > My understanding is that the tasklet in this case is responsible
-> > > for
-> > > reading the response registers of the DMA controller and return
-> > > the
-> > > response to the MMC host driver.
-> > > 
-> > > The vendor kernel does this in the interrupt routine of mxs-mmc by
-> > > issueing a complete whereas the mainline kernel does this in the
-> > > interrupt routine in mxs-dma by scheduling the tasklet.
-> > Is vendor kernel using dmaengine APIs or not?
-> It's this engine [1].
-> 
-> [1] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/a
-> r
-> ch/arm/plat-mxs/dmaengine.c?h=imx_2.6.35_1.1.0
+Hi Wan,
 
-Thanks for info, this looks okay.
+This patch was acked by you long before,
+but it has not been pulled-in yet for some reasons.
 
-First can you confirm that register configuration for DMA transaction is
-same in both cases.
+Now the patch was split per platform.
 
-Second, looking at the driver I see that interrupt handler is not
-pushing next descriptor. Also the tasklet is doing callback action and
-not pushing any descriptors, did I miss anything in this?
+So, could you apply this patch to your tree, please?
 
-For good dma throughput, you should have multiple dma transactions
-queued up and submitted as fast as possible. Can you check if this is
-being done.?
 
-We need to minimize/eliminate the delay between two transactions. This
-can be done in SW or HW based on support from HW. If HW supports
-chaining of descriptors then next transaction which is given to
-dmaengine driver should be appended at the end. If not submit the
-descriptor to hw immediately on interrupt.?
+2016-09-19 2:59 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> In many of clk_disable() implementations, it is a no-op for a NULL
+> pointer input, but this is one of the exceptions.
+>
+> Making it treewide consistent will allow clock consumers to call
+> clk_disable() without NULL pointer check.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+> ---
+>
+> Changes in v4:
+>   - Split into per-arch patches
+>
+> Changes in v3:
+>   - Return only when clk is NULL.  Do not take care of error pointer.
+>
+> Changes in v2:
+>   - Rebase on Linux 4.6-rc1
+>
+>  arch/arm/mach-w90x900/clock.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+> index 2c371ff..ac6fd1a 100644
+> --- a/arch/arm/mach-w90x900/clock.c
+> +++ b/arch/arm/mach-w90x900/clock.c
+> @@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
+>  {
+>         unsigned long flags;
+>
+> +       if (!clk)
+> +               return;
+> +
+>         WARN_ON(clk->enabled == 0);
+>
+>         spin_lock_irqsave(&clocks_lock, flags);
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-For good example of latter please look at?drivers/dma/sa11x0-dma.c
 
-HTH
+
 -- 
-~Vinod
+Best Regards
+Masahiro Yamada
