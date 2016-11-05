@@ -1,29 +1,38 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 5 Nov 2016 15:00:45 +0800
-Subject: [PATCH] ARM: dts: imx6: Add support for Logic PD SOM and Baseboard
-In-Reply-To: <CAHCN7x+YopHVNxh4Vi5o1d=S3FFkoz45dNmgHMgs1sAQqaL77A@mail.gmail.com>
-References: <1469030786-28424-1-git-send-email-aford173@gmail.com>
- <20160809082400.GR4678@tiger>
- <CAHCN7x+YopHVNxh4Vi5o1d=S3FFkoz45dNmgHMgs1sAQqaL77A@mail.gmail.com>
-Message-ID: <20161105070043.GA5597@dragon>
+Date: Sat, 5 Nov 2016 15:05:54 +0800
+Subject: [PATCH v2 4/4] ARM: dts: imx28: Fix build warnings with W=1
+In-Reply-To: <CAOMZO5DbiHV-uR9bpdEFTfzDRXuWDao_RYxDCPJ1N=FuF4VCyQ@mail.gmail.com>
+References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
+ <1473103670-15922-4-git-send-email-festevam@gmail.com>
+ <20160908140338.GD16911@tiger>
+ <CAOMZO5DbiHV-uR9bpdEFTfzDRXuWDao_RYxDCPJ1N=FuF4VCyQ@mail.gmail.com>
+Message-ID: <20161105070344.GB5597@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 12:44:21PM -0500, Adam Ford wrote:
-> >> +&iomuxc {
-> >> +     imx6qdl-logicpd-baseboard {
-> >> +
-> >
-> > Drop this container node and put the following pinctrl nodes directly
-> > under &iomuxc.
-> >
+On Fri, Nov 04, 2016 at 06:51:06PM -0200, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> Like the regulators above, if I remove this connector, the system
-> won't boot.  I compared both the regulator and the iomuxc containers
-> in this device tree with other imx6q boards, and I seem to be
-> consistent with what other boards are doing.
+> On Thu, Sep 8, 2016 at 11:03 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > On Mon, Sep 05, 2016 at 04:27:50PM -0300, Fabio Estevam wrote:
+> >> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
+> >> index 0ebbc83..b4d4dbb 100644
+> >> --- a/arch/arm/boot/dts/imx28-tx28.dts
+> >> +++ b/arch/arm/boot/dts/imx28-tx28.dts
+> >> @@ -35,7 +35,8 @@
+> >>               usbotg = &usb0;
+> >>       };
+> >>
+> >> -     memory {
+> >> +     memory at 0 {
+> >> +             device_type = "memory";
+> >>               reg = <0 0>; /* will be filled in by U-Boot */
+> >
+> > I'm curious to know if the unit-address will be fixed up or not when
+> > 'reg' property gets updated by U-Boot.
+> 
+> Should I resend this series and keep imx28-tx28.dts unmodified?
 
-You might want to rebase the patch to latest mainline like v4.9-rc3 and
-test first.
+Yeah, probably the best thing we can do.
 
 Shawn
