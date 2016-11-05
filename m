@@ -1,30 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 5 Nov 2016 22:37:41 +0100
+From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 5 Nov 2016 23:08:48 +0100
 Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161105212748.vtdprlxxismy5xmk@perseus.defre.kleine-koenig.org>
+In-Reply-To: <20161105210441.GB1216@lunn.ch>
 References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <20161105212326.GC1216@lunn.ch>
- <20161105212748.vtdprlxxismy5xmk@perseus.defre.kleine-koenig.org>
-Message-ID: <20161105213741.GD1216@lunn.ch>
+ <20161105210441.GB1216@lunn.ch>
+Message-ID: <20161105220848.k6rrjmvvhdaeduma@perseus.defre.kleine-koenig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 10:27:49PM +0100, Uwe Kleine-K?nig wrote:
-> Hello Andrew,
+On Sat, Nov 05, 2016 at 10:04:41PM +0100, Andrew Lunn wrote:
+> > +&mdio {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&mdio_pins>;
+> > +	status = "okay";
+> > +
+> > +	phy1: phy at 1 {
+> > +		status = "okay";
+> > +		compatible = "marvell,88E1514", "marvell,88E1510", "ethernet-phy-ieee802.3-c22";
+> > +		reg = <1>;
+> > +	};
 > 
-> On Sat, Nov 05, 2016 at 10:23:26PM +0100, Andrew Lunn wrote:
-> > > Still missing is support for the switch.
-> > 
-> > Is it a Marvell Switch? armada-370-rd.dts would be a good start for
-> > the old binding? vf610-zii-dev-rev-b.dts uses the new binding.
+> phy.txt says:
 > 
-> Yeah, a 88E6176. I already try to understand vf610-zii-dev-rev-b.dts. Do
-> you know if this driver works for the 88E6176?
+> - compatible: Compatible list, may contain
+>   "ethernet-phy-ieee802.3-c22" or "ethernet-phy-ieee802.3-c45" for
+>   PHYs that implement IEEE802.3 clause 22 or IEEE802.3 clause 45
+>   specifications. If neither of these are specified, the default is to
+>   assume clause 22.
+> 
+>   If the phy's identifier is known then the list may contain an entry
+>   of the form: "ethernet-phy-idAAAA.BBBB" where
+>      AAAA - The value of the 16 bit Phy Identifier 1 register as
+>             4 hex digits. This is the chip vendor OUI bits 3:18
+>      BBBB - The value of the 16 bit Phy Identifier 2 register as
+>             4 hex digits. This is the chip vendor OUI bits 19:24,
+>             followed by 10 bits of a vendor specific ID.
+> 
+>   The compatible list should not contain other values than those
+>   listed here.
+> 
+> Please don't list the "marvell,*" names.
 
-Yes it does. 
+Will do for v2. arch/arm/boot/dts/keystone-* needs fixing in this
+regard, too.
 
-The vf610-zii-dev-rev-b is a bit complex because it has three
-switches, and an mdio mux. You should be able to transplant the
-switch0: switch0 at 0 part into the mdio node.
-
-	 Andrew
+Best regards
+Uwe
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161105/813ef036/attachment.sig>
