@@ -1,24 +1,65 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 5 Nov 2016 17:41:37 +0200
-Subject: [PATCH 2/4] ARM: dts: exynos: Add SCU device node to exynos4.dtsi
-In-Reply-To: <1478230764-13748-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
- <1478230764-13748-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20161105154137.GB8183@kozik-lap>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 6 Nov 2016 00:42:33 +0900
+Subject: [PATCH v4] ARM: mmp: let clk_disable() return immediately if clk
+ is NULL
+In-Reply-To: <1474221526-21195-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1474221526-21195-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNASn+-HrzwSnrrR3nuGzvmhLzQRTXduSmF1N51uwyzaYTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 09:09:22AM +0530, Pankaj Dubey wrote:
-> Exynos4 like other Cortex-A9 SoC's has a Snoop Control Unit(SCU)
-> and its SFR are used during SMP boot and S2R. Add SCU node to the device tree.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Hi Eric Miao, Haojian Zhuang,
+
+Could you pick up this patch, please?
+
+
+2016-09-19 2:58 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> In many of clk_disable() implementations, it is a no-op for a NULL
+> pointer input, but this is one of the exceptions.
+>
+> Making it treewide consistent will allow clock consumers to call
+> clk_disable() without NULL pointer check.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->  arch/arm/boot/dts/exynos4.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
+>
+> Changes in v4:
+>   - Split into per-arch patches
+>
+> Changes in v3:
+>   - Return only when clk is NULL.  Do not take care of error pointer.
+>
+> Changes in v2:
+>   - Rebase on Linux 4.6-rc1
+>
+>  arch/arm/mach-mmp/clock.c | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+> index ac6633d..28fe64c 100644
+> --- a/arch/arm/mach-mmp/clock.c
+> +++ b/arch/arm/mach-mmp/clock.c
+> @@ -67,6 +67,9 @@ void clk_disable(struct clk *clk)
+>  {
+>         unsigned long flags;
+>
+> +       if (!clk)
+> +               return;
+> +
+>         WARN_ON(clk->enabled == 0);
+>
+>         spin_lock_irqsave(&clocks_lock, flags);
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Thanks, applied.
 
-Best regards,
-Krzysztof
+
+-- 
+Best Regards
+Masahiro Yamada
