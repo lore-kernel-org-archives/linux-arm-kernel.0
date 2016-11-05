@@ -1,79 +1,75 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 5 Nov 2016 17:45:14 +0000
-Subject: [PATCH 1/4] mfd: ti_am335x_tscadc: store physical address
-In-Reply-To: <20161031081643.GN13127@dell>
-References: <20160921161134.6951-1-mugunthanvnm@ti.com>
- <20160921161134.6951-2-mugunthanvnm@ti.com> <20160927194045.GK21388@dell>
- <f271b805-82c2-a45e-0de9-39edafd34d2e@ti.com> <20161026121730.GS8574@dell>
- <954adfa7-94d9-f785-aeab-6f20c8f4c3b9@kernel.org>
- <20161031081643.GN13127@dell>
-Message-ID: <3f3339b5-3861-832c-a26d-d6fd2d2cfd59@kernel.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 5 Nov 2016 18:05:42 +0000
+Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
+In-Reply-To: <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
+References: <20161023133134.GI1041@n2100.armlinux.org.uk>
+ <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <20161031161700.GH1041@n2100.armlinux.org.uk>
+ <847975190.29034.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
+ <20161101092304.GM1041@n2100.armlinux.org.uk>
+ <322177156.158733.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+ <1478345972.2206.15.camel@intel.com>
+ <122295766.159553.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+ <20161105130034.GG15759@mai>
+ <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
+Message-ID: <20161105180542.GE1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/16 08:16, Lee Jones wrote:
-> On Sun, 30 Oct 2016, Jonathan Cameron wrote:
-> 
->> On 26/10/16 13:17, Lee Jones wrote:
->>> On Fri, 30 Sep 2016, Mugunthan V N wrote:
->>>
->>>> On Wednesday 28 September 2016 01:10 AM, Lee Jones wrote:
->>>>> On Wed, 21 Sep 2016, Mugunthan V N wrote:
->>>>>
->>>>>> store the physical address of the device in its priv to use it
->>>>>> for DMA addressing in the client drivers.
->>>>>>
->>>>>> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
->>>>>> ---
->>>>>>  drivers/mfd/ti_am335x_tscadc.c       | 1 +
->>>>>>  include/linux/mfd/ti_am335x_tscadc.h | 1 +
->>>>>>  2 files changed, 2 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/mfd/ti_am335x_tscadc.c b/drivers/mfd/ti_am335x_tscadc.c
->>>>>> index c8f027b..0f3fab4 100644
->>>>>> --- a/drivers/mfd/ti_am335x_tscadc.c
->>>>>> +++ b/drivers/mfd/ti_am335x_tscadc.c
->>>>>> @@ -183,6 +183,7 @@ static	int ti_tscadc_probe(struct platform_device *pdev)
->>>>>>  		tscadc->irq = err;
->>>>>>  
->>>>>>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>>>>> +	tscadc->tscadc_phys_base = res->start;
->>>>>
->>>>> This is unusual.  Can't you use a virt_to_phys() variant instead?
->>>>>
->>>>
->>>> I tried using virt_to_phys(), but its not working for me.
->>>> Also saw many drivers uses like this to get physical address
->>>> ("git grep -n " res->start;" drivers/*").
->>>
->>> Very well:
->>>
->>> For my own reference:
->>>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
->>>
->>> Let me know how you wish this set to be handled.
->> I'm happy to pick up the whole series.  There are some more mfd
->> header changes in patch 2 but as they only add defines, I
->> don't mind that much if I don't an Ack from you on those
->> (btw this got to V3 but as patch 1 didn't change I'll carry
->> your ack forwards).
->>
->> Do you want an immutable branch?  Seems unlikely to cause
->> much trouble even if there is a merge issue on all 10ish
->> lines of mfd code in the next merge window.
-> 
-> Not at the moment, but if you could set things up so it's possible to
-> create one at a later date if things go Pete Tong, that would be
-> great.
-Couldn't think of an easy way to do this without creating a branch
-and merging it into my normal branch.  I'll not push it out to
-kernel.org though unless you tell me you need it.
+On Sat, Nov 05, 2016 at 04:28:37PM +0100, Stefan Wahren wrote:
+> As i wrote in my email before, i added a pr_info() into freeze_wake.
+> But i never see the output of this message. So i assume freeze_wake
+> is never called. Again, how could this happen?
 
-Applied to the togreg branch (indirectly ;) of iio.git pushed out
-as testing for the autobuilders to play with it.
+Hmm, so the bit that you're getting stuck on is:
 
-Thanks,
+        wait_event(suspend_freeze_wait_head,
+                   suspend_freeze_state == FREEZE_STATE_WAKE);
 
-Jonathan
+Now there's two things about this here - it's a non-interruptible wait,
+so I think the hung task detection may trigger on that (I'm not entirely
+sure on that point though, and I don't have time this evening to read
+the code to find out.)
 
-> 
+The second thing is, that in order to pass this point, something has to
+call freeze_wake().
+
+There's not that many possibilities for that:
+
+$ git grep freeze_wake drivers kernel
+drivers/base/power/wakeup.c:    freeze_wake();
+drivers/base/power/wakeup.c:    freeze_wake();
+kernel/power/suspend.c:void freeze_wake(void)
+kernel/power/suspend.c:EXPORT_SYMBOL_GPL(freeze_wake);
+
+One of those is pm_system_wakeup(), the other is wakeup_source_activate()
+via wakeup_source_report_event() via __pm_stay_awake() or
+__pm_wakeup_event().
+
+Looking at the results of:
+
+$ grep 'pm_wakeup_event\|pm_stay_awake\|pm_system_wakeup' drivers kernel -r
+
+it looks like for freeze support to work, various drivers need to call
+one of these functions.
+
+The iMX serial driver doesn't call any of these functions, so I can't
+see how we'd get past this point - and from that grep you'll see nothing
+in kernel/irq touches any of these functions.
+
+Documentation/power/suspend-and-interrupts.txt does a very poor job
+(which is typical) of describing what the requirements are for
+"suspend-to-idle", it doesn't really say that any of the above
+functions must be called and it doesn't say who's responsible for
+calling these functions.  It does talk about "pm_system_wakeup()"
+for "rare cases".
+
+So my conclusion, based on the poor documentation and the results of
+my greps, is that "freeze" aka "suspend-to-idle" is not supported on
+the majority of hardware, and attempting to use it will result in the
+system locking up in exactly the way you're seeing.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
