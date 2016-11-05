@@ -1,5 +1,5 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Sat, 05 Nov 2016 13:47:35 +0100
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 5 Nov 2016 10:48:12 -0200
 Subject: Low network throughput on i.MX28
 In-Reply-To: <1478349578.3405.5.camel@intel.com>
 References: <1476313753.2065.11.camel@embedded.rocks>
@@ -19,58 +19,23 @@ References: <1476313753.2065.11.camel@embedded.rocks>
  <1478299359.26659.5.camel@embedded.rocks>
  <963717394.159124.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
  <1478347610.353.2.camel@embedded.rocks> <1478349578.3405.5.camel@intel.com>
-Message-ID: <1478350055.353.4.camel@embedded.rocks>
+Message-ID: <CAOMZO5AZDANN_z6-qNgRjZOsBMX6PQv26Mbq8iVtkbrE3GvQ+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-11-05 at 12:39 +0000, Koul, Vinod wrote:
+Hi Vinod,
+
+On Sat, Nov 5, 2016 at 10:39 AM, Koul, Vinod <vinod.koul@intel.com> wrote:
 > On Sat, 2016-11-05 at 13:06 +0100, J?rg Krause wrote:
-> > @ Vinod
-> > In short, I noticed poor performance in the SSP2 (MMC/SD/SDIO)
-> > interface on a custom i.MX28 board with a wifi chip attached.
-> > Comparing
-> > the bandwith with iperf I get >20Mbits/sec on the vendor kernel and
-> > <5Mbits/sec on the mainline kernel. I am trying to investigate what
-> > the
-> > bottleneck is.
-> 
+>> @ Vinod
+>> In short, I noticed poor performance in the SSP2 (MMC/SD/SDIO)
+>> interface on a custom i.MX28 board with a wifi chip attached.
+>> Comparing
+>> the bandwith with iperf I get >20Mbits/sec on the vendor kernel and
+>> <5Mbits/sec on the mainline kernel. I am trying to investigate what
+>> the
+>> bottleneck is.
+>
 > is this imx-dma or imx-sdma..
 
-Its' mxs-dma.
-
-> 
-> > 
-> > @ Stefan, all
-> > My understanding is that the tasklet in this case is responsible
-> > for
-> > reading the response registers of the DMA controller and return the
-> > response to the MMC host driver.
-> > 
-> > The vendor kernel does this in the interrupt routine of mxs-mmc by
-> > issueing a complete whereas the mainline kernel does this in the
-> > interrupt routine in mxs-dma by scheduling the tasklet.
-> 
-> Is vendor kernel using dmaengine APIs or not?
-
-No. It's using a custom dmaengine.
-
-> 
-> Okay, if we talk about getting best performance, I always advise
-> folks
-> to issue next transaction in the interrupt routine and then do
-> descriptor management and callback in tasklet.
-> 
-> Some drivers do that correctly but some don't..
-
-Do you have an example for a driver doing it correctly?
-
-> Tasklet can be an issue but only if there is a huge scheduling delay
-> for
-> the tasklet. You can check using tracing tools and confirm.
-
-Don't think the tasklets is an issue here as I replaced the tasklets in
-the dmaengine API by completion (which the vendor kernel uses) and
-there are no performance benefits. However, I am not a Linux kernel
-developer...
-
-J?rg
+This is drivers/dma/mxs-dma.c, thanks.
