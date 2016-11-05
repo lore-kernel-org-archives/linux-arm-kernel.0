@@ -1,42 +1,63 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat,  5 Nov 2016 22:38:30 +0800
-Subject: [PATCH 2/2] arm64: dts: sunxi: enable EHCI1,
- OHCI1 and USB PHY nodes in Pine64
-In-Reply-To: <20161105143830.10099-1-icenowy@aosc.xyz>
-References: <20161105143830.10099-1-icenowy@aosc.xyz>
-Message-ID: <20161105143830.10099-2-icenowy@aosc.xyz>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun, 6 Nov 2016 00:18:11 +0900
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.10
+Message-ID: <CAK7LNAQ5_Sc99WbTWR9u3_J0FqG8KUSGNQzggdQC91Cngxi+Cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pine64 have two USB Type-A ports, which are wired to the two ports of
-A64 USB PHY, and the lower port is the EHCI/OHCI1 port.
+Hi Arnd, Olof,
 
-Enable the necessary nodes to enable the lower USB port to work.
+Here are UniPhier DT (32bit) updates for the v4.10 merge window.
+Please pull!
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+(This time, I based this pull-request on -rc3 instead of -rc1
+because I want to make sure to have no conflict
+between fixes that had already been pulled-in and
+new development commits in this series.)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 4709590..d836995 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -72,3 +72,15 @@
- &i2c1_pins {
- 	bias-pull-up;
- };
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
+
+The following changes since commit a909d3e636995ba7c349e2ca5dbb528154d4ac30:
+
+  Linux 4.9-rc3 (2016-10-29 13:52:02 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+tags/uniphier-dt-v4.10
+
+for you to fetch changes up to 13b4a6190b25c7bf69239bbc212d256656ada7b9:
+
+  ARM: dts: uniphier: make compatible of syscon nodes SoC-specific
+(2016-11-05 23:33:36 +0900)
+
+----------------------------------------------------------------
+UniPhier ARM SoC DT updates for v4.10
+
+- Add OPP tables to support generic cpufreq driver
+- Use more clocks/resets properties
+- Misc fixes and cleanups
+
+----------------------------------------------------------------
+Masahiro Yamada (7):
+      ARM: dts: uniphier: increase register region size of sysctrl node
+      ARM: dts: uniphier: add CPU clocks and OPP table for Pro5 SoC
+      ARM: dts: uniphier: add CPU clocks and OPP table for PXs2 SoC
+      ARM: dts: uniphier: make 32bit SoC DTSI linear
+      ARM: dts: uniphier: remove redundant serial fifo-size properties
+      ARM: dts: uniphier: add clocks/resets to EHCI nodes of sLD3 SoC
+      ARM: dts: uniphier: make compatible of syscon nodes SoC-specific
+
+ arch/arm/boot/dts/uniphier-common32.dtsi | 199 --------------
+ arch/arm/boot/dts/uniphier-ld4.dtsi      | 358 +++++++++++++++++--------
+ arch/arm/boot/dts/uniphier-pro4.dtsi     | 378 +++++++++++++++++---------
+ arch/arm/boot/dts/uniphier-pro5.dtsi     | 432 ++++++++++++++++++++++--------
+ arch/arm/boot/dts/uniphier-pxs2.dtsi     | 399 +++++++++++++++++++--------
+ arch/arm/boot/dts/uniphier-sld3.dtsi     |  21 +-
+ arch/arm/boot/dts/uniphier-sld8.dtsi     | 359 +++++++++++++++++--------
+ 7 files changed, 1344 insertions(+), 802 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/uniphier-common32.dtsi
+
+
 -- 
-2.10.1
+Best Regards
+Masahiro Yamada
