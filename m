@@ -1,38 +1,157 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 5 Nov 2016 15:05:54 +0800
-Subject: [PATCH v2 4/4] ARM: dts: imx28: Fix build warnings with W=1
-In-Reply-To: <CAOMZO5DbiHV-uR9bpdEFTfzDRXuWDao_RYxDCPJ1N=FuF4VCyQ@mail.gmail.com>
-References: <1473103670-15922-1-git-send-email-festevam@gmail.com>
- <1473103670-15922-4-git-send-email-festevam@gmail.com>
- <20160908140338.GD16911@tiger>
- <CAOMZO5DbiHV-uR9bpdEFTfzDRXuWDao_RYxDCPJ1N=FuF4VCyQ@mail.gmail.com>
-Message-ID: <20161105070344.GB5597@dragon>
+Date: Sat, 5 Nov 2016 15:31:38 +0800
+Subject: [PATCH v2 1/2] ARM: imx: mmdc perf function support i.MX6QP
+In-Reply-To: <1478109604-18323-1-git-send-email-Frank.Li@nxp.com>
+References: <1478109604-18323-1-git-send-email-Frank.Li@nxp.com>
+Message-ID: <20161105073137.GC5597@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 06:51:06PM -0200, Fabio Estevam wrote:
-> Hi Shawn,
-> 
-> On Thu, Sep 8, 2016 at 11:03 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > On Mon, Sep 05, 2016 at 04:27:50PM -0300, Fabio Estevam wrote:
-> >> diff --git a/arch/arm/boot/dts/imx28-tx28.dts b/arch/arm/boot/dts/imx28-tx28.dts
-> >> index 0ebbc83..b4d4dbb 100644
-> >> --- a/arch/arm/boot/dts/imx28-tx28.dts
-> >> +++ b/arch/arm/boot/dts/imx28-tx28.dts
-> >> @@ -35,7 +35,8 @@
-> >>               usbotg = &usb0;
-> >>       };
-> >>
-> >> -     memory {
-> >> +     memory at 0 {
-> >> +             device_type = "memory";
-> >>               reg = <0 0>; /* will be filled in by U-Boot */
-> >
-> > I'm curious to know if the unit-address will be fixed up or not when
-> > 'reg' property gets updated by U-Boot.
-> 
-> Should I resend this series and keep imx28-tx28.dts unmodified?
+On Wed, Nov 02, 2016 at 01:00:03PM -0500, Frank Li wrote:
+> i.MX6QP added new reigster bit PROFILE_SEL in MADPCR0.
 
-Yeah, probably the best thing we can do.
+s/reigster/register
+
+> need set it at perf start.
+> 
+> Signed-off-by: Frank Li <Frank.Li@nxp.com>
+
+We probably need a 'for' in patch subject after 'support'?
+
+> ---
+> V1 to V2: remove fsl_mmdc_devtype
+> 
+>  arch/arm/mach-imx/mmdc.c | 38 ++++++++++++++++++++++++++++++++------
+>  1 file changed, 32 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+> index d82d14c..032cbe0 100644
+> --- a/arch/arm/mach-imx/mmdc.c
+> +++ b/arch/arm/mach-imx/mmdc.c
+> @@ -44,6 +44,7 @@
+>  #define DBG_RST			0x2
+>  #define PRF_FRZ			0x4
+>  #define CYC_OVF			0x8
+> +#define PROFILE_SEL		0x10
+>  
+>  #define MMDC_MADPCR0	0x410
+>  #define MMDC_MADPSR0	0x418
+> @@ -55,10 +56,29 @@
+>  
+>  #define MMDC_NUM_COUNTERS	6
+>  
+> +#define FSL_MMDC_QUIRK_PROFILE_SEL	0x1
+> +
+
+What about naming it MMDC_FLAG_PROFILE_SEL?
+
+>  #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
+>  
+>  static int ddr_type;
+>  
+> +struct fsl_mmdc_devtype_data {
+> +	int driver_data;
+> +};
+
+What about the following?
+
+struct imx_mmdc_data {
+	unsigned int flags;
+};
+
+> +
+> +static struct fsl_mmdc_devtype_data imx6q_data = {
+> +};
+> +
+> +static struct fsl_mmdc_devtype_data imx6qp_data = {
+> +	.driver_data = FSL_MMDC_QUIRK_PROFILE_SEL,
+> +};
+
+Have a const for better?
+
+> +
+> +static const struct of_device_id imx_mmdc_dt_ids[] = {
+> +	{ .compatible = "fsl,imx6q-mmdc", .data = (void *)&imx6q_data},
+> +	{ .compatible = "fsl,imx6qp-mmdc", .data = (void *)&imx6qp_data},
+> +	{ /* sentinel */ }
+> +};
+> +
+>  #ifdef CONFIG_PERF_EVENTS
+>  
+>  static DEFINE_IDA(mmdc_ida);
+> @@ -83,6 +103,7 @@ struct mmdc_pmu {
+>  	struct device *dev;
+>  	struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
+>  	struct hlist_node node;
+> +	struct fsl_mmdc_devtype_data *devtype_data;
+
+mmdc_data
+
+>  };
+>  
+>  /*
+> @@ -307,6 +328,7 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+>  	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+>  	struct hw_perf_event *hwc = &event->hw;
+>  	void __iomem *mmdc_base, *reg;
+> +	int val;
+
+Shouldn't it be u32 for better?
 
 Shawn
+
+>  
+>  	mmdc_base = pmu_mmdc->mmdc_base;
+>  	reg = mmdc_base + MMDC_MADPCR0;
+> @@ -321,7 +343,12 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+>  	local64_set(&hwc->prev_count, 0);
+>  
+>  	writel(DBG_RST, reg);
+> -	writel(DBG_EN, reg);
+> +
+> +	val = DBG_EN;
+> +	if (pmu_mmdc->devtype_data->driver_data & FSL_MMDC_QUIRK_PROFILE_SEL)
+> +		val |= PROFILE_SEL;
+> +
+> +	writel(val, reg);
+>  }
+>  
+>  static int mmdc_pmu_event_add(struct perf_event *event, int flags)
+> @@ -436,6 +463,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+>  	char *name;
+>  	int mmdc_num;
+>  	int ret;
+> +	const struct of_device_id *of_id =
+> +		of_match_device(imx_mmdc_dt_ids, &pdev->dev);
+>  
+>  	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
+>  	if (!pmu_mmdc) {
+> @@ -450,6 +479,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+>  		name = devm_kasprintf(&pdev->dev,
+>  				GFP_KERNEL, "mmdc%d", mmdc_num);
+>  
+> +	pmu_mmdc->devtype_data = (struct fsl_mmdc_devtype_data *)of_id->data;
+> +
+>  	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
+>  			HRTIMER_MODE_REL);
+>  	pmu_mmdc->hrtimer.function = mmdc_pmu_timer_handler;
+> @@ -524,11 +555,6 @@ int imx_mmdc_get_ddr_type(void)
+>  	return ddr_type;
+>  }
+>  
+> -static const struct of_device_id imx_mmdc_dt_ids[] = {
+> -	{ .compatible = "fsl,imx6q-mmdc", },
+> -	{ /* sentinel */ }
+> -};
+> -
+>  static struct platform_driver imx_mmdc_driver = {
+>  	.driver		= {
+>  		.name	= "imx-mmdc",
+> -- 
+> 2.5.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
