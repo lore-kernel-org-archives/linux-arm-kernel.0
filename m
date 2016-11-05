@@ -1,50 +1,65 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 6 Nov 2016 00:25:15 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.10
-Message-ID: <CAK7LNASgYKnhpRM4jj1oHagK=MvO71QnbnaSr=Gt+hkV+6vxXg@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 5 Nov 2016 16:28:37 +0100 (CET)
+Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
+In-Reply-To: <20161105130034.GG15759@mai>
+References: <315017958.66634.5d4fc19c-31cd-4900-8613-af4cadec5da4.open-xchange@email.1und1.de>
+ <20161023133134.GI1041@n2100.armlinux.org.uk>
+ <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
+ <20161031161700.GH1041@n2100.armlinux.org.uk>
+ <847975190.29034.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
+ <20161101092304.GM1041@n2100.armlinux.org.uk>
+ <322177156.158733.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+ <1478345972.2206.15.camel@intel.com>
+ <122295766.159553.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+ <20161105130034.GG15759@mai>
+Message-ID: <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Hi Daniel,
 
-Here are UniPhier DT (64bit) updates for the v4.10 merge window.
-Please pull!
+> Daniel Lezcano <daniel.lezcano@linaro.org> hat am 5. November 2016 um 14:00
+> geschrieben:
+> 
+> 
+> On Sat, Nov 05, 2016 at 01:01:26PM +0100, Stefan Wahren wrote:
+> 
+> [?... ]
+> 
+> > > > CONFIG_SUSPEND=y
+> > > > CONFIG_SUSPEND_FREEZER=y
+> > > > CONFIG_PM=y
+> > > > CONFIG_CPU_IDLE is not set
+> > > 
+> > > hmmm, why not have CONFIG_CPU_IDLE set?
+> > 
+> > I'm using mxs_defconfig which doesn't select the ARM CPU idle. Is this
+> > necessary?
+> 
+> Very likely :) suspend_freezer and cpuidle are tied together.
+> 
+> Moreover, while reading the code, it appears without CONFIG_CPU_IDLE the
+> function cpuidle_idle_call is constantly failing, ending up by having the
+> cpu looping again and again in the idle loop. The function stubs return
+> -ENODEV in the cpuidle's header when CONFIG_CPU_IDLE is not set.
+> 
+> If I'm not wrong the traces should show the cpu actually does never go
+> to suspend. As soon as it enters the state, it should exit immediately
+> without an interrupt event.
+> 
+> Probably there is an inconsistent configuration leaving the kernel with
+> a strange wakeup condition or a race with the short the suspend/resume
+> cycle delay.
+> 
+> First test would be to enable CONFIG_CPU_IDLE.
+> 
+> If it is confirmed, it would be nice to feed bugzilla.
 
+first i tried with CONFIG_CPU_IDLE=Y and then additionally with
+CONFIG_ARM_CPUIDLE=y.
 
-The following changes since commit a909d3e636995ba7c349e2ca5dbb528154d4ac30:
+In both cases the issue is still reproducible.
 
-  Linux 4.9-rc3 (2016-10-29 13:52:02 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.10
-
-for you to fetch changes up to fb28cef06a9065748fbc6949dd7fca3c320c8e0d:
-
-  arm64: dts: uniphier: make compatible of syscon nodes SoC-specific
-(2016-11-05 23:30:11 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.10
-
-- Switch CPU enable-method from spin-table to PSCI
-- Add OPP tables to support generic cpufreq driver
-- Misc fixes
-
-----------------------------------------------------------------
-Masahiro Yamada (5):
-      arm64: dts: uniphier: switch over to PSCI enable method
-      arm64: dts: uniphier: increase register region size of sysctrl node
-      arm64: dts: uniphier: add CPU clock and OPP table for LD11 SoC
-      arm64: dts: uniphier: add CPU clocks and OPP tables for LD20 SoC
-      arm64: dts: uniphier: make compatible of syscon nodes SoC-specific
-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi |  59 ++++++++++--
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 111 +++++++++++++++++++---
- 2 files changed, 148 insertions(+), 22 deletions(-)
-
-
--- 
-Best Regards
-Masahiro Yamada
+As i wrote in my email before, i added a pr_info() into freeze_wake. But i never
+see the output of this message. So i assume freeze_wake is never called. Again,
+how could this happen?
