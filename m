@@ -1,75 +1,22 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 5 Nov 2016 18:05:42 +0000
-Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
-In-Reply-To: <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
-References: <20161023133134.GI1041@n2100.armlinux.org.uk>
- <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <20161031161700.GH1041@n2100.armlinux.org.uk>
- <847975190.29034.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
- <20161101092304.GM1041@n2100.armlinux.org.uk>
- <322177156.158733.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <1478345972.2206.15.camel@intel.com>
- <122295766.159553.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <20161105130034.GG15759@mai>
- <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
-Message-ID: <20161105180542.GE1041@n2100.armlinux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 5 Nov 2016 17:35:50 -0200
+Subject: [PATCH 1/9] ARM: dts: imx1: Remove skeleton.dtsi
+In-Reply-To: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
+References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <CAOMZO5CUyZF5wXBxvcsJWSLt1NVzejpH0bZKedJfx3TfBPB2vQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 04:28:37PM +0100, Stefan Wahren wrote:
-> As i wrote in my email before, i added a pr_info() into freeze_wake.
-> But i never see the output of this message. So i assume freeze_wake
-> is never called. Again, how could this happen?
+Hi Shawn,
 
-Hmm, so the bit that you're getting stuck on is:
+On Tue, Sep 6, 2016 at 12:53 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+> The inclusion of skeleton.dtsi causes the following build warning:
+>
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+>
+> Instead of fixing skeleton.dtsi, just add the top level definitions
+> for address-cells and size-cell and remove its inclusion.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-        wait_event(suspend_freeze_wait_head,
-                   suspend_freeze_state == FREEZE_STATE_WAKE);
-
-Now there's two things about this here - it's a non-interruptible wait,
-so I think the hung task detection may trigger on that (I'm not entirely
-sure on that point though, and I don't have time this evening to read
-the code to find out.)
-
-The second thing is, that in order to pass this point, something has to
-call freeze_wake().
-
-There's not that many possibilities for that:
-
-$ git grep freeze_wake drivers kernel
-drivers/base/power/wakeup.c:    freeze_wake();
-drivers/base/power/wakeup.c:    freeze_wake();
-kernel/power/suspend.c:void freeze_wake(void)
-kernel/power/suspend.c:EXPORT_SYMBOL_GPL(freeze_wake);
-
-One of those is pm_system_wakeup(), the other is wakeup_source_activate()
-via wakeup_source_report_event() via __pm_stay_awake() or
-__pm_wakeup_event().
-
-Looking at the results of:
-
-$ grep 'pm_wakeup_event\|pm_stay_awake\|pm_system_wakeup' drivers kernel -r
-
-it looks like for freeze support to work, various drivers need to call
-one of these functions.
-
-The iMX serial driver doesn't call any of these functions, so I can't
-see how we'd get past this point - and from that grep you'll see nothing
-in kernel/irq touches any of these functions.
-
-Documentation/power/suspend-and-interrupts.txt does a very poor job
-(which is typical) of describing what the requirements are for
-"suspend-to-idle", it doesn't really say that any of the above
-functions must be called and it doesn't say who's responsible for
-calling these functions.  It does talk about "pm_system_wakeup()"
-for "rare cases".
-
-So my conclusion, based on the poor documentation and the results of
-my greps, is that "freeze" aka "suspend-to-idle" is not supported on
-the majority of hardware, and attempting to use it will result in the
-system locking up in exactly the way you're seeing.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Are you OK with this series?
