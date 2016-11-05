@@ -1,55 +1,37 @@
-From: uwe@kleine-koenig.org (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 5 Nov 2016 23:08:48 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161105210441.GB1216@lunn.ch>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <20161105210441.GB1216@lunn.ch>
-Message-ID: <20161105220848.k6rrjmvvhdaeduma@perseus.defre.kleine-koenig.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 05 Nov 2016 23:14:46 +0100
+Subject: [PATCH] clk: rockchip: remove more CLK_IGNORE_UNUSED for rk3399
+ clocktree
+In-Reply-To: <1478144333-13436-1-git-send-email-jay.xu@rock-chips.com>
+References: <1478144333-13436-1-git-send-email-jay.xu@rock-chips.com>
+Message-ID: <1554357.c2SylEul2r@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 10:04:41PM +0100, Andrew Lunn wrote:
-> > +&mdio {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&mdio_pins>;
-> > +	status = "okay";
-> > +
-> > +	phy1: phy at 1 {
-> > +		status = "okay";
-> > +		compatible = "marvell,88E1514", "marvell,88E1510", "ethernet-phy-ieee802.3-c22";
-> > +		reg = <1>;
-> > +	};
+Am Donnerstag, 3. November 2016, 11:38:53 CET schrieb Jianqun Xu:
+> Optimize rk3399 clocktree by removing CLK_IGNORE_UNUSED of some clocks.
 > 
-> phy.txt says:
+> clocks will managered by usb:
+> - clk_usbphy0_480m_src
+> - clk_usbphy1_480m_src
+> - clk_usbphy_480m
 > 
-> - compatible: Compatible list, may contain
->   "ethernet-phy-ieee802.3-c22" or "ethernet-phy-ieee802.3-c45" for
->   PHYs that implement IEEE802.3 clause 22 or IEEE802.3 clause 45
->   specifications. If neither of these are specified, the default is to
->   assume clause 22.
+> clocks will be managered by pvtm:
+> - clk_pvtm_core_l
+> - clk_pvtm_core_b
+> - clk_pvtm_ddr
 > 
->   If the phy's identifier is known then the list may contain an entry
->   of the form: "ethernet-phy-idAAAA.BBBB" where
->      AAAA - The value of the 16 bit Phy Identifier 1 register as
->             4 hex digits. This is the chip vendor OUI bits 3:18
->      BBBB - The value of the 16 bit Phy Identifier 2 register as
->             4 hex digits. This is the chip vendor OUI bits 19:24,
->             followed by 10 bits of a vendor specific ID.
+> clocks will be managered by dfi:
+> - pclk_ddr_mon
+> - clk_dfimon0_timer
+> - clk_dfimon1_timer
+> - aclk_dcf
+> - pclk_dcf
 > 
->   The compatible list should not contain other values than those
->   listed here.
-> 
-> Please don't list the "marvell,*" names.
+> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
 
-Will do for v2. arch/arm/boot/dts/keystone-* needs fixing in this
-regard, too.
+I gave this a test on a rk3399-gru device and was still able to boot 
+sucessfully. So I've applied the patch to my clk-branch for 4.10
 
-Best regards
-Uwe
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161105/813ef036/attachment.sig>
+Thanks
+Heiko
