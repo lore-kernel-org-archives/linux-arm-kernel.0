@@ -1,26 +1,47 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 5 Nov 2016 16:19:02 +0800
-Subject: [PATCH v2] ARM: dts: imx53-qsb: Fix regulator constraints
-In-Reply-To: <1477580804-1423-1-git-send-email-fabio.estevam@nxp.com>
-References: <1477580804-1423-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20161105081901.GE5597@dragon>
+Date: Sat, 5 Nov 2016 16:31:46 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6sx-sdb: update TX D_CAL for USBPHY
+In-Reply-To: <1477882709-2518-1-git-send-email-peter.chen@nxp.com>
+References: <1477882709-2518-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <20161105083145.GF5597@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 27, 2016 at 01:06:44PM -0200, Fabio Estevam wrote:
-> Since commit fa93fd4ecc9c ("regulator: core: Ensure we are at least in
-> bounds for our constraints") the imx53-qsb board populated with a Dialog
-> DA9053 PMIC fails to boot:
-> 
-> LDO3: Bringing 3300000uV into 1800000-1800000uV
-> 
-> The LDO3 voltage constraints passed in the device tree do not match
-> the valid range according to the datasheet, so fix this accordingly to
-> allow the board booting again.
-> 
-> While at it, fix the other voltage constraints as well.
-> 
-> Cc: <stable@vger.kernel.org> # 4.7.x
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Mon, Oct 31, 2016 at 10:58:28AM +0800, Peter Chen wrote:
+> We need to change trimming value (as a percentage) of the 17.78mA TX
+> reference current for better signal quality. With this change, we
+> can patch the eye-diagram test on this board.
 
-Applied, thanks.
+s/patch/pass?  I just want to confirm this is a typo, and can fix it up
+when applying.
+
+Shawn
+
+> 
+> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6sx-sdb.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+> index 85f56a5..4933c56 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+> @@ -317,6 +317,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usbphy1 {
+> +	fsl,tx-d-cal = <106>;
+> +};
+> +
+> +&usbphy2 {
+> +	fsl,tx-d-cal = <106>;
+> +};
+> +
+>  &usdhc2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc2>;
+> -- 
+> 2.7.4
+> 
