@@ -1,176 +1,80 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 5 Nov 2016 16:59:53 +0800
-Subject: [PATCH 1/3] ARM: imx6u: add imx6ull support
-In-Reply-To: <1477969343-19887-2-git-send-email-peter.chen@nxp.com>
+Date: Sat, 5 Nov 2016 17:05:07 +0800
+Subject: [PATCH 3/3] clk: imx: clk-imx6ul: add clk support for imx6ull
+In-Reply-To: <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
 References: <1477969343-19887-1-git-send-email-peter.chen@nxp.com>
- <1477969343-19887-2-git-send-email-peter.chen@nxp.com>
-Message-ID: <20161105085951.GG5597@dragon>
+ <1477969343-19887-4-git-send-email-peter.chen@nxp.com>
+Message-ID: <20161105090506.GH5597@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 11:02:21AM +0800, Peter Chen wrote:
-> It is the 10th processor in the well-known imx6 series, and derived
-> from imx6ul but cost optimized. The more information about imx6ull
-> can be found at:
+On Tue, Nov 01, 2016 at 11:02:23AM +0800, Peter Chen wrote:
+> From: Bai Ping <ping.bai@nxp.com>
 > 
-> http://www.nxp.com/products/microcontrollers-and-processors/
-> arm-processors/i.mx-applications-processors/i.mx-6-processors
-> /i.mx6qp/i.mx-6ull-single-core-processor-with-arm-cortex-a7-core
-> :i.MX6ULL
+> imx6ull is the derived SoC from imx6ul
 > 
-> In this patch, it moves common dts between imx6ul* and imx6ull* as
-> new files named imx6u*, and the specific part for imx6ul and imx6ull
-> are individual file.
-
-No.  That only helps churn the tree and git history.  Please keep using
-imx6ul.dtsi and simply have it be included by imx6ull.dtsi.
-
-> 
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> Signed-off-by: Bai Ping <ping.bai@nxp.com>
 > Signed-off-by: Peter Chen <peter.chen@nxp.com>
 > ---
->  arch/arm/boot/dts/Makefile              |   3 +-
->  arch/arm/boot/dts/imx6u-14x14-evk.dts   | 475 ++++++++++++++++
->  arch/arm/boot/dts/imx6u-14x14-evk.dtsi  | 487 +++++++++++++++++
->  arch/arm/boot/dts/imx6u.dtsi            | 942 ++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6ul-14x14-evk.dts  | 479 +---------------
->  arch/arm/boot/dts/imx6ul.dtsi           | 936 +------------------------------
->  arch/arm/boot/dts/imx6ull-14x14-evk.dts |  17 +
->  arch/arm/boot/dts/imx6ull-pinfunc.h     |  57 ++
->  arch/arm/boot/dts/imx6ull.dtsi          |  10 +
->  9 files changed, 1993 insertions(+), 1413 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6u-14x14-evk.dts
->  create mode 100644 arch/arm/boot/dts/imx6u-14x14-evk.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6u.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6ull-14x14-evk.dts
->  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc.h
->  create mode 100644 arch/arm/boot/dts/imx6ull.dtsi
+>  drivers/clk/imx/clk-imx6ul.c             | 74 +++++++++++++++++++++++++++-----
+>  include/dt-bindings/clock/imx6ul-clock.h | 15 ++++++-
+>  2 files changed, 77 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index befcd26..3d6e199 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -423,7 +423,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
->  	imx6ul-pico-hobbit.dtb \
->  	imx6ul-tx6ul-0010.dtb \
->  	imx6ul-tx6ul-0011.dtb \
-> -	imx6ul-tx6ul-mainboard.dtb
-> +	imx6ul-tx6ul-mainboard.dtb \
-> +	imx6ull-14x14-evk.dtb
->  dtb-$(CONFIG_SOC_IMX7D) += \
->  	imx7d-cl-som-imx7.dtb \
->  	imx7d-colibri-eval-v3.dtb \
-> diff --git a/arch/arm/boot/dts/imx6u-14x14-evk.dts b/arch/arm/boot/dts/imx6u-14x14-evk.dts
-> new file mode 100644
-> index 0000000..ba8614c
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6u-14x14-evk.dts
-> @@ -0,0 +1,475 @@
-> +/*
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+> diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+> index d1d7787..ceb99a7 100644
+> --- a/drivers/clk/imx/clk-imx6ul.c
+> +++ b/drivers/clk/imx/clk-imx6ul.c
+> @@ -64,6 +64,11 @@ static const char *perclk_sels[] = { "ipg", "osc", };
+>  static const char *lcdif_sels[] = { "lcdif_podf", "ipp_di0", "ipp_di1", "ldb_di0", "ldb_di1", };
+>  static const char *csi_sels[] = { "osc", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
+>  static const char *sim_sels[] = { "sim_podf", "ipp_di0", "ipp_di1", "ldb_di0", "ldb_di1", };
+> +/* epdc_pre_sels, epdc_sels, esai_sels only exists on i.MX6ULL */
+> +static const char *epdc_pre_sels[] = { "pll2_bus", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd2_508m", };
+> +static const char *esai_sels[] = { "pll4_audio_div", "pll3_pfd2_508m", "pll5_video_div", "pll3_usb_otg", };
+> +static const char *epdc_sels[] = { "epdc_podf", "ipp_di0", "ipp_di1", "ldb_di0", "ldb_di1", };
+> +
 
-For new DT files, please consider to use GPL/X11 dual license.  You
-should be able to find a lot of examples in arch/arm/boot/dts.
+The new line is not needed.  There is already one below.
+
+>  
+>  static struct clk *clks[IMX6UL_CLK_END];
+>  static struct clk_onecell_data clk_data;
 
 <snip>
 
-> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h b/arch/arm/boot/dts/imx6ull-pinfunc.h
-> new file mode 100644
-> index 0000000..fca0036
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
-> @@ -0,0 +1,57 @@
-> +/*
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __DTS_IMX6ULL_PINFUNC_H
-> +#define __DTS_IMX6ULL_PINFUNC_H
-> +
-> +#include "imx6ul-pinfunc.h"
-> +/*
-> + * The pin function ID is a tuple of
-> + * <mux_reg conf_reg input_reg mux_mode input_val>
-> + */
-> +#define MX6UL_PAD_ENET2_RX_DATA0__EPDC_SDDO08                    0x00E4 0x0370 0x0000 0x9 0x0
+> diff --git a/include/dt-bindings/clock/imx6ul-clock.h b/include/dt-bindings/clock/imx6ul-clock.h
+> index fd8aee8..563fd5b 100644
+> --- a/include/dt-bindings/clock/imx6ul-clock.h
+> +++ b/include/dt-bindings/clock/imx6ul-clock.h
+> @@ -236,6 +236,19 @@
+>  #define IMX6UL_CLK_PLL3_120M		223
+>  #define IMX6UL_CLK_KPP			224
+>  
+> -#define IMX6UL_CLK_END			225
+> +/* For i.MX6ULL */
+> +#define IMX6UL_CLK_ESAI_PRED		225
+> +#define IMX6UL_CLK_ESAI_PODF		226
+> +#define IMX6UL_CLK_ESAI_EXTAL		227
+> +#define IMX6UL_CLK_ESAI_MEM		228
+> +#define IMX6UL_CLK_ESAI_IPG		229
+> +#define IMX6UL_CLK_DCP_CLK		230
+> +#define IMX6UL_CLK_EPDC_PRE_SEL		231
+> +#define IMX6UL_CLK_EPDC_SEL		232
+> +#define IMX6UL_CLK_EPDC_PODF		233
+> +#define IMX6UL_CLK_EPDC_ACLK		234
+> +#define IMX6UL_CLK_EPDC_PIX		235
+> +#define IMX6UL_CLK_ESAI_SEL		236
 
-Can we name these imx6ull specific defines MX6ULL_xxx, so that we know
-they should only be used in imx6ull specific dts?
-
-> +#define MX6UL_PAD_ENET2_RX_DATA1__EPDC_SDDO09                    0x00E8 0x0374 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC 0x0378 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_TX_DATA0__EPDC_SDDO11                    0x00F0 0x037C 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_TX_DATA1__EPDC_SDDO12                    0x00F4 0x0380 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_TX_EN__EPDC_SDDO13                       0x00F8 0x0384 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_TX_CLK__EPDC_SDDO14                      0x00FC 0x0388 0x0000 0x9 0x0
-> +#define MX6UL_PAD_ENET2_RX_ER__EPDC_SDDO15                       0x0100 0x038C 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_CLK__EPDC_SDCLK                            0x0104 0x0390 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_ENABLE__EPDC_SDLE                          0x0108 0x0394 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_HSYNC__EPDC_SDOE                           0x010C 0x0398 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_VSYNC__EPDC_SDCE0                          0x0110 0x039C 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_RESET__EPDC_GDOE                           0x0114 0x03A0 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA00__EPDC_SDDO00                        0x0118 0x03A4 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA01__EPDC_SDDO01                        0x011C 0x03A8 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA02__EPDC_SDDO02                        0x0120 0x03AC 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA03__EPDC_SDDO03                        0x0124 0x03B0 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA04__EPDC_SDDO04                        0x0128 0x03B4 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA05__EPDC_SDDO05                        0x012C 0x03B8 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA06__EPDC_SDDO06                        0x0130 0x03BC 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA07__EPDC_SDDO07                        0x0134 0x03C0 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA14__EPDC_SDSHR                         0x0150 0x03DC 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA15__EPDC_GDRL                          0x0154 0x03E0 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA16__EPDC_GDCLK                         0x0158 0x03E4 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA17__EPDC_GDSP                          0x015C 0x03E8 0x0000 0x9 0x0
-> +#define MX6UL_PAD_LCD_DATA21__EPDC_SDCE1                         0x016C 0x03F8 0x0000 0x9 0x0
-> +
-
-Why this new line?
+Can we have these imx6ull only clocks named after IMX6ULL_xxx?
 
 Shawn
 
-> +#define MX6UL_PAD_CSI_MCLK__ESAI_TX3_RX2                          0x01D4 0x0460 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_PIXCLK__ESAI_TX2_RX3                        0x01D8 0x0464 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_VSYNC__ESAI_TX4_RX1                         0x01DC 0x0468 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_HSYNC__ESAI_TX1                             0x01E0 0x046C 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA00__ESAI_TX_HF_CLK                      0x01E4 0x0470 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA01__ESAI_RX_HF_CLK                      0x01E8 0x0474 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA02__ESAI_RX_FS                          0x01EC 0x0478 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA03__ESAI_RX_CLK                         0x01F0 0x047C 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA04__ESAI_TX_FS                          0x01F4 0x0480 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA05__ESAI_TX_CLK                         0x01F8 0x0484 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA06__ESAI_TX5_RX0                        0x01FC 0x0488 0x0000 0x9 0x0
-> +#define MX6UL_PAD_CSI_DATA07__ESAI_T0                             0x0200 0x048C 0x0000 0x9 0x0
-> +
-> +#endif /* __DTS_IMX6ULL_PINFUNC_H */
-> diff --git a/arch/arm/boot/dts/imx6ull.dtsi b/arch/arm/boot/dts/imx6ull.dtsi
-> new file mode 100644
-> index 0000000..afd9796
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6ull.dtsi
-> @@ -0,0 +1,10 @@
-> +/*
-> + * Copyright 2016 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "imx6u.dtsi"
-> +#include "imx6ull-pinfunc.h"
+> +#define IMX6UL_CLK_END			237
+>  
+>  #endif /* __DT_BINDINGS_CLOCK_IMX6UL_H */
 > -- 
 > 2.7.4
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
