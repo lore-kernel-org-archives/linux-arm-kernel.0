@@ -1,55 +1,113 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun,  6 Nov 2016 23:27:02 +0100
-Subject: [PATCH 09/19] ARM: dts: armada-370-xp: Fixup sa-ram DT warning
+Date: Sun,  6 Nov 2016 23:27:01 +0100
+Subject: [PATCH 08/19] ARM: dts: armada-370-xp: Fixup bm-bppi DT warning
 In-Reply-To: <20161106222712.27366-1-gregory.clement@free-electrons.com>
 References: <20161106222712.27366-1-gregory.clement@free-electrons.com>
-Message-ID: <20161106222712.27366-10-gregory.clement@free-electrons.com>
+Message-ID: <20161106222712.27366-9-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sa-ram which is a mmio-sram has a reg property so the unit name should
-contain an address.
+bm-bppi has a reg property so the unit name should contain an address.
+Take the opportunity to use the node label instead of the full name.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 2 +-
- arch/arm/boot/dts/armada-xp.dtsi  | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/armada-xp-db.dts               | 8 ++++----
+ arch/arm/boot/dts/armada-xp-gp.dts               | 8 ++++----
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 8 ++++----
+ arch/arm/boot/dts/armada-xp.dtsi                 | 2 +-
+ 4 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index c376c2399d5c..19a9a8a67739 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -262,7 +262,7 @@
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index 9e3bb3d7b4dc..486caf887da4 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -213,10 +213,6 @@
+ 				};
  			};
  		};
+-
+-		bm-bppi {
+-			status = "okay";
+-		};
+ 	};
+ };
  
--		crypto_sram: sa-sram {
-+		crypto_sram: sa-sram at 0 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x01) 0 0x800>;
- 			reg-names = "sram";
+@@ -248,6 +244,10 @@
+ 	};
+ };
+ 
++&bm_bppi {
++	status = "okay";
++};
++
+ &mdio {
+ 	phy0: ethernet-phy at 0 {
+ 		reg = <0>;
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 9918c7883a36..65d960defff3 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -198,10 +198,6 @@
+ 				nand-on-flash-bbt;
+ 			};
+ 		};
+-
+-		bm-bppi {
+-			status = "okay";
+-		};
+ 	};
+ };
+ 
+@@ -233,6 +229,10 @@
+ 	};
+ };
+ 
++&bm_bppi {
++	status = "okay";
++};
++
+ &mdio {
+ 	phy0: ethernet-phy at 0 {
+ 		reg = <16>;
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index c8dd5a3bccb6..7cd2d74e0161 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -187,10 +187,6 @@
+ 				status = "okay";
+ 			};
+ 		};
+-
+-		bm-bppi {
+-			status = "okay";
+-		};
+ 	};
+ };
+ 
+@@ -222,6 +218,10 @@
+ 	};
+ };
+ 
++&bm_bppi {
++	status = "okay";
++};
++
+ &mdio {
+ 	phy0: ethernet-phy at 0 {
+ 		reg = <0>;
 diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index fff1b81b8f5f..4cfec3ceb523 100644
+index 61f2880f1195..fff1b81b8f5f 100644
 --- a/arch/arm/boot/dts/armada-xp.dtsi
 +++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -230,7 +230,7 @@
- 			};
+@@ -248,7 +248,7 @@
+ 			ranges = <0 MBUS_ID(0x09, 0x05) 0 0x800>;
  		};
  
--		crypto_sram0: sa-sram0 {
-+		crypto_sram0: sa-sram0 at 0 {
+-		bm_bppi: bm-bppi {
++		bm_bppi: bm-bppi at 0 {
  			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
- 			clocks = <&gateclk 23>;
-@@ -239,7 +239,7 @@
- 			ranges = <0 MBUS_ID(0x09, 0x09) 0 0x800>;
- 		};
- 
--		crypto_sram1: sa-sram1 {
-+		crypto_sram1: sa-sram1 at 0 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
- 			clocks = <&gateclk 23>;
+ 			reg = <MBUS_ID(0x0c, 0x04) 0 0x100000>;
+ 			ranges = <0 MBUS_ID(0x0c, 0x04) 0 0x100000>;
 -- 
 2.10.1
