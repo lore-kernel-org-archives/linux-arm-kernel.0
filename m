@@ -1,85 +1,51 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 6 Nov 2016 19:56:15 +0100
-Subject: [PATCH 1/2] arm64: dts: add USB1-related nodes of Allwinner A64
-In-Reply-To: <20161105143830.10099-1-icenowy@aosc.xyz>
-References: <20161105143830.10099-1-icenowy@aosc.xyz>
-Message-ID: <20161106185615.dxppyh2hjsqxe4jv@lukather>
+Date: Sun, 6 Nov 2016 19:57:15 +0100
+Subject: [PATCH v2 06/14] ASoC: sun4i-codec: Add support for A31 playback
+ through headphone output
+In-Reply-To: <CAGb2v65CZJ+1LTWWk3+vABV8PDgsDta+nZ7o3H2Z--KFPe2kog@mail.gmail.com>
+References: <20161103075556.29018-1-wens@csie.org>
+ <20161103075556.29018-7-wens@csie.org>
+ <20161103173602.zchyciwj66zdibc7@lukather>
+ <CAGb2v65CZJ+1LTWWk3+vABV8PDgsDta+nZ7o3H2Z--KFPe2kog@mail.gmail.com>
+Message-ID: <20161106185715.tlvcakzqay2lamd5@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 10:38:29PM +0800, Icenowy Zheng wrote:
-> Allwinner A64 have two HCI USB controllers, a OTG controller and a USB
-> PHY device which have two ports. One of the port is wired to both a HCI
-> USB controller and the OTG controller, which is currently not supported.
-> The another one is only wired to a HCI controller, and the device node of
-> OHCI/EHCI controller of the port can be added now.
+On Fri, Nov 04, 2016 at 09:08:11AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Nov 4, 2016 at 1:36 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Thu, Nov 03, 2016 at 03:55:48PM +0800, Chen-Yu Tsai wrote:
+> >> +/* headphone controls */
+> >> +static const char * const sun6i_codec_hp_src_enum_text[] = {
+> >> +     "DAC", "Mixer",
+> >> +};
+> >> +
+> >> +static SOC_ENUM_DOUBLE_DECL(sun6i_codec_hp_src_enum,
+> >> +                         SUN6I_CODEC_OM_DACA_CTRL,
+> >> +                         SUN6I_CODEC_OM_DACA_CTRL_LHPIS,
+> >> +                         SUN6I_CODEC_OM_DACA_CTRL_RHPIS,
+> >> +                         sun6i_codec_hp_src_enum_text);
+> >> +
+> >> +static const struct snd_kcontrol_new sun6i_codec_hp_src[] = {
+> >> +     SOC_DAPM_ENUM("Headphone Source Playback Route",
+> >> +                   sun6i_codec_hp_src_enum),
+> >> +};
+> >
+> > What is that route exactly? A muxer?
 > 
-> Also the A64 USB PHY device node is also added for the HCI controllers to
-> work.
+> Yup. The following is part of the widgets list later in the code:
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 50 +++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index 3d70be3..c2b6dc8 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -259,5 +259,55 @@
->  			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
->  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
->  		};
-> +
-> +		usbphy: phy at 01c19400 {
-> +			compatible = "allwinner,sun50i-a64-usb-phy";
-> +			reg = <0x01c19400 0x14>,
-> +			      <0x01c1b800 0x4>;
-> +			reg-names = "phy_ctrl",
-> +				    "pmu1";
-> +			clocks = <&ccu CLK_USB_PHY0>,
-> +				 <&ccu CLK_USB_PHY1>;
-> +			clock-names = "usb0_phy",
-> +				      "usb1_phy";
-> +			resets = <&ccu RST_USB_PHY0>,
-> +				 <&ccu RST_USB_PHY1>;
-> +			reset-names = "usb0_reset",
-> +				      "usb1_reset";
-> +			status = "disabled";
-> +			#phy-cells = <1>;
-> +		};
-> +
-> +		ohci1: usb at 01c1a400 {
-> +			compatible = "allwinner,sun50i-a64-ohci", "generic-ohci";
-> +			reg = <0x01c1b400 0x100>;
-> +			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-> +			/*
-> +			 * According to the user manual, OHCI1 USB clock
-> +			 * depends on OHCI0 clock.
-> +			 */
+> +       /* Headphone output path */
+> +       SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+> +                        SND_SOC_NOPM, 0, 0, sun6i_codec_hp_src),
 
-This is something that should be dealt with in the clock framework,
-not in your driver.
+Oh, right.
 
-> +			clocks = <&ccu CLK_BUS_OHCI1>,
-> +				 <&ccu CLK_USB_OHCI0>,
-> +				 <&ccu CLK_USB_OHCI1>;
-> +			resets = <&ccu RST_BUS_OHCI1>;
-> +			phys = <&usbphy 1>;
-> +			phy-names = "usb";
-> +			status = "disabled";
-> +		};
-> +
-> +		ehci1: usb at 01c1a000 {
-> +			compatible = "allwinner,sun50i-a64-ehci", "generic-ehci";
-> +			reg = <0x01c1b000 0x100>;
+You can add my Acked-by on this one and the other patches too.
 
-And please order these nodes by base address.
-
-Also, in both the ehci and ohci nodes, the unit-address and reg don't
-match, which one is the right one?
-
-Thanks,
+Thanks!
 Maxime
 
 -- 
@@ -92,4 +58,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161106/8451990e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161106/37df34b8/attachment-0001.sig>
