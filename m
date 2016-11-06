@@ -1,77 +1,119 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 6 Nov 2016 14:37:11 +0100
-Subject: [PATCH v2 1/1] ARM: dmaengine: sun6i: share the dma driver with
- sun50i
-In-Reply-To: <20161105080548.GA32546@arx12>
-References: <20161105080548.GA32546@arx12>
-Message-ID: <20161106133711.np2hm77myfd75sn2@lukather>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 6 Nov 2016 15:27:11 +0100
+Subject: [RFC PATCH] ARM: dts: add panel and tcon nodes to Allwinner A33
+ Q8 tablet dts
+In-Reply-To: <20161106111119.14927-1-icenowy@aosc.xyz>
+References: <20161106111119.14927-1-icenowy@aosc.xyz>
+Message-ID: <948897e3-12a2-b02c-ed26-929921ff04b2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 04:05:48PM +0800, Hao Zhang wrote:
-> Add soc a64 dma support.
-> 
-> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
+Hi,
+
+On 06-11-16 12:11, Icenowy Zheng wrote:
+> All A33 Q8 tablets features a LCD panel, with a resolution of either
+> 800x480 or 1024x600.
+>
+> Add "bone" device nodes to the device tree.
+
+Bone ?
+
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+
+He, as discussed in the other thread since sun8i-a33-q8-tablet.dts
+is used for both 800x480 and 1024x600 versions we really need to
+introduce new sun8i-a33-q8-tablet-800x600.dts and
+sun8i-a33-q8-tablet-1024x600.dts files, which include
+sun8i-a33-q8-tablet.dts and then add just the panel bits; and patch
+newer u-boots to use those instead.
+
+This way people who stick with an old u-boot will just not get
+the drm driver, rather then all of a sudden getting a wrong
+resolution.
+
+Icenowy, can you please also submit a matching u-boot patch
+(both the new dts file, as well as updating the defconfig you
+  use to the new dts file)?
+
+Regards,
+
+Hans
+
+
+
 > ---
->  drivers/dma/sun6i-dma.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> index 8346199..00fcfc7 100644
-> --- a/drivers/dma/sun6i-dma.c
-> +++ b/drivers/dma/sun6i-dma.c
-> @@ -1028,11 +1028,23 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
->  	.nr_max_vchans   = 34,
->  };
->  
-> +/*
-> + * The A64 has 8 physical channels, a maximum DRQ port id of 27,
-> + * and a total of 38 usable source and destination endpoints.
-> + */
+>
+> Maybe it will be better to add them to sun8i-q8-reference-tablet.dtsi, as
+> these pin configurations are part of reference design of both A23 and A33,
+> not only restricted to Q8.
+>
+> The DTS file is tested by me, after cherry-picks this patch from Chen-Yu Tsai:
+> https://github.com/wens/linux/commit/2823b887a289fbee5f97f3c6b45ed6c74a6368c6
+>
+> And add these commands to my U-Boot boot command:
+>
+> fdt addr 0x43000000
+> fdt resize
+> fdt set /panel compatible "urt,umsh-8596md-t"
+> fdt set /panel status "okay"
+> fdt set /display-engine status "okay"
+> fdt set /soc at 01c00000/lcd-controller at 01c0c000 status "okay"
+>
+>  arch/arm/boot/dts/sun8i-a33-q8-tablet.dts | 44 +++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
+> index b0bc236..871a20c 100644
+> --- a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
+> +++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
+> @@ -47,4 +47,48 @@
+>  / {
+>  	model = "Q8 A33 Tablet";
+>  	compatible = "allwinner,q8-a33", "allwinner,sun8i-a33";
 > +
-> +static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-> +	.nr_max_channels = 8,
-> +	.nr_max_requests = 27,
-> +	.nr_max_vchans   = 38,
+> +	panel: panel {
+> +		/* compatible should be set according to the panel */
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&lcd_en_q8>;
+> +		backlight = <&backlight>;
+> +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> +		power-supply = <&reg_dc1sw>;
+> +		status = "disabled";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			panel_input: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&tcon0_out_lcd>;
+> +			};
+> +		};
+> +	};
 > +};
 > +
->  static const struct of_device_id sun6i_dma_match[] = {
->  	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
->  	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
->  	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
->  	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-> +	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
-
-You need to add that compatible to the DT binding documentation.
-
->  	{ /* sentinel */ }
+> +&tcon0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&lcd_rgb666_pins>;
+> +};
+> +
+> +&tcon0_out {
+> +	tcon0_out_lcd: endpoint at 0 {
+> +		reg = <0>;
+> +		remote-endpoint = <&panel_input>;
+> +	};
+> +};
+> +
+> +&pio {
+> +	lcd_en_q8: lcd_en at 0 {
+> +		allwinner,pins = "PH7";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
 >  };
->  MODULE_DEVICE_TABLE(of, sun6i_dma_match);
-> @@ -1110,6 +1122,13 @@ static int sun6i_dma_probe(struct platform_device *pdev)
->  	sdc->slave.dst_addr_widths		= BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
->  						  BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
->  						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
-> +
-> +	if (of_device_is_compatible(pdev->dev.of_node,
-> +				    "allwinner,sun50i-a64-dma")) {
-> +		sdc->slave.src_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-> +		sdc->slave.dst_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-> +	}
-> +
-
-You'll also need to change convert_buswidth, it will reject any width
-higher than 4 bytes.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161106/61c65236/attachment.sig>
+>
