@@ -1,104 +1,92 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Sun, 6 Nov 2016 19:04:48 +0100
-Subject: [PATCH 2/2] clk: sunxi-ng: fix up PLL_CPUX adjusting for A23/A33
-In-Reply-To: <20161106172932.39478-2-icenowy@aosc.xyz>
-References: <20161106172932.39478-1-icenowy@aosc.xyz>
- <20161106172932.39478-2-icenowy@aosc.xyz>
-Message-ID: <138cc32f-4c0a-2731-9517-d67be7103cca@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 6 Nov 2016 19:27:43 +0100
+Subject: [PATCH 13/22] mtd: nand: lpc32xx: return error code of
+ nand_scan_ident/tail() on error
+In-Reply-To: <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
+References: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
+ <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20161106192743.00e401ec@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+On Fri,  4 Nov 2016 19:43:01 +0900
+Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
 
-This patch (2/2) should be before the first one.
-
-The first patch allows adjusting of the PLL and the second fixes a
-problem with the adjustment of the PLL.
-
-You should fix the problem before allowing the adjustment of the PLL.
-That way, if someone builds the kernel between your two patches, the
-kernel is supposed to be working.
-
-Tested in correct order on A33.
-
-Thanks!
-
-Quentin
-
-On 06/11/2016 18:29, Icenowy Zheng wrote:
-> When adjusting PLL_CPUX on A23/A33, the PLL is driven too high, and the
-> system stucks.
+> The nand_scan_ident/tail() returns an appropriate error value when
+> it fails.  Use it instead of the fixed error code -ENXIO.
 > 
-> Add a notifier to avoid this situation.
-> 
-> The code is ported from ccu-sun6i-a31.c.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> Patch 4.9-rc too.
->  drivers/clk/sunxi-ng/ccu-sun8i-a23.c | 10 ++++++++++
->  drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 10 ++++++++++
->  2 files changed, 20 insertions(+)
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a23.c b/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-> index 44c4775..41a8594 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a23.c
-> @@ -709,6 +709,13 @@ static const struct sunxi_ccu_desc sun8i_a23_ccu_desc = {
->  	.num_resets	= ARRAY_SIZE(sun8i_a23_ccu_resets),
->  };
->  
-> +static struct ccu_mux_nb sun8i_a23_cpu_nb = {
-> +	.common		= &cpux_clk.common,
-> +	.cm		= &cpux_clk.mux,
-> +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
-> +	.bypass_index	= 1, /* index of 24 MHz oscillator */
-> +};
-> +
->  static void __init sun8i_a23_ccu_setup(struct device_node *node)
->  {
->  	void __iomem *reg;
-> @@ -732,6 +739,9 @@ static void __init sun8i_a23_ccu_setup(struct device_node *node)
->  	writel(val, reg + SUN8I_A23_PLL_MIPI_REG);
->  
->  	sunxi_ccu_probe(node, reg, &sun8i_a23_ccu_desc);
-> +
-> +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
-> +				  &sun8i_a23_cpu_nb);
->  }
->  CLK_OF_DECLARE(sun8i_a23_ccu, "allwinner,sun8i-a23-ccu",
->  	       sun8i_a23_ccu_setup);
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> index 59cfdc8..3efbb6e 100644
-> --- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
-> @@ -752,6 +752,13 @@ static const struct sunxi_ccu_desc sun8i_a33_ccu_desc = {
->  	.num_resets	= ARRAY_SIZE(sun8i_a33_ccu_resets),
->  };
->  
-> +static struct ccu_mux_nb sun8i_a33_cpu_nb = {
-> +	.common		= &cpux_clk.common,
-> +	.cm		= &cpux_clk.mux,
-> +	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
-> +	.bypass_index	= 1, /* index of 24 MHz oscillator */
-> +};
-> +
->  static void __init sun8i_a33_ccu_setup(struct device_node *node)
->  {
->  	void __iomem *reg;
-> @@ -775,6 +782,9 @@ static void __init sun8i_a33_ccu_setup(struct device_node *node)
->  	writel(val, reg + SUN8I_A33_PLL_MIPI_REG);
->  
->  	sunxi_ccu_probe(node, reg, &sun8i_a33_ccu_desc);
-> +
-> +	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
-> +				  &sun8i_a33_cpu_nb);
->  }
->  CLK_OF_DECLARE(sun8i_a33_ccu, "allwinner,sun8i-a33-ccu",
->  	       sun8i_a33_ccu_setup);
+>  drivers/mtd/nand/lpc32xx_mlc.c | 10 ++++------
+>  drivers/mtd/nand/lpc32xx_slc.c |  9 +++------
+>  2 files changed, 7 insertions(+), 12 deletions(-)
 > 
+> diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+> index 8523881..5553a5d 100644
+> --- a/drivers/mtd/nand/lpc32xx_mlc.c
+> +++ b/drivers/mtd/nand/lpc32xx_mlc.c
+> @@ -747,10 +747,9 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	 * Scan to find existance of the device and
+>  	 * Get the type of NAND device SMALL block or LARGE block
+>  	 */
+> -	if (nand_scan_ident(mtd, 1, NULL)) {
+> -		res = -ENXIO;
+> +	res = nand_scan_ident(mtd, 1, NULL);
+> +	if (res)
+>  		goto err_exit3;
+> -	}
+>  
+>  	host->dma_buf = devm_kzalloc(&pdev->dev, mtd->writesize, GFP_KERNEL);
+>  	if (!host->dma_buf) {
+> @@ -793,10 +792,9 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	 * Fills out all the uninitialized function pointers with the defaults
+>  	 * And scans for a bad block table if appropriate.
+>  	 */
+> -	if (nand_scan_tail(mtd)) {
+> -		res = -ENXIO;
+> +	res = nand_scan_tail(mtd);
+> +	if (res)
+>  		goto err_exit4;
+> -	}
+>  
+>  	mtd->name = DRV_NAME;
+>  
+> diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
+> index 8d3edc3..f1094e5 100644
+> --- a/drivers/mtd/nand/lpc32xx_slc.c
+> +++ b/drivers/mtd/nand/lpc32xx_slc.c
+> @@ -894,10 +894,9 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* Find NAND device */
+> -	if (nand_scan_ident(mtd, 1, NULL)) {
+> -		res = -ENXIO;
+> +	res = nand_scan_ident(mtd, 1, NULL);
+> +	if (res)
+>  		goto err_exit3;
+> -	}
+>  
+>  	/* OOB and ECC CPU and DMA work areas */
+>  	host->ecc_buf = (uint32_t *)(host->data_buf + LPC32XX_DMA_DATA_SIZE);
+> @@ -929,10 +928,8 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+>  	/*
+>  	 * Fills out all the uninitialized function pointers with the defaults
+>  	 */
+> -	if (nand_scan_tail(mtd)) {
+> -		res = -ENXIO;
+> +	res = nand_scan_tail(mtd);
 
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+You miss
+
+	if (res)
+
+here.
+
+No need to resend, I'll fix it when applying the patches.
+
+>  		goto err_exit3;
+> -	}
+>  
+>  	mtd->name = "nxp_lpc3220_slc";
+>  	res = mtd_device_register(mtd, host->ncfg->parts,
