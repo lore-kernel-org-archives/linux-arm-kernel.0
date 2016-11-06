@@ -1,18 +1,25 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 5 Nov 2016 17:26:29 -0700
-Subject: [PATCH] MAINTAINERS: Update Broadcom Vulcan maintainer email
-In-Reply-To: <1478249673-8163-1-git-send-email-c.jayachandran@gmail.com>
-References: <1478249673-8163-1-git-send-email-c.jayachandran@gmail.com>
-Message-ID: <0570d6ae-6b06-a577-164c-07ebb389311d@gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 6 Nov 2016 03:37:06 +0200
+Subject: [PATCH 13/22] mtd: nand: lpc32xx: return error code of
+ nand_scan_ident/tail() on error
+In-Reply-To: <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
+References: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
+ <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <fab30f15-231a-f5fa-c547-025ee615b472@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 04/11/2016 ? 01:54, Jayachandran C a ?crit :
-> Update Broadcom Vulcan maintainer's email address, the broadcom.com
-> address is no longer valid.
-> 
-> Signed-off-by: Jayachandran C <c.jayachandran@gmail.com>
+On 11/04/2016 12:43 PM, Masahiro Yamada wrote:
+> The nand_scan_ident/tail() returns an appropriate error value when
+> it fails.  Use it instead of the fixed error code -ENXIO.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Applied; thanks JC!
--- 
-Florian
+Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+
+Thank you for the change.
+
+--
+With best wishes,
+Vladimir
