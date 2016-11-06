@@ -1,60 +1,90 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 6 Nov 2016 11:20:56 +0100 (CET)
-Subject: [Bug] ARM: mxs: STI: console can't wake up from freeze
-In-Reply-To: <20161105180542.GE1041@n2100.armlinux.org.uk>
-References: <20161023133134.GI1041@n2100.armlinux.org.uk>
- <1709157673.85170.1cb53b4d-2805-48ea-aef1-dd282306d108.open-xchange@email.1und1.de>
- <20161031161700.GH1041@n2100.armlinux.org.uk>
- <847975190.29034.38a9c7fa-bdf8-4732-ac8b-cf15c21e3ce8.open-xchange@email.1und1.de>
- <20161101092304.GM1041@n2100.armlinux.org.uk>
- <322177156.158733.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <1478345972.2206.15.camel@intel.com>
- <122295766.159553.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
- <20161105130034.GG15759@mai>
- <1113068116.152452.34665947-6f6b-41d6-92af-eabcbcb794ea.open-xchange@email.1und1.de>
- <20161105180542.GE1041@n2100.armlinux.org.uk>
-Message-ID: <381813296.167766.9867e3e7-5710-4844-a098-6f44bd852a6d.open-xchange@email.1und1.de>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun,  6 Nov 2016 19:11:19 +0800
+Subject: [RFC PATCH] ARM: dts: add panel and tcon nodes to Allwinner A33 Q8
+ tablet dts
+Message-ID: <20161106111119.14927-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+All A33 Q8 tablets features a LCD panel, with a resolution of either
+800x480 or 1024x600.
 
-> Russell King - ARM Linux <linux@armlinux.org.uk> hat am 5. November 2016 um
-> 19:05 geschrieben:
-> 
-> 
-> On Sat, Nov 05, 2016 at 04:28:37PM +0100, Stefan Wahren wrote:
-> > As i wrote in my email before, i added a pr_info() into freeze_wake.
-> > But i never see the output of this message. So i assume freeze_wake
-> > is never called. Again, how could this happen?
-> 
-> Hmm, so the bit that you're getting stuck on is:
-> 
->         wait_event(suspend_freeze_wait_head,
->                    suspend_freeze_state == FREEZE_STATE_WAKE);
-> 
+Add "bone" device nodes to the device tree.
 
-thanks for all the feedback. The real cause for this issue is in the irqchip
-driver. I fixed it with this patch:
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
 
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index 1730470..05fa9f7 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
- 	.irq_ack = icoll_ack_irq,
- 	.irq_mask = icoll_mask_irq,
- 	.irq_unmask = icoll_unmask_irq,
-+	.flags = IRQCHIP_MASK_ON_SUSPEND |
-+		 IRQCHIP_SKIP_SET_WAKE,
+Maybe it will be better to add them to sun8i-q8-reference-tablet.dtsi, as
+these pin configurations are part of reference design of both A23 and A33,
+not only restricted to Q8.
+
+The DTS file is tested by me, after cherry-picks this patch from Chen-Yu Tsai:
+https://github.com/wens/linux/commit/2823b887a289fbee5f97f3c6b45ed6c74a6368c6
+
+And add these commands to my U-Boot boot command:
+
+fdt addr 0x43000000
+fdt resize
+fdt set /panel compatible "urt,umsh-8596md-t"
+fdt set /panel status "okay"
+fdt set /display-engine status "okay"
+fdt set /soc at 01c00000/lcd-controller at 01c0c000 status "okay"
+
+ arch/arm/boot/dts/sun8i-a33-q8-tablet.dts | 44 +++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
+index b0bc236..871a20c 100644
+--- a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
++++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
+@@ -47,4 +47,48 @@
+ / {
+ 	model = "Q8 A33 Tablet";
+ 	compatible = "allwinner,q8-a33", "allwinner,sun8i-a33";
++
++	panel: panel {
++		/* compatible should be set according to the panel */
++		pinctrl-names = "default";
++		pinctrl-0 = <&lcd_en_q8>;
++		backlight = <&backlight>;
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++		power-supply = <&reg_dc1sw>;
++		status = "disabled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		port at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&tcon0_out_lcd>;
++			};
++		};
++	};
++};
++
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++};
++
++&tcon0_out {
++	tcon0_out_lcd: endpoint at 0 {
++		reg = <0>;
++		remote-endpoint = <&panel_input>;
++	};
++};
++
++&pio {
++	lcd_en_q8: lcd_en at 0 {
++		allwinner,pins = "PH7";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
  };
- 
- static struct irq_chip asm9260_icoll_chip = {
- 	.irq_ack = icoll_ack_irq,
- 	.irq_mask = asm9260_mask_irq,
- 	.irq_unmask = asm9260_unmask_irq,
-+	.flags = IRQCHIP_MASK_ON_SUSPEND |
-+		 IRQCHIP_SKIP_SET_WAKE,
- };
- 
- asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+-- 
+2.10.1
