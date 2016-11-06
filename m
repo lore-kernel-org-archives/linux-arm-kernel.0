@@ -1,24 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 6 Nov 2016 11:05:04 +0100
-Subject: [PATCH 2/6] pinctrl: rockchip: add support for rk1108
-In-Reply-To: <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
-References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
- <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <CACRpkdbTKuom7BSejMSysuwV5Yf1LizbBGZczJw-UuRagDcBzw@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 6 Nov 2016 11:19:37 +0100
+Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
+In-Reply-To: <20161105220848.k6rrjmvvhdaeduma@perseus.defre.kleine-koenig.org>
+References: <20161105203841.9661-1-uwe@kleine-koenig.org>
+ <20161105210441.GB1216@lunn.ch>
+ <20161105220848.k6rrjmvvhdaeduma@perseus.defre.kleine-koenig.org>
+Message-ID: <20161106101937.GA9617@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 3, 2016 at 1:34 PM, Andy Yan <andy.yan@rock-chips.com> wrote:
+> Will do for v2. arch/arm/boot/dts/keystone-* needs fixing in this
+> regard, too.
 
-> Add basic support for rk1108 soc
->
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+There is a whitelist of compatible strings which are ignored, for
+backwards compatibility. See of_mdiobus_child_is_phy(). It would be
+nice to fix keystone, but it is not required.
 
-I only see this patch from the series, I guess this is the only
-patch affecting pin control so thanks for not spamming :)
-
-Please resend with Heiko's requested fixes and his Reviewed-by
-tag and I will apply it.
-
-Yours,
-Linus Walleij
+     Andrew
