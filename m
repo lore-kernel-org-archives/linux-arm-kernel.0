@@ -1,17 +1,18 @@
 From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 7 Nov 2016 10:02:50 +0100
-Subject: [PATCH 1/1] pinctrl: st: st_pinconf_dbg_show wrong format string
-In-Reply-To: <20161105142515.4377-1-xypron.glpk@gmx.de>
-References: <20161105142515.4377-1-xypron.glpk@gmx.de>
-Message-ID: <8069c787-a934-ba1f-0284-1a28f170ef6d@st.com>
+Date: Mon, 7 Nov 2016 10:05:13 +0100
+Subject: [PATCH 1/1] pinctrl: st: st_pctl_dt_parse_groups simplify
+ expression
+In-Reply-To: <20161105143515.4668-1-xypron.glpk@gmx.de>
+References: <20161105143515.4668-1-xypron.glpk@gmx.de>
+Message-ID: <1ac9af0e-0a00-757b-6981-0ff9461fbbb3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/05/2016 03:25 PM, Heinrich Schuchardt wrote:
-> function is defined as unsigned int.
-> So we need %u to print it.
+On 11/05/2016 03:35 PM, Heinrich Schuchardt wrote:
+> for_each_property_of_node(pins, pp) checks that pp is not NULL.
+> So there is no need to check it inside the loop.
 > 
 > Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
 > ---
@@ -19,20 +20,19 @@ On 11/05/2016 03:25 PM, Heinrich Schuchardt wrote:
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index b7bb371..8308f15 100644
+> index 8308f15..676efcc 100644
 > --- a/drivers/pinctrl/pinctrl-st.c
 > +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1006,7 +1006,7 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
+> @@ -1181,7 +1181,7 @@ static int st_pctl_dt_parse_groups(struct device_node *np,
+>  		if (!strcmp(pp->name, "name"))
+>  			continue;
 >  
->  	function = st_pctl_get_pin_function(pc, offset);
->  	if (function)
-> -		snprintf(f, 10, "Alt Fn %d", function);
-> +		snprintf(f, 10, "Alt Fn %u", function);
->  	else
->  		snprintf(f, 5, "GPIO");
->  
+> -		if (pp  && (pp->length/sizeof(__be32)) >= OF_GPIO_ARGS_MIN) {
+> +		if (pp->length / sizeof(__be32) >= OF_GPIO_ARGS_MIN) {
+>  			npins++;
+>  		} else {
+>  			pr_warn("Invalid st,pins in %s node\n", np->name);
 > 
-
 
 Hi Heinrich
 
