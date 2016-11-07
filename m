@@ -1,31 +1,20 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 7 Nov 2016 10:15:19 -0200
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <1478514883.12872.2.camel@pengutronix.de>
-References: <1427377198.3378.16.camel@pengutronix.de>
- <20161106153117.GA22538@frolo.macqel>
- <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
- <1478514883.12872.2.camel@pengutronix.de>
-Message-ID: <CAOMZO5C+3rCnpQvonXyDaMmUxsDYAnXRBXrUwbP3AT5TbofSgQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 7 Nov 2016 13:32:38 +0100
+Subject: [PATCH v7 03/11] arm64: dts: r8a7795: salvator-x: Enable UHS-I
+ SDR-104
+In-Reply-To: <CAMuHMdW8WMFMWzjr+KnrifbOgvJV3dZWxC3zVYMfSvd=L6KAsw@mail.gmail.com>
+References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
+ <1473764228-24768-4-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdW8WMFMWzjr+KnrifbOgvJV3dZWxC3zVYMfSvd=L6KAsw@mail.gmail.com>
+Message-ID: <20161107123237.GC12319@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On Tue, Oct 25, 2016 at 12:48:40PM +0200, Geert Uytterhoeven wrote:
+> On Tue, Sep 13, 2016 at 12:57 PM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Add the sd-uhs-sdr104 property to SDHI0 and SDHI1.
+> 
+> SDHI0 and SDHI3?
 
-On Mon, Nov 7, 2016 at 8:34 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-
-> The problem is definitely present in current mainline Linux. I intent to
-> remove this workaround from the kernel, but we need to make sure that
-> the bootloader properly disables PCIe before jumping to the kernel
-> image.
->
-> I don't know what the status of this is in U-Boot, but Barebox already
-> does this correctly.
->
-> Fabio, would you mind to port this coed to U-Boot, or at least check if
-> it does the right thing?
-
-Sure, could you point me to the Barebox fix so I can take a look?
-
-Thanks
+Thanks, I will fix that.
