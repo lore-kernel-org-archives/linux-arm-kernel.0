@@ -1,58 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2016 10:43:09 -0700
-Subject: [PATCH 0/3] Add memremap executable mapping and extend
- drivers/misc/sram.c
-In-Reply-To: <20161107110444.GA23750@n2100.armlinux.org.uk>
-References: <20161027185612.22362-1-d-gerlach@ti.com>
- <20161107110444.GA23750@n2100.armlinux.org.uk>
-Message-ID: <20161107174309.GC2428@atomide.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 7 Nov 2016 19:44:11 +0200
+Subject: [PATCH 6/6] ARM: dts: Extend the S3C RTC node with rtc_src clock
+In-Reply-To: <1478513376-14307-7-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478513376-14307-7-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20161107174411.GC4865@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [161107 04:05]:
-> On Thu, Oct 27, 2016 at 01:56:09PM -0500, Dave Gerlach wrote:
-> > There are several instances when one would want to execute out of on-chip
-> > SRAM, such as PM code on ARM platforms, so once again revisiting this
-> > series to allow that in a generic manner. Seems that having a solution for
-> > allowing SRAM to be mapped as executable will help clean up PM code on several
-> > ARM platforms that are using ARM internal __arm_ioremap_exec API
-> > and also open the door for PM support on new platforms like TI AM335x and
-> > AM437x. This was last sent as RFC here [1] and based on comments from Russell
-> > King and Arnd Bergmann has been rewritten to use memremap API rather than
-> > ioremap API, as executable iomem does not really make sense.
+On Mon, Nov 07, 2016 at 03:39:36PM +0530, Pankaj Dubey wrote:
+> Extend the S3C RTC node with rtc_src clock so it could be operational.
+> The rtc_src clock is provided by MAX8997.
 > 
-> This is better, as it avoids the issue that I pointed out last time
-> around, but I'm still left wondering about the approach.
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: devicetree at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-origen.dts | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Sure, having executable SRAM mappings sounds nice and easy, but we're
-> creating WX mappings.  Folk have spent a while improving the security of
-> the kernel by ensuring that there are no WX mappings, and this series
-> reintroduces them.  The sad thing is that any WX mapping which appears
-> at a known address can be exploited.
-> 
-> "A known address" can be something that appears to be random, but ends
-> up being the same across the same device type... or can be discovered
-> by some means.  Eg, consider if the WX mapping is dynamically allocated,
-> but occurs at exactly the same point at boot - and if this happens with
-> android phones, consider how many of those are out there.  Or if the
-> address of the WX mapping is available via some hardware register.
-> Or...
-> 
-> See Kees Cook's slides at last years kernel summit -
-> 	https://outflux.net/slides/2015/ks/security.pdf
-> 
-> So, I think avoiding WX mappings - mappings should be either W or X but
-> not both simultaneously (see page 19.)
-> 
-> I guess what I'm angling at is that we don't want memremap_exec(), but
-> we need an API which changes the permissions of a SRAM mapping between
-> allowing writes and allowing execution.
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+> index 6c7ef4e..4cac9b6 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -18,6 +18,7 @@
+>  #include "exynos4210.dtsi"
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+> +#include <dt-bindings/clock/maxim,max8997.h>
 
-That should work just fine. So first copy the code to SRAM,
-then set it read-only and exectuable. Note that we need to
-restore the state of SRAM every time when returning from
-off mode during idle on some SoCs.
+Just a nit: put the system-wide includes in alphabetical order, so
+clock, gpio and finally input. It helps reducing conflicting changes
+(when more people add includes in the same time).
 
-Regards,
+Beside that, looks good, but it requires a dt-bindings in separate patch
+so I could pull it.
 
-Tony
+Best regards,
+Krzysztof
