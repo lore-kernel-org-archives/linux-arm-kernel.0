@@ -1,33 +1,31 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon,  7 Nov 2016 22:41:26 +0100
-Subject: [PATCH 1/3] arm64: dts: marvell: Fixup internal-regs DT warning for
- Armada 37xx
-In-Reply-To: <20161107214128.18401-1-gregory.clement@free-electrons.com>
-References: <20161107214128.18401-1-gregory.clement@free-electrons.com>
-Message-ID: <20161107214128.18401-2-gregory.clement@free-electrons.com>
+Date: Mon,  7 Nov 2016 22:41:25 +0100
+Subject: [PATCH 0/3] Various ARM64 Armada DT warning fixup
+Message-ID: <20161107214128.18401-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-internal-regs has a ranges property so the unit name should contain an
-address.
+Following the series sent for Armada 370/XP, this patchset fixes up
+various warning from the DT compiler when using the flag W=1 with
+make.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Being a fresh new port, the arm64 we did a better job for dt than for
+the arm32 so there is only a few patches needed.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c4762538ec01..f1596daa2bc7 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -91,7 +91,7 @@
- 		#size-cells = <2>;
- 		ranges;
- 
--		internal-regs {
-+		internal-regs at d0000000 {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "simple-bus";
+Gregory
+
+Gregory CLEMENT (3):
+  arm64: dts: marvell: Fixup internal-regs DT warning for Armada 37xx
+  arm64: dts: marvell: Fixup config-space DT warning For Armada 7K/8K
+  ARM64: dts: marvell: Fixup memory DT warning for Armada 37xx
+
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts          | 2 +-
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 2 +-
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi            | 2 +-
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi           | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi    | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi     | 2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
+
 -- 
 2.10.1
