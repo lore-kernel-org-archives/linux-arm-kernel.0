@@ -1,34 +1,49 @@
-From: martin.strbacka@nic.cz (=?UTF-8?Q?Martin_Strba=c4=8dka?=)
-Date: Mon, 7 Nov 2016 08:41:39 +0100
-Subject: [PATCH RFC] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161105212748.vtdprlxxismy5xmk@perseus.defre.kleine-koenig.org>
-References: <20161105203841.9661-1-uwe@kleine-koenig.org>
- <20161105212326.GC1216@lunn.ch>
- <20161105212748.vtdprlxxismy5xmk@perseus.defre.kleine-koenig.org>
-Message-ID: <e8f73fe4-0b8b-0b53-4ae1-c592ac5b576a@nic.cz>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Nov 2016 08:54:38 +0100
+Subject: [PATCH 1/2] clk: sunxi-ng: Fix CPUX clock for the A23/A33
+In-Reply-To: <20161106172932.39478-1-icenowy@aosc.xyz>
+References: <20161106172932.39478-1-icenowy@aosc.xyz>
+Message-ID: <20161107075438.gjva4r53q25z2ijb@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5.11.2016 22:27, Uwe Kleine-K?nig wrote:
->>> Do I need to "register" turris in vendor-prefixes.txt for that?
->> > 
->> > Yes please.
-> OK, will wait for Martin to comment what we want there. cznic or turris.
+Hi,
 
-Hello,
+On Mon, Nov 07, 2016 at 01:29:31AM +0800, Icenowy Zheng wrote:
+> The CPUX clock of A23/33 CCU driver forgot to add CLK_SET_RATE_PARENT
+> flag, which makes its frequency fail to change (as part of cpu thermal
+> throttle).
+> 
+> Fix it by add this flag.
 
-please use CZ.NIC in this case. Turris Omnia is a model name.
+Your commit title and log could be better.
 
-Thanks for your work!
+The title usually is more about what is done in the patch itself,
+something like "clk: sunxi-ng: Allow to change the parent rate for the
+CPU clocks" in this case.
 
-Martin
+And your commit log should explain why it is an issue. Yours is even
+wrong here, we could definitely change the rate of these clocks
+already. The only thing that was not allowed was to change the rate of
+its parents, which is what this patch fixes.
+
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Patch 4.9-rc too.
+
+I don't see why it should be part of 4.9. No one uses that code in 4.9.
+
+Thanks!
+Maxime
+
 -- 
-Martin Strbacka CZ.NIC, z.s.p.o. tel. +420 604 217 854
-
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/cee2ad06/attachment.sig>
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/46d235a8/attachment.sig>
