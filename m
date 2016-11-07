@@ -1,103 +1,30 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  7 Nov 2016 09:21:21 +0000
-Subject: [RESEND PATCH v1 5/6] ARM: gic-v3-its: Add 32bit support to GICv3 ITS
+Date: Mon,  7 Nov 2016 09:21:22 +0000
+Subject: [RESEND PATCH v1 6/6] ARM: virt: Select ARM_GIC_V3_ITS
 In-Reply-To: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
 References: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1478510482-15471-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1478510482-15471-7-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire-up flush_dcache, readq- and writeq-like gic-v3-its assessors, so
-GICv3 ITS gets all it needs to be built and run.
+This patch allows ARM guests to use GICv3 ITS on an arm64 host
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm/include/asm/arch_gicv3.h |   54 ++++++++++++++++++++++++++++++++-----
- 1 file changed, 47 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-index a808829..2747590 100644
---- a/arch/arm/include/asm/arch_gicv3.h
-+++ b/arch/arm/include/asm/arch_gicv3.h
-@@ -22,6 +22,7 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b5d529f..caef684 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -703,6 +703,7 @@ config ARCH_VIRT
+ 	select ARM_GIC
+ 	select ARM_GIC_V2M if PCI
+ 	select ARM_GIC_V3
++	select ARM_GIC_V3_ITS if PCI
+ 	select ARM_PSCI
+ 	select HAVE_ARM_ARCH_TIMER
  
- #include <linux/io.h>
- #include <asm/barrier.h>
-+#include <asm/cacheflush.h>
- #include <asm/cp15.h>
- 
- #define ICC_EOIR1			__ACCESS_CP15(c12, 0, c12, 1)
-@@ -230,19 +231,14 @@ static inline void gic_write_bpr1(u32 val)
-  * AArch32, since the syndrome register doesn't provide any information for
-  * them.
-  * Consequently, the following IO helpers use 32bit accesses.
-- *
-- * There are only two registers that need 64bit accesses in this driver:
-- * - GICD_IROUTERn, contain the affinity values associated to each interrupt.
-- *   The upper-word (aff3) will always be 0, so there is no need for a lock.
-- * - GICR_TYPER is an ID register and doesn't need atomicity.
-  */
--static inline void gic_write_irouter(u64 val, volatile void __iomem *addr)
-+static inline void __gic_writeq_nonatomic(u64 val, volatile void __iomem *addr)
- {
- 	writel_relaxed((u32)val, addr);
- 	writel_relaxed((u32)(val >> 32), addr + 4);
- }
- 
--static inline u64 gic_read_typer(const volatile void __iomem *addr)
-+static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
- {
- 	u64 val;
- 
-@@ -251,5 +247,49 @@ static inline u64 gic_read_typer(const volatile void __iomem *addr)
- 	return val;
- }
- 
-+#define gic_flush_dcache_to_poc(a,l)    __cpuc_flush_dcache_area((a), (l))
-+
-+/*
-+ *  GICD_IROUTERn, contain the affinity values associated to each interrupt.
-+ *  The upper-word (aff3) will always be 0, so there is no need for a lock.
-+ */
-+#define gic_write_irouter(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GICR_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gic_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_BASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_baser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_baser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GICR_PENDBASER and GICR_PROPBASE are changed with LPIs disabled, so they
-+ * won't be being used during any updates and can be changed non-atomically
-+ */
-+#define gicr_read_propbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_propbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+#define gicr_read_pendbaser(c)		__gic_readq_nonatomic(c)
-+#define gicr_write_pendbaser(v, c)	__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_TYPER is an ID register and doesn't need atomicity.
-+ */
-+#define gits_read_typer(c)		__gic_readq_nonatomic(c)
-+
-+/*
-+ * GITS_CBASER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_read_cbaser(c)		__gic_readq_nonatomic(c)
-+#define gits_write_cbaser(v, c)		__gic_writeq_nonatomic(v, c)
-+
-+/*
-+ * GITS_CWRITER - hi and lo bits may be accessed independently.
-+ */
-+#define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
-+
- #endif /* !__ASSEMBLY__ */
- #endif /* !__ASM_ARCH_GICV3_H */
 -- 
 1.7.9.5
