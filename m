@@ -1,494 +1,210 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon,  7 Nov 2016 23:24:57 +0100
-Subject: [PATCH v4 1/2] ARM: PIE infrastructure
-In-Reply-To: <20161107222458.15732-1-alexandre.belloni@free-electrons.com>
-References: <20161107222458.15732-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20161107222458.15732-2-alexandre.belloni@free-electrons.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 07 Nov 2016 14:30:55 -0800
+Subject: [PATCH 2/8] ARM64: dts: meson-gxl: Add pinctrl nodes
+In-Reply-To: <1477932286-27482-3-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 31 Oct 2016 17:44:40 +0100")
+References: <1477932286-27482-1-git-send-email-narmstrong@baylibre.com>
+ <1477932286-27482-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m27f8e7wio.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for embedding position independent executables (PIE) in the
-kernel. Those PIEs can then be loaded into memory allocated using genalloc.
-For example, this allows running code from SRAM which is usually needed for
-suspend/resume or to change the DDR timings. That code is usually written
-in assembly and can now be developed in C.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/Kconfig          |   2 +
- arch/arm/Makefile         |   1 +
- arch/arm/pie/Kconfig      |   8 +++
- arch/arm/pie/Makefile     |   1 +
- arch/arm/pie/Makefile.pie |  86 +++++++++++++++++++++++++++
- arch/arm/pie/lib/empty.c  |  15 +++++
- arch/arm/pie/pie.c        |  97 ++++++++++++++++++++++++++++++
- arch/arm/pie/pie.lds.S    |  40 +++++++++++++
- include/linux/pie.h       | 146 ++++++++++++++++++++++++++++++++++++++++++++++
- 9 files changed, 396 insertions(+)
- create mode 100644 arch/arm/pie/Kconfig
- create mode 100644 arch/arm/pie/Makefile
- create mode 100644 arch/arm/pie/Makefile.pie
- create mode 100644 arch/arm/pie/lib/empty.c
- create mode 100644 arch/arm/pie/pie.c
- create mode 100644 arch/arm/pie/pie.lds.S
- create mode 100644 include/linux/pie.h
+> Add pinctrl nodes and pin definitions for Amlogic Meson GXL.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 168 +++++++++++++++++++++++++++++
+>  1 file changed, 168 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> index 13b10ee..ce7f550 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+> @@ -42,7 +42,175 @@
+>   */
+>  
+>  #include "meson-gx.dtsi"
+> +#include <dt-bindings/gpio/meson-gxl-gpio.h>
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index b5d529fdffab..aba849d7a7cf 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2209,3 +2209,5 @@ endif
- source "lib/Kconfig"
- 
- source "arch/arm/kvm/Kconfig"
-+
-+source "arch/arm/pie/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 6be9ee148b78..9acb9581853a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -282,6 +282,7 @@ core-$(CONFIG_VFP)		+= arch/arm/vfp/
- core-$(CONFIG_XEN)		+= arch/arm/xen/
- core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
- core-$(CONFIG_VDSO)		+= arch/arm/vdso/
-+core-$(CONFIG_PIE)		+= arch/arm/pie/
- 
- # If we have a machine-specific directory, then include it in the build.
- core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-diff --git a/arch/arm/pie/Kconfig b/arch/arm/pie/Kconfig
-new file mode 100644
-index 000000000000..d76122140561
---- /dev/null
-+++ b/arch/arm/pie/Kconfig
-@@ -0,0 +1,8 @@
-+config PIE
-+	bool
-+	help
-+	  This option adds support for embedding position indepentant (PIE)
-+	  executables into the kernel. The PIEs can then be copied into
-+	  genalloc regions such as SRAM and executed. Some platforms require
-+	  this for suspend/resume support.
-+
-diff --git a/arch/arm/pie/Makefile b/arch/arm/pie/Makefile
-new file mode 100644
-index 000000000000..d1a6a823e431
---- /dev/null
-+++ b/arch/arm/pie/Makefile
-@@ -0,0 +1 @@
-+obj-y += pie.o
-diff --git a/arch/arm/pie/Makefile.pie b/arch/arm/pie/Makefile.pie
-new file mode 100644
-index 000000000000..4125da72bcaa
---- /dev/null
-+++ b/arch/arm/pie/Makefile.pie
-@@ -0,0 +1,86 @@
-+obj-y		:= pie.bin.elf
-+
-+# Report unresolved symbol references
-+ldflags-y	+= --no-undefined
-+# Delete all temporary local symbols
-+ldflags-y	+= -X
-+
-+GCOV_PROFILE := n
-+
-+KBUILD_CFLAGS += -DDISABLE_BRANCH_PROFILING
-+
-+ifeq ($(CONFIG_FUNCTION_TRACER),y)
-+ORIG_CFLAGS := $(KBUILD_CFLAGS)
-+KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
-+endif
-+
-+# Reset objcopy flags
-+OBJCOPYFLAGS	=
-+
-+$(obj)/empty.o: arch/arm/pie/lib/empty.c FORCE
-+	$(call if_changed_rule,cc_o_c)
-+
-+# Reference gcc builtins for use in PIE with __pie_
-+$(obj)/pie_rename.syms: $(obj)/empty.o
-+	@$(NM) $^ | awk '{if ($$3) print $$3,"__pie_"$(PIE_NAME)$$3}' > $@
-+
-+# For embedding address of the symbols copied from the PIE into the kernel
-+$(obj)/pie.syms: $(obj)/pie.elf
-+	@$(NM) $^ | awk '{if ($$3 && $$2 == toupper($$2)) print $$3,"=","0x"$$1";"}' > $@
-+
-+# Collect together the libpie objects
-+LDFLAGS_libpie_stage1.o += -r
-+
-+$(obj)/libpie_stage1.o: $(obj)/empty.o
-+	$(call if_changed,ld)
-+
-+# Rename the libpie gcc builtins with a __pie_ prefix
-+OBJCOPYFLAGS_libpie_stage2.o += --redefine-syms=$(obj)/pie_rename.syms
-+
-+$(obj)/libpie_stage2.o: $(obj)/libpie_stage1.o
-+	$(call if_changed,objcopy)
-+
-+CFLAGS_$(PIE_NAME).o += -fPIE
-+
-+OBJCOPYFLAGS_pie_stage1.o += --redefine-syms=$(obj)/pie_rename.syms
-+$(obj)/pie_stage1.o: $(obj)/$(PIE_NAME).o $(obj)/pie_rename.syms
-+	$(call if_changed,objcopy)
-+
-+LDFLAGS_pie_stage2.o += -r
-+
-+$(obj)/pie_stage2.o: $(obj)/pie_stage1.o $(obj)/libpie_stage2.o
-+	$(call if_changed,ld)
-+
-+SEDFLAGS_lds	= s/PIE_NAME/$(PIE_NAME)/
-+$(obj)/pie.lds.S: arch/arm/pie/pie.lds.S
-+	@sed "$(SEDFLAGS_lds)" < $< > $@
-+
-+# Create the position independent executable
-+LDFLAGS_pie.elf += -Bstatic -T $(obj)/pie.lds
-+
-+$(obj)/pie.elf: $(obj)/pie_stage2.o $(obj)/pie.lds
-+	$(call if_changed,ld)
-+
-+# Create binary data for the kernel
-+OBJCOPYFLAGS_pie.bin += -O binary
-+
-+$(obj)/pie.bin: $(obj)/pie.elf
-+	$(call if_changed,objcopy)
-+
-+# Import the data into the kernel
-+ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
-+OBJCOPYFLAGS_pie.bin.o += -B $(ARCH) -I binary -O elf32-bigarm
-+else
-+OBJCOPYFLAGS_pie.bin.o += -B $(ARCH) -I binary -O elf32-littlearm
-+endif
-+
-+$(obj)/pie.al.c: $(obj)/pie.elf
-+	@$(OBJDUMP) -h --section .text $^ | awk '{sub(/2\*\*/,"(1 << ",$$7);if ($$2 == ".text") print "unsigned int __pie_$(PIE_NAME)_align = "$$7");"}' > $@
-+
-+$(obj)/pie.bin.o: $(obj)/pie.bin
-+	$(call if_changed,objcopy)
-+
-+LDFLAGS_pie.bin.elf += --just-symbols=$(obj)/pie.syms -r
-+$(obj)/pie.bin.elf: $(obj)/pie.bin.o $(obj)/pie.al.o $(obj)/pie.syms
-+	$(call if_changed,ld)
-+
-diff --git a/arch/arm/pie/lib/empty.c b/arch/arm/pie/lib/empty.c
-new file mode 100644
-index 000000000000..9a6d54956379
---- /dev/null
-+++ b/arch/arm/pie/lib/empty.c
-@@ -0,0 +1,15 @@
-+void __div0(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr0(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr1(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr2(void)
-+{
-+};
-diff --git a/arch/arm/pie/pie.c b/arch/arm/pie/pie.c
-new file mode 100644
-index 000000000000..b32aa4cb11a8
---- /dev/null
-+++ b/arch/arm/pie/pie.c
-@@ -0,0 +1,97 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/genalloc.h>
-+#include <linux/pie.h>
-+#include <asm/cacheflush.h>
-+
-+struct pie_chunk {
-+	struct gen_pool *pool;
-+	unsigned long addr;
-+	unsigned int align_offset;
-+	size_t sz;
-+};
-+
-+struct pie_chunk *__pie_load_data(struct gen_pool *pool, void *code_start,
-+				  void *code_end, unsigned int align)
-+{
-+	struct pie_chunk *chunk;
-+	unsigned long offset;
-+	int ret;
-+	size_t code_sz;
-+	unsigned long base;
-+	phys_addr_t pbase;
-+
-+	chunk = kzalloc(sizeof(*chunk), GFP_KERNEL);
-+	if (!chunk) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	code_sz = code_end - code_start;
-+	chunk->pool = pool;
-+	chunk->sz = code_sz;
-+
-+	base = gen_pool_alloc(pool, chunk->sz + align);
-+	if (!base) {
-+		ret = -ENOMEM;
-+		goto err_free;
-+	}
-+
-+	pbase = gen_pool_virt_to_phys(pool, base);
-+	chunk->addr = (unsigned long)__arm_ioremap_exec(pbase, code_sz, false);
-+	if (!chunk->addr) {
-+		ret = -ENOMEM;
-+		goto err_remap;
-+	}
-+
-+	chunk->align_offset = chunk->addr % align;
-+	chunk->addr += chunk->align_offset;
-+
-+	memcpy((char *)chunk->addr, code_start, code_sz);
-+	flush_icache_range(chunk->addr, chunk->addr + code_sz);
-+
-+	offset = gen_pool_virt_to_phys(pool, chunk->addr);
-+
-+	return chunk;
-+
-+err_remap:
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+
-+err_free:
-+	kfree(chunk);
-+err:
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(__pie_load_data);
-+
-+phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr)
-+{
-+	return gen_pool_virt_to_phys(chunk->pool, addr);
-+}
-+EXPORT_SYMBOL_GPL(pie_to_phys);
-+
-+void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	uintptr_t offset = (uintptr_t)ptr;
-+
-+	if (offset >= chunk->sz)
-+		return NULL;
-+	else
-+		return (void *)(chunk->addr + offset);
-+}
-+EXPORT_SYMBOL_GPL(__kern_to_pie);
-+
-+void pie_free(struct pie_chunk *chunk)
-+{
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+	kfree(chunk);
-+}
-+EXPORT_SYMBOL_GPL(pie_free);
-diff --git a/arch/arm/pie/pie.lds.S b/arch/arm/pie/pie.lds.S
-new file mode 100644
-index 000000000000..e640c93f5bc8
---- /dev/null
-+++ b/arch/arm/pie/pie.lds.S
-@@ -0,0 +1,40 @@
-+OUTPUT_FORMAT("elf32-littlearm", "elf32-bigarm", "elf32-littlearm")
-+OUTPUT_ARCH(arm)
-+
-+#include <linux/export.h>
-+
-+SECTIONS
-+{
-+	/* Don't need unwind tables */
-+	/DISCARD/ : {
-+		*(.ARM.exidx*)
-+		*(.ARM.extab*)
-+		*(.comment)
-+	}
-+
-+	. = 0x0;
-+
-+	____pie_PIE_NAME_start : {
-+		VMLINUX_SYMBOL(__pie_PIE_NAME_start) = .;
-+	}
-+
-+	.text : {
-+		. = ALIGN(4);
-+		KEEP(*(.text))
-+	}
-+
-+	.rodata : { *(SORT_BY_ALIGNMENT(.rodata*)) }
-+	. = ALIGN(4);
-+
-+	.data : {
-+		*(SORT_BY_ALIGNMENT(.data*))
-+		. = ALIGN(4);
-+
-+		*(SORT_BY_ALIGNMENT(.bss*))
-+		. = ALIGN(4);
-+	}
-+
-+	____pie_PIE_NAME_end : {
-+		VMLINUX_SYMBOL(__pie_PIE_NAME_end) = .;
-+	}
-+}
-diff --git a/include/linux/pie.h b/include/linux/pie.h
-new file mode 100644
-index 000000000000..cec58384dda2
---- /dev/null
-+++ b/include/linux/pie.h
-@@ -0,0 +1,146 @@
-+/*
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *      Russ Dill <russ.dill@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#ifndef _LINUX_PIE_H
-+#define _LINUX_PIE_H
-+
-+#include <linux/kernel.h>
-+#include <linux/err.h>
-+
-+#include <asm/fncpy.h>
-+#include <linux/bug.h>
-+
-+struct gen_pool;
-+struct pie_chunk;
-+
-+#ifdef CONFIG_PIE
-+
-+/**
-+ * __pie_load_data - load and fixup PIE code from kernel data
-+ * @pool:	pool to allocate memory from and copy code into
-+ * @start:	virtual start address in kernel of chunk specific code
-+ * @end:	virtual end address in kernel of chunk specific code
-+ * @phys:	%true to fixup to physical address of destination, %false to
-+ *		fixup to virtual address of destination
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+struct pie_chunk *__pie_load_data(struct gen_pool *pool, void *start, void *end,
-+				  unsigned int align);
-+
-+/**
-+ * pie_to_phys - translate a virtual PIE address into a physical one
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @addr:	virtual address within pie chunk
-+ *
-+ * Returns physical address on success, -1 otherwise
-+ */
-+phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr);
-+
-+void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr);
-+
-+/**
-+ * pie_free - free the pool space used by an pie chunk
-+ * @chunk:	identifier returned by pie_load_sections
-+ */
-+void pie_free(struct pie_chunk *chunk);
-+
-+#define __pie_load_sections(pool, name, folder) ({			\
-+	extern char _binary_##folder##_pie_bin_start[];			\
-+	extern char __pie_##name##_start[];				\
-+	extern char __pie_##name##_end[];				\
-+	extern unsigned int __pie_##name##_align;			\
-+	char *start = _binary_##folder##_pie_bin_start +		\
-+		(unsigned long)__pie_##name##_start;			\
-+	char *end = _binary_##folder##_pie_bin_start +			\
-+		(unsigned long)__pie_##name##_end;			\
-+	__pie_load_data(pool, start, end, __pie_##name##_align);	\
-+})
-+
-+/*
-+ * Required for any symbol within an PIE section that is referenced by the
-+ * kernel
-+ */
-+#define EXPORT_PIE_SYMBOL(sym)		extern typeof(sym) sym __weak
-+
-+#else
-+
-+static inline struct pie_chunk *__pie_load_data(struct gen_pool *pool,
-+						void *start, void *end,
-+						unsigned int algin)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static inline phys_addr_t pie_to_phys(struct pie_chunk *chunk,
-+				      unsigned long addr)
-+{
-+	return -1;
-+}
-+
-+static inline void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	return NULL;
-+}
-+
-+static inline void pie_free(struct pie_chunk *chunk)
-+{
-+}
-+
-+#define __pie_load_sections(pool, name, folder, phys) ({ ERR_PTR(-EINVAL); })
-+
-+#endif
-+
-+/**
-+ * pie_load_sections - load and fixup sections associated with the given name
-+ * @pool:	pool to allocate memory from and copy code into
-+ *		fixup to virtual address of destination
-+ * @name:	the name given to __pie() and __pie_data() when marking
-+ *		data and code
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+#define pie_load_sections(pool, name, folder) ({			\
-+	__pie_load_sections(pool, name, folder);			\
-+})
-+
-+/**
-+ * kern_to_pie - convert a kernel symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk.
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @p:		symbol to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define kern_to_pie(chunk, p) ({					\
-+	void *__ptr = (void *)(p);					\
-+	typeof(p) __result = (typeof(p))__kern_to_pie(chunk, __ptr);	\
-+	__result;							\
-+})
-+
-+/**
-+ * kern_to_fn - convert a kernel function symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @funcp:	function to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define fn_to_pie(chunk, funcp) ({					\
-+	uintptr_t __kern_addr, __pie_addr;				\
-+									\
-+	__kern_addr = (uintptr_t)funcp;					\
-+	__pie_addr = kern_to_pie(chunk, __kern_addr);			\
-+									\
-+	(typeof(&funcp))(__pie_addr);					\
-+})
-+
-+#endif
--- 
-2.10.2
+Oops, this has a dependency on the patch going through the pinctrl tree,
+which causes probelems we like to avoid in the arm-soc tree.
+
+For now, I've changed this to use the GXBB include since the values used
+are the same, but we can fix this for good in v4.10-rc, after the GXL
+pinctrl changes are merged.
+
+Kevin
+
+[1] [PATCH] pinctrl: meson: Add GXL pinctrl definitions
+>  / {
+>  	compatible = "amlogic,meson-gxl";
+>  };
+> +
+> +&aobus {
+> +	pinctrl_aobus: pinctrl at 14 {
+> +		compatible = "amlogic,meson-gxl-aobus-pinctrl";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		gpio_ao: bank at 14 {
+> +			reg = <0x0 0x00014 0x0 0x8>,
+> +			      <0x0 0x0002c 0x0 0x4>,
+> +			      <0x0 0x00024 0x0 0x8>;
+> +			reg-names = "mux", "pull", "gpio";
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +		};
+> +
+> +		uart_ao_a_pins: uart_ao_a {
+> +			mux {
+> +				groups = "uart_tx_ao_a", "uart_rx_ao_a";
+> +				function = "uart_ao";
+> +			};
+> +		};
+> +
+> +		remote_input_ao_pins: remote_input_ao {
+> +			mux {
+> +				groups = "remote_input_ao";
+> +				function = "remote_input_ao";
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&periphs {
+> +	pinctrl_periphs: pinctrl at 4b0 {
+> +		compatible = "amlogic,meson-gxl-periphs-pinctrl";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		gpio: bank at 4b0 {
+> +			reg = <0x0 0x004b0 0x0 0x28>,
+> +			      <0x0 0x004e8 0x0 0x14>,
+> +			      <0x0 0x00120 0x0 0x14>,
+> +			      <0x0 0x00430 0x0 0x40>;
+> +			reg-names = "mux", "pull", "pull-enable", "gpio";
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +		};
+> +
+> +		emmc_pins: emmc {
+> +			mux {
+> +				groups = "emmc_nand_d07",
+> +				       "emmc_cmd",
+> +				       "emmc_clk",
+> +				       "emmc_ds";
+> +				function = "emmc";
+> +			};
+> +		};
+> +
+> +		sdcard_pins: sdcard {
+> +			mux {
+> +				groups = "sdcard_d0",
+> +				       "sdcard_d1",
+> +				       "sdcard_d2",
+> +				       "sdcard_d3",
+> +				       "sdcard_cmd",
+> +				       "sdcard_clk";
+> +				function = "sdcard";
+> +			};
+> +		};
+> +
+> +		sdio_pins: sdio {
+> +			mux {
+> +				groups = "sdio_d0",
+> +				       "sdio_d1",
+> +				       "sdio_d2",
+> +				       "sdio_d3",
+> +				       "sdio_cmd",
+> +				       "sdio_clk";
+> +				function = "sdio";
+> +			};
+> +		};
+> +
+> +		sdio_irq_pins: sdio_irq {
+> +			mux {
+> +				groups = "sdio_irq";
+> +				function = "sdio";
+> +			};
+> +		};
+> +
+> +		uart_a_pins: uart_a {
+> +			mux {
+> +				groups = "uart_tx_a",
+> +				       "uart_rx_a";
+> +				function = "uart_a";
+> +			};
+> +		};
+> +
+> +		uart_b_pins: uart_b {
+> +			mux {
+> +				groups = "uart_tx_b",
+> +				       "uart_rx_b";
+> +				function = "uart_b";
+> +			};
+> +		};
+> +
+> +		uart_c_pins: uart_c {
+> +			mux {
+> +				groups = "uart_tx_c",
+> +				       "uart_rx_c";
+> +				function = "uart_c";
+> +			};
+> +		};
+> +
+> +		i2c_a_pins: i2c_a {
+> +			mux {
+> +				groups = "i2c_sck_a",
+> +				     "i2c_sda_a";
+> +				function = "i2c_a";
+> +			};
+> +		};
+> +
+> +		i2c_b_pins: i2c_b {
+> +			mux {
+> +				groups = "i2c_sck_b",
+> +				      "i2c_sda_b";
+> +				function = "i2c_b";
+> +			};
+> +		};
+> +
+> +		i2c_c_pins: i2c_c {
+> +			mux {
+> +				groups = "i2c_sck_c",
+> +				      "i2c_sda_c";
+> +				function = "i2c_c";
+> +			};
+> +		};
+> +
+> +		eth_pins: eth_c {
+> +			mux {
+> +				groups = "eth_mdio",
+> +				       "eth_mdc",
+> +				       "eth_clk_rx_clk",
+> +				       "eth_rx_dv",
+> +				       "eth_rxd0",
+> +				       "eth_rxd1",
+> +				       "eth_rxd2",
+> +				       "eth_rxd3",
+> +				       "eth_rgmii_tx_clk",
+> +				       "eth_tx_en",
+> +				       "eth_txd0",
+> +				       "eth_txd1",
+> +				       "eth_txd2",
+> +				       "eth_txd3";
+> +				function = "eth";
+> +			};
+> +		};
+> +
+> +		pwm_e_pins: pwm_e {
+> +			mux {
+> +				groups = "pwm_e";
+> +				function = "pwm_e";
+> +			};
+> +		};
+> +	};
+> +};
