@@ -1,41 +1,33 @@
-From: Frank.Li@nxp.com (Frank Li)
-Date: Mon, 7 Nov 2016 11:30:49 -0600
-Subject: [PATCH V3 2/2] ARM: dts: add new compatible stream for i.MX6QP mmdc
-In-Reply-To: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
-References: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
-Message-ID: <1478539849-10834-2-git-send-email-Frank.Li@nxp.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 8 Nov 2016 00:44:23 +0800
+Subject: [PATCH 1/3] arm64: dts: hisi: fix hip06 sas am-max-trans quirk
+In-Reply-To: <1478537065-169286-1-git-send-email-john.garry@huawei.com>
+References: <1478537065-169286-1-git-send-email-john.garry@huawei.com>
+Message-ID: <1478537065-169286-2-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MMDC has a slightly different programming model between imx6q and imx6qp
-in terms of perf support, it's exactly same for suspend support, so we
-have fsl,imx6q-mmdc here to save patching suspend driver with the new
-compatible.
+The string for the am max transmissions quirk property
+is not correct -> fix it.
 
-Signed-off-by: Frank Li <Frank.Li@nxp.com>
+Signed-off-by: John Garry <john.garry@huawei.com>
+Reviewed-by: Xiang Chen <chenxiang66@hisilicon.com>
 ---
-Change from V3 to V2
-- change commit message to show suspend need fsl,imx6q-mmdc
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx6qp.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 886dbf2..e0fdd0f 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -85,5 +85,12 @@
- 		pcie: pcie at 0x01000000 {
- 			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
- 		};
-+
-+		aips-bus at 02100000 {
-+			mmdc0: mmdc at 021b0000 { /* MMDC0 */
-+				compatible = "fsl,imx6qp-mmdc", "fsl,imx6q-mmdc";
-+				reg = <0x021b0000 0x4000>;
-+			};
-+		};
- 	};
- };
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+index b548763..5330abb 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+@@ -590,7 +590,7 @@
+ 			reg = <0 0xa2000000 0 0x10000>;
+ 			sas-addr = [50 01 88 20 16 00 00 00];
+ 			hisilicon,sas-syscon = <&pcie_subctl>;
+-			am-max-trans;
++			hip06-sas-v2-quirk-amt;
+ 			ctrl-reset-reg = <0xa18>;
+ 			ctrl-reset-sts-reg = <0x5a0c>;
+ 			ctrl-clock-ena-reg = <0x318>;
 -- 
-2.5.2
+1.9.1
