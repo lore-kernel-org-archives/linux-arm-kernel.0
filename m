@@ -1,69 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 7 Nov 2016 14:42:20 +0100
-Subject: [PATCH v4 0/3] ASoC/ARM: tegra: apalis t30/tk1/colibri t30:
- sgtl5000 audio
-In-Reply-To: <1471355726.4197.6.camel@toradex.com>
-References: <1466298002-12576-1-git-send-email-marcel.ziswiler@toradex.com>
- <1471355726.4197.6.camel@toradex.com>
-Message-ID: <20161107134220.GA29676@ulmo.ba.sec>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Nov 2016 14:50:27 +0100
+Subject: [PATCH] serial: sirf: Simplify a test
+In-Reply-To: <20161101070333.12255-1-christophe.jaillet@wanadoo.fr>
+References: <20161101070333.12255-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <2916662.De1FDumaQl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 16, 2016 at 01:55:28PM +0000, Marcel Ziswiler wrote:
-> On Sun, 2016-06-19 at 02:59 +0200, Marcel Ziswiler wrote:
-> > This series adds/integrates Freescale SGTL5000 analogue audio codec
-> > support.
-> > 
-> > Changes in v4:
-> > - simple-audio-card does still not allow for more advanced use cases
-> > ? like Tegra SoCs
-> > - further platform drivers have been accepted since my last attempt
-> > ? (e.g. rt5677 one)
-> > - relevance for one further board the new Toradex Apalis TK1
-> > - drop unused sound/jack.h include
-> > - in tegra_sgtl5000_driver_remove() pass return value of
-> > ? snd_soc_unregister_card() on to caller
-> > - no longer set owner property in platform_driver to THIS_MODULE
-> > - re-based/resend
-> > 
-> > Changes in v3:
-> > - revert to not using simple-audio-card being incompatible with tegra
-> > - rebased to for-next
-> > 
-> > Changes in v2:
-> > - using simple-audio-card as suggested by Fabio
-> > 
-> > Marcel Ziswiler (3):
-> > ? ASoC: tegra: add tegra sgtl5000 machine driver
-> > ? ARM: tegra: apalis/colibri t30: integrate audio
-> > ? ARM: tegra: enable sgtl5000 audio
-> > 
-> > ?.../bindings/sound/nvidia,tegra-audio-sgtl5000.txt |??42 ++++
-> > ?arch/arm/boot/dts/tegra30-apalis.dtsi??????????????|??49 +++++
-> > ?arch/arm/boot/dts/tegra30-colibri.dtsi?????????????|??49 +++++
-> > ?arch/arm/configs/tegra_defconfig???????????????????|???1 +
-> > ?sound/soc/tegra/Kconfig????????????????????????????|??11 ++
-> > ?sound/soc/tegra/Makefile???????????????????????????|???2 +
-> > ?sound/soc/tegra/tegra_sgtl5000.c???????????????????| 212
-> > +++++++++++++++++++++
-> > ?7 files changed, 366 insertions(+)
-> > ?create mode 100644
-> > Documentation/devicetree/bindings/sound/nvidia,tegra-audio-
-> > sgtl5000.txt
-> > ?create mode 100644 sound/soc/tegra/tegra_sgtl5000.c
+On Tuesday, November 1, 2016 8:03:33 AM CET Christophe JAILLET wrote:
+> 'dmaengine_prep_dma_cyclic()' does not return an error pointer, so the test
+> can be simplified to be more consistent.
 > 
-> With Mark finally having pulled the first patch of this series (https:/
-> /lkml.org/lkml/2016/8/15/297) I'm wondering whether the second and
-> third patch are now being pulled via tegra tree? Or should I rather re-
-> submit those as a new v5 patch set?
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 
-Both patches applied now, thanks.
+The change looks correct in principle. It would be good to automate looking
+for other instances of this bug. How did you find it? Do you have e.g. a
+coccinelle script or did you just stumble over the issue by accident?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/2eb5a3a1/attachment-0001.sig>
+There is one problem with your patch:
+
+>  drivers/tty/serial/sirfsoc_uart.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+> index b186c9c4f850..666ca3156961 100644
+> --- a/drivers/tty/serial/sirfsoc_uart.c
+> +++ b/drivers/tty/serial/sirfsoc_uart.c
+> @@ -609,7 +609,7 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
+>                 sirfport->rx_dma_items.dma_addr, SIRFSOC_RX_DMA_BUF_SIZE,
+>                 SIRFSOC_RX_DMA_BUF_SIZE / 2,
+>                 DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
+> -       if (IS_ERR_OR_NULL(sirfport->rx_dma_items.desc)) {
+> +       if (!sirfport->rx_dma_items.desc) {
+>                 dev_err(port->dev, "DMA slave single fail\n");
+>                 return;
+>         }
+
+The serial driver is for the sirf platform, which uses the sirf-dma
+dmaengine driver, and that particular driver has an incorrect
+dma_prep_cyclic implementation, so I think we also need this fix:
+
+diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+index 8f62edad51be..220c611c89ae 100644
+--- a/drivers/dma/sirf-dma.c
++++ b/drivers/dma/sirf-dma.c
+@@ -775,7 +775,7 @@ sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
+ 	 * BUFB
+ 	 */
+ 	if (buf_len !=  2 * period_len)
+-		return ERR_PTR(-EINVAL);
++		return NULL;
+ 
+ 	/* Get free descriptor */
+ 	spin_lock_irqsave(&schan->lock, iflags);
+
+
+	Arnd
