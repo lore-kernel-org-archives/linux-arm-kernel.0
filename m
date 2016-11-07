@@ -1,43 +1,76 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 7 Nov 2016 19:58:42 +0000
-Subject: [kernel-hardening] Re: [PATCHv4 0/4] WX checking for arm64
-In-Reply-To: <20161107194910.GM19796@leverpostej>
-References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
- <20161030150307.33vc2m7y5y6wzbqc@localhost>
- <20161107153802.GJ19796@leverpostej>
- <20161107194910.GM19796@leverpostej>
-Message-ID: <CAKv+Gu9c3PmC6CQ0Av9e=OmNr1cbbcwB4synSHiX5-d-xPg55w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Nov 2016 21:05:05 +0100
+Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
+In-Reply-To: <20161106190248.48b59e166bcd9d6f0ebb4d04@free.fr>
+References: <cover.1477142934.git.moinejf@free.fr>
+ <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
+ <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
+ <20161106190248.48b59e166bcd9d6f0ebb4d04@free.fr>
+Message-ID: <20161107200505.g76zz7adtfy4ltku@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2016 at 19:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Nov 07, 2016 at 03:38:02PM +0000, Mark Rutland wrote:
->> On Sun, Oct 30, 2016 at 03:03:07PM +0000, Catalin Marinas wrote:
->> > On Thu, Oct 27, 2016 at 09:27:30AM -0700, Laura Abbott wrote:
->> > > Laura Abbott (4):
->> > >   arm64: dump: Make ptdump debugfs a separate option
->> > >   arm64: dump: Make the page table dumping seq_file optional
->> > >   arm64: dump: Remove max_addr
->> > >   arm64: dump: Add checking for writable and exectuable pages
->> >
->> > Queued for 4.10. Thanks.
->>
->> Catalin mentioned to me that he saw some KASAN splats when testing; it
->> looks like need a fixup something like the below.
->
-> As an aside, it looks like any ptdump usage when KASAN is enabled takes
-> several minutes, which at boot time looks like a hang.
->
-> AFAICT, this is because KASAN allocates *huge* VA ranges (4TB+) worth of
-> zeroed shadow memory at pte granularity (reusing the same pmd, pud,
-> tables), and the ptdump code dutifully walks this with, with the added
-> KASAN instrumentation overhead.
->
-> I'll try to dig into that tomorrow; I suspect/hope it's not necessary to
-> keep all of that mapped.
->
+Hi,
 
-I have noticed that in the past, but I see how this delay at boot time
-is an issue. However, I don't think there is a huge cost involved in
-terms of memory footprint: AFAIK, the same PMD/PTE/kasan zero page are
-mapped over and over across the range.
+On Sun, Nov 06, 2016 at 07:02:48PM +0100, Jean-Francois Moine wrote:
+> On Sun, 23 Oct 2016 09:33:16 +0800
+> Chen-Yu Tsai <wens@csie.org> wrote:
+> 
+> > On Fri, Oct 21, 2016 at 4:36 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
+> > > This patch adds I2S support to sun8i SoCs as the A83T and H3.
+> > >
+> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > > ---
+> > > Note: This driver is closed to the sun4i-i2s except that:
+> > > - it handles the H3
+> > 
+> > If it's close to sun4i-i2s, you should probably rework that one to support
+> > the newer SoCs.
+> 
+> I started to add the H3 into the sun4i-i2s, but I am blocked with
+> regmap.
+> Many H3 registers are common with the A10, but some of them have more
+> or less fields, the fields may be at different offsets. And, finally,
+> some registers are completely different.
+> This would not raise any problem, except with regmap which is really
+> painful.
+
+That's weird, because regmap's regmap_field should make that much
+easier.
+
+> As I may understood, regmap is used to simplify suspend/resume, but, is
+> it useful to save the I2S register on suspend?
+> Practically, I am streaming some tune on my device. I suspend it for
+> any reason. The next morning, I resume it. Are you sure I want to
+> continue to hear the end of the tune?
+> 
+> I better think that streaming should be simply stopped on suspend.
+
+You're mistaken. The code in there is for *runtime* suspend, ie when
+the device is no longer used, so that case shouldn't even happen at
+all.
+
+(And real suspend isn't supported anyway)
+
+> Then, there is no need to save the playing registers, and, here I am,
+> there is no need to use regmap.
+> 
+> May I go this way?
+
+No, please don't. regmap is also providing very useful features, such
+as access to all the registers through debugfs, or tracing. What
+exactly feels painful to you?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/a27a59e7/attachment.sig>
