@@ -1,22 +1,20 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Nov 2016 16:14:48 +0000
-Subject: [PATCH] ARM: cache-uniphier: include <linux/errno.h> instead of
- <linux/types.h>
-In-Reply-To: <1478534334-15562-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1478534334-15562-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161107161448.GJ1041@n2100.armlinux.org.uk>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 8 Nov 2016 00:44:22 +0800
+Subject: [PATCH 0/3] arm64: dts: hisi: hip06 SAS device tree fixes
+Message-ID: <1478537065-169286-1-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 12:58:54AM +0900, Masahiro Yamada wrote:
-> Nothing in this header file depends on <linux/types.h>.
-> Rather, <linux/errno.h> should be included for -ENODEV.
+This patchset resolves some hip06 SAS device tree issues.
 
-So how do we end up with a definition for u32?
+John Garry (3):
+  arm64: dts: hisi: fix hip06 sas am-max-trans quirk
+  arm64: dts: hisi: disable sas0 and sas2 for d03
+  arm64: dts: hisi: add refclk node to hip06 dts files for SAS
 
-I think you need both these include files.
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts |  8 --------
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi    | 11 ++++++++++-
+ 2 files changed, 10 insertions(+), 9 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
