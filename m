@@ -1,49 +1,32 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon,  7 Nov 2016 23:07:22 +0530
-Subject: [PATCH] arm64: fix error: conflicting types for 'kprobe_fault_handler'
-Message-ID: <7dcc7652817db90bab2df463f856acff41d270fe.1478540228.git.panand@redhat.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 7 Nov 2016 19:41:58 +0200
+Subject: [PATCH 3/6] clk: Add driver for Maxim-8997 PMIC clocks
+In-Reply-To: <1478513376-14307-4-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478513376-14307-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20161107174158.GB4865@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_KPROBE is disabled but CONFIG_UPROBE_EVENT is enabled, we get
-following compilation error:
+On Mon, Nov 07, 2016 at 03:39:33PM +0530, Pankaj Dubey wrote:
+> The MAX8997 PMIC has 32.786kHz crystal oscillator which provides an
+> accurate low frequency clock for MAX8997 internal circuit as well as
+> external circuit. This patch adds support for these two clocks.
+> 
+> CC: Michael Turquette <mturquette@baylibre.com>
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: devicetree at vger.kernel.org
+> CC: linux-clk at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  drivers/clk/Kconfig                       | 10 ++++
+>  drivers/clk/Makefile                      |  1 +
+>  drivers/clk/clk-max8997.c                 | 76 +++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/maxim,max8997.h | 23 ++++++++++
 
-In file included from
-.../arch/arm64/kernel/probes/decode-insn.c:20:0:
-.../arch/arm64/include/asm/kprobes.h:52:5: error:
-conflicting types for 'kprobe_fault_handler'
- int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
-     ^~~~~~~~~~~~~~~~~~~~
-In file included from
-.../arch/arm64/kernel/probes/decode-insn.c:17:0:
-.../include/linux/kprobes.h:398:90: note:
-previous definition of 'kprobe_fault_handler' was here
- static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
-                                                                                          ^
-.../scripts/Makefile.build:290: recipe for target
-'arch/arm64/kernel/probes/decode-insn.o' failed
+You need to split the dt-bindings header into separate one so others
+could pull it.  Please also mention the dependencies between patches in
+cover letter, because it does not look like it could be applied as is.
 
-<asm/kprobes.h> is already included from <linux/kprobes.h> under #ifdef
-CONFIG_KPROBE. So, this patch fixes the error by removing it from
-decode-insn.c.
-
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- arch/arm64/kernel/probes/decode-insn.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/probes/decode-insn.c b/arch/arm64/kernel/probes/decode-insn.c
-index 8a29d2982eec..6bf6657a5a52 100644
---- a/arch/arm64/kernel/probes/decode-insn.c
-+++ b/arch/arm64/kernel/probes/decode-insn.c
-@@ -17,7 +17,6 @@
- #include <linux/kprobes.h>
- #include <linux/module.h>
- #include <linux/kallsyms.h>
--#include <asm/kprobes.h>
- #include <asm/insn.h>
- #include <asm/sections.h>
- 
--- 
-2.7.4
+Best regards,
+Krzysztof
