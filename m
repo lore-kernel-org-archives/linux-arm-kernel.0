@@ -1,135 +1,200 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Mon, 7 Nov 2016 21:13:22 +0300
-Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
-In-Reply-To: <d1aa8bec-a53e-cd30-e66a-39bebb6a400a@codeaurora.org>
-References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
- <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
- <714d2aea-ed4c-6272-89c1-e1d0e037855e@virtuozzo.com>
- <d1aa8bec-a53e-cd30-e66a-39bebb6a400a@codeaurora.org>
-Message-ID: <db2c63e4-1d7a-6da7-7d87-553a1c8049a7@virtuozzo.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon,  7 Nov 2016 18:17:31 +0000
+Subject: [PATCH v11 00/14] Add support for FDMA DMA controller and slim core
+ rproc found on STi chipsets
+Message-ID: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2016 09:08 PM, Christopher Covington wrote:
-> On 11/07/2016 12:16 PM, Dmitry Safonov wrote:
->> On 11/07/2016 08:00 PM, Christopher Covington wrote:
->>> Hi Dmitry,
->>>
->>> On 11/01/2016 01:22 PM, Dmitry Safonov wrote:
->>>>   Add vdso_mremap hook which will fix context.vdso pointer after mremap()
->>>> on vDSO vma. This is needed for correct landing after syscall execution.
->>>> Primary goal of this is for CRIU on arm - we need to restore vDSO image
->>>> at the exactly same place where the vma was in dumped application. With
->>>> the help of this hook we'll move vDSO at the new position.
->>>>   The CRIU code handles situations like when vDSO of dumped application
->>>> was different from vDSO on restoring system. This usally happens when
->>>> some new symbols are being added to vDSO. In these situations CRIU
->>>> inserts jump trampolines from old vDSO blob to new vDSO on restore.
->>>> By that reason even if on restore vDSO blob lies on the same address as
->>>> blob in dumped application - we still need to move it if it differs.
->>>>
->>>>   There was previously attempt to add this functionality for arm64 by
->>>> arch_mremap hook [1], while this patch introduces this with minimal
->>>> effort - the same way I've added it to x86:
->>>> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
->>>>
->>>>   At this moment, vdso restoring code is disabled for arm/arm64 arch
->>>> in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
->>>> is aimed to fix that.
->>>>   The same hook may be introduced for arm64 kernel, but at this moment
->>>> arm64 vdso code is actively reworked by Kevin, so we can do it on top.
->>>>   Separately, I've refactored arch_remap hook out from ppc64 [3].
->>>>
->>>> [1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
->>>> [2]: https://github.com/xemul/criu/blob/master/Makefile#L39
->>>> [3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
->>>>
->>>> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
->>>> Cc: Christopher Covington <cov@codeaurora.org>
->>>> Cc: Andy Lutomirski <luto@amacapital.net>
->>>> Cc: Oleg Nesterov <oleg@redhat.com>
->>>> Cc: Russell King <linux@armlinux.org.uk>
->>>> Cc: Will Deacon <will.deacon@arm.com>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: linux-mm at kvack.org
->>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
->>>> ---
->>>>  arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
->>>>  1 file changed, 21 insertions(+)
->>>>
->>>> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
->>>> index 53cf86cf2d1a..d1001f87c2f6 100644
->>>> --- a/arch/arm/kernel/vdso.c
->>>> +++ b/arch/arm/kernel/vdso.c
->>>> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
->>>>      .pages = &vdso_data_page,
->>>>  };
->>>>
->>>> +static int vdso_mremap(const struct vm_special_mapping *sm,
->>>> +        struct vm_area_struct *new_vma);
->>>>  static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
->>>>      .name = "[vdso]",
->>>> +    .mremap = vdso_mremap,
->>>>  };
->>>>
->>>>  struct elfinfo {
->>>> @@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
->>>>          mm->context.vdso = addr;
->>>>  }
->>>>
->>>> +static int vdso_mremap(const struct vm_special_mapping *sm,
->>>> +        struct vm_area_struct *new_vma)
->>>> +{
->>>> +    unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
->>>> +    unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
->>>> +
->>>> +    /* Disallow partial vDSO blob remap */
->>>> +    if (vdso_size != new_size)
->>>> +        return -EINVAL;
->>>> +
->>>> +    if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
->>>> +        return -EFAULT;
->>>> +
->>>> +    current->mm->context.vdso = new_vma->vm_start;
->>>> +
->>>> +    return 0;
->>>> +}
->>>> +
->>>>  static void vdso_write_begin(struct vdso_data *vdata)
->>>>  {
->>>>      ++vdso_data->seq_count;
->>>>
->>>
->>> What do you think about putting this code somewhere generic (not under
->>> arch/*), so that powerpc and arm64 can reuse it once the cosmetic changes
->>> to make them compatible are made? My thought was that it could be defined
->>> underneath CONFIG_GENERIC_VDSO, which architectures could select as they
->>> became compatible.
->>
->> Hi Chistopher,
->>
->> Well, I don't think we won something out of generalization of simple assignment for context.vdso pointer accross arches. And a need to rename
->> vdso over arches for saving one single line?
->
-> I count 17 lines, which duplicated across 3 architectures becomes 51 lines.
-> Presumable in the future other architectures will want CRIU support as well.
-> Additionally, should fixes ever be required, fixing one implementation instead
-> of 3+ is preferred.
->
->> Also I don't like a bit this arch_mremap hook and need to nullify
->> vdso pointer.
->
-> I'm sorry for the confusion but I in no way meant to imply that the
-> arch_mremap hook should be carried forward. I fully  agree that the function
-> pointer in struct vm_special_mapping is the better way to go.
->
-> If you don't want to implement a version with vdso_mremap defined in a
-> generic location (using it from struct vm_special_mapping), do you mind if I
-> propose such a version?
+Hi Vinod and Bjorn,
 
-Sure, do it, no objections.
+This patchset adds support for the Flexible Direct Memory Access (FDMA) core
+found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
+with a dedicated firmware. It is a general purpose DMA controller supporting
+16 independent channels and data can be moved from memory to memory or between
+memory and paced latency critical real time targets.
+
+In reponse to Bjorn latest mail here https://lkml.org/lkml/2016/11/7/425 and
+here https://patchwork.kernel.org/patch/9368157/ I have created a v11
+incorporating the minor API update, and removed the unrelated change.
+
+As tthis series has been in linux-next for a while, some additional fixes
+have been submitted and applied by Vinod. I have included these as part of
+the v11 series as well.
+
+I believe the best route as described here
+https://www.spinics.net/lists/arm-kernel/msg541026.htmlforward is for Vinod
+to apply the whole series on an immutable branch which is then merged into
+both the dma and remoteproc trees.
+
+regards,
+
+Peter.
+
+v11 Fix rproc_put to rproc_free(). Also fix unrelated change in Kconfig caused
+by a bad rebase. Include additional fixes which are already in linux-next.
+
+V10 series updates remoteproc kconfig subsystem to use 'depends on' rather
+than select for the remoteproc core. Remoteproc client drivers now need to
+'depends on' for the core part.
+
+This avoids the Kconfig recursive dependency errors and reliance on the DRM
+patch included with the v9 series. Patches are also included for enabling the
+remoteproc core in the multi_v7 defconfig. All patches for DRM subsystem have
+been removed.
+
+Note there is no longer a depedency with the DRM_VIRTIO_GPU driver in this series,
+only remoteproc and dmaengine subsystems.
+
+regards,
+
+Peter.
+
+v11
+ - rproc_put to rproc_free
+ - Fix bad rebase with unrelated Kconfig change.
+ - include additional fixes submitted since driver has been in linux-next
+
+v10 RESEND
+ - Rebase on v4.9-rc1
+
+Changes since v9:
+ - Update remoteproc Kconfig to 'depends on'
+ - Add remoteproc core to multi_v7 defconfig
+ - Remove drm patches
+ - rebase v4.8
+
+Changes since v8:
+ - Add MODULE_ALIAS (Vinod)
+ - devm_kzalloc to devm_kcalloc (Vinod)
+ - quisce tasklet initialised by vchan_init() (Vinod)
+ - Don't make SLIM rproc user selectable (Bjorn)
+ - slim_rproc: Ensure clocks enabled before firmware load (Peter)
+ - Various code style nits / commit message change (Lee)
+ - Separate patch for '\n' kconfig removal (Vinod)
+ - Fix clock bug when booting without clk_ignore_unused param
+
+Changes since v7:
+ - Rebase on v4.8-rc3 (Peter)
+ - Double check that len is <= mem[i].size (Bjorn)
+ - Remove if (!fw) checks (Bjorn)
+ - Omit reference from fw_ops struct (Bjorn)
+ - Call rproc_del() before rproc_put() (Bjorn)
+ - Fix some odd line breaks (Bjorn)
+ - Rename SLIM_* and slim_* with st prefix (Bjorn)
+
+Changes since v6:
+ - Fix recursive Kconfig warning (Patrice)
+ - Fix various Intel zero day compiler warnings
+ - Remove all changes related to late firmware load (now relies on initramfs) (Peter)
+
+Changes since v5:
+ - Remove optional rsc table and go back to dummy resource table (Bjorn)
+ - Retry rproc_fw_config_virtio() from rproc_boot() if previously failed (Peter)
+ - Fixup some kbuild warnings
+ - rebase on v4.7-rc5
+ - Remove some patches which were merged via ASoC tree
+
+Changes since v4:
+ - Make rsc table optional in remoteproc (Peter)
+ - Various fixups to STi audio DT nodes (Arnaud)
+ - Bulk rename of xp70 to slim (Peter)
+ - Update my email to @linaro.org (Lee)
+ - rebase on v4.7-rc2 (Peter)
+ - Don't make ST_SLIM_REMOTEPROC user selectable (Bjorn)
+ - -EPROBE_DEFER if rproc_boot fails when allocating DMA channel (Arnaud / Peter)
+ - Drop some unnecessary headers (Vinod / Bjorn)
+ - Change to writel now we have several mappings (Bjorn)
+ - Remove io_res, rproc, and some unused structure fields / #define (Bjorn)
+ - put clks in error path, also put clks before rproc_put() (Bjorn)
+ - Make enum less generic (Bjorn)
+ - Make slim_rproc_alloc() return a st_slim_rproc reference (Bjorn)
+ - Alphabetical naming in Kconfig & Makefile (Vinod)
+ - Add FDMA prefix to REQ_CTRL* (Vinod)
+ - Print ret on some error paths (Vinod)
+ - Add some acked-by (Peter)
+
+Changes since v3:
+ - Remove elf loading code from fdma driver (Vinod)
+ - Remove fdma_ prefix for clock names (Arnd)
+ - Make _xlate use dma_get_any_channel rather than request_channel (Arnd)
+ - Make a common function for _prep_ routines (Vinod)
+ - Make driver depend on COMPILE_TEST (Arnd)
+ - Remove unnecessary st_fdma_filter_fn (Arnd)
+ - Enable FDMA as a module (Arnd)
+ - Drop fdma_ clock prefix (Arnd)
+ - Fix description as well as example for st, prefix (Arnd)
+ - Remove string concatenation from fdma register macros to ease grep'ability (Arnd)
+ - Add a XP70 rproc driver for ELF firmware loading and start/stop control (Peter)
+ - Add myself as a author of the driver (Peter)
+
+Changes since v2:
+ - Change to dma-controller (Arnd)
+ - Remove platform data header file and simplifiy code (Arnd)
+ - Remove FW_LOADER_USER_HELPER_FALLBACK and rework firmware loading to device config (Vinod)
+ - Use SET_RUNTIME_PM_OPS helpers (Vinod)
+ - Remove fdma-id dt prop and use compatibles to generate different fdma firmware names (Arnd / Lee)
+ - Add sti-asoc-card DT nodes and pinmux config for uniperif player & reader (Peter)
+ - Update sti-asoc-card DT binding documentation (Peter)
+ - Enable STi audio drivers in multi_v7_defconfig (Peter)
+
+Changes since v1:
+ - split into smaller patches for easier / faster review (Vinod)
+ - new fill_hw_mode() with common code (Vinod)
+ - new config_reqctrl() called from *_prep() instead of device_config cb (Vinod)
+ - fdma-xbar support removed (Peter)
+ - rework firmware name mechanism so fwname isn't in DT (Peter / Lee)
+ - st_fdma_seg_to_mem can be static (Paul)
+ - EXPORT_SYMBOL st_fdma_filter_fn not required (Paul)
+ - s/channel/channels (vinod)
+ - better describe "Must be <3>" (vinod)
+ - sizeof(*ehdr) (vinod)
+ - print values on error debug (vinod)
+ - empty line (Vinod)
+ - Update to -EIO (Vinod)
+ - Make st_fdma tristate (Paul)
+ - Remove __exit tag from .remove (Maxime)
+ - Update MAINTAINERS rule to fdma* (Lee)
+ - Unit address should match reg property (Lee)
+
+Arnd Bergmann (1):
+  dmaengine: st_fdma: fix uninitialized variable access
+
+Peter Griffin (12):
+  remoteproc: Update Kconfig setup to 'depends on REMOTEPROC'
+  remoteproc: st_slim_rproc: add a slimcore rproc driver
+  MAINTAINERS: Add st slim core rproc driver to STi section.
+  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
+    documentation
+  dmaengine: st_fdma: Add STMicroelectronics FDMA driver header file
+  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
+  MAINTAINERS: Add FDMA driver files to STi section.
+  ARM: multi_v7_defconfig: Enable remoteproc core
+  ARM: multi_v7_defconfig: Enable st_remoteproc driver.
+  ARM: multi_v7_defconfig: Enable STi FDMA driver
+  ARM: multi_v7_defconfig: Enable STi and simple-card drivers.
+  dmaengine: st_fdma: Update st_fdma to 'depends on REMOTEPROC'.
+
+Wei Yongjun (1):
+  dmaengine: st_fdma: Fix the error return code in st_fdma_probe()
+
+ Documentation/devicetree/bindings/dma/st_fdma.txt |  87 +++
+ MAINTAINERS                                       |   3 +
+ arch/arm/configs/multi_v7_defconfig               |   6 +
+ drivers/dma/Kconfig                               |  14 +
+ drivers/dma/Makefile                              |   1 +
+ drivers/dma/st_fdma.c                             | 889 ++++++++++++++++++++++
+ drivers/dma/st_fdma.h                             | 249 ++++++
+ drivers/remoteproc/Kconfig                        |  25 +-
+ drivers/remoteproc/Makefile                       |   1 +
+ drivers/remoteproc/st_slim_rproc.c                | 364 +++++++++
+ include/linux/remoteproc/st_slim_rproc.h          |  58 ++
+ 11 files changed, 1688 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+ create mode 100644 drivers/dma/st_fdma.c
+ create mode 100644 drivers/dma/st_fdma.h
+ create mode 100644 drivers/remoteproc/st_slim_rproc.c
+ create mode 100644 include/linux/remoteproc/st_slim_rproc.h
 
 -- 
-              Dmitry
+2.7.4
