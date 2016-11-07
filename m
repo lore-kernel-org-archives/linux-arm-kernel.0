@@ -1,122 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Nov 2016 14:08:19 +0100
-Subject: [PATCH 1/3] ASoC: sunxi: i2s: Implement set_sysclk
+Date: Mon,  7 Nov 2016 14:08:21 +0100
+Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
 In-Reply-To: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <e86d676f28ff62bc0a56741f76afb2cbdfedbdd8.1478524066.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In our i2s driver, we were previously trying to guess which oversample the
-user wanted to use by looking at the rate and trying to max it.
+The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
 
-However, the cards, and especially simple-card with its mclk-fs property
-will already provide the expected oversample ratio by using the set_sysclk
-callback.
-
-We can thus implement it and remove the logic to deal with the runtime
-guess.
+Add a card in order to have it working
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 53 +++++++++++++++++++++++++++-----------
- 1 file changed, 38 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+), 0 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index a7653114e895..f24d19526603 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -93,6 +93,8 @@ struct sun4i_i2s {
- 	struct clk	*mod_clk;
- 	struct regmap	*regmap;
+diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+index 12b4317a4383..5291e425caf9 100644
+--- a/arch/arm/boot/dts/ntc-gr8-evb.dts
++++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+@@ -76,6 +76,20 @@
+ 		default-brightness-level = <8>;
+ 	};
  
-+	unsigned int	mclk_freq;
++	i2s {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "gr8-evb-wm8978";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,mclk-fs = <512>;
 +
- 	struct snd_dmaengine_dai_dma_data	capture_dma_data;
- 	struct snd_dmaengine_dai_dma_data	playback_dma_data;
- };
-@@ -158,14 +160,24 @@ static int sun4i_i2s_get_mclk_div(struct sun4i_i2s *i2s,
- }
- 
- static int sun4i_i2s_oversample_rates[] = { 128, 192, 256, 384, 512, 768 };
-+static bool sun4i_i2s_oversample_is_valid(unsigned int oversample)
-+{
-+	int i;
++		simple-audio-card,cpu {
++			sound-dai = <&i2s0>;
++		};
 +
-+	for (i = 0; i < ARRAY_SIZE(sun4i_i2s_oversample_rates); i++)
-+		if (sun4i_i2s_oversample_rates[i] == oversample)
-+			return true;
-+
-+	return false;
-+}
++		simple-audio-card,codec {
++			sound-dai = <&wm8978>;
++		};
++	};
  
- static int sun4i_i2s_set_clk_rate(struct sun4i_i2s *i2s,
- 				  unsigned int rate,
- 				  unsigned int word_size)
- {
--	unsigned int clk_rate;
-+	unsigned int oversample_rate, clk_rate;
- 	int bclk_div, mclk_div;
--	int ret, i;
-+	int ret;
- 
- 	switch (rate) {
- 	case 176400:
-@@ -197,21 +209,18 @@ static int sun4i_i2s_set_clk_rate(struct sun4i_i2s *i2s,
- 	if (ret)
- 		return ret;
- 
--	/* Always favor the highest oversampling rate */
--	for (i = (ARRAY_SIZE(sun4i_i2s_oversample_rates) - 1); i >= 0; i--) {
--		unsigned int oversample_rate = sun4i_i2s_oversample_rates[i];
--
--		bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
--						  word_size);
--		mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
--						  clk_rate,
--						  rate);
-+	oversample_rate = i2s->mclk_freq / rate;
-+	if (!sun4i_i2s_oversample_is_valid(oversample_rate))
-+		return -EINVAL;
- 
--		if ((bclk_div >= 0) && (mclk_div >= 0))
--			break;
--	}
-+	bclk_div = sun4i_i2s_get_bclk_div(i2s, oversample_rate,
-+					  word_size);
-+	if (bclk_div < 0)
-+		return -EINVAL;
- 
--	if ((bclk_div < 0) || (mclk_div < 0))
-+	mclk_div = sun4i_i2s_get_mclk_div(i2s, oversample_rate,
-+					  clk_rate, rate);
-+	if (mclk_div < 0)
- 		return -EINVAL;
- 
- 	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
-@@ -481,9 +490,23 @@ static void sun4i_i2s_shutdown(struct snd_pcm_substream *substream,
- 	regmap_write(i2s->regmap, SUN4I_I2S_CTRL_REG, 0);
- }
- 
-+static int sun4i_i2s_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-+				unsigned int freq, int dir)
-+{
-+	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-+
-+	if (clk_id != 0)
-+		return -EINVAL;
-+
-+	i2s->mclk_freq = freq;
-+
-+	return 0;
-+}
-+
- static const struct snd_soc_dai_ops sun4i_i2s_dai_ops = {
- 	.hw_params	= sun4i_i2s_hw_params,
- 	.set_fmt	= sun4i_i2s_set_fmt,
-+	.set_sysclk	= sun4i_i2s_set_sysclk,
- 	.shutdown	= sun4i_i2s_shutdown,
- 	.startup	= sun4i_i2s_startup,
- 	.trigger	= sun4i_i2s_trigger,
+ 	panel {
+ 		compatible = "allwinner,sun4i-a10-sub-evb-5-lcd";
 -- 
 git-series 0.8.11
