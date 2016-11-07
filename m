@@ -1,59 +1,71 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 7 Nov 2016 12:49:37 +0100
-Subject: [PATCH V4 6/6] bus: Add support for Tegra Generic Memory Interface
-In-Reply-To: <1478507405-13204-7-git-send-email-mirza.krak@gmail.com>
-References: <1478507405-13204-1-git-send-email-mirza.krak@gmail.com>
- <1478507405-13204-7-git-send-email-mirza.krak@gmail.com>
-Message-ID: <20161107114937.GD28616@ulmo.ba.sec>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 7 Nov 2016 11:51:57 +0000
+Subject: Tegra baseline test results for v4.9-rc4
+Message-ID: <df62ac1f-d7f1-82e5-e0ef-2f46ab89f86b@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 09:30:05AM +0100, Mirza Krak wrote:
-> From: Mirza Krak <mirza.krak@gmail.com>
-> 
-> The Generic Memory Interface bus can be used to connect high-speed
-> devices such as NOR flash, FPGAs, DSPs...
-> 
-> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
-> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
-> ---
-> 
-> Changes in v2:
->  - Fixed some checkpatch errors
->  - Re-ordered probe to get rid of local variables
->  - Moved of_platform_default_populate call to the end of probe
->  - Use the timing and configuration properties from the child device
->  - Added warning if more then 1 child device exist
-> 
-> Changes in v3:
->  - added helper function to disable the controller which is used in remove and
->  on error.
->  - Added logic to parse CS# from "ranges" property with fallback to "reg"
->  property
-> 
-> Changes in v4:
-> - added sanity check of chip-select property (fail if invalid)
-> - adjusted for device tree binding property name changes
-> - fail probe if there are no child nodes
-> - removed superfluous error message
-> - removed superfluous newline in Kconfig
-> 
->  drivers/bus/Kconfig     |   7 ++
->  drivers/bus/Makefile    |   1 +
->  drivers/bus/tegra-gmi.c | 275 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 283 insertions(+)
->  create mode 100644 drivers/bus/tegra-gmi.c
+Here are some basic Tegra test results for Linux v4.9-rc4.
+Logs and other details at:
 
-Applied with a bit of code reshuffling to make things more symmetric as
-well as a couple of pedantic cleanups because I couldn't resist.
+    https://nvtb.github.io//linux/test_v4.9-rc4/20161107030103/
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/e087bf16/attachment-0001.sig>
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.9-rc3 (a909d3e636995ba7c349e2ca5dbb528154d4ac30)):
+   text     data      bss    total  kernel
+  +4122      -32        0    +4090  defconfig
+  +1138        0        0    +1138  multi_v7_defconfig
+  +1573        0        0    +1573  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.9-rc3 (a909d3e636995ba7c349e2ca5dbb528154d4ac30))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
