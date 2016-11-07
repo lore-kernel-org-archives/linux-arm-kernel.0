@@ -1,86 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Nov 2016 16:47:38 +0100
-Subject: [PATCH v2 1/2] regulator: Add coupled regulator
-In-Reply-To: <20160205153258.GW4455@sirena.org.uk>
-References: <1452605842-9317-1-git-send-email-maxime.ripard@free-electrons.com>
- <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
- <20160112143100.GA14628@rob-hp-laptop>
- <20160115085734.GG4581@lukather>
- <20160117000434.GB7774@rob-hp-laptop>
- <20160118162538.GH6588@sirena.org.uk>
- <20160121154649.GE3997@lukather>
- <20160121162802.GL6588@sirena.org.uk>
- <20160205143328.GD31506@lukather>
- <20160205153258.GW4455@sirena.org.uk>
-Message-ID: <20161107154738.ewliwzx5plams4ni@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Nov 2016 15:47:20 +0000
+Subject: [PATCH] iommu/arm-smmu: Fix out-of-bounds dereference
+In-Reply-To: <dea89ff1b2bd97b08d72f5c32fcf228bec767142.1478533142.git.robin.murphy@arm.com>
+References: <dea89ff1b2bd97b08d72f5c32fcf228bec767142.1478533142.git.robin.murphy@arm.com>
+Message-ID: <20161107154719.GK19796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Fri, Feb 05, 2016 at 03:32:58PM +0000, Mark Brown wrote:
-> On Fri, Feb 05, 2016 at 03:33:28PM +0100, Maxime Ripard wrote:
-> > On Thu, Jan 21, 2016 at 04:28:02PM +0000, Mark Brown wrote:
-> > > On Thu, Jan 21, 2016 at 04:46:49PM +0100, Maxime Ripard wrote:
+On Mon, Nov 07, 2016 at 03:39:02PM +0000, Robin Murphy wrote:
+> When we iterate a master's config entries, what we generally care
+> about is the entry's stream map index, rather than the entry index
+> itself, so it's nice to have the iterator automatically assign the
+> former from the latter. Unfortunately, booting with KASAN reveals
+> the oversight that using a simple comma operator results in the
+> entry index being dereferenced before being checked for validity,
+> so we always access one element past the end of the fwspec array.
 > 
-> > > > Anyway, I'm fine with both approaches, just let me know what you
-> > > > prefer.
+> Flip things around so that the check always happens before the index
+> may be dereferenced.
 > 
-> > > Without seeing an implementation of the lists it's hard to say.
-> 
-> > Just to make sure we're on the same page: you want to keep the
-> > regulator, but instead of giving the parent through vinX-supplies
-> > properties, you want to have a single *-supply property, with a list
-> > of regulators, right?
-> 
-> Either that or an explicit regulator describing the merge.  Rob wants
-> the list I think but I really don't care.
+> Fixes: adfec2e709d2 ("iommu/arm-smmu: Convert to iommu_fwspec")
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-So, I'm reviving this old thread after speaking to you about it at
-ELCE and trying to code something up, and getting lost..
+This patch fixes the KASAN splats as I saw (example below).
 
-To put a bit of context, I'm still trying to tackle the issue of
-devices that have two regulators powering them on the same pin for
-example when each regulator cannot provide enough current alone to
-power the device (all the setups like this one I've seen so far were
-for WiFi chips, but it might be different).
+With this patch applied, my dmesg is free of errors.
 
-I guess we already agreed on the fact that the DT binding should just
-be to allow a *-supply property to take multiple regulators, and mark
-them as "coupled" (or whatever name we see fit) in such a case.
+So feel free to add:
 
-Since regulator_get returns a struct regulator pointer, it felt
-logical to try to add the list of parent regulators to it, especially
-as this structure is per-consumer, and different consumers might have
-different combinations of regulators.
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 
-However, this structure embeds a pointer to a struct regulator_dev,
-which seems to model the regulator itself, but will also contain
-pointer to the struct regulator, probably to model its parent? I guess
-my first question would be do we care about nesting? or having a
-regulator with multiple parents?
+Thanks,
+Mark.
 
-It also contains the constraints on each regulator, which might or
-might not be different for each of the coupled regulators, but I'm
-guessing the couple might have contraints of its own too I guess. Is
-it something that might happen? Should we care about it?
-
-And finally, my real question is, do we want to aggregate them in
-struct regulator, at the consumer level, which might make the more
-sense, or do we want to create an intermediate regulator internally?
-What is your take on this?
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/133eabc8/attachment.sig>
+==================================================================
+BUG: KASAN: slab-out-of-bounds in arm_smmu_add_device+0x510/0x960 at addr ffff800935c6e72c
+Read of size 2 by task swapper/0/1
+CPU: 4 PID: 1 Comm: swapper/0 Not tainted 4.9.0-rc3-00005-g8cc374c #79
+Hardware name: ARM Juno development board (r1) (DT)
+Call trace:
+[<ffff20000808b2d8>] dump_backtrace+0x0/0x278
+[<ffff20000808b564>] show_stack+0x14/0x20
+[<ffff2000084e4e4c>] dump_stack+0xa4/0xc8
+[<ffff200008256984>] kasan_object_err+0x24/0x80
+[<ffff200008256c40>] kasan_report_error+0x208/0x4d0
+[<ffff200008257330>] kasan_report+0x40/0x48
+[<ffff200008255624>] __asan_load2+0x84/0x98
+[<ffff200008743e80>] arm_smmu_add_device+0x510/0x960
+[<ffff20000873acf8>] iommu_bus_notifier+0x120/0x160
+[<ffff2000081038e4>] notifier_call_chain+0x6c/0xb8
+[<ffff200008103dfc>] __blocking_notifier_call_chain+0x5c/0xa0
+[<ffff200008103e54>] blocking_notifier_call_chain+0x14/0x20
+[<ffff20000874ef98>] device_add+0x5c8/0x840
+[<ffff20000863d574>] amba_device_try_add+0x1cc/0x298
+[<ffff20000863d7a8>] amba_device_add+0x20/0x148
+[<ffff200008ad4344>] of_platform_bus_create+0x34c/0x428
+[<ffff200008ad4554>] of_platform_populate+0x4c/0xb8
+[<ffff200009389c9c>] of_platform_default_populate_init+0x78/0x8c
+[<ffff200008083a28>] do_one_initcall+0x90/0x1c8
+[<ffff200009331038>] kernel_init_freeable+0x280/0x324
+[<ffff200008cb5d00>] kernel_init+0x10/0x110
+[<ffff200008083680>] ret_from_fork+0x10/0x50
+Object at ffff800935c6e700, in cache kmalloc-128 size: 128
+Allocated:
+PID = 1
+ [<ffff20000808ac90>] save_stack_trace_tsk+0x0/0x180
+ [<ffff20000808ae38>] save_stack_trace+0x28/0x38
+ [<ffff200008255ebc>] kasan_kmalloc+0xdc/0x188
+ [<ffff200008252780>] __kmalloc+0x148/0x238
+ [<ffff200008743b38>] arm_smmu_add_device+0x1c8/0x960
+ [<ffff20000873acf8>] iommu_bus_notifier+0x120/0x160
+ [<ffff2000081038e4>] notifier_call_chain+0x6c/0xb8
+ [<ffff200008103dfc>] __blocking_notifier_call_chain+0x5c/0xa0
+ [<ffff200008103e54>] blocking_notifier_call_chain+0x14/0x20
+ [<ffff20000874ef98>] device_add+0x5c8/0x840
+ [<ffff20000863d574>] amba_device_try_add+0x1cc/0x298
+ [<ffff20000863d7a8>] amba_device_add+0x20/0x148
+ [<ffff200008ad4344>] of_platform_bus_create+0x34c/0x428
+ [<ffff200008ad4554>] of_platform_populate+0x4c/0xb8
+ [<ffff200009389c9c>] of_platform_default_populate_init+0x78/0x8c
+ [<ffff200008083a28>] do_one_initcall+0x90/0x1c8
+ [<ffff200009331038>] kernel_init_freeable+0x280/0x324
+ [<ffff200008cb5d00>] kernel_init+0x10/0x110
+ [<ffff200008083680>] ret_from_fork+0x10/0x50
+Freed:
+PID = 0
+(stack is not available)
+Memory state around the buggy address:
+ ffff800935c6e600: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+ ffff800935c6e680: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+>ffff800935c6e700: 00 00 00 00 00 04 fc fc fc fc fc fc fc fc fc fc
+                                  ^
+ ffff800935c6e780: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+ ffff800935c6e800: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+==================================================================
