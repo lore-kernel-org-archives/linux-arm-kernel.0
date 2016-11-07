@@ -1,84 +1,72 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 7 Nov 2016 14:54:30 +0100
-Subject: [PATCH] spi: atmel: use managed resource for gpio chip select
-In-Reply-To: <CAMuHMdUQLkHn4=3U6TNjgTN--RUHZHsbwNu9dLdFrBJA0sx4aw@mail.gmail.com>
-References: <20160921075528.14452-1-nicolas.ferre@atmel.com>
- <CAMuHMdUQLkHn4=3U6TNjgTN--RUHZHsbwNu9dLdFrBJA0sx4aw@mail.gmail.com>
-Message-ID: <3f5b93d7-ee40-bb1a-2cfb-49fa193e2b9d@atmel.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 7 Nov 2016 13:55:29 +0000
+Subject: [PATCH 2/6] clk: stm32f4: SDIO & 48Mhz clock management for
+ STM32F469 board
+In-Reply-To: <1478523943-23142-3-git-send-email-gabriel.fernandez@st.com>
+References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+ <1478523943-23142-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <45a332b6-5170-9ae3-8d5e-c5f827c3edea@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/09/2016 ? 10:20, Geert Uytterhoeven a ?crit :
-> Hi Nicolas,
-> 
-> On Wed, Sep 21, 2016 at 9:55 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->> Use the managed gpio CS pin request so that we avoid having trouble
->> in the cleanup code.
->> In fact, if module was configured with DT, cleanup code released
->> invalid pin.  Since resource wasn't freed, module cannot be reinserted.
->>
->> Reported-by: Alexander Morozov <linux@meltdown.ru>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  drivers/spi/spi-atmel.c | 5 ++---
->>  1 file changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
->> index 8feac599e9ab..4e3f2345844a 100644
->> --- a/drivers/spi/spi-atmel.c
->> +++ b/drivers/spi/spi-atmel.c
->> @@ -1248,7 +1248,8 @@ static int atmel_spi_setup(struct spi_device *spi)
->>                         return -ENOMEM;
->>
->>                 if (as->use_cs_gpios) {
->> -                       ret = gpio_request(npcs_pin, dev_name(&spi->dev));
->> +                       ret = devm_gpio_request(&spi->dev,
->> +                                               npcs_pin, dev_name(&spi->dev));
-> 
-> Note that spi_master.setup() can be called multiple times during the lifetime
-> of the spi_device.
+On 07/11/16 13:05, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
+> from pll-sai-p.
+>
+> The SDIO clock could be also derived from 48Mhz or from sys clock.
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/clk/clk-stm32f4.c | 18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+> index 7641acd..dda15bc 100644
+> --- a/drivers/clk/clk-stm32f4.c
+> +++ b/drivers/clk/clk-stm32f4.c
+> @@ -199,7 +199,7 @@ struct stm32f4_gate_data {
+>  	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
+>  	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
+>  	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
+> -	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
+> +	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"sdmux" },
 
-Sure, this is what I read in include/linux/spi/spi.h "It's always safe
-to call this unless transfers are pending on the device whose settings
-are being modified."
-
-It also means that the whole memory allocation for devices that is done
-a few lines above this gpio request is also completely wrong... This
-function needs a serious refactoring.
-
-Thanks for the heads-up.
-
-Best regards,
-
->>                         if (ret) {
->>                                 kfree(asd);
->>                                 return ret;
->> @@ -1471,13 +1472,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
->>  static void atmel_spi_cleanup(struct spi_device *spi)
->>  {
->>         struct atmel_spi_device *asd = spi->controller_state;
->> -       unsigned                gpio = (unsigned long) spi->controller_data;
->>
->>         if (!asd)
->>                 return;
->>
->>         spi->controller_state = NULL;
->> -       gpio_free(gpio);
->>         kfree(asd);
->>  }
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+I'm confused. How do the "sdmux" clock come to exist on STM32F429?
 
 
--- 
-Nicolas Ferre
+>  	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
+>  	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
+>  	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
+> @@ -940,6 +940,10 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+>  	"no-clock", "lse", "lsi", "hse-rtc"
+>  };
+>
+> +static const char *pll48_parents[2] = { "pll-q", "pllsai-p" };
+> +
+> +static const char *sdmux_parents[2] = { "pll48", "sys" };
+> +
+>  struct stm32f4_clk_data {
+>  	const struct stm32f4_gate_data *gates_data;
+>  	const u64 *gates_map;
+> @@ -1109,6 +1113,18 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+>  		goto fail;
+>  	}
+>
+> +	if (of_device_is_compatible(np, "st,stm32f469-rcc")) {
+> +		clk_hw_register_mux_table(NULL, "pll48",
+> +				pll48_parents, ARRAY_SIZE(pll48_parents), 0,
+> +				base + STM32F4_RCC_DCKCFGR, 27, 1, 0, NULL,
+> +				&stm32f4_clk_lock);
+> +
+> +		clk_hw_register_mux_table(NULL, "sdmux",
+> +				sdmux_parents, ARRAY_SIZE(sdmux_parents), 0,
+> +				base + STM32F4_RCC_DCKCFGR, 28, 1, 0, NULL,
+> +				&stm32f4_clk_lock);
+> +	}
+> +
+>  	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
+>  	return;
+>  fail:
+>
