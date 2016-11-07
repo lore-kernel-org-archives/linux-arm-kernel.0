@@ -1,275 +1,395 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Nov 2016 23:37:41 +0100
-Subject: [PATCH v5 1/7] drm: sunxi: Add a basic DRM driver for Allwinner
- DE2
-In-Reply-To: <20161028193420.0f7dc67ea1042ff72b09b701@free.fr>
-References: <cover.1477142934.git.moinejf@free.fr>
- <8afc5e020c5767face34fe3a9ab300ce9e67ba00.1477142934.git.moinejf@free.fr>
- <20161024140419.ah6hywf3b24pj3fv@lukather>
- <20161025161441.6b248efe9229bd80e3f7a33c@free.fr>
- <20161027220316.y7u3h4qsfftryrmp@lukather>
- <20161028193420.0f7dc67ea1042ff72b09b701@free.fr>
-Message-ID: <20161107223741.gjxj4tqwuxud2iqc@lukather>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 7 Nov 2016 16:38:09 -0600
+Subject: [RFC PATCH v2 1/1] PCI/ACPI: xgene: Add ECAM quirk for X-Gene
+ PCIe controller
+In-Reply-To: <CADaLND=xjHkt1yuT+1_P8Ppbrjn+cyKrLEOb_yJNzSWFPcZZJg@mail.gmail.com>
+References: <20160921212258.GE20006@localhost>
+ <ff2976e86b4990fba80544e9916a85361afcc237.1477443743.git.dhdang@apm.com>
+ <20161102165329.GB10528@bhelgaas-glaptop.roam.corp.google.com>
+ <CADaLND=xjHkt1yuT+1_P8Ppbrjn+cyKrLEOb_yJNzSWFPcZZJg@mail.gmail.com>
+Message-ID: <20161107223809.GA24776@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Oct 28, 2016 at 07:34:20PM +0200, Jean-Francois Moine wrote:
-> On Fri, 28 Oct 2016 00:03:16 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Wed, Nov 02, 2016 at 01:54:44PM -0700, Duc Dang wrote:
+> On Wed, Nov 2, 2016 at 9:53 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Tue, Oct 25, 2016 at 06:24:32PM -0700, Duc Dang wrote:
+> > > PCIe controllers in X-Gene SoCs is not ECAM compliant: software
+> > > needs to configure additional controller's register to address
+> > > device at bus:dev:function.
+> > >
+> > > This patch depends on "ECAM quirks handling for ARM64 platforms"
+> > > series (http://www.spinics.net/lists/arm-kernel/msg530692.html,
+> > > the series was also modified by Bjorn) to address the limitation
+> > > above for X-Gene PCIe controller.
+> > >
+> > > The quirk will only be applied for X-Gene PCIe MCFG table with
+> > > OEM revison 1, 2, 3 or 4 (PCIe controller v1 and v2 on X-Gene SoCs).
+> >
+> > The quirks here contain some hard-coded address space consumed by
+> > ECAM.  The ECAM quirk itself is not a generic description of that
+> > address space in the sense of a PCI BAR or an ACPI _CRS method, i.e.,
+> > the quirk description is not enough to keep other parts of the kernel
+> > from treating the address space as "available".
 > 
-> > On Tue, Oct 25, 2016 at 04:14:41PM +0200, Jean-Francois Moine wrote:
-> > > > > +Display controller
-> > > > > +==================
-> > > > > +
-> > > > > +Required properties:
-> > > > > +
-> > > > > +- compatible: value should be one of the following
-> > > > > +		"allwinner,sun8i-a83t-display-engine"
-> > > > > +		"allwinner,sun8i-h3-display-engine"
-> > > > > +
-> > > > > +- clocks: must include clock specifiers corresponding to entries in the
-> > > > > +		clock-names property.
-> > > > > +
-> > > > > +- clock-names: must contain
-> > > > > +		"gate": for DE activation
-> > > > > +		"clock": DE clock
-> > > > 
-> > > > We've been calling them bus and mod.
-> > > 
-> > > I can understand "bus" (which is better than "apb"), but why "mod"?
-> > 
-> > Allwinner has been calling the clocks that are supposed to generate
-> > the external signals (depending on where you were looking) module or
-> > mod clocks (which is also why we have mod in the clock
-> > compatibles). The module 1 clocks being used for the audio and the
-> > module 0 for the rest (SPI, MMC, NAND, display, etc.)
+> Your concern here is the controller register region that I declared as
+> hard-coded array of resource (xgene_vx_csr_res) is not owned by the
+> root bridge? So unlike DT case where kernel discovers and knows
+> exactly who owns this resource (and we can also use
+> platform_get_resource to get the resource); in ACPI case with ECAM
+> quirk, kernel knows who requests this resource but does not know who
+> owns it? Do I understand correctly?
+
+I think so.  MCFG tells the PCI bridge driver where the ECAM space is.
+But the ACPI core itself doesn't look at MCFG, so it doesn't know that
+space is occupied, and it could potentially assign that space to some
+other device, which would cause a conflict.
+
+> > Can you add a note here in the changelog about how you are describing
+> > this space generically?  The standard solution is a PNP0C02 device
+> > with _CRS that describes it.
+> >
+> > It would be ideal if you could open a bugzilla at bugzilla.kernel.org
+> > and attach there a dmesg log, /proc/iomem contents, and DSDT.  This
+> > would show both the generic PNP0C02 piece and the ECAM quirk piece.
 > 
-> I did not find any 'module' in the H3 documentation.
-> So, is it really a good name?
+> We don't have PNP0C02 device in our ACPI Table. Do you want me add a
+> PNP0C02 device into our firmware and check/document the difference in
+> /proc/iomem output?
 
-It's true that they use it less nowadays, but they still do,
-ie. https://github.com/allwinner-zh/linux-3.4-sunxi/blob/master/drivers/clk/sunxi/clk-sun8iw7.c#L513
+Yes, you should have a PNP0C02 device and its _CRS should describe the
+ECAM space.  _CRS is generic (not device-specific), and it's what
+tells the ACPI core that the space is already in use.
 
-And we have to remain consistent anyway.
+If you already had a PNP0C02 device, you could make a quirk similar to
+quirk_amd_mmconfig_area() to add things to its _CRS.
 
-> > > > > +
-> > > > > +- resets: phandle to the reset of the device
-> > > > > +
-> > > > > +- ports: phandle's to the LCD ports
-> > > > 
-> > > > Please use the OF graph.
-> > > 
-> > > These ports are references to the graph of nodes. See
-> > > 	http://www.kernelhub.org/?msg=911825&p=2
-> > 
-> > In an OF-graph, your phandle to the LCD controller would be replaced
-> > by an output endpoint.
+But I think you have firmware in the field that does not have a
+PNP0C02 device at all, and that's harder to fix because you would need
+to add some sort of fake device.
+
+Rafael, do you have any ideas about this?  I can imagine something
+like the following, but I don't know what cans of worms it might open:
+
+  struct pnp_protocol pnpquirk_protocol = {
+    .name = "Plug and Play Quirks",
+  };
+
+  void quirk()
+  {
+    struct pnp_dev *dev;
+    struct resource res;
+
+    ret = pnp_register_protocol(&pnpquirk_protocol);
+    if (ret)
+      return;
+
+    dev = pnp_alloc_dev(&pnpquirk_protocol, 0, "PNP0C02");
+    if (!dev)
+      return;
+
+    res.start = XX;          /* ECAM start */
+    res.end = YY;            /* ECAM end */
+    res.flags = IORESOURCE_MEM;
+    pnp_add_resource(dev, &res);
+
+    dev->active = 1;
+    pnp_add_device(dev);
+
+    dev_info(&dev->dev, "fabricated device to reserve ECAM space %pR\n", &res);
+  }
+
+> > BTW, I did refresh and re-push the pci/ecam-v6 branch where I'm
+> > collecting this stuff, so if you want to rebase your patch on top of
+> > that and test it, that would be great.
 > 
-> This is the DE controller. There is no endpoint link at this level.
-
-The display engine definitely has an endpoint: the TCON.
-
-> The Device Engine just handles the planes of the LCDs, but, indeed,
-> the LCDs must know about the DE and the DE must know about the LCDs.
-> There are 2 ways to realize this knowledge in the DT:
-> 1) either the DE has one or two phandle's to the LCDs,
-> 2) or the LCDs have a phandle to the DE.
-> 
-> I chose the 1st way, the DE ports pointing to the endpoint of the LCDs
-> which is part of the video link (OF-graph LCD <-> connector).
-> It would be possible to have phandles to the LCDs themselves, but this
-> asks for more code.
-> 
-> The second way is also possible, but it also complexifies a bit the
-> exchanges DE <-> LCD.
-
-I'm still not sure how it would complexify anything, and why you can't
-use the display graph to model the relation between the display engine
-and the TCON (and why you want to use a generic property that refers
-to the of-graph while it really isn't).
-
-> > > > > +void de2_disable_vblank(struct drm_device *drm, unsigned crtc)
-> > > > > +{
-> > > > > +	struct priv *priv = drm->dev_private;
-> > > > > +	struct lcd *lcd = priv->lcds[crtc];
-> > > > > +
-> > > > > +	tcon_write(lcd->mmio, gint0,
-> > > > > +			 tcon_read(lcd->mmio, gint0) &
-> > > > > +					~TCON_GINT0_TCON1_Vb_Int_En);
-> > > > > +}
-> > > > > +
-> > > > > +/* panel functions */
-> > > > 
-> > > > Panel functions? In the CRTC driver?
-> > > 
-> > > Yes, dumb panel.
-> > 
-> > What do you mean by that? Using a Parallel/RGB interface?
-> 
-> Sorry, I though this was a well-known name. The 'dump panel' was used
-> in the documentation of my previous ARM machine as the video frame sent
-> to the HDMI controller. 'video_frame' is OK for you?
-
-If it's the frame sent to the encoder, then it would be the CRTC by
-DRM's nomenclature.
-
-> > > > > +static const struct {
-> > > > > +	char chan;
-> > > > > +	char layer;
-> > > > > +	char pipe;
-> > > > > +} plane2layer[DE2_N_PLANES] = {
-> > > > > +	[DE2_PRIMARY_PLANE] =	{0, 0, 0},
-> > > > > +	[DE2_CURSOR_PLANE] =	{1, 0, 1},
-> > > > > +	[DE2_VI_PLANE] =	{0, 1, 0},
-> > > > > +};
-> > > > 
-> > > > Comments?
-> > > 
-> > > This
-> > > 	primary plane is channel 0 (VI), layer 0, pipe 0
-> > > 	cursor plane is channel 1 (UI), layer 0, pipe 1
-> > > 	overlay plane is channel 0 (VI), layer 1, pipe 0
-> > > or the full explanation:
-> > >     Constraints:
-> > > 	The VI channels can do RGB or YUV, while UI channels can do RGB
-> > > 	only.
-> > > 	The LCD 0 has 1 VI channel and 4 UI channels, while
-> > > 	LCD 1 has only 1 VI channel and 1 UI channel.
-> > > 	The cursor must go to a channel bigger than the primary channel,
-> > > 	otherwise it is not transparent.
-> > >     First try:
-> > > 	Letting the primary plane (usually RGB) in the 2nd channel (UI),
-> > > 	as this is done in the legacy driver, asks for the cursor to go
-> > > 	to the next channel (UI), but this one does not exist in LCD1.
-> > >     Retained layout:
-> > > 	So, we must use only 2 channels for the same behaviour on LCD0
-> > > 	(H3) and LCD1 (A83T)
-> > > 	The retained combination is:
-> > > 		- primary plane in the first channel (VI),
-> > > 		- cursor plane inthe 2nd channel (UI), and
-> > > 		- overlay plane in the 1st channel (VI).
-> > > 
-> > > 	Note that there could be 3 overlay planes (a channel has 4
-> > > 	layers), but I am not sure that the A83T or the H3 could
-> > > 	support 3 simultaneous video streams...
-> > 
-> > Do you know if the pipe works in the old display engine?
-> > 
-> > Especially about the two-steps composition that wouldn't allow you to
-> > have alpha on all the planes?
-> > 
-> > If it is similar, I think hardcoding the pipe number is pretty bad,
-> > because that would restrict the combination of planes and formats,
-> > while some other might have worked.
-> 
-> From what I understood about the DE2, the pipes just define the priority
-> of the overlay channels (one pipe for one channel).
-> With the cursor constraint, there must be at least 2 channels in
-> order (primary, cursor). Then, with these 2 channels/pipes, there can be
-> 6 so-called overlay planes (3 RGB/YUV and 3 RGB only).
-> Enabling the pipes 2 and 3 (LCD 0 only) would offer 8 more planes, but
-> RGB only. Then, it might be useful to have dynamic pipes.
-
-That's very valuable (and definitely should go into a comment),
-thanks!
-
-I still believe that's it should be into a (simple at first)
-atomic_check. That would be easier to extend and quite easy to
-document and get simply by looking at the code.
-
-> > > > > +static int __init de2_drm_init(void)
-> > > > > +{
-> > > > > +	int ret;
-> > > > > +
-> > > > > +/* uncomment to activate the drm traces at startup time */
-> > > > > +/*	drm_debug = DRM_UT_CORE | DRM_UT_DRIVER | DRM_UT_KMS |
-> > > > > +			DRM_UT_PRIME | DRM_UT_ATOMIC; */
-> > > > 
-> > > > That's useless.
-> > > 
-> > > Right, but it seems that some people don't know how to debug a DRM
-> > > driver. This is only a reminder.
-> > > 
-> > > > > +	DRM_DEBUG_DRIVER("\n");
-> > > > > +
-> > > > > +	ret = platform_driver_register(&de2_lcd_platform_driver);
-> > > > > +	if (ret < 0)
-> > > > > +		return ret;
-> > > > > +
-> > > > > +	ret = platform_driver_register(&de2_drm_platform_driver);
-> > > > > +	if (ret < 0)
-> > > > > +		platform_driver_unregister(&de2_lcd_platform_driver);
-> > > > > +
-> > > > > +	return ret;
-> > > > > +}
-> > > > 
-> > > > And that really shouldn't be done that way.
-> > > 
-> > > May you explain?
-> > 
-> > This goes against the whole idea of the device and driver
-> > model. Drivers should only register themselves, device should be
-> > created by buses (or by using some external components if the bus
-> > can't: DT, ACPI, etc.). If there's a match, you get probed.
-> > 
-> > A driver that creates its own device just to probe itself violates
-> > that.
-> 
-> In this function (module init), there is no driver yet.
-> The module contains 2 drivers: the DE (planes) and the LCD (CRTC),
-> and there is no macro to handle such modules.
-
-Ah, yes, my bad. I thought you were registering a device and a
-driver. Still this is a very unusual pattern. Why do you need to split
-the two? Can't you just merge them?
-
-> > > > > +int de2_plane_init(struct drm_device *drm, struct lcd *lcd)
-> > > > > +{
-> > > > > +	int ret, possible_crtcs = 1 << lcd->crtc_idx;
-> > > > > +
-> > > > > +	ret = de2_one_plane_init(drm, &lcd->planes[DE2_PRIMARY_PLANE],
-> > > > > +				DRM_PLANE_TYPE_PRIMARY, possible_crtcs,
-> > > > > +				ui_formats, ARRAY_SIZE(ui_formats));
-> > > > > +	if (ret >= 0)
-> > > > > +		ret = de2_one_plane_init(drm, &lcd->planes[DE2_CURSOR_PLANE],
-> > > > > +				DRM_PLANE_TYPE_CURSOR, possible_crtcs,
-> > > > > +				ui_formats, ARRAY_SIZE(ui_formats));
-> > > > 
-> > > > Nothing looks really special about that cursor plane. Any reasion not
-> > > > to make it an overlay?
-> > > 
-> > > As explained above (channel/layer/pipe plane definitions), the cursor
-> > > cannot go in a channel lower or equal to the one of the primary plane.
-> > > Then, it must be known and, so, have an explicit plane.
-> > 
-> > If you were to make it a plane, you could use atomic_check to check
-> > this and make sure this doesn't happen. And you would gain a generic
-> > plane that can be used for other purposes if needed.
-> 
-> The function drm_crtc_init_with_planes() offers a cursor plane for free.
-> On the other side, having 6 overlay planes is more than the SoCs can
-> support.
-
-It's not really for free, it costs you a generic plane that could
-definitely be used for something else and cannot anymore because
-they've been hardcoded to a cursor.
-
-And having a camera, the VPU or even an application directly output
-directly into one of these planes seems a much better use of a generic
-plane than a cursor.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/1138769a/attachment.sig>
+> Thanks, I will definitely do that.
+> >
+> > > Signed-off-by: Duc Dang <dhdang@apm.com>
+> > > ---
+> > > v2 changes:
+> > >       1. Get rid of pci-xgene-ecam.c file and fold quirk code into pci-xgene.c
+> > >       2. Redefine fixup array for X-Gene
+> > >       3. Use devm_ioremap_resource to map csr_base
+> > >
+> > >  drivers/acpi/pci_mcfg.c      |  30 ++++++++
+> > >  drivers/pci/host/pci-xgene.c | 165 ++++++++++++++++++++++++++++++++++++++++++-
+> > >  include/linux/pci-ecam.h     |   5 ++
+> > >  3 files changed, 197 insertions(+), 3 deletions(-)
+> > >
+> > > diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> > > index bb2c508..9dfc937 100644
+> > > --- a/drivers/acpi/pci_mcfg.c
+> > > +++ b/drivers/acpi/pci_mcfg.c
+> > > @@ -96,6 +96,36 @@ struct mcfg_fixup {
+> > >       THUNDER_ECAM_MCFG(2, 12),
+> > >       THUNDER_ECAM_MCFG(2, 13),
+> > >  #endif
+> > > +#ifdef CONFIG_PCI_XGENE
+> > > +#define XGENE_V1_ECAM_MCFG(rev, seg) \
+> > > +     {"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> > > +             &xgene_v1_pcie_ecam_ops }
+> > > +#define XGENE_V2_1_ECAM_MCFG(rev, seg) \
+> > > +     {"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> > > +             &xgene_v2_1_pcie_ecam_ops }
+> > > +#define XGENE_V2_2_ECAM_MCFG(rev, seg) \
+> > > +     {"APM   ", "XGENE   ", rev, seg, MCFG_BUS_ANY, \
+> > > +             &xgene_v2_2_pcie_ecam_ops }
+> > > +
+> > > +     /* X-Gene SoC with v1 PCIe controller */
+> > > +     XGENE_V1_ECAM_MCFG(1, 0),
+> > > +     XGENE_V1_ECAM_MCFG(1, 1),
+> > > +     XGENE_V1_ECAM_MCFG(1, 2),
+> > > +     XGENE_V1_ECAM_MCFG(1, 3),
+> > > +     XGENE_V1_ECAM_MCFG(1, 4),
+> > > +     XGENE_V1_ECAM_MCFG(2, 0),
+> > > +     XGENE_V1_ECAM_MCFG(2, 1),
+> > > +     XGENE_V1_ECAM_MCFG(2, 2),
+> > > +     XGENE_V1_ECAM_MCFG(2, 3),
+> > > +     XGENE_V1_ECAM_MCFG(2, 4),
+> > > +     /* X-Gene SoC with v2.1 PCIe controller */
+> > > +     XGENE_V2_1_ECAM_MCFG(3, 0),
+> > > +     XGENE_V2_1_ECAM_MCFG(3, 1),
+> > > +     /* X-Gene SoC with v2.2 PCIe controller */
+> > > +     XGENE_V2_2_ECAM_MCFG(4, 0),
+> > > +     XGENE_V2_2_ECAM_MCFG(4, 1),
+> > > +     XGENE_V2_2_ECAM_MCFG(4, 2),
+> > > +#endif
+> > >  };
+> > >
+> > >  static char mcfg_oem_id[ACPI_OEM_ID_SIZE];
+> > > diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+> > > index 1de23d7..d6aa642 100644
+> > > --- a/drivers/pci/host/pci-xgene.c
+> > > +++ b/drivers/pci/host/pci-xgene.c
+> > > @@ -27,6 +27,8 @@
+> > >  #include <linux/of_irq.h>
+> > >  #include <linux/of_pci.h>
+> > >  #include <linux/pci.h>
+> > > +#include <linux/pci-acpi.h>
+> > > +#include <linux/pci-ecam.h>
+> > >  #include <linux/platform_device.h>
+> > >  #include <linux/slab.h>
+> > >
+> > > @@ -64,6 +66,7 @@
+> > >  /* PCIe IP version */
+> > >  #define XGENE_PCIE_IP_VER_UNKN               0
+> > >  #define XGENE_PCIE_IP_VER_1          1
+> > > +#define XGENE_PCIE_IP_VER_2          2
+> > >
+> > >  struct xgene_pcie_port {
+> > >       struct device_node      *node;
+> > > @@ -97,7 +100,15 @@ static inline u32 pcie_bar_low_val(u32 addr, u32 flags)
+> > >   */
+> > >  static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+> > >  {
+> > > -     struct xgene_pcie_port *port = bus->sysdata;
+> > > +     struct pci_config_window *cfg;
+> > > +     struct xgene_pcie_port *port;
+> > > +
+> > > +     if (acpi_disabled)
+> > > +             port = bus->sysdata;
+> > > +     else {
+> > > +             cfg = bus->sysdata;
+> > > +             port = cfg->priv;
+> > > +     }
+> > >
+> > >       if (bus->number >= (bus->primary + 1))
+> > >               return port->cfg_base + AXI_EP_CFG_ACCESS;
+> > > @@ -111,10 +122,18 @@ static void __iomem *xgene_pcie_get_cfg_base(struct pci_bus *bus)
+> > >   */
+> > >  static void xgene_pcie_set_rtdid_reg(struct pci_bus *bus, uint devfn)
+> > >  {
+> > > -     struct xgene_pcie_port *port = bus->sysdata;
+> > > +     struct pci_config_window *cfg;
+> > > +     struct xgene_pcie_port *port;
+> > >       unsigned int b, d, f;
+> > >       u32 rtdid_val = 0;
+> > >
+> > > +     if (acpi_disabled)
+> > > +             port = bus->sysdata;
+> > > +     else {
+> > > +             cfg = bus->sysdata;
+> > > +             port = cfg->priv;
+> > > +     }
+> > > +
+> > >       b = bus->number;
+> > >       d = PCI_SLOT(devfn);
+> > >       f = PCI_FUNC(devfn);
+> > > @@ -158,7 +177,15 @@ static void __iomem *xgene_pcie_map_bus(struct pci_bus *bus, unsigned int devfn,
+> > >  static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+> > >                                   int where, int size, u32 *val)
+> > >  {
+> > > -     struct xgene_pcie_port *port = bus->sysdata;
+> > > +     struct pci_config_window *cfg;
+> > > +     struct xgene_pcie_port *port;
+> > > +
+> > > +     if (acpi_disabled)
+> > > +             port = bus->sysdata;
+> > > +     else {
+> > > +             cfg = bus->sysdata;
+> > > +             port = cfg->priv;
+> > > +     }
+> > >
+> > >       if (pci_generic_config_read32(bus, devfn, where & ~0x3, 4, val) !=
+> > >           PCIBIOS_SUCCESSFUL)
+> > > @@ -189,6 +216,138 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
+> > >       .write = pci_generic_config_write32,
+> > >  };
+> > >
+> > > +#ifdef CONFIG_ACPI
+> > > +static struct resource xgene_v1_csr_res[] = {
+> > > +     [0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
+> > > +     [1] = DEFINE_RES_MEM(0x1f2c0000UL, SZ_64K),
+> > > +     [2] = DEFINE_RES_MEM(0x1f2d0000UL, SZ_64K),
+> > > +     [3] = DEFINE_RES_MEM(0x1f500000UL, SZ_64K),
+> > > +     [4] = DEFINE_RES_MEM(0x1f510000UL, SZ_64K),
+> > > +};
+> > > +
+> > > +static int xgene_v1_pcie_ecam_init(struct pci_config_window *cfg)
+> > > +{
+> > > +     struct acpi_device *adev = to_acpi_device(cfg->parent);
+> > > +     struct acpi_pci_root *root = acpi_driver_data(adev);
+> > > +     struct device *dev = cfg->parent;
+> > > +     struct xgene_pcie_port *port;
+> > > +     struct resource *csr;
+> > > +
+> > > +     port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> > > +     if (!port)
+> > > +             return -ENOMEM;
+> > > +
+> > > +     csr = &xgene_v1_csr_res[root->segment];
+> > > +     port->csr_base = devm_ioremap_resource(dev, csr);
+> > > +     if (IS_ERR(port->csr_base)) {
+> > > +             kfree(port);
+> > > +             return -ENOMEM;
+> > > +     }
+> > > +
+> > > +     port->cfg_base = cfg->win;
+> > > +     port->version = XGENE_PCIE_IP_VER_1;
+> > > +
+> > > +     cfg->priv = port;
+> > > +
+> > > +     return 0;
+> > > +}
+> > > +
+> > > +struct pci_ecam_ops xgene_v1_pcie_ecam_ops = {
+> > > +     .bus_shift      = 16,
+> > > +     .init           = xgene_v1_pcie_ecam_init,
+> > > +     .pci_ops        = {
+> > > +             .map_bus        = xgene_pcie_map_bus,
+> > > +             .read           = xgene_pcie_config_read32,
+> > > +             .write          = pci_generic_config_write,
+> > > +     }
+> > > +};
+> > > +
+> > > +static struct resource xgene_v2_1_csr_res[] = {
+> > > +     [0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
+> > > +     [1] = DEFINE_RES_MEM(0x1f2c0000UL, SZ_64K),
+> > > +};
+> > > +
+> > > +static int xgene_v2_1_pcie_ecam_init(struct pci_config_window *cfg)
+> > > +{
+> > > +     struct acpi_device *adev = to_acpi_device(cfg->parent);
+> > > +     struct acpi_pci_root *root = acpi_driver_data(adev);
+> > > +     struct device *dev = cfg->parent;
+> > > +     struct xgene_pcie_port *port;
+> > > +     struct resource *csr;
+> > > +
+> > > +     port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> > > +     if (!port)
+> > > +             return -ENOMEM;
+> > > +
+> > > +     csr = &xgene_v2_1_csr_res[root->segment];
+> > > +     port->csr_base = devm_ioremap_resource(dev, csr);
+> > > +     if (IS_ERR(port->csr_base)) {
+> > > +             kfree(port);
+> > > +             return -ENOMEM;
+> > > +     }
+> > > +
+> > > +     port->cfg_base = cfg->win;
+> > > +     port->version = XGENE_PCIE_IP_VER_2;
+> > > +
+> > > +     cfg->priv = port;
+> > > +
+> > > +     return 0;
+> > > +}
+> > > +
+> > > +struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops = {
+> > > +     .bus_shift      = 16,
+> > > +     .init           = xgene_v2_1_pcie_ecam_init,
+> > > +     .pci_ops        = {
+> > > +             .map_bus        = xgene_pcie_map_bus,
+> > > +             .read           = xgene_pcie_config_read32,
+> > > +             .write          = pci_generic_config_write,
+> > > +     }
+> > > +};
+> > > +
+> > > +static struct resource xgene_v2_2_csr_res[] = {
+> > > +     [0] = DEFINE_RES_MEM(0x1f2b0000UL, SZ_64K),
+> > > +     [1] = DEFINE_RES_MEM(0x1f500000UL, SZ_64K),
+> > > +     [2] = DEFINE_RES_MEM(0x1f2d0000UL, SZ_64K),
+> > > +};
+> > > +
+> > > +static int xgene_v2_2_pcie_ecam_init(struct pci_config_window *cfg)
+> > > +{
+> > > +     struct acpi_device *adev = to_acpi_device(cfg->parent);
+> > > +     struct acpi_pci_root *root = acpi_driver_data(adev);
+> > > +     struct device *dev = cfg->parent;
+> > > +     struct xgene_pcie_port *port;
+> > > +     struct resource *csr;
+> > > +
+> > > +     port = devm_kzalloc(dev, sizeof(*port), GFP_KERNEL);
+> > > +     if (!port)
+> > > +             return -ENOMEM;
+> > > +
+> > > +     csr = &xgene_v2_2_csr_res[root->segment];
+> > > +     port->csr_base = devm_ioremap_resource(dev, csr);
+> > > +     if (IS_ERR(port->csr_base)) {
+> > > +             kfree(port);
+> > > +             return -ENOMEM;
+> > > +     }
+> > > +
+> > > +     port->cfg_base = cfg->win;
+> > > +     port->version = XGENE_PCIE_IP_VER_2;
+> > > +
+> > > +     cfg->priv = port;
+> > > +
+> > > +     return 0;
+> > > +}
+> > > +
+> > > +struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops = {
+> > > +     .bus_shift      = 16,
+> > > +     .init           = xgene_v2_2_pcie_ecam_init,
+> > > +     .pci_ops        = {
+> > > +             .map_bus        = xgene_pcie_map_bus,
+> > > +             .read           = xgene_pcie_config_read32,
+> > > +             .write          = pci_generic_config_write,
+> > > +     }
+> > > +};
+> > > +#endif
+> > > +
+> > >  static u64 xgene_pcie_set_ib_mask(struct xgene_pcie_port *port, u32 addr,
+> > >                                 u32 flags, u64 size)
+> > >  {
+> > > diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+> > > index 35f0e81..40da3e7 100644
+> > > --- a/include/linux/pci-ecam.h
+> > > +++ b/include/linux/pci-ecam.h
+> > > @@ -65,6 +65,11 @@ void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+> > >  #ifdef CONFIG_PCI_HOST_THUNDER_ECAM
+> > >  extern struct pci_ecam_ops pci_thunder_ecam_ops;
+> > >  #endif
+> > > +#ifdef CONFIG_PCI_XGENE
+> > > +extern struct pci_ecam_ops xgene_v1_pcie_ecam_ops;
+> > > +extern struct pci_ecam_ops xgene_v2_1_pcie_ecam_ops;
+> > > +extern struct pci_ecam_ops xgene_v2_2_pcie_ecam_ops;
+> > > +#endif
+> > >
+> > >  #ifdef CONFIG_PCI_HOST_GENERIC
+> > >  /* for DT-based PCI controllers that support ECAM */
+> > > --
+> > > 1.9.1
+> > >
+> Regards,
+> Duc Dang.
