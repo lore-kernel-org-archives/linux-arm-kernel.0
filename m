@@ -1,79 +1,89 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Nov 2016 15:39:31 +0530
-Subject: [PATCH 1/6] mfd: max8997: Initialize max8997 register map
+Date: Mon, 07 Nov 2016 15:39:32 +0530
+Subject: [PATCH 2/6] dt-bindings: clk: max8997: Add DT binding documentation
 In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1478513376-14307-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478513376-14307-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add regmap initialization to use register map
-in max8997-clk device driver
+Add Device Tree binding documentation for the clocks
+outputs in the Maxim-8997 Power Management IC.
 
-CC: Lee Jones <lee.jones@linaro.org>
+CC: Michael Turquette <mturquette@baylibre.com>
+CC: Rob Herring <robh+dt@kernel.org>
+CC: devicetree at vger.kernel.org
+CC: linux-clk at vger.kernel.org
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/mfd/max8997.c               | 14 ++++++++++++++
- include/linux/mfd/max8997-private.h |  3 +++
- 2 files changed, 17 insertions(+)
+ .../devicetree/bindings/clock/maxim,max8997.txt    | 44 ++++++++++++++++++++++
+ .../bindings/regulator/max8997-regulator.txt       |  3 ++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
 
-diff --git a/drivers/mfd/max8997.c b/drivers/mfd/max8997.c
-index 2d6e2c3..bda9ec8 100644
---- a/drivers/mfd/max8997.c
-+++ b/drivers/mfd/max8997.c
-@@ -175,11 +175,17 @@ static inline unsigned long max8997_i2c_get_driver_data(struct i2c_client *i2c,
- 	return id->driver_data;
- }
- 
-+static const struct regmap_config max8997_regmap_config = {
-+	.reg_bits = 8,
-+	.val_bits = 8,
-+};
+diff --git a/Documentation/devicetree/bindings/clock/maxim,max8997.txt b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
+new file mode 100644
+index 0000000..d2e2a74
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
+@@ -0,0 +1,44 @@
++Binding for Maxim MAX8997 32k clock generator block
 +
- static int max8997_i2c_probe(struct i2c_client *i2c,
- 			    const struct i2c_device_id *id)
- {
- 	struct max8997_dev *max8997;
- 	struct max8997_platform_data *pdata = dev_get_platdata(&i2c->dev);
-+	const struct regmap_config *config = &max8997_regmap_config;
- 	int ret = 0;
- 
- 	max8997 = devm_kzalloc(&i2c->dev, sizeof(struct max8997_dev),
-@@ -202,6 +208,14 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
- 	if (!pdata)
- 		return ret;
- 
-+	max8997->regmap = devm_regmap_init_i2c(i2c, config);
-+	if (IS_ERR(max8997->regmap)) {
-+		ret = PTR_ERR(max8997->regmap);
-+		dev_err(max8997->dev, "Failed to allocate register map: %d\n",
-+				ret);
-+		return ret;
-+	}
++This is a part of device tree bindings of MAX8997 multi-function device.
++More information can be found in bindings/regulator/max8997-regulator.txt file.
 +
- 	max8997->pdata = pdata;
- 	max8997->ono = pdata->ono;
- 
-diff --git a/include/linux/mfd/max8997-private.h b/include/linux/mfd/max8997-private.h
-index 78c76cd..50c7129 100644
---- a/include/linux/mfd/max8997-private.h
-+++ b/include/linux/mfd/max8997-private.h
-@@ -25,6 +25,7 @@
- #include <linux/i2c.h>
- #include <linux/export.h>
- #include <linux/irqdomain.h>
-+#include <linux/regmap.h>
- 
- #define MAX8997_REG_INVALID	(0xff)
- 
-@@ -388,6 +389,8 @@ struct max8997_dev {
- 	struct mutex iolock;
- 
- 	unsigned long type;
++The MAX8997 contains two 32.768khz clock outputs that can be controlled
++(gated/ungated) over I2C.
 +
-+	struct regmap *regmap;
- 	struct platform_device *battery; /* battery control (not fuel gauge) */
++Following properties should be presend in main device node of the MFD chip.
++
++Required properties:
++
++- #clock-cells: from common clock binding; shall be set to 1.
++
++Optional properties:
++- clock-output-names: From common clock binding.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. Following indices are allowed:
++    - 0: 32khz_ap clock,
++    - 1: 32khz_cp clock,
++
++Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max8997.h
++header and can be used in device tree sources.
++
++Example: Node of the MFD chip
++
++	max8997: max8997_pmic at 66 {
++		compatible = "maxim,max8997-pmic";
++		reg = <0x66>;
++		interrupt-parent = <&gpx0>;
++		interrupts = <4 0>, <3 0>;
++		#clock-cells = <1>;
++		/* ... */
++	};
++
++Example: Clock consumer node
++
++	foo at 0 {
++		compatible = "bar,foo";
++		/* ... */
++		clocks = <&max8997 MAX8997_CLK_AP>;
++		clock-names = "my-clock";
++	};
+diff --git a/Documentation/devicetree/bindings/regulator/max8997-regulator.txt b/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
+index 5c186a7..af1f9c0 100644
+--- a/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
+@@ -6,6 +6,9 @@ interfaced to the host controller using a i2c interface. Each sub-block is
+ addressed by the host system using different i2c slave address. This document
+ describes the bindings for 'pmic' sub-block of max8997.
  
- 	int irq;
++Binding for the built-in 32k clock generator block is defined separately
++in bindings/clk/maxim,max8997.txt file
++
+ Required properties:
+ - compatible: Should be "maxim,max8997-pmic".
+ - reg: Specifies the i2c slave address of the pmic block. It should be 0x66.
 -- 
 2.7.4
