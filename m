@@ -1,35 +1,31 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 7 Nov 2016 13:14:40 +0100
-Subject: [PATCH v2 0/2] mmc: sdhci-iproc: Add byte register access support
-In-Reply-To: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
-References: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <CAPDyKFrWffNpwvXA7Yj2=t_9g-ikJnhpwqMpTp3+jCu1A9FRnQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 7 Nov 2016 10:15:19 -0200
+Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
+ reset
+In-Reply-To: <1478514883.12872.2.camel@pengutronix.de>
+References: <1427377198.3378.16.camel@pengutronix.de>
+ <20161106153117.GA22538@frolo.macqel>
+ <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
+ <1478514883.12872.2.camel@pengutronix.de>
+Message-ID: <CAOMZO5C+3rCnpQvonXyDaMmUxsDYAnXRBXrUwbP3AT5TbofSgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2016 at 17:37, Scott Branden <scott.branden@broadcom.com> wrote:
-> Add brcm,sdhci-iproc compat string and code for support of newer versions of
-> sdhci-iproc controller that allow byte-wise register accesses.
->
-> Changes from v1:
-> - added details to bindings documentation to clarify usage of brcm,sdhci-iproc
-> compatibility string
->
-> Scott Branden (2):
->   mmc: sdhci-iproc: Add brcm,sdhci-iproc compat string in bindings
->     document
->   mmc: sdhci-iproc: support standard byte register accesses
->
->  .../devicetree/bindings/mmc/brcm,sdhci-iproc.txt   |  9 ++++++
->  drivers/mmc/host/sdhci-iproc.c                     | 35 ++++++++++++++++++++--
->  2 files changed, 42 insertions(+), 2 deletions(-)
->
-> --
-> 2.5.0
->
+Hi Lucas,
 
-It seems I had already applied v1 of this series. I have dropped those
-now, waiting to receive an ack from Rob first.
+On Mon, Nov 7, 2016 at 8:34 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-Kind regards
-Uffe
+> The problem is definitely present in current mainline Linux. I intent to
+> remove this workaround from the kernel, but we need to make sure that
+> the bootloader properly disables PCIe before jumping to the kernel
+> image.
+>
+> I don't know what the status of this is in U-Boot, but Barebox already
+> does this correctly.
+>
+> Fabio, would you mind to port this coed to U-Boot, or at least check if
+> it does the right thing?
+
+Sure, could you point me to the Barebox fix so I can take a look?
+
+Thanks
