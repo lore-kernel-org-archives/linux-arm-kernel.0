@@ -1,75 +1,128 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 7 Nov 2016 16:30:05 +0000
-Subject: [PATCH 2/3] arm64/setup: Use ID_AA64ISAR0_EL1_.* macros
-In-Reply-To: <1441303972-9480-1-git-send-email-kuleshovmail@gmail.com>
-References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
- <1441303972-9480-1-git-send-email-kuleshovmail@gmail.com>
-Message-ID: <f1ea41d9-6e34-11a4-9bd0-caaecc606ae6@arm.com>
+From: Frank.Li@nxp.com (Frank Li)
+Date: Mon, 7 Nov 2016 11:30:48 -0600
+Subject: [PATCH V3 1/2] ARM: imx: mmdc perf function support i.MX6QP
+Message-ID: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/15 19:12, Alexander Kuleshov wrote:
-> The 26d75e67c commit (arm64/cpufeature.h: Add macros for a cpu features
-> testing) provides set of macros for the testing processor's crypto features.
-> Let's use these macros instead of direct calculation.
->
+i.MX6QP added new register bit PROFILE_SEL in MADPCR0.
+need set it at perf start.
 
+Signed-off-by: Frank Li <Frank.Li@nxp.com>
+---
+Change from V2 - V3
+- Use MMDC_FLAG_PROFILE_SEL
+- Use flags instead of driver_data
+- fix commit message typo
+- add const
+- use u32 val.
+Change from V1 - V2
+- remove fsl_mmdc_devtype
 
+ arch/arm/mach-imx/mmdc.c | 38 ++++++++++++++++++++++++++++++++------
+ 1 file changed, 32 insertions(+), 6 deletions(-)
 
-> Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
-> ---
->  arch/arm64/kernel/setup.c | 29 +++++++++--------------------
->  1 file changed, 9 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 926ae8d..a3faf4f 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-
-This patch doesn't apply on the current mainline tree. Where does this patch apply ?
-The elf_hwcap calculation has been moved to a separate function setup_elf_hwcaps()
-in arch/arm64/kernel/cpufeature.c,  which makes uses of a table of arm64_cpu_capabilities.
-
-Suzuki
-
-> @@ -250,33 +250,22 @@ static void __init setup_processor(void)
->
->  	/*
->  	 * ID_AA64ISAR0_EL1 contains 4-bit wide signed feature blocks.
-> -	 * The blocks we test below represent incremental functionality
-> -	 * for non-negative values. Negative values are reserved.
->  	 */
->  	features = read_cpuid(ID_AA64ISAR0_EL1);
-> -	block = (features >> 4) & 0xf;
-> -	if (!(block & 0x8)) {
-> -		switch (block) {
-> -		default:
-> -		case 2:
-> -			elf_hwcap |= HWCAP_PMULL;
-> -		case 1:
-> -			elf_hwcap |= HWCAP_AES;
-> -		case 0:
-> -			break;
-> -		}
-> -	}
->
-> -	block = (features >> 8) & 0xf;
-> -	if (block && !(block & 0x8))
-> +	if (ID_AA64ISAR0_EL1_AES(features))
-> +		elf_hwcap |= HWCAP_AES;
-> +
-> +	if (ID_AA64ISAR0_EL1_PMULL(features))
-> +		elf_hwcap |= HWCAP_PMULL;
-> +
-> +	if (ID_AA64ISAR0_EL1_SHA1(features))
->  		elf_hwcap |= HWCAP_SHA1;
->
-> -	block = (features >> 12) & 0xf;
-> -	if (block && !(block & 0x8))
-> +	if (ID_AA64ISAR0_EL1_SHA2(features))
->  		elf_hwcap |= HWCAP_SHA2;
->
-> -	block = (features >> 16) & 0xf;
-> -	if (block && !(block & 0x8))
-> +	if (ID_AA64ISAR0_EL1_CRC32(features))
->  		elf_hwcap |= HWCAP_CRC32;
+diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+index d82d14c..ba96bf9 100644
+--- a/arch/arm/mach-imx/mmdc.c
++++ b/arch/arm/mach-imx/mmdc.c
+@@ -44,6 +44,7 @@
+ #define DBG_RST			0x2
+ #define PRF_FRZ			0x4
+ #define CYC_OVF			0x8
++#define PROFILE_SEL		0x10
+ 
+ #define MMDC_MADPCR0	0x410
+ #define MMDC_MADPSR0	0x418
+@@ -55,10 +56,29 @@
+ 
+ #define MMDC_NUM_COUNTERS	6
+ 
++#define MMDC_FLAG_PROFILE_SEL	0x1
++
+ #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
+ 
+ static int ddr_type;
+ 
++struct fsl_mmdc_devtype_data {
++	unsigned int flags;
++};
++
++static const struct fsl_mmdc_devtype_data imx6q_data = {
++};
++
++static const struct fsl_mmdc_devtype_data imx6qp_data = {
++	.flags = MMDC_FLAG_PROFILE_SEL,
++};
++
++static const struct of_device_id imx_mmdc_dt_ids[] = {
++	{ .compatible = "fsl,imx6q-mmdc", .data = (void *)&imx6q_data},
++	{ .compatible = "fsl,imx6qp-mmdc", .data = (void *)&imx6qp_data},
++	{ /* sentinel */ }
++};
++
+ #ifdef CONFIG_PERF_EVENTS
+ 
+ static DEFINE_IDA(mmdc_ida);
+@@ -83,6 +103,7 @@ struct mmdc_pmu {
+ 	struct device *dev;
+ 	struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
+ 	struct hlist_node node;
++	struct fsl_mmdc_devtype_data *devtype_data;
+ };
+ 
+ /*
+@@ -307,6 +328,7 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+ 	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	void __iomem *mmdc_base, *reg;
++	u32 val;
+ 
+ 	mmdc_base = pmu_mmdc->mmdc_base;
+ 	reg = mmdc_base + MMDC_MADPCR0;
+@@ -321,7 +343,12 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
+ 	local64_set(&hwc->prev_count, 0);
+ 
+ 	writel(DBG_RST, reg);
+-	writel(DBG_EN, reg);
++
++	val = DBG_EN;
++	if (pmu_mmdc->devtype_data->flags & MMDC_FLAG_PROFILE_SEL)
++		val |= PROFILE_SEL;
++
++	writel(val, reg);
+ }
+ 
+ static int mmdc_pmu_event_add(struct perf_event *event, int flags)
+@@ -436,6 +463,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+ 	char *name;
+ 	int mmdc_num;
+ 	int ret;
++	const struct of_device_id *of_id =
++		of_match_device(imx_mmdc_dt_ids, &pdev->dev);
+ 
+ 	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
+ 	if (!pmu_mmdc) {
+@@ -450,6 +479,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
+ 		name = devm_kasprintf(&pdev->dev,
+ 				GFP_KERNEL, "mmdc%d", mmdc_num);
+ 
++	pmu_mmdc->devtype_data = (struct fsl_mmdc_devtype_data *)of_id->data;
++
+ 	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
+ 			HRTIMER_MODE_REL);
+ 	pmu_mmdc->hrtimer.function = mmdc_pmu_timer_handler;
+@@ -524,11 +555,6 @@ int imx_mmdc_get_ddr_type(void)
+ 	return ddr_type;
+ }
+ 
+-static const struct of_device_id imx_mmdc_dt_ids[] = {
+-	{ .compatible = "fsl,imx6q-mmdc", },
+-	{ /* sentinel */ }
+-};
+-
+ static struct platform_driver imx_mmdc_driver = {
+ 	.driver		= {
+ 		.name	= "imx-mmdc",
+-- 
+2.5.2
