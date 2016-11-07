@@ -1,130 +1,47 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Sun,  6 Nov 2016 17:13:25 -0700
-Subject: [PATCH 3/4] fpga mgr: zynq: Add support for encrypted bitstreams
-In-Reply-To: <20161107001326.7395-1-moritz.fischer@ettus.com>
-References: <20161107001326.7395-1-moritz.fischer@ettus.com>
-Message-ID: <20161107001326.7395-4-moritz.fischer@ettus.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 7 Nov 2016 02:30:08 +0200
+Subject: [PATCH 13/22] mtd: nand: lpc32xx: return error code of
+ nand_scan_ident/tail() on error
+In-Reply-To: <20161106192743.00e401ec@bbrezillon>
+References: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
+ <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
+ <20161106192743.00e401ec@bbrezillon>
+Message-ID: <c9983167-cedd-3246-ccb8-54aad229e275@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new flag FPGA_MGR_DECRYPT_BISTREAM as well as a matching
-capability FPGA_MGR_CAP_DECRYPT to allow for on-the-fly
-decryption of an encrypted bitstream.
+Hi Boris,
 
-If the system is not booted in secure mode AES & HMAC units
-are disabled by the boot ROM, therefore the capability
-is not available.
+On 11/06/2016 08:27 PM, Boris Brezillon wrote:
+> On Fri,  4 Nov 2016 19:43:01 +0900
+> Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+>
+>> The nand_scan_ident/tail() returns an appropriate error value when
+>> it fails.  Use it instead of the fixed error code -ENXIO.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> ---
 
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-Cc: Alan Tull <atull@opensource.altera.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/fpga/fpga-mgr.c       |  7 +++++++
- drivers/fpga/zynq-fpga.c      | 21 +++++++++++++++++++--
- include/linux/fpga/fpga-mgr.h |  2 ++
- 3 files changed, 28 insertions(+), 2 deletions(-)
+[snip]
 
-diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-index 98230b7..e4d08e1 100644
---- a/drivers/fpga/fpga-mgr.c
-+++ b/drivers/fpga/fpga-mgr.c
-@@ -61,6 +61,12 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
- 		return -ENOTSUPP;
- 	}
- 
-+	if (flags & FPGA_MGR_DECRYPT_BITSTREAM &&
-+	    !fpga_mgr_has_cap(FPGA_MGR_CAP_DECRYPT, mgr->caps)) {
-+		dev_err(dev, "Bitstream decryption not supported\n");
-+		return -ENOTSUPP;
-+	}
-+
- 	/*
- 	 * Call the low level driver's write_init function.  This will do the
- 	 * device-specific things to get the FPGA into the state where it is
-@@ -170,6 +176,7 @@ static const char * const state_str[] = {
- static const char * const cap_str[] = {
- 	[FPGA_MGR_CAP_FULL_RECONF] = "Full reconfiguration",
- 	[FPGA_MGR_CAP_PARTIAL_RECONF] = "Partial reconfiguration",
-+	[FPGA_MGR_CAP_DECRYPT] = "Decrypt bitstream on the fly",
- };
- 
- static ssize_t name_show(struct device *dev,
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index 1d37ff0..0aa4705 100644
---- a/drivers/fpga/zynq-fpga.c
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -71,6 +71,10 @@
- #define CTRL_PCAP_PR_MASK		BIT(27)
- /* Enable PCAP */
- #define CTRL_PCAP_MODE_MASK		BIT(26)
-+/* Needed to reduce clock rate for secure config */
-+#define CTRL_PCAP_RATE_EN_MASK		BIT(25)
-+/* System booted in secure mode */
-+#define CTRL_SEC_EN_MASK		BIT(7)
- 
- /* Miscellaneous Control Register bit definitions */
- /* Internal PCAP loopback */
-@@ -252,12 +256,20 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
- 
- 	/* set configuration register with following options:
- 	 * - enable PCAP interface
--	 * - set throughput for maximum speed
-+	 * - set throughput for maximum speed (if we're not decrypting)
- 	 * - set CPU in user mode
- 	 */
- 	ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
--	zynq_fpga_write(priv, CTRL_OFFSET,
-+	if (flags & FPGA_MGR_DECRYPT_BITSTREAM) {
-+		zynq_fpga_write(priv, CTRL_OFFSET,
-+			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK |
-+			 CTRL_PCAP_RATE_EN_MASK | ctrl));
-+
-+	} else {
-+		ctrl &= ~CTRL_PCAP_RATE_EN_MASK;
-+		zynq_fpga_write(priv, CTRL_OFFSET,
- 			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK | ctrl));
-+	}
- 
- 	/* check that we have room in the command queue */
- 	status = zynq_fpga_read(priv, STATUS_OFFSET);
-@@ -412,6 +424,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	fpga_mgr_cap_mask_t caps;
- 	int err;
-+	u32 tmp;
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
-@@ -466,6 +479,10 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
- 	fpga_mgr_cap_set(FPGA_MGR_CAP_PARTIAL_RECONF, caps);
- 
-+	/* only works if we booted in secure mode */
-+	tmp = zynq_fpga_read(priv, CTRL_OFFSET);
-+	if (tmp & CTRL_SEC_EN_MASK)
-+		fpga_mgr_cap_set(FPGA_MGR_CAP_DECRYPT, caps);
- 
- 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
- 				&zynq_fpga_ops, caps, priv);
-diff --git a/include/linux/fpga/fpga-mgr.h b/include/linux/fpga/fpga-mgr.h
-index 9bb96a5..aabe258 100644
---- a/include/linux/fpga/fpga-mgr.h
-+++ b/include/linux/fpga/fpga-mgr.h
-@@ -68,10 +68,12 @@ enum fpga_mgr_states {
-  */
- #define FPGA_MGR_PARTIAL_RECONFIG	BIT(0)
- #define FPGA_MGR_FULL_RECONFIG		BIT(1)
-+#define FPGA_MGR_DECRYPT_BITSTREAM	BIT(2)
- 
- enum fpga_mgr_capability {
- 	FPGA_MGR_CAP_PARTIAL_RECONF,
- 	FPGA_MGR_CAP_FULL_RECONF,
-+	FPGA_MGR_CAP_DECRYPT,
- 
- /* last capability type for creation of the capabilities mask */
- 	FPGA_MGR_CAP_END,
--- 
-2.10.0
+>> -	if (nand_scan_tail(mtd)) {
+>> -		res = -ENXIO;
+>> +	res = nand_scan_tail(mtd);
+>
+> You miss
+>
+> 	if (res)
+>
+> here.
+>
+> No need to resend, I'll fix it when applying the patches.
+>
+>>  		goto err_exit3;
+>> -	}
+>>
+
+nice catch, thank you for noticing and fixing the overlooked bug!
+
+--
+With best wishes,
+Vladimir
