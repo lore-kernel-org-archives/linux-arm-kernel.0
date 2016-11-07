@@ -1,72 +1,136 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 7 Nov 2016 13:55:29 +0000
-Subject: [PATCH 2/6] clk: stm32f4: SDIO & 48Mhz clock management for
- STM32F469 board
-In-Reply-To: <1478523943-23142-3-git-send-email-gabriel.fernandez@st.com>
-References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
- <1478523943-23142-3-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <45a332b6-5170-9ae3-8d5e-c5f827c3edea@linaro.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 7 Nov 2016 13:57:35 +0000
+Subject: [PATCH v10 01/11] remoteproc: st_slim_rproc: add a slimcore
+ rproc driver
+In-Reply-To: <20161103213703.GA15449@tuxbot>
+References: <1476783556-2501-1-git-send-email-peter.griffin@linaro.org>
+ <1476783556-2501-2-git-send-email-peter.griffin@linaro.org>
+ <20161103213703.GA15449@tuxbot>
+Message-ID: <20161107135735.GA27280@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/16 13:05, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->
-> In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
-> from pll-sai-p.
->
-> The SDIO clock could be also derived from 48Mhz or from sys clock.
->
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->  drivers/clk/clk-stm32f4.c | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-> index 7641acd..dda15bc 100644
-> --- a/drivers/clk/clk-stm32f4.c
-> +++ b/drivers/clk/clk-stm32f4.c
-> @@ -199,7 +199,7 @@ struct stm32f4_gate_data {
->  	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
->  	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
->  	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
-> -	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
-> +	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"sdmux" },
+Hi Bjorn,
 
-I'm confused. How do the "sdmux" clock come to exist on STM32F429?
+On Thu, 03 Nov 2016, Bjorn Andersson wrote:
 
+> On Tue 18 Oct 02:39 PDT 2016, Peter Griffin wrote:
+> 
+> > slim core is used as a basis for many IPs in the STi
+> > chipsets such as fdma and demux. To avoid duplicating
+> > the elf loading code in each device driver a slim
+> > rproc driver has been created.
+> > 
+> > This driver is designed to be used by other device drivers
+> > such as fdma, or demux whose IP is based around a slim core.
+> > The device driver can call slim_rproc_alloc() to allocate
+> > a slim rproc and slim_rproc_put() when finished.
+> > 
+> > This driver takes care of ioremapping the slim
+> > registers (dmem, imem, slimcore, peripherals), whose offsets
+> > and sizes can change between IP's. It also obtains and enables
+> > any clocks used by the device. This approach avoids having
+> > a double mapping of the registers as slim_rproc does not register
+> > its own platform device. It also maps well to device tree
+> > abstraction as it allows us to have one dt node for the whole
+> > device.
+> > 
+> > All of the generic rproc elf loading code can be reused, and
+> > we provide start() stop() hooks to start and stop the slim
+> > core once the firmware has been loaded. This has been tested
+> > successfully with fdma driver.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  drivers/remoteproc/Kconfig               |   7 +-
+> >  drivers/remoteproc/Makefile              |   1 +
+> >  drivers/remoteproc/st_slim_rproc.c       | 364 +++++++++++++++++++++++++++++++
+> >  include/linux/remoteproc/st_slim_rproc.h |  58 +++++
+> >  4 files changed, 428 insertions(+), 2 deletions(-)
+> >  create mode 100644 drivers/remoteproc/st_slim_rproc.c
+> >  create mode 100644 include/linux/remoteproc/st_slim_rproc.h
+> > 
+> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> > index f396bfe..9270c8e 100644
+> > --- a/drivers/remoteproc/Kconfig
+> > +++ b/drivers/remoteproc/Kconfig
+> > @@ -58,7 +58,6 @@ config DA8XX_REMOTEPROC
+> >  	tristate "DA8xx/OMAP-L13x remoteproc support"
+> >  	depends on ARCH_DAVINCI_DA8XX
+> >  	select CMA if MMU
+> > -	select REMOTEPROC
+> 
+> No, this is an unrelated change to this patch.
 
->  	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
->  	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
->  	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
-> @@ -940,6 +940,10 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
->  	"no-clock", "lse", "lsi", "hse-rtc"
->  };
->
-> +static const char *pll48_parents[2] = { "pll-q", "pllsai-p" };
-> +
-> +static const char *sdmux_parents[2] = { "pll48", "sys" };
-> +
->  struct stm32f4_clk_data {
->  	const struct stm32f4_gate_data *gates_data;
->  	const u64 *gates_map;
-> @@ -1109,6 +1113,18 @@ static void __init stm32f4_rcc_init(struct device_node *np)
->  		goto fail;
->  	}
->
-> +	if (of_device_is_compatible(np, "st,stm32f469-rcc")) {
-> +		clk_hw_register_mux_table(NULL, "pll48",
-> +				pll48_parents, ARRAY_SIZE(pll48_parents), 0,
-> +				base + STM32F4_RCC_DCKCFGR, 27, 1, 0, NULL,
-> +				&stm32f4_clk_lock);
-> +
-> +		clk_hw_register_mux_table(NULL, "sdmux",
-> +				sdmux_parents, ARRAY_SIZE(sdmux_parents), 0,
-> +				base + STM32F4_RCC_DCKCFGR, 28, 1, 0, NULL,
-> +				&stm32f4_clk_lock);
-> +	}
-> +
->  	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
->  	return;
->  fail:
->
+Sorry that crept in as part of the rebase. Will fix.
+> 
+> >  	select RPMSG_VIRTIO
+> >  	help
+> >  	  Say y here to support DA8xx/OMAP-L13x remote processors via the
+> > @@ -99,10 +98,10 @@ config QCOM_WCNSS_PIL
+> >  	tristate "Qualcomm WCNSS Peripheral Image Loader"
+> >  	depends on OF && ARCH_QCOM
+> >  	depends on QCOM_SMEM
+> > +	depends on REMOTEPROC
+> >  	select QCOM_MDT_LOADER
+> >  	select QCOM_SCM
+> >  	select QCOM_WCNSS_IRIS
+> > -	select REMOTEPROC
+> 
+> Dito.
+
+Will fix.
+
+> 
+> 
+> As you now make changes to the entire remoteproc Kconfig file, rather
+> than simply add a Kconfig symbol we can't bring this in via Vinod's tree
+> without providing Linus with a messy merge conflict.
+> 
+> So the remoteproc parts now has to go through my tree.
+
+OK, I think the best approach is for Vinod to create an immutable
+branch with the entire fdma series on, and then both of you merge that branch into
+your respective trees.
+
+That way there won't be any conflicts and you can both accept further changes
+for v4.9 release. Trying to take half the series via rproc, and half via dma trees won't work
+because they have dependencies on each other.
+
+I will send a v11 series in a moment which includes the feedback in this email
+and also include the additional fixes which Vinod has applied since the driver
+has been in linux-next.
+
+> 
+> >  	help
+> >  	  Say y here to support the Peripheral Image Loader for the Qualcomm
+> >  	  Wireless Connectivity Subsystem.
+> > @@ -116,4 +115,8 @@ config ST_REMOTEPROC
+> >  	  processor framework.
+> >  	  This can be either built-in or a loadable module.
+> >  
+> > +config ST_SLIM_REMOTEPROC
+> > +	tristate
+> > +	select REMOTEPROC
+> > +
+> >  endmenu
+> [..]
+> > diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+> [..]
+> > +struct st_slim_rproc *st_slim_rproc_alloc(struct platform_device *pdev,
+> > +				char *fw_name)
+> > +{
+> [..]
+> > +	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
+> > +			fw_name, sizeof(*slim_rproc));
+> [..]
+> > +	rproc_put(rproc);
+> 
+> As of v4.9 you need to rproc_free() rather than rproc_put() to undo
+> rproc_alloc().
+
+Will fix.
+
+regards,
+
+Peter.
