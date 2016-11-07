@@ -1,44 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon,  7 Nov 2016 15:39:02 +0000
-Subject: [PATCH] iommu/arm-smmu: Fix out-of-bounds dereference
-Message-ID: <dea89ff1b2bd97b08d72f5c32fcf228bec767142.1478533142.git.robin.murphy@arm.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 07 Nov 2016 07:41:27 -0800
+Subject: [PATCH] staging: vc04_services: add vchiq_pagelist_info structure
+In-Reply-To: <20161107100331.GA19666@kroah.com>
+References: <20161031081035.22677-1-mzoran@crowfest.net>
+ <20161107100331.GA19666@kroah.com>
+Message-ID: <1478533287.17065.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we iterate a master's config entries, what we generally care
-about is the entry's stream map index, rather than the entry index
-itself, so it's nice to have the iterator automatically assign the
-former from the latter. Unfortunately, booting with KASAN reveals
-the oversight that using a simple comma operator results in the
-entry index being dereferenced before being checked for validity,
-so we always access one element past the end of the fwspec array.
+On Mon, 2016-11-07 at 11:03 +0100, Greg KH wrote:
+> On Mon, Oct 31, 2016 at 01:10:35AM -0700, Michael Zoran wrote:
+> > The current dma_map_sg based implementation for bulk messages
+> > computes many offsets into a single allocation multiple times in
+> > both the create and free code paths.??This is inefficient,
+> > error prone and in fact still has a few lingering issues
+> > with arm64.
+> > 
+> > This change replaces a small portion of that inplementation with
+> > new code that uses a new struct vchiq_pagelist_info to store the
+> > needed information rather then complex offset calculations.
+> > 
+> > This improved implementation should be more efficient and easier
+> > to understand and maintain.
+> > 
+> > Tests Run(Both Pass):
+> > vchiq_test -p 1
+> > vchiq_test -f 10
+> > 
+> > Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> > ---
+> > ?.../interface/vchiq_arm/vchiq_2835_arm.c???????????| 223
+> > +++++++++++----------
+> > ?1 file changed, 113 insertions(+), 110 deletions(-)
+> 
+> This doesn't apply to the tree anymore because of your previous patch
+> :(
+> 
+> Can you refresh it and resend?
+> 
+> thanks,
+> 
+> greg k-h
 
-Flip things around so that the check always happens before the index
-may be dereferenced.
+OK, I resubmitted it.
 
-Fixes: adfec2e709d2 ("iommu/arm-smmu: Convert to iommu_fwspec")
-Reported-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Once this patch gets applied 64-bit should be in decent shape.  I'm not
+seeing any warnings or errors anymore and functional tests from a 64-
+bit OS look good.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index f86683eec446..44ffe3a391d6 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -324,8 +324,10 @@ struct arm_smmu_master_cfg {
- #define INVALID_SMENDX			-1
- #define __fwspec_cfg(fw) ((struct arm_smmu_master_cfg *)fw->iommu_priv)
- #define fwspec_smmu(fw)  (__fwspec_cfg(fw)->smmu)
--#define for_each_cfg_sme(fw, i, idx) \
--	for (i = 0; idx = __fwspec_cfg(fw)->smendx[i], i < fw->num_ids; ++i)
-+#define for_each_cfg_sme(fw, i, idx)					\
-+	for (i = 0;							\
-+	     i < fw->num_ids && (idx = __fwspec_cfg(fw)->smendx[i], true); \
-+	     ++i)
- 
- struct arm_smmu_device {
- 	struct device			*dev;
--- 
-2.10.2.dirty
+The only remaining issue that I know of is that it needs a 32-bit
+compatibility layer for the ioctls when running a 32-bit OS(Raspbian)
+on top of a 64-bit kernel.
