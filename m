@@ -1,38 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Nov 2016 19:49:11 +0000
-Subject: [kernel-hardening] Re: [PATCHv4 0/4] WX checking for arm64
-In-Reply-To: <20161107153802.GJ19796@leverpostej>
-References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
- <20161030150307.33vc2m7y5y6wzbqc@localhost>
- <20161107153802.GJ19796@leverpostej>
-Message-ID: <20161107194910.GM19796@leverpostej>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Nov 2016 20:54:29 +0100
+Subject: [PATCH v3 1/3] Documentation: DT: add dma compatible for sun50i
+ A64 SOC.
+In-Reply-To: <20161107181457.GA3619@arx12>
+References: <20161107181457.GA3619@arx12>
+Message-ID: <20161107195429.u4j6mbow5m6ix7g3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 03:38:02PM +0000, Mark Rutland wrote:
-> On Sun, Oct 30, 2016 at 03:03:07PM +0000, Catalin Marinas wrote:
-> > On Thu, Oct 27, 2016 at 09:27:30AM -0700, Laura Abbott wrote:
-> > > Laura Abbott (4):
-> > >   arm64: dump: Make ptdump debugfs a separate option
-> > >   arm64: dump: Make the page table dumping seq_file optional
-> > >   arm64: dump: Remove max_addr
-> > >   arm64: dump: Add checking for writable and exectuable pages
-> > 
-> > Queued for 4.10. Thanks.
+On Tue, Nov 08, 2016 at 02:14:57AM +0800, Hao Zhang wrote:
+> This adds documentation of the sun50i a64 dma binding compatible.
 > 
-> Catalin mentioned to me that he saw some KASAN splats when testing; it
-> looks like need a fixup something like the below.
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
 
-As an aside, it looks like any ptdump usage when KASAN is enabled takes
-several minutes, which at boot time looks like a hang.
-
-AFAICT, this is because KASAN allocates *huge* VA ranges (4TB+) worth of
-zeroed shadow memory at pte granularity (reusing the same pmd, pud,
-tables), and the ptdump code dutifully walks this with, with the added
-KASAN instrumentation overhead.
-
-I'll try to dig into that tomorrow; I suspect/hope it's not necessary to
-keep all of that mapped.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 Thanks,
-Mark.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/ab8769ab/attachment.sig>
