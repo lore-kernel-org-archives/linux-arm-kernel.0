@@ -1,36 +1,33 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Tue, 8 Nov 2016 02:22:47 +0800
-Subject: [PATCH v3 2/3] ARM64: dts: sun6i: add dma node for a64.
-Message-ID: <20161107182247.GA3669@arx12>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Mon, 7 Nov 2016 21:36:48 +0300
+Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
+In-Reply-To: <20161107182734.GL1041@n2100.armlinux.org.uk>
+References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
+ <20161107182734.GL1041@n2100.armlinux.org.uk>
+Message-ID: <0d3a03e0-43ad-1e6f-a065-17e5bfdd92f4@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the dma node for sun50i a64.
+On 11/07/2016 09:27 PM, Russell King - ARM Linux wrote:
+> On Tue, Nov 01, 2016 at 08:22:14PM +0300, Dmitry Safonov wrote:
+>> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+>> index 53cf86cf2d1a..d1001f87c2f6 100644
+>> --- a/arch/arm/kernel/vdso.c
+>> +++ b/arch/arm/kernel/vdso.c
+>> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
+>>  	.pages = &vdso_data_page,
+>>  };
+>>
+>> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>> +		struct vm_area_struct *new_vma);
+>
+> I'd much rather avoid this forward declaration.  Is there any reason the
+> function body can't be here?
+>
 
-Signed-off-by: Hao Zhang <hao5781286@gmail.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Well, I didn't want it to be in the middle of static file variables -
+those looks nice at this moment just on top of the file.
+No other than that.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index e3c3d7d8..855ae2c 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -227,6 +227,15 @@
- 			};
- 		};
- 
-+		dma: dma-controller at 01c02000 {
-+			compatible = "allwinner,sun50i-a64-dma";
-+			reg = <0x01c02000 0x1000>;
-+			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_DMA>;
-+			resets = <&ccu RST_BUS_DMA>;
-+			#dma-cells = <1>;
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
 -- 
-2.7.4
+              Dmitry
