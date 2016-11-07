@@ -1,75 +1,70 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 7 Nov 2016 13:58:40 +0000
-Subject: [PATCH 3/6] clk: stm32f4: Add post divisor for I2S & SAI PLLs and
- Add lcd-tft clock
-In-Reply-To: <1478523943-23142-4-git-send-email-gabriel.fernandez@st.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Mon, 7 Nov 2016 15:05:46 +0100
+Subject: [PATCH 1/6] clk: stm32f4: Add PLL_I2S & PLL_SAI for STM32F429/469
+ boards
+In-Reply-To: <d60df94d-8f42-12eb-af55-2fc839c126bc@linaro.org>
 References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
- <1478523943-23142-4-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <860ce6a2-066f-2b44-3cf5-2d73720ed588@linaro.org>
+ <1478523943-23142-2-git-send-email-gabriel.fernandez@st.com>
+ <d60df94d-8f42-12eb-af55-2fc839c126bc@linaro.org>
+Message-ID: <42c31c00-3b0b-b1e7-46c1-0c849b14dae2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/16 13:05, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->
-> This patch adds post dividers of I2S & SAI PLLs.
-> These dividers are managed by a dedicated register (RCC_DCKCFGR).
-> The PLL should be off before a set rate.
-> This patch also introduces the lcd-tft clock.
->
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> ---
->  drivers/clk/clk-stm32f4.c | 27 +++++++++++++++++++++++++--
->  1 file changed, 25 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-> index dda15bc..5fa5d51 100644
-> --- a/drivers/clk/clk-stm32f4.c
-> +++ b/drivers/clk/clk-stm32f4.c
-> @@ -215,6 +215,7 @@ struct stm32f4_gate_data {
->  enum {
->  	SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC,
->  	PLL_VCO_I2S, PLL_VCO_SAI,
-> +	CLK_LCD,
->  	END_PRIMARY_CLK
->  };
->
-> @@ -599,6 +600,9 @@ static struct clk_hw *clk_register_pll_div(const char *name,
->  static const struct clk_div_table pll_divp_table[] = {
->  	{ 0, 2 }, { 1, 4 }, { 2, 6 }, { 3, 8 },
->  };
-> +static const struct clk_div_table pll_lcd_div_table[] = {
-> +	{ 0, 2 }, { 1, 4 }, { 2, 8 }, { 3, 16 },
-> +};
->
->  /*
->   * Decode current PLL state and (statically) model the state we inherit from
-> @@ -659,16 +663,35 @@ static struct clk_hw *stm32f4_rcc_register_pll(const char *pllsrc,
->  		clk_register_pll_div(data->p_name, data->vco_name, 0, reg,
->  				16, 2, 0, pll_divp_table, pll_hw, lock);
->
-> -	if (data->q_name)
-> +	if (data->q_name) {
->  		clk_register_pll_div(data->q_name, data->vco_name, 0, reg,
->  				24, 4, CLK_DIVIDER_ONE_BASED, NULL,
->  				pll_hw, lock);
->
-> -	if (data->r_name)
-> +		if (data->pll_num == PLL_I2S)
-> +			clk_register_pll_div("plli2s-q-div", data->q_name,
-> +				0, base + STM32F4_RCC_DCKCFGR,
-> +				0, 5, 0, NULL, pll_hw, &stm32f4_clk_lock);
-> +
-> +		if (data->pll_num == PLL_SAI)
-> +			clk_register_pll_div("pllsai-q-div", data->q_name,
-> +				0, base + STM32F4_RCC_DCKCFGR,
-> +				8, 5, 0, NULL, pll_hw, &stm32f4_clk_lock);
-> +	}
+Hi Daniel,
 
-Shouldn't this be in the config structures?
-
-It seems very odd to me to allow the config structures to control 
-whether we take the branch or not and then add these hard coded hacks.
+Thanks for reviewing.
 
 
-Daniel.
+On 11/07/2016 02:53 PM, Daniel Thompson wrote:
+> On 07/11/16 13:05, gabriel.fernandez at st.com wrote:
+>> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>
+>> This patch introduces PLL_I2S and PLL_SAI.
+>> Vco clock of these PLLs can be modify by DT (only n multiplicator,
+>> m divider is still fixed by the boot-loader).
+>> Each PLL has 3 dividers. PLL should be off when we modify the rate.
+>>
+>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+>> ---
+>>  drivers/clk/clk-stm32f4.c | 371 
+>> ++++++++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 359 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+>> index c2661e2..7641acd 100644
+>> --- a/drivers/clk/clk-stm32f4.c
+>> +++ b/drivers/clk/clk-stm32f4.c
+>> @@ -28,6 +28,7 @@
+> > ...
+>> +static const struct clk_div_table pll_divp_table[] = {
+>> +    { 0, 2 }, { 1, 4 }, { 2, 6 }, { 3, 8 },
+>> +};
+>> +
+>>  /*
+>>   * Decode current PLL state and (statically) model the state we 
+>> inherit from
+>>   * the bootloader.
+>>   */
+>
+> This comment isn't right. For a start the model is no longer static.
+>
+you're right, i will suppress it.
+
+>
+>> @@ -615,18 +944,24 @@ struct stm32f4_clk_data {
+>>      const struct stm32f4_gate_data *gates_data;
+>>      const u64 *gates_map;
+>>      int gates_num;
+>> +    const struct stm32f4_pll_data *pll_data;
+>> +    int pll_num;
+>
+> pll_num is unused.
+>
+ok
+
+BR
+
+Gabriel
+
+>
+> Daniel.
