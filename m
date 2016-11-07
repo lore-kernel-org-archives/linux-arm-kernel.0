@@ -1,111 +1,23 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 7 Nov 2016 12:00:22 -0500
-Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
-In-Reply-To: <20161101172214.2938-1-dsafonov@virtuozzo.com>
-References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
-Message-ID: <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 7 Nov 2016 09:06:18 -0800
+Subject: [PATCH v2 3/3] arm64: dts: Add Broadcom Northstar2 device tree
+ entries for PDC driver.
+In-Reply-To: <1467316764-19686-4-git-send-email-rob.rice@broadcom.com>
+References: <1467316764-19686-1-git-send-email-rob.rice@broadcom.com>
+ <1467316764-19686-4-git-send-email-rob.rice@broadcom.com>
+Message-ID: <ee54ef5b-4cbb-e4e7-994e-00acf233dcc7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On 06/30/2016 12:59 PM, Rob Rice wrote:
+> From: Rob Rice <rrice@broadcom.com>
+> 
+> Add Broadcom Northstar2 SoC device tree entries for PDC driver.
+> 
+> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 
-On 11/01/2016 01:22 PM, Dmitry Safonov wrote:
->   Add vdso_mremap hook which will fix context.vdso pointer after mremap()
-> on vDSO vma. This is needed for correct landing after syscall execution.
-> Primary goal of this is for CRIU on arm - we need to restore vDSO image
-> at the exactly same place where the vma was in dumped application. With
-> the help of this hook we'll move vDSO at the new position.
->   The CRIU code handles situations like when vDSO of dumped application
-> was different from vDSO on restoring system. This usally happens when
-> some new symbols are being added to vDSO. In these situations CRIU
-> inserts jump trampolines from old vDSO blob to new vDSO on restore.
-> By that reason even if on restore vDSO blob lies on the same address as
-> blob in dumped application - we still need to move it if it differs.
-> 
->   There was previously attempt to add this functionality for arm64 by
-> arch_mremap hook [1], while this patch introduces this with minimal
-> effort - the same way I've added it to x86:
-> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
-> 
->   At this moment, vdso restoring code is disabled for arm/arm64 arch
-> in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
-> is aimed to fix that.
->   The same hook may be introduced for arm64 kernel, but at this moment
-> arm64 vdso code is actively reworked by Kevin, so we can do it on top.
->   Separately, I've refactored arch_remap hook out from ppc64 [3].
-> 
-> [1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
-> [2]: https://github.com/xemul/criu/blob/master/Makefile#L39
-> [3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
-> 
-> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-> Cc: Christopher Covington <cov@codeaurora.org>
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Cc: Oleg Nesterov <oleg@redhat.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-mm at kvack.org
-> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
-> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
-> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
-> ---
->  arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index 53cf86cf2d1a..d1001f87c2f6 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
->  	.pages = &vdso_data_page,
->  };
->  
-> +static int vdso_mremap(const struct vm_special_mapping *sm,
-> +		struct vm_area_struct *new_vma);
->  static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
->  	.name = "[vdso]",
-> +	.mremap = vdso_mremap,
->  };
->  
->  struct elfinfo {
-> @@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
->  		mm->context.vdso = addr;
->  }
->  
-> +static int vdso_mremap(const struct vm_special_mapping *sm,
-> +		struct vm_area_struct *new_vma)
-> +{
-> +	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
-> +	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
-> +
-> +	/* Disallow partial vDSO blob remap */
-> +	if (vdso_size != new_size)
-> +		return -EINVAL;
-> +
-> +	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
-> +		return -EFAULT;
-> +
-> +	current->mm->context.vdso = new_vma->vm_start;
-> +
-> +	return 0;
-> +}
-> +
->  static void vdso_write_begin(struct vdso_data *vdata)
->  {
->  	++vdso_data->seq_count;
-> 
-
-What do you think about putting this code somewhere generic (not under
-arch/*), so that powerpc and arm64 can reuse it once the cosmetic changes
-to make them compatible are made? My thought was that it could be defined
-underneath CONFIG_GENERIC_VDSO, which architectures could select as they
-became compatible.
-
-Thanks,
-Cov
-
+Applied, thanks Rob!
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Florian
