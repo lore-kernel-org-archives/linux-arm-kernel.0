@@ -1,82 +1,41 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 6 Nov 2016 23:55:08 +0100
-Subject: [PATCH 00/22] mtd: nand: return error code of
- nand_scan(_ident,_tail) on error
-In-Reply-To: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161106235508.52374ac3@bbrezillon>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Sun,  6 Nov 2016 17:13:22 -0700
+Subject: [PATCH 0/4] fpga mgr: Add support for capabilities & encrypted
+ bistreams
+Message-ID: <20161107001326.7395-1-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  4 Nov 2016 19:42:48 +0900
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+This patchset introduces FPGA capabilities, to model what operations
+an FPGA Manager low level driver supports.
+Exposing them via sysfs allows userland to make smart decisions which FPGA to deploy
+an image to in case there are multiple FPGAs with different capabilities available.
 
-> nand_scan(), nand_scan_ident(), nand_scan_tail() return
-> an appropriate negative value on error.
-> 
-> Most of drivers return the value from them on error,
-> but some of them return the fixed error code -ENXIO
-> (and a few return -ENODEV).
-> 
-> This series make those drivers return more precise error code.
+As an example of a capability: Support for encrypted bitstreams to Zynq & SocFPGA.
+Please note that [4/4] is separate as I couldn't find info on how encrypted bitstreams
+work on socfpga platforms, however Alan mentioned during an offline discussion it should
+'just work'.
 
-Applied and fixed the bug I found in patch 13.
+On Zynq using the HMAC & AES units in the devcfg peripheral only work when the system
+has been booted in Secure Mode, otherwise the boot rom will disable them.
+The FPGA manager capability will only get exposed if available.
 
 Thanks,
 
-Boris
+    Moritz
 
-> 
-> 
-> Masahiro Yamada (22):
->   mtd: nand: ams-delta: return error code of nand_scan() on error
->   mtd: nand: cmx270: return error code of nand_scan() on error
->   mtd: nand: cs553x: return error code of nand_scan() on error
->   mtd: nand: gpio: return error code of nand_scan() on error
->   mtd: nand: mpc5121: return error code of nand_scan() on error
->   mtd: nand: tmio: return error code of nand_scan() on error
->   mtd: nand: orion: return error code of nand_scan() on error
->   mtd: nand: pasemi: return error code of nand_scan() on error
->   mtd: nand: plat_nand: return error code of nand_scan() on error
->   mtd: nand: atmel: return error code of nand_scan_ident/tail() on error
->   mtd: nand: brcmnand: return error code of nand_scan_ident/tail() on
->     error
->   mtd: nand: fsmc: return error code of nand_scan_ident/tail() on error
->   mtd: nand: lpc32xx: return error code of nand_scan_ident/tail() on
->     error
->   mtd: nand: mediatek: return error code of nand_scan_ident/tail() on
->     error
->   mtd: nand: mxc: return error code of nand_scan_ident/tail() on error
->   mtd: nand: omap2: return error code of nand_scan_ident/tail() on error
->   mtd: nand: vf610: return error code of nand_scan_ident/tail() on error
->   mtd: nand: cafe: return error code of nand_scan_ident() on error
->   mtd: nand: hisi504: return error code of nand_scan_ident() on error
->   mtd: nand: pxa3xx: return error code of nand_scan_ident() on error
->   mtd: nand: nandsim: remove unneeded checks for nand_scan_ident/tail()
->   mtd: nand: socrates: use nand_scan() for nand_scan_ident/tail() combo
-> 
->  drivers/mtd/nand/ams-delta.c         |  5 ++---
->  drivers/mtd/nand/atmel_nand.c        | 10 ++++------
->  drivers/mtd/nand/brcmnand/brcmnand.c | 10 ++++++----
->  drivers/mtd/nand/cafe_nand.c         |  5 ++---
->  drivers/mtd/nand/cmx270_nand.c       |  4 ++--
->  drivers/mtd/nand/cs553x_nand.c       |  5 ++---
->  drivers/mtd/nand/fsmc_nand.c         |  9 ++++-----
->  drivers/mtd/nand/gpio.c              |  5 ++---
->  drivers/mtd/nand/hisi504_nand.c      |  4 +---
->  drivers/mtd/nand/lpc32xx_mlc.c       | 10 ++++------
->  drivers/mtd/nand/lpc32xx_slc.c       |  9 +++------
->  drivers/mtd/nand/mpc5121_nfc.c       |  4 ++--
->  drivers/mtd/nand/mtk_nand.c          |  4 ++--
->  drivers/mtd/nand/mxc_nand.c          | 10 ++++------
->  drivers/mtd/nand/nandsim.c           |  4 ----
->  drivers/mtd/nand/omap2.c             |  9 ++++-----
->  drivers/mtd/nand/orion_nand.c        |  5 ++---
->  drivers/mtd/nand/pasemi_nand.c       |  5 ++---
->  drivers/mtd/nand/plat_nand.c         |  5 ++---
->  drivers/mtd/nand/pxa3xx_nand.c       |  5 +++--
->  drivers/mtd/nand/socrates_nand.c     | 12 ++----------
->  drivers/mtd/nand/tmio_nand.c         |  6 +++---
->  drivers/mtd/nand/vf610_nfc.c         | 10 ++++------
->  23 files changed, 62 insertions(+), 93 deletions(-)
-> 
+Moritz Fischer (4):
+  fpga mgr: Introduce FPGA capabilities
+  fpga mgr: Expose FPGA capabilities to userland via sysfs
+  fpga mgr: zynq: Add support for encrypted bitstreams
+  fpga mgr: socfpga: Expose support for encrypted bitstreams
+
+ Documentation/ABI/testing/sysfs-class-fpga-manager | 16 +++++++
+ drivers/fpga/fpga-mgr.c                            | 42 ++++++++++++++++++
+ drivers/fpga/socfpga.c                             | 11 ++---
+ drivers/fpga/zynq-fpga.c                           | 28 ++++++++++--
+ include/linux/fpga/fpga-mgr.h                      | 50 +++++++++++++++++++++-
+ 5 files changed, 138 insertions(+), 9 deletions(-)
+
+-- 
+2.10.0
