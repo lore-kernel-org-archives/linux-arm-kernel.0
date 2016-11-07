@@ -1,30 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Nov 2016 22:14:34 +0100
-Subject: [PATCH RFC 4/7] ASoC: samsung: i2s: Do not use platform_data for
- DMA parameters
-In-Reply-To: <c4388f30-702b-895b-5280-6fabf8e7bfe1@samsung.com>
-References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
- <201611050029.18984.arnd@arndb.de>
- <c4388f30-702b-895b-5280-6fabf8e7bfe1@samsung.com>
-Message-ID: <1863253.DX7iDsal5P@wuerfel>
+Date: Mon, 07 Nov 2016 22:20:18 +0100
+Subject: [v15, 3/7] powerpc/fsl: move mpc85xx.h to include/linux/fsl
+In-Reply-To: <DB6PR0401MB2536B1B2E6AC36BDC8FC540DF8AE0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+ <2723366.1bJeJ7SKI6@wuerfel>
+ <DB6PR0401MB2536B1B2E6AC36BDC8FC540DF8AE0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+Message-ID: <1543282.vWjeo4ynTa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 7, 2016 5:02:54 PM CET Sylwester Nawrocki wrote:
-> On 11/05/2016 12:29 AM, Arnd Bergmann wrote:
-> > On Friday 04 November 2016, Sylwester Nawrocki wrote:
-> >> > -       ret = samsung_asoc_dma_platform_register(&pdev->dev, pri_dai->filter,
-> >> > +       ret = samsung_asoc_dma_platform_register(&pdev->dev, NULL,
-> >> >                                                  NULL, NULL);
-> >
-> > If we remove the filter argument from every caller here, maybe we should also
-> > change the prototype to not expect those three NULL arguments any more.
+On Monday, October 31, 2016 9:35:33 AM CET Y.B. Lu wrote:
+> > 
+> > I don't see any of the contents of this header referenced by the soc
+> > driver any more. I think you can just drop this patch.
+> > 
 > 
-> There is one occurrence where the third argument needs to be not NULL.
-> I'm planning to modify sound/sound/samsung/i2s.c so there is no need
-> to create another platform device just for the overlay DAI, afterwards
-> the above function could be simplified.
+> [Lu Yangbo-B47093] This header file was included by guts.c.
+> The guts driver used macro SVR_MAJ/SVR_MIN for calculation.
+> 
+> This header file was for powerpc arch before. And this patch is to made it as
+> common header file for both ARM and PPC.
+> Sooner or later this is needed.
 
-Ok, sounds good.
+Let's discuss it once we actually need the header then, ok?
 
 	Arnd
