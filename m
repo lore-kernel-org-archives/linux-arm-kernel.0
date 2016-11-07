@@ -1,68 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Nov 2016 09:35:19 +0100
-Subject: [PATCH v7 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <1478347427-28409-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1478347427-28409-1-git-send-email-pankaj.dubey@samsung.com>
- <1478347427-28409-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <2804574.ikPKivcpT9@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  7 Nov 2016 09:44:42 +0100
+Subject: [PATCH 1/3 v4] ARM: dts: rename MSM8660/APQ8060 pmicintc to pm8058
+Message-ID: <1478508284-10847-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, November 5, 2016 5:33:46 PM CET Pankaj Dubey wrote:
-> Exynos SoCs have Chipid, for identification of product IDs
-> and SoC revisions. This patch intends to provide initialization
-> code for all these functionalities, at the same time it provides some
-> sysfs entries for accessing these information to user-space.
-> 
-> This driver uses existing binding for exynos-chipid.
-> 
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/soc/samsung/Kconfig         |   5 ++
->  drivers/soc/samsung/Makefile        |   1 +
->  drivers/soc/samsung/exynos-chipid.c | 148 ++++++++++++++++++++++++++++++++++++
->  3 files changed, 154 insertions(+)
->  create mode 100644 drivers/soc/samsung/exynos-chipid.c
-> 
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> index 2455339..f9ab858 100644
-> --- a/drivers/soc/samsung/Kconfig
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -14,4 +14,9 @@ config EXYNOS_PM_DOMAINS
->  	bool "Exynos PM domains" if COMPILE_TEST
->  	depends on PM_GENERIC_DOMAINS || COMPILE_TEST
->  
-> +config EXYNOS_CHIPID
-> +	bool "Exynos Chipid controller driver" if COMPILE_TEST
-> +	depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
-> +	select SOC_BUS
-> +
+The name "pmicintc" is ambiguous: there is a second power
+management IC named PM8901 on these systems, and it is also
+an interrupt controller. To make things clear, just name the
+node alias "pm8058", this in unambigous and has all information
+we need.
 
-Please add a help text.
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v4:
+- Add Bjorn's ACK.
+- Follow version numbering of the primary patch.
+---
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts |  2 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts        |  2 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi            | 12 ++++++------
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-Why is this not enabled for ARM64 EXYNOS?
-
-> +	exynos_chipid_base = of_iomap(np, 0);
-> +
-> +	if (!exynos_chipid_base)
-> +		return PTR_ERR(exynos_chipid_base);
-> +
-> +	product_id  = __raw_readl(exynos_chipid_base);
-> +	revision = product_id & EXYNOS_REV_MASK;
-> +	iounmap(exynos_chipid_base);
-
-Never use __raw_readl/__raw_writel in device drivers, they are not endian
-safe, and we just removed all instances for Exynos a while back.
-
-> +	return 0;
-> +}
-> +early_initcall(exynos_chipid_early_init);
-> 
-
-Why is this early? Please add a code comment if it's really needed to be
-an early_initcall, otherwise make it a device_initcall.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+index 4b8872cc8bf9..4a532ddab53a 100644
+--- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
++++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+@@ -412,7 +412,7 @@
+ 				 * The second interrupt is the PME interrupt
+ 				 * for network wakeup, connected to the TLMM.
+ 				 */
+-				interrupts-extended = <&pmicintc 198 IRQ_TYPE_EDGE_FALLING>,
++				interrupts-extended = <&pm8058 198 IRQ_TYPE_EDGE_FALLING>,
+ 						    <&tlmm 29 IRQ_TYPE_EDGE_RISING>;
+ 				reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
+ 				vdd33a-supply = <&dragon_veth>;
+diff --git a/arch/arm/boot/dts/qcom-msm8660-surf.dts b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+index 23de764558ab..1adc04978a47 100644
+--- a/arch/arm/boot/dts/qcom-msm8660-surf.dts
++++ b/arch/arm/boot/dts/qcom-msm8660-surf.dts
+@@ -48,7 +48,7 @@
+ 	};
+ };
+ 
+-&pmicintc {
++&pm8058 {
+ 	keypad at 148 {
+ 		linux,keymap = <
+ 			MATRIX_KEY(0, 0, KEY_FN_F1)
+diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
+index 4d828f810746..91c9a62ae725 100644
+--- a/arch/arm/boot/dts/qcom-msm8660.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
+@@ -163,7 +163,7 @@
+ 			reg = <0x500000 0x1000>;
+ 			qcom,controller-type = "pmic-arbiter";
+ 
+-			pmicintc: pmic at 0 {
++			pm8058: pmic at 0 {
+ 				compatible = "qcom,pm8058";
+ 				interrupt-parent = <&tlmm>;
+ 				interrupts = <88 8>;
+@@ -176,7 +176,7 @@
+ 					compatible = "qcom,pm8058-gpio",
+ 						     "qcom,ssbi-gpio";
+ 					reg = <0x150>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <192 IRQ_TYPE_NONE>,
+ 						     <193 IRQ_TYPE_NONE>,
+ 						     <194 IRQ_TYPE_NONE>,
+@@ -232,7 +232,7 @@
+ 					reg = <0x50>;
+ 					gpio-controller;
+ 					#gpio-cells = <2>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts =
+ 					<128 IRQ_TYPE_NONE>,
+ 					<129 IRQ_TYPE_NONE>,
+@@ -251,7 +251,7 @@
+ 				pwrkey at 1c {
+ 					compatible = "qcom,pm8058-pwrkey";
+ 					reg = <0x1c>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <50 1>, <51 1>;
+ 					debounce = <15625>;
+ 					pull-up;
+@@ -260,7 +260,7 @@
+ 				keypad at 148 {
+ 					compatible = "qcom,pm8058-keypad";
+ 					reg = <0x148>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <74 1>, <75 1>;
+ 					debounce = <15>;
+ 					scan-delay = <32>;
+@@ -270,7 +270,7 @@
+ 				rtc at 1e8 {
+ 					compatible = "qcom,pm8058-rtc";
+ 					reg = <0x1e8>;
+-					interrupt-parent = <&pmicintc>;
++					interrupt-parent = <&pm8058>;
+ 					interrupts = <39 1>;
+ 					allow-set-time;
+ 				};
+-- 
+2.7.4
