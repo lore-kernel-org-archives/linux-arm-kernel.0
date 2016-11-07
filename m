@@ -1,45 +1,80 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon,  7 Nov 2016 11:43:54 +0100
-Subject: [PATCH 0/3] ARM64: dts: meson-gxl: Enable Ethernet
-Message-ID: <20161107104357.24428-1-narmstrong@baylibre.com>
+Date: Mon,  7 Nov 2016 11:43:55 +0100
+Subject: [PATCH 1/3] ARM64: dts: meson-gxl: Add ethernet nodes with internal
+ PHY
+In-Reply-To: <20161107104357.24428-1-narmstrong@baylibre.com>
+References: <20161107104357.24428-1-narmstrong@baylibre.com>
+Message-ID: <20161107104357.24428-2-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
-external RGMII pins.
+Add Ethernet node with Internal PHY selection for the Amlogic GXL SoCs
 
-The internal PHY is added in the GXL dtsi and support for each
-board is added in intermediate board family dtsi or final dts.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 43 ++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-This patchset depends on ARM64 dts patch at [1]
-
-Changes since v2 RFC at : [3]
- - Change phy Kconfig/Makefile alphabetic order
- - GXL dtsi cleanup
- - Add P230 External PHY reset
- - Add external PHY compatible ID string
-
-Changes since original RFC patchset at : [2]
- - Remove meson8b experimental phy switching
- - Switch to mdio-mux-mmioreg with extennded size support
- - Add internal phy support for S905x and p231
- - Add external PHY support for p230
-
-[1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
-[3] http://lkml.kernel.org/r/1477932987-27871-1-git-send-email-narmstrong at baylibre.com
-
-Neil Armstrong (3):
-  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
-  ARM64: dts: meson-gxl-p23x: Enable ethernet
-  ARM64: dts: meson-gxl-s905x: Enable internal ethernet PHY
-
- .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 25 +++++++++++++
- .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  6 +++
- .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  4 ++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  6 +++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 43 ++++++++++++++++++++++
- 5 files changed, 84 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index d1bf381..3af54dc 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -49,6 +49,22 @@
+ 	compatible = "amlogic,meson-gxl";
+ };
+ 
++&ethmac {
++	reg = <0x0 0xc9410000 0x0 0x10000
++	       0x0 0xc8834540 0x0 0x4>;
++
++	clocks = <&clkc CLKID_ETH>,
++		 <&clkc CLKID_FCLK_DIV2>,
++		 <&clkc CLKID_MPLL2>;
++	clock-names = "stmmaceth", "clkin0", "clkin1";
++
++	mdio0: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++	};
++};
++
+ &aobus {
+ 	pinctrl_aobus: pinctrl at 14 {
+ 		compatible = "amlogic,meson-gxl-aobus-pinctrl";
+@@ -214,6 +230,33 @@
+ 			};
+ 		};
+ 	};
++
++	eth-phy-mux {
++		compatible = "mdio-mux-mmioreg", "mdio-mux";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x0 0x55c 0x0 0x4>;
++		mux-mask = <0xffffffff>;
++		mdio-parent-bus = <&mdio0>;
++
++		internal_mdio: mdio at e40908ff {
++			reg = <0xe40908ff>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			internal_phy: ethernet-phy at 8 {
++				compatible = "ethernet-phy-id0181.4400", "ethernet-phy-ieee802.3-c22";
++				reg = <8>;
++				max-speed = <100>;
++			};
++		};
++
++		external_mdio: mdio at 2009087f {
++			reg = <0x2009087f>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
+ };
+ 
+ &hiubus {
 -- 
 2.7.0
