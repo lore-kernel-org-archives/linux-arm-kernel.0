@@ -1,15 +1,15 @@
 From: mirza.krak@gmail.com (Mirza Krak)
-Date: Mon,  7 Nov 2016 09:30:03 +0100
-Subject: [PATCH V4 4/6] ARM: tegra: Add Tegra30 GMI support
+Date: Mon,  7 Nov 2016 09:30:04 +0100
+Subject: [PATCH V4 5/6] ARM: tegra: Add Tegra20 GMI support
 In-Reply-To: <1478507405-13204-1-git-send-email-mirza.krak@gmail.com>
 References: <1478507405-13204-1-git-send-email-mirza.krak@gmail.com>
-Message-ID: <1478507405-13204-5-git-send-email-mirza.krak@gmail.com>
+Message-ID: <1478507405-13204-6-git-send-email-mirza.krak@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mirza Krak <mirza.krak@gmail.com>
 
-Add a device node for the GMI controller found on Tegra30.
+Add a device node for the GMI controller found on Tegra20.
 
 Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
 Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
@@ -21,29 +21,29 @@ Changes in v2:
 - added address-cells, size-cells and ranges properties
 
 Changes in v3:
-- no changes
+- fixed range address which is not the same as Tegra30.
 
 Changes in v4:
-- no changes
+- removed extra newline and a initial space in resets property.
 
- arch/arm/boot/dts/tegra30.dtsi | 13 +++++++++++++
+ arch/arm/boot/dts/tegra20.dtsi | 13 +++++++++++++
  1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 5030065..bbb1c00 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -439,6 +439,19 @@
+diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+index 2207c08..e880750 100644
+--- a/arch/arm/boot/dts/tegra20.dtsi
++++ b/arch/arm/boot/dts/tegra20.dtsi
+@@ -376,6 +376,19 @@
  		status = "disabled";
  	};
 
 +	gmi at 70009000 {
-+		compatible = "nvidia,tegra30-gmi";
++		compatible = "nvidia,tegra20-gmi";
 +		reg = <0x70009000 0x1000>;
 +		#address-cells = <2>;
 +		#size-cells = <1>;
-+		ranges = <0 0 0x48000000 0x7ffffff>;
-+		clocks = <&tegra_car TEGRA30_CLK_NOR>;
++		ranges = <0 0 0xd0000000 0xfffffff>;
++		clocks = <&tegra_car TEGRA20_CLK_NOR>;
 +		clock-names = "gmi";
 +		resets = <&tegra_car 42>;
 +		reset-names = "gmi";
@@ -51,7 +51,7 @@ index 5030065..bbb1c00 100644
 +	};
 +
  	pwm: pwm at 7000a000 {
- 		compatible = "nvidia,tegra30-pwm", "nvidia,tegra20-pwm";
+ 		compatible = "nvidia,tegra20-pwm";
  		reg = <0x7000a000 0x100>;
 --
 2.1.4
