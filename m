@@ -1,39 +1,32 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 7 Nov 2016 11:03:31 +0100
-Subject: [PATCH] staging: vc04_services: add vchiq_pagelist_info structure
-In-Reply-To: <20161031081035.22677-1-mzoran@crowfest.net>
-References: <20161031081035.22677-1-mzoran@crowfest.net>
-Message-ID: <20161107100331.GA19666@kroah.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 07 Nov 2016 15:39:35 +0530
+Subject: [PATCH 5/6] mfd: max8997: Add max8997-clk name in mfd_cell
+In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478513376-14307-6-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 01:10:35AM -0700, Michael Zoran wrote:
-> The current dma_map_sg based implementation for bulk messages
-> computes many offsets into a single allocation multiple times in
-> both the create and free code paths.  This is inefficient,
-> error prone and in fact still has a few lingering issues
-> with arm64.
-> 
-> This change replaces a small portion of that inplementation with
-> new code that uses a new struct vchiq_pagelist_info to store the
-> needed information rather then complex offset calculations.
-> 
-> This improved implementation should be more efficient and easier
-> to understand and maintain.
-> 
-> Tests Run(Both Pass):
-> vchiq_test -p 1
-> vchiq_test -f 10
-> 
-> Signed-off-by: Michael Zoran <mzoran@crowfest.net>
-> ---
->  .../interface/vchiq_arm/vchiq_2835_arm.c           | 223 +++++++++++----------
->  1 file changed, 113 insertions(+), 110 deletions(-)
+This patch add max8997-clk in mfd_cell max8997_devs in order to probe
+max8997-clk device driver.
 
-This doesn't apply to the tree anymore because of your previous patch :(
+CC: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ drivers/mfd/max8997.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Can you refresh it and resend?
-
-thanks,
-
-greg k-h
+diff --git a/drivers/mfd/max8997.c b/drivers/mfd/max8997.c
+index bda9ec8..4b809f8 100644
+--- a/drivers/mfd/max8997.c
++++ b/drivers/mfd/max8997.c
+@@ -48,6 +48,7 @@ static const struct mfd_cell max8997_devs[] = {
+ 	{ .name = "max8997-muic", },
+ 	{ .name = "max8997-led", .id = 1 },
+ 	{ .name = "max8997-led", .id = 2 },
++	{ .name = "max8997-clk",},
+ };
+ 
+ #ifdef CONFIG_OF
+-- 
+2.7.4
