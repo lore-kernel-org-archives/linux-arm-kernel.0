@@ -1,55 +1,73 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Mon, 7 Nov 2016 20:47:25 +0800
-Subject: [PATCH next 1/2] media: mtk-mdp: fix video_device_release argument
-In-Reply-To: <dbaa8b70-ea72-7d9b-176c-6c0a816aaae8@xs4all.nl>
-References: <1473340146-6598-4-git-send-email-minghsiu.tsai@mediatek.com>
- <20161027202325.20680-1-vincent.stehle@laposte.net>
- <20161028075253.gdy2bbugih6oqncw@romuald.bergerie>
- <dbaa8b70-ea72-7d9b-176c-6c0a816aaae8@xs4all.nl>
-Message-ID: <1478522845.4269.3.camel@mtksdaap41>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 7 Nov 2016 21:51:06 +0900
+Subject: [PATCH] ARM: tegra: nyan: Enable GPU node and related supply
+In-Reply-To: <e95335ae-ad19-b8cd-634b-63c6a0b88e01@nvidia.com>
+References: <20160918141311.17140-1-contact@paulk.fr>
+ <f2489bf5-bb08-11f5-1b53-7a1568f20b6b@nvidia.com>
+ <1474395433.1215.23.camel@paulk.fr>
+ <e95335ae-ad19-b8cd-634b-63c6a0b88e01@nvidia.com>
+Message-ID: <CAAVeFuLb5gU70B0jP0YNPB58NcuR_D0e--6zn3dG7VOmZafLRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-11-03 at 13:47 +0100, Hans Verkuil wrote:
-> Hi Vincent,
-> 
-> On 28/10/16 09:52, Vincent Stehl? wrote:
-> > On Thu, Oct 27, 2016 at 10:23:24PM +0200, Vincent Stehl? wrote:
-> >> video_device_release() takes a pointer to struct video_device as argument.
-> >> Fix two call sites where the address of the pointer is passed instead.
-> >
-> > Sorry, I messed up: please ignore that "fix". The 0day robot made me
-> > realize this is indeed not a proper fix.
-> >
-> > The issue remains, though: we cannot call video_device_release() on the
-> > vdev structure member, as this will in turn call kfree(). Most probably,
-> > vdev needs to be dynamically allocated, or the call to
-> > video_device_release() dropped completely.
-> 
-> I prefer that vdev is dynamically allocated. There are known problems with
-> embedded video_device structs, so allocating it is preferred.
-> 
-> Minghsiu, can you do that?
-> 
+On Wed, Sep 21, 2016 at 4:57 PM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+> On 20/09/16 19:17, Paul Kocialkowski wrote:
+>> * PGP Signed by an unknown key
+>>
+>> Le mardi 20 septembre 2016 ? 13:24 +0100, Jon Hunter a ?crit :
+>>> On 18/09/16 15:13, Paul Kocialkowski wrote:
+>>>>
+>>>> This enables the GPU node for tegra124 nyan boards, which is required to
+>>>> get graphics acceleration with nouveau on these devices.
+>>>>
+>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+>>>> ---
+>>>>  arch/arm/boot/dts/tegra124-nyan.dtsi | 8 +++++++-
+>>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>>> b/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>>> index dab9509..225ca77 100644
+>>>> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>>> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
+>>>> @@ -42,6 +42,12 @@
+>>>>             };
+>>>>     };
+>>>>
+>>>> +   gpu at 0,57000000 {
+>>>> +           status = "okay";
+>>>> +
+>>>> +           vdd-supply = <&vdd_gpu>;
+>>>> +   };
+>>>> +
+>>>>     serial at 70006000 {
+>>>>             /* Debug connector on the bottom of the board near SD card.
+>>>> */
+>>>>             status = "okay";
+>>>> @@ -214,7 +220,7 @@
+>>>>                                     regulator-always-on;
+>>>>                             };
+>>>>
+>>>> -                           sd6 {
+>>>> +                           vdd_gpu: sd6 {
+>>>>                                     regulator-name = "+VDD_GPU_AP";
+>>>>                                     regulator-min-microvolt = <650000>;
+>>>>                                     regulator-max-microvolt =
+>>>> <1200000>;
+>>>>
+>>>
+>>> Looks good to me. I see the following error when booting but looking at the
+>>> code appears to be benign. Thierry, Alex, is this normal/okay?
+>>
+>> I have the same messages and asked Alexandre about them the other day. He told
+>> me that it looks normal.
+>
+> Ok great. Hopefully, Alex can ACK then.
 
-Hi Hans,
+Apologies for the (very) delayed reply.
 
-I just send the patch for this.
-https://patchwork.kernel.org/patch/9415007/
+Yes, the messages you are seeing are part of the normal probe sequence
+on Tegra. So this looks good to me.
 
-
-> Regards,
-> 
-> 	Hans
-> 
-> >
-> > Sorry for the bad patch.
-> >
-> > Best regards,
-> >
-> > Vincent.
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
+Acked-by: Alexandre Courbot <acourbot@nvidia.com>
