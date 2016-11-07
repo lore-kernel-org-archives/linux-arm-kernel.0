@@ -1,47 +1,135 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 07 Nov 2016 13:11:41 -0500 (EST)
-Subject: [PATCH v6 0/7] add NS2 support to bgmac
-In-Reply-To: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
-References: <1478236262-3351-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20161107.131141.526803424224367244.davem@davemloft.net>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Mon, 7 Nov 2016 21:13:22 +0300
+Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
+In-Reply-To: <d1aa8bec-a53e-cd30-e66a-39bebb6a400a@codeaurora.org>
+References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
+ <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
+ <714d2aea-ed4c-6272-89c1-e1d0e037855e@virtuozzo.com>
+ <d1aa8bec-a53e-cd30-e66a-39bebb6a400a@codeaurora.org>
+Message-ID: <db2c63e4-1d7a-6da7-7d87-553a1c8049a7@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jon.mason@broadcom.com>
-Date: Fri,  4 Nov 2016 01:10:55 -0400
+On 11/07/2016 09:08 PM, Christopher Covington wrote:
+> On 11/07/2016 12:16 PM, Dmitry Safonov wrote:
+>> On 11/07/2016 08:00 PM, Christopher Covington wrote:
+>>> Hi Dmitry,
+>>>
+>>> On 11/01/2016 01:22 PM, Dmitry Safonov wrote:
+>>>>   Add vdso_mremap hook which will fix context.vdso pointer after mremap()
+>>>> on vDSO vma. This is needed for correct landing after syscall execution.
+>>>> Primary goal of this is for CRIU on arm - we need to restore vDSO image
+>>>> at the exactly same place where the vma was in dumped application. With
+>>>> the help of this hook we'll move vDSO at the new position.
+>>>>   The CRIU code handles situations like when vDSO of dumped application
+>>>> was different from vDSO on restoring system. This usally happens when
+>>>> some new symbols are being added to vDSO. In these situations CRIU
+>>>> inserts jump trampolines from old vDSO blob to new vDSO on restore.
+>>>> By that reason even if on restore vDSO blob lies on the same address as
+>>>> blob in dumped application - we still need to move it if it differs.
+>>>>
+>>>>   There was previously attempt to add this functionality for arm64 by
+>>>> arch_mremap hook [1], while this patch introduces this with minimal
+>>>> effort - the same way I've added it to x86:
+>>>> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+>>>>
+>>>>   At this moment, vdso restoring code is disabled for arm/arm64 arch
+>>>> in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
+>>>> is aimed to fix that.
+>>>>   The same hook may be introduced for arm64 kernel, but at this moment
+>>>> arm64 vdso code is actively reworked by Kevin, so we can do it on top.
+>>>>   Separately, I've refactored arch_remap hook out from ppc64 [3].
+>>>>
+>>>> [1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
+>>>> [2]: https://github.com/xemul/criu/blob/master/Makefile#L39
+>>>> [3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
+>>>>
+>>>> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+>>>> Cc: Christopher Covington <cov@codeaurora.org>
+>>>> Cc: Andy Lutomirski <luto@amacapital.net>
+>>>> Cc: Oleg Nesterov <oleg@redhat.com>
+>>>> Cc: Russell King <linux@armlinux.org.uk>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-mm at kvack.org
+>>>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+>>>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+>>>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>>>> ---
+>>>>  arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
+>>>>  1 file changed, 21 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+>>>> index 53cf86cf2d1a..d1001f87c2f6 100644
+>>>> --- a/arch/arm/kernel/vdso.c
+>>>> +++ b/arch/arm/kernel/vdso.c
+>>>> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
+>>>>      .pages = &vdso_data_page,
+>>>>  };
+>>>>
+>>>> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>>>> +        struct vm_area_struct *new_vma);
+>>>>  static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+>>>>      .name = "[vdso]",
+>>>> +    .mremap = vdso_mremap,
+>>>>  };
+>>>>
+>>>>  struct elfinfo {
+>>>> @@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+>>>>          mm->context.vdso = addr;
+>>>>  }
+>>>>
+>>>> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>>>> +        struct vm_area_struct *new_vma)
+>>>> +{
+>>>> +    unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+>>>> +    unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
+>>>> +
+>>>> +    /* Disallow partial vDSO blob remap */
+>>>> +    if (vdso_size != new_size)
+>>>> +        return -EINVAL;
+>>>> +
+>>>> +    if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
+>>>> +        return -EFAULT;
+>>>> +
+>>>> +    current->mm->context.vdso = new_vma->vm_start;
+>>>> +
+>>>> +    return 0;
+>>>> +}
+>>>> +
+>>>>  static void vdso_write_begin(struct vdso_data *vdata)
+>>>>  {
+>>>>      ++vdso_data->seq_count;
+>>>>
+>>>
+>>> What do you think about putting this code somewhere generic (not under
+>>> arch/*), so that powerpc and arm64 can reuse it once the cosmetic changes
+>>> to make them compatible are made? My thought was that it could be defined
+>>> underneath CONFIG_GENERIC_VDSO, which architectures could select as they
+>>> became compatible.
+>>
+>> Hi Chistopher,
+>>
+>> Well, I don't think we won something out of generalization of simple assignment for context.vdso pointer accross arches. And a need to rename
+>> vdso over arches for saving one single line?
+>
+> I count 17 lines, which duplicated across 3 architectures becomes 51 lines.
+> Presumable in the future other architectures will want CRIU support as well.
+> Additionally, should fixes ever be required, fixing one implementation instead
+> of 3+ is preferred.
+>
+>> Also I don't like a bit this arch_mremap hook and need to nullify
+>> vdso pointer.
+>
+> I'm sorry for the confusion but I in no way meant to imply that the
+> arch_mremap hook should be carried forward. I fully  agree that the function
+> pointer in struct vm_special_mapping is the better way to go.
+>
+> If you don't want to implement a version with vdso_mremap defined in a
+> generic location (using it from struct vm_special_mapping), do you mind if I
+> propose such a version?
 
-> Changes in v6:
-> * Use a common bgmac_phy_connect_direct (per Rafal Milecki) 
-> * Rebased on latest net-next
-> * Added Reviewed-by to the relevant patches
-> 
-> 
-> Changes in v5:
-> * Change a pr_err to netdev_err (per Scott Branden)
-> * Reword the lane swap binding documentation (per Andrew Lunn)
-> 
-> 
-> Changes in v4:
-> * Actually send out the lane swap binding doc patch (Per Scott Branden)
-> * Remove unused #define (Per Andrew Lunn)
-> 
-> 
-> Changes in v3:
-> * Clean-up the bgmac DT binding doc (per Rob Herring)
-> * Document the lane swap binding and make it generic (Per Andrew Lunn)
-> 
-> 
-> Changes in v2:
-> * Remove the PHY power-on (per Andrew Lunn)
-> * Misc PHY clean-ups regarding comments and #defines (per Andrew Lunn)
->   This results on none of the original PHY code from Vikas being
->   present.  So, I'm removing him as an author and giving him
->   "Inspired-by" credit.
-> * Move PHY lane swapping to PHY driver (per Andrew Lunn and Florian
->   Fainelli)
-> * Remove bgmac sleep (per Florian Fainelli)
-> * Re-add bgmac chip reset (per Florian Fainelli and Ray Jui)
-> * Rebased on latest net-next
-> * Added patch for bcm54xx_auxctl_read, which is used in the BCM54810
+Sure, do it, no objections.
 
-Series applied, thanks.
+-- 
+              Dmitry
