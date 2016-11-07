@@ -1,20 +1,37 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 7 Nov 2016 13:32:50 +0100
-Subject: [PATCH v7 11/11] arm64: dts: r8a7796: salvator-x: Enable UHS-I
- SDR-104
-In-Reply-To: <CAMuHMdVLAK0TKLoB07_U1XNW9kCOyen80gPrkaXOLqAq0=BA+Q@mail.gmail.com>
-References: <1473764228-24768-1-git-send-email-horms+renesas@verge.net.au>
- <1473764228-24768-12-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVLAK0TKLoB07_U1XNW9kCOyen80gPrkaXOLqAq0=BA+Q@mail.gmail.com>
-Message-ID: <20161107123249.GD12319@verge.net.au>
+Date: Mon, 7 Nov 2016 13:40:45 +0100
+Subject: [PATCH v2] ARM: DTS: r8a7794: alt: Fix PFC names for DU
+In-Reply-To: <c0a3c44b-545c-7af3-feed-857cb20ef698@cogentembedded.com>
+References: <1478180574-15464-1-git-send-email-jacopo@jmondi.org>
+ <1478201686-25488-1-git-send-email-jacopo@jmondi.org>
+ <c0a3c44b-545c-7af3-feed-857cb20ef698@cogentembedded.com>
+Message-ID: <20161107124044.GE12319@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 12:49:42PM +0200, Geert Uytterhoeven wrote:
-> On Tue, Sep 13, 2016 at 12:57 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Add the sd-uhs-sdr104 property to SDHI0 and SDHI1.
+On Fri, Nov 04, 2016 at 02:43:18PM +0300, Sergei Shtylyov wrote:
+> Hello.
 > 
-> SDHI0 and SDHI3.
+> On 11/3/2016 10:34 PM, Jacopo Mondi wrote:
+> 
+> >Update the PFC pin groups and function names of DU interface for
+> >r8a7794 ALT board.
+> >
+> >The currently specified pin groups and function names prevented PFC and
+> >DU interfaces from being correctly configured:
+> >
+> >sh-pfc e6060000.pin-controller: function 'du' not supported
+> >sh-pfc e6060000.pin-controller: invalid function du in map table
+> >sh-pfc e6060000.pin-controller: function 'du' not supported
+> >sh-pfc e6060000.pin-controller: invalid function du in map table
+> >sh-pfc e6060000.pin-controller: function 'du' not supported
+> >sh-pfc e6060000.pin-controller: invalid function du in map table
+> >sh-pfc e6060000.pin-controller: function 'du' not supported
+> >sh-pfc e6060000.pin-controller: invalid function du in map table
+> >rcar-du: probe of feb00000.display failed with error -22
+> >
+> >Signed-off-by: Jacopo Mondi <jacopo@jmondi.org>
+> 
+> Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Thanks, I will fix that.
+Thanks, I have queued this up.
