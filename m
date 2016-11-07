@@ -1,57 +1,65 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 7 Nov 2016 22:50:58 +0530
-Subject: [PATCH 3/6] clk: Add driver for Maxim-8997 PMIC clocks
-In-Reply-To: <63750c2f-35cb-91ab-276b-c788f51081cb@osg.samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 7 Nov 2016 19:27:34 +0200
+Subject: [PATCH 0/6] Add support for MAX8997 Clock Driver
+In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
- <1478513376-14307-4-git-send-email-pankaj.dubey@samsung.com>
- <63750c2f-35cb-91ab-276b-c788f51081cb@osg.samsung.com>
-Message-ID: <CAGcde9EkEsvJ2kBpNvd+bEZj0nbpgmFu1zBe+RQz+Kij9WxHMA@mail.gmail.com>
+Message-ID: <20161107172734.GA4865@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On Mon, Nov 07, 2016 at 03:39:30PM +0530, Pankaj Dubey wrote:
+> During recent test on Exynos4210 based Origen board, I observed
+> RTC1 probe is failing giving following error message:
+> 
+> [    2.195817] s3c-rtc 10070000.rtc: failed to find rtc source clock
+> [    2.200475] s3c-rtc: probe of 10070000.rtc failed with error -2
+> [    2.206597] i2c /dev entries driver
+> 
+> This is mainly because S3C-RTC expects two clocks "rtc" and "rtc_src".
+> In case of Origen board this second clock is supplied by MAX8997 clock
+> oscillator.
+> This patch series modified MAX8997 MFD driver for supporting regmap, and 
+> adds max8997-clk driver. Also it documentation where-ever required and
+> extends RTC node in exynos4210-origen.dts for supporting both clocks.
+> 
+> After this patch series, RTC is getting probed properly on Origen board.
+> 
+> This patch series is tested for SMP boot on Origen board.
 
-On 7 November 2016 at 20:31, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Hello Pankaj,
->
-> On 11/07/2016 07:09 AM, Pankaj Dubey wrote:
->> The MAX8997 PMIC has 32.786kHz crystal oscillator which provides an
->> accurate low frequency clock for MAX8997 internal circuit as well as
->> external circuit. This patch adds support for these two clocks.
->>
->> CC: Michael Turquette <mturquette@baylibre.com>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: devicetree at vger.kernel.org
->> CC: linux-clk at vger.kernel.org
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->
-> What kernel version are you basing this on? The Maxim common clock code
+No need to re-invent the wheel:
+https://lkml.org/lkml/2016/6/17/57
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/437113.html
 
-This patch series, I have prepared on Krzysztof's for-next which is 4.9-rc1,
+I won't be sending updates for these patches. Feel free to continue the
+work.
 
-> is going away for v4.9 and instead the clk-max77686 driver supports both
-> 77686 and 77802 clocks. See commit 8ad313fe4e00 ("clk: max77686: Combine
-> Maxim max77686 and max77802 driver").
->
-> Since the 8997 clock IP looks very similar to 77802 AFAICT, you should
-> also extend the clk-max77686 driver to have 8997 support.
->
+BR,
+Krzysztof
 
-I was not aware of this change. I will check this and if I can
-reuse/extend max77686 for 8997 I will do it.
-
-Thanks,
-Pankaj Dubey
-
-> Best regards,
-> --
-> Javier Martinez Canillas
-> Open Source Group
-> Samsung Research America
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> Pankaj Dubey (6):
+>   mfd: max8997: Initialize max8997 register map
+>   dt-bindings: clk: max8997: Add DT binding documentation
+>   clk: Add driver for Maxim-8997 PMIC clocks
+>   ARM: dts: Add clock provider specific properties to max8997 node
+>   mfd: max8997: Add max8997-clk name in mfd_cell
+>   ARM: dts: Extend the S3C RTC node with rtc_src clock
+> 
+>  .../devicetree/bindings/clock/maxim,max8997.txt    | 44 +++++++++++++
+>  .../bindings/regulator/max8997-regulator.txt       |  3 +
+>  arch/arm/boot/dts/exynos4210-origen.dts            |  6 +-
+>  arch/arm/boot/dts/exynos4210-trats.dts             |  3 +-
+>  drivers/clk/Kconfig                                | 10 +++
+>  drivers/clk/Makefile                               |  1 +
+>  drivers/clk/clk-max8997.c                          | 76 ++++++++++++++++++++++
+>  drivers/mfd/max8997.c                              | 15 +++++
+>  include/dt-bindings/clock/maxim,max8997.h          | 23 +++++++
+>  include/linux/mfd/max8997-private.h                |  3 +
+>  10 files changed, 182 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
+>  create mode 100644 drivers/clk/clk-max8997.c
+>  create mode 100644 include/dt-bindings/clock/maxim,max8997.h
+> 
+> -- 
+> 2.7.4
+> 
