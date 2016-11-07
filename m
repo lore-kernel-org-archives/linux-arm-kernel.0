@@ -1,200 +1,126 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon,  7 Nov 2016 18:17:31 +0000
-Subject: [PATCH v11 00/14] Add support for FDMA DMA controller and slim core
- rproc found on STi chipsets
-Message-ID: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
+Date: Mon,  7 Nov 2016 18:17:32 +0000
+Subject: [PATCH v11 01/14] remoteproc: Update Kconfig setup to 'depends on
+ REMOTEPROC'
+In-Reply-To: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
+References: <1478542665-17089-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1478542665-17089-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod and Bjorn,
+Make REMOTEPROC core a selectable kconfig option, and update
+remoteproc client drivers to 'depends on' the core. This avoids
+some nasty Kconfig recursive dependency issues. Also when using
+menuconfig client drivers will be hidden until the core has been
+enabled.
 
-This patchset adds support for the Flexible Direct Memory Access (FDMA) core
-found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
-with a dedicated firmware. It is a general purpose DMA controller supporting
-16 independent channels and data can be moved from memory to memory or between
-memory and paced latency critical real time targets.
+Documentation/kbuild/kconfig-language.txt:
 
-In reponse to Bjorn latest mail here https://lkml.org/lkml/2016/11/7/425 and
-here https://patchwork.kernel.org/patch/9368157/ I have created a v11
-incorporating the minor API update, and removed the unrelated change.
+  Note:
+        select should be used with care. select will force
+        a symbol to a value without visiting the dependencies.
+        By abusing select you are able to select a symbol FOO even
+        if FOO depends on BAR that is not set.
+        In general use select only for non-visible symbols
+        (no prompts anywhere) and for symbols with no dependencies.
+        That will limit the usefulness but on the other hand avoid
+        the illegal configurations all over.
 
-As tthis series has been in linux-next for a while, some additional fixes
-have been submitted and applied by Vinod. I have included these as part of
-the v11 series as well.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/remoteproc/Kconfig | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-I believe the best route as described here
-https://www.spinics.net/lists/arm-kernel/msg541026.htmlforward is for Vinod
-to apply the whole series on an immutable branch which is then merged into
-both the dma and remoteproc trees.
-
-regards,
-
-Peter.
-
-v11 Fix rproc_put to rproc_free(). Also fix unrelated change in Kconfig caused
-by a bad rebase. Include additional fixes which are already in linux-next.
-
-V10 series updates remoteproc kconfig subsystem to use 'depends on' rather
-than select for the remoteproc core. Remoteproc client drivers now need to
-'depends on' for the core part.
-
-This avoids the Kconfig recursive dependency errors and reliance on the DRM
-patch included with the v9 series. Patches are also included for enabling the
-remoteproc core in the multi_v7 defconfig. All patches for DRM subsystem have
-been removed.
-
-Note there is no longer a depedency with the DRM_VIRTIO_GPU driver in this series,
-only remoteproc and dmaengine subsystems.
-
-regards,
-
-Peter.
-
-v11
- - rproc_put to rproc_free
- - Fix bad rebase with unrelated Kconfig change.
- - include additional fixes submitted since driver has been in linux-next
-
-v10 RESEND
- - Rebase on v4.9-rc1
-
-Changes since v9:
- - Update remoteproc Kconfig to 'depends on'
- - Add remoteproc core to multi_v7 defconfig
- - Remove drm patches
- - rebase v4.8
-
-Changes since v8:
- - Add MODULE_ALIAS (Vinod)
- - devm_kzalloc to devm_kcalloc (Vinod)
- - quisce tasklet initialised by vchan_init() (Vinod)
- - Don't make SLIM rproc user selectable (Bjorn)
- - slim_rproc: Ensure clocks enabled before firmware load (Peter)
- - Various code style nits / commit message change (Lee)
- - Separate patch for '\n' kconfig removal (Vinod)
- - Fix clock bug when booting without clk_ignore_unused param
-
-Changes since v7:
- - Rebase on v4.8-rc3 (Peter)
- - Double check that len is <= mem[i].size (Bjorn)
- - Remove if (!fw) checks (Bjorn)
- - Omit reference from fw_ops struct (Bjorn)
- - Call rproc_del() before rproc_put() (Bjorn)
- - Fix some odd line breaks (Bjorn)
- - Rename SLIM_* and slim_* with st prefix (Bjorn)
-
-Changes since v6:
- - Fix recursive Kconfig warning (Patrice)
- - Fix various Intel zero day compiler warnings
- - Remove all changes related to late firmware load (now relies on initramfs) (Peter)
-
-Changes since v5:
- - Remove optional rsc table and go back to dummy resource table (Bjorn)
- - Retry rproc_fw_config_virtio() from rproc_boot() if previously failed (Peter)
- - Fixup some kbuild warnings
- - rebase on v4.7-rc5
- - Remove some patches which were merged via ASoC tree
-
-Changes since v4:
- - Make rsc table optional in remoteproc (Peter)
- - Various fixups to STi audio DT nodes (Arnaud)
- - Bulk rename of xp70 to slim (Peter)
- - Update my email to @linaro.org (Lee)
- - rebase on v4.7-rc2 (Peter)
- - Don't make ST_SLIM_REMOTEPROC user selectable (Bjorn)
- - -EPROBE_DEFER if rproc_boot fails when allocating DMA channel (Arnaud / Peter)
- - Drop some unnecessary headers (Vinod / Bjorn)
- - Change to writel now we have several mappings (Bjorn)
- - Remove io_res, rproc, and some unused structure fields / #define (Bjorn)
- - put clks in error path, also put clks before rproc_put() (Bjorn)
- - Make enum less generic (Bjorn)
- - Make slim_rproc_alloc() return a st_slim_rproc reference (Bjorn)
- - Alphabetical naming in Kconfig & Makefile (Vinod)
- - Add FDMA prefix to REQ_CTRL* (Vinod)
- - Print ret on some error paths (Vinod)
- - Add some acked-by (Peter)
-
-Changes since v3:
- - Remove elf loading code from fdma driver (Vinod)
- - Remove fdma_ prefix for clock names (Arnd)
- - Make _xlate use dma_get_any_channel rather than request_channel (Arnd)
- - Make a common function for _prep_ routines (Vinod)
- - Make driver depend on COMPILE_TEST (Arnd)
- - Remove unnecessary st_fdma_filter_fn (Arnd)
- - Enable FDMA as a module (Arnd)
- - Drop fdma_ clock prefix (Arnd)
- - Fix description as well as example for st, prefix (Arnd)
- - Remove string concatenation from fdma register macros to ease grep'ability (Arnd)
- - Add a XP70 rproc driver for ELF firmware loading and start/stop control (Peter)
- - Add myself as a author of the driver (Peter)
-
-Changes since v2:
- - Change to dma-controller (Arnd)
- - Remove platform data header file and simplifiy code (Arnd)
- - Remove FW_LOADER_USER_HELPER_FALLBACK and rework firmware loading to device config (Vinod)
- - Use SET_RUNTIME_PM_OPS helpers (Vinod)
- - Remove fdma-id dt prop and use compatibles to generate different fdma firmware names (Arnd / Lee)
- - Add sti-asoc-card DT nodes and pinmux config for uniperif player & reader (Peter)
- - Update sti-asoc-card DT binding documentation (Peter)
- - Enable STi audio drivers in multi_v7_defconfig (Peter)
-
-Changes since v1:
- - split into smaller patches for easier / faster review (Vinod)
- - new fill_hw_mode() with common code (Vinod)
- - new config_reqctrl() called from *_prep() instead of device_config cb (Vinod)
- - fdma-xbar support removed (Peter)
- - rework firmware name mechanism so fwname isn't in DT (Peter / Lee)
- - st_fdma_seg_to_mem can be static (Paul)
- - EXPORT_SYMBOL st_fdma_filter_fn not required (Paul)
- - s/channel/channels (vinod)
- - better describe "Must be <3>" (vinod)
- - sizeof(*ehdr) (vinod)
- - print values on error debug (vinod)
- - empty line (Vinod)
- - Update to -EIO (Vinod)
- - Make st_fdma tristate (Paul)
- - Remove __exit tag from .remove (Maxime)
- - Update MAINTAINERS rule to fdma* (Lee)
- - Unit address should match reg property (Lee)
-
-Arnd Bergmann (1):
-  dmaengine: st_fdma: fix uninitialized variable access
-
-Peter Griffin (12):
-  remoteproc: Update Kconfig setup to 'depends on REMOTEPROC'
-  remoteproc: st_slim_rproc: add a slimcore rproc driver
-  MAINTAINERS: Add st slim core rproc driver to STi section.
-  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
-    documentation
-  dmaengine: st_fdma: Add STMicroelectronics FDMA driver header file
-  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
-  MAINTAINERS: Add FDMA driver files to STi section.
-  ARM: multi_v7_defconfig: Enable remoteproc core
-  ARM: multi_v7_defconfig: Enable st_remoteproc driver.
-  ARM: multi_v7_defconfig: Enable STi FDMA driver
-  ARM: multi_v7_defconfig: Enable STi and simple-card drivers.
-  dmaengine: st_fdma: Update st_fdma to 'depends on REMOTEPROC'.
-
-Wei Yongjun (1):
-  dmaengine: st_fdma: Fix the error return code in st_fdma_probe()
-
- Documentation/devicetree/bindings/dma/st_fdma.txt |  87 +++
- MAINTAINERS                                       |   3 +
- arch/arm/configs/multi_v7_defconfig               |   6 +
- drivers/dma/Kconfig                               |  14 +
- drivers/dma/Makefile                              |   1 +
- drivers/dma/st_fdma.c                             | 889 ++++++++++++++++++++++
- drivers/dma/st_fdma.h                             | 249 ++++++
- drivers/remoteproc/Kconfig                        |  25 +-
- drivers/remoteproc/Makefile                       |   1 +
- drivers/remoteproc/st_slim_rproc.c                | 364 +++++++++
- include/linux/remoteproc/st_slim_rproc.h          |  58 ++
- 11 files changed, 1688 insertions(+), 9 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
- create mode 100644 drivers/dma/st_fdma.c
- create mode 100644 drivers/dma/st_fdma.h
- create mode 100644 drivers/remoteproc/st_slim_rproc.c
- create mode 100644 include/linux/remoteproc/st_slim_rproc.h
-
+diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+index f396bfe..a244b1a 100644
+--- a/drivers/remoteproc/Kconfig
++++ b/drivers/remoteproc/Kconfig
+@@ -1,20 +1,21 @@
+ menu "Remoteproc drivers"
+ 
+-# REMOTEPROC gets selected by whoever wants it
+ config REMOTEPROC
+-	tristate
++	tristate "Support for Remote Processor subsystem"
+ 	depends on HAS_DMA
+ 	select CRC32
+ 	select FW_LOADER
+ 	select VIRTIO
+ 	select VIRTUALIZATION
+ 
++if REMOTEPROC
++
+ config OMAP_REMOTEPROC
+ 	tristate "OMAP remoteproc support"
+ 	depends on HAS_DMA
+ 	depends on ARCH_OMAP4 || SOC_OMAP5
+ 	depends on OMAP_IOMMU
+-	select REMOTEPROC
++	depends on REMOTEPROC
+ 	select MAILBOX
+ 	select OMAP2PLUS_MBOX
+ 	select RPMSG_VIRTIO
+@@ -34,7 +35,7 @@ config OMAP_REMOTEPROC
+ config STE_MODEM_RPROC
+ 	tristate "STE-Modem remoteproc support"
+ 	depends on HAS_DMA
+-	select REMOTEPROC
++	depends on REMOTEPROC
+ 	default n
+ 	help
+ 	  Say y or m here to support STE-Modem shared memory driver.
+@@ -44,7 +45,7 @@ config STE_MODEM_RPROC
+ config WKUP_M3_RPROC
+ 	tristate "AMx3xx Wakeup M3 remoteproc support"
+ 	depends on SOC_AM33XX || SOC_AM43XX
+-	select REMOTEPROC
++	depends on REMOTEPROC
+ 	help
+ 	  Say y here to support Wakeup M3 remote processor on TI AM33xx
+ 	  and AM43xx family of SoCs.
+@@ -57,8 +58,8 @@ config WKUP_M3_RPROC
+ config DA8XX_REMOTEPROC
+ 	tristate "DA8xx/OMAP-L13x remoteproc support"
+ 	depends on ARCH_DAVINCI_DA8XX
++	depends on REMOTEPROC
+ 	select CMA if MMU
+-	select REMOTEPROC
+ 	select RPMSG_VIRTIO
+ 	help
+ 	  Say y here to support DA8xx/OMAP-L13x remote processors via the
+@@ -84,9 +85,9 @@ config QCOM_Q6V5_PIL
+ 	tristate "Qualcomm Hexagon V5 Peripherial Image Loader"
+ 	depends on OF && ARCH_QCOM
+ 	depends on QCOM_SMEM
++	depends on REMOTEPROC
+ 	select MFD_SYSCON
+ 	select QCOM_MDT_LOADER
+-	select REMOTEPROC
+ 	help
+ 	  Say y here to support the Qualcomm Peripherial Image Loader for the
+ 	  Hexagon V5 based remote processors.
+@@ -102,7 +103,7 @@ config QCOM_WCNSS_PIL
+ 	select QCOM_MDT_LOADER
+ 	select QCOM_SCM
+ 	select QCOM_WCNSS_IRIS
+-	select REMOTEPROC
++	depends on REMOTEPROC
+ 	help
+ 	  Say y here to support the Peripheral Image Loader for the Qualcomm
+ 	  Wireless Connectivity Subsystem.
+@@ -110,10 +111,12 @@ config QCOM_WCNSS_PIL
+ config ST_REMOTEPROC
+ 	tristate "ST remoteproc support"
+ 	depends on ARCH_STI
+-	select REMOTEPROC
++	depends on REMOTEPROC
+ 	help
+ 	  Say y here to support ST's adjunct processors via the remote
+ 	  processor framework.
+ 	  This can be either built-in or a loadable module.
+ 
++endif # REMOTEPROC
++
+ endmenu
 -- 
 2.7.4
