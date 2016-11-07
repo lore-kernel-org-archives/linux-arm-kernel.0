@@ -1,50 +1,79 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Nov 2016 15:39:30 +0530
-Subject: [PATCH 0/6] Add support for MAX8997 Clock Driver
-Message-ID: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Mon, 07 Nov 2016 15:39:31 +0530
+Subject: [PATCH 1/6] mfd: max8997: Initialize max8997 register map
+In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478513376-14307-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During recent test on Exynos4210 based Origen board, I observed
-RTC1 probe is failing giving following error message:
+This patch add regmap initialization to use register map
+in max8997-clk device driver
 
-[    2.195817] s3c-rtc 10070000.rtc: failed to find rtc source clock
-[    2.200475] s3c-rtc: probe of 10070000.rtc failed with error -2
-[    2.206597] i2c /dev entries driver
+CC: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+---
+ drivers/mfd/max8997.c               | 14 ++++++++++++++
+ include/linux/mfd/max8997-private.h |  3 +++
+ 2 files changed, 17 insertions(+)
 
-This is mainly because S3C-RTC expects two clocks "rtc" and "rtc_src".
-In case of Origen board this second clock is supplied by MAX8997 clock
-oscillator.
-This patch series modified MAX8997 MFD driver for supporting regmap, and 
-adds max8997-clk driver. Also it documentation where-ever required and
-extends RTC node in exynos4210-origen.dts for supporting both clocks.
-
-After this patch series, RTC is getting probed properly on Origen board.
-
-This patch series is tested for SMP boot on Origen board.
-
-Pankaj Dubey (6):
-  mfd: max8997: Initialize max8997 register map
-  dt-bindings: clk: max8997: Add DT binding documentation
-  clk: Add driver for Maxim-8997 PMIC clocks
-  ARM: dts: Add clock provider specific properties to max8997 node
-  mfd: max8997: Add max8997-clk name in mfd_cell
-  ARM: dts: Extend the S3C RTC node with rtc_src clock
-
- .../devicetree/bindings/clock/maxim,max8997.txt    | 44 +++++++++++++
- .../bindings/regulator/max8997-regulator.txt       |  3 +
- arch/arm/boot/dts/exynos4210-origen.dts            |  6 +-
- arch/arm/boot/dts/exynos4210-trats.dts             |  3 +-
- drivers/clk/Kconfig                                | 10 +++
- drivers/clk/Makefile                               |  1 +
- drivers/clk/clk-max8997.c                          | 76 ++++++++++++++++++++++
- drivers/mfd/max8997.c                              | 15 +++++
- include/dt-bindings/clock/maxim,max8997.h          | 23 +++++++
- include/linux/mfd/max8997-private.h                |  3 +
- 10 files changed, 182 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
- create mode 100644 drivers/clk/clk-max8997.c
- create mode 100644 include/dt-bindings/clock/maxim,max8997.h
-
+diff --git a/drivers/mfd/max8997.c b/drivers/mfd/max8997.c
+index 2d6e2c3..bda9ec8 100644
+--- a/drivers/mfd/max8997.c
++++ b/drivers/mfd/max8997.c
+@@ -175,11 +175,17 @@ static inline unsigned long max8997_i2c_get_driver_data(struct i2c_client *i2c,
+ 	return id->driver_data;
+ }
+ 
++static const struct regmap_config max8997_regmap_config = {
++	.reg_bits = 8,
++	.val_bits = 8,
++};
++
+ static int max8997_i2c_probe(struct i2c_client *i2c,
+ 			    const struct i2c_device_id *id)
+ {
+ 	struct max8997_dev *max8997;
+ 	struct max8997_platform_data *pdata = dev_get_platdata(&i2c->dev);
++	const struct regmap_config *config = &max8997_regmap_config;
+ 	int ret = 0;
+ 
+ 	max8997 = devm_kzalloc(&i2c->dev, sizeof(struct max8997_dev),
+@@ -202,6 +208,14 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
+ 	if (!pdata)
+ 		return ret;
+ 
++	max8997->regmap = devm_regmap_init_i2c(i2c, config);
++	if (IS_ERR(max8997->regmap)) {
++		ret = PTR_ERR(max8997->regmap);
++		dev_err(max8997->dev, "Failed to allocate register map: %d\n",
++				ret);
++		return ret;
++	}
++
+ 	max8997->pdata = pdata;
+ 	max8997->ono = pdata->ono;
+ 
+diff --git a/include/linux/mfd/max8997-private.h b/include/linux/mfd/max8997-private.h
+index 78c76cd..50c7129 100644
+--- a/include/linux/mfd/max8997-private.h
++++ b/include/linux/mfd/max8997-private.h
+@@ -25,6 +25,7 @@
+ #include <linux/i2c.h>
+ #include <linux/export.h>
+ #include <linux/irqdomain.h>
++#include <linux/regmap.h>
+ 
+ #define MAX8997_REG_INVALID	(0xff)
+ 
+@@ -388,6 +389,8 @@ struct max8997_dev {
+ 	struct mutex iolock;
+ 
+ 	unsigned long type;
++
++	struct regmap *regmap;
+ 	struct platform_device *battery; /* battery control (not fuel gauge) */
+ 
+ 	int irq;
 -- 
 2.7.4
