@@ -1,89 +1,60 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Nov 2016 15:39:32 +0530
-Subject: [PATCH 2/6] dt-bindings: clk: max8997: Add DT binding documentation
+Date: Mon, 07 Nov 2016 15:39:34 +0530
+Subject: [PATCH 4/6] ARM: dts: Add clock provider specific properties to
+ max8997 node
 In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1478513376-14307-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478513376-14307-5-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Tree binding documentation for the clocks
-outputs in the Maxim-8997 Power Management IC.
+This patch adds a label and #clock-cells property to device node of
+max8997 PMIC to allow using it as a clock provider.
 
-CC: Michael Turquette <mturquette@baylibre.com>
 CC: Rob Herring <robh+dt@kernel.org>
 CC: devicetree at vger.kernel.org
-CC: linux-clk at vger.kernel.org
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- .../devicetree/bindings/clock/maxim,max8997.txt    | 44 ++++++++++++++++++++++
- .../bindings/regulator/max8997-regulator.txt       |  3 ++
- 2 files changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/maxim,max8997.txt
+ arch/arm/boot/dts/exynos4210-origen.dts | 3 ++-
+ arch/arm/boot/dts/exynos4210-trats.dts  | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/maxim,max8997.txt b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
-new file mode 100644
-index 0000000..d2e2a74
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/maxim,max8997.txt
-@@ -0,0 +1,44 @@
-+Binding for Maxim MAX8997 32k clock generator block
-+
-+This is a part of device tree bindings of MAX8997 multi-function device.
-+More information can be found in bindings/regulator/max8997-regulator.txt file.
-+
-+The MAX8997 contains two 32.768khz clock outputs that can be controlled
-+(gated/ungated) over I2C.
-+
-+Following properties should be presend in main device node of the MFD chip.
-+
-+Required properties:
-+
-+- #clock-cells: from common clock binding; shall be set to 1.
-+
-+Optional properties:
-+- clock-output-names: From common clock binding.
-+
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. Following indices are allowed:
-+    - 0: 32khz_ap clock,
-+    - 1: 32khz_cp clock,
-+
-+Clocks are defined as preprocessor macros in dt-bindings/clock/maxim,max8997.h
-+header and can be used in device tree sources.
-+
-+Example: Node of the MFD chip
-+
-+	max8997: max8997_pmic at 66 {
-+		compatible = "maxim,max8997-pmic";
-+		reg = <0x66>;
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <4 0>, <3 0>;
-+		#clock-cells = <1>;
-+		/* ... */
-+	};
-+
-+Example: Clock consumer node
-+
-+	foo at 0 {
-+		compatible = "bar,foo";
-+		/* ... */
-+		clocks = <&max8997 MAX8997_CLK_AP>;
-+		clock-names = "my-clock";
-+	};
-diff --git a/Documentation/devicetree/bindings/regulator/max8997-regulator.txt b/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
-index 5c186a7..af1f9c0 100644
---- a/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/max8997-regulator.txt
-@@ -6,6 +6,9 @@ interfaced to the host controller using a i2c interface. Each sub-block is
- addressed by the host system using different i2c slave address. This document
- describes the bindings for 'pmic' sub-block of max8997.
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index cb3a255..6c7ef4e 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -147,11 +147,12 @@
+ 	pinctrl-0 = <&i2c0_bus>;
+ 	pinctrl-names = "default";
  
-+Binding for the built-in 32k clock generator block is defined separately
-+in bindings/clk/maxim,max8997.txt file
-+
- Required properties:
- - compatible: Should be "maxim,max8997-pmic".
- - reg: Specifies the i2c slave address of the pmic block. It should be 0x66.
+-	max8997_pmic at 66 {
++	max8997: max8997_pmic at 66 {
+ 		compatible = "maxim,max8997-pmic";
+ 		reg = <0x66>;
+ 		interrupt-parent = <&gpx0>;
+ 		interrupts = <4 0>, <3 0>;
++		#clock-cells = <1>;
+ 
+ 		max8997,pmic-buck1-dvs-voltage = <1350000>;
+ 		max8997,pmic-buck2-dvs-voltage = <1100000>;
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 0ca1b4d..74a9d39 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -295,12 +295,13 @@
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ 
+-	max8997_pmic at 66 {
++	max8997: max8997_pmic at 66 {
+ 		compatible = "maxim,max8997-pmic";
+ 
+ 		reg = <0x66>;
+ 		interrupt-parent = <&gpx0>;
+ 		interrupts = <7 0>;
++		#clock-cells = <1>;
+ 
+ 		max8997,pmic-buck1-uses-gpio-dvs;
+ 		max8997,pmic-buck2-uses-gpio-dvs;
 -- 
 2.7.4
