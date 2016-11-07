@@ -1,135 +1,41 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  7 Nov 2016 09:21:20 +0000
-Subject: [RESEND PATCH v1 4/6] irqchip/gicv3-its: Specialise readq and writeq
- accesses
-In-Reply-To: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-References: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1478510482-15471-5-git-send-email-vladimir.murzin@arm.com>
+Date: Mon,  7 Nov 2016 09:21:16 +0000
+Subject: [RESEND PATCH v1 0/6] Support GICv3 ITS in 32-bit mode
+Message-ID: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-readq and writeq type of assessors are not supported in AArch32, so we
-need to specialise them and glue later with series of 32-bit accesses
-on AArch32 side.
+Hi,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/include/asm/arch_gicv3.h |   14 ++++++++++++++
- drivers/irqchip/irq-gic-v3-its.c    |   24 ++++++++++++------------
- 2 files changed, 26 insertions(+), 12 deletions(-)
+This series introduces GICv3 ITS to 32-bit world. Since I'm limited
+with real world 32-bit platforms which uses ITS it was tested with
+help of vITS on 64-bit host running 32-bit guest.
 
-diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-index 4f0402a..022523b 100644
---- a/arch/arm64/include/asm/arch_gicv3.h
-+++ b/arch/arm64/include/asm/arch_gicv3.h
-@@ -190,5 +190,19 @@ static inline void gic_write_bpr1(u32 val)
- 
- #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
- 
-+#define gits_read_baser(c)		readq_relaxed(c)
-+#define gits_write_baser(v, c)		writeq_relaxed(v, c)
-+
-+#define gits_read_cbaser(c)		readq_relaxed(c)
-+#define gits_write_cbaser(v, c)		writeq_relaxed(v, c)
-+
-+#define gits_write_cwriter(v, c)	writeq_relaxed(v, c)
-+
-+#define gicr_read_propbaser(c)		readq_relaxed(c)
-+#define gicr_write_propbaser(v, c)	writeq_relaxed(v, c)
-+
-+#define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
-+#define gicr_read_pendbaser(c)		readq_relaxed(c)
-+
- #endif /* __ASSEMBLY__ */
- #endif /* __ASM_ARCH_GICV3_H */
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index b2a6e7b..69b040f 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -835,7 +835,7 @@ static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
- {
- 	u32 idx = baser - its->tables;
- 
--	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
-+	return gits_read_baser(its->base + GITS_BASER + (idx << 3));
- }
- 
- static void its_write_baser(struct its_node *its, struct its_baser *baser,
-@@ -843,7 +843,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
- {
- 	u32 idx = baser - its->tables;
- 
--	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
-+	gits_write_baser(val, its->base + GITS_BASER + (idx << 3));
- 	baser->val = its_read_baser(its, baser);
- }
- 
-@@ -1125,8 +1125,8 @@ static void its_cpu_init_lpis(void)
- 	       GICR_PROPBASER_WaWb |
- 	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
- 
--	writeq_relaxed(val, rbase + GICR_PROPBASER);
--	tmp = readq_relaxed(rbase + GICR_PROPBASER);
-+	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
-+	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
- 
- 	if ((tmp ^ val) & GICR_PROPBASER_SHAREABILITY_MASK) {
- 		if (!(tmp & GICR_PROPBASER_SHAREABILITY_MASK)) {
-@@ -1138,7 +1138,7 @@ static void its_cpu_init_lpis(void)
- 			val &= ~(GICR_PROPBASER_SHAREABILITY_MASK |
- 				 GICR_PROPBASER_CACHEABILITY_MASK);
- 			val |= GICR_PROPBASER_nC;
--			writeq_relaxed(val, rbase + GICR_PROPBASER);
-+			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
- 		}
- 		pr_info_once("GIC: using cache flushing for LPI property table\n");
- 		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
-@@ -1149,8 +1149,8 @@ static void its_cpu_init_lpis(void)
- 	       GICR_PENDBASER_InnerShareable |
- 	       GICR_PENDBASER_WaWb);
- 
--	writeq_relaxed(val, rbase + GICR_PENDBASER);
--	tmp = readq_relaxed(rbase + GICR_PENDBASER);
-+	gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
-+	tmp = gicr_read_pendbaser(rbase + GICR_PENDBASER);
- 
- 	if (!(tmp & GICR_PENDBASER_SHAREABILITY_MASK)) {
- 		/*
-@@ -1160,7 +1160,7 @@ static void its_cpu_init_lpis(void)
- 		val &= ~(GICR_PENDBASER_SHAREABILITY_MASK |
- 			 GICR_PENDBASER_CACHEABILITY_MASK);
- 		val |= GICR_PENDBASER_nC;
--		writeq_relaxed(val, rbase + GICR_PENDBASER);
-+		gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
- 	}
- 
- 	/* Enable LPIs */
-@@ -1716,8 +1716,8 @@ static int __init its_probe_one(struct resource *res,
- 		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
- 		 GITS_CBASER_VALID);
- 
--	writeq_relaxed(baser, its->base + GITS_CBASER);
--	tmp = readq_relaxed(its->base + GITS_CBASER);
-+	gits_write_cbaser(baser, its->base + GITS_CBASER);
-+	tmp = gits_read_cbaser(its->base + GITS_CBASER);
- 
- 	if ((tmp ^ baser) & GITS_CBASER_SHAREABILITY_MASK) {
- 		if (!(tmp & GITS_CBASER_SHAREABILITY_MASK)) {
-@@ -1729,13 +1729,13 @@ static int __init its_probe_one(struct resource *res,
- 			baser &= ~(GITS_CBASER_SHAREABILITY_MASK |
- 				   GITS_CBASER_CACHEABILITY_MASK);
- 			baser |= GITS_CBASER_nC;
--			writeq_relaxed(baser, its->base + GITS_CBASER);
-+			gits_write_cbaser(baser, its->base + GITS_CBASER);
- 		}
- 		pr_info("ITS: using cache flushing for cmd queue\n");
- 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
- 	}
- 
--	writeq_relaxed(0, its->base + GITS_CWRITER);
-+	gits_write_cwriter(0, its->base + GITS_CWRITER);
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
- 	err = its_init_domain(handle, its);
+I used Andrea's its/v8 branch at [1] with following option passed to
+kvmtool: --aarch32 --irqchip=gicv3-its --force-pci
+
+[1] git://www.linux-arm.org/kvmtool.git
+
+Changelog:
+
+    RFC -> v1
+        - rebased on 4.9-rc2,  gits_read_typer() has been dropped
+	- spilt ITS and vITS in separate patch sets
+	
+Vladimir Murzin (6):
+  irqchip/gic-v3-its: Change unsigned types for AArch32 compatibility
+  irqchip/gic-v3-its: Narrow down Entry Size when used as a divider
+  irqchip/gicv3-its: Specialise flush_dcache operation
+  irqchip/gicv3-its: Specialise readq and writeq accesses
+  ARM: gic-v3-its: Add 32bit support to GICv3 ITS
+  ARM: virt: Select ARM_GIC_V3_ITS
+
+ arch/arm/Kconfig                    |    1 +
+ arch/arm/include/asm/arch_gicv3.h   |   54 +++++++++++++++++++++----
+ arch/arm64/include/asm/arch_gicv3.h |   17 ++++++++
+ drivers/irqchip/irq-gic-v3-its.c    |   75 +++++++++++++++++------------------
+ include/linux/irqchip/arm-gic-v3.h  |    4 +-
+ 5 files changed, 104 insertions(+), 47 deletions(-)
+
 -- 
 1.7.9.5
