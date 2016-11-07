@@ -1,5 +1,5 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Nov 2016 19:13:12 +0000
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 7 Nov 2016 19:22:19 +0000
 Subject: [PATCH V3 0/8] IOMMU probe deferral support
 In-Reply-To: <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
 References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
@@ -7,34 +7,36 @@ References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
  <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
  <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
  <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
-Message-ID: <20161107191312.GK20591@arm.com>
+Message-ID: <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 08:46:06PM +0530, Sricharan wrote:
-> >>>Yikes, on second look, that definitely shouldn't be happening.
-> >>>Everything below is probably the resulting fallout.
-> >>
-> >>[   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
-> >>
-> >>I think the above print which says "failed to setup iommu_ops"
-> >>because the call ops->add_device failed in of_pci_iommu_configure
-> >>is the reason for the failure, in my case i simply do not get this even with
-> >>your scripts. ops->add_device succeeds in the rebind as well. So still
-> >>checking what could be happening in your case.
-> >
-> >I was looking at your code base from [1].The ops->add_device
-> >callback from of_pci_iommu_configure on the rebind is the
-> >one which is causing the failure. But not able to spot out
-> >from code which point is causing the failure. It would be very helpful
-> >if i can know which is the return value from the add_device callback
-> >or point inside add_device callback which fails in your setup.
-> >
-> >
-> >[1] git://linux-arm.org/linux-rm iommu/misc
+Hi Sricharan,
 
-So this also applies to mainline.
-
+On 04/11/16 15:16, Sricharan wrote:
+> Hi Robin,
+> 
+>>>> Yikes, on second look, that definitely shouldn't be happening.
+>>>> Everything below is probably the resulting fallout.
+>>>
+>>> [   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
+>>>
+>>> I think the above print which says "failed to setup iommu_ops"
+>>> because the call ops->add_device failed in of_pci_iommu_configure
+>>> is the reason for the failure, in my case i simply do not get this even with
+>>> your scripts. ops->add_device succeeds in the rebind as well. So still
+>>> checking what could be happening in your case.
+>>
+>> I was looking at your code base from [1].The ops->add_device
+>> callback from of_pci_iommu_configure on the rebind is the
+>> one which is causing the failure. But not able to spot out
+>>from code which point is causing the failure. It would be very helpful
+>> if i can know which is the return value from the add_device callback
+>> or point inside add_device callback which fails in your setup.
+>>
+>>
+>> [1] git://linux-arm.org/linux-rm iommu/misc
+> 
 > With little more try, i saw an issue where i had an failure
 > similar to what you reported. The issue happens when multiple
 > devices fall in to same group due to matching sids. I ended up
@@ -55,7 +57,22 @@ So this also applies to mainline.
 > the reference is not incremented, resulting in issues when the
 > remove_device callback for the devices is invoked.
 > Fixing the same here.
-> 
+
+Bah, yes, this does look like my fault - after flip-flopping between
+about 3 different ways to keep refcounts for the S2CR entries, none of
+which would quite work, I ripped it all out but apparently still got
+things wrong, oh well. Thanks for figuring it out.
+
+On the probe-deferral angle, whilst it's useful to have uncovered this
+bug, I don't think we should actually be calling remove_device() from
+DMA teardown. I think it's preferable from a user perspective if group
+numbering remains stable, rather than changing depending on the order in
+which they unbind/rebind VFIO drivers. I'm really keen to try and get
+this in shape for 4.10, so I've taken the liberty of hacking up my own
+branch (iommu/defer) based on v3 - would you mind taking a look at the
+two "iommu/of:" commits to see what you think? (Ignore the PCI changes
+to your later patches - that was an experiment which didn't really work out)
+
 > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
 >  drivers/iommu/arm-smmu.c | 4 +++-
@@ -73,14 +90,20 @@ So this also applies to mainline.
 > +	if (group) {
 > +		iommu_group_get_by_id(iommu_group_id(group));
 >  		return group;
+
+This might as well just be inline, i.e.:
+
+		return iommu_group_get_by_id(iommu_group_id(group));
+
+It's a shame we have to go all round the houses when we have the group
+right there, but this is probably the most expedient fix. I guess we can
+extend the API with some sort of iommu_group_get(group) overload in
+future if we really want to.
+
+Robin.
+
 > +	}
-
-This is foul :(
-
-I think we should either add a function for incrementing the refcount on a
-group, or we should get a handle on the existing aliasing device and get
-the group from that. As written, this patch is far too subtle.
-
-Joerg -- do you have any preference?
-
-Will
+>  
+>  	if (dev_is_pci(dev))
+>  		group = pci_device_group(dev);
+> 
