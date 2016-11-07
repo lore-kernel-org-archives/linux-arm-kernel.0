@@ -1,128 +1,55 @@
-From: Frank.Li@nxp.com (Frank Li)
-Date: Mon, 7 Nov 2016 11:30:48 -0600
-Subject: [PATCH V3 1/2] ARM: imx: mmdc perf function support i.MX6QP
-Message-ID: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 7 Nov 2016 16:31:16 +0000
+Subject: [PATCH 3/3] arm64/fpsimd: Use ID_AA64PFR0_EL1_.* macros
+In-Reply-To: <1441303979-9535-1-git-send-email-kuleshovmail@gmail.com>
+References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
+ <1441303979-9535-1-git-send-email-kuleshovmail@gmail.com>
+Message-ID: <f0a6a6de-8a54-52d3-f0c6-773c43989eb7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6QP added new register bit PROFILE_SEL in MADPCR0.
-need set it at perf start.
+On 03/09/15 19:12, Alexander Kuleshov wrote:
+> The 26d75e67c commit (arm64/cpufeature.h: Add macros for a cpu features
+> testing) provides set of macros for the testing processor's FP and advanced
+> SIMD features.
+>
+> Let's use these macros instead of direct calculation.
+>
+> Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
+> ---
+>  arch/arm64/kernel/fpsimd.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 44d6f75..12943a5 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -27,6 +27,7 @@
+>
+>  #include <asm/fpsimd.h>
+>  #include <asm/cputype.h>
+> +#include <asm/cpufeature.h>
+>
+>  #define FPEXC_IOF	(1 << 0)
+>  #define FPEXC_DZF	(1 << 1)
+> @@ -333,13 +334,13 @@ static int __init fpsimd_init(void)
+>  {
+>  	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
+>
+> -	if (pfr & (0xf << 16)) {
+> +	if (ID_AA64PFR0_EL1_FP(pfr)) {
+>  		pr_notice("Floating-point is not implemented\n");
+>  		return 0;
+>  	}
+>  	elf_hwcap |= HWCAP_FP;
+>
+> -	if (pfr & (0xf << 20))
+> +	if (ID_AA64PFR0_EL1_ADV_SIMD(pfr))
+>  		pr_notice("Advanced SIMD is not implemented\n");
+>  	else
+>  		elf_hwcap |= HWCAP_ASIMD;
+>
 
-Signed-off-by: Frank Li <Frank.Li@nxp.com>
----
-Change from V2 - V3
-- Use MMDC_FLAG_PROFILE_SEL
-- Use flags instead of driver_data
-- fix commit message typo
-- add const
-- use u32 val.
-Change from V1 - V2
-- remove fsl_mmdc_devtype
+Similar to the previous one, this won't apply anymore.
 
- arch/arm/mach-imx/mmdc.c | 38 ++++++++++++++++++++++++++++++++------
- 1 file changed, 32 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-index d82d14c..ba96bf9 100644
---- a/arch/arm/mach-imx/mmdc.c
-+++ b/arch/arm/mach-imx/mmdc.c
-@@ -44,6 +44,7 @@
- #define DBG_RST			0x2
- #define PRF_FRZ			0x4
- #define CYC_OVF			0x8
-+#define PROFILE_SEL		0x10
- 
- #define MMDC_MADPCR0	0x410
- #define MMDC_MADPSR0	0x418
-@@ -55,10 +56,29 @@
- 
- #define MMDC_NUM_COUNTERS	6
- 
-+#define MMDC_FLAG_PROFILE_SEL	0x1
-+
- #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
- 
- static int ddr_type;
- 
-+struct fsl_mmdc_devtype_data {
-+	unsigned int flags;
-+};
-+
-+static const struct fsl_mmdc_devtype_data imx6q_data = {
-+};
-+
-+static const struct fsl_mmdc_devtype_data imx6qp_data = {
-+	.flags = MMDC_FLAG_PROFILE_SEL,
-+};
-+
-+static const struct of_device_id imx_mmdc_dt_ids[] = {
-+	{ .compatible = "fsl,imx6q-mmdc", .data = (void *)&imx6q_data},
-+	{ .compatible = "fsl,imx6qp-mmdc", .data = (void *)&imx6qp_data},
-+	{ /* sentinel */ }
-+};
-+
- #ifdef CONFIG_PERF_EVENTS
- 
- static DEFINE_IDA(mmdc_ida);
-@@ -83,6 +103,7 @@ struct mmdc_pmu {
- 	struct device *dev;
- 	struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
- 	struct hlist_node node;
-+	struct fsl_mmdc_devtype_data *devtype_data;
- };
- 
- /*
-@@ -307,6 +328,7 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
- 	struct mmdc_pmu *pmu_mmdc = to_mmdc_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
- 	void __iomem *mmdc_base, *reg;
-+	u32 val;
- 
- 	mmdc_base = pmu_mmdc->mmdc_base;
- 	reg = mmdc_base + MMDC_MADPCR0;
-@@ -321,7 +343,12 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
- 	local64_set(&hwc->prev_count, 0);
- 
- 	writel(DBG_RST, reg);
--	writel(DBG_EN, reg);
-+
-+	val = DBG_EN;
-+	if (pmu_mmdc->devtype_data->flags & MMDC_FLAG_PROFILE_SEL)
-+		val |= PROFILE_SEL;
-+
-+	writel(val, reg);
- }
- 
- static int mmdc_pmu_event_add(struct perf_event *event, int flags)
-@@ -436,6 +463,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
- 	char *name;
- 	int mmdc_num;
- 	int ret;
-+	const struct of_device_id *of_id =
-+		of_match_device(imx_mmdc_dt_ids, &pdev->dev);
- 
- 	pmu_mmdc = kzalloc(sizeof(*pmu_mmdc), GFP_KERNEL);
- 	if (!pmu_mmdc) {
-@@ -450,6 +479,8 @@ static int imx_mmdc_perf_init(struct platform_device *pdev, void __iomem *mmdc_b
- 		name = devm_kasprintf(&pdev->dev,
- 				GFP_KERNEL, "mmdc%d", mmdc_num);
- 
-+	pmu_mmdc->devtype_data = (struct fsl_mmdc_devtype_data *)of_id->data;
-+
- 	hrtimer_init(&pmu_mmdc->hrtimer, CLOCK_MONOTONIC,
- 			HRTIMER_MODE_REL);
- 	pmu_mmdc->hrtimer.function = mmdc_pmu_timer_handler;
-@@ -524,11 +555,6 @@ int imx_mmdc_get_ddr_type(void)
- 	return ddr_type;
- }
- 
--static const struct of_device_id imx_mmdc_dt_ids[] = {
--	{ .compatible = "fsl,imx6q-mmdc", },
--	{ /* sentinel */ }
--};
--
- static struct platform_driver imx_mmdc_driver = {
- 	.driver		= {
- 		.name	= "imx-mmdc",
--- 
-2.5.2
+Suzuki
