@@ -1,70 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Nov 2016 11:39:47 +0000
-Subject: [PATCH V3 0/6] ARM64: Uprobe support added
-In-Reply-To: <e1593d0d-b63c-cc7b-fcee-753b5bd8f0de@redhat.com>
-References: <cover.1478068479.git.panand@redhat.com>
- <20161104174951.vj4il3xkdy7a2ln7@localhost>
- <20161104184652.rxllldll4qfe7qdn@localhost>
- <e1593d0d-b63c-cc7b-fcee-753b5bd8f0de@redhat.com>
-Message-ID: <20161107113944.GB28876@MBP.local>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 7 Nov 2016 12:27:53 +0100
+Subject: [PATCH V4 1/6] clk: tegra: add TEGRA20_CLK_NOR to init table
+In-Reply-To: <1478507405-13204-2-git-send-email-mirza.krak@gmail.com>
+References: <1478507405-13204-1-git-send-email-mirza.krak@gmail.com>
+ <1478507405-13204-2-git-send-email-mirza.krak@gmail.com>
+Message-ID: <20161107112753.GA28616@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 11:01:31AM +0530, Pratyush Anand wrote:
-> On Saturday 05 November 2016 12:16 AM, Catalin Marinas wrote:
-> > On Fri, Nov 04, 2016 at 11:49:51AM -0600, Catalin Marinas wrote:
-> > > On Wed, Nov 02, 2016 at 02:40:40PM +0530, Pratyush Anand wrote:
-> > > > Pratyush Anand (6):
-> > > >   arm64: kprobe: protect/rename few definitions to be reused by uprobe
-> > > >   arm64: kgdb_step_brk_fn: ignore other's exception
-> > > >   arm64: Handle TRAP_TRACE for user mode as well
-> > > >   arm64: Handle TRAP_BRKPT for user mode as well
-> > > >   arm64: introduce mm context flag to keep 32 bit task information
-> > > >   arm64: Add uprobe support
-> > > 
-> > > I queued the patches for 4.10. I will push them into -next sometime next
-> > > week once I do some testing (I'm currently at the LPC).
-> > 
-> > I spoke too soon. With these patches on top of 4.9-rc3, defconfig
-> > together with FTRACE and UPROBE_EVENT enabled I get:
-> > 
-> > In file included from /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/probes/decode-insn.c:20:0:
-> > /work/Linux/linux-2.6-aarch64/arch/arm64/include/asm/kprobes.h:52:5: error: conflicting types for 'kprobe_fault_handler'
-> >  int kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr);
-> >      ^~~~~~~~~~~~~~~~~~~~
-> > In file included from /work/Linux/linux-2.6-aarch64/arch/arm64/kernel/probes/decode-insn.c:17:0:
-> > /work/Linux/linux-2.6-aarch64/include/linux/kprobes.h:398:90: note: previous definition of 'kprobe_fault_handler' was here
-> >  static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
-> >                                                                                           ^
-> > /work/Linux/linux-2.6-aarch64/scripts/Makefile.build:290: recipe for target 'arch/arm64/kernel/probes/decode-insn.o' failed
+On Mon, Nov 07, 2016 at 09:30:00AM +0100, Mirza Krak wrote:
+> From: Mirza Krak <mirza.krak@gmail.com>
 > 
-> Hummmm...CONFIG_KPROBE was defined in my setup and did not notice it :( . We
-> need to remove #include <asm/kprobes.h> from
-> /arch/arm64/kernel/probes/decode-insn.c.
-> <asm/kprobes.h> is already included from <linux/kprobes.h> under #ifdef
-> CONFIG_KPROBE.
+> Add TEGRA20_CLK_NOR to init table and set default rate to 92 MHz which
+> is max rate.
 > 
-> diff --git a/arch/arm64/kernel/probes/decode-insn.c
-> b/arch/arm64/kernel/probes/decode-insn.c
-> index 8a29d29..6bf6657 100644
-> --- a/arch/arm64/kernel/probes/decode-insn.c
-> +++ b/arch/arm64/kernel/probes/decode-insn.c
-> @@ -17,7 +17,6 @@
->  #include <linux/kprobes.h>
->  #include <linux/module.h>
->  #include <linux/kallsyms.h>
-> -#include <asm/kprobes.h>
->  #include <asm/insn.h>
->  #include <asm/sections.h>
+> The maximum rate value of 92 MHz is pulled from the downstream L4T
+> kernel.
 > 
-> So, do you want me to send V4 or a separate topup fixup patch. Please let me
-> know, will do accordingly.
+> Signed-off-by: Mirza Krak <mirza.krak@gmail.com>
+> Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Tested-on: Colibri T20/T30 on EvalBoard V3.x and GMI-Memory Board
+> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+> 
+> Changes in v2:
+> - no changes
+> 
+> Changes in v3:
+> - Added comment in commit message where I got the maximum rates from.
+> 
+> Changes in V4:
+> - no changes
 
-Just a separate patch on top of your series would do. Also please test
-your series with CONFIG_KPROBE disabled and I assume this wasn't done
-(just in case there is an interaction we were not aware of).
+Applied, thanks.
 
-Thanks.
-
--- 
-Catalin
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/14d088fa/attachment.sig>
