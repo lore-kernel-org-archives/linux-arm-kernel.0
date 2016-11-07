@@ -1,117 +1,271 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Tue, 8 Nov 2016 02:28:40 +0800
-Subject: [PATCH v3 3/3] ARM: dmaengine: sun6i: share the dma driver with sun50i
-Message-ID: <20161107182840.GA3711@arx12>
+From: minyard@acm.org (Corey Minyard)
+Date: Mon, 7 Nov 2016 13:04:43 -0600
+Subject: [PATCH 2/3] ipmi/bt-bmc: maintain a request expiry list
+In-Reply-To: <1478073426-3714-3-git-send-email-clg@kaod.org>
+References: <1478073426-3714-1-git-send-email-clg@kaod.org>
+ <1478073426-3714-3-git-send-email-clg@kaod.org>
+Message-ID: <a7aea2a7-6cb4-655e-3c69-1a156945e27b@acm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, the dma of A64 support 8/16/32/64 bits
-so, we can add the condition of device compatible in convert_buswidth
-function and other place to determine the device whether is for A64,
-and then accept the 8 bytes bus width to it.
+On 11/02/2016 02:57 AM, C?dric Le Goater wrote:
+> Regarding the response expiration handling, the IPMI spec says :
+>
+>     The BMC must not return a given response once the corresponding
+>     Request-to-Response interval has passed. The BMC can ensure this
+>     by maintaining its own internal list of outstanding requests through
+>     the interface. The BMC could age and expire the entries in the list
+>     by expiring the entries at an interval that is somewhat shorter than
+>     the specified Request-to-Response interval....
+>
+> To handle such case, we maintain list of received requests using the
+> seq number of the BT message to identify them. The list is updated
+> each time a request is received and a response is sent. The expiration
+> of the reponses is handled at each updates but also with a timer.
 
-Signed-off-by: Hao Zhang <hao5781286@gmail.com>
----
- drivers/dma/sun6i-dma.c | 43 +++++++++++++++++++++++++++++++++----------
- 1 file changed, 33 insertions(+), 10 deletions(-)
+This looks correct, but it seems awfully complicated.
 
-diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-index 8346199..8a95a1a 100644
---- a/drivers/dma/sun6i-dma.c
-+++ b/drivers/dma/sun6i-dma.c
-@@ -247,13 +247,17 @@ static inline s8 convert_burst(u32 maxburst)
- 	}
- }
- 
--static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
-+static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width,
-+				  struct sun6i_dma_dev *sdev)
- {
--	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
--	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
-+	if (((addr_width >= DMA_SLAVE_BUSWIDTH_1_BYTE) &&
-+	     (addr_width <= DMA_SLAVE_BUSWIDTH_4_BYTES)) ||
-+	    ((addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES) &&
-+	     (of_device_is_compatible(sdev->slave.dev->of_node,
-+				      "allwinner,sun50i-a64-dma"))))
-+		return addr_width >> 1;
-+	else
- 		return -EINVAL;
--
--	return addr_width >> 1;
- }
- 
- static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
-@@ -508,19 +512,19 @@ static int set_config(struct sun6i_dma_dev *sdev,
- 		src_width = convert_buswidth(sconfig->src_addr_width !=
- 						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
- 				sconfig->src_addr_width :
--				DMA_SLAVE_BUSWIDTH_4_BYTES);
-+				DMA_SLAVE_BUSWIDTH_4_BYTES, sdev);
- 		dst_burst = convert_burst(sconfig->dst_maxburst);
--		dst_width = convert_buswidth(sconfig->dst_addr_width);
-+		dst_width = convert_buswidth(sconfig->dst_addr_width, sdev);
- 		break;
- 	case DMA_DEV_TO_MEM:
- 		src_burst = convert_burst(sconfig->src_maxburst);
--		src_width = convert_buswidth(sconfig->src_addr_width);
-+		src_width = convert_buswidth(sconfig->src_addr_width, sdev);
- 		dst_burst = convert_burst(sconfig->dst_maxburst ?
- 					sconfig->dst_maxburst : 8);
- 		dst_width = convert_buswidth(sconfig->dst_addr_width !=
- 						DMA_SLAVE_BUSWIDTH_UNDEFINED ?
- 				sconfig->dst_addr_width :
--				DMA_SLAVE_BUSWIDTH_4_BYTES);
-+				DMA_SLAVE_BUSWIDTH_4_BYTES, sdev);
- 		break;
- 	default:
- 		return -EINVAL;
-@@ -577,7 +581,7 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
- 	v_lli->para = NORMAL_WAIT;
- 
- 	burst = convert_burst(8);
--	width = convert_buswidth(DMA_SLAVE_BUSWIDTH_4_BYTES);
-+	width = convert_buswidth(DMA_SLAVE_BUSWIDTH_4_BYTES, sdev);
- 	v_lli->cfg |= DMA_CHAN_CFG_SRC_DRQ(DRQ_SDRAM) |
- 		DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
- 		DMA_CHAN_CFG_DST_LINEAR_MODE |
-@@ -1028,11 +1032,23 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
- 	.nr_max_vchans   = 34,
- };
- 
-+/*
-+ * The A64 has 8 physical channels, a maximum DRQ port id of 27,
-+ * and a total of 38 usable source and destination endpoints.
-+ */
-+
-+static struct sun6i_dma_config sun50i_a64_dma_cfg = {
-+	.nr_max_channels = 8,
-+	.nr_max_requests = 27,
-+	.nr_max_vchans   = 38,
-+};
-+
- static const struct of_device_id sun6i_dma_match[] = {
- 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
-+	{ .compatible = "allwinner,sun50i-a64-dma", .data = &sun50i_a64_dma_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sun6i_dma_match);
-@@ -1112,6 +1128,13 @@ static int sun6i_dma_probe(struct platform_device *pdev)
- 						  BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
- 	sdc->slave.directions			= BIT(DMA_DEV_TO_MEM) |
- 						  BIT(DMA_MEM_TO_DEV);
-+
-+	if (of_device_is_compatible(pdev->dev.of_node,
-+				    "allwinner,sun50i-a64-dma")) {
-+		sdc->slave.src_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+		sdc->slave.dst_addr_widths	|= BIT(DMA_SLAVE_BUSWIDTH_8_BYTES);
-+	}
-+
- 	sdc->slave.residue_granularity		= DMA_RESIDUE_GRANULARITY_BURST;
- 	sdc->slave.dev = &pdev->dev;
- 
--- 
-2.7.4
+Why can't you get the current time before the wait_event_interruptible()
+and then compare the time before you do the write?  That would seem to
+accomplish the same thing without any lists or extra locks.
+
+Also, if you are going to have multiple writers on this interface, I don't
+think the interface will work correctly.  I think you need to claim the
+mutex first.  Otherwise you might get into a situation where two writers
+will wake up at the same time, the first writes and releases the mutex,
+then the second will find that the interface is busy and fail.
+
+If I am correct, the mutex will need to become interruptible and come
+first, I think.  (And the timing would have to start before the mutex,
+of course.)  This applies to both the read and write interface.
+
+Another thing is that this is request-to-release time.  If a request takes
+a long time to process (say, a write to a flash device) the timeout would
+need to be decreased by the processing time.  It's probably ok to not
+do that for the moment, but you may want to add a note.  Fixing that
+would require adding a timeout for each message.
+
+-corey
+
+
+> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+> ---
+>   drivers/char/ipmi/bt-bmc.c | 132 +++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 132 insertions(+)
+>
+> diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
+> index fc9e8891eae3..e751e4a754b7 100644
+> --- a/drivers/char/ipmi/bt-bmc.c
+> +++ b/drivers/char/ipmi/bt-bmc.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/poll.h>
+>   #include <linux/sched.h>
+> +#include <linux/slab.h>
+>   #include <linux/timer.h>
+>   
+>   /*
+> @@ -57,6 +58,15 @@
+>   
+>   #define BT_BMC_BUFFER_SIZE 256
+>   
+> +#define BT_BMC_RESPONSE_TIME	5 /* seconds */
+> +
+> +struct ipmi_request {
+> +	struct list_head list;
+> +
+> +	u8 seq;
+> +	unsigned long expires;
+> +};
+> +
+>   struct bt_bmc {
+>   	struct device		dev;
+>   	struct miscdevice	miscdev;
+> @@ -65,6 +75,11 @@ struct bt_bmc {
+>   	wait_queue_head_t	queue;
+>   	struct timer_list	poll_timer;
+>   	struct mutex		mutex;
+> +
+> +	unsigned int		response_time;
+> +	struct timer_list	requests_timer;
+> +	spinlock_t              requests_lock;
+> +	struct list_head        requests;
+>   };
+>   
+>   static atomic_t open_count = ATOMIC_INIT(0);
+> @@ -163,6 +178,94 @@ static int bt_bmc_open(struct inode *inode, struct file *file)
+>   }
+>   
+>   /*
+> + * lock should be held
+> + */
+> +static void drop_expired_requests(struct bt_bmc *bt_bmc)
+> +{
+> +	unsigned long flags = 0;
+> +	struct ipmi_request *req, *next;
+> +	unsigned long next_expires = 0;
+> +	int start_timer = 0;
+> +
+> +	spin_lock_irqsave(&bt_bmc->requests_lock, flags);
+> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+> +		if (time_after_eq(jiffies, req->expires)) {
+> +			pr_warn("BT: request seq:%d has expired. dropping\n",
+> +				req->seq);
+> +			list_del(&req->list);
+> +			kfree(req);
+> +			continue;
+> +		}
+> +		if (!start_timer) {
+> +			start_timer = 1;
+> +			next_expires = req->expires;
+> +		} else {
+> +			next_expires = min(next_expires, req->expires);
+> +		}
+> +	}
+> +	spin_unlock_irqrestore(&bt_bmc->requests_lock, flags);
+> +
+> +	/* and possibly restart */
+> +	if (start_timer)
+> +		mod_timer(&bt_bmc->requests_timer, next_expires);
+> +}
+> +
+> +static void requests_timer(unsigned long data)
+> +{
+> +	struct bt_bmc *bt_bmc = (void *)data;
+> +
+> +	drop_expired_requests(bt_bmc);
+> +}
+> +
+> +static int bt_bmc_add_request(struct bt_bmc *bt_bmc, u8 seq)
+> +{
+> +	struct ipmi_request *req;
+> +
+> +	req = kmalloc(sizeof(*req), GFP_KERNEL);
+> +	if (!req)
+> +		return -ENOMEM;
+> +
+> +	req->seq = seq;
+> +	req->expires = jiffies +
+> +		msecs_to_jiffies(bt_bmc->response_time * 1000);
+> +
+> +	spin_lock(&bt_bmc->requests_lock);
+> +	list_add(&req->list, &bt_bmc->requests);
+> +	spin_unlock(&bt_bmc->requests_lock);
+> +
+> +	drop_expired_requests(bt_bmc);
+> +	return 0;
+> +}
+> +
+> +static int bt_bmc_remove_request(struct bt_bmc *bt_bmc, u8 seq)
+> +{
+> +	struct ipmi_request *req, *next;
+> +	int ret = -EBADRQC; /* Invalid request code */
+> +
+> +	spin_lock(&bt_bmc->requests_lock);
+> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+> +		/*
+> +		 * The sequence number should be unique, so remove the
+> +		 * first matching request found. If there are others,
+> +		 * they should expire
+> +		 */
+> +		if (req->seq == seq) {
+> +			list_del(&req->list);
+> +			kfree(req);
+> +			ret = 0;
+> +			break;
+> +		}
+> +	}
+> +	spin_unlock(&bt_bmc->requests_lock);
+> +
+> +	if (ret)
+> +		pr_warn("BT: request seq:%d is invalid\n", seq);
+> +
+> +	drop_expired_requests(bt_bmc);
+> +	return ret;
+> +}
+> +
+> +/*
+>    * The BT (Block Transfer) interface means that entire messages are
+>    * buffered by the host before a notification is sent to the BMC that
+>    * there is data to be read. The first byte is the length and the
+> @@ -231,6 +334,13 @@ static ssize_t bt_bmc_read(struct file *file, char __user *buf,
+>   		len_byte = 0;
+>   	}
+>   
+> +	if (ret > 0) {
+> +		int ret2 = bt_bmc_add_request(bt_bmc, kbuffer[2]);
+> +
+> +		if (ret2)
+> +			ret = ret2;
+> +	}
+> +
+>   	clr_b_busy(bt_bmc);
+>   
+>   out_unlock:
+> @@ -283,12 +393,20 @@ static ssize_t bt_bmc_write(struct file *file, const char __user *buf,
+>   	clr_wr_ptr(bt_bmc);
+>   
+>   	while (count) {
+> +		int ret2;
+> +
+>   		nwritten = min_t(ssize_t, count, sizeof(kbuffer));
+>   		if (copy_from_user(&kbuffer, buf, nwritten)) {
+>   			ret = -EFAULT;
+>   			break;
+>   		}
+>   
+> +		ret2 = bt_bmc_remove_request(bt_bmc, kbuffer[2]);
+> +		if (ret2) {
+> +			ret = ret2;
+> +			break;
+> +		}
+> +
+>   		bt_writen(bt_bmc, kbuffer, nwritten);
+>   
+>   		count -= nwritten;
+> @@ -438,6 +556,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>   
+>   	mutex_init(&bt_bmc->mutex);
+>   	init_waitqueue_head(&bt_bmc->queue);
+> +	INIT_LIST_HEAD(&bt_bmc->requests);
+> +	spin_lock_init(&bt_bmc->requests_lock);
+>   
+>   	bt_bmc->miscdev.minor	= MISC_DYNAMIC_MINOR,
+>   		bt_bmc->miscdev.name	= DEVICE_NAME,
+> @@ -451,6 +571,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>   
+>   	bt_bmc_config_irq(bt_bmc, pdev);
+>   
+> +	bt_bmc->response_time = BT_BMC_RESPONSE_TIME;
+> +
+>   	if (bt_bmc->irq) {
+>   		dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
+>   	} else {
+> @@ -468,6 +590,9 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>   		  BT_CR0_ENABLE_IBT,
+>   		  bt_bmc->base + BT_CR0);
+>   
+> +	setup_timer(&bt_bmc->requests_timer, requests_timer,
+> +		    (unsigned long)bt_bmc);
+> +
+>   	clr_b_busy(bt_bmc);
+>   
+>   	return 0;
+> @@ -476,10 +601,17 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>   static int bt_bmc_remove(struct platform_device *pdev)
+>   {
+>   	struct bt_bmc *bt_bmc = dev_get_drvdata(&pdev->dev);
+> +	struct ipmi_request *req, *next;
+>   
+>   	misc_deregister(&bt_bmc->miscdev);
+>   	if (!bt_bmc->irq)
+>   		del_timer_sync(&bt_bmc->poll_timer);
+> +
+> +	del_timer_sync(&bt_bmc->requests_timer);
+> +	list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+> +		list_del(&req->list);
+> +		kfree(req);
+> +	}
+>   	return 0;
+>   }
+>   
