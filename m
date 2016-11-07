@@ -1,62 +1,47 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Mon, 7 Nov 2016 14:05:42 +0100
-Subject: [PATCH 5/6] clk: stm32f4: Add SAI clocks
+Date: Mon, 7 Nov 2016 14:05:43 +0100
+Subject: [PATCH 6/6] arm: dts: stm32f4: Add external I2S clock
 In-Reply-To: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
 References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1478523943-23142-6-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1478523943-23142-7-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch introduces SAI clocks for stm32f4 socs.
+This patch adds an external I2S clock in the DT.
+The I2S clock could be derived from an external I2S clock or by I2S pll.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index b7cb359..c305659 100644
---- a/drivers/clk/clk-stm32f4.c
-+++ b/drivers/clk/clk-stm32f4.c
-@@ -217,6 +217,7 @@ enum {
- 	PLL_VCO_I2S, PLL_VCO_SAI,
- 	CLK_LCD,
- 	CLK_I2S,
-+	CLK_SAI1, CLK_SAI2,
- 	END_PRIMARY_CLK
- };
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 2700449..14da6ce 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -68,6 +68,12 @@
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32000>;
+ 		};
++
++		clk_i2s_ckin: i2s-ckin {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++		};
+ 	};
  
-@@ -970,6 +971,9 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ 	soc {
+@@ -356,7 +362,7 @@
+ 			#clock-cells = <2>;
+ 			compatible = "st,stm32f42xx-rcc", "st,stm32-rcc";
+ 			reg = <0x40023800 0x400>;
+-			clocks = <&clk_hse>;
++			clocks = <&clk_hse>, <&clk_i2s_ckin>;
+ 			st,syscfg = <&pwrcfg>;
+ 		};
  
- static const char *i2s_parents[2] = { "plli2s-r", NULL };
- 
-+static const char *sai_parents[4] = { "pllsai-q-div", "plli2s-q-div", NULL,
-+	"no-clock" };
-+
- struct stm32f4_clk_data {
- 	const struct stm32f4_gate_data *gates_data;
- 	const u64 *gates_map;
-@@ -1063,6 +1067,19 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 				i2s_parents, ARRAY_SIZE(i2s_parents), 0,
- 				base + STM32F4_RCC_CFGR, 23, 1, 0, NULL,
- 				&stm32f4_clk_lock);
-+
-+	sai_parents[2] = i2s_in_clk;
-+
-+	clks[CLK_SAI1] = clk_hw_register_mux_table(NULL, "sai1-clk",
-+			sai_parents, ARRAY_SIZE(sai_parents), 0,
-+			base + STM32F4_RCC_DCKCFGR, 20, 1, 0, NULL,
-+			&stm32f4_clk_lock);
-+
-+	clks[CLK_SAI2] = clk_hw_register_mux_table(NULL, "sai2-clk",
-+			sai_parents, ARRAY_SIZE(sai_parents), 0,
-+			base + STM32F4_RCC_DCKCFGR, 22, 1, 0, NULL,
-+			&stm32f4_clk_lock);
-+
- 	sys_parents[1] = hse_clk;
- 	clk_register_mux_table(
- 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
 -- 
 1.9.1
