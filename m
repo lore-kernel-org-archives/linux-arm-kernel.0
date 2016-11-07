@@ -1,44 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Nov 2016 12:00:06 +0000
-Subject: [PATCH] ARM: avoid cache flushing in flush_dcache_page()
-In-Reply-To: <20161107114845.GF1041@n2100.armlinux.org.uk>
-References: <1478514624-30910-1-git-send-email-rabin.vincent@axis.com>
- <20161107113525.GA28876@MBP.local>
- <20161107114845.GF1041@n2100.armlinux.org.uk>
-Message-ID: <20161107120005.xzjpsmpu5b6qs42v@localhost>
+From: wulf@rock-chips.com (William Wu)
+Date: Mon,  7 Nov 2016 20:08:47 +0800
+Subject: [PATCH v3 0/2] support USB2 PHY OTG port for rk3399
+Message-ID: <1478520529-8869-1-git-send-email-wulf@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 11:48:45AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 07, 2016 at 11:35:27AM +0000, Catalin Marinas wrote:
-> > On Mon, Nov 07, 2016 at 11:30:24AM +0100, Rabin Vincent wrote:
-> > > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-> > > index 3cced84..f1e6190 100644
-> > > --- a/arch/arm/mm/flush.c
-> > > +++ b/arch/arm/mm/flush.c
-> > > @@ -327,6 +327,12 @@ void flush_dcache_page(struct page *page)
-> > >  	if (page == ZERO_PAGE(0))
-> > >  		return;
-> > >  
-> > > +	if (!cache_ops_need_broadcast() && cache_is_vipt_nonaliasing()) {
-> > > +		if (test_bit(PG_dcache_clean, &page->flags))
-> > > +			clear_bit(PG_dcache_clean, &page->flags);
-> > > +		return;
-> > > +	}
-> > > +
-> > >  	mapping = page_mapping(page);
-> > >  
-> > >  	if (!cache_ops_need_broadcast() &&
-> > 
-> > I'm ok with the logic in this patch but is there a way to combine the
-> > two 'if' blocks together, just to keep the function shorter?
-> 
-> Probably not without reducing code readability, or moving
-> page_mapping() before this new if() block (which may introduce
-> extra code into the path.)
+This series add support for rk3399 USB2 PHY0 and PHY1 OTG port.
+rk3399 has two USB2 PHYs, and each USB2 PHY is comprised of one
+Host port and one OTG port. We have supported Host port before,
+and try to support OTG port now.
 
-You are right, we would need 'mapping' in the subsequent checks, so I
-don't think the code would be more readable if we are to keep it
-efficient. In this case:
+Test on rk3399-evb board.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+William Wu (2):
+  phy: rockchip-inno-usb2: support otg-port for rk3399
+  arm64: dts: rockchip: add usb2-phy otg-port support for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi |  21 ++
+ drivers/phy/phy-rockchip-inno-usb2.c     | 591 +++++++++++++++++++++++++++++--
+ 2 files changed, 582 insertions(+), 30 deletions(-)
+
+-- 
+2.0.0
