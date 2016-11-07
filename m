@@ -1,50 +1,58 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon, 7 Nov 2016 09:03:31 -0600
-Subject: [PATCH] ARM: dts: imx6: Add support for Logic PD SOM and Baseboard
-In-Reply-To: <20161105070043.GA5597@dragon>
-References: <1469030786-28424-1-git-send-email-aford173@gmail.com>
- <20160809082400.GR4678@tiger>
- <CAHCN7x+YopHVNxh4Vi5o1d=S3FFkoz45dNmgHMgs1sAQqaL77A@mail.gmail.com>
- <20161105070043.GA5597@dragon>
-Message-ID: <CAHCN7xJ=KK-=5sVu0Or5bep-cdk3hq4+a3gFj-W0bCcVhQyWNw@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 7 Nov 2016 12:07:32 -0300
+Subject: [PATCH 4/6] ARM: dts: Add clock provider specific properties to
+ max8997 node
+In-Reply-To: <1478513376-14307-5-git-send-email-pankaj.dubey@samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478513376-14307-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <ef27992b-87a0-6d18-35cc-83360e6d677a@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 5, 2016 at 2:00 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Fri, Nov 04, 2016 at 12:44:21PM -0500, Adam Ford wrote:
->> >> +&iomuxc {
->> >> +     imx6qdl-logicpd-baseboard {
->> >> +
->> >
->> > Drop this container node and put the following pinctrl nodes directly
->> > under &iomuxc.
->> >
->>
->> Like the regulators above, if I remove this connector, the system
->> won't boot.  I compared both the regulator and the iomuxc containers
->> in this device tree with other imx6q boards, and I seem to be
->> consistent with what other boards are doing.
->
-> You might want to rebase the patch to latest mainline like v4.9-rc3 and
-> test first.
+Hello Pankaj,
 
-I rebased on the 4.9-rc4, and the pinmux errors go away, but the
-regulators appear to need their own container or I get the following
-error:
+On 11/07/2016 07:09 AM, Pankaj Dubey wrote:
+> This patch adds a label and #clock-cells property to device node of
+> max8997 PMIC to allow using it as a clock provider.
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: devicetree at vger.kernel.org
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-origen.dts | 3 ++-
+>  arch/arm/boot/dts/exynos4210-trats.dts  | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+> index cb3a255..6c7ef4e 100644
+> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+> @@ -147,11 +147,12 @@
+>  	pinctrl-0 = <&i2c0_bus>;
+>  	pinctrl-names = "default";
+>  
+> -	max8997_pmic at 66 {
+> +	max8997: max8997_pmic at 66 {
 
-Warning (reg_format): "reg" property in /regulator-otg-vbus has
-invalid length (4 bytes) (#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in /regulator-h1-vbus has invalid
-length (4 bytes) (#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in /regulator-3v3 has invalid
-length (4 bytes) (#address-cells == 1, #size-cells == 1)
-Warning (reg_format): "reg" property in /regulator-pcie has invalid
-length (4 bytes) (#address-cells == 1, #size-cells == 1)
+The ePAPR says that the node name should be "somewhat generic, reflecting
+the function of the device and not its precise programming model". So I
+think this should be instead:
 
-Can I leave the the regulator container?  This seems consistent with
-the other imx6 boards.
+        max8997: pmic at 66 {
 
-adam
+[...]
+  
+> -	max8997_pmic at 66 {
+> +	max8997: max8997_pmic at 66 {
 
->
-> Shawn
+Same here.
+
+The rest looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
