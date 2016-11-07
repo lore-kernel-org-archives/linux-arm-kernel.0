@@ -1,18 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 7 Nov 2016 16:25:06 -0700
-Subject: [PATCH] ARM: OMAP2+: avoid NULL pointer dereference
-In-Reply-To: <1477993765-9980-1-git-send-email-Nicolae_Rosia@mentor.com>
-References: <1477993765-9980-1-git-send-email-Nicolae_Rosia@mentor.com>
-Message-ID: <20161107232505.GG2428@atomide.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon,  7 Nov 2016 16:39:25 -0700
+Subject: [PATCH v2] media: s5p-mfc include buffer size in error message
+Message-ID: <20161107233925.25070-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolae Rosia <Nicolae_Rosia@mentor.com> [161101 02:50]:
-> For OMAP4, volt_data is set in omap44xx_voltagedomains_init.
-> If the SoC is neither OMAP443X or OMAP446X, we end up with a
-> NULL in volt_data which causes a kernel oops.
-> This is the case when booting OMAP4470.
+Include buffer size in s5p_mfc_alloc_priv_buf() the error message when it
+fails to allocate the buffer.
 
-Thanks applying into omap-for-v4.9/fixes.
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+Changes since v1:
+ - Left debug message as is. v1 removed the debug message.
 
-Tony
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+index 1e72502..da4f52a 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
+@@ -45,7 +45,8 @@ int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
+ 	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
+ 
+ 	if (!b->virt) {
+-		mfc_err("Allocating private buffer failed\n");
++		mfc_err("Allocating private buffer of size %zu failed\n",
++			b->size);
+ 		return -ENOMEM;
+ 	}
+ 
+-- 
+2.7.4
