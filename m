@@ -1,33 +1,25 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 8 Nov 2016 00:44:23 +0800
-Subject: [PATCH 1/3] arm64: dts: hisi: fix hip06 sas am-max-trans quirk
-In-Reply-To: <1478537065-169286-1-git-send-email-john.garry@huawei.com>
-References: <1478537065-169286-1-git-send-email-john.garry@huawei.com>
-Message-ID: <1478537065-169286-2-git-send-email-john.garry@huawei.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 7 Nov 2016 16:31:29 +0000
+Subject: [PATCHv4 0/4] WX checking for arm64
+In-Reply-To: <07589590-7b7d-4ba1-67af-b39c40b16939@redhat.com>
+References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
+ <20161030150307.33vc2m7y5y6wzbqc@localhost>
+ <20161107153802.GJ19796@leverpostej>
+ <07589590-7b7d-4ba1-67af-b39c40b16939@redhat.com>
+Message-ID: <20161107163128.GA11975@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The string for the am max transmissions quirk property
-is not correct -> fix it.
+On Mon, Nov 07, 2016 at 08:26:34AM -0800, Laura Abbott wrote:
+> On 11/07/2016 07:38 AM, Mark Rutland wrote:
+> >From 06fef1ad1138d0808eec770e64458a350941bd2d Mon Sep 17 00:00:00 2001
+> >From: Mark Rutland <mark.rutland@arm.com>
+> >Date: Mon, 7 Nov 2016 15:24:40 +0000
+> >Subject: [PATCH] Fix KASAN splats with DEBUG_WX
+[...]
+> Acked-by: Laura Abbott <labbott@redhat.com>
 
-Signed-off-by: John Garry <john.garry@huawei.com>
-Reviewed-by: Xiang Chen <chenxiang66@hisilicon.com>
----
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks. I'll queue the patch on top of the others.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index b548763..5330abb 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -590,7 +590,7 @@
- 			reg = <0 0xa2000000 0 0x10000>;
- 			sas-addr = [50 01 88 20 16 00 00 00];
- 			hisilicon,sas-syscon = <&pcie_subctl>;
--			am-max-trans;
-+			hip06-sas-v2-quirk-amt;
- 			ctrl-reset-reg = <0xa18>;
- 			ctrl-reset-sts-reg = <0x5a0c>;
- 			ctrl-clock-ena-reg = <0x318>;
 -- 
-1.9.1
+Catalin
