@@ -1,97 +1,100 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Mon, 7 Nov 2016 16:25:04 +0100
-Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
-References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
- <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161107162504.17591806@thinkpad>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 7 Nov 2016 15:38:02 +0000
+Subject: [PATCHv4 0/4] WX checking for arm64
+In-Reply-To: <20161030150307.33vc2m7y5y6wzbqc@localhost>
+References: <1477585654-8908-1-git-send-email-labbott@redhat.com>
+ <20161030150307.33vc2m7y5y6wzbqc@localhost>
+Message-ID: <20161107153802.GJ19796@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Nov 2016 10:51:38 +0800
-Huang Shijie <shijie.huang@arm.com> wrote:
+On Sun, Oct 30, 2016 at 03:03:07PM +0000, Catalin Marinas wrote:
+> On Thu, Oct 27, 2016 at 09:27:30AM -0700, Laura Abbott wrote:
+> > Laura Abbott (4):
+> >   arm64: dump: Make ptdump debugfs a separate option
+> >   arm64: dump: Make the page table dumping seq_file optional
+> >   arm64: dump: Remove max_addr
+> >   arm64: dump: Add checking for writable and exectuable pages
+> 
+> Queued for 4.10. Thanks.
 
-> When testing the gigantic page whose order is too large for the buddy
-> allocator, the libhugetlbfs test case "counter.sh" will fail.
-> 
-> The failure is caused by:
->  1) kernel fails to allocate a gigantic page for the surplus case.
->     And the gather_surplus_pages() will return NULL in the end.
-> 
->  2) The condition checks for "over-commit" is wrong.
-> 
-> This patch adds code to allocate the gigantic page in the
-> __alloc_huge_page(). After this patch, gather_surplus_pages()
-> can return a gigantic page for the surplus case.
-> 
-> This patch also changes the condition checks for:
->      return_unused_surplus_pages()
->      nr_overcommit_hugepages_store()
-> 
-> After this patch, the counter.sh can pass for the gigantic page.
-> 
-> Acked-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
->  mm/hugetlb.c | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
-> 
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index 0bf4444..2b67aff 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
->  	struct page *page;
->  	unsigned int r_nid;
-> 
-> -	if (hstate_is_gigantic(h))
-> +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
->  		return NULL;
+Catalin mentioned to me that he saw some KASAN splats when testing; it
+looks like need a fixup something like the below.
 
-Is it really possible to stumble over gigantic pages w/o having
-gigantic_page_supported()?
+Apologies for not having spotted this when testing!
 
-Also, I've just tried this on s390 and counter.sh still fails after these
-patches, and it should fail on all archs as long as you use the gigantic
-hugepage size as default hugepage size. This is because you only changed
-nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
-in sysfs, and missed hugetlb_overcommit_handler() which handles
-/proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
+Thanks,
+Mark.
 
-However, changing hugetlb_overcommit_handler() in a similar way
-produces a lockdep warning, see below, and counters.sh now results in
-FAIL	mmap failed: Cannot allocate memory
-So I guess this needs more thinking (or just a proper annotation, as
-suggested, didn't really look into it):
+---->8----
+>From 06fef1ad1138d0808eec770e64458a350941bd2d Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Mon, 7 Nov 2016 15:24:40 +0000
+Subject: [PATCH] Fix KASAN splats with DEBUG_WX
 
-[  129.595054] INFO: trying to register non-static key.
-[  129.595060] the code is fine but needs lockdep annotation.
-[  129.595062] turning off the locking correctness validator.
-[  129.595066] CPU: 4 PID: 1108 Comm: counters Not tainted 4.9.0-rc3-00261-g577f12c-dirty #12
-[  129.595067] Hardware name: IBM              2964 N96              704              (LPAR)
-[  129.595069] Stack:
-[  129.595070]        00000003b4833688 00000003b4833718 0000000000000003 0000000000000000
-[  129.595075]        00000003b48337b8 00000003b4833730 00000003b4833730 0000000000000020
-[  129.595078]        0000000000000000 0000000000000020 000000000000000a 000000000000000a
-[  129.595082]        000000000000000c 00000003b4833780 0000000000000000 00000003b4830000
-[  129.595086]        0000000000000000 0000000000112d90 00000003b4833718 00000003b4833770
-[  129.595089] Call Trace:
-[  129.595095] ([<0000000000112c6a>] show_trace+0x8a/0xe0)
-[  129.595098]  [<0000000000112d40>] show_stack+0x80/0xd8 
-[  129.595103]  [<0000000000744eec>] dump_stack+0x9c/0xe0 
-[  129.595106]  [<00000000001b0760>] register_lock_class+0x1a8/0x530 
-[  129.595109]  [<00000000001b59fa>] __lock_acquire+0x10a/0x7f0 
-[  129.595110]  [<00000000001b69b8>] lock_acquire+0x2e0/0x330 
-[  129.595115]  [<0000000000a44920>] _raw_spin_lock_irqsave+0x70/0xb8 
-[  129.595118]  [<000000000031cdce>] alloc_gigantic_page+0x8e/0x2c8 
-[  129.595120]  [<000000000031e95a>] __alloc_huge_page+0xea/0x4d8 
-[  129.595122]  [<000000000031f4c6>] hugetlb_acct_memory+0xa6/0x418 
-[  129.595125]  [<0000000000323b32>] hugetlb_reserve_pages+0x132/0x240 
-[  129.595152]  [<000000000048be62>] hugetlbfs_file_mmap+0xd2/0x130 
-[  129.595155]  [<0000000000303918>] mmap_region+0x368/0x6e0 
-[  129.595157]  [<0000000000303fb8>] do_mmap+0x328/0x400 
-[  129.595160]  [<00000000002dc1aa>] vm_mmap_pgoff+0x9a/0xe8 
-[  129.595162]  [<00000000003016dc>] SyS_mmap_pgoff+0x23c/0x288 
-[  129.595164]  [<00000000003017b6>] SyS_old_mmap+0x8e/0xb0 
-[  129.595166]  [<0000000000a45b06>] system_call+0xd6/0x270 
-[  129.595167] INFO: lockdep is turned off.
+Booting a kernel built with both CONFIG_KASAN and CONFIG_DEBUG_WX
+results in a stream of KASAN splats for stack-out-of-bounds accesses,
+e.g.
+
+==================================================================
+BUG: KASAN: stack-out-of-bounds in note_page+0xd8/0x650 at addr ffff8009364ebdd0
+Read of size 8 by task swapper/0/1
+page:ffff7e0024d93ac0 count:0 mapcount:0 mapping:          (null) index:0x0
+flags: 0x4000000000000000()
+page dumped because: kasan: bad access detected
+CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.9.0-rc3-00004-g25f7267 #77
+Hardware name: ARM Juno development board (r1) (DT)
+Call trace:
+[<ffff20000808b2d8>] dump_backtrace+0x0/0x278
+[<ffff20000808b564>] show_stack+0x14/0x20
+[<ffff2000084e4e4c>] dump_stack+0xa4/0xc8
+[<ffff200008256ee0>] kasan_report_error+0x4a8/0x4d0
+[<ffff200008257330>] kasan_report+0x40/0x48
+[<ffff200008255894>] __asan_load8+0x84/0x98
+[<ffff2000080a0928>] note_page+0xd8/0x650
+[<ffff2000080a0fb4>] walk_pgd.isra.1+0x114/0x220
+[<ffff2000080a1248>] ptdump_check_wx+0xa8/0x118
+[<ffff20000809ed40>] mark_rodata_ro+0x90/0xd0
+[<ffff200008cafb88>] kernel_init+0x28/0x110
+[<ffff200008083680>] ret_from_fork+0x10/0x50
+Memory state around the buggy address:
+ ffff8009364ebc80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+ ffff8009364ebd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+>ffff8009364ebd80: 00 00 00 00 f1 f1 f1 f1 00 00 f4 f4 f2 f2 f2 f2
+                                                 ^
+ ffff8009364ebe00: 00 00 00 00 00 00 00 00 f3 f3 f3 f3 00 00 00 00
+ ffff8009364ebe80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+==================================================================
+
+... this happens because note_page assumes that the marker array has at
+least two elements (the latter of which may be the terminator), but the
+marker array for ptdump_check_wx only contains one element. Thus we
+dereference some garbage on the stack when looking at
+marker[1].start_address.
+
+Given we don't need the markers for the WX checks, we could modify
+note_page to allow for a NULL marker array, but for now it's simpler to
+add an entry to the ptdump_check_wx marker array, so let's do that. As
+it's somewhat confusing to have two identical entries, we add an initial
+entry with a start address of zero.
+
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/mm/dump.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index ef8aca8..ca74a2a 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -383,6 +383,7 @@ void ptdump_check_wx(void)
+ 	struct pg_state st = {
+ 		.seq = NULL,
+ 		.marker = (struct addr_marker[]) {
++			{ 0, NULL},
+ 			{ -1, NULL},
+ 		},
+ 		.check_wx = true,
+-- 
+1.9.1
