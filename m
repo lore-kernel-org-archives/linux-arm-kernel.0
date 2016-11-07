@@ -1,117 +1,81 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 7 Nov 2016 09:39:45 +0800
-Subject: [PATCH v4 0/3] Add initial ZTE VOU DRM/KMS driver
-In-Reply-To: <1477905445-4983-1-git-send-email-shawnguo@kernel.org>
-References: <1477905445-4983-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20161107013943.GB14622@dragon>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Sun, 6 Nov 2016 17:44:16 -0800
+Subject: [PATCH] arm64: percpu: kill off final ACCESS_ONCE() uses
+In-Reply-To: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
+References: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CACT4Y+Z5z-ywh8sMWuLEk48uqtZ6tS67kX+scXm+PtmTMj-neg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, Daniel,
+On Fri, Nov 4, 2016 at 11:17 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> For several reasons it is preferable to use {READ,WRITE}_ONCE() rather than
+> ACCESS_ONCE(). For example, these handle aggregate types, result in shorter
+> source code, and better document the intended access (which may be useful for
+> instrumentation features such as the upcoming KTSAN).
+>
+> Over a number of patches, most uses of ACCESS_ONCE() in arch/arm64 have been
+> migrated to {READ,WRITE}_ONCE(). For consistency, and the above reasons, this
+> patch migrates the final remaining uses.
 
-On Mon, Oct 31, 2016 at 05:17:22PM +0800, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> 
-> The series adds the initial ZTE VOU display controller DRM/KMS driver.
-> There are still some features to be added, like overlay plane, scaling,
-> and more output devices support.  But it's already useful with dual
-> CRTCs and HDMI display working.
+Thanks!
 
-After a few rounds of reviewing (thanks to all reviewers), it seems that
-the series is ready for merging, I guess?  If so, could you suggest how
-we proceed?  I can prepare a pull request if you like.  Thanks.
+Acked-by: Dmitry Vyukov <dvyukov@google.com>
 
-Shawn
 
-> Changes for v4:
->  - Move the hardware setup done in zx_hdmi_hw_init() and clock enable
->    into .enable hook of drm_encoder_helper_funcs.
->  - Compare pipe to crtc->index instead of using our own index counter.
->  - Save the pipe check in zx_vou_enable[disable]_vblank by putting frame
->    interrupt bit into zx_crtc_bits.
->  - Use DRM_DEV_* for log messages instead of old dev_* functions
->  - Return directly in case of -ETIMEDOUT in zx_hdmi_i2c_read to simplify
->    the code for error condition.
->  - Shuffle things around to make the crtc and plane state check in
->    zx_gl_plane_atomic_check a bit clearer
->  - Move hardware register definitions into headers instead of disturbing
->    C file reading.
->  - Save the call to drm_connector_unregister(), so that
->    drm_connector_cleanup can directly be used as drm_connector_funcs
->    .destroy hook.
->  - Move vblank notification from .atomic_begin hook to .atomic_flush,
->    so that vblank event is sent to user space after planes are committed
->    rather than before.
-> 
-> Changes for v3:
->  - Rebase to v4.9-rc1
->  - Update bindings doc to use 'ranges' for address translation between
->    parent and child devices.
->  - Call drm_dev_register() last in bind function and drm_dev_unregister()
->    first in unbind, so that drm_connector_regiser() can be saved from
->    HDMI driver.
->  - Instead of using open-coded drm_do_get_edid(), add an I2C adapter for
->    HDMI DDC read and use drm_get_edid().
->  - Improve the plane .atomic_check implementation by calling helper
->    function drm_plane_helper_check_state().
->  - Rename zx_crtc.c to zx_vou.c to avoid the confusion that the file
->    implements crtc instance.
->  - Store vou pointer in zx_crtc, so that we do not need to embed the
->    pointer in zx_drm_private.
->  - Create zx_readl/zx_writel/zx_writel_mask for register access.
->  - Define a few macro helpers to ease the register bit setting, like
->    SYNC_WIDE, BACK_PORCH and FRONT_PORCH.
->  - Define main/aux channel specific register offset and bits in zx_crtc
->    to save the use of is_main check
->  - Sort include headers alphabetically
->  - Removing encoder pointer out of the structure and constify struct
->    vou_inf
->  - Add log message for error conditions
->  - Make the function calls in teardown path asymmetrical
->  - A few coding style improvements like defining macro for sub-module
->    address and changing code to save indentation level
->  - Add a MAINTAINERS entry for ZTE ZX DRM driver
-> 
-> Changes for v2:
->  - Change device tree bindings to kill the virtual display-subsystem
->    node make VOU the parent node.
-> 
-> Shawn Guo (3):
->   dt-bindings: add bindings doc for ZTE VOU display controller
->   drm: zte: add initial vou drm driver
->   MAINTAINERS: add an entry for ZTE ZX DRM driver
-> 
->  .../devicetree/bindings/display/zte,vou.txt        |  84 +++
->  MAINTAINERS                                        |   7 +
->  drivers/gpu/drm/Kconfig                            |   2 +
->  drivers/gpu/drm/Makefile                           |   1 +
->  drivers/gpu/drm/zte/Kconfig                        |   8 +
->  drivers/gpu/drm/zte/Makefile                       |   7 +
->  drivers/gpu/drm/zte/zx_drm_drv.c                   | 267 +++++++++
->  drivers/gpu/drm/zte/zx_drm_drv.h                   |  36 ++
->  drivers/gpu/drm/zte/zx_hdmi.c                      | 624 +++++++++++++++++++
->  drivers/gpu/drm/zte/zx_hdmi_regs.h                 |  56 ++
->  drivers/gpu/drm/zte/zx_plane.c                     | 299 ++++++++++
->  drivers/gpu/drm/zte/zx_plane.h                     |  26 +
->  drivers/gpu/drm/zte/zx_plane_regs.h                |  91 +++
->  drivers/gpu/drm/zte/zx_vou.c                       | 661 +++++++++++++++++++++
->  drivers/gpu/drm/zte/zx_vou.h                       |  46 ++
->  drivers/gpu/drm/zte/zx_vou_regs.h                  | 157 +++++
->  16 files changed, 2372 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/zte,vou.txt
->  create mode 100644 drivers/gpu/drm/zte/Kconfig
->  create mode 100644 drivers/gpu/drm/zte/Makefile
->  create mode 100644 drivers/gpu/drm/zte/zx_drm_drv.c
->  create mode 100644 drivers/gpu/drm/zte/zx_drm_drv.h
->  create mode 100644 drivers/gpu/drm/zte/zx_hdmi.c
->  create mode 100644 drivers/gpu/drm/zte/zx_hdmi_regs.h
->  create mode 100644 drivers/gpu/drm/zte/zx_plane.c
->  create mode 100644 drivers/gpu/drm/zte/zx_plane.h
->  create mode 100644 drivers/gpu/drm/zte/zx_plane_regs.h
->  create mode 100644 drivers/gpu/drm/zte/zx_vou.c
->  create mode 100644 drivers/gpu/drm/zte/zx_vou.h
->  create mode 100644 drivers/gpu/drm/zte/zx_vou_regs.h
-> 
-> -- 
-> 1.9.1
-> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dmitry Vyukov <dvyukov@google.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/percpu.h | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+> index 5394c84..4afb6fc 100644
+> --- a/arch/arm64/include/asm/percpu.h
+> +++ b/arch/arm64/include/asm/percpu.h
+> @@ -101,16 +101,16 @@ static inline unsigned long __percpu_read(void *ptr, int size)
+>
+>         switch (size) {
+>         case 1:
+> -               ret = ACCESS_ONCE(*(u8 *)ptr);
+> +               ret = READ_ONCE(*(u8 *)ptr);
+>                 break;
+>         case 2:
+> -               ret = ACCESS_ONCE(*(u16 *)ptr);
+> +               ret = READ_ONCE(*(u16 *)ptr);
+>                 break;
+>         case 4:
+> -               ret = ACCESS_ONCE(*(u32 *)ptr);
+> +               ret = READ_ONCE(*(u32 *)ptr);
+>                 break;
+>         case 8:
+> -               ret = ACCESS_ONCE(*(u64 *)ptr);
+> +               ret = READ_ONCE(*(u64 *)ptr);
+>                 break;
+>         default:
+>                 BUILD_BUG();
+> @@ -123,16 +123,16 @@ static inline void __percpu_write(void *ptr, unsigned long val, int size)
+>  {
+>         switch (size) {
+>         case 1:
+> -               ACCESS_ONCE(*(u8 *)ptr) = (u8)val;
+> +               WRITE_ONCE(*(u8 *)ptr, (u8)val);
+>                 break;
+>         case 2:
+> -               ACCESS_ONCE(*(u16 *)ptr) = (u16)val;
+> +               WRITE_ONCE(*(u16 *)ptr, (u16)val);
+>                 break;
+>         case 4:
+> -               ACCESS_ONCE(*(u32 *)ptr) = (u32)val;
+> +               WRITE_ONCE(*(u32 *)ptr, (u32)val);
+>                 break;
+>         case 8:
+> -               ACCESS_ONCE(*(u64 *)ptr) = (u64)val;
+> +               WRITE_ONCE(*(u64 *)ptr, (u64)val);
+>                 break;
+>         default:
+>                 BUILD_BUG();
+> --
+> 2.7.4
+>
