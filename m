@@ -1,43 +1,55 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 7 Nov 2016 14:09:31 +0000
-Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
-In-Reply-To: <20161107132854.GF12559@ulmo.ba.sec>
-References: <20160918102852.6593-1-contact@paulk.fr>
- <20161107132854.GF12559@ulmo.ba.sec>
-Message-ID: <13e7ff98-8bc2-ccf7-94bb-4e1d3c61b20d@nvidia.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Nov 2016 22:11:45 +0800
+Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
+In-Reply-To: <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 7, 2016 at 9:08 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
+>
+> Add a card in order to have it working
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> index 12b4317a4383..5291e425caf9 100644
+> --- a/arch/arm/boot/dts/ntc-gr8-evb.dts
+> +++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> @@ -76,6 +76,20 @@
+>                 default-brightness-level = <8>;
+>         };
+>
+> +       i2s {
 
-On 07/11/16 13:28, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Sun, Sep 18, 2016 at 12:28:52PM +0200, Paul Kocialkowski wrote:
->> Nyan boards only have host USB ports (2 external, 1 internal), there is
->> no OTG-enabled connector.
->>
->> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->> ---
->>  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Where is this information coming from? I don't have one of the Nyans
-> myself, but one of the Tegra132 devices I have, which I think was
-> derived from one of the Nyans uses one of the external host ports as
-> forced recovery port, for which it would need OTG.
-> 
-> I suspect that the way to get U-Boot onto the Nyans is via tegrarcm?
-> In that case I think one of the ports must be OTG.
+"sound" might be a better node name? The I2S controllers are also named "i2s".
 
-It is true that the port on the back on the nyan-big can be used with
-recovery mode. I was thinking that this is not a true OTG port as it is
-just a 4-pin type A socket and does not have an ID pin. Thinking some
-more about this the USB spec does include a "Host Negotiation Protocol
-(HNP)" that allows a host and device to swap roles and so keeping it as
-OTG seems valid afterall.
+Otherwise,
 
-Cheers
-Jon
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
--- 
-nvpublic
+> +               compatible = "simple-audio-card";
+> +               simple-audio-card,name = "gr8-evb-wm8978";
+> +               simple-audio-card,format = "i2s";
+> +               simple-audio-card,mclk-fs = <512>;
+> +
+> +               simple-audio-card,cpu {
+> +                       sound-dai = <&i2s0>;
+> +               };
+> +
+> +               simple-audio-card,codec {
+> +                       sound-dai = <&wm8978>;
+> +               };
+> +       };
+>
+>         panel {
+>                 compatible = "allwinner,sun4i-a10-sub-evb-5-lcd";
+> --
+> git-series 0.8.11
