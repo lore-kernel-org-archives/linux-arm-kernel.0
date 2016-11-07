@@ -1,55 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 7 Nov 2016 16:31:16 +0000
-Subject: [PATCH 3/3] arm64/fpsimd: Use ID_AA64PFR0_EL1_.* macros
-In-Reply-To: <1441303979-9535-1-git-send-email-kuleshovmail@gmail.com>
-References: <1441303911-9421-1-git-send-email-kuleshovmail@gmail.com>
- <1441303979-9535-1-git-send-email-kuleshovmail@gmail.com>
-Message-ID: <f0a6a6de-8a54-52d3-f0c6-773c43989eb7@arm.com>
+From: Frank.Li@nxp.com (Frank Li)
+Date: Mon, 7 Nov 2016 11:30:49 -0600
+Subject: [PATCH V3 2/2] ARM: dts: add new compatible stream for i.MX6QP mmdc
+In-Reply-To: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
+References: <1478539849-10834-1-git-send-email-Frank.Li@nxp.com>
+Message-ID: <1478539849-10834-2-git-send-email-Frank.Li@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/09/15 19:12, Alexander Kuleshov wrote:
-> The 26d75e67c commit (arm64/cpufeature.h: Add macros for a cpu features
-> testing) provides set of macros for the testing processor's FP and advanced
-> SIMD features.
->
-> Let's use these macros instead of direct calculation.
->
-> Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 44d6f75..12943a5 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -27,6 +27,7 @@
->
->  #include <asm/fpsimd.h>
->  #include <asm/cputype.h>
-> +#include <asm/cpufeature.h>
->
->  #define FPEXC_IOF	(1 << 0)
->  #define FPEXC_DZF	(1 << 1)
-> @@ -333,13 +334,13 @@ static int __init fpsimd_init(void)
->  {
->  	u64 pfr = read_cpuid(ID_AA64PFR0_EL1);
->
-> -	if (pfr & (0xf << 16)) {
-> +	if (ID_AA64PFR0_EL1_FP(pfr)) {
->  		pr_notice("Floating-point is not implemented\n");
->  		return 0;
->  	}
->  	elf_hwcap |= HWCAP_FP;
->
-> -	if (pfr & (0xf << 20))
-> +	if (ID_AA64PFR0_EL1_ADV_SIMD(pfr))
->  		pr_notice("Advanced SIMD is not implemented\n");
->  	else
->  		elf_hwcap |= HWCAP_ASIMD;
->
+MMDC has a slightly different programming model between imx6q and imx6qp
+in terms of perf support, it's exactly same for suspend support, so we
+have fsl,imx6q-mmdc here to save patching suspend driver with the new
+compatible.
 
-Similar to the previous one, this won't apply anymore.
+Signed-off-by: Frank Li <Frank.Li@nxp.com>
+---
+Change from V3 to V2
+- change commit message to show suspend need fsl,imx6q-mmdc
 
-Suzuki
+ arch/arm/boot/dts/imx6qp.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
+index 886dbf2..e0fdd0f 100644
+--- a/arch/arm/boot/dts/imx6qp.dtsi
++++ b/arch/arm/boot/dts/imx6qp.dtsi
+@@ -85,5 +85,12 @@
+ 		pcie: pcie at 0x01000000 {
+ 			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
+ 		};
++
++		aips-bus at 02100000 {
++			mmdc0: mmdc at 021b0000 { /* MMDC0 */
++				compatible = "fsl,imx6qp-mmdc", "fsl,imx6q-mmdc";
++				reg = <0x021b0000 0x4000>;
++			};
++		};
+ 	};
+ };
+-- 
+2.5.2
