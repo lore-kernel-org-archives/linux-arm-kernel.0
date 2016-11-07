@@ -1,139 +1,85 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 7 Nov 2016 10:26:02 +0100
-Subject: [linux-sunxi] Re: [RFC PATCH] ARM: dts: add panel and tcon nodes
- to Allwinner A33 Q8 tablet dts
-In-Reply-To: <2578261478451207@web24j.yandex.ru>
-References: <20161106111119.14927-1-icenowy@aosc.xyz>
- <948897e3-12a2-b02c-ed26-929921ff04b2@redhat.com>
- <2578261478451207@web24j.yandex.ru>
-Message-ID: <a8cbb66c-246d-287c-33e4-13d6e3c59084@redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 7 Nov 2016 10:30:05 +0100
+Subject: [PATCH v4 00/23] soc: renesas: Add R-Car RST driver for obtaining
+ mode pin state
+In-Reply-To: <20161104194914.GB16026@codeaurora.org>
+References: <1477055857-17936-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdVbpuv94x-ocTSDoEj+SbnESDbkuMXsXExQvoyZepp+Zg@mail.gmail.com>
+ <20161031081923.GF18195@verge.net.au>
+ <CAMuHMdXA-hemOT=ZysEfettei9=HsDddGhqddkw38hwRrdeagw@mail.gmail.com>
+ <20161031232537.GT16026@codeaurora.org>
+ <CAMuHMdXOW4Ubafu=x9pCw_W-MtLGe3N974dbfHCH5TJuUAeYrQ@mail.gmail.com>
+ <20161104194914.GB16026@codeaurora.org>
+Message-ID: <CAMuHMdUL3GcOoNjd78wn_m0YRQvh8D5RGcC+RaRxEDpQCQxB5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Stephen,
 
-On 06-11-16 17:53, Icenowy Zheng wrote:
+On Fri, Nov 4, 2016 at 8:49 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 11/02, Geert Uytterhoeven wrote:
+>> On Tue, Nov 1, 2016 at 12:25 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>> >
+>> > Would the pull requests for clk also have dts changes at the base
+>> > of the tree? Perhaps clk side can just ack the clk patches and
+>>
+>> Yes they would: this is moving functionality from platform code to DT.
+>> Without the DT updates, it will break bisection (except for R-Car Gen2,
+>> where we have fallback code to handle old DTBs).
+>>
+>> > then have it all routed through arm-soc? The only worry I have is
+>> > if we need to make some sort of change in clk side that conflicts
+>> > with these changes. I don't usually like taking dts changes
+>> > through clk tree, so I'd like to avoid that if possible.
+>>
+>> Everything could go through arm-soc only with your Acked-by.
+>> However, there are new clock drivers pending on this series.
+>> Either they have to go through arm-soc, too, or this series would
+>> be pulled into the clk tree with these new clock drivers.
+>>
+>> > Part E could happen anytime after everything else happens, so
+>> > that doesn't seem like a concern.
+>>
+>> Part E can indeed by postponed.
+>> But if parts A-D are applied together, there's no reason to postpone part E.
+>>
+>> > Part C could also be made to
+>> > only call into the new reset drivers if the reset dts nodes are
+>> > present? If that's done then we could merge clk patches anytime
+>> > and remove the dead code and the node search at some later time
+>> > when everything has settled?
+>>
+>> That would require adding more backwards compatibility code for
+>> old DTBs, even for platform where we're not interested in maintaining
+>> that. In addition, Part C depends on the header file for the reset driver
+>> to compile the clock driver, even if you would add some DT detection,
+>> and on the reset driver to link. So I'm afraid this is not feasible.
 >
+> TL;DR: Sounds fine, I'll be on the lookout for the PR.
+
+Thank you very much!
+
+> Longer version: Let me step back a bit and actually think about
+> this longer than 2 minutes. From what I see
+> rcar_rst_read_mode_pins() already returns -ENODEV if the nodes
+> aren't present. Great.
 >
-> 06.11.2016, 22:27, "Hans de Goede" <hdegoede@redhat.com>:
->> Hi,
->>
->> On 06-11-16 12:11, Icenowy Zheng wrote:
->>>  All A33 Q8 tablets features a LCD panel, with a resolution of either
->>>  800x480 or 1024x600.
->>>
->>>  Add "bone" device nodes to the device tree.
->>
->> Bone ?
->>
->>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->>
->> He, as discussed in the other thread since sun8i-a33-q8-tablet.dts
->> is used for both 800x480 and 1024x600 versions we really need to
->> introduce new sun8i-a33-q8-tablet-800x600.dts and
->> sun8i-a33-q8-tablet-1024x600.dts files, which include
->> sun8i-a33-q8-tablet.dts and then add just the panel bits; and patch
->> newer u-boots to use those instead.
->>
->> This way people who stick with an old u-boot will just not get
->> the drm driver, rather then all of a sudden getting a wrong
->> resolution.
->>
->> Icenowy, can you please also submit a matching u-boot patch
->> (both the new dts file, as well as updating the defconfig you
->>   use to the new dts file)?
->
-> Could you choose a compatible for 1024x600 variant?
+> So clk tree could be given a pull for the clk patches, part C, on
+> top of part A, the reset driver. If the rcar_rst_read_mode_pins()
+> returns failure because the node is missing, we fall back to the
+> old style of doing things. Some drivers already do that anyway,
 
-Lets just add a sun8i-a33-q8-tablet-800x600.dts now and then
-I will add a sun8i-a33-q8-tablet-1024x600.dts file later.
+For R-Car Gen2, we want to keep backwards compatibility for a while.
+But not for the others, and I didn't want to add more code that was going
+to be removed again soon.
 
-Regards,
+Gr{oetje,eeting}s,
 
-Hans
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-
->
-> (Since I have never such a Q8 tablet)
->
->>
->> Regards,
->>
->> Hans
->>
->>>  ---
->>>
->>>  Maybe it will be better to add them to sun8i-q8-reference-tablet.dtsi, as
->>>  these pin configurations are part of reference design of both A23 and A33,
->>>  not only restricted to Q8.
->>>
->>>  The DTS file is tested by me, after cherry-picks this patch from Chen-Yu Tsai:
->>>  https://github.com/wens/linux/commit/2823b887a289fbee5f97f3c6b45ed6c74a6368c6
->>>
->>>  And add these commands to my U-Boot boot command:
->>>
->>>  fdt addr 0x43000000
->>>  fdt resize
->>>  fdt set /panel compatible "urt,umsh-8596md-t"
->>>  fdt set /panel status "okay"
->>>  fdt set /display-engine status "okay"
->>>  fdt set /soc at 01c00000/lcd-controller at 01c0c000 status "okay"
->>>
->>>   arch/arm/boot/dts/sun8i-a33-q8-tablet.dts | 44 +++++++++++++++++++++++++++++++
->>>   1 file changed, 44 insertions(+)
->>>
->>>  diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
->>>  index b0bc236..871a20c 100644
->>>  --- a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
->>>  +++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
->>>  @@ -47,4 +47,48 @@
->>>   / {
->>>           model = "Q8 A33 Tablet";
->>>           compatible = "allwinner,q8-a33", "allwinner,sun8i-a33";
->>>  +
->>>  + panel: panel {
->>>  + /* compatible should be set according to the panel */
->>>  + pinctrl-names = "default";
->>>  + pinctrl-0 = <&lcd_en_q8>;
->>>  + backlight = <&backlight>;
->>>  + enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
->>>  + power-supply = <&reg_dc1sw>;
->>>  + status = "disabled";
->>>  + #address-cells = <1>;
->>>  + #size-cells = <0>;
->>>  +
->>>  + port at 0 {
->>>  + reg = <0>;
->>>  + #address-cells = <1>;
->>>  + #size-cells = <0>;
->>>  +
->>>  + panel_input: endpoint at 0 {
->>>  + reg = <0>;
->>>  + remote-endpoint = <&tcon0_out_lcd>;
->>>  + };
->>>  + };
->>>  + };
->>>  +};
->>>  +
->>>  +&tcon0 {
->>>  + pinctrl-names = "default";
->>>  + pinctrl-0 = <&lcd_rgb666_pins>;
->>>  +};
->>>  +
->>>  +&tcon0_out {
->>>  + tcon0_out_lcd: endpoint at 0 {
->>>  + reg = <0>;
->>>  + remote-endpoint = <&panel_input>;
->>>  + };
->>>  +};
->>>  +
->>>  +&pio {
->>>  + lcd_en_q8: lcd_en at 0 {
->>>  + allwinner,pins = "PH7";
->>>  + allwinner,function = "gpio_out";
->>>  + allwinner,drive = <SUN4I_PINCTRL_10_MA>;
->>>  + allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
->>>  + };
->>>   };
->
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
