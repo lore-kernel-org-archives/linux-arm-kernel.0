@@ -1,36 +1,24 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 7 Nov 2016 09:10:18 +0800
-Subject: [PATCH 1/9] ARM: dts: imx1: Remove skeleton.dtsi
-In-Reply-To: <CAOMZO5CUyZF5wXBxvcsJWSLt1NVzejpH0bZKedJfx3TfBPB2vQ@mail.gmail.com>
-References: <1473177196-29371-1-git-send-email-fabio.estevam@nxp.com>
- <CAOMZO5CUyZF5wXBxvcsJWSLt1NVzejpH0bZKedJfx3TfBPB2vQ@mail.gmail.com>
-Message-ID: <20161107011017.GA14622@dragon>
+From: gustavo@padovan.org (Gustavo Padovan)
+Date: Mon, 7 Nov 2016 10:19:57 +0900
+Subject: [PATCH] drm/sun4i: Propagate error to the caller
+In-Reply-To: <20161104061352.12596-1-christophe.jaillet@wanadoo.fr>
+References: <20161104061352.12596-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <20161107011957.GK3327@joana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 05, 2016 at 05:35:50PM -0200, Fabio Estevam wrote:
-> Hi Shawn,
+Hi Christophe,
+
+2016-11-04 Christophe JAILLET <christophe.jaillet@wanadoo.fr>:
+
+> If 'sun4i_layers_init()' returns an error, propagate it instead of
+> returning -EINVAL unconditionally.
 > 
-> On Tue, Sep 6, 2016 at 12:53 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> > The inclusion of skeleton.dtsi causes the following build warning:
-> >
-> > Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> >
-> > Instead of fixing skeleton.dtsi, just add the top level definitions
-> > for address-cells and size-cell and remove its inclusion.
-> >
-> > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Are you OK with this series?
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_drv.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Has the series cleaned up all i.MX dts files?  I do not like to see so
-many patches doing such small cleanups.  Can we do it with 3 patches
-maybe?
+Reviewed-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
 
- - one for skeleton.dtsi cleanup
- - one for memory node
- - one for cpu node
-
-Each one covers all i.MX dts files.
-
-Shawn
+Gustavo
