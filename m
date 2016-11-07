@@ -1,58 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 07 Nov 2016 14:50:27 +0100
-Subject: [PATCH] serial: sirf: Simplify a test
-In-Reply-To: <20161101070333.12255-1-christophe.jaillet@wanadoo.fr>
-References: <20161101070333.12255-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <2916662.De1FDumaQl@wuerfel>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 7 Nov 2016 13:53:19 +0000
+Subject: [PATCH 1/6] clk: stm32f4: Add PLL_I2S & PLL_SAI for STM32F429/469
+ boards
+In-Reply-To: <1478523943-23142-2-git-send-email-gabriel.fernandez@st.com>
+References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+ <1478523943-23142-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <d60df94d-8f42-12eb-af55-2fc839c126bc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 1, 2016 8:03:33 AM CET Christophe JAILLET wrote:
-> 'dmaengine_prep_dma_cyclic()' does not return an error pointer, so the test
-> can be simplified to be more consistent.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+On 07/11/16 13:05, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> This patch introduces PLL_I2S and PLL_SAI.
+> Vco clock of these PLLs can be modify by DT (only n multiplicator,
+> m divider is still fixed by the boot-loader).
+> Each PLL has 3 dividers. PLL should be off when we modify the rate.
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/clk/clk-stm32f4.c | 371 ++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 359 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+> index c2661e2..7641acd 100644
+> --- a/drivers/clk/clk-stm32f4.c
+> +++ b/drivers/clk/clk-stm32f4.c
+> @@ -28,6 +28,7 @@
+ > ...
+> +static const struct clk_div_table pll_divp_table[] = {
+> +	{ 0, 2 }, { 1, 4 }, { 2, 6 }, { 3, 8 },
+> +};
+> +
+>  /*
+>   * Decode current PLL state and (statically) model the state we inherit from
+>   * the bootloader.
+>   */
 
-The change looks correct in principle. It would be good to automate looking
-for other instances of this bug. How did you find it? Do you have e.g. a
-coccinelle script or did you just stumble over the issue by accident?
-
-There is one problem with your patch:
-
->  drivers/tty/serial/sirfsoc_uart.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-> index b186c9c4f850..666ca3156961 100644
-> --- a/drivers/tty/serial/sirfsoc_uart.c
-> +++ b/drivers/tty/serial/sirfsoc_uart.c
-> @@ -609,7 +609,7 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
->                 sirfport->rx_dma_items.dma_addr, SIRFSOC_RX_DMA_BUF_SIZE,
->                 SIRFSOC_RX_DMA_BUF_SIZE / 2,
->                 DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
-> -       if (IS_ERR_OR_NULL(sirfport->rx_dma_items.desc)) {
-> +       if (!sirfport->rx_dma_items.desc) {
->                 dev_err(port->dev, "DMA slave single fail\n");
->                 return;
->         }
-
-The serial driver is for the sirf platform, which uses the sirf-dma
-dmaengine driver, and that particular driver has an incorrect
-dma_prep_cyclic implementation, so I think we also need this fix:
-
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 8f62edad51be..220c611c89ae 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -775,7 +775,7 @@ sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
- 	 * BUFB
- 	 */
- 	if (buf_len !=  2 * period_len)
--		return ERR_PTR(-EINVAL);
-+		return NULL;
- 
- 	/* Get free descriptor */
- 	spin_lock_irqsave(&schan->lock, iflags);
+This comment isn't right. For a start the model is no longer static.
 
 
-	Arnd
+> @@ -615,18 +944,24 @@ struct stm32f4_clk_data {
+>  	const struct stm32f4_gate_data *gates_data;
+>  	const u64 *gates_map;
+>  	int gates_num;
+> +	const struct stm32f4_pll_data *pll_data;
+> +	int pll_num;
+
+pll_num is unused.
+
+
+Daniel.
