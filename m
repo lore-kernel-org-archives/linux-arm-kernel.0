@@ -1,39 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Nov 2016 16:10:05 +0100
-Subject: [PATCH] drm/sun4i: Propagate error to the caller
-In-Reply-To: <20161107011957.GK3327@joana>
-References: <20161104061352.12596-1-christophe.jaillet@wanadoo.fr>
- <20161107011957.GK3327@joana>
-Message-ID: <20161107151005.7sobo4hn2hr6vfwv@lukather>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 7 Nov 2016 13:11:25 -0200
+Subject: [PATCH] ARM: dts: imx6: Add support for Logic PD SOM and Baseboard
+In-Reply-To: <CAHCN7xJ=KK-=5sVu0Or5bep-cdk3hq4+a3gFj-W0bCcVhQyWNw@mail.gmail.com>
+References: <1469030786-28424-1-git-send-email-aford173@gmail.com>
+ <20160809082400.GR4678@tiger>
+ <CAHCN7x+YopHVNxh4Vi5o1d=S3FFkoz45dNmgHMgs1sAQqaL77A@mail.gmail.com>
+ <20161105070043.GA5597@dragon>
+ <CAHCN7xJ=KK-=5sVu0Or5bep-cdk3hq4+a3gFj-W0bCcVhQyWNw@mail.gmail.com>
+Message-ID: <CAOMZO5DOjGAJytMruLT7mZg2BEbNB2FW-Fyo0Xx0tsr-sZ=6Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 10:19:57AM +0900, Gustavo Padovan wrote:
-> Hi Christophe,
-> 
-> 2016-11-04 Christophe JAILLET <christophe.jaillet@wanadoo.fr>:
-> 
-> > If 'sun4i_layers_init()' returns an error, propagate it instead of
-> > returning -EINVAL unconditionally.
-> > 
-> > Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun4i_drv.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Reviewed-by: Gustavo Padovan <gustavo.padovan@collabora.co.uk>
+Hi Adam,
 
-Applied, thanks!
-Maxime
+On Mon, Nov 7, 2016 at 1:03 PM, Adam Ford <aford173@gmail.com> wrote:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/310f8f7b/attachment-0001.sig>
+> I rebased on the 4.9-rc4, and the pinmux errors go away, but the
+> regulators appear to need their own container or I get the following
+> error:
+
+You can write the regulators without the container as follows:
+
+reg_3p3v: regulator-3p3v {
+
+reg_usb_otg_vbus: regulator-usbotgvbus {
+         compatible = "regulator-fixed";
+         regulator-name = "usb_otg_vbus";
+         regulator-min-microvolt = <5000000>;
+         regulator-max-microvolt = <5000000>;
+         gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+         enable-active-high;
+};
