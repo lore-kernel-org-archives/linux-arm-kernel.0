@@ -1,34 +1,84 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 7 Nov 2016 14:28:54 +0100
-Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
-In-Reply-To: <20160918102852.6593-1-contact@paulk.fr>
-References: <20160918102852.6593-1-contact@paulk.fr>
-Message-ID: <20161107132854.GF12559@ulmo.ba.sec>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 7 Nov 2016 14:54:30 +0100
+Subject: [PATCH] spi: atmel: use managed resource for gpio chip select
+In-Reply-To: <CAMuHMdUQLkHn4=3U6TNjgTN--RUHZHsbwNu9dLdFrBJA0sx4aw@mail.gmail.com>
+References: <20160921075528.14452-1-nicolas.ferre@atmel.com>
+ <CAMuHMdUQLkHn4=3U6TNjgTN--RUHZHsbwNu9dLdFrBJA0sx4aw@mail.gmail.com>
+Message-ID: <3f5b93d7-ee40-bb1a-2cfb-49fa193e2b9d@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Sep 18, 2016 at 12:28:52PM +0200, Paul Kocialkowski wrote:
-> Nyan boards only have host USB ports (2 external, 1 internal), there is
-> no OTG-enabled connector.
+Le 21/09/2016 ? 10:20, Geert Uytterhoeven a ?crit :
+> Hi Nicolas,
 > 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> On Wed, Sep 21, 2016 at 9:55 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> Use the managed gpio CS pin request so that we avoid having trouble
+>> in the cleanup code.
+>> In fact, if module was configured with DT, cleanup code released
+>> invalid pin.  Since resource wasn't freed, module cannot be reinserted.
+>>
+>> Reported-by: Alexander Morozov <linux@meltdown.ru>
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>  drivers/spi/spi-atmel.c | 5 ++---
+>>  1 file changed, 2 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+>> index 8feac599e9ab..4e3f2345844a 100644
+>> --- a/drivers/spi/spi-atmel.c
+>> +++ b/drivers/spi/spi-atmel.c
+>> @@ -1248,7 +1248,8 @@ static int atmel_spi_setup(struct spi_device *spi)
+>>                         return -ENOMEM;
+>>
+>>                 if (as->use_cs_gpios) {
+>> -                       ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+>> +                       ret = devm_gpio_request(&spi->dev,
+>> +                                               npcs_pin, dev_name(&spi->dev));
+> 
+> Note that spi_master.setup() can be called multiple times during the lifetime
+> of the spi_device.
 
-Where is this information coming from? I don't have one of the Nyans
-myself, but one of the Tegra132 devices I have, which I think was
-derived from one of the Nyans uses one of the external host ports as
-forced recovery port, for which it would need OTG.
+Sure, this is what I read in include/linux/spi/spi.h "It's always safe
+to call this unless transfers are pending on the device whose settings
+are being modified."
 
-I suspect that the way to get U-Boot onto the Nyans is via tegrarcm?
-In that case I think one of the ports must be OTG.
+It also means that the whole memory allocation for devices that is done
+a few lines above this gpio request is also completely wrong... This
+function needs a serious refactoring.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/7889311c/attachment.sig>
+Thanks for the heads-up.
+
+Best regards,
+
+>>                         if (ret) {
+>>                                 kfree(asd);
+>>                                 return ret;
+>> @@ -1471,13 +1472,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
+>>  static void atmel_spi_cleanup(struct spi_device *spi)
+>>  {
+>>         struct atmel_spi_device *asd = spi->controller_state;
+>> -       unsigned                gpio = (unsigned long) spi->controller_data;
+>>
+>>         if (!asd)
+>>                 return;
+>>
+>>         spi->controller_state = NULL;
+>> -       gpio_free(gpio);
+>>         kfree(asd);
+>>  }
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
+
+
+-- 
+Nicolas Ferre
