@@ -1,119 +1,57 @@
-From: dsafonov@virtuozzo.com (Dmitry Safonov)
-Date: Mon, 7 Nov 2016 20:16:58 +0300
-Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
-In-Reply-To: <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
-References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
- <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
-Message-ID: <714d2aea-ed4c-6272-89c1-e1d0e037855e@virtuozzo.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 7 Nov 2016 22:50:58 +0530
+Subject: [PATCH 3/6] clk: Add driver for Maxim-8997 PMIC clocks
+In-Reply-To: <63750c2f-35cb-91ab-276b-c788f51081cb@osg.samsung.com>
+References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478513376-14307-4-git-send-email-pankaj.dubey@samsung.com>
+ <63750c2f-35cb-91ab-276b-c788f51081cb@osg.samsung.com>
+Message-ID: <CAGcde9EkEsvJ2kBpNvd+bEZj0nbpgmFu1zBe+RQz+Kij9WxHMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2016 08:00 PM, Christopher Covington wrote:
-> Hi Dmitry,
+Hi Javier,
+
+On 7 November 2016 at 20:31, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Pankaj,
 >
-> On 11/01/2016 01:22 PM, Dmitry Safonov wrote:
->>   Add vdso_mremap hook which will fix context.vdso pointer after mremap()
->> on vDSO vma. This is needed for correct landing after syscall execution.
->> Primary goal of this is for CRIU on arm - we need to restore vDSO image
->> at the exactly same place where the vma was in dumped application. With
->> the help of this hook we'll move vDSO at the new position.
->>   The CRIU code handles situations like when vDSO of dumped application
->> was different from vDSO on restoring system. This usally happens when
->> some new symbols are being added to vDSO. In these situations CRIU
->> inserts jump trampolines from old vDSO blob to new vDSO on restore.
->> By that reason even if on restore vDSO blob lies on the same address as
->> blob in dumped application - we still need to move it if it differs.
+> On 11/07/2016 07:09 AM, Pankaj Dubey wrote:
+>> The MAX8997 PMIC has 32.786kHz crystal oscillator which provides an
+>> accurate low frequency clock for MAX8997 internal circuit as well as
+>> external circuit. This patch adds support for these two clocks.
 >>
->>   There was previously attempt to add this functionality for arm64 by
->> arch_mremap hook [1], while this patch introduces this with minimal
->> effort - the same way I've added it to x86:
->> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
->>
->>   At this moment, vdso restoring code is disabled for arm/arm64 arch
->> in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
->> is aimed to fix that.
->>   The same hook may be introduced for arm64 kernel, but at this moment
->> arm64 vdso code is actively reworked by Kevin, so we can do it on top.
->>   Separately, I've refactored arch_remap hook out from ppc64 [3].
->>
->> [1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
->> [2]: https://github.com/xemul/criu/blob/master/Makefile#L39
->> [3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
->>
->> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
->> Cc: Christopher Covington <cov@codeaurora.org>
->> Cc: Andy Lutomirski <luto@amacapital.net>
->> Cc: Oleg Nesterov <oleg@redhat.com>
->> Cc: Russell King <linux@armlinux.org.uk>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-mm at kvack.org
->> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>> CC: Michael Turquette <mturquette@baylibre.com>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: devicetree at vger.kernel.org
+>> CC: linux-clk at vger.kernel.org
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 >> ---
->>  arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>
->> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
->> index 53cf86cf2d1a..d1001f87c2f6 100644
->> --- a/arch/arm/kernel/vdso.c
->> +++ b/arch/arm/kernel/vdso.c
->> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
->>  	.pages = &vdso_data_page,
->>  };
->>
->> +static int vdso_mremap(const struct vm_special_mapping *sm,
->> +		struct vm_area_struct *new_vma);
->>  static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
->>  	.name = "[vdso]",
->> +	.mremap = vdso_mremap,
->>  };
->>
->>  struct elfinfo {
->> @@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
->>  		mm->context.vdso = addr;
->>  }
->>
->> +static int vdso_mremap(const struct vm_special_mapping *sm,
->> +		struct vm_area_struct *new_vma)
->> +{
->> +	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
->> +	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
->> +
->> +	/* Disallow partial vDSO blob remap */
->> +	if (vdso_size != new_size)
->> +		return -EINVAL;
->> +
->> +	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
->> +		return -EFAULT;
->> +
->> +	current->mm->context.vdso = new_vma->vm_start;
->> +
->> +	return 0;
->> +}
->> +
->>  static void vdso_write_begin(struct vdso_data *vdata)
->>  {
->>  	++vdso_data->seq_count;
->>
 >
-> What do you think about putting this code somewhere generic (not under
-> arch/*), so that powerpc and arm64 can reuse it once the cosmetic changes
-> to make them compatible are made? My thought was that it could be defined
-> underneath CONFIG_GENERIC_VDSO, which architectures could select as they
-> became compatible.
+> What kernel version are you basing this on? The Maxim common clock code
 
-Hi Chistopher,
+This patch series, I have prepared on Krzysztof's for-next which is 4.9-rc1,
 
-Well, I don't think we won something out of generalization of simple 
-assignment for context.vdso pointer accross arches. And a need to rename
-vdso over arches for saving one single line?
-Also I don't like a bit this arch_mremap hook and need to nullify
-vdso pointer.
+> is going away for v4.9 and instead the clk-max77686 driver supports both
+> 77686 and 77802 clocks. See commit 8ad313fe4e00 ("clk: max77686: Combine
+> Maxim max77686 and max77802 driver").
+>
+> Since the 8997 clock IP looks very similar to 77802 AFAICT, you should
+> also extend the clk-max77686 driver to have 8997 support.
+>
 
-But, anyway, I don't mind if your patches got applied instead - this
-unability to move vdso prevent's to support vdso vma C/R, as you know ;)
+I was not aware of this change. I will check this and if I can
+reuse/extend max77686 for 8997 I will do it.
 
--- 
-              Dmitry
+Thanks,
+Pankaj Dubey
+
+> Best regards,
+> --
+> Javier Martinez Canillas
+> Open Source Group
+> Samsung Research America
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
