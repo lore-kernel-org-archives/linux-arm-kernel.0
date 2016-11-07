@@ -1,42 +1,72 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 07 Nov 2016 14:06:13 +0100
-Subject: [PATCH] iommu/dma-iommu: properly respect configured address space
- size
-References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
-Message-ID: <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
+From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
+Date: Mon, 7 Nov 2016 14:05:41 +0100
+Subject: [PATCH 4/6] clk: stm32f4: Add I2S clock
+In-Reply-To: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1478523943-23142-5-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When one called iommu_dma_init_domain() with size smaller than device's
-DMA mask, the alloc_iova() will not respect it and always assume that all
-IOVA addresses will be allocated from the the (base ... dev->dma_mask) range.
+From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch fixes this issue by taking the configured address space size
-parameter into account (if it is smaller than the device's dma_mask).
+This patch introduces I2S clock for stm32f4 soc.
+The I2S clock could be derived from an external clock or from pll-i2s
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/iommu/dma-iommu.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/clk/clk-stm32f4.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index c5ab8667e6f2..8b4b72654359 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -212,11 +212,13 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index 5fa5d51..b7cb359 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -216,6 +216,7 @@ enum {
+ 	SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC,
+ 	PLL_VCO_I2S, PLL_VCO_SAI,
+ 	CLK_LCD,
++	CLK_I2S,
+ 	END_PRIMARY_CLK
+ };
  
- 	if (domain->geometry.force_aperture)
- 		dma_limit = min(dma_limit, domain->geometry.aperture_end);
+@@ -967,6 +968,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ 
+ static const char *sdmux_parents[2] = { "pll48", "sys" };
+ 
++static const char *i2s_parents[2] = { "plli2s-r", NULL };
 +
-+	dma_limit = min(dma_limit >> shift, (dma_addr_t)iovad->dma_32bit_pfn);
- 	/*
- 	 * Enforce size-alignment to be safe - there could perhaps be an
- 	 * attribute to control this per-device, or at least per-domain...
- 	 */
--	return alloc_iova(iovad, length, dma_limit >> shift, true);
-+	return alloc_iova(iovad, length, dma_limit, true);
- }
+ struct stm32f4_clk_data {
+ 	const struct stm32f4_gate_data *gates_data;
+ 	const u64 *gates_map;
+@@ -1005,7 +1008,7 @@ struct stm32f4_clk_data {
  
- /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+ static void __init stm32f4_rcc_init(struct device_node *np)
+ {
+-	const char *hse_clk;
++	const char *hse_clk, *i2s_in_clk;
+ 	int n;
+ 	const struct of_device_id *match;
+ 	const struct stm32f4_clk_data *data;
+@@ -1038,6 +1041,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 	stm32f4_gate_map = data->gates_map;
+ 
+ 	hse_clk = of_clk_get_parent_name(np, 0);
++	i2s_in_clk = of_clk_get_parent_name(np, 1);
+ 
+ 	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
+ 			16000000, 160000);
+@@ -1053,6 +1057,12 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 	clks[PLL_VCO_SAI] = stm32f4_rcc_register_pll(pllsrc,
+ 			&data->pll_data[2], &stm32f4_clk_lock);
+ 
++	i2s_parents[1] = i2s_in_clk;
++
++	clks[CLK_I2S] =	clk_hw_register_mux_table(NULL, "i2s",
++				i2s_parents, ARRAY_SIZE(i2s_parents), 0,
++				base + STM32F4_RCC_CFGR, 23, 1, 0, NULL,
++				&stm32f4_clk_lock);
+ 	sys_parents[1] = hse_clk;
+ 	clk_register_mux_table(
+ 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
 -- 
 1.9.1
