@@ -1,72 +1,67 @@
 From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Mon, 7 Nov 2016 14:05:41 +0100
-Subject: [PATCH 4/6] clk: stm32f4: Add I2S clock
+Date: Mon, 7 Nov 2016 14:05:39 +0100
+Subject: [PATCH 2/6] clk: stm32f4: SDIO & 48Mhz clock management for STM32F469
+ board
 In-Reply-To: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
 References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1478523943-23142-5-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <1478523943-23142-3-git-send-email-gabriel.fernandez@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Gabriel Fernandez <gabriel.fernandez@st.com>
 
-This patch introduces I2S clock for stm32f4 soc.
-The I2S clock could be derived from an external clock or from pll-i2s
+In the stm32f469 soc, the 48Mhz clock could be derived from pll-q or
+from pll-sai-p.
+
+The SDIO clock could be also derived from 48Mhz or from sys clock.
 
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 ---
- drivers/clk/clk-stm32f4.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/clk/clk-stm32f4.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
-index 5fa5d51..b7cb359 100644
+index 7641acd..dda15bc 100644
 --- a/drivers/clk/clk-stm32f4.c
 +++ b/drivers/clk/clk-stm32f4.c
-@@ -216,6 +216,7 @@ enum {
- 	SYSTICK, FCLK, CLK_LSI, CLK_LSE, CLK_HSE_RTC, CLK_RTC,
- 	PLL_VCO_I2S, PLL_VCO_SAI,
- 	CLK_LCD,
-+	CLK_I2S,
- 	END_PRIMARY_CLK
+@@ -199,7 +199,7 @@ struct stm32f4_gate_data {
+ 	{ STM32F4_RCC_APB2ENR,  8,	"adc1",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR,  9,	"adc2",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 10,	"adc3",		"apb2_div" },
+-	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"pll48" },
++	{ STM32F4_RCC_APB2ENR, 11,	"sdio",		"sdmux" },
+ 	{ STM32F4_RCC_APB2ENR, 12,	"spi1",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 13,	"spi4",		"apb2_div" },
+ 	{ STM32F4_RCC_APB2ENR, 14,	"syscfg",	"apb2_div" },
+@@ -940,6 +940,10 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
+ 	"no-clock", "lse", "lsi", "hse-rtc"
  };
  
-@@ -967,6 +968,8 @@ static struct clk_hw *stm32_register_cclk(struct device *dev, const char *name,
- 
- static const char *sdmux_parents[2] = { "pll48", "sys" };
- 
-+static const char *i2s_parents[2] = { "plli2s-r", NULL };
++static const char *pll48_parents[2] = { "pll-q", "pllsai-p" };
++
++static const char *sdmux_parents[2] = { "pll48", "sys" };
 +
  struct stm32f4_clk_data {
  	const struct stm32f4_gate_data *gates_data;
  	const u64 *gates_map;
-@@ -1005,7 +1008,7 @@ struct stm32f4_clk_data {
+@@ -1109,6 +1113,18 @@ static void __init stm32f4_rcc_init(struct device_node *np)
+ 		goto fail;
+ 	}
  
- static void __init stm32f4_rcc_init(struct device_node *np)
- {
--	const char *hse_clk;
-+	const char *hse_clk, *i2s_in_clk;
- 	int n;
- 	const struct of_device_id *match;
- 	const struct stm32f4_clk_data *data;
-@@ -1038,6 +1041,7 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	stm32f4_gate_map = data->gates_map;
- 
- 	hse_clk = of_clk_get_parent_name(np, 0);
-+	i2s_in_clk = of_clk_get_parent_name(np, 1);
- 
- 	clk_register_fixed_rate_with_accuracy(NULL, "hsi", NULL, 0,
- 			16000000, 160000);
-@@ -1053,6 +1057,12 @@ static void __init stm32f4_rcc_init(struct device_node *np)
- 	clks[PLL_VCO_SAI] = stm32f4_rcc_register_pll(pllsrc,
- 			&data->pll_data[2], &stm32f4_clk_lock);
- 
-+	i2s_parents[1] = i2s_in_clk;
-+
-+	clks[CLK_I2S] =	clk_hw_register_mux_table(NULL, "i2s",
-+				i2s_parents, ARRAY_SIZE(i2s_parents), 0,
-+				base + STM32F4_RCC_CFGR, 23, 1, 0, NULL,
++	if (of_device_is_compatible(np, "st,stm32f469-rcc")) {
++		clk_hw_register_mux_table(NULL, "pll48",
++				pll48_parents, ARRAY_SIZE(pll48_parents), 0,
++				base + STM32F4_RCC_DCKCFGR, 27, 1, 0, NULL,
 +				&stm32f4_clk_lock);
- 	sys_parents[1] = hse_clk;
- 	clk_register_mux_table(
- 	    NULL, "sys", sys_parents, ARRAY_SIZE(sys_parents), 0,
++
++		clk_hw_register_mux_table(NULL, "sdmux",
++				sdmux_parents, ARRAY_SIZE(sdmux_parents), 0,
++				base + STM32F4_RCC_DCKCFGR, 28, 1, 0, NULL,
++				&stm32f4_clk_lock);
++	}
++
+ 	of_clk_add_hw_provider(np, stm32f4_rcc_lookup_clk, NULL);
+ 	return;
+ fail:
 -- 
 1.9.1
