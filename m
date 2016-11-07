@@ -1,82 +1,119 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 7 Nov 2016 18:19:45 +0100 (CET)
-Subject: [PATCH] serial: sirf: Simplify a test
-In-Reply-To: <2916662.De1FDumaQl@wuerfel>
-References: <20161101070333.12255-1-christophe.jaillet@wanadoo.fr>
- <2916662.De1FDumaQl@wuerfel>
-Message-ID: <alpine.DEB.2.10.1611071816140.3128@hadrien>
+From: dsafonov@virtuozzo.com (Dmitry Safonov)
+Date: Mon, 7 Nov 2016 20:16:58 +0300
+Subject: [PATCH] arm/vdso: introduce vdso_mremap hook
+In-Reply-To: <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
+References: <20161101172214.2938-1-dsafonov@virtuozzo.com>
+ <0b41c28b-20ef-332f-d8d6-e381e05b8252@codeaurora.org>
+Message-ID: <714d2aea-ed4c-6272-89c1-e1d0e037855e@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/07/2016 08:00 PM, Christopher Covington wrote:
+> Hi Dmitry,
+>
+> On 11/01/2016 01:22 PM, Dmitry Safonov wrote:
+>>   Add vdso_mremap hook which will fix context.vdso pointer after mremap()
+>> on vDSO vma. This is needed for correct landing after syscall execution.
+>> Primary goal of this is for CRIU on arm - we need to restore vDSO image
+>> at the exactly same place where the vma was in dumped application. With
+>> the help of this hook we'll move vDSO at the new position.
+>>   The CRIU code handles situations like when vDSO of dumped application
+>> was different from vDSO on restoring system. This usally happens when
+>> some new symbols are being added to vDSO. In these situations CRIU
+>> inserts jump trampolines from old vDSO blob to new vDSO on restore.
+>> By that reason even if on restore vDSO blob lies on the same address as
+>> blob in dumped application - we still need to move it if it differs.
+>>
+>>   There was previously attempt to add this functionality for arm64 by
+>> arch_mremap hook [1], while this patch introduces this with minimal
+>> effort - the same way I've added it to x86:
+>> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+>>
+>>   At this moment, vdso restoring code is disabled for arm/arm64 arch
+>> in CRIU [2], so C/R is only working for !CONFIG_VDSO kernels. This patch
+>> is aimed to fix that.
+>>   The same hook may be introduced for arm64 kernel, but at this moment
+>> arm64 vdso code is actively reworked by Kevin, so we can do it on top.
+>>   Separately, I've refactored arch_remap hook out from ppc64 [3].
+>>
+>> [1]: https://marc.info/?i=1448455781-26660-1-git-send-email-cov at codeaurora.org
+>> [2]: https://github.com/xemul/criu/blob/master/Makefile#L39
+>> [3]: https://marc.info/?i=20161027170948.8279-1-dsafonov at virtuozzo.com
+>>
+>> Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+>> Cc: Christopher Covington <cov@codeaurora.org>
+>> Cc: Andy Lutomirski <luto@amacapital.net>
+>> Cc: Oleg Nesterov <oleg@redhat.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-mm at kvack.org
+>> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+>> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+>> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>> ---
+>>  arch/arm/kernel/vdso.c | 21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
+>>
+>> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+>> index 53cf86cf2d1a..d1001f87c2f6 100644
+>> --- a/arch/arm/kernel/vdso.c
+>> +++ b/arch/arm/kernel/vdso.c
+>> @@ -54,8 +54,11 @@ static const struct vm_special_mapping vdso_data_mapping = {
+>>  	.pages = &vdso_data_page,
+>>  };
+>>
+>> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>> +		struct vm_area_struct *new_vma);
+>>  static struct vm_special_mapping vdso_text_mapping __ro_after_init = {
+>>  	.name = "[vdso]",
+>> +	.mremap = vdso_mremap,
+>>  };
+>>
+>>  struct elfinfo {
+>> @@ -254,6 +257,24 @@ void arm_install_vdso(struct mm_struct *mm, unsigned long addr)
+>>  		mm->context.vdso = addr;
+>>  }
+>>
+>> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>> +		struct vm_area_struct *new_vma)
+>> +{
+>> +	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+>> +	unsigned long vdso_size = (vdso_total_pages - 1) << PAGE_SHIFT;
+>> +
+>> +	/* Disallow partial vDSO blob remap */
+>> +	if (vdso_size != new_size)
+>> +		return -EINVAL;
+>> +
+>> +	if (WARN_ON_ONCE(current->mm != new_vma->vm_mm))
+>> +		return -EFAULT;
+>> +
+>> +	current->mm->context.vdso = new_vma->vm_start;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static void vdso_write_begin(struct vdso_data *vdata)
+>>  {
+>>  	++vdso_data->seq_count;
+>>
+>
+> What do you think about putting this code somewhere generic (not under
+> arch/*), so that powerpc and arm64 can reuse it once the cosmetic changes
+> to make them compatible are made? My thought was that it could be defined
+> underneath CONFIG_GENERIC_VDSO, which architectures could select as they
+> became compatible.
 
+Hi Chistopher,
 
-On Mon, 7 Nov 2016, Arnd Bergmann wrote:
+Well, I don't think we won something out of generalization of simple 
+assignment for context.vdso pointer accross arches. And a need to rename
+vdso over arches for saving one single line?
+Also I don't like a bit this arch_mremap hook and need to nullify
+vdso pointer.
 
-> On Tuesday, November 1, 2016 8:03:33 AM CET Christophe JAILLET wrote:
-> > 'dmaengine_prep_dma_cyclic()' does not return an error pointer, so the test
-> > can be simplified to be more consistent.
-> >
-> > Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
->
-> The change looks correct in principle. It would be good to automate looking
-> for other instances of this bug. How did you find it? Do you have e.g. a
-> coccinelle script or did you just stumble over the issue by accident?
+But, anyway, I don't mind if your patches got applied instead - this
+unability to move vdso prevent's to support vdso vma C/R, as you know ;)
 
-I'm working on collecting this information in a more general way.  It is
-complicated by the fact that there are some functions that have the same
-names but different behaviors, and I want to be clear about when that is
-an issue.  There are nevertheless limits to the accuracy that can be
-obtained with Coccinelle, because Coccinelle doesn't take values into
-account.  Sometimes a variable is initialized to NULL, just to have a
-starting value, but in practice the only way to reach an error return is
-via conditionals that have the effect of ensuring that the value is
-ERR_PTR.  So at least the cases that are reported as being able to return
-both NULL and ERR_PTR will need some careful checking.
-
-julia
-
->
-> There is one problem with your patch:
->
-> >  drivers/tty/serial/sirfsoc_uart.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-> > index b186c9c4f850..666ca3156961 100644
-> > --- a/drivers/tty/serial/sirfsoc_uart.c
-> > +++ b/drivers/tty/serial/sirfsoc_uart.c
-> > @@ -609,7 +609,7 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
-> >                 sirfport->rx_dma_items.dma_addr, SIRFSOC_RX_DMA_BUF_SIZE,
-> >                 SIRFSOC_RX_DMA_BUF_SIZE / 2,
-> >                 DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT);
-> > -       if (IS_ERR_OR_NULL(sirfport->rx_dma_items.desc)) {
-> > +       if (!sirfport->rx_dma_items.desc) {
-> >                 dev_err(port->dev, "DMA slave single fail\n");
-> >                 return;
-> >         }
->
-> The serial driver is for the sirf platform, which uses the sirf-dma
-> dmaengine driver, and that particular driver has an incorrect
-> dma_prep_cyclic implementation, so I think we also need this fix:
->
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index 8f62edad51be..220c611c89ae 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -775,7 +775,7 @@ sirfsoc_dma_prep_cyclic(struct dma_chan *chan, dma_addr_t addr,
->  	 * BUFB
->  	 */
->  	if (buf_len !=  2 * period_len)
-> -		return ERR_PTR(-EINVAL);
-> +		return NULL;
->
->  	/* Get free descriptor */
->  	spin_lock_irqsave(&schan->lock, iflags);
->
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-- 
+              Dmitry
