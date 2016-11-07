@@ -1,34 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 07 Nov 2016 11:34:43 +0100
-Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
- reset
-In-Reply-To: <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
-References: <1427377198.3378.16.camel@pengutronix.de>
- <20161106153117.GA22538@frolo.macqel>
- <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
-Message-ID: <1478514883.12872.2.camel@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon,  7 Nov 2016 11:43:54 +0100
+Subject: [PATCH 0/3] ARM64: dts: meson-gxl: Enable Ethernet
+Message-ID: <20161107104357.24428-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, den 06.11.2016, 14:59 -0200 schrieb Fabio Estevam:
-> On Sun, Nov 6, 2016 at 1:31 PM, Philippe De Muyter <phdm@macq.eu> wrote:
-> 
-> > I use either v3.17 or Freescale's 4.1.15_1.2.0_ga
-> 
-> These kernel versions are not supported by the kernel community.
-> 
-> Do you observe issues with 4.8.6 or 4.9-rc4?
+The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
+external RGMII pins.
 
-The problem is definitely present in current mainline Linux. I intent to
-remove this workaround from the kernel, but we need to make sure that
-the bootloader properly disables PCIe before jumping to the kernel
-image.
+The internal PHY is added in the GXL dtsi and support for each
+board is added in intermediate board family dtsi or final dts.
 
-I don't know what the status of this is in U-Boot, but Barebox already
-does this correctly.
+This patchset depends on ARM64 dts patch at [1]
 
-Fabio, would you mind to port this coed to U-Boot, or at least check if
-it does the right thing?
+Changes since v2 RFC at : [3]
+ - Change phy Kconfig/Makefile alphabetic order
+ - GXL dtsi cleanup
+ - Add P230 External PHY reset
+ - Add external PHY compatible ID string
 
-Regards,
-Lucas
+Changes since original RFC patchset at : [2]
+ - Remove meson8b experimental phy switching
+ - Switch to mdio-mux-mmioreg with extennded size support
+ - Add internal phy support for S905x and p231
+ - Add external PHY support for p230
+
+[1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1477932987-27871-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (3):
+  ARM64: dts: meson-gxl: Add ethernet nodes with internal PHY
+  ARM64: dts: meson-gxl-p23x: Enable ethernet
+  ARM64: dts: meson-gxl-s905x: Enable internal ethernet PHY
+
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      | 25 +++++++++++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  6 +++
+ .../boot/dts/amlogic/meson-gxl-s905d-p23x.dtsi     |  4 ++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi   |  6 +++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 43 ++++++++++++++++++++++
+ 5 files changed, 84 insertions(+)
+
+-- 
+2.7.0
