@@ -1,47 +1,31 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 7 Nov 2016 02:30:08 +0200
-Subject: [PATCH 13/22] mtd: nand: lpc32xx: return error code of
- nand_scan_ident/tail() on error
-In-Reply-To: <20161106192743.00e401ec@bbrezillon>
-References: <1478256190-7452-1-git-send-email-yamada.masahiro@socionext.com>
- <1478256190-7452-14-git-send-email-yamada.masahiro@socionext.com>
- <20161106192743.00e401ec@bbrezillon>
-Message-ID: <c9983167-cedd-3246-ccb8-54aad229e275@mleia.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 7 Nov 2016 01:36:39 +0100
+Subject: [PATCH v4 0/7] i2c: bcm2835: Bring in changes from downstream
+In-Reply-To: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
+References: <1475525174-28604-1-git-send-email-noralf@tronnes.org>
+Message-ID: <20161107003639.GC1442@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Mon, Oct 03, 2016 at 10:06:07PM +0200, Noralf Tr?nnes wrote:
 
-On 11/06/2016 08:27 PM, Boris Brezillon wrote:
-> On Fri,  4 Nov 2016 19:43:01 +0900
-> Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
->
->> The nand_scan_ident/tail() returns an appropriate error value when
->> it fails.  Use it instead of the fixed error code -ENXIO.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->> ---
+> This patchset tries to bring in the lessons learned in the downstream
+> driver i2c-bcm2708. The downstream clock stretcing timeout patch has
+> been left out since clock stretching is broken/unreliable on this
+> controller, so no point in setting it.
+> 
+> Changes since version 3:
+> - Add comment about I2C_C_CLEAR on error
 
-[snip]
+Looks like some serious hacking to get around HW limitations. Thanks for
+upporting it.
 
->> -	if (nand_scan_tail(mtd)) {
->> -		res = -ENXIO;
->> +	res = nand_scan_tail(mtd);
->
-> You miss
->
-> 	if (res)
->
-> here.
->
-> No need to resend, I'll fix it when applying the patches.
->
->>  		goto err_exit3;
->> -	}
->>
+Applied to for-next.
 
-nice catch, thank you for noticing and fixing the overlooked bug!
-
---
-With best wishes,
-Vladimir
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/3c095562/attachment.sig>
