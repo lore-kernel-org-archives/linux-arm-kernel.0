@@ -1,41 +1,135 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Mon, 7 Nov 2016 10:05:13 +0100
-Subject: [PATCH 1/1] pinctrl: st: st_pctl_dt_parse_groups simplify
- expression
-In-Reply-To: <20161105143515.4668-1-xypron.glpk@gmx.de>
-References: <20161105143515.4668-1-xypron.glpk@gmx.de>
-Message-ID: <1ac9af0e-0a00-757b-6981-0ff9461fbbb3@st.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon,  7 Nov 2016 09:21:20 +0000
+Subject: [RESEND PATCH v1 4/6] irqchip/gicv3-its: Specialise readq and writeq
+ accesses
+In-Reply-To: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
+References: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1478510482-15471-5-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+readq and writeq type of assessors are not supported in AArch32, so we
+need to specialise them and glue later with series of 32-bit accesses
+on AArch32 side.
 
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm64/include/asm/arch_gicv3.h |   14 ++++++++++++++
+ drivers/irqchip/irq-gic-v3-its.c    |   24 ++++++++++++------------
+ 2 files changed, 26 insertions(+), 12 deletions(-)
 
-On 11/05/2016 03:35 PM, Heinrich Schuchardt wrote:
-> for_each_property_of_node(pins, pp) checks that pp is not NULL.
-> So there is no need to check it inside the loop.
-> 
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
-> ---
->  drivers/pinctrl/pinctrl-st.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-> index 8308f15..676efcc 100644
-> --- a/drivers/pinctrl/pinctrl-st.c
-> +++ b/drivers/pinctrl/pinctrl-st.c
-> @@ -1181,7 +1181,7 @@ static int st_pctl_dt_parse_groups(struct device_node *np,
->  		if (!strcmp(pp->name, "name"))
->  			continue;
->  
-> -		if (pp  && (pp->length/sizeof(__be32)) >= OF_GPIO_ARGS_MIN) {
-> +		if (pp->length / sizeof(__be32) >= OF_GPIO_ARGS_MIN) {
->  			npins++;
->  		} else {
->  			pr_warn("Invalid st,pins in %s node\n", np->name);
-> 
-
-Hi Heinrich
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 4f0402a..022523b 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -190,5 +190,19 @@ static inline void gic_write_bpr1(u32 val)
+ 
+ #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
++#define gits_read_baser(c)		readq_relaxed(c)
++#define gits_write_baser(v, c)		writeq_relaxed(v, c)
++
++#define gits_read_cbaser(c)		readq_relaxed(c)
++#define gits_write_cbaser(v, c)		writeq_relaxed(v, c)
++
++#define gits_write_cwriter(v, c)	writeq_relaxed(v, c)
++
++#define gicr_read_propbaser(c)		readq_relaxed(c)
++#define gicr_write_propbaser(v, c)	writeq_relaxed(v, c)
++
++#define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
++#define gicr_read_pendbaser(c)		readq_relaxed(c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index b2a6e7b..69b040f 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -835,7 +835,7 @@ static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
+ {
+ 	u32 idx = baser - its->tables;
+ 
+-	return readq_relaxed(its->base + GITS_BASER + (idx << 3));
++	return gits_read_baser(its->base + GITS_BASER + (idx << 3));
+ }
+ 
+ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+@@ -843,7 +843,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+ {
+ 	u32 idx = baser - its->tables;
+ 
+-	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
++	gits_write_baser(val, its->base + GITS_BASER + (idx << 3));
+ 	baser->val = its_read_baser(its, baser);
+ }
+ 
+@@ -1125,8 +1125,8 @@ static void its_cpu_init_lpis(void)
+ 	       GICR_PROPBASER_WaWb |
+ 	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
+ 
+-	writeq_relaxed(val, rbase + GICR_PROPBASER);
+-	tmp = readq_relaxed(rbase + GICR_PROPBASER);
++	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
++	tmp = gicr_read_propbaser(rbase + GICR_PROPBASER);
+ 
+ 	if ((tmp ^ val) & GICR_PROPBASER_SHAREABILITY_MASK) {
+ 		if (!(tmp & GICR_PROPBASER_SHAREABILITY_MASK)) {
+@@ -1138,7 +1138,7 @@ static void its_cpu_init_lpis(void)
+ 			val &= ~(GICR_PROPBASER_SHAREABILITY_MASK |
+ 				 GICR_PROPBASER_CACHEABILITY_MASK);
+ 			val |= GICR_PROPBASER_nC;
+-			writeq_relaxed(val, rbase + GICR_PROPBASER);
++			gicr_write_propbaser(val, rbase + GICR_PROPBASER);
+ 		}
+ 		pr_info_once("GIC: using cache flushing for LPI property table\n");
+ 		gic_rdists->flags |= RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING;
+@@ -1149,8 +1149,8 @@ static void its_cpu_init_lpis(void)
+ 	       GICR_PENDBASER_InnerShareable |
+ 	       GICR_PENDBASER_WaWb);
+ 
+-	writeq_relaxed(val, rbase + GICR_PENDBASER);
+-	tmp = readq_relaxed(rbase + GICR_PENDBASER);
++	gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
++	tmp = gicr_read_pendbaser(rbase + GICR_PENDBASER);
+ 
+ 	if (!(tmp & GICR_PENDBASER_SHAREABILITY_MASK)) {
+ 		/*
+@@ -1160,7 +1160,7 @@ static void its_cpu_init_lpis(void)
+ 		val &= ~(GICR_PENDBASER_SHAREABILITY_MASK |
+ 			 GICR_PENDBASER_CACHEABILITY_MASK);
+ 		val |= GICR_PENDBASER_nC;
+-		writeq_relaxed(val, rbase + GICR_PENDBASER);
++		gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
+ 	}
+ 
+ 	/* Enable LPIs */
+@@ -1716,8 +1716,8 @@ static int __init its_probe_one(struct resource *res,
+ 		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
+ 		 GITS_CBASER_VALID);
+ 
+-	writeq_relaxed(baser, its->base + GITS_CBASER);
+-	tmp = readq_relaxed(its->base + GITS_CBASER);
++	gits_write_cbaser(baser, its->base + GITS_CBASER);
++	tmp = gits_read_cbaser(its->base + GITS_CBASER);
+ 
+ 	if ((tmp ^ baser) & GITS_CBASER_SHAREABILITY_MASK) {
+ 		if (!(tmp & GITS_CBASER_SHAREABILITY_MASK)) {
+@@ -1729,13 +1729,13 @@ static int __init its_probe_one(struct resource *res,
+ 			baser &= ~(GITS_CBASER_SHAREABILITY_MASK |
+ 				   GITS_CBASER_CACHEABILITY_MASK);
+ 			baser |= GITS_CBASER_nC;
+-			writeq_relaxed(baser, its->base + GITS_CBASER);
++			gits_write_cbaser(baser, its->base + GITS_CBASER);
+ 		}
+ 		pr_info("ITS: using cache flushing for cmd queue\n");
+ 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
+ 	}
+ 
+-	writeq_relaxed(0, its->base + GITS_CWRITER);
++	gits_write_cwriter(0, its->base + GITS_CWRITER);
+ 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+ 
+ 	err = its_init_domain(handle, its);
+-- 
+1.7.9.5
