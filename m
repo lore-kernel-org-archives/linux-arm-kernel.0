@@ -1,41 +1,48 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Sun,  6 Nov 2016 17:13:22 -0700
-Subject: [PATCH 0/4] fpga mgr: Add support for capabilities & encrypted
- bistreams
-Message-ID: <20161107001326.7395-1-moritz.fischer@ettus.com>
+Date: Sun,  6 Nov 2016 17:13:26 -0700
+Subject: [PATCH 4/4] fpga mgr: socfpga: Expose support for encrypted bitstreams
+In-Reply-To: <20161107001326.7395-1-moritz.fischer@ettus.com>
+References: <20161107001326.7395-1-moritz.fischer@ettus.com>
+Message-ID: <20161107001326.7395-5-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces FPGA capabilities, to model what operations
-an FPGA Manager low level driver supports.
-Exposing them via sysfs allows userland to make smart decisions which FPGA to deploy
-an image to in case there are multiple FPGAs with different capabilities available.
+Expose support for on the fly decryption of bitstreams.
+This needs no additional work or configuration,
+so just expose the new capability.
 
-As an example of a capability: Support for encrypted bitstreams to Zynq & SocFPGA.
-Please note that [4/4] is separate as I couldn't find info on how encrypted bitstreams
-work on socfpga platforms, however Alan mentioned during an offline discussion it should
-'just work'.
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+Cc: Alan Tull <atull@opensource.altera.com>
+Cc: Michal Simek <michal.simek@xilinx.com>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
 
-On Zynq using the HMAC & AES units in the devcfg peripheral only work when the system
-has been booted in Secure Mode, otherwise the boot rom will disable them.
-The FPGA manager capability will only get exposed if available.
+Alan,
 
-Thanks,
+can you please let me know if that works this way, or where to find
+information on encrypted bitstreams? I have a CycloneV SoCFPGA to test
+on ...
 
-    Moritz
+Cheers,
 
-Moritz Fischer (4):
-  fpga mgr: Introduce FPGA capabilities
-  fpga mgr: Expose FPGA capabilities to userland via sysfs
-  fpga mgr: zynq: Add support for encrypted bitstreams
-  fpga mgr: socfpga: Expose support for encrypted bitstreams
+Moritz
+---
+ drivers/fpga/socfpga.c | 1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/ABI/testing/sysfs-class-fpga-manager | 16 +++++++
- drivers/fpga/fpga-mgr.c                            | 42 ++++++++++++++++++
- drivers/fpga/socfpga.c                             | 11 ++---
- drivers/fpga/zynq-fpga.c                           | 28 ++++++++++--
- include/linux/fpga/fpga-mgr.h                      | 50 +++++++++++++++++++++-
- 5 files changed, 138 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+index fd9760c..ab57ec0c 100644
+--- a/drivers/fpga/socfpga.c
++++ b/drivers/fpga/socfpga.c
+@@ -579,6 +579,7 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
+ 
+ 	fpga_mgr_cap_zero(&caps);
+ 	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
++	fpga_mgr_cap_set(FPGA_MGR_CAP_DECRYPT, caps);
+ 
+ 	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
+ 				 &socfpga_fpga_ops, caps, priv);
 -- 
 2.10.0
