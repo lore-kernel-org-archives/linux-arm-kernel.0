@@ -1,81 +1,74 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Sun, 6 Nov 2016 17:44:16 -0800
-Subject: [PATCH] arm64: percpu: kill off final ACCESS_ONCE() uses
-In-Reply-To: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
-References: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CACT4Y+Z5z-ywh8sMWuLEk48uqtZ6tS67kX+scXm+PtmTMj-neg@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Mon, 7 Nov 2016 09:29:20 +0800
+Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <147829269430.21688.2345895151880009021@sboyd-linaro>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-3-stephen.boyd@linaro.org>
+ <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+ <147733850401.29612.2343965740004706258@sboyd-linaro>
+ <20161025011632.GA23876@b29397-desktop>
+ <147829269430.21688.2345895151880009021@sboyd-linaro>
+Message-ID: <20161107012920.GA10559@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 4, 2016 at 11:17 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> For several reasons it is preferable to use {READ,WRITE}_ONCE() rather than
-> ACCESS_ONCE(). For example, these handle aggregate types, result in shorter
-> source code, and better document the intended access (which may be useful for
-> instrumentation features such as the upcoming KTSAN).
->
-> Over a number of patches, most uses of ACCESS_ONCE() in arch/arm64 have been
-> migrated to {READ,WRITE}_ONCE(). For consistency, and the above reasons, this
-> patch migrates the final remaining uses.
+On Fri, Nov 04, 2016 at 01:51:34PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-10-24 18:16:32)
+> > On Mon, Oct 24, 2016 at 12:48:24PM -0700, Stephen Boyd wrote:
+> > > Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
+> > > > Hi,
+> > > > 
+> > > > On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > > > > The ULPI bus can be built as a module, and it will soon be
+> > > > > calling these functions when it supports probing devices from DT.
+> > > > > Export them so they can be used by the ULPI module.
+> > > > >
+> > > > > Acked-by: Rob Herring <robh@kernel.org>
+> > > > > Cc: <devicetree@vger.kernel.org>
+> > > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> > > > > ---
+> > > > >  drivers/of/device.c | 2 ++
+> > > > >  1 file changed, 2 insertions(+)
+> > > > >
+> > > > > diff --git a/drivers/of/device.c b/drivers/of/device.c
+> > > > > index 8a22a253a830..6719ab35b62e 100644
+> > > > > --- a/drivers/of/device.c
+> > > > > +++ b/drivers/of/device.c
+> > > > > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+> > > > >
+> > > > >         return tsize;
+> > > > >  }
+> > > > > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
+> > > > >
+> > > > >  int of_device_request_module(struct device *dev)
+> > > > >  {
+> > > > > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+> > > > >         }
+> > > > >         mutex_unlock(&of_mutex);
+> > > > >  }
+> > > > > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+> > > > 
+> > > > This is trailing the wrong function.
+> > > > 
+> > > 
+> > > Good catch. Must have been some bad rebase.
+> > > 
+> > > Peter, can you fix it while applying or should I resend this patch?
+> > > 
+> > 
+> > But, this is device tree patch. I can only get chipidea part and other
+> > USB patches if Greg agrees.
+> > 
+> 
+> Were you expecting Rob to take the drivers/of/* patches? Sorry I thought
+> Rob acked them so they could go through usb with the other changes.
 
-Thanks!
+I am just worried about possible merge error when linus pulls both OF
+and USB tree. Greg, is it ok the OF patches through USB tree with OF
+maintainer's ack?
 
-Acked-by: Dmitry Vyukov <dvyukov@google.com>
+-- 
 
-
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dmitry Vyukov <dvyukov@google.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/percpu.h | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-> index 5394c84..4afb6fc 100644
-> --- a/arch/arm64/include/asm/percpu.h
-> +++ b/arch/arm64/include/asm/percpu.h
-> @@ -101,16 +101,16 @@ static inline unsigned long __percpu_read(void *ptr, int size)
->
->         switch (size) {
->         case 1:
-> -               ret = ACCESS_ONCE(*(u8 *)ptr);
-> +               ret = READ_ONCE(*(u8 *)ptr);
->                 break;
->         case 2:
-> -               ret = ACCESS_ONCE(*(u16 *)ptr);
-> +               ret = READ_ONCE(*(u16 *)ptr);
->                 break;
->         case 4:
-> -               ret = ACCESS_ONCE(*(u32 *)ptr);
-> +               ret = READ_ONCE(*(u32 *)ptr);
->                 break;
->         case 8:
-> -               ret = ACCESS_ONCE(*(u64 *)ptr);
-> +               ret = READ_ONCE(*(u64 *)ptr);
->                 break;
->         default:
->                 BUILD_BUG();
-> @@ -123,16 +123,16 @@ static inline void __percpu_write(void *ptr, unsigned long val, int size)
->  {
->         switch (size) {
->         case 1:
-> -               ACCESS_ONCE(*(u8 *)ptr) = (u8)val;
-> +               WRITE_ONCE(*(u8 *)ptr, (u8)val);
->                 break;
->         case 2:
-> -               ACCESS_ONCE(*(u16 *)ptr) = (u16)val;
-> +               WRITE_ONCE(*(u16 *)ptr, (u16)val);
->                 break;
->         case 4:
-> -               ACCESS_ONCE(*(u32 *)ptr) = (u32)val;
-> +               WRITE_ONCE(*(u32 *)ptr, (u32)val);
->                 break;
->         case 8:
-> -               ACCESS_ONCE(*(u64 *)ptr) = (u64)val;
-> +               WRITE_ONCE(*(u64 *)ptr, (u64)val);
->                 break;
->         default:
->                 BUILD_BUG();
-> --
-> 2.7.4
->
+Best Regards,
+Peter Chen
