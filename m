@@ -1,35 +1,23 @@
-From: ping.bai@nxp.com (Bai Ping)
-Date: Mon, 7 Nov 2016 13:41:21 +0800
-Subject: [PATCH 3/3] ARM: dts: imx: Add ocotp node for imx6ul
-In-Reply-To: <1478497281-5477-1-git-send-email-ping.bai@nxp.com>
-References: <1478497281-5477-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <1478497281-5477-3-git-send-email-ping.bai@nxp.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Mon,  7 Nov 2016 14:33:38 +0800
+Subject: [RESEND PATCH v3 0/2] set specific ddr frequency when stop ddr dvfs
+Message-ID: <1478500420-22045-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ocotp node for i.MX6UL SOC.
+We need ddr run a specific frequency when ddr dvfs stop working. So we
+implement get suspend frequency function in devfreq framework, and call
+it in rk3399 dmc driver. 
 
-Signed-off-by: Bai Ping <ping.bai@nxp.com>
----
- arch/arm/boot/dts/imx6ul.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Lin Huang (2):
+  PM/devfreq: add suspend frequency support
+  PM/devfreq: rk3399: get devfreq suspend frequency
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index c5c05fd..c6f6613 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -849,6 +849,12 @@
- 				reg = <0x021b0000 0x4000>;
- 			};
- 
-+			ocotp: ocotp-ctrl at 021bc000 {
-+				compatible = "fsl,imx6ul-ocotp", "syscon";
-+				reg = <0x021bc000 0x4000>;
-+				clocks = <&clks IMX6UL_CLK_OCOTP>;
-+			};
-+
- 			lcdif: lcdif at 021c8000 {
- 				compatible = "fsl,imx6ul-lcdif", "fsl,imx28-lcdif";
- 				reg = <0x021c8000 0x4000>;
+ drivers/devfreq/devfreq.c                 | 18 ++++++++++++++++--
+ drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
+ drivers/devfreq/rk3399_dmc.c              |  2 +-
+ include/linux/devfreq.h                   |  8 ++++++++
+ 4 files changed, 34 insertions(+), 3 deletions(-)
+
 -- 
-2.8.2
+1.9.1
