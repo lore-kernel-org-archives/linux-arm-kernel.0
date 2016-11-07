@@ -1,133 +1,124 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon,  7 Nov 2016 09:21:17 +0000
-Subject: [RESEND PATCH v1 1/6] irqchip/gic-v3-its: Change unsigned types for
- AArch32 compatibility
+Date: Mon,  7 Nov 2016 09:21:19 +0000
+Subject: [RESEND PATCH v1 3/6] irqchip/gicv3-its: Specialise flush_dcache
+ operation
 In-Reply-To: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
 References: <1478510482-15471-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1478510482-15471-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1478510482-15471-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that constants which are supposed to be applied on 64-bit
-data is actually unsigned long long, so they won't be truncated when
-used in 32-bit mode.
+It'd be better to switch to CMA... but before that done redirect
+flush_dcache operation, so 32-bit implementation could be wired
+latter.
 
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   |   28 ++++++++++++++--------------
- include/linux/irqchip/arm-gic-v3.h |    4 ++--
- 2 files changed, 16 insertions(+), 16 deletions(-)
+ arch/arm64/include/asm/arch_gicv3.h |    3 +++
+ drivers/irqchip/irq-gic-v3-its.c    |   17 ++++++++---------
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index f8ae6d6..4f0402a 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -79,6 +79,7 @@
+ 
+ #include <linux/stringify.h>
+ #include <asm/barrier.h>
++#include <asm/cacheflush.h>
+ 
+ #define read_gicreg(r)							\
+ 	({								\
+@@ -187,5 +188,7 @@ static inline void gic_write_bpr1(u32 val)
+ #define gic_read_typer(c)		readq_relaxed(c)
+ #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
+ 
++#define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c5dee30..bca125e 100644
+index 312dd55..b2a6e7b 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -196,7 +196,7 @@ struct its_cmd_block {
+@@ -37,7 +37,6 @@
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
  
- static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
- {
--	cmd->raw_cmd[0] &= ~0xffUL;
-+	cmd->raw_cmd[0] &= ~0xffULL;
- 	cmd->raw_cmd[0] |= cmd_nr;
+-#include <asm/cacheflush.h>
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
+ 
+@@ -433,7 +432,7 @@ static void its_flush_cmd(struct its_node *its, struct its_cmd_block *cmd)
+ 	 * the ITS.
+ 	 */
+ 	if (its->flags & ITS_FLAGS_CMDQ_NEEDS_FLUSHING)
+-		__flush_dcache_area(cmd, sizeof(*cmd));
++		gic_flush_dcache_to_poc(cmd, sizeof(*cmd));
+ 	else
+ 		dsb(ishst);
  }
+@@ -602,7 +601,7 @@ static void lpi_set_config(struct irq_data *d, bool enable)
+ 	 * Humpf...
+ 	 */
+ 	if (gic_rdists->flags & RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING)
+-		__flush_dcache_area(cfg, sizeof(*cfg));
++		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
+ 	else
+ 		dsb(ishst);
+ 	its_send_inv(its_dev, id);
+@@ -817,7 +816,7 @@ static int __init its_alloc_lpi_tables(void)
+ 	       LPI_PROPBASE_SZ);
  
-@@ -208,43 +208,43 @@ static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
+ 	/* Make sure the GIC will observe the written configuration */
+-	__flush_dcache_area(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
++	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
  
- static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
- {
--	cmd->raw_cmd[1] &= ~0xffffffffUL;
-+	cmd->raw_cmd[1] &= ~0xffffffffULL;
- 	cmd->raw_cmd[1] |= id;
+ 	return 0;
  }
+@@ -910,7 +909,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		shr = tmp & GITS_BASER_SHAREABILITY_MASK;
+ 		if (!shr) {
+ 			cache = GITS_BASER_nC;
+-			__flush_dcache_area(base, PAGE_ORDER_TO_SIZE(order));
++			gic_flush_dcache_to_poc(base, PAGE_ORDER_TO_SIZE(order));
+ 		}
+ 		goto retry_baser;
+ 	}
+@@ -1102,7 +1101,7 @@ static void its_cpu_init_lpis(void)
+ 		}
  
- static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
- {
--	cmd->raw_cmd[1] &= 0xffffffffUL;
-+	cmd->raw_cmd[1] &= 0xffffffffULL;
- 	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
- }
+ 		/* Make sure the GIC will observe the zero-ed page */
+-		__flush_dcache_area(page_address(pend_page), LPI_PENDBASE_SZ);
++		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
  
- static void its_encode_size(struct its_cmd_block *cmd, u8 size)
- {
--	cmd->raw_cmd[1] &= ~0x1fUL;
-+	cmd->raw_cmd[1] &= ~0x1fULL;
- 	cmd->raw_cmd[1] |= size & 0x1f;
- }
+ 		paddr = page_to_phys(pend_page);
+ 		pr_info("CPU%d: using LPI pending table @%pa\n",
+@@ -1287,13 +1286,13 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
  
- static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
- {
--	cmd->raw_cmd[2] &= ~0xffffffffffffUL;
--	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00UL;
-+	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
-+	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
- }
+ 		/* Flush Lvl2 table to PoC if hw doesn't support coherency */
+ 		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+-			__flush_dcache_area(page_address(page), baser->psz);
++			gic_flush_dcache_to_poc(page_address(page), baser->psz);
  
- static void its_encode_valid(struct its_cmd_block *cmd, int valid)
- {
--	cmd->raw_cmd[2] &= ~(1UL << 63);
-+	cmd->raw_cmd[2] &= ~(1ULL << 63);
- 	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
- }
+ 		table[idx] = cpu_to_le64(page_to_phys(page) | GITS_BASER_VALID);
  
- static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
- {
--	cmd->raw_cmd[2] &= ~(0xffffffffUL << 16);
--	cmd->raw_cmd[2] |= (target_addr & (0xffffffffUL << 16));
-+	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
-+	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
- }
+ 		/* Flush Lvl1 entry to PoC if hw doesn't support coherency */
+ 		if (!(baser->val & GITS_BASER_SHAREABILITY_MASK))
+-			__flush_dcache_area(table + idx, GITS_LVL1_ENTRY_SIZE);
++			gic_flush_dcache_to_poc(table + idx, GITS_LVL1_ENTRY_SIZE);
  
- static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
- {
--	cmd->raw_cmd[2] &= ~0xffffUL;
-+	cmd->raw_cmd[2] &= ~0xffffULL;
- 	cmd->raw_cmd[2] |= col;
- }
- 
-@@ -657,8 +657,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
- 	its = its_dev->its;
- 	addr = its->phys_base + GITS_TRANSLATER;
- 
--	msg->address_lo		= addr & ((1UL << 32) - 1);
--	msg->address_hi		= addr >> 32;
-+	msg->address_lo		= lower_32_bits(addr);
-+	msg->address_hi		= upper_32_bits(addr);
- 	msg->data		= its_get_event_id(d);
- 
- 	iommu_dma_map_msi_msg(d->irq, msg);
-@@ -935,9 +935,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		/* Ensure updated table contents are visible to ITS hardware */
+ 		dsb(sy);
+@@ -1340,7 +1339,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 		return NULL;
  	}
  
- 	if (val != tmp) {
--		pr_err("ITS@%pa: %s doesn't stick: %lx %lx\n",
-+		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
- 		       &its->phys_base, its_base_type_string[type],
--		       (unsigned long) val, (unsigned long) tmp);
-+		       val, tmp);
- 		free_pages((unsigned long)base, order);
- 		return -ENXIO;
- 	}
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index b7e3431..5118d3a 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -239,7 +239,7 @@
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
+-	__flush_dcache_area(itt, sz);
++	gic_flush_dcache_to_poc(itt, sz);
  
--#define GITS_CBASER_VALID			(1UL << 63)
-+#define GITS_CBASER_VALID			(1ULL << 63)
- #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
- #define GITS_CBASER_INNER_CACHEABILITY_SHIFT	(59)
- #define GITS_CBASER_OUTER_CACHEABILITY_SHIFT	(53)
-@@ -265,7 +265,7 @@
- 
- #define GITS_BASER_NR_REGS		8
- 
--#define GITS_BASER_VALID			(1UL << 63)
-+#define GITS_BASER_VALID			(1ULL << 63)
- #define GITS_BASER_INDIRECT			(1ULL << 62)
- 
- #define GITS_BASER_INNER_CACHEABILITY_SHIFT	(59)
+ 	dev->its = its;
+ 	dev->itt = itt;
 -- 
 1.7.9.5
