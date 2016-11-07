@@ -1,54 +1,53 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Mon, 07 Nov 2016 09:07:42 +0530
-Subject: [PATCH 1/4] ARM: EXYNOS: Remove smp_init_cpus hook from platsmp.c
-In-Reply-To: <20161105154119.GA8183@kozik-lap>
-References: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
- <1478230764-13748-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161105154127epcas1p1316e4c558b8442426db131ce7bb87bd2@epcas1p1.samsung.com>
- <20161105154119.GA8183@kozik-lap>
-Message-ID: <581FF706.3050502@samsung.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 7 Nov 2016 09:19:55 +0530
+Subject: [PATCH v2 0/9] ARM: DRA7: Add support for DRA718-evm
+In-Reply-To: <20161021103841.8044-1-lokeshvutla@ti.com>
+References: <20161021103841.8044-1-lokeshvutla@ti.com>
+Message-ID: <1b9c4d14-78d7-841f-776c-63a8c1ae1fb1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Tony,
 
-On Saturday 05 November 2016 09:11 PM, Krzysztof Kozlowski wrote:
-> On Fri, Nov 04, 2016 at 09:09:21AM +0530, Pankaj Dubey wrote:
->> We can safely remove exynos_smp_init_cpus() hook from mach-exynos/platsmp.c,
->> as all SMP platforms in mach-exynos can rely on DT for CPU core description
->> instead of determining number of cores from the SCU.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm/mach-exynos/platsmp.c | 31 -------------------------------
->>  1 file changed, 31 deletions(-)
->>
+On Friday 21 October 2016 04:08 PM, Lokesh Vutla wrote:
+> This series does minor dts cleanup for dra72-evm and adds support for
+> DRA718-evm.
+
+Do you have any comments on this series?
+
+Thanks and regards,
+Lokesh
+
 > 
+> Changes since v1:
+> - Updated xxx-supply to xxx-in-supply in Documentation.
 > 
-> Thanks, applied. Somehow your patchset did not reach linux-samsung-soc's
-> Parchwork. I don't have a clue why... It is on linux-arm-kernel's
-> Patchwork.
+> Lokesh Vutla (7):
+>   ARM: dts: dra72-evm: Remove pinmux configurations for erratum i869
+>   ARM: dra72-evm: Fix modelling of regulators
+>   ARM: dts: dra72: Add separate dtsi for tps65917
+>   regulator: lp873x: Add support for populating input supply
+>   ARM: OMAP2+: board-generic: add support for DRA71x family
+>   ARM: omap2plus_defconfig: Enable REGULATOR_GPIO
+>   ARM: omap2plus_defconfig: Enable LP873X support
 > 
-
-Thanks for looking into this series.
-
-I am also not sure why its not reflecting for you on linux-samsung-soc's
-Patchwork, but I can see this series in linux-samsung-soc Patchwork at
-below links:
-
-[1/4]: https://patchwork.kernel.org/patch/9411787/
-[2/4]: https://patchwork.kernel.org/patch/9411789/
-[3/4]: https://patchwork.kernel.org/patch/9411791/
-[4/4]: https://patchwork.kernel.org/patch/9411793/
-
-Will you please review other two patches (3/4 and 4/4) in this series?
-
-Thanks,
-Pankaj Dubey
-
-> Best regards,
-> Krzysztof
+> Nishanth Menon (2):
+>   ARM: DRA7: hwmod: Do not register RTC on DRA71
+>   ARM: dts: Add support for dra718-evm
 > 
-> 
-> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   6 +
+>  Documentation/devicetree/bindings/mfd/lp873x.txt   |   8 +
+>  arch/arm/boot/dts/Makefile                         |   3 +-
+>  arch/arm/boot/dts/dra71-evm.dts                    | 230 ++++++++++++++
+>  arch/arm/boot/dts/dra72-evm-common.dtsi            | 348 +++------------------
+>  arch/arm/boot/dts/dra72-evm-revc.dts               |  21 +-
+>  arch/arm/boot/dts/dra72-evm-tps65917.dtsi          | 134 ++++++++
+>  arch/arm/boot/dts/dra72-evm.dts                    |  14 +-
+>  arch/arm/configs/omap2plus_defconfig               |   3 +
+>  arch/arm/mach-omap2/board-generic.c                |   1 +
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  10 +-
+>  drivers/regulator/lp873x-regulator.c               |   1 +
+>  12 files changed, 453 insertions(+), 326 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/dra71-evm.dts
+>  create mode 100644 arch/arm/boot/dts/dra72-evm-tps65917.dtsi
 > 
