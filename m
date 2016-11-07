@@ -1,227 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 7 Nov 2016 10:56:11 +0000
-Subject: [PATCH v6 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
-In-Reply-To: <9e91cb41-3034-c1ca-9275-cce3235cc662@arm.com>
-References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
- <20161018160414.1228-5-lorenzo.pieralisi@arm.com>
- <9e91cb41-3034-c1ca-9275-cce3235cc662@arm.com>
-Message-ID: <20161107105611.GA7183@red-moon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 7 Nov 2016 11:04:44 +0000
+Subject: [PATCH 0/3] Add memremap executable mapping and extend
+ drivers/misc/sram.c
+In-Reply-To: <20161027185612.22362-1-d-gerlach@ti.com>
+References: <20161027185612.22362-1-d-gerlach@ti.com>
+Message-ID: <20161107110444.GA23750@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 01, 2016 at 04:36:10PM +0000, Robin Murphy wrote:
-> Bikeshed alert...
-> 
-> On 18/10/16 17:04, Lorenzo Pieralisi wrote:
-> > The of_iommu_{set/get}_ops() API is used to associate a device
-> > tree node with a specific set of IOMMU operations. The same
-> > kernel interface is required on systems booting with ACPI, where
-> > devices are not associated with a device tree node, therefore
-> > the interface requires generalization.
-> > 
-> > The struct device fwnode member represents the fwnode token
-> > associated with the device and the struct it points at is firmware
-> > specific; regardless, it is initialized on both ACPI and DT systems
-> > and makes an ideal candidate to use it to associate a set of IOMMU
-> > operations to a given device, through its struct device.fwnode member
-> > pointer.
-> > 
-> > Convert the DT specific of_iommu_{set/get}_ops() interface to
-> > use struct device.fwnode as a look-up token, making the interface
-> > usable on ACPI systems.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > Cc: Robin Murphy <robin.murphy@arm.com>
-> > Cc: Joerg Roedel <joro@8bytes.org>
-> > ---
-> >  drivers/iommu/iommu.c    | 43 +++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/iommu/of_iommu.c | 39 ---------------------------------------
-> >  include/linux/iommu.h    | 14 ++++++++++++++
-> >  include/linux/of_iommu.h | 12 ++++++++++--
-> >  4 files changed, 67 insertions(+), 41 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> > index 9a2f196..320eb8c 100644
-> > --- a/drivers/iommu/iommu.c
-> > +++ b/drivers/iommu/iommu.c
-> > @@ -1615,6 +1615,49 @@ int iommu_request_dm_for_dev(struct device *dev)
-> >  	return ret;
-> >  }
-> >  
-> > +struct fwnode_iommu_node {
-> 
-> Having just pulled in this patch in isolation for some hacking, I
-> realise that by about the fifth time one reads "fwnode_iommu_node" it
-> just looks like meaningless gibberish. Can we just call it
-> "iommu_instance" instead, as that's what it's representing here?
+On Thu, Oct 27, 2016 at 01:56:09PM -0500, Dave Gerlach wrote:
+> There are several instances when one would want to execute out of on-chip
+> SRAM, such as PM code on ARM platforms, so once again revisiting this
+> series to allow that in a generic manner. Seems that having a solution for
+> allowing SRAM to be mapped as executable will help clean up PM code on several
+> ARM platforms that are using ARM internal __arm_ioremap_exec API
+> and also open the door for PM support on new platforms like TI AM335x and
+> AM437x. This was last sent as RFC here [1] and based on comments from Russell
+> King and Arnd Bergmann has been rewritten to use memremap API rather than
+> ioremap API, as executable iomem does not really make sense.
 
-Agreed, how about iommu_(fw)entry ? Anyway, I will do, point taken.
+This is better, as it avoids the issue that I pointed out last time
+around, but I'm still left wondering about the approach.
 
-> > +	struct list_head list;
-> > +	struct fwnode_handle *fwnode;
-> > +	const struct iommu_ops *ops;
-> > +};
-> > +static LIST_HEAD(fwnode_iommu_list);
-> > +static DEFINE_SPINLOCK(fwnode_iommu_lock);
-> > +
-> > +void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-> > +			  const struct iommu_ops *ops)
-> > +{
-> > +	struct fwnode_iommu_node *iommu =
-> > +				kzalloc(sizeof(*iommu), GFP_KERNEL);
-> 
-> (plus it shortens this line so it really doesn't the awkward break)
-> 
-> Apologies, (the original rubbish name was my fault anyway)
+Sure, having executable SRAM mappings sounds nice and easy, but we're
+creating WX mappings.  Folk have spent a while improving the security of
+the kernel by ensuring that there are no WX mappings, and this series
+reintroduces them.  The sad thing is that any WX mapping which appears
+at a known address can be exploited.
 
-No worries, you have a point, will update for next (hopefully last)
-posting.
+"A known address" can be something that appears to be random, but ends
+up being the same across the same device type... or can be discovered
+by some means.  Eg, consider if the WX mapping is dynamically allocated,
+but occurs at exactly the same point at boot - and if this happens with
+android phones, consider how many of those are out there.  Or if the
+address of the WX mapping is available via some hardware register.
+Or...
 
-Thanks !
-Lorenzo
+See Kees Cook's slides at last years kernel summit -
+	https://outflux.net/slides/2015/ks/security.pdf
 
-> Robin.
-> 
-> > +
-> > +	if (WARN_ON(!iommu))
-> > +		return;
-> > +
-> > +	if (is_of_node(fwnode))
-> > +		of_node_get(to_of_node(fwnode));
-> > +
-> > +	INIT_LIST_HEAD(&iommu->list);
-> > +	iommu->fwnode = fwnode;
-> > +	iommu->ops = ops;
-> > +	spin_lock(&fwnode_iommu_lock);
-> > +	list_add_tail(&iommu->list, &fwnode_iommu_list);
-> > +	spin_unlock(&fwnode_iommu_lock);
-> > +}
-> > +
-> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
-> > +{
-> > +	struct fwnode_iommu_node *node;
-> > +	const struct iommu_ops *ops = NULL;
-> > +
-> > +	spin_lock(&fwnode_iommu_lock);
-> > +	list_for_each_entry(node, &fwnode_iommu_list, list)
-> > +		if (node->fwnode == fwnode) {
-> > +			ops = node->ops;
-> > +			break;
-> > +		}
-> > +	spin_unlock(&fwnode_iommu_lock);
-> > +	return ops;
-> > +}
-> > +
-> >  int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
-> >  		      const struct iommu_ops *ops)
-> >  {
-> > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> > index 5b82862..0f57ddc 100644
-> > --- a/drivers/iommu/of_iommu.c
-> > +++ b/drivers/iommu/of_iommu.c
-> > @@ -96,45 +96,6 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_get_dma_window);
-> >  
-> > -struct of_iommu_node {
-> > -	struct list_head list;
-> > -	struct device_node *np;
-> > -	const struct iommu_ops *ops;
-> > -};
-> > -static LIST_HEAD(of_iommu_list);
-> > -static DEFINE_SPINLOCK(of_iommu_lock);
-> > -
-> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops)
-> > -{
-> > -	struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
-> > -
-> > -	if (WARN_ON(!iommu))
-> > -		return;
-> > -
-> > -	of_node_get(np);
-> > -	INIT_LIST_HEAD(&iommu->list);
-> > -	iommu->np = np;
-> > -	iommu->ops = ops;
-> > -	spin_lock(&of_iommu_lock);
-> > -	list_add_tail(&iommu->list, &of_iommu_list);
-> > -	spin_unlock(&of_iommu_lock);
-> > -}
-> > -
-> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> > -{
-> > -	struct of_iommu_node *node;
-> > -	const struct iommu_ops *ops = NULL;
-> > -
-> > -	spin_lock(&of_iommu_lock);
-> > -	list_for_each_entry(node, &of_iommu_list, list)
-> > -		if (node->np == np) {
-> > -			ops = node->ops;
-> > -			break;
-> > -		}
-> > -	spin_unlock(&of_iommu_lock);
-> > -	return ops;
-> > -}
-> > -
-> >  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-> >  {
-> >  	struct of_phandle_args *iommu_spec = data;
-> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> > index 436dc21..15d5478 100644
-> > --- a/include/linux/iommu.h
-> > +++ b/include/linux/iommu.h
-> > @@ -351,6 +351,9 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
-> >  		      const struct iommu_ops *ops);
-> >  void iommu_fwspec_free(struct device *dev);
-> >  int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
-> > +void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-> > +			  const struct iommu_ops *ops);
-> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode);
-> >  
-> >  #else /* CONFIG_IOMMU_API */
-> >  
-> > @@ -580,6 +583,17 @@ static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
-> >  	return -ENODEV;
-> >  }
-> >  
-> > +static inline void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
-> > +					const struct iommu_ops *ops)
-> > +{
-> > +}
-> > +
-> > +static inline
-> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
-> > +{
-> > +	return NULL;
-> > +}
-> > +
-> >  #endif /* CONFIG_IOMMU_API */
-> >  
-> >  #endif /* __LINUX_IOMMU_H */
-> > diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
-> > index e80b9c7..7681007 100644
-> > --- a/include/linux/of_iommu.h
-> > +++ b/include/linux/of_iommu.h
-> > @@ -31,8 +31,16 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
-> >  
-> >  #endif	/* CONFIG_OF_IOMMU */
-> >  
-> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
-> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
-> > +static inline void of_iommu_set_ops(struct device_node *np,
-> > +				    const struct iommu_ops *ops)
-> > +{
-> > +	fwnode_iommu_set_ops(&np->fwnode, ops);
-> > +}
-> > +
-> > +static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
-> > +{
-> > +	return fwnode_iommu_get_ops(&np->fwnode);
-> > +}
-> >  
-> >  extern struct of_device_id __iommu_of_table;
-> >  
-> > 
-> 
+So, I think avoiding WX mappings - mappings should be either W or X but
+not both simultaneously (see page 19.)
+
+I guess what I'm angling at is that we don't want memremap_exec(), but
+we need an API which changes the permissions of a SRAM mapping between
+allowing writes and allowing execution.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
