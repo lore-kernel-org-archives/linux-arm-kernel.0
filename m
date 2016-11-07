@@ -1,395 +1,82 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Mon,  7 Nov 2016 06:06:03 -0800
-Subject: [PATCH v2] staging: vc04_services: add vchiq_pagelist_info structure
-Message-ID: <20161107140603.14125-1-mzoran@crowfest.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 7 Nov 2016 15:11:46 +0100
+Subject: [PATCH 0/5] drm/sun4i: Handle TV overscan
+In-Reply-To: <CAEqLBRknDAKQu1641BEd_MKe42hYx+Jz8FcASZvC1dn6+yazxg@mail.gmail.com>
+References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <20161018092422.GJ1041@n2100.armlinux.org.uk>
+ <20161018100349.qm2f554oiwyjwrsi@lukather>
+ <20161031084233.GS1041@n2100.armlinux.org.uk>
+ <20161103090106.dq2bn4z7m2hzhi53@lukather>
+ <CAEqLBRknDAKQu1641BEd_MKe42hYx+Jz8FcASZvC1dn6+yazxg@mail.gmail.com>
+Message-ID: <20161107141146.vremdlwdizzejwzd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dma_map_sg based implementation for bulk messages
-computes many offsets into a single allocation multiple times in
-both the create and free code paths.  This is inefficient,
-error prone and in fact still has a few lingering issues
-with arm64.
+Hi Sean,
 
-This change replaces a small portion of that inplementation with
-new code that uses a new struct vchiq_pagelist_info to store the
-needed information rather then complex offset calculations.
+On Thu, Nov 03, 2016 at 03:11:26PM -0600, Sean Paul wrote:
+> On Thu, Nov 3, 2016 at 3:01 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi Russell,
+> >
+> > On Mon, Oct 31, 2016 at 08:42:34AM +0000, Russell King - ARM Linux wrote:
+> >> On Tue, Oct 18, 2016 at 12:03:49PM +0200, Maxime Ripard wrote:
+> >> > The first one is that this overscanning should be reported by the
+> >> > connector I guess? but this is really TV specific, so we need one way
+> >> > to let the user tell how the image is displayed on its side, and we
+> >> > cannot really autodetect it, and this needs to be done at runtime so
+> >> > that we can present some shiny interface to let it select which
+> >> > overscan ratio works for him/her.
+> >>
+> >> See xbmc... they go through a nice shiny setup which includes adjusting
+> >> the visible area.  From what I remember, it has pointers on each corner
+> >> which you can adjust to be just visible on the screen, so xbmc knows
+> >> how much overscan there is, and xbmc itself reduces down to the user
+> >> set size.
+> >
+> > Yes. And that is an XBMC only solution, that doesn't work with the
+> > fbdev emulation and is probably doing an additional composition to
+> > scale down and center their frames through OpenGL.
+> >
+> > We might not have a GPU in the system, and we might not even have an
+> > entire graphic stack on top either, so I don't think fixing at the
+> > user-space level is a good option (especially since we already have an
+> > overscan property in DRM).
+> >
+> 
+> Hi Maxime,
+> I took a quick look at the first 2 patches in the series and they look
+> good at first glance. I have them in my queue to review more
+> carefully.
 
-This improved implementation should be more efficient and easier
-to understand and maintain.
+Yes, the first one is pretty scary.
 
-Tests Run(Both Pass):
-vchiq_test -p 1
-vchiq_test -f 10
+If it can ease your review, I made a bunch of unittests to test that
+code. It's pretty hacky (basically a copy of some kernel structures
+and the new logic to parse the command line), but it should test it
+with a significant number of cases:
 
-Signed-off-by: Michael Zoran <mzoran@crowfest.net>
----
- .../interface/vchiq_arm/vchiq_2835_arm.c           | 223 +++++++++++----------
- 1 file changed, 113 insertions(+), 110 deletions(-)
+http://code.bulix.org/4lnlk7-107122?raw
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-index 1499a96..2b500d8 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-@@ -62,6 +62,18 @@ typedef struct vchiq_2835_state_struct {
-    VCHIQ_ARM_STATE_T arm_state;
- } VCHIQ_2835_ARM_STATE_T;
- 
-+struct vchiq_pagelist_info {
-+	PAGELIST_T *pagelist;
-+	size_t pagelist_buffer_size;
-+	dma_addr_t dma_addr;
-+	enum dma_data_direction dma_dir;
-+	unsigned int num_pages;
-+	unsigned int pages_need_release;
-+	struct page **pages;
-+	struct scatterlist *scatterlist;
-+	unsigned int scatterlist_mapped;
-+};
-+
- static void __iomem *g_regs;
- static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
- static unsigned int g_fragments_size;
-@@ -77,13 +89,13 @@ static DEFINE_SEMAPHORE(g_free_fragments_mutex);
- static irqreturn_t
- vchiq_doorbell_irq(int irq, void *dev_id);
- 
--static int
-+static struct vchiq_pagelist_info *
- create_pagelist(char __user *buf, size_t count, unsigned short type,
--		struct task_struct *task, PAGELIST_T **ppagelist,
--		dma_addr_t *dma_addr);
-+		struct task_struct *task);
- 
- static void
--free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual);
-+free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
-+	      int actual);
- 
- int vchiq_platform_init(struct platform_device *pdev, VCHIQ_STATE_T *state)
- {
-@@ -224,29 +236,27 @@ VCHIQ_STATUS_T
- vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
- 	void *offset, int size, int dir)
- {
--	PAGELIST_T *pagelist;
--	int ret;
--	dma_addr_t dma_addr;
-+	struct vchiq_pagelist_info *pagelistinfo;
- 
- 	WARN_ON(memhandle != VCHI_MEM_HANDLE_INVALID);
- 
--	ret = create_pagelist((char __user *)offset, size,
--			(dir == VCHIQ_BULK_RECEIVE)
--			? PAGELIST_READ
--			: PAGELIST_WRITE,
--			current,
--			&pagelist,
--			&dma_addr);
-+	pagelistinfo = create_pagelist((char __user *)offset, size,
-+				       (dir == VCHIQ_BULK_RECEIVE)
-+				       ? PAGELIST_READ
-+				       : PAGELIST_WRITE,
-+				       current);
- 
--	if (ret != 0)
-+	if (!pagelistinfo)
- 		return VCHIQ_ERROR;
- 
- 	bulk->handle = memhandle;
--	bulk->data = (void *)(unsigned long)dma_addr;
-+	bulk->data = (void *)(unsigned long)pagelistinfo->dma_addr;
- 
--	/* Store the pagelist address in remote_data, which isn't used by the
--	   slave. */
--	bulk->remote_data = pagelist;
-+	/*
-+	 * Store the pagelistinfo address in remote_data,
-+	 * which isn't used by the slave.
-+	 */
-+	bulk->remote_data = pagelistinfo;
- 
- 	return VCHIQ_SUCCESS;
- }
-@@ -255,8 +265,8 @@ void
- vchiq_complete_bulk(VCHIQ_BULK_T *bulk)
- {
- 	if (bulk && bulk->remote_data && bulk->actual)
--		free_pagelist((dma_addr_t)(unsigned long)bulk->data,
--			      (PAGELIST_T *)bulk->remote_data, bulk->actual);
-+		free_pagelist((struct vchiq_pagelist_info *)bulk->remote_data,
-+			      bulk->actual);
- }
- 
- void
-@@ -344,6 +354,25 @@ vchiq_doorbell_irq(int irq, void *dev_id)
- 	return ret;
- }
- 
-+static void
-+cleaup_pagelistinfo(struct vchiq_pagelist_info *pagelistinfo)
-+{
-+	if (pagelistinfo->scatterlist_mapped) {
-+		dma_unmap_sg(g_dev, pagelistinfo->scatterlist,
-+			     pagelistinfo->num_pages, pagelistinfo->dma_dir);
-+	}
-+
-+	if (pagelistinfo->pages_need_release) {
-+		unsigned int i;
-+
-+		for (i = 0; i < pagelistinfo->num_pages; i++)
-+			put_page(pagelistinfo->pages[i]);
-+	}
-+
-+	dma_free_coherent(g_dev, pagelistinfo->pagelist_buffer_size,
-+			  pagelistinfo->pagelist, pagelistinfo->dma_addr);
-+}
-+
- /* There is a potential problem with partial cache lines (pages?)
- ** at the ends of the block when reading. If the CPU accessed anything in
- ** the same line (page?) then it may have pulled old data into the cache,
-@@ -352,52 +381,64 @@ vchiq_doorbell_irq(int irq, void *dev_id)
- ** cached area.
- */
- 
--static int
-+static struct vchiq_pagelist_info *
- create_pagelist(char __user *buf, size_t count, unsigned short type,
--		struct task_struct *task, PAGELIST_T **ppagelist,
--		dma_addr_t *dma_addr)
-+		struct task_struct *task)
- {
- 	PAGELIST_T *pagelist;
-+	struct vchiq_pagelist_info *pagelistinfo;
- 	struct page **pages;
- 	u32 *addrs;
- 	unsigned int num_pages, offset, i, k;
- 	int actual_pages;
--        unsigned long *need_release;
- 	size_t pagelist_size;
- 	struct scatterlist *scatterlist, *sg;
- 	int dma_buffers;
--	int dir;
-+	dma_addr_t dma_addr;
- 
- 	offset = ((unsigned int)(unsigned long)buf & (PAGE_SIZE - 1));
- 	num_pages = (count + offset + PAGE_SIZE - 1) / PAGE_SIZE;
- 
- 	pagelist_size = sizeof(PAGELIST_T) +
--			(num_pages * sizeof(unsigned long)) +
--			sizeof(unsigned long) +
-+			(num_pages * sizeof(u32)) +
- 			(num_pages * sizeof(pages[0]) +
--			(num_pages * sizeof(struct scatterlist)));
--
--	*ppagelist = NULL;
--
--	dir = (type == PAGELIST_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
-+			(num_pages * sizeof(struct scatterlist))) +
-+			sizeof(struct vchiq_pagelist_info);
- 
- 	/* Allocate enough storage to hold the page pointers and the page
- 	** list
- 	*/
- 	pagelist = dma_zalloc_coherent(g_dev,
- 				       pagelist_size,
--				       dma_addr,
-+				       &dma_addr,
- 				       GFP_KERNEL);
- 
- 	vchiq_log_trace(vchiq_arm_log_level, "create_pagelist - %pK",
- 			pagelist);
- 	if (!pagelist)
--		return -ENOMEM;
-+		return NULL;
-+
-+	addrs		= pagelist->addrs;
-+	pages		= (struct page **)(addrs + num_pages);
-+	scatterlist	= (struct scatterlist *)(pages + num_pages);
-+	pagelistinfo	= (struct vchiq_pagelist_info *)
-+			  (scatterlist + num_pages);
- 
--	addrs = pagelist->addrs;
--        need_release = (unsigned long *)(addrs + num_pages);
--	pages = (struct page **)(addrs + num_pages + 1);
--	scatterlist = (struct scatterlist *)(pages + num_pages);
-+	pagelist->length = count;
-+	pagelist->type = type;
-+	pagelist->offset = offset;
-+
-+	/* Populate the fields of the pagelistinfo structure */
-+	pagelistinfo->pagelist = pagelist;
-+	pagelistinfo->pagelist_buffer_size = pagelist_size;
-+	pagelistinfo->dma_addr = dma_addr;
-+	pagelistinfo->dma_dir =  (type == PAGELIST_WRITE) ?
-+				  DMA_TO_DEVICE : DMA_FROM_DEVICE;
-+	pagelistinfo->num_pages = num_pages;
-+	pagelistinfo->pages_need_release = 0;
-+	pagelistinfo->pages = pages;
-+	pagelistinfo->scatterlist = scatterlist;
-+	pagelistinfo->scatterlist_mapped = 0;
- 
- 	if (is_vmalloc_addr(buf)) {
- 		unsigned long length = count;
-@@ -415,7 +456,7 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 			length -= bytes;
- 			off = 0;
- 		}
--		*need_release = 0; /* do not try and release vmalloc pages */
-+		/* do not try and release vmalloc pages */
- 	} else {
- 		down_read(&task->mm->mmap_sem);
- 		actual_pages = get_user_pages(
-@@ -438,19 +479,13 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 				actual_pages--;
- 				put_page(pages[actual_pages]);
- 			}
--			dma_free_coherent(g_dev, pagelist_size,
--					  pagelist, *dma_addr);
--			if (actual_pages == 0)
--				actual_pages = -ENOMEM;
--			return actual_pages;
-+			cleaup_pagelistinfo(pagelistinfo);
-+			return NULL;
- 		}
--		*need_release = 1; /* release user pages */
-+		 /* release user pages */
-+		pagelistinfo->pages_need_release = 1;
- 	}
- 
--	pagelist->length = count;
--	pagelist->type = type;
--	pagelist->offset = offset;
--
- 	/*
- 	 * Initialize the scatterlist so that the magic cookie
- 	 *  is filled if debugging is enabled
-@@ -463,15 +498,15 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 	dma_buffers = dma_map_sg(g_dev,
- 				 scatterlist,
- 				 num_pages,
--				 dir);
-+				 pagelistinfo->dma_dir);
- 
- 	if (dma_buffers == 0) {
--		dma_free_coherent(g_dev, pagelist_size,
--				  pagelist, *dma_addr);
--
--		return -EINTR;
-+		cleaup_pagelistinfo(pagelistinfo);
-+		return NULL;
- 	}
- 
-+	pagelistinfo->scatterlist_mapped = 1;
-+
- 	/* Combine adjacent blocks for performance */
- 	k = 0;
- 	for_each_sg(scatterlist, sg, dma_buffers, i) {
-@@ -503,11 +538,8 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 		char *fragments;
- 
- 		if (down_interruptible(&g_free_fragments_sema) != 0) {
--			dma_unmap_sg(g_dev, scatterlist, num_pages,
--				     DMA_BIDIRECTIONAL);
--			dma_free_coherent(g_dev, pagelist_size,
--					  pagelist, *dma_addr);
--			return -EINTR;
-+			cleaup_pagelistinfo(pagelistinfo);
-+			return NULL;
- 		}
- 
- 		WARN_ON(g_free_fragments == NULL);
-@@ -521,42 +553,28 @@ create_pagelist(char __user *buf, size_t count, unsigned short type,
- 			(fragments - g_fragments_base) / g_fragments_size;
- 	}
- 
--	*ppagelist = pagelist;
--
--	return 0;
-+	return pagelistinfo;
- }
- 
- static void
--free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual)
-+free_pagelist(struct vchiq_pagelist_info *pagelistinfo,
-+	      int actual)
- {
--        unsigned long *need_release;
--	struct page **pages;
--	unsigned int num_pages, i;
--	size_t pagelist_size;
--	struct scatterlist *scatterlist;
--	int dir;
-+	unsigned int i;
-+	PAGELIST_T *pagelist   = pagelistinfo->pagelist;
-+	struct page **pages    = pagelistinfo->pages;
-+	unsigned int num_pages = pagelistinfo->num_pages;
- 
- 	vchiq_log_trace(vchiq_arm_log_level, "free_pagelist - %pK, %d",
--			pagelist, actual);
--
--	dir = (pagelist->type == PAGELIST_WRITE) ? DMA_TO_DEVICE :
--						   DMA_FROM_DEVICE;
--
--	num_pages =
--		(pagelist->length + pagelist->offset + PAGE_SIZE - 1) /
--		PAGE_SIZE;
-+			pagelistinfo->pagelist, actual);
- 
--	pagelist_size = sizeof(PAGELIST_T) +
--			(num_pages * sizeof(unsigned long)) +
--			sizeof(unsigned long) +
--			(num_pages * sizeof(pages[0]) +
--			(num_pages * sizeof(struct scatterlist)));
--
--        need_release = (unsigned long *)(pagelist->addrs + num_pages);
--	pages = (struct page **)(pagelist->addrs + num_pages + 1);
--	scatterlist = (struct scatterlist *)(pages + num_pages);
--
--	dma_unmap_sg(g_dev, scatterlist, num_pages, dir);
-+	/*
-+	 * NOTE: dma_unmap_sg must be called before the
-+	 * cpu can touch any of the data/pages.
-+	 */
-+	dma_unmap_sg(g_dev, pagelistinfo->scatterlist,
-+		     pagelistinfo->num_pages, pagelistinfo->dma_dir);
-+	pagelistinfo->scatterlist_mapped = 0;
- 
- 	/* Deal with any partial cache lines (fragments) */
- 	if (pagelist->type >= PAGELIST_READ_WITH_FRAGMENTS) {
-@@ -594,27 +612,12 @@ free_pagelist(dma_addr_t dma_addr, PAGELIST_T *pagelist, int actual)
- 		up(&g_free_fragments_sema);
- 	}
- 
--	if (*need_release) {
--		unsigned int length = pagelist->length;
--		unsigned int offset = pagelist->offset;
--
--		for (i = 0; i < num_pages; i++) {
--			struct page *pg = pages[i];
--
--			if (pagelist->type != PAGELIST_WRITE) {
--				unsigned int bytes = PAGE_SIZE - offset;
--
--				if (bytes > length)
--					bytes = length;
--
--				length -= bytes;
--				offset = 0;
--				set_page_dirty(pg);
--			}
--			put_page(pg);
--		}
-+	/* Need to mark all the pages dirty. */
-+	if (pagelist->type != PAGELIST_WRITE &&
-+	    pagelistinfo->pages_need_release) {
-+		for (i = 0; i < num_pages; i++)
-+			set_page_dirty(pages[i]);
- 	}
- 
--	dma_free_coherent(g_dev, pagelist_size,
--			  pagelist, dma_addr);
-+	cleaup_pagelistinfo(pagelistinfo);
- }
+It's pretty straightforward to compile, you just have to link against
+cmocka.
+
+> Can you explain why you can't fix this by specifying a new mode with
+> big porches (as Russell suggested)?
+
+I'll reply to his mail.
+
+Thanks!
+Maxime
+
 -- 
-2.10.2
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/f6460e69/attachment.sig>
