@@ -1,42 +1,38 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 07 Nov 2016 15:39:36 +0530
-Subject: [PATCH 6/6] ARM: dts: Extend the S3C RTC node with rtc_src clock
-In-Reply-To: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1478513376-14307-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1478513376-14307-7-git-send-email-pankaj.dubey@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  7 Nov 2016 18:07:00 +0800
+Subject: [PATCH v3 3/6] ASoC: sun4i-codec: Add "Right Mixer" to "Line Out Mono
+ Diff." route
+In-Reply-To: <20161107100703.5586-1-wens@csie.org>
+References: <20161107100703.5586-1-wens@csie.org>
+Message-ID: <20161107100703.5586-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the S3C RTC node with rtc_src clock so it could be operational.
-The rtc_src clock is provided by MAX8997.
+The mono differential output for "Line Out" downmixes the stereo audio
+from the mixer, instead of just taking the left channel.
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: devicetree at vger.kernel.org
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Add a route from the "Right Mixer" to "Line Out Source Playback Route"
+through the "Mono Differential" path, so DAPM doesn't shut down
+everything if the left channel is muted.
+
+Fixes: 0f909f98d7cb ("ASoC: sun4i-codec: Add support for A31 Line Out
+		      playback")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/exynos4210-origen.dts | 3 +++
- 1 file changed, 3 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index 6c7ef4e..4cac9b6 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -18,6 +18,7 @@
- #include "exynos4210.dtsi"
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/clock/maxim,max8997.h>
- #include "exynos-mfc-reserved-memory.dtsi"
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 6379efd21f00..006ca3c17e80 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -1047,6 +1047,7 @@ static const struct snd_soc_dapm_route sun6i_codec_codec_dapm_routes[] = {
+ 	{ "Line Out Source Playback Route", "Stereo", "Left Mixer" },
+ 	{ "Line Out Source Playback Route", "Stereo", "Right Mixer" },
+ 	{ "Line Out Source Playback Route", "Mono Differential", "Left Mixer" },
++	{ "Line Out Source Playback Route", "Mono Differential", "Right Mixer" },
+ 	{ "LINEOUT", NULL, "Line Out Source Playback Route" },
  
- / {
-@@ -324,6 +325,8 @@
- 
- &rtc {
- 	status = "okay";
-+	clocks = <&clock CLK_RTC>, <&max8997 MAX8997_CLK_AP>;
-+	clock-names = "rtc", "rtc_src";
- };
- 
- &tmu {
+ 	/* ADC Routes */
 -- 
-2.7.4
+2.10.2
