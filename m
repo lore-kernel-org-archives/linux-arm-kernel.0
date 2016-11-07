@@ -1,45 +1,36 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon,  7 Nov 2016 14:08:21 +0100
-Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
+Date: Mon,  7 Nov 2016 14:08:20 +0100
+Subject: [PATCH 2/3] ASoC: wm8978: Adjust clock indices so that simple card
+ works
 In-Reply-To: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
 References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3d9c794b19e99745f0a98412c4cf8dcf26d728d4.1478524066.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
+Using simple-card with the wm8978 doesn't work because simple card calls
+set_sysclk on the clock index 0, which is not the MCLK in the WM8978.
 
-Add a card in order to have it working
+Adjust the clock definition so that the clock 0 is the MCLK.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+), 0 deletions(-)
+ sound/soc/codecs/wm8978.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
-index 12b4317a4383..5291e425caf9 100644
---- a/arch/arm/boot/dts/ntc-gr8-evb.dts
-+++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
-@@ -76,6 +76,20 @@
- 		default-brightness-level = <8>;
- 	};
+diff --git a/sound/soc/codecs/wm8978.h b/sound/soc/codecs/wm8978.h
+index 6ae43495b7cf..0dcf6868dff6 100644
+--- a/sound/soc/codecs/wm8978.h
++++ b/sound/soc/codecs/wm8978.h
+@@ -78,8 +78,8 @@ enum wm8978_clk_id {
+ };
  
-+	i2s {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "gr8-evb-wm8978";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,mclk-fs = <512>;
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&i2s0>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&wm8978>;
-+		};
-+	};
+ enum wm8978_sysclk_src {
++	WM8978_MCLK = 0,
+ 	WM8978_PLL,
+-	WM8978_MCLK
+ };
  
- 	panel {
- 		compatible = "allwinner,sun4i-a10-sub-evb-5-lcd";
+ #endif	/* __WM8978_H__ */
 -- 
 git-series 0.8.11
