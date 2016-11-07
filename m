@@ -1,76 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 7 Nov 2016 21:05:05 +0100
-Subject: [linux-sunxi] [PATCH v5 4/7] ASoC: sunxi: Add sun8i I2S driver
-In-Reply-To: <20161106190248.48b59e166bcd9d6f0ebb4d04@free.fr>
-References: <cover.1477142934.git.moinejf@free.fr>
- <bee315efb909c1ee8b5fe7d3aeb9a33d713cb562.1477142934.git.moinejf@free.fr>
- <CAGb2v67gDd650TJk_-oHOehnzdH2qor=36HXdPt339Ji=ToAMg@mail.gmail.com>
- <20161106190248.48b59e166bcd9d6f0ebb4d04@free.fr>
-Message-ID: <20161107200505.g76zz7adtfy4ltku@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 07 Nov 2016 21:08:27 +0100
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <2a8dc40f-be75-b010-3ec7-6912f02e3c90@huawei.com>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <2127881.qmAR1XgW9F@wuerfel>
+ <2a8dc40f-be75-b010-3ec7-6912f02e3c90@huawei.com>
+Message-ID: <2467231.EbVekJun1R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Nov 06, 2016 at 07:02:48PM +0100, Jean-Francois Moine wrote:
-> On Sun, 23 Oct 2016 09:33:16 +0800
-> Chen-Yu Tsai <wens@csie.org> wrote:
+On Monday, November 7, 2016 2:15:10 PM CET John Garry wrote:
 > 
-> > On Fri, Oct 21, 2016 at 4:36 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> > > This patch adds I2S support to sun8i SoCs as the A83T and H3.
-> > >
-> > > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > > ---
-> > > Note: This driver is closed to the sun4i-i2s except that:
-> > > - it handles the H3
-> > 
-> > If it's close to sun4i-i2s, you should probably rework that one to support
-> > the newer SoCs.
+> Hi Arnd,
 > 
-> I started to add the H3 into the sun4i-i2s, but I am blocked with
-> regmap.
-> Many H3 registers are common with the A10, but some of them have more
-> or less fields, the fields may be at different offsets. And, finally,
-> some registers are completely different.
-> This would not raise any problem, except with regmap which is really
-> painful.
-
-That's weird, because regmap's regmap_field should make that much
-easier.
-
-> As I may understood, regmap is used to simplify suspend/resume, but, is
-> it useful to save the I2S register on suspend?
-> Practically, I am streaming some tune on my device. I suspend it for
-> any reason. The next morning, I resume it. Are you sure I want to
-> continue to hear the end of the tune?
+> The new bus type tries to model the djtag in a similar way to I2C/USB 
+> driver arch, where we have a host bus adapter and child devices attached 
+> to the bus. The child devices are bus driver devices and have bus 
+> addresses. We think of the djtag as a separate bus, so we are modelling 
+> it as such.
 > 
-> I better think that streaming should be simply stopped on suspend.
+> The bus driver offers a simple host interface for clients to read/write 
+> to the djtag bus: bus accesses are hidden from the client, the host 
+> drives the bus.
 
-You're mistaken. The code in there is for *runtime* suspend, ie when
-the device is no longer used, so that case shouldn't even happen at
-all.
+Ok, in that case we should probably start out by having a bus specific
+DT binding, and separating the description from that of the bus master
+device.
 
-(And real suspend isn't supported anyway)
+I'd suggest requiring #address-cells=<1> and #size-cells=<0> in the master
+node, and listing the children by reg property. If the address is not
+easily expressed as a single integer, use a larger #address-cells value.
 
-> Then, there is no need to save the playing registers, and, here I am,
-> there is no need to use regmap.
-> 
-> May I go this way?
+Another option that we have previously used was to actually pretend that
+a vendor specific bus is an i2c bus and use the i2c probing infrastructure,
+but that only makes sense if the software side closely resembles i2c
+(this was the case for Allwinner I think, but I have not looked at
+your driver in enough detail to know if it is true here as well).
 
-No, please don't. regmap is also providing very useful features, such
-as access to all the registers through debugfs, or tracing. What
-exactly feels painful to you?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161107/a27a59e7/attachment.sig>
+	Arnd
