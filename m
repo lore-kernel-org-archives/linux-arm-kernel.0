@@ -1,38 +1,34 @@
-From: rabin.vincent@axis.com (Rabin Vincent)
-Date: Mon,  7 Nov 2016 11:30:24 +0100
-Subject: [PATCH] ARM: avoid cache flushing in flush_dcache_page()
-Message-ID: <1478514624-30910-1-git-send-email-rabin.vincent@axis.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 07 Nov 2016 11:34:43 +0100
+Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
+ reset
+In-Reply-To: <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
+References: <1427377198.3378.16.camel@pengutronix.de>
+ <20161106153117.GA22538@frolo.macqel>
+ <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
+Message-ID: <1478514883.12872.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabinv@axis.com>
+Am Sonntag, den 06.11.2016, 14:59 -0200 schrieb Fabio Estevam:
+> On Sun, Nov 6, 2016 at 1:31 PM, Philippe De Muyter <phdm@macq.eu> wrote:
+> 
+> > I use either v3.17 or Freescale's 4.1.15_1.2.0_ga
+> 
+> These kernel versions are not supported by the kernel community.
+> 
+> Do you observe issues with 4.8.6 or 4.9-rc4?
 
-When the data cache is PIPT or VIPT non-aliasing, and cache operations
-are broadcast by the hardware, we can always postpone the flush in
-flush_dcache_page().  A similar change was done for ARM64 in commit
-b5b6c9e9149d ("arm64: Avoid cache flushing in flush_dcache_page()").
+The problem is definitely present in current mainline Linux. I intent to
+remove this workaround from the kernel, but we need to make sure that
+the bootloader properly disables PCIe before jumping to the kernel
+image.
 
-Signed-off-by: Rabin Vincent <rabinv@axis.com>
----
- arch/arm/mm/flush.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+I don't know what the status of this is in U-Boot, but Barebox already
+does this correctly.
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 3cced84..f1e6190 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -327,6 +327,12 @@ void flush_dcache_page(struct page *page)
- 	if (page == ZERO_PAGE(0))
- 		return;
- 
-+	if (!cache_ops_need_broadcast() && cache_is_vipt_nonaliasing()) {
-+		if (test_bit(PG_dcache_clean, &page->flags))
-+			clear_bit(PG_dcache_clean, &page->flags);
-+		return;
-+	}
-+
- 	mapping = page_mapping(page);
- 
- 	if (!cache_ops_need_broadcast() &&
--- 
-2.1.4
+Fabio, would you mind to port this coed to U-Boot, or at least check if
+it does the right thing?
+
+Regards,
+Lucas
