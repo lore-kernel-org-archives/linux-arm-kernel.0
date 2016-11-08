@@ -1,32 +1,30 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  8 Nov 2016 18:23:10 +0100
-Subject: [PATCH 6/10] clk: sunxi-ng: Add A10s CCU driver
+Date: Tue,  8 Nov 2016 18:23:12 +0100
+Subject: [PATCH 8/10] clk: sunxi-ng: Add GR8 driver
 In-Reply-To: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
 References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <2110deed00d33bdb557efebe8f988976fbf5a440.1478625788.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cac4ed6c32817d50edc620264edea95cf19670a4.1478625788.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi-ng/Kconfig          |  10 +-
- drivers/clk/sunxi-ng/Makefile         |   1 +-
- drivers/clk/sunxi-ng/ccu-sun5i-a10s.c | 755 +++++++++++++++++++++++++++-
- drivers/clk/sunxi-ng/ccu-sun5i.h      | 129 +++++-
- 4 files changed, 895 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i.h
+ drivers/clk/sunxi-ng/Kconfig         |  10 +-
+ drivers/clk/sunxi-ng/Makefile        |   1 +-
+ drivers/clk/sunxi-ng/ccu-sun5i-gr8.c | 684 ++++++++++++++++++++++++++++-
+ 3 files changed, 695 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-gr8.c
 
 diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 8454c6e3dd65..e2becd36a1f9 100644
+index 5e62e6ad6e08..43f2096b9894 100644
 --- a/drivers/clk/sunxi-ng/Kconfig
 +++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -64,6 +64,16 @@ config SUN50I_A64_CCU
+@@ -84,6 +84,16 @@ config SUN5I_A13_CCU
  	select SUNXI_CCU_PHASE
- 	default ARM64 && ARCH_SUNXI
+ 	default MACH_SUN5I
  
-+config SUN5I_A10S_CCU
-+	bool "Support for the Allwinner A10s CCM"
++config SUN5I_GR8_CCU
++	bool "Support for the NextThing GR8 CCM"
 +	select SUNXI_CCU_DIV
 +	select SUNXI_CCU_NK
 +	select SUNXI_CCU_NKM
@@ -39,23 +37,23 @@ index 8454c6e3dd65..e2becd36a1f9 100644
  	bool "Support for the Allwinner A31/A31s CCU"
  	select SUNXI_CCU_DIV
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 24fbc6e5deb8..79e9a166dc83 100644
+index 1f03b3d608f2..bbdce44c145b 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -19,6 +19,7 @@ obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
- 
- # SoC support
+@@ -21,6 +21,7 @@ obj-$(CONFIG_SUNXI_CCU_MP)	+= ccu_mp.o
  obj-$(CONFIG_SUN50I_A64_CCU)	+= ccu-sun50i-a64.o
-+obj-$(CONFIG_SUN5I_A10S_CCU)	+= ccu-sun5i-a10s.o
+ obj-$(CONFIG_SUN5I_A10S_CCU)	+= ccu-sun5i-a10s.o
+ obj-$(CONFIG_SUN5I_A13_CCU)	+= ccu-sun5i-a13.o
++obj-$(CONFIG_SUN5I_GR8_CCU)	+= ccu-sun5i-gr8.o
  obj-$(CONFIG_SUN6I_A31_CCU)	+= ccu-sun6i-a31.o
  obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
  obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c b/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
+diff --git a/drivers/clk/sunxi-ng/ccu-sun5i-gr8.c b/drivers/clk/sunxi-ng/ccu-sun5i-gr8.c
 new file mode 100644
-index 000000000000..94d9a5cbf60b
+index 000000000000..9c1169d0406e
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
-@@ -0,0 +1,755 @@
++++ b/drivers/clk/sunxi-ng/ccu-sun5i-gr8.c
+@@ -0,0 +1,684 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -294,18 +292,10 @@ index 000000000000..94d9a5cbf60b
 +		      0x060, BIT(13), 0);
 +static SUNXI_CCU_GATE(ahb_sdram_clk,	"ahb-sdram",	"ahb",
 +		      0x060, BIT(14), CLK_IS_CRITICAL);
-+static SUNXI_CCU_GATE(ahb_emac_clk,	"ahb-emac",	"ahb",
-+		      0x060, BIT(17), 0);
-+static SUNXI_CCU_GATE(ahb_ts_clk,	"ahb-ts",	"ahb",
-+		      0x060, BIT(18), 0);
 +static SUNXI_CCU_GATE(ahb_spi0_clk,	"ahb-spi0",	"ahb",
 +		      0x060, BIT(20), 0);
-+static SUNXI_CCU_GATE(ahb_spi1_clk,	"ahb-spi1",	"ahb",
-+		      0x060, BIT(21), 0);
 +static SUNXI_CCU_GATE(ahb_spi2_clk,	"ahb-spi2",	"ahb",
 +		      0x060, BIT(22), 0);
-+static SUNXI_CCU_GATE(ahb_gps_clk,	"ahb-gps",	"ahb",
-+		      0x060, BIT(26), 0);
 +static SUNXI_CCU_GATE(ahb_hstimer_clk,	"ahb-hstimer",	"ahb",
 +		      0x060, BIT(28), 0);
 +
@@ -317,8 +307,6 @@ index 000000000000..94d9a5cbf60b
 +		      0x064, BIT(4), 0);
 +static SUNXI_CCU_GATE(ahb_csi_clk,	"ahb-csi",	"ahb",
 +		      0x064, BIT(8), 0);
-+static SUNXI_CCU_GATE(ahb_hdmi_clk,	"ahb-hdmi",	"ahb",
-+		      0x064, BIT(11), 0);
 +static SUNXI_CCU_GATE(ahb_de_be_clk,	"ahb-de-be",	"ahb",
 +		      0x064, BIT(12), 0);
 +static SUNXI_CCU_GATE(ahb_de_fe_clk,	"ahb-de-fe",	"ahb",
@@ -330,14 +318,14 @@ index 000000000000..94d9a5cbf60b
 +
 +static SUNXI_CCU_GATE(apb0_codec_clk,	"apb0-codec",	"apb0",
 +		      0x068, BIT(0), 0);
++static SUNXI_CCU_GATE(apb0_spdif_clk,	"apb0-spdif",	"apb0",
++		      0x068, BIT(1), 0);
 +static SUNXI_CCU_GATE(apb0_i2s_clk,	"apb0-i2s",	"apb0",
 +		      0x068, BIT(3), 0);
 +static SUNXI_CCU_GATE(apb0_pio_clk,	"apb0-pio",	"apb0",
 +		      0x068, BIT(5), 0);
 +static SUNXI_CCU_GATE(apb0_ir_clk,	"apb0-ir",	"apb0",
 +		      0x068, BIT(6), 0);
-+static SUNXI_CCU_GATE(apb0_keypad_clk,	"apb0-keypad",	"apb0",
-+		      0x068, BIT(10), 0);
 +
 +static SUNXI_CCU_GATE(apb1_i2c0_clk,	"apb1-i2c0",	"apb1",
 +		      0x06c, BIT(0), 0);
@@ -384,13 +372,6 @@ index 000000000000..94d9a5cbf60b
 +				  BIT(31),	/* gate */
 +				  0);
 +
-+static SUNXI_CCU_MP_WITH_MUX_GATE(ts_clk, "ts", mod0_default_parents, 0x098,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 2,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
 +static SUNXI_CCU_MP_WITH_MUX_GATE(ss_clk, "ss", mod0_default_parents, 0x09c,
 +				  0, 4,		/* M */
 +				  16, 2,	/* P */
@@ -399,13 +380,6 @@ index 000000000000..94d9a5cbf60b
 +				  0);
 +
 +static SUNXI_CCU_MP_WITH_MUX_GATE(spi0_clk, "spi0", mod0_default_parents, 0x0a0,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 2,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents, 0x0a4,
 +				  0, 4,		/* M */
 +				  16, 2,	/* P */
 +				  24, 2,	/* mux */
@@ -431,22 +405,10 @@ index 000000000000..94d9a5cbf60b
 +static SUNXI_CCU_MUX_WITH_GATE(i2s_clk, "i2s", i2s_parents,
 +			       0x0b8, 16, 2, BIT(31), 0);
 +
-+static const char * const keypad_parents[] = { "hosc", "losc"};
-+static const u8 keypad_table[] = { 0, 2 };
-+static struct ccu_mp keypad_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(8, 5),
-+	.p		= _SUNXI_CCU_DIV(20, 2),
-+	.mux		= _SUNXI_CCU_MUX_TABLE(24, 2, keypad_table),
-+
-+	.common		= {
-+		.reg		= 0x0c4,
-+		.hw.init	= CLK_HW_INIT_PARENTS("keypad",
-+						      keypad_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
++static const char * const spdif_parents[] = { "pll-audio-8x", "pll-audio-4x",
++					    "pll-audio-2x", "pll-audio" };
++static SUNXI_CCU_MUX_WITH_GATE(spdif_clk, "spdif", spdif_parents,
++			       0x0c0, 16, 2, BIT(31), 0);
 +
 +static SUNXI_CCU_GATE(usb_ohci_clk,	"usb-ohci",	"pll-periph",
 +		      0x0cc, BIT(6), 0);
@@ -455,17 +417,10 @@ index 000000000000..94d9a5cbf60b
 +static SUNXI_CCU_GATE(usb_phy1_clk,	"usb-phy1",	"pll-periph",
 +		      0x0cc, BIT(9), 0);
 +
-+static const char * const gps_parents[] = { "hosc", "pll-periph",
-+					    "pll-video1", "pll-ve" };
-+static SUNXI_CCU_M_WITH_MUX_GATE(gps_clk, "gps", gps_parents,
-+				 0x0d0, 0, 3, 24, 2, BIT(31), 0);
-+
 +static SUNXI_CCU_GATE(dram_ve_clk,	"dram-ve",	"pll-ddr",
 +		      0x100, BIT(0), 0);
 +static SUNXI_CCU_GATE(dram_csi_clk,	"dram-csi",	"pll-ddr",
 +		      0x100, BIT(1), 0);
-+static SUNXI_CCU_GATE(dram_ts_clk,	"dram-ts",	"pll-ddr",
-+		      0x100, BIT(3), 0);
 +static SUNXI_CCU_GATE(dram_tve_clk,	"dram-tve",	"pll-ddr",
 +		      0x100, BIT(5), 0);
 +static SUNXI_CCU_GATE(dram_de_fe_clk,	"dram-de-fe",	"pll-ddr",
@@ -513,12 +468,6 @@ index 000000000000..94d9a5cbf60b
 +static SUNXI_CCU_GATE(avs_clk,		"avs",		"hosc",
 +		      0x144, BIT(31), 0);
 +
-+static const char * const hdmi_parents[] = { "pll-video0", "pll-video0-2x" };
-+static const u8 hdmi_table[] = { 0, 2 };
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(hdmi_clk, "hdmi",
-+				       hdmi_parents, hdmi_table,
-+				       0x150, 0, 4, 24, 2, BIT(31), 0);
-+
 +static const char * const gpu_parents[] = { "pll-video0", "pll-ve",
 +					    "pll-ddr-other", "pll-video1",
 +					    "pll-video1-2x" };
@@ -532,7 +481,7 @@ index 000000000000..94d9a5cbf60b
 +static SUNXI_CCU_GATE(iep_clk,		"iep",		"de-be",
 +		      0x160, BIT(31), 0);
 +
-+static struct ccu_common *sun5i_a10s_ccu_clks[] = {
++static struct ccu_common *sun5i_gr8_ccu_clks[] = {
 +	&hosc_clk.common,
 +	&pll_core_clk.common,
 +	&pll_audio_base_clk.common,
@@ -560,27 +509,22 @@ index 000000000000..94d9a5cbf60b
 +	&ahb_mmc2_clk.common,
 +	&ahb_nand_clk.common,
 +	&ahb_sdram_clk.common,
-+	&ahb_emac_clk.common,
-+	&ahb_ts_clk.common,
 +	&ahb_spi0_clk.common,
-+	&ahb_spi1_clk.common,
 +	&ahb_spi2_clk.common,
-+	&ahb_gps_clk.common,
 +	&ahb_hstimer_clk.common,
 +	&ahb_ve_clk.common,
 +	&ahb_tve_clk.common,
 +	&ahb_lcd_clk.common,
 +	&ahb_csi_clk.common,
-+	&ahb_hdmi_clk.common,
 +	&ahb_de_be_clk.common,
 +	&ahb_de_fe_clk.common,
 +	&ahb_iep_clk.common,
 +	&ahb_gpu_clk.common,
 +	&apb0_codec_clk.common,
++	&apb0_spdif_clk.common,
 +	&apb0_i2s_clk.common,
 +	&apb0_pio_clk.common,
 +	&apb0_ir_clk.common,
-+	&apb0_keypad_clk.common,
 +	&apb1_i2c0_clk.common,
 +	&apb1_i2c1_clk.common,
 +	&apb1_i2c2_clk.common,
@@ -592,21 +536,17 @@ index 000000000000..94d9a5cbf60b
 +	&mmc0_clk.common,
 +	&mmc1_clk.common,
 +	&mmc2_clk.common,
-+	&ts_clk.common,
 +	&ss_clk.common,
 +	&spi0_clk.common,
-+	&spi1_clk.common,
 +	&spi2_clk.common,
 +	&ir_clk.common,
 +	&i2s_clk.common,
-+	&keypad_clk.common,
++	&spdif_clk.common,
 +	&usb_ohci_clk.common,
 +	&usb_phy0_clk.common,
 +	&usb_phy1_clk.common,
-+	&gps_clk.common,
 +	&dram_ve_clk.common,
 +	&dram_csi_clk.common,
-+	&dram_ts_clk.common,
 +	&dram_tve_clk.common,
 +	&dram_de_fe_clk.common,
 +	&dram_de_be_clk.common,
@@ -621,7 +561,6 @@ index 000000000000..94d9a5cbf60b
 +	&ve_clk.common,
 +	&codec_clk.common,
 +	&avs_clk.common,
-+	&hdmi_clk.common,
 +	&gpu_clk.common,
 +	&mbus_clk.common,
 +	&iep_clk.common,
@@ -642,7 +581,7 @@ index 000000000000..94d9a5cbf60b
 +static CLK_FIXED_FACTOR(pll_video1_2x_clk, "pll-video1-2x",
 +			"pll-video1", 1, 2, CLK_SET_RATE_PARENT);
 +
-+static struct clk_hw_onecell_data sun5i_a10s_hw_clks = {
++static struct clk_hw_onecell_data sun5i_gr8_hw_clks = {
 +	.hws	= {
 +		[CLK_HOSC]		= &hosc_clk.common.hw,
 +		[CLK_OSC3M]		= &osc3M_clk.hw,
@@ -678,27 +617,22 @@ index 000000000000..94d9a5cbf60b
 +		[CLK_AHB_MMC2]		= &ahb_mmc2_clk.common.hw,
 +		[CLK_AHB_NAND]		= &ahb_nand_clk.common.hw,
 +		[CLK_AHB_SDRAM]		= &ahb_sdram_clk.common.hw,
-+		[CLK_AHB_EMAC]		= &ahb_emac_clk.common.hw,
-+		[CLK_AHB_TS]		= &ahb_ts_clk.common.hw,
 +		[CLK_AHB_SPI0]		= &ahb_spi0_clk.common.hw,
-+		[CLK_AHB_SPI1]		= &ahb_spi1_clk.common.hw,
 +		[CLK_AHB_SPI2]		= &ahb_spi2_clk.common.hw,
-+		[CLK_AHB_GPS]		= &ahb_gps_clk.common.hw,
 +		[CLK_AHB_HSTIMER]	= &ahb_hstimer_clk.common.hw,
 +		[CLK_AHB_VE]		= &ahb_ve_clk.common.hw,
 +		[CLK_AHB_TVE]		= &ahb_tve_clk.common.hw,
 +		[CLK_AHB_LCD]		= &ahb_lcd_clk.common.hw,
 +		[CLK_AHB_CSI]		= &ahb_csi_clk.common.hw,
-+		[CLK_AHB_HDMI]		= &ahb_hdmi_clk.common.hw,
 +		[CLK_AHB_DE_BE]		= &ahb_de_be_clk.common.hw,
 +		[CLK_AHB_DE_FE]		= &ahb_de_fe_clk.common.hw,
 +		[CLK_AHB_IEP]		= &ahb_iep_clk.common.hw,
 +		[CLK_AHB_GPU]		= &ahb_gpu_clk.common.hw,
 +		[CLK_APB0_CODEC]	= &apb0_codec_clk.common.hw,
++		[CLK_APB0_SPDIF]	= &apb0_spdif_clk.common.hw,
 +		[CLK_APB0_I2S]		= &apb0_i2s_clk.common.hw,
 +		[CLK_APB0_PIO]		= &apb0_pio_clk.common.hw,
 +		[CLK_APB0_IR]		= &apb0_ir_clk.common.hw,
-+		[CLK_APB0_KEYPAD]	= &apb0_keypad_clk.common.hw,
 +		[CLK_APB1_I2C0]		= &apb1_i2c0_clk.common.hw,
 +		[CLK_APB1_I2C1]		= &apb1_i2c1_clk.common.hw,
 +		[CLK_APB1_I2C2]		= &apb1_i2c2_clk.common.hw,
@@ -710,21 +644,17 @@ index 000000000000..94d9a5cbf60b
 +		[CLK_MMC0]		= &mmc0_clk.common.hw,
 +		[CLK_MMC1]		= &mmc1_clk.common.hw,
 +		[CLK_MMC2]		= &mmc2_clk.common.hw,
-+		[CLK_TS]		= &ts_clk.common.hw,
 +		[CLK_SS]		= &ss_clk.common.hw,
 +		[CLK_SPI0]		= &spi0_clk.common.hw,
-+		[CLK_SPI1]		= &spi1_clk.common.hw,
 +		[CLK_SPI2]		= &spi2_clk.common.hw,
 +		[CLK_IR]		= &ir_clk.common.hw,
 +		[CLK_I2S]		= &i2s_clk.common.hw,
-+		[CLK_KEYPAD]		= &keypad_clk.common.hw,
++		[CLK_SPDIF]		= &spdif_clk.common.hw,
 +		[CLK_USB_OHCI]		= &usb_ohci_clk.common.hw,
 +		[CLK_USB_PHY0]		= &usb_phy0_clk.common.hw,
 +		[CLK_USB_PHY1]		= &usb_phy1_clk.common.hw,
-+		[CLK_GPS]		= &gps_clk.common.hw,
 +		[CLK_DRAM_VE]		= &dram_ve_clk.common.hw,
 +		[CLK_DRAM_CSI]		= &dram_csi_clk.common.hw,
-+		[CLK_DRAM_TS]		= &dram_ts_clk.common.hw,
 +		[CLK_DRAM_TVE]		= &dram_tve_clk.common.hw,
 +		[CLK_DRAM_DE_FE]	= &dram_de_fe_clk.common.hw,
 +		[CLK_DRAM_DE_BE]	= &dram_de_be_clk.common.hw,
@@ -739,7 +669,6 @@ index 000000000000..94d9a5cbf60b
 +		[CLK_VE]		= &ve_clk.common.hw,
 +		[CLK_CODEC]		= &codec_clk.common.hw,
 +		[CLK_AVS]		= &avs_clk.common.hw,
-+		[CLK_HDMI]		= &hdmi_clk.common.hw,
 +		[CLK_GPU]		= &gpu_clk.common.hw,
 +		[CLK_MBUS]		= &mbus_clk.common.hw,
 +		[CLK_IEP]		= &iep_clk.common.hw,
@@ -747,11 +676,9 @@ index 000000000000..94d9a5cbf60b
 +	.num	= CLK_NUMBER,
 +};
 +
-+static struct ccu_reset_map sun5i_a10s_ccu_resets[] = {
++static struct ccu_reset_map sun5i_gr8_ccu_resets[] = {
 +	[RST_USB_PHY0]		=  { 0x0cc, BIT(0) },
 +	[RST_USB_PHY1]		=  { 0x0cc, BIT(1) },
-+
-+	[RST_GPS]		=  { 0x0d0, BIT(30) },
 +
 +	[RST_DE_BE]		=  { 0x104, BIT(30) },
 +
@@ -769,17 +696,17 @@ index 000000000000..94d9a5cbf60b
 +	[RST_IEP]		=  { 0x160, BIT(30) },
 +};
 +
-+static const struct sunxi_ccu_desc sun5i_a10s_ccu_desc = {
-+	.ccu_clks	= sun5i_a10s_ccu_clks,
-+	.num_ccu_clks	= ARRAY_SIZE(sun5i_a10s_ccu_clks),
++static const struct sunxi_ccu_desc sun5i_gr8_ccu_desc = {
++	.ccu_clks	= sun5i_gr8_ccu_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sun5i_gr8_ccu_clks),
 +
-+	.hw_clks	= &sun5i_a10s_hw_clks,
++	.hw_clks	= &sun5i_gr8_hw_clks,
 +
-+	.resets		= sun5i_a10s_ccu_resets,
-+	.num_resets	= ARRAY_SIZE(sun5i_a10s_ccu_resets),
++	.resets		= sun5i_gr8_ccu_resets,
++	.num_resets	= ARRAY_SIZE(sun5i_gr8_ccu_resets),
 +};
 +
-+static void __init sun5i_a10s_ccu_setup(struct device_node *node)
++static void __init sun5i_gr8_ccu_setup(struct device_node *node)
 +{
 +	void __iomem *reg;
 +	u32 val;
@@ -807,144 +734,9 @@ index 000000000000..94d9a5cbf60b
 +	val &= ~GENMASK(7, 6);
 +	writel(val | (2 << 6), reg + SUN5I_AHB_REG);
 +
-+	sunxi_ccu_probe(node, reg, &sun5i_a10s_ccu_desc);
++	sunxi_ccu_probe(node, reg, &sun5i_gr8_ccu_desc);
 +}
-+CLK_OF_DECLARE(sun5i_a10s_ccu, "allwinner,sun5i-a10s-ccu",
-+	       sun5i_a10s_ccu_setup);
-diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
-new file mode 100644
-index 000000000000..43f2ce3e9e6e
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
-@@ -0,0 +1,129 @@
-+/*
-+ * Copyright 2016 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _CCU_SUN5I_H_
-+#define _CCU_SUN5I_H_
-+
-+#include <dt-bindings/clock/sun5i-ccu.h>
-+#include <dt-bindings/reset/sun5i-ccu.h>
-+
-+#define CLK_HOSC		1
-+#define CLK_OSC3M		2
-+#define CLK_PLL_CORE		3
-+#define CLK_PLL_AUDIO_BASE	4
-+#define CLK_PLL_AUDIO		5
-+#define CLK_PLL_AUDIO_2X	6
-+#define CLK_PLL_AUDIO_4X	7
-+#define CLK_PLL_AUDIO_8X	8
-+#define CLK_PLL_VIDEO0		9
-+#define CLK_PLL_VIDEO0_2X	10
-+#define CLK_PLL_VE		11
-+#define CLK_PLL_DDR_BASE	12
-+#define CLK_PLL_DDR		13
-+#define CLK_PLL_DDR_OTHER	14
-+#define CLK_PLL_PERIPH		15
-+#define CLK_PLL_VIDEO1		16
-+#define CLK_PLL_VIDEO1_2X	17
-+#define CLK_OSC24M		18
-+#define CLK_CPU			19
-+#define CLK_AXI			20
-+#define CLK_AHB			21
-+#define CLK_APB0		22
-+#define CLK_APB1		23
-+#define CLK_DRAM_AXI		24
-+#define CLK_AHB_OTG		25
-+#define CLK_AHB_EHCI		26
-+#define CLK_AHB_OHCI		27
-+#define CLK_AHB_SS		28
-+#define CLK_AHB_DMA		29
-+#define CLK_AHB_BIST		30
-+#define CLK_AHB_MMC0		31
-+#define CLK_AHB_MMC1		32
-+#define CLK_AHB_MMC2		33
-+#define CLK_AHB_NAND		34
-+#define CLK_AHB_SDRAM		35
-+#define CLK_AHB_EMAC		36
-+#define CLK_AHB_TS		37
-+#define CLK_AHB_SPI0		38
-+#define CLK_AHB_SPI1		39
-+#define CLK_AHB_SPI2		40
-+#define CLK_AHB_GPS		41
-+#define CLK_AHB_HSTIMER		42
-+#define CLK_AHB_VE		43
-+#define CLK_AHB_TVE		44
-+#define CLK_AHB_LCD		45
-+#define CLK_AHB_CSI		46
-+#define CLK_AHB_HDMI		47
-+#define CLK_AHB_DE_BE		48
-+#define CLK_AHB_DE_FE		49
-+#define CLK_AHB_IEP		50
-+#define CLK_AHB_GPU		51
-+#define CLK_APB0_CODEC		52
-+#define CLK_APB0_SPDIF		53
-+#define CLK_APB0_I2S		54
-+#define CLK_APB0_PIO		55
-+#define CLK_APB0_IR		56
-+#define CLK_APB0_KEYPAD		57
-+#define CLK_APB1_I2C0		58
-+#define CLK_APB1_I2C1		59
-+#define CLK_APB1_I2C2		60
-+#define CLK_APB1_UART0		61
-+#define CLK_APB1_UART1		62
-+#define CLK_APB1_UART2		63
-+#define CLK_APB1_UART3		64
-+#define CLK_NAND		65
-+#define CLK_MMC0		66
-+#define CLK_MMC1		67
-+#define CLK_MMC2		68
-+#define CLK_TS			69
-+#define CLK_SS			70
-+#define CLK_CE			71
-+#define CLK_SPI0		72
-+#define CLK_SPI1		73
-+#define CLK_SPI2		74
-+#define CLK_IR			75
-+#define CLK_I2S			76
-+#define CLK_SPDIF		77
-+#define CLK_KEYPAD		78
-+#define CLK_USB_OHCI		79
-+#define CLK_USB_PHY0		80
-+#define CLK_USB_PHY1		81
-+#define CLK_GPS			82
-+#define CLK_DRAM_VE		83
-+#define CLK_DRAM_CSI		84
-+#define CLK_DRAM_TS		85
-+#define CLK_DRAM_TVE		86
-+#define CLK_DRAM_DE_FE		87
-+#define CLK_DRAM_DE_BE		88
-+#define CLK_DRAM_ACE		89
-+#define CLK_DRAM_IEP		90
-+#define CLK_DE_BE		91
-+#define CLK_DE_FE		92
-+#define CLK_TCON_CH0		93
-+#define CLK_TCON_CH1_SCLK	94
-+#define CLK_TCON_CH1		95
-+#define CLK_CSI			96
-+#define CLK_VE			97
-+#define CLK_CODEC		98
-+#define CLK_AVS			99
-+#define CLK_HDMI		100
-+#define CLK_GPU			101
-+#define CLK_MBUS		102
-+#define CLK_IEP			103
-+
-+#define CLK_NUMBER		(CLK_IEP + 1)
-+
-+#endif /* _CCU_SUN5I_H_ */
++CLK_OF_DECLARE(sun5i_gr8_ccu, "nextthing,gr8-ccu",
++	       sun5i_gr8_ccu_setup);
 -- 
 git-series 0.8.11
