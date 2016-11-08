@@ -1,108 +1,89 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Nov 2016 17:46:22 +0000
-Subject: [PATCH 0/8] firmware: arm_scpi: add support for legacy SCPI
- protocol
-In-Reply-To: <fb4348a8-197c-2219-ff01-8716e2a0b955@arm.com>
-References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
- <20161108145118.GR1041@n2100.armlinux.org.uk>
- <28decdc3-6b86-924f-d3c1-9873a8cfce77@arm.com>
- <20161108154038.GS1041@n2100.armlinux.org.uk>
- <20161108160625.GU1041@n2100.armlinux.org.uk>
- <fb4348a8-197c-2219-ff01-8716e2a0b955@arm.com>
-Message-ID: <20161108174622.GW1041@n2100.armlinux.org.uk>
+From: John.Youn@synopsys.com (John Youn)
+Date: Tue, 8 Nov 2016 09:48:03 -0800
+Subject: [PATCH 01/30] usb: dwc2: Deprecate g-use-dma binding
+In-Reply-To: <87wpgeibdh.fsf@linux.intel.com>
+References: <cover.1478558343.git.johnyoun@synopsys.com>
+ <e99e9d8df77884671f94734109a1a8d76a0222c1.1478558343.git.johnyoun@synopsys.com>
+ <87wpgeibdh.fsf@linux.intel.com>
+Message-ID: <6e90b835-73b1-3970-24a4-eab72381b469@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 05:37:25PM +0000, Sudeep Holla wrote:
+On 11/8/2016 1:12 AM, Felipe Balbi wrote:
 > 
+> Hi,
 > 
-> On 08/11/16 16:06, Russell King - ARM Linux wrote:
-> >On Tue, Nov 08, 2016 at 03:40:38PM +0000, Russell King - ARM Linux wrote:
-> >>As it contains a zero sized Image and .dtb files, I tried copying my
-> >>Image and .dtb over, and also copied my original config.txt (only
-> >>change is AUTORUN: FALSE).  It still doesn't appear to boot beyond
-> >>this point.
-> >
-> >Well, it seems that I can't even go back to my original set of firmware
-> >as UEFI has stopped working:
-> >
-> >NOTICE:  Booting Trusted Firmware
-> >NOTICE:  BL1: v1.0(release):14b6608
-> >NOTICE:  BL1: Built : 14:15:51, Sep  1 2014
-> >NOTICE:  BL1: Booting BL2
-> >NOTICE:  BL2: v1.0(release):14b6608
-> >NOTICE:  BL2: Built : 14:15:51, Sep  1 2014
-> >NOTICE:  BL1: Booting BL3-1
-> >NOTICE:  BL3-1: v1.0(release):14b6608
-> >NOTICE:  BL3-1: Built : 14:15:53, Sep  1 2014
-> >UEFI firmware (version v2.1 built at 14:41:56 on Oct 23 2014)
-> >Warning: Fail to load FDT file 'juno.dtb'.
-> >
+> John Youn <johnyoun@synopsys.com> writes:
+>> Add a vendor prefix and make the name more consistent by renaming it to
+>> "snps,gadget-dma-enable".
+>>
+>> Signed-off-by: John Youn <johnyoun@synopsys.com>
+>> ---
+>>  Documentation/devicetree/bindings/usb/dwc2.txt | 5 ++++-
+>>  arch/arm/boot/dts/rk3036.dtsi                  | 2 +-
+>>  arch/arm/boot/dts/rk3288.dtsi                  | 2 +-
+>>  arch/arm/boot/dts/rk3xxx.dtsi                  | 2 +-
+>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 2 +-
+>>  arch/arm64/boot/dts/rockchip/rk3368.dtsi       | 2 +-
+>>  drivers/usb/dwc2/params.c                      | 9 ++++++++-
+>>  drivers/usb/dwc2/pci.c                         | 2 +-
+>>  8 files changed, 18 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+>> index 9472111..389a461 100644
+>> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+>> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+>> @@ -26,11 +26,14 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
+>>  - dr_mode: shall be one of "host", "peripheral" and "otg"
+>>    Refer to usb/generic.txt
+>>  - snps,host-dma-disable: disable host DMA mode.
+>> -- g-use-dma: enable dma usage in gadget driver.
+>> +- snps,gadget-dma-enable: enable gadget DMA mode.
 > 
-> This again because of incompatibility of the configuration data saved in
-> NOR flash. The erase command I gave early is to erase that when you
-> switched between the UEFI binaries. It's really horrible mess UEFI
-> created in the initial days of Juno, and hopefully they have moved to
-> some standard format these days.
+> I don't see why you even have this binding. Looking through the code,
+> you have:
+> 
+> #define GHWCFG2_SLAVE_ONLY_ARCH			0
+> #define GHWCFG2_EXT_DMA_ARCH			1
+> #define GHWCFG2_INT_DMA_ARCH			2
+> 
+> void dwc2_set_param_dma_enable(struct dwc2_hsotg *hsotg, int val)
+> {
+> 	int valid = 1;
+> 
+> 	if (val > 0 && hsotg->hw_params.arch == GHWCFG2_SLAVE_ONLY_ARCH)
+> 		valid = 0;
+> 	if (val < 0)
+> 		valid = 0;
+> 
+> 	if (!valid) {
+> 		if (val >= 0)
+> 			dev_err(hsotg->dev,
+> 				"%d invalid for dma_enable parameter. Check HW configuration.\n",
+> 				val);
+> 		val = hsotg->hw_params.arch != GHWCFG2_SLAVE_ONLY_ARCH;
+> 		dev_dbg(hsotg->dev, "Setting dma_enable to %d\n", val);
+> 	}
+> 
+> 	hsotg->core_params->dma_enable = val;
+> }
+> 
+> which seems to hint that DMA support is discoverable. If there is DMA,
+> why would disable it?
+> 
 
-Yea, what it means is I've no possibility to go back to what was
-originally working now, since I don't understand how to get UEFI to
-behave (Will set the machine up for me, I don't have any information
-on how it was originally configured other than what was on the uSD
-card, which appears incomplete.)
+Yes that's the case and I would prefer to make it discoverable and
+enabled by default.
 
-> >and UEFI is the most unfriendly thing going - the "boot manager" thing
-> >doesn't let you view the configuration:
-> >
-> 
-> I completely agree. I had real bad times in past dealing with such
-> things in UEFI.
-> 
-> >[1] Linux from NOR Flash
-> >[2] Shell
-> >[3] Boot Manager
-> >Start: 3
-> >[1] Add Boot Device Entry
-> >[2] Update Boot Device Entry
-> >[3] Remove Boot Device Entry
-> >[4] Reorder Boot Device Entries
-> >[5] Update FDT path
-> >[6] Set Boot Timeout
-> >[7] Return to main menu
-> >Choice:
-> >
-> >and dropping into the shell... well, I've no idea how to get a listing
-> >of what it thinks is in the NOR device (or even how to refer to the
-> >NOR device.)  "devices" shows nothing that's even remotely English.
-> >
-> 
-> I think startup.nsh needs some edits. Just replace it with something like:
-> 
-> "norkern dtb=board.dtb console=ttyAMA0,115200n8 root=/dev/nfs rw
-> rootwait ip=dhcp systemd.log_target=null nfsroot=..." or something
-> alike. Currently it just echos and stops.
-> 
-> Regarding the new firmware stopping abruptly, I have no clue, except
-> asking you to erase the flash completely when switching between the
-> firmware versions. That has worked for me for all UEFI related issues in
-> the past. It's really annoying I understand.
-> 
-> flash> eraseall
+But the legacy behavior has always been like this because DMA was
+never fully implemented in the gadget driver and it was an opt-in
+feature. Periodic support was only added recently.
 
-I've tried that, it still stops at the same point, after:
+What do you think about enabling it by default now? I think most
+platforms already use DMA.
 
-FV2 Hob           0xFE07B000 - 0xFE8253BF
+We would still need a "disable" binding for IP validation purposes at
+least.
 
-and remains unresponsive.
-
-I do notice that the uSD card becomes visible through USB at this point
-though.
-
-Okay, well, I'm going to have to disable Juno from the nightly boots
-until we get some kind of resolution on this, as my Juno is now
-incapable of booting anything.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+John
