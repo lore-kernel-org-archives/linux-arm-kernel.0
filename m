@@ -1,197 +1,107 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Tue, 8 Nov 2016 14:00:07 -0500
-Subject: [PATCH 1/1 v7] ARM: imx: Added perf functionality to mmdc driver
-In-Reply-To: <1474307267-3081-1-git-send-email-Frank.Li@nxp.com>
-References: <1474307267-3081-1-git-send-email-Frank.Li@nxp.com>
-Message-ID: <CAP=VYLo_p3ZmOFcyM9om_31-=5O3ZiRLCBkJDDtj84JxAA7h8Q@mail.gmail.com>
+From: ddutile@redhat.com (Don Dutile)
+Date: Tue, 8 Nov 2016 14:02:39 -0500
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161108175457.GK20591@arm.com>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
+ <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
+ <20161108175457.GK20591@arm.com>
+Message-ID: <5822214F.2070500@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 19, 2016 at 1:47 PM, Frank Li <Frank.Li@nxp.com> wrote:
-> From: Zhengyu Shen <zhengyu.shen@nxp.com>
+On 11/08/2016 12:54 PM, Will Deacon wrote:
+> On Tue, Nov 08, 2016 at 03:27:23PM +0100, Auger Eric wrote:
+>> On 08/11/2016 03:45, Will Deacon wrote:
+>>> Rather than treat these as separate problems, a better interface is to
+>>> tell userspace about a set of reserved regions, and have this include
+>>> the MSI doorbell, irrespective of whether or not it can be remapped.
+>>> Don suggested that we statically pick an address for the doorbell in a
+>>> similar way to x86, and have the kernel map it there. We could even pick
+>>> 0xfee00000. If it conflicts with a reserved region on the platform (due
+>>> to (4)), then we'd obviously have to (deterministically?) allocate it
+>>> somewhere else, but probably within the bottom 4G.
+>> This is tentatively achieved now with
+>> [1] [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
+>> (http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1264506.html)
+> Yup, I saw that fly by. Hopefully some of the internals can be reused
+> with the current thinking on user ABI.
 >
-> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
-> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
-> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
-> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
-> MMDC provides registers for performance counters which read via this
-> driver to help debug memory throughput and similar issues.
+>>> The next question is how to tell userspace about all of the reserved
+>>> regions. Initially, the idea was to extend VFIO, however Alex pointed
+>>> out a horrible scenario:
+>>>
+>>>    1. QEMU spawns a VM on system 0
+>>>    2. VM is migrated to system 1
+>>>    3. QEMU attempts to passthrough a device using PCI hotplug
+>>>
+>>> In this scenario, the guest memory map is chosen at step (1), yet there
+>>> is no VFIO fd available to determine the reserved regions. Furthermore,
+>>> the reserved regions may vary between system 0 and system 1. This pretty
+>>> much rules out using VFIO to determine the reserved regions.Alex suggested
+>>> that the SMMU driver can advertise the regions via /sys/class/iommu/. This
+>>> would solve part of the problem, but migration between systems with
+>>> different memory maps can still cause problems if the reserved regions
+>>> of the new system conflict with the guest memory map chosen by QEMU.
+>>
+>> OK so I understand we do not want anymore the VFIO chain capability API
+>> (patch 5 of above series) but we prefer a sysfs approach instead.
+> Right.
 >
-> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
-> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+>> I understand the sysfs approach which allows the userspace to get the
+>> info earlier and independently on VFIO. Keeping in mind current QEMU
+>> virt - which is not the only userspace - will not do much from this info
+>> until we bring upheavals in virt address space management. So if I am
+>> not wrong, at the moment the main action to be undertaken is the
+>> rejection of the PCI hotplug in case we detect a collision.
+> I don't think so; it should be up to userspace to reject the hotplug.
+> If userspace doesn't have support for the regions, then that's fine --
+> you just end up in a situation where the CPU page table maps memory
+> somewhere that the device can't see. In other words, you'll end up with
+> spurious DMA failures, but that's exactly what happens with current systems
+> if you passthrough an overlapping region (Robin demonstrated this on Juno).
 >
->          898021787      mmdc/busy-cycles/
->           14819600      mmdc/read-accesses/
->             471.30 MB   mmdc/read-bytes/
->         2815419216      mmdc/total-cycles/
->           13367354      mmdc/write-accesses/
->             427.76 MB   mmdc/write-bytes/
+> Additionally, you can imagine some future support where you can tell the
+> guest not to use certain regions of its memory for DMA. In this case, you
+> wouldn't want to refuse the hotplug in the case of overlapping regions.
 >
->        5.334757334 seconds time elapsed
+> Really, I think the kernel side just needs to enumerate the fixed reserved
+> regions, place the doorbell at a fixed address and then advertise these
+> via sysfs.
 >
-> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
-> Signed-off-by: Frank Li <frank.li@nxp.com>
-> ---
-> Changes from v6 to v7
->     use mmdc_pmu prefix
->     remove unnecessary check
->     improve group event check according to mark's feedback.
->     check pmu_mmdc->mmdc_events[cfg] at event_add
->     only check == 0 at event_del
+>> I can respin [1]
+>> - studying and taking into account Robin's comments about dm_regions
+>> similarities
+>> - removing the VFIO capability chain and replacing this by a sysfs API
+> Ideally, this would be reusable between different SMMU drivers so the sysfs
+> entries have the same format etc.
 >
-> Changes from v5 to v6
->     Improve group event error handle
+>> Would that be OK?
+> Sounds good to me. Are you in a position to prototype something on the qemu
+> side once we've got kernel-side agreement?
 >
-> Changes from v4 to v5
->     Remove mmdc_pmu:irq
->     remove static variable cpuhp_mmdc_pmu
->     remove spin_lock
->     check is_sampling_event(event)
->     remove unnecessary cast
->     use hw_perf_event::prev_count
+>> What about Alex comments who wanted to report the usable memory ranges
+>> instead of unusable memory ranges?
+>>
+>> Also did you have a chance to discuss the following items:
+>> 1) the VFIO irq safety assessment
+> The discussion really focussed on system topology, as opposed to properties
+> of the doorbell. Regardless of how the device talks to the doorbell, if
+> the doorbell can't protect against things like MSI spoofing, then it's
+> unsafe. My opinion is that we shouldn't allow passthrough by default on
+> systems with unsafe doorbells (we could piggyback on allow_unsafe_interrupts
+> cmdline option to VFIO).
 >
-> Changes from v3 to v4:
->     Tested and fixed crash relating to removing events with perf fuzzer
->     Adjusted formatting
->     Moved all perf event code under CONFIG_PERF_EVENTS
->         Switched cpuhp_setup_state to cpuhp_setup_state_nocalls
+> A first step would be making all this opt-in, and only supporting GICv3
+> ITS for now.
+You're trying to support a config that is < GICv3 and no ITS ? ...
+That would be the equiv. of x86 pre-intr-remap, and that's why allow_unsafe_interrupts
+hook was created ... to enable devel/kick-the-tires.
+>> 2) the MSI reserved size computation (is an arbitrary size OK?)
+> If we fix the base address, we could fix a size too. However, we'd still
+> need to enumerate the doorbells to check that they fit in the region we
+> have. If not, then we can warn during boot and treat it the same way as
+> a resource conflict (that is, reallocate the region in some deterministic
+> way).
 >
-> Changes from v2 to v3:
->     Use WARN_ONCE instead of returning generic error values
->     Replace CPU Notifiers with newer state machine hotplug
->     Added additional checks on event_init for grouping and sampling
->     Remove useless mmdc_enable_profiling function
->     Added comments
->     Moved start index of events from 0x01 to 0x00
->     Added a counter to pmu_mmdc to only stop hrtimer after all events are finished
->     Replace readl_relaxed and writel_relaxed with readl and writel
->     Removed duplicate update function
->     Used devm_kasprintf when naming mmdcs probed
->
-> Changes from v1 to v2:
->     Added cpumask and migration handling support to driver
->     Validated event during event_init
->     Added code to properly stop counters
->     Used perf_invalid_context instead of perf_sw_context
->     Added hrtimer to poll for overflow
->     Added better description
->     Added support for multiple mmdcs
->
->  arch/arm/mach-imx/mmdc.c | 459 ++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 457 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-> index db9621c..1f70376 100644
-> --- a/arch/arm/mach-imx/mmdc.c
-> +++ b/arch/arm/mach-imx/mmdc.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright 2011 Freescale Semiconductor, Inc.
-> + * Copyright 2011,2016 Freescale Semiconductor, Inc.
->   * Copyright 2011 Linaro Ltd.
->   *
->   * The code contained herein is licensed under the GNU General Public
-> @@ -10,12 +10,16 @@
->   * http://www.gnu.org/copyleft/gpl.html
->   */
->
-> +#include <linux/hrtimer.h>
->  #include <linux/init.h>
-> +#include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> +#include <linux/perf_event.h>
-> +#include <linux/slab.h>
->
->  #include "common.h"
->
-> @@ -27,8 +31,458 @@
->  #define BM_MMDC_MDMISC_DDR_TYPE        0x18
->  #define BP_MMDC_MDMISC_DDR_TYPE        0x3
->
-> +#define TOTAL_CYCLES           0x0
-> +#define BUSY_CYCLES            0x1
-> +#define READ_ACCESSES          0x2
-> +#define WRITE_ACCESSES         0x3
-> +#define READ_BYTES             0x4
-> +#define WRITE_BYTES            0x5
-> +
-> +/* Enables, resets, freezes, overflow profiling*/
-> +#define DBG_DIS                        0x0
-> +#define DBG_EN                 0x1
-> +#define DBG_RST                        0x2
-> +#define PRF_FRZ                        0x4
-> +#define CYC_OVF                        0x8
-> +
-> +#define MMDC_MADPCR0   0x410
-> +#define MMDC_MADPSR0   0x418
-> +#define MMDC_MADPSR1   0x41C
-> +#define MMDC_MADPSR2   0x420
-> +#define MMDC_MADPSR3   0x424
-> +#define MMDC_MADPSR4   0x428
-> +#define MMDC_MADPSR5   0x42C
-> +
-> +#define MMDC_NUM_COUNTERS      6
-> +
-> +#define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
-> +
->  static int ddr_type;
->
-> +#ifdef CONFIG_PERF_EVENTS
-> +
-> +static DEFINE_IDA(mmdc_ida);
-> +
-> +PMU_EVENT_ATTR_STRING(total-cycles, mmdc_pmu_total_cycles, "event=0x00")
-> +PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_pmu_busy_cycles, "event=0x01")
-> +PMU_EVENT_ATTR_STRING(read-accesses, mmdc_pmu_read_accesses, "event=0x02")
-> +PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "config=0x03")
-> +PMU_EVENT_ATTR_STRING(read-bytes, mmdc_pmu_read_bytes, "event=0x04")
-> +PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_pmu_read_bytes_unit, "MB");
-> +PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_pmu_read_bytes_scale, "0.000001");
-> +PMU_EVENT_ATTR_STRING(write-bytes, mmdc_pmu_write_bytes, "event=0x05")
-> +PMU_EVENT_ATTR_STRING(write-bytes.unit, mmdc_pmu_write_bytes_unit, "MB");
-> +PMU_EVENT_ATTR_STRING(write-bytes.scale, mmdc_pmu_write_bytes_scale, "0.000001");
-> +
-> +struct mmdc_pmu {
-> +       struct pmu pmu;
-> +       void __iomem *mmdc_base;
-> +       cpumask_t cpu;
-> +       struct hrtimer hrtimer;
-> +       unsigned int active_events;
-> +       struct device *dev;
-> +       struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
-> +       struct hlist_node node;
-> +};
-> +
-> +/*
-> + * Polling period is set to one second, overflow of total-cycles (the fastest
-> + * increasing counter) takes ten seconds so one second is safe
-> + */
-> +static unsigned int mmdc_pmu_poll_period_us = 1000000;
-> +
-> +module_param_named(pmu_pmu_poll_period_us, mmdc_pmu_poll_period_us, uint,
-> +               S_IRUGO | S_IWUSR);
-
-I just noticed this commit now that linux-next is back after the week off.
-
-This should probably use core_param or setup_param since the Kconfig
-for this is bool and not tristate.  Similarly, that means that the .remove
-function you've added is dead code -- unless you envision a case where
-the user needs to forcibly unbind the driver...
-
-Do you want to redo the existing commit or do you want me to submit
-a follow-up fixup patch?
-
-Thanks
-Paul.
---
-
-> +
-> +static ktime_t mmdc_pmu_timer_period(void)
-> +{
-> +       return ns_to_ktime((u64)mmdc_pmu_poll_period_us * 1000);
-> +}
-> +
+> Will
