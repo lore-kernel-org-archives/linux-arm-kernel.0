@@ -1,194 +1,58 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Tue, 8 Nov 2016 13:08:31 +0530
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <58217871.6050609@huawei.com>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <1478101374-18778-4-git-send-email-anurup.m@huawei.com>
- <2127881.qmAR1XgW9F@wuerfel> <58217871.6050609@huawei.com>
-Message-ID: <582180F7.5060100@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 8 Nov 2016 08:44:14 +0100
+Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
+In-Reply-To: <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
+References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
+Message-ID: <20161108074414.vvnjj7aa26sloi2f@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 07, 2016 at 10:11:45PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Nov 7, 2016 at 9:08 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
+> >
+> > Add a card in order to have it working
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
+> >  1 file changed, 14 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> > index 12b4317a4383..5291e425caf9 100644
+> > --- a/arch/arm/boot/dts/ntc-gr8-evb.dts
+> > +++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> > @@ -76,6 +76,20 @@
+> >                 default-brightness-level = <8>;
+> >         };
+> >
+> > +       i2s {
+> 
+> "sound" might be a better node name? The I2S controllers are also
+> named "i2s".
 
-On Tuesday 08 November 2016 12:32 PM, Tan Xiaojun wrote:
-> On 2016/11/7 21:26, Arnd Bergmann wrote:
->> On Wednesday, November 2, 2016 11:42:46 AM CET Anurup M wrote:
->>> From: Tan Xiaojun <tanxiaojun@huawei.com>
->>>
->>> 	The Hisilicon Djtag is an independent component which connects
->>> 	with some other components in the SoC by Debug Bus. This driver
->>> 	can be configured to access the registers of connecting components
->>> 	(like L3 cache) during real time debugging.
->> The formatting of the text seems odd, please remove the leading spaces.
->>
-> Sorry for that. We will fix it.
->
->>>   drivers/soc/Kconfig                 |   1 +
->>>   drivers/soc/Makefile                |   1 +
->>>   drivers/soc/hisilicon/Kconfig       |  12 +
->>>   drivers/soc/hisilicon/Makefile      |   1 +
->>>   drivers/soc/hisilicon/djtag.c       | 639 ++++++++++++++++++++++++++++++++++++
->>>   include/linux/soc/hisilicon/djtag.h |  38 +++
->> Do you expect other drivers to be added that reference this interface?
->> If not, or if you are unsure, just put all of it under drivers/perf
->> so we don't introduce a global API that has only one user.
->>
-> OK. For now, this suggestion sounds good.
->
->>> +
->>> +#include <linux/bitops.h>
->>> +#include <linux/init.h>
->>> +#include <linux/list.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_device.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/slab.h>
->>> +#include <linux/spinlock.h>
->>> +
->>> +#include <asm-generic/delay.h>
->> Never include files from asm-generic directly except from
->> an architecture specific asm/*.h header file.
->>
->>
-> OK. Sorry for that.
->
->>> +DEFINE_IDR(djtag_hosts_idr);
->> make this static
->>
-> OK.
->
->>> +static void djtag_read32_relaxed(void __iomem *regs_base, u32 off, u32 *value)
->>> +{
->>> +	void __iomem *reg_addr = regs_base + off;
->>> +
->>> +	*value = readl_relaxed(reg_addr);
->>> +}
->>> +
->>> +static void djtag_write32(void __iomem *regs_base, u32 off, u32 val)
->>> +{
->>> +	void __iomem *reg_addr = regs_base + off;
->>> +
->>> +	writel(val, reg_addr);
->>> +}
->> This looks like an odd combination of interfaces.
->> Why can the reads be "relaxed" when the writes can not?
->>
->> Generally speaking, I'd advise to always use non-relaxed accessors
->> unless there is a strong performance reason, and in that case there
->> should be a comment explaining the use at each of the callers
->> of a relaxed accessor.
->>
-> Yes, it is our mistake.
-Shall use non-relaxed version and make it consistent.
->>> +	/* ensure the djtag operation is done */
->>> +	do {
->>> +		djtag_read32_relaxed(regs_base, SC_DJTAG_MSTR_START_EN_EX, &rd);
->>> +
->>> +		if (!(rd & DJTAG_MSTR_START_EN_EX))
->>> +			break;
->>> +
->>> +		udelay(1);
->>> +	} while (timeout--);
->> This one is obviously not performance critical at all, so use a non-relaxed
->> accessor. Same for the other two in this function.
->>
->> Are these functions ever called from atomic context? If yes, please document
->> from what context they can be called, otherwise please consider changing
->> the udelay calls into sleeping waits.
->>
-> Yes, this is not reentrant.
-The read/write functions shall also be called from irq handler (for 
-handling counter overflow).
-So need to use udelay calls. Shall Document it in v2.
->>> +int hisi_djtag_writel(struct hisi_djtag_client *client, u32 offset, u32 mod_sel,
->>> +							u32 mod_mask, u32 val)
->>> +{
->>> +	void __iomem *reg_map = client->host->sysctl_reg_map;
->>> +	unsigned long flags;
->>> +	int ret = 0;
->>> +
->>> +	spin_lock_irqsave(&client->host->lock, flags);
->>> +	ret = client->host->djtag_readwrite(reg_map, offset, mod_sel, mod_mask,
->>> +					true, val, 0, NULL);
->>> +	if (ret)
->>> +		pr_err("djtag_writel: error! ret=%d\n", ret);
->>> +	spin_unlock_irqrestore(&client->host->lock, flags);
->>> +
->>> +	return ret;
->>> +}
->>> +EXPORT_SYMBOL_GPL(hisi_djtag_writel);
->> That would of course imply changing the spinlock to a mutex here as well.
->>
->>> +static const struct of_device_id djtag_of_match[] = {
->>> +	/* for hip05(D02) cpu die */
->>> +	{ .compatible = "hisilicon,hip05-cpu-djtag-v1",
->>> +		.data = (void *)djtag_readwrite_v1 },
->>> +	/* for hip05(D02) io die */
->>> +	{ .compatible = "hisilicon,hip05-io-djtag-v1",
->>> +		.data = (void *)djtag_readwrite_v1 },
->>> +	/* for hip06(D03) cpu die */
->>> +	{ .compatible = "hisilicon,hip06-cpu-djtag-v1",
->>> +		.data = (void *)djtag_readwrite_v1 },
->>> +	/* for hip06(D03) io die */
->>> +	{ .compatible = "hisilicon,hip06-io-djtag-v2",
->>> +		.data = (void *)djtag_readwrite_v2 },
->>> +	/* for hip07(D05) cpu die */
->>> +	{ .compatible = "hisilicon,hip07-cpu-djtag-v2",
->>> +		.data = (void *)djtag_readwrite_v2 },
->>> +	/* for hip07(D05) io die */
->>> +	{ .compatible = "hisilicon,hip07-io-djtag-v2",
->>> +		.data = (void *)djtag_readwrite_v2 },
->>> +	{},
->>> +};
->> If these are backwards compatible, just mark them as compatible in DT,
->> e.g. hip06 can use
->>
->> 	compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
->>
->> so you can tell the difference if you need to, but the driver only has to
->> list the oldest one here.
->>
->> What is the difference between the cpu and io djtag interfaces?
-On some chips like hip06, the djtag version is different for IO die.
+I know, but we also had the codec and SPDIF on this board, so sound
+was too generic to be meaningful I guess. I don't really care about
+the name though, if you have any suggestion...
 
-Thanks,
-Anurup
->>
->> I think you can also drop the '(void *)'.
->>
-> OK. We will consider it.
->
-> Thanks.
-> Xiaojun.
->
->>> +static void djtag_register_devices(struct hisi_djtag_host *host)
->>> +{
->>> +	struct device_node *node;
->>> +	struct hisi_djtag_client *client;
->>> +
->>> +	if (!host->of_node)
->>> +		return;
->>> +
->>> +	for_each_available_child_of_node(host->of_node, node) {
->>> +		if (of_node_test_and_set_flag(node, OF_POPULATED))
->>> +			continue;
->>> +		client = hisi_djtag_of_register_device(host, node);
->>> +		list_add(&client->next, &host->client_list);
->>> +	}
->>> +}
->> Can you explain your thoughts behind creating a new bus type
->> and adding the child devices manually rather than using
->> platform_device structures with of_platform_populate()?
->>
->> Do you expect to see other implementations of this bus type
->> with incompatible bus drivers?
->>
->> 	Arnd
->>
->>
->> .
->>
->
+> Otherwise,
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/9cd82ae9/attachment.sig>
