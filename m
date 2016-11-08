@@ -1,25 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 19:10:22 +0000
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <5822214F.2070500@redhat.com>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home>
- <20161108024559.GA20591@arm.com>
- <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
- <20161108175457.GK20591@arm.com> <5822214F.2070500@redhat.com>
-Message-ID: <20161108191022.GA17771@arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 8 Nov 2016 11:13:43 -0800
+Subject: [PATCH 2/2] ARM: dts: apq8064: add support to pm8821
+In-Reply-To: <1478622577-20699-2-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1478622577-20699-2-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20161108191343.GP25787@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 02:02:39PM -0500, Don Dutile wrote:
-> On 11/08/2016 12:54 PM, Will Deacon wrote:
-> >A first step would be making all this opt-in, and only supporting GICv3
-> >ITS for now.
-> You're trying to support a config that is < GICv3 and no ITS ? ...
-> That would be the equiv. of x86 pre-intr-remap, and that's why allow_unsafe_interrupts
-> hook was created ... to enable devel/kick-the-tires.
+On Tue 08 Nov 08:29 PST 2016, Srinivas Kandagatla wrote:
 
-Yup, that's exactly what I was envisaging. For systems that can't do
-passthrough safely, we'll always have to throw a devel switch.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064.dtsi | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 1dbe697..fde006c 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -627,6 +627,34 @@
+>  			clock-names = "core";
+>  		};
+>  
+> +		qcom,ssbi at c00000 {
 
-Will
+No "qcom," in the node name.
+
+> +			compatible = "qcom,ssbi";
+> +			reg = <0x00c00000 0x1000>;
+> +			qcom,controller-type = "pmic-arbiter";
+> +
+> +			pmicintc2: pmic at 1 {
+
+I think we should follow Linus' lead and label this "pm8821".
+
+> +				compatible = "qcom,pm8821";
+> +				interrupt-parent = <&tlmm_pinmux>;
+> +				interrupts = <76 8>;
+
+Please spell out IRQ_TYPE_LEVEL_LOW.
+
+And interrupts-extended = <&tlmm_pinmux 76 IRQ_TYPE_LEVEL_LOW> combines
+the two lines nicely.
+
+> +				#interrupt-cells = <2>;
+> +				interrupt-controller;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				pm8821_mpps: mpps at 50 {
+> +
+
+Extra newline.
+
+> +					compatible = "qcom,pm8821-mpp", "qcom,ssbi-mpp";
+> +					reg = <0x50>;
+> +
+> +					interrupts = <24 1>, <25 1>, <26 1>,
+> +						     <27 1>;
+
+I think these should be IRQ_TYPE_NONE per the discussion on how to share
+interrupts between the gpio/mpp driver and other clients.
+
+On the other hand, per the pm8821 driver we only support LEVEL_LOW
+(high?).
+
+> +
+> +					gpio-controller;
+> +					#gpio-cells = <2>;
+> +		                };
+> +			};
+> +		};
+> +
+
+Regards,
+Bjorn
