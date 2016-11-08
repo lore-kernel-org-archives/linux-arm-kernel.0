@@ -1,79 +1,149 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Tue, 8 Nov 2016 10:51:12 +0800
-Subject: [PATCH v9 8/8] ARM: dts: imx6q-evi: Fix onboard hub reset line
-In-Reply-To: <1478573472-29516-1-git-send-email-peter.chen@nxp.com>
-References: <1478573472-29516-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1478573472-29516-9-git-send-email-peter.chen@nxp.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 08 Nov 2016 08:44:18 +0530
+Subject: [PATCH 3/4] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <20161107175349.GD4865@kozik-lap>
+References: <1478230764-13748-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478230764-13748-4-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161107175358epcas4p35857a8a830abc0203ff6f24cbc27ecf7@epcas4p3.samsung.com>
+ <20161107175349.GD4865@kozik-lap>
+Message-ID: <5821430A.5060007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+Hi Krzysztof,
 
-Previously the onboard hub was made to work by treating its
-reset gpio as a regulator enable.
-Get rid of that kludge now that pwseq has added reset gpio support
-Move pin muxing the hub reset pin into the usbh1 group
+On Monday 07 November 2016 11:23 PM, Krzysztof Kozlowski wrote:
+> On Fri, Nov 04, 2016 at 09:09:23AM +0530, Pankaj Dubey wrote:
+>> Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based boards.
+>> Instead use mapping from device tree node of SCU.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm/mach-exynos/exynos.c                | 22 ----------------------
+>>  arch/arm/mach-exynos/include/mach/map.h      |  2 --
+>>  arch/arm/mach-exynos/platsmp.c               | 18 +++++++++++-------
+>>  arch/arm/mach-exynos/pm.c                    | 14 +++++++++++---
+>>  arch/arm/mach-exynos/suspend.c               | 15 +++++++++++----
+>>  arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
+>>  6 files changed, 33 insertions(+), 42 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index 757fc11..fa08ef9 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -28,15 +28,6 @@
+>>  
+>>  #include "common.h"
+>>  
+>> -static struct map_desc exynos4_iodesc[] __initdata = {
+>> -	{
+>> -		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
+>> -		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
+>> -		.length		= SZ_8K,
+>> -		.type		= MT_DEVICE,
+>> -	},
+>> -};
+>> -
+>>  static struct platform_device exynos_cpuidle = {
+>>  	.name              = "exynos_cpuidle",
+>>  #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+>> @@ -99,17 +90,6 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+>>  	return 1;
+>>  }
+>>  
+>> -/*
+>> - * exynos_map_io
+>> - *
+>> - * register the standard cpu IO areas
+>> - */
+>> -static void __init exynos_map_io(void)
+>> -{
+>> -	if (soc_is_exynos4())
+>> -		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+>> -}
+>> -
+>>  static void __init exynos_init_io(void)
+>>  {
+>>  	debug_ll_io_init();
+>> @@ -118,8 +98,6 @@ static void __init exynos_init_io(void)
+>>  
+>>  	/* detect cpu id and rev. */
+>>  	s5p_init_cpu(S5P_VA_CHIPID);
+>> -
+>> -	exynos_map_io();
+>>  }
+>>  
+>>  /*
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>> index 5fb0040..0eef407 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -18,6 +18,4 @@
+>>  
+>>  #define EXYNOS_PA_CHIPID		0x10000000
+>>  
+>> -#define EXYNOS4_PA_COREPERI		0x10500000
+>> -
+>>  #endif /* __ASM_ARCH_MAP_H */
+>> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+>> index a5d6841..553d0d9 100644
+>> --- a/arch/arm/mach-exynos/platsmp.c
+>> +++ b/arch/arm/mach-exynos/platsmp.c
+>> @@ -224,11 +224,6 @@ static void write_pen_release(int val)
+>>  	sync_cache_w(&pen_release);
+>>  }
+>>  
+>> -static void __iomem *scu_base_addr(void)
+>> -{
+>> -	return (void __iomem *)(S5P_VA_SCU);
+>> -}
+>> -
+>>  static DEFINE_SPINLOCK(boot_lock);
+>>  
+>>  static void exynos_secondary_init(unsigned int cpu)
+>> @@ -387,14 +382,23 @@ fail:
+>>  
+>>  static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+>>  {
+>> +	struct device_node *np;
+>> +	void __iomem *scu_base;
+>>  	int i;
+>>  
+>>  	exynos_sysram_init();
+>>  
+>>  	exynos_set_delayed_reset_assertion(true);
+>>  
+>> -	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+>> -		scu_enable(scu_base_addr());
+>> +	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+>> +		np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+>> +		scu_base = of_iomap(np, 0);
+>> +		if (scu_base) {
+>> +			scu_enable(scu_base);
+>> +			iounmap(scu_base);
+>> +		}
+>> +		of_node_put(np);
+> 
+> I do not like the duplication - this code appears in three places and
+> they are the same. Could you split it into separate function?
+> 
+OK, will do these changes in v2.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/boot/dts/imx6q-evi.dts | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+Only pm.c and suspend.c file's scu_enable can be moved to single place
+without introducing more dependencies between these mach files.
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 6de21ff..3277a06 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -54,18 +54,6 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	reg_usbh1_vbus: regulator-usbhubreset {
--		compatible = "regulator-fixed";
--		regulator-name = "usbh1_vbus";
--		regulator-min-microvolt = <5000000>;
--		regulator-max-microvolt = <5000000>;
--		enable-active-high;
--		startup-delay-us = <2>;
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_usbh1_hubreset>;
--		gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
--	};
--
- 	reg_usb_otg_vbus: regulator-usbotgvbus {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_otg_vbus";
-@@ -207,12 +195,18 @@
- };
- 
- &usbh1 {
--	vbus-supply = <&reg_usbh1_vbus>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh1>;
- 	dr_mode = "host";
- 	disable-over-current;
- 	status = "okay";
-+
-+	usb2415host: hub at 1 {
-+		compatible = "usb424,2513";
-+		reg = <1>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usbotg {
-@@ -471,11 +465,6 @@
- 			MX6QDL_PAD_GPIO_3__USB_H1_OC 0x1b0b0
- 			/* usbh1_b OC */
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
--		>;
--	};
--
--	pinctrl_usbh1_hubreset: usbh1hubresetgrp {
--		fsl,pins = <
- 			MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x1b0b0
- 		>;
- 	};
--- 
-2.7.4
+> As you mentioned to Alim, in case of lack of node, it would be nice to notify the
+> user (pr_err() etc).
+> 
+OK, will do these changes in v2.
+
+
+Thanks,
+Pankaj Dubey
+
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
+> 
