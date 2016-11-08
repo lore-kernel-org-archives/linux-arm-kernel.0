@@ -1,60 +1,54 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 8 Nov 2016 10:25:29 +0800
-Subject: [PATCH 1/2] arm64: hugetlb: remove the wrong pmd check in
- find_num_contig()
-In-Reply-To: <20161104154814.hizb5277wp2f3enj@localhost>
-References: <1478140059-13829-1-git-send-email-shijie.huang@arm.com>
- <1478140059-13829-2-git-send-email-shijie.huang@arm.com>
- <20161104001616.ssjbemliorxi6evl@localhost>
- <20161104025216.GA19810@sha-win-210.asiapac.arm.com>
- <20161104154814.hizb5277wp2f3enj@localhost>
-Message-ID: <20161108022527.GB982@sha-win-210.asiapac.arm.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Mon,  7 Nov 2016 20:28:30 -0600
+Subject: [PATCHv3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+Message-ID: <20161108022830.29303-1-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 09:48:14AM -0600, Catalin Marinas wrote:
-> On Fri, Nov 04, 2016 at 10:52:17AM +0800, Huang Shijie wrote:
-> > On Thu, Nov 03, 2016 at 06:16:16PM -0600, Catalin Marinas wrote:
-> > > On Thu, Nov 03, 2016 at 10:27:38AM +0800, Huang Shijie wrote:
-> > > > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> > > > index 2e49bd2..4811ef1 100644
-> > > > --- a/arch/arm64/mm/hugetlbpage.c
-> > > > +++ b/arch/arm64/mm/hugetlbpage.c
-> > > > @@ -61,10 +61,6 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
-> > > >  		return 1;
-> > > >  	}
-> > > >  	pmd = pmd_offset(pud, addr);
-> > > > -	if (!pmd_present(*pmd)) {
-> > > > -		VM_BUG_ON(!pmd_present(*pmd));
-> > > > -		return 1;
-> > > > -	}
-> > > >  	if ((pte_t *)pmd == ptep) {
-> > > >  		*pgsize = PMD_SIZE;
-> > > >  		return CONT_PMDS;
-> > > 
-> > > BTW, for the !pud_present() and !pgd_present() cases, shouldn't
-> > > find_num_contig() actually return 0? These are more likely real bugs, so
-> > > no point in setting the huge pte.
-> > 
-> > The kernel will not call the find_num_contig() if the PGD/PUD are empty.
-> > Please see the code in the hugetlb_fault().
-> > 
-> >    ------------------------------------------------------
-> > 	ptep = huge_pte_offset(mm, address);
-> > 	if (ptep) {
-> > 	    ...............................
-> > 	} else {
-> > 		ptep = huge_pte_alloc(mm, address, huge_page_size(h));
-> > 		if (!ptep)
-> > 			return VM_FAULT_OOM;
-> > 	}
-> >    ------------------------------------------------------
-> 
-> Exactly. So what is the reason for returning 1 if !pgd_present()? Would
-I think the author was too cautious for returning 1 if !pgd_present().
-:)
-> removing the checks entirely or adding BUG() be a better option?
-I will remove the checks in the next version.
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Thanks
-Huang Shijie
+Enable the QSPI node and add the flash chip.
+
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v3: Use n25q00 for the compatible entry for the flash part and
+    tested on SoCKit
+v2: Remove partition entries for the SoCKIT
+---
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index 02e22f5..d59f6f2 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -175,6 +175,27 @@
+ 	status = "okay";
+ };
+ 
++&qspi {
++	status = "okay";
++
++	flash: flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q00";
++		reg = <0>;
++		spi-max-frequency = <100000000>;
++
++		m25p,fast-read;
++		cdns,page-size = <256>;
++		cdns,block-size = <16>;
++		cdns,read-delay = <4>;
++		cdns,tshsl-ns = <50>;
++		cdns,tsd2d-ns = <50>;
++		cdns,tchsh-ns = <4>;
++		cdns,tslch-ns = <4>;
++	};
++};
++
+ &usb1 {
+ 	status = "okay";
+ };
+-- 
+2.8.3
