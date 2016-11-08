@@ -1,59 +1,40 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue,  8 Nov 2016 17:31:32 +0100
-Subject: [PATCH] arm64: dts: marvell: add unique identifiers for Armada A8k
- SPI controllers
-Message-ID: <1478622692-18441-1-git-send-email-mw@semihalf.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue,  8 Nov 2016 17:32:16 +0100
+Subject: [PATCH] arm64: dts: marvell: Fix typo in label name on Armada 37xx
+Message-ID: <20161108163216.24470-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling SPI controllers, which are attached to different busses
-inside an SoC, may result in overlapping enumeration and cause
-sysfs registration failure. Example log after enabling two
-controllers on Armada 8040 SoC with same identifiers:
+The label names of the peripheral clocks have a typo. Fix it before it is
+more widely used.
 
-[    3.740415] sysfs: cannot create duplicate filename
-'/class/spi_master/spi0'
-[    3.747510] ------------[ cut here ]------------
-[    3.752145] WARNING: at fs/sysfs/dir.c:31
-[...]
-[    4.002299] orion_spi: probe of f4700600.spi failed with error -17
-
-spi-orion driver offers dedicated DT property ('cell-index'), that
-allow setting unique identifiers. Recently added support for CP110-slave
-HW block introduced two new SPI controllers' nodes with same ID as
-ones from CP110-master.
-
-This commit fixes the issue by assigning different 'cell-index' values
-for CP110-slave SPI controllers.
-
-Fixes: 4eef78a0091b ("arm64: dts: marvell: add description for the slave
-CP110 in Armada 8K")
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 4 ++--
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-index abb3fa2..d94d592 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-@@ -132,7 +132,7 @@
- 				reg = <0x700600 0x50>;
- 				#address-cells = <0x1>;
- 				#size-cells = <0x0>;
--				cell-index = <1>;
-+				cell-index = <3>;
- 				clocks = <&cps_syscon0 1 21>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index c4762538ec01..693c36ac2c70 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -105,7 +105,7 @@
  				status = "disabled";
  			};
-@@ -142,7 +142,7 @@
- 				reg = <0x700680 0x50>;
- 				#address-cells = <1>;
- 				#size-cells = <0>;
--				cell-index = <2>;
-+				cell-index = <4>;
- 				clocks = <&cps_syscon0 1 21>;
- 				status = "disabled";
+ 
+-			nb_perih_clk: nb-periph-clk at 13000{
++			nb_periph_clk: nb-periph-clk at 13000{
+ 				compatible = "marvell,armada-3700-periph-clock-nb";
+ 				reg = <0x13000 0x100>;
+ 				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
+@@ -113,7 +113,7 @@
+ 				#clock-cells = <1>;
  			};
+ 
+-			sb_perih_clk: sb-periph-clk at 18000{
++			sb_periph_clk: sb-periph-clk at 18000{
+ 				compatible = "marvell,armada-3700-periph-clock-sb";
+ 				reg = <0x18000 0x100>;
+ 				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
 -- 
-1.8.3.1
+2.10.1
