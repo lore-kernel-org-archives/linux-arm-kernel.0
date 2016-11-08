@@ -1,66 +1,48 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 8 Nov 2016 13:44:39 +0800
-Subject: [PATCH v2 2/2] arm64: hugetlb: fix the wrong address for several
- functions
-In-Reply-To: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
-References: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1478583879-14654-3-git-send-email-shijie.huang@arm.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 8 Nov 2016 13:56:51 +0800
+Subject: [PATCH v2 0/3] imx: add imx6ull support
+Message-ID: <1478584614-12054-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The libhugetlbfs meets several failures since the following functions
-do not use the correct address:
-   huge_ptep_get_and_clear()
-   huge_ptep_set_access_flags()
-   huge_ptep_set_wrprotect()
-   huge_ptep_clear_flush()
+Hi Shawn,
 
-This patch fixes the wrong address for them.
+In this series, it adds support for imx6ull SoC which is a derived SoC
+from imx6ul, and imx6ull is pin-to-pin compatible with imx6ul, the
+basic functions are tested at imx6ull 14x14 evk, and imx6ul 14x14 evk
+is tested too to avoid regression.
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Changes for v2:
+- Keep imx6ul.dtsi unchanging, and using GPL/X11 dual license
+  for new dts file. [Patch 1/3]
+- Using IMX6ULL prefix for both imx6ull dedicated pin and clock name.
+  [Patch 1/3, 3/3]
+- Delete useless changes for patch 2/3.
+- Delete blank line for patch 3/3.
+- Using assigned-clocks for imx6ull 14x14 evk. [Patch 1/3, 3/3]
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index b0d3f8b..fd96ba7 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -200,7 +200,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
- 		/* save the 1st pte to return */
- 		pte = ptep_get_and_clear(mm, addr, cpte);
--		for (i = 1; i < ncontig; ++i) {
-+		for (i = 1, addr += pgsize; i < ncontig; ++i, addr += pgsize) {
- 			/*
- 			 * If HW_AFDBM is enabled, then the HW could
- 			 * turn on the dirty bit for any of the page
-@@ -238,7 +238,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		pfn = pte_pfn(*cpte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
- 					  *cpte, &pgsize);
--		for (i = 0; i < ncontig; ++i, ++cpte) {
-+		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize) {
- 			changed = ptep_set_access_flags(vma, addr, cpte,
- 							pfn_pte(pfn,
- 								hugeprot),
-@@ -261,7 +261,7 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 
- 		cpte = huge_pte_offset(mm, addr);
- 		ncontig = find_num_contig(mm, addr, cpte, *cpte, &pgsize);
--		for (i = 0; i < ncontig; ++i, ++cpte)
-+		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_set_wrprotect(mm, addr, cpte);
- 	} else {
- 		ptep_set_wrprotect(mm, addr, ptep);
-@@ -279,7 +279,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 		cpte = huge_pte_offset(vma->vm_mm, addr);
- 		ncontig = find_num_contig(vma->vm_mm, addr, cpte,
- 					  *cpte, &pgsize);
--		for (i = 0; i < ncontig; ++i, ++cpte)
-+		for (i = 0; i < ncontig; ++i, ++cpte, addr += pgsize)
- 			ptep_clear_flush(vma, addr, cpte);
- 	} else {
- 		ptep_clear_flush(vma, addr, ptep);
+
+Bai Ping (1):
+  clk: imx: clk-imx6ul: add clk support for imx6ull
+
+Peter Chen (2):
+  ARM: imx6ull: add imx6ull support
+  ARM: imx: mach-imx6ul: add imx6ull support
+
+ arch/arm/boot/dts/Makefile               |   3 +-
+ arch/arm/boot/dts/imx6u-14x14-evk.dtsi   | 487 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts   | 479 +-----------------------------
+ arch/arm/boot/dts/imx6ull-14x14-evk.dts  |  55 ++++
+ arch/arm/boot/dts/imx6ull-pinfunc.h      |  56 ++++
+ arch/arm/boot/dts/imx6ull.dtsi           |  43 +++
+ arch/arm/mach-imx/mach-imx6ul.c          |   1 +
+ drivers/clk/imx/clk-imx6ul.c             |  72 ++++-
+ include/dt-bindings/clock/imx6ul-clock.h |  15 +-
+ 9 files changed, 720 insertions(+), 491 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6u-14x14-evk.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6ull-14x14-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6ull.dtsi
+
 -- 
-2.5.5
+2.7.4
