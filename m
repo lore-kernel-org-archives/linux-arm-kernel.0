@@ -1,37 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  8 Nov 2016 17:55:47 +0000
-Subject: [PATCH 2/2] drivers: psci: Allow PSCI node to be disabled
-In-Reply-To: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
-References: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161108175547.31146-2-lorenzo.pieralisi@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2016 18:11:03 +0000
+Subject: [PATCH v3 1/2] arm64: Add hypervisor safe helper for checking
+ constant capabilities
+In-Reply-To: <1478613381-5718-2-git-send-email-suzuki.poulose@arm.com>
+References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
+ <1478613381-5718-2-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20161108181103.GM20591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Tue, Nov 08, 2016 at 01:56:20PM +0000, Suzuki K Poulose wrote:
+> The hypervisor may not have full access to the kernel data structures
+> and hence cannot safely use cpus_have_cap() helper for checking the
+> system capability. Add a safe helper for hypervisors to check a constant
+> system capability, which *doesn't* fall back to checking the bitmap
+> maintained by the kernel. With this, make the cpus_have_cap() only
+> check the bitmask and force constant cap checks to use the new API
+> for quicker checks.
+> 
+> Cc: Robert Ritcher <rritcher@cavium.com>
+> Cc: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 19 ++++++++++++-------
+>  arch/arm64/kernel/cpufeature.c      |  2 +-
+>  arch/arm64/kernel/process.c         |  2 +-
+>  drivers/irqchip/irq-gic-v3.c        | 13 +------------
 
-Allow disabling PSCI support (mostly for testing purposes) by setting
-the status property to "disabled". This makes the node behave in much
-the same way as proper device nodes.
+It might be worth having the GIC changes as a separate patch, but either
+way:
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
- drivers/firmware/psci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 8263429..6c60a50 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -630,7 +630,7 @@ int __init psci_dt_init(void)
- 
- 	np = of_find_matching_node_and_match(NULL, psci_of_match, &matched_np);
- 
--	if (!np)
-+	if (!np || !of_device_is_available(np))
- 		return -ENODEV;
- 
- 	init_fn = (psci_initcall_t)matched_np->data;
--- 
-2.10.0
+Will
