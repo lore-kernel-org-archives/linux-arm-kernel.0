@@ -1,277 +1,130 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 8 Nov 2016 16:33:44 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <20161108161245.GD20591@arm.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108161245.GD20591@arm.com>
-Message-ID: <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 8 Nov 2016 18:48:52 +0100
+Subject: [PATCH v2] spi: atmel: use managed resource for gpio chip select
+Message-ID: <20161108174852.14311-1-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 16:12, Will Deacon wrote:
-> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
->> For arm64, there is no I/O space as other architectural platforms, such as
->> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
->> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
->> known port addresses are used to control the corresponding target devices, for
->> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
->> normal MMIO mode in using.
->>
->> To drive these devices, this patch introduces a method named indirect-IO.
->> In this method the in/out pair in arch/arm64/include/asm/io.h will be
->> redefined. When upper layer drivers call in/out with those known legacy port
->> addresses to access the peripherals, the hooking functions corrresponding to
->> those target peripherals will be called. Through this way, those upper layer
->> drivers which depend on in/out can run on Hip06 without any changes.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->> ---
->>  arch/arm64/Kconfig             |  6 +++
->>  arch/arm64/include/asm/extio.h | 94 ++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm64/include/asm/io.h    | 29 +++++++++++++
->>  arch/arm64/kernel/Makefile     |  1 +
->>  arch/arm64/kernel/extio.c      | 27 ++++++++++++
->>  5 files changed, 157 insertions(+)
->>  create mode 100644 arch/arm64/include/asm/extio.h
->>  create mode 100644 arch/arm64/kernel/extio.c
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 969ef88..b44070b 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -163,6 +163,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
->>  config ARCH_MMAP_RND_COMPAT_BITS_MAX
->>         default 16
->>
->> +config ARM64_INDIRECT_PIO
->> +	bool "access peripherals with legacy I/O port"
->> +	help
->> +	  Support special accessors for ISA I/O devices. This is needed for
->> +	  SoCs that do not support standard read/write for the ISA range.
->> +
->>  config NO_IOPORT_MAP
->>  	def_bool y if !PCI
->>
->> diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
->> new file mode 100644
->> index 0000000..6ae0787
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/extio.h
->> @@ -0,0 +1,94 @@
->> +/*
->> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#ifndef __LINUX_EXTIO_H
->> +#define __LINUX_EXTIO_H
->> +
->> +struct extio_ops {
->> +	unsigned long start;/* inclusive, sys io addr */
->> +	unsigned long end;/* inclusive, sys io addr */
->> +
->> +	u64 (*pfin)(void *devobj, unsigned long ptaddr,	size_t dlen);
->> +	void (*pfout)(void *devobj, unsigned long ptaddr, u32 outval,
->> +					size_t dlen);
->> +	u64 (*pfins)(void *devobj, unsigned long ptaddr, void *inbuf,
->> +				size_t dlen, unsigned int count);
->> +	void (*pfouts)(void *devobj, unsigned long ptaddr,
->> +				const void *outbuf, size_t dlen,
->> +				unsigned int count);
->> +	void *devpara;
->> +};
->> +
->> +extern struct extio_ops *arm64_extio_ops;
->> +
->> +#define DECLARE_EXTIO(bw, type)						\
->> +extern type in##bw(unsigned long addr);					\
->> +extern void out##bw(type value, unsigned long addr);			\
->> +extern void ins##bw(unsigned long addr, void *buffer, unsigned int count);\
->> +extern void outs##bw(unsigned long addr, const void *buffer, unsigned int count);
->> +
->> +#define BUILD_EXTIO(bw, type)						\
->> +type in##bw(unsigned long addr)						\
->> +{									\
->> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
->> +			arm64_extio_ops->end < addr)			\
->> +		return read##bw(PCI_IOBASE + addr);			\
->> +	return arm64_extio_ops->pfin ?					\
->> +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,		\
->> +			addr, sizeof(type)) : -1;			\
->> +}									\
->> +									\
->> +void out##bw(type value, unsigned long addr)				\
->> +{									\
->> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
->> +			arm64_extio_ops->end < addr)			\
->> +		write##bw(value, PCI_IOBASE + addr);			\
->> +	else								\
->> +		if (arm64_extio_ops->pfout)				\
->> +			arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
->> +				addr, value, sizeof(type));		\
->> +}									\
->> +									\
->> +void ins##bw(unsigned long addr, void *buffer, unsigned int count)	\
->> +{									\
->> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
->> +			arm64_extio_ops->end < addr)			\
->> +		reads##bw(PCI_IOBASE + addr, buffer, count);		\
->> +	else								\
->> +		if (arm64_extio_ops->pfins)				\
->> +			arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
->> +				addr, buffer, sizeof(type), count);	\
->> +}									\
->> +									\
->> +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)	\
->> +{									\
->> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
->> +			arm64_extio_ops->end < addr)			\
->> +		writes##bw(PCI_IOBASE + addr, buffer, count);		\
->> +	else								\
->> +		if (arm64_extio_ops->pfouts)				\
->> +			arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
->> +				addr, buffer, sizeof(type), count);	\
->> +}
->> +
->> +static inline void arm64_set_extops(struct extio_ops *ops)
->> +{
->> +	if (ops)
->> +		WRITE_ONCE(arm64_extio_ops, ops);
->
-> Why does this need to be WRITE_ONCE? You don't have READ_ONCE on the reader
-> side. Also, what if multiple drivers want to set different ops for distinct
-> address ranges?
+Use the managed gpio CS pin request so that we avoid having trouble
+in the cleanup code.
+In fact, if module was configured with DT, cleanup code released
+invalid pin.  Since resource wasn't freed, module cannot be reinserted.
 
-I think that the idea here is that we only have possibly one master in 
-the system which offers indirectIO backend, so another one could not 
-possibly re-set this value.
+This require to extract the gpio request call from the "setup" function
+and call it in the appropriate probe function.
 
->
->> +}
->> +
->> +#endif /* __LINUX_EXTIO_H*/
->> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
->> index 0bba427..136735d 100644
->> --- a/arch/arm64/include/asm/io.h
->> +++ b/arch/arm64/include/asm/io.h
->> @@ -31,6 +31,7 @@
->>  #include <asm/early_ioremap.h>
->>  #include <asm/alternative.h>
->>  #include <asm/cpufeature.h>
->> +#include <asm/extio.h>
->>
->>  #include <xen/xen.h>
->>
->> @@ -149,6 +150,34 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->>  #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
->>  #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
->>
->> +
->> +/*
->> + * redefine the in(s)b/out(s)b for indirect-IO.
->> + */
->> +#ifdef CONFIG_ARM64_INDIRECT_PIO
->> +#define inb inb
->> +#define outb outb
->> +#define insb insb
->> +#define outsb outsb
->> +/* external declaration */
->> +DECLARE_EXTIO(b, u8)
->> +
->> +#define inw inw
->> +#define outw outw
->> +#define insw insw
->> +#define outsw outsw
->> +
->> +DECLARE_EXTIO(w, u16)
->> +
->> +#define inl inl
->> +#define outl outl
->> +#define insl insl
->> +#define outsl outsl
->> +
->> +DECLARE_EXTIO(l, u32)
->> +#endif
->> +
->> +
->>  /*
->>   * String version of I/O memory access operations.
->>   */
->> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> index 7d66bba..60e0482 100644
->> --- a/arch/arm64/kernel/Makefile
->> +++ b/arch/arm64/kernel/Makefile
->> @@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
->>  					   sys_compat.o entry32.o
->>  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
->>  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
->> +arm64-obj-$(CONFIG_ARM64_INDIRECT_PIO)	+= extio.o
->>  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
->>  arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
->>  arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
->> diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
->> new file mode 100644
->> index 0000000..647b3fa
->> --- /dev/null
->> +++ b/arch/arm64/kernel/extio.c
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/io.h>
->> +
->> +struct extio_ops *arm64_extio_ops;
->> +
->> +
->> +BUILD_EXTIO(b, u8)
->> +
->> +BUILD_EXTIO(w, u16)
->> +
->> +BUILD_EXTIO(l, u32)
->
-> Is there no way to make this slightly more generic, so that it can be
-> re-used elsewhere? For example, if struct extio_ops was common, then
-> you could have the singleton (which maybe should be an interval tree?),
-> type definition, setter function and the BUILD_EXTIO invocations
-> somewhere generic, rather than squirelled away in the arch backend.
->
-> Will
+Reported-by: Alexander Morozov <linux@meltdown.ru>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v2: fix devm_gpio_request location: the setup code for device was not proper
+    location. Move it to the probe function and add needed DT routines to
+    handle all CS gpio specified.
 
-The concern would be that some architecture which uses generic 
-higher-level ISA accessor ops, but have IO space, could be affected.
+ drivers/spi/spi-atmel.c | 50 ++++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 39 insertions(+), 11 deletions(-)
 
-John
-
->
-> .
->
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 32683a13dd60..a60925614480 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -24,6 +24,7 @@
+ 
+ #include <linux/io.h>
+ #include <linux/gpio.h>
++#include <linux/of_gpio.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pm_runtime.h>
+ 
+@@ -1204,7 +1205,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	u32			csr;
+ 	unsigned int		bits = spi->bits_per_word;
+ 	unsigned int		npcs_pin;
+-	int			ret;
+ 
+ 	as = spi_master_get_devdata(spi->master);
+ 
+@@ -1247,16 +1247,9 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		if (!asd)
+ 			return -ENOMEM;
+ 
+-		if (as->use_cs_gpios) {
+-			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+-			if (ret) {
+-				kfree(asd);
+-				return ret;
+-			}
+-
++		if (as->use_cs_gpios)
+ 			gpio_direction_output(npcs_pin,
+ 					      !(spi->mode & SPI_CS_HIGH));
+-		}
+ 
+ 		asd->npcs_pin = npcs_pin;
+ 		spi->controller_state = asd;
+@@ -1471,13 +1464,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
+ static void atmel_spi_cleanup(struct spi_device *spi)
+ {
+ 	struct atmel_spi_device	*asd = spi->controller_state;
+-	unsigned		gpio = (unsigned long) spi->controller_data;
+ 
+ 	if (!asd)
+ 		return;
+ 
+ 	spi->controller_state = NULL;
+-	gpio_free(gpio);
+ 	kfree(asd);
+ }
+ 
+@@ -1499,6 +1490,39 @@ static void atmel_get_caps(struct atmel_spi *as)
+ }
+ 
+ /*-------------------------------------------------------------------------*/
++static int atmel_spi_gpio_cs(struct platform_device *pdev)
++{
++	struct spi_master	*master = platform_get_drvdata(pdev);
++	struct atmel_spi	*as = spi_master_get_devdata(master);
++	struct device_node	*np = master->dev.of_node;
++	int			i;
++	int			ret = 0;
++	int			nb = 0;
++
++	if (!as->use_cs_gpios)
++		return 0;
++
++	if (!np)
++		return 0;
++
++	nb = of_gpio_named_count(np, "cs-gpios");
++	for (i = 0; i < nb; i++) {
++		int cs_gpio = of_get_named_gpio(pdev->dev.of_node,
++						"cs-gpios", i);
++
++			if (cs_gpio == -EPROBE_DEFER)
++				return cs_gpio;
++
++			if (gpio_is_valid(cs_gpio)) {
++				ret = devm_gpio_request(&pdev->dev, cs_gpio,
++							dev_name(&pdev->dev));
++				if (ret)
++					return ret;
++			}
++	}
++
++	return 0;
++}
+ 
+ static int atmel_spi_probe(struct platform_device *pdev)
+ {
+@@ -1577,6 +1601,10 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 		master->num_chipselect = 4;
+ 	}
+ 
++	ret = atmel_spi_gpio_cs(pdev);
++	if (ret)
++		goto out_unmap_regs;
++
+ 	as->use_dma = false;
+ 	as->use_pdc = false;
+ 	if (as->caps.has_dma_support) {
+-- 
+2.9.0
