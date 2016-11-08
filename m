@@ -1,63 +1,80 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 8 Nov 2016 15:57:48 +0800
-Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
-In-Reply-To: <20161108074414.vvnjj7aa26sloi2f@lukather>
-References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
- <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
- <20161108074414.vvnjj7aa26sloi2f@lukather>
-Message-ID: <CAGb2v6557B5dooERbKc709Hbrzb3vP8eoSj3nh6rKek7UwrgEQ@mail.gmail.com>
+From: gabriel.fernandez@st.com (Gabriel Fernandez)
+Date: Tue, 8 Nov 2016 09:35:58 +0100
+Subject: [PATCH 1/6] clk: stm32f4: Add PLL_I2S & PLL_SAI for STM32F429/469
+ boards
+In-Reply-To: <CAFvLkMQxvo=2Ak033n2XkPgdDfU5DLCMF7dj487QFB0e7WceCQ@mail.gmail.com>
+References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+ <1478523943-23142-2-git-send-email-gabriel.fernandez@st.com>
+ <CAFvLkMQxvo=2Ak033n2XkPgdDfU5DLCMF7dj487QFB0e7WceCQ@mail.gmail.com>
+Message-ID: <ebadfacf-73fb-01a6-791a-324daad5e695@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2016 at 3:44 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Mon, Nov 07, 2016 at 10:11:45PM +0800, Chen-Yu Tsai wrote:
->> On Mon, Nov 7, 2016 at 9:08 PM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
->> >
->> > Add a card in order to have it working
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
->> >  1 file changed, 14 insertions(+), 0 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
->> > index 12b4317a4383..5291e425caf9 100644
->> > --- a/arch/arm/boot/dts/ntc-gr8-evb.dts
->> > +++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
->> > @@ -76,6 +76,20 @@
->> >                 default-brightness-level = <8>;
->> >         };
->> >
->> > +       i2s {
->>
->> "sound" might be a better node name? The I2S controllers are also
->> named "i2s".
+Hi Rados?aw
+
+Many thanks for reviewing.
+
+On 11/07/2016 03:57 PM, Rados?aw Pietrzyk wrote:
+>> +static struct clk_hw *clk_register_pll_div(const char *name,
+>> +               const char *parent_name, unsigned long flags,
+>> +               void __iomem *reg, u8 shift, u8 width,
+>> +               u8 clk_divider_flags, const struct clk_div_table *table,
+>> +               struct clk_hw *pll_hw, spinlock_t *lock)
+>> +{
+>> +       struct stm32f4_pll_div *pll_div;
+>> +       struct clk_hw *hw;
+>> +       struct clk_init_data init;
+>> +       int ret;
+>> +
+>> +       /* allocate the divider */
+>> +       pll_div = kzalloc(sizeof(*pll_div), GFP_KERNEL);
+>> +       if (!pll_div)
+>> +               return ERR_PTR(-ENOMEM);
+>> +
+>> +       init.name = name;
+>> +       init.ops = &stm32f4_pll_div_ops;
+>> +       init.flags = flags;
+> Maybe it's worth to have CLK_SET_RATE_PARENT here and the VCO clock
+> should have CLK_SET_RATE_GATE flag and we can get rid of custom
+> divider ops.
+I don't want to offer the possibility to change the vco clock through 
+the divisor of the pll (only by a boot-loader or by DT).
+
+e.g. if i make a set rate on lcd-tft clock, i don't want to change the 
+SAI frequencies.
+
+I used same structure for internal divisors of the pll (p, q, r) and for 
+post divisors (plli2s-q-div, pllsai-q-div & pllsai-r-div).
+That why the CLK_SET_RATE_PARENT flag is transmit by parameter.
+
+These divisors are similar because we have to switch off the pll before 
+changing the rate.
+
 >
-> I know, but we also had the codec and SPDIF on this board, so sound
-> was too generic to be meaningful I guess. I don't really care about
-> the name though, if you have any suggestion...
-
-Well people seem to use "sound" for the sound card nodes...
-
-What about "sound-analog" for this one, and "sound-spdif" for the
-SPDIF simple card? Or "analog-sound" and "spdif-sound" if that looks
-better.
-
-
-ChenYu
-
->> Otherwise,
->>
->> Acked-by: Chen-Yu Tsai <wens@csie.org>
 >
-> Thanks!
-> Maxime
+>> -static void stm32f4_rcc_register_pll(const char *hse_clk, const char *hsi_clk)
+>> +
+>> +static struct clk_hw *stm32f4_rcc_register_pll(const char *pllsrc,
+>> +               const struct stm32f4_pll_data *data,  spinlock_t *lock)
+>>   {
+>> -       unsigned long pllcfgr = readl(base + STM32F4_RCC_PLLCFGR);
+>> +       struct stm32f4_pll *pll;
+>> +       struct clk_init_data init = { NULL };
+>> +       void __iomem *reg;
+>> +       struct clk_hw *pll_hw;
+>> +       int ret;
+>> +
+>> +       pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+>> +       if (!pll)
+>> +               return ERR_PTR(-ENOMEM);
+>> +
+>> +       init.name = data->vco_name;
+>> +       init.ops = &stm32f4_pll_gate_ops;
+>> +       init.flags = CLK_IGNORE_UNUSED;
+> CLK_SET_RATE_GATE here
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Moreover why not having VCO as a composite clock from gate and mult ?
+Yes, that sounds a good idea.
+
+> According to docs SAI VCO (don't know about I2S ) must be within
+> certain range so clk_set_rate_range should be somewhere.
