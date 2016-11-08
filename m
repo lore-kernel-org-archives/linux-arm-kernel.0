@@ -1,72 +1,184 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 08 Nov 2016 08:44:22 +0530
-Subject: [PATCH v2 0/2] Remove static mapping of SCU from mach-exynos
-Message-ID: <1478574864-24683-1-git-send-email-pankaj.dubey@samsung.com>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Tue, 8 Nov 2016 10:57:13 +0800
+Subject: [PATCH v2 2/3] irqchip: mtk-cirq: Add mediatek mtk-cirq implement
+In-Reply-To: <867f8ilwcl.fsf@arm.com>
+References: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+ <1478001122-8664-3-git-send-email-youlin.pei@mediatek.com>
+ <86twbrj586.fsf@arm.com> <1478234577.7975.29.camel@mtksdaap41>
+ <867f8ilwcl.fsf@arm.com>
+Message-ID: <1478573833.32099.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is part of patch series [1], which adds support of SCU
-device node for Cortex-A9 based Exynos4 SoC. First two patches of the same
-has been accepted and hence not included them in v2.
+On Fri, 2016-11-04 at 22:21 +0000, Marc Zyngier wrote:
+> On Fri, Nov 04 2016 at 04:42:57 AM, Youlin Pei <youlin.pei@mediatek.com> wrote:
+> > On Tue, 2016-11-01 at 20:49 +0000, Marc Zyngier wrote:
+> >> On Tue, Nov 01 2016 at 11:52:01 AM, Youlin Pei <youlin.pei@mediatek.com> wrote:
+> >> > In Mediatek SOCs, the CIRQ is a low power interrupt controller
+> >> > designed to works outside MCUSYS which comprises with Cortex-Ax
+> >> > cores,CCI and GIC.
+> >> >
+> >> > The CIRQ controller is integrated in between MCUSYS( include
+> >> > Cortex-Ax, CCI and GIC ) and interrupt sources as the second
+> >> > level interrupt controller. The external interrupts which outside
+> >> > MCUSYS will feed through CIRQ then bypass to GIC. CIRQ can monitors
+> >> > all edge trigger interupts. When an edge interrupt is triggered,
+> >> > CIRQ can record the status and generate a pulse signal to GIC when
+> >> > flush command executed.
+> >> >
+> >> > When system enters sleep mode, MCUSYS will be turned off to improve
+> >> > power consumption, also GIC is power down. The edge trigger interrupts
+> >> > will be lost in this scenario without CIRQ.
+> >> >
+> >> > This commit provides the CIRQ irqchip implement.
+> >> >
+> >> > Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+> >> > ---
+> >> >  drivers/irqchip/Makefile       |    2 +-
+> >> >  drivers/irqchip/irq-mtk-cirq.c |  262 ++++++++++++++++++++++++++++++++++++++++
+> >> >  2 files changed, 263 insertions(+), 1 deletion(-)
+> >> >  create mode 100644 drivers/irqchip/irq-mtk-cirq.c
+> >> >
+> >> > diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> >> > index e4dbfc8..8f33580 100644
+> >> > --- a/drivers/irqchip/Makefile
+> >> > +++ b/drivers/irqchip/Makefile
+> >> > @@ -60,7 +60,7 @@ obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
+> >> >  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
+> >> >  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
+> >> >  obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
+> >> > -obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
+> >> > +obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o irq-mtk-cirq.o
+> >> >  obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
+> >> >  obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
+> >> >  obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
+> >> > diff --git a/drivers/irqchip/irq-mtk-cirq.c b/drivers/irqchip/irq-mtk-cirq.c
+> >> > new file mode 100644
+> >> > index 0000000..fc43ef3
+> >> > --- /dev/null
+> >> > +++ b/drivers/irqchip/irq-mtk-cirq.c
+> >> > @@ -0,0 +1,262 @@
+> >> > +/*
+> >> > + * Copyright (c) 2016 MediaTek Inc.
+> >> > + * Author: Youlin.Pei <youlin.pei@mediatek.com>
+> >> > + *
+> >> > + * This program is free software; you can redistribute it and/or modify
+> >> > + * it under the terms of the GNU General Public License version 2 as
+> >> > + * published by the Free Software Foundation.
+> >> > + *
+> >> > + * This program is distributed in the hope that it will be useful,
+> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >> > + * GNU General Public License for more details.
+> >> > + */
+> >> > +
+> >> > +#include <linux/irq.h>
+> >> > +#include <linux/irqchip.h>
+> >> > +#include <linux/irqdomain.h>
+> >> > +#include <linux/of.h>
+> >> > +#include <linux/of_irq.h>
+> >> > +#include <linux/of_address.h>
+> >> > +#include <linux/io.h>
+> >> > +#include <linux/slab.h>
+> >> > +#include <linux/syscore_ops.h>
+> >> > +
+> >> > +#define CIRQ_ACK	0x40
+> >> > +#define CIRQ_MASK_SET	0xc0
+> >> > +#define CIRQ_MASK_CLR	0x100
+> >> > +#define CIRQ_SENS_SET	0x180
+> >> > +#define CIRQ_SENS_CLR	0x1c0
+> >> > +#define CIRQ_POL_SET	0x240
+> >> > +#define CIRQ_POL_CLR	0x280
+> >> > +#define CIRQ_CONTROL	0x300
+> >> > +
+> >> > +#define CIRQ_EN	0x1
+> >> > +#define CIRQ_EDGE	0x2
+> >> > +#define CIRQ_FLUSH	0x4
+> >> > +
+> >> > +#define CIRQ_IRQ_NUM    0x200
+> >> > +
+> >> > +struct mtk_cirq_chip_data {
+> >> > +	void __iomem *base;
+> >> > +	unsigned int ext_irq_start;
+> >> > +};
+> >> > +
+> >> > +static struct mtk_cirq_chip_data *cirq_data;
+> >> 
+> >> Are you guaranteed that you'll only ever have a single CIRQ in any
+> >> system?
+> >
+> > In Mediatek's SOC, only hace a single CIRQ.
+> >
+> >> 
+> >> > +
+> >> > +static void mtk_cirq_write_mask(struct irq_data *data, unsigned int offset)
+> >> > +{
+> >> > +	struct mtk_cirq_chip_data *chip_data = data->chip_data;
+> >> > +	unsigned int cirq_num = data->hwirq;
+> >> > +	u32 mask = 1 << (cirq_num % 32);
+> >> > +
+> >> > +	writel(mask, chip_data->base + offset + (cirq_num / 32) * 4);
+> >> 
+> >> Why can't you use the relaxed accessors?
+> >
+> > It seems that i use wrong function, i will change the writel to
+> > writel_relaxed in next ve
+> >
+> >> 
+> >> > +}
+> >> > +
+> >> > +static void mtk_cirq_mask(struct irq_data *data)
+> >> > +{
+> >> > +	mtk_cirq_write_mask(data, CIRQ_MASK_SET);
+> >> > +	irq_chip_mask_parent(data);
+> >> > +}
+> >> > +
+> >> > +static void mtk_cirq_unmask(struct irq_data *data)
+> >> > +{
+> >> > +	mtk_cirq_write_mask(data, CIRQ_MASK_CLR);
+> >> > +	irq_chip_unmask_parent(data);
+> >> > +}
+> >> > +
+> >> > +static void mtk_cirq_eoi(struct irq_data *data)
+> >> > +{
+> >> > +	mtk_cirq_write_mask(data, CIRQ_ACK);
+> >> 
+> >> EOI and ACK have very different semantics. What is this write actually
+> >> doing? Also, you're now doing an additional MMIO write on each interrupt
+> >> EOI, doubling its cost. Do you really need to do actually signal the HW
+> >> that we've EOIed an interrupt? I would have hoped that you'd be able to
+> >> put it in "bypass" mode as long as you're not suspending...
+> >> 
+> >
+> > When external interrupt happened, CIRQ status register record the status
+> > even CIRQ is not enabled. when execute the flush command, CIRQ will
+> > resend the signals according to the status. So if don't clear the
+> > status, CIRQ will resend the wrong signals. the ACK write operation will
+> > clear the status.
+> 
+> But at this time, we haven't suspended yet, and there is nothing to
+> replay. Also, you only enable the edge capture when suspending. So what
+> are you ACKing here? Can't you simply clear everything right when
+> suspending and not do it at all on the fast path?
 
-This patch series does some cleanup for Exynos4 SoC based boards.
-We are currently statically mapping SCU SFRs in mach-exynos/exynos.c
-which can be avoided if map this from device node of SCU. 
+I had planned to ACK the status in cirq suspend callback, but
+encountered a problem.
+following is a piece of code from
+http://lxr.free-electrons.com/source/kernel/power/suspend.c#L361
 
-This patch introduces exynos_scu_enable in firmware.c file,
-which will be called from exynos_resume, which in turn called by pm.c and
-suspend.c as firmware_ops.
+arch_suspend_disable_irqs(); ---step1
+BUG_ON(!irqs_disabled());
 
-[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
+error = syscore_suspend();
+           |
+           ---cirq suspend(); ---step2
 
+if ack the status in cirq suspend, the interrupts will be lost which
+happened during step1 to step2.
 
-This patch series is prepared on Krzysztof's for-next
-(SHA_ID: b33c7bb9d59c3f4100d4)
-
-I have tested these patches on Exynos4210 based on Origen board for SMP boot.
-Patchset v1 was tested by Marek Szyprowski on Exynos4412-based Odroid U3
-for SMP boot and S2R.
-
-To confirm concern raised by Alim, I intentionally removed SCU device node
-from exynos4.dtsi and tested on Origen board, I can see code handles this
-case gracefully without any crash and system boot was fine. Of-course in such
-case only single core will be able to boot.
-
-Following boot message observed on Origen in case of missing SCU node
--------------
-[    0.000864] CPU: Testing write buffer coherency: ok
-[    0.001068] CPU0: thread -1, cpu 0, socket 9, mpidr 80000900
-[    0.001456] exynos_smp_prepare_cpus failed to map scu_base
-[    0.001477] Setting up static identity map for 0x40100000 - 0x40100058
-[    1.120003] CPU1: failed to come online
-[    1.120059] Brought up 1 CPUs
-[    1.120068] SMP: Total of 1 processors activated (48.00 BogoMIPS).
-[    1.120076] CPU: All CPU(s) started in SVC mode.
--------------
-
-Changes since v1:
- - Address review comments from Krzysztof
- - Moved scu_enable from pm.c and suspend.c to single place in firmware.c,
-   as both pm.c and suspend.c needs scu_enable during exynos_resume call. 
- - Added error handling during scu_enable in platsmp.c.
- - Added Reviewed-by tag from Alim.
-
-
-This patch series is tested on Exynos4210 based Origen board for SMP boot.
-
-Pankaj Dubey (2):
-  ARM: EXYNOS: Remove static mapping of SCU SFR
-  ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
-
- arch/arm/mach-exynos/common.h                |  5 -----
- arch/arm/mach-exynos/exynos.c                | 22 ----------------------
- arch/arm/mach-exynos/firmware.c              | 17 +++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h      |  2 --
- arch/arm/mach-exynos/platsmp.c               | 20 +++++++++++++-------
- arch/arm/mach-exynos/pm.c                    |  4 +---
- arch/arm/mach-exynos/suspend.c               |  5 -----
- arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
- 8 files changed, 31 insertions(+), 48 deletions(-)
-
--- 
-2.7.4
+So would you mind give me some suggestions about this?
+Thanks a lot!
+> 
+> Thanks,
+> 
+> 	M.
