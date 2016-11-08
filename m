@@ -1,152 +1,113 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 8 Nov 2016 18:49:09 +0100
-Subject: [PATCH v2] spi: atmel: use managed resource for gpio chip select
-In-Reply-To: <20161108174852.14311-1-nicolas.ferre@atmel.com>
-References: <20161108174852.14311-1-nicolas.ferre@atmel.com>
-Message-ID: <20161108174909.vnsw3zppiwpv2npo@piout.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2016 17:54:57 +0000
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home>
+ <20161108024559.GA20591@arm.com>
+ <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
+Message-ID: <20161108175457.GK20591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 at 18:48:52 +0100, Nicolas Ferre wrote :
-> Use the managed gpio CS pin request so that we avoid having trouble
-> in the cleanup code.
-> In fact, if module was configured with DT, cleanup code released
-> invalid pin.  Since resource wasn't freed, module cannot be reinserted.
+On Tue, Nov 08, 2016 at 03:27:23PM +0100, Auger Eric wrote:
+> On 08/11/2016 03:45, Will Deacon wrote:
+> > Rather than treat these as separate problems, a better interface is to
+> > tell userspace about a set of reserved regions, and have this include
+> > the MSI doorbell, irrespective of whether or not it can be remapped.
+> > Don suggested that we statically pick an address for the doorbell in a
+> > similar way to x86, and have the kernel map it there. We could even pick
+> > 0xfee00000. If it conflicts with a reserved region on the platform (due
+> > to (4)), then we'd obviously have to (deterministically?) allocate it
+> > somewhere else, but probably within the bottom 4G.
 > 
-> This require to extract the gpio request call from the "setup" function
-> and call it in the appropriate probe function.
+> This is tentatively achieved now with
+> [1] [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
+> (http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1264506.html)
+
+Yup, I saw that fly by. Hopefully some of the internals can be reused
+with the current thinking on user ABI.
+
+> > The next question is how to tell userspace about all of the reserved
+> > regions. Initially, the idea was to extend VFIO, however Alex pointed
+> > out a horrible scenario:
+> > 
+> >   1. QEMU spawns a VM on system 0
+> >   2. VM is migrated to system 1
+> >   3. QEMU attempts to passthrough a device using PCI hotplug
+> > 
+> > In this scenario, the guest memory map is chosen at step (1), yet there
+> > is no VFIO fd available to determine the reserved regions. Furthermore,
+> > the reserved regions may vary between system 0 and system 1. This pretty
+> > much rules out using VFIO to determine the reserved regions.Alex suggested
+> > that the SMMU driver can advertise the regions via /sys/class/iommu/. This
+> > would solve part of the problem, but migration between systems with
+> > different memory maps can still cause problems if the reserved regions
+> > of the new system conflict with the guest memory map chosen by QEMU.
 > 
-> Reported-by: Alexander Morozov <linux@meltdown.ru>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-I think that's fine but I still have that item on my todo list
-(discussion in july 2014 with Mark):
-
----
->> Mark: maybe it would make sense to do devm_gpio_request_one() in
->> of_spi_register_master(), after of_get_named_gpio.
-
-> You need to transition all the drivers doing things manually but yes.
-> As I keep saying all the GPIO handling needs to be completely
-> refactored.
----
-
-> ---
-> v2: fix devm_gpio_request location: the setup code for device was not proper
->     location. Move it to the probe function and add needed DT routines to
->     handle all CS gpio specified.
 > 
->  drivers/spi/spi-atmel.c | 50 ++++++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 39 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 32683a13dd60..a60925614480 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -24,6 +24,7 @@
->  
->  #include <linux/io.h>
->  #include <linux/gpio.h>
-> +#include <linux/of_gpio.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/pm_runtime.h>
->  
-> @@ -1204,7 +1205,6 @@ static int atmel_spi_setup(struct spi_device *spi)
->  	u32			csr;
->  	unsigned int		bits = spi->bits_per_word;
->  	unsigned int		npcs_pin;
-> -	int			ret;
->  
->  	as = spi_master_get_devdata(spi->master);
->  
-> @@ -1247,16 +1247,9 @@ static int atmel_spi_setup(struct spi_device *spi)
->  		if (!asd)
->  			return -ENOMEM;
->  
-> -		if (as->use_cs_gpios) {
-> -			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
-> -			if (ret) {
-> -				kfree(asd);
-> -				return ret;
-> -			}
-> -
-> +		if (as->use_cs_gpios)
->  			gpio_direction_output(npcs_pin,
->  					      !(spi->mode & SPI_CS_HIGH));
-> -		}
->  
->  		asd->npcs_pin = npcs_pin;
->  		spi->controller_state = asd;
-> @@ -1471,13 +1464,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
->  static void atmel_spi_cleanup(struct spi_device *spi)
->  {
->  	struct atmel_spi_device	*asd = spi->controller_state;
-> -	unsigned		gpio = (unsigned long) spi->controller_data;
->  
->  	if (!asd)
->  		return;
->  
->  	spi->controller_state = NULL;
-> -	gpio_free(gpio);
->  	kfree(asd);
->  }
->  
-> @@ -1499,6 +1490,39 @@ static void atmel_get_caps(struct atmel_spi *as)
->  }
->  
->  /*-------------------------------------------------------------------------*/
-> +static int atmel_spi_gpio_cs(struct platform_device *pdev)
-> +{
-> +	struct spi_master	*master = platform_get_drvdata(pdev);
-> +	struct atmel_spi	*as = spi_master_get_devdata(master);
-> +	struct device_node	*np = master->dev.of_node;
-> +	int			i;
-> +	int			ret = 0;
-> +	int			nb = 0;
-> +
-> +	if (!as->use_cs_gpios)
-> +		return 0;
-> +
-> +	if (!np)
-> +		return 0;
-> +
-> +	nb = of_gpio_named_count(np, "cs-gpios");
-> +	for (i = 0; i < nb; i++) {
-> +		int cs_gpio = of_get_named_gpio(pdev->dev.of_node,
-> +						"cs-gpios", i);
-> +
-> +			if (cs_gpio == -EPROBE_DEFER)
-> +				return cs_gpio;
-> +
-> +			if (gpio_is_valid(cs_gpio)) {
-> +				ret = devm_gpio_request(&pdev->dev, cs_gpio,
-> +							dev_name(&pdev->dev));
-> +				if (ret)
-> +					return ret;
-> +			}
-> +	}
-> +
-> +	return 0;
-> +}
->  
->  static int atmel_spi_probe(struct platform_device *pdev)
->  {
-> @@ -1577,6 +1601,10 @@ static int atmel_spi_probe(struct platform_device *pdev)
->  		master->num_chipselect = 4;
->  	}
->  
-> +	ret = atmel_spi_gpio_cs(pdev);
-> +	if (ret)
-> +		goto out_unmap_regs;
-> +
->  	as->use_dma = false;
->  	as->use_pdc = false;
->  	if (as->caps.has_dma_support) {
-> -- 
-> 2.9.0
-> 
+> OK so I understand we do not want anymore the VFIO chain capability API
+> (patch 5 of above series) but we prefer a sysfs approach instead.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Right.
+
+> I understand the sysfs approach which allows the userspace to get the
+> info earlier and independently on VFIO. Keeping in mind current QEMU
+> virt - which is not the only userspace - will not do much from this info
+> until we bring upheavals in virt address space management. So if I am
+> not wrong, at the moment the main action to be undertaken is the
+> rejection of the PCI hotplug in case we detect a collision.
+
+I don't think so; it should be up to userspace to reject the hotplug.
+If userspace doesn't have support for the regions, then that's fine --
+you just end up in a situation where the CPU page table maps memory
+somewhere that the device can't see. In other words, you'll end up with
+spurious DMA failures, but that's exactly what happens with current systems
+if you passthrough an overlapping region (Robin demonstrated this on Juno).
+
+Additionally, you can imagine some future support where you can tell the
+guest not to use certain regions of its memory for DMA. In this case, you
+wouldn't want to refuse the hotplug in the case of overlapping regions.
+
+Really, I think the kernel side just needs to enumerate the fixed reserved
+regions, place the doorbell at a fixed address and then advertise these
+via sysfs.
+
+> I can respin [1]
+> - studying and taking into account Robin's comments about dm_regions
+> similarities
+> - removing the VFIO capability chain and replacing this by a sysfs API
+
+Ideally, this would be reusable between different SMMU drivers so the sysfs
+entries have the same format etc.
+
+> Would that be OK?
+
+Sounds good to me. Are you in a position to prototype something on the qemu
+side once we've got kernel-side agreement?
+
+> What about Alex comments who wanted to report the usable memory ranges
+> instead of unusable memory ranges?
+> 
+> Also did you have a chance to discuss the following items:
+> 1) the VFIO irq safety assessment
+
+The discussion really focussed on system topology, as opposed to properties
+of the doorbell. Regardless of how the device talks to the doorbell, if
+the doorbell can't protect against things like MSI spoofing, then it's
+unsafe. My opinion is that we shouldn't allow passthrough by default on
+systems with unsafe doorbells (we could piggyback on allow_unsafe_interrupts
+cmdline option to VFIO).
+
+A first step would be making all this opt-in, and only supporting GICv3
+ITS for now.
+
+> 2) the MSI reserved size computation (is an arbitrary size OK?)
+
+If we fix the base address, we could fix a size too. However, we'd still
+need to enumerate the doorbells to check that they fit in the region we
+have. If not, then we can warn during boot and treat it the same way as
+a resource conflict (that is, reallocate the region in some deterministic
+way).
+
+Will
