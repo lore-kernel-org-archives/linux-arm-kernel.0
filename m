@@ -1,783 +1,95 @@
-From: aford173@gmail.com (aford173 at gmail.com)
-Date: Tue,  8 Nov 2016 06:43:37 -0600
-Subject: [PATCH V4] ARM: dts: imx6: Add support for Logic PD SOM and Baseboard
-Message-ID: <1478609017-2415-1-git-send-email-aford173@gmail.com>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 08 Nov 2016 14:02:38 +0100
+Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
+In-Reply-To: <3fbd3fb9-1dc5-a46d-355b-f7c94b3c43ef@nvidia.com>
+References: <20160918102852.6593-1-contact@paulk.fr>
+ <20161107132854.GF12559@ulmo.ba.sec>
+ <13e7ff98-8bc2-ccf7-94bb-4e1d3c61b20d@nvidia.com>
+ <20161108085420.GG2478@tbergstrom-lnx.Nvidia.com>
+ <58046fbb-8e19-e629-770a-940a40ca6ef9@nvidia.com>
+ <20161108110735.GA13098@ulmo.ba.sec>
+ <3fbd3fb9-1dc5-a46d-355b-f7c94b3c43ef@nvidia.com>
+Message-ID: <1478610158.853.1.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Adam Ford <aford173@gmail.com>
+Le mardi 08 novembre 2016 ? 11:09 +0000, Jon Hunter a ?crit?:
+> On 08/11/16 11:07, Thierry Reding wrote:
+> > 
+> > * PGP Signed by an unknown key
+> > 
+> > On Tue, Nov 08, 2016 at 09:47:42AM +0000, Jon Hunter wrote:
+> > > 
+> > > 
+> > > On 08/11/16 08:54, Peter De Schrijver wrote:
+> > > > 
+> > > > On Mon, Nov 07, 2016 at 02:09:31PM +0000, Jon Hunter wrote:
+> > > > > 
+> > > > > 
+> > > > > On 07/11/16 13:28, Thierry Reding wrote:
+> > > > > > 
+> > > > > > > 
+> > > > > > > Old Signed by an unknown key
+> > > > > > 
+> > > > > > On Sun, Sep 18, 2016 at 12:28:52PM +0200, Paul Kocialkowski wrote:
+> > > > > > > 
+> > > > > > > Nyan boards only have host USB ports (2 external, 1 internal),
+> > > > > > > there is
+> > > > > > > no OTG-enabled connector.
+> > > > > > > 
+> > > > > > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > > > > > > ---
+> > > > > > > ?arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
+> > > > > > > ?1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > > 
+> > > > > > Where is this information coming from? I don't have one of the Nyans
+> > > > > > myself, but one of the Tegra132 devices I have, which I think was
+> > > > > > derived from one of the Nyans uses one of the external host ports as
+> > > > > > forced recovery port, for which it would need OTG.
+> > > > > > 
+> > > > > > I suspect that the way to get U-Boot onto the Nyans is via tegrarcm?
+> > > > > > In that case I think one of the ports must be OTG.
+> > > > > 
+> > > > > It is true that the port on the back on the nyan-big can be used with
+> > > > > recovery mode. I was thinking that this is not a true OTG port as it
+> > > > > is
+> > > > > just a 4-pin type A socket and does not have an ID pin. Thinking some
+> > > > > more about this the USB spec does include a "Host Negotiation Protocol
+> > > > > (HNP)" that allows a host and device to swap roles and so keeping it
+> > > > > as
+> > > > > OTG seems valid afterall.
+> > > > 
+> > > > I don't think the bootrom implements that though. I expect recovery mode
+> > > > to just program the controller in device mode, without performing any
+> > > > negotiation.
+> > > 
+> > > I am not talking about the bootrom and I would not expect the bootrom to
+> > > do that. However, the kernel could.
+> > 
+> > Either way, configuring the controller in device mode is enough to make
+> > the host detect it, otherwise tegrarcm wouldn't work.
+> > 
+> > From the point of view of the binding I think "otg" is the most accurate
+> > option because we know that the controller can operate in both modes. If
+> > it currently doesn't or how exactly switching modes is done is outside
+> > the scope of this property.
+> > 
+> > Is everyone okay with just dropping this patch?
+> 
+> Fine with me.
 
-The system on module (SOM) specific portions are in the .dtsi
-while the baseboard specific portions are in the .dts file.
+Same here.
 
-V4: Forgot to fix the Wlcore property list and child node
-V3: Forgot to remove push buttons in V2, and change the
-    enable-sdio-wakup to wakeup-source
-V2: Fix small bug and update style for 4.9 Kernel
-
-Signed-off-by: Adam Ford <aford173@gmail.com>
-
-diff --git a/arch/arm/boot/dts/imx6q-logicpd.dts b/arch/arm/boot/dts/imx6q-logicpd.dts
-new file mode 100644
-index 0000000..c44aef4
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-logicpd.dts
-@@ -0,0 +1,419 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ * Copyright 2016 Logic PD
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6qdl-logicpd.dtsi"
-+
-+/ {
-+	model = "Logic PD Acuity SOM";
-+	compatible = "fsl,imx6q";
-+
-+	aliases {
-+		display = &lcd_display;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		gen_led0 {
-+			label = "cpu0";
-+			gpios = <&gpio3 19 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu0";
-+		};
-+
-+		gen_led1 {
-+			label = "cpu1";
-+			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "cpu1";
-+		};
-+
-+		gen_led2 {
-+			label = "heartbeat";
-+			gpios = <&gpio3 21 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		gen_led3 {
-+			label = "Always On";
-+			gpios = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	reg_usb_otg_vbus: regulator-otg-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_h1_vbus: regulator-h1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	reg_3v3: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "reg_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_pcie: regulator-pcie {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pcie_reg>;
-+		regulator-name = "MPCIE_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+
-+		power {
-+			label = "Power Button";
-+			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
-+			wakeup-source;
-+			linux,code = <KEY_POWER>;
-+		};
-+	};
-+
-+	backlight_lcd: backlight-lcd {
-+		compatible = "pwm-backlight";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_backlight>;
-+		enable-gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
-+		pwms = <&pwm3 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+
-+
-+	lcd_display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interface-pix-fmt = "rgb565";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_lcd>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&type15_timing>;
-+			type15_timing: type_15 {
-+				clock-frequency = <9000000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hfront-porch = <3>;
-+				hback-porch = <2>;
-+				hsync-len = <42>;
-+				vback-porch = <3>;
-+				vfront-porch = <2>;
-+				vsync-len = <11>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+
-+		port at 0 {
-+			reg = <0>;
-+			display_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp0>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+			display_out: endpoint {
-+				remote-endpoint = <&panel_in>;
-+			};
-+		};
-+	};
-+
-+	panel: panel {
-+		compatible = "innolux,at043tn24", "simple-panel";
-+		enable-gpios = <&gpio4 17 GPIO_ACTIVE_HIGH>;
-+		backlight = <&backlight_lcd>;
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&display_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&ipu1_di0_disp0 {
-+	remote-endpoint = <&display_in>;
-+};
-+
-+&pwm3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm3>;
-+	status = "okay";
-+};
-+
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbh2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh2>;
-+	phy_type = "hsic";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "okay";
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rmii";
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	touchscreen: tsc2004 at 48 {
-+		compatible = "ti,tsc2004";
-+		vio-supply = <&reg_3v3>;
-+		reg = <0x48>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_touchscreen>;
-+		reset-gpios = <&gpio4 10 GPIO_ACTIVE_HIGH>;
-+		interrupts-extended = <&gpio1 6 IRQ_TYPE_EDGE_RISING>;
-+		touchscreen-fuzz-x = <4>;
-+		touchscreen-fuzz-y = <7>;
-+		touchscreen-fuzz-pressure = <2>;
-+		touchscreen-size-x = <4096>;
-+		touchscreen-size-y = <4096>;
-+		touchscreen-max-pressure = <2048>;
-+		ti,x-plate-ohms = <280>;
-+		ti,esd-recovery-timeout-ms = <8000>;
-+	};
-+};
-+
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	reset-gpio = <&gpio1 9 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D23__UART3_CTS_B	0x1b0b1
-+			MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_EIM_EB3__UART3_RTS_B	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_1__USB_OTG_ID	0x17059
-+			MX6QDL_PAD_KEY_ROW4__GPIO4_IO15 0x130b0
-+			>;
-+	};
-+
-+	pinctrl_usbh1: usbh1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_0__GPIO1_IO00 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_usbh2: usbh2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_RGMII_TXC__USB_H2_DATA      0x13030
-+			MX6QDL_PAD_RGMII_TX_CTL__USB_H2_STROBE 0x17030
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__SD2_CMD	0x17059
-+			MX6QDL_PAD_SD2_CLK__SD2_CLK	0x10059
-+			MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
-+			MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
-+			MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
-+			MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
-+		>;
-+	};
-+
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO	0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC	0x1b0b0
-+			MX6QDL_PAD_ENET_CRS_DV__ENET_RX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD0__ENET_TX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_TXD1__ENET_TX_DATA1	0x1b0b0
-+			MX6QDL_PAD_ENET_RX_ER__ENET_RX_ER	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0	0x1b0b0
-+			MX6QDL_PAD_ENET_RXD1__ENET_RX_DATA1	0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_gpio_leds: gpioledsgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x130b0
-+			MX6QDL_PAD_EIM_D20__GPIO3_IO20	0x130b0
-+			MX6QDL_PAD_EIM_D21__GPIO3_IO21	0x130b0
-+			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x130b0
-+		>;
-+	};
-+
-+	pinctrl_gpio_keys: gpio_keysgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D28__GPIO3_IO28 0x1b0b0
-+			MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x1b0b0
-+			MX6QDL_PAD_EIM_D30__GPIO3_IO30 0x1b0b0
-+			MX6QDL_PAD_EIM_D31__GPIO3_IO31 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_touchscreen: touchscreengrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL2__GPIO4_IO10 0x1b0b0
-+			MX6QDL_PAD_GPIO_6__GPIO1_IO06 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_pcie_reg: pciereggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_pcie: pciegrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__GPIO1_IO07	0x1b0b0
-+			MX6QDL_PAD_GPIO_8__GPIO1_IO08	0x1b0b0
-+			MX6QDL_PAD_GPIO_9__GPIO1_IO09	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_lcd: lcdgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK	0x10
-+			MX6QDL_PAD_DI0_PIN15__GPIO4_IO17	0x100b0
-+			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02	0x10
-+			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03	0x10
-+			MX6QDL_PAD_DI0_PIN4__IPU1_DI0_PIN04	0x10
-+			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
-+			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
-+			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
-+			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
-+			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
-+			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
-+			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
-+			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
-+			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
-+			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
-+			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
-+			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
-+			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
-+			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
-+			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
-+			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
-+		>;
-+	};
-+
-+	pinctrl_backlight: backlightgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD4_DAT2__GPIO2_IO10		0x100b0
-+	    >;
-+	};
-+
-+	pinctrl_pwm3: pwm3grp {
-+	    fsl,pins = <
-+		MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
-+	    >;
-+	};
-+};
-+
-+
-diff --git a/arch/arm/boot/dts/imx6qdl-logicpd.dtsi b/arch/arm/boot/dts/imx6qdl-logicpd.dtsi
-new file mode 100644
-index 0000000..ca266a3
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-logicpd.dtsi
-@@ -0,0 +1,331 @@
-+/*
-+ * Copyright 2016 Logic PD
-+ * This file is adapted from imx6qdl-sabresd.dtsi.
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "imx6q.dtsi"
-+
-+/ {
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
-+
-+
-+};
-+
-+/* Reroute power feeding the CPU to come from the external PMIC */
-+&cpu0 {
-+	arm-supply = <&sw1a_reg>;
-+	soc-supply = <&sw1c_reg>;
-+};
-+
-+&reg_arm
-+{
-+	vin-supply = <&sw1a_reg>;
-+};
-+
-+&reg_soc
-+{
-+	vin-supply = <&sw1c_reg>;
-+};
-+
-+&clks {
-+	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-+			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-+				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+};
-+
-+&gpmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_gpmi_nand>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "okay";
-+
-+	pmic: pfuze100 at 08 {
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <725000>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-name = "vddcore";
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <725000>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-name = "vddsoc";
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "gen_3v3";
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-name = "sw3a_vddr";
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <400000>;
-+				regulator-max-microvolt = <1975000>;
-+				regulator-name = "sw3b_vddr";
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "gen_rgmii";
-+			};
-+
-+			swbst_reg: swbst {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5150000>;
-+				regulator-name = "gen_5v0";
-+			};
-+
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-name = "gen_vsns";
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen1_reg: vgen1 {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-name = "gen_1v5";
-+			};
-+
-+			vgen2_reg: vgen2 {
-+				regulator-name = "vgen2";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1550000>;
-+			};
-+
-+			vgen3_reg: vgen3 {
-+				regulator-name = "gen_vadj_0";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			vgen4_reg: vgen4 {
-+				regulator-name = "gen_1v8";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen5_reg: vgen5 {
-+				regulator-name = "gen_adj_1";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-name = "gen_2v5";
-+				regulator-min-microvolt = <2500000>;
-+				regulator-max-microvolt = <2500000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+
-+	temp_sense1: tmp102 at 49 {
-+		compatible = "ti,tmp102";
-+		reg = <0x49>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_tempsense>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-+		#thermal-sensor-cells = <1>;
-+	};
-+
-+	temp_sense0: tmp102 at 4a {
-+		compatible = "ti,tmp102";
-+		reg = <0x4a>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
-+		#thermal-sensor-cells = <1>;
-+	};
-+
-+	user_eeprom: at24 at 52 {
-+		compatible = "atmel,24c64";
-+		pagesize = <32>;
-+		reg = <0x52>;
-+	};
-+
-+	mfg_eeprom: at24 at 51 {
-+		compatible = "atmel,24c64";
-+		pagesize = <32>;
-+		read-only;
-+		reg = <0x51>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl_gpmi_nand: gpminandgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0x0b0b1
-+			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0x0b0b1
-+			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0x0b0b1
-+			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0x0b000
-+			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0x0b0b1
-+			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0x0b0b1
-+			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0x0b0b1
-+			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0x0b0b1
-+			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0x0b0b1
-+			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0x0b0b1
-+			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0x0b0b1
-+			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0x0b0b1
-+			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0x0b0b1
-+			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0x0b0b1
-+			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0x0b0b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
-+			MX6QDL_PAD_EIM_D18__I2C3_SDA		0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17071
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10071
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17071
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17071
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17071
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17071
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10059
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08	0x1f0b0
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
-+			MX6QDL_PAD_SD3_DAT4__GPIO7_IO01	0x1f0b0
-+			MX6QDL_PAD_SD3_DAT5__GPIO7_IO00	0x1f0b0
-+		>;
-+	};
-+
-+	pinctrl_tempsense: tempsensegrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x1b0b0
-+		>;
-+	};
-+};
-+
-+&snvs_poweroff {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	status = "okay";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	cd-gpios = <&gpio6 16 GPIO_ACTIVE_HIGH>;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	non-removable;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	vmmc-supply = <&sw2_reg>;
-+	status = "okay";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	wlcore: wlcore at 0 {
-+		  compatible = "ti,wl1837";
-+		  reg = <0>;
-+		  interrupt-parent = <&gpio7>;
-+		  interrupts = <1 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+
 -- 
-2.7.4
+Paul Kocialkowski, developer of low-level free software for embedded devices
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/bfba18c1/attachment.sig>
