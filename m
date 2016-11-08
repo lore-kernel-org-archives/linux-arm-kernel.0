@@ -1,75 +1,73 @@
-From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
-Date: Tue, 08 Nov 2016 02:06:58 +0000
-Subject: =?UTF-8?B?UkU6IFtSRVNFTkQgUEFUQ0ggdjMgMS8yXSBQTS9kZXZmcmVx?=
- =?UTF-8?B?OiBhZGQgc3VzcGVuZCBmcmVxdWVuY3kgc3VwcG9ydA==?=
-References: <1478500420-22045-1-git-send-email-hl@rock-chips.com>
- <CGME20161107063403epcas5p4f8d0d95b9a997ca7bf2b2702c3e5d337@epcas5p4.samsung.com>
-Message-ID: <960394560.458817.1478570818491.JavaMail.weblogic@ep2ml102b>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 8 Nov 2016 10:19:31 +0800
+Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
+In-Reply-To: <20161107162504.17591806@thinkpad>
+References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
+ <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+ <20161107162504.17591806@thinkpad>
+Message-ID: <20161108021929.GA982@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add suspend frequency support and if needed set it to
-> the frequency obtained from the suspend opp (can be defined
-> using opp-v2 bindings and is optional).
+On Mon, Nov 07, 2016 at 04:25:04PM +0100, Gerald Schaefer wrote:
+> On Thu, 3 Nov 2016 10:51:38 +0800
+> Huang Shijie <shijie.huang@arm.com> wrote:
 > 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - use update_devfreq() instead devfreq_update_status()
-> Changes in v3:
-> - fix build error
+> > When testing the gigantic page whose order is too large for the buddy
+> > allocator, the libhugetlbfs test case "counter.sh" will fail.
+> > 
+> > The failure is caused by:
+> >  1) kernel fails to allocate a gigantic page for the surplus case.
+> >     And the gather_surplus_pages() will return NULL in the end.
+> > 
+> >  2) The condition checks for "over-commit" is wrong.
+> > 
+> > This patch adds code to allocate the gigantic page in the
+> > __alloc_huge_page(). After this patch, gather_surplus_pages()
+> > can return a gigantic page for the surplus case.
+> > 
+> > This patch also changes the condition checks for:
+> >      return_unused_surplus_pages()
+> >      nr_overcommit_hugepages_store()
+> > 
+> > After this patch, the counter.sh can pass for the gigantic page.
+> > 
+> > Acked-by: Steve Capper <steve.capper@arm.com>
+> > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> > ---
+> >  mm/hugetlb.c | 15 ++++++++++-----
+> >  1 file changed, 10 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> > index 0bf4444..2b67aff 100644
+> > --- a/mm/hugetlb.c
+> > +++ b/mm/hugetlb.c
+> > @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
+> >  	struct page *page;
+> >  	unsigned int r_nid;
+> > 
+> > -	if (hstate_is_gigantic(h))
+> > +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+> >  		return NULL;
 > 
->  drivers/devfreq/devfreq.c                 | 18 ++++++++++++++++--
->  drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
->  include/linux/devfreq.h                   |  8 ++++++++
->  3 files changed, 33 insertions(+), 2 deletions(-)
+> Is it really possible to stumble over gigantic pages w/o having
+> gigantic_page_supported()?
 > 
->  
-[]
-> +void devfreq_opp_get_suspend_opp(struct device *dev, struct devfreq *devfreq)
-> +{
-> +	struct dev_pm_opp *suspend_opp;
-> +
-> +	rcu_read_lock();
-> +	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
-> +	if (suspend_opp)
-> +		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
-> +	rcu_read_unlock();
-> +}
-> +EXPORT_SYMBOL(devfreq_opp_get_suspend_opp);
-> +
+> Also, I've just tried this on s390 and counter.sh still fails after these
+> patches, and it should fail on all archs as long as you use the gigantic
+I guess the failure you met is caused by the libhugetlbfs itself, there are
+several bugs in the libhugetlbfs. I have a patch set for the
+libhugetlbfs too. I will send it as soon as possible.
 
-Why do we need this function?
+> hugepage size as default hugepage size. This is because you only changed
+> nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
+> in sysfs, and missed hugetlb_overcommit_handler() which handles
+> /proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
+This is wrong. :)
 
-This could be done at the init time (devfreq_add_device).
+I did have an extra patch to fix the hugetlb_overcommit_handler().
+but the counters.sh does not use the /proc/sys/vm/nr_overcommit_hugepages.
+Please grep it in the code.
 
-Plus, when it does not have dev_pm_opp_get_suspend_opp() available,
-
->  /**
->   * devfreq_register_opp_notifier() - Helper function to get devfreq notified
->   *				   for any changes in the OPP availability
-> diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
-> index ae72ba5..a3efee0 100644
-> --- a/drivers/devfreq/governor_simpleondemand.c
-> +++ b/drivers/devfreq/governor_simpleondemand.c
-> @@ -29,6 +29,15 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
->  	struct devfreq_simple_ondemand_data *data = df->data;
->  	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
->  
-> +	/*
-> +	 * if devfreq in suspend status and have suspend_freq,
-> +	 * the frequency need to set to suspend_freq
-> +	 */
-> +	if (df->stop_polling && df->suspend_freq) {
-> +		*freq =	df->suspend_freq;
-> +		return 0;
-> +	}
-> +
-
-Why are you adding this? "Stop polling" does not necessarily mean that
-we are doing suspend-to-RAM/disk. It may really mean just to stop at
-the current frequency.
-
-
-Cheers,
-MyungJoo
+Thanks
+Huang Shijie
