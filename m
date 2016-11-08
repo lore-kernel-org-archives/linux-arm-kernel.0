@@ -1,81 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 16:49:49 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108161245.GD20591@arm.com>
- <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
-Message-ID: <20161108164948.GG20591@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 8 Nov 2016 17:52:50 +0100
+Subject: [PATCH] arm64: dts: marvell: add unique identifiers for Armada
+ A8k SPI controllers
+In-Reply-To: <20161108174851.2cd8efb4@free-electrons.com>
+References: <1478622692-18441-1-git-send-email-mw@semihalf.com>
+ <20161108174851.2cd8efb4@free-electrons.com>
+Message-ID: <CAPv3WKdPO4Rsjq2y=sW0JyBAqr_NPRedGbY0qabwYiU8QBPbDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
-> On 08/11/2016 16:12, Will Deacon wrote:
-> >On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
-> >>+static inline void arm64_set_extops(struct extio_ops *ops)
-> >>+{
-> >>+	if (ops)
-> >>+		WRITE_ONCE(arm64_extio_ops, ops);
-> >
-> >Why does this need to be WRITE_ONCE? You don't have READ_ONCE on the reader
-> >side. Also, what if multiple drivers want to set different ops for distinct
-> >address ranges?
-> 
-> I think that the idea here is that we only have possibly one master in the
-> system which offers indirectIO backend, so another one could not possibly
-> re-set this value.
+Hi Thomas,
 
-Why is that assumption valid, and why does WRITE_ONCE help there? It's not
-ONCE as in WARN_ONCE, more ONCE as in exactly-once-per-invocation.
+2016-11-08 17:48 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Hello,
+>
+> On Tue,  8 Nov 2016 17:31:32 +0100, Marcin Wojtas wrote:
+>> Enabling SPI controllers, which are attached to different busses
+>> inside an SoC, may result in overlapping enumeration and cause
+>> sysfs registration failure. Example log after enabling two
+>> controllers on Armada 8040 SoC with same identifiers:
+>>
+>> [    3.740415] sysfs: cannot create duplicate filename
+>> '/class/spi_master/spi0'
+>> [    3.747510] ------------[ cut here ]------------
+>> [    3.752145] WARNING: at fs/sysfs/dir.c:31
+>> [...]
+>> [    4.002299] orion_spi: probe of f4700600.spi failed with error -17
+>>
+>> spi-orion driver offers dedicated DT property ('cell-index'), that
+>> allow setting unique identifiers. Recently added support for CP110-slave
+>> HW block introduced two new SPI controllers' nodes with same ID as
+>> ones from CP110-master.
+>>
+>> This commit fixes the issue by assigning different 'cell-index' values
+>> for CP110-slave SPI controllers.
+>>
+>> Fixes: 4eef78a0091b ("arm64: dts: marvell: add description for the slave
+>> CP110 in Armada 8K")
+>> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+>
+> It's sad that we need to hardcode those indexes in the Device Tree
+> (which by no means are a description of the HW by the way), but that's
+> what the SPI framework expects I believe.
 
-> >>diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
-> >>new file mode 100644
-> >>index 0000000..647b3fa
-> >>--- /dev/null
-> >>+++ b/arch/arm64/kernel/extio.c
-> >>@@ -0,0 +1,27 @@
-> >>+/*
-> >>+ * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
-> >>+ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
-> >>+ *
-> >>+ * This program is free software; you can redistribute it and/or modify
-> >>+ * it under the terms of the GNU General Public License version 2 as
-> >>+ * published by the Free Software Foundation.
-> >>+ *
-> >>+ * This program is distributed in the hope that it will be useful,
-> >>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>+ * GNU General Public License for more details.
-> >>+ *
-> >>+ * You should have received a copy of the GNU General Public License
-> >>+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>+ */
-> >>+
-> >>+#include <linux/io.h>
-> >>+
-> >>+struct extio_ops *arm64_extio_ops;
-> >>+
-> >>+
-> >>+BUILD_EXTIO(b, u8)
-> >>+
-> >>+BUILD_EXTIO(w, u16)
-> >>+
-> >>+BUILD_EXTIO(l, u32)
-> >
-> >Is there no way to make this slightly more generic, so that it can be
-> >re-used elsewhere? For example, if struct extio_ops was common, then
-> >you could have the singleton (which maybe should be an interval tree?),
-> >type definition, setter function and the BUILD_EXTIO invocations
-> >somewhere generic, rather than squirelled away in the arch backend.
-> >
-> The concern would be that some architecture which uses generic higher-level
-> ISA accessor ops, but have IO space, could be affected.
+Right. Devices are enumerated by generic code beginning from '0' on
+each bus (AP806, CP110-master, CP110-slave) independently and
+I didn't see any nice solution for it either.
 
-You're already adding a Kconfig symbol for this stuff, so you can keep
-that if you don't want it on other architectures. I'm just arguing that
-plumbing drivers directly into arch code via arm64_set_extops is not
-something I'm particularly fond of, especially when it looks like it
-could be avoided with a small amount of effort.
+> Therefore:
+>
+> Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>
 
-Will
+Thanks,
+Marcin
