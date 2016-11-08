@@ -1,177 +1,248 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 03:29:42 +0000
-Subject: [PATCH V2 3/5] arm64: hw_breakpoint: Handle inexact watchpoint
- addresses
-In-Reply-To: <22f4d20911e39efa0b8a6f7082d6839b80bb16b0.1476941895.git.panand@redhat.com>
-References: <cover.1476941895.git.panand@redhat.com>
- <22f4d20911e39efa0b8a6f7082d6839b80bb16b0.1476941895.git.panand@redhat.com>
-Message-ID: <20161108032941.GC20591@arm.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Tue, 8 Nov 2016 11:47:07 +0800
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 20, 2016 at 11:18:15AM +0530, Pratyush Anand wrote:
-> From: Pavel Labath <test.tberghammer@gmail.com>
-> 
-> Arm64 hardware does not always report a watchpoint hit address that
-> matches one of the watchpoints set. It can also report an address
-> "near" the watchpoint if a single instruction access both watched and
-> unwatched addresses. There is no straight-forward way, short of
-> disassembling the offending instruction, to map that address back to
-> the watchpoint.
-> 
-> Previously, when the hardware reported a watchpoint hit on an address
-> that did not match our watchpoint (this happens in case of instructions
-> which access large chunks of memory such as "stp") the process would
-> enter a loop where we would be continually resuming it (because we did
-> not recognise that watchpoint hit) and it would keep hitting the
-> watchpoint again and again. The tracing process would never get
-> notified of the watchpoint hit.
-> 
-> This commit fixes the problem by looking at the watchpoints near the
-> address reported by the hardware. If the address does not exactly match
-> one of the watchpoints we have set, it attributes the hit to the
-> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
-> think we can do much more, given the hardware limitations.
-> 
-> [panand: reworked to rebase on his patches]
-> 
-> Signed-off-by: Pavel Labath <labath@google.com>
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  arch/arm64/kernel/hw_breakpoint.c | 94 +++++++++++++++++++++++++++------------
->  1 file changed, 66 insertions(+), 28 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 3c2b96803eba..c57bc90b8286 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -662,11 +662,46 @@ unlock:
->  }
->  NOKPROBE_SYMBOL(breakpoint_handler);
->  
-> +/*
-> + * Arm64 hardware does not always report a watchpoint hit address that matches
-> + * one of the watchpoints set. It can also report an address "near" the
-> + * watchpoint if a single instruction access both watched and unwatched
-> + * addresses. There is no straight-forward way, short of disassembling the
-> + * offending instruction, to map that address back to the watchpoint. This
-> + * function computes the distance of the memory access from the watchpoint as a
-> + * heuristic for the likelyhood that a given access triggered the watchpoint.
-> + *
-> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
-> + * exception" of ARMv8 Architecture Reference Manual for details.
-> + *
-> + * The function returns the distance of the address from the bytes watched by
-> + * the watchpoint. In case of an exact match, it returns 0.
-> + */
-> +static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
-> +					struct arch_hw_breakpoint_ctrl *ctrl)
-> +{
-> +	u64 wp_low, wp_high;
-> +	u32 lens, lene;
-> +
-> +	lens = ffs(ctrl->len) - 1;
-> +	lene = fls(ctrl->len) - 1;
-> +
-> +	wp_low = val + lens;
-> +	wp_high = val + lene;
-> +	if (addr < wp_low)
-> +		return wp_low - addr;
-> +	else if (addr > wp_high)
-> +		return addr - wp_high;
-> +	else
-> +		return 0;
-> +}
-> +
->  static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  			      struct pt_regs *regs)
->  {
-> -	int i, step = 0, *kernel_step, access;
-> -	u32 ctrl_reg, lens, lene;
-> +	int i, step = 0, *kernel_step, access, closest_match = 0;
-> +	u64 min_dist = -1, dist;
-> +	u32 ctrl_reg;
->  	u64 val;
->  	struct perf_event *wp, **slots;
->  	struct debug_info *debug_info;
-> @@ -676,31 +711,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  	slots = this_cpu_ptr(wp_on_reg);
->  	debug_info = &current->thread.debug;
->  
-> +	/*
-> +	 * Find all watchpoints that match the reported address. If no exact
-> +	 * match is found. Attribute the hit to the closest watchpoint.
-> +	 */
-> +	rcu_read_lock();
->  	for (i = 0; i < core_num_wrps; ++i) {
-> -		rcu_read_lock();
-> -
->  		wp = slots[i];
-> -
->  		if (wp == NULL)
-> -			goto unlock;
-> -
-> -		info = counter_arch_bp(wp);
-> -
-> -		/* Check if the watchpoint value and byte select match. */
-> -		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
-> -		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
-> -		decode_ctrl_reg(ctrl_reg, &ctrl);
-> -		lens = ffs(ctrl.len) - 1;
-> -		lene = fls(ctrl.len) - 1;
-> -		/*
-> -		 * FIXME: reported address can be anywhere between "the
-> -		 * lowest address accessed by the memory access that
-> -		 * triggered the watchpoint" and "the highest watchpointed
-> -		 * address accessed by the memory access". So, it may not
-> -		 * lie in the interval of watchpoint address range.
-> -		 */
-> -		if (addr < val + lens || addr > val + lene)
-> -			goto unlock;
-> +			continue;
->  
->  		/*
->  		 * Check that the access type matches.
-> @@ -709,18 +728,37 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  		access = (esr & AARCH64_ESR_ACCESS_MASK) ? HW_BREAKPOINT_W :
->  			 HW_BREAKPOINT_R;
->  		if (!(access & hw_breakpoint_type(wp)))
-> -			goto unlock;
-> +			continue;
-> +
-> +		/* Check if the watchpoint value and byte select match. */
-> +		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
-> +		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
-> +		decode_ctrl_reg(ctrl_reg, &ctrl);
-> +		dist = get_distance_from_watchpoint(addr, val, &ctrl);
-> +		if (dist < min_dist) {
-> +			min_dist = dist;
-> +			closest_match = i;
-> +		}
-> +		/* Is this an exact match? */
-> +		if (dist != 0)
-> +			continue;
->  
-> +		info = counter_arch_bp(wp);
->  		info->trigger = addr;
->  		perf_bp_event(wp, regs);
->  
->  		/* Do we need to handle the stepping? */
->  		if (is_default_overflow_handler(wp))
->  			step = 1;
-> -
-> -unlock:
-> -		rcu_read_unlock();
->  	}
-> +	if (min_dist > 0 && min_dist != -1) {
-> +		/* No exact match found. */
-> +		wp = slots[closest_match];
-> +		info = counter_arch_bp(wp);
-> +		info->trigger = addr;
-> +		perf_bp_event(wp, regs);
-> +	}
+For arm64, there is no I/O space as other architectural platforms, such as
+X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+known port addresses are used to control the corresponding target devices, for
+example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+normal MMIO mode in using.
 
-Why don't we need to bother with the stepping in the case of a non-exact
-match?
+To drive these devices, this patch introduces a method named indirect-IO.
+In this method the in/out pair in arch/arm64/include/asm/io.h will be
+redefined. When upper layer drivers call in/out with those known legacy port
+addresses to access the peripherals, the hooking functions corrresponding to
+those target peripherals will be called. Through this way, those upper layer
+drivers which depend on in/out can run on Hip06 without any changes.
 
-Will
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+---
+ arch/arm64/Kconfig             |  6 +++
+ arch/arm64/include/asm/extio.h | 94 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/io.h    | 29 +++++++++++++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/extio.c      | 27 ++++++++++++
+ 5 files changed, 157 insertions(+)
+ create mode 100644 arch/arm64/include/asm/extio.h
+ create mode 100644 arch/arm64/kernel/extio.c
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 969ef88..b44070b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -163,6 +163,12 @@ config ARCH_MMAP_RND_COMPAT_BITS_MIN
+ config ARCH_MMAP_RND_COMPAT_BITS_MAX
+        default 16
+ 
++config ARM64_INDIRECT_PIO
++	bool "access peripherals with legacy I/O port"
++	help
++	  Support special accessors for ISA I/O devices. This is needed for
++	  SoCs that do not support standard read/write for the ISA range.
++
+ config NO_IOPORT_MAP
+ 	def_bool y if !PCI
+ 
+diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
+new file mode 100644
+index 0000000..6ae0787
+--- /dev/null
++++ b/arch/arm64/include/asm/extio.h
+@@ -0,0 +1,94 @@
++/*
++ * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
++ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __LINUX_EXTIO_H
++#define __LINUX_EXTIO_H
++
++struct extio_ops {
++	unsigned long start;/* inclusive, sys io addr */
++	unsigned long end;/* inclusive, sys io addr */
++
++	u64 (*pfin)(void *devobj, unsigned long ptaddr,	size_t dlen);
++	void (*pfout)(void *devobj, unsigned long ptaddr, u32 outval,
++					size_t dlen);
++	u64 (*pfins)(void *devobj, unsigned long ptaddr, void *inbuf,
++				size_t dlen, unsigned int count);
++	void (*pfouts)(void *devobj, unsigned long ptaddr,
++				const void *outbuf, size_t dlen,
++				unsigned int count);
++	void *devpara;
++};
++
++extern struct extio_ops *arm64_extio_ops;
++
++#define DECLARE_EXTIO(bw, type)						\
++extern type in##bw(unsigned long addr);					\
++extern void out##bw(type value, unsigned long addr);			\
++extern void ins##bw(unsigned long addr, void *buffer, unsigned int count);\
++extern void outs##bw(unsigned long addr, const void *buffer, unsigned int count);
++
++#define BUILD_EXTIO(bw, type)						\
++type in##bw(unsigned long addr)						\
++{									\
++	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
++			arm64_extio_ops->end < addr)			\
++		return read##bw(PCI_IOBASE + addr);			\
++	return arm64_extio_ops->pfin ?					\
++		arm64_extio_ops->pfin(arm64_extio_ops->devpara,		\
++			addr, sizeof(type)) : -1;			\
++}									\
++									\
++void out##bw(type value, unsigned long addr)				\
++{									\
++	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
++			arm64_extio_ops->end < addr)			\
++		write##bw(value, PCI_IOBASE + addr);			\
++	else								\
++		if (arm64_extio_ops->pfout)				\
++			arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
++				addr, value, sizeof(type));		\
++}									\
++									\
++void ins##bw(unsigned long addr, void *buffer, unsigned int count)	\
++{									\
++	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
++			arm64_extio_ops->end < addr)			\
++		reads##bw(PCI_IOBASE + addr, buffer, count);		\
++	else								\
++		if (arm64_extio_ops->pfins)				\
++			arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
++				addr, buffer, sizeof(type), count);	\
++}									\
++									\
++void outs##bw(unsigned long addr, const void *buffer, unsigned int count)	\
++{									\
++	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
++			arm64_extio_ops->end < addr)			\
++		writes##bw(PCI_IOBASE + addr, buffer, count);		\
++	else								\
++		if (arm64_extio_ops->pfouts)				\
++			arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
++				addr, buffer, sizeof(type), count);	\
++}
++
++static inline void arm64_set_extops(struct extio_ops *ops)
++{
++	if (ops)
++		WRITE_ONCE(arm64_extio_ops, ops);
++}
++
++#endif /* __LINUX_EXTIO_H*/
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 0bba427..136735d 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -31,6 +31,7 @@
+ #include <asm/early_ioremap.h>
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
++#include <asm/extio.h>
+ 
+ #include <xen/xen.h>
+ 
+@@ -149,6 +150,34 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ #define IO_SPACE_LIMIT		(PCI_IO_SIZE - 1)
+ #define PCI_IOBASE		((void __iomem *)PCI_IO_START)
+ 
++
++/*
++ * redefine the in(s)b/out(s)b for indirect-IO.
++ */
++#ifdef CONFIG_ARM64_INDIRECT_PIO
++#define inb inb
++#define outb outb
++#define insb insb
++#define outsb outsb
++/* external declaration */
++DECLARE_EXTIO(b, u8)
++
++#define inw inw
++#define outw outw
++#define insw insw
++#define outsw outsw
++
++DECLARE_EXTIO(w, u16)
++
++#define inl inl
++#define outl outl
++#define insl insl
++#define outsl outsl
++
++DECLARE_EXTIO(l, u32)
++#endif
++
++
+ /*
+  * String version of I/O memory access operations.
+  */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7d66bba..60e0482 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -31,6 +31,7 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
++arm64-obj-$(CONFIG_ARM64_INDIRECT_PIO)	+= extio.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
+new file mode 100644
+index 0000000..647b3fa
+--- /dev/null
++++ b/arch/arm64/kernel/extio.c
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
++ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/io.h>
++
++struct extio_ops *arm64_extio_ops;
++
++
++BUILD_EXTIO(b, u8)
++
++BUILD_EXTIO(w, u16)
++
++BUILD_EXTIO(l, u32)
+-- 
+1.9.1
