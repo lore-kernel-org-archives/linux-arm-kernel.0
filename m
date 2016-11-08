@@ -1,86 +1,403 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 08 Nov 2016 12:25:31 +0000
-Subject: [PATCH RFC 07/12] drm/i2c: tda998x: move and rename
- tda998x_encoder_set_config()
+Date: Tue, 08 Nov 2016 12:25:37 +0000
+Subject: [PATCH RFC 08/12] drm/i2c: tda998x: group connector functions and
+ funcs together
 In-Reply-To: <20161108122420.GP1041@n2100.armlinux.org.uk>
 References: <20161108122420.GP1041@n2100.armlinux.org.uk>
-Message-ID: <E1c45T1-0005jv-VK@rmk-PC.armlinux.org.uk>
+Message-ID: <E1c45T7-0005k1-AB@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The naming of tda998x_encoder_set_config() is a left-over from when
-TDA998x was a slave encoder.  Since this is part of the initialisation,
-drop the _encoder from the name, and move it near tda998x_bind().
+Group the TDA998x connector functions and funcs structures together
+before the encoder support, rather than scattered amongst the rest of
+the file.  This keeps like code together.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 40 +++++++++++++++++++--------------------
- 1 file changed, 20 insertions(+), 20 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 350 +++++++++++++++++++-------------------
+ 1 file changed, 176 insertions(+), 174 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 349e04a30210..6b966c19a449 100644
+index 6b966c19a449..3f3e1f0137f8 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -822,25 +822,6 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+@@ -820,6 +820,182 @@ tda998x_configure_audio(struct tda998x_priv *priv,
+ 	return tda998x_write_aif(priv, &params->cea);
+ }
  
- /* DRM encoder functions */
- 
--static void tda998x_encoder_set_config(struct tda998x_priv *priv,
--				       const struct tda998x_encoder_params *p)
--{
--	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(p->swap_a) |
--			    (p->mirr_a ? VIP_CNTRL_0_MIRR_A : 0) |
--			    VIP_CNTRL_0_SWAP_B(p->swap_b) |
--			    (p->mirr_b ? VIP_CNTRL_0_MIRR_B : 0);
--	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(p->swap_c) |
--			    (p->mirr_c ? VIP_CNTRL_1_MIRR_C : 0) |
--			    VIP_CNTRL_1_SWAP_D(p->swap_d) |
--			    (p->mirr_d ? VIP_CNTRL_1_MIRR_D : 0);
--	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(p->swap_e) |
--			    (p->mirr_e ? VIP_CNTRL_2_MIRR_E : 0) |
--			    VIP_CNTRL_2_SWAP_F(p->swap_f) |
--			    (p->mirr_f ? VIP_CNTRL_2_MIRR_F : 0);
--
--	priv->audio_params = p->audio_params;
--}
--
- static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
- {
- 	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
-@@ -1636,6 +1617,25 @@ static const struct drm_connector_funcs tda998x_connector_funcs = {
- 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
- };
- 
-+static void tda998x_set_config(struct tda998x_priv *priv,
-+			       const struct tda998x_encoder_params *p)
-+{
-+	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(p->swap_a) |
-+			    (p->mirr_a ? VIP_CNTRL_0_MIRR_A : 0) |
-+			    VIP_CNTRL_0_SWAP_B(p->swap_b) |
-+			    (p->mirr_b ? VIP_CNTRL_0_MIRR_B : 0);
-+	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(p->swap_c) |
-+			    (p->mirr_c ? VIP_CNTRL_1_MIRR_C : 0) |
-+			    VIP_CNTRL_1_SWAP_D(p->swap_d) |
-+			    (p->mirr_d ? VIP_CNTRL_1_MIRR_D : 0);
-+	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(p->swap_e) |
-+			    (p->mirr_e ? VIP_CNTRL_2_MIRR_E : 0) |
-+			    VIP_CNTRL_2_SWAP_F(p->swap_f) |
-+			    (p->mirr_f ? VIP_CNTRL_2_MIRR_F : 0);
++/* DRM connector functions */
 +
-+	priv->audio_params = p->audio_params;
++static int tda998x_connector_dpms(struct drm_connector *connector, int mode)
++{
++	if (drm_core_check_feature(connector->dev, DRIVER_ATOMIC))
++		return drm_atomic_helper_connector_dpms(connector, mode);
++	else
++		return drm_helper_connector_dpms(connector, mode);
 +}
 +
- static int tda998x_bind(struct device *dev, struct device *master, void *data)
++static int tda998x_connector_fill_modes(struct drm_connector *connector,
++					uint32_t maxX, uint32_t maxY)
++{
++	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
++	int ret;
++
++	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
++
++	if (connector->edid_blob_ptr) {
++		struct edid *edid = (void *)connector->edid_blob_ptr->data;
++
++		priv->sink_has_audio = drm_detect_monitor_audio(edid);
++	} else {
++		priv->sink_has_audio = false;
++	}
++
++	return ret;
++}
++
++static enum drm_connector_status
++tda998x_connector_detect(struct drm_connector *connector, bool force)
++{
++	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
++	u8 val = cec_read(priv, REG_CEC_RXSHPDLEV);
++
++	return (val & CEC_RXSHPDLEV_HPD) ? connector_status_connected :
++			connector_status_disconnected;
++}
++
++static void tda998x_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_cleanup(connector);
++}
++
++static const struct drm_connector_funcs tda998x_connector_funcs = {
++	.dpms = tda998x_connector_dpms,
++	.reset = drm_atomic_helper_connector_reset,
++	.fill_modes = tda998x_connector_fill_modes,
++	.detect = tda998x_connector_detect,
++	.destroy = tda998x_connector_destroy,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static int read_edid_block(void *data, u8 *buf, unsigned int blk, size_t length)
++{
++	struct tda998x_priv *priv = data;
++	u8 offset, segptr;
++	int ret, i;
++
++	offset = (blk & 1) ? 128 : 0;
++	segptr = blk / 2;
++
++	reg_write(priv, REG_DDC_ADDR, 0xa0);
++	reg_write(priv, REG_DDC_OFFS, offset);
++	reg_write(priv, REG_DDC_SEGM_ADDR, 0x60);
++	reg_write(priv, REG_DDC_SEGM, segptr);
++
++	/* enable reading EDID: */
++	priv->wq_edid_wait = 1;
++	reg_write(priv, REG_EDID_CTRL, 0x1);
++
++	/* flag must be cleared by sw: */
++	reg_write(priv, REG_EDID_CTRL, 0x0);
++
++	/* wait for block read to complete: */
++	if (priv->hdmi->irq) {
++		i = wait_event_timeout(priv->wq_edid,
++					!priv->wq_edid_wait,
++					msecs_to_jiffies(100));
++		if (i < 0) {
++			dev_err(&priv->hdmi->dev, "read edid wait err %d\n", i);
++			return i;
++		}
++	} else {
++		for (i = 100; i > 0; i--) {
++			msleep(1);
++			ret = reg_read(priv, REG_INT_FLAGS_2);
++			if (ret < 0)
++				return ret;
++			if (ret & INT_FLAGS_2_EDID_BLK_RD)
++				break;
++		}
++	}
++
++	if (i == 0) {
++		dev_err(&priv->hdmi->dev, "read edid timeout\n");
++		return -ETIMEDOUT;
++	}
++
++	ret = reg_read_range(priv, REG_EDID_DATA_0, buf, length);
++	if (ret != length) {
++		dev_err(&priv->hdmi->dev, "failed to read edid block %d: %d\n",
++			blk, ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int tda998x_connector_get_modes(struct drm_connector *connector)
++{
++	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
++	struct edid *edid;
++	int n;
++
++	/*
++	 * If we get killed while waiting for the HPD timeout, return
++	 * no modes found: we are not in a restartable path, so we
++	 * can't handle signals gracefully.
++	 */
++	if (tda998x_edid_delay_wait(priv))
++		return 0;
++
++	if (priv->rev == TDA19988)
++		reg_clear(priv, REG_TX4, TX4_PD_RAM);
++
++	edid = drm_do_get_edid(connector, read_edid_block, priv);
++
++	if (priv->rev == TDA19988)
++		reg_set(priv, REG_TX4, TX4_PD_RAM);
++
++	if (!edid) {
++		dev_warn(&priv->hdmi->dev, "failed to read EDID\n");
++		return 0;
++	}
++
++	drm_mode_connector_update_edid_property(connector, edid);
++	n = drm_add_edid_modes(connector, edid);
++	drm_edid_to_eld(connector, edid);
++
++	kfree(edid);
++
++	return n;
++}
++
++static int tda998x_connector_mode_valid(struct drm_connector *connector,
++					struct drm_display_mode *mode)
++{
++	/* TDA19988 dotclock can go up to 165MHz */
++	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
++
++	if (mode->clock > ((priv->rev == TDA19988) ? 165000 : 150000))
++		return MODE_CLOCK_HIGH;
++	if (mode->htotal >= BIT(13))
++		return MODE_BAD_HVALUE;
++	if (mode->vtotal >= BIT(11))
++		return MODE_BAD_VVALUE;
++	return MODE_OK;
++}
++
++static struct drm_encoder *
++tda998x_connector_best_encoder(struct drm_connector *connector)
++{
++	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
++
++	return &priv->encoder;
++}
++
++static
++const struct drm_connector_helper_funcs tda998x_connector_helper_funcs = {
++	.get_modes = tda998x_connector_get_modes,
++	.mode_valid = tda998x_connector_mode_valid,
++	.best_encoder = tda998x_connector_best_encoder,
++};
++
+ /* DRM encoder functions */
+ 
+ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+@@ -855,21 +1031,6 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+ 	priv->dpms = mode;
+ }
+ 
+-static int tda998x_connector_mode_valid(struct drm_connector *connector,
+-					struct drm_display_mode *mode)
+-{
+-	/* TDA19988 dotclock can go up to 165MHz */
+-	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-
+-	if (mode->clock > ((priv->rev == TDA19988) ? 165000 : 150000))
+-		return MODE_CLOCK_HIGH;
+-	if (mode->htotal >= BIT(13))
+-		return MODE_BAD_HVALUE;
+-	if (mode->vtotal >= BIT(11))
+-		return MODE_BAD_VVALUE;
+-	return MODE_OK;
+-}
+-
+ static void
+ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 			 struct drm_display_mode *mode,
+@@ -1080,127 +1241,6 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 	mutex_unlock(&priv->audio_mutex);
+ }
+ 
+-static int tda998x_connector_fill_modes(struct drm_connector *connector,
+-					uint32_t maxX, uint32_t maxY)
+-{
+-	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-	int ret;
+-
+-	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+-
+-	if (connector->edid_blob_ptr) {
+-		struct edid *edid = (void *)connector->edid_blob_ptr->data;
+-
+-		priv->sink_has_audio = drm_detect_monitor_audio(edid);
+-	} else {
+-		priv->sink_has_audio = false;
+-	}
+-
+-	return ret;
+-}
+-
+-static enum drm_connector_status
+-tda998x_connector_detect(struct drm_connector *connector, bool force)
+-{
+-	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-	u8 val = cec_read(priv, REG_CEC_RXSHPDLEV);
+-
+-	return (val & CEC_RXSHPDLEV_HPD) ? connector_status_connected :
+-			connector_status_disconnected;
+-}
+-
+-static int read_edid_block(void *data, u8 *buf, unsigned int blk, size_t length)
+-{
+-	struct tda998x_priv *priv = data;
+-	u8 offset, segptr;
+-	int ret, i;
+-
+-	offset = (blk & 1) ? 128 : 0;
+-	segptr = blk / 2;
+-
+-	reg_write(priv, REG_DDC_ADDR, 0xa0);
+-	reg_write(priv, REG_DDC_OFFS, offset);
+-	reg_write(priv, REG_DDC_SEGM_ADDR, 0x60);
+-	reg_write(priv, REG_DDC_SEGM, segptr);
+-
+-	/* enable reading EDID: */
+-	priv->wq_edid_wait = 1;
+-	reg_write(priv, REG_EDID_CTRL, 0x1);
+-
+-	/* flag must be cleared by sw: */
+-	reg_write(priv, REG_EDID_CTRL, 0x0);
+-
+-	/* wait for block read to complete: */
+-	if (priv->hdmi->irq) {
+-		i = wait_event_timeout(priv->wq_edid,
+-					!priv->wq_edid_wait,
+-					msecs_to_jiffies(100));
+-		if (i < 0) {
+-			dev_err(&priv->hdmi->dev, "read edid wait err %d\n", i);
+-			return i;
+-		}
+-	} else {
+-		for (i = 100; i > 0; i--) {
+-			msleep(1);
+-			ret = reg_read(priv, REG_INT_FLAGS_2);
+-			if (ret < 0)
+-				return ret;
+-			if (ret & INT_FLAGS_2_EDID_BLK_RD)
+-				break;
+-		}
+-	}
+-
+-	if (i == 0) {
+-		dev_err(&priv->hdmi->dev, "read edid timeout\n");
+-		return -ETIMEDOUT;
+-	}
+-
+-	ret = reg_read_range(priv, REG_EDID_DATA_0, buf, length);
+-	if (ret != length) {
+-		dev_err(&priv->hdmi->dev, "failed to read edid block %d: %d\n",
+-			blk, ret);
+-		return ret;
+-	}
+-
+-	return 0;
+-}
+-
+-static int tda998x_connector_get_modes(struct drm_connector *connector)
+-{
+-	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-	struct edid *edid;
+-	int n;
+-
+-	/*
+-	 * If we get killed while waiting for the HPD timeout, return
+-	 * no modes found: we are not in a restartable path, so we
+-	 * can't handle signals gracefully.
+-	 */
+-	if (tda998x_edid_delay_wait(priv))
+-		return 0;
+-
+-	if (priv->rev == TDA19988)
+-		reg_clear(priv, REG_TX4, TX4_PD_RAM);
+-
+-	edid = drm_do_get_edid(connector, read_edid_block, priv);
+-
+-	if (priv->rev == TDA19988)
+-		reg_set(priv, REG_TX4, TX4_PD_RAM);
+-
+-	if (!edid) {
+-		dev_warn(&priv->hdmi->dev, "failed to read EDID\n");
+-		return 0;
+-	}
+-
+-	drm_mode_connector_update_edid_property(connector, edid);
+-	n = drm_add_edid_modes(connector, edid);
+-	drm_edid_to_eld(connector, edid);
+-
+-	kfree(edid);
+-
+-	return n;
+-}
+-
+ static void tda998x_encoder_set_polling(struct tda998x_priv *priv,
+ 					struct drm_connector *connector)
  {
- 	struct tda998x_encoder_params *params = dev->platform_data;
-@@ -1668,7 +1668,7 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- 		return ret;
+@@ -1579,44 +1619,6 @@ static const struct drm_encoder_funcs tda998x_encoder_funcs = {
+ 	.destroy = tda998x_encoder_destroy,
+ };
  
- 	if (!dev->of_node && params)
--		tda998x_encoder_set_config(priv, params);
-+		tda998x_set_config(priv, params);
- 
- 	tda998x_encoder_set_polling(priv, &priv->connector);
- 
+-static struct drm_encoder *
+-tda998x_connector_best_encoder(struct drm_connector *connector)
+-{
+-	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+-
+-	return &priv->encoder;
+-}
+-
+-static
+-const struct drm_connector_helper_funcs tda998x_connector_helper_funcs = {
+-	.get_modes = tda998x_connector_get_modes,
+-	.mode_valid = tda998x_connector_mode_valid,
+-	.best_encoder = tda998x_connector_best_encoder,
+-};
+-
+-static void tda998x_connector_destroy(struct drm_connector *connector)
+-{
+-	drm_connector_cleanup(connector);
+-}
+-
+-static int tda998x_connector_dpms(struct drm_connector *connector, int mode)
+-{
+-	if (drm_core_check_feature(connector->dev, DRIVER_ATOMIC))
+-		return drm_atomic_helper_connector_dpms(connector, mode);
+-	else
+-		return drm_helper_connector_dpms(connector, mode);
+-}
+-
+-static const struct drm_connector_funcs tda998x_connector_funcs = {
+-	.dpms = tda998x_connector_dpms,
+-	.reset = drm_atomic_helper_connector_reset,
+-	.fill_modes = tda998x_connector_fill_modes,
+-	.detect = tda998x_connector_detect,
+-	.destroy = tda998x_connector_destroy,
+-	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+-	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+-};
+-
+ static void tda998x_set_config(struct tda998x_priv *priv,
+ 			       const struct tda998x_encoder_params *p)
+ {
 -- 
 2.7.4
