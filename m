@@ -1,63 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  8 Nov 2016 18:23:05 +0100
-Subject: [PATCH 1/10] clk: sunxi-ng: multiplier: Add fractionnal support
-In-Reply-To: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
-References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b3d3436c03e0597de205f674061892dbc9498a7e.1478625788.git-series.maxime.ripard@free-electrons.com>
+Date: Tue,  8 Nov 2016 18:23:04 +0100
+Subject: [PATCH 0/10] ARM: sun5i: Convert sun5i SoCs to sunxi-ng
+Message-ID: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi-ng/ccu_mult.c | 8 ++++++++
- drivers/clk/sunxi-ng/ccu_mult.h | 2 ++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+Hi,
 
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 678b6cb49f01..826302464650 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.c
-+++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -75,6 +75,9 @@ static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
- 	unsigned long val;
- 	u32 reg;
- 
-+	if (ccu_frac_helper_is_enabled(&cm->common, &cm->frac))
-+		return ccu_frac_helper_read_rate(&cm->common, &cm->frac);
-+
- 	reg = readl(cm->common.base + cm->common.reg);
- 	val = reg >> cm->mult.shift;
- 	val &= (1 << cm->mult.width) - 1;
-@@ -102,6 +105,11 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags;
- 	u32 reg;
- 
-+	if (ccu_frac_helper_has_rate(&cm->common, &cm->frac, rate))
-+		return ccu_frac_helper_set_rate(&cm->common, &cm->frac, rate);
-+	else
-+		ccu_frac_helper_disable(&cm->common, &cm->frac);
-+
- 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
- 						&parent_rate);
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-index c1a2134bdc71..bd2e38b5a32a 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.h
-+++ b/drivers/clk/sunxi-ng/ccu_mult.h
-@@ -2,6 +2,7 @@
- #define _CCU_MULT_H_
- 
- #include "ccu_common.h"
-+#include "ccu_frac.h"
- #include "ccu_mux.h"
- 
- struct ccu_mult_internal {
-@@ -23,6 +24,7 @@ struct ccu_mult_internal {
- struct ccu_mult {
- 	u32			enable;
- 
-+	struct ccu_frac_internal	frac;
- 	struct ccu_mult_internal	mult;
- 	struct ccu_mux_internal	mux;
- 	struct ccu_common	common;
+This is yet another serie bringing more SoCs into the sunxi-ng world.
+
+This is pretty common stuff. Dealing with more corner cases, and adding the
+drivers for the SoCs. The A10 and A20 should be pretty close, and pretty
+easy to support after that.
+
+Let me know what you think,
+Maxime
+
+Maxime Ripard (10):
+  clk: sunxi-ng: multiplier: Add fractionnal support
+  clk: sunxi-ng: nkm: Deal with fixed post dividers
+  clk: sunxi-ng: Implement multiplier offsets
+  clk: sunxi-ng: Add clocks and resets indices for sun5i
+  clk: sunxi-ng: Implement multiplier maximum
+  clk: sunxi-ng: Add A10s CCU driver
+  clk: sunxi-ng: Add A13 CCU driver
+  clk: sunxi-ng: Add GR8 driver
+  ARM: sun5i: Convert to CCU
+  ARM: gr8: Convert to CCU
+
+ arch/arm/boot/dts/ntc-gr8.dtsi        | 518 ++-----------------
+ arch/arm/boot/dts/sun5i-a10s.dtsi     |  94 +---
+ arch/arm/boot/dts/sun5i-a13.dtsi      | 140 +-----
+ arch/arm/boot/dts/sun5i-r8.dtsi       |  10 +-
+ arch/arm/boot/dts/sun5i.dtsi          | 368 +------------
+ drivers/clk/sunxi-ng/Kconfig          |  30 +-
+ drivers/clk/sunxi-ng/Makefile         |   3 +-
+ drivers/clk/sunxi-ng/ccu-sun5i-a10s.c | 755 +++++++++++++++++++++++++++-
+ drivers/clk/sunxi-ng/ccu-sun5i-a13.c  | 681 ++++++++++++++++++++++++-
+ drivers/clk/sunxi-ng/ccu-sun5i-gr8.c  | 684 ++++++++++++++++++++++++-
+ drivers/clk/sunxi-ng/ccu-sun5i.h      | 129 +++++-
+ drivers/clk/sunxi-ng/ccu_div.h        |  10 +-
+ drivers/clk/sunxi-ng/ccu_mp.c         |  10 +-
+ drivers/clk/sunxi-ng/ccu_mult.c       |  12 +-
+ drivers/clk/sunxi-ng/ccu_mult.h       |  24 +-
+ drivers/clk/sunxi-ng/ccu_nk.c         |  14 +-
+ drivers/clk/sunxi-ng/ccu_nkm.c        |  33 +-
+ drivers/clk/sunxi-ng/ccu_nkm.h        |   2 +-
+ drivers/clk/sunxi-ng/ccu_nkmp.c       |  17 +-
+ drivers/clk/sunxi-ng/ccu_nm.c         |  13 +-
+ include/dt-bindings/clock/sun5i-ccu.h | 126 +++++-
+ include/dt-bindings/reset/sun5i-ccu.h |  32 +-
+ 22 files changed, 2690 insertions(+), 1015 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-a13.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-gr8.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i.h
+ create mode 100644 include/dt-bindings/clock/sun5i-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun5i-ccu.h
+
+base-commit: bc5952be2d424b75ed11ff599b70bc9604e98d42
 -- 
 git-series 0.8.11
