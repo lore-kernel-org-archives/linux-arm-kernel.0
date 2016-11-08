@@ -1,66 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Nov 2016 13:26:48 -0800
-Subject: [GIT PULL] ARM: OXNAS SoC updates for 4.10
-In-Reply-To: <1305c61f-b1ef-7caf-7788-67e2b907e873@baylibre.com>
-References: <1305c61f-b1ef-7caf-7788-67e2b907e873@baylibre.com>
-Message-ID: <20161107212648.GC2106@localhost>
+From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
+Date: Tue, 08 Nov 2016 02:06:58 +0000
+Subject: =?UTF-8?B?UkU6IFtSRVNFTkQgUEFUQ0ggdjMgMS8yXSBQTS9kZXZmcmVx?=
+ =?UTF-8?B?OiBhZGQgc3VzcGVuZCBmcmVxdWVuY3kgc3VwcG9ydA==?=
+References: <1478500420-22045-1-git-send-email-hl@rock-chips.com>
+ <CGME20161107063403epcas5p4f8d0d95b9a997ca7bf2b2702c3e5d337@epcas5p4.samsung.com>
+Message-ID: <960394560.458817.1478570818491.JavaMail.weblogic@ep2ml102b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 31, 2016 at 10:52:53AM +0100, Neil Armstrong wrote:
-> Dear arm-soc maintainers,
+> Add suspend frequency support and if needed set it to
+> the frequency obtained from the suspend opp (can be defined
+> using opp-v2 bindings and is optional).
 > 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v2:
+> - use update_devfreq() instead devfreq_update_status()
+> Changes in v3:
+> - fix build error
 > 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+>  drivers/devfreq/devfreq.c                 | 18 ++++++++++++++++--
+>  drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
+>  include/linux/devfreq.h                   |  8 ++++++++
+>  3 files changed, 33 insertions(+), 2 deletions(-)
 > 
-> are available in the git repository at:
-> 
->   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.10
-> 
-> for you to fetch changes up to b3cdb3c5ef514687891f03442f2677850340bcfa:
-> 
->   ARM: oxnas: Add OX820 config and makefile entry (2016-10-31 10:41:33 +0100)
-> 
-> ----------------------------------------------------------------
-> - Add SMP support for the Oxford Semiconductor OX820 SoC
-> from http://lkml.kernel.org/r/20161021085848.1754-1-narmstrong at baylibre.com
-> 
-> ----------------------------------------------------------------
-> Neil Armstrong (2):
->       ARM: oxnas: Add OX820 SMP support
->       ARM: oxnas: Add OX820 config and makefile entry
+>  
+[]
+> +void devfreq_opp_get_suspend_opp(struct device *dev, struct devfreq *devfreq)
+> +{
+> +	struct dev_pm_opp *suspend_opp;
+> +
+> +	rcu_read_lock();
+> +	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
+> +	if (suspend_opp)
+> +		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
+> +	rcu_read_unlock();
+> +}
+> +EXPORT_SYMBOL(devfreq_opp_get_suspend_opp);
+> +
 
-Hi Neil,
+Why do we need this function?
 
-Sorry for being picky here, please be patient with us. :-)
+This could be done at the init time (devfreq_add_device).
 
-Overall comments on this patch set:
+Plus, when it does not have dev_pm_opp_get_suspend_opp() available,
 
-1) Copyrights seem to be a bit varied. All 3 new source files have
-   different copyright holders. Only one has yours, one is from 2003, one
-   is also from 2013. Is this expected? Seems like it's worth mentioning
-   in commit messages at least.
+>  /**
+>   * devfreq_register_opp_notifier() - Helper function to get devfreq notified
+>   *				   for any changes in the OPP availability
+> diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
+> index ae72ba5..a3efee0 100644
+> --- a/drivers/devfreq/governor_simpleondemand.c
+> +++ b/drivers/devfreq/governor_simpleondemand.c
+> @@ -29,6 +29,15 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
+>  	struct devfreq_simple_ondemand_data *data = df->data;
+>  	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
+>  
+> +	/*
+> +	 * if devfreq in suspend status and have suspend_freq,
+> +	 * the frequency need to set to suspend_freq
+> +	 */
+> +	if (df->stop_polling && df->suspend_freq) {
+> +		*freq =	df->suspend_freq;
+> +		return 0;
+> +	}
+> +
 
-2) Please remove the linux/arch/... lines from the top of the files. It's
-   something we've been trying to remove for a while and don't want to
-   introduce more occurrances of.
-
-I'd say (2) is fine to do incremental, but please provide clarification on (1).
-I could just add that to the merge commit message so don't respin the branch
-yet, depending on what we hear back!
-
->  arch/arm/Makefile             |   1 +
->  arch/arm/mach-oxnas/Kconfig   |  30 +++++++++++++++++++---------
->  arch/arm/mach-oxnas/Makefile  |   2 ++
->  arch/arm/mach-oxnas/headsmp.S |  28 ++++++++++++++++++++++++++
->  arch/arm/mach-oxnas/hotplug.c | 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-oxnas/platsmp.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-Git tip: If you redirect the output to a file (or pipe through cat), the
-diffstat will be limited to 80 characters and look better in email.
+Why are you adding this? "Stop polling" does not necessarily mean that
+we are doing suspend-to-RAM/disk. It may really mean just to stop at
+the current frequency.
 
 
-Thanks,
-
--Olof
+Cheers,
+MyungJoo
