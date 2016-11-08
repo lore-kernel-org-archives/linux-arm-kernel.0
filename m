@@ -1,45 +1,108 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Tue, 8 Nov 2016 23:03:15 +0530
-Subject: [PATCH v2 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C
- bus bitbang for HDMI
-In-Reply-To: <3d2b6dfd-c03c-e635-8dc1-2dc9ac454f5a@mentor.com>
-References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
- <20161022032559.GL30578@tiger>
- <3d2b6dfd-c03c-e635-8dc1-2dc9ac454f5a@mentor.com>
-Message-ID: <20161108173315.GA16082@Sanchayan-Arch.localdomain>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2016 17:46:22 +0000
+Subject: [PATCH 0/8] firmware: arm_scpi: add support for legacy SCPI
+ protocol
+In-Reply-To: <fb4348a8-197c-2219-ff01-8716e2a0b955@arm.com>
+References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
+ <20161108145118.GR1041@n2100.armlinux.org.uk>
+ <28decdc3-6b86-924f-d3c1-9873a8cfce77@arm.com>
+ <20161108154038.GS1041@n2100.armlinux.org.uk>
+ <20161108160625.GU1041@n2100.armlinux.org.uk>
+ <fb4348a8-197c-2219-ff01-8716e2a0b955@arm.com>
+Message-ID: <20161108174622.GW1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Tue, Nov 08, 2016 at 05:37:25PM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 08/11/16 16:06, Russell King - ARM Linux wrote:
+> >On Tue, Nov 08, 2016 at 03:40:38PM +0000, Russell King - ARM Linux wrote:
+> >>As it contains a zero sized Image and .dtb files, I tried copying my
+> >>Image and .dtb over, and also copied my original config.txt (only
+> >>change is AUTORUN: FALSE).  It still doesn't appear to boot beyond
+> >>this point.
+> >
+> >Well, it seems that I can't even go back to my original set of firmware
+> >as UEFI has stopped working:
+> >
+> >NOTICE:  Booting Trusted Firmware
+> >NOTICE:  BL1: v1.0(release):14b6608
+> >NOTICE:  BL1: Built : 14:15:51, Sep  1 2014
+> >NOTICE:  BL1: Booting BL2
+> >NOTICE:  BL2: v1.0(release):14b6608
+> >NOTICE:  BL2: Built : 14:15:51, Sep  1 2014
+> >NOTICE:  BL1: Booting BL3-1
+> >NOTICE:  BL3-1: v1.0(release):14b6608
+> >NOTICE:  BL3-1: Built : 14:15:53, Sep  1 2014
+> >UEFI firmware (version v2.1 built at 14:41:56 on Oct 23 2014)
+> >Warning: Fail to load FDT file 'juno.dtb'.
+> >
+> 
+> This again because of incompatibility of the configuration data saved in
+> NOR flash. The erase command I gave early is to erase that when you
+> switched between the UEFI binaries. It's really horrible mess UEFI
+> created in the initial days of Juno, and hopefully they have moved to
+> some standard format these days.
 
-On 16-10-22 15:43:04, Vladimir Zapolskiy wrote:
-> Hi Shawn,
-> 
-> On 10/22/2016 06:25 AM, Shawn Guo wrote:
-> > On Mon, Sep 19, 2016 at 10:41:51AM +0530, Sanchayan Maity wrote:
-> > > Remove the use of DDC I2C bus bitbang to support reading of EDID
-> > > and rely on support from internal HDMI I2C master controller instead.
-> > > As a result remove the device tree property ddc-i2c-bus.
-> > > 
-> > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > 
-> > I think that the dw-hdmi i2c support [1] is a prerequisite of this
-> > patch.  I do not see it lands on v4.9-rc1.  Or am I missing something?
-> > 
-> > Shawn
-> > 
-> > [1] https://patchwork.kernel.org/patch/9296883/
-> > 
-> 
-> I'm adding Philipp to Cc, since he is the last one who tested the change
-> and helped me to push the change to the mainline:
-> 
->   https://lists.freedesktop.org/archives/dri-devel/2016-September/118569.html
-> 
-> The problem is that there is no official DW HDMI bridge maintainer, may be
-> you can review the change, and if you find it satisfactory push it through
-> ARM/iMX tree.
+Yea, what it means is I've no possibility to go back to what was
+originally working now, since I don't understand how to get UEFI to
+behave (Will set the machine up for me, I don't have any information
+on how it was originally configured other than what was on the uSD
+card, which appears incomplete.)
 
-Shawn, is it okay if that patch goes through your ARM/iMX tree?
+> >and UEFI is the most unfriendly thing going - the "boot manager" thing
+> >doesn't let you view the configuration:
+> >
+> 
+> I completely agree. I had real bad times in past dealing with such
+> things in UEFI.
+> 
+> >[1] Linux from NOR Flash
+> >[2] Shell
+> >[3] Boot Manager
+> >Start: 3
+> >[1] Add Boot Device Entry
+> >[2] Update Boot Device Entry
+> >[3] Remove Boot Device Entry
+> >[4] Reorder Boot Device Entries
+> >[5] Update FDT path
+> >[6] Set Boot Timeout
+> >[7] Return to main menu
+> >Choice:
+> >
+> >and dropping into the shell... well, I've no idea how to get a listing
+> >of what it thinks is in the NOR device (or even how to refer to the
+> >NOR device.)  "devices" shows nothing that's even remotely English.
+> >
+> 
+> I think startup.nsh needs some edits. Just replace it with something like:
+> 
+> "norkern dtb=board.dtb console=ttyAMA0,115200n8 root=/dev/nfs rw
+> rootwait ip=dhcp systemd.log_target=null nfsroot=..." or something
+> alike. Currently it just echos and stops.
+> 
+> Regarding the new firmware stopping abruptly, I have no clue, except
+> asking you to erase the flash completely when switching between the
+> firmware versions. That has worked for me for all UEFI related issues in
+> the past. It's really annoying I understand.
+> 
+> flash> eraseall
 
-- Sanchayan.
+I've tried that, it still stops at the same point, after:
+
+FV2 Hob           0xFE07B000 - 0xFE8253BF
+
+and remains unresponsive.
+
+I do notice that the uSD card becomes visible through USB at this point
+though.
+
+Okay, well, I'm going to have to disable Juno from the nightly boots
+until we get some kind of resolution on this, as my Juno is now
+incapable of booting anything.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
