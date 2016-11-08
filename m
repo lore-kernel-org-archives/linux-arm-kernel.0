@@ -1,27 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Nov 2016 10:34:25 +0100
-Subject: [PATCH v3 1/5] pinctrl: samsung: Add the support the multiple
- IORESOURCE_MEM for one pin-bank
-In-Reply-To: <1478155149-28527-2-git-send-email-cw00.choi@samsung.com>
+Date: Tue, 8 Nov 2016 10:36:04 +0100
+Subject: [PATCH v3 2/5] pinctrl: samsung: Add GPF support for Exynos5433
+In-Reply-To: <1478155149-28527-3-git-send-email-cw00.choi@samsung.com>
 References: <1478155149-28527-1-git-send-email-cw00.choi@samsung.com>
- <1478155149-28527-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CACRpkdZ3JmvbEkLK77V9x44WZ0tfmJWLv5CW7QkTM5-aw6M-4g@mail.gmail.com>
+ <1478155149-28527-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <CACRpkdaBWBy__DhpUW0vKy90YWR8rHFjVkPDAC8rL05ZMnn6OQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Nov 3, 2016 at 7:39 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
 
-> This patch supports the multiple IORESOURCE_MEM resources for one pin-bank.
-> In the pre-existing Exynos series, the registers of the gpio bank are included
-> in the one memory map. But, some gpio bank need to support the one more memory
-> map (IORESOURCE_MEM) because the registers of gpio bank are separated into
-> the different memory map.
->
-> For example,
-> The both ALIVE and IMEM domain have the different memory base address.
-> The GFP[1-5] of exynos5433 are composed as following:
-> - ALIVE domain : WEINT_* registers
-> - IMEM domain  : CON/DAT/PUD/DRV/CONPDN/PUDPDN register
+> This patch add the support of GPF[1-5] pin of Exynos5433 SoC. The GPFx need
+> to support the multiple memory map because the registers of GPFx are located
+> in the different domain.
 >
 > Cc: Tomasz Figa <tomasz.figa@gmail.com>
 > Cc: Krzysztof Kozlowski <krzk@kernel.org>
@@ -31,10 +22,10 @@ On Thu, Nov 3, 2016 at 7:39 AM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
 > Cc: Rob Herring <robh+dt@kernel.org>
 > Cc: Mark Rutland <mark.rutland@arm.com>
 > Cc: linux-gpio at vger.kernel.org
-> Suggested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Patch applied with Krzysztof's review tag.
+Patch applied.
 
 Yours,
 Linus Walleij
