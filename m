@@ -1,73 +1,62 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 8 Nov 2016 11:09:57 +0000
-Subject: [PATCH] ARM: tegra: nyan: Mark all USB ports as host
-In-Reply-To: <20161108110735.GA13098@ulmo.ba.sec>
-References: <20160918102852.6593-1-contact@paulk.fr>
- <20161107132854.GF12559@ulmo.ba.sec>
- <13e7ff98-8bc2-ccf7-94bb-4e1d3c61b20d@nvidia.com>
- <20161108085420.GG2478@tbergstrom-lnx.Nvidia.com>
- <58046fbb-8e19-e629-770a-940a40ca6ef9@nvidia.com>
- <20161108110735.GA13098@ulmo.ba.sec>
-Message-ID: <3fbd3fb9-1dc5-a46d-355b-f7c94b3c43ef@nvidia.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 08 Nov 2016 16:49:42 +0530
+Subject: [RESPIN-PATCH v2 0/2] Remove static mapping of SCU from mach-exynos
+Message-ID: <1478603984-504-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series is part of patch series [1], which adds support of SCU
+device node for Cortex-A9 based Exynos4 SoC. First two patches of the same
+has been accepted and hence not included them in v2.
 
-On 08/11/16 11:07, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Tue, Nov 08, 2016 at 09:47:42AM +0000, Jon Hunter wrote:
->>
->> On 08/11/16 08:54, Peter De Schrijver wrote:
->>> On Mon, Nov 07, 2016 at 02:09:31PM +0000, Jon Hunter wrote:
->>>>
->>>> On 07/11/16 13:28, Thierry Reding wrote:
->>>>>> Old Signed by an unknown key
->>>>>
->>>>> On Sun, Sep 18, 2016 at 12:28:52PM +0200, Paul Kocialkowski wrote:
->>>>>> Nyan boards only have host USB ports (2 external, 1 internal), there is
->>>>>> no OTG-enabled connector.
->>>>>>
->>>>>> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->>>>>> ---
->>>>>>  arch/arm/boot/dts/tegra124-nyan.dtsi | 2 +-
->>>>>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>
->>>>> Where is this information coming from? I don't have one of the Nyans
->>>>> myself, but one of the Tegra132 devices I have, which I think was
->>>>> derived from one of the Nyans uses one of the external host ports as
->>>>> forced recovery port, for which it would need OTG.
->>>>>
->>>>> I suspect that the way to get U-Boot onto the Nyans is via tegrarcm?
->>>>> In that case I think one of the ports must be OTG.
->>>>
->>>> It is true that the port on the back on the nyan-big can be used with
->>>> recovery mode. I was thinking that this is not a true OTG port as it is
->>>> just a 4-pin type A socket and does not have an ID pin. Thinking some
->>>> more about this the USB spec does include a "Host Negotiation Protocol
->>>> (HNP)" that allows a host and device to swap roles and so keeping it as
->>>> OTG seems valid afterall.
->>>
->>> I don't think the bootrom implements that though. I expect recovery mode
->>> to just program the controller in device mode, without performing any
->>> negotiation.
->>
->> I am not talking about the bootrom and I would not expect the bootrom to
->> do that. However, the kernel could.
-> 
-> Either way, configuring the controller in device mode is enough to make
-> the host detect it, otherwise tegrarcm wouldn't work.
-> 
-> From the point of view of the binding I think "otg" is the most accurate
-> option because we know that the controller can operate in both modes. If
-> it currently doesn't or how exactly switching modes is done is outside
-> the scope of this property.
-> 
-> Is everyone okay with just dropping this patch?
+This patch series does some cleanup for Exynos4 SoC based boards.
+We are currently statically mapping SCU SFRs in mach-exynos/exynos.c
+which can be avoided if map this from device node of SCU
 
-Fine with me.
+[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
 
-Jon
+This patch series is prepared on Krzysztof's for-next
+(SHA_ID: b33c7bb9d59c3f4100d4)
+
+I have tested these patches on Exynos4210 based on Origen board for SMP boot.
+Patchset v1 was tested by Marek Szyprowski on Exynos4412-based Odroid U3
+for SMP boot and S2R.
+
+To confirm concern raised by Alim, I intentionally removed SCU device node
+from exynos4.dtsi and tested on Origen board, I can see code handles this
+case gracefully without any crash and system boot was fine. Of-course in such
+case only single core will be able to boot.
+
+Following boot message observed on Origen in case of missing SCU node
+-------------
+[    0.000864] CPU: Testing write buffer coherency: ok
+[    0.001068] CPU0: thread -1, cpu 0, socket 9, mpidr 80000900
+[    0.001456] exynos_scu_enable failed to map scu_base
+[    0.001477] Setting up static identity map for 0x40100000 - 0x40100058
+[    1.120003] CPU1: failed to come online
+[    1.120059] Brought up 1 CPUs
+[    1.120068] SMP: Total of 1 processors activated (48.00 BogoMIPS).
+[    1.120076] CPU: All CPU(s) started in SVC mode.
+-------------
+
+Changes since v1:
+ - Address review comments from Krzysztof
+ - Moved scu_enable from pm.c and suspend.c to single place in platsmp.c
+ - Added error handling during scu_enable in platsmp.c
+ - Added Reviewed-by tag from Alim.
+
+Pankaj Dubey (2):
+  ARM: EXYNOS: Remove static mapping of SCU SFR
+  ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
+
+ arch/arm/mach-exynos/common.h                |  6 +----
+ arch/arm/mach-exynos/exynos.c                | 22 ------------------
+ arch/arm/mach-exynos/include/mach/map.h      |  2 --
+ arch/arm/mach-exynos/platsmp.c               | 34 +++++++++++++++++++++-------
+ arch/arm/mach-exynos/pm.c                    |  5 ++--
+ arch/arm/mach-exynos/suspend.c               | 13 ++++-------
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
+ 7 files changed, 34 insertions(+), 52 deletions(-)
 
 -- 
-nvpublic
+2.7.4
