@@ -1,73 +1,60 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 8 Nov 2016 10:19:31 +0800
-Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <20161107162504.17591806@thinkpad>
-References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
- <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
- <20161107162504.17591806@thinkpad>
-Message-ID: <20161108021929.GA982@sha-win-210.asiapac.arm.com>
+Date: Tue, 8 Nov 2016 10:25:29 +0800
+Subject: [PATCH 1/2] arm64: hugetlb: remove the wrong pmd check in
+ find_num_contig()
+In-Reply-To: <20161104154814.hizb5277wp2f3enj@localhost>
+References: <1478140059-13829-1-git-send-email-shijie.huang@arm.com>
+ <1478140059-13829-2-git-send-email-shijie.huang@arm.com>
+ <20161104001616.ssjbemliorxi6evl@localhost>
+ <20161104025216.GA19810@sha-win-210.asiapac.arm.com>
+ <20161104154814.hizb5277wp2f3enj@localhost>
+Message-ID: <20161108022527.GB982@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 04:25:04PM +0100, Gerald Schaefer wrote:
-> On Thu, 3 Nov 2016 10:51:38 +0800
-> Huang Shijie <shijie.huang@arm.com> wrote:
+On Fri, Nov 04, 2016 at 09:48:14AM -0600, Catalin Marinas wrote:
+> On Fri, Nov 04, 2016 at 10:52:17AM +0800, Huang Shijie wrote:
+> > On Thu, Nov 03, 2016 at 06:16:16PM -0600, Catalin Marinas wrote:
+> > > On Thu, Nov 03, 2016 at 10:27:38AM +0800, Huang Shijie wrote:
+> > > > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > > > index 2e49bd2..4811ef1 100644
+> > > > --- a/arch/arm64/mm/hugetlbpage.c
+> > > > +++ b/arch/arm64/mm/hugetlbpage.c
+> > > > @@ -61,10 +61,6 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+> > > >  		return 1;
+> > > >  	}
+> > > >  	pmd = pmd_offset(pud, addr);
+> > > > -	if (!pmd_present(*pmd)) {
+> > > > -		VM_BUG_ON(!pmd_present(*pmd));
+> > > > -		return 1;
+> > > > -	}
+> > > >  	if ((pte_t *)pmd == ptep) {
+> > > >  		*pgsize = PMD_SIZE;
+> > > >  		return CONT_PMDS;
+> > > 
+> > > BTW, for the !pud_present() and !pgd_present() cases, shouldn't
+> > > find_num_contig() actually return 0? These are more likely real bugs, so
+> > > no point in setting the huge pte.
+> > 
+> > The kernel will not call the find_num_contig() if the PGD/PUD are empty.
+> > Please see the code in the hugetlb_fault().
+> > 
+> >    ------------------------------------------------------
+> > 	ptep = huge_pte_offset(mm, address);
+> > 	if (ptep) {
+> > 	    ...............................
+> > 	} else {
+> > 		ptep = huge_pte_alloc(mm, address, huge_page_size(h));
+> > 		if (!ptep)
+> > 			return VM_FAULT_OOM;
+> > 	}
+> >    ------------------------------------------------------
 > 
-> > When testing the gigantic page whose order is too large for the buddy
-> > allocator, the libhugetlbfs test case "counter.sh" will fail.
-> > 
-> > The failure is caused by:
-> >  1) kernel fails to allocate a gigantic page for the surplus case.
-> >     And the gather_surplus_pages() will return NULL in the end.
-> > 
-> >  2) The condition checks for "over-commit" is wrong.
-> > 
-> > This patch adds code to allocate the gigantic page in the
-> > __alloc_huge_page(). After this patch, gather_surplus_pages()
-> > can return a gigantic page for the surplus case.
-> > 
-> > This patch also changes the condition checks for:
-> >      return_unused_surplus_pages()
-> >      nr_overcommit_hugepages_store()
-> > 
-> > After this patch, the counter.sh can pass for the gigantic page.
-> > 
-> > Acked-by: Steve Capper <steve.capper@arm.com>
-> > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> > ---
-> >  mm/hugetlb.c | 15 ++++++++++-----
-> >  1 file changed, 10 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> > index 0bf4444..2b67aff 100644
-> > --- a/mm/hugetlb.c
-> > +++ b/mm/hugetlb.c
-> > @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
-> >  	struct page *page;
-> >  	unsigned int r_nid;
-> > 
-> > -	if (hstate_is_gigantic(h))
-> > +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
-> >  		return NULL;
-> 
-> Is it really possible to stumble over gigantic pages w/o having
-> gigantic_page_supported()?
-> 
-> Also, I've just tried this on s390 and counter.sh still fails after these
-> patches, and it should fail on all archs as long as you use the gigantic
-I guess the failure you met is caused by the libhugetlbfs itself, there are
-several bugs in the libhugetlbfs. I have a patch set for the
-libhugetlbfs too. I will send it as soon as possible.
-
-> hugepage size as default hugepage size. This is because you only changed
-> nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
-> in sysfs, and missed hugetlb_overcommit_handler() which handles
-> /proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
-This is wrong. :)
-
-I did have an extra patch to fix the hugetlb_overcommit_handler().
-but the counters.sh does not use the /proc/sys/vm/nr_overcommit_hugepages.
-Please grep it in the code.
+> Exactly. So what is the reason for returning 1 if !pgd_present()? Would
+I think the author was too cautious for returning 1 if !pgd_present().
+:)
+> removing the checks entirely or adding BUG() be a better option?
+I will remove the checks in the next version.
 
 Thanks
 Huang Shijie
