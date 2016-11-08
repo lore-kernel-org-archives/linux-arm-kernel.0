@@ -1,49 +1,53 @@
-From: rick.chang@mediatek.com (Rick Chang)
-Date: Tue, 8 Nov 2016 14:34:40 +0800
-Subject: [PATCH v5 3/3] arm: dts: mt2701: Add node for Mediatek JPEG Decoder
-In-Reply-To: <1478586880-3923-1-git-send-email-rick.chang@mediatek.com>
-References: <1478586880-3923-1-git-send-email-rick.chang@mediatek.com>
-Message-ID: <1478586880-3923-4-git-send-email-rick.chang@mediatek.com>
+From: yangbo.lu@nxp.com (Y.B. Lu)
+Date: Tue, 8 Nov 2016 06:49:51 +0000
+Subject: [v15, 3/7] powerpc/fsl: move mpc85xx.h to include/linux/fsl
+In-Reply-To: <1543282.vWjeo4ynTa@wuerfel>
+References: <1477637418-38938-1-git-send-email-yangbo.lu@nxp.com>
+ <2723366.1bJeJ7SKI6@wuerfel>
+ <DB6PR0401MB2536B1B2E6AC36BDC8FC540DF8AE0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+ <1543282.vWjeo4ynTa@wuerfel>
+Message-ID: <DB6PR0401MB25366BC8FF59C68E2823245EF8A60@DB6PR0401MB2536.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rick Chang <rick.chang@mediatek.com>
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
----
-This patch depends on: 
-  CCF "Add clock support for Mediatek MT2701"[1]
-  iommu and smi "Add the dtsi node of iommu and smi for mt2701"[2]
+Hi Arnd,
 
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-October/007271.html
-[2] https://patchwork.kernel.org/patch/9164013/
----
- arch/arm/boot/dts/mt2701.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 8f13c70..4dd5048 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -298,6 +298,20 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
- 	};
- 
-+	jpegdec: jpegdec at 15004000 {
-+		compatible = "mediatek,mt2701-jpgdec";
-+		reg = <0 0x15004000 0 0x1000>;
-+		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_LOW>;
-+		clocks =  <&imgsys CLK_IMG_JPGDEC_SMI>,
-+			  <&imgsys CLK_IMG_JPGDEC>;
-+		clock-names = "jpgdec-smi",
-+			      "jpgdec";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-+		mediatek,larb = <&larb2>;
-+		iommus = <&iommu MT2701_M4U_PORT_JPGDEC_WDMA>,
-+			 <&iommu MT2701_M4U_PORT_JPGDEC_BSDMA>;
-+	};
-+
- 	vdecsys: syscon at 16000000 {
- 		compatible = "mediatek,mt2701-vdecsys", "syscon";
- 		reg = <0 0x16000000 0 0x1000>;
--- 
-1.9.1
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Tuesday, November 08, 2016 5:20 AM
+> To: Y.B. Lu
+> Cc: linuxppc-dev at lists.ozlabs.org; linux-mmc at vger.kernel.org;
+> ulf.hansson at linaro.org; Scott Wood; Mark Rutland; Greg Kroah-Hartman; X.B.
+> Xie; M.H. Lian; linux-i2c at vger.kernel.org; linux-clk at vger.kernel.org;
+> Qiang Zhao; Russell King; Bhupesh Sharma; Joerg Roedel; Claudiu Manoil;
+> devicetree at vger.kernel.org; Rob Herring; Santosh Shilimkar; linux-arm-
+> kernel at lists.infradead.org; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; Leo Li; iommu at lists.linux-foundation.org; Kumar
+> Gala
+> Subject: Re: [v15, 3/7] powerpc/fsl: move mpc85xx.h to include/linux/fsl
+> 
+> On Monday, October 31, 2016 9:35:33 AM CET Y.B. Lu wrote:
+> > >
+> > > I don't see any of the contents of this header referenced by the soc
+> > > driver any more. I think you can just drop this patch.
+> > >
+> >
+> > [Lu Yangbo-B47093] This header file was included by guts.c.
+> > The guts driver used macro SVR_MAJ/SVR_MIN for calculation.
+> >
+> > This header file was for powerpc arch before. And this patch is to
+> > made it as common header file for both ARM and PPC.
+> > Sooner or later this is needed.
+> 
+> Let's discuss it once we actually need the header then, ok?
+
+[Lu Yangbo-B47093] As I said, this header file was included by guts.c in patch 4.
+The guts driver used macro SVR_MAJ/SVR_MIN for calculation which were defined in this header file.
+Did you suggest we dropped this patch and just calculated them in driver?
+
+Thanks :)
+
+
+> 
+> 	Arnd
