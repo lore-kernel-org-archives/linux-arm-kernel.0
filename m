@@ -1,58 +1,45 @@
 From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue,  8 Nov 2016 19:58:31 +0100
-Subject: [PATCH 3/3] ARM: dts: da850: add usb device node
+Date: Tue,  8 Nov 2016 19:58:30 +0100
+Subject: [PATCH 2/3] USB: ohci: da8xx: Allow probing from DT
 In-Reply-To: <20161108185831.17683-1-ahaslam@baylibre.com>
 References: <20161108185831.17683-1-ahaslam@baylibre.com>
-Message-ID: <20161108185831.17683-4-ahaslam@baylibre.com>
+Message-ID: <20161108185831.17683-3-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the ohci device node for the da850 soc.
-It also enables it for the omapl138 hawk board.
+This adds the compatible string to the ohci driver
+to be able to probe from DT
 
 Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 ---
- arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
- arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
- 2 files changed, 16 insertions(+)
+ drivers/usb/host/ohci-da8xx.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-index 7b8ab21..aaf533e 100644
---- a/arch/arm/boot/dts/da850-lcdk.dts
-+++ b/arch/arm/boot/dts/da850-lcdk.dts
-@@ -86,6 +86,14 @@
- 	};
+diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+index 83b182e..bbfe342 100644
+--- a/drivers/usb/host/ohci-da8xx.c
++++ b/drivers/usb/host/ohci-da8xx.c
+@@ -321,6 +321,13 @@ static int ohci_da8xx_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
+ }
+ 
+ /*-------------------------------------------------------------------------*/
++#ifdef CONFIG_OF
++static const struct of_device_id da8xx_ohci_ids[] = {
++	{ .compatible = "ti,da830-ohci" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, da8xx_ohci_ids);
++#endif
+ 
+ static int ohci_da8xx_probe(struct platform_device *pdev)
+ {
+@@ -472,6 +479,7 @@ static struct platform_driver ohci_hcd_da8xx_driver = {
+ #endif
+ 	.driver		= {
+ 		.name	= DRV_NAME,
++		.of_match_table = of_match_ptr(da8xx_ohci_ids),
+ 	},
  };
  
-+&usb_phy {
-+	status = "okay";
-+};
-+
-+&ohci {
-+	status = "okay";
-+};
-+
- &serial2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&serial2_rxtx_pins>;
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 2534aab..c74f1a6 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -405,6 +405,14 @@
- 					>;
- 			status = "disabled";
- 		};
-+		ohci: usb at 225000 {
-+			compatible = "ti,da830-ohci";
-+			reg = <0x225000 0x1000>;
-+			interrupts = <59>;
-+			phys = <&usb_phy 1>;
-+			phy-names = "usb-phy";
-+			status = "disabled";
-+		};
- 		gpio: gpio at 226000 {
- 			compatible = "ti,dm6441-gpio";
- 			gpio-controller;
 -- 
 2.10.1
