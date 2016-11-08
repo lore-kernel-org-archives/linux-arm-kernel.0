@@ -1,101 +1,33 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 8 Nov 2016 17:17:28 +0800
-Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
-References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
- <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
- <20161107162504.17591806@thinkpad>
- <20161108021929.GA982@sha-win-210.asiapac.arm.com>
- <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
-Message-ID: <20161108091725.GA18678@sha-win-210.asiapac.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  8 Nov 2016 10:27:17 +0100
+Subject: [PATCH] pinctrl: sx150x: fix up headers
+Message-ID: <1478597237-4441-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerald,
-On Tue, Nov 08, 2016 at 03:08:52PM +0800, Huang Shijie wrote:
-> On Tue, Nov 08, 2016 at 10:19:30AM +0800, Huang Shijie wrote:
-> > On Mon, Nov 07, 2016 at 04:25:04PM +0100, Gerald Schaefer wrote:
-> > > On Thu, 3 Nov 2016 10:51:38 +0800
-> > > Huang Shijie <shijie.huang@arm.com> wrote:
-> > > 
-> > > > When testing the gigantic page whose order is too large for the buddy
-> > > > allocator, the libhugetlbfs test case "counter.sh" will fail.
-> > > > 
-> > > > The failure is caused by:
-> > > >  1) kernel fails to allocate a gigantic page for the surplus case.
-> > > >     And the gather_surplus_pages() will return NULL in the end.
-> > > > 
-> > > >  2) The condition checks for "over-commit" is wrong.
-> > > > 
-> > > > This patch adds code to allocate the gigantic page in the
-> > > > __alloc_huge_page(). After this patch, gather_surplus_pages()
-> > > > can return a gigantic page for the surplus case.
-> > > > 
-> > > > This patch also changes the condition checks for:
-> > > >      return_unused_surplus_pages()
-> > > >      nr_overcommit_hugepages_store()
-> > > > 
-> > > > After this patch, the counter.sh can pass for the gigantic page.
-> > > > 
-> > > > Acked-by: Steve Capper <steve.capper@arm.com>
-> > > > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> > > > ---
-> > > >  mm/hugetlb.c | 15 ++++++++++-----
-> > > >  1 file changed, 10 insertions(+), 5 deletions(-)
-> > > > 
-> > > > diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> > > > index 0bf4444..2b67aff 100644
-> > > > --- a/mm/hugetlb.c
-> > > > +++ b/mm/hugetlb.c
-> > > > @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
-> > > >  	struct page *page;
-> > > >  	unsigned int r_nid;
-> > > > 
-> > > > -	if (hstate_is_gigantic(h))
-> > > > +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
-> > > >  		return NULL;
-> > > 
-> > > Is it really possible to stumble over gigantic pages w/o having
-> > > gigantic_page_supported()?
-> > > 
-> > > Also, I've just tried this on s390 and counter.sh still fails after these
-> > > patches, and it should fail on all archs as long as you use the gigantic
-> > I guess the failure you met is caused by the libhugetlbfs itself, there are
-> > several bugs in the libhugetlbfs. I have a patch set for the
-> > libhugetlbfs too. I will send it as soon as possible.
-> > 
-> > > hugepage size as default hugepage size. This is because you only changed
-> > > nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
-> > > in sysfs, and missed hugetlb_overcommit_handler() which handles
-> > > /proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
-> > This is wrong. :)
-> Sorry, I was wrong :). The counters test does call the /proc/sys/vm/nr_overcommit_hugepages.
-> But in the arm64, it does not trigger a fail for the counters test.
-> In an other word, I did not change the hugetlb_overcommit_handler(),
-> the counters.sh also can pass in arm64. 
-After I add the "default_hugepagesz=32M" to the kernel cmdlin, I can
-reproduce this issue. Thanks for point this.
+Include <linux/gpio/driver.h> rather than <linux/gpio.h>
+Drop <linux/pinctrl/machine.h>.
 
-> 
-> I will look at the lockdep issue.
-I tested the new patch (will be sent out later) on the arm64 platform,
-and I did not meet the lockdep issue when I enabled the lockdep.
-The following is my config:
+Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-sx150x.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-	CONFIG_LOCKD=y
-	CONFIG_LOCKD_V4=y
-	CONFIG_LOCKUP_DETECTOR=y
-        # CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-	CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-	CONFIG_DEBUG_SPINLOCK=y
-	CONFIG_DEBUG_LOCK_ALLOC=y
-	CONFIG_PROVE_LOCKING=y
-	CONFIG_LOCKDEP=y
-	CONFIG_LOCK_STAT=y
-	CONFIG_DEBUG_LOCKDEP=y
-	CONFIG_DEBUG_LOCKING_API_SELFTESTS=y
-	
-So do I miss something? 
-
-Thanks	
-Huang Shijie
+diff --git a/drivers/pinctrl/pinctrl-sx150x.c b/drivers/pinctrl/pinctrl-sx150x.c
+index dc1341fdc73d..63778058eec7 100644
+--- a/drivers/pinctrl/pinctrl-sx150x.c
++++ b/drivers/pinctrl/pinctrl-sx150x.c
+@@ -27,8 +27,7 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <linux/gpio.h>
+-#include <linux/pinctrl/machine.h>
++#include <linux/gpio/driver.h>
+ #include <linux/pinctrl/pinconf.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+-- 
+2.7.4
