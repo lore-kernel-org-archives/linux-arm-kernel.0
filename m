@@ -1,171 +1,41 @@
-From: hl@rock-chips.com (hl)
-Date: Tue, 8 Nov 2016 17:55:49 +0800
-Subject: [PATCH v4] PM/devfreq: add suspend frequency support
-In-Reply-To: <58219B96.6060106@samsung.com>
-References: <CGME20161108091527epcas2p1ff889a34d3538d548fcb63aa62a76b9a@epcas2p1.samsung.com>
- <1478596289-7442-1-git-send-email-hl@rock-chips.com>
- <58219B96.6060106@samsung.com>
-Message-ID: <5821A125.10308@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 8 Nov 2016 17:56:39 +0800
+Subject: [PATCH 2/2] irqchip/gicv3-its: Test code for measuring
+ Read-allocate
+In-Reply-To: <8c3ea714-5bd2-6784-8eae-8b953860c8f6@codeaurora.org>
+Message-ID: <201611081703.K5VlCvmj%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo Choi,
+Hi Shanker,
 
-On 2016?11?08? 17:32, Chanwoo Choi wrote:
-> Hi Lin,
->
-> On 2016? 11? 08? 18:11, Lin Huang wrote:
->> Add suspend frequency support and if needed set it to
->> the frequency obtained from the suspend opp (can be defined
->> using opp-v2 bindings and is optional).
->>
->> Signed-off-by: Lin Huang <hl@rock-chips.com>
->> ---
->> Changes in v2:
->> - use update_devfreq() instead devfreq_update_status()
->> Changes in v3:
->> - fix build error
->> Changes in v4:
->> - move dev_pm_opp_get_suspend_opp() to devfreq_add_device()
->>
->>   drivers/devfreq/devfreq.c                 | 15 +++++++++++++--
->>   drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
->>   include/linux/devfreq.h                   |  9 +++++++++
->>   3 files changed, 31 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
->> index bf3ea76..d9d56e1 100644
->> --- a/drivers/devfreq/devfreq.c
->> +++ b/drivers/devfreq/devfreq.c
->> @@ -363,7 +363,10 @@ void devfreq_monitor_suspend(struct devfreq *devfreq)
->>   		mutex_unlock(&devfreq->lock);
->>   		return;
->>   	}
->> -
->> +	if (devfreq->suspend_freq) {
->> +		update_devfreq(devfreq);
->> +		devfreq->suspend_flag = true;
-> You don't need the additional variable (devfreq->suspend_flag).
-> When adding the devfreq on devfreq_add_device(),
-> you can initialize the devfreq->suspend_freq as zero(0).
->
-> You can check whether devfreq->suspend_freq is 0 or not
-> without the new suspend_flag.
->
->> +	}
->>   	devfreq_update_status(devfreq, devfreq->previous_freq);
->>   	devfreq->stop_polling = true;
->>   	mutex_unlock(&devfreq->lock);
->> @@ -394,7 +397,8 @@ void devfreq_monitor_resume(struct devfreq *devfreq)
->>   
->>   	devfreq->last_stat_updated = jiffies;
->>   	devfreq->stop_polling = false;
->> -
->> +	if (devfreq->suspend_freq)
->> +		devfreq->suspend_flag = false;
-> ditto. You don't need to add this code.
->
->>   	if (devfreq->profile->get_cur_freq &&
->>   		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq))
->>   		devfreq->previous_freq = freq;
->> @@ -528,6 +532,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
->>   	struct devfreq *devfreq;
->>   	struct devfreq_governor *governor;
->>   	int err = 0;
->> +	struct dev_pm_opp *suspend_opp;
->>   
->>   	if (!dev || !profile || !governor_name) {
->>   		dev_err(dev, "%s: Invalid parameters.\n", __func__);
->> @@ -563,6 +568,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
->>   	devfreq->data = data;
->>   	devfreq->nb.notifier_call = devfreq_notifier_call;
->>   
->> +	rcu_read_lock();
->> +	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
->> +	if (suspend_opp)
->> +		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
->> +	rcu_read_unlock();
->> +
->>   	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
->>   		mutex_unlock(&devfreq->lock);
->>   		devfreq_set_freq_table(devfreq);
->> diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
->> index ae72ba5..84b3ce1 100644
->> --- a/drivers/devfreq/governor_simpleondemand.c
->> +++ b/drivers/devfreq/governor_simpleondemand.c
->> @@ -29,6 +29,15 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
->>   	struct devfreq_simple_ondemand_data *data = df->data;
->>   	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
->>   
->> +	/*
->> +	 * if devfreq in suspend status and have suspend_freq,
->> +	 * the frequency need to set to suspend_freq
->> +	 */
->> +	if (df->suspend_flag) {
->> +		*freq =	df->suspend_freq;
->> +		return 0;
->> +	}
-> You can check it as following:
->
-> 	if (df->suspend_freq != 0)
-> 		*freq = df->suspend_freq;
-If i do like this, it will always return suspend frequency, since 
-devfreq->suspend_freq will be assigned value
-if we define it on dts. But what we want is only in suspend status we 
-return the suspend frequency.
->
->> +
->>   	err = devfreq_update_stats(df);
->>   	if (err)
->>   		return err;
->> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
->> index 2de4e2e..c463ae1 100644
->> --- a/include/linux/devfreq.h
->> +++ b/include/linux/devfreq.h
->> @@ -172,6 +172,7 @@ struct devfreq {
->>   	struct delayed_work work;
->>   
->>   	unsigned long previous_freq;
->> +	unsigned long suspend_freq;
->>   	struct devfreq_dev_status last_status;
->>   
->>   	void *data; /* private data for governors */
->> @@ -179,6 +180,7 @@ struct devfreq {
->>   	unsigned long min_freq;
->>   	unsigned long max_freq;
->>   	bool stop_polling;
->> +	bool suspend_flag;
-> You don't need to add new variable.
->
->>   
->>   	/* information for device frequency transition */
->>   	unsigned int total_trans;
->> @@ -214,6 +216,8 @@ extern int devfreq_resume_device(struct devfreq *devfreq);
->>   /* Helper functions for devfreq user device driver with OPP. */
->>   extern struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->>   					   unsigned long *freq, u32 flags);
->> +extern void devfreq_opp_get_suspend_opp(struct device *dev,
->> +					struct devfreq *devfreq);
-> Why do you need this function? Also, this patch don't include the body
-> of devfreq_opp_get_suspend_opp() function.
-Oh, forget to delete it, sorry about that.
->
->>   extern int devfreq_register_opp_notifier(struct device *dev,
->>   					 struct devfreq *devfreq);
->>   extern int devfreq_unregister_opp_notifier(struct device *dev,
->> @@ -348,6 +352,11 @@ static inline struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->>   	return ERR_PTR(-EINVAL);
->>   }
->>   
->> +static inline void devfreq_opp_get_suspend_opp(struct device *dev,
->> +					       struct devfreq *devfreq)
->> +{
->> +}
->> +
->>   static inline int devfreq_register_opp_notifier(struct device *dev,
->>   					 struct devfreq *devfreq)
->>   {
->>
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.9-rc4 next-20161028]
+[cannot apply to tip/irq/core arm-jcooper/irqchip/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
--- 
-Lin Huang
+url:    https://github.com/0day-ci/linux/commits/Shanker-Donthineni/irqchip-gicv3-its-Test-code-for-measuring-Read-allocate/20161108-154723
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All errors (new ones prefixed by >>):
+
+   /tmp/ccEUFgcT.s: Assembler messages:
+>> /tmp/ccEUFgcT.s:700: Error: selected processor does not support requested special purpose register -- `mrs r10,pmccntr_el0'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38721 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/f74b1c64/attachment-0001.gz>
