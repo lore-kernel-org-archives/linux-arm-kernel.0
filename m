@@ -1,37 +1,58 @@
 From: ahaslam@baylibre.com (Axel Haslam)
-Date: Tue,  8 Nov 2016 19:58:28 +0100
-Subject: [PATCH 0/3] [PART 4/4] USB: ohci-da8xx: Add DT support
-Message-ID: <20161108185831.17683-1-ahaslam@baylibre.com>
+Date: Tue,  8 Nov 2016 19:58:31 +0100
+Subject: [PATCH 3/3] ARM: dts: da850: add usb device node
+In-Reply-To: <20161108185831.17683-1-ahaslam@baylibre.com>
+References: <20161108185831.17683-1-ahaslam@baylibre.com>
+Message-ID: <20161108185831.17683-4-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series defines the bindings and adds device tree support
-for the davinci OHCI driver.
+This adds the ohci device node for the da850 soc.
+It also enables it for the omapl138 hawk board.
 
-DEPENDENCIES:
-1. [PATCH 0/3] fix ohci phy name
-https://lkml.org/lkml/2016/11/2/208
-2. [PATCH/RFC v2 0/3] regulator: handling of error conditions for usb drivers
-https://lkml.org/lkml/2016/11/3/188
-3. [PATCH v4 0/3] [PART 1/4] USB: ohci-da8xx: Allow a regulator for VBUS and over current
-4. [PATCH 0/3] [PART 2/4] ARM: davinci: OHCI: Use a regulator instead of callbacks
-5. [PATCH 0/2] [PART 3/4] USB: ohci-da8xx: Remove platform callbacks
+Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+---
+ arch/arm/boot/dts/da850-lcdk.dts | 8 ++++++++
+ arch/arm/boot/dts/da850.dtsi     | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-A branch with all the dependencies can be found here:
-https://github.com/axelhaslamx/linux-axel/commits/ohci-da8xx-dt-v4
-
-
-Axel Haslam (3):
-  USB: ohci: da8xx: Add devicetree bindings
-  USB: ohci: da8xx: Allow probing from DT
-  ARM: dts: da850: add usb device node
-
- .../devicetree/bindings/usb/ohci-da8xx.txt         | 39 ++++++++++++++++++++++
- arch/arm/boot/dts/da850-lcdk.dts                   |  8 +++++
- arch/arm/boot/dts/da850.dtsi                       |  8 +++++
- drivers/usb/host/ohci-da8xx.c                      |  8 +++++
- 4 files changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/usb/ohci-da8xx.txt
-
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index 7b8ab21..aaf533e 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -86,6 +86,14 @@
+ 	};
+ };
+ 
++&usb_phy {
++	status = "okay";
++};
++
++&ohci {
++	status = "okay";
++};
++
+ &serial2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&serial2_rxtx_pins>;
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 2534aab..c74f1a6 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -405,6 +405,14 @@
+ 					>;
+ 			status = "disabled";
+ 		};
++		ohci: usb at 225000 {
++			compatible = "ti,da830-ohci";
++			reg = <0x225000 0x1000>;
++			interrupts = <59>;
++			phys = <&usb_phy 1>;
++			phy-names = "usb-phy";
++			status = "disabled";
++		};
+ 		gpio: gpio at 226000 {
+ 			compatible = "ti,dm6441-gpio";
+ 			gpio-controller;
 -- 
 2.10.1
