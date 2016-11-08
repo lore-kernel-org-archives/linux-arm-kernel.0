@@ -1,207 +1,188 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Tue, 08 Nov 2016 08:56:26 +0530
-Subject: [PATCH v7 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <cafc255a-3bdb-7eb2-1092-545866752858@samsung.com>
-References: <1478347427-28409-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161105120051epcas5p2edc77b9b0d2729725b626f88d555a4a0@epcas5p2.samsung.com>
- <1478347427-28409-2-git-send-email-pankaj.dubey@samsung.com>
- <cafc255a-3bdb-7eb2-1092-545866752858@samsung.com>
-Message-ID: <582145E2.7010802@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2016 03:26:58 +0000
+Subject: [PATCH V2 2/5] arm64: Allow hw watchpoint at varied offset from
+ base address
+In-Reply-To: <9394621e1b9709178ba54133a1469937fedae355.1476941895.git.panand@redhat.com>
+References: <cover.1476941895.git.panand@redhat.com>
+ <9394621e1b9709178ba54133a1469937fedae355.1476941895.git.panand@redhat.com>
+Message-ID: <20161108032658.GB20591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Pratyush,
 
-On Monday 07 November 2016 01:05 PM, Marek Szyprowski wrote:
-> Hi Pankaj,
+On Thu, Oct 20, 2016 at 11:18:14AM +0530, Pratyush Anand wrote:
+> ARM64 hardware supports watchpoint at any double word aligned address.
+> However, it can select any consecutive bytes from offset 0 to 7 from that
+> base address. For example, if base address is programmed as 0x420030 and
+> byte select is 0x1C, then access of 0x420032,0x420033 and 0x420034 will
+> generate a watchpoint exception.
 > 
+> Currently, we do not have such modularity. We can only program byte,
+> halfword, word and double word access exception from any base address.
 > 
-> On 2016-11-05 13:03, Pankaj Dubey wrote:
->> Exynos SoCs have Chipid, for identification of product IDs
->> and SoC revisions. This patch intends to provide initialization
->> code for all these functionalities, at the same time it provides some
->> sysfs entries for accessing these information to user-space.
->>
->> This driver uses existing binding for exynos-chipid.
->>
->> CC: Grant Likely <grant.likely@linaro.org>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>   drivers/soc/samsung/Kconfig         |   5 ++
->>   drivers/soc/samsung/Makefile        |   1 +
->>   drivers/soc/samsung/exynos-chipid.c | 148
->> ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 154 insertions(+)
->>   create mode 100644 drivers/soc/samsung/exynos-chipid.c
->>
->> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
->> index 2455339..f9ab858 100644
->> --- a/drivers/soc/samsung/Kconfig
->> +++ b/drivers/soc/samsung/Kconfig
->> @@ -14,4 +14,9 @@ config EXYNOS_PM_DOMAINS
->>       bool "Exynos PM domains" if COMPILE_TEST
->>       depends on PM_GENERIC_DOMAINS || COMPILE_TEST
->>   +config EXYNOS_CHIPID
->> +    bool "Exynos Chipid controller driver" if COMPILE_TEST
->> +    depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
->> +    select SOC_BUS
->> +
->>   endif
->> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
->> index 3619f2e..2a8a85e 100644
->> --- a/drivers/soc/samsung/Makefile
->> +++ b/drivers/soc/samsung/Makefile
->> @@ -1,3 +1,4 @@
->>   obj-$(CONFIG_EXYNOS_PMU)    += exynos-pmu.o exynos3250-pmu.o
->> exynos4-pmu.o \
->>                       exynos5250-pmu.o exynos5420-pmu.o
->>   obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
->> +obj-$(CONFIG_EXYNOS_CHIPID)    += exynos-chipid.o
->> diff --git a/drivers/soc/samsung/exynos-chipid.c
->> b/drivers/soc/samsung/exynos-chipid.c
->> new file mode 100644
->> index 0000000..9761e54
->> --- /dev/null
->> +++ b/drivers/soc/samsung/exynos-chipid.c
->> @@ -0,0 +1,148 @@
->> +/*
->> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
->> + *          http://www.samsung.com/
->> + *
->> + * EXYNOS - CHIP ID support
->> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_platform.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/sys_soc.h>
->> +
->> +#define EXYNOS3250_SOC_ID    0xE3472000
->> +#define EXYNOS4210_SOC_ID    0x43210000
->> +#define EXYNOS4212_SOC_ID    0x43220000
->> +#define EXYNOS4412_SOC_ID    0xE4412000
->> +#define EXYNOS4415_SOC_ID    0xE4415000
->> +#define EXYNOS5250_SOC_ID    0x43520000
->> +#define EXYNOS5260_SOC_ID    0xE5260000
->> +#define EXYNOS5410_SOC_ID    0xE5410000
->> +#define EXYNOS5420_SOC_ID    0xE5420000
->> +#define EXYNOS5440_SOC_ID    0xE5440000
->> +#define EXYNOS5800_SOC_ID    0xE5422000
->> +
->> +#define EXYNOS_SOC_MASK        0xFFFFF000
->> +
->> +#define EXYNOS4210_REV_0    0x0
->> +#define EXYNOS4210_REV_1_0    0x10
->> +#define EXYNOS4210_REV_1_1    0x11
+> This patch adds support to overcome above limitations.
 > 
-> EXYNOS4210_REV* defines are not used at all in this driver.
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+>  arch/arm64/include/asm/hw_breakpoint.h |  2 +-
+>  arch/arm64/kernel/hw_breakpoint.c      | 45 ++++++++++++++++------------------
+>  arch/arm64/kernel/ptrace.c             |  5 ++--
+>  3 files changed, 25 insertions(+), 27 deletions(-)
 > 
->> +
->> +#define EXYNOS_SUBREV_MASK    (0xF << 4)
->> +#define EXYNOS_MAINREV_MASK    (0xF << 0)
->> +#define EXYNOS_REV_MASK        (EXYNOS_SUBREV_MASK |
->> EXYNOS_MAINREV_MASK)
->> +
->> +
->> +static const char * __init product_id_to_soc_id(unsigned int product_id)
->> +{
->> +    const char *soc_name;
->> +    unsigned int soc_id = product_id & EXYNOS_SOC_MASK;
->> +
->> +    switch (soc_id) {
->> +    case EXYNOS3250_SOC_ID:
->> +        soc_name = "EXYNOS3250";
->> +        break;
->> +    case EXYNOS4210_SOC_ID:
->> +        soc_name = "EXYNOS4210";
->> +        break;
->> +    case EXYNOS4212_SOC_ID:
->> +        soc_name = "EXYNOS4212";
->> +        break;
->> +    case EXYNOS4412_SOC_ID:
->> +        soc_name = "EXYNOS4412";
->> +        break;
->> +    case EXYNOS4415_SOC_ID:
->> +        soc_name = "EXYNOS4415";
->> +        break;
->> +    case EXYNOS5250_SOC_ID:
->> +        soc_name = "EXYNOS5250";
->> +        break;
->> +    case EXYNOS5260_SOC_ID:
->> +        soc_name = "EXYNOS5260";
->> +        break;
->> +    case EXYNOS5420_SOC_ID:
->> +        soc_name = "EXYNOS5420";
->> +        break;
->> +    case EXYNOS5440_SOC_ID:
->> +        soc_name = "EXYNOS5440";
->> +        break;
->> +    case EXYNOS5800_SOC_ID:
->> +        soc_name = "EXYNOS5800";
->> +        break;
->> +    default:
->> +        soc_name = "UNKNOWN";
->> +    }
->> +    return soc_name;
->> +}
-> 
-> This approach is a bit error prone. You have already missed Exynos5410
-> and early Exynos 4210 are not detected because of the incorrect SOC MASK.
+> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+> index 115ea2a64520..4f4e58bee9bc 100644
+> --- a/arch/arm64/include/asm/hw_breakpoint.h
+> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+> @@ -118,7 +118,7 @@ struct perf_event;
+>  struct pmu;
+>  
+>  extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+> -				  int *gen_len, int *gen_type);
+> +				  int *gen_len, int *gen_type, int *offset);
+>  extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
+>  extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
+>  extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 26a6bf77d272..3c2b96803eba 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -349,7 +349,7 @@ int arch_check_bp_in_kernelspace(struct perf_event *bp)
+>   * to generic breakpoint descriptions.
+>   */
+>  int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+> -			   int *gen_len, int *gen_type)
+> +			   int *gen_len, int *gen_type, int *offset)
+>  {
+>  	/* Type */
+>  	switch (ctrl.type) {
+> @@ -369,8 +369,10 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+>  		return -EINVAL;
+>  	}
+>  
+> +	*offset = ffs(ctrl.len) - 1;
 
-Yes I missed to update Exynos4210 SoC Mask, thanks for pointing out.
+Do we want to fail the length == 0 case early? If you do add that check,
+then you can use __ffs here instead.
 
-> IMHO you should replace above code and defines with a simple array,
-> where each ID is present only once, so it will be much easier to add
-> future SoCs:
-> 
+>  	/* Len */
+> -	switch (ctrl.len) {
+> +	switch (ctrl.len >> *offset) {
+>  	case ARM_BREAKPOINT_LEN_1:
+>  		*gen_len = HW_BREAKPOINT_LEN_1;
+>  		break;
+> @@ -517,18 +519,17 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+>  		default:
+>  			return -EINVAL;
+>  		}
+> -
+> -		info->address &= ~alignment_mask;
+> -		info->ctrl.len <<= offset;
+>  	} else {
+>  		if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE)
+>  			alignment_mask = 0x3;
+>  		else
+>  			alignment_mask = 0x7;
+> -		if (info->address & alignment_mask)
+> -			return -EINVAL;
+> +		offset = info->address & alignment_mask;
+>  	}
+>  
+> +	info->address &= ~alignment_mask;
+> +	info->ctrl.len <<= offset;
 
-Well, this looks good to me as well. I will incorporate these changes in
-v2 as suggested by you and reuse your code, along with your
-Signed-off-by for this part :)
+Urgh, I really hate all this converting to and fro to keep perf happy.
+FWIW, I'm@the point where I would seriously consider ripping out the
+hw_breakpoint code and replacing it with a ptrace-specific backend so we
+just drop all this crap. The only people that seem to use the perf interface
+are those running the (failing) selftests. Given that we have to have
+a bloody thread switch notifier *anyway*, all perf seems to give us is
+complexity and restrictions.
 
-> static const struct exynos_soc_id {
->         const char *name;
->         unsigned int id;
->         unsigned int mask;
-> } soc_ids[] = {
->         { "EXYNOS3250", 0xE3472000, 0xFFFFF000 },
->         { "EXYNOS4210", 0x43200000, 0xFFFE0000 },
->         { "EXYNOS4212", 0x43220000, 0xFFFE0000 },
->         { "EXYNOS4412", 0xE4412000, 0xFFFE0000 },
->         { "EXYNOS4415", 0xE4415000, 0xFFFE0000 },
->         { "EXYNOS5250", 0x43520000, 0xFFFFF000 },
->         { "EXYNOS5260", 0xE5260000, 0xFFFFF000 },
->         { "EXYNOS5410", 0xE5410000, 0xFFFFF000 },
->         { "EXYNOS5420", 0xE5420000, 0xFFFFF000 },
->         { "EXYNOS5440", 0xE5440000, 0xFFFFF000 },
->         { "EXYNOS5800", 0xE5422000, 0xFFFFF000 },
-> };
-> 
-> static const char * __init product_id_to_soc_id(unsigned int product_id)
-> {
->         int i;
-> 
->         for (i = 0; i < ARRAY_SIZE(soc_ids); i++)
->                 if ((product_id & soc_ids[i].mask) == soc_ids[i].id)
->                         return soc_ids[i].name;
->         return "UNKNOWN";
-> }
-> 
-> I'm also not sure about Exynos 4415, which has been scheduled for removal.
-> 
+>  	/*
+>  	 * Disallow per-task kernel breakpoints since these would
+>  	 * complicate the stepping code.
+> @@ -665,8 +666,8 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  			      struct pt_regs *regs)
+>  {
+>  	int i, step = 0, *kernel_step, access;
+> -	u32 ctrl_reg;
+> -	u64 val, alignment_mask;
+> +	u32 ctrl_reg, lens, lene;
+> +	u64 val;
+>  	struct perf_event *wp, **slots;
+>  	struct debug_info *debug_info;
+>  	struct arch_hw_breakpoint *info;
+> @@ -684,25 +685,21 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  			goto unlock;
+>  
+>  		info = counter_arch_bp(wp);
+> -		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+> -		if (is_compat_task()) {
+> -			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+> -				alignment_mask = 0x7;
+> -			else
+> -				alignment_mask = 0x3;
+> -		} else {
+> -			alignment_mask = 0x7;
+> -		}
+>  
+> -		/* Check if the watchpoint value matches. */
+> +		/* Check if the watchpoint value and byte select match. */
+>  		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+> -		if (val != (addr & ~alignment_mask))
+> -			goto unlock;
+> -
+> -		/* Possible match, check the byte address select to confirm. */
+>  		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+>  		decode_ctrl_reg(ctrl_reg, &ctrl);
+> -		if (!((1 << (addr & alignment_mask)) & ctrl.len))
+> +		lens = ffs(ctrl.len) - 1;
+> +		lene = fls(ctrl.len) - 1;
 
-As suggested by Arnd, I will keep entry for Exynos 4415 in the driver.
+Again, you can use the '__' variants to avoid the '- 1'.
 
+> +		/*
+> +		 * FIXME: reported address can be anywhere between "the
+> +		 * lowest address accessed by the memory access that
+> +		 * triggered the watchpoint" and "the highest watchpointed
+> +		 * address accessed by the memory access". So, it may not
+> +		 * lie in the interval of watchpoint address range.
+> +		 */
+> +		if (addr < val + lens || addr > val + lene)
+>  			goto unlock;
+>  
+>  		/*
+> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+> index e0c81da60f76..0eb366a94382 100644
+> --- a/arch/arm64/kernel/ptrace.c
+> +++ b/arch/arm64/kernel/ptrace.c
+> @@ -327,13 +327,13 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
+>  				     struct arch_hw_breakpoint_ctrl ctrl,
+>  				     struct perf_event_attr *attr)
+>  {
+> -	int err, len, type, disabled = !ctrl.enabled;
+> +	int err, len, type, offset, disabled = !ctrl.enabled;
+>  
+>  	attr->disabled = disabled;
+>  	if (disabled)
+>  		return 0;
+>  
+> -	err = arch_bp_generic_fields(ctrl, &len, &type);
+> +	err = arch_bp_generic_fields(ctrl, &len, &type, &offset);
+>  	if (err)
+>  		return err;
+>  
+> @@ -352,6 +352,7 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
+>  
+>  	attr->bp_len	= len;
+>  	attr->bp_type	= type;
+> +	attr->bp_addr	+= offset;
 
-Thanks,
-Pankaj Dubey
+That's going to look pretty bizarre from userspace if it decides to read
+back the address registers to find that they've mysteriously changed.
+
+Perhaps ptrace_hbp_get_addr needs to retrieve the address from the
+arch_hw_breakpoint, like we do for the ctrl register. What do you think?
+
+Will
