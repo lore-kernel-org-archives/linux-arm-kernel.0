@@ -1,80 +1,101 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Tue, 08 Nov 2016 11:12:10 +0200
-Subject: [PATCH 01/30] usb: dwc2: Deprecate g-use-dma binding
-In-Reply-To: <e99e9d8df77884671f94734109a1a8d76a0222c1.1478558343.git.johnyoun@synopsys.com>
-References: <cover.1478558343.git.johnyoun@synopsys.com>
- <e99e9d8df77884671f94734109a1a8d76a0222c1.1478558343.git.johnyoun@synopsys.com>
-Message-ID: <87wpgeibdh.fsf@linux.intel.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 8 Nov 2016 17:17:28 +0800
+Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
+In-Reply-To: <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
+References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
+ <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+ <20161107162504.17591806@thinkpad>
+ <20161108021929.GA982@sha-win-210.asiapac.arm.com>
+ <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
+Message-ID: <20161108091725.GA18678@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Gerald,
+On Tue, Nov 08, 2016 at 03:08:52PM +0800, Huang Shijie wrote:
+> On Tue, Nov 08, 2016 at 10:19:30AM +0800, Huang Shijie wrote:
+> > On Mon, Nov 07, 2016 at 04:25:04PM +0100, Gerald Schaefer wrote:
+> > > On Thu, 3 Nov 2016 10:51:38 +0800
+> > > Huang Shijie <shijie.huang@arm.com> wrote:
+> > > 
+> > > > When testing the gigantic page whose order is too large for the buddy
+> > > > allocator, the libhugetlbfs test case "counter.sh" will fail.
+> > > > 
+> > > > The failure is caused by:
+> > > >  1) kernel fails to allocate a gigantic page for the surplus case.
+> > > >     And the gather_surplus_pages() will return NULL in the end.
+> > > > 
+> > > >  2) The condition checks for "over-commit" is wrong.
+> > > > 
+> > > > This patch adds code to allocate the gigantic page in the
+> > > > __alloc_huge_page(). After this patch, gather_surplus_pages()
+> > > > can return a gigantic page for the surplus case.
+> > > > 
+> > > > This patch also changes the condition checks for:
+> > > >      return_unused_surplus_pages()
+> > > >      nr_overcommit_hugepages_store()
+> > > > 
+> > > > After this patch, the counter.sh can pass for the gigantic page.
+> > > > 
+> > > > Acked-by: Steve Capper <steve.capper@arm.com>
+> > > > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> > > > ---
+> > > >  mm/hugetlb.c | 15 ++++++++++-----
+> > > >  1 file changed, 10 insertions(+), 5 deletions(-)
+> > > > 
+> > > > diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> > > > index 0bf4444..2b67aff 100644
+> > > > --- a/mm/hugetlb.c
+> > > > +++ b/mm/hugetlb.c
+> > > > @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
+> > > >  	struct page *page;
+> > > >  	unsigned int r_nid;
+> > > > 
+> > > > -	if (hstate_is_gigantic(h))
+> > > > +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+> > > >  		return NULL;
+> > > 
+> > > Is it really possible to stumble over gigantic pages w/o having
+> > > gigantic_page_supported()?
+> > > 
+> > > Also, I've just tried this on s390 and counter.sh still fails after these
+> > > patches, and it should fail on all archs as long as you use the gigantic
+> > I guess the failure you met is caused by the libhugetlbfs itself, there are
+> > several bugs in the libhugetlbfs. I have a patch set for the
+> > libhugetlbfs too. I will send it as soon as possible.
+> > 
+> > > hugepage size as default hugepage size. This is because you only changed
+> > > nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
+> > > in sysfs, and missed hugetlb_overcommit_handler() which handles
+> > > /proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
+> > This is wrong. :)
+> Sorry, I was wrong :). The counters test does call the /proc/sys/vm/nr_overcommit_hugepages.
+> But in the arm64, it does not trigger a fail for the counters test.
+> In an other word, I did not change the hugetlb_overcommit_handler(),
+> the counters.sh also can pass in arm64. 
+After I add the "default_hugepagesz=32M" to the kernel cmdlin, I can
+reproduce this issue. Thanks for point this.
 
-Hi,
+> 
+> I will look at the lockdep issue.
+I tested the new patch (will be sent out later) on the arm64 platform,
+and I did not meet the lockdep issue when I enabled the lockdep.
+The following is my config:
 
-John Youn <johnyoun@synopsys.com> writes:
-> Add a vendor prefix and make the name more consistent by renaming it to
-> "snps,gadget-dma-enable".
->
-> Signed-off-by: John Youn <johnyoun@synopsys.com>
-> ---
->  Documentation/devicetree/bindings/usb/dwc2.txt | 5 ++++-
->  arch/arm/boot/dts/rk3036.dtsi                  | 2 +-
->  arch/arm/boot/dts/rk3288.dtsi                  | 2 +-
->  arch/arm/boot/dts/rk3xxx.dtsi                  | 2 +-
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 2 +-
->  arch/arm64/boot/dts/rockchip/rk3368.dtsi       | 2 +-
->  drivers/usb/dwc2/params.c                      | 9 ++++++++-
->  drivers/usb/dwc2/pci.c                         | 2 +-
->  8 files changed, 18 insertions(+), 8 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-> index 9472111..389a461 100644
-> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
-> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-> @@ -26,11 +26,14 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
->  - dr_mode: shall be one of "host", "peripheral" and "otg"
->    Refer to usb/generic.txt
->  - snps,host-dma-disable: disable host DMA mode.
-> -- g-use-dma: enable dma usage in gadget driver.
-> +- snps,gadget-dma-enable: enable gadget DMA mode.
+	CONFIG_LOCKD=y
+	CONFIG_LOCKD_V4=y
+	CONFIG_LOCKUP_DETECTOR=y
+        # CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
+	CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
+	CONFIG_DEBUG_SPINLOCK=y
+	CONFIG_DEBUG_LOCK_ALLOC=y
+	CONFIG_PROVE_LOCKING=y
+	CONFIG_LOCKDEP=y
+	CONFIG_LOCK_STAT=y
+	CONFIG_DEBUG_LOCKDEP=y
+	CONFIG_DEBUG_LOCKING_API_SELFTESTS=y
+	
+So do I miss something? 
 
-I don't see why you even have this binding. Looking through the code,
-you have:
-
-#define GHWCFG2_SLAVE_ONLY_ARCH			0
-#define GHWCFG2_EXT_DMA_ARCH			1
-#define GHWCFG2_INT_DMA_ARCH			2
-
-void dwc2_set_param_dma_enable(struct dwc2_hsotg *hsotg, int val)
-{
-	int valid = 1;
-
-	if (val > 0 && hsotg->hw_params.arch == GHWCFG2_SLAVE_ONLY_ARCH)
-		valid = 0;
-	if (val < 0)
-		valid = 0;
-
-	if (!valid) {
-		if (val >= 0)
-			dev_err(hsotg->dev,
-				"%d invalid for dma_enable parameter. Check HW configuration.\n",
-				val);
-		val = hsotg->hw_params.arch != GHWCFG2_SLAVE_ONLY_ARCH;
-		dev_dbg(hsotg->dev, "Setting dma_enable to %d\n", val);
-	}
-
-	hsotg->core_params->dma_enable = val;
-}
-
-which seems to hint that DMA support is discoverable. If there is DMA,
-why would disable it?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/28908c8d/attachment-0001.sig>
+Thanks	
+Huang Shijie
