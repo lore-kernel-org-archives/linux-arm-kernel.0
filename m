@@ -1,39 +1,48 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Tue, 8 Nov 2016 12:15:57 -0600
-Subject: [PATCH 1/3] ipmi/bt-bmc: change compatible node to
- 'aspeed,ast2400-ibt-bmc'
-In-Reply-To: <a886778e-a85e-758e-3a61-c4909652e39d@kaod.org>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <CACPK8XcM1_xmmUu-cCZrSR67Y_qeXuSJ4Xmd_2gcgDT321LdBQ@mail.gmail.com>
- <ebeba60f-429f-fb84-b9da-c27d11d23094@kaod.org> <2368736.y6FyG1ESuP@wuerfel>
- <a886778e-a85e-758e-3a61-c4909652e39d@kaod.org>
-Message-ID: <c749ff0a-bc71-bc9f-0e8c-326db2cea0fb@acm.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2016 18:24:34 +0000
+Subject: [PATCH RFC 00/12] tda998x updates
+In-Reply-To: <1478625636.27416.7.camel@linaro.org>
+References: <20161108122420.GP1041@n2100.armlinux.org.uk>
+ <2264579a-3273-d9c4-761a-f50f547eb39b@arm.com>
+ <20161108133215.GQ1041@n2100.armlinux.org.uk>
+ <20161108133411.GA31754@n2100.armlinux.org.uk>
+ <1478625636.27416.7.camel@linaro.org>
+Message-ID: <20161108182434.GX1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2016 09:52 AM, C?dric Le Goater wrote:
-> O
-snip
+On Tue, Nov 08, 2016 at 05:20:36PM +0000, Jon Medhurst (Tixy) wrote:
+> On Tue, 2016-11-08 at 13:34 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Nov 08, 2016 at 01:32:15PM +0000, Russell King - ARM Linux wrote:
+> > > Unfortunately, my drm-tda998x-devel branch is slightly out of date with
+> > > these patches it's the original set of 10 patches.  I've not pushed
+> > > these ones out to that branch yet, as I've three additional patches on
+> > > top of these which aren't "ready" for pushing out.
+> > 
+> > Here's the delta between the branch and what I just posted:
+> > 
+> > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> [...]
+> 
+> I have a working setup for HDMI audio on Juno an would like to test this
+> series but am struggling to work out which patches to apply in what
+> order to what branch, can you be specific? (I've tried various
+> combinations of patches series from the list, drm-tda998x-devel, and the
+> diff you posted)
 
->>>> While we're modifying the binding, should we add a compat string for
->>>> the ast2500?
->>> Well, if the change in this patch is fine for all, may be we can add
->>> the ast2500 compat string in a followup patch ?
->> Sounds good to me.
-> OK. So, how do we proceed with this patch ? Who would include it in its
-> tree ?
+Hmm, I guess this is going to be annoyingly rather difficult then.
+The structure of my git tree is:
 
-I don't have anything for 4.9 at the moment.  Arnd, if you have 
-something, can
-you take this?  Otherwise I will.
+v4.8 ---------------- mali patch ------------------ merge --- these patches
+v4.7 -- tda998x audio patches (up to df0bd1e8f3c5) --^
 
-And I guess I should add:
+which makes it rather difficult to send out a series that people can
+apply as patches without first replicating that merge.  I guess the
+answer is... use the _patches_ for review, and I'll push out the
+changes into drm-tda998x-devel... should be there soon.  Look for
+commit hash d61fa2e50f2a.  (Bah, slow 'net connections.)
 
-Acked-by: Corey Minyard <cminyard@mvista.com>
-
--corey
-
-> Thanks,
->
-> C.
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
