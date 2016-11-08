@@ -1,53 +1,31 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Tue, 8 Nov 2016 14:53:08 -0600
-Subject: [PATCHv2] ARM: dts: socfpga: add specific compatible strings for
- boards
-In-Reply-To: <20161101222352.GA6328@localhost>
-References: <20161101205652.26384-1-dinguyen@kernel.org>
- <20161101222352.GA6328@localhost>
-Message-ID: <17b93c4e-eb42-0bc1-07d7-98d52a3f057f@kernel.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 7 Nov 2016 19:16:32 -0800
+Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.10
+In-Reply-To: <cover.1478078567.git.horms+renesas@verge.net.au>
+References: <cover.1478078567.git.horms+renesas@verge.net.au>
+Message-ID: <20161108031632.GD2106@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/01/2016 05:23 PM, Olof Johansson wrote:
-> On Tue, Nov 01, 2016 at 03:56:52PM -0500, Dinh Nguyen wrote:
->> Add a more specific board compatible entry for all of the SOCFPGA
->> Cyclone 5 based boards.
->>
-
-[snip]
-
->>  / {
->>  	model = "Altera SOCFPGA Cyclone V SoC Development Kit";
->> -	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
->> +	compatible = "altr,socdk", "altr,socfpga-cyclone5", "altr,socfpga";
+On Wed, Nov 02, 2016 at 10:23:40AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> This looks a little too generic, what if there's another dk with another
-> SoC down the road?
+> Please consider these Renesas ARM64 based SoC defconfig updates for v4.10.
 > 
-
-Right...I'll change it to "altr,socfpga-cyclone5-socdk",
-
->>  	chosen {
->>  		bootargs = "earlyprintk";
->> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> index 02e22f5..c5623a7 100644
->> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->> @@ -19,7 +19,7 @@
->>  
->>  / {
->>  	model = "Terasic SoCkit";
->> -	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
->> +	compatible = "terasic,sockit", "altr,socfpga-cyclone5", "altr,socfpga";
 > 
-> Same thing here, this seems a bit on the generic side.
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.10
+> 
+> for you to fetch changes up to 833c97254724a620d1d9fb9a580681fb52536fbf:
+> 
+>   arm64: defconfig: Enable DRM DU and V4L2 FCP + VSP modules (2016-10-27 09:07:35 +0200)
 
-perhaps "terasic,socfpga-cyclone5-sockit" ?
+Merged, thanks.
 
-Thanks for reviewing.
 
-Dinh
+-Olof
