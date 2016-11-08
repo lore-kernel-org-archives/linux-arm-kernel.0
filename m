@@ -1,104 +1,135 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 8 Nov 2016 10:32:17 -0800
-Subject: [PATCH 3/4] fpga mgr: zynq: Add support for encrypted bitstreams
-In-Reply-To: <20161107001326.7395-4-moritz.fischer@ettus.com>
-References: <20161107001326.7395-1-moritz.fischer@ettus.com>
- <20161107001326.7395-4-moritz.fischer@ettus.com>
-Message-ID: <20161108183217.GV14444@xsjsorenbubuntu>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 8 Nov 2016 11:41:41 -0700
+Subject: [PATCH] arm64: acpi: arch_apei_get_mem_attributes() should use
+ memblock
+In-Reply-To: <20161108102714.29931-1-james.morse@arm.com>
+References: <20161108102714.29931-1-james.morse@arm.com>
+Message-ID: <168e341f-2377-2962-34a4-63043d5ab6d6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-11-06 at 17:13:25 -0700, Moritz Fischer wrote:
-> Add new flag FPGA_MGR_DECRYPT_BISTREAM as well as a matching
-> capability FPGA_MGR_CAP_DECRYPT to allow for on-the-fly
-> decryption of an encrypted bitstream.
-> 
-> If the system is not booted in secure mode AES & HMAC units
-> are disabled by the boot ROM, therefore the capability
-> is not available.
-> 
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Cc: Alan Tull <atull@opensource.altera.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+On 11/8/2016 3:27 AM, James Morse wrote:
+> arm64's arch_apei_get_mem_attributes() tries to use
+> efi_mem_attributes() to read the memory attributes from the efi
+> memory map.
+>
+> drivers/firmware/efi/arm-init.c:efi_init() calls efi_memmap_unmap(),
+> which clears the EFI_MEMMAP bit from efi.flags once efi_init() has
+> finished with the memory map. This causes efi_mem_attributes() to
+> return 0 meaning PROT_DEVICE_nGnRnE is the chosen memory type for
+> all ACPI APEI mappings.
+>
+> APEI may call this from NMI context, so we can't re-map the EFI
+> memory map as this may need to allocate virtual address space.
+> 'ghes_ioremap_area' is APEIs cache of virtual address space to
+> access the buffer once we tell it the memory attributes.
+>
+> Do as acpi_os_ioremap() does, and consult memblock to learn if
+> the provided address is memory, or not.
+>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+
+Hello James,
+
+This patch seems fine, APEI/GHES functionality still works properly for me.
+I tested on a 4.8 kernel with the patch you mention below from Jonathan and
+my patchset https://lkml.org/lkml/2016/10/21/746
+
+My only question is when you say that this may be called from an NMI 
+context.
+arch_apei_get_mem_attributes() only gets called from ghes_ioremap_pfn_irq()
+which only appears to get called if we are not in an NMI context.
+
+ From drivers/acpi/apei/ghes.c:
+
+312                 if (in_nmi) {
+313 raw_spin_lock(&ghes_ioremap_lock_nmi);
+314                         vaddr = ghes_ioremap_pfn_nmi(paddr >> 
+PAGE_SHIFT);
+315                 } else {
+316 spin_lock_irqsave(&ghes_ioremap_lock_irq, flags);
+317                         vaddr = ghes_ioremap_pfn_irq(paddr >> 
+PAGE_SHIFT);
+318                 }
+
+So can this really be called from an NMI context?
+
+Thanks,
+Tyler
 > ---
->  drivers/fpga/fpga-mgr.c       |  7 +++++++
->  drivers/fpga/zynq-fpga.c      | 21 +++++++++++++++++++--
->  include/linux/fpga/fpga-mgr.h |  2 ++
->  3 files changed, 28 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/fpga/fpga-mgr.c b/drivers/fpga/fpga-mgr.c
-> index 98230b7..e4d08e1 100644
-> --- a/drivers/fpga/fpga-mgr.c
-> +++ b/drivers/fpga/fpga-mgr.c
-> @@ -61,6 +61,12 @@ int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags, const char *buf,
->  		return -ENOTSUPP;
->  	}
->  
-> +	if (flags & FPGA_MGR_DECRYPT_BITSTREAM &&
-> +	    !fpga_mgr_has_cap(FPGA_MGR_CAP_DECRYPT, mgr->caps)) {
-> +		dev_err(dev, "Bitstream decryption not supported\n");
-> +		return -ENOTSUPP;
-> +	}
-> +
->  	/*
->  	 * Call the low level driver's write_init function.  This will do the
->  	 * device-specific things to get the FPGA into the state where it is
-> @@ -170,6 +176,7 @@ static const char * const state_str[] = {
->  static const char * const cap_str[] = {
->  	[FPGA_MGR_CAP_FULL_RECONF] = "Full reconfiguration",
->  	[FPGA_MGR_CAP_PARTIAL_RECONF] = "Partial reconfiguration",
-> +	[FPGA_MGR_CAP_DECRYPT] = "Decrypt bitstream on the fly",
->  };
->  
->  static ssize_t name_show(struct device *dev,
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 1d37ff0..0aa4705 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -71,6 +71,10 @@
->  #define CTRL_PCAP_PR_MASK		BIT(27)
->  /* Enable PCAP */
->  #define CTRL_PCAP_MODE_MASK		BIT(26)
-> +/* Needed to reduce clock rate for secure config */
-> +#define CTRL_PCAP_RATE_EN_MASK		BIT(25)
-> +/* System booted in secure mode */
-> +#define CTRL_SEC_EN_MASK		BIT(7)
->  
->  /* Miscellaneous Control Register bit definitions */
->  /* Internal PCAP loopback */
-> @@ -252,12 +256,20 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
->  
->  	/* set configuration register with following options:
->  	 * - enable PCAP interface
-> -	 * - set throughput for maximum speed
-> +	 * - set throughput for maximum speed (if we're not decrypting)
->  	 * - set CPU in user mode
->  	 */
->  	ctrl = zynq_fpga_read(priv, CTRL_OFFSET);
-> -	zynq_fpga_write(priv, CTRL_OFFSET,
-> +	if (flags & FPGA_MGR_DECRYPT_BITSTREAM) {
-> +		zynq_fpga_write(priv, CTRL_OFFSET,
-> +			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK |
-> +			 CTRL_PCAP_RATE_EN_MASK | ctrl));
-> +
-> +	} else {
-> +		ctrl &= ~CTRL_PCAP_RATE_EN_MASK;
-> +		zynq_fpga_write(priv, CTRL_OFFSET,
->  			(CTRL_PCAP_PR_MASK | CTRL_PCAP_MODE_MASK | ctrl));
-> +	}
+> Fixes: 89e44b51cc0d ("arm64, acpi/apei: Implement arch_apei_get_mem_attributes()")
+>
+> This doesn't code even get built on mainline as HAVE_ACPI_APEI isn't
+> defined, until https://lkml.org/lkml/2016/8/10/231 gets merged.
+> I don't think this should go to stable.
+>
+> I also took the opportunity to remove some unnecessarily ifdef'd
+> includes.
+>
+>   arch/arm64/kernel/acpi.c | 28 ++++++++--------------------
+>   1 file changed, 8 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 252a6d9c1da5..985f721f3bdd 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -18,6 +18,7 @@
+>   #include <linux/acpi.h>
+>   #include <linux/bootmem.h>
+>   #include <linux/cpumask.h>
+> +#include <linux/efi.h>
+>   #include <linux/init.h>
+>   #include <linux/irq.h>
+>   #include <linux/irqdomain.h>
+> @@ -28,13 +29,9 @@
+>   
+>   #include <asm/cputype.h>
+>   #include <asm/cpu_ops.h>
+> +#include <asm/pgtable.h>
+>   #include <asm/smp_plat.h>
+>   
+> -#ifdef CONFIG_ACPI_APEI
+> -# include <linux/efi.h>
+> -# include <asm/pgtable.h>
+> -#endif
+> -
+>   int acpi_noirq = 1;		/* skip ACPI IRQ initialization */
+>   int acpi_disabled = 1;
+>   EXPORT_SYMBOL(acpi_disabled);
+> @@ -241,22 +238,13 @@ void __init acpi_boot_table_init(void)
+>   pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
+>   {
+>   	/*
+> -	 * According to "Table 8 Map: EFI memory types to AArch64 memory
+> -	 * types" of UEFI 2.5 section 2.3.6.1, each EFI memory type is
+> -	 * mapped to a corresponding MAIR attribute encoding.
+> -	 * The EFI memory attribute advises all possible capabilities
+> -	 * of a memory region. We use the most efficient capability.
+> +	 * The EFI memmap isn't mapped, instead read the version exported
+> +	 * into memblock. EFI's reserve_regions() call adds memory with the
+> +	 * WB attribute to memblock via early_init_dt_add_memory_arch().
+>   	 */
+> +	if (!memblock_is_memory(addr))
+> +		return __pgprot(PROT_DEVICE_nGnRnE);
+>   
+> -	u64 attr;
+> -
+> -	attr = efi_mem_attributes(addr);
+> -	if (attr & EFI_MEMORY_WB)
+> -		return PAGE_KERNEL;
+> -	if (attr & EFI_MEMORY_WT)
+> -		return __pgprot(PROT_NORMAL_WT);
+> -	if (attr & EFI_MEMORY_WC)
+> -		return __pgprot(PROT_NORMAL_NC);
+> -	return __pgprot(PROT_DEVICE_nGnRnE);
+> +	return PAGE_KERNEL;
+>   }
+>   #endif
 
-Minor nit:
-Assuming that there may be more caps to check to come, wouldn't it be
-slightly easier to write this in a way like?:
-  if (flags & SOME_FLAG)
-     ctrl |= FOO;
-  if (flags & SOME_OTHER_FLAG)
-     ctrl |= BAR;
-  zynq_fpga_write(priv, CTRL_OFFSET, ctrl);
-
-i.e. moving the fpga_write outside of the conditionals.
-
-	S?ren
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
