@@ -1,549 +1,210 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 8 Nov 2016 11:07:51 -0800
-Subject: [PATCH 1/2] mfd: pm8921: add support to pm8821
-In-Reply-To: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20161108190751.GO25787@tuxbot>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 8 Nov 2016 13:21:47 -0600
+Subject: [PATCH 1/1 v7] ARM: imx: Added perf functionality to mmdc driver
+In-Reply-To: <CAP=VYLo_p3ZmOFcyM9om_31-=5O3ZiRLCBkJDDtj84JxAA7h8Q@mail.gmail.com>
+References: <1474307267-3081-1-git-send-email-Frank.Li@nxp.com>
+ <CAP=VYLo_p3ZmOFcyM9om_31-=5O3ZiRLCBkJDDtj84JxAA7h8Q@mail.gmail.com>
+Message-ID: <CAHrpEqQGRLY7ZB6moP9FZ0w-t63QkyLE1fUb3heRZJfRd2Y9sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 08 Nov 08:29 PST 2016, Srinivas Kandagatla wrote:
+On Tue, Nov 8, 2016 at 1:00 PM, Paul Gortmaker
+<paul.gortmaker@windriver.com> wrote:
+> On Mon, Sep 19, 2016 at 1:47 PM, Frank Li <Frank.Li@nxp.com> wrote:
+>> From: Zhengyu Shen <zhengyu.shen@nxp.com>
+>>
+>> MMDC is a multi-mode DDR controller that supports DDR3/DDR3L x16/x32/x64
+>> and LPDDR2 two channel x16/x32 memory types. MMDC is configurable, high
+>> performance, and optimized. MMDC is present on i.MX6 Quad and i.MX6
+>> QuadPlus devices, but this driver only supports i.MX6 Quad at the moment.
+>> MMDC provides registers for performance counters which read via this
+>> driver to help debug memory throughput and similar issues.
+>>
+>> $ perf stat -a -e mmdc/busy-cycles/,mmdc/read-accesses/,mmdc/read-bytes/,mmdc/total-cycles/,mmdc/write-accesses/,mmdc/write-bytes/ dd if=/dev/zero of=/dev/null bs=1M count=5000
+>> Performance counter stats for 'dd if=/dev/zero of=/dev/null bs=1M count=5000':
+>>
+>>          898021787      mmdc/busy-cycles/
+>>           14819600      mmdc/read-accesses/
+>>             471.30 MB   mmdc/read-bytes/
+>>         2815419216      mmdc/total-cycles/
+>>           13367354      mmdc/write-accesses/
+>>             427.76 MB   mmdc/write-bytes/
+>>
+>>        5.334757334 seconds time elapsed
+>>
+>> Signed-off-by: Zhengyu Shen <zhengyu.shen@nxp.com>
+>> Signed-off-by: Frank Li <frank.li@nxp.com>
+>> ---
+>> Changes from v6 to v7
+>>     use mmdc_pmu prefix
+>>     remove unnecessary check
+>>     improve group event check according to mark's feedback.
+>>     check pmu_mmdc->mmdc_events[cfg] at event_add
+>>     only check == 0 at event_del
+>>
+>> Changes from v5 to v6
+>>     Improve group event error handle
+>>
+>> Changes from v4 to v5
+>>     Remove mmdc_pmu:irq
+>>     remove static variable cpuhp_mmdc_pmu
+>>     remove spin_lock
+>>     check is_sampling_event(event)
+>>     remove unnecessary cast
+>>     use hw_perf_event::prev_count
+>>
+>> Changes from v3 to v4:
+>>     Tested and fixed crash relating to removing events with perf fuzzer
+>>     Adjusted formatting
+>>     Moved all perf event code under CONFIG_PERF_EVENTS
+>>         Switched cpuhp_setup_state to cpuhp_setup_state_nocalls
+>>
+>> Changes from v2 to v3:
+>>     Use WARN_ONCE instead of returning generic error values
+>>     Replace CPU Notifiers with newer state machine hotplug
+>>     Added additional checks on event_init for grouping and sampling
+>>     Remove useless mmdc_enable_profiling function
+>>     Added comments
+>>     Moved start index of events from 0x01 to 0x00
+>>     Added a counter to pmu_mmdc to only stop hrtimer after all events are finished
+>>     Replace readl_relaxed and writel_relaxed with readl and writel
+>>     Removed duplicate update function
+>>     Used devm_kasprintf when naming mmdcs probed
+>>
+>> Changes from v1 to v2:
+>>     Added cpumask and migration handling support to driver
+>>     Validated event during event_init
+>>     Added code to properly stop counters
+>>     Used perf_invalid_context instead of perf_sw_context
+>>     Added hrtimer to poll for overflow
+>>     Added better description
+>>     Added support for multiple mmdcs
+>>
+>>  arch/arm/mach-imx/mmdc.c | 459 ++++++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 457 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+>> index db9621c..1f70376 100644
+>> --- a/arch/arm/mach-imx/mmdc.c
+>> +++ b/arch/arm/mach-imx/mmdc.c
+>> @@ -1,5 +1,5 @@
+>>  /*
+>> - * Copyright 2011 Freescale Semiconductor, Inc.
+>> + * Copyright 2011,2016 Freescale Semiconductor, Inc.
+>>   * Copyright 2011 Linaro Ltd.
+>>   *
+>>   * The code contained herein is licensed under the GNU General Public
+>> @@ -10,12 +10,16 @@
+>>   * http://www.gnu.org/copyleft/gpl.html
+>>   */
+>>
+>> +#include <linux/hrtimer.h>
+>>  #include <linux/init.h>
+>> +#include <linux/interrupt.h>
+>>  #include <linux/io.h>
+>>  #include <linux/module.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_device.h>
+>> +#include <linux/perf_event.h>
+>> +#include <linux/slab.h>
+>>
+>>  #include "common.h"
+>>
+>> @@ -27,8 +31,458 @@
+>>  #define BM_MMDC_MDMISC_DDR_TYPE        0x18
+>>  #define BP_MMDC_MDMISC_DDR_TYPE        0x3
+>>
+>> +#define TOTAL_CYCLES           0x0
+>> +#define BUSY_CYCLES            0x1
+>> +#define READ_ACCESSES          0x2
+>> +#define WRITE_ACCESSES         0x3
+>> +#define READ_BYTES             0x4
+>> +#define WRITE_BYTES            0x5
+>> +
+>> +/* Enables, resets, freezes, overflow profiling*/
+>> +#define DBG_DIS                        0x0
+>> +#define DBG_EN                 0x1
+>> +#define DBG_RST                        0x2
+>> +#define PRF_FRZ                        0x4
+>> +#define CYC_OVF                        0x8
+>> +
+>> +#define MMDC_MADPCR0   0x410
+>> +#define MMDC_MADPSR0   0x418
+>> +#define MMDC_MADPSR1   0x41C
+>> +#define MMDC_MADPSR2   0x420
+>> +#define MMDC_MADPSR3   0x424
+>> +#define MMDC_MADPSR4   0x428
+>> +#define MMDC_MADPSR5   0x42C
+>> +
+>> +#define MMDC_NUM_COUNTERS      6
+>> +
+>> +#define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
+>> +
+>>  static int ddr_type;
+>>
+>> +#ifdef CONFIG_PERF_EVENTS
+>> +
+>> +static DEFINE_IDA(mmdc_ida);
+>> +
+>> +PMU_EVENT_ATTR_STRING(total-cycles, mmdc_pmu_total_cycles, "event=0x00")
+>> +PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_pmu_busy_cycles, "event=0x01")
+>> +PMU_EVENT_ATTR_STRING(read-accesses, mmdc_pmu_read_accesses, "event=0x02")
+>> +PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "config=0x03")
+>> +PMU_EVENT_ATTR_STRING(read-bytes, mmdc_pmu_read_bytes, "event=0x04")
+>> +PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_pmu_read_bytes_unit, "MB");
+>> +PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_pmu_read_bytes_scale, "0.000001");
+>> +PMU_EVENT_ATTR_STRING(write-bytes, mmdc_pmu_write_bytes, "event=0x05")
+>> +PMU_EVENT_ATTR_STRING(write-bytes.unit, mmdc_pmu_write_bytes_unit, "MB");
+>> +PMU_EVENT_ATTR_STRING(write-bytes.scale, mmdc_pmu_write_bytes_scale, "0.000001");
+>> +
+>> +struct mmdc_pmu {
+>> +       struct pmu pmu;
+>> +       void __iomem *mmdc_base;
+>> +       cpumask_t cpu;
+>> +       struct hrtimer hrtimer;
+>> +       unsigned int active_events;
+>> +       struct device *dev;
+>> +       struct perf_event *mmdc_events[MMDC_NUM_COUNTERS];
+>> +       struct hlist_node node;
+>> +};
+>> +
+>> +/*
+>> + * Polling period is set to one second, overflow of total-cycles (the fastest
+>> + * increasing counter) takes ten seconds so one second is safe
+>> + */
+>> +static unsigned int mmdc_pmu_poll_period_us = 1000000;
+>> +
+>> +module_param_named(pmu_pmu_poll_period_us, mmdc_pmu_poll_period_us, uint,
+>> +               S_IRUGO | S_IWUSR);
+>
+> I just noticed this commit now that linux-next is back after the week off.
+>
+> This should probably use core_param or setup_param since the Kconfig
+> for this is bool and not tristate.  Similarly, that means that the .remove
+> function you've added is dead code -- unless you envision a case where
+> the user needs to forcibly unbind the driver...
+>
+> Do you want to redo the existing commit or do you want me to submit
+> a follow-up fixup patch?
 
-> This patch adds support to PM8821 PMIC and interrupt support.
-> PM8821 is companion device that supplements primary PMIC PM8921 IC.
-> 
+I will do follow-up fixup patch.
 
-Linus Walleij has a patch out for renaming a lot of things in this file,
-so we should probably make sure that lands and then rebase this ontop.
+I think pmu_pmu_poll_period_us should be removed because no benefit to
+change it.
+I can delete .remove
 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> Tested this patch for MPP and IRQ functionality on IFC6410 and SD600 EVAL
-> board with mpps PM8821 and PM8921.
-> 
->  .../devicetree/bindings/mfd/qcom-pm8xxx.txt        |   1 +
->  drivers/mfd/pm8921-core.c                          | 368 +++++++++++++++++++--
->  2 files changed, 340 insertions(+), 29 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
-> index 37a088f..8f1b4ec 100644
-> --- a/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
-> +++ b/Documentation/devicetree/bindings/mfd/qcom-pm8xxx.txt
-> @@ -11,6 +11,7 @@ voltages and other various functionality to Qualcomm SoCs.
->  	Definition: must be one of:
->  		    "qcom,pm8058"
->  		    "qcom,pm8921"
-> +		    "qcom,pm8821"
->  
->  - #address-cells:
->  	Usage: required
-> diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/pm8921-core.c
-> index 0e3a2ea..28c2470 100644
-> --- a/drivers/mfd/pm8921-core.c
-> +++ b/drivers/mfd/pm8921-core.c
-> @@ -28,16 +28,26 @@
->  #include <linux/mfd/core.h>
->  
->  #define	SSBI_REG_ADDR_IRQ_BASE		0x1BB
-> -
-> -#define	SSBI_REG_ADDR_IRQ_ROOT		(SSBI_REG_ADDR_IRQ_BASE + 0)
-> -#define	SSBI_REG_ADDR_IRQ_M_STATUS1	(SSBI_REG_ADDR_IRQ_BASE + 1)
-> -#define	SSBI_REG_ADDR_IRQ_M_STATUS2	(SSBI_REG_ADDR_IRQ_BASE + 2)
-> -#define	SSBI_REG_ADDR_IRQ_M_STATUS3	(SSBI_REG_ADDR_IRQ_BASE + 3)
-> -#define	SSBI_REG_ADDR_IRQ_M_STATUS4	(SSBI_REG_ADDR_IRQ_BASE + 4)
-> -#define	SSBI_REG_ADDR_IRQ_BLK_SEL	(SSBI_REG_ADDR_IRQ_BASE + 5)
-> -#define	SSBI_REG_ADDR_IRQ_IT_STATUS	(SSBI_REG_ADDR_IRQ_BASE + 6)
-> -#define	SSBI_REG_ADDR_IRQ_CONFIG	(SSBI_REG_ADDR_IRQ_BASE + 7)
-> -#define	SSBI_REG_ADDR_IRQ_RT_STATUS	(SSBI_REG_ADDR_IRQ_BASE + 8)
+best regards
+Frank Li
 
-Keep these (per argumentation that follows), but try to name them
-appropriately.
-
-> +#define	SSBI_PM8821_REG_ADDR_IRQ_BASE	0x100
-> +
-> +#define	SSBI_REG_ADDR_IRQ_ROOT		(0)
-> +#define	SSBI_REG_ADDR_IRQ_M_STATUS1	(1)
-> +#define	SSBI_REG_ADDR_IRQ_M_STATUS2	(2)
-> +#define	SSBI_REG_ADDR_IRQ_M_STATUS3	(3)
-> +#define	SSBI_REG_ADDR_IRQ_M_STATUS4	(4)
-> +#define	SSBI_REG_ADDR_IRQ_BLK_SEL	(5)
-> +#define	SSBI_REG_ADDR_IRQ_IT_STATUS	(6)
-> +#define	SSBI_REG_ADDR_IRQ_CONFIG	(7)
-> +#define	SSBI_REG_ADDR_IRQ_RT_STATUS	(8)
-
-Unnecessary parenthesis.
-
-> +
-> +#define	PM8821_TOTAL_IRQ_MASTERS	2
-
-Unused.
-
-> +#define	PM8821_BLOCKS_PER_MASTER	7
-> +#define	PM8821_IRQ_MASTER1_SET		0x01
-
-BIT(0), but I would prefer that you just inline this with a comment.
-
-> +#define	PM8821_IRQ_CLEAR_OFFSET		0x01
-
-Rather than having a single define for this and add in the base and
-block numbers I think you should split it into a master0 and master1
-define. (And it's not a offset as much as a register)
-
-> +#define	PM8821_IRQ_RT_STATUS_OFFSET	0x0f
-
-Dito
-
-> +#define	PM8821_IRQ_MASK_REG_OFFSET	0x08
-
-Dito
-
-> +#define	SSBI_REG_ADDR_IRQ_MASTER0	0x30
-> +#define	SSBI_REG_ADDR_IRQ_MASTER1	0xb0
-
-Fold these two into the registers above.
-
->  
->  #define	PM_IRQF_LVL_SEL			0x01	/* level select */
->  #define	PM_IRQF_MASK_FE			0x02	/* mask falling edge */
-> @@ -54,30 +64,41 @@
->  #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
->  
->  #define PM8921_NR_IRQS		256
-> +#define PM8821_NR_IRQS		112
->  
->  struct pm_irq_chip {
->  	struct regmap		*regmap;
->  	spinlock_t		pm_irq_lock;
->  	struct irq_domain	*irqdomain;
-> +	unsigned int		irq_reg_base;
->  	unsigned int		num_irqs;
->  	unsigned int		num_blocks;
->  	unsigned int		num_masters;
->  	u8			config[0];
->  };
->  
-> +struct pm8xxx_data {
-> +	int num_irqs;
-> +	unsigned int		irq_reg_base;
-
-As far as I can see this is always SSBI_PM8821_REG_ADDR_IRQ_BASE in the
-8821 functions and SSBI_REG_ADDR_IRQ_BASE in the pm8xxx functions. If
-you have disjunct code paths I think it's better to not obscure this
-with a variable.
-
-Try renaming the constants appropriately instead. This also has the
-benefit of reducing the size of the patch slightly.
-
-> +	const struct irq_domain_ops  *irq_domain_ops;
-> +	void (*irq_handler)(struct irq_desc *desc);
-> +};
-> +
->  static int pm8xxx_read_block_irq(struct pm_irq_chip *chip, unsigned int bp,
->  				 unsigned int *ip)
->  {
->  	int	rc;
->  
->  	spin_lock(&chip->pm_irq_lock);
-> -	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
-> +	rc = regmap_write(chip->regmap,
-> +			  chip->irq_reg_base + SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
->  	if (rc) {
->  		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
->  		goto bail;
->  	}
->  
-> -	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
-> +	rc = regmap_read(chip->regmap,
-> +			 chip->irq_reg_base + SSBI_REG_ADDR_IRQ_IT_STATUS, ip);
->  	if (rc)
->  		pr_err("Failed Reading Status rc=%d\n", rc);
->  bail:
-> @@ -91,14 +112,16 @@ pm8xxx_config_irq(struct pm_irq_chip *chip, unsigned int bp, unsigned int cp)
->  	int	rc;
->  
->  	spin_lock(&chip->pm_irq_lock);
-> -	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
-> +	rc = regmap_write(chip->regmap,
-> +			  chip->irq_reg_base + SSBI_REG_ADDR_IRQ_BLK_SEL, bp);
->  	if (rc) {
->  		pr_err("Failed Selecting Block %d rc=%d\n", bp, rc);
->  		goto bail;
->  	}
->  
->  	cp |= PM_IRQF_WRITE;
-> -	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_CONFIG, cp);
-> +	rc = regmap_write(chip->regmap,
-> +			  chip->irq_reg_base + SSBI_REG_ADDR_IRQ_CONFIG, cp);
->  	if (rc)
->  		pr_err("Failed Configuring IRQ rc=%d\n", rc);
->  bail:
-> @@ -137,8 +160,8 @@ static int pm8xxx_irq_master_handler(struct pm_irq_chip *chip, int master)
->  	unsigned int blockbits;
->  	int block_number, i, ret = 0;
->  
-> -	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_M_STATUS1 + master,
-> -			  &blockbits);
-> +	ret = regmap_read(chip->regmap, chip->irq_reg_base +
-> +			  SSBI_REG_ADDR_IRQ_M_STATUS1 + master, &blockbits);
->  	if (ret) {
->  		pr_err("Failed to read master %d ret=%d\n", master, ret);
->  		return ret;
-> @@ -165,7 +188,8 @@ static void pm8xxx_irq_handler(struct irq_desc *desc)
->  
->  	chained_irq_enter(irq_chip, desc);
->  
-> -	ret = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_ROOT, &root);
-> +	ret = regmap_read(chip->regmap,
-> +			  chip->irq_reg_base + SSBI_REG_ADDR_IRQ_ROOT, &root);
->  	if (ret) {
->  		pr_err("Can't read root status ret=%d\n", ret);
->  		return;
-> @@ -182,6 +206,122 @@ static void pm8xxx_irq_handler(struct irq_desc *desc)
->  	chained_irq_exit(irq_chip, desc);
->  }
->  
-> +static int pm8821_read_master_irq(const struct pm_irq_chip *chip,
-> +				  int m, unsigned int *master)
-> +{
-
-I think you should inline this, as you already have the calls unrolled
-in pm8821_irq_handler().
-
-> +	unsigned int base;
-> +
-> +	if (!m)
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER0;
-> +	else
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER1;
-> +
-> +	return regmap_read(chip->regmap, base, master);
-> +}
-> +
-> +static int pm8821_read_block_irq(struct pm_irq_chip *chip, int master,
-> +				 u8 block, unsigned int *bits)
-> +{
-> +	int rc;
-> +
-> +	unsigned int base;
-
-Odd empty line between rc and base. (And btw, sorting your local
-variables in descending length make things pretty).
-
-> +
-> +	if (!master)
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER0;
-> +	else
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER1;
-> +
-> +	spin_lock(&chip->pm_irq_lock);
-
-The reason why this is done under a lock in the other case is because
-the status register is paged, so you shouldn't need it here.
-
-With this updated I think you can favorably inline this into
-pm8821_irq_block_handler().
-
-> +
-> +	rc = regmap_read(chip->regmap, base + block, bits);
-> +	if (rc)
-> +		pr_err("Failed Reading Status rc=%d\n", rc);
-> +
-> +	spin_unlock(&chip->pm_irq_lock);
-> +	return rc;
-> +}
-> +
-> +static int pm8821_irq_block_handler(struct pm_irq_chip *chip,
-> +				    int master_number, int block)
-> +{
-> +	int pmirq, irq, i, ret;
-> +	unsigned int bits;
-> +
-> +	ret = pm8821_read_block_irq(chip, master_number, block, &bits);
-> +	if (ret) {
-> +		pr_err("Failed reading %d block ret=%d", block, ret);
-> +		return ret;
-> +	}
-> +	if (!bits) {
-> +		pr_err("block bit set in master but no irqs: %d", block);
-> +		return 0;
-> +	}
-> +
-> +	/* Convert block offset to global block number */
-> +	block += (master_number * PM8821_BLOCKS_PER_MASTER) - 1;
-
-So this is block -= 1 for master 0 and block += 6 for master 1, is the
-latter correct?
-
-> +
-> +	/* Check IRQ bits */
-> +	for (i = 0; i < 8; i++) {
-> +		if (bits & BIT(i)) {
-> +			pmirq = block * 8 + i;
-> +			irq = irq_find_mapping(chip->irqdomain, pmirq);
-> +			generic_handle_irq(irq);
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int pm8821_irq_read_master(struct pm_irq_chip *chip,
-> +				int master_number, u8 master_val)
-
-This isn't so much a matter of "reading master X" as "handle master X".
-
-Also, you don't care about the return value, so no need to return one...
-
-> +{
-> +	int ret = 0;
-> +	int block;
-> +
-> +	for (block = 1; block < 8; block++) {
-> +		if (master_val & BIT(block)) {
-> +			ret |= pm8821_irq_block_handler(chip,
-> +					master_number, block);
-> +		}
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +static void pm8821_irq_handler(struct irq_desc *desc)
-> +{
-> +	struct pm_irq_chip *chip = irq_desc_get_handler_data(desc);
-> +	struct irq_chip *irq_chip = irq_desc_get_chip(desc);
-> +	int ret;
-> +	unsigned int master;
-> +
-> +	chained_irq_enter(irq_chip, desc);
-> +	/* check master 0 */
-> +	ret = pm8821_read_master_irq(chip, 0, &master);
-> +	if (ret) {
-> +		pr_err("Failed to re:Qad master 0 ret=%d\n", ret);
-> +		return;
-> +	}
-> +
-> +	if (master & ~PM8821_IRQ_MASTER1_SET)
-
-Rather than having a define for MASTER1_SET use BIT(0) here and write a
-comment like:
-
-"bits 1 through 7 marks the first 7 blocks"
-
-> +		pm8821_irq_read_master(chip, 0, master);
-> +
-
-and then
-
-"bit 0 is set if second master contains any bits"
-
-Or just skip this optimization and check the two masters unconditionally
-in a loop.
-
-> +	/* check master 1 */
-> +	if (!(master & PM8821_IRQ_MASTER1_SET))
-> +		goto done;
-> +
-> +	ret = pm8821_read_master_irq(chip, 1, &master);
-> +	if (ret) {
-> +		pr_err("Failed to read master 1 ret=%d\n", ret);
-> +		return;
-> +	}
-> +
-> +	pm8821_irq_read_master(chip, 1, master);
-> +
-> +done:
-> +	chained_irq_exit(irq_chip, desc);
-> +}
-> +
->  static void pm8xxx_irq_mask_ack(struct irq_data *d)
->  {
->  	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> @@ -254,13 +394,15 @@ static int pm8xxx_irq_get_irqchip_state(struct irq_data *d,
->  	irq_bit = pmirq % 8;
->  
->  	spin_lock(&chip->pm_irq_lock);
-> -	rc = regmap_write(chip->regmap, SSBI_REG_ADDR_IRQ_BLK_SEL, block);
-> +	rc = regmap_write(chip->regmap, chip->irq_reg_base +
-> +			  SSBI_REG_ADDR_IRQ_BLK_SEL, block);
->  	if (rc) {
->  		pr_err("Failed Selecting Block %d rc=%d\n", block, rc);
->  		goto bail;
->  	}
->  
-> -	rc = regmap_read(chip->regmap, SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
-> +	rc = regmap_read(chip->regmap, chip->irq_reg_base +
-> +			 SSBI_REG_ADDR_IRQ_RT_STATUS, &bits);
->  	if (rc) {
->  		pr_err("Failed Reading Status rc=%d\n", rc);
->  		goto bail;
-> @@ -299,6 +441,151 @@ static const struct irq_domain_ops pm8xxx_irq_domain_ops = {
->  	.map = pm8xxx_irq_domain_map,
->  };
->  
-> +static void pm8821_irq_mask_ack(struct irq_data *d)
-> +{
-> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int base, pmirq = irqd_to_hwirq(d);
-> +	u8 block, master;
-> +	int irq_bit, rc;
-> +
-> +	block = pmirq / 8;
-> +	master = block / PM8821_BLOCKS_PER_MASTER;
-> +	irq_bit = pmirq % 8;
-> +	block %= PM8821_BLOCKS_PER_MASTER;
-
-You can deobfuscate this somewhat by instead of testing for !master
-below you just do:
-
-if (block < PM8821_BLOCKS_PER_MASTER) {
-	base = 
-} else {
-	base = 
-	block -= PM8821_BLOCKS_PER_MASTER;
-}
-
-> +
-> +	if (!master)
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER0;
-> +	else
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER1;
-> +
-> +	spin_lock(&chip->pm_irq_lock);
-
-The irqchip code grabs a lock on the irq_desc, so this can't race with
-unmask - and the regmap_update_bits() is internally protecting the
-read/write cycle.
-
-So you shouldn't need to lock around this section.
-
-> +	rc = regmap_update_bits(chip->regmap,
-> +				base + PM8821_IRQ_MASK_REG_OFFSET + block,
-> +				BIT(irq_bit), BIT(irq_bit));
-> +
-> +	if (rc) {
-> +		pr_err("Failed to read/write mask IRQ:%d rc=%d\n", pmirq, rc);
-> +		goto fail;
-> +	}
-> +
-> +	rc = regmap_update_bits(chip->regmap,
-> +				base + PM8821_IRQ_CLEAR_OFFSET + block,
-> +				BIT(irq_bit), BIT(irq_bit));
-> +
-> +	if (rc) {
-> +		pr_err("Failed to read/write IT_CLEAR IRQ:%d rc=%d\n",
-> +								pmirq, rc);
-> +	}
-> +
-> +fail:
-> +	spin_unlock(&chip->pm_irq_lock);
-> +}
-> +
-> +static void pm8821_irq_unmask(struct irq_data *d)
-> +{
-> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	unsigned int base, pmirq = irqd_to_hwirq(d);
-> +	int irq_bit, rc;
-> +	u8 block, master;
-> +
-> +	block = pmirq / 8;
-> +	master = block / PM8821_BLOCKS_PER_MASTER;
-> +	irq_bit = pmirq % 8;
-> +	block %= PM8821_BLOCKS_PER_MASTER;
-
-As mask().
-
-> +
-> +	if (!master)
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER0;
-> +	else
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER1;
-> +
-> +	spin_lock(&chip->pm_irq_lock);
-
-As mask().
-
-> +
-> +	rc = regmap_update_bits(chip->regmap,
-> +				base + PM8821_IRQ_MASK_REG_OFFSET + block,
-> +				BIT(irq_bit), ~BIT(irq_bit));
-> +
-> +	if (rc)
-> +		pr_err("Failed to read/write unmask IRQ:%d rc=%d\n", pmirq, rc);
-> +
-> +	spin_unlock(&chip->pm_irq_lock);
-> +}
-> +
-> +static int pm8821_irq_set_type(struct irq_data *d, unsigned int flow_type)
-> +{
-> +
-> +	/*
-> +	 * PM8821 IRQ controller does not have explicit software support for
-> +	 * IRQ flow type.
-> +	 */
-
-Is returning "success" here the right thing to do? Shouldn't we just
-omit the function? Or did you perhaps hit some clients that wouldn't
-deal with that?
-
-> +	return 0;
-> +}
-> +
-> +static int pm8821_irq_get_irqchip_state(struct irq_data *d,
-> +					enum irqchip_irq_state which,
-> +					bool *state)
-> +{
-> +	struct pm_irq_chip *chip = irq_data_get_irq_chip_data(d);
-> +	int pmirq, rc;
-> +	u8 block, irq_bit, master;
-> +	unsigned int bits;
-> +	unsigned int base;
-> +	unsigned long flags;
-> +
-> +	pmirq = irqd_to_hwirq(d);
-> +
-> +	block = pmirq / 8;
-> +	master = block / PM8821_BLOCKS_PER_MASTER;
-> +	irq_bit = pmirq % 8;
-> +	block %= PM8821_BLOCKS_PER_MASTER;
-> +
-
-Simplify as in mask().
-
-> +	if (!master)
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER0;
-> +	else
-> +		base = chip->irq_reg_base + SSBI_REG_ADDR_IRQ_MASTER1;
-> +
-> +	spin_lock_irqsave(&chip->pm_irq_lock, flags);
-
-No need to lock here as we're just reading a single register.
-
-> +
-> +	rc = regmap_read(chip->regmap,
-> +		base + PM8821_IRQ_RT_STATUS_OFFSET + block, &bits);
-> +	if (rc) {
-> +		pr_err("Failed Reading Status rc=%d\n", rc);
-> +		goto bail_out;
-> +	}
-> +
-> +	*state = !!(bits & BIT(irq_bit));
-> +
-> +bail_out:
-> +	spin_unlock_irqrestore(&chip->pm_irq_lock, flags);
-> +
-> +	return rc;
-> +}
-> +
-> +static struct irq_chip pm8821_irq_chip = {
-> +	.name		= "pm8821",
-> +	.irq_mask_ack	= pm8821_irq_mask_ack,
-> +	.irq_unmask	= pm8821_irq_unmask,
-> +	.irq_set_type	= pm8821_irq_set_type,
-> +	.irq_get_irqchip_state = pm8821_irq_get_irqchip_state,
-> +	.flags		= IRQCHIP_MASK_ON_SUSPEND | IRQCHIP_SKIP_SET_WAKE,
-> +};
-> +
-
-Regards,
-Bjorn
+>
+> Thanks
+> Paul.
+> --
+>
+>> +
+>> +static ktime_t mmdc_pmu_timer_period(void)
+>> +{
+>> +       return ns_to_ktime((u64)mmdc_pmu_poll_period_us * 1000);
+>> +}
+>> +
