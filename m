@@ -1,52 +1,24 @@
-From: gerald.schaefer@de.ibm.com (Gerald Schaefer)
-Date: Tue, 8 Nov 2016 20:27:42 +0100
-Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
-In-Reply-To: <20161108091725.GA18678@sha-win-210.asiapac.arm.com>
-References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
- <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
- <20161107162504.17591806@thinkpad>
- <20161108021929.GA982@sha-win-210.asiapac.arm.com>
- <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
- <20161108091725.GA18678@sha-win-210.asiapac.arm.com>
-Message-ID: <20161108202742.57ed120d@thinkpad>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 8 Nov 2016 21:11:14 +0100
+Subject: [PATCH 1/1 v7] ARM: imx: Added perf functionality to mmdc driver
+In-Reply-To: <CAHrpEqQGRLY7ZB6moP9FZ0w-t63QkyLE1fUb3heRZJfRd2Y9sw@mail.gmail.com>
+References: <1474307267-3081-1-git-send-email-Frank.Li@nxp.com>
+ <CAP=VYLo_p3ZmOFcyM9om_31-=5O3ZiRLCBkJDDtj84JxAA7h8Q@mail.gmail.com>
+ <CAHrpEqQGRLY7ZB6moP9FZ0w-t63QkyLE1fUb3heRZJfRd2Y9sw@mail.gmail.com>
+Message-ID: <20161108201114.GQ3117@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Nov 2016 17:17:28 +0800
-Huang Shijie <shijie.huang@arm.com> wrote:
+On Tue, Nov 08, 2016 at 01:21:47PM -0600, Zhi Li wrote:
+> On Tue, Nov 8, 2016 at 1:00 PM, Paul Gortmaker
+> > I just noticed this commit now that linux-next is back after the week off.
+> >
+> > This should probably use core_param or setup_param since the Kconfig
+> > for this is bool and not tristate. 
 
-> > I will look at the lockdep issue.
-> I tested the new patch (will be sent out later) on the arm64 platform,
-> and I did not meet the lockdep issue when I enabled the lockdep.
-> The following is my config:
-> 
-> 	CONFIG_LOCKD=y
-> 	CONFIG_LOCKD_V4=y
-> 	CONFIG_LOCKUP_DETECTOR=y
->         # CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
-> 	CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=0
-> 	CONFIG_DEBUG_SPINLOCK=y
-> 	CONFIG_DEBUG_LOCK_ALLOC=y
-> 	CONFIG_PROVE_LOCKING=y
-> 	CONFIG_LOCKDEP=y
-> 	CONFIG_LOCK_STAT=y
-> 	CONFIG_DEBUG_LOCKDEP=y
-> 	CONFIG_DEBUG_LOCKING_API_SELFTESTS=y
-> 	
-> So do I miss something? 
 
-Those options should be OK. Meanwhile I looked into this a little more,
-and the problematic line/lock is spin_lock_irqsave(&z->lock, flags) at
-the top of alloc_gigantic_page(). From the lockdep trace we see that
-it is triggered by an mmap(), and then hugetlb_acct_memory() ->
-__alloc_huge_page() -> alloc_gigantic_page().
+> I think pmu_pmu_poll_period_us should be removed because no benefit to
+> change it.
+> I can delete .remove
 
-However, in between those functions (inside gather_surplus_pages())
-a NUMA_NO_NODE node id comes into play. And this finally results in
-alloc_gigantic_page() being called with NUMA_NO_NODE as nid (which is
--1), and NODE_DATA(nid)->node_zones will then reach into Nirvana.
-
-So, I guess the problem is a missing NUMA_NO_NODE check in
-alloc_gigantic_page(), similar to the one in
-__hugetlb_alloc_buddy_huge_page(). And somehow this was not a problem
-before the gigantic surplus change.
+Why not make it tristate ?
