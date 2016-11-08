@@ -1,92 +1,177 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Tue, 8 Nov 2016 11:47:06 +0800
-Subject: [PATCH V5 0/3] ARM64 LPC: legacy ISA I/O support
-Message-ID: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2016 03:29:42 +0000
+Subject: [PATCH V2 3/5] arm64: hw_breakpoint: Handle inexact watchpoint
+ addresses
+In-Reply-To: <22f4d20911e39efa0b8a6f7082d6839b80bb16b0.1476941895.git.panand@redhat.com>
+References: <cover.1476941895.git.panand@redhat.com>
+ <22f4d20911e39efa0b8a6f7082d6839b80bb16b0.1476941895.git.panand@redhat.com>
+Message-ID: <20161108032941.GC20591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch supports the IPMI-bt device attached to the Low-Pin-Count interface
-implemented on Hisilicon Hip06 SoC.
-	                -----------
-			| LPC host|
-	                |         |
-	                -----------
-	                     |
- 	        _____________V_______________LPC
-                  |			  |
-                  V	                  V
-			             ------------
-			             |  BT(ipmi)|
-			             ------------
+On Thu, Oct 20, 2016 at 11:18:15AM +0530, Pratyush Anand wrote:
+> From: Pavel Labath <test.tberghammer@gmail.com>
+> 
+> Arm64 hardware does not always report a watchpoint hit address that
+> matches one of the watchpoints set. It can also report an address
+> "near" the watchpoint if a single instruction access both watched and
+> unwatched addresses. There is no straight-forward way, short of
+> disassembling the offending instruction, to map that address back to
+> the watchpoint.
+> 
+> Previously, when the hardware reported a watchpoint hit on an address
+> that did not match our watchpoint (this happens in case of instructions
+> which access large chunks of memory such as "stp") the process would
+> enter a loop where we would be continually resuming it (because we did
+> not recognise that watchpoint hit) and it would keep hitting the
+> watchpoint again and again. The tracing process would never get
+> notified of the watchpoint hit.
+> 
+> This commit fixes the problem by looking at the watchpoints near the
+> address reported by the hardware. If the address does not exactly match
+> one of the watchpoints we have set, it attributes the hit to the
+> nearest watchpoint we have.  This heuristic is a bit dodgy, but I don't
+> think we can do much more, given the hardware limitations.
+> 
+> [panand: reworked to rebase on his patches]
+> 
+> Signed-off-by: Pavel Labath <labath@google.com>
+> Signed-off-by: Pratyush Anand <panand@redhat.com>
+> ---
+>  arch/arm64/kernel/hw_breakpoint.c | 94 +++++++++++++++++++++++++++------------
+>  1 file changed, 66 insertions(+), 28 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 3c2b96803eba..c57bc90b8286 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -662,11 +662,46 @@ unlock:
+>  }
+>  NOKPROBE_SYMBOL(breakpoint_handler);
+>  
+> +/*
+> + * Arm64 hardware does not always report a watchpoint hit address that matches
+> + * one of the watchpoints set. It can also report an address "near" the
+> + * watchpoint if a single instruction access both watched and unwatched
+> + * addresses. There is no straight-forward way, short of disassembling the
+> + * offending instruction, to map that address back to the watchpoint. This
+> + * function computes the distance of the memory access from the watchpoint as a
+> + * heuristic for the likelyhood that a given access triggered the watchpoint.
+> + *
+> + * See Section D2.10.5 "Determining the memory location that caused a Watchpoint
+> + * exception" of ARMv8 Architecture Reference Manual for details.
+> + *
+> + * The function returns the distance of the address from the bytes watched by
+> + * the watchpoint. In case of an exact match, it returns 0.
+> + */
+> +static u64 get_distance_from_watchpoint(unsigned long addr, u64 val,
+> +					struct arch_hw_breakpoint_ctrl *ctrl)
+> +{
+> +	u64 wp_low, wp_high;
+> +	u32 lens, lene;
+> +
+> +	lens = ffs(ctrl->len) - 1;
+> +	lene = fls(ctrl->len) - 1;
+> +
+> +	wp_low = val + lens;
+> +	wp_high = val + lene;
+> +	if (addr < wp_low)
+> +		return wp_low - addr;
+> +	else if (addr > wp_high)
+> +		return addr - wp_high;
+> +	else
+> +		return 0;
+> +}
+> +
+>  static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  			      struct pt_regs *regs)
+>  {
+> -	int i, step = 0, *kernel_step, access;
+> -	u32 ctrl_reg, lens, lene;
+> +	int i, step = 0, *kernel_step, access, closest_match = 0;
+> +	u64 min_dist = -1, dist;
+> +	u32 ctrl_reg;
+>  	u64 val;
+>  	struct perf_event *wp, **slots;
+>  	struct debug_info *debug_info;
+> @@ -676,31 +711,15 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  	slots = this_cpu_ptr(wp_on_reg);
+>  	debug_info = &current->thread.debug;
+>  
+> +	/*
+> +	 * Find all watchpoints that match the reported address. If no exact
+> +	 * match is found. Attribute the hit to the closest watchpoint.
+> +	 */
+> +	rcu_read_lock();
+>  	for (i = 0; i < core_num_wrps; ++i) {
+> -		rcu_read_lock();
+> -
+>  		wp = slots[i];
+> -
+>  		if (wp == NULL)
+> -			goto unlock;
+> -
+> -		info = counter_arch_bp(wp);
+> -
+> -		/* Check if the watchpoint value and byte select match. */
+> -		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+> -		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+> -		decode_ctrl_reg(ctrl_reg, &ctrl);
+> -		lens = ffs(ctrl.len) - 1;
+> -		lene = fls(ctrl.len) - 1;
+> -		/*
+> -		 * FIXME: reported address can be anywhere between "the
+> -		 * lowest address accessed by the memory access that
+> -		 * triggered the watchpoint" and "the highest watchpointed
+> -		 * address accessed by the memory access". So, it may not
+> -		 * lie in the interval of watchpoint address range.
+> -		 */
+> -		if (addr < val + lens || addr > val + lene)
+> -			goto unlock;
+> +			continue;
+>  
+>  		/*
+>  		 * Check that the access type matches.
+> @@ -709,18 +728,37 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>  		access = (esr & AARCH64_ESR_ACCESS_MASK) ? HW_BREAKPOINT_W :
+>  			 HW_BREAKPOINT_R;
+>  		if (!(access & hw_breakpoint_type(wp)))
+> -			goto unlock;
+> +			continue;
+> +
+> +		/* Check if the watchpoint value and byte select match. */
+> +		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+> +		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+> +		decode_ctrl_reg(ctrl_reg, &ctrl);
+> +		dist = get_distance_from_watchpoint(addr, val, &ctrl);
+> +		if (dist < min_dist) {
+> +			min_dist = dist;
+> +			closest_match = i;
+> +		}
+> +		/* Is this an exact match? */
+> +		if (dist != 0)
+> +			continue;
+>  
+> +		info = counter_arch_bp(wp);
+>  		info->trigger = addr;
+>  		perf_bp_event(wp, regs);
+>  
+>  		/* Do we need to handle the stepping? */
+>  		if (is_default_overflow_handler(wp))
+>  			step = 1;
+> -
+> -unlock:
+> -		rcu_read_unlock();
+>  	}
+> +	if (min_dist > 0 && min_dist != -1) {
+> +		/* No exact match found. */
+> +		wp = slots[closest_match];
+> +		info = counter_arch_bp(wp);
+> +		info->trigger = addr;
+> +		perf_bp_event(wp, regs);
+> +	}
 
-When master accesses those periperals beneath the Hip06 LPC, a specific LPC
-driver is needed to make LPC host generate the standard LPC I/O cycles with
-the target periperals'I/O port addresses. But on curent arm64 world, there is
-no real I/O accesses. All the I/O operations through in/out pair are based on
-MMIO which is not satisfied the I/O mechanism on Hip06 LPC.
-To solve this issue and keep the relevant existing peripherals' driver
-unchanged, this patch set redefines the in/out pair to support both the IO
-operations for Hip06 LPC and the original MMIO. The way specific to Hip06 is
-named as indirect-IO in this patchset.
+Why don't we need to bother with the stepping in the case of a non-exact
+match?
 
-Changes from V4:
-  - Some revises based on the comments from Bjorn, Rob on V4;
-  - Fixed the compile error on some platforms, such as openrisc;
-
-Changes from V3:
-  - UART support deferred to a separate patchset; This patchset only support
-  ipmi device under LPC;
-  - LPC bus I/O range is fixed to 0 ~ (PCIBIOS_MIN_IO - 1), which is separeted
-  from PCI/PCIE PIO space;
-  - Based on Arnd's remarks, removed the ranges property from Hip06 lpc dts and
-  added a new fixup function, of_isa_indirect_io(), to get the I/O address
-  directly from LPC dts configurations;
-  - Support in(w,l)/out(w,l) for Hip06 lpc I/O;
-  - Decouple the header file dependency on the gerenic io.h by defining in/out
-  as normal functions in c file;
-  - removed unused macro definitions in the LPC driver;
-
-Changes from V2:
-  - Support the PIO retrieval from the linux PIO generated by
-  pci_address_to_pio. This method replace the 4K PIO reservation in V2;
-  - Support the flat-tree earlycon;
-  - Some revises based on Arnd's remarks;
-  - Make sure the linux PIO range allocated to Hip06 LPC peripherals starts
-  from non-ZERO;
-
-Changes from V1:
-  - Support the ACPI LPC device;
-  - Optimize the dts LPC driver in ISA compatible mode;
-  - Reserve the IO range below 4K in avoid the possible conflict with PCI host
-  IO ranges;
-  - Support the LPC uart and relevant earlycon;
-
-Signed-off-by: Zhichang Yuan <yuanzhichang@hisilicon.com>
-
-zhichang.yuan (3):
-  ARM64 LPC: Indirect ISA port IO introduced
-  ARM64 LPC: Add missing range exception for special ISA
-  ARM64 LPC: LPC driver implementation on Hip06
-
- .../arm/hisilicon/hisilicon-low-pin-count.txt      |  31 ++
- MAINTAINERS                                        |   8 +
- arch/arm64/Kconfig                                 |   6 +
- arch/arm64/include/asm/extio.h                     |  94 ++++
- arch/arm64/include/asm/io.h                        |  35 ++
- arch/arm64/kernel/Makefile                         |   1 +
- arch/arm64/kernel/extio.c                          |  52 +++
- drivers/bus/Kconfig                                |   8 +
- drivers/bus/Makefile                               |   1 +
- drivers/bus/hisi_lpc.c                             | 501 +++++++++++++++++++++
- drivers/of/address.c                               |  56 ++-
- drivers/pci/pci.c                                  |   6 +-
- include/linux/of_address.h                         |  17 +
- include/linux/pci.h                                |   8 +
- 14 files changed, 820 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
- create mode 100644 arch/arm64/include/asm/extio.h
- create mode 100644 arch/arm64/kernel/extio.c
- create mode 100644 drivers/bus/hisi_lpc.c
-
--- 
-1.9.1
+Will
