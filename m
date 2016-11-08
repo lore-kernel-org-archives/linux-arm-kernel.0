@@ -1,33 +1,54 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Nov 2016 19:47:15 +0100
-Subject: [PATCH v3 2/3] ARM64: dts: sun6i: add dma node for a64.
-In-Reply-To: <20161107182247.GA3669@arx12>
-References: <20161107182247.GA3669@arx12>
-Message-ID: <20161108184715.x5kjhjthmuxor2xz@lukather>
+Date: Tue, 8 Nov 2016 19:54:42 +0100
+Subject: [PATCH v3 3/3] ARM: dmaengine: sun6i: share the dma driver with
+ sun50i
+In-Reply-To: <20161107182840.GA3711@arx12>
+References: <20161107182840.GA3711@arx12>
+Message-ID: <20161108185442.oyywmgrvmqomnqe6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 08, 2016 at 02:22:47AM +0800, Hao Zhang wrote:
-> This adds the dma node for sun50i a64.
+On Tue, Nov 08, 2016 at 02:28:40AM +0800, Hao Zhang wrote:
+> According to the datasheet, the dma of A64 support 8/16/32/64 bits
+> so, we can add the condition of device compatible in convert_buswidth
+> function and other place to determine the device whether is for A64,
+> and then accept the 8 bytes bus width to it.
 > 
 > Signed-off-by: Hao Zhang <hao5781286@gmail.com>
 > ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  drivers/dma/sun6i-dma.c | 43 +++++++++++++++++++++++++++++++++----------
+>  1 file changed, 33 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index e3c3d7d8..855ae2c 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -227,6 +227,15 @@
->  			};
->  		};
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index 8346199..8a95a1a 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -247,13 +247,17 @@ static inline s8 convert_burst(u32 maxburst)
+>  	}
+>  }
 >  
-> +		dma: dma-controller at 01c02000 {
+> -static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width)
+> +static inline s8 convert_buswidth(enum dma_slave_buswidth addr_width,
+> +				  struct sun6i_dma_dev *sdev)
+>  {
+> -	if ((addr_width < DMA_SLAVE_BUSWIDTH_1_BYTE) ||
+> -	    (addr_width > DMA_SLAVE_BUSWIDTH_4_BYTES))
+> +	if (((addr_width >= DMA_SLAVE_BUSWIDTH_1_BYTE) &&
+> +	     (addr_width <= DMA_SLAVE_BUSWIDTH_4_BYTES)) ||
+> +	    ((addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES) &&
+> +	     (of_device_is_compatible(sdev->slave.dev->of_node,
+> +				      "allwinner,sun50i-a64-dma"))))
+> +		return addr_width >> 1;
+> +	else
 
-Please order the nodes by base adress, thanks!
+Just like for the burst (https://lkml.org/lkml/2016/10/4/367) I think
+this should be taken care of in the the framework's
+dmaengine_slave_config function.
+
+This is quite easy to do in the width case, since you just have to
+test whether what has been set in the dma_device has support for the
+burst give in the configuration.
+
 Maxime
 
 -- 
@@ -40,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/cd8a7e91/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/df9a830d/attachment.sig>
