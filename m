@@ -1,84 +1,48 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 08 Nov 2016 12:25:58 +0000
-Subject: [PATCH RFC 12/12] drm/i2c: tda998x: switch to boolean is_on
-In-Reply-To: <20161108122420.GP1041@n2100.armlinux.org.uk>
-References: <20161108122420.GP1041@n2100.armlinux.org.uk>
-Message-ID: <E1c45TS-0005kT-2y@rmk-PC.armlinux.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 8 Nov 2016 12:24:20 +0000
+Subject: [PATCH RFC 00/12] tda998x updates
+Message-ID: <20161108122420.GP1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than storing the DPMS mode (which will always be on or off) use a
-boolean to store this instead.
+As no one responded to the previous round, I'm not spending soo much
+time writing up a description of these changes again.  It's also been
+quite a long time, so I've forgotten all the details of the changes,
+so I'll do my best.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+Changes from the previous series include:
+- reorder the initial three patches
+- change the (now third patch)... I think to increase the size of the
+  locked region.
+- fix edid parsing for infoframe generation - as was pointed out for
+  dw-hdmi, parsing the EDID in get_modes() is incorrect, as that method
+  will not be called when an override-edid is in effect.  We need to
+  parse the override-edid.  Moreover, infoframe generation should not
+  be keyed to whether the monitor is HDMI or not, CEA-861B allows non-
+  HDMI to send infoframes.
+- only send audio if audio and infoframes are supported.
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 226871e34442..3a5e5c466972 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -42,7 +42,7 @@ struct tda998x_priv {
- 	struct mutex mutex;
- 	u16 rev;
- 	u8 current_page;
--	int dpms;
-+	bool is_on;
- 	bool supports_infoframes;
- 	bool sink_has_audio;
- 	u8 vip_cntrl_0;
-@@ -1159,16 +1159,15 @@ static int tda998x_connector_init(struct tda998x_priv *priv,
- static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
- {
- 	struct tda998x_priv *priv = enc_to_tda998x_priv(encoder);
-+	bool on;
- 
- 	/* we only care about on or off: */
--	if (mode != DRM_MODE_DPMS_ON)
--		mode = DRM_MODE_DPMS_OFF;
-+	on = mode == DRM_MODE_DPMS_ON;
- 
--	if (mode == priv->dpms)
-+	if (on == priv->is_on)
- 		return;
- 
--	switch (mode) {
--	case DRM_MODE_DPMS_ON:
-+	if (on) {
- 		/* enable video ports, audio will be enabled later */
- 		reg_write(priv, REG_ENA_VP_0, 0xff);
- 		reg_write(priv, REG_ENA_VP_1, 0xff);
-@@ -1177,16 +1176,16 @@ static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
- 		reg_write(priv, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
- 		reg_write(priv, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
- 		reg_write(priv, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
--		break;
--	case DRM_MODE_DPMS_OFF:
-+
-+		priv->is_on = true;
-+	} else {
- 		/* disable video ports */
- 		reg_write(priv, REG_ENA_VP_0, 0x00);
- 		reg_write(priv, REG_ENA_VP_1, 0x00);
- 		reg_write(priv, REG_ENA_VP_2, 0x00);
--		break;
--	}
- 
--	priv->dpms = mode;
-+		priv->is_on = false;
-+	}
- }
- 
- static void
-@@ -1480,8 +1479,6 @@ static int tda998x_create(struct i2c_client *client, struct tda998x_priv *priv)
- 	if (!priv->cec)
- 		return -ENODEV;
- 
--	priv->dpms = DRM_MODE_DPMS_OFF;
--
- 	mutex_init(&priv->mutex);	/* protect the page access */
- 	init_waitqueue_head(&priv->edid_delay_waitq);
- 	setup_timer(&priv->edid_delay_timer, tda998x_edid_delay_done,
+Otherwise, these are very much like the previous posting of the series,
+except rebased upon the mali/hdlcd/tda998x change to remove the
+drm_connector_register() call.
+
+https://www.spinics.net/lists/dri-devel/msg121495.html
+
+It'd be nice to have other tda998x users ack and test these patches,
+I've tried to test on Juno, but the Juno situation seems to be a huge
+fail.  (HBI0282B completely fails with latest firmware - (a) FPGA image
+incompatibilities io_b118 causes all FPGA AMBA devices to vanish, (b)
+seems no way to get SCPI support on it - adding the BL0 executable
+start address in the SCC registers seems to be incompatible with the
+devchip, causing the PLLs to fail.  In discussion with Sudeep over
+these issues, but no idea where things are with it at the moment, other
+than Sudeep needs to investigate.  All Linaro firmware releases are
+broken on HBI0282B.)
+
+ drivers/gpu/drm/i2c/tda998x_drv.c | 826 ++++++++++++++++++++------------------
+ 1 file changed, 429 insertions(+), 397 deletions(-)
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
