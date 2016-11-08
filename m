@@ -1,68 +1,149 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Nov 2016 14:09:09 +0000
-Subject: [PATCH v2 0/2] arm64: fix the bugs found in the hugetlb test
-In-Reply-To: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
-References: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20161108140909.GF29087@e104818-lin.cambridge.arm.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 8 Nov 2016 15:27:23 +0100
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161108024559.GA20591@arm.com>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
+Message-ID: <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 01:44:37PM +0800, Huang Shijie wrote:
-> (3) The test result in the Softiron and Juno-r1 boards:
-> 
->    This detail test result shows below (both the "make func" & "make stress"):
-> 
->     4KB granule:
-> 
->         1.1) PTE + Contiguous bit : 4K x 16 = 64K (per huge page size)
->              Test result          : PASS
-> 
->         1.2) PMD                  : 2M x  1 = 2M  (per huge page size)
->              Test result          : PASS
-> 
->         1.3) PMD + Contiguous bit : 2M x 16 = 32M (per huge page size)
->              Test result          : PASS
-> 
->     64KB granule:
-> 
->         3.1) PTE + Contiguous bit : 64K x 32 = 2M (per huge page size)
->              Test result          : PASS
-> 
->         3.2) PMD + Contiguous bit : 512M x 32 = 16G (per huge page size)
->              Test result          : no hardware to support this test
+Hi Will,
 
-Don't we have support for single (non-contiguous) PMD huge page with 64K
-pages (512M per huge page)? I gave it a try and it seems to work (though
-without your patches applied ;)).
+On 08/11/2016 03:45, Will Deacon wrote:
+> Hi all,
+> 
+> I figured this was a reasonable post to piggy-back on for the LPC minutes
+> relating to guest MSIs on arm64.
+> 
+> On Thu, Nov 03, 2016 at 10:02:05PM -0600, Alex Williamson wrote:
+>> We can always have QEMU reject hot-adding the device if the reserved
+>> region overlaps existing guest RAM, but I don't even really see how we
+>> advise users to give them a reasonable chance of avoiding that
+>> possibility.  Apparently there are also ARM platforms where MSI pages
+>> cannot be remapped to support the previous programmable user/VM
+>> address, is it even worthwhile to support those platforms?  Does that
+>> decision influence whether user programmable MSI reserved regions are
+>> really a second class citizen to fixed reserved regions?  I expect
+>> we'll be talking about this tomorrow morning, but I certainly haven't
+>> come up with any viable solutions to this.  Thanks,
+> 
+> At LPC last week, we discussed guest MSIs on arm64 as part of the PCI
+> microconference. I presented some slides to illustrate some of the issues
+> we're trying to solve:
+> 
+>   http://www.willdeacon.ukfsn.org/bitbucket/lpc-16/msi-in-guest-arm64.pdf
+> 
+> Punit took some notes (thanks!) on the etherpad here:
+> 
+>   https://etherpad.openstack.org/p/LPC2016_PCI
 
-> Huang Shijie (2):
->   arm64: hugetlb: remove the wrong pmd check in find_num_contig()
->   arm64: hugetlb: fix the wrong address for several functions
+Thanks to both of you for the minutes and slides. Unfortunately I could
+not travel but my ears were burning ;-)
+> 
+> although the discussion was pretty lively and jumped about, so I've had
+> to go from memory where the notes didn't capture everything that was
+> said.
+> 
+> To summarise, arm64 platforms differ in their handling of MSIs when compared
+> to x86:
+> 
+>   1. The physical memory map is not standardised (Jon pointed out that
+>      this is something that was realised late on)
+>   2. MSIs are usually treated the same as DMA writes, in that they must be
+>      mapped by the SMMU page tables so that they target a physical MSI
+>      doorbell
+>   3. On some platforms, MSIs bypass the SMMU entirely (e.g. due to an MSI
+>      doorbell built into the PCI RC)
+>   4. Platforms typically have some set of addresses that abort before
+>      reaching the SMMU (e.g. because the PCI identifies them as P2P).
+> 
+> All of this means that userspace (QEMU) needs to identify the memory
+> regions corresponding to points (3) and (4) and ensure that they are
+> not allocated in the guest physical (IPA) space. For platforms that can
+> remap the MSI doorbell as in (2), then some space also needs to be
+> allocated for that.
+> 
+> Rather than treat these as separate problems, a better interface is to
+> tell userspace about a set of reserved regions, and have this include
+> the MSI doorbell, irrespective of whether or not it can be remapped.
+> Don suggested that we statically pick an address for the doorbell in a
+> similar way to x86, and have the kernel map it there. We could even pick
+> 0xfee00000. If it conflicts with a reserved region on the platform (due
+> to (4)), then we'd obviously have to (deterministically?) allocate it
+> somewhere else, but probably within the bottom 4G.
 
-For these patches:
+This is tentatively achieved now with
+[1] [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
+(http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1264506.html)
+> 
+> The next question is how to tell userspace about all of the reserved
+> regions. Initially, the idea was to extend VFIO, however Alex pointed
+> out a horrible scenario:
+> 
+>   1. QEMU spawns a VM on system 0
+>   2. VM is migrated to system 1
+>   3. QEMU attempts to passthrough a device using PCI hotplug
+> 
+> In this scenario, the guest memory map is chosen at step (1), yet there
+> is no VFIO fd available to determine the reserved regions. Furthermore,
+> the reserved regions may vary between system 0 and system 1. This pretty
+> much rules out using VFIO to determine the reserved regions.Alex suggested
+> that the SMMU driver can advertise the regions via /sys/class/iommu/. This
+> would solve part of the problem, but migration between systems with
+> different memory maps can still cause problems if the reserved regions
+> of the new system conflict with the guest memory map chosen by QEMU.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-I'm not sure whether Will plans to push them into 4.9. AFAICT, the
-contiguous huge pages never worked properly, so we may not count it as a
-regression but a new feature. If Will doesn't take them, I'll queue the
-patches for 4.10.
+OK so I understand we do not want anymore the VFIO chain capability API
+(patch 5 of above series) but we prefer a sysfs approach instead.
 
-BTW, I think we also need to fix this (no functional change though):
+I understand the sysfs approach which allows the userspace to get the
+info earlier and independently on VFIO. Keeping in mind current QEMU
+virt - which is not the only userspace - will not do much from this info
+until we bring upheavals in virt address space management. So if I am
+not wrong, at the moment the main action to be undertaken is the
+rejection of the PCI hotplug in case we detect a collision.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 2e49bd252fe7..0a4c97b618ec 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -323,7 +323,7 @@ __setup("hugepagesz=", setup_hugepagesz);
- static __init int add_default_hugepagesz(void)
- {
- 	if (size_to_hstate(CONT_PTES * PAGE_SIZE) == NULL)
--		hugetlb_add_hstate(CONT_PMD_SHIFT);
-+		hugetlb_add_hstate(CONT_PTE_SHIFT);
- 	return 0;
- }
- arch_initcall(add_default_hugepagesz);
+I can respin [1]
+- studying and taking into account Robin's comments about dm_regions
+similarities
+- removing the VFIO capability chain and replacing this by a sysfs API
 
--- 
-Catalin
+Would that be OK?
+
+What about Alex comments who wanted to report the usable memory ranges
+instead of unusable memory ranges?
+
+Also did you have a chance to discuss the following items:
+1) the VFIO irq safety assessment
+2) the MSI reserved size computation (is an arbitrary size OK?)
+
+Thanks
+
+Eric
+
+> Jon pointed out that most people are pretty conservative about hardware
+> choices when migrating between them -- that is, they may only migrate
+> between different revisions of the same SoC, or they know ahead of time
+> all of the memory maps they want to support and this could be communicated
+> by way of configuration to libvirt. It would be up to QEMU to fail the
+> hotplug if it detected a conflict. Alex asked if there was a security
+> issue with DMA bypassing the SMMU, but there aren't currently any systems
+> where that is known to happen. Such a system would surely not be safe for
+> passthrough.
+> 
+> Ben mused that a way to handle conflicts dynamically might be to hotplug
+> on the entire host bridge in the guest, passing firmware tables describing
+> the new reserved regions as a property of the host bridge. Whilst this
+> may well solve the issue, it was largely considered future work due to
+> its invasive nature and dependency on firmware tables (and guest support)
+> that do not currently exist.
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
