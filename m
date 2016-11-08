@@ -1,120 +1,74 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Tue, 8 Nov 2016 21:21:45 +0530
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <2030692.HPgjBCTYG6@wuerfel>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <2467231.EbVekJun1R@wuerfel>
- <c68064fa-a274-2e22-88a6-5fe388debf2b@huawei.com>
- <2030692.HPgjBCTYG6@wuerfel>
-Message-ID: <5821F491.1010603@gmail.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Tue, 8 Nov 2016 16:52:43 +0100
+Subject: [PATCH 1/3] ipmi/bt-bmc: change compatible node to
+ 'aspeed,ast2400-ibt-bmc'
+In-Reply-To: <2368736.y6FyG1ESuP@wuerfel>
+References: <1478073426-3714-1-git-send-email-clg@kaod.org>
+ <CACPK8XcM1_xmmUu-cCZrSR67Y_qeXuSJ4Xmd_2gcgDT321LdBQ@mail.gmail.com>
+ <ebeba60f-429f-fb84-b9da-c27d11d23094@kaod.org> <2368736.y6FyG1ESuP@wuerfel>
+Message-ID: <a886778e-a85e-758e-3a61-c4909652e39d@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tuesday 08 November 2016 05:15 PM, Arnd Bergmann wrote:
-> On Tuesday, November 8, 2016 11:23:35 AM CET John Garry wrote:
->> On 07/11/2016 20:08, Arnd Bergmann wrote:
->>> On Monday, November 7, 2016 2:15:10 PM CET John Garry wrote:
->>>> Hi Arnd,
+On 11/07/2016 02:02 PM, Arnd Bergmann wrote:
+> On Wednesday, November 2, 2016 3:28:01 PM CET C?dric Le Goater wrote:
+>> On 11/02/2016 02:56 PM, Joel Stanley wrote:
+>>> On Wed, Nov 2, 2016 at 11:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Wednesday 02 November 2016, C?dric Le Goater wrote:
+>>>>> The Aspeed SoCs have two BT interfaces : one is IPMI compliant and the
+>>>>> other is H8S/2168 compliant.
+>>>>>
+>>>>> The current ipmi/bt-bmc driver implements the IPMI version and we
+>>>>> should reflect its nature in the compatible node name using
+>>>>> 'aspeed,ast2400-ibt-bmc' instead of 'aspeed,ast2400-bt-bmc'. The
+>>>>> latter should be used for a H8S interface driver if it is implemented
+>>>>> one day.
+>>>>>
+>>>>> Signed-off-by: C?dric Le Goater <clg@kaod.org>
 >>>>
->>>> The new bus type tries to model the djtag in a similar way to I2C/USB
->>>> driver arch, where we have a host bus adapter and child devices attached
->>>> to the bus. The child devices are bus driver devices and have bus
->>>> addresses. We think of the djtag as a separate bus, so we are modelling
->>>> it as such.
->>>>
->>>> The bus driver offers a simple host interface for clients to read/write
->>>> to the djtag bus: bus accesses are hidden from the client, the host
->>>> drives the bus.
->>> Ok, in that case we should probably start out by having a bus specific
->>> DT binding, and separating the description from that of the bus master
->>> device.
->> OK
+>>>> We generally try to avoid changing the compatible strings after the
+>>>> fact, but it's probably ok in this case.
 >>
->>> I'd suggest requiring #address-cells=<1> and #size-cells=<0> in the master
->>> node, and listing the children by reg property. If the address is not
->>> easily expressed as a single integer, use a larger #address-cells value.
->> We already have something equivalent to reg in "module-id" (see patch
->> 02/11), which is the slave device bus address; here's a sample:
->> +		/* For L3 cache PMU */
->> +		pmul3c0 {
->> +			compatible = "hisilicon,hisi-pmu-l3c-v1";
->> +			scl-id = <0x02>;
->> +			num-events = <0x16>;
->> +			num-counters = <0x08>;
->> +			module-id = <0x04>;
->> +			num-banks = <0x04>;
->> +			cfgen-map = <0x02 0x04 0x01 0x08>;
->> +			counter-reg = <0x170>;
->> +			evctrl-reg = <0x04>;
->> +			event-en = <0x1000000>;
->> +			evtype-reg = <0x140>;
->> +		};
+>> As the device tree changes are not merged yet, we thought we had some 
+>> more time to fine tune the naming. 
+> 
+> Ok, I see. No problem then.
+> 
+>>>> I don't understand who decides which of the two interfaces is used:
+>>>> is it the same register set that can be driven by either one or the
+>>>> other driver, or do you expect to have two drivers that can both
+>>>> be active in the same system and talk to different hardware once
+>>>> you get there?
+>>>
+>>> It's the second case. The H8S BT has a different register layout so it
+>>> would require a different driver.
 >>
->> FYI, "module-id" is our own internal hw nomenclature.
-> Yes, that was my interpretation as well. Please use the standard
-> "reg" property for this then.
-Hi Arnd,
+>> yes.
+>>  
+>>> We don't yet have a driver for the other BT device, but there was
+>>> recent talk of using it as an alternate (non-ipmi channel) between the
+>>> BMC and the host. Before that discussion I wasn't aware that the H8S
+>>> BT existed. I suggested we fix this up before it hits a final release.
+>>>
+>>> C?dric, do you think ast2400-ibt-bmc or ast2400-ipmi-bt-bmc does a
+>>> better job of describing the hardware here?
+>>
+>> The specs refer to the two interfaces as BT (non IPMI) and iBT (IPMI). 
+>> I think we can keep the same naming.
+> 
+> Ok
+> 
+>>> While we're modifying the binding, should we add a compat string for
+>>> the ast2500?
+>>
+>> Well, if the change in this patch is fine for all, may be we can add 
+>> the ast2500 compat string in a followup patch ?
+> 
+> Sounds good to me.
 
-Firstly my apologies for a mistake in the bindings example in ([PATCH 
-02/11 ..]).
-The module-id property is a list as defined in the PMU bindings patch 
-([PATCH v1 05/11] dt-bindings .. <https://lkml.org/lkml/2016/11/2/323>).
-
-+	djtag0: djtag at 0 {
-+		compatible = "hisilicon,hip05-cpu-djtag-v1";
-+			pmul3c0 {
-+				compatible = "hisilicon,hisi-pmu-l3c-v1";
-+				scl-id = <0x02>;
-+				num-events = <0x16>;
-+				num-counters = <0x08>;
-+				module-id = <0x04 0x04 0x04 0x04>;
-+				num-banks = <0x04>;
-+				cfgen-map = <0x02 0x04 0x01 0x08>;
-+				counter-reg = <0x170>;
-+				evctrl-reg = <0x04>;
-+				event-en = <0x1000000>;
-+				evtype-reg = <0x140>;
-+			};
-
-
-The L3 cache in hip05/06/07 chips consist of 4 banks (each bank has PMU 
-registers).
-
-In hip05/06 all L3 cache banks are identified with same module-id.
-module-id = <0x04 0x04 0x04 0x04>;
-
-But in the case hip07 chip(djtag v2), each L3 cache bank has different 
-module-id
-module-id = <0x01 0x02 0x03 0x04>;
-
-So in this case Please share your opinion on how to model it.
-
-Some more detail of L3 cache PMU.
-------------------------------------------------
-The hip05/06/07 chips consists of a multiple Super CPU cluster (16 CPU 
-cores). we call it SCCL.
-The L3 cache( 4 banks) is shared by all CPU cores in a SCCL.
-Each L3 cache bank has PMU registers. We always take the sum of the 
-counters to show in perf.
-Taking individual L3 cache count is not meaningful as there is no 
-mapping of CPU cores to individual
-L3 cache banks.
-
-Please share your suggestion.
+OK. So, how do we proceed with this patch ? Who would include it in its 
+tree ? 
 
 Thanks,
-Anurup
->>> Another option that we have previously used was to actually pretend that
->>> a vendor specific bus is an i2c bus and use the i2c probing infrastructure,
->>> but that only makes sense if the software side closely resembles i2c
->>> (this was the case for Allwinner I think, but I have not looked at
->>> your driver in enough detail to know if it is true here as well).
->>>
->> OK, let me check this. By chance do you remember the specific AllWinner
->> driver/hw?
-> drivers/i2c/busses/i2c-sun6i-p2wi.c
->
-> 	Arnd
+
+C.
