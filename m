@@ -1,184 +1,207 @@
-From: youlin.pei@mediatek.com (Youlin Pei)
-Date: Tue, 8 Nov 2016 10:57:13 +0800
-Subject: [PATCH v2 2/3] irqchip: mtk-cirq: Add mediatek mtk-cirq implement
-In-Reply-To: <867f8ilwcl.fsf@arm.com>
-References: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
- <1478001122-8664-3-git-send-email-youlin.pei@mediatek.com>
- <86twbrj586.fsf@arm.com> <1478234577.7975.29.camel@mtksdaap41>
- <867f8ilwcl.fsf@arm.com>
-Message-ID: <1478573833.32099.11.camel@mtksdaap41>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 08 Nov 2016 08:56:26 +0530
+Subject: [PATCH v7 1/2] soc: samsung: add exynos chipid driver support
+In-Reply-To: <cafc255a-3bdb-7eb2-1092-545866752858@samsung.com>
+References: <1478347427-28409-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161105120051epcas5p2edc77b9b0d2729725b626f88d555a4a0@epcas5p2.samsung.com>
+ <1478347427-28409-2-git-send-email-pankaj.dubey@samsung.com>
+ <cafc255a-3bdb-7eb2-1092-545866752858@samsung.com>
+Message-ID: <582145E2.7010802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-11-04 at 22:21 +0000, Marc Zyngier wrote:
-> On Fri, Nov 04 2016 at 04:42:57 AM, Youlin Pei <youlin.pei@mediatek.com> wrote:
-> > On Tue, 2016-11-01 at 20:49 +0000, Marc Zyngier wrote:
-> >> On Tue, Nov 01 2016 at 11:52:01 AM, Youlin Pei <youlin.pei@mediatek.com> wrote:
-> >> > In Mediatek SOCs, the CIRQ is a low power interrupt controller
-> >> > designed to works outside MCUSYS which comprises with Cortex-Ax
-> >> > cores,CCI and GIC.
-> >> >
-> >> > The CIRQ controller is integrated in between MCUSYS( include
-> >> > Cortex-Ax, CCI and GIC ) and interrupt sources as the second
-> >> > level interrupt controller. The external interrupts which outside
-> >> > MCUSYS will feed through CIRQ then bypass to GIC. CIRQ can monitors
-> >> > all edge trigger interupts. When an edge interrupt is triggered,
-> >> > CIRQ can record the status and generate a pulse signal to GIC when
-> >> > flush command executed.
-> >> >
-> >> > When system enters sleep mode, MCUSYS will be turned off to improve
-> >> > power consumption, also GIC is power down. The edge trigger interrupts
-> >> > will be lost in this scenario without CIRQ.
-> >> >
-> >> > This commit provides the CIRQ irqchip implement.
-> >> >
-> >> > Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
-> >> > ---
-> >> >  drivers/irqchip/Makefile       |    2 +-
-> >> >  drivers/irqchip/irq-mtk-cirq.c |  262 ++++++++++++++++++++++++++++++++++++++++
-> >> >  2 files changed, 263 insertions(+), 1 deletion(-)
-> >> >  create mode 100644 drivers/irqchip/irq-mtk-cirq.c
-> >> >
-> >> > diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> >> > index e4dbfc8..8f33580 100644
-> >> > --- a/drivers/irqchip/Makefile
-> >> > +++ b/drivers/irqchip/Makefile
-> >> > @@ -60,7 +60,7 @@ obj-$(CONFIG_BCM7120_L2_IRQ)		+= irq-bcm7120-l2.o
-> >> >  obj-$(CONFIG_BRCMSTB_L2_IRQ)		+= irq-brcmstb-l2.o
-> >> >  obj-$(CONFIG_KEYSTONE_IRQ)		+= irq-keystone.o
-> >> >  obj-$(CONFIG_MIPS_GIC)			+= irq-mips-gic.o
-> >> > -obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o
-> >> > +obj-$(CONFIG_ARCH_MEDIATEK)		+= irq-mtk-sysirq.o irq-mtk-cirq.o
-> >> >  obj-$(CONFIG_ARCH_DIGICOLOR)		+= irq-digicolor.o
-> >> >  obj-$(CONFIG_RENESAS_H8300H_INTC)	+= irq-renesas-h8300h.o
-> >> >  obj-$(CONFIG_RENESAS_H8S_INTC)		+= irq-renesas-h8s.o
-> >> > diff --git a/drivers/irqchip/irq-mtk-cirq.c b/drivers/irqchip/irq-mtk-cirq.c
-> >> > new file mode 100644
-> >> > index 0000000..fc43ef3
-> >> > --- /dev/null
-> >> > +++ b/drivers/irqchip/irq-mtk-cirq.c
-> >> > @@ -0,0 +1,262 @@
-> >> > +/*
-> >> > + * Copyright (c) 2016 MediaTek Inc.
-> >> > + * Author: Youlin.Pei <youlin.pei@mediatek.com>
-> >> > + *
-> >> > + * This program is free software; you can redistribute it and/or modify
-> >> > + * it under the terms of the GNU General Public License version 2 as
-> >> > + * published by the Free Software Foundation.
-> >> > + *
-> >> > + * This program is distributed in the hope that it will be useful,
-> >> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> > + * GNU General Public License for more details.
-> >> > + */
-> >> > +
-> >> > +#include <linux/irq.h>
-> >> > +#include <linux/irqchip.h>
-> >> > +#include <linux/irqdomain.h>
-> >> > +#include <linux/of.h>
-> >> > +#include <linux/of_irq.h>
-> >> > +#include <linux/of_address.h>
-> >> > +#include <linux/io.h>
-> >> > +#include <linux/slab.h>
-> >> > +#include <linux/syscore_ops.h>
-> >> > +
-> >> > +#define CIRQ_ACK	0x40
-> >> > +#define CIRQ_MASK_SET	0xc0
-> >> > +#define CIRQ_MASK_CLR	0x100
-> >> > +#define CIRQ_SENS_SET	0x180
-> >> > +#define CIRQ_SENS_CLR	0x1c0
-> >> > +#define CIRQ_POL_SET	0x240
-> >> > +#define CIRQ_POL_CLR	0x280
-> >> > +#define CIRQ_CONTROL	0x300
-> >> > +
-> >> > +#define CIRQ_EN	0x1
-> >> > +#define CIRQ_EDGE	0x2
-> >> > +#define CIRQ_FLUSH	0x4
-> >> > +
-> >> > +#define CIRQ_IRQ_NUM    0x200
-> >> > +
-> >> > +struct mtk_cirq_chip_data {
-> >> > +	void __iomem *base;
-> >> > +	unsigned int ext_irq_start;
-> >> > +};
-> >> > +
-> >> > +static struct mtk_cirq_chip_data *cirq_data;
-> >> 
-> >> Are you guaranteed that you'll only ever have a single CIRQ in any
-> >> system?
-> >
-> > In Mediatek's SOC, only hace a single CIRQ.
-> >
-> >> 
-> >> > +
-> >> > +static void mtk_cirq_write_mask(struct irq_data *data, unsigned int offset)
-> >> > +{
-> >> > +	struct mtk_cirq_chip_data *chip_data = data->chip_data;
-> >> > +	unsigned int cirq_num = data->hwirq;
-> >> > +	u32 mask = 1 << (cirq_num % 32);
-> >> > +
-> >> > +	writel(mask, chip_data->base + offset + (cirq_num / 32) * 4);
-> >> 
-> >> Why can't you use the relaxed accessors?
-> >
-> > It seems that i use wrong function, i will change the writel to
-> > writel_relaxed in next ve
-> >
-> >> 
-> >> > +}
-> >> > +
-> >> > +static void mtk_cirq_mask(struct irq_data *data)
-> >> > +{
-> >> > +	mtk_cirq_write_mask(data, CIRQ_MASK_SET);
-> >> > +	irq_chip_mask_parent(data);
-> >> > +}
-> >> > +
-> >> > +static void mtk_cirq_unmask(struct irq_data *data)
-> >> > +{
-> >> > +	mtk_cirq_write_mask(data, CIRQ_MASK_CLR);
-> >> > +	irq_chip_unmask_parent(data);
-> >> > +}
-> >> > +
-> >> > +static void mtk_cirq_eoi(struct irq_data *data)
-> >> > +{
-> >> > +	mtk_cirq_write_mask(data, CIRQ_ACK);
-> >> 
-> >> EOI and ACK have very different semantics. What is this write actually
-> >> doing? Also, you're now doing an additional MMIO write on each interrupt
-> >> EOI, doubling its cost. Do you really need to do actually signal the HW
-> >> that we've EOIed an interrupt? I would have hoped that you'd be able to
-> >> put it in "bypass" mode as long as you're not suspending...
-> >> 
-> >
-> > When external interrupt happened, CIRQ status register record the status
-> > even CIRQ is not enabled. when execute the flush command, CIRQ will
-> > resend the signals according to the status. So if don't clear the
-> > status, CIRQ will resend the wrong signals. the ACK write operation will
-> > clear the status.
+Hi Marek,
+
+On Monday 07 November 2016 01:05 PM, Marek Szyprowski wrote:
+> Hi Pankaj,
 > 
-> But at this time, we haven't suspended yet, and there is nothing to
-> replay. Also, you only enable the edge capture when suspending. So what
-> are you ACKing here? Can't you simply clear everything right when
-> suspending and not do it at all on the fast path?
-
-I had planned to ACK the status in cirq suspend callback, but
-encountered a problem.
-following is a piece of code from
-http://lxr.free-electrons.com/source/kernel/power/suspend.c#L361
-
-arch_suspend_disable_irqs(); ---step1
-BUG_ON(!irqs_disabled());
-
-error = syscore_suspend();
-           |
-           ---cirq suspend(); ---step2
-
-if ack the status in cirq suspend, the interrupts will be lost which
-happened during step1 to step2.
-
-So would you mind give me some suggestions about this?
-Thanks a lot!
 > 
-> Thanks,
+> On 2016-11-05 13:03, Pankaj Dubey wrote:
+>> Exynos SoCs have Chipid, for identification of product IDs
+>> and SoC revisions. This patch intends to provide initialization
+>> code for all these functionalities, at the same time it provides some
+>> sysfs entries for accessing these information to user-space.
+>>
+>> This driver uses existing binding for exynos-chipid.
+>>
+>> CC: Grant Likely <grant.likely@linaro.org>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>   drivers/soc/samsung/Kconfig         |   5 ++
+>>   drivers/soc/samsung/Makefile        |   1 +
+>>   drivers/soc/samsung/exynos-chipid.c | 148
+>> ++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 154 insertions(+)
+>>   create mode 100644 drivers/soc/samsung/exynos-chipid.c
+>>
+>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+>> index 2455339..f9ab858 100644
+>> --- a/drivers/soc/samsung/Kconfig
+>> +++ b/drivers/soc/samsung/Kconfig
+>> @@ -14,4 +14,9 @@ config EXYNOS_PM_DOMAINS
+>>       bool "Exynos PM domains" if COMPILE_TEST
+>>       depends on PM_GENERIC_DOMAINS || COMPILE_TEST
+>>   +config EXYNOS_CHIPID
+>> +    bool "Exynos Chipid controller driver" if COMPILE_TEST
+>> +    depends on (ARM && ARCH_EXYNOS) || ((ARM || ARM64) && COMPILE_TEST)
+>> +    select SOC_BUS
+>> +
+>>   endif
+>> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+>> index 3619f2e..2a8a85e 100644
+>> --- a/drivers/soc/samsung/Makefile
+>> +++ b/drivers/soc/samsung/Makefile
+>> @@ -1,3 +1,4 @@
+>>   obj-$(CONFIG_EXYNOS_PMU)    += exynos-pmu.o exynos3250-pmu.o
+>> exynos4-pmu.o \
+>>                       exynos5250-pmu.o exynos5420-pmu.o
+>>   obj-$(CONFIG_EXYNOS_PM_DOMAINS) += pm_domains.o
+>> +obj-$(CONFIG_EXYNOS_CHIPID)    += exynos-chipid.o
+>> diff --git a/drivers/soc/samsung/exynos-chipid.c
+>> b/drivers/soc/samsung/exynos-chipid.c
+>> new file mode 100644
+>> index 0000000..9761e54
+>> --- /dev/null
+>> +++ b/drivers/soc/samsung/exynos-chipid.c
+>> @@ -0,0 +1,148 @@
+>> +/*
+>> + * Copyright (c) 2016 Samsung Electronics Co., Ltd.
+>> + *          http://www.samsung.com/
+>> + *
+>> + * EXYNOS - CHIP ID support
+>> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/sys_soc.h>
+>> +
+>> +#define EXYNOS3250_SOC_ID    0xE3472000
+>> +#define EXYNOS4210_SOC_ID    0x43210000
+>> +#define EXYNOS4212_SOC_ID    0x43220000
+>> +#define EXYNOS4412_SOC_ID    0xE4412000
+>> +#define EXYNOS4415_SOC_ID    0xE4415000
+>> +#define EXYNOS5250_SOC_ID    0x43520000
+>> +#define EXYNOS5260_SOC_ID    0xE5260000
+>> +#define EXYNOS5410_SOC_ID    0xE5410000
+>> +#define EXYNOS5420_SOC_ID    0xE5420000
+>> +#define EXYNOS5440_SOC_ID    0xE5440000
+>> +#define EXYNOS5800_SOC_ID    0xE5422000
+>> +
+>> +#define EXYNOS_SOC_MASK        0xFFFFF000
+>> +
+>> +#define EXYNOS4210_REV_0    0x0
+>> +#define EXYNOS4210_REV_1_0    0x10
+>> +#define EXYNOS4210_REV_1_1    0x11
 > 
-> 	M.
+> EXYNOS4210_REV* defines are not used at all in this driver.
+> 
+>> +
+>> +#define EXYNOS_SUBREV_MASK    (0xF << 4)
+>> +#define EXYNOS_MAINREV_MASK    (0xF << 0)
+>> +#define EXYNOS_REV_MASK        (EXYNOS_SUBREV_MASK |
+>> EXYNOS_MAINREV_MASK)
+>> +
+>> +
+>> +static const char * __init product_id_to_soc_id(unsigned int product_id)
+>> +{
+>> +    const char *soc_name;
+>> +    unsigned int soc_id = product_id & EXYNOS_SOC_MASK;
+>> +
+>> +    switch (soc_id) {
+>> +    case EXYNOS3250_SOC_ID:
+>> +        soc_name = "EXYNOS3250";
+>> +        break;
+>> +    case EXYNOS4210_SOC_ID:
+>> +        soc_name = "EXYNOS4210";
+>> +        break;
+>> +    case EXYNOS4212_SOC_ID:
+>> +        soc_name = "EXYNOS4212";
+>> +        break;
+>> +    case EXYNOS4412_SOC_ID:
+>> +        soc_name = "EXYNOS4412";
+>> +        break;
+>> +    case EXYNOS4415_SOC_ID:
+>> +        soc_name = "EXYNOS4415";
+>> +        break;
+>> +    case EXYNOS5250_SOC_ID:
+>> +        soc_name = "EXYNOS5250";
+>> +        break;
+>> +    case EXYNOS5260_SOC_ID:
+>> +        soc_name = "EXYNOS5260";
+>> +        break;
+>> +    case EXYNOS5420_SOC_ID:
+>> +        soc_name = "EXYNOS5420";
+>> +        break;
+>> +    case EXYNOS5440_SOC_ID:
+>> +        soc_name = "EXYNOS5440";
+>> +        break;
+>> +    case EXYNOS5800_SOC_ID:
+>> +        soc_name = "EXYNOS5800";
+>> +        break;
+>> +    default:
+>> +        soc_name = "UNKNOWN";
+>> +    }
+>> +    return soc_name;
+>> +}
+> 
+> This approach is a bit error prone. You have already missed Exynos5410
+> and early Exynos 4210 are not detected because of the incorrect SOC MASK.
+
+Yes I missed to update Exynos4210 SoC Mask, thanks for pointing out.
+
+> IMHO you should replace above code and defines with a simple array,
+> where each ID is present only once, so it will be much easier to add
+> future SoCs:
+> 
+
+Well, this looks good to me as well. I will incorporate these changes in
+v2 as suggested by you and reuse your code, along with your
+Signed-off-by for this part :)
+
+> static const struct exynos_soc_id {
+>         const char *name;
+>         unsigned int id;
+>         unsigned int mask;
+> } soc_ids[] = {
+>         { "EXYNOS3250", 0xE3472000, 0xFFFFF000 },
+>         { "EXYNOS4210", 0x43200000, 0xFFFE0000 },
+>         { "EXYNOS4212", 0x43220000, 0xFFFE0000 },
+>         { "EXYNOS4412", 0xE4412000, 0xFFFE0000 },
+>         { "EXYNOS4415", 0xE4415000, 0xFFFE0000 },
+>         { "EXYNOS5250", 0x43520000, 0xFFFFF000 },
+>         { "EXYNOS5260", 0xE5260000, 0xFFFFF000 },
+>         { "EXYNOS5410", 0xE5410000, 0xFFFFF000 },
+>         { "EXYNOS5420", 0xE5420000, 0xFFFFF000 },
+>         { "EXYNOS5440", 0xE5440000, 0xFFFFF000 },
+>         { "EXYNOS5800", 0xE5422000, 0xFFFFF000 },
+> };
+> 
+> static const char * __init product_id_to_soc_id(unsigned int product_id)
+> {
+>         int i;
+> 
+>         for (i = 0; i < ARRAY_SIZE(soc_ids); i++)
+>                 if ((product_id & soc_ids[i].mask) == soc_ids[i].id)
+>                         return soc_ids[i].name;
+>         return "UNKNOWN";
+> }
+> 
+> I'm also not sure about Exynos 4415, which has been scheduled for removal.
+> 
+
+As suggested by Arnd, I will keep entry for Exynos 4415 in the driver.
+
+
+Thanks,
+Pankaj Dubey
