@@ -1,46 +1,59 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Tue, 8 Nov 2016 14:55:34 +0000
-Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
-In-Reply-To: <20161108144445.GD1575@localhost.localdomain>
-References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
- <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
- <20161108144445.GD1575@localhost.localdomain>
-Message-ID: <20161108145534.GE1575@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Nov 2016 16:08:58 +0100
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <5821D736.7080803@gmail.com>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <22120038.dbaYpsQoUH@wuerfel> <5821D736.7080803@gmail.com>
+Message-ID: <4657586.c5MJoh65Ux@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 02:44:45PM +0000, Charles Keepax wrote:
-> On Fri, Nov 04, 2016 at 05:14:49PM +0100, Sylwester Nawrocki wrote:
-> > This patch adds DMA slave map tables to the pl080 devices's
-> > platform_data in order to support the new channel request API.
-> > A few devices for which there was no DMA support with current
-> > code are omitted from the tables.
-> > 
-> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > ---
-> >  arch/arm/mach-s3c64xx/pl080.c | 32 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
-> > index 89c5a62..8c88680 100644
-> > --- a/arch/arm/mach-s3c64xx/pl080.c
-> > +++ b/arch/arm/mach-s3c64xx/pl080.c
-> <snip>
-> > @@ -134,6 +153,8 @@ struct pl08x_platform_data s3c64xx_dma0_plat_data = {
-> >  	.put_xfer_signal = pl08x_put_xfer_signal,
-> >  	.slave_channels = s3c64xx_dma0_info,
-> >  	.num_slave_channels = ARRAY_SIZE(s3c64xx_dma0_info),
-> > +	.slave_map = s3c64xx_dma0_slave_map,
-> > +	.slavecnt = ARRAY_SIZE(s3c64xx_dma0_slave_map),
-> >  };
+On Tuesday, November 8, 2016 7:16:30 PM CET Anurup M wrote:
+> >>>> If these are backwards compatible, just mark them as compatible in DT,
+> >>>> e.g. hip06 can use
+> >>>>
+> >>>>    compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
+> >>>>
+> >>>> so you can tell the difference if you need to, but the driver only has to
+> >>>> list the oldest one here.
+> >>>>
+> >>>> What is the difference between the cpu and io djtag interfaces?
+> >> On some chips like hip06, the djtag version is different for IO die.
+> > In what way? The driver doesn't seem to care about the difference.
+> There is  a difference in djtag version of CPU and IO die (in some chips).
+> For ex: in hip06 djtag for CPU is v1 and for IO is v2.
+> so they use different readwrite handlers djtag_readwrite_(v1/2).
 > 
-> Here we add a .slavecnt but the pl08x_platform_data structure doesn't
-> contain that field. I can't see it on the branch you linked in
-> the cover letter either, is it added by a patch on another branch
-> I am missing?
+> +       /* for hip06(D03) cpu die */
+> +       { .compatible = "hisilicon,hip06-cpu-djtag-v1",
+> +               .data = (void *)djtag_readwrite_v1 },
+> +       /* for hip06(D03) io die */
+> +       { .compatible = "hisilicon,hip06-io-djtag-v2",
+> +               .data = (void *)djtag_readwrite_v2 },
 > 
+> 
+> For the same djtag version, there is no difference in handling in the 
+> driver.
 
-Ah I think I see it should be .slave_map_len here.
+Right, but my point was about the compatibility with the older chips
+using the same IP block, marking the ones as compatible that actually
+use the same interface.
 
-Thanks,
-Charles
+I also see that the compatible strings have the version included in
+them, and you can probably drop them by requiring them only in the
+fallback:
+
+	compatible = "hisilicon,hip05-cpu-djtag", "hisilicon,djtag-v1";
+	compatible = "hisilicon,hip05-io-djtag", "hisilicon,djtag-v1";
+	compatible = "hisilicon,hip06-cpu-djtag", "hisilicon,djtag-v1";
+	compatible = "hisilicon,hip06-io-djtag", "hisilicon,djtag-v2";
+	compatible = "hisilicon,hip07-cpu-djtag", "hisilicon,djtag-v2";
+	compatible = "hisilicon,hip07-io-djtag", "hisilicon,djtag-v2";
+
+We want to have the first entry be as specific as possible, but
+the last (second) entry is the one that can be used by the driver
+for matching. When a future hip08/hip09/... chip uses an existing
+interface, you then don't have to update the driver.
+
+	Arnd
