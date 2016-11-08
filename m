@@ -1,56 +1,95 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 16:36:43 +0000
-Subject: [PATCH v2 0/2] arm64: fix the bugs found in the hugetlb test
-In-Reply-To: <20161108140909.GF29087@e104818-lin.cambridge.arm.com>
-References: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
- <20161108140909.GF29087@e104818-lin.cambridge.arm.com>
-Message-ID: <20161108163642.GE20591@arm.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Tue, 8 Nov 2016 17:37:41 +0100
+Subject: [PATCH v3 00/10] Add DT support for ohci-da8xx
+In-Reply-To: <20161107203948.28324-1-ahaslam@baylibre.com>
+References: <20161107203948.28324-1-ahaslam@baylibre.com>
+Message-ID: <CAKXjFTN04Wz5jsaHsyvDD7G8QqXQvCE4D-YbHtGT=jUqELiS_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 02:09:09PM +0000, Catalin Marinas wrote:
-> On Tue, Nov 08, 2016 at 01:44:37PM +0800, Huang Shijie wrote:
-> > (3) The test result in the Softiron and Juno-r1 boards:
-> > 
-> >    This detail test result shows below (both the "make func" & "make stress"):
-> > 
-> >     4KB granule:
-> > 
-> >         1.1) PTE + Contiguous bit : 4K x 16 = 64K (per huge page size)
-> >              Test result          : PASS
-> > 
-> >         1.2) PMD                  : 2M x  1 = 2M  (per huge page size)
-> >              Test result          : PASS
-> > 
-> >         1.3) PMD + Contiguous bit : 2M x 16 = 32M (per huge page size)
-> >              Test result          : PASS
-> > 
-> >     64KB granule:
-> > 
-> >         3.1) PTE + Contiguous bit : 64K x 32 = 2M (per huge page size)
-> >              Test result          : PASS
-> > 
-> >         3.2) PMD + Contiguous bit : 512M x 32 = 16G (per huge page size)
-> >              Test result          : no hardware to support this test
-> 
-> Don't we have support for single (non-contiguous) PMD huge page with 64K
-> pages (512M per huge page)? I gave it a try and it seems to work (though
-> without your patches applied ;)).
-> 
-> > Huang Shijie (2):
-> >   arm64: hugetlb: remove the wrong pmd check in find_num_contig()
-> >   arm64: hugetlb: fix the wrong address for several functions
-> 
-> For these patches:
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> I'm not sure whether Will plans to push them into 4.9. AFAICT, the
-> contiguous huge pages never worked properly, so we may not count it as a
-> regression but a new feature. If Will doesn't take them, I'll queue the
-> patches for 4.10.
+Hi,
 
-Right, given that it's never worked and the failure only seems to crop up
-in synthetic testing, I think you can queue these for 4.10.
+On Mon, Nov 7, 2016 at 9:39 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
+> The purpose of this patch series is to add DT support for the davinci
+> ohci driver.
+>
 
-Will
+To make it easier to review. I will split the arch/arm and driver
+patches into separate series.
+
+Regards
+Axel
+
+
+> To be able to use device tree to probe the driver, we need to remove
+> the platform callbacks that are handling vbus and over current.
+>
+> The first four patches prepare the stage by allowing to use a regulator
+> instead of the callbacks.
+>
+> The next three patches convert the callback users to use a regulator
+> instead and then remove the callbacks from the driver and platform code.
+>
+> Finally, we add device tree bindings and support in the driver.
+>
+> DEPENDENCIES:
+> This series has depends on some patches currently under review
+> but mostly accepted:
+> 1. [PATCH 0/3] fix ohci phy name [1] (accepted)
+> 2. [PATCH/RFC v2 0/3] regulator: handling of error conditions for usb drivers [2] (accepted)
+> 3. [PATCH] gpio: davinci: Use unique labels for each gpio chip [3] (review pending)
+>
+> Also the current davinci baranches soon to be pulled to linux-next:
+> davinci-for-v4.10/soc
+> davinci-for-v4.10/dt
+> davinci-for-v4.10/defconfig
+> davinci-for-v4.10/cleanup
+>
+> A branch with all the dependencies can be found here [4].
+>
+> Changes form v2->v3
+> * drop patches that have been integrated to arch/arm
+> * drop regulator patches which will be integrated through regulator tree
+> * use of the accepted regulator API to get over current status
+> * better patch separation with the use of wrappers
+>
+> Changes from v1->v2
+> * Rebased and added patch to make ohci a separate driver
+> * Use a regulator instead of handling Gpios (David Lechner)
+> * Add an over current mode to regulator framework
+> * Fixed regulator is able to register for and over current irq
+> * Added patch by Alexandre to remove build warnings
+> * Moved global variables into private hcd structure.
+>
+> [1] https://lkml.org/lkml/2016/11/2/208
+> [2] https://lkml.org/lkml/2016/11/3/188
+> [3] http://www.spinics.net/lists/linux-gpio/msg17710.html
+> [4] https://github.com/axelhaslamx/linux-axel/commits/ohci-da8xx-dt-v3
+>
+> Axel Haslam (10):
+>   USB: ohci: da8xx: use ohci priv data instead of globals
+>   USB: ohci: da8xx: Prepare to remove platform callbacks
+>   USB: ohci: da8xx: Allow a regulator to handle VBUS
+>   ARM: davinci: da830: Handle vbus with a regulator
+>   ARM: davinci: hawk: Remove vbus and over current gpios
+>   USB: ohci: da8xx: Remove ohci platform callbacks
+>   USB: ohci: da8xx: use a flag instead of mask for ocic
+>   USB: ohci: da8xx: Add devicetree bindings
+>   USB: ohci: da8xx: Allow probing from DT
+>   ARM: dts: da850: add usb device node
+>
+>  .../devicetree/bindings/usb/ohci-da8xx.txt         |  39 ++++
+>  arch/arm/boot/dts/da850-lcdk.dts                   |   8 +
+>  arch/arm/boot/dts/da850.dtsi                       |   8 +
+>  arch/arm/mach-davinci/board-da830-evm.c            | 108 ++++-----
+>  arch/arm/mach-davinci/board-omapl138-hawk.c        |  99 +-------
+>  arch/arm/mach-davinci/include/mach/da8xx.h         |   2 +-
+>  arch/arm/mach-davinci/usb-da8xx.c                  |   3 +-
+>  drivers/usb/host/ohci-da8xx.c                      | 253 +++++++++++++++------
+>  include/linux/platform_data/usb-davinci.h          |  20 --
+>  9 files changed, 283 insertions(+), 257 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ohci-da8xx.txt
+>
+> --
+> 2.10.1
+>
