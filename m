@@ -1,41 +1,57 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 8 Nov 2016 13:27:41 +0800
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <201611081334.f6tho6TK%fengguang.wu@intel.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 8 Nov 2016 13:44:37 +0800
+Subject: [PATCH v2 0/2] arm64: fix the bugs found in the hugetlb test
+Message-ID: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhichang.yuan,
+(1) Backgroud
+   For the arm64, the hugetlb page size can be 32M (PMD + Contiguous bit).
+   In the 4K page environment, the max page order is 10 (max_order - 1),
+   so 32M page is the gigantic page.    
 
-[auto build test ERROR on arm64/for-next/core]
-[also build test ERROR on v4.9-rc4 next-20161028]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+   The arm64 MMU supports a Contiguous bit which is a hint that the PTE
+   is one of a set of contiguous entries which can be cached in a single
+   TLB entry.  Please refer to the arm64v8 mannul :
+       DDI0487A_f_armv8_arm.pdf (in page D4-1811)
 
-url:    https://github.com/0day-ci/linux/commits/zhichang-yuan/ARM64-LPC-legacy-ISA-I-O-support/20161108-114742
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm-sunxi_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+(2) The bugs   
+   After I tested the libhugetlbfs, I found several bugs in arm64 code.
+   This patch set has all the bug fixes for the arm64.
+   
+(3) The test result in the Softiron and Juno-r1 boards:
 
-All errors (new ones prefixed by >>):
+   This detail test result shows below (both the "make func" & "make stress"):
 
-   drivers/built-in.o: In function `of_address_to_resource':
->> sunxi_sid.c:(.text+0x18af5c): undefined reference to `pcibios_min_io'
-   sunxi_sid.c:(.text+0x18af60): undefined reference to `pcibios_min_io'
+    4KB granule:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20012 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/cbd550e2/attachment-0001.gz>
+        1.1) PTE + Contiguous bit : 4K x 16 = 64K (per huge page size)
+             Test result          : PASS
+
+        1.2) PMD                  : 2M x  1 = 2M  (per huge page size)
+             Test result          : PASS
+
+        1.3) PMD + Contiguous bit : 2M x 16 = 32M (per huge page size)
+             Test result          : PASS
+
+    64KB granule:
+
+        3.1) PTE + Contiguous bit : 64K x 32 = 2M (per huge page size)
+             Test result          : PASS
+
+        3.2) PMD + Contiguous bit : 512M x 32 = 16G (per huge page size)
+             Test result          : no hardware to support this test
+
+v1 -- > v2:
+    1.) remove the redundant checks for PGD/PUD
+
+
+Huang Shijie (2):
+  arm64: hugetlb: remove the wrong pmd check in find_num_contig()
+  arm64: hugetlb: fix the wrong address for several functions
+
+ arch/arm64/mm/hugetlbpage.c | 20 ++++----------------
+ 1 file changed, 4 insertions(+), 16 deletions(-)
+
+-- 
+2.5.5
