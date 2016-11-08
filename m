@@ -1,150 +1,86 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 09 Nov 2016 10:16:42 +1100
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <20161108120323.GC15297@leverpostej>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108120323.GC15297@leverpostej>
-Message-ID: <1478647002.7430.69.camel@kernel.crashing.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 8 Nov 2016 16:35:08 -0700
+Subject: Summary of LPC guest MSI discussion in Santa Fe (was: Re: [RFC
+ 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 (Alt II))
+In-Reply-To: <20161108202922.GC15676@cbox>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home>
+ <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
+Message-ID: <20161108163508.1bcae0c2@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-11-08 at 12:03 +0000, Mark Rutland wrote:
-> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
-> > 
-> > For arm64, there is no I/O space as other architectural platforms, such as
-> > X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
-> > such as Hip06, when accessing some legacy ISA devices connected to LPC, those
-> > known port addresses are used to control the corresponding target devices, for
-> > example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
-> > normal MMIO mode in using.
-> 
-> This has nothing to do with arm64. Hardware with this kind of indirect
-> bus access could be integrated with a variety of CPU architectures. It
-> simply hasn't been, yet.
+On Tue, 8 Nov 2016 21:29:22 +0100
+Christoffer Dall <christoffer.dall@linaro.org> wrote:
 
-On some ppc's we also use similar indirect access methods for IOs. We
-have a generic infrastructure for re-routing some memory or IO regions
-to hooks.
-
-On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
-firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
-
-> > To drive these devices, this patch introduces a method named indirect-IO.
-> > In this method the in/out pair in arch/arm64/include/asm/io.h will be
-> > redefined. When upper layer drivers call in/out with those known legacy port
-> > addresses to access the peripherals, the hooking functions corrresponding to
-> > those target peripherals will be called. Through this way, those upper layer
-> > drivers which depend on in/out can run on Hip06 without any changes.
+> Hi Will,
 > 
-> As above, this has nothing to do with arm64, and as such, should live in
-> generic code, exactly as we would do if we had higher-level ISA
-> accessor ops.
-> 
-> Regardless, given the multi-instance case, I don't think this is
-> sufficient in general (and I think we need higher-level ISA accessors
-> to handle the indirection).
-
-Multi-instance with IO is tricky to do generically because archs already
-have all sort of hacks to deal with the fact that inb/outb don't require
-an explicit ioremap, so an IO resource can take all sort of shape depending
-on the arch.
-
-Overall it boils down to applying some kind of per-instance "offset" to
-the IO port number though.
-
-> [...]
-> 
+> On Tue, Nov 08, 2016 at 02:45:59AM +0000, Will Deacon wrote:
+> > Hi all,
 > > 
-> > diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
-> > new file mode 100644
-> > index 0000000..6ae0787
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/extio.h
-> 
+> > I figured this was a reasonable post to piggy-back on for the LPC minutes
+> > relating to guest MSIs on arm64.
 > > 
-> > +#ifndef __LINUX_EXTIO_H
-> > +#define __LINUX_EXTIO_H
-> 
-> This doesn't match the file naming, __ASM_EXTIO_H would be consistent
-> with other arm64 headers.
-> 
+> > On Thu, Nov 03, 2016 at 10:02:05PM -0600, Alex Williamson wrote:  
+> > > We can always have QEMU reject hot-adding the device if the reserved
+> > > region overlaps existing guest RAM, but I don't even really see how we
+> > > advise users to give them a reasonable chance of avoiding that
+> > > possibility.  Apparently there are also ARM platforms where MSI pages
+> > > cannot be remapped to support the previous programmable user/VM
+> > > address, is it even worthwhile to support those platforms?  Does that
+> > > decision influence whether user programmable MSI reserved regions are
+> > > really a second class citizen to fixed reserved regions?  I expect
+> > > we'll be talking about this tomorrow morning, but I certainly haven't
+> > > come up with any viable solutions to this.  Thanks,  
 > > 
-> > +
-> > +struct extio_ops {
-> > > > +	unsigned long start;/* inclusive, sys io addr */
-> > > > +	unsigned long end;/* inclusive, sys io addr */
-> 
-> Please put whitespace before inline comments.
-> 
-> [...]
-> 
+> > At LPC last week, we discussed guest MSIs on arm64 as part of the PCI
+> > microconference. I presented some slides to illustrate some of the issues
+> > we're trying to solve:
 > > 
-> > > > +type in##bw(unsigned long addr)						\
-> > > > +{									\
-> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> > > > > > +			arm64_extio_ops->end < addr)			\
-> > > > > > +		return read##bw(PCI_IOBASE + addr);			\
-> > > > > > +	return arm64_extio_ops->pfin ?					\
-> > > > > > +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,		\
-> > > > > > +			addr, sizeof(type)) : -1;			\
-> > > > +}									\
-> > > > +									\
-> > > > +void out##bw(type value, unsigned long addr)				\
-> > > > +{									\
-> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> > > > > > +			arm64_extio_ops->end < addr)			\
-> > > > > > +		write##bw(value, PCI_IOBASE + addr);			\
-> > > > > > +	else								\
-> > > > > > +		if (arm64_extio_ops->pfout)				\
-> > > > +			arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> > > > > > +				addr, value, sizeof(type));		\
-> > > > +}									\
-> > > > +									\
-> > > > +void ins##bw(unsigned long addr, void *buffer, unsigned int count)	\
-> > > > +{									\
-> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> > > > > > +			arm64_extio_ops->end < addr)			\
-> > > > > > +		reads##bw(PCI_IOBASE + addr, buffer, count);		\
-> > > > > > +	else								\
-> > > > > > +		if (arm64_extio_ops->pfins)				\
-> > > > +			arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
-> > > > > > +				addr, buffer, sizeof(type), count);	\
-> > > > +}									\
-> > > > +									\
-> > > > +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)	\
-> > > > +{									\
-> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> > > > > > +			arm64_extio_ops->end < addr)			\
-> > > > > > +		writes##bw(PCI_IOBASE + addr, buffer, count);		\
-> > > > > > +	else								\
-> > > > > > +		if (arm64_extio_ops->pfouts)				\
-> > > > +			arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
-> > > > > > +				addr, buffer, sizeof(type), count);	\
-> > +}
-> > +
-> 
-> So all PCI I/O will be slowed down by irrelevant checks when this is
-> enabled?
-> 
-> [...]
-> 
+> >   http://www.willdeacon.ukfsn.org/bitbucket/lpc-16/msi-in-guest-arm64.pdf
 > > 
-> > +static inline void arm64_set_extops(struct extio_ops *ops)
-> > +{
-> > > > +	if (ops)
-> > > > +		WRITE_ONCE(arm64_extio_ops, ops);
-> > +}
+> > Punit took some notes (thanks!) on the etherpad here:
+> > 
+> >   https://etherpad.openstack.org/p/LPC2016_PCI
+> > 
+> > although the discussion was pretty lively and jumped about, so I've had
+> > to go from memory where the notes didn't capture everything that was
+> > said.
+> > 
+> > To summarise, arm64 platforms differ in their handling of MSIs when compared
+> > to x86:
+> > 
+> >   1. The physical memory map is not standardised (Jon pointed out that
+> >      this is something that was realised late on)
+> >   2. MSIs are usually treated the same as DMA writes, in that they must be
+> >      mapped by the SMMU page tables so that they target a physical MSI
+> >      doorbell
+> >   3. On some platforms, MSIs bypass the SMMU entirely (e.g. due to an MSI
+> >      doorbell built into the PCI RC)
+> >   4. Platforms typically have some set of addresses that abort before
+> >      reaching the SMMU (e.g. because the PCI identifies them as P2P).
+> > 
+> > All of this means that userspace (QEMU) needs to identify the memory
+> > regions corresponding to points (3) and (4) and ensure that they are
+> > not allocated in the guest physical (IPA) space. For platforms that can
+> > remap the MSI doorbell as in (2), then some space also needs to be
+> > allocated for that.
+> > 
+> > Rather than treat these as separate problems, a better interface is to
+> > tell userspace about a set of reserved regions, and have this include
+> > the MSI doorbell, irrespective of whether or not it can be remapped.  
 > 
-> Why WRITE_ONCE()?
-> 
-> Is this not protected/propagated by some synchronisation mechanism?
-> 
-> WRITE_ONCE() is not sufficient to ensure that this is consistently
-> observed by readers, and regardless, I don't see READ_ONCE() anywhere in
-> this patch.
-> 
-> This looks very suspicious.
-> 
-> Thanks,
-> Mark.
+> Is my understanding correct, that you need to tell userspace about the
+> location of the doorbell (in the IOVA space) in case (2), because even
+> though the configuration of the device is handled by the (host) kernel
+> through trapping of the BARs, we have to avoid the VFIO user programming
+> the device to create other DMA transactions to this particular address,
+> since that will obviously conflict and either not produce the desired
+> DMA transactions or result in unintended weird interrupts?
+
+Correct, if the MSI doorbell IOVA range overlaps RAM in the VM, then
+it's potentially a DMA target and we'll get bogus data on DMA read from
+the device, and lose data and potentially trigger spurious interrupts on
+DMA write from the device.  Thanks,
+
+Alex
