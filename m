@@ -1,53 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 08 Nov 2016 17:19:54 +0100
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for special
- ISA
-In-Reply-To: <20161108114953.GB15297@leverpostej>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
- <20161108114953.GB15297@leverpostej>
-Message-ID: <2368890.jTbyGqYR0M@wuerfel>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 8 Nov 2016 09:24:51 -0700
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <2e0ed43b-9a3e-48d4-4e8a-60d6f25ca4ee@suse.com>
+References: <20161028154740.GC10441@obsidianresearch.com>
+ <5ea0e77e-11c5-b4f7-00a9-9c5425ffac5a@suse.com>
+ <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+ <20161028210015.GA19901@live.com>
+ <20161028220546.GA19693@obsidianresearch.com>
+ <20161029000926.GA30169@live.com>
+ <20161108004642.GB32444@obsidianresearch.com>
+ <2e0ed43b-9a3e-48d4-4e8a-60d6f25ca4ee@suse.com>
+Message-ID: <20161108162451.GA31453@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 8, 2016 11:49:53 AM CET Mark Rutland wrote:
-> On Tue, Nov 08, 2016 at 11:47:08AM +0800, zhichang.yuan wrote:
-> > +Hisilicon Hip06 low-pin-count device
-> > +  Usually LPC controller is part of PCI host bridge, so the legacy ISA ports
-> > +  locate on LPC bus can be accessed direclty. But some SoCs have independent
-> > +  LPC controller, and access the legacy ports by triggering LPC I/O cycles.
-> > +  Hisilicon Hip06 implements this LPC device.
-> 
-> s/direclty/directly/
-> 
-> My understanding of ISA (which may be flawed) is that it's not part of
-> the PCI host bridge, but rather on x86 it happens to share the IO space
-> with PCI.
+On Tue, Nov 08, 2016 at 10:59:43AM +0100, Matthias Brugger wrote:
 
-On normal systems, ISA or LPC are behind a PCI bridge device, which
-passes down both low addresses of I/O space and memory space.
-
-> So, how about this becomes:
+> > 	/* don't globally reset PL if we're doing partial reconfig */
+> > 	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+> >+		if (!zynq_fpga_has_sync(buf, count)) {
 > 
->   Hisilicon Hip06 SoCs implement a Low Pin Count (LPC) controller, which
->   provides access to some legacy ISA devices.
-> 
-> I believe that we could theoretically have multiple independent LPC/ISA
-> busses, as is possible with PCI on !x86 systems. If the current ISA code
-> assumes a singleton bus, I think that's something that needs to be fixed
-> up more generically.
-> 
-> I don't see why we should need any architecture-specific code here. Why
-> can we not fix up the ISA bus code in drivers/of/address.c such that it
-> handles multiple ISA bus instances, and translates all sub-device
-> addresses relative to the specific bus instance?
+> Maybe we should add an error message here to let the user know what went
+> wrong, as I think this error path could easily be hit by an user.
 
-I think it is a relatively safe assumption that there is only one
-ISA bridge. A lot of old drivers hardcode PIO or memory addresses
-when talking to an ISA device, so having multiple instances is
-already problematic.
+Sure, happy with this wording:
 
-What is odd about ARM64 here is that the PIO space is not shared among
-all ISA and PCI buses in some cases.
-
-	Arnd
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index de475a6a1882..2f3da4c6e2e6 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -181,7 +181,7 @@ static irqreturn_t zynq_fpga_isr(int irq, void *data)
+  */
+ static bool zynq_fpga_has_sync(const char *buf, size_t count)
+ {
+-	for (; count > 4; buf += 4, --count)
++	for (; count > 4; buf += 4, count -= 4)
+ 		if (buf[0] == 0x66 && buf[1] == 0x55 && buf[2] == 0x99 &&
+ 		    buf[3] == 0xaa)
+ 			return true;
+@@ -200,8 +200,11 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	/* The hardware can only DMA multiples of 4 bytes, and we need at
+ 	 * least the sync word and something else to do anything.
+ 	 */
+-	if (count <= 4 || (count % 4) != 0)
++	if (count <= 4 || (count % 4) != 0) {
++		dev_err(priv->dev,
++			"Invalid bitstream size, must be multiples of 4 bytes");
+ 		return -EINVAL;
++	}
+ 
+ 	err = clk_enable(priv->clk);
+ 	if (err)
+@@ -210,6 +213,8 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	/* don't globally reset PL if we're doing partial reconfig */
+ 	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+ 		if (!zynq_fpga_has_sync(buf, count)) {
++			dev_err(priv->dev,
++				"Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file");
+ 			err = -EINVAL;
+ 			goto out_err;
+ 		}
