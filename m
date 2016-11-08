@@ -1,113 +1,601 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 17:54:57 +0000
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home>
- <20161108024559.GA20591@arm.com>
- <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
-Message-ID: <20161108175457.GK20591@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue,  8 Nov 2016 17:55:46 +0000
+Subject: [PATCH 1/2] drivers: psci: PSCI checker module
+Message-ID: <20161108175547.31146-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 03:27:23PM +0100, Auger Eric wrote:
-> On 08/11/2016 03:45, Will Deacon wrote:
-> > Rather than treat these as separate problems, a better interface is to
-> > tell userspace about a set of reserved regions, and have this include
-> > the MSI doorbell, irrespective of whether or not it can be remapped.
-> > Don suggested that we statically pick an address for the doorbell in a
-> > similar way to x86, and have the kernel map it there. We could even pick
-> > 0xfee00000. If it conflicts with a reserved region on the platform (due
-> > to (4)), then we'd obviously have to (deterministically?) allocate it
-> > somewhere else, but probably within the bottom 4G.
-> 
-> This is tentatively achieved now with
-> [1] [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
-> (http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1264506.html)
+From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-Yup, I saw that fly by. Hopefully some of the internals can be reused
-with the current thinking on user ABI.
+On arm and arm64, PSCI is one of the possible firmware interfaces
+used for power management. This includes both turning CPUs on and off,
+and suspending them (entering idle states).
 
-> > The next question is how to tell userspace about all of the reserved
-> > regions. Initially, the idea was to extend VFIO, however Alex pointed
-> > out a horrible scenario:
-> > 
-> >   1. QEMU spawns a VM on system 0
-> >   2. VM is migrated to system 1
-> >   3. QEMU attempts to passthrough a device using PCI hotplug
-> > 
-> > In this scenario, the guest memory map is chosen at step (1), yet there
-> > is no VFIO fd available to determine the reserved regions. Furthermore,
-> > the reserved regions may vary between system 0 and system 1. This pretty
-> > much rules out using VFIO to determine the reserved regions.Alex suggested
-> > that the SMMU driver can advertise the regions via /sys/class/iommu/. This
-> > would solve part of the problem, but migration between systems with
-> > different memory maps can still cause problems if the reserved regions
-> > of the new system conflict with the guest memory map chosen by QEMU.
-> 
-> 
-> OK so I understand we do not want anymore the VFIO chain capability API
-> (patch 5 of above series) but we prefer a sysfs approach instead.
+This patch adds a PSCI checker module that enables basic testing of
+PSCI operations during startup. There are two main tests: CPU
+hotplugging and suspending.
 
-Right.
+In the hotplug tests, the hotplug API is used to turn off and on again
+all CPUs in the system, and then all CPUs in each cluster, checking
+the consistency of the return codes.
 
-> I understand the sysfs approach which allows the userspace to get the
-> info earlier and independently on VFIO. Keeping in mind current QEMU
-> virt - which is not the only userspace - will not do much from this info
-> until we bring upheavals in virt address space management. So if I am
-> not wrong, at the moment the main action to be undertaken is the
-> rejection of the PCI hotplug in case we detect a collision.
+In the suspend tests, a high-priority thread is created on each core
+and uses low-level cpuidle functionalities to enter suspend, in all
+the possible states and multiple times. This should allow a maximum
+number of CPUs to enter the same sleep state at the same or slightly
+different time.
 
-I don't think so; it should be up to userspace to reject the hotplug.
-If userspace doesn't have support for the regions, then that's fine --
-you just end up in a situation where the CPU page table maps memory
-somewhere that the device can't see. In other words, you'll end up with
-spurious DMA failures, but that's exactly what happens with current systems
-if you passthrough an overlapping region (Robin demonstrated this on Juno).
+In essence, the suspend tests use a principle similar to that of the
+intel_powerclamp driver (drivers/thermal/intel_powerclamp.c), but the
+threads are only kept for the duration of the test (they are already
+gone when userspace is started) and it does not require to stop/start
+the tick.
 
-Additionally, you can imagine some future support where you can tell the
-guest not to use certain regions of its memory for DMA. In this case, you
-wouldn't want to refuse the hotplug in the case of overlapping regions.
+While in theory power management PSCI functions (CPU_{ON,OFF,SUSPEND})
+could be directly called, this proved too difficult as it would imply
+the duplication of all the logic used by the kernel to allow for a
+clean shutdown/bringup/suspend of the CPU (the deepest sleep states
+implying potentially the shutdown of the CPU).
 
-Really, I think the kernel side just needs to enumerate the fixed reserved
-regions, place the doorbell at a fixed address and then advertise these
-via sysfs.
+Note that this file cannot be compiled as a loadable module, since it
+uses a number of non-exported identifiers (essentially for
+PSCI-specific checks and direct use of cpuidle) and relies on the
+absence of userspace to avoid races when calling hotplug and cpuidle
+functions.
 
-> I can respin [1]
-> - studying and taking into account Robin's comments about dm_regions
-> similarities
-> - removing the VFIO capability chain and replacing this by a sysfs API
+For now at least, CONFIG_PSCI_CHECKER is mutually exclusive with
+CONFIG_TORTURE_TEST, because torture tests may also use hotplug and
+cause false positives in the hotplug tests.
 
-Ideally, this would be reusable between different SMMU drivers so the sysfs
-entries have the same format etc.
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> [torture test config]
+Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+[lpieralisi: added cpuidle locking, reworded commit log/kconfig entry]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/firmware/Kconfig        |  11 +
+ drivers/firmware/Makefile       |   1 +
+ drivers/firmware/psci_checker.c | 490 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 502 insertions(+)
+ create mode 100644 drivers/firmware/psci_checker.c
 
-> Would that be OK?
-
-Sounds good to me. Are you in a position to prototype something on the qemu
-side once we've got kernel-side agreement?
-
-> What about Alex comments who wanted to report the usable memory ranges
-> instead of unusable memory ranges?
-> 
-> Also did you have a chance to discuss the following items:
-> 1) the VFIO irq safety assessment
-
-The discussion really focussed on system topology, as opposed to properties
-of the doorbell. Regardless of how the device talks to the doorbell, if
-the doorbell can't protect against things like MSI spoofing, then it's
-unsafe. My opinion is that we shouldn't allow passthrough by default on
-systems with unsafe doorbells (we could piggyback on allow_unsafe_interrupts
-cmdline option to VFIO).
-
-A first step would be making all this opt-in, and only supporting GICv3
-ITS for now.
-
-> 2) the MSI reserved size computation (is an arbitrary size OK?)
-
-If we fix the base address, we could fix a size too. However, we'd still
-need to enumerate the doorbells to check that they fit in the region we
-have. If not, then we can warn during boot and treat it the same way as
-a resource conflict (that is, reallocate the region in some deterministic
-way).
-
-Will
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index bca172d..f358ec8 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -8,6 +8,17 @@ menu "Firmware Drivers"
+ config ARM_PSCI_FW
+ 	bool
+ 
++config ARM_PSCI_CHECKER
++	bool "ARM PSCI checker"
++	depends on ARM_PSCI_FW && HOTPLUG_CPU && !TORTURE_TEST
++	help
++	  Run the PSCI checker during startup. This checks that hotplug and
++	  suspend operations work correctly when using PSCI.
++
++	  The torture tests may interfere with the PSCI checker by turning CPUs
++	  on and off through hotplug, so for now torture tests and PSCI checker
++	  are mutually exclusive.
++
+ config ARM_SCPI_PROTOCOL
+ 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
+ 	depends on MAILBOX
+diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
+index 898ac41..cfeb7ad 100644
+--- a/drivers/firmware/Makefile
++++ b/drivers/firmware/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the linux kernel.
+ #
+ obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
++obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
+ obj-$(CONFIG_ARM_SCPI_PROTOCOL)	+= arm_scpi.o
+ obj-$(CONFIG_ARM_SCPI_POWER_DOMAIN) += scpi_pm_domain.o
+ obj-$(CONFIG_DMI)		+= dmi_scan.o
+diff --git a/drivers/firmware/psci_checker.c b/drivers/firmware/psci_checker.c
+new file mode 100644
+index 0000000..44bdb78
+--- /dev/null
++++ b/drivers/firmware/psci_checker.c
+@@ -0,0 +1,490 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2016 ARM Limited
++ */
++
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/atomic.h>
++#include <linux/completion.h>
++#include <linux/cpu.h>
++#include <linux/cpuidle.h>
++#include <linux/cpu_pm.h>
++#include <linux/kernel.h>
++#include <linux/kthread.h>
++#include <linux/module.h>
++#include <linux/preempt.h>
++#include <linux/psci.h>
++#include <linux/slab.h>
++#include <linux/tick.h>
++#include <linux/topology.h>
++
++#include <asm/cpuidle.h>
++
++#include <uapi/linux/psci.h>
++
++#define NUM_SUSPEND_CYCLE (10)
++
++static unsigned int nb_available_cpus;
++static int tos_resident_cpu = -1;
++
++static atomic_t nb_active_threads;
++static struct completion suspend_threads_started =
++	COMPLETION_INITIALIZER(suspend_threads_started);
++static struct completion suspend_threads_done =
++	COMPLETION_INITIALIZER(suspend_threads_done);
++
++/*
++ * We assume that PSCI operations are used if they are available. This is not
++ * necessarily true on arm64, since the decision is based on the
++ * "enable-method" property of each CPU in the DT, but given that there is no
++ * arch-specific way to check this, we assume that the DT is sensible.
++ */
++static int psci_ops_check(void)
++{
++	int migrate_type = -1;
++	int cpu;
++
++	if (!(psci_ops.cpu_off && psci_ops.cpu_on && psci_ops.cpu_suspend)) {
++		pr_warn("Missing PSCI operations, aborting tests\n");
++		return -EOPNOTSUPP;
++	}
++
++	if (psci_ops.migrate_info_type)
++		migrate_type = psci_ops.migrate_info_type();
++
++	if (migrate_type == PSCI_0_2_TOS_UP_MIGRATE ||
++	    migrate_type == PSCI_0_2_TOS_UP_NO_MIGRATE) {
++		/* There is a UP Trusted OS, find on which core it resides. */
++		for_each_online_cpu(cpu)
++			if (psci_tos_resident_on(cpu)) {
++				tos_resident_cpu = cpu;
++				break;
++			}
++		if (tos_resident_cpu == -1)
++			pr_warn("UP Trusted OS resides on no online CPU\n");
++	}
++
++	return 0;
++}
++
++static int find_clusters(const struct cpumask *cpus,
++			 const struct cpumask **clusters)
++{
++	unsigned int nb = 0;
++	cpumask_var_t tmp;
++
++	if (!alloc_cpumask_var(&tmp, GFP_KERNEL))
++		return -ENOMEM;
++	cpumask_copy(tmp, cpus);
++
++	while (!cpumask_empty(tmp)) {
++		const struct cpumask *cluster =
++			topology_core_cpumask(cpumask_any(tmp));
++
++		clusters[nb++] = cluster;
++		cpumask_andnot(tmp, tmp, cluster);
++	}
++
++	free_cpumask_var(tmp);
++	return nb;
++}
++
++/*
++ * offlined_cpus is a temporary array but passing it as an argument avoids
++ * multiple allocations.
++ */
++static unsigned int down_and_up_cpus(const struct cpumask *cpus,
++				     struct cpumask *offlined_cpus)
++{
++	int cpu;
++	int err = 0;
++
++	cpumask_clear(offlined_cpus);
++
++	/* Try to power down all CPUs in the mask. */
++	for_each_cpu(cpu, cpus) {
++		int ret = cpu_down(cpu);
++
++		/*
++		 * cpu_down() checks the number of online CPUs before the TOS
++		 * resident CPU.
++		 */
++		if (cpumask_weight(offlined_cpus) + 1 == nb_available_cpus) {
++			if (ret != -EBUSY) {
++				pr_err("Unexpected return code %d while trying "
++				       "to power down last online CPU %d\n",
++				       ret, cpu);
++				++err;
++			}
++		} else if (cpu == tos_resident_cpu) {
++			if (ret != -EPERM) {
++				pr_err("Unexpected return code %d while trying "
++				       "to power down TOS resident CPU %d\n",
++				       ret, cpu);
++				++err;
++			}
++		} else if (ret != 0) {
++			pr_err("Error occurred (%d) while trying "
++			       "to power down CPU %d\n", ret, cpu);
++			++err;
++		}
++
++		if (ret == 0)
++			cpumask_set_cpu(cpu, offlined_cpus);
++	}
++
++	/* Try to power up all the CPUs that have been offlined. */
++	for_each_cpu(cpu, offlined_cpus) {
++		int ret = cpu_up(cpu);
++
++		if (ret != 0) {
++			pr_err("Error occurred (%d) while trying "
++			       "to power up CPU %d\n", ret, cpu);
++			++err;
++		} else {
++			cpumask_clear_cpu(cpu, offlined_cpus);
++		}
++	}
++
++	/*
++	 * Something went bad at some point and some CPUs could not be turned
++	 * back on.
++	 */
++	WARN_ON(!cpumask_empty(offlined_cpus) ||
++		num_online_cpus() != nb_available_cpus);
++
++	return err;
++}
++
++static int hotplug_tests(void)
++{
++	int err;
++	cpumask_var_t offlined_cpus;
++	int i, nb_cluster;
++	const struct cpumask **clusters;
++	char *page_buf;
++
++	err = -ENOMEM;
++	if (!alloc_cpumask_var(&offlined_cpus, GFP_KERNEL))
++		return err;
++	/* We may have up to nb_available_cpus clusters. */
++	clusters = kmalloc_array(nb_available_cpus, sizeof(*clusters),
++				 GFP_KERNEL);
++	if (!clusters)
++		goto out_free_cpus;
++	page_buf = (char *)__get_free_page(GFP_KERNEL);
++	if (!page_buf)
++		goto out_free_clusters;
++
++	err = 0;
++	nb_cluster = find_clusters(cpu_online_mask, clusters);
++
++	/*
++	 * Of course the last CPU cannot be powered down and cpu_down() should
++	 * refuse doing that.
++	 */
++	pr_info("Trying to turn off and on again all CPUs\n");
++	err += down_and_up_cpus(cpu_online_mask, offlined_cpus);
++
++	/*
++	 * Take down CPUs by cluster this time. When the last CPU is turned
++	 * off, the cluster itself should shut down.
++	 */
++	for (i = 0; i < nb_cluster; ++i) {
++		int cluster_id =
++			topology_physical_package_id(cpumask_any(clusters[i]));
++		ssize_t len = cpumap_print_to_pagebuf(true, page_buf,
++						      clusters[i]);
++		/* Remove trailing newline. */
++		page_buf[len - 1] = '\0';
++		pr_info("Trying to turn off and on again cluster %d "
++			"(CPUs %s)\n", cluster_id, page_buf);
++		err += down_and_up_cpus(clusters[i], offlined_cpus);
++	}
++
++	free_page((unsigned long)page_buf);
++out_free_clusters:
++	kfree(clusters);
++out_free_cpus:
++	free_cpumask_var(offlined_cpus);
++	return err;
++}
++
++static void dummy_callback(unsigned long ignored) {}
++
++static int suspend_cpu(int index, bool broadcast)
++{
++	int ret;
++
++	arch_cpu_idle_enter();
++
++	if (broadcast) {
++		/*
++		 * The local timer will be shut down, we need to enter tick
++		 * broadcast.
++		 */
++		ret = tick_broadcast_enter();
++		if (ret) {
++			/*
++			 * In the absence of hardware broadcast mechanism,
++			 * this CPU might be used to broadcast wakeups, which
++			 * may be why entering tick broadcast has failed.
++			 * There is little the kernel can do to work around
++			 * that, so enter WFI instead (idle state 0).
++			 */
++			cpu_do_idle();
++			ret = 0;
++			goto out_arch_exit;
++		}
++	}
++
++	/*
++	 * Replicate the common ARM cpuidle enter function
++	 * (arm_enter_idle_state).
++	 */
++	ret = CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, index);
++
++	if (broadcast)
++		tick_broadcast_exit();
++
++out_arch_exit:
++	arch_cpu_idle_exit();
++
++	return ret;
++}
++
++static int suspend_test_thread(void *arg)
++{
++	int cpu = (long)arg;
++	int i, nb_suspend = 0, nb_shallow_sleep = 0, nb_err = 0;
++	struct sched_param sched_priority = { .sched_priority = MAX_RT_PRIO-1 };
++	struct cpuidle_device *dev;
++	struct cpuidle_driver *drv;
++	/* No need for an actual callback, we just want to wake up the CPU. */
++	struct timer_list wakeup_timer =
++		TIMER_INITIALIZER(dummy_callback, 0, 0);
++
++	/* Wait for the main thread to give the start signal. */
++	wait_for_completion(&suspend_threads_started);
++
++	/* Set maximum priority to preempt all other threads on this CPU. */
++	if (sched_setscheduler_nocheck(current, SCHED_FIFO, &sched_priority))
++		pr_warn("Failed to set suspend thread scheduler on CPU %d\n",
++			cpu);
++
++	dev = this_cpu_read(cpuidle_devices);
++	drv = cpuidle_get_cpu_driver(dev);
++
++	pr_info("CPU %d entering suspend cycles, states 1 through %d\n",
++		cpu, drv->state_count - 1);
++
++	for (i = 0; i < NUM_SUSPEND_CYCLE; ++i) {
++		int index;
++		/*
++		 * Test all possible states, except 0 (which is usually WFI and
++		 * doesn't use PSCI).
++		 */
++		for (index = 1; index < drv->state_count; ++index) {
++			struct cpuidle_state *state = &drv->states[index];
++			bool broadcast = state->flags & CPUIDLE_FLAG_TIMER_STOP;
++			int ret;
++
++			/*
++			 * Set the timer to wake this CPU up in some time (which
++			 * should be largely sufficient for entering suspend).
++			 * If the local tick is disabled when entering suspend,
++			 * suspend_cpu() takes care of switching to a broadcast
++			 * tick, so the timer will still wake us up.
++			 */
++			mod_timer(&wakeup_timer, jiffies +
++				  usecs_to_jiffies(state->target_residency));
++
++			/* IRQs must be disabled during suspend operations. */
++			local_irq_disable();
++
++			ret = suspend_cpu(index, broadcast);
++
++			/*
++			 * We have woken up. Re-enable IRQs to handle any
++			 * pending interrupt, do not wait until the end of the
++			 * loop.
++			 */
++			local_irq_enable();
++
++			if (ret == index) {
++				++nb_suspend;
++			} else if (ret >= 0) {
++				/* We did not enter the expected state. */
++				++nb_shallow_sleep;
++			} else {
++				pr_err("Failed to suspend CPU %d: error %d "
++				       "(requested state %d, cycle %d)\n",
++				       cpu, ret, index, i);
++				++nb_err;
++			}
++		}
++	}
++
++	/*
++	 * Disable the timer to make sure that the timer will not trigger
++	 * later.
++	 */
++	del_timer(&wakeup_timer);
++
++	if (atomic_dec_return_relaxed(&nb_active_threads) == 0)
++		complete(&suspend_threads_done);
++
++	/* Give up on RT scheduling and wait for termination. */
++	sched_priority.sched_priority = 0;
++	if (sched_setscheduler_nocheck(current, SCHED_NORMAL, &sched_priority))
++		pr_warn("Failed to set suspend thread scheduler on CPU %d\n",
++			cpu);
++	for (;;) {
++		/* Needs to be set first to avoid missing a wakeup. */
++		set_current_state(TASK_INTERRUPTIBLE);
++		if (kthread_should_stop()) {
++			__set_current_state(TASK_RUNNING);
++			break;
++		}
++		schedule();
++	}
++
++	pr_info("CPU %d suspend test results: success %d, shallow states %d, errors %d\n",
++		cpu, nb_suspend, nb_shallow_sleep, nb_err);
++
++	return nb_err;
++}
++
++static int suspend_tests(void)
++{
++	int i, cpu, err = 0;
++	struct task_struct **threads;
++	int nb_threads = 0;
++
++	threads = kmalloc_array(nb_available_cpus, sizeof(*threads),
++				GFP_KERNEL);
++	if (!threads)
++		return -ENOMEM;
++
++	/*
++	 * Stop cpuidle to prevent the idle tasks from entering a deep sleep
++	 * mode, as it might interfere with the suspend threads on other CPUs.
++	 * This does not prevent the suspend threads from using cpuidle (only
++	 * the idle tasks check this status). Take the idle lock so that
++	 * the cpuidle driver and device look-up can be carried out safely.
++	 */
++	cpuidle_pause_and_lock();
++
++	for_each_online_cpu(cpu) {
++		struct task_struct *thread;
++		/* Check that cpuidle is available on that CPU. */
++		struct cpuidle_device *dev = per_cpu(cpuidle_devices, cpu);
++		struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
++
++		if (!dev || !drv) {
++			pr_warn("cpuidle not available on CPU %d, ignoring\n",
++				cpu);
++			continue;
++		}
++
++		thread = kthread_create_on_cpu(suspend_test_thread,
++					       (void *)(long)cpu, cpu,
++					       "psci_suspend_test");
++		if (IS_ERR(thread))
++			pr_err("Failed to create kthread on CPU %d\n", cpu);
++		else
++			threads[nb_threads++] = thread;
++	}
++
++	if (nb_threads < 1) {
++		err = -ENODEV;
++		goto out;
++	}
++
++	atomic_set(&nb_active_threads, nb_threads);
++
++	/*
++	 * Wake up the suspend threads. To avoid the main thread being preempted
++	 * before all the threads have been unparked, the suspend threads will
++	 * wait for the completion of suspend_threads_started.
++	 */
++	for (i = 0; i < nb_threads; ++i)
++		wake_up_process(threads[i]);
++	complete_all(&suspend_threads_started);
++
++	wait_for_completion(&suspend_threads_done);
++
++
++	/* Stop and destroy all threads, get return status. */
++	for (i = 0; i < nb_threads; ++i)
++		err += kthread_stop(threads[i]);
++ out:
++	cpuidle_resume_and_unlock();
++	kfree(threads);
++	return err;
++}
++
++static int __init psci_checker(void)
++{
++	int ret;
++
++	/*
++	 * Since we're in an initcall, we assume that all the CPUs that all
++	 * CPUs that can be onlined have been onlined.
++	 *
++	 * The tests assume that hotplug is enabled but nobody else is using it,
++	 * otherwise the results will be unpredictable. However, since there
++	 * is no userspace yet in initcalls, that should be fine, as long as
++	 * no torture test is running@the same time (see Kconfig).
++	 */
++	nb_available_cpus = num_online_cpus();
++
++	/* Check PSCI operations are set up and working. */
++	ret = psci_ops_check();
++	if (ret)
++		return ret;
++
++	pr_info("PSCI checker started using %u CPUs\n", nb_available_cpus);
++
++	pr_info("Starting hotplug tests\n");
++	ret = hotplug_tests();
++	if (ret == 0)
++		pr_info("Hotplug tests passed OK\n");
++	else if (ret > 0)
++		pr_err("%d error(s) encountered in hotplug tests\n", ret);
++	else {
++		pr_err("Out of memory\n");
++		return ret;
++	}
++
++	pr_info("Starting suspend tests (%d cycles per state)\n",
++		NUM_SUSPEND_CYCLE);
++	ret = suspend_tests();
++	if (ret == 0)
++		pr_info("Suspend tests passed OK\n");
++	else if (ret > 0)
++		pr_err("%d error(s) encountered in suspend tests\n", ret);
++	else {
++		switch (ret) {
++		case -ENOMEM:
++			pr_err("Out of memory\n");
++			break;
++		case -ENODEV:
++			pr_warn("Could not start suspend tests on any CPU\n");
++			break;
++		}
++	}
++
++	pr_info("PSCI checker completed\n");
++	return ret < 0 ? ret : 0;
++}
++late_initcall(psci_checker);
+-- 
+2.10.0
