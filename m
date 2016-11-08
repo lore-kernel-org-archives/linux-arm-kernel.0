@@ -1,89 +1,76 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 8 Nov 2016 12:21:28 +0100
-Subject: [GIT PULL] ARM: OXNAS SoC updates for 4.10
-In-Reply-To: <20161107212648.GC2106@localhost>
-References: <1305c61f-b1ef-7caf-7788-67e2b907e873@baylibre.com>
- <20161107212648.GC2106@localhost>
-Message-ID: <0b12c093-4be4-8f1c-2b46-ffaa54c5520b@baylibre.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 8 Nov 2016 11:23:35 +0000
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <2467231.EbVekJun1R@wuerfel>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <2127881.qmAR1XgW9F@wuerfel>
+ <2a8dc40f-be75-b010-3ec7-6912f02e3c90@huawei.com>
+ <2467231.EbVekJun1R@wuerfel>
+Message-ID: <c68064fa-a274-2e22-88a6-5fe388debf2b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2016 10:26 PM, Olof Johansson wrote:
-> On Mon, Oct 31, 2016 at 10:52:53AM +0100, Neil Armstrong wrote:
->> Dear arm-soc maintainers,
+On 07/11/2016 20:08, Arnd Bergmann wrote:
+> On Monday, November 7, 2016 2:15:10 PM CET John Garry wrote:
 >>
->> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+>> Hi Arnd,
 >>
->>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+>> The new bus type tries to model the djtag in a similar way to I2C/USB
+>> driver arch, where we have a host bus adapter and child devices attached
+>> to the bus. The child devices are bus driver devices and have bus
+>> addresses. We think of the djtag as a separate bus, so we are modelling
+>> it as such.
 >>
->> are available in the git repository at:
->>
->>   https://github.com/OXNAS/linux.git tags/oxnas-arm-soc-for-4.10
->>
->> for you to fetch changes up to b3cdb3c5ef514687891f03442f2677850340bcfa:
->>
->>   ARM: oxnas: Add OX820 config and makefile entry (2016-10-31 10:41:33 +0100)
->>
->> ----------------------------------------------------------------
->> - Add SMP support for the Oxford Semiconductor OX820 SoC
->> from http://lkml.kernel.org/r/20161021085848.1754-1-narmstrong at baylibre.com
->>
->> ----------------------------------------------------------------
->> Neil Armstrong (2):
->>       ARM: oxnas: Add OX820 SMP support
->>       ARM: oxnas: Add OX820 config and makefile entry
-> 
-> Hi Neil,
-Hi Olof,
+>> The bus driver offers a simple host interface for clients to read/write
+>> to the djtag bus: bus accesses are hidden from the client, the host
+>> drives the bus.
+>
+> Ok, in that case we should probably start out by having a bus specific
+> DT binding, and separating the description from that of the bus master
+> device.
 
-> 
-> Sorry for being picky here, please be patient with us. :-)
-Seems legit !
+OK
 
-> 
-> Overall comments on this patch set:
-> 
-> 1) Copyrights seem to be a bit varied. All 3 new source files have
->    different copyright holders. Only one has yours, one is from 2003, one
->    is also from 2013. Is this expected? Seems like it's worth mentioning
->    in commit messages at least.
+>
+> I'd suggest requiring #address-cells=<1> and #size-cells=<0> in the master
+> node, and listing the children by reg property. If the address is not
+> easily expressed as a single integer, use a larger #address-cells value.
 
-Yes, the files comes from various places :
-- hotplug.c was taken from versatile by Ma Haijun and left verbatim, so I left the original header
-- headsmp.S was taken from the versatile code and adapted by Ma Haijun
-- platsmp.c is a mix from versatile code, Ma Haijun code and my code for DT
+We already have something equivalent to reg in "module-id" (see patch 
+02/11), which is the slave device bus address; here's a sample:
++		/* For L3 cache PMU */
++		pmul3c0 {
++			compatible = "hisilicon,hisi-pmu-l3c-v1";
++			scl-id = <0x02>;
++			num-events = <0x16>;
++			num-counters = <0x08>;
++			module-id = <0x04>;
++			num-banks = <0x04>;
++			cfgen-map = <0x02 0x04 0x01 0x08>;
++			counter-reg = <0x170>;
++			evctrl-reg = <0x04>;
++			event-en = <0x1000000>;
++			evtype-reg = <0x140>;
++		};
 
-The two first file were only modified in order to build and pass checkpatch actually.
+FYI, "module-id" is our own internal hw nomenclature.
 
-I tried to find the *real* copyright holders, but it was not easy...
+>
+> Another option that we have previously used was to actually pretend that
+> a vendor specific bus is an i2c bus and use the i2c probing infrastructure,
+> but that only makes sense if the software side closely resembles i2c
+> (this was the case for Allwinner I think, but I have not looked at
+> your driver in enough detail to know if it is true here as well).
+>
 
-> 
-> 2) Please remove the linux/arch/... lines from the top of the files. It's
->    something we've been trying to remove for a while and don't want to
->    introduce more occurrances of.
-> 
-> I'd say (2) is fine to do incremental, but please provide clarification on (1).
-> I could just add that to the merge commit message so don't respin the branch
-> yet, depending on what we hear back!
-> 
+OK, let me check this. By chance do you remember the specific AllWinner 
+driver/hw?
 
-Ok, please tell me if/when I need to send a new pull for the (2) fix.
+Cheers,
+John
 
->>  arch/arm/Makefile             |   1 +
->>  arch/arm/mach-oxnas/Kconfig   |  30 +++++++++++++++++++---------
->>  arch/arm/mach-oxnas/Makefile  |   2 ++
->>  arch/arm/mach-oxnas/headsmp.S |  28 ++++++++++++++++++++++++++
->>  arch/arm/mach-oxnas/hotplug.c | 111 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-oxnas/platsmp.c | 104 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> Git tip: If you redirect the output to a file (or pipe through cat), the
-> diffstat will be limited to 80 characters and look better in email.
-> 
-> 
-> Thanks,
-> 
-> -Olof
-> 
-
-Thanks,
-Neil
+> 	Arnd
+>
+> .
+>
