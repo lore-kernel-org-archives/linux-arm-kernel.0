@@ -1,52 +1,69 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Tue, 8 Nov 2016 14:09:27 -0800
-Subject: KASAN & the vmalloc area
-In-Reply-To: <20161108190302.GH15297@leverpostej>
-References: <20161108190302.GH15297@leverpostej>
-Message-ID: <CACT4Y+ZSgfK-=wFFswMmQ+636Arz4kgwxdxz+FvEJHXvjZ8ckg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 08 Nov 2016 23:19:22 +0100
+Subject: [GIT PULL] pxa for v4.10
+Message-ID: <87a8d9wr6d.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2016 at 11:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> I see a while back [1] there was a discussion of what to do about KASAN
-> and vmapped stacks, but it doesn't look like that was solved, judging by
-> the vmapped stacks pull [2] for v4.9.
->
-> I wondered whether anyone had looked at that since?
->
-> I have an additional reason to want to dynamically allocate the vmalloc
-> area shadow: it turns out that KASAN currently interacts rather poorly
-> with the arm64 ptdump code.
->
-> When KASAN is selected, we allocate shadow for the whole vmalloc area,
-> using common zero pte, pmd, pud tables. Walking over these in the ptdump
-> code takes a *very* long time (I've seen up to 15 minutes with
-> KASAN_OUTLINE enabled). For DEBUG_WX [3], this means boot hangs for that
-> long, too.
->
-> If I don't allocate vmalloc shadow (and remove the apparently pointlesss
-> shadow of the shadow area), and only allocate shadow for the image,
-> fixmap, vmemmap and so on, that delay gets cut to a few seconds, which
-> is tolerable for a debug configuration...
->
-> ... however, things blow up when the kernel touches vmalloc'd memory for
-> the first time, as we don't install shadow for that dynamically.
+Hello Arnd, Kevin, Olof,
+
+Please consider this pull request for pxa 4.10 cycle. This pull request strides
+off from my usual ones as its spans more than just mach-pxa.
+
+The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+
+  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-for-4.10
+
+for you to fetch changes up to e413bd33ac44b6d0bebc0ef2ac19cbe7558a7303:
+
+  ARM: pxa: fix pxa25x interrupt init (2016-11-05 21:48:18 +0100)
+
+----------------------------------------------------------------
+This is the pxa changes for v4.10 cycle.
+
+This cycle is covering :
+ - some clock fixes common with sa1100 architecture
+ - the consequence of the pxa_camera conversion to v4l2
+ - a small irq related fix for pxa25x device-tree only
+
+----------------------------------------------------------------
+Robert Jarzmik (8):
+      ARM: sa11x0/pxa: acquire timer rate from the clock rate
+      watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
+      ARM: sa11x0/pxa: get rid of get_clock_tick_rate
+      ARM: pxa: pxa_cplds: honor probe deferral
+      ARM: pxa: mioa701: use the new pxa_camera platform_data
+      ARM: pxa: ezx: use the new pxa_camera platform_data
+      ARM: pxa: em-x270: use the new pxa_camera platform_data
+      ARM: pxa: fix pxa25x interrupt init
+
+Russell King - ARM Linux (1):
+      clk: pxa25x: OSTIMER0 clocks from the main oscillator
+
+Wei Yongjun (1):
+      ARM: pxa: remove duplicated include from spitz.c
+
+ arch/arm/mach-pxa/corgi.c                    |   1 -
+ arch/arm/mach-pxa/em-x270.c                  |  89 +++++---------
+ arch/arm/mach-pxa/ezx.c                      | 176 +++++++++++----------------
+ arch/arm/mach-pxa/generic.c                  |  18 +--
+ arch/arm/mach-pxa/include/mach/hardware.h    |   2 -
+ arch/arm/mach-pxa/mioa701.c                  |  13 +-
+ arch/arm/mach-pxa/pxa25x.c                   |   2 +-
+ arch/arm/mach-pxa/pxa_cplds_irqs.c           |  11 +-
+ arch/arm/mach-pxa/spitz.c                    |   1 -
+ arch/arm/mach-sa1100/generic.c               |   2 +-
+ arch/arm/mach-sa1100/include/mach/hardware.h |   4 -
+ drivers/clk/pxa/clk-pxa25x.c                 |   2 +-
+ drivers/clocksource/pxa_timer.c              |  11 +-
+ drivers/watchdog/sa1100_wdt.c                |  24 +++-
+ include/clocksource/pxa.h                    |   3 +-
+ 15 files changed, 142 insertions(+), 217 deletions(-)
 
 
-I've seen the same iteration slowness problem on x86 with
-CONFIG_DEBUG_RODATA which walks all pages. The is about 1 minute, but
-it is enough to trigger rcu stall warning.
-
-The zero pud and vmalloc-ed stacks looks like different problems.
-To overcome the slowness we could map zero shadow for vmalloc area lazily.
-However for vmalloc-ed stacks we need to map actual memory, because
-stack instrumentation will read/write into the shadow. One downside
-here is that vmalloc shadow can be as large as 1:1 (if we allocate 1
-page in vmalloc area we need to allocate 1 page for shadow).
-
-Re slowness: could we just skip the KASAN zero puds (the top level)
-while walking? Can they be interesting for anybody? We can just
-pretend that they are not there. Looks like a trivial solution for the
-problem at hand.
+-- 
+Robert
