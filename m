@@ -1,76 +1,65 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 8 Nov 2016 11:23:35 +0000
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <2467231.EbVekJun1R@wuerfel>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <2127881.qmAR1XgW9F@wuerfel>
- <2a8dc40f-be75-b010-3ec7-6912f02e3c90@huawei.com>
- <2467231.EbVekJun1R@wuerfel>
-Message-ID: <c68064fa-a274-2e22-88a6-5fe388debf2b@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 8 Nov 2016 11:37:23 +0000
+Subject: [PATCH] iommu/dma-iommu: properly respect configured address
+ space size
+In-Reply-To: <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
+ <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2016 20:08, Arnd Bergmann wrote:
-> On Monday, November 7, 2016 2:15:10 PM CET John Garry wrote:
->>
->> Hi Arnd,
->>
->> The new bus type tries to model the djtag in a similar way to I2C/USB
->> driver arch, where we have a host bus adapter and child devices attached
->> to the bus. The child devices are bus driver devices and have bus
->> addresses. We think of the djtag as a separate bus, so we are modelling
->> it as such.
->>
->> The bus driver offers a simple host interface for clients to read/write
->> to the djtag bus: bus accesses are hidden from the client, the host
->> drives the bus.
->
-> Ok, in that case we should probably start out by having a bus specific
-> DT binding, and separating the description from that of the bus master
-> device.
+Hi Marek,
 
-OK
+On 07/11/16 13:06, Marek Szyprowski wrote:
+> When one called iommu_dma_init_domain() with size smaller than device's
+> DMA mask, the alloc_iova() will not respect it and always assume that all
+> IOVA addresses will be allocated from the the (base ... dev->dma_mask) range.
 
->
-> I'd suggest requiring #address-cells=<1> and #size-cells=<0> in the master
-> node, and listing the children by reg property. If the address is not
-> easily expressed as a single integer, use a larger #address-cells value.
+Is that actually a problem for anything?
 
-We already have something equivalent to reg in "module-id" (see patch 
-02/11), which is the slave device bus address; here's a sample:
-+		/* For L3 cache PMU */
-+		pmul3c0 {
-+			compatible = "hisilicon,hisi-pmu-l3c-v1";
-+			scl-id = <0x02>;
-+			num-events = <0x16>;
-+			num-counters = <0x08>;
-+			module-id = <0x04>;
-+			num-banks = <0x04>;
-+			cfgen-map = <0x02 0x04 0x01 0x08>;
-+			counter-reg = <0x170>;
-+			evctrl-reg = <0x04>;
-+			event-en = <0x1000000>;
-+			evtype-reg = <0x140>;
-+		};
+> This patch fixes this issue by taking the configured address space size
+> parameter into account (if it is smaller than the device's dma_mask).
 
-FYI, "module-id" is our own internal hw nomenclature.
+TBH I've been pondering ripping the size stuff out of dma-iommu, as it
+all stems from me originally failing to understand what dma_32bit_pfn is
+actually for. The truth is that iova_domains just don't have a size or
+upper limit; however if devices with both large and small DMA masks
+share a domain, then the top-down nature of the allocator means that
+allocating for the less-capable devices would involve walking through
+every out-of-range entry in the tree every time. Having cached32_node
+based on dma_32bit_pfn just provides an optimised starting point for
+searching within the smaller mask.
 
->
-> Another option that we have previously used was to actually pretend that
-> a vendor specific bus is an i2c bus and use the i2c probing infrastructure,
-> but that only makes sense if the software side closely resembles i2c
-> (this was the case for Allwinner I think, but I have not looked at
-> your driver in enough detail to know if it is true here as well).
->
+Would it hurt any of your use-cases to relax/rework the reinitialisation
+checks in iommu_dma_init_domain()? Alternatively if we really do have a
+case for wanting a hard upper limit, it might make more sense to add an
+end_pfn to the iova_domain and handle it in the allocator itself.
 
-OK, let me check this. By chance do you remember the specific AllWinner 
-driver/hw?
+Robin.
 
-Cheers,
-John
-
-> 	Arnd
->
-> .
->
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index c5ab8667e6f2..8b4b72654359 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -212,11 +212,13 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
+>  
+>  	if (domain->geometry.force_aperture)
+>  		dma_limit = min(dma_limit, domain->geometry.aperture_end);
+> +
+> +	dma_limit = min(dma_limit >> shift, (dma_addr_t)iovad->dma_32bit_pfn);
+>  	/*
+>  	 * Enforce size-alignment to be safe - there could perhaps be an
+>  	 * attribute to control this per-device, or at least per-domain...
+>  	 */
+> -	return alloc_iova(iovad, length, dma_limit >> shift, true);
+> +	return alloc_iova(iovad, length, dma_limit, true);
+>  }
+>  
+>  /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
+> 
