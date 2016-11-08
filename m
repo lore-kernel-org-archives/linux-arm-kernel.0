@@ -1,86 +1,51 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 Nov 2016 14:44:09 +0000
-Subject: [PATCH] iommu/dma-iommu: properly respect configured address
- space size
-In-Reply-To: <8286728f-fab3-8179-5215-e156da426244@samsung.com>
-References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
- <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
- <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
- <8286728f-fab3-8179-5215-e156da426244@samsung.com>
-Message-ID: <d215c05c-b922-4bee-a2dc-695669a801f6@arm.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Tue, 8 Nov 2016 14:44:45 +0000
+Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
+In-Reply-To: <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
+References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+ <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20161108144445.GD1575@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/16 13:41, Marek Szyprowski wrote:
-> Hi Robin,
+On Fri, Nov 04, 2016 at 05:14:49PM +0100, Sylwester Nawrocki wrote:
+> This patch adds DMA slave map tables to the pl080 devices's
+> platform_data in order to support the new channel request API.
+> A few devices for which there was no DMA support with current
+> code are omitted from the tables.
 > 
+> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  arch/arm/mach-s3c64xx/pl080.c | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> On 2016-11-08 12:37, Robin Murphy wrote:
->> On 07/11/16 13:06, Marek Szyprowski wrote:
->>> When one called iommu_dma_init_domain() with size smaller than device's
->>> DMA mask, the alloc_iova() will not respect it and always assume that
->>> all
->>> IOVA addresses will be allocated from the the (base ...
->>> dev->dma_mask) range.
->> Is that actually a problem for anything?
-> 
-> Yes, I found this issue while working on next version of ARM & ARM64
-> DMA-mapping/IOMMU integration patchset and adapting Exynos drivers for the
-> new IOMMU/DMA-mapping glue.
-> 
-> Some Exynos devices (codec and camera isp) operate only on the limited (and
-> really small: 256M for example) DMA window. They use non-standard way of
-> addressing memory: an offset from the firmware base. However they still
-> have
-> 32bit DMA mask, as the firmware can be located basically everywhere in the
-> real DMA address space, but then they can access only next 256M from that
-> firmware base.
+> diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
+> index 89c5a62..8c88680 100644
+> --- a/arch/arm/mach-s3c64xx/pl080.c
+> +++ b/arch/arm/mach-s3c64xx/pl080.c
+<snip>
+> @@ -134,6 +153,8 @@ struct pl08x_platform_data s3c64xx_dma0_plat_data = {
+>  	.put_xfer_signal = pl08x_put_xfer_signal,
+>  	.slave_channels = s3c64xx_dma0_info,
+>  	.num_slave_channels = ARRAY_SIZE(s3c64xx_dma0_info),
+> +	.slave_map = s3c64xx_dma0_slave_map,
+> +	.slavecnt = ARRAY_SIZE(s3c64xx_dma0_slave_map),
+>  };
 
-OK, that's good to know, thanks. However, I think in this case it sounds
-like it's really the DMA mask that's the underlying problem - if those
-blocks themselves can only drive 28 address bits, then the struct
-devices representing them should have 28-bit DMA masks, and the
-"firmware base" of whoever's driving the upper bits modelled with a
-dma_pfn_offset. Even if they do have full 32-bit interfaces themselves,
-but are constrained to segment-offset addressing internally, I still
-think it would be tidier to represent things that way.
+Here we add a .slavecnt but the pl08x_platform_data structure doesn't
+contain that field. I can't see it on the branch you linked in
+the cover letter either, is it added by a patch on another branch
+I am missing?
 
-At some point in dma-iommu development I did have support for DMA
-offsets upstream of the IOMMU, and am happy to reinstate it if there's a
-real use case (assuming you can't simply always set the firmware base to
-0 when using the IOMMU).
+> @@ -224,6 +254,8 @@ struct pl08x_platform_data s3c64xx_dma1_plat_data = {
+>  	.put_xfer_signal = pl08x_put_xfer_signal,
+>  	.slave_channels = s3c64xx_dma1_info,
+>  	.num_slave_channels = ARRAY_SIZE(s3c64xx_dma1_info),
+> +	.slave_map = s3c64xx_dma1_slave_map,
+> +	.slavecnt = ARRAY_SIZE(s3c64xx_dma1_slave_map),
+>  };
 
->>> This patch fixes this issue by taking the configured address space size
->>> parameter into account (if it is smaller than the device's dma_mask).
->> TBH I've been pondering ripping the size stuff out of dma-iommu, as it
->> all stems from me originally failing to understand what dma_32bit_pfn is
->> actually for. The truth is that iova_domains just don't have a size or
->> upper limit; however if devices with both large and small DMA masks
->> share a domain, then the top-down nature of the allocator means that
->> allocating for the less-capable devices would involve walking through
->> every out-of-range entry in the tree every time. Having cached32_node
->> based on dma_32bit_pfn just provides an optimised starting point for
->> searching within the smaller mask.
-> 
-> Right, this dma_32bit_pfn was really misleading at the first glance,
-> but then I found that this was something like end_pfn in case of dma-iommu
-> code.
+ditto.
 
-Yes, that was my incorrect assumption - at the time I interpreted it as
-a de-facto upper limit which was still possible to allocate above in
-special circumstances, which turns out to be almost entirely backwards.
-I'd rather not bake that into the dma-iommu code any further if we can
-avoid it (I'll try throwing an RFC together to clear up what's there
-already).
-
-Robin.
-
->> Would it hurt any of your use-cases to relax/rework the reinitialisation
->> checks in iommu_dma_init_domain()? Alternatively if we really do have a
->> case for wanting a hard upper limit, it might make more sense to add an
->> end_pfn to the iova_domain and handle it in the allocator itself.
-> 
-> The proper support for end_pfn would be a better approach probably,
-> especially if we consider readability of the code.
-> 
-> Best regards
+Thanks,
+Charles
