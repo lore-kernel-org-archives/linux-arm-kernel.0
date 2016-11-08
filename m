@@ -1,168 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 8 Nov 2016 21:38:12 +0100
-Subject: [PATCH] drm/sun4i: Fix error handling
-In-Reply-To: <1d4a8fc9-6b62-4af7-19bc-565b15cdc413@wanadoo.fr>
-References: <20161030084926.15303-1-christophe.jaillet@wanadoo.fr>
- <c15282b4-e88a-06b1-527d-96aedce8b7eb@wanadoo.fr>
- <20161102181444.hfrh6fcr2a5oe5n4@lukather>
- <1d4a8fc9-6b62-4af7-19bc-565b15cdc413@wanadoo.fr>
-Message-ID: <20161108203812.rclbve6wwoupaf4v@lukather>
+Date: Tue, 8 Nov 2016 21:39:07 +0100
+Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
+In-Reply-To: <CAGb2v6557B5dooERbKc709Hbrzb3vP8eoSj3nh6rKek7UwrgEQ@mail.gmail.com>
+References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
+ <20161108074414.vvnjj7aa26sloi2f@lukather>
+ <CAGb2v6557B5dooERbKc709Hbrzb3vP8eoSj3nh6rKek7UwrgEQ@mail.gmail.com>
+Message-ID: <20161108203907.wylvt3xvhx3mi3tg@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut,
+On Tue, Nov 08, 2016 at 03:57:48PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 8, 2016 at 3:44 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Nov 07, 2016 at 10:11:45PM +0800, Chen-Yu Tsai wrote:
+> >> On Mon, Nov 7, 2016 at 9:08 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
+> >> >
+> >> > Add a card in order to have it working
+> >> >
+> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
+> >> >  1 file changed, 14 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > index 12b4317a4383..5291e425caf9 100644
+> >> > --- a/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > +++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > @@ -76,6 +76,20 @@
+> >> >                 default-brightness-level = <8>;
+> >> >         };
+> >> >
+> >> > +       i2s {
+> >>
+> >> "sound" might be a better node name? The I2S controllers are also
+> >> named "i2s".
+> >
+> > I know, but we also had the codec and SPDIF on this board, so sound
+> > was too generic to be meaningful I guess. I don't really care about
+> > the name though, if you have any suggestion...
+> 
+> Well people seem to use "sound" for the sound card nodes...
+> 
+> What about "sound-analog" for this one, and "sound-spdif" for the
+> SPDIF simple card? Or "analog-sound" and "spdif-sound" if that looks
+> better.
 
-On Sat, Nov 05, 2016 at 07:15:45AM +0100, Christophe JAILLET wrote:
-> Le 02/11/2016 ? 19:14, Maxime Ripard a ?crit :
-> > Hi,
-> > 
-> > On Sun, Oct 30, 2016 at 12:53:02PM +0100, Christophe JAILLET wrote:
-> > > BTW, memory allocation in 'sun4i_layers_init()' looks spurious, especially
-> > > the use of 'layer' in the for loop.
-> > > Just my 2 cents.
-> > What do you mean by it's spurious?
-> Hi Maxime,
-> 
-> what I mean is:
-> 
-> > struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
-> > {
-> >     struct sun4i_drv *drv = drm->dev_private;
-> >     struct sun4i_layer **layers;
-> >     int i;
-> >
-> >     layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes),
-> >                   sizeof(**layers), GFP_KERNEL);
-> Here, we allocate some memory for ARRAY_SIZE(sun4i_backend_planes) (i.e. 2)
-> 'struct sun4i_layer'.
-> We do not allocate some space for some pointers but for some structure.
-> 
-> Also, these structures are zeroed and seem to never be initialized by
-> anything else.
-> 
-> >     if (!layers)
-> >         return ERR_PTR(-ENOMEM);
-> >
-> >     /*
-> >      * The hardware is a bit unusual here.
-> >      *
-> >      * Even though it supports 4 layers, it does the composition
-> >      * in two separate steps.
-> >      *
-> >      * The first one is assigning a layer to one of its two
-> >      * pipes. If more that 1 layer is assigned to the same pipe,
-> >      * and if pixels overlaps, the pipe will take the pixel from
-> >      * the layer with the highest priority.
-> >      *
-> >      * The second step is the actual alpha blending, that takes
-> >      * the two pipes as input, and uses the eventual alpha
-> >      * component to do the transparency between the two.
-> >      *
-> >      * This two steps scenario makes us unable to guarantee a
-> >      * robust alpha blending between the 4 layers in all
-> >      * situations. So we just expose two layers, one per pipe. On
-> >      * SoCs that support it, sprites could fill the need for more
-> >      * layers.
-> >      */
-> The comment make me think that this driver (and this function) only handles
-> 2 layers ("So we just expose two layers"), which is consistent with
-> ARRAY_SIZE(sun4i_backend_planes) (i.e. 2)
-> So I would expect that only 2 'struct sun4i_layer' to be allcoated
-> 
-> >     for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
-> >         const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
-> >         struct sun4i_layer *layer = layers[i];
-> Here, we take the address of one of the 2 structure allocated above.
-> This is overridden, just the line after.
-> 
-> >
-> >         layer = sun4i_layer_init_one(drm, plane);
-> 'sun4i_layer_init_one()' looks() like:
-> 
->     struct sun4i_layer *layer;
->     layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
->     ...
->     return layer;
-> 
-> So we once more allocate some 'struct sun4i_layer'
-> 
-> BUT, the corresponding address is stored into the 'layer' variable, and
-> finally seems to get lost and no reference is kept of this. (i.e. 'layers'
-> (with an s) is left unchanged)
-> 
-> >         if (IS_ERR(layer)) {
-> >             dev_err(drm->dev, "Couldn't initialize %s plane\n",
-> >                 i ? "overlay" : "primary");
-> >             return ERR_CAST(layer);
-> >         };
-> >
-> >         DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
-> >                  i ? "overlay" : "primary", plane->pipe);
-> >         regmap_update_bits(drv->backend->regs,
-> SUN4I_BACKEND_ATTCTL_REG0(i),
-> >                    SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL_MASK,
-> > SUN4I_BACKEND_ATTCTL_REG0_LAY_PIPESEL(plane->pipe));
-> >
-> >         layer->id = i;
-> >     };
-> >
-> >     return layers;
-> > }
-> 
-> 
-> So, 4 'struct sun4i_layer' have been allocated. 2 in 'sun4i_layers_init()'
-> and 2 in 'sun4i_layer_init_one()' (once at a time, but called twice)
-> 
-> What looks spurious to me is either:
->    - 'struct sun4i_layer *layer = layers[i];' which should just be 'struct
-> sun4i_layer *layer;'
-> or
->    - 'layers' (with an s) should be an array of pointers and the addresses
-> returned by 'sun4i_layer_init_one()' should be saved there.
-> 
-> 
-> I don't know at all this driver, so I'm maybe completely wrong.
-> What I would have expected would be something like: (un-tested, just to give
-> an idea)
-> 
-> 
-> ==============8<================================================
-> 
-> @@ -133,9 +133,9 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device
-> *drm)
->      struct sun4i_layer **layers;
->      int i;
-> 
->      layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes),
-> -                  sizeof(**layers), GFP_KERNEL);
-> +                  sizeof(*layers), GFP_KERNEL);
->      if (!layers)
->          return ERR_PTR(-ENOMEM);
-> 
->      /*
-> @@ -160,16 +160,17 @@ struct sun4i_layer **sun4i_layers_init(struct
-> drm_device *drm)
->       * layers.
->       */
->      for (i = 0; i < ARRAY_SIZE(sun4i_backend_planes); i++) {
->          const struct sun4i_plane_desc *plane = &sun4i_backend_planes[i];
-> -        struct sun4i_layer *layer = layers[i];
-> +        struct sun4i_layer *layer;
-> 
->          layer = sun4i_layer_init_one(drm, plane);
->          if (IS_ERR(layer)) {
->              dev_err(drm->dev, "Couldn't initialize %s plane\n",
->                  i ? "overlay" : "primary");
->              return ERR_CAST(layer);
->          };
-> +        layers[i] = layer;
-> 
->          DRM_DEBUG_DRIVER("Assigning %s plane to pipe %d\n",
->                   i ? "overlay" : "primary", plane->pipe);
->          regmap_update_bits(drv->backend->regs,
-> SUN4I_BACKEND_ATTCTL_REG0(i),
-
-You're totally right. Can you send this as a formal patch?
+sound-analog works for me. I'll either fix it in the v2, or while
+applying.
 
 Thanks!
 Maxime
@@ -177,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/2ed78f33/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161108/68ade2b6/attachment.sig>
