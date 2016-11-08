@@ -1,39 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Nov 2016 19:21:21 -0800
-Subject: [GIT PULL] DaVinci fix for v4.9-rc
-In-Reply-To: <f57fbfde-89ff-fdac-2a04-e8a4788b4ee5@ti.com>
-References: <f57fbfde-89ff-fdac-2a04-e8a4788b4ee5@ti.com>
-Message-ID: <20161108032121.GG2106@localhost>
+Date: Tue, 8 Nov 2016 12:23:08 -0800
+Subject: [GIT PULL 2/4] DaVinci SoC updates for v4.10
+In-Reply-To: <20161104062535.9593-2-nsekhar@ti.com>
+References: <20161104062535.9593-1-nsekhar@ti.com>
+ <20161104062535.9593-2-nsekhar@ti.com>
+Message-ID: <20161108202308.GI2106@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 04:48:44PM +0530, Sekhar Nori wrote:
-> The following changes since commit a909d3e636995ba7c349e2ca5dbb528154d4ac30:
+On Fri, Nov 04, 2016 at 11:55:33AM +0530, Sekhar Nori wrote:
+> The following changes since commit 766763dbdc1dca11deabdb00077a1c19e2803f0a:
 > 
->   Linux 4.9-rc3 (2016-10-29 13:52:02 -0700)
+>   ARM: davinci: da8xx: Remove duplicated defines (2016-10-31 16:51:56 +0530)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.9
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/soc
 > 
-> for you to fetch changes up to 36173c2d023bad4dbad6ed0e6e886fde10ec8f2f:
+> for you to fetch changes up to ced95ac0815501f47a6041548d70d8900400912d:
 > 
->   ARM: davinci: da850: Fix pwm name matching (2016-11-01 15:30:03 +0530)
+>   ARM: davinci: da8xx: register USB PHY clocks in the DT file (2016-11-01 15:24:24 +0530)
 > 
 > ----------------------------------------------------------------
-> This patch enables usage of multiple eCAP and eHRPWM devices
-> using PWM sysfs entries.
+> DaVinci SoC support improvements mainly towards an effort to
+> get to working USB support.
 > 
-> Without this patch, creation of multiple entries fails due
-> to name clash.
+> - use CFGCHIP syscon device to access common registers
 > 
-> This is not a v4.9 regression but it will be nice to fix it
-> soon.
+> - define platform data and device tree nodes for newly
+>   introduced USB phy driver
+> 
+> - clock lookup and auxdata lookup for USB phy and also
+>   for LCDC (LCD controller)
 
-Hi,
-
-Merged into next/fixes-non-critical -- we're getting some pushback on fixes
-for this cycle, so I'm being a bit more conservative.
+Merged, thanks.
 
 
 -Olof
