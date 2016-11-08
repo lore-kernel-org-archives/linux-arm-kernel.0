@@ -1,58 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 Nov 2016 13:19:51 +0000
-Subject: [PATCH RFC 00/12] tda998x updates
-In-Reply-To: <20161108122420.GP1041@n2100.armlinux.org.uk>
-References: <20161108122420.GP1041@n2100.armlinux.org.uk>
-Message-ID: <2264579a-3273-d9c4-761a-f50f547eb39b@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 08 Nov 2016 14:20:17 +0100
+Subject: [PATCH 4/6] ARM: dts: add basic support for Rockchip RK1108 SOC
+In-Reply-To: <0516ad0b-bfbe-ec80-fdb6-e118dab3e758@rock-chips.com>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1788707.rfxhNfegGu@phil>
+ <0516ad0b-bfbe-ec80-fdb6-e118dab3e758@rock-chips.com>
+Message-ID: <2018991.LuBz7Cl7BQ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Am Dienstag, 8. November 2016, 20:31:55 schrieb Andy Yan:
+> Hi Heiko:
+> 
+> On 2016?11?04? 16:00, Heiko Stuebner wrote:
+> > Am Donnerstag, 3. November 2016, 20:40:48 CET schrieb Andy Yan:
 
-On 08/11/16 12:24, Russell King - ARM Linux wrote:
-> As no one responded to the previous round, I'm not spending soo much
-> time writing up a description of these changes again.  It's also been
-> quite a long time, so I've forgotten all the details of the changes,
-> so I'll do my best.
+> >> +	gic: interrupt-controller at 32010000 {
+> >> +		compatible = "arm,cortex-a15-gic";
+> > 
+> > compatible = "arm,gic-400"; ?
+> > 
+> >> +		interrupt-controller;
+> >> +		#interrupt-cells = <3>;
+> >> +		#address-cells = <0>;
+> >> +
+> >> +		reg = <0x32011000 0x1000>,
+> >> +		      <0x32012000 0x1000>;
+> > 
+> > please provide all 4 register areas and also the interrupt (
 > 
-> Changes from the previous series include:
-> - reorder the initial three patches
-> - change the (now third patch)... I think to increase the size of the
->   locked region.
-> - fix edid parsing for infoframe generation - as was pointed out for
->   dw-hdmi, parsing the EDID in get_modes() is incorrect, as that method
->   will not be called when an override-edid is in effect.  We need to
->   parse the override-edid.  Moreover, infoframe generation should not
->   be keyed to whether the monitor is HDMI or not, CEA-861B allows non-
->   HDMI to send infoframes.
-> - only send audio if audio and infoframes are supported.
-> 
-> Otherwise, these are very much like the previous posting of the series,
-> except rebased upon the mali/hdlcd/tda998x change to remove the
-> drm_connector_register() call.
-> 
-> https://www.spinics.net/lists/dri-devel/msg121495.html
-> 
-> It'd be nice to have other tda998x users ack and test these patches,
+>      I only found 2 register areas in our rockchip linux 3.10 source
+> code. And haven't found the interrupt. From the arm,gic bindings, the
+> interrupt property is optional. So am not sure if we
+> really need it here.
 
-I've just merged your drm-tda998x-devel branch and booted it on my Juno,
-and I can at least confirm that DVI still seems to still work as before.
-Anything in particular I should be looking out for? (Unfortunately the
-only handy HDMI monitor is one of those slightly-out-of-spec ones which
-has never really worked with the pixel clocks Juno provides)
+Devicetree is a hardware description, so it's not a factor if we "need" it but 
+only if it is present in the hardware. And we really want this information to 
+be complete, as these additional areas are necessary if someone wants to use 
+the virtualization extensions the cortext-A7 does contain.
 
-Robin.
+The gic is a very standard component and the gic400 used here should definitly 
+have those two additional areas as well as the interrupt.
 
-> I've tried to test on Juno, but the Juno situation seems to be a huge
-> fail.  (HBI0282B completely fails with latest firmware - (a) FPGA image
-> incompatibilities io_b118 causes all FPGA AMBA devices to vanish, (b)
-> seems no way to get SCPI support on it - adding the BL0 executable
-> start address in the SCC registers seems to be incompatible with the
-> devchip, causing the PLLs to fail.  In discussion with Sudeep over
-> these issues, but no idea where things are with it at the moment, other
-> than Sudeep needs to investigate.  All Linaro firmware releases are
-> broken on HBI0282B.)
-> 
->  drivers/gpu/drm/i2c/tda998x_drv.c | 826 ++++++++++++++++++++------------------
->  1 file changed, 429 insertions(+), 397 deletions(-)
-> 
+I think the memory areas are pretty standard and should be for the rk1108:
+reg = <0x32011000 0x1000>,
+      <0x32012000 0x1000>,
+      <0x32014000 0x2000>,
+      <0x32016000 0x2000>;
+
+The TRM talks about 128 SPI and 3 PPI interrupts but the irq-list does not 
+contain them, so this seems to be an error in the TRM, as the gic interrupt 
+should be one of those PPI interrupts.
+
+
+Heiko
