@@ -1,42 +1,81 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 8 Nov 2016 17:49:27 +0100
-Subject: [PATCH] arm64: dts: marvell: Fix typo in label name on Armada 37xx
-In-Reply-To: <20161108163216.24470-1-gregory.clement@free-electrons.com>
-References: <20161108163216.24470-1-gregory.clement@free-electrons.com>
-Message-ID: <20161108174927.1ccfc47e@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Nov 2016 16:49:49 +0000
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108161245.GD20591@arm.com>
+ <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
+Message-ID: <20161108164948.GG20591@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue,  8 Nov 2016 17:32:16 +0100, Gregory CLEMENT wrote:
-> The label names of the peripheral clocks have a typo. Fix it before it is
-> more widely used.
+On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
+> On 08/11/2016 16:12, Will Deacon wrote:
+> >On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
+> >>+static inline void arm64_set_extops(struct extio_ops *ops)
+> >>+{
+> >>+	if (ops)
+> >>+		WRITE_ONCE(arm64_extio_ops, ops);
+> >
+> >Why does this need to be WRITE_ONCE? You don't have READ_ONCE on the reader
+> >side. Also, what if multiple drivers want to set different ops for distinct
+> >address ranges?
 > 
-> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> I think that the idea here is that we only have possibly one master in the
+> system which offers indirectIO backend, so another one could not possibly
+> re-set this value.
 
-> -			nb_perih_clk: nb-periph-clk at 13000{
-> +			nb_periph_clk: nb-periph-clk at 13000{
+Why is that assumption valid, and why does WRITE_ONCE help there? It's not
+ONCE as in WARN_ONCE, more ONCE as in exactly-once-per-invocation.
 
-Space before {
+> >>diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
+> >>new file mode 100644
+> >>index 0000000..647b3fa
+> >>--- /dev/null
+> >>+++ b/arch/arm64/kernel/extio.c
+> >>@@ -0,0 +1,27 @@
+> >>+/*
+> >>+ * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+> >>+ * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+> >>+ *
+> >>+ * This program is free software; you can redistribute it and/or modify
+> >>+ * it under the terms of the GNU General Public License version 2 as
+> >>+ * published by the Free Software Foundation.
+> >>+ *
+> >>+ * This program is distributed in the hope that it will be useful,
+> >>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>+ * GNU General Public License for more details.
+> >>+ *
+> >>+ * You should have received a copy of the GNU General Public License
+> >>+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >>+ */
+> >>+
+> >>+#include <linux/io.h>
+> >>+
+> >>+struct extio_ops *arm64_extio_ops;
+> >>+
+> >>+
+> >>+BUILD_EXTIO(b, u8)
+> >>+
+> >>+BUILD_EXTIO(w, u16)
+> >>+
+> >>+BUILD_EXTIO(l, u32)
+> >
+> >Is there no way to make this slightly more generic, so that it can be
+> >re-used elsewhere? For example, if struct extio_ops was common, then
+> >you could have the singleton (which maybe should be an interval tree?),
+> >type definition, setter function and the BUILD_EXTIO invocations
+> >somewhere generic, rather than squirelled away in the arch backend.
+> >
+> The concern would be that some architecture which uses generic higher-level
+> ISA accessor ops, but have IO space, could be affected.
 
->  				compatible = "marvell,armada-3700-periph-clock-nb";
->  				reg = <0x13000 0x100>;
->  				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
-> @@ -113,7 +113,7 @@
->  				#clock-cells = <1>;
->  			};
->  
-> -			sb_perih_clk: sb-periph-clk at 18000{
-> +			sb_periph_clk: sb-periph-clk at 18000{
+You're already adding a Kconfig symbol for this stuff, so you can keep
+that if you don't want it on other architectures. I'm just arguing that
+plumbing drivers directly into arch code via arm64_set_extops is not
+something I'm particularly fond of, especially when it looks like it
+could be avoided with a small amount of effort.
 
-Ditto.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Will
