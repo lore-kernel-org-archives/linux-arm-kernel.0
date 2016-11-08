@@ -1,65 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 Nov 2016 11:37:23 +0000
-Subject: [PATCH] iommu/dma-iommu: properly respect configured address
- space size
-In-Reply-To: <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
- <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Nov 2016 12:43:41 +0100
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <582180F7.5060100@gmail.com>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <58217871.6050609@huawei.com> <582180F7.5060100@gmail.com>
+Message-ID: <22120038.dbaYpsQoUH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Tuesday, November 8, 2016 1:08:31 PM CET Anurup M wrote:
+ 
+> On Tuesday 08 November 2016 12:32 PM, Tan Xiaojun wrote:
+> > On 2016/11/7 21:26, Arnd Bergmann wrote:
+> >> On Wednesday, November 2, 2016 11:42:46 AM CET Anurup M wrote:
+> >>> From: Tan Xiaojun <tanxiaojun@huawei.com>
+> >>> +	/* ensure the djtag operation is done */
+> >>> +	do {
+> >>> +		djtag_read32_relaxed(regs_base, SC_DJTAG_MSTR_START_EN_EX, &rd);
+> >>> +
+> >>> +		if (!(rd & DJTAG_MSTR_START_EN_EX))
+> >>> +			break;
+> >>> +
+> >>> +		udelay(1);
+> >>> +	} while (timeout--);
+> >> This one is obviously not performance critical at all, so use a non-relaxed
+> >> accessor. Same for the other two in this function.
+> >>
+> >> Are these functions ever called from atomic context? If yes, please document
+> >> from what context they can be called, otherwise please consider changing
+> >> the udelay calls into sleeping waits.
+> >>
+> > Yes, this is not reentrant.
+> The read/write functions shall also be called from irq handler (for 
+> handling counter overflow).
+> So need to use udelay calls. Shall Document it in v2.
 
-On 07/11/16 13:06, Marek Szyprowski wrote:
-> When one called iommu_dma_init_domain() with size smaller than device's
-> DMA mask, the alloc_iova() will not respect it and always assume that all
-> IOVA addresses will be allocated from the the (base ... dev->dma_mask) range.
+Ok.
 
-Is that actually a problem for anything?
+> >>> +static const struct of_device_id djtag_of_match[] = {
+> >>> +	/* for hip05(D02) cpu die */
+> >>> +	{ .compatible = "hisilicon,hip05-cpu-djtag-v1",
+> >>> +		.data = (void *)djtag_readwrite_v1 },
+> >>> +	/* for hip05(D02) io die */
+> >>> +	{ .compatible = "hisilicon,hip05-io-djtag-v1",
+> >>> +		.data = (void *)djtag_readwrite_v1 },
+> >>> +	/* for hip06(D03) cpu die */
+> >>> +	{ .compatible = "hisilicon,hip06-cpu-djtag-v1",
+> >>> +		.data = (void *)djtag_readwrite_v1 },
+> >>> +	/* for hip06(D03) io die */
+> >>> +	{ .compatible = "hisilicon,hip06-io-djtag-v2",
+> >>> +		.data = (void *)djtag_readwrite_v2 },
+> >>> +	/* for hip07(D05) cpu die */
+> >>> +	{ .compatible = "hisilicon,hip07-cpu-djtag-v2",
+> >>> +		.data = (void *)djtag_readwrite_v2 },
+> >>> +	/* for hip07(D05) io die */
+> >>> +	{ .compatible = "hisilicon,hip07-io-djtag-v2",
+> >>> +		.data = (void *)djtag_readwrite_v2 },
+> >>> +	{},
+> >>> +};
+> >>
+> >> If these are backwards compatible, just mark them as compatible in DT,
+> >> e.g. hip06 can use
+> >>
+> >> 	compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
+> >>
+> >> so you can tell the difference if you need to, but the driver only has to
+> >> list the oldest one here.
+> >>
+> >> What is the difference between the cpu and io djtag interfaces?
+> On some chips like hip06, the djtag version is different for IO die.
 
-> This patch fixes this issue by taking the configured address space size
-> parameter into account (if it is smaller than the device's dma_mask).
+In what way? The driver doesn't seem to care about the difference.
 
-TBH I've been pondering ripping the size stuff out of dma-iommu, as it
-all stems from me originally failing to understand what dma_32bit_pfn is
-actually for. The truth is that iova_domains just don't have a size or
-upper limit; however if devices with both large and small DMA masks
-share a domain, then the top-down nature of the allocator means that
-allocating for the less-capable devices would involve walking through
-every out-of-range entry in the tree every time. Having cached32_node
-based on dma_32bit_pfn just provides an optimised starting point for
-searching within the smaller mask.
-
-Would it hurt any of your use-cases to relax/rework the reinitialisation
-checks in iommu_dma_init_domain()? Alternatively if we really do have a
-case for wanting a hard upper limit, it might make more sense to add an
-end_pfn to the iova_domain and handle it in the allocator itself.
-
-Robin.
-
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/iommu/dma-iommu.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index c5ab8667e6f2..8b4b72654359 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -212,11 +212,13 @@ static struct iova *__alloc_iova(struct iommu_domain *domain, size_t size,
->  
->  	if (domain->geometry.force_aperture)
->  		dma_limit = min(dma_limit, domain->geometry.aperture_end);
-> +
-> +	dma_limit = min(dma_limit >> shift, (dma_addr_t)iovad->dma_32bit_pfn);
->  	/*
->  	 * Enforce size-alignment to be safe - there could perhaps be an
->  	 * attribute to control this per-device, or at least per-domain...
->  	 */
-> -	return alloc_iova(iovad, length, dma_limit >> shift, true);
-> +	return alloc_iova(iovad, length, dma_limit, true);
->  }
->  
->  /* The IOVA allocator knows what we mapped, so just unmap whatever that was */
-> 
+	Arnd
