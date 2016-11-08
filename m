@@ -1,104 +1,132 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Nov 2016 02:45:59 +0000
-Subject: Summary of LPC guest MSI discussion in Santa Fe (was: Re: [RFC 0/8]
- KVM PCIe/MSI passthrough on ARM/ARM64 (Alt II))
-In-Reply-To: <20161103220205.37715b49@t450s.home>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home>
-Message-ID: <20161108024559.GA20591@arm.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 8 Nov 2016 10:51:04 +0800
+Subject: [PATCH v9 0/8] power: add power sequence library
+Message-ID: <1478573472-29516-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-I figured this was a reasonable post to piggy-back on for the LPC minutes
-relating to guest MSIs on arm64.
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+power sequence instances will be added at postcore_initcall, the match
+criteria is compatible string first, if the compatible string is not
+matched between dts and library, it will try to use generic power sequence.
+	 
+The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+if only one power sequence instance is needed, for more power sequences
+are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
 
-On Thu, Nov 03, 2016 at 10:02:05PM -0600, Alex Williamson wrote:
-> We can always have QEMU reject hot-adding the device if the reserved
-> region overlaps existing guest RAM, but I don't even really see how we
-> advise users to give them a reasonable chance of avoiding that
-> possibility.  Apparently there are also ARM platforms where MSI pages
-> cannot be remapped to support the previous programmable user/VM
-> address, is it even worthwhile to support those platforms?  Does that
-> decision influence whether user programmable MSI reserved regions are
-> really a second class citizen to fixed reserved regions?  I expect
-> we'll be talking about this tomorrow morning, but I certainly haven't
-> come up with any viable solutions to this.  Thanks,
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-At LPC last week, we discussed guest MSIs on arm64 as part of the PCI
-microconference. I presented some slides to illustrate some of the issues
-we're trying to solve:
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch [1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
 
-  http://www.willdeacon.ukfsn.org/bitbucket/lpc-16/msi-in-guest-arm64.pdf
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
 
-Punit took some notes (thanks!) on the etherpad here:
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
 
-  https://etherpad.openstack.org/p/LPC2016_PCI
+Changes for v9:
+- Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
+- Rebase to v4.9-rc1
 
-although the discussion was pretty lively and jumped about, so I've had
-to go from memory where the notes didn't capture everything that was
-said.
+Changes for v8:
+- Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+  preallocate instances problem which the number of instance is decided at
+  compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+- Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+  match method. [Patch 2/8]
+- Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
 
-To summarise, arm64 platforms differ in their handling of MSIs when compared
-to x86:
+Changes for v7:
+- Create kinds of power sequence instance at postcore_initcall, and match
+  the instance with node using compatible string, the beneit of this is
+  the host driver doesn't need to consider which pwrseq instance needs
+  to be used, and pwrseq core will match it, however, it eats some memories
+  if less power sequence instances are used. [Patch 2/8]
+- Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+- Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+  use device_node for parameters at pwrseq_on. [Patch 2/8]
+- Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+- Tested three pwrseq instances together using both specific compatible string and
+  generic libraries.
 
-  1. The physical memory map is not standardised (Jon pointed out that
-     this is something that was realised late on)
-  2. MSIs are usually treated the same as DMA writes, in that they must be
-     mapped by the SMMU page tables so that they target a physical MSI
-     doorbell
-  3. On some platforms, MSIs bypass the SMMU entirely (e.g. due to an MSI
-     doorbell built into the PCI RC)
-  4. Platforms typically have some set of addresses that abort before
-     reaching the SMMU (e.g. because the PCI identifies them as P2P).
+Changes for v6:
+- Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+- Change chipidea core of_node assignment for coming user. (patch [5/6])
+- Applies Joshua Clayton's three dts changes for two boards,
+  the USB device's reg has only #address-cells, but without #size-cells.
 
-All of this means that userspace (QEMU) needs to identify the memory
-regions corresponding to points (3) and (4) and ensure that they are
-not allocated in the guest physical (IPA) space. For platforms that can
-remap the MSI doorbell as in (2), then some space also needs to be
-allocated for that.
+Changes for v5:
+- Delete pwrseq_register/pwrseq_unregister, which is useless currently
+- Fix the linker error when the pwrseq user is compiled as module
 
-Rather than treat these as separate problems, a better interface is to
-tell userspace about a set of reserved regions, and have this include
-the MSI doorbell, irrespective of whether or not it can be remapped.
-Don suggested that we statically pick an address for the doorbell in a
-similar way to x86, and have the kernel map it there. We could even pick
-0xfee00000. If it conflicts with a reserved region on the platform (due
-to (4)), then we'd obviously have to (deterministically?) allocate it
-somewhere else, but probably within the bottom 4G.
+Changes for v4:
+- Create the patch on next-20160722 
+- Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+- Using more friendly wait method for reset gpio [Patch 2/6]
+- Support multiple input clocks [Patch 2/6]
+- Add Rob Herring's ack for DT changes
+- Add Joshua Clayton's Tested-by
 
-The next question is how to tell userspace about all of the reserved
-regions. Initially, the idea was to extend VFIO, however Alex pointed
-out a horrible scenario:
+Changes for v3:
+- Delete "power-sequence" property at binding-doc, and change related code
+  at both library and user code.
+- Change binding-doc example node name with Rob's comments
+- of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+  add additional code request gpio with proper gpio flags
+- Add Philipp Zabel's Ack and MAINTAINER's entry
 
-  1. QEMU spawns a VM on system 0
-  2. VM is migrated to system 1
-  3. QEMU attempts to passthrough a device using PCI hotplug
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
 
-In this scenario, the guest memory map is chosen at step (1), yet there
-is no VFIO fd available to determine the reserved regions. Furthermore,
-the reserved regions may vary between system 0 and system 1. This pretty
-much rules out using VFIO to determine the reserved regions. Alex suggested
-that the SMMU driver can advertise the regions via /sys/class/iommu/. This
-would solve part of the problem, but migration between systems with
-different memory maps can still cause problems if the reserved regions
-of the new system conflict with the guest memory map chosen by QEMU.
-Jon pointed out that most people are pretty conservative about hardware
-choices when migrating between them -- that is, they may only migrate
-between different revisions of the same SoC, or they know ahead of time
-all of the memory maps they want to support and this could be communicated
-by way of configuration to libvirt. It would be up to QEMU to fail the
-hotplug if it detected a conflict. Alex asked if there was a security
-issue with DMA bypassing the SMMU, but there aren't currently any systems
-where that is known to happen. Such a system would surely not be safe for
-passthrough.
+Joshua Clayton (2):
+  ARM: dts: imx6qdl: Enable usb node children with <reg>
+  ARM: dts: imx6q-evi: Fix onboard hub reset line
 
-Ben mused that a way to handle conflicts dynamically might be to hotplug
-on the entire host bridge in the guest, passing firmware tables describing
-the new reserved regions as a property of the host bridge. Whilst this
-may well solve the issue, it was largely considered future work due to
-its invasive nature and dependency on firmware tables (and guest support)
-that do not currently exist.
+Peter Chen (6):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+  usb: chipidea: let chipidea core device of_node equal's glue layer
+    device of_node
+  ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
 
-Will
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 ++++++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+ MAINTAINERS                                        |   9 +
+ arch/arm/boot/dts/imx6q-evi.dts                    |  25 +--
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 ++-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  19 ++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        | 191 +++++++++++++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 183 ++++++++++++++++++++
+ drivers/usb/chipidea/core.c                        |  27 ++-
+ drivers/usb/core/hub.c                             |  41 ++++-
+ drivers/usb/core/hub.h                             |   1 +
+ include/linux/power/pwrseq.h                       |  72 ++++++++
+ 16 files changed, 621 insertions(+), 41 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 include/linux/power/pwrseq.h
+
+-- 
+2.7.4
