@@ -1,14 +1,14 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 08 Nov 2016 23:19:22 +0100
-Subject: [GIT PULL] pxa for v4.10
-Message-ID: <87a8d9wr6d.fsf@belgarion.home>
+Date: Tue, 08 Nov 2016 23:27:59 +0100
+Subject: [GIT PULL] pxa-dt for v4.10
+Message-ID: <8760nxwqs0.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd, Kevin, Olof,
+Hi Arnd, Kevin, and Olof,
 
-Please consider this pull request for pxa 4.10 cycle. This pull request strides
-off from my usual ones as its spans more than just mach-pxa.
+This is the pxa pull request for 4.10 device-tree, can you please consider
+pulling ?
 
 The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
@@ -16,54 +16,34 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.10
+  https://github.com/rjarzmik/linux.git tags/pxa-dt-4.10
 
-for you to fetch changes up to e413bd33ac44b6d0bebc0ef2ac19cbe7558a7303:
+for you to fetch changes up to f409d2f134d499354dca0613693f27d8efd75c74:
 
-  ARM: pxa: fix pxa25x interrupt init (2016-11-05 21:48:18 +0100)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.10 cycle.
-
-This cycle is covering :
- - some clock fixes common with sa1100 architecture
- - the consequence of the pxa_camera conversion to v4l2
- - a small irq related fix for pxa25x device-tree only
+  ARM: dts: pxa: add pxa27x cpu operating points (2016-11-02 22:52:45 +0100)
 
 ----------------------------------------------------------------
-Robert Jarzmik (8):
-      ARM: sa11x0/pxa: acquire timer rate from the clock rate
-      watchdog: sa11x0/pxa: get rid of get_clock_tick_rate
-      ARM: sa11x0/pxa: get rid of get_clock_tick_rate
-      ARM: pxa: pxa_cplds: honor probe deferral
-      ARM: pxa: mioa701: use the new pxa_camera platform_data
-      ARM: pxa: ezx: use the new pxa_camera platform_data
-      ARM: pxa: em-x270: use the new pxa_camera platform_data
-      ARM: pxa: fix pxa25x interrupt init
+This device-tree pxa update brings :
+ - pxa25x support
+ - cpu operating points in preparation for cpufreq-dt
+ - small fixes
 
-Russell King - ARM Linux (1):
-      clk: pxa25x: OSTIMER0 clocks from the main oscillator
+----------------------------------------------------------------
+Robert Jarzmik (4):
+      ARM: dts: add pxa25x .dtsi file
+      ARM: dts: pxa: fix gpio0 and gpio1 interrupts
+      ARM: dts: pxa: add pxa25x cpu operating points
+      ARM: dts: pxa: add pxa27x cpu operating points
 
-Wei Yongjun (1):
-      ARM: pxa: remove duplicated include from spitz.c
+Vijay Kumar (1):
+      Fix no. of gpio cells in the pxa gpio binding doucmentation
 
- arch/arm/mach-pxa/corgi.c                    |   1 -
- arch/arm/mach-pxa/em-x270.c                  |  89 +++++---------
- arch/arm/mach-pxa/ezx.c                      | 176 +++++++++++----------------
- arch/arm/mach-pxa/generic.c                  |  18 +--
- arch/arm/mach-pxa/include/mach/hardware.h    |   2 -
- arch/arm/mach-pxa/mioa701.c                  |  13 +-
- arch/arm/mach-pxa/pxa25x.c                   |   2 +-
- arch/arm/mach-pxa/pxa_cplds_irqs.c           |  11 +-
- arch/arm/mach-pxa/spitz.c                    |   1 -
- arch/arm/mach-sa1100/generic.c               |   2 +-
- arch/arm/mach-sa1100/include/mach/hardware.h |   4 -
- drivers/clk/pxa/clk-pxa25x.c                 |   2 +-
- drivers/clocksource/pxa_timer.c              |  11 +-
- drivers/watchdog/sa1100_wdt.c                |  24 +++-
- include/clocksource/pxa.h                    |   3 +-
- 15 files changed, 142 insertions(+), 217 deletions(-)
-
+ .../devicetree/bindings/gpio/mrvl-gpio.txt         |   6 +-
+ arch/arm/boot/dts/pxa25x.dtsi                      | 117 +++++++++++++++++++++
+ arch/arm/boot/dts/pxa27x.dtsi                      |  40 +++++++
+ arch/arm/boot/dts/pxa2xx.dtsi                      |   4 +-
+ 4 files changed, 163 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa25x.dtsi
 
 -- 
 Robert
