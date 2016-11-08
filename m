@@ -1,39 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 8 Nov 2016 12:23:08 -0800
-Subject: [GIT PULL 2/4] DaVinci SoC updates for v4.10
-In-Reply-To: <20161104062535.9593-2-nsekhar@ti.com>
+Date: Tue, 8 Nov 2016 12:22:13 -0800
+Subject: [GIT PULL 1/4] DaVinci cleanup for v4.10
+In-Reply-To: <20161104062535.9593-1-nsekhar@ti.com>
 References: <20161104062535.9593-1-nsekhar@ti.com>
- <20161104062535.9593-2-nsekhar@ti.com>
-Message-ID: <20161108202308.GI2106@localhost>
+Message-ID: <20161108202213.GH2106@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 11:55:33AM +0530, Sekhar Nori wrote:
-> The following changes since commit 766763dbdc1dca11deabdb00077a1c19e2803f0a:
+On Fri, Nov 04, 2016 at 11:55:32AM +0530, Sekhar Nori wrote:
+> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 > 
->   ARM: davinci: da8xx: Remove duplicated defines (2016-10-31 16:51:56 +0530)
+>   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.10/cleanup
 > 
-> for you to fetch changes up to ced95ac0815501f47a6041548d70d8900400912d:
+> for you to fetch changes up to 766763dbdc1dca11deabdb00077a1c19e2803f0a:
 > 
->   ARM: davinci: da8xx: register USB PHY clocks in the DT file (2016-11-01 15:24:24 +0530)
+>   ARM: davinci: da8xx: Remove duplicated defines (2016-10-31 16:51:56 +0530)
 > 
 > ----------------------------------------------------------------
-> DaVinci SoC support improvements mainly towards an effort to
-> get to working USB support.
+> Clean-up some unnecessary code from mach-davinci.
 > 
-> - use CFGCHIP syscon device to access common registers
+> - Remove now unneeded dma resources where drivers
+>   are already converted to use the dma_slave_map[]
+>   structure.
 > 
-> - define platform data and device tree nodes for newly
->   introduced USB phy driver
-> 
-> - clock lookup and auxdata lookup for USB phy and also
->   for LCDC (LCD controller)
+> - Remove some duplicated defines related to USB support.
 
-Merged, thanks.
+We don't have a cleanup branch in our tree any more, but thanks for breaking
+this out for us anyway! I've merged it into next/soc.
 
 
 -Olof
