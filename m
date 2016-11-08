@@ -1,106 +1,69 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 08 Nov 2016 12:25:42 +0000
-Subject: [PATCH RFC 09/12] drm/i2c: tda998x: separate connector initialisation
+Date: Tue, 08 Nov 2016 12:25:52 +0000
+Subject: [PATCH RFC 11/12] drm/i2c: tda998x: remove complexity from
+ tda998x_audio_get_eld()
 In-Reply-To: <20161108122420.GP1041@n2100.armlinux.org.uk>
 References: <20161108122420.GP1041@n2100.armlinux.org.uk>
-Message-ID: <E1c45TC-0005k7-Fg@rmk-PC.armlinux.org.uk>
+Message-ID: <E1c45TM-0005kN-UB@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate out the connector initialisation from the rest of the drivers
-initialisation.
+tda998x_audio_get_eld() is needlessly complex - the connector associated
+with the encoder is always our own priv->connector.  Remove this
+complexity, but ensure that there are no races when copying out the ELD.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c | 46 ++++++++++++++++++++++-----------------
- 1 file changed, 26 insertions(+), 20 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 3f3e1f0137f8..af3dc5528663 100644
+index b1ad5ed5d645..226871e34442 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -996,6 +996,31 @@ const struct drm_connector_helper_funcs tda998x_connector_helper_funcs = {
- 	.best_encoder = tda998x_connector_best_encoder,
- };
+@@ -910,21 +910,13 @@ static int tda998x_audio_get_eld(struct device *dev, void *data,
+ 				 uint8_t *buf, size_t len)
+ {
+ 	struct tda998x_priv *priv = dev_get_drvdata(dev);
+-	struct drm_mode_config *config = &priv->encoder.dev->mode_config;
+-	struct drm_connector *connector;
+-	int ret = -ENODEV;
+-
+-	mutex_lock(&config->mutex);
+-	list_for_each_entry(connector, &config->connector_list, head) {
+-		if (&priv->encoder == connector->encoder) {
+-			memcpy(buf, connector->eld,
+-			       min(sizeof(connector->eld), len));
+-			ret = 0;
+-		}
+-	}
+-	mutex_unlock(&config->mutex);
  
-+static int tda998x_connector_init(struct tda998x_priv *priv,
-+				  struct drm_device *drm)
-+{
-+	struct drm_connector *connector = &priv->connector;
-+	int ret;
-+
-+	connector->interlace_allowed = 1;
-+
-+	if (priv->hdmi->irq)
-+		connector->polled = DRM_CONNECTOR_POLL_HPD;
-+	else
-+		connector->polled = DRM_CONNECTOR_POLL_CONNECT |
-+			DRM_CONNECTOR_POLL_DISCONNECT;
-+
-+	drm_connector_helper_add(connector, &tda998x_connector_helper_funcs);
-+	ret = drm_connector_init(drm, connector, &tda998x_connector_funcs,
-+				 DRM_MODE_CONNECTOR_HDMIA);
-+	if (ret)
-+		return ret;
-+
-+	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
+-	return ret;
++	mutex_lock(&priv->audio_mutex);
++	memcpy(buf, priv->connector.eld,
++	       min(sizeof(priv->connector.eld), len));
++	mutex_unlock(&priv->audio_mutex);
 +
 +	return 0;
-+}
-+
- /* DRM encoder functions */
- 
- static void tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
-@@ -1241,16 +1266,6 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 	mutex_unlock(&priv->audio_mutex);
  }
  
--static void tda998x_encoder_set_polling(struct tda998x_priv *priv,
--					struct drm_connector *connector)
--{
--	if (priv->hdmi->irq)
--		connector->polled = DRM_CONNECTOR_POLL_HPD;
--	else
--		connector->polled = DRM_CONNECTOR_POLL_CONNECT |
--			DRM_CONNECTOR_POLL_DISCONNECT;
--}
--
- static void tda998x_destroy(struct tda998x_priv *priv)
- {
- 	/* disable all IRQs and free the IRQ handler */
-@@ -1662,7 +1677,6 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- 		crtcs = 1 << 0;
+ static const struct hdmi_codec_ops audio_codec_ops = {
+@@ -975,6 +967,7 @@ static int tda998x_connector_fill_modes(struct drm_connector *connector,
+ 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
+ 	int ret;
+ 
++	mutex_lock(&priv->audio_mutex);
+ 	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+ 
+ 	if (connector->edid_blob_ptr) {
+@@ -984,6 +977,7 @@ static int tda998x_connector_fill_modes(struct drm_connector *connector,
+ 	} else {
+ 		priv->sink_has_audio = false;
  	}
++	mutex_unlock(&priv->audio_mutex);
  
--	priv->connector.interlace_allowed = 1;
- 	priv->encoder.possible_crtcs = crtcs;
- 
- 	ret = tda998x_create(client, priv);
-@@ -1672,24 +1686,16 @@ static int tda998x_bind(struct device *dev, struct device *master, void *data)
- 	if (!dev->of_node && params)
- 		tda998x_set_config(priv, params);
- 
--	tda998x_encoder_set_polling(priv, &priv->connector);
--
- 	drm_encoder_helper_add(&priv->encoder, &tda998x_encoder_helper_funcs);
- 	ret = drm_encoder_init(drm, &priv->encoder, &tda998x_encoder_funcs,
- 			       DRM_MODE_ENCODER_TMDS, NULL);
- 	if (ret)
- 		goto err_encoder;
- 
--	drm_connector_helper_add(&priv->connector,
--				 &tda998x_connector_helper_funcs);
--	ret = drm_connector_init(drm, &priv->connector,
--				 &tda998x_connector_funcs,
--				 DRM_MODE_CONNECTOR_HDMIA);
-+	ret = tda998x_connector_init(priv, drm);
- 	if (ret)
- 		goto err_connector;
- 
--	drm_mode_connector_attach_encoder(&priv->connector, &priv->encoder);
--
- 	return 0;
- 
- err_connector:
+ 	return ret;
+ }
 -- 
 2.7.4
