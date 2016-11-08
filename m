@@ -1,31 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 7 Nov 2016 19:18:44 -0800
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.10
-In-Reply-To: <cover.1478077617.git.horms+renesas@verge.net.au>
-References: <cover.1478077617.git.horms+renesas@verge.net.au>
-Message-ID: <20161108031844.GF2106@localhost>
+Date: Mon, 7 Nov 2016 19:21:21 -0800
+Subject: [GIT PULL] DaVinci fix for v4.9-rc
+In-Reply-To: <f57fbfde-89ff-fdac-2a04-e8a4788b4ee5@ti.com>
+References: <f57fbfde-89ff-fdac-2a04-e8a4788b4ee5@ti.com>
+Message-ID: <20161108032121.GG2106@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 10:24:05AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Nov 03, 2016 at 04:48:44PM +0530, Sekhar Nori wrote:
+> The following changes since commit a909d3e636995ba7c349e2ca5dbb528154d4ac30:
 > 
-> Please consider these Renesas ARM based SoC drivers updates for v4.10.
-> 
-> 
-> The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-> 
->   Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+>   Linux 4.9-rc3 (2016-10-29 13:52:02 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.10
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.9
 > 
-> for you to fetch changes up to 603311ba979fa5bbbf6a8961e5f7a27deafce1b4:
+> for you to fetch changes up to 36173c2d023bad4dbad6ed0e6e886fde10ec8f2f:
 > 
->   soc: renesas: rcar-sysc: add R8A7743 support (2016-10-17 08:21:20 +0200)
+>   ARM: davinci: da850: Fix pwm name matching (2016-11-01 15:30:03 +0530)
+> 
+> ----------------------------------------------------------------
+> This patch enables usage of multiple eCAP and eHRPWM devices
+> using PWM sysfs entries.
+> 
+> Without this patch, creation of multiple entries fails due
+> to name clash.
+> 
+> This is not a v4.9 regression but it will be nice to fix it
+> soon.
 
-Merged, thanks.
+Hi,
+
+Merged into next/fixes-non-critical -- we're getting some pushback on fixes
+for this cycle, so I'm being a bit more conservative.
 
 
 -Olof
