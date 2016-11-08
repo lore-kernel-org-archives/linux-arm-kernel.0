@@ -1,16 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Nov 2016 11:26:32 +0100
-Subject: [PATCH 1/1] pinctrl: st: st_pinconf_dbg_show wrong format string
-In-Reply-To: <20161105142515.4377-1-xypron.glpk@gmx.de>
-References: <20161105142515.4377-1-xypron.glpk@gmx.de>
-Message-ID: <CACRpkdb1OoFxYNwU9Zm=AcQuWNmogM0HsoiiWi=VNj-3HrCF1A@mail.gmail.com>
+Date: Tue, 8 Nov 2016 11:27:41 +0100
+Subject: [PATCH 1/1] pinctrl: st: st_pctl_dt_parse_groups simplify
+ expression
+In-Reply-To: <20161105143515.4668-1-xypron.glpk@gmx.de>
+References: <20161105143515.4668-1-xypron.glpk@gmx.de>
+Message-ID: <CACRpkdaDV4FjOtUoSwCAmbOnQqn8NZZ_nD2tpRoVoSPVePtKyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 5, 2016 at 3:25 PM, Heinrich Schuchardt <xypron.glpk@gmx.de> wrote:
+On Sat, Nov 5, 2016 at 3:35 PM, Heinrich Schuchardt <xypron.glpk@gmx.de> wrote:
 
-> function is defined as unsigned int.
-> So we need %u to print it.
+> for_each_property_of_node(pins, pp) checks that pp is not NULL.
+> So there is no need to check it inside the loop.
 >
 > Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
 
