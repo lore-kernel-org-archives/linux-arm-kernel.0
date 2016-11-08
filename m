@@ -1,127 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 8 Nov 2016 12:03:23 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <20161108120323.GC15297@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 08 Nov 2016 13:11:11 +0100
+Subject: [PATCH] staging: vc04_services: Add 32-bit compatibility ioctls
+In-Reply-To: <20161108004835.7458-1-mzoran@crowfest.net>
+References: <20161108004835.7458-1-mzoran@crowfest.net>
+Message-ID: <3832904.LMk9ToHSyP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
-> For arm64, there is no I/O space as other architectural platforms, such as
-> X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
-> such as Hip06, when accessing some legacy ISA devices connected to LPC, those
-> known port addresses are used to control the corresponding target devices, for
-> example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
-> normal MMIO mode in using.
+On Monday, November 7, 2016 4:48:35 PM CET Michael Zoran wrote:
+>  .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 269 +++++++++++++++++++++
+>  .../vc04_services/interface/vchiq_arm/vchiq_if.h   |  25 ++
+>  .../interface/vchiq_arm/vchiq_ioctl.h              | 102 ++++++++
+>  3 files changed, 396 insertions(+)
+> 
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> index 8fcd940..df343a0 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+> @@ -573,12 +573,40 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+>  				"vchiq: could not connect: %d", status);
+>  		break;
+>  
+> +#if defined(CONFIG_64BIT)
+> +	case VCHIQ_IOC_CREATE_SERVICE32:
+> +#endif
 
-This has nothing to do with arm64. Hardware with this kind of indirect
-bus access could be integrated with a variety of CPU architectures. It
-simply hasn't been, yet.
+>  	case VCHIQ_IOC_CREATE_SERVICE: {
+>  		VCHIQ_CREATE_SERVICE_T args;
+>  		USER_SERVICE_T *user_service = NULL;
+>  		void *userdata;
+>  		int srvstate;
+>  
+> +#if defined(CONFIG_64BIT)
+> +		if (cmd == VCHIQ_IOC_CREATE_SERVICE32) {
 
-> To drive these devices, this patch introduces a method named indirect-IO.
-> In this method the in/out pair in arch/arm64/include/asm/io.h will be
-> redefined. When upper layer drivers call in/out with those known legacy port
-> addresses to access the peripherals, the hooking functions corrresponding to
-> those target peripherals will be called. Through this way, those upper layer
-> drivers which depend on in/out can run on Hip06 without any changes.
+Better use CONFIG_COMPAT here. Also, a simple #ifdef is sufficient
+as neither of those symbols can be a loadable module.
 
-As above, this has nothing to do with arm64, and as such, should live in
-generic code, exactly as we would do if we had higher-level ISA
-accessor ops.
+Also, just move all the compat handling into the .compat_ioctl
+callback function and move out the common parts into helpers
+for simplicity.
 
-Regardless, given the multi-instance case, I don't think this is
-sufficient in general (and I think we need higher-level ISA accessors
-to handle the indirection).
-
-[...]
-
-> diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
-> new file mode 100644
-> index 0000000..6ae0787
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/extio.h
-
-> +#ifndef __LINUX_EXTIO_H
-> +#define __LINUX_EXTIO_H
-
-This doesn't match the file naming, __ASM_EXTIO_H would be consistent
-with other arm64 headers.
-
+> +#if defined(CONFIG_64BIT)
+> +		if (cmd == VCHIQ_IOC_AWAIT_COMPLETION32) {
+> +			VCHIQ_AWAIT_COMPLETION32_T args32;
 > +
-> +struct extio_ops {
-> +	unsigned long start;/* inclusive, sys io addr */
-> +	unsigned long end;/* inclusive, sys io addr */
-
-Please put whitespace before inline comments.
-
-[...]
-
-> +type in##bw(unsigned long addr)						\
-> +{									\
-> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> +			arm64_extio_ops->end < addr)			\
-> +		return read##bw(PCI_IOBASE + addr);			\
-> +	return arm64_extio_ops->pfin ?					\
-> +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,		\
-> +			addr, sizeof(type)) : -1;			\
-> +}									\
-> +									\
-> +void out##bw(type value, unsigned long addr)				\
-> +{									\
-> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> +			arm64_extio_ops->end < addr)			\
-> +		write##bw(value, PCI_IOBASE + addr);			\
-> +	else								\
-> +		if (arm64_extio_ops->pfout)				\
-> +			arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> +				addr, value, sizeof(type));		\
-> +}									\
-> +									\
-> +void ins##bw(unsigned long addr, void *buffer, unsigned int count)	\
-> +{									\
-> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> +			arm64_extio_ops->end < addr)			\
-> +		reads##bw(PCI_IOBASE + addr, buffer, count);		\
-> +	else								\
-> +		if (arm64_extio_ops->pfins)				\
-> +			arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
-> +				addr, buffer, sizeof(type), count);	\
-> +}									\
-> +									\
-> +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)	\
-> +{									\
-> +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
-> +			arm64_extio_ops->end < addr)			\
-> +		writes##bw(PCI_IOBASE + addr, buffer, count);		\
-> +	else								\
-> +		if (arm64_extio_ops->pfouts)				\
-> +			arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
-> +				addr, buffer, sizeof(type), count);	\
-> +}
+> +			if (copy_from_user(&args32, (const void __user *)arg,
+> +					   sizeof(args32)) != 0) {
+> +						ret = -EFAULT;
+> +						break;
+> +			}
 > +
+> +			args.count = args32.count;
+> +			args.buf =
+> +				(VCHIQ_COMPLETION_DATA_T *)(unsigned long)
+> +					args32.buf;
+> +			args.msgbufsize = args32.msgbufsize;
+> +			args.msgbufcount = args32.msgbufcount;
+> +			args.msgbufs = (void **)(unsigned long)args32.msgbufs;
+> +		} else
+> +#endif
 
-So all PCI I/O will be slowed down by irrelevant checks when this is
-enabled?
+There seems to be a bit of confusion about the address space
+here. args.buf should be a user space pointer, right?
 
-[...]
+> +#if defined(CONFIG_64BIT)
+> +typedef struct {
+> +	u32 data;
+> +	unsigned int size;
+> +} VCHIQ_ELEMENT32_T;
+> +#endif
 
-> +static inline void arm64_set_extops(struct extio_ops *ops)
-> +{
-> +	if (ops)
-> +		WRITE_ONCE(arm64_extio_ops, ops);
-> +}
+remove the typedefs, it just forces someone to clean it up later.
 
-Why WRITE_ONCE()?
+>  #define VCHIQ_IOC_CONNECT              _IO(VCHIQ_IOC_MAGIC,   0)
+>  #define VCHIQ_IOC_SHUTDOWN             _IO(VCHIQ_IOC_MAGIC,   1)
+>  #define VCHIQ_IOC_CREATE_SERVICE \
+>  	_IOWR(VCHIQ_IOC_MAGIC, 2, VCHIQ_CREATE_SERVICE_T)
+> +#if defined(CONFIG_64BIT)
+> +#define VCHIQ_IOC_CREATE_SERVICE32 \
+> +	_IOWR(VCHIQ_IOC_MAGIC, 2, VCHIQ_CREATE_SERVICE32_T)
+> +#endif
 
-Is this not protected/propagated by some synchronisation mechanism?
+No need for the #ifdef here.
 
-WRITE_ONCE() is not sufficient to ensure that this is consistently
-observed by readers, and regardless, I don't see READ_ONCE() anywhere in
-this patch.
-
-This looks very suspicious.
-
-Thanks,
-Mark.
+	Arnd
