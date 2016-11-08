@@ -1,100 +1,145 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 8 Nov 2016 17:05:50 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <20161108164948.GG20591@arm.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108161245.GD20591@arm.com>
- <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
- <20161108164948.GG20591@arm.com>
-Message-ID: <ecf81900-8116-2ef7-8ebb-e5739cc91de7@huawei.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 08 Nov 2016 17:19:47 +0000
+Subject: [PATCH v2 0/8] Add support for monitoring guest TLB operations
+In-Reply-To: <20161026174148.17172-1-punit.agrawal@arm.com> (Punit Agrawal's
+ message of "Wed, 26 Oct 2016 18:41:40 +0100")
+References: <20161026174148.17172-1-punit.agrawal@arm.com>
+Message-ID: <87vavx51os.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 16:49, Will Deacon wrote:
-> On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
->> On 08/11/2016 16:12, Will Deacon wrote:
->>> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
->>>> +static inline void arm64_set_extops(struct extio_ops *ops)
->>>> +{
->>>> +	if (ops)
->>>> +		WRITE_ONCE(arm64_extio_ops, ops);
->>>
->>> Why does this need to be WRITE_ONCE? You don't have READ_ONCE on the reader
->>> side. Also, what if multiple drivers want to set different ops for distinct
->>> address ranges?
->>
->> I think that the idea here is that we only have possibly one master in the
->> system which offers indirectIO backend, so another one could not possibly
->> re-set this value.
+[ +PeterZ who should've been cc'd but doesn't show up in get_maintainers ]
+
+Punit Agrawal <punit.agrawal@arm.com> writes:
+
+> Hi,
 >
-> Why is that assumption valid, and why does WRITE_ONCE help there? It's not
-> ONCE as in WARN_ONCE, more ONCE as in exactly-once-per-invocation.
-
-It's only valid based on the inherent assumption that all indirectIO is 
-redirected to one backend master, i.e. LPC driver.
-
-Anyway, right, I don't think that WRITE_ONCE is correct. Zhichang was 
-looking for something which would only allow the pointer to be written 
-once ever.
-
+> This is the fourth posting of this series. The biggest change compared
+> to previous vesion is the addition of support for ARM hosts. With the
+> addition of ARM support, the patchset is now more complete. Prior
+> versions can be found at [0][1][2].
 >
->>>> diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
->>>> new file mode 100644
->>>> index 0000000..647b3fa
->>>> --- /dev/null
->>>> +++ b/arch/arm64/kernel/extio.c
->>>> @@ -0,0 +1,27 @@
->>>> +/*
->>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public License
->>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>> + */
->>>> +
->>>> +#include <linux/io.h>
->>>> +
->>>> +struct extio_ops *arm64_extio_ops;
->>>> +
->>>> +
->>>> +BUILD_EXTIO(b, u8)
->>>> +
->>>> +BUILD_EXTIO(w, u16)
->>>> +
->>>> +BUILD_EXTIO(l, u32)
->>>
->>> Is there no way to make this slightly more generic, so that it can be
->>> re-used elsewhere? For example, if struct extio_ops was common, then
->>> you could have the singleton (which maybe should be an interval tree?),
->>> type definition, setter function and the BUILD_EXTIO invocations
->>> somewhere generic, rather than squirelled away in the arch backend.
->>>
->> The concern would be that some architecture which uses generic higher-level
->> ISA accessor ops, but have IO space, could be affected.
+> I would particularly appreciate feedback from maintainers on the
+> approach to tie the control of TLB monitoring with perf trace events
+> (Patch 3 and 4) especially if there are any suggestions on avoiding
+> (or reducing) the overhead of "perf trace" notifications.
 >
-> You're already adding a Kconfig symbol for this stuff, so you can keep
-> that if you don't want it on other architectures. I'm just arguing that
-> plumbing drivers directly into arch code via arm64_set_extops is not
-> something I'm particularly fond of, especially when it looks like it
-> could be avoided with a small amount of effort.
+> I looked at using regfunc/unregfunc tracepoint hooks but they don't
+> include the event context. But the bigger problem was that the
+> callbacks are only called on the first instance of simultaneously
+> executing perf stat invocations.
 
-We'll check this.
+I had a chance to discuss this patchset with SteveR and PeterZ at LPC
+and both don't like the idea of introducing notifications on perf trace
+event [un]registration.
 
-Cheers,
-John
+Peter suggested using the PMU interface to expose this functionality. As
+we want to monitor TLB instructions for for each VM, this will require
+creating a PMU per-VM. The PMU events can be extended in the future if
+monitoring of additional operations is supported and required.
+
+I'll post the next version with the above changes - please chime-in if
+you disagrees with this approach.
+
+Thanks,
+Punit
 
 >
-> Will
+> Changelog and previous cover-letter follows.
 >
-> .
+> Changes:
 >
+> v1 -> v2
+>
+> * New (Patch 6) - Add support for trapping and emulating TLB
+>   operations to ARM hosts
+> * Move common code to handle perf trace notifications to virt/kvm/arm
+> * Move tracepoint to include/trace/events/kvm.h
+> * Drop patch to introduce __tlbi helper as it is now merged
+> * Reorder patches
+>
+> RFC v2 -> v1
+> * Dropped the RFC tag
+> * Patch 2 - Use VM thread group id for identification
+> * Patch 4 - Update comment for clarity
+> * Patch 6 - Add comment explaining switch to hype-role when VHE is enabled
+> * Patch 7 - Add comment to clarify struct kvm_trace_hook
+>
+> RFC -> RFC v2
+> * Patch 4 - Rename left-over TLBI macro to __TLBI
+> * Patch 6 - Replace individual TLB operation emulation with
+>   invalidating all stage 1 TLB for the VM. TLB monitoring is expected
+>   to be a debug feature and performance is not critical.
+>
+> Although there are no PMU events to monitor TLB operations, ARMv8
+> supports trapping guest TLB maintenance operations to the
+> hypervisor. This trapping mechanism can be used to monitor the use of
+> guest TLB instructions.
+>
+> As taking a trap for every TLB operation can have significant
+> overhead, trapping should only be enabled -
+>
+> * on user request
+> * for the VM of interest
+>
+> This patchset adds support to listen to perf trace event state change
+> notifications. The notifications and associated context are then used
+> to enable trapping of guest TLB operations when requested by the
+> user. The trap handling generates trace events (kvm_tlb_invalidate)
+> which can already be counted using existing perf trace functionality.
+>
+> With this patchset, 'perf' tool when attached to a VM process can be
+> used to monitor the TLB operations. E.g., to monitor a VM with process
+> id 4166 -
+>
+> # perf stat -e "kvm:kvm_tlb_invalidate" -p 4166
+>
+> Perform some operations in VM (running 'make -j 7' on the kernel
+> sources in this instance). Breaking out of perf shows -
+>
+> Performance counter stats for process id '4166':
+>
+>          7,471,974      kvm:kvm_tlb_invalidate
+>
+>      374.235405282 seconds time elapsed
+>
+> Thanks,
+> Punit
+>
+> [0] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1210715.html
+> [1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1224353.html
+> [2] https://marc.info/?l=linux-kernel&m=147376184208258&w=2
+>
+> Mark Rutland (1):
+>   arm64/kvm: hyp: tlb: use __tlbi() helper
+>
+> Punit Agrawal (7):
+>   KVM: Track the pid of the VM process
+>   perf/trace: Add notification for perf trace events
+>   KVM: arm/arm64: Register perf trace event notifier
+>   KVM: Add event to trace tlb invalidations
+>   arm: KVM: Handle trappable TLB instructions
+>   arm64: KVM: Handle trappable TLB instructions
+>   KVM: arm/arm64: Enable selective trapping of TLB instructions
+>
+>  arch/arm/include/asm/kvm_asm.h    |   1 +
+>  arch/arm/include/asm/kvm_host.h   |   8 ++
+>  arch/arm/kvm/Kconfig              |   4 +
+>  arch/arm/kvm/Makefile             |   1 +
+>  arch/arm/kvm/arm.c                |   2 +
+>  arch/arm/kvm/coproc.c             |  55 ++++++++++++++
+>  arch/arm/kvm/hyp/tlb.c            |  33 ++++++++
+>  arch/arm64/include/asm/kvm_asm.h  |   1 +
+>  arch/arm64/include/asm/kvm_host.h |   8 ++
+>  arch/arm64/kvm/Kconfig            |   4 +
+>  arch/arm64/kvm/Makefile           |   1 +
+>  arch/arm64/kvm/hyp/tlb.c          |  87 +++++++++++++++++++--
+>  arch/arm64/kvm/sys_regs.c         |  81 ++++++++++++++++++++
+>  include/linux/kvm_host.h          |   1 +
+>  include/linux/trace_events.h      |   3 +
+>  include/trace/events/kvm.h        |  17 +++++
+>  kernel/trace/trace_event_perf.c   |  24 ++++++
+>  virt/kvm/arm/perf_trace.c         | 154 ++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/kvm_main.c               |   2 +
+>  19 files changed, 481 insertions(+), 6 deletions(-)
+>  create mode 100644 virt/kvm/arm/perf_trace.c
