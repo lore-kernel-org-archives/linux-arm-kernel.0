@@ -1,299 +1,166 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Tue, 8 Nov 2016 11:47:08 +0800
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for special ISA
-In-Reply-To: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Tue, 8 Nov 2016 03:44:02 +0000
+Subject: [PATCH 1/3] ARM: imx6u: add imx6ull support
+In-Reply-To: <20161105085951.GG5597@dragon>
+References: <1477969343-19887-1-git-send-email-peter.chen@nxp.com>
+ <1477969343-19887-2-git-send-email-peter.chen@nxp.com>
+ <20161105085951.GG5597@dragon>
+Message-ID: <HE1PR04MB1450E18DBDFB1EEB51B7A3ED8BA60@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch solves two issues:
-1) parse and get the right I/O range from DTS node whose parent does not
-define the corresponding ranges property;
+ 
 
-There are some special ISA/LPC devices that work on a specific I/O range where
-it is not correct to specify a ranges property in DTS parent node as cpu
-addresses translated from DTS node are only for memory space on some
-architectures, such as Arm64. Without the parent 'ranges' property, current
-of_translate_address() return an error.
-Here we add a fixup function, of_get_isa_indirect_io(). During the OF address
-translation, this fixup will be called to check the 'reg' address to be
-translating is for those sepcial ISA/LPC devices and get the I/O range
-directly from the 'reg' property.
+Thanks, Shawn. All comments will be adopted in v2.
 
-2) eliminate the I/O range conflict risk with PCI/PCIE leagecy I/O device;
+Peter
 
-The current __of_address_to_resource() always translates the I/O range to PIO.
-But this processing is not suitable for our ISA/LPC devices whose I/O range is
-not cpu address(Arnd had stressed this in his comments on V2,V3 patch-set).
-Here, we bypass the mapping between cpu address and PIO for the special
-ISA/LPC devices. But to drive these ISA/LPC devices, a I/O port address below
-PCIBIOS_MIN_IO is needed by in*/out*(). Which means there is conflict risk
-between I/O range of [0, PCIBIOS_MIN_IO) and PCI/PCIE legacy I/O range of [0,
-IO_SPACE_LIMIT).
-To avoid the I/O conflict, this patch reserve the I/O range below
-PCIBIOS_MIN_IO.
-
-Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
----
- .../arm/hisilicon/hisilicon-low-pin-count.txt      | 31 ++++++++++++
- arch/arm64/include/asm/io.h                        |  6 +++
- arch/arm64/kernel/extio.c                          | 25 ++++++++++
- drivers/of/address.c                               | 56 +++++++++++++++++++++-
- drivers/pci/pci.c                                  |  6 +--
- include/linux/of_address.h                         | 17 +++++++
- include/linux/pci.h                                |  8 ++++
- 7 files changed, 145 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-new file mode 100644
-index 0000000..13c8ddd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-@@ -0,0 +1,31 @@
-+Hisilicon Hip06 low-pin-count device
-+  Usually LPC controller is part of PCI host bridge, so the legacy ISA ports
-+  locate on LPC bus can be accessed direclty. But some SoCs have independent
-+  LPC controller, and access the legacy ports by triggering LPC I/O cycles.
-+  Hisilicon Hip06 implements this LPC device.
-+
-+Required properties:
-+- compatible: should be "hisilicon,low-pin-count"
-+- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
-+- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
-+- reg: base memory range where the register set of this device is mapped.
-+
-+Note:
-+  The node name before '@' must be "isa" to represent the binding stick to the
-+  ISA/EISA binding specification.
-+
-+Example:
-+
-+isa at a01b0000 {
-+	compatible = "hisilicom,low-pin-count";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	reg = <0x0 0xa01b0000 0x0 0x1000>;
-+
-+	ipmi0: bt at e4 {
-+		compatible = "ipmi-bt";
-+		device_type = "ipmi";
-+		reg = <0x01 0xe4 0x04>;
-+		status = "disabled";
-+	};
-+};
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 136735d..c26b7cc 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -175,6 +175,12 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- #define outsl outsl
- 
- DECLARE_EXTIO(l, u32)
-+
-+#define indirect_io_enabled indirect_io_enabled
-+extern bool indirect_io_enabled(void);
-+
-+#define addr_is_indirect_io addr_is_indirect_io
-+extern int addr_is_indirect_io(u64 taddr);
- #endif
- 
- 
-diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
-index 647b3fa..3d45fa8 100644
---- a/arch/arm64/kernel/extio.c
-+++ b/arch/arm64/kernel/extio.c
-@@ -19,6 +19,31 @@
- 
- struct extio_ops *arm64_extio_ops;
- 
-+/**
-+ * indirect_io_enabled - check whether indirectIO is enabled.
-+ *	arm64_extio_ops will be set only when indirectIO mechanism had been
-+ *	initialized.
-+ *
-+ * Returns true when indirectIO is enabled.
-+ */
-+bool indirect_io_enabled(void)
-+{
-+	return arm64_extio_ops ? true : false;
-+}
-+
-+/**
-+ * addr_is_indirect_io - check whether the input taddr is for indirectIO.
-+ * @taddr: the io address to be checked.
-+ *
-+ * Returns 1 when taddr is in the range; otherwise return 0.
-+ */
-+int addr_is_indirect_io(u64 taddr)
-+{
-+	if (arm64_extio_ops->start > taddr || arm64_extio_ops->end < taddr)
-+		return 0;
-+
-+	return 1;
-+}
- 
- BUILD_EXTIO(b, u8)
- 
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 02b2903..cc2a05d 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -479,6 +479,50 @@ static int of_empty_ranges_quirk(struct device_node *np)
- 	return false;
- }
- 
-+
-+/*
-+ * of_isa_indirect_io - get the IO address from some isa reg property value.
-+ *	For some isa/lpc devices, no ranges property in ancestor node.
-+ *	The device addresses are described directly in their regs property.
-+ *	This fixup function will be called to get the IO address of isa/lpc
-+ *	devices when the normal of_translation failed.
-+ *
-+ * @parent:	points to the parent dts node;
-+ * @bus:		points to the of_bus which can be used to parse address;
-+ * @addr:	the address from reg property;
-+ * @na:		the address cell counter of @addr;
-+ * @presult:	store the address paresed from @addr;
-+ *
-+ * return 1 when successfully get the I/O address;
-+ * 0 will return for some failures.
-+ */
-+static int of_get_isa_indirect_io(struct device_node *parent,
-+				struct of_bus *bus, __be32 *addr,
-+				int na, u64 *presult)
-+{
-+	unsigned int flags;
-+	unsigned int rlen;
-+
-+	/* whether support indirectIO */
-+	if (!indirect_io_enabled())
-+		return 0;
-+
-+	if (!of_bus_isa_match(parent))
-+		return 0;
-+
-+	flags = bus->get_flags(addr);
-+	if (!(flags & IORESOURCE_IO))
-+		return 0;
-+
-+	/* there is ranges property, apply the normal translation directly. */
-+	if (of_get_property(parent, "ranges", &rlen))
-+		return 0;
-+
-+	*presult = of_read_number(addr + 1, na - 1);
-+	/* this fixup is only valid for specific I/O range. */
-+	return addr_is_indirect_io(*presult);
-+}
-+
- static int of_translate_one(struct device_node *parent, struct of_bus *bus,
- 			    struct of_bus *pbus, __be32 *addr,
- 			    int na, int ns, int pna, const char *rprop)
-@@ -595,6 +639,15 @@ static u64 __of_translate_address(struct device_node *dev,
- 			result = of_read_number(addr, na);
- 			break;
- 		}
-+		/*
-+		 * For indirectIO device which has no ranges property, get
-+		 * the address from reg directly.
-+		 */
-+		if (of_get_isa_indirect_io(dev, bus, addr, na, &result)) {
-+			pr_debug("isa indirectIO matched(%s)..addr = 0x%llx\n",
-+				of_node_full_name(dev), result);
-+			break;
-+		}
- 
- 		/* Get new parent bus and counts */
- 		pbus = of_match_bus(parent);
-@@ -688,8 +741,9 @@ static int __of_address_to_resource(struct device_node *dev,
- 	if (taddr == OF_BAD_ADDR)
- 		return -EINVAL;
- 	memset(r, 0, sizeof(struct resource));
--	if (flags & IORESOURCE_IO) {
-+	if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
- 		unsigned long port;
-+
- 		port = pci_address_to_pio(taddr);
- 		if (port == (unsigned long)-1)
- 			return -EINVAL;
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index ba34907..1a08511 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3263,7 +3263,7 @@ int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
- 
- #ifdef PCI_IOBASE
- 	struct io_range *range;
--	resource_size_t allocated_size = 0;
-+	resource_size_t allocated_size = PCIBIOS_MIN_IO;
- 
- 	/* check if the range hasn't been previously recorded */
- 	spin_lock(&io_range_lock);
-@@ -3312,7 +3312,7 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
- 
- #ifdef PCI_IOBASE
- 	struct io_range *range;
--	resource_size_t allocated_size = 0;
-+	resource_size_t allocated_size = PCIBIOS_MIN_IO;
- 
- 	if (pio > IO_SPACE_LIMIT)
- 		return address;
-@@ -3335,7 +3335,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
- {
- #ifdef PCI_IOBASE
- 	struct io_range *res;
--	resource_size_t offset = 0;
-+	resource_size_t offset = PCIBIOS_MIN_IO;
- 	unsigned long addr = -1;
- 
- 	spin_lock(&io_range_lock);
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index 3786473..deec469 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -24,6 +24,23 @@ struct of_pci_range {
- #define for_each_of_pci_range(parser, range) \
- 	for (; of_pci_range_parser_one(parser, range);)
- 
-+
-+#ifndef indirect_io_enabled
-+#define indirect_io_enabled indirect_io_enabled
-+static inline bool indirect_io_enabled(void)
-+{
-+	return false;
-+}
-+#endif
-+
-+#ifndef addr_is_indirect_io
-+#define addr_is_indirect_io addr_is_indirect_io
-+static inline int addr_is_indirect_io(u64 taddr)
-+{
-+	return 0;
-+}
-+#endif
-+
- /* Translate a DMA address from device space to CPU space */
- extern u64 of_translate_dma_address(struct device_node *dev,
- 				    const __be32 *in_addr);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 0e49f70..7f6bbb6 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -2130,4 +2130,12 @@ static inline bool pci_ari_enabled(struct pci_bus *bus)
- /* provide the legacy pci_dma_* API */
- #include <linux/pci-dma-compat.h>
- 
-+/*
-+ * define this macro here to refrain from compilation error for some
-+ * platforms. Please keep this macro at the end of this header file.
-+ */
-+#ifndef PCIBIOS_MIN_IO
-+#define PCIBIOS_MIN_IO		0
-+#endif
-+
- #endif /* LINUX_PCI_H */
--- 
-1.9.1
+>>
+>> In this patch, it moves common dts between imx6ul* and imx6ull* as new
+>> files named imx6u*, and the specific part for imx6ul and imx6ull are
+>> individual file.
+>
+>No.  That only helps churn the tree and git history.  Please keep using imx6ul.dtsi and
+>simply have it be included by imx6ull.dtsi.
+>
+>>
+>> Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile              |   3 +-
+>>  arch/arm/boot/dts/imx6u-14x14-evk.dts   | 475 ++++++++++++++++
+>>  arch/arm/boot/dts/imx6u-14x14-evk.dtsi  | 487 +++++++++++++++++
+>>  arch/arm/boot/dts/imx6u.dtsi            | 942
+>++++++++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/imx6ul-14x14-evk.dts  | 479 +---------------
+>>  arch/arm/boot/dts/imx6ul.dtsi           | 936 +------------------------------
+>>  arch/arm/boot/dts/imx6ull-14x14-evk.dts |  17 +
+>>  arch/arm/boot/dts/imx6ull-pinfunc.h     |  57 ++
+>>  arch/arm/boot/dts/imx6ull.dtsi          |  10 +
+>>  9 files changed, 1993 insertions(+), 1413 deletions(-)  create mode
+>> 100644 arch/arm/boot/dts/imx6u-14x14-evk.dts
+>>  create mode 100644 arch/arm/boot/dts/imx6u-14x14-evk.dtsi
+>>  create mode 100644 arch/arm/boot/dts/imx6u.dtsi  create mode 100644
+>> arch/arm/boot/dts/imx6ull-14x14-evk.dts
+>>  create mode 100644 arch/arm/boot/dts/imx6ull-pinfunc.h
+>>  create mode 100644 arch/arm/boot/dts/imx6ull.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index befcd26..3d6e199 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -423,7 +423,8 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
+>>  	imx6ul-pico-hobbit.dtb \
+>>  	imx6ul-tx6ul-0010.dtb \
+>>  	imx6ul-tx6ul-0011.dtb \
+>> -	imx6ul-tx6ul-mainboard.dtb
+>> +	imx6ul-tx6ul-mainboard.dtb \
+>> +	imx6ull-14x14-evk.dtb
+>>  dtb-$(CONFIG_SOC_IMX7D) += \
+>>  	imx7d-cl-som-imx7.dtb \
+>>  	imx7d-colibri-eval-v3.dtb \
+>> diff --git a/arch/arm/boot/dts/imx6u-14x14-evk.dts
+>> b/arch/arm/boot/dts/imx6u-14x14-evk.dts
+>> new file mode 100644
+>> index 0000000..ba8614c
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6u-14x14-evk.dts
+>> @@ -0,0 +1,475 @@
+>> +/*
+>> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> +modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>
+>For new DT files, please consider to use GPL/X11 dual license.  You should be able
+>to find a lot of examples in arch/arm/boot/dts.
+>
+><snip>
+>
+>> diff --git a/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> new file mode 100644
+>> index 0000000..fca0036
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6ull-pinfunc.h
+>> @@ -0,0 +1,57 @@
+>> +/*
+>> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> +modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +#ifndef __DTS_IMX6ULL_PINFUNC_H
+>> +#define __DTS_IMX6ULL_PINFUNC_H
+>> +
+>> +#include "imx6ul-pinfunc.h"
+>> +/*
+>> + * The pin function ID is a tuple of
+>> + * <mux_reg conf_reg input_reg mux_mode input_val>  */
+>> +#define MX6UL_PAD_ENET2_RX_DATA0__EPDC_SDDO08
+>0x00E4 0x0370 0x0000 0x9 0x0
+>
+>Can we name these imx6ull specific defines MX6ULL_xxx, so that we know they
+>should only be used in imx6ull specific dts?
+>
+>> +#define MX6UL_PAD_ENET2_RX_DATA1__EPDC_SDDO09
+>0x00E8 0x0374 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_RX_EN__EPDC_SDDO10                       0x00EC
+>0x0378 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_TX_DATA0__EPDC_SDDO11
+>0x00F0 0x037C 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_TX_DATA1__EPDC_SDDO12
+>0x00F4 0x0380 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_TX_EN__EPDC_SDDO13                       0x00F8
+>0x0384 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_TX_CLK__EPDC_SDDO14                      0x00FC
+>0x0388 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_ENET2_RX_ER__EPDC_SDDO15                       0x0100
+>0x038C 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_CLK__EPDC_SDCLK                            0x0104
+>0x0390 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_ENABLE__EPDC_SDLE                          0x0108
+>0x0394 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_HSYNC__EPDC_SDOE                           0x010C
+>0x0398 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_VSYNC__EPDC_SDCE0                          0x0110
+>0x039C 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_RESET__EPDC_GDOE                           0x0114
+>0x03A0 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA00__EPDC_SDDO00                        0x0118
+>0x03A4 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA01__EPDC_SDDO01                        0x011C
+>0x03A8 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA02__EPDC_SDDO02                        0x0120
+>0x03AC 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA03__EPDC_SDDO03                        0x0124
+>0x03B0 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA04__EPDC_SDDO04                        0x0128
+>0x03B4 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA05__EPDC_SDDO05                        0x012C
+>0x03B8 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA06__EPDC_SDDO06                        0x0130
+>0x03BC 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA07__EPDC_SDDO07                        0x0134
+>0x03C0 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA14__EPDC_SDSHR                         0x0150
+>0x03DC 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA15__EPDC_GDRL                          0x0154
+>0x03E0 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA16__EPDC_GDCLK                         0x0158
+>0x03E4 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA17__EPDC_GDSP                          0x015C
+>0x03E8 0x0000 0x9 0x0
+>> +#define MX6UL_PAD_LCD_DATA21__EPDC_SDCE1                         0x016C
+>0x03F8 0x0000 0x9 0x0
+>> +
+>
+>Why this new line?
+>
+>Shawn
+>
