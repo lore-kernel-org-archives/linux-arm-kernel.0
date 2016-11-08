@@ -1,201 +1,77 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Tue, 8 Nov 2016 15:02:09 +0800
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <2127881.qmAR1XgW9F@wuerfel>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <1478101374-18778-4-git-send-email-anurup.m@huawei.com>
- <2127881.qmAR1XgW9F@wuerfel>
-Message-ID: <58217871.6050609@huawei.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 8 Nov 2016 15:08:53 +0800
+Subject: [PATCH 2/2] mm: hugetlb: support gigantic surplus pages
+In-Reply-To: <20161108021929.GA982@sha-win-210.asiapac.arm.com>
+References: <1478141499-13825-1-git-send-email-shijie.huang@arm.com>
+ <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+ <20161107162504.17591806@thinkpad>
+ <20161108021929.GA982@sha-win-210.asiapac.arm.com>
+Message-ID: <20161108070851.GA15044@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/11/7 21:26, Arnd Bergmann wrote:
-> On Wednesday, November 2, 2016 11:42:46 AM CET Anurup M wrote:
->> From: Tan Xiaojun <tanxiaojun@huawei.com>
->>
->> 	The Hisilicon Djtag is an independent component which connects
->> 	with some other components in the SoC by Debug Bus. This driver
->> 	can be configured to access the registers of connecting components
->> 	(like L3 cache) during real time debugging.
+On Tue, Nov 08, 2016 at 10:19:30AM +0800, Huang Shijie wrote:
+> On Mon, Nov 07, 2016 at 04:25:04PM +0100, Gerald Schaefer wrote:
+> > On Thu, 3 Nov 2016 10:51:38 +0800
+> > Huang Shijie <shijie.huang@arm.com> wrote:
+> > 
+> > > When testing the gigantic page whose order is too large for the buddy
+> > > allocator, the libhugetlbfs test case "counter.sh" will fail.
+> > > 
+> > > The failure is caused by:
+> > >  1) kernel fails to allocate a gigantic page for the surplus case.
+> > >     And the gather_surplus_pages() will return NULL in the end.
+> > > 
+> > >  2) The condition checks for "over-commit" is wrong.
+> > > 
+> > > This patch adds code to allocate the gigantic page in the
+> > > __alloc_huge_page(). After this patch, gather_surplus_pages()
+> > > can return a gigantic page for the surplus case.
+> > > 
+> > > This patch also changes the condition checks for:
+> > >      return_unused_surplus_pages()
+> > >      nr_overcommit_hugepages_store()
+> > > 
+> > > After this patch, the counter.sh can pass for the gigantic page.
+> > > 
+> > > Acked-by: Steve Capper <steve.capper@arm.com>
+> > > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> > > ---
+> > >  mm/hugetlb.c | 15 ++++++++++-----
+> > >  1 file changed, 10 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> > > index 0bf4444..2b67aff 100644
+> > > --- a/mm/hugetlb.c
+> > > +++ b/mm/hugetlb.c
+> > > @@ -1574,7 +1574,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
+> > >  	struct page *page;
+> > >  	unsigned int r_nid;
+> > > 
+> > > -	if (hstate_is_gigantic(h))
+> > > +	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+> > >  		return NULL;
+> > 
+> > Is it really possible to stumble over gigantic pages w/o having
+> > gigantic_page_supported()?
+> > 
+> > Also, I've just tried this on s390 and counter.sh still fails after these
+> > patches, and it should fail on all archs as long as you use the gigantic
+> I guess the failure you met is caused by the libhugetlbfs itself, there are
+> several bugs in the libhugetlbfs. I have a patch set for the
+> libhugetlbfs too. I will send it as soon as possible.
 > 
-> The formatting of the text seems odd, please remove the leading spaces.
-> 
+> > hugepage size as default hugepage size. This is because you only changed
+> > nr_overcommit_hugepages_store(), which handles nr_overcommit_hugepages
+> > in sysfs, and missed hugetlb_overcommit_handler() which handles
+> > /proc/sys/vm/nr_overcommit_hugepages for the default sized hugepages.
+> This is wrong. :)
+Sorry, I was wrong :). The counters test does call the /proc/sys/vm/nr_overcommit_hugepages.
+But in the arm64, it does not trigger a fail for the counters test.
+In an other word, I did not change the hugetlb_overcommit_handler(),
+the counters.sh also can pass in arm64. 
 
-Sorry for that. We will fix it.
+I will look at the lockdep issue.
 
->>  drivers/soc/Kconfig                 |   1 +
->>  drivers/soc/Makefile                |   1 +
->>  drivers/soc/hisilicon/Kconfig       |  12 +
->>  drivers/soc/hisilicon/Makefile      |   1 +
->>  drivers/soc/hisilicon/djtag.c       | 639 ++++++++++++++++++++++++++++++++++++
->>  include/linux/soc/hisilicon/djtag.h |  38 +++
-> 
-> Do you expect other drivers to be added that reference this interface?
-> If not, or if you are unsure, just put all of it under drivers/perf
-> so we don't introduce a global API that has only one user.
-> 
-
-OK. For now, this suggestion sounds good.
-
->> +
->> +#include <linux/bitops.h>
->> +#include <linux/init.h>
->> +#include <linux/list.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/spinlock.h>
->> +
->> +#include <asm-generic/delay.h>
-> 
-> Never include files from asm-generic directly except from
-> an architecture specific asm/*.h header file.
-> 
-> 
-
-OK. Sorry for that.
-
->> +DEFINE_IDR(djtag_hosts_idr);
-> 
-> make this static
-> 
-
-OK.
-
->> +static void djtag_read32_relaxed(void __iomem *regs_base, u32 off, u32 *value)
->> +{
->> +	void __iomem *reg_addr = regs_base + off;
->> +
->> +	*value = readl_relaxed(reg_addr);
->> +}
->> +
->> +static void djtag_write32(void __iomem *regs_base, u32 off, u32 val)
->> +{
->> +	void __iomem *reg_addr = regs_base + off;
->> +
->> +	writel(val, reg_addr);
->> +}
-> 
-> This looks like an odd combination of interfaces.
-> Why can the reads be "relaxed" when the writes can not?
-> 
-> Generally speaking, I'd advise to always use non-relaxed accessors
-> unless there is a strong performance reason, and in that case there
-> should be a comment explaining the use at each of the callers
-> of a relaxed accessor.
-> 
-
-Yes, it is our mistake.
-
->> +	/* ensure the djtag operation is done */
->> +	do {
->> +		djtag_read32_relaxed(regs_base, SC_DJTAG_MSTR_START_EN_EX, &rd);
->> +
->> +		if (!(rd & DJTAG_MSTR_START_EN_EX))
->> +			break;
->> +
->> +		udelay(1);
->> +	} while (timeout--);
-> 
-> This one is obviously not performance critical at all, so use a non-relaxed
-> accessor. Same for the other two in this function.
-> 
-> Are these functions ever called from atomic context? If yes, please document
-> from what context they can be called, otherwise please consider changing
-> the udelay calls into sleeping waits.
-> 
-
-Yes, this is not reentrant. 
-
->> +int hisi_djtag_writel(struct hisi_djtag_client *client, u32 offset, u32 mod_sel,
->> +							u32 mod_mask, u32 val)
->> +{
->> +	void __iomem *reg_map = client->host->sysctl_reg_map;
->> +	unsigned long flags;
->> +	int ret = 0;
->> +
->> +	spin_lock_irqsave(&client->host->lock, flags);
->> +	ret = client->host->djtag_readwrite(reg_map, offset, mod_sel, mod_mask,
->> +					true, val, 0, NULL);
->> +	if (ret)
->> +		pr_err("djtag_writel: error! ret=%d\n", ret);
->> +	spin_unlock_irqrestore(&client->host->lock, flags);
->> +
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(hisi_djtag_writel);
-> 
-> That would of course imply changing the spinlock to a mutex here as well.
-> 
->> +static const struct of_device_id djtag_of_match[] = {
->> +	/* for hip05(D02) cpu die */
->> +	{ .compatible = "hisilicon,hip05-cpu-djtag-v1",
->> +		.data = (void *)djtag_readwrite_v1 },
->> +	/* for hip05(D02) io die */
->> +	{ .compatible = "hisilicon,hip05-io-djtag-v1",
->> +		.data = (void *)djtag_readwrite_v1 },
->> +	/* for hip06(D03) cpu die */
->> +	{ .compatible = "hisilicon,hip06-cpu-djtag-v1",
->> +		.data = (void *)djtag_readwrite_v1 },
->> +	/* for hip06(D03) io die */
->> +	{ .compatible = "hisilicon,hip06-io-djtag-v2",
->> +		.data = (void *)djtag_readwrite_v2 },
->> +	/* for hip07(D05) cpu die */
->> +	{ .compatible = "hisilicon,hip07-cpu-djtag-v2",
->> +		.data = (void *)djtag_readwrite_v2 },
->> +	/* for hip07(D05) io die */
->> +	{ .compatible = "hisilicon,hip07-io-djtag-v2",
->> +		.data = (void *)djtag_readwrite_v2 },
->> +	{},
->> +};
-> 
-> If these are backwards compatible, just mark them as compatible in DT,
-> e.g. hip06 can use
-> 
-> 	compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
-> 
-> so you can tell the difference if you need to, but the driver only has to
-> list the oldest one here.
-> 
-> What is the difference between the cpu and io djtag interfaces?
-> 
-> I think you can also drop the '(void *)'.
-> 
-
-OK. We will consider it.
-
-Thanks.
-Xiaojun.
-
->> +static void djtag_register_devices(struct hisi_djtag_host *host)
->> +{
->> +	struct device_node *node;
->> +	struct hisi_djtag_client *client;
->> +
->> +	if (!host->of_node)
->> +		return;
->> +
->> +	for_each_available_child_of_node(host->of_node, node) {
->> +		if (of_node_test_and_set_flag(node, OF_POPULATED))
->> +			continue;
->> +		client = hisi_djtag_of_register_device(host, node);
->> +		list_add(&client->next, &host->client_list);
->> +	}
->> +}
-> 
-> Can you explain your thoughts behind creating a new bus type
-> and adding the child devices manually rather than using
-> platform_device structures with of_platform_populate()?
-> 
-> Do you expect to see other implementations of this bus type
-> with incompatible bus drivers?
-> 
-> 	Arnd
-> 
-> 
-> .
-> 
+Thanks
+Huang Shijie
