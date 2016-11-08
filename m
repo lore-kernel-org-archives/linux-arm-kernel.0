@@ -1,57 +1,72 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 8 Nov 2016 13:44:37 +0800
-Subject: [PATCH v2 0/2] arm64: fix the bugs found in the hugetlb test
-Message-ID: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
+Date: Tue, 8 Nov 2016 13:44:38 +0800
+Subject: [PATCH v2 1/2] arm64: hugetlb: remove the wrong pmd check in
+ find_num_contig()
+In-Reply-To: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
+References: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <1478583879-14654-2-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(1) Backgroud
-   For the arm64, the hugetlb page size can be 32M (PMD + Contiguous bit).
-   In the 4K page environment, the max page order is 10 (max_order - 1),
-   so 32M page is the gigantic page.    
+The find_num_contig() will return 1 when the pmd is not present.
+It will cause a kernel dead loop in the following scenaro:
 
-   The arm64 MMU supports a Contiguous bit which is a hint that the PTE
-   is one of a set of contiguous entries which can be cached in a single
-   TLB entry.  Please refer to the arm64v8 mannul :
-       DDI0487A_f_armv8_arm.pdf (in page D4-1811)
+   1.) pmd entry is not present.
 
-(2) The bugs   
-   After I tested the libhugetlbfs, I found several bugs in arm64 code.
-   This patch set has all the bug fixes for the arm64.
-   
-(3) The test result in the Softiron and Juno-r1 boards:
+   2.) the page fault occurs:
+       ... hugetlb_fault() --> hugetlb_no_page() --> set_huge_pte_at()
 
-   This detail test result shows below (both the "make func" & "make stress"):
+   3.) set_huge_pte_at() will only set the first PMD entry, since the
+       find_num_contig just return 1 in this case. So the PMD entries
+       are all empty except the first one.
 
-    4KB granule:
+   4.) when kernel accesses the address mapped by the second PMD entry,
+       a new page fault occurs:
+       ... hugetlb_fault() --> huge_ptep_set_access_flags()
 
-        1.1) PTE + Contiguous bit : 4K x 16 = 64K (per huge page size)
-             Test result          : PASS
+       The second PMD entry is still empty now.
 
-        1.2) PMD                  : 2M x  1 = 2M  (per huge page size)
-             Test result          : PASS
+   5.) When the kernel returns, the access will cause a page fault again.
+       The kernel will run like the "4)" above.
+       We will see a dead loop since here.
 
-        1.3) PMD + Contiguous bit : 2M x 16 = 32M (per huge page size)
-             Test result          : PASS
+The dead loop is caught in the 32M hugetlb page (2M PMD + Contiguous bit).
 
-    64KB granule:
+This patch removes wrong pmd check, and fixes this dead loop.
 
-        3.1) PTE + Contiguous bit : 64K x 32 = 2M (per huge page size)
-             Test result          : PASS
+This patch also removes the redundant checks for PGD/PUD in
+the find_num_contig().
 
-        3.2) PMD + Contiguous bit : 512M x 32 = 16G (per huge page size)
-             Test result          : no hardware to support this test
+Acked-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-v1 -- > v2:
-    1.) remove the redundant checks for PGD/PUD
-
-
-Huang Shijie (2):
-  arm64: hugetlb: remove the wrong pmd check in find_num_contig()
-  arm64: hugetlb: fix the wrong address for several functions
-
- arch/arm64/mm/hugetlbpage.c | 20 ++++----------------
- 1 file changed, 4 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 2e49bd2..b0d3f8b 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -51,20 +51,8 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+ 	*pgsize = PAGE_SIZE;
+ 	if (!pte_cont(pte))
+ 		return 1;
+-	if (!pgd_present(*pgd)) {
+-		VM_BUG_ON(!pgd_present(*pgd));
+-		return 1;
+-	}
+ 	pud = pud_offset(pgd, addr);
+-	if (!pud_present(*pud)) {
+-		VM_BUG_ON(!pud_present(*pud));
+-		return 1;
+-	}
+ 	pmd = pmd_offset(pud, addr);
+-	if (!pmd_present(*pmd)) {
+-		VM_BUG_ON(!pmd_present(*pmd));
+-		return 1;
+-	}
+ 	if ((pte_t *)pmd == ptep) {
+ 		*pgsize = PMD_SIZE;
+ 		return CONT_PMDS;
 -- 
 2.5.5
