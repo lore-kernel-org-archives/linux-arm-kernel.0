@@ -1,40 +1,150 @@
 From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Wed, 09 Nov 2016 10:12:59 +1100
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <20161108114953.GB15297@leverpostej>
+Date: Wed, 09 Nov 2016 10:16:42 +1100
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <20161108120323.GC15297@leverpostej>
 References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
- <20161108114953.GB15297@leverpostej>
-Message-ID: <1478646779.7430.66.camel@kernel.crashing.org>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108120323.GC15297@leverpostej>
+Message-ID: <1478647002.7430.69.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-11-08 at 11:49 +0000, Mark Rutland wrote:
+On Tue, 2016-11-08 at 12:03 +0000, Mark Rutland wrote:
+> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
+> > 
+> > For arm64, there is no I/O space as other architectural platforms, such as
+> > X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+> > such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+> > known port addresses are used to control the corresponding target devices, for
+> > example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+> > normal MMIO mode in using.
 > 
-> My understanding of ISA (which may be flawed) is that it's not part of
-> the PCI host bridge, but rather on x86 it happens to share the IO space
-> with PCI.
+> This has nothing to do with arm64. Hardware with this kind of indirect
+> bus access could be integrated with a variety of CPU architectures. It
+> simply hasn't been, yet.
 
-Sort-of. On some systems it actually goes through PCI and there's a
-PCI->ISA bridge that uses substractive decoding to the legacy devices.
+On some ppc's we also use similar indirect access methods for IOs. We
+have a generic infrastructure for re-routing some memory or IO regions
+to hooks.
 
-> So, how about this becomes:
+On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
+firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
+
+> > To drive these devices, this patch introduces a method named indirect-IO.
+> > In this method the in/out pair in arch/arm64/include/asm/io.h will be
+> > redefined. When upper layer drivers call in/out with those known legacy port
+> > addresses to access the peripherals, the hooking functions corrresponding to
+> > those target peripherals will be called. Through this way, those upper layer
+> > drivers which depend on in/out can run on Hip06 without any changes.
 > 
-> ? Hisilicon Hip06 SoCs implement a Low Pin Count (LPC) controller, which
-> ? provides access to some legacy ISA devices.
+> As above, this has nothing to do with arm64, and as such, should live in
+> generic code, exactly as we would do if we had higher-level ISA
+> accessor ops.
 > 
-> I believe that we could theoretically have multiple independent LPC/ISA
-> busses, as is possible with PCI on !x86 systems. If the current ISA code
-> assumes a singleton bus, I think that's something that needs to be fixed
-> up more generically.
+> Regardless, given the multi-instance case, I don't think this is
+> sufficient in general (and I think we need higher-level ISA accessors
+> to handle the indirection).
+
+Multi-instance with IO is tricky to do generically because archs already
+have all sort of hacks to deal with the fact that inb/outb don't require
+an explicit ioremap, so an IO resource can take all sort of shape depending
+on the arch.
+
+Overall it boils down to applying some kind of per-instance "offset" to
+the IO port number though.
+
+> [...]
 > 
-> I don't see why we should need any architecture-specific code here. Why
-> can we not fix up the ISA bus code in drivers/of/address.c such that it
-> handles multiple ISA bus instances, and translates all sub-device
-> addresses relative to the specific bus instance?
-
-What in that code prevents that today ?
-
-Cheers,
-Ben.
+> > 
+> > diff --git a/arch/arm64/include/asm/extio.h b/arch/arm64/include/asm/extio.h
+> > new file mode 100644
+> > index 0000000..6ae0787
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/extio.h
+> 
+> > 
+> > +#ifndef __LINUX_EXTIO_H
+> > +#define __LINUX_EXTIO_H
+> 
+> This doesn't match the file naming, __ASM_EXTIO_H would be consistent
+> with other arm64 headers.
+> 
+> > 
+> > +
+> > +struct extio_ops {
+> > > > +	unsigned long start;/* inclusive, sys io addr */
+> > > > +	unsigned long end;/* inclusive, sys io addr */
+> 
+> Please put whitespace before inline comments.
+> 
+> [...]
+> 
+> > 
+> > > > +type in##bw(unsigned long addr)						\
+> > > > +{									\
+> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
+> > > > > > +			arm64_extio_ops->end < addr)			\
+> > > > > > +		return read##bw(PCI_IOBASE + addr);			\
+> > > > > > +	return arm64_extio_ops->pfin ?					\
+> > > > > > +		arm64_extio_ops->pfin(arm64_extio_ops->devpara,		\
+> > > > > > +			addr, sizeof(type)) : -1;			\
+> > > > +}									\
+> > > > +									\
+> > > > +void out##bw(type value, unsigned long addr)				\
+> > > > +{									\
+> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
+> > > > > > +			arm64_extio_ops->end < addr)			\
+> > > > > > +		write##bw(value, PCI_IOBASE + addr);			\
+> > > > > > +	else								\
+> > > > > > +		if (arm64_extio_ops->pfout)				\
+> > > > +			arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
+> > > > > > +				addr, value, sizeof(type));		\
+> > > > +}									\
+> > > > +									\
+> > > > +void ins##bw(unsigned long addr, void *buffer, unsigned int count)	\
+> > > > +{									\
+> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
+> > > > > > +			arm64_extio_ops->end < addr)			\
+> > > > > > +		reads##bw(PCI_IOBASE + addr, buffer, count);		\
+> > > > > > +	else								\
+> > > > > > +		if (arm64_extio_ops->pfins)				\
+> > > > +			arm64_extio_ops->pfins(arm64_extio_ops->devpara,\
+> > > > > > +				addr, buffer, sizeof(type), count);	\
+> > > > +}									\
+> > > > +									\
+> > > > +void outs##bw(unsigned long addr, const void *buffer, unsigned int count)	\
+> > > > +{									\
+> > > > > > +	if (!arm64_extio_ops || arm64_extio_ops->start > addr ||	\
+> > > > > > +			arm64_extio_ops->end < addr)			\
+> > > > > > +		writes##bw(PCI_IOBASE + addr, buffer, count);		\
+> > > > > > +	else								\
+> > > > > > +		if (arm64_extio_ops->pfouts)				\
+> > > > +			arm64_extio_ops->pfouts(arm64_extio_ops->devpara,\
+> > > > > > +				addr, buffer, sizeof(type), count);	\
+> > +}
+> > +
+> 
+> So all PCI I/O will be slowed down by irrelevant checks when this is
+> enabled?
+> 
+> [...]
+> 
+> > 
+> > +static inline void arm64_set_extops(struct extio_ops *ops)
+> > +{
+> > > > +	if (ops)
+> > > > +		WRITE_ONCE(arm64_extio_ops, ops);
+> > +}
+> 
+> Why WRITE_ONCE()?
+> 
+> Is this not protected/propagated by some synchronisation mechanism?
+> 
+> WRITE_ONCE() is not sufficient to ensure that this is consistently
+> observed by readers, and regardless, I don't see READ_ONCE() anywhere in
+> this patch.
+> 
+> This looks very suspicious.
+> 
+> Thanks,
+> Mark.
