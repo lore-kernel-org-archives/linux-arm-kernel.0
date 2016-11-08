@@ -1,130 +1,48 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 8 Nov 2016 18:48:52 +0100
-Subject: [PATCH v2] spi: atmel: use managed resource for gpio chip select
-Message-ID: <20161108174852.14311-1-nicolas.ferre@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 8 Nov 2016 17:48:51 +0100
+Subject: [PATCH] arm64: dts: marvell: add unique identifiers for Armada
+ A8k SPI controllers
+In-Reply-To: <1478622692-18441-1-git-send-email-mw@semihalf.com>
+References: <1478622692-18441-1-git-send-email-mw@semihalf.com>
+Message-ID: <20161108174851.2cd8efb4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the managed gpio CS pin request so that we avoid having trouble
-in the cleanup code.
-In fact, if module was configured with DT, cleanup code released
-invalid pin.  Since resource wasn't freed, module cannot be reinserted.
+Hello,
 
-This require to extract the gpio request call from the "setup" function
-and call it in the appropriate probe function.
+On Tue,  8 Nov 2016 17:31:32 +0100, Marcin Wojtas wrote:
+> Enabling SPI controllers, which are attached to different busses
+> inside an SoC, may result in overlapping enumeration and cause
+> sysfs registration failure. Example log after enabling two
+> controllers on Armada 8040 SoC with same identifiers:
+> 
+> [    3.740415] sysfs: cannot create duplicate filename
+> '/class/spi_master/spi0'
+> [    3.747510] ------------[ cut here ]------------
+> [    3.752145] WARNING: at fs/sysfs/dir.c:31
+> [...]
+> [    4.002299] orion_spi: probe of f4700600.spi failed with error -17
+> 
+> spi-orion driver offers dedicated DT property ('cell-index'), that
+> allow setting unique identifiers. Recently added support for CP110-slave
+> HW block introduced two new SPI controllers' nodes with same ID as
+> ones from CP110-master.
+> 
+> This commit fixes the issue by assigning different 'cell-index' values
+> for CP110-slave SPI controllers.
+> 
+> Fixes: 4eef78a0091b ("arm64: dts: marvell: add description for the slave
+> CP110 in Armada 8K")
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Reported-by: Alexander Morozov <linux@meltdown.ru>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: fix devm_gpio_request location: the setup code for device was not proper
-    location. Move it to the probe function and add needed DT routines to
-    handle all CS gpio specified.
+It's sad that we need to hardcode those indexes in the Device Tree
+(which by no means are a description of the HW by the way), but that's
+what the SPI framework expects I believe. Therefore:
 
- drivers/spi/spi-atmel.c | 50 ++++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 39 insertions(+), 11 deletions(-)
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 32683a13dd60..a60925614480 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -24,6 +24,7 @@
- 
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/of_gpio.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/pm_runtime.h>
- 
-@@ -1204,7 +1205,6 @@ static int atmel_spi_setup(struct spi_device *spi)
- 	u32			csr;
- 	unsigned int		bits = spi->bits_per_word;
- 	unsigned int		npcs_pin;
--	int			ret;
- 
- 	as = spi_master_get_devdata(spi->master);
- 
-@@ -1247,16 +1247,9 @@ static int atmel_spi_setup(struct spi_device *spi)
- 		if (!asd)
- 			return -ENOMEM;
- 
--		if (as->use_cs_gpios) {
--			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
--			if (ret) {
--				kfree(asd);
--				return ret;
--			}
--
-+		if (as->use_cs_gpios)
- 			gpio_direction_output(npcs_pin,
- 					      !(spi->mode & SPI_CS_HIGH));
--		}
- 
- 		asd->npcs_pin = npcs_pin;
- 		spi->controller_state = asd;
-@@ -1471,13 +1464,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
- static void atmel_spi_cleanup(struct spi_device *spi)
- {
- 	struct atmel_spi_device	*asd = spi->controller_state;
--	unsigned		gpio = (unsigned long) spi->controller_data;
- 
- 	if (!asd)
- 		return;
- 
- 	spi->controller_state = NULL;
--	gpio_free(gpio);
- 	kfree(asd);
- }
- 
-@@ -1499,6 +1490,39 @@ static void atmel_get_caps(struct atmel_spi *as)
- }
- 
- /*-------------------------------------------------------------------------*/
-+static int atmel_spi_gpio_cs(struct platform_device *pdev)
-+{
-+	struct spi_master	*master = platform_get_drvdata(pdev);
-+	struct atmel_spi	*as = spi_master_get_devdata(master);
-+	struct device_node	*np = master->dev.of_node;
-+	int			i;
-+	int			ret = 0;
-+	int			nb = 0;
-+
-+	if (!as->use_cs_gpios)
-+		return 0;
-+
-+	if (!np)
-+		return 0;
-+
-+	nb = of_gpio_named_count(np, "cs-gpios");
-+	for (i = 0; i < nb; i++) {
-+		int cs_gpio = of_get_named_gpio(pdev->dev.of_node,
-+						"cs-gpios", i);
-+
-+			if (cs_gpio == -EPROBE_DEFER)
-+				return cs_gpio;
-+
-+			if (gpio_is_valid(cs_gpio)) {
-+				ret = devm_gpio_request(&pdev->dev, cs_gpio,
-+							dev_name(&pdev->dev));
-+				if (ret)
-+					return ret;
-+			}
-+	}
-+
-+	return 0;
-+}
- 
- static int atmel_spi_probe(struct platform_device *pdev)
- {
-@@ -1577,6 +1601,10 @@ static int atmel_spi_probe(struct platform_device *pdev)
- 		master->num_chipselect = 4;
- 	}
- 
-+	ret = atmel_spi_gpio_cs(pdev);
-+	if (ret)
-+		goto out_unmap_regs;
-+
- 	as->use_dma = false;
- 	as->use_pdc = false;
- 	if (as->caps.has_dma_support) {
+Thomas
 -- 
-2.9.0
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
