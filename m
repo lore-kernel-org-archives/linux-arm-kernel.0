@@ -1,53 +1,52 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 7 Nov 2016 16:40:14 -0700
-Subject: [PATCH] media: s5p-mfc include buffer size in error message
-In-Reply-To: <b1a9fa02-6821-7637-881c-a31719e891c9@samsung.com>
-References: <20161018004337.26831-1-shuahkh@osg.samsung.com>
- <CGME20161104100504eucas1p196456ab351847ffabb60f51e76eab707@eucas1p1.samsung.com>
- <b1a9fa02-6821-7637-881c-a31719e891c9@samsung.com>
-Message-ID: <8078d0e6-246b-e8f3-ec62-41e9d543909f@osg.samsung.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Mon, 7 Nov 2016 17:05:38 -0700
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
+References: <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+ <20161028210015.GA19901@live.com>
+ <20161028220546.GA19693@obsidianresearch.com>
+ <20161029000926.GA30169@live.com>
+ <20161031162327.GA28817@obsidianresearch.com>
+ <7117d821-a1b1-7c07-806a-483be99131e6@xilinx.com>
+ <20161101153326.GA6193@obsidianresearch.com>
+ <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
+Message-ID: <20161108000538.GA13959@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2016 04:05 AM, Sylwester Nawrocki wrote:
-> On 10/18/2016 02:43 AM, Shuah Khan wrote:
->> Include buffer size in s5p_mfc_alloc_priv_buf() the error message when it
->> fails to allocate the buffer. Remove the debug message that does the same.
->>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> ---
->>  drivers/media/platform/s5p-mfc/s5p_mfc_opr.c | 5 ++---
->>  1 file changed, 2 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
->> index 1e72502..eee16a1 100644
->> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
->> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.c
->> @@ -40,12 +40,11 @@ void s5p_mfc_init_regs(struct s5p_mfc_dev *dev)
->>  int s5p_mfc_alloc_priv_buf(struct device *dev, dma_addr_t base,
->>  					struct s5p_mfc_priv_buf *b)
->>  {
->> -	mfc_debug(3, "Allocating priv: %zu\n", b->size);
+On Tue, Nov 01, 2016 at 06:48:42PM +0100, Michal Simek wrote:
+> On 1.11.2016 16:33, Jason Gunthorpe wrote:
+> > On Tue, Nov 01, 2016 at 07:39:22AM +0100, Michal Simek wrote:
+> > 
+> >> Regarding BIT and BIN format. This support is in vivado for a long time
+> >> and it is up2you what you want to support. We have removed that BIT
+> >> support and not doing any swap by saying only BIN format is supported.
+> > 
+> > BIN is not supported, it needs a swap as well.
+> > 
+> > Moritz has it right, you have to use vivado to create a PROM image to be
+> > compatible with the driver.
 > 
-> How about keeping this debug message, I think it would be useful
-> to leave that information in the debug logs.
+> hm than that's bad.
 
-Sent v2 with just the error message change.
+IMHO, Xilinx made an error with Zynq DevC, the DMA does not accept a
+memory image that is output by the usual Xilinx tools. It should have
+accepted a byte swapped input.
 
-thanks,
--- Shuah
+I think Moritz is right, the fpgamgr *should not* alter the bitstream
+in any way. This is important for future work to make the DMA do
+gather and avoid the really bad high-order allocation.
 
-> 
->>  	b->virt = dma_alloc_coherent(dev, b->size, &b->dma, GFP_KERNEL);
->>  
->>  	if (!b->virt) {
->> -		mfc_err("Allocating private buffer failed\n");
->> +		mfc_err("Allocating private buffer of size %zu failed\n",
->> +			b->size);
->>  		return -ENOMEM;
->>  	}
-> 
-> --
-> Thanks,
-> Sylwester
-> 
+So users will have to provide byte swapped .bin files - the vivado
+write_cfgmem command will produce them - this all needs to be
+documented.
+
+Also, I think Punnaiah (?) was telling me that bitstream encryption
+does not work - DevC must be told the bitstream is encrypted.
+That seems like something that needs work at the fpgamgr level - and
+maybe this driver should auto-detect encryption by looking at the
+bitfile (as is typical for Xilinx programming)
+
+Jason
