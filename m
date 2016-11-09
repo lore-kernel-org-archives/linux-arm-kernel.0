@@ -1,114 +1,109 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 9 Nov 2016 11:54:20 +0530
-Subject: [PATCH V3 0/8] IOMMU probe deferral support
-In-Reply-To: <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
-References: <1475600632-21289-1-git-send-email-sricharan@codeaurora.org>
- <60ee8066-f167-e9df-ae3e-4138f1133bad@arm.com>
- <003a01d22f97$82534c70$86f9e550$@codeaurora.org>
- <421e2b14-0231-d376-02a0-097423120b3d@arm.com>
- <006f01d236ae$61751c40$245f54c0$@codeaurora.org>
- <9f36244f-62d4-08e3-d64a-2b04ad4dc2e0@arm.com>
-Message-ID: <002001d23a51$ecb01390$c6103ab0$@codeaurora.org>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Wed, 9 Nov 2016 15:08:14 +0800
+Subject: [PATCH v2 2/2] mm: hugetlb: support gigantic surplus pages
+In-Reply-To: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+References: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+Message-ID: <1478675294-2507-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+When testing the gigantic page whose order is too large for the buddy
+allocator, the libhugetlbfs test case "counter.sh" will fail.
 
->On 04/11/16 15:16, Sricharan wrote:
->> Hi Robin,
->>
->>>>> Yikes, on second look, that definitely shouldn't be happening.
->>>>> Everything below is probably the resulting fallout.
->>>>
->>>> [   40.206703] vfio-pci 0000:08:00.0: Failed to setup iommu ops
->>>>
->>>> I think the above print which says "failed to setup iommu_ops"
->>>> because the call ops->add_device failed in of_pci_iommu_configure
->>>> is the reason for the failure, in my case i simply do not get this even with
->>>> your scripts. ops->add_device succeeds in the rebind as well. So still
->>>> checking what could be happening in your case.
->>>
->>> I was looking at your code base from [1].The ops->add_device
->>> callback from of_pci_iommu_configure on the rebind is the
->>> one which is causing the failure. But not able to spot out
->>>from code which point is causing the failure. It would be very helpful
->>> if i can know which is the return value from the add_device callback
->>> or point inside add_device callback which fails in your setup.
->>>
->>>
->>> [1] git://linux-arm.org/linux-rm iommu/misc
->>
->> With little more try, i saw an issue where i had an failure
->> similar to what you reported. The issue happens when multiple
->> devices fall in to same group due to matching sids. I ended up
->> doing a fix like below and it would be nice to verify if it is the same
->> that we are seeing in your setup and if the fix makes a difference ?
->>
->> From: Sricharan R <sricharan@codeaurora.org>
->> Date: Fri, 4 Nov 2016 20:28:49 +0530
->> Subject: [PATCH] iommu/arm-smmu: Fix group's reference counting
->>
->> iommu_group_get_for_dev which gets called in the add_device
->> callback, increases the reference count of the iommu_group,
->> so we do an iommu_group_put after that. iommu_group_get_for_dev
->> inturn calls device_group callback and in the case of arm-smmu
->> we call generic_device_group/pci_device_group which takes
->> care of increasing the group's reference. But when we return
->> an already existing group(when multiple devices have same group)
->> the reference is not incremented, resulting in issues when the
->> remove_device callback for the devices is invoked.
->> Fixing the same here.
->
->Bah, yes, this does look like my fault - after flip-flopping between
->about 3 different ways to keep refcounts for the S2CR entries, none of
->which would quite work, I ripped it all out but apparently still got
->things wrong, oh well. Thanks for figuring it out.
- >
->On the probe-deferral angle, whilst it's useful to have uncovered this
->bug, I don't think we should actually be calling remove_device() from
->DMA teardown. I think it's preferable from a user perspective if group
->numbering remains stable, rather than changing depending on the order in
->which they unbind/rebind VFIO drivers. I'm really keen to try and get
->this in shape for 4.10, so I've taken the liberty of hacking up my own
->branch (iommu/defer) based on v3 - would you mind taking a look at the
->two "iommu/of:" commits to see what you think? (Ignore the PCI changes
->to your later patches - that was an experiment which didn't really work out)
+The failure is caused by:
+ 1) kernel fails to allocate a gigantic page for the surplus case.
+    And the gather_surplus_pages() will return NULL in the end.
 
-Ok, will take a look at this now and respond more on this.
+ 2) The condition checks for "over-commit" is wrong.
 
->
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu.c | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index 71ce4b6..a1d0b3c 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -1516,8 +1516,10 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
->>  		group = smmu->s2crs[idx].group;
->>  	}
->>
->> -	if (group)
->> +	if (group) {
->> +		iommu_group_get_by_id(iommu_group_id(group));
->>  		return group;
->
->This might as well just be inline, i.e.:
->
->		return iommu_group_get_by_id(iommu_group_id(group));
->
->It's a shame we have to go all round the houses when we have the group
->right there, but this is probably the most expedient fix. I guess we can
->extend the API with some sort of iommu_group_get(group) overload in
->future if we really want to.
->
+This patch adds code to allocate the gigantic page in the
+__alloc_huge_page(). After this patch, gather_surplus_pages()
+can return a gigantic page for the surplus case.
 
-ok, i can send this fix separately then. Otherwise, Will was suggesting on the
-other thread that there should probably be a separate API to increment
-the group refcount or get the group from the existing aliasing device.
-As per me adding the api, looks like another option or post the above ?
+This patch changes the condition checks for:
+     return_unused_surplus_pages()
+     nr_overcommit_hugepages_store()
+     hugetlb_overcommit_handler()
 
-Regards,
- Sricharan
+This patch also set @nid with proper value when NUMA_NO_NODE is
+passed to alloc_gigantic_page().
+
+After this patch, the counter.sh can pass for the gigantic page.
+
+Acked-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+  1. fix the wrong check in hugetlb_overcommit_handler();
+  2. try to fix the s390 issue.
+---
+ mm/hugetlb.c | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index 9fdfc24..5dbfd62 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -1095,6 +1095,9 @@ static struct page *alloc_gigantic_page(int nid, unsigned int order)
+ 	unsigned long ret, pfn, flags;
+ 	struct zone *z;
+ 
++	if (nid == NUMA_NO_NODE)
++		nid = numa_mem_id();
++
+ 	z = NODE_DATA(nid)->node_zones;
+ 	for (; z - NODE_DATA(nid)->node_zones < MAX_NR_ZONES; z++) {
+ 		spin_lock_irqsave(&z->lock, flags);
+@@ -1578,7 +1581,7 @@ static struct page *__alloc_huge_page(struct hstate *h,
+ 	struct page *page;
+ 	unsigned int r_nid;
+ 
+-	if (hstate_is_gigantic(h))
++	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+ 		return NULL;
+ 
+ 	/*
+@@ -1623,7 +1626,13 @@ static struct page *__alloc_huge_page(struct hstate *h,
+ 	}
+ 	spin_unlock(&hugetlb_lock);
+ 
+-	page = __hugetlb_alloc_buddy_huge_page(h, vma, addr, nid);
++	if (hstate_is_gigantic(h))  {
++		page = alloc_gigantic_page(nid, huge_page_order(h));
++		if (page)
++			prep_compound_gigantic_page(page, huge_page_order(h));
++	} else {
++		page = __hugetlb_alloc_buddy_huge_page(h, vma, addr, nid);
++	}
+ 
+ 	spin_lock(&hugetlb_lock);
+ 	if (page) {
+@@ -1790,8 +1799,7 @@ static void return_unused_surplus_pages(struct hstate *h,
+ 	/* Uncommit the reservation */
+ 	h->resv_huge_pages -= unused_resv_pages;
+ 
+-	/* Cannot return gigantic pages currently */
+-	if (hstate_is_gigantic(h))
++	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+ 		return;
+ 
+ 	nr_pages = min(unused_resv_pages, h->surplus_huge_pages);
+@@ -2443,7 +2451,7 @@ static ssize_t nr_overcommit_hugepages_store(struct kobject *kobj,
+ 	unsigned long input;
+ 	struct hstate *h = kobj_to_hstate(kobj, NULL);
+ 
+-	if (hstate_is_gigantic(h))
++	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+ 		return -EINVAL;
+ 
+ 	err = kstrtoul(buf, 10, &input);
+@@ -2884,7 +2892,7 @@ int hugetlb_overcommit_handler(struct ctl_table *table, int write,
+ 
+ 	tmp = h->nr_overcommit_huge_pages;
+ 
+-	if (write && hstate_is_gigantic(h))
++	if (write && hstate_is_gigantic(h) && !gigantic_page_supported())
+ 		return -EINVAL;
+ 
+ 	table->data = &tmp;
+-- 
+2.1.4
