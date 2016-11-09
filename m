@@ -1,36 +1,51 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 8 Nov 2016 18:23:29 -0600
-Subject: [PATCH] ARM: socfpga_defconfig: enable FS configs to support
- Angstrom filesystem
-In-Reply-To: <2911351.Izg0zkPBzd@wuerfel>
-References: <20161108224750.30242-1-dinguyen@kernel.org>
- <2911351.Izg0zkPBzd@wuerfel>
-Message-ID: <CADhT+wenXK0w4+yrBs0j4wEFZiQM3kbUKPVF660tGne-SH_qbg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 08 Nov 2016 16:50:24 -0800
+Subject: [PATCH v2 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C
+ bus bitbang for HDMI
+In-Reply-To: <20161108173315.GA16082@Sanchayan-Arch.localdomain>
+References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
+ <20161022032559.GL30578@tiger>
+ <3d2b6dfd-c03c-e635-8dc1-2dc9ac454f5a@mentor.com>
+ <20161108173315.GA16082@Sanchayan-Arch.localdomain>
+Message-ID: <57268103e8fabf344723eae99b45ec7d@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 8, 2016 at 4:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday, November 8, 2016 4:47:50 PM CET Dinh Nguyen wrote:
->> Enables:
+On 2016-11-08 09:33, maitysanchayan at gmail.com wrote:
+> Hello Shawn,
+> 
+> On 16-10-22 15:43:04, Vladimir Zapolskiy wrote:
+>> Hi Shawn,
 >>
->> CONFIG_AUTOFS4_FS=y
->> CONFIG_NFSD=y
->> CONFIG_NFS_V3_ACL=y
->> CONFIG_NFSD_V3_ACL=y
->> CONFIG_NFSD_V4=y
+>> On 10/22/2016 06:25 AM, Shawn Guo wrote:
+>> > On Mon, Sep 19, 2016 at 10:41:51AM +0530, Sanchayan Maity wrote:
+>> > > Remove the use of DDC I2C bus bitbang to support reading of EDID
+>> > > and rely on support from internal HDMI I2C master controller instead.
+>> > > As a result remove the device tree property ddc-i2c-bus.
+>> > >
+>> > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> >
+>> > I think that the dw-hdmi i2c support [1] is a prerequisite of this
+>> > patch.  I do not see it lands on v4.9-rc1.  Or am I missing something?
+>> >
+>> > Shawn
+>> >
+>> > [1] https://patchwork.kernel.org/patch/9296883/
+>> >
 >>
->> Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
->> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>> I'm adding Philipp to Cc, since he is the last one who tested the change
+>> and helped me to push the change to the mainline:
 >>
->
-> No objections to the patch, but the changelog should not state what
-> the patch clearly shows already but instead it should explain why
-> you do this.
->
-> The subject line mentions "to support Angstrom filesystem", but
-> it's not clear (at least not to me) what that filesystem is.
->
+>>   https://lists.freedesktop.org/archives/dri-devel/2016-September/118569.html
+>>
+>> The problem is that there is no official DW HDMI bridge maintainer, may be
+>> you can review the change, and if you find it satisfactory push it through
+>> ARM/iMX tree.
+> 
+> Shawn, is it okay if that patch goes through your ARM/iMX tree?
 
-Thanks for the review Arnd. I'll update with a better changelog message.
+I don't think it makes sense that the DRM bridge changes go through
+Shawn's tree. Dave should merge Philipps pull request...
 
-Dinh
+--
+Stefan
