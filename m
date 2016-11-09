@@ -1,83 +1,38 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 9 Nov 2016 19:27:47 +0100
-Subject: [v16, 0/7] Fix eSDHC host version register bug
-In-Reply-To: <1478661252-42439-1-git-send-email-yangbo.lu@nxp.com>
-References: <1478661252-42439-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <CAPDyKFrcAN_pqgtGaUanfB2zh97zGcL23m5VDtJ3g==NJeRrfA@mail.gmail.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 9 Nov 2016 10:38:38 -0800
+Subject: [PATCH v2 2/2] mmc: sdhci-iproc: support standard byte register
+ accesses
+In-Reply-To: <c94dc018-5a2d-d50b-5746-43ae7fc258ce@intel.com>
+References: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
+ <1478018277-10097-3-git-send-email-scott.branden@broadcom.com>
+ <c94dc018-5a2d-d50b-5746-43ae7fc258ce@intel.com>
+Message-ID: <132c772b-d4b9-c4b6-2eca-0393e7c995f9@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- i2c-list
+Hi Adrian/Ulf,
 
-On 9 November 2016 at 04:14, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
-> eSDHC controller. To match the SoC version and revision, 15 previous version
-> patchsets had tried many methods but all of them were rejected by reviewers.
-> Such as
->         - dts compatible method
->         - syscon method
->         - ifdef PPC method
->         - GUTS driver getting SVR method
-> Anrd suggested a soc_device_match method in v10, and this is the only available
-> method left now. This v11 patchset introduces the soc_device_match interface in
-> soc driver.
+On 16-11-08 01:55 AM, Adrian Hunter wrote:
+> On 01/11/16 18:37, Scott Branden wrote:
+>> Add bytewise register accesses support for newer versions of IPROC
+>> SDHCI controllers.
+>> Previous sdhci-iproc versions of SDIO controllers
+>> (such as Raspberry Pi and Cygnus) only allowed for 32-bit register
+>> accesses.
+>>
+>> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+>> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 >
-> The first four patches of Yangbo are to add the GUTS driver. This is used to
-> register a soc device which contain soc version and revision information.
-> The other three patches introduce the soc_device_match method in soc driver
-> and apply it on esdhc driver to fix this bug.
->
-> ---
-> Changes for v15:
->         - Dropped patch 'dt: bindings: update Freescale DCFG compatible'
->           since the work had been done by below patch on ShawnGuo's linux tree.
->           'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG
->            and DCFG'
->         - Fixed error code issue in guts driver
-> Changes for v16:
->         - Dropped patch 'powerpc/fsl: move mpc85xx.h to include/linux/fsl'
->         - Added a bug-fix patch from Geert
-> ---
->
-> Arnd Bergmann (1):
->   base: soc: introduce soc_device_match() interface
->
-> Geert Uytterhoeven (1):
->   base: soc: Check for NULL SoC device attributes
->
-> Yangbo Lu (5):
->   ARM64: dts: ls2080a: add device configuration node
->   dt: bindings: move guts devicetree doc out of powerpc directory
->   soc: fsl: add GUTS driver for QorIQ platforms
->   MAINTAINERS: add entry for Freescale SoC drivers
->   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
->
->  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
->  MAINTAINERS                                        |  11 +-
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
->  drivers/base/Kconfig                               |   1 +
->  drivers/base/soc.c                                 |  70 ++++++
->  drivers/mmc/host/Kconfig                           |   1 +
->  drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
->  drivers/soc/Kconfig                                |   3 +-
->  drivers/soc/fsl/Kconfig                            |  18 ++
->  drivers/soc/fsl/Makefile                           |   1 +
->  drivers/soc/fsl/guts.c                             | 236 +++++++++++++++++++++
->  include/linux/fsl/guts.h                           | 125 ++++++-----
->  include/linux/sys_soc.h                            |   3 +
->  13 files changed, 447 insertions(+), 51 deletions(-)
->  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
->  create mode 100644 drivers/soc/fsl/Kconfig
->  create mode 100644 drivers/soc/fsl/guts.c
->
-> --
-> 2.1.0.27.g96db324
->
+> This is unchanged from V1 which I acked, so:
+I updated the binding name in the documentation but forgot to change it 
+in this patch.  Now that Rob has ack'd the binding documentation I will 
+send out an updated patch with binding string in the code matching the 
+ack'd documentation.
 
-Thanks, applied on my mmc tree for next!
+>
+> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+>
+With the minor change I will add your ack to the next version I send out.
 
-I noticed that some DT compatibles weren't documented, according to
-checkpatch. Please fix that asap!
-
-Kind regards
-Ulf Hansson
+Thanks,
+  Scott
