@@ -1,112 +1,76 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 09 Nov 2016 09:53:25 +0200
-Subject: [PATCH 01/30] usb: dwc2: Deprecate g-use-dma binding
-In-Reply-To: <6e90b835-73b1-3970-24a4-eab72381b469@synopsys.com>
-References: <cover.1478558343.git.johnyoun@synopsys.com>
- <e99e9d8df77884671f94734109a1a8d76a0222c1.1478558343.git.johnyoun@synopsys.com>
- <87wpgeibdh.fsf@linux.intel.com>
- <6e90b835-73b1-3970-24a4-eab72381b469@synopsys.com>
-Message-ID: <87zil9gkcq.fsf@linux.intel.com>
+From: radoslaw.pietrzyk@gmail.com (=?UTF-8?Q?Rados=C5=82aw_Pietrzyk?=)
+Date: Wed, 9 Nov 2016 09:10:25 +0100
+Subject: [PATCH 1/6] clk: stm32f4: Add PLL_I2S & PLL_SAI for STM32F429/469
+ boards
+In-Reply-To: <0368d067-461d-2edb-5561-9717934e0dde@st.com>
+References: <1478523943-23142-1-git-send-email-gabriel.fernandez@st.com>
+ <1478523943-23142-2-git-send-email-gabriel.fernandez@st.com>
+ <CAFvLkMQxvo=2Ak033n2XkPgdDfU5DLCMF7dj487QFB0e7WceCQ@mail.gmail.com>
+ <ebadfacf-73fb-01a6-791a-324daad5e695@st.com>
+ <CAFvLkMSwwyoi8Vb_-+6dViB8PaBRUoCZYBcrzDjgX9EJnv_mvQ@mail.gmail.com>
+ <0368d067-461d-2edb-5561-9717934e0dde@st.com>
+Message-ID: <CAFvLkMSUg8=nYY9Zm2Q4ZW=GqUaczK_TA5b5jjb45vYyhoVLZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I would expect that VCO clock will force recalculation for all its
+children if I am not mistaken.
 
-Hi,
-
-John Youn <John.Youn@synopsys.com> writes:
-> On 11/8/2016 1:12 AM, Felipe Balbi wrote:
->> 
->> Hi,
->> 
->> John Youn <johnyoun@synopsys.com> writes:
->>> Add a vendor prefix and make the name more consistent by renaming it to
->>> "snps,gadget-dma-enable".
+2016-11-08 17:19 GMT+01:00 Gabriel Fernandez <gabriel.fernandez@st.com>:
+> On 11/08/2016 09:52 AM, Rados?aw Pietrzyk wrote:
+>>
+>> 2016-11-08 9:35 GMT+01:00 Gabriel Fernandez <gabriel.fernandez@st.com>:
 >>>
->>> Signed-off-by: John Youn <johnyoun@synopsys.com>
->>> ---
->>>  Documentation/devicetree/bindings/usb/dwc2.txt | 5 ++++-
->>>  arch/arm/boot/dts/rk3036.dtsi                  | 2 +-
->>>  arch/arm/boot/dts/rk3288.dtsi                  | 2 +-
->>>  arch/arm/boot/dts/rk3xxx.dtsi                  | 2 +-
->>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 2 +-
->>>  arch/arm64/boot/dts/rockchip/rk3368.dtsi       | 2 +-
->>>  drivers/usb/dwc2/params.c                      | 9 ++++++++-
->>>  drivers/usb/dwc2/pci.c                         | 2 +-
->>>  8 files changed, 18 insertions(+), 8 deletions(-)
+>>> Hi Rados?aw
 >>>
->>> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
->>> index 9472111..389a461 100644
->>> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
->>> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
->>> @@ -26,11 +26,14 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
->>>  - dr_mode: shall be one of "host", "peripheral" and "otg"
->>>    Refer to usb/generic.txt
->>>  - snps,host-dma-disable: disable host DMA mode.
->>> -- g-use-dma: enable dma usage in gadget driver.
->>> +- snps,gadget-dma-enable: enable gadget DMA mode.
->> 
->> I don't see why you even have this binding. Looking through the code,
->> you have:
->> 
->> #define GHWCFG2_SLAVE_ONLY_ARCH			0
->> #define GHWCFG2_EXT_DMA_ARCH			1
->> #define GHWCFG2_INT_DMA_ARCH			2
->> 
->> void dwc2_set_param_dma_enable(struct dwc2_hsotg *hsotg, int val)
->> {
->> 	int valid = 1;
->> 
->> 	if (val > 0 && hsotg->hw_params.arch == GHWCFG2_SLAVE_ONLY_ARCH)
->> 		valid = 0;
->> 	if (val < 0)
->> 		valid = 0;
->> 
->> 	if (!valid) {
->> 		if (val >= 0)
->> 			dev_err(hsotg->dev,
->> 				"%d invalid for dma_enable parameter. Check HW configuration.\n",
->> 				val);
->> 		val = hsotg->hw_params.arch != GHWCFG2_SLAVE_ONLY_ARCH;
->> 		dev_dbg(hsotg->dev, "Setting dma_enable to %d\n", val);
->> 	}
->> 
->> 	hsotg->core_params->dma_enable = val;
->> }
->> 
->> which seems to hint that DMA support is discoverable. If there is DMA,
->> why would disable it?
->> 
+>>> Many thanks for reviewing.
+>>>
+>>> On 11/07/2016 03:57 PM, Rados?aw Pietrzyk wrote:
+>>>>>
+>>>>> +static struct clk_hw *clk_register_pll_div(const char *name,
+>>>>> +               const char *parent_name, unsigned long flags,
+>>>>> +               void __iomem *reg, u8 shift, u8 width,
+>>>>> +               u8 clk_divider_flags, const struct clk_div_table
+>>>>> *table,
+>>>>> +               struct clk_hw *pll_hw, spinlock_t *lock)
+>>>>> +{
+>>>>> +       struct stm32f4_pll_div *pll_div;
+>>>>> +       struct clk_hw *hw;
+>>>>> +       struct clk_init_data init;
+>>>>> +       int ret;
+>>>>> +
+>>>>> +       /* allocate the divider */
+>>>>> +       pll_div = kzalloc(sizeof(*pll_div), GFP_KERNEL);
+>>>>> +       if (!pll_div)
+>>>>> +               return ERR_PTR(-ENOMEM);
+>>>>> +
+>>>>> +       init.name = name;
+>>>>> +       init.ops = &stm32f4_pll_div_ops;
+>>>>> +       init.flags = flags;
+>>>>
+>>>> Maybe it's worth to have CLK_SET_RATE_PARENT here and the VCO clock
+>>>> should have CLK_SET_RATE_GATE flag and we can get rid of custom
+>>>> divider ops.
+>>>
+>>> I don't want to offer the possibility to change the vco clock through the
+>>> divisor of the pll (only by a boot-loader or by DT).
+>>>
+>>> e.g. if i make a set rate on lcd-tft clock, i don't want to change the
+>>> SAI
+>>> frequencies.
+>>>
+>>> I used same structure for internal divisors of the pll (p, q, r) and for
+>>> post divisors (plli2s-q-div, pllsai-q-div & pllsai-r-div).
+>>> That why the CLK_SET_RATE_PARENT flag is transmit by parameter.
+>>>
+>>> These divisors are similar because we have to switch off the pll before
+>>> changing the rate.
+>>>
+>> But changing pll and lcd dividers only may not be enough for getting
+>> very specific pixelclocks and that might require changing the VCO
+>> frequency itself. The rest of the SAI tree should be recalculated
+>> then.
 >
-> Yes that's the case and I would prefer to make it discoverable and
-> enabled by default.
->
-> But the legacy behavior has always been like this because DMA was
-> never fully implemented in the gadget driver and it was an opt-in
-> feature. Periodic support was only added recently.
-
-legacy behavior can be changed if another 'policy' makes more
-sense. IMHO, whatever can be discovered in runtime, should be enabled by
-default. That way, we force people to use it and find bugs in certain
-features.
-
-> What do you think about enabling it by default now? I think most
-> platforms already use DMA.
-
-I think it should be discovered. Drop all these "*-use-dma" bindings
-because they're not needed if you can probe a register to answer the
-same question.
-
-> We would still need a "disable" binding for IP validation purposes at
-> least.
-
-Yeah, could be a quirk.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 800 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161109/0691c4a0/attachment.sig>
+> I agree but it seems to be too much complicated to recalculate all PLL
+> divisors if we change the vco clock.
+> You mean to use Clock notifier callback ?
