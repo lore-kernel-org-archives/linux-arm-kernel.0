@@ -1,84 +1,22 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 9 Nov 2016 16:49:55 -0600
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
- <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
- <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
-Message-ID: <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 09 Nov 2016 23:53:21 +0100
+Subject: [PATCH] mfd: qcom-pm8xxx: Clean up PM8XXX namespace
+In-Reply-To: <CACRpkdZe0VO=ABfbven8mU0FGb=sJNY_tjk2_GpAP30wsiDkvQ@mail.gmail.com>
+References: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+ <20161109154727.GG13127@dell>
+ <CACRpkdZe0VO=ABfbven8mU0FGb=sJNY_tjk2_GpAP30wsiDkvQ@mail.gmail.com>
+Message-ID: <3092039.jgPntmgY1a@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 08:29:23PM +0000, Ard Biesheuvel wrote:
-> Hi Bjorn,
+On Wednesday, November 9, 2016 11:19:34 PM CET Linus Walleij wrote:
+> On Wed, Nov 9, 2016 at 4:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> On 9 November 2016 at 20:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
-> >> Hi Bjorn,
-> >>
-> [...]
-> >>
-> >> We're working to add the PNP0C02 resource to future firmware, but it's
-> >> not in the current firmware. Are dmesg and /proc/iomem from the
-> >> current firmware interesting or should we wait for the update to file?
-> >
-> > Note that the ECAM space is not the only thing that should be
-> > described via these PNP0C02 devices.  *All* non-enumerable resources
-> > should be described by the _CRS method of some ACPI device.  Here's a
-> > sample from my laptop:
-> >
-> >   PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
-> >   system 00:01: [io  0x1800-0x189f] could not be reserved
-> >   system 00:01: [io  0x0800-0x087f] has been reserved
-> >   system 00:01: [io  0x0880-0x08ff] has been reserved
-> >   system 00:01: [io  0x0900-0x097f] has been reserved
-> >   system 00:01: [io  0x0980-0x09ff] has been reserved
-> >   system 00:01: [io  0x0a00-0x0a7f] has been reserved
-> >   system 00:01: [io  0x0a80-0x0aff] has been reserved
-> >   system 00:01: [io  0x0b00-0x0b7f] has been reserved
-> >   system 00:01: [io  0x0b80-0x0bff] has been reserved
-> >   system 00:01: [io  0x15e0-0x15ef] has been reserved
-> >   system 00:01: [io  0x1600-0x167f] has been reserved
-> >   system 00:01: [io  0x1640-0x165f] has been reserved
-> >   system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
-> >   system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
-> >   system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
-> >   system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
-> >   system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
-> >   system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
-> >   system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
-> >   system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
-> >   system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
-> >
-> > Do you have firmware in the field that may not get updated?  If so,
-> > I'd like to see the whole solution for that firmware, including the
-> > MCFG quirk (which tells the PCI core where the ECAM region is) and
-> > whatever PNP0C02 quirk you figure out to actually reserve the region.
-> >
-> > I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
-> > don't actually know if it's feasible, but it didn't look as bad as I
-> > expected, so I'd kind of like somebody to try it out.  I think you
-> > would have to call this via a DMI hook (do you have DMI on arm64?),
-> > maybe from pnp_init() or similar.
+> > How many more Acks do we need?
 > 
-> We do have SMBIOS/DMI on arm64, but we have been successful so far not
-> to rely on it for quirks, and we'd very much like to keep it that way.
+> Jacek and one of the ARM SoC people ideally...
 > 
-> Since this ACPI _CRS method has nothing to do with SMBIOS/DMI, surely
-> there is a better way to wire up the reservation code to the
-> information exposed by ACPI?
+> Jacek? Arnd/Olof?
+> 
 
-I'm open to other ways, feel free to propose one :)
-
-If you do a quirk, you need some way to identify the machine/firmware
-combination, because you don't want to apply the quirk on every
-machine.  You're trying to work around a firmware issue, so you
-probably want something tied to the firmware version.  On x86, that's
-typically done with DMI.
-
-Bjorn
+Acked-by: Arnd Bergmann <arnd@arndb.de>
