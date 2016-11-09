@@ -1,76 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 9 Nov 2016 14:44:07 +0000
-Subject: [PATCH v7 06/16] drivers: iommu: arm-smmu-v3: convert struct
- device of_node to fwnode usage
-In-Reply-To: <20161109141948.19244-7-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
- <20161109141948.19244-7-lorenzo.pieralisi@arm.com>
-Message-ID: <5d824cfb-6b38-405d-d5f6-96590247efd8@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 9 Nov 2016 15:45:15 +0100
+Subject: [PATCH 3/6] net: mdio-mux: Add MDIO mux driver for NSP SoC
+In-Reply-To: <1478683994-12008-4-git-send-email-yendapally.reddy@broadcom.com>
+References: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1478683994-12008-4-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20161109144515.GF15386@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/16 14:19, Lorenzo Pieralisi wrote:
-> Current ARM SMMU v3 driver rely on the struct device.of_node pointer for
-> device look-up and iommu_ops retrieval.
-> 
-> In preparation for ACPI probing enablement, convert the driver to use
-> the struct device.fwnode member for device and iommu_ops look-up so that
-> the driver infrastructure can be used also on systems that do not
-> associate an of_node pointer to a struct device (eg ACPI), making the
-> device look-up and iommu_ops retrieval firmware agnostic.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> ---
->  drivers/iommu/arm-smmu-v3.c | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index e6f9b2d..fef9f60 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1723,13 +1723,14 @@ static struct platform_driver arm_smmu_driver;
->  
->  static int arm_smmu_match_node(struct device *dev, void *data)
->  {
-> -	return dev->of_node == data;
-> +	return dev->fwnode == data;
->  }
->  
-> -static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
-> +static
-> +struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
->  {
->  	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
-> -						np, arm_smmu_match_node);
-> +						fwnode, arm_smmu_match_node);
->  	put_device(dev);
->  	return dev ? dev_get_drvdata(dev) : NULL;
->  }
-> @@ -1765,7 +1766,7 @@ static int arm_smmu_add_device(struct device *dev)
->  		master = fwspec->iommu_priv;
->  		smmu = master->smmu;
->  	} else {
-> -		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
-> +		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
->  		if (!smmu)
->  			return -ENODEV;
->  		master = kzalloc(sizeof(*master), GFP_KERNEL);
-> @@ -2634,7 +2635,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->  		return ret;
->  
->  	/* And we're up. Go go go! */
-> -	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
-> +	fwnode_iommu_set_ops(dev->fwnode, &arm_smmu_ops);
+> +#define NSP_MDIO_EXT_BUS_START_ADDR		16
+> +#define NSP_MDIO_EXT_SELECT_BIT			BIT(9)
 > +
->  #ifdef CONFIG_PCI
->  	if (pci_bus_type.iommu_ops != &arm_smmu_ops) {
->  		pci_request_acs();
-> 
+> +static int mdio_mux_nsp_switch_fn(int current_child, int desired_child,
+> +				  void *priv)
+> +{
+> +	struct nsp_mdiomux_desc *md = priv;
+> +	u32 data, bus_id;
+> +
+> +	/* select internal or external bus */
+> +	data = readl(md->mgmt_ctrl);
+> +	if (desired_child == NSP_MDIO_EXT_BUS_START_ADDR)
+> +		data |= NSP_MDIO_EXT_SELECT_BIT;
+> +	else
+> +		data &= ~NSP_MDIO_EXT_SELECT_BIT;
+> +	writel(data, md->mgmt_ctrl);
+> +
+> +	/* select bus number */
+> +	if (md->bus_ctrl) {
+> +		bus_id = desired_child & (NSP_MDIO_EXT_BUS_START_ADDR - 1);
+> +		writel(bus_id, md->bus_ctrl);
+> +	}
+> +
+> +	return 0;
+
+So address 16 is external. What happens which you try to access
+address 16 internally? Does the chip raise an abort? Reads just give
+0xffff?
+
+I'm wondering if it would be better to implement this as two nested
+muxes. One mux doing internal/external, and the other doing the bus.
+If you do that, you can use the existing mdio-mux-mmioreg.c and don't
+need any new code at all.
+
+     Andrew
