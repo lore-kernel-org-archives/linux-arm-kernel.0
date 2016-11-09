@@ -1,49 +1,97 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 9 Nov 2016 11:29:46 +0000
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <2479288.4UmF9SBrq1@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
- <20161108164948.GG20591@arm.com> <2479288.4UmF9SBrq1@wuerfel>
-Message-ID: <6dee9821-5145-2113-e391-6317e4533c06@huawei.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Wed, 9 Nov 2016 17:09:14 +0530
+Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA
+ controller hardware v1.1
+In-Reply-To: <1476962064-8775-1-git-send-email-rsahu@apm.com>
+References: <1476962064-8775-1-git-send-email-rsahu@apm.com>
+Message-ID: <CAFd313yibujm+yzeVUZFrLwT8vwbDYN+DJmsAQ7rWUNXUb2ixw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2016 22:35, Arnd Bergmann wrote:
-> On Tuesday, November 8, 2016 4:49:49 PM CET Will Deacon wrote:
->> On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
->>> On 08/11/2016 16:12, Will Deacon wrote:
->>>> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
->
->>>> Is there no way to make this slightly more generic, so that it can be
->>>> re-used elsewhere? For example, if struct extio_ops was common, then
->>>> you could have the singleton (which maybe should be an interval tree?),
->>>> type definition, setter function and the BUILD_EXTIO invocations
->>>> somewhere generic, rather than squirelled away in the arch backend.
->>>>
->>> The concern would be that some architecture which uses generic higher-level
->>> ISA accessor ops, but have IO space, could be affected.
->>
->> You're already adding a Kconfig symbol for this stuff, so you can keep
->> that if you don't want it on other architectures. I'm just arguing that
->> plumbing drivers directly into arch code via arm64_set_extops is not
->> something I'm particularly fond of, especially when it looks like it
->> could be avoided with a small amount of effort.
->
-> Agreed, I initially suggested putting this into arch/arm64/, but there isn't
-> really a reason why it couldn't just live in lib/ with the header file
-> bits moved to include/asm-generic/io.h which we already use.
->
+Hi Olof/Tejun,
 
-Right, Zhichang will check the logistics of this. The generic io.h is 
-quite clean, so as long as you don't mind new build switches of this 
-nature being added, it should be ok; and we'll plan on moving extio.h 
-into include/asm-generic as well.
-
-Cheers,
-John
-
-> 	Arnd
+On Thu, Oct 20, 2016 at 4:44 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
 >
-> .
+> This patch enables NCQ support for APM X-Gene SATA controller
+> hardware v1.1 that was broken with hardware v1.0.
 >
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> ---
+>  drivers/ata/ahci_xgene.c |   14 ++++++++------
+>  1 files changed, 8 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
+> index 73b19b2..8b88be9 100644
+> --- a/drivers/ata/ahci_xgene.c
+> +++ b/drivers/ata/ahci_xgene.c
+> @@ -87,6 +87,7 @@
+>
+>  enum xgene_ahci_version {
+>         XGENE_AHCI_V1 = 1,
+> +       XGENE_AHCI_V1_1,
+>         XGENE_AHCI_V2,
+>  };
+>
+> @@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
+>  #ifdef CONFIG_ACPI
+>  static const struct acpi_device_id xgene_ahci_acpi_match[] = {
+>         { "APMC0D0D", XGENE_AHCI_V1},
+> +       { "APMC0D67", XGENE_AHCI_V1_1},
+>         { "APMC0D32", XGENE_AHCI_V2},
+>         {},
+>  };
+> @@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
+>
+>  static const struct of_device_id xgene_ahci_of_match[] = {
+>         {.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
+> +       {.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
+>         {.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
+>         {},
+>  };
+> @@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+>         struct resource *res;
+>         const struct of_device_id *of_devid;
+>         enum xgene_ahci_version version = XGENE_AHCI_V1;
+> -       const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
+> -                                             &xgene_ahci_v2_port_info };
+> +       const struct ata_port_info *ppi;
+>         int rc;
+>
+>         hpriv = ahci_platform_get_resources(pdev);
+> @@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
+>                                 dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
+>                                         __func__);
+>                                 version = XGENE_AHCI_V1;
+> -                       } else if (info->valid & ACPI_VALID_CID) {
+> -                               version = XGENE_AHCI_V2;
+>                         }
+>                 }
+>         }
+> @@ -858,18 +858,20 @@ skip_clk_phy:
+>
+>         switch (version) {
+>         case XGENE_AHCI_V1:
+> +               ppi = &xgene_ahci_v1_port_info;
+>                 hpriv->flags = AHCI_HFLAG_NO_NCQ;
+>                 break;
+>         case XGENE_AHCI_V2:
+> +               ppi = &xgene_ahci_v2_port_info;
+>                 hpriv->flags |= AHCI_HFLAG_YES_FBS;
+>                 hpriv->irq_handler = xgene_ahci_irq_intr;
+>                 break;
+>         default:
+> +               ppi = &xgene_ahci_v1_port_info;
+>                 break;
+>         }
+>
+> -       rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
+> -                                    &ahci_platform_sht);
+> +       rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
+>         if (rc)
+>                 goto disable_resources;
+>
+> --
+> 1.7.1
+
+
+Any comment on above patch ??
