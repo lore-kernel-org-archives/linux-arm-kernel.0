@@ -1,119 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 9 Nov 2016 12:12:08 +0000
-Subject: [PATCH] arm64: acpi: arch_apei_get_mem_attributes() should use
- memblock
-In-Reply-To: <20161108102714.29931-1-james.morse@arm.com>
-References: <20161108102714.29931-1-james.morse@arm.com>
-Message-ID: <CAKv+Gu9+T0TYqk+uTUWa5K0E49WXDBpUK4Px_q=52jR0ON1zGA@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 09 Nov 2016 17:45:53 +0530
+Subject: [PATCH v3 0/2] Remove static mapping of SCU from mach-exynos
+Message-ID: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+This patch series is part of patch series [1], which adds support of SCU
+device node for Cortex-A9 based Exynos4 SoC. First two patches of the same
+has been accepted and hence not included them in v3.
 
-On 8 November 2016 at 10:27, James Morse <james.morse@arm.com> wrote:
-> arm64's arch_apei_get_mem_attributes() tries to use
-> efi_mem_attributes() to read the memory attributes from the efi
-> memory map.
->
-> drivers/firmware/efi/arm-init.c:efi_init() calls efi_memmap_unmap(),
-> which clears the EFI_MEMMAP bit from efi.flags once efi_init() has
-> finished with the memory map. This causes efi_mem_attributes() to
-> return 0 meaning PROT_DEVICE_nGnRnE is the chosen memory type for
-> all ACPI APEI mappings.
->
-> APEI may call this from NMI context, so we can't re-map the EFI
-> memory map as this may need to allocate virtual address space.
-> 'ghes_ioremap_area' is APEIs cache of virtual address space to
-> access the buffer once we tell it the memory attributes.
->
-> Do as acpi_os_ioremap() does, and consult memblock to learn if
-> the provided address is memory, or not.
->
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Fixes: 89e44b51cc0d ("arm64, acpi/apei: Implement arch_apei_get_mem_attributes()")
->
-> This doesn't code even get built on mainline as HAVE_ACPI_APEI isn't
-> defined, until https://lkml.org/lkml/2016/8/10/231 gets merged.
-> I don't think this should go to stable.
->
-> I also took the opportunity to remove some unnecessarily ifdef'd
-> includes.
->
->  arch/arm64/kernel/acpi.c | 28 ++++++++--------------------
->  1 file changed, 8 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 252a6d9c1da5..985f721f3bdd 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/acpi.h>
->  #include <linux/bootmem.h>
->  #include <linux/cpumask.h>
-> +#include <linux/efi.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
->  #include <linux/irqdomain.h>
-> @@ -28,13 +29,9 @@
->
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
-> +#include <asm/pgtable.h>
->  #include <asm/smp_plat.h>
->
-> -#ifdef CONFIG_ACPI_APEI
-> -# include <linux/efi.h>
-> -# include <asm/pgtable.h>
-> -#endif
-> -
->  int acpi_noirq = 1;            /* skip ACPI IRQ initialization */
->  int acpi_disabled = 1;
->  EXPORT_SYMBOL(acpi_disabled);
-> @@ -241,22 +238,13 @@ void __init acpi_boot_table_init(void)
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->  {
->         /*
-> -        * According to "Table 8 Map: EFI memory types to AArch64 memory
-> -        * types" of UEFI 2.5 section 2.3.6.1, each EFI memory type is
-> -        * mapped to a corresponding MAIR attribute encoding.
-> -        * The EFI memory attribute advises all possible capabilities
-> -        * of a memory region. We use the most efficient capability.
-> +        * The EFI memmap isn't mapped, instead read the version exported
-> +        * into memblock. EFI's reserve_regions() call adds memory with the
-> +        * WB attribute to memblock via early_init_dt_add_memory_arch().
->          */
-> +       if (!memblock_is_memory(addr))
-> +               return __pgprot(PROT_DEVICE_nGnRnE);
->
-> -       u64 attr;
-> -
-> -       attr = efi_mem_attributes(addr);
-> -       if (attr & EFI_MEMORY_WB)
-> -               return PAGE_KERNEL;
-> -       if (attr & EFI_MEMORY_WT)
-> -               return __pgprot(PROT_NORMAL_WT);
-> -       if (attr & EFI_MEMORY_WC)
-> -               return __pgprot(PROT_NORMAL_NC);
-> -       return __pgprot(PROT_DEVICE_nGnRnE);
-> +       return PAGE_KERNEL;
+This patch series does some cleanup for Exynos4 SoC based boards.
+We are currently statically mapping SCU SFRs in mach-exynos/exynos.c
+which can be avoided if map this from device node of SCU
 
-As you know, we recently applied [0] to ensure that memory regions
-that are marked by UEFI was write-through cacheable (WT) or
-write-combining (WC) are not misidentified by the kernel as having
-strongly ordered semantics.
+[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
 
-This means that in this case, you may be returning PAGE_KERNEL for
-regions that are lacking the EFI_MEMORY_WB attribute, which kind of
-defeats the purpose of this function (AIUI), to align the kernel's
-view of the region's attributes with the view of the firmware. I would
-expect that, for use cases like this one, the burden is on the
-firmware to ensure that only a single EFI_MEMORY_xx attribute is set
-if any kind of coherency between UEFI and the kernel is expected. If
-that single attribute is WT or WC, PAGE_KERNEL is most certainly
-wrong.
+This patch series is prepared on Krzysztof's for-next
+(SHA_ID: b33c7bb9d59c3f4100d4)
+
+I have tested these patches on Exynos4210 based on Origen board for SMP boot.
+Patchset v1 was tested by Marek Szyprowski on Exynos4412-based Odroid U3
+for SMP boot and S2R.
+
+To confirm concern raised by Alim, I intentionally removed SCU device node
+from exynos4.dtsi and tested on Origen board, I can see code handles this
+case gracefully without any crash and system boot was fine. Of-course in such
+case only single core will be able to boot.
+
+Following boot message observed on Origen in case of missing SCU node
+-------------
+[    0.000864] CPU: Testing write buffer coherency: ok
+[    0.001068] CPU0: thread -1, cpu 0, socket 9, mpidr 80000900
+[    0.001456] exynos_scu_enable failed to map scu_base
+[    0.001477] Setting up static identity map for 0x40100000 - 0x40100058
+[    1.120003] CPU1: failed to come online
+[    1.120059] Brought up 1 CPUs
+[    1.120068] SMP: Total of 1 processors activated (48.00 BogoMIPS).
+[    1.120076] CPU: All CPU(s) started in SVC mode.
+-------------
+
+Changes since v2:
+ - Removed unnecessary header file inclusion from pm.c.
+ - Move out call_firmware_op call from CORTEX-A9 check.
+ - Update commit log for 1/2 patch describing dependency on DTS and affect of
+   the patch on out-of-tree DTS
+
+Changes since v1:
+ - Address review comments from Krzysztof
+ - Moved scu_enable from pm.c and suspend.c to single place in platsmp.c
+ - Added error handling during scu_enable in platsmp.c
+ - Added Reviewed-by tag from Alim.
 
 
-[0] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=cb82cce7035
+Pankaj Dubey (2):
+  ARM: EXYNOS: Remove static mapping of SCU SFR
+  ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
+
+ arch/arm/mach-exynos/common.h                |  6 +----
+ arch/arm/mach-exynos/exynos.c                | 22 ------------------
+ arch/arm/mach-exynos/include/mach/map.h      |  2 --
+ arch/arm/mach-exynos/platsmp.c               | 34 +++++++++++++++++++++-------
+ arch/arm/mach-exynos/pm.c                    |  4 +---
+ arch/arm/mach-exynos/suspend.c               |  4 +---
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
+ 7 files changed, 29 insertions(+), 47 deletions(-)
+
+-- 
+2.7.4
