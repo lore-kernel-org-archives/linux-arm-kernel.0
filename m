@@ -1,88 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 9 Nov 2016 17:46:16 +0000
-Subject: [PATCH 1/5] iommu: Allow taking a reference on a group directly
-In-Reply-To: <20161109172543.GI17771@arm.com>
-References: <3922e1f14d8ecb50440b2d9b0d1123f3c9307fc5.1478695557.git.robin.murphy@arm.com>
- <20161109172543.GI17771@arm.com>
-Message-ID: <8b35afe8-7e09-c2d3-91ae-5d2a10da6fc8@arm.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 09 Nov 2016 12:51:24 -0500 (EST)
+Subject: [PATCH net-next 0/2] ARM64: Add Internal PHY support for Meson GXL
+In-Reply-To: <1478274683-1503-1-git-send-email-narmstrong@baylibre.com>
+References: <1478274683-1503-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20161109.125124.589689108919427759.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/16 17:25, Will Deacon wrote:
-> On Wed, Nov 09, 2016 at 12:47:24PM +0000, Robin Murphy wrote:
->> iommu_group_get_for_dev() expects that the IOMMU driver's device_group
->> callback return a group with a reference held for the given device.
->> Whilst allocating a new group is fine, and pci_device_group() correctly
->> handles reusing an existing group, there is no general means for IOMMU
->> drivers doing their own group lookup to take additional references on an
->> existing group pointer without having to also store device pointers or
->> resort to elaborate trickery.
->>
->> Add an IOMMU-driver-specific function to fill the hole.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/iommu.c | 14 ++++++++++++++
->>  include/linux/iommu.h |  1 +
->>  2 files changed, 15 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 9a2f1960873b..b0b052bc6bb5 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -552,6 +552,20 @@ struct iommu_group *iommu_group_get(struct device *dev)
->>  EXPORT_SYMBOL_GPL(iommu_group_get);
->>  
->>  /**
->> + * __iommu_group_get - Increment reference on a group
->> + * @group: the group to use, must not be NULL
->> + *
->> + * This function may be called by internal iommu driver group management
->> + * when the context of a struct device pointer is not available.  It is
->> + * not for general use.  Returns the given group for convenience.
->> + */
->> +struct iommu_group *__iommu_group_get(struct iommu_group *group)
->> +{
->> +	kobject_get(group->devices_kobj);
->> +	return group;
->> +}
+From: Neil Armstrong <narmstrong@baylibre.com>
+Date: Fri,  4 Nov 2016 16:51:21 +0100
+
+> The Amlogic Meson GXL SoCs have an internal RMII PHY that is muxed with the
+> external RGMII pins.
 > 
-> This probably either wants sticking in a header or exporting to modules.
-> That said, why do we need the underscores and the comment about internal
-> group management? That's pretty much already the case for iommu_group_get.
+> In order to support switching between the two PHYs links, extended registers
+> size for mdio-mux-mmioreg must be added.
+> 
+> The DT related patches submitted as RFC in [3] will be sent in a separate
+> patchset due to multiple patchsets and DTSI migrations.
+> 
+> Changes since v2 RFC patchset at : [3]
+>  - Change phy Kconfig/Makefile alphabetic order
+>  - GXL dtsi cleanup
+> 
+> Changes since original RFC patchset at : [2]
+>  - Remove meson8b experimental phy switching
+>  - Switch to mdio-mux-mmioreg with extennded size support
+>  - Add internal phy support for S905x and p231
+>  - Add external PHY support for p230
+> 
+> [1] http://lkml.kernel.org/r/1477932286-27482-1-git-send-email-narmstrong at baylibre.com
+> [2] http://lkml.kernel.org/r/1477060838-14164-1-git-send-email-narmstrong at baylibre.com
+> [3] http://lkml.kernel.org/r/1477932987-27871-1-git-send-email-narmstrong at baylibre.com
 
-The definition of struct iommu_group is private to iommu.c, so any
-touching of the members has to be in here. The comment is to contrast
-with iommu_group_get()'s "This function is called by iommu drivers and
-users". This one is explicitly not for users of the API (DMA mapping,
-VFIO, etc.), as they really have no business messing with refcounts
-directly, and should always be operating in the context of a device;
-it's only for the benefit of anyone *implementing* the API. And since
-IOMMU drivers aren't modular (yet... ;)) there's no cause for an export.
-
-> Of course, removing the underscores gives you a naming conflict, but we
-> could just call it something like "iommu_group_get_ref".
-
-Ideally, this would be the iommu_group_get() to precisely match
-iommu_group_put(), and the existing function would renamed something
-like iommu_dev_group_get() (or perhaps even all external uses converted
-over to iommu_group_get_for_dev()), but that would be an awful lot of
-churn for little obvious benefit. Similarly, I nearly added the below
-hunk, but it didn't seem worth the bother.
-
-Robin.
-
------>8-----
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 9a2f1960873b..89d509c59019 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -545,7 +545,7 @@ struct iommu_group *iommu_group_get(struct device *dev)
- 	struct iommu_group *group = dev->iommu_group;
-
- 	if (group)
--		kobject_get(group->devices_kobj);
-+		__iommu_group_get(group);
-
- 	return group;
- }
+Series applied, thanks.
