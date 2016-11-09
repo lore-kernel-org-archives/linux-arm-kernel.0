@@ -1,51 +1,67 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 08 Nov 2016 16:50:24 -0800
-Subject: [PATCH v2 1/3] ARM: dts: imx6qdl-apalis: Do not rely on DDC I2C
- bus bitbang for HDMI
-In-Reply-To: <20161108173315.GA16082@Sanchayan-Arch.localdomain>
-References: <2263d508999ada9476268138b2922702eb50131f.1474260360.git.maitysanchayan@gmail.com>
- <20161022032559.GL30578@tiger>
- <3d2b6dfd-c03c-e635-8dc1-2dc9ac454f5a@mentor.com>
- <20161108173315.GA16082@Sanchayan-Arch.localdomain>
-Message-ID: <57268103e8fabf344723eae99b45ec7d@agner.ch>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Wed, 9 Nov 2016 09:42:36 +0800
+Subject: [PATCH v2 0/2] arm64: fix the bugs found in the hugetlb test
+In-Reply-To: <20161108163642.GE20591@arm.com>
+References: <1478583879-14654-1-git-send-email-shijie.huang@arm.com>
+ <20161108140909.GF29087@e104818-lin.cambridge.arm.com>
+ <20161108163642.GE20591@arm.com>
+Message-ID: <20161109014234.GA20242@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-11-08 09:33, maitysanchayan at gmail.com wrote:
-> Hello Shawn,
-> 
-> On 16-10-22 15:43:04, Vladimir Zapolskiy wrote:
->> Hi Shawn,
->>
->> On 10/22/2016 06:25 AM, Shawn Guo wrote:
->> > On Mon, Sep 19, 2016 at 10:41:51AM +0530, Sanchayan Maity wrote:
->> > > Remove the use of DDC I2C bus bitbang to support reading of EDID
->> > > and rely on support from internal HDMI I2C master controller instead.
->> > > As a result remove the device tree property ddc-i2c-bus.
->> > >
->> > > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> >
->> > I think that the dw-hdmi i2c support [1] is a prerequisite of this
->> > patch.  I do not see it lands on v4.9-rc1.  Or am I missing something?
->> >
->> > Shawn
->> >
->> > [1] https://patchwork.kernel.org/patch/9296883/
->> >
->>
->> I'm adding Philipp to Cc, since he is the last one who tested the change
->> and helped me to push the change to the mainline:
->>
->>   https://lists.freedesktop.org/archives/dri-devel/2016-September/118569.html
->>
->> The problem is that there is no official DW HDMI bridge maintainer, may be
->> you can review the change, and if you find it satisfactory push it through
->> ARM/iMX tree.
-> 
-> Shawn, is it okay if that patch goes through your ARM/iMX tree?
+Hi Will & Catalin,
 
-I don't think it makes sense that the DRM bridge changes go through
-Shawn's tree. Dave should merge Philipps pull request...
+On Tue, Nov 08, 2016 at 04:36:43PM +0000, Will Deacon wrote:
+> On Tue, Nov 08, 2016 at 02:09:09PM +0000, Catalin Marinas wrote:
+> > On Tue, Nov 08, 2016 at 01:44:37PM +0800, Huang Shijie wrote:
+> > > (3) The test result in the Softiron and Juno-r1 boards:
+> > > 
+> > >    This detail test result shows below (both the "make func" & "make stress"):
+> > > 
+> > >     4KB granule:
+> > > 
+> > >         1.1) PTE + Contiguous bit : 4K x 16 = 64K (per huge page size)
+> > >              Test result          : PASS
+> > > 
+> > >         1.2) PMD                  : 2M x  1 = 2M  (per huge page size)
+> > >              Test result          : PASS
+> > > 
+> > >         1.3) PMD + Contiguous bit : 2M x 16 = 32M (per huge page size)
+> > >              Test result          : PASS
+> > > 
+> > >     64KB granule:
+> > > 
+> > >         3.1) PTE + Contiguous bit : 64K x 32 = 2M (per huge page size)
+> > >              Test result          : PASS
+> > > 
+> > >         3.2) PMD + Contiguous bit : 512M x 32 = 16G (per huge page size)
+> > >              Test result          : no hardware to support this test
+> > 
+> > Don't we have support for single (non-contiguous) PMD huge page with 64K
+> > pages (512M per huge page)? I gave it a try and it seems to work (though
+> > without your patches applied ;)).
+Yes, it should be okay. This patch set does not affect the the single
+PMD huge page.
 
---
-Stefan
+> > 
+> > > Huang Shijie (2):
+> > >   arm64: hugetlb: remove the wrong pmd check in find_num_contig()
+> > >   arm64: hugetlb: fix the wrong address for several functions
+> > 
+> > For these patches:
+> > 
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Thanks you, Catalin.
+
+> > 
+> > I'm not sure whether Will plans to push them into 4.9. AFAICT, the
+> > contiguous huge pages never worked properly, so we may not count it as a
+> > regression but a new feature. If Will doesn't take them, I'll queue the
+> > patches for 4.10.
+> 
+> Right, given that it's never worked and the failure only seems to crop up
+> in synthetic testing, I think you can queue these for 4.10.
+Okay. Thank for queue them for 4.10.
+
+Thanks
+Huang Shijie
