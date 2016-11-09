@@ -1,55 +1,133 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 9 Nov 2016 09:10:35 +0100
-Subject: [GIT PULL] Integrator DTS and defconfig changes
-Message-ID: <CACRpkdara5D=kvGVYu-WRh_JYK6Z9NKmQ-eniXsauxdzx-QJbA@mail.gmail.com>
+Date: Wed,  9 Nov 2016 09:12:06 +0100
+Subject: [PATCH] ARM: integrator: drop EBI access use syscon
+Message-ID: <1478679126-5460-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+The EBI lookup is not longer in use: this has been moved to the
+NAND chip driver. The syscon node is better accessed indirectly
+using the regmap like the NAND chip driver does, so let's use
+the syscon to set the modem control signals RTS/CTS through the
+dedicated syscon register.
 
-this adds DT-based cpufreq to the Integrator family.
+We also migrate the decoder status "SC_DEC" register that
+enumerate the logic modules using syscon.
 
-The corresponding cpufreq changes are merged by Rafael to the
-cpufreq tree, and can go in orthogonally.
+Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this patch directly to the tree
+wherever it fits. I do not plan to send more Integrator patches
+this merge window.
+---
+ arch/arm/mach-integrator/integrator_ap.c | 54 ++++++++++++++++++--------------
+ 1 file changed, 30 insertions(+), 24 deletions(-)
 
-However I have included the defconfig change turning on the feature
-here as it makes all kind of logic sense to have these three patches
-in succession: addin the DTS nodes and then turning on the DT
-cpufreq.
-
-If you insist, of course I can send the defconfig patch separately.
-I just think it makes more sense like this.
-
-Please pull it in so we get some rotation in linux-next for this!
-
-Yours,
-Linus Walleij
-
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
-
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/armsoc-integrator-dts
-
-for you to fetch changes up to 023c8faf9bbc95b2d00768414f0f73076ca06dc9:
-
-  ARM: defconfig: turn on the DT cpufreq for Integrator (2016-11-09
-09:02:46 +0100)
-
-----------------------------------------------------------------
-This contains the DTS changes enabling DT-only cpufreq
-scaling on the Integrator family.
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: Add Integrator/AP cpus node and operating points
-      ARM: dts: Add Integrator/CP cpus node and operating points
-      ARM: defconfig: turn on the DT cpufreq for Integrator
-
- arch/arm/boot/dts/integratorap.dts    | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/integratorcp.dts    | 26 ++++++++++++++++++++++++++
- arch/arm/configs/integrator_defconfig |  1 +
- 3 files changed, 62 insertions(+)
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 23b98fd414bf..a1af634f8709 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -27,6 +27,8 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/termios.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -37,11 +39,8 @@
+ #include "pci_v3.h"
+ #include "lm.h"
+ 
+-/* Base address to the AP system controller */
+-void __iomem *ap_syscon_base;
+-/* Base address to the external bus interface */
+-static void __iomem *ebi_base;
+-
++/* Regmap to the AP system controller */
++static struct regmap *ap_syscon_map;
+ 
+ /*
+  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
+@@ -125,6 +124,7 @@ static void integrator_uart_set_mctrl(struct amba_device *dev,
+ {
+ 	unsigned int ctrls = 0, ctrlc = 0, rts_mask, dtr_mask;
+ 	u32 phybase = dev->res.start;
++	int ret;
+ 
+ 	if (phybase == INTEGRATOR_UART0_BASE) {
+ 		/* UART0 */
+@@ -146,8 +146,17 @@ static void integrator_uart_set_mctrl(struct amba_device *dev,
+ 	else
+ 		ctrls |= dtr_mask;
+ 
+-	__raw_writel(ctrls, ap_syscon_base + INTEGRATOR_SC_CTRLS_OFFSET);
+-	__raw_writel(ctrlc, ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
++	ret = regmap_write(ap_syscon_map,
++			   INTEGRATOR_SC_CTRLS_OFFSET,
++			   ctrls);
++	if (ret)
++		pr_err("MODEM: unable to write PL010 UART CTRLS\n");
++
++	ret = regmap_write(ap_syscon_map,
++			   INTEGRATOR_SC_CTRLC_OFFSET,
++			   ctrlc);
++	if (ret)
++		pr_err("MODEM: unable to write PL010 UART CRTLC\n");
+ }
+ 
+ struct amba_pl010_data ap_uart_data = {
+@@ -178,35 +187,32 @@ static const struct of_device_id ap_syscon_match[] = {
+ 	{ },
+ };
+ 
+-static const struct of_device_id ebi_match[] = {
+-	{ .compatible = "arm,external-bus-interface"},
+-	{ },
+-};
+-
+ static void __init ap_init_of(void)
+ {
+-	unsigned long sc_dec;
++	u32 sc_dec;
+ 	struct device_node *syscon;
+-	struct device_node *ebi;
++	int ret;
+ 	int i;
+ 
++	of_platform_default_populate(NULL, ap_auxdata_lookup, NULL);
++
+ 	syscon = of_find_matching_node(NULL, ap_syscon_match);
+ 	if (!syscon)
+ 		return;
+-	ebi = of_find_matching_node(NULL, ebi_match);
+-	if (!ebi)
++	ap_syscon_map = syscon_node_to_regmap(syscon);
++	if (IS_ERR(ap_syscon_map)) {
++		pr_crit("could not find Integrator/AP system controller\n");
+ 		return;
++	}
+ 
+-	ap_syscon_base = of_iomap(syscon, 0);
+-	if (!ap_syscon_base)
+-		return;
+-	ebi_base = of_iomap(ebi, 0);
+-	if (!ebi_base)
++	ret = regmap_read(ap_syscon_map,
++			  INTEGRATOR_SC_DEC_OFFSET,
++			  &sc_dec);
++	if (ret) {
++		pr_crit("could not read from Integrator/AP syscon\n");
+ 		return;
++	}
+ 
+-	of_platform_default_populate(NULL, ap_auxdata_lookup, NULL);
+-
+-	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+ 
+-- 
+2.7.4
