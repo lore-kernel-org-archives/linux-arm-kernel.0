@@ -1,152 +1,56 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 9 Nov 2016 16:01:31 -0700
-Subject: [PATCH] PCI: mvebu: Take control of mbus windows setup by the
- firmware
-In-Reply-To: <20161026174440.GA24717@obsidianresearch.com>
-References: <20161026174440.GA24717@obsidianresearch.com>
-Message-ID: <20161109230131.GA4034@obsidianresearch.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 9 Nov 2016 16:24:58 -0700
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161109222522.GS17771@arm.com>
+References: <20161103220205.37715b49@t450s.home>
+ <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
+ <20161108163508.1bcae0c2@t450s.home> <58228F71.6020108@redhat.com>
+ <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
+ <20161109192303.GD15676@cbox> <20161109203145.GO17771@arm.com>
+ <20161109151709.74927f83@t450s.home>
+ <20161109222522.GS17771@arm.com>
+Message-ID: <20161109162458.39594fdb@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thomas,
+On Wed, 9 Nov 2016 22:25:22 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-Could you take a look at this? Thanks
+> On Wed, Nov 09, 2016 at 03:17:09PM -0700, Alex Williamson wrote:
+> > On Wed, 9 Nov 2016 20:31:45 +0000
+> > Will Deacon <will.deacon@arm.com> wrote:  
+> > > On Wed, Nov 09, 2016 at 08:23:03PM +0100, Christoffer Dall wrote:  
+> > > > 
+> > > > (I suppose it's technically possible to get around this issue by letting
+> > > > QEMU place RAM wherever it wants but tell the guest to never use a
+> > > > particular subset of its RAM for DMA, because that would conflict with
+> > > > the doorbell IOVA or be seen as p2p transactions.  But I think we all
+> > > > probably agree that it's a disgusting idea.)    
+> > > 
+> > > Disgusting, yes, but Ben's idea of hotplugging on the host controller with
+> > > firmware tables describing the reserved regions is something that we could
+> > > do in the distant future. In the meantime, I don't think that VFIO should
+> > > explicitly reject overlapping mappings if userspace asks for them.  
+> > 
+> > I'm confused by the last sentence here, rejecting user mappings that
+> > overlap reserved ranges, such as MSI doorbell pages, is exactly how
+> > we'd reject hot-adding a device when we meet such a conflict.  If we
+> > don't reject such a mapping, we're knowingly creating a situation that
+> > potentially leads to data loss.  Minimally, QEMU would need to know
+> > about the reserved region, map around it through VFIO, and take
+> > responsibility (somehow) for making sure that region is never used for
+> > DMA.  Thanks,  
+> 
+> Yes, but my point is that it should be up to QEMU to abort the hotplug, not
+> the host kernel, since there may be ways in which a guest can tolerate the
+> overlapping region (e.g. by avoiding that range of memory for DMA).
 
-Jason
+The VFIO_IOMMU_MAP_DMA ioctl is a contract, the user ask to map a range
+of IOVAs to a range of virtual addresses for a given device.  If VFIO
+cannot reasonably fulfill that contract, it must fail.  It's up to QEMU
+how to manage the hotplug and what memory regions it asks VFIO to map
+for a device, but VFIO must reject mappings that it (or the SMMU by
+virtue of using the IOMMU API) know to overlap reserved ranges.  So I
+still disagree with the referenced statement.  Thanks,
 
-On Wed, Oct 26, 2016 at 11:44:40AM -0600, Jason Gunthorpe wrote:
-> The firmware may setup the mbus to access PCI-E and indicate this
-> has happened with a ranges mapping for the PCI-E ID. If this happens
-> then the mbus setup and the pci dynamic setup conflict, creating
-> problems.
-> 
-> Have PCI-E assume control of the firmware specified default mapping by
-> setting the value of the bridge window to match the firmware mapping.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->  drivers/bus/mvebu-mbus.c     | 36 ++++++++++++++++++++++++++++++++++++
->  drivers/pci/host/pci-mvebu.c | 22 ++++++++++++++++++++++
->  include/linux/mbus.h         |  3 +++
->  3 files changed, 61 insertions(+)
-> 
-> In the DT this could look like:
-> 
-> 	mbus {
-> 		ranges = <MBUS_ID(0x04, 0xe8) 0 0xe0000000 0x8000000 /* PEX 0 MEM */
-> 		pex at e0000000 {
-> 			compatible = "marvell,kirkwood-pcie";
-> 			ranges = <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000 /* Controller regs */
-> 				  0x82000000 1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
-> 				  >;
-> 			pcie at 1,0 {
-> 				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0>;
-> 				reg = <0x0800 0 0  0 0>; // 0000:00:01.0
-> 
-> 				device at 0 {
-> 					reg = <0x0 0 0	0 0>; // 0000:01:00.0
-> 					ranges = <0x00000000  0x82000000 0x00000000 0x00000000	0x8000000>;
-> 
-> Which is basically the OF way to describe PCI devices downstream of
-> the interface and give information about what their BARs should be.
-> 
-> This is useful if there is even more DT stuff below the explicitly
-> declared device as it allows standard DT address translation to work
-> properly.
-> 
-> diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-> index c7f396903184..ce0ac5049c1f 100644
-> +++ b/drivers/bus/mvebu-mbus.c
-> @@ -922,6 +922,42 @@ int mvebu_mbus_add_window_by_id(unsigned int target, unsigned int attribute,
->  						 size, MVEBU_MBUS_NO_REMAP);
->  }
->  
-> +/**
-> + * mvebu_mbus_get_single_window_by_id() - return the location of the window if
-> + * the target/attribute has a single enabled mapping.
-> + *
-> + * RETURNS:
-> + *	-ENODEV if no mapping and -E2BIG if there is more than one mapping
-> + */
-> +int mvebu_mbus_get_single_window_by_id(unsigned int target,
-> +				       unsigned int attribute,
-> +				       phys_addr_t *base, phys_addr_t *size)
-> +{
-> +	unsigned int win;
-> +	unsigned int count = 0;
-> +
-> +	for (win = 0; win < mbus_state.soc->num_wins; win++) {
-> +		u64 wbase;
-> +		u32 wsize;
-> +		u8 wtarget, wattr;
-> +		int enabled;
-> +
-> +		mvebu_mbus_read_window(&mbus_state, win, &enabled, &wbase,
-> +				       &wsize, &wtarget, &wattr, NULL);
-> +		if (enabled && wtarget == target && wattr == attribute) {
-> +			*base = wbase;
-> +			*size = wsize;
-> +			count++;
-> +		}
-> +	}
-> +
-> +	if (count == 1)
-> +		return 0;
-> +	if (count == 0)
-> +		return -ENODEV;
-> +	return -E2BIG;
-> +}
-> +
->  int mvebu_mbus_del_window(phys_addr_t base, size_t size)
->  {
->  	int win;
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 307f81d6b479..5d5a2687b73e 100644
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -464,6 +464,8 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
->  static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
->  {
->  	struct mvebu_sw_pci_bridge *bridge = &port->bridge;
-> +	int rc;
-> +	phys_addr_t base, size;
->  
->  	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
->  
-> @@ -480,6 +482,26 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
->  
->  	/* Add capabilities */
->  	bridge->status = PCI_STATUS_CAP_LIST;
-> +
-> +	/*
-> +	 * If the firmware has already setup a window for PCIe then assume
-> +	 * control of it by defaulting the BAR to the window setting.
-> +	 */
-> +	rc = mvebu_mbus_get_single_window_by_id(port->mem_target,
-> +						port->mem_attr, &base, &size);
-> +	if (rc == -E2BIG)
-> +		pr_err(FW_BUG "%s: Too many pre-existing mbus mappings\n",
-> +		       port->dn->name);
-> +	if (!rc) {
-> +		if ((base & 0xFFFFF) != 0 || ((size + base) & 0xFFFFF) != 0)
-> +			pr_err(FW_BUG "%s: Invalid pre-existing mbus mapping\n",
-> +			       port->dn->name);
-> +		port->memwin_base = base;
-> +		port->memwin_size = size;
-> +		port->bridge.membase = (base >> 16) & 0xFFF0;
-> +		port->bridge.memlimit = ((size - 1 + base) >> 16) & 0xFFF0;
-> +		port->bridge.command |= PCI_COMMAND_MEMORY;
-> +	}
->  }
->  
->  /*
-> diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-> index d610232762e3..dfafc27b41b5 100644
-> +++ b/include/linux/mbus.h
-> @@ -83,5 +83,8 @@ int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
->  		    size_t mbus_size, phys_addr_t sdram_phys_base,
->  		    size_t sdram_size);
->  int mvebu_mbus_dt_init(bool is_coherent);
-> +int mvebu_mbus_get_single_window_by_id(unsigned int target,
-> +				       unsigned int attribute,
-> +				       phys_addr_t *base, phys_addr_t *size);
->  
->  #endif /* __LINUX_MBUS_H */
+Alex
