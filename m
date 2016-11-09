@@ -1,183 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 9 Nov 2016 15:33:27 +0000
-Subject: [PATCH v7 07/16] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <20161109141948.19244-8-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
- <20161109141948.19244-8-lorenzo.pieralisi@arm.com>
-Message-ID: <e25b0ebb-2ae4-cb13-b264-9ab43d8f2934@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 9 Nov 2016 15:47:27 +0000
+Subject: [PATCH] mfd: qcom-pm8xxx: Clean up PM8XXX namespace
+In-Reply-To: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+References: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161109154727.GG13127@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/16 14:19, Lorenzo Pieralisi wrote:
-> On DT based systems, the of_dma_configure() API implements DMA
-> configuration for a given device. On ACPI systems an API equivalent to
-> of_dma_configure() is missing which implies that it is currently not
-> possible to set-up DMA operations for devices through the ACPI generic
-> kernel layer.
+On Wed, 26 Oct 2016, Linus Walleij wrote:
+
+> The Kconfig and file naming for the PM8xxx driver is totally
+> confusing:
 > 
-> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
-> calls that for now are just wrappers around arch_setup_dma_ops() and
-> arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
-> the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+> - Kconfig options MFD_PM8XXX and MFD_PM8921_CORE, some in-kernel
+>   users depending on or selecting either at random.
+> - A driver file named pm8921-core.c even if it is indeed
+>   used by the whole PM8xxx family of chips.
+> - An irqchip named pm8xxx since it was (I guess) realized that
+>   the driver was generic for all pm8xxx PMICs.
 > 
-> Since acpi_dma_configure() is used to configure DMA operations, the
-> function initializes the dma/coherent_dma masks to sane default values
-> if the current masks are uninitialized (also to keep the default values
-> consistent with DT systems) to make sure the device has a complete
-> default DMA set-up.
+> As I may want to add support for PM8901 this is starting to get
+> really messy. Fix this situation by:
 > 
-> The DMA range size passed to arch_setup_dma_ops() is sized according
-> to the device coherent_dma_mask (starting at address 0x0), mirroring the
-> DT probing path behaviour when a dma-ranges property is not provided
-> for the device being probed; this changes the current arch_setup_dma_ops()
-> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
-> is a NOP on all architectures but ARM/ARM64 this patch does not change
-> the current kernel behaviour on them.
+> - Remove the MFD_PM8921_CORE symbol and rely solely on MFD_PM8XXX
+>   and convert all users, including LEDs Kconfig and ARM defconfigs
+>   for qcom and multi_v7 to use that single symbol.
+> - Renaming the driver to qcom-pm8xxx.c to fit along the two
+>   other qcom* prefixed drivers.
+> - Rename functions withing the driver from 8921 to 8xxx to
+>   indicate it is generic.
+> - Just drop the =m config from the pxa_defconfig, I have no clue
+>   why it is even there, it is not a Qualcomm platform. (Possibly
+>   older Kconfig noise from saveconfig.)
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com> [pci]
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/acpi/glue.c     |  4 ++--
->  drivers/acpi/scan.c     | 40 ++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/probe.c     |  3 +--
->  include/acpi/acpi_bus.h |  2 ++
->  include/linux/acpi.h    |  5 +++++
->  5 files changed, 50 insertions(+), 4 deletions(-)
+> I do NOT think it is a good idea to try to split this commit up,
+> I rather prefer that Lee simply merge it into MFD.
 > 
-> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-> index 5ea5dc2..f8d6564 100644
-> --- a/drivers/acpi/glue.c
-> +++ b/drivers/acpi/glue.c
-> @@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->  
->  	attr = acpi_get_dma_attr(acpi_dev);
->  	if (attr != DEV_DMA_NOT_SUPPORTED)
-> -		arch_setup_dma_ops(dev, 0, 0, NULL,
-> -				   attr == DEV_DMA_COHERENT);
-> +		acpi_dma_configure(dev, attr);
->  
->  	acpi_physnode_link_name(physical_node_name, node_id);
->  	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
-> @@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
->  	return 0;
->  
->   err:
-> +	acpi_dma_deconfigure(dev);
->  	ACPI_COMPANION_SET(dev, NULL);
->  	put_device(dev);
->  	put_device(&acpi_dev->dev);
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 035ac64..694e0b6 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -1370,6 +1370,46 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
->  		return DEV_DMA_NON_COHERENT;
->  }
->  
-> +/**
-> + * acpi_dma_configure - Set-up DMA configuration for the device.
-> + * @dev: The pointer to the device
-> + * @attr: device dma attributes
-> + */
-> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-> +{
-> +	/*
-> +	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-> +	 * setup the correct supported mask.
-> +	 */
-> +	if (!dev->coherent_dma_mask)
-> +		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-> +
-> +	/*
-> +	 * Set it to coherent_dma_mask by default if the architecture
-> +	 * code has not set it.
-> +	 */
-> +	if (!dev->dma_mask)
-> +		dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +	/*
-> +	 * Assume dma valid range starts at 0 and covers the whole
-> +	 * coherent_dma_mask.
-> +	 */
-> +	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
-> +			   attr == DEV_DMA_COHERENT);
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_dma_configure);
-> +
-> +/**
-> + * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
-> + * @dev: The pointer to the device
-> + */
-> +void acpi_dma_deconfigure(struct device *dev)
-> +{
-> +	arch_teardown_dma_ops(dev);
-> +}
-> +EXPORT_SYMBOL_GPL(acpi_dma_deconfigure);
-> +
->  static void acpi_init_coherency(struct acpi_device *adev)
->  {
->  	unsigned long long cca = 0;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index ab00267..c29e07a 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1738,8 +1738,7 @@ static void pci_dma_configure(struct pci_dev *dev)
->  		if (attr == DEV_DMA_NOT_SUPPORTED)
->  			dev_warn(&dev->dev, "DMA not supported.\n");
-
-If we're going to check attr for DMA support before each call like this,
-it seems like we may as well put the check at the top of
-acpi_dma_configure() instead. I think it should be viable to predicate
-the warning on dev_is_pci() at this point, if that's the appropriate
-behaviour.
-
-Still, we're likely to be touching this again soon with the
-IOMMU-probe-ordering work, so there's plenty of room for further
-cleanups then:
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
->  		else
-> -			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
-> -					   attr == DEV_DMA_COHERENT);
-> +			acpi_dma_configure(&dev->dev, attr);
->  	}
->  
->  	pci_put_host_bridge_device(bridge);
-> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
-> index c1a524d..4242c31 100644
-> --- a/include/acpi/acpi_bus.h
-> +++ b/include/acpi/acpi_bus.h
-> @@ -573,6 +573,8 @@ struct acpi_pci_root {
->  
->  bool acpi_dma_supported(struct acpi_device *adev);
->  enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
-> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
-> +void acpi_dma_deconfigure(struct device *dev);
->  
->  struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
->  					   u64 address, bool check_children);
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 6efb13c..df961f4 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -764,6 +764,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
->  	return DEV_DMA_NOT_SUPPORTED;
->  }
->  
-> +static inline void acpi_dma_configure(struct device *dev,
-> +				      enum dev_dma_attr attr) { }
-> +
-> +static inline void acpi_dma_deconfigure(struct device *dev) { }
-> +
->  #define ACPI_PTR(_ptr)	(NULL)
->  
->  static inline void acpi_device_set_enumerated(struct acpi_device *adev)
+> The reason is that files like qcom_defconfig already contain both
+> the right symbols, but the MFD_PM8921_CORE symbol cannot be removed
+> until this rename has happened, whereas multi_v7_defconfig needs
+> it added etc, and this is just a clean nice cut.
 > 
+> Jacek, ARM SoC person: please ACK this patch to get merged into
+> MFD.
+> ---
+>  arch/arm/configs/multi_v7_defconfig          |  2 +-
+>  arch/arm/configs/pxa_defconfig               |  1 -
+>  arch/arm/configs/qcom_defconfig              |  1 -
+>  drivers/leds/Kconfig                         |  2 +-
+>  drivers/mfd/Kconfig                          | 14 ++++------
+>  drivers/mfd/Makefile                         |  2 +-
+>  drivers/mfd/{pm8921-core.c => qcom-pm8xxx.c} | 42 ++++++++++++++--------------
+
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+
+>  7 files changed, 29 insertions(+), 35 deletions(-)
+>  rename drivers/mfd/{pm8921-core.c => qcom-pm8xxx.c} (92%)
+
+How many more Acks do we need?
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
