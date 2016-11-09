@@ -1,28 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Nov 2016 17:16:24 +0000
-Subject: [PATCH] arm64: percpu: kill off final ACCESS_ONCE() uses
-In-Reply-To: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
-References: <1478283426-6649-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20161109171623.GC15943@e104818-lin.cambridge.arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 9 Nov 2016 18:19:06 +0100
+Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <1626072.dpWPnWgGl9@wuerfel>
+References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
+ <CAMuHMdUmpMpizZpq1V-sLA8Cf2q5oOgOVxGOvKXqTHvn+Mj7Tg@mail.gmail.com>
+ <1626072.dpWPnWgGl9@wuerfel>
+Message-ID: <CAMuHMdVrdjqWruY=dBjWP=jZuZkc=aTBTMijOyTDfZFcaD_jsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 06:17:06PM +0000, Mark Rutland wrote:
-> For several reasons it is preferable to use {READ,WRITE}_ONCE() rather than
-> ACCESS_ONCE(). For example, these handle aggregate types, result in shorter
-> source code, and better document the intended access (which may be useful for
-> instrumentation features such as the upcoming KTSAN).
-> 
-> Over a number of patches, most uses of ACCESS_ONCE() in arch/arm64 have been
-> migrated to {READ,WRITE}_ONCE(). For consistency, and the above reasons, this
-> patch migrates the final remaining uses.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dmitry Vyukov <dvyukov@google.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi Arnd,
 
-I'll queue this for 4.10. Thanks.
+On Wed, Nov 9, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday, November 9, 2016 2:34:33 PM CET Geert Uytterhoeven wrote:
+>> > And Samsung.
+>> > Shall I create the immutable branch now?
+>>
+>> Arnd: are you happy with the new patches and changes?
+>
+> I still had some comments for patch 7, but that shouldn't stop
+> you from creating a branch for the first three so everyone can
+> build on top of that.
 
--- 
-Catalin
+Thanks!
+
+What about patch [4/7]?
+Haven't you received it? Your address was in the To-line for all 7 patches.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
