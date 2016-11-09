@@ -1,89 +1,64 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed,  9 Nov 2016 21:21:52 +0800
-Subject: [PATCH v2 0/9] rockchip: add more power domain and devices dts for
- rk3399
-Message-ID: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+Date: Wed,  9 Nov 2016 21:21:53 +0800
+Subject: [PATCH v2 1/9] arm64: dts: rockchip: add eMMC's power domain support
+ for rk3399
+In-Reply-To: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Ziyuan Xu <xzy.xu@rock-chips.com>
 
-Please allow me to integrate these patches.
-They are missing or losing for upstream, then there are some patches
-are  always depending on them.
+Control power domain for eMMC via genpd to reduce power consumption.
 
-The following patches are releated to PD.
-git log --oneline
-827198c arm64: dts: rockchip: add the usb3 pd for rk3399
-95e95b4 arm64: dts: rockchip: support dwc3 USB for rk3399
-3ced49c arm64: dts: rockchip: add pd_edp node for rk3399
-e19db3f arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
-eb92079 arm64: dts: rockchip: add backlight support for rk3399 evb board
-20b8135 arm64: dts: rockchip: add eDP device node for rk3399
-480a1bb arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
-4964c0a arm64: dts: rockchip: add pd_sd power node for rk3399
-c407a4c arm64: dts: rockchip: add eMMC's power domain support for rk3399
-
-----
-Hi Heiko & guys,
-
-This series patches support the below PDs.
-
-1) sd & emmc pd
-4964c0a arm64: dts: rockchip: add pd_sd power node for rk3399
-c407a4c arm64: dts: rockchip: add eMMC's power domain support for rk3399
-
-2) edp pd
-3ced49c arm64: dts: rockchip: add pd_edp node for rk3399
-e19db3f arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
-eb92079 arm64: dts: rockchip: add backlight support for rk3399 evb board
-20b8135 arm64: dts: rockchip: add eDP device node for rk3399
-480a1bb arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
-
-3) usb3 pd
-827198c arm64: dts: rockchip: add the usb3 pd for rk3399
-95e95b4 arm64: dts: rockchip: support dwc3 USB for rk3399
-
-Thanks,
-Caesar
-
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
 Changes in v2:
 - Reviewed-on: https://chromium-review.googlesource.com/376558
 - Verified on ChromeOS kernel4.4
-- v1 on https://patchwork.kernel.org/patch/9322553/
-- Reviewed-on: https://chromium-review.googlesource.com/386483
-- Verified on ChromeOS kernel4.4
-- Yakir posted the original patch on
-- https://patchwork.kernel.org/patch/9191777
-- the original patches from brian posting on
-  https://chromium-review.googlesource.com/343603
-- Reviewed-on: https://chromium-review.googlesource.com/384280
 
-Brian Norris (1):
-  arm64: dts: rockchip: support dwc3 USB for rk3399
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Caesar Wang (1):
-  arm64: dts: rockchip: add the usb3 pd for rk3399
-
-Mark Yao (1):
-  arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
-
-Yakir Yang (3):
-  arm64: dts: rockchip: add eDP device node for rk3399
-  arm64: dts: rockchip: add backlight support for rk3399 evb board
-  arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
-
-Ziyuan Xu (1):
-  arm64: dts: rockchip: add eMMC's power domain support for rk3399
-
-zhangqing (2):
-  arm64: dts: rockchip: add pd_sd power node for rk3399
-  arm64: dts: rockchip: add pd_edp node for rk3399
-
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  40 ++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 210 ++++++++++++++++++++++++++++
- 2 files changed, 250 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index cbb7f8b..b401176 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -269,6 +269,7 @@
+ 		#clock-cells = <0>;
+ 		phys = <&emmc_phy>;
+ 		phy-names = "phy_arasan";
++		power-domains = <&power RK3399_PD_EMMC>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -690,6 +691,11 @@
+ 		status = "disabled";
+ 	};
+ 
++	qos_emmc: qos at ffa58000 {
++		compatible = "syscon";
++		reg = <0x0 0xffa58000 0x0 0x20>;
++	};
++
+ 	qos_gmac: qos at ffa5c000 {
+ 		compatible = "syscon";
+ 		reg = <0x0 0xffa5c000 0x0 0x20>;
+@@ -823,6 +829,11 @@
+ 			};
+ 
+ 			/* These power domains are grouped by VD_LOGIC */
++			pd_emmc at RK3399_PD_EMMC {
++				reg = <RK3399_PD_EMMC>;
++				clocks = <&cru ACLK_EMMC>;
++				pm_qos = <&qos_emmc>;
++			};
+ 			pd_gmac at RK3399_PD_GMAC {
+ 				reg = <RK3399_PD_GMAC>;
+ 				clocks = <&cru ACLK_GMAC>;
 -- 
 2.7.4
