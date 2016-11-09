@@ -1,163 +1,67 @@
-From: myungjoo.ham@samsung.com (=?UTF-8?B?TXl1bmdKb28gSGFt?=)
-Date: Wed, 09 Nov 2016 01:53:37 +0000
-Subject: =?UTF-8?B?UkU6IFtQQVRDSCB2NF0gUE0vZGV2ZnJlcTogYWRkIHN1c3Bl?=
- =?UTF-8?B?bmQgZnJlcXVlbmN5IHN1cHBvcnQ=?=
-References: <CGME20161108091840epcas3p21af60a1b0a4867306366633427567dc3@epcas3p2.samsung.com>
-Message-ID: <851217549.619875.1478656417915.JavaMail.weblogic@ep2ml103c>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue,  8 Nov 2016 18:44:56 -0800
+Subject: [PATCH] ARM: dts: imx7d-pinfunc: fix UART pinmux defines
+Message-ID: <20161109024456.1832-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add suspend frequency support and if needed set it to
-> the frequency obtained from the suspend opp (can be defined
-> using opp-v2 bindings and is optional).
-> 
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
-> Changes in v2:
-> - use update_devfreq() instead devfreq_update_status()
-> Changes in v3:
-> - fix build error
-> Changes in v4:
-> - move dev_pm_opp_get_suspend_opp() to devfreq_add_device()
-> 
->  drivers/devfreq/devfreq.c                 | 15 +++++++++++++--
->  drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
->  include/linux/devfreq.h                   |  9 +++++++++
->  3 files changed, 31 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-> index bf3ea76..d9d56e1 100644
-> --- a/drivers/devfreq/devfreq.c
-> +++ b/drivers/devfreq/devfreq.c
-> @@ -363,7 +363,10 @@ void devfreq_monitor_suspend(struct devfreq *devfreq)
->  		mutex_unlock(&devfreq->lock);
->  		return;
->  	}
-> -
-> +	if (devfreq->suspend_freq) {
-> +		update_devfreq(devfreq);
-> +		devfreq->suspend_flag = true;
+The UART pinmux defines for the pins which are part of the LPSR
+pinmux controller are wrong: Output signals configure the input
+sel value and the pinmux defines allow not to distinguish between
+DCE/DTE mode. Follow the usual pattern using DTE/DCE as part of
+the define to denote the two UART configuration options.
 
-+	} else {
-+ 		devfreq_update_status(devfreq, devfreq->previous_freq);
-+	}
--   	devfreq_update_status(devfreq, devfreq->previous_freq);
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+There is a similar patch downstream named:
+"MLK-10662: arm: imx7d-pinfunc: fix uart input sel option value"
 
-update_devfreq() calls devfreq_update_status.
-So let's call it only when update_devfreq is not called.
+Tested using UART5 on a Colibri iMX7.
 
->  	devfreq->stop_polling = true;
->  	mutex_unlock(&devfreq->lock);
-> @@ -394,7 +397,8 @@ void devfreq_monitor_resume(struct devfreq *devfreq)
->  
->  	devfreq->last_stat_updated = jiffies;
->  	devfreq->stop_polling = false;
-> -
-> +	if (devfreq->suspend_freq)
-> +		devfreq->suspend_flag = false;
->  	if (devfreq->profile->get_cur_freq &&
->  		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq))
->  		devfreq->previous_freq = freq;
-> @@ -528,6 +532,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
->  	struct devfreq *devfreq;
->  	struct devfreq_governor *governor;
->  	int err = 0;
-> +	struct dev_pm_opp *suspend_opp;
->  
->  	if (!dev || !profile || !governor_name) {
->  		dev_err(dev, "%s: Invalid parameters.\n", __func__);
-> @@ -563,6 +568,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
->  	devfreq->data = data;
->  	devfreq->nb.notifier_call = devfreq_notifier_call;
->  
-> +	rcu_read_lock();
-> +	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
-> +	if (suspend_opp)
-> +		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
-> +	rcu_read_unlock();
-> +
->  	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
->  		mutex_unlock(&devfreq->lock);
->  		devfreq_set_freq_table(devfreq);
-> diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
-> index ae72ba5..84b3ce1 100644
-> --- a/drivers/devfreq/governor_simpleondemand.c
-> +++ b/drivers/devfreq/governor_simpleondemand.c
-> @@ -29,6 +29,15 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
->  	struct devfreq_simple_ondemand_data *data = df->data;
->  	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
->  
-> +	/*
-> +	 * if devfreq in suspend status and have suspend_freq,
-> +	 * the frequency need to set to suspend_freq
-> +	 */
-> +	if (df->suspend_flag) {
-> +		*freq =	df->suspend_freq;
-> +		return 0;
-> +	}
-> +
+--
+Stefan
 
-If this is because of the case when devfreq_simple_ondemand_func() is called
-before cancel_delayed_work_sync() in devfreq_monitor_suspend() and
-after update_devfreq() in devfreq_monitor_suspend(),
-you can use devfreq->stop_polling (and move devfreq->stop_polling = true; a bit earlier).
+ arch/arm/boot/dts/imx7d-pinfunc.h | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-You do not need to introduce yet another variable, suspend_flag, in the devfreq struct.
-
-The semantics of "stop_polling" fits the purpose well enough.
-
->  	err = devfreq_update_stats(df);
->  	if (err)
->  		return err;
-> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-> index 2de4e2e..c463ae1 100644
-> --- a/include/linux/devfreq.h
-> +++ b/include/linux/devfreq.h
-> @@ -172,6 +172,7 @@ struct devfreq {
->  	struct delayed_work work;
->  
->  	unsigned long previous_freq;
-> +	unsigned long suspend_freq;
->  	struct devfreq_dev_status last_status;
->  
->  	void *data; /* private data for governors */
-> @@ -179,6 +180,7 @@ struct devfreq {
->  	unsigned long min_freq;
->  	unsigned long max_freq;
->  	bool stop_polling;
-> +	bool suspend_flag;
->  
->  	/* information for device frequency transition */
->  	unsigned int total_trans;
-> @@ -214,6 +216,8 @@ extern int devfreq_resume_device(struct devfreq *devfreq);
->  /* Helper functions for devfreq user device driver with OPP. */
->  extern struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->  					   unsigned long *freq, u32 flags);
-> +extern void devfreq_opp_get_suspend_opp(struct device *dev,
-> +					struct devfreq *devfreq);
-
-No more required.
-
->  extern int devfreq_register_opp_notifier(struct device *dev,
->  					 struct devfreq *devfreq);
->  extern int devfreq_unregister_opp_notifier(struct device *dev,
-> @@ -348,6 +352,11 @@ static inline struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
->  	return ERR_PTR(-EINVAL);
->  }
->  
-> +static inline void devfreq_opp_get_suspend_opp(struct device *dev,
-> +					       struct devfreq *devfreq)
-> +{
-> +}
-> +
-
-No more required.
-
->  static inline int devfreq_register_opp_notifier(struct device *dev,
->  					 struct devfreq *devfreq)
->  {
-> -- 
-> 2.6.6
-> 
-> 
-> 
+diff --git a/arch/arm/boot/dts/imx7d-pinfunc.h b/arch/arm/boot/dts/imx7d-pinfunc.h
+index 3f9f0d9..7bc3c00 100644
+--- a/arch/arm/boot/dts/imx7d-pinfunc.h
++++ b/arch/arm/boot/dts/imx7d-pinfunc.h
+@@ -43,26 +43,30 @@
+ #define MX7D_PAD_GPIO1_IO04__GPIO1_IO4                            0x0010 0x0040 0x0000 0x0 0x0
+ #define MX7D_PAD_GPIO1_IO04__USB_OTG1_OC                          0x0010 0x0040 0x072C 0x1 0x1
+ #define MX7D_PAD_GPIO1_IO04__FLEXTIMER1_CH4                       0x0010 0x0040 0x0594 0x2 0x1
+-#define MX7D_PAD_GPIO1_IO04__UART5_CTS_B                          0x0010 0x0040 0x0710 0x3 0x4
++#define MX7D_PAD_GPIO1_IO04__UART5_DCE_CTS                        0x0010 0x0040 0x0000 0x3 0x0
++#define MX7D_PAD_GPIO1_IO04__UART5_DTE_RTS                        0x0010 0x0040 0x0710 0x3 0x4
+ #define MX7D_PAD_GPIO1_IO04__I2C1_SCL                             0x0010 0x0040 0x05D4 0x4 0x2
+ #define MX7D_PAD_GPIO1_IO04__OBSERVE3_OUT                         0x0010 0x0040 0x0000 0x6 0x0
+ #define MX7D_PAD_GPIO1_IO05__GPIO1_IO5                            0x0014 0x0044 0x0000 0x0 0x0
+ #define MX7D_PAD_GPIO1_IO05__USB_OTG1_PWR                         0x0014 0x0044 0x0000 0x1 0x0
+ #define MX7D_PAD_GPIO1_IO05__FLEXTIMER1_CH5                       0x0014 0x0044 0x0598 0x2 0x1
+-#define MX7D_PAD_GPIO1_IO05__UART5_RTS_B                          0x0014 0x0044 0x0710 0x3 0x5
++#define MX7D_PAD_GPIO1_IO05__UART5_DCE_RTS                        0x0014 0x0044 0x0710 0x3 0x5
++#define MX7D_PAD_GPIO1_IO05__UART5_DTE_CTS                        0x0014 0x0044 0x0000 0x3 0x0
+ #define MX7D_PAD_GPIO1_IO05__I2C1_SDA                             0x0014 0x0044 0x05D8 0x4 0x2
+ #define MX7D_PAD_GPIO1_IO05__OBSERVE4_OUT                         0x0014 0x0044 0x0000 0x6 0x0
+ #define MX7D_PAD_GPIO1_IO06__GPIO1_IO6                            0x0018 0x0048 0x0000 0x0 0x0
+ #define MX7D_PAD_GPIO1_IO06__USB_OTG2_OC                          0x0018 0x0048 0x0728 0x1 0x1
+ #define MX7D_PAD_GPIO1_IO06__FLEXTIMER1_CH6                       0x0018 0x0048 0x059C 0x2 0x1
+-#define MX7D_PAD_GPIO1_IO06__UART5_RX_DATA                        0x0018 0x0048 0x0714 0x3 0x4
++#define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
++#define MX7D_PAD_GPIO1_IO06__UART5_DTE_TX                         0x0018 0x0048 0x0000 0x3 0x0
+ #define MX7D_PAD_GPIO1_IO06__I2C2_SCL                             0x0018 0x0048 0x05DC 0x4 0x2
+ #define MX7D_PAD_GPIO1_IO06__CCM_WAIT                             0x0018 0x0048 0x0000 0x5 0x0
+ #define MX7D_PAD_GPIO1_IO06__KPP_ROW4                             0x0018 0x0048 0x0624 0x6 0x1
+ #define MX7D_PAD_GPIO1_IO07__GPIO1_IO7                            0x001C 0x004C 0x0000 0x0 0x0
+ #define MX7D_PAD_GPIO1_IO07__USB_OTG2_PWR                         0x001C 0x004C 0x0000 0x1 0x0
+ #define MX7D_PAD_GPIO1_IO07__FLEXTIMER1_CH7                       0x001C 0x004C 0x05A0 0x2 0x1
+-#define MX7D_PAD_GPIO1_IO07__UART5_TX_DATA                        0x001C 0x004C 0x0714 0x3 0x5
++#define MX7D_PAD_GPIO1_IO07__UART5_DCE_TX                         0x001C 0x004C 0x0000 0x3 0x0
++#define MX7D_PAD_GPIO1_IO07__UART5_DTE_RX                         0x001C 0x004C 0x0714 0x3 0x5
+ #define MX7D_PAD_GPIO1_IO07__I2C2_SDA                             0x001C 0x004C 0x05E0 0x4 0x2
+ #define MX7D_PAD_GPIO1_IO07__CCM_STOP                             0x001C 0x004C 0x0000 0x5 0x0
+ #define MX7D_PAD_GPIO1_IO07__KPP_COL4                             0x001C 0x004C 0x0604 0x6 0x1
+-- 
+2.10.2
