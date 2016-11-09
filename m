@@ -1,121 +1,28 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 9 Nov 2016 14:34:33 +0100
-Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
-Message-ID: <CAMuHMdUmpMpizZpq1V-sLA8Cf2q5oOgOVxGOvKXqTHvn+Mj7Tg@mail.gmail.com>
+From: gnomes@lxorguk.ukuu.org.uk (One Thousand Gnomes)
+Date: Wed, 9 Nov 2016 13:54:53 +0000
+Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
+ special ISA
+In-Reply-To: <2368890.jTbyGqYR0M@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108114953.GB15297@leverpostej> <2368890.jTbyGqYR0M@wuerfel>
+Message-ID: <20161109135453.2e5402bd@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+> I think it is a relatively safe assumption that there is only one
+> ISA bridge. A lot of old drivers hardcode PIO or memory addresses
 
-On Mon, Nov 7, 2016 at 10:35 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Mon, Oct 31, 2016 at 12:30 PM, Geert Uytterhoeven
-> <geert+renesas@glider.be> wrote:
->> Some Renesas SoCs may exist in different revisions, providing slightly
->> different functionalities (e.g. R-Car H3 ES1.x and ES2.0), and behavior
->> (errate and quirks).  This needs to be catered for by drivers and/or
->> platform code.  The recently proposed soc_device_match() API seems like
->> a good fit to handle this.
->>
->> This patch series implements the core infrastructure to provide SoC and
->> revision information through the SoC bus for Renesas ARM SoCs. It
->> consists of 7 patches:
->>   - Patches 1-4 provide soc_device_match(), with some related fixes,
->>   - Patches 5-7 implement identification of Renesas SoCs and
->>     registration with the SoC bus,
->>
->> Changes compared to v1:
->>   - Add Acked-by,
->>   - New patches:
->>       - "[4/7] base: soc: Provide a dummy implementation of
->>                soc_device_match()",
->>       - "[5/7] ARM: shmobile: Document DT bindings for CCCR and PRR",
->>       - "[6/7] arm64: dts: r8a7795: Add device node for PRR"
->>         (more similar patches available, I'm not yet spamming you all
->>          with them),
->>   - Drop SoC families and family names; use fixed "Renesas" instead,
->>   - Drop EMEV2, which doesn't have a chip ID register, and doesn't share
->>     devices with other SoCs,
->>   - Drop RZ/A1H and R-CAR M1A, which don't have chip ID registers (for
->>     M1A: not accessible from the ARM core?),
->>   - On arm, move "select SOC_BUS" from ARCH_RENESAS to Kconfig symbols
->>     for SoCs that provide a chip ID register,
->>   - Build renesas-soc only if SOC_BUS is enabled,
->>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
->>     available, else fall back to hardcoded addresses for compatibility
->>     with existing DTBs,
->>   - Remove verification of product IDs; just print the ID instead,
->>   - Don't register the SoC bus if the chip ID register is missing,
->>   - Change R-Mobile APE6 fallback to use PRR instead of CCCR (it has
->>     both).
->>
->> Merge strategy:
->>   - In theory, patches 1-4 should go through Greg's driver core tree.
->>     But it's a hard dependency for all users.
->>     If people agree, I can provide an immutable branch in my
->>     renesas-drivers repository, to be merged by all interested parties.
->>     So far I'm aware of Freescale/NXP, and Renesas.
->
-> And Samsung.
-> Shall I create the immutable branch now?
+It's not a safe assumption for x86 at least. There are a few systems with
+multiple ISA busses particularly older laptops with a docking station.
 
-Arnd: are you happy with the new patches and changes?
+> when talking to an ISA device, so having multiple instances is
+> already problematic.
 
-Thanks again!
+PCMCIA devices handle it themselves so are ok. I'm not clear how the dual
+PIIX4 configuration used in the older IBM laptop docks actually worked so
+I assume the transaction went out of both bridges and providing one of
+them responded the other kept silent as you simply stuffed the card into
+the dock and it worked.
 
->>   - Patches 5-7 obviously have to go through Simon's Renesas tree (after
->>     merging the soc_device_match() core), and arm-soc.
->>
->> Tested on (machine, soc_id, optional revision):
->>     EMEV2 KZM9D Board, emev2
->>     Genmai, r7s72100
->>     APE6EVM, r8a73a4, ES1.0
->>     armadillo 800 eva, r8a7740, ES2.0
->>     bockw, r8a7778
->>     marzen, r8a7779, ES1.0
->>     Lager, r8a7790, ES1.0
->>     Koelsch, r8a7791, ES1.0
->>     Porter, r8a7791, ES3.0
->>     Blanche, r8a7792, ES1.1
->>     Gose, r8a7793, ES1.0
->>     Alt, r8a7794, ES1.0
->>     Renesas Salvator-X board based on r8a7795, r8a7795, ES1.0
->>     Renesas Salvator-X board based on r8a7795, r8a7795, ES1.1
->>     Renesas Salvator-X board based on r8a7796, r8a7796, ES1.0
->>     KZM-A9-GT, sh73a0, ES2.0
->>
->> For your convenience, this series (incl. more DT updates to add device
->> nodes for CCCR and PRR to all other Renesas ARM SoCs) is also available
->> in the topic/renesas-soc-id-v2 branch of my renesas-drivers git
->> repository at
->> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
->> Its first user is support for R-Car H3 ES2.0 in branch
->> topic/r8a7795-es2-v1-rebased2.
->>
->> Thanks for your comments!
->>
->> Arnd Bergmann (1):
->>   base: soc: Introduce soc_device_match() interface
->>
->> Geert Uytterhoeven (6):
->>   base: soc: Early register bus when needed
->>   base: soc: Check for NULL SoC device attributes
->>   base: soc: Provide a dummy implementation of soc_device_match()
->>   ARM: shmobile: Document DT bindings for CCCR and PRR
->>   arm64: dts: r8a7795: Add device node for PRR
->>   soc: renesas: Identify SoC and register with the SoC bus
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Alan
