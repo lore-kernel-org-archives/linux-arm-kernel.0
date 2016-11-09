@@ -1,110 +1,99 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Wed,  9 Nov 2016 11:37:45 +0800
-Subject: [PATCH v6] PM/devfreq: add suspend frequency support
-Message-ID: <1478662665-6357-1-git-send-email-hl@rock-chips.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed, 9 Nov 2016 09:58:38 +0530
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <4657586.c5MJoh65Ux@wuerfel>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <22120038.dbaYpsQoUH@wuerfel> <5821D736.7080803@gmail.com>
+ <4657586.c5MJoh65Ux@wuerfel>
+Message-ID: <5822A5F6.9040806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add suspend frequency support and if needed set it to
-the frequency obtained from the suspend opp (can be defined
-using opp-v2 bindings and is optional).
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
----
-Changes in v2:
-- use update_devfreq() instead devfreq_update_status()
-Changes in v3:
-- fix build error
-Changes in v4:
-- move dev_pm_opp_get_suspend_opp() to devfreq_add_device()
-Changes in v5:
-- delete devfreq_opp_get_suspend_opp() in devfreq.h
-Changes in v6:
-- return to use stop_polling check suspend status
 
- drivers/devfreq/devfreq.c                 | 14 +++++++++++---
- drivers/devfreq/governor_simpleondemand.c |  9 +++++++++
- include/linux/devfreq.h                   |  1 +
- 3 files changed, 21 insertions(+), 3 deletions(-)
+On Tuesday 08 November 2016 08:38 PM, Arnd Bergmann wrote:
+> On Tuesday, November 8, 2016 7:16:30 PM CET Anurup M wrote:
+>>>>>> If these are backwards compatible, just mark them as compatible in DT,
+>>>>>> e.g. hip06 can use
+>>>>>>
+>>>>>>     compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
+>>>>>>
+>>>>>> so you can tell the difference if you need to, but the driver only has to
+>>>>>> list the oldest one here.
+>>>>>>
+>>>>>> What is the difference between the cpu and io djtag interfaces?
+>>>> On some chips like hip06, the djtag version is different for IO die.
+>>> In what way? The driver doesn't seem to care about the difference.
+>> There is  a difference in djtag version of CPU and IO die (in some chips).
+>> For ex: in hip06 djtag for CPU is v1 and for IO is v2.
+>> so they use different readwrite handlers djtag_readwrite_(v1/2).
+>>
+>> +       /* for hip06(D03) cpu die */
+>> +       { .compatible = "hisilicon,hip06-cpu-djtag-v1",
+>> +               .data = (void *)djtag_readwrite_v1 },
+>> +       /* for hip06(D03) io die */
+>> +       { .compatible = "hisilicon,hip06-io-djtag-v2",
+>> +               .data = (void *)djtag_readwrite_v2 },
+>>
+>>
+>> For the same djtag version, there is no difference in handling in the
+>> driver.
+> Right, but my point was about the compatibility with the older chips
+> using the same IP block, marking the ones as compatible that actually
+> use the same interface.
+>
+> I also see that the compatible strings have the version included in
+> them, and you can probably drop them by requiring them only in the
+> fallback:
+>
+> 	compatible = "hisilicon,hip05-cpu-djtag", "hisilicon,djtag-v1";
+> 	compatible = "hisilicon,hip05-io-djtag", "hisilicon,djtag-v1";
+> 	compatible = "hisilicon,hip06-cpu-djtag", "hisilicon,djtag-v1";
+> 	compatible = "hisilicon,hip06-io-djtag", "hisilicon,djtag-v2";
+> 	compatible = "hisilicon,hip07-cpu-djtag", "hisilicon,djtag-v2";
+> 	compatible = "hisilicon,hip07-io-djtag", "hisilicon,djtag-v2";
+>
+> We want to have the first entry be as specific as possible, but
+> the last (second) entry is the one that can be used by the driver
+> for matching. When a future hip08/hip09/... chip uses an existing
+> interface, you then don't have to update the driver.
+Thanks. I had a similar thought on this. So as I have the version string 
+in the
+second entry "-v(1/2)".
+I can use it in driver for matching. So i think  I will change it as below.
+Please correct me if my understanding is wrong.
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index da72d97..cfa64a0 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -359,9 +359,11 @@ void devfreq_monitor_suspend(struct devfreq *devfreq)
- 		mutex_unlock(&devfreq->lock);
- 		return;
- 	}
--
--	devfreq_update_status(devfreq, devfreq->previous_freq);
- 	devfreq->stop_polling = true;
-+	if (devfreq->suspend_freq)
-+		update_devfreq(devfreq);
-+	else
-+		devfreq_update_status(devfreq, devfreq->previous_freq);
- 	mutex_unlock(&devfreq->lock);
- 	cancel_delayed_work_sync(&devfreq->work);
- }
-@@ -390,7 +392,6 @@ void devfreq_monitor_resume(struct devfreq *devfreq)
- 
- 	devfreq->last_stat_updated = jiffies;
- 	devfreq->stop_polling = false;
--
- 	if (devfreq->profile->get_cur_freq &&
- 		!devfreq->profile->get_cur_freq(devfreq->dev.parent, &freq))
- 		devfreq->previous_freq = freq;
-@@ -524,6 +525,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
- 	struct devfreq *devfreq;
- 	struct devfreq_governor *governor;
- 	int err = 0;
-+	struct dev_pm_opp *suspend_opp;
- 
- 	if (!dev || !profile || !governor_name) {
- 		dev_err(dev, "%s: Invalid parameters.\n", __func__);
-@@ -558,6 +560,12 @@ struct devfreq *devfreq_add_device(struct device *dev,
- 	devfreq->data = data;
- 	devfreq->nb.notifier_call = devfreq_notifier_call;
- 
-+	rcu_read_lock();
-+	suspend_opp = dev_pm_opp_get_suspend_opp(dev);
-+	if (suspend_opp)
-+		devfreq->suspend_freq = dev_pm_opp_get_freq(suspend_opp);
-+	rcu_read_unlock();
-+
- 	if (!devfreq->profile->max_state && !devfreq->profile->freq_table) {
- 		mutex_unlock(&devfreq->lock);
- 		devfreq_set_freq_table(devfreq);
-diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
-index ae72ba5..b82f089 100644
---- a/drivers/devfreq/governor_simpleondemand.c
-+++ b/drivers/devfreq/governor_simpleondemand.c
-@@ -29,6 +29,15 @@ static int devfreq_simple_ondemand_func(struct devfreq *df,
- 	struct devfreq_simple_ondemand_data *data = df->data;
- 	unsigned long max = (df->max_freq) ? df->max_freq : UINT_MAX;
- 
-+	/*
-+	 * if devfreq in suspend status and have suspend_freq,
-+	 * the frequency need to set to suspend_freq
-+	 */
-+	if (df->stop_polling) {
-+		*freq =	df->suspend_freq;
-+		return 0;
-+	}
-+
- 	err = devfreq_update_stats(df);
- 	if (err)
- 		return err;
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index 98c6993..517e394 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -172,6 +172,7 @@ struct devfreq {
- 	struct delayed_work work;
- 
- 	unsigned long previous_freq;
-+	unsigned long suspend_freq;
- 	struct devfreq_dev_status last_status;
- 
- 	void *data; /* private data for governors */
--- 
-2.6.6
+  static const struct of_device_id djtag_of_match[] = {
+-       /* for hip05(D02) cpu die */
+-       { .compatible = "hisilicon,hip05-cpu-djtag-v1",
++       /* for hisi djtag-v1 cpu die */
++       { .compatible = "hisilicon,hisi-cpu-djtag-v1",
+                 .data = djtag_readwrite_v1 },
+-       /* for hip05(D02) io die */
+-       { .compatible = "hisilicon,hip05-io-djtag-v1",
++       /* for hisi djtag-v1 io die */
++       { .compatible = "hisilicon,hisi-io-djtag-v1",
+                 .data = djtag_readwrite_v1 },
+-       /* for hip06(D03) cpu die */
+-       { .compatible = "hisilicon,hip06-cpu-djtag-v1",
+-               .data = djtag_readwrite_v1 },
+-       /* for hip06(D03) io die */
+-       { .compatible = "hisilicon,hip06-io-djtag-v2",
+-               .data = djtag_readwrite_v2 },
+-       /* for hip07(D05) cpu die */
+-       { .compatible = "hisilicon,hip07-cpu-djtag-v2",
++       /* for hisi djtag-v2 cpu die */
++       { .compatible = "hisilicon,hisi-cpu-djtag-v2",
+                 .data = djtag_readwrite_v2 },
+-       /* for hip07(D05) io die */
+-       { .compatible = "hisilicon,hip07-io-djtag-v2",
++       /* for hisi djtag-v2 io die */
++       { .compatible = "hisilicon,hisi-io-djtag-v2",
+                 .data = (djtag_readwrite_v2 },
+         {},
+  };
+
+Thanks,
+Anurup
+> 	Arnd
