@@ -1,37 +1,153 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Nov 2016 14:50:13 -0700
-Subject: [PATCH v2 4/9] regulator: lp873x: Add support for populating
- input supply
-In-Reply-To: <20161109182618.ajqhtffure76zfnf@rob-hp-laptop>
-References: <20161021103841.8044-1-lokeshvutla@ti.com>
- <20161021103841.8044-5-lokeshvutla@ti.com>
- <20161030204118.ojeetnxl5qsi6lp7@rob-hp-laptop>
- <e5619d78-5752-c8fb-8a11-6629c4b7c3f6@ti.com>
- <20161109182618.ajqhtffure76zfnf@rob-hp-laptop>
-Message-ID: <20161109215013.GF2428@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 9 Nov 2016 16:05:06 -0600
+Subject: ACPI namespace details for ARM64
+Message-ID: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robh@kernel.org> [161109 11:26]:
-> On Wed, Nov 02, 2016 at 10:58:40AM +0530, Lokesh Vutla wrote:
-> > On Monday 31 October 2016 02:11 AM, Rob Herring wrote:
-> > > On Fri, Oct 21, 2016 at 04:08:36PM +0530, Lokesh Vutla wrote:
-> > >> In order to have a proper topology of regulators for a platform, each
-> > >> registering regulator needs to populate supply_name field for identifying
-> > >> its supply's name. Add supply_name field for lp873x regulators.
-> > >>
-> > >> Cc: Lee Jones <lee.jones@linaro.org>
-> > >> Cc: Keerthy <j-keerthy@ti.com>
-> > >> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> > >> ---
-> > >>  Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
-> > >>  drivers/regulator/lp873x-regulator.c             | 1 +
-...
+Hi all,
 
-> Acked-by: Rob Herring <robh@kernel.org>
+We've been working through the details of getting ACPI to work on
+arm64, and there have been lots of questions about what this means for
+PCI.  I've outlined this for several people individually, but I'm
+going to send this separately, apart from a specific patch series, to
+make sure we're all on the same page.  Please correct my errors and
+misunderstandings.
 
-Please send this patch separately to the regulator maintainer.
+Bjorn
 
-Thanks,
 
-Tony
+The basic requirement is that the ACPI namespace should describe
+*everything* that consumes address space unless there's another
+standard way for the OS to find it [1, 2]. ?For example, windows that
+are forwarded to PCI by a PCI host bridge should be described via ACPI
+devices, since the OS can't locate the host bridge by itself. ?PCI
+devices *below* the host bridge do not need to be described via ACPI,
+because the resources they consume are inside the host bridge windows,
+and the OS can discover them via the standard PCI enumeration
+mechanism (using config accesses to read and size the BARs).
+
+This ACPI resource description is done via _CRS methods of devices in
+the ACPI namespace [2]. ? _CRS methods are like generalized PCI BARs:
+the OS can read _CRS and figure out what resource is being consumed
+even if it doesn't have a driver for the device [3]. ?That's important
+because it means an old OS can work correctly even on a system with
+new devices unknown to the OS. ?The new devices won't do anything, but
+the OS can at least make sure no resources conflict with them.
+
+Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
+reserving address space!  The static tables are for things the OS
+needs to know early in boot, before it can parse the ACPI namespace.
+If a new table is defined, an old OS needs to operate correctly even
+though it ignores the table.  _CRS allows that because it is generic
+and understood by the old OS; a static table does not.
+
+If the OS is expected to manage an ACPI device, that device will have
+a specific _HID/_CID that tells the OS what driver to bind to it, and
+the _CRS tells the OS and the driver where the device's registers are.
+
+PNP0C02 "motherboard" devices are basically a catch-all. ?There's no
+programming model for them other than "don't use these resources for
+anything else." ?So any address space that is (1) not claimed by some
+other ACPI device and (2) should not be assigned by the OS to
+something else, should be claimed by a PNP0C02 _CRS method.
+
+PCI host bridges are PNP0A03 or PNP0A08 devices. ?Their _CRS should
+describe all the address space they consume. ?In principle, this would
+be all the windows they forward down to the PCI bus, as well as the
+bridge registers themselves. ?The bridge registers include things like
+secondary/subordinate bus registers that determine the bus range below
+the bridge, window registers that describe the apertures, etc. ?These
+are all device-specific, non-architected things, so the only way a
+PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
+contain the device-specific details. ?These bridge registers also
+include ECAM space, since it is consumed by the bridge.
+
+ACPI defined a Producer/Consumer bit that was intended to distinguish
+the bridge apertures from the bridge registers [4, 5]. ?However,
+BIOSes didn't use that bit correctly, and the result is that OSes have
+to assume that everything in a PCI host bridge _CRS is a window. ?That
+leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
+device itself.
+
+The workaround is to describe the bridge registers (including ECAM
+space) in PNP0C02 catch-all devices [6]. ?With the exception of ECAM,
+the bridge register space is device-specific anyway, so the generic
+PNP0A03/PNP0A08 driver (pci_root.c) has no need to know about it. ?For
+ECAM, pci_root.c learns about the space from either MCFG or the _CBA
+method.
+
+Note that the PCIe spec actually does require ECAM unless there's a
+standard firmware interface for config access, e.g., the ia64 SAL
+interface [7].  One reason is that we want a generic host bridge
+driver (pci_root.c), and a generic driver requires a generic way to
+access config space.
+
+
+[1] ACPI 6.0, sec 6.1:
+    For any device that is on a non-enumerable type of bus (for
+    example, an ISA bus), OSPM enumerates the devices' identifier(s)
+    and the ACPI system firmware must supply an _HID object ... for
+    each device to enable OSPM to do that.
+
+[2] ACPI 6.0, sec 3.7:
+    The OS enumerates motherboard devices simply by reading through
+    the ACPI Namespace looking for devices with hardware IDs.
+
+    Each device enumerated by ACPI includes ACPI-defined objects in
+    the ACPI Namespace that report the hardware resources the device
+    could occupy [_PRS], an object that reports the resources that are
+    currently used by the device [_CRS], and objects for configuring
+    those resources [_SRS].  The information is used by the Plug and
+    Play OS (OSPM) to configure the devices.
+
+[3] ACPI 6.0, sec 6.2:
+    OSPM uses device configuration objects to configure hardware
+    resources for devices enumerated via ACPI.  Device configuration
+    objects provide information about current and possible resource
+    requirements, the relationship between shared resources, and
+    methods for configuring hardware resources.
+
+    When OSPM enumerates a device, it calls _PRS to determine the
+    resource requirements of the device.  It may also call _CRS to
+    find the current resource settings for the device.  Using this
+    information, the Plug and Play system determines what resources
+    the device should consume and sets those resources by calling the
+    device?s _SRS control method.
+
+    In ACPI, devices can consume resources (for example, legacy
+    keyboards), provide resources (for example, a proprietary PCI
+    bridge), or do both.  Unless otherwise specified, resources for a
+    device are assumed to be taken from the nearest matching resource
+    above the device in the device hierarchy.
+
+[4] ACPI 6.0, sec 6.4.3.5.4:
+    Extended Address Space Descriptor
+    General Flags: Bit [0] Consumer/Producer:
+	1?This device consumes this resource
+	0?This device produces and consumes this resource
+
+[5] ACPI 6.0, sec 19.6.43:
+    ResourceUsage specifies whether the Memory range is consumed by
+    this device (ResourceConsumer) or passed on to child devices
+    (ResourceProducer).  If nothing is specified, then
+    ResourceConsumer is assumed.
+
+[6] PCI Firmware 3.0, sec 4.1.2:
+    If the operating system does not natively comprehend reserving the
+    MMCFG region, the MMCFG region must be reserved by firmware.  The
+    address range reported in the MCFG table or by _CBA method (see
+    Section 4.1.3) must be reserved by declaring a motherboard
+    resource.  For most systems, the motherboard resource would appear
+    at the root of the ACPI namespace (under \_SB) in a node with a
+    _HID of EISAID (PNP0C02), and the resources in this case should
+    not be claimed in the root PCI bus?s _CRS.  The resources can
+    optionally be returned in Int15 E820 or EFIGetMemoryMap as
+    reserved memory but must always be reported through ACPI as a
+    motherboard resource.
+
+[7] PCI Express 3.0, sec 7.2.2:
+    For systems that are PC-compatible, or that do not implement a
+    processor-architecture-specific firmware interface standard that
+    allows access to the Configuration Space, the ECAM is required as
+    defined in this section.
