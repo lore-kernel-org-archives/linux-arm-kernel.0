@@ -1,139 +1,123 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed,  9 Nov 2016 15:58:18 -0700
-Subject: [PATCH fpga 4/9] fpga zynq: Check for errors after completing DMA
+Date: Wed,  9 Nov 2016 15:58:19 -0700
+Subject: [PATCH fpga 5/9] fpga zynq: Remove priv->dev
 In-Reply-To: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
 References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <1478732303-13718-5-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <1478732303-13718-6-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The completion did not check the interrupt status to see if any error
-bits were asserted, check error bits and dump some registers if things
-went wrong.
-
-A few fixes are needed to make this work, the IXR_ERROR_FLAGS_MASK was
-wrong, it included the done bits, which shows a bug in mask/unmask_irqs
-which were using the wrong bits, simplify all of this stuff.
+socfpga uses mgr->dev for debug prints, there should be consistency
+here, so standardize on that. The only other use was for dma
+which can be replaced with mgr->dev.parent.
 
 Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- drivers/fpga/zynq-fpga.c | 55 +++++++++++++++++++++++++++---------------------
- 1 file changed, 31 insertions(+), 24 deletions(-)
+ drivers/fpga/zynq-fpga.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index 40cf0feaca7c..3ffc5fcc3072 100644
+index 3ffc5fcc3072..ac2deae92dbd 100644
 --- a/drivers/fpga/zynq-fpga.c
 +++ b/drivers/fpga/zynq-fpga.c
-@@ -89,7 +89,7 @@
- #define IXR_D_P_DONE_MASK		BIT(12)
-  /* FPGA programmed */
- #define IXR_PCFG_DONE_MASK		BIT(2)
--#define IXR_ERROR_FLAGS_MASK		0x00F0F860
-+#define IXR_ERROR_FLAGS_MASK		0x00F0C860
- #define IXR_ALL_MASK			0xF8F7F87F
+@@ -118,7 +118,6 @@
+ #define FPGA_RST_NONE_MASK		0x0
  
- /* Miscellaneous constant values */
-@@ -144,23 +144,10 @@ static inline u32 zynq_fpga_read(const struct zynq_fpga_priv *priv,
- 	readl_poll_timeout(priv->io_base + addr, val, cond, sleep_us, \
- 			   timeout_us)
+ struct zynq_fpga_priv {
+-	struct device *dev;
+ 	int irq;
+ 	struct clk *clk;
  
--static void zynq_fpga_mask_irqs(struct zynq_fpga_priv *priv)
-+static inline void zynq_fpga_set_irq_mask(struct zynq_fpga_priv *priv,
-+					  u32 enable)
- {
--	u32 intr_mask;
--
--	intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
--	zynq_fpga_write(priv, INT_MASK_OFFSET,
--			intr_mask | IXR_DMA_DONE_MASK | IXR_ERROR_FLAGS_MASK);
--}
--
--static void zynq_fpga_unmask_irqs(struct zynq_fpga_priv *priv)
--{
--	u32 intr_mask;
--
--	intr_mask = zynq_fpga_read(priv, INT_MASK_OFFSET);
--	zynq_fpga_write(priv, INT_MASK_OFFSET,
--			intr_mask
--			& ~(IXR_D_P_DONE_MASK | IXR_ERROR_FLAGS_MASK));
-+	zynq_fpga_write(priv, INT_MASK_OFFSET, ~enable);
- }
- 
- static irqreturn_t zynq_fpga_isr(int irq, void *data)
-@@ -168,7 +155,7 @@ static irqreturn_t zynq_fpga_isr(int irq, void *data)
- 	struct zynq_fpga_priv *priv = data;
- 
- 	/* disable DMA and error IRQs */
--	zynq_fpga_mask_irqs(priv);
-+	zynq_fpga_set_irq_mask(priv, 0);
- 
- 	complete(&priv->dma_done);
- 
-@@ -314,6 +301,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
- 			       const char *buf, size_t count)
- {
- 	struct zynq_fpga_priv *priv;
-+	const char *why;
- 	int err;
- 	char *kbuf;
- 	dma_addr_t dma_addr;
-@@ -337,7 +325,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
- 	reinit_completion(&priv->dma_done);
- 
- 	/* enable DMA and error IRQs */
--	zynq_fpga_unmask_irqs(priv);
-+	zynq_fpga_set_irq_mask(priv, IXR_D_P_DONE_MASK | IXR_ERROR_FLAGS_MASK);
- 
- 	/* the +1 in the src addr is used to hold off on DMA_DONE IRQ
- 	 * until both AXI and PCAP are done ...
-@@ -352,16 +340,35 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
- 	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
- 	zynq_fpga_write(priv, INT_STS_OFFSET, intr_status);
- 
-+	if (intr_status & IXR_ERROR_FLAGS_MASK) {
-+		why = "DMA reported error";
-+		err = -EIO;
-+		goto out_report;
-+	}
-+
- 	if (!((intr_status & IXR_D_P_DONE_MASK) == IXR_D_P_DONE_MASK)) {
--		dev_err(priv->dev, "Error configuring FPGA\n");
--		err = -EFAULT;
-+		why = "DMA did not complete";
-+		err = -EIO;
-+		goto out_report;
+@@ -188,7 +187,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	 * least the sync word and something else to do anything.
+ 	 */
+ 	if (count <= 4 || (count % 4) != 0) {
+-		dev_err(priv->dev,
++		dev_err(&mgr->dev,
+ 			"Invalid bitstream size, must be multiples of 4 bytes\n");
+ 		return -EINVAL;
  	}
+@@ -200,7 +199,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	/* don't globally reset PL if we're doing partial reconfig */
+ 	if (!(flags & FPGA_MGR_PARTIAL_RECONFIG)) {
+ 		if (!zynq_fpga_has_sync(buf, count)) {
+-			dev_err(priv->dev,
++			dev_err(&mgr->dev,
+ 				"Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file\n");
+ 			err = -EINVAL;
+ 			goto out_err;
+@@ -233,7 +232,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 					     INIT_POLL_DELAY,
+ 					     INIT_POLL_TIMEOUT);
+ 		if (err) {
+-			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
++			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+ 			goto out_err;
+ 		}
  
-+	err = 0;
-+	goto out_clk;
-+
-+out_report:
-+	dev_err(priv->dev,
-+		"%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
-+		why,
-+		intr_status,
-+		zynq_fpga_read(priv, CTRL_OFFSET),
-+		zynq_fpga_read(priv, LOCK_OFFSET),
-+		zynq_fpga_read(priv, INT_MASK_OFFSET),
-+		zynq_fpga_read(priv, STATUS_OFFSET),
-+		zynq_fpga_read(priv, MCTRL_OFFSET));
-+out_clk:
+@@ -247,7 +246,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 					     INIT_POLL_DELAY,
+ 					     INIT_POLL_TIMEOUT);
+ 		if (err) {
+-			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT\n");
++			dev_err(&mgr->dev, "Timeout waiting for !PCFG_INIT\n");
+ 			goto out_err;
+ 		}
+ 
+@@ -261,7 +260,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 					     INIT_POLL_DELAY,
+ 					     INIT_POLL_TIMEOUT);
+ 		if (err) {
+-			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
++			dev_err(&mgr->dev, "Timeout waiting for PCFG_INIT\n");
+ 			goto out_err;
+ 		}
+ 	}
+@@ -278,7 +277,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	/* check that we have room in the command queue */
+ 	status = zynq_fpga_read(priv, STATUS_OFFSET);
+ 	if (status & STATUS_DMA_Q_F) {
+-		dev_err(priv->dev, "DMA command queue full\n");
++		dev_err(&mgr->dev, "DMA command queue full\n");
+ 		err = -EBUSY;
+ 		goto out_err;
+ 	}
+@@ -309,7 +308,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 
+ 	priv = mgr->priv;
+ 
+-	kbuf = dma_alloc_coherent(priv->dev, count, &dma_addr, GFP_KERNEL);
++	kbuf =
++	    dma_alloc_coherent(mgr->dev.parent, count, &dma_addr, GFP_KERNEL);
+ 	if (!kbuf)
+ 		return -ENOMEM;
+ 
+@@ -356,7 +356,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 	goto out_clk;
+ 
+ out_report:
+-	dev_err(priv->dev,
++	dev_err(&mgr->dev,
+ 		"%s: INT_STS:0x%x CTRL:0x%x LOCK:0x%x INT_MASK:0x%x STATUS:0x%x MCTRL:0x%x\n",
+ 		why,
+ 		intr_status,
+@@ -368,7 +368,7 @@ out_report:
+ out_clk:
  	clk_disable(priv->clk);
--
  out_free:
- 	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
--
+-	dma_free_coherent(priv->dev, count, kbuf, dma_addr);
++	dma_free_coherent(mgr->dev.parent, count, kbuf, dma_addr);
  	return err;
  }
  
-@@ -475,7 +482,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	/* unlock the device */
- 	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+@@ -445,8 +445,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ 	if (!priv)
+ 		return -ENOMEM;
  
--	zynq_fpga_write(priv, INT_MASK_OFFSET, 0xFFFFFFFF);
-+	zynq_fpga_set_irq_mask(priv, 0);
- 	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
- 	err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0, dev_name(dev),
- 			       priv);
+-	priv->dev = dev;
+-
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	priv->io_base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(priv->io_base))
 -- 
 2.1.4
