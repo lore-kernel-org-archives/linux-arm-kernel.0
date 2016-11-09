@@ -1,83 +1,306 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Wed, 9 Nov 2016 15:21:52 +0100
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <20161108000538.GA13959@obsidianresearch.com>
-References: <20161028165555.GA17998@obsidianresearch.com>
- <20161028182308.GB18325@live.com>
- <20161028202619.GA29625@obsidianresearch.com>
- <20161028210015.GA19901@live.com>
- <20161028220546.GA19693@obsidianresearch.com>
- <20161029000926.GA30169@live.com>
- <20161031162327.GA28817@obsidianresearch.com>
- <7117d821-a1b1-7c07-806a-483be99131e6@xilinx.com>
- <20161101153326.GA6193@obsidianresearch.com>
- <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
- <20161108000538.GA13959@obsidianresearch.com>
-Message-ID: <609bc971-bb6d-8cd2-8e64-23c0082a6216@topic.nl>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Wed, 9 Nov 2016 15:30:53 +0100
+Subject: [PATCH 2/3] ipmi/bt-bmc: maintain a request expiry list
+In-Reply-To: <a7aea2a7-6cb4-655e-3c69-1a156945e27b@acm.org>
+References: <1478073426-3714-1-git-send-email-clg@kaod.org>
+ <1478073426-3714-3-git-send-email-clg@kaod.org>
+ <a7aea2a7-6cb4-655e-3c69-1a156945e27b@acm.org>
+Message-ID: <6117c1fd-b969-9394-0be5-d46f64269cac@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 08-11-16 01:05, Jason Gunthorpe wrote:
-> On Tue, Nov 01, 2016 at 06:48:42PM +0100, Michal Simek wrote:
->> On 1.11.2016 16:33, Jason Gunthorpe wrote:
->>> On Tue, Nov 01, 2016 at 07:39:22AM +0100, Michal Simek wrote:
->>>
->>>> Regarding BIT and BIN format. This support is in vivado for a long time
->>>> and it is up2you what you want to support. We have removed that BIT
->>>> support and not doing any swap by saying only BIN format is supported.
->>>
->>> BIN is not supported, it needs a swap as well.
->>>
->>> Moritz has it right, you have to use vivado to create a PROM image to be
->>> compatible with the driver.
+On 11/07/2016 08:04 PM, Corey Minyard wrote:
+> On 11/02/2016 02:57 AM, C?dric Le Goater wrote:
+>> Regarding the response expiration handling, the IPMI spec says :
 >>
->> hm than that's bad.
->
-> IMHO, Xilinx made an error with Zynq DevC, the DMA does not accept a
-> memory image that is output by the usual Xilinx tools. It should have
-> accepted a byte swapped input.
->
-> I think Moritz is right, the fpgamgr *should not* alter the bitstream
-> in any way. This is important for future work to make the DMA do
-> gather and avoid the really bad high-order allocation.
->
-> So users will have to provide byte swapped .bin files - the vivado
-> write_cfgmem command will produce them - this all needs to be
-> documented.
->
-> Also, I think Punnaiah (?) was telling me that bitstream encryption
-> does not work - DevC must be told the bitstream is encrypted.
-> That seems like something that needs work at the fpgamgr level - and
-> maybe this driver should auto-detect encryption by looking at the
-> bitfile (as is typical for Xilinx programming)
->
+>>     The BMC must not return a given response once the corresponding
+>>     Request-to-Response interval has passed. The BMC can ensure this
+>>     by maintaining its own internal list of outstanding requests through
+>>     the interface. The BMC could age and expire the entries in the list
+>>     by expiring the entries at an interval that is somewhat shorter than
+>>     the specified Request-to-Response interval....
+>>
+>> To handle such case, we maintain list of received requests using the
+>> seq number of the BT message to identify them. The list is updated
+>> each time a request is received and a response is sent. The expiration
+>> of the reponses is handled at each updates but also with a timer.
+> 
+> This looks correct, but it seems awfully complicated.
+> 
+> Why can't you get the current time before the wait_event_interruptible()
+> and then compare the time before you do the write?  That would seem to
+> accomplish the same thing without any lists or extra locks.
 
-I think the basic idea behind the commit is flawed to begin with and the patch 
-should be discarded completely. The same discussion was done for the Xilinx 
-FPGA manager driver, which resulted in the decision that the tooling should 
-create a proper file. This driver should either become obsolete or at least 
-move into the same direction as the FPGA manager rather than away from that.
+Well, the expiry list needs a request identifier and it is currently using
+the Seq byte for this purpose. So the BT message needs to be read to grab 
+that byte. The request is added to a list and that involves some locking.
 
-Besides political arguments, there's a more pressing technical argument 
-against this theck as well: The whole check is pointless since the hardware
-itself already verifies the validity of the stream. Sending bitstreams 
-intended for other devices has no effect at all. Even sending random data 
-doesn't have any effect, the hardware will discard it. There's no reason to 
-waste CPU cycles duplicating this check in software.
+When the response is written, the first matching request is removed from
+the list and a garbage collector loop is also run. Then, as we might not 
+get any responses to run that loop, we use a timer to empty the list from 
+any expired requests. 
 
+The read/write ops of the driver are protected with a mutex, the list and 
+the timer add their share of locking. That could have been done with RCU 
+surely but we don't really need performance in this driver. 
 
+Caveats :
 
+bt_bmc_remove_request() should not be done in the writing loop though. 
+It needs a fix.
 
-Kind regards,
+The request identifier is currently Seq but the spec say we should use 
+Seq, NetFn, and Command or an internal Seq value as a request identifier. 
+Google is also working on an OEM/Group extension (Brendan in CC: )
+which has a different message format. I need to look closer at what 
+should be done in this case.
 
-Mike Looijmans
-System Expert
+> Also, if you are going to have multiple writers on this interface, I don't
+> think the interface will work correctly.  I think you need to claim the
+> mutex first.  Otherwise you might get into a situation where two writers
+> will wake up at the same time, the first writes and releases the mutex,
+> then the second will find that the interface is busy and fail.
 
-TOPIC Products
-Materiaalweg 4, NL-5681 RJ Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
+yes. that is a current problem in the driver and it is not really an 
+elegant way to handle concurrency. We are fine for the moment as we 
+only have one single threaded process using the device. 
 
-Please consider the environment before printing this e-mail
+> If I am correct, the mutex will need to become interruptible and come
+> first, I think.  (And the timing would have to start before the mutex,
+> of course.)  This applies to both the read and write interface.
+
+OK. I will look into fixing this problem first. 
+
+> Another thing is that this is request-to-release time.  If a request takes
+> a long time to process (say, a write to a flash device) the timeout would
+> need to be decreased by the processing time. 
+
+Hmm, how would that fit with the "BT Interface Capabilities" which 
+defines :
+
+  BMC Request-to-Response time, in seconds, 1 based. 30 seconds, maximum.
+
+This is a fixed value. And the spec only say :
+
+  The BMC could age and expire the entries in the list by expiring 
+  the entries at an interval that is somewhat shorter than the 
+  specified Request-to-Response interval.
+
+May be I am misunderstanding.
+
+> It's probably ok to not do that for the moment, but you may want to add 
+> a note.  Fixing that would require adding a timeout for each message.
+
+Thanks,
+
+C. 
+
+> -corey
+> 
+> 
+>> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+>> ---
+>>   drivers/char/ipmi/bt-bmc.c | 132 +++++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 132 insertions(+)
+>>
+>> diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
+>> index fc9e8891eae3..e751e4a754b7 100644
+>> --- a/drivers/char/ipmi/bt-bmc.c
+>> +++ b/drivers/char/ipmi/bt-bmc.c
+>> @@ -17,6 +17,7 @@
+>>   #include <linux/platform_device.h>
+>>   #include <linux/poll.h>
+>>   #include <linux/sched.h>
+>> +#include <linux/slab.h>
+>>   #include <linux/timer.h>
+>>     /*
+>> @@ -57,6 +58,15 @@
+>>     #define BT_BMC_BUFFER_SIZE 256
+>>   +#define BT_BMC_RESPONSE_TIME    5 /* seconds */
+>> +
+>> +struct ipmi_request {
+>> +    struct list_head list;
+>> +
+>> +    u8 seq;
+>> +    unsigned long expires;
+>> +};
+>> +
+>>   struct bt_bmc {
+>>       struct device        dev;
+>>       struct miscdevice    miscdev;
+>> @@ -65,6 +75,11 @@ struct bt_bmc {
+>>       wait_queue_head_t    queue;
+>>       struct timer_list    poll_timer;
+>>       struct mutex        mutex;
+>> +
+>> +    unsigned int        response_time;
+>> +    struct timer_list    requests_timer;
+>> +    spinlock_t              requests_lock;
+>> +    struct list_head        requests;
+>>   };
+>>     static atomic_t open_count = ATOMIC_INIT(0);
+>> @@ -163,6 +178,94 @@ static int bt_bmc_open(struct inode *inode, struct file *file)
+>>   }
+>>     /*
+>> + * lock should be held
+>> + */
+>> +static void drop_expired_requests(struct bt_bmc *bt_bmc)
+>> +{
+>> +    unsigned long flags = 0;
+>> +    struct ipmi_request *req, *next;
+>> +    unsigned long next_expires = 0;
+>> +    int start_timer = 0;
+>> +
+>> +    spin_lock_irqsave(&bt_bmc->requests_lock, flags);
+>> +    list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+>> +        if (time_after_eq(jiffies, req->expires)) {
+>> +            pr_warn("BT: request seq:%d has expired. dropping\n",
+>> +                req->seq);
+>> +            list_del(&req->list);
+>> +            kfree(req);
+>> +            continue;
+>> +        }
+>> +        if (!start_timer) {
+>> +            start_timer = 1;
+>> +            next_expires = req->expires;
+>> +        } else {
+>> +            next_expires = min(next_expires, req->expires);
+>> +        }
+>> +    }
+>> +    spin_unlock_irqrestore(&bt_bmc->requests_lock, flags);
+>> +
+>> +    /* and possibly restart */
+>> +    if (start_timer)
+>> +        mod_timer(&bt_bmc->requests_timer, next_expires);
+>> +}
+>> +
+>> +static void requests_timer(unsigned long data)
+>> +{
+>> +    struct bt_bmc *bt_bmc = (void *)data;
+>> +
+>> +    drop_expired_requests(bt_bmc);
+>> +}
+>> +
+>> +static int bt_bmc_add_request(struct bt_bmc *bt_bmc, u8 seq)
+>> +{
+>> +    struct ipmi_request *req;
+>> +
+>> +    req = kmalloc(sizeof(*req), GFP_KERNEL);
+>> +    if (!req)
+>> +        return -ENOMEM;
+>> +
+>> +    req->seq = seq;
+>> +    req->expires = jiffies +
+>> +        msecs_to_jiffies(bt_bmc->response_time * 1000);
+>> +
+>> +    spin_lock(&bt_bmc->requests_lock);
+>> +    list_add(&req->list, &bt_bmc->requests);
+>> +    spin_unlock(&bt_bmc->requests_lock);
+>> +
+>> +    drop_expired_requests(bt_bmc);
+>> +    return 0;
+>> +}
+>> +
+>> +static int bt_bmc_remove_request(struct bt_bmc *bt_bmc, u8 seq)
+>> +{
+>> +    struct ipmi_request *req, *next;
+>> +    int ret = -EBADRQC; /* Invalid request code */
+>> +
+>> +    spin_lock(&bt_bmc->requests_lock);
+>> +    list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+>> +        /*
+>> +         * The sequence number should be unique, so remove the
+>> +         * first matching request found. If there are others,
+>> +         * they should expire
+>> +         */
+>> +        if (req->seq == seq) {
+>> +            list_del(&req->list);
+>> +            kfree(req);
+>> +            ret = 0;
+>> +            break;
+>> +        }
+>> +    }
+>> +    spin_unlock(&bt_bmc->requests_lock);
+>> +
+>> +    if (ret)
+>> +        pr_warn("BT: request seq:%d is invalid\n", seq);
+>> +
+>> +    drop_expired_requests(bt_bmc);
+>> +    return ret;
+>> +}
+>> +
+>> +/*
+>>    * The BT (Block Transfer) interface means that entire messages are
+>>    * buffered by the host before a notification is sent to the BMC that
+>>    * there is data to be read. The first byte is the length and the
+>> @@ -231,6 +334,13 @@ static ssize_t bt_bmc_read(struct file *file, char __user *buf,
+>>           len_byte = 0;
+>>       }
+>>   +    if (ret > 0) {
+>> +        int ret2 = bt_bmc_add_request(bt_bmc, kbuffer[2]);
+>> +
+>> +        if (ret2)
+>> +            ret = ret2;
+>> +    }
+>> +
+>>       clr_b_busy(bt_bmc);
+>>     out_unlock:
+>> @@ -283,12 +393,20 @@ static ssize_t bt_bmc_write(struct file *file, const char __user *buf,
+>>       clr_wr_ptr(bt_bmc);
+>>         while (count) {
+>> +        int ret2;
+>> +
+>>           nwritten = min_t(ssize_t, count, sizeof(kbuffer));
+>>           if (copy_from_user(&kbuffer, buf, nwritten)) {
+>>               ret = -EFAULT;
+>>               break;
+>>           }
+>>   +        ret2 = bt_bmc_remove_request(bt_bmc, kbuffer[2]);
+>> +        if (ret2) {
+>> +            ret = ret2;
+>> +            break;
+>> +        }
+>> +
+>>           bt_writen(bt_bmc, kbuffer, nwritten);
+>>             count -= nwritten;
+>> @@ -438,6 +556,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>>         mutex_init(&bt_bmc->mutex);
+>>       init_waitqueue_head(&bt_bmc->queue);
+>> +    INIT_LIST_HEAD(&bt_bmc->requests);
+>> +    spin_lock_init(&bt_bmc->requests_lock);
+>>         bt_bmc->miscdev.minor    = MISC_DYNAMIC_MINOR,
+>>           bt_bmc->miscdev.name    = DEVICE_NAME,
+>> @@ -451,6 +571,8 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>>         bt_bmc_config_irq(bt_bmc, pdev);
+>>   +    bt_bmc->response_time = BT_BMC_RESPONSE_TIME;
+>> +
+>>       if (bt_bmc->irq) {
+>>           dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
+>>       } else {
+>> @@ -468,6 +590,9 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>>             BT_CR0_ENABLE_IBT,
+>>             bt_bmc->base + BT_CR0);
+>>   +    setup_timer(&bt_bmc->requests_timer, requests_timer,
+>> +            (unsigned long)bt_bmc);
+>> +
+>>       clr_b_busy(bt_bmc);
+>>         return 0;
+>> @@ -476,10 +601,17 @@ static int bt_bmc_probe(struct platform_device *pdev)
+>>   static int bt_bmc_remove(struct platform_device *pdev)
+>>   {
+>>       struct bt_bmc *bt_bmc = dev_get_drvdata(&pdev->dev);
+>> +    struct ipmi_request *req, *next;
+>>         misc_deregister(&bt_bmc->miscdev);
+>>       if (!bt_bmc->irq)
+>>           del_timer_sync(&bt_bmc->poll_timer);
+>> +
+>> +    del_timer_sync(&bt_bmc->requests_timer);
+>> +    list_for_each_entry_safe(req, next, &bt_bmc->requests, list) {
+>> +        list_del(&req->list);
+>> +        kfree(req);
+>> +    }
+>>       return 0;
+>>   }
+>>   
+> 
+> 
