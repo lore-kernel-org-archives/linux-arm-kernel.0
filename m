@@ -1,64 +1,73 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Nov 2016 12:26:18 -0600
-Subject: [PATCH v2 4/9] regulator: lp873x: Add support for populating
- input supply
-In-Reply-To: <e5619d78-5752-c8fb-8a11-6629c4b7c3f6@ti.com>
-References: <20161021103841.8044-1-lokeshvutla@ti.com>
- <20161021103841.8044-5-lokeshvutla@ti.com>
- <20161030204118.ojeetnxl5qsi6lp7@rob-hp-laptop>
- <e5619d78-5752-c8fb-8a11-6629c4b7c3f6@ti.com>
-Message-ID: <20161109182618.ajqhtffure76zfnf@rob-hp-laptop>
+Date: Wed, 9 Nov 2016 12:26:13 -0600
+Subject: [PATCH v2 1/3] binding: irqchip: mtk-cirq: Add binding document
+In-Reply-To: <1478001122-8664-2-git-send-email-youlin.pei@mediatek.com>
+References: <1478001122-8664-1-git-send-email-youlin.pei@mediatek.com>
+ <1478001122-8664-2-git-send-email-youlin.pei@mediatek.com>
+Message-ID: <20161109182613.7tvzewua6ewxdvjc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 02, 2016 at 10:58:40AM +0530, Lokesh Vutla wrote:
+On Tue, Nov 01, 2016 at 07:52:00PM +0800, Youlin Pei wrote:
+> This commit adds the device tree binding document for
+> the mediatek cirq.
 > 
-> 
-> On Monday 31 October 2016 02:11 AM, Rob Herring wrote:
-> > On Fri, Oct 21, 2016 at 04:08:36PM +0530, Lokesh Vutla wrote:
-> >> In order to have a proper topology of regulators for a platform, each
-> >> registering regulator needs to populate supply_name field for identifying
-> >> its supply's name. Add supply_name field for lp873x regulators.
-> >>
-> >> Cc: Lee Jones <lee.jones@linaro.org>
-> >> Cc: Keerthy <j-keerthy@ti.com>
-> >> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> >> ---
-> >>  Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
-> >>  drivers/regulator/lp873x-regulator.c             | 1 +
-> >>  2 files changed, 9 insertions(+)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/mfd/lp873x.txt b/Documentation/devicetree/bindings/mfd/lp873x.txt
-> >> index 52766c2..998837a 100644
-> >> --- a/Documentation/devicetree/bindings/mfd/lp873x.txt
-> >> +++ b/Documentation/devicetree/bindings/mfd/lp873x.txt
-> >> @@ -7,6 +7,9 @@ Required properties:
-> >>    - #gpio-cells:	Should be two.  The first cell is the pin number and
-> >>  			the second cell is used to specify flags.
-> >>  			See ../gpio/gpio.txt for more information.
-> >> +  - xxx-in-supply:	Phandle to parent supply node of each regulator
-> >> +			populated under regulators node. xxx should match
-> >> +			the supply_name populated in driver.
-> > 
-> > The driver is irrelevant. This should reference a list in this document.
-> 
-> okay. See if the below updated patch is fine.
-> 
-> -----------------------------8<----------------------------8<----------------------------
-> From 666f925423fa35c7bfcc77fa3c883cbea5d8ef8e Mon Sep 17 00:00:00 2001
-> From: Lokesh Vutla <lokeshvutla@ti.com>
-> Date: Wed, 21 Sep 2016 11:50:49 +0530
-> Subject: [PATCH v3] regulator: lp873x: Add support for populating input
-> supply
-> 
-> In order to have a proper topology of regulators for a platform, each
-> registering regulator needs to populate supply_name field for identifying
-> its supply's name. Add supply_name field for lp873x regulators.
-> 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
 > ---
->  Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
->  drivers/regulator/lp873x-regulator.c             | 1 +
->  2 files changed, 9 insertions(+)
+>  .../interrupt-controller/mediatek,cirq.txt         |   30 ++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+> new file mode 100644
+> index 0000000..84e8123
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+> @@ -0,0 +1,30 @@
+> +* Mediatek 27xx cirq
+> +
+> +In Mediatek SOCs, the CIRQ is a low power interrupt controller designed to
+> +works outside MCUSYS which comprises with Cortex-Ax cores,CCI and GIC.
 
-Acked-by: Rob Herring <robh@kernel.org>
+s/works/work/
+
+> +The external interrupts (outside MCUSYS) will feed through CIRQ and connect
+> +to GIC in MCUSYS. When CIRQ is enabled, it will record the edge-sensitive
+> +interrupts and generated a pulse signal to parent interrupt controller when
+
+s/generated/generate/
+
+> +flush command is executed. With CIRQ, MCUSYS can be completely turned off
+> +to improve the system power consumption without losing interrupts.
+> +
+> +Required properties:
+> +- compatible: should be: "mediatek,mtk-cirq".
+
+This should be SoC specific. This is fine as a fallback if the same 
+block is in many SoCs, but mediatek and mtk is a bit redundant.
+
+> +- interrupt-controller : Identifies the node as an interrupt controller.
+> +- #interrupt-cells : Use the same format as specified by GIC in arm,gic.txt.
+> +- interrupt-parent: phandle of irq parent for cirq. The parent must
+> +  use the same interrupt-cells format as GIC.
+> +- reg: Physical base address of the cirq registers and length of memory
+> +  mapped region.
+> +- mediatek,ext-irq-start: Identifies external irq start number in different
+> +  SOCs.
+
+Wouldn't this always be 32 if the GIC is the parent? If 32 is the common 
+case, then use the SoC compatible to determine this value.
+
+> +
+> +Example:
+> +	cirq: interrupt-controller at 10204000 {
+> +		compatible = "mediatek,mtk-cirq";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&sysirq>;
+> +		reg = <0 0x10204000 0 0x4000>;
+> +		mediatek,ext-irq-start = <32>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
