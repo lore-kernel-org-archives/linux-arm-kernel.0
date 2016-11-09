@@ -1,99 +1,121 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Wed, 9 Nov 2016 09:58:38 +0530
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <4657586.c5MJoh65Ux@wuerfel>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <22120038.dbaYpsQoUH@wuerfel> <5821D736.7080803@gmail.com>
- <4657586.c5MJoh65Ux@wuerfel>
-Message-ID: <5822A5F6.9040806@gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 8 Nov 2016 21:33:09 -0800
+Subject: [PATCH 3/3 v4] ARM: dts: Add gyro and accel to APQ8060 Dragonboard
+In-Reply-To: <1478508284-10847-3-git-send-email-linus.walleij@linaro.org>
+References: <1478508284-10847-1-git-send-email-linus.walleij@linaro.org>
+ <1478508284-10847-3-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161109053309.GQ25787@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon 07 Nov 00:44 PST 2016, Linus Walleij wrote:
 
+> This adds the MPU-3050 gyroscope and the KXSD9 accelerometer to
+> the Qualcomm APQ8060 Dragonboard. The KXSD9 is mounted beyond the
+> MPU-3050 and appear as a subdevice beyond it. We set up the
+> required GPIO and interrupt lines to make the devices work.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v3->v4:
+> - Use interrupts-extended
+> - Add Bjorn's ACK.
 
-On Tuesday 08 November 2016 08:38 PM, Arnd Bergmann wrote:
-> On Tuesday, November 8, 2016 7:16:30 PM CET Anurup M wrote:
->>>>>> If these are backwards compatible, just mark them as compatible in DT,
->>>>>> e.g. hip06 can use
->>>>>>
->>>>>>     compatible = "hisilicon,hip06-cpu-djtag-v1", "hisilicon,hip05-cpu-djtag-v1";
->>>>>>
->>>>>> so you can tell the difference if you need to, but the driver only has to
->>>>>> list the oldest one here.
->>>>>>
->>>>>> What is the difference between the cpu and io djtag interfaces?
->>>> On some chips like hip06, the djtag version is different for IO die.
->>> In what way? The driver doesn't seem to care about the difference.
->> There is  a difference in djtag version of CPU and IO die (in some chips).
->> For ex: in hip06 djtag for CPU is v1 and for IO is v2.
->> so they use different readwrite handlers djtag_readwrite_(v1/2).
->>
->> +       /* for hip06(D03) cpu die */
->> +       { .compatible = "hisilicon,hip06-cpu-djtag-v1",
->> +               .data = (void *)djtag_readwrite_v1 },
->> +       /* for hip06(D03) io die */
->> +       { .compatible = "hisilicon,hip06-io-djtag-v2",
->> +               .data = (void *)djtag_readwrite_v2 },
->>
->>
->> For the same djtag version, there is no difference in handling in the
->> driver.
-> Right, but my point was about the compatibility with the older chips
-> using the same IP block, marking the ones as compatible that actually
-> use the same interface.
->
-> I also see that the compatible strings have the version included in
-> them, and you can probably drop them by requiring them only in the
-> fallback:
->
-> 	compatible = "hisilicon,hip05-cpu-djtag", "hisilicon,djtag-v1";
-> 	compatible = "hisilicon,hip05-io-djtag", "hisilicon,djtag-v1";
-> 	compatible = "hisilicon,hip06-cpu-djtag", "hisilicon,djtag-v1";
-> 	compatible = "hisilicon,hip06-io-djtag", "hisilicon,djtag-v2";
-> 	compatible = "hisilicon,hip07-cpu-djtag", "hisilicon,djtag-v2";
-> 	compatible = "hisilicon,hip07-io-djtag", "hisilicon,djtag-v2";
->
-> We want to have the first entry be as specific as possible, but
-> the last (second) entry is the one that can be used by the driver
-> for matching. When a future hip08/hip09/... chip uses an existing
-> interface, you then don't have to update the driver.
-Thanks. I had a similar thought on this. So as I have the version string 
-in the
-second entry "-v(1/2)".
-I can use it in driver for matching. So i think  I will change it as below.
-Please correct me if my understanding is wrong.
+Looks like it didn't make it to the message after all, but Andy is using
+patchworks, so here we go again :)
 
-  static const struct of_device_id djtag_of_match[] = {
--       /* for hip05(D02) cpu die */
--       { .compatible = "hisilicon,hip05-cpu-djtag-v1",
-+       /* for hisi djtag-v1 cpu die */
-+       { .compatible = "hisilicon,hisi-cpu-djtag-v1",
-                 .data = djtag_readwrite_v1 },
--       /* for hip05(D02) io die */
--       { .compatible = "hisilicon,hip05-io-djtag-v1",
-+       /* for hisi djtag-v1 io die */
-+       { .compatible = "hisilicon,hisi-io-djtag-v1",
-                 .data = djtag_readwrite_v1 },
--       /* for hip06(D03) cpu die */
--       { .compatible = "hisilicon,hip06-cpu-djtag-v1",
--               .data = djtag_readwrite_v1 },
--       /* for hip06(D03) io die */
--       { .compatible = "hisilicon,hip06-io-djtag-v2",
--               .data = djtag_readwrite_v2 },
--       /* for hip07(D05) cpu die */
--       { .compatible = "hisilicon,hip07-cpu-djtag-v2",
-+       /* for hisi djtag-v2 cpu die */
-+       { .compatible = "hisilicon,hisi-cpu-djtag-v2",
-                 .data = djtag_readwrite_v2 },
--       /* for hip07(D05) io die */
--       { .compatible = "hisilicon,hip07-io-djtag-v2",
-+       /* for hisi djtag-v2 io die */
-+       { .compatible = "hisilicon,hisi-io-djtag-v2",
-                 .data = (djtag_readwrite_v2 },
-         {},
-  };
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Thanks,
-Anurup
-> 	Arnd
+Regards,
+Bjorn
+
+> ChangeLog v2->v3:
+> - Move the interrupt to the pm8058 alias to reflect the two patches
+>   properly specifying the PMIC as interrupt parent.
+> ChangeLog v1->v2:
+> - Use the new I2C mux gate bindings from Peter Rosin (merged to
+>   the I2C subsystem)
+> ---
+>  arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 52 ++++++++++++++++++++++++++
+>  1 file changed, 52 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> index ea660ffa03ea..39d9e6ddefed 100644
+> --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
+> @@ -220,6 +220,14 @@
+>  					function = "ebi2";
+>  				};
+>  			};
+> +
+> +			/* Interrupt line for the KXSD9 accelerometer */
+> +			dragon_kxsd9_gpios: kxsd9 {
+> +				irq {
+> +					pins = "gpio57"; /* IRQ line */
+> +					bias-pull-up;
+> +				};
+> +			};
+>  		};
+>  
+>  		qcom,ssbi at 500000 {
+> @@ -272,6 +280,15 @@
+>  							power-source = <PM8058_GPIO_S3>;
+>  						};
+>  					};
+> +					dragon_mpu3050_gpios: mpu3050-gpios {
+> +						pinconf {
+> +							pins = "gpio17";
+> +							function = "normal";
+> +							input-enable;
+> +							bias-disable;
+> +							power-source = <PM8058_GPIO_S3>;
+> +						};
+> +					};
+>  					dragon_sdcc3_gpios: sdcc3-gpios {
+>  						pinconf {
+>  							pins = "gpio22";
+> @@ -389,6 +406,41 @@
+>  					vddd-supply = <&pm8058_lvs0>; // 1.8V
+>  					vdda-supply = <&pm8058_l14>; // 2.85V
+>  				};
+> +				mpu3050 at 68 {
+> +					compatible = "invensense,mpu3050";
+> +					reg = <0x68>;
+> +					/*
+> +					 * GPIO17 has interrupt 208 on the
+> +					 * PM8058, it is pulled high by a 10k
+> +					 * resistor to VLOGIC so needs to be
+> +					 * active low/falling edge.
+> +					 */
+> +					interrupts-extended = <&pm8058 208 IRQ_TYPE_EDGE_FALLING>;
+> +					pinctrl-names = "default";
+> +					pinctrl-0 = <&dragon_mpu3050_gpios>;
+> +					vlogic-supply = <&pm8058_lvs0>; // 1.8V
+> +					vdd-supply = <&pm8058_l14>; // 2.85V
+> +
+> +					/*
+> +					 * The MPU-3050 acts as a hub for the
+> +					 * accelerometer.
+> +					 */
+> +					i2c-gate {
+> +						#address-cells = <1>;
+> +						#size-cells = <0>;
+> +
+> +						kxsd9 at 18 {
+> +							compatible = "kionix,kxsd9";
+> +							reg = <0x18>;
+> +							interrupt-parent = <&tlmm>;
+> +							interrupts = <57 IRQ_TYPE_EDGE_FALLING>;
+> +							pinctrl-names = "default";
+> +							pinctrl-0 = <&dragon_kxsd9_gpios>;
+> +							iovdd-supply = <&pm8058_lvs0>; // 1.8V
+> +							vdd-supply = <&pm8058_l14>; // 2.85V
+> +						};
+> +					};
+> +				};
+>  			};
+>  		};
+>  
+> -- 
+> 2.7.4
+> 
