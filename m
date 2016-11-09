@@ -1,88 +1,44 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 9 Nov 2016 14:23:42 -0800
-Subject: [PATCH 1/6] dt-bindings: mdio-mux: Add documentation for mdio mux
- for NSP SoC
-In-Reply-To: <1478683994-12008-2-git-send-email-yendapally.reddy@broadcom.com>
-References: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
- <1478683994-12008-2-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <54363ca1-333a-52e6-911c-cc394256be97@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Nov 2016 22:25:22 +0000
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161109151709.74927f83@t450s.home>
+References: <20161103220205.37715b49@t450s.home>
+ <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
+ <20161108163508.1bcae0c2@t450s.home> <58228F71.6020108@redhat.com>
+ <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
+ <20161109192303.GD15676@cbox> <20161109203145.GO17771@arm.com>
+ <20161109151709.74927f83@t450s.home>
+Message-ID: <20161109222522.GS17771@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One change
+On Wed, Nov 09, 2016 at 03:17:09PM -0700, Alex Williamson wrote:
+> On Wed, 9 Nov 2016 20:31:45 +0000
+> Will Deacon <will.deacon@arm.com> wrote:
+> > On Wed, Nov 09, 2016 at 08:23:03PM +0100, Christoffer Dall wrote:
+> > > 
+> > > (I suppose it's technically possible to get around this issue by letting
+> > > QEMU place RAM wherever it wants but tell the guest to never use a
+> > > particular subset of its RAM for DMA, because that would conflict with
+> > > the doorbell IOVA or be seen as p2p transactions.  But I think we all
+> > > probably agree that it's a disgusting idea.)  
+> > 
+> > Disgusting, yes, but Ben's idea of hotplugging on the host controller with
+> > firmware tables describing the reserved regions is something that we could
+> > do in the distant future. In the meantime, I don't think that VFIO should
+> > explicitly reject overlapping mappings if userspace asks for them.
+> 
+> I'm confused by the last sentence here, rejecting user mappings that
+> overlap reserved ranges, such as MSI doorbell pages, is exactly how
+> we'd reject hot-adding a device when we meet such a conflict.  If we
+> don't reject such a mapping, we're knowingly creating a situation that
+> potentially leads to data loss.  Minimally, QEMU would need to know
+> about the reserved region, map around it through VFIO, and take
+> responsibility (somehow) for making sure that region is never used for
+> DMA.  Thanks,
 
-On 16-11-09 01:33 AM, Yendapally Reddy Dhananjaya Reddy wrote:
-> Add documentation for mdio mux available in Broadcom NSP SoC
->
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> ---
->  .../devicetree/bindings/net/brcm,mdio-mux-nsp.txt  | 57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
-> new file mode 100644
-> index 0000000..b749a2b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
-> @@ -0,0 +1,57 @@
-> +Properties for an MDIO bus multiplexer available in Broadcom NSP SoC.
-> +
-> +This MDIO bus multiplexer defines buses that could access the internal
-> +phys as well as external to SoCs. When child bus is selected, one needs
-> +to select the below properties to generate desired MDIO transaction on
-> +appropriate bus.
-> +
-> +Required properties in addition to the generic multiplexer properties:
-> +
-> +MDIO multiplexer node:
-> +- compatible: brcm,mdio-mux-iproc.
-This should be brcm,mdio-mux-nsp
+Yes, but my point is that it should be up to QEMU to abort the hotplug, not
+the host kernel, since there may be ways in which a guest can tolerate the
+overlapping region (e.g. by avoiding that range of memory for DMA).
 
-> +- reg: Should contain registers location and length.
-> +- reg-names: Should contain the resource reg names.
-> +	- bus-ctrl: mdio bus control register address space required to
-> +	  select the bus master. This property is not required for SoC's
-> +	  that doesn't provide master selection.
-> +	- mgmt-ctrl: mdio management control register address space
-> +
-> +Sub-nodes:
-> +   Each bus master should be represented as a sub-node.
-> +
-> +Sub-nodes required properties:
-> +- reg: Bus master number. Should be 0x10 to access the external mdio devices.
-> +- address-cells: should be 1
-> +- size-cells: should be 0
-> +
-> +Every non-ethernet PHY requires a compatible property so that it could be
-> +probed based on this compatible string.
-> +
-> +Additional information regarding generic multiplexer properties can be found
-> +at- Documentation/devicetree/bindings/net/mdio-mux.txt
-> +
-> +example:
-> +
-> +	mdio_mux: mdio-mux at 3f190 {
-> +		compatible = "brcm,mdio-mux-nsp";
-> +		reg = <0x3f190 0x4>,
-> +		      <0x32000 0x4>;
-> +		reg-names = "bus-ctrl", "mgmt-ctrl";
-> +		mdio-parent-bus = <&mdio>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		mdio at 0 {
-> +			reg = <0x0>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			usb3_phy: usb3-phy at 10 {
-> +				compatible = "brcm,nsp-usb3-phy";
-> +				reg = <0x10>;
-> +				usb3-ctrl-syscon = <&usb3_ctrl>;
-> +				#phy-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +	};
->
+Will
