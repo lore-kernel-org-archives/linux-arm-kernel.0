@@ -1,269 +1,83 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  9 Nov 2016 14:19:45 +0000
-Subject: [PATCH v7 13/16] drivers: iommu: arm-smmu: add IORT configuration
-In-Reply-To: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161109141948.19244-14-lorenzo.pieralisi@arm.com>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Wed, 9 Nov 2016 15:21:52 +0100
+Subject: [PATCH] fpga zynq: Check the bitstream for validity
+In-Reply-To: <20161108000538.GA13959@obsidianresearch.com>
+References: <20161028165555.GA17998@obsidianresearch.com>
+ <20161028182308.GB18325@live.com>
+ <20161028202619.GA29625@obsidianresearch.com>
+ <20161028210015.GA19901@live.com>
+ <20161028220546.GA19693@obsidianresearch.com>
+ <20161029000926.GA30169@live.com>
+ <20161031162327.GA28817@obsidianresearch.com>
+ <7117d821-a1b1-7c07-806a-483be99131e6@xilinx.com>
+ <20161101153326.GA6193@obsidianresearch.com>
+ <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
+ <20161108000538.GA13959@obsidianresearch.com>
+Message-ID: <609bc971-bb6d-8cd2-8e64-23c0082a6216@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ACPI bases systems, in order to be able to create platform
-devices and initialize them for ARM SMMU components, the IORT
-kernel implementation requires a set of static functions to be
-used by the IORT kernel layer to configure platform devices for
-ARM SMMU components.
+?On 08-11-16 01:05, Jason Gunthorpe wrote:
+> On Tue, Nov 01, 2016 at 06:48:42PM +0100, Michal Simek wrote:
+>> On 1.11.2016 16:33, Jason Gunthorpe wrote:
+>>> On Tue, Nov 01, 2016 at 07:39:22AM +0100, Michal Simek wrote:
+>>>
+>>>> Regarding BIT and BIN format. This support is in vivado for a long time
+>>>> and it is up2you what you want to support. We have removed that BIT
+>>>> support and not doing any swap by saying only BIN format is supported.
+>>>
+>>> BIN is not supported, it needs a swap as well.
+>>>
+>>> Moritz has it right, you have to use vivado to create a PROM image to be
+>>> compatible with the driver.
+>>
+>> hm than that's bad.
+>
+> IMHO, Xilinx made an error with Zynq DevC, the DMA does not accept a
+> memory image that is output by the usual Xilinx tools. It should have
+> accepted a byte swapped input.
+>
+> I think Moritz is right, the fpgamgr *should not* alter the bitstream
+> in any way. This is important for future work to make the DMA do
+> gather and avoid the really bad high-order allocation.
+>
+> So users will have to provide byte swapped .bin files - the vivado
+> write_cfgmem command will produce them - this all needs to be
+> documented.
+>
+> Also, I think Punnaiah (?) was telling me that bitstream encryption
+> does not work - DevC must be told the bitstream is encrypted.
+> That seems like something that needs work at the fpgamgr level - and
+> maybe this driver should auto-detect encryption by looking at the
+> bitfile (as is typical for Xilinx programming)
+>
 
-Add static configuration functions to the IORT kernel layer for
-the ARM SMMU components, so that the ARM SMMU driver can
-initialize its respective platform device by relying on the IORT
-kernel infrastructure and by adding a corresponding ACPI device
-early probe section entry.
+I think the basic idea behind the commit is flawed to begin with and the patch 
+should be discarded completely. The same discussion was done for the Xilinx 
+FPGA manager driver, which resulted in the decision that the tooling should 
+create a proper file. This driver should either become obsolete or at least 
+move into the same direction as the FPGA manager rather than away from that.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Tomasz Nowicki <tn@semihalf.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
----
- drivers/acpi/arm64/iort.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
- drivers/iommu/arm-smmu.c  | 83 ++++++++++++++++++++++++++++++++++++++++++++++-
- include/linux/acpi_iort.h |  3 ++
- 3 files changed, 166 insertions(+), 1 deletion(-)
+Besides political arguments, there's a more pressing technical argument 
+against this theck as well: The whole check is pointless since the hardware
+itself already verifies the validity of the stream. Sending bitstreams 
+intended for other devices has no effect at all. Even sending random data 
+doesn't have any effect, the hardware will discard it. There's no reason to 
+waste CPU cycles duplicating this check in software.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index fd52e4c..4708806 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -548,6 +548,78 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
- 	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
- }
- 
-+static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu *smmu;
-+	int num_irqs;
-+	u64 *glb_irq;
-+
-+	/* Retrieve SMMU specific data */
-+	smmu = (struct acpi_iort_smmu *)node->node_data;
-+
-+	glb_irq = ACPI_ADD_PTR(u64, node, smmu->global_interrupt_offset);
-+	if (!IORT_IRQ_MASK(glb_irq[1]))	/* 0 means not implemented */
-+		num_irqs = 1;
-+	else
-+		num_irqs = 2;
-+
-+	num_irqs += smmu->context_interrupt_count;
-+
-+	return num_irqs + 1;
-+}
-+
-+static void __init arm_smmu_init_resources(struct resource *res,
-+					   struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu *smmu;
-+	int i, hw_irq, trigger, num_res = 0;
-+	u64 *ctx_irq, *glb_irq;
-+
-+	/* Retrieve SMMU specific data */
-+	smmu = (struct acpi_iort_smmu *)node->node_data;
-+
-+	res[num_res].start = smmu->base_address;
-+	res[num_res].end = smmu->base_address + smmu->span - 1;
-+	res[num_res].flags = IORESOURCE_MEM;
-+	num_res++;
-+
-+	glb_irq = ACPI_ADD_PTR(u64, node, smmu->global_interrupt_offset);
-+	/* Global IRQs */
-+	hw_irq = IORT_IRQ_MASK(glb_irq[0]);
-+	trigger = IORT_IRQ_TRIGGER_MASK(glb_irq[0]);
-+
-+	acpi_iort_register_irq(hw_irq, "arm-smmu-global", trigger,
-+				     &res[num_res++]);
-+
-+	/* Global IRQs */
-+	hw_irq = IORT_IRQ_MASK(glb_irq[1]);
-+	if (hw_irq) {
-+		trigger = IORT_IRQ_TRIGGER_MASK(glb_irq[1]);
-+		acpi_iort_register_irq(hw_irq, "arm-smmu-global", trigger,
-+					     &res[num_res++]);
-+	}
-+
-+	/* Context IRQs */
-+	ctx_irq = ACPI_ADD_PTR(u64, node, smmu->context_interrupt_offset);
-+	for (i = 0; i < smmu->context_interrupt_count; i++) {
-+		hw_irq = IORT_IRQ_MASK(ctx_irq[i]);
-+		trigger = IORT_IRQ_TRIGGER_MASK(ctx_irq[i]);
-+
-+		acpi_iort_register_irq(hw_irq, "arm-smmu-context", trigger,
-+				       &res[num_res++]);
-+	}
-+}
-+
-+static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu *smmu;
-+
-+	/* Retrieve SMMU specific data */
-+	smmu = (struct acpi_iort_smmu *)node->node_data;
-+
-+	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
-+}
-+
- struct iort_iommu_config {
- 	const char *name;
- 	int (*iommu_init)(struct acpi_iort_node *node);
-@@ -564,12 +636,21 @@ static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
- 	.iommu_init_resources = arm_smmu_v3_init_resources
- };
- 
-+static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-+	.name = "arm-smmu",
-+	.iommu_is_coherent = arm_smmu_is_coherent,
-+	.iommu_count_resources = arm_smmu_count_resources,
-+	.iommu_init_resources = arm_smmu_init_resources
-+};
-+
- static __init
- const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
- {
- 	switch (node->type) {
- 	case ACPI_IORT_NODE_SMMU_V3:
- 		return &iort_arm_smmu_v3_cfg;
-+	case ACPI_IORT_NODE_SMMU:
-+		return &iort_arm_smmu_cfg;
- 	default:
- 		return NULL;
- 	}
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e1b6951..2e86cbf 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -28,6 +28,8 @@
- 
- #define pr_fmt(fmt) "arm-smmu: " fmt
- 
-+#include <linux/acpi.h>
-+#include <linux/acpi_iort.h>
- #include <linux/atomic.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-@@ -1904,6 +1906,70 @@ static const struct of_device_id arm_smmu_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
- 
-+#ifdef CONFIG_ACPI
-+static int acpi_smmu_get_data(u32 model, u32 *version, u32 *impl)
-+{
-+	int ret = 0;
-+
-+	switch (model) {
-+	case ACPI_IORT_SMMU_V1:
-+	case ACPI_IORT_SMMU_CORELINK_MMU400:
-+		*version = ARM_SMMU_V1;
-+		*impl = GENERIC_SMMU;
-+		break;
-+	case ACPI_IORT_SMMU_V2:
-+		*version = ARM_SMMU_V2;
-+		*impl = GENERIC_SMMU;
-+		break;
-+	case ACPI_IORT_SMMU_CORELINK_MMU500:
-+		*version = ARM_SMMU_V2;
-+		*impl = ARM_MMU500;
-+		break;
-+	default:
-+		ret = -ENODEV;
-+	}
-+
-+	return ret;
-+}
-+
-+static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-+				      struct arm_smmu_device *smmu)
-+{
-+	struct device *dev = smmu->dev;
-+	struct acpi_iort_node *node =
-+		*(struct acpi_iort_node **)dev_get_platdata(dev);
-+	struct acpi_iort_smmu *iort_smmu;
-+	u64 *glb_irq;
-+	int ret;
-+
-+	/* Retrieve SMMU1/2 specific data */
-+	iort_smmu = (struct acpi_iort_smmu *)node->node_data;
-+
-+	ret = acpi_smmu_get_data(iort_smmu->model, &smmu->version,
-+						   &smmu->model);
-+	if (ret < 0)
-+		return ret;
-+
-+	glb_irq = ACPI_ADD_PTR(u64, node, iort_smmu->global_interrupt_offset);
-+
-+	if (!IORT_IRQ_MASK(glb_irq[1]))	/* 0 means not implemented */
-+		smmu->num_global_irqs = 1;
-+	else
-+		smmu->num_global_irqs = 2;
-+
-+	if (iort_smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK)
-+		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
-+
-+	return 0;
-+}
-+#else
-+static inline int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-+					     struct arm_smmu_device *smmu)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int arm_smmu_device_dt_probe(struct platform_device *pdev,
- 				    struct arm_smmu_device *smmu)
- {
-@@ -1955,7 +2021,11 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 	}
- 	smmu->dev = dev;
- 
--	err = arm_smmu_device_dt_probe(pdev, smmu);
-+	if (dev->of_node)
-+		err = arm_smmu_device_dt_probe(pdev, smmu);
-+	else
-+		err = arm_smmu_device_acpi_probe(pdev, smmu);
-+
- 	if (err)
- 		return err;
- 
-@@ -2103,6 +2173,17 @@ IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
- IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
- IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
- 
-+#ifdef CONFIG_ACPI
-+static int __init arm_smmu_acpi_init(struct acpi_table_header *table)
-+{
-+	if (iort_node_match(ACPI_IORT_NODE_SMMU))
-+		return arm_smmu_init();
-+
-+	return 0;
-+}
-+IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, arm_smmu_acpi_init);
-+#endif
-+
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 17bb078..79ba1bb 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -23,6 +23,9 @@
- #include <linux/fwnode.h>
- #include <linux/irqdomain.h>
- 
-+#define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
-+#define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
-+
- int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
- void iort_deregister_domain_token(int trans_id);
- struct fwnode_handle *iort_find_domain_token(int trans_id);
--- 
-2.10.0
+
+
+
+Kind regards,
+
+Mike Looijmans
+System Expert
+
+TOPIC Products
+Materiaalweg 4, NL-5681 RJ Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
