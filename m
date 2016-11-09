@@ -1,50 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Nov 2016 22:40:14 +0100
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <5822A5F6.9040806@gmail.com>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <4657586.c5MJoh65Ux@wuerfel> <5822A5F6.9040806@gmail.com>
-Message-ID: <4812554.ng09YGQfZ9@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Nov 2016 14:47:18 -0700
+Subject: [PATCH v2 0/5] ARM: OMAP: dead code removal
+In-Reply-To: <1478268138-7044-1-git-send-email-Nicolae_Rosia@mentor.com>
+References: <1478000206-10855-1-git-send-email-Nicolae_Rosia@mentor.com>
+ <1478268138-7044-1-git-send-email-Nicolae_Rosia@mentor.com>
+Message-ID: <20161109214718.GE2428@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 9, 2016 9:58:38 AM CET Anurup M wrote:
+* Nicolae Rosia <Nicolae_Rosia@mentor.com> [161104 07:02]:
+> Hi,
 > 
-> > I also see that the compatible strings have the version included in
-> > them, and you can probably drop them by requiring them only in the
-> > fallback:
-> >
-> >       compatible = "hisilicon,hip05-cpu-djtag", "hisilicon,djtag-v1";
-> >       compatible = "hisilicon,hip05-io-djtag", "hisilicon,djtag-v1";
-> >       compatible = "hisilicon,hip06-cpu-djtag", "hisilicon,djtag-v1";
-> >       compatible = "hisilicon,hip06-io-djtag", "hisilicon,djtag-v2";
-> >       compatible = "hisilicon,hip07-cpu-djtag", "hisilicon,djtag-v2";
-> >       compatible = "hisilicon,hip07-io-djtag", "hisilicon,djtag-v2";
-> >
-> > We want to have the first entry be as specific as possible, but
-> > the last (second) entry is the one that can be used by the driver
-> > for matching. When a future hip08/hip09/... chip uses an existing
-> > interface, you then don't have to update the driver.
-> Thanks. I had a similar thought on this. So as I have the version string 
-> in the
-> second entry "-v(1/2)".
-> I can use it in driver for matching. So i think  I will change it as below.
-> Please correct me if my understanding is wrong.
+> I have identified some dead code which can be removed.
 > 
->   static const struct of_device_id djtag_of_match[] = {
-> -       /* for hip05(D02) cpu die */
-> -       { .compatible = "hisilicon,hip05-cpu-djtag-v1",
-> +       /* for hisi djtag-v1 cpu die */
-> +       { .compatible = "hisilicon,hisi-cpu-djtag-v1",
->                  .data = djtag_readwrite_v1 },
-> -       /* for hip05(D02) io die */
-> -       { .compatible = "hisilicon,hip05-io-djtag-v1",
-> +       /* for hisi djtag-v1 io die */
-> +       { .compatible = "hisilicon,hisi-io-djtag-v1",
+> v2:
+> - Added details on each commit on how the code ended up unused.
+> 
+> Nicolae Rosia (5):
+>   ARM: OMAP4: kill omap4_pmic_init and omap4_pmic_get_config
+>   ARM: OMAP3: kill omap3_pmic_get_config and twl_{get,set}_voltage
+>   ARM: OMAP3: kill omap3_pmic_init
+>   ARM: OMAP2: kill omap2_pmic_init
+>   ARM: OMAP: kill omap_pmic_init
+> 
+>  arch/arm/mach-omap2/twl-common.c | 483 ---------------------------------------
+>  arch/arm/mach-omap2/twl-common.h |  24 --
+>  2 files changed, 507 deletions(-)
 
->From the code it looks like "hisilicon,hisi-io-djtag-v1" and
-"hisilicon,hisi-cpu-djtag-v1" have the same register-level interface,
-so we just need one compatible string for them to match the driver.
+Thanks applying all these into omap-for-v4.10/legacy.
 
-	Arnd
+Regards,
+
+Tony
