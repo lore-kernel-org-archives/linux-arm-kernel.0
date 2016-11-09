@@ -1,50 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Nov 2016 18:16:53 +0000
-Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <20161109175413.GE17020@leverpostej>
-References: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
- <20161109175413.GE17020@leverpostej>
-Message-ID: <20161109181652.GK17771@arm.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Wed, 9 Nov 2016 10:19:34 -0800
+Subject: KASAN & the vmalloc area
+In-Reply-To: <8abab822-4d93-a336-b00f-7aa9b1f47f8c@virtuozzo.com>
+References: <20161108190302.GH15297@leverpostej>
+ <8abab822-4d93-a336-b00f-7aa9b1f47f8c@virtuozzo.com>
+Message-ID: <CACT4Y+YP0TUxXY+0PZ+oo6K8rZmzECEW_4qTt6kU=tHHgYFrKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 05:54:13PM +0000, Mark Rutland wrote:
-> On Fri, Oct 28, 2016 at 04:50:13PM -0400, Neil Leeder wrote:
-> > +	struct perf_event *events[MAX_L2_CTRS];
-> > +	struct l2cache_pmu *l2cache_pmu;
-> > +	DECLARE_BITMAP(used_counters, MAX_L2_CTRS);
-> > +	DECLARE_BITMAP(used_groups, L2_EVT_GROUP_MAX + 1);
-> > +	int group_to_counter[L2_EVT_GROUP_MAX + 1];
-> > +	int irq;
-> > +	/* The CPU that is used for collecting events on this cluster */
-> > +	int on_cpu;
-> > +	/* All the CPUs associated with this cluster */
-> > +	cpumask_t cluster_cpus;
-> 
-> I'm still uncertain about aggregating all cluster PMUs into a larger
-> PMU, given the cluster PMUs are logically independent (at least in terms
-> of the programming model).
-> 
-> However, from what I understand the x86 uncore PMU drivers aggregate
-> symmetric instances of uncore PMUs (and also aggregate across packages
-> to the same logical PMU).
-> 
-> Whatever we do, it would be nice for the uncore drivers to align on a
-> common behaviour (and I think we're currently going the oppposite route
-> with Cavium's uncore PMU). Will, thoughts?
+On Wed, Nov 9, 2016 at 8:53 AM, Andrey Ryabinin <aryabinin@virtuozzo.com> wrote:
+> On 11/08/2016 10:03 PM, Mark Rutland wrote:
+>> Hi,
+>>
+>> I see a while back [1] there was a discussion of what to do about KASAN
+>> and vmapped stacks, but it doesn't look like that was solved, judging by
+>> the vmapped stacks pull [2] for v4.9.
+>>
+>> I wondered whether anyone had looked at that since?
+>>
+>
+> Sadly, but I didn't have much time for this yet, so it's in an initial state.
+>
+>> I have an additional reason to want to dynamically allocate the vmalloc
+>> area shadow: it turns out that KASAN currently interacts rather poorly
+>> with the arm64 ptdump code.
+>>
+>> When KASAN is selected, we allocate shadow for the whole vmalloc area,
+>> using common zero pte, pmd, pud tables. Walking over these in the ptdump
+>> code takes a *very* long time (I've seen up to 15 minutes with
+>> KASAN_OUTLINE enabled). For DEBUG_WX [3], this means boot hangs for that
+>> long, too.
+>>
+>
+> I didn't look at any code, but we probably could can remember last visited pgd
+> and skip next pgd if it's the same as previous.
 
-I'm not a big fan of aggregating this stuff. Ultimately, the user in the
-driving seat of perf is going to need some knowledge about the toplogy of
-the system in order to perform sensible profiling using an uncore PMU.
-If the kernel tries to present a single, unified PMU then we paint ourselves
-into a corner when the hardware isn't as symmetric as we want it to be
-(big/little on the CPU side is the extreme example of this). If we want
-to be consistent, then exposing each uncore unit as a separate PMU is
-the way to go. That doesn't mean we can't aggregate the components of a
-distributed PMU (e.g. the CCN or the SMMU), but we don't want to aggregate
-at the programming interface/IP block level.
+Good idea.
 
-We could consider exposing some topology information in sysfs if that's
-seen as an issue with the non-aggregated case.
+> Alternatively - just skip kasan_zero_p*d in ptdump walker.
 
-Will
+Mark have concern with the fact that we hide the mapping from the
+walker this way. But your above idea with deduping pgd's during walk
+both fast and doesn't hide anything from walker.
+
+
+
+>> If I don't allocate vmalloc shadow (and remove the apparently pointlesss
+>> shadow of the shadow area), and only allocate shadow for the image,
+>> fixmap, vmemmap and so on, that delay gets cut to a few seconds, which
+>> is tolerable for a debug configuration...
+>>
+>> ... however, things blow up when the kernel touches vmalloc'd memory for
+>> the first time, as we don't install shadow for that dynamically.
+>>
+>> Thanks,
+>> Mark.
+>>
+>> [1] https://lkml.kernel.org/r/CALCETrWucrYp+yq8RHSDqf93xtg793duByirurzJbLRhrz=tcA at mail.gmail.com
+>> [2] https://lkml.kernel.org/r/20161003092940.GA691 at gmail.com
+>> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/464191.html
+>>
