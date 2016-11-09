@@ -1,345 +1,66 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Wed, 9 Nov 2016 11:39:55 +0000
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <20161109113955.GD10219@e106497-lin.cambridge.arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 09 Nov 2016 11:45:05 +0000
+Subject: [PATCH RFC 00/12] tda998x updates
+In-Reply-To: <20161108182434.GX1041@n2100.armlinux.org.uk>
+References: <20161108122420.GP1041@n2100.armlinux.org.uk>
+ <2264579a-3273-d9c4-761a-f50f547eb39b@arm.com>
+ <20161108133215.GQ1041@n2100.armlinux.org.uk>
+ <20161108133411.GA31754@n2100.armlinux.org.uk>
+ <1478625636.27416.7.camel@linaro.org>
+ <20161108182434.GX1041@n2100.armlinux.org.uk>
+Message-ID: <1478691905.2835.12.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 11:47:08AM +0800, zhichang.yuan wrote:
-> This patch solves two issues:
-> 1) parse and get the right I/O range from DTS node whose parent does not
-> define the corresponding ranges property;
+On Tue, 2016-11-08 at 18:24 +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 08, 2016 at 05:20:36PM +0000, Jon Medhurst (Tixy) wrote:
+> > On Tue, 2016-11-08 at 13:34 +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Nov 08, 2016 at 01:32:15PM +0000, Russell King - ARM Linux wrote:
+> > > > Unfortunately, my drm-tda998x-devel branch is slightly out of date with
+> > > > these patches it's the original set of 10 patches.  I've not pushed
+> > > > these ones out to that branch yet, as I've three additional patches on
+> > > > top of these which aren't "ready" for pushing out.
+> > > 
+> > > Here's the delta between the branch and what I just posted:
+> > > 
+> > > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> > [...]
+> > 
+> > I have a working setup for HDMI audio on Juno an would like to test this
+> > series but am struggling to work out which patches to apply in what
+> > order to what branch, can you be specific? (I've tried various
+> > combinations of patches series from the list, drm-tda998x-devel, and the
+> > diff you posted)
 > 
-> There are some special ISA/LPC devices that work on a specific I/O range where
-> it is not correct to specify a ranges property in DTS parent node as cpu
-> addresses translated from DTS node are only for memory space on some
-> architectures, such as Arm64. Without the parent 'ranges' property, current
-> of_translate_address() return an error.
-> Here we add a fixup function, of_get_isa_indirect_io(). During the OF address
-> translation, this fixup will be called to check the 'reg' address to be
-> translating is for those sepcial ISA/LPC devices and get the I/O range
-> directly from the 'reg' property.
+> Hmm, I guess this is going to be annoyingly rather difficult then.
+> The structure of my git tree is:
 > 
-> 2) eliminate the I/O range conflict risk with PCI/PCIE leagecy I/O device;
+> v4.8 ---------------- mali patch ------------------ merge --- these patches
+> v4.7 -- tda998x audio patches (up to df0bd1e8f3c5) --^
 > 
-> The current __of_address_to_resource() always translates the I/O range to PIO.
-> But this processing is not suitable for our ISA/LPC devices whose I/O range is
-> not cpu address(Arnd had stressed this in his comments on V2,V3 patch-set).
-> Here, we bypass the mapping between cpu address and PIO for the special
-> ISA/LPC devices. But to drive these ISA/LPC devices, a I/O port address below
-> PCIBIOS_MIN_IO is needed by in*/out*(). Which means there is conflict risk
-> between I/O range of [0, PCIBIOS_MIN_IO) and PCI/PCIE legacy I/O range of [0,
-> IO_SPACE_LIMIT).
-> To avoid the I/O conflict, this patch reserve the I/O range below
-> PCIBIOS_MIN_IO.
-> 
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> ---
->  .../arm/hisilicon/hisilicon-low-pin-count.txt      | 31 ++++++++++++
->  arch/arm64/include/asm/io.h                        |  6 +++
->  arch/arm64/kernel/extio.c                          | 25 ++++++++++
->  drivers/of/address.c                               | 56 +++++++++++++++++++++-
->  drivers/pci/pci.c                                  |  6 +--
->  include/linux/of_address.h                         | 17 +++++++
->  include/linux/pci.h                                |  8 ++++
->  7 files changed, 145 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-> new file mode 100644
-> index 0000000..13c8ddd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
-> @@ -0,0 +1,31 @@
-> +Hisilicon Hip06 low-pin-count device
-> +  Usually LPC controller is part of PCI host bridge, so the legacy ISA ports
-> +  locate on LPC bus can be accessed direclty. But some SoCs have independent
-> +  LPC controller, and access the legacy ports by triggering LPC I/O cycles.
-> +  Hisilicon Hip06 implements this LPC device.
-> +
-> +Required properties:
-> +- compatible: should be "hisilicon,low-pin-count"
-> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
-> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
-> +- reg: base memory range where the register set of this device is mapped.
-> +
-> +Note:
-> +  The node name before '@' must be "isa" to represent the binding stick to the
-> +  ISA/EISA binding specification.
-> +
-> +Example:
-> +
-> +isa at a01b0000 {
-> +	compatible = "hisilicom,low-pin-count";
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	reg = <0x0 0xa01b0000 0x0 0x1000>;
-> +
-> +	ipmi0: bt at e4 {
-> +		compatible = "ipmi-bt";
-> +		device_type = "ipmi";
-> +		reg = <0x01 0xe4 0x04>;
-> +		status = "disabled";
-> +	};
-> +};
+> which makes it rather difficult to send out a series that people can
+> apply as patches without first replicating that merge.  I guess the
+> answer is... use the _patches_ for review, and I'll push out the
+> changes into drm-tda998x-devel... should be there soon.  Look for
+> commit hash d61fa2e50f2a.  (Bah, slow 'net connections.)
 
+Testing gets more complicated as I'm using 4.9-rc? which has a DMA fix
+needed for audio [1] and breaks hdmi-codec which I hope I fixed [2].
 
-This documentation file needs to be part of the next patch. It has nothing to do with
-what you are trying to fix here.
+Anyway, I merged in drm-tda998x-devel and audio continued to work on my
+HDMI connected monitor. So I guess that's
 
+Tested-by: Jon Medhurst <tixy@linaro.org>
 
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 136735d..c26b7cc 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -175,6 +175,12 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->  #define outsl outsl
->  
->  DECLARE_EXTIO(l, u32)
-> +
-> +#define indirect_io_enabled indirect_io_enabled
-> +extern bool indirect_io_enabled(void);
-> +
-> +#define addr_is_indirect_io addr_is_indirect_io
-> +extern int addr_is_indirect_io(u64 taddr);
->  #endif
->  
->  
-> diff --git a/arch/arm64/kernel/extio.c b/arch/arm64/kernel/extio.c
-> index 647b3fa..3d45fa8 100644
-> --- a/arch/arm64/kernel/extio.c
-> +++ b/arch/arm64/kernel/extio.c
-> @@ -19,6 +19,31 @@
->  
->  struct extio_ops *arm64_extio_ops;
->  
-> +/**
-> + * indirect_io_enabled - check whether indirectIO is enabled.
-> + *	arm64_extio_ops will be set only when indirectIO mechanism had been
-> + *	initialized.
-> + *
-> + * Returns true when indirectIO is enabled.
-> + */
-> +bool indirect_io_enabled(void)
-> +{
-> +	return arm64_extio_ops ? true : false;
-> +}
-> +
-> +/**
-> + * addr_is_indirect_io - check whether the input taddr is for indirectIO.
-> + * @taddr: the io address to be checked.
-> + *
-> + * Returns 1 when taddr is in the range; otherwise return 0.
-> + */
-> +int addr_is_indirect_io(u64 taddr)
-> +{
-> +	if (arm64_extio_ops->start > taddr || arm64_extio_ops->end < taddr)
+I also reviewed the patches in this series. They look like a mostly
+mechanical code organisation improvement, and whilst I'm not very
+familiar with the driver and DRM, the other actual code changes look OK
+too. So, FWIW:
 
-start >= taddr ?
+Acked-by: Jon Medhurst <tixy@linaro.org>
 
-> +		return 0;
-> +
-> +	return 1;
-> +}
->  
->  BUILD_EXTIO(b, u8)
->  
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 02b2903..cc2a05d 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -479,6 +479,50 @@ static int of_empty_ranges_quirk(struct device_node *np)
->  	return false;
->  }
->  
-> +
-> +/*
-> + * of_isa_indirect_io - get the IO address from some isa reg property value.
-> + *	For some isa/lpc devices, no ranges property in ancestor node.
-> + *	The device addresses are described directly in their regs property.
-> + *	This fixup function will be called to get the IO address of isa/lpc
-> + *	devices when the normal of_translation failed.
-> + *
-> + * @parent:	points to the parent dts node;
-> + * @bus:		points to the of_bus which can be used to parse address;
-> + * @addr:	the address from reg property;
-> + * @na:		the address cell counter of @addr;
-> + * @presult:	store the address paresed from @addr;
-> + *
-> + * return 1 when successfully get the I/O address;
-> + * 0 will return for some failures.
-
-Bah, you are returning a signed int, why 0 for failure? Return a negative value with
-error codes. Otherwise change the return value into a bool.
-
-> + */
-> +static int of_get_isa_indirect_io(struct device_node *parent,
-> +				struct of_bus *bus, __be32 *addr,
-> +				int na, u64 *presult)
-> +{
-> +	unsigned int flags;
-> +	unsigned int rlen;
-> +
-> +	/* whether support indirectIO */
-> +	if (!indirect_io_enabled())
-> +		return 0;
-> +
-> +	if (!of_bus_isa_match(parent))
-> +		return 0;
-> +
-> +	flags = bus->get_flags(addr);
-> +	if (!(flags & IORESOURCE_IO))
-> +		return 0;
-> +
-> +	/* there is ranges property, apply the normal translation directly. */
-
-s/there is ranges/if we have a 'ranges'/
-
-> +	if (of_get_property(parent, "ranges", &rlen))
-> +		return 0;
-> +
-> +	*presult = of_read_number(addr + 1, na - 1);
-> +	/* this fixup is only valid for specific I/O range. */
-> +	return addr_is_indirect_io(*presult);
-> +}
-> +
->  static int of_translate_one(struct device_node *parent, struct of_bus *bus,
->  			    struct of_bus *pbus, __be32 *addr,
->  			    int na, int ns, int pna, const char *rprop)
-> @@ -595,6 +639,15 @@ static u64 __of_translate_address(struct device_node *dev,
->  			result = of_read_number(addr, na);
->  			break;
->  		}
-> +		/*
-> +		 * For indirectIO device which has no ranges property, get
-> +		 * the address from reg directly.
-> +		 */
-> +		if (of_get_isa_indirect_io(dev, bus, addr, na, &result)) {
-> +			pr_debug("isa indirectIO matched(%s)..addr = 0x%llx\n",
-> +				of_node_full_name(dev), result);
-> +			break;
-> +		}
->  
->  		/* Get new parent bus and counts */
->  		pbus = of_match_bus(parent);
-> @@ -688,8 +741,9 @@ static int __of_address_to_resource(struct device_node *dev,
->  	if (taddr == OF_BAD_ADDR)
->  		return -EINVAL;
->  	memset(r, 0, sizeof(struct resource));
-> -	if (flags & IORESOURCE_IO) {
-> +	if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
->  		unsigned long port;
-> +
->  		port = pci_address_to_pio(taddr);
->  		if (port == (unsigned long)-1)
->  			return -EINVAL;
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index ba34907..1a08511 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3263,7 +3263,7 @@ int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
->  
->  #ifdef PCI_IOBASE
->  	struct io_range *range;
-> -	resource_size_t allocated_size = 0;
-> +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
->  
->  	/* check if the range hasn't been previously recorded */
->  	spin_lock(&io_range_lock);
-> @@ -3312,7 +3312,7 @@ phys_addr_t pci_pio_to_address(unsigned long pio)
->  
->  #ifdef PCI_IOBASE
->  	struct io_range *range;
-> -	resource_size_t allocated_size = 0;
-> +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
-
-Have you checked that pci_pio_to_address still returns valid values after this? I know that
-you are trying to take into account PCIBIOS_MIN_IO limit when allocating reserving the IO ranges,
-but the values added in the io_range_list are still starting from zero, no from PCIBIOS_MIN_IO,
-so the calculation of the address in this function could return negative values casted to pci_addr_t.
-
-Maybe you want to adjust the range->start value in pci_register_io_range() as well to have it
-offset by PCIBIOS_MIN_IO as well.
-
-Best regards,
-Liviu
-
->  
->  	if (pio > IO_SPACE_LIMIT)
->  		return address;
-> @@ -3335,7 +3335,7 @@ unsigned long __weak pci_address_to_pio(phys_addr_t address)
->  {
->  #ifdef PCI_IOBASE
->  	struct io_range *res;
-> -	resource_size_t offset = 0;
-> +	resource_size_t offset = PCIBIOS_MIN_IO;
->  	unsigned long addr = -1;
->  
->  	spin_lock(&io_range_lock);
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index 3786473..deec469 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -24,6 +24,23 @@ struct of_pci_range {
->  #define for_each_of_pci_range(parser, range) \
->  	for (; of_pci_range_parser_one(parser, range);)
->  
-> +
-> +#ifndef indirect_io_enabled
-> +#define indirect_io_enabled indirect_io_enabled
-> +static inline bool indirect_io_enabled(void)
-> +{
-> +	return false;
-> +}
-> +#endif
-> +
-> +#ifndef addr_is_indirect_io
-> +#define addr_is_indirect_io addr_is_indirect_io
-> +static inline int addr_is_indirect_io(u64 taddr)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
->  /* Translate a DMA address from device space to CPU space */
->  extern u64 of_translate_dma_address(struct device_node *dev,
->  				    const __be32 *in_addr);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 0e49f70..7f6bbb6 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -2130,4 +2130,12 @@ static inline bool pci_ari_enabled(struct pci_bus *bus)
->  /* provide the legacy pci_dma_* API */
->  #include <linux/pci-dma-compat.h>
->  
-> +/*
-> + * define this macro here to refrain from compilation error for some
-> + * platforms. Please keep this macro at the end of this header file.
-> + */
-> +#ifndef PCIBIOS_MIN_IO
-> +#define PCIBIOS_MIN_IO		0
-> +#endif
-> +
->  #endif /* LINUX_PCI_H */
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+[1] Commit d64e9a2c7509 ("dmaengine: pl330: fix residual for non-running BUSY descriptors")
+[2] https://patchwork.kernel.org/patch/9401485/
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Tixy
