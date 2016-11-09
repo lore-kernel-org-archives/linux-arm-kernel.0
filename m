@@ -1,146 +1,66 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 9 Nov 2016 14:06:35 -0600
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
- <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
-Message-ID: <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 9 Nov 2016 22:10:29 +0200
+Subject: [PATCH 10/13] ARM: dts: exynos: replace to "max-frequecy"
+ instead of "clock-freq-min-max"
+In-Reply-To: <72612112-3b79-8fd3-8be4-a8f60ab3b68a@samsung.com>
+References: <20161103062135.10697-1-jh80.chung@samsung.com>
+ <20161103184112.GB11071@kozik-lap>
+ <ecf4fac2-0ab7-d4c4-69e3-d498ee5b601c@samsung.com>
+ <4066252.a1W9ejEKHX@phil>
+ <CGME20161104150527epcas4p4004d2c3a8686cccef97760dacdb2892c@epcas4p4.samsung.com>
+ <20161104150447.GA4829@kozik-lap>
+ <72612112-3b79-8fd3-8be4-a8f60ab3b68a@samsung.com>
+Message-ID: <20161109201029.GE23534@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
-> Hi Bjorn,
-> 
-> On 11/02/2016 12:08 PM, Bjorn Helgaas wrote:
-> > On Tue, Nov 01, 2016 at 07:06:31AM -0600, cov at codeaurora.org wrote:
-> >> Hi Bjorn,
+On Mon, Nov 07, 2016 at 09:38:15AM +0900, Jaehoon Chung wrote:
+> On 11/05/2016 12:04 AM, Krzysztof Kozlowski wrote:
+> > On Fri, Nov 04, 2016 at 12:19:49PM +0100, Heiko Stuebner wrote:
+> >> Hi Jaehoon,
 > >>
-> >> On 2016-10-31 15:48, Bjorn Helgaas wrote:
-> >>> On Wed, Sep 21, 2016 at 06:38:05PM -0400, Christopher Covington wrote:
-> >>>> The Qualcomm Technologies QDF2432 SoC does not support accesses
-> >>>> smaller
-> >>>> than 32 bits to the PCI configuration space. Register the appropriate
-> >>>> quirk.
+> >> Am Freitag, 4. November 2016, 19:21:30 CET schrieb Jaehoon Chung:
+> >>> On 11/04/2016 03:41 AM, Krzysztof Kozlowski wrote:
+> >>>> On Thu, Nov 03, 2016 at 03:21:32PM +0900, Jaehoon Chung wrote:
+> >>>>> In drivers/mmc/core/host.c, there is "max-frequency" property.
+> >>>>> It should be same behavior. So Use the "max-frequency" instead of
+> >>>>> "clock-freq-min-max".
+> >>>>>
+> >>>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> >>>>> ---
+> >>>>>
+> >>>>>  arch/arm/boot/dts/exynos3250-artik5-eval.dts | 2 +-
+> >>>>>  arch/arm/boot/dts/exynos3250-artik5.dtsi     | 2 +-
+> >>>>>  arch/arm/boot/dts/exynos3250-monk.dts        | 2 +-
+> >>>>>  arch/arm/boot/dts/exynos3250-rinato.dts      | 2 +-
+> >>>>>  4 files changed, 4 insertions(+), 4 deletions(-)
 > >>>>
-> >>>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> >>>> This looks totally independent to rest of patches so it can be applied
+> >>>> separately without any functional impact (except lack of minimum
+> >>>> frequency). Is that correct?
 > >>>
-> >>> Hi Christopher,
-> >>>
-> >>> Can you rebase this against v4.9-rc1?  It no longer applies to my tree.
+> >>> You're right. I will split the patches. And will resend.
+> >>> Thanks!
 > >>
-> >> I apologize for not being clearer. This patch depends on:
+> >> I think what Krzysztof was asking was just if he can simply pick up this patch 
+> >> alone, as it does not require any of the previous changes.
 > >>
-> >> PCI/ACPI: Extend pci_mcfg_lookup() responsibilities
-> >> PCI/ACPI: Check platform-specific ECAM quirks
-> >>
-> >> These patches from Tomasz Nowicki were previously in your pci/ecam-v6
-> >> branch, but that seems to have come and gone. How would you like to
-> >> proceed?
+> >> Same is true for the Rockchip patches I guess, so we could just take them 
+> >> individually into samsung/rockchip dts branches.
 > > 
-> > Oh yes, that's right, I forgot that connection.  I'm afraid I kind of
-> > dropped the ball on that thread, so I went back and read through it
-> > again.
-> > 
-> > I *think* the current state is:
-> > 
-> >   - I'm OK with the first two patches that add the quirk
-> >     infrastructure.
-> > 
-> >   - My issue with the last three patches that add ThunderX quirks is
-> >     that there's no generic description of the ECAM address space.
-> > 
-> > So if I understand correctly, your Qualcomm patch depends only on the
-> > first two patches.
-> > 
-> > Then the question is how the Qualcomm ECAM address space is described.
-> > Your quirk overrides the default pci_generic_ecam_ops with the
-> > &pci_32b_ops, but it doesn't touch the address space part, so I assume
-> > the bus ranges and corresponding address space in your MCFG is
-> > correct.  So far, so good.
-> > 
-> > Is there also an ACPI device that contains that space in _CRS?  I
-> > think we concluded that the standard solution is to describe this with
-> > a PNP0C02 device.
-> > 
-> > Would you mind opening a bugzilla at bugzilla.kernel.org and attaching
-> > the dmesg log, /proc/iomem, and maybe a DSDT dump?  I'd like to have
-> > something to point at to say "if you need an MCFG quirk, you need the
-> > MCFG bit and *also* these other related ACPI device bits, and here's
-> > how it should be done."
+> > Yes, I wanted to get exactly this information. I couldn't find it in
+> > cover letter.
 > 
-> We're working to add the PNP0C02 resource to future firmware, but it's
-> not in the current firmware. Are dmesg and /proc/iomem from the
-> current firmware interesting or should we wait for the update to file?
+> In drivers/mmc/core/host.c, there already is "max-frequency" property.
+> It's same functionality with "clock-freq-min-max". 
+> Minimum clock value can be fixed to 100K. because MMC core will check clock value from 400K to 100K.
+> But max-frequency can be difference.
+> If we can use "max-frequency" property, we don't need to use "clock-freq-min-max" property anymore.
+> I will resend the deprecated property instead of removing "clock-freq-min-max".
+> 
+> If you want to pick this, it's possible to pick. Then i will resend the patches without dt patches.
 
-Note that the ECAM space is not the only thing that should be
-described via these PNP0C02 devices.  *All* non-enumerable resources
-should be described by the _CRS method of some ACPI device.  Here's a
-sample from my laptop:
+Thanks, applied.
 
-  PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
-  system 00:01: [io  0x1800-0x189f] could not be reserved
-  system 00:01: [io  0x0800-0x087f] has been reserved
-  system 00:01: [io  0x0880-0x08ff] has been reserved
-  system 00:01: [io  0x0900-0x097f] has been reserved
-  system 00:01: [io  0x0980-0x09ff] has been reserved
-  system 00:01: [io  0x0a00-0x0a7f] has been reserved
-  system 00:01: [io  0x0a80-0x0aff] has been reserved
-  system 00:01: [io  0x0b00-0x0b7f] has been reserved
-  system 00:01: [io  0x0b80-0x0bff] has been reserved
-  system 00:01: [io  0x15e0-0x15ef] has been reserved
-  system 00:01: [io  0x1600-0x167f] has been reserved
-  system 00:01: [io  0x1640-0x165f] has been reserved
-  system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
-  system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
-  system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
-  system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
-  system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
-  system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
-  system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
-  system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
-  system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
-
-Do you have firmware in the field that may not get updated?  If so,
-I'd like to see the whole solution for that firmware, including the
-MCFG quirk (which tells the PCI core where the ECAM region is) and
-whatever PNP0C02 quirk you figure out to actually reserve the region.
-
-I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
-don't actually know if it's feasible, but it didn't look as bad as I
-expected, so I'd kind of like somebody to try it out.  I think you
-would have to call this via a DMI hook (do you have DMI on arm64?),
-maybe from pnp_init() or similar.
-
-  struct pnp_protocol pnpquirk_protocol = {
-    .name = "Plug and Play Quirks",
-  };
-
-  void quirk()
-  {
-    struct pnp_dev *dev;
-    struct resource res;
-
-    ret = pnp_register_protocol(&pnpquirk_protocol);
-    if (ret)
-      return;
-
-    dev = pnp_alloc_dev(&pnpquirk_protocol, 0, "PNP0C02");
-    if (!dev)
-      return;
-
-    res.start = XX;          /* ECAM start */
-    res.end = YY;            /* ECAM end */
-    res.flags = IORESOURCE_MEM;
-    pnp_add_resource(dev, &res);
-
-    dev->active = 1;
-    pnp_add_device(dev);
-
-    dev_info(&dev->dev, "fabricated device to reserve ECAM space %pR\n", &res);
-  }
-
-Bjorn
+Best regards,
+Krzysztof
