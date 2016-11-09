@@ -1,120 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Nov 2016 12:26:32 -0600
-Subject: [PATCH v2 4/6] pinctrl: aspeed: Read and write bits in LPCHC and
- GFX controllers
-In-Reply-To: <1478097481-14895-5-git-send-email-andrew@aj.id.au>
-References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
- <1478097481-14895-5-git-send-email-andrew@aj.id.au>
-Message-ID: <20161109182632.etsvezgfu7nhtl55@rob-hp-laptop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 9 Nov 2016 19:27:47 +0100
+Subject: [v16, 0/7] Fix eSDHC host version register bug
+In-Reply-To: <1478661252-42439-1-git-send-email-yangbo.lu@nxp.com>
+References: <1478661252-42439-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <CAPDyKFrcAN_pqgtGaUanfB2zh97zGcL23m5VDtJ3g==NJeRrfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 01:07:59AM +1030, Andrew Jeffery wrote:
-> The System Control Unit IP block in the Aspeed SoCs is typically where
-> the pinmux configuration is found, but not always. A number of pins
-> depend on state in one of LPC Host Control (LPCHC) or SoC Display
-> Controller (GFX) IP blocks, so the Aspeed pinmux drivers should have the
-> means to adjust these as necessary.
-> 
-> We use syscon to cast a regmap over the GFX and LPCHCR blocks, which is
-> used as an arbitration layer between the relevant driver and the pinctrl
-> subsystem. The regmaps are then exposed to the SoC-specific pinctrl
-> drivers by phandles in the devicetree, and are selected during a mux
-> request by querying a new 'ip' member in struct aspeed_sig_desc.
-> 
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+- i2c-list
+
+On 9 November 2016 at 04:14, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+> eSDHC controller. To match the SoC version and revision, 15 previous version
+> patchsets had tried many methods but all of them were rejected by reviewers.
+> Such as
+>         - dts compatible method
+>         - syscon method
+>         - ifdef PPC method
+>         - GUTS driver getting SVR method
+> Anrd suggested a soc_device_match method in v10, and this is the only available
+> method left now. This v11 patchset introduces the soc_device_match interface in
+> soc driver.
+>
+> The first four patches of Yangbo are to add the GUTS driver. This is used to
+> register a soc device which contain soc version and revision information.
+> The other three patches introduce the soc_device_match method in soc driver
+> and apply it on esdhc driver to fix this bug.
+>
 > ---
-> Since v1:
-> 
-> The change is now proactive: instead of reporting that we need to flip bits in
-> controllers we can't access, the patch provides access via regmaps for the
-> relevant controllers. The implementation also splits out the IP block ID into
-> its own variable rather than packing the value into the upper bits of the reg
-> member of struct aspeed_sig_desc. This drives some churn in the diff, but I've
-> tried to minimise it.
-> 
->  .../devicetree/bindings/pinctrl/pinctrl-aspeed.txt | 50 +++++++++++++---
->  drivers/pinctrl/aspeed/pinctrl-aspeed-g4.c         | 18 +++---
->  drivers/pinctrl/aspeed/pinctrl-aspeed-g5.c         | 39 ++++++++++---
->  drivers/pinctrl/aspeed/pinctrl-aspeed.c            | 66 +++++++++++++---------
->  drivers/pinctrl/aspeed/pinctrl-aspeed.h            | 32 ++++++++---
->  5 files changed, 144 insertions(+), 61 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-> index 2ad18c4ea55c..115b0cce6c1c 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-aspeed.txt
-> @@ -4,12 +4,19 @@ Aspeed Pin Controllers
->  The Aspeed SoCs vary in functionality inside a generation but have a common mux
->  device register layout.
->  
-> -Required properties:
-> -- compatible : Should be any one of the following:
-> -		"aspeed,ast2400-pinctrl"
-> -		"aspeed,g4-pinctrl"
-> -		"aspeed,ast2500-pinctrl"
-> -		"aspeed,g5-pinctrl"
-> +Required properties for g4:
-> +- compatible : 			Should be any one of the following:
-> +				"aspeed,ast2400-pinctrl"
-> +				"aspeed,g4-pinctrl"
-> +
-> +Required properties for g5:
-> +- compatible : 			Should be any one of the following:
-> +				"aspeed,ast2500-pinctrl"
-> +				"aspeed,g5-pinctrl"
-> +
-> +- aspeed,external-nodes:	A cell of phandles to external controller nodes:
-> +				0: compatible with "aspeed,ast2500-gfx", "syscon"
-> +				1: compatible with "aspeed,ast2500-lpchc", "syscon"
->  
->  The pin controller node should be a child of a syscon node with the required
->  property:
-> @@ -47,7 +54,7 @@ RGMII1 RGMII2 RMII1 RMII2 SD1 SPI1 SPI1DEBUG SPI1PASSTHRU TIMER4 TIMER5 TIMER6
->  TIMER7 TIMER8 VGABIOSROM
->  
->  
-> -Examples:
-> +g4 Example:
->  
->  syscon: scu at 1e6e2000 {
->  	compatible = "syscon", "simple-mfd";
-> @@ -63,5 +70,34 @@ syscon: scu at 1e6e2000 {
->  	};
->  };
->  
-> +g5 Example:
-> +
-> +apb {
-> +	gfx: display at 1e6e6000 {
-> +		compatible = "aspeed,ast2500-gfx", "syscon";
-> +		reg = <0x1e6e6000 0x1000>;
-> +	};
-> +
-> +	lpchc: lpchc at 1e7890a0 {
-> +		compatible = "aspeed,ast2500-lpchc", "syscon";
-> +		reg = <0x1e7890a0 0xc4>;
-> +	};
-> +
-> +	syscon: scu at 1e6e2000 {
-> +		compatible = "syscon", "simple-mfd";
-> +		reg = <0x1e6e2000 0x1a8>;
-> +
-> +		pinctrl: pinctrl {
+> Changes for v15:
+>         - Dropped patch 'dt: bindings: update Freescale DCFG compatible'
+>           since the work had been done by below patch on ShawnGuo's linux tree.
+>           'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG
+>            and DCFG'
+>         - Fixed error code issue in guts driver
+> Changes for v16:
+>         - Dropped patch 'powerpc/fsl: move mpc85xx.h to include/linux/fsl'
+>         - Added a bug-fix patch from Geert
+> ---
+>
+> Arnd Bergmann (1):
+>   base: soc: introduce soc_device_match() interface
+>
+> Geert Uytterhoeven (1):
+>   base: soc: Check for NULL SoC device attributes
+>
+> Yangbo Lu (5):
+>   ARM64: dts: ls2080a: add device configuration node
+>   dt: bindings: move guts devicetree doc out of powerpc directory
+>   soc: fsl: add GUTS driver for QorIQ platforms
+>   MAINTAINERS: add entry for Freescale SoC drivers
+>   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+>
+>  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+>  MAINTAINERS                                        |  11 +-
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 +
+>  drivers/base/Kconfig                               |   1 +
+>  drivers/base/soc.c                                 |  70 ++++++
+>  drivers/mmc/host/Kconfig                           |   1 +
+>  drivers/mmc/host/sdhci-of-esdhc.c                  |  20 ++
+>  drivers/soc/Kconfig                                |   3 +-
+>  drivers/soc/fsl/Kconfig                            |  18 ++
+>  drivers/soc/fsl/Makefile                           |   1 +
+>  drivers/soc/fsl/guts.c                             | 236 +++++++++++++++++++++
+>  include/linux/fsl/guts.h                           | 125 ++++++-----
+>  include/linux/sys_soc.h                            |   3 +
+>  13 files changed, 447 insertions(+), 51 deletions(-)
+>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+>  create mode 100644 drivers/soc/fsl/Kconfig
+>  create mode 100644 drivers/soc/fsl/guts.c
+>
+> --
+> 2.1.0.27.g96db324
+>
 
-Why the single child node here? Doesn't look like any reason for it in 
-the example. 
+Thanks, applied on my mmc tree for next!
 
-> +			compatible = "aspeed,g5-pinctrl";
-> +			aspeed,external-nodes = <&gfx, &lpchc>;
-> +
-> +			pinctrl_i2c3_default: i2c3_default {
-> +				function = "I2C3";
-> +				groups = "I2C3";
-> +			};
-> +		};
-> +	};
-> +};
-> +
->  Please refer to pinctrl-bindings.txt in this directory for details of the
->  common pinctrl bindings used by client devices.
+I noticed that some DT compatibles weren't documented, according to
+checkpatch. Please fix that asap!
+
+Kind regards
+Ulf Hansson
