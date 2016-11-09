@@ -1,128 +1,173 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Wed,  9 Nov 2016 04:33:14 -0500
-Subject: [PATCH 6/6] arm: dts: nsp: Add USB nodes to device tree
-In-Reply-To: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1478683994-12008-7-git-send-email-yendapally.reddy@broadcom.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 9 Nov 2016 10:34:17 +0100
+Subject: [PATCH v2] spi: atmel: use managed resource for gpio chip select
+In-Reply-To: <8756e0f4-de7b-5d89-2561-ace18d157d91@atmel.com>
+References: <20161108174852.14311-1-nicolas.ferre@atmel.com>
+ <20161108174909.vnsw3zppiwpv2npo@piout.net>
+ <8756e0f4-de7b-5d89-2561-ace18d157d91@atmel.com>
+Message-ID: <20161109093417.kgcm27o3jwivageq@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB nodes to the Northstar plus device tree file
+On 09/11/2016 at 10:16:18 +0100, Nicolas Ferre wrote :
+> Le 08/11/2016 ? 18:49, Alexandre Belloni a ?crit :
+> > On 08/11/2016 at 18:48:52 +0100, Nicolas Ferre wrote :
+> >> Use the managed gpio CS pin request so that we avoid having trouble
+> >> in the cleanup code.
+> >> In fact, if module was configured with DT, cleanup code released
+> >> invalid pin.  Since resource wasn't freed, module cannot be reinserted.
+> >>
+> >> This require to extract the gpio request call from the "setup" function
+> >> and call it in the appropriate probe function.
+> >>
+> >> Reported-by: Alexander Morozov <linux@meltdown.ru>
+> >> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > 
+> > I think that's fine but I still have that item on my todo list
+> > (discussion in july 2014 with Mark):
+> > 
+> > ---
+> >>> Mark: maybe it would make sense to do devm_gpio_request_one() in
+> >>> of_spi_register_master(), after of_get_named_gpio.
+> > 
+> >> You need to transition all the drivers doing things manually but yes.
+> >> As I keep saying all the GPIO handling needs to be completely
+> >> refactored.
+> > ---
+> 
+> Would make sense indeed as we are currently doing the same node scanning
+> twice...
+> 
+> But this patch actually fixes an issue with module unloading/re-loading
+> and freeing of a wrong gpio. So I do think that we shouldn't hold its
+> adoption while thinking about this enhancement...
+> 
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi   | 57 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/bcm958625k.dts | 16 +++++++++++
- 2 files changed, 73 insertions(+)
+Yes, this patch is still useful as-is and fixes a bug.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 7c9e0fa..acdb576 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -249,6 +249,34 @@
- 			status = "disabled";
- 		};
- 
-+		xhci: usb at 29000 {
-+			compatible = "generic-xhci";
-+			reg = <0x29000 0x1000>;
-+			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb3_phy>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
-+
-+		ehci0: usb at 2a000 {
-+			compatible = "generic-ehci";
-+			reg = <0x2a000 0x100>;
-+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		ohci0: usb at 2b000 {
-+			compatible = "generic-ohci";
-+			reg = <0x2b000 0x100>;
-+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		mdio: mdio at 32000 {
-+			compatible = "brcm,iproc-mdio";
-+			reg = <0x32000 0x8>;
-+		};
-+
- 		rng: rng at 33000 {
- 			compatible = "brcm,bcm-nsp-rng";
- 			reg = <0x33000 0x14>;
-@@ -319,6 +347,30 @@
- 					     "sata2";
- 		};
- 
-+		mdio_mux: mdio-mux at 3f190 {
-+			compatible = "brcm,mdio-mux-nsp";
-+			reg = <0x3f190 0x4>,
-+			      <0x32000 0x4>;
-+			reg-names = "bus-ctrl", "mgmt-ctrl";
-+			mdio-parent-bus = <&mdio>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			mdio at 0 {
-+				reg = <0x0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				usb3_phy: usb3-phy at 10 {
-+					compatible = "brcm,nsp-usb3-phy";
-+					reg = <0x10>;
-+					usb3-ctrl-syscon = <&usb3_ctrl>;
-+					#phy-cells = <0>;
-+					status = "disabled";
-+				};
-+			};
-+		};
-+
- 		pinctrl: pinctrl at 3f1c0 {
- 			compatible = "brcm,nsp-pinmux";
- 			reg = <0x3f1c0 0x04>,
-@@ -367,6 +419,11 @@
- 				phy-names = "sata-phy";
- 			};
- 		};
-+
-+		usb3_ctrl: syscon at 104408 {
-+			compatible = "brcm,nsp-usb3-ctrl", "syscon";
-+			reg = <0x104408 0x3fc>;
-+		};
- 	};
- 
- 	pcie0: pcie at 18012000 {
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 05c5f98..c7303fa 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -53,6 +53,22 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
+> Regards,
+> 
+> >> ---
+> >> v2: fix devm_gpio_request location: the setup code for device was not proper
+> >>     location. Move it to the probe function and add needed DT routines to
+> >>     handle all CS gpio specified.
+> >>
+> >>  drivers/spi/spi-atmel.c | 50 ++++++++++++++++++++++++++++++++++++++-----------
+> >>  1 file changed, 39 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> >> index 32683a13dd60..a60925614480 100644
+> >> --- a/drivers/spi/spi-atmel.c
+> >> +++ b/drivers/spi/spi-atmel.c
+> >> @@ -24,6 +24,7 @@
+> >>  
+> >>  #include <linux/io.h>
+> >>  #include <linux/gpio.h>
+> >> +#include <linux/of_gpio.h>
+> >>  #include <linux/pinctrl/consumer.h>
+> >>  #include <linux/pm_runtime.h>
+> >>  
+> >> @@ -1204,7 +1205,6 @@ static int atmel_spi_setup(struct spi_device *spi)
+> >>  	u32			csr;
+> >>  	unsigned int		bits = spi->bits_per_word;
+> >>  	unsigned int		npcs_pin;
+> >> -	int			ret;
+> >>  
+> >>  	as = spi_master_get_devdata(spi->master);
+> >>  
+> >> @@ -1247,16 +1247,9 @@ static int atmel_spi_setup(struct spi_device *spi)
+> >>  		if (!asd)
+> >>  			return -ENOMEM;
+> >>  
+> >> -		if (as->use_cs_gpios) {
+> >> -			ret = gpio_request(npcs_pin, dev_name(&spi->dev));
+> >> -			if (ret) {
+> >> -				kfree(asd);
+> >> -				return ret;
+> >> -			}
+> >> -
+> >> +		if (as->use_cs_gpios)
+> >>  			gpio_direction_output(npcs_pin,
+> >>  					      !(spi->mode & SPI_CS_HIGH));
+> >> -		}
+> >>  
+> >>  		asd->npcs_pin = npcs_pin;
+> >>  		spi->controller_state = asd;
+> >> @@ -1471,13 +1464,11 @@ static int atmel_spi_transfer_one_message(struct spi_master *master,
+> >>  static void atmel_spi_cleanup(struct spi_device *spi)
+> >>  {
+> >>  	struct atmel_spi_device	*asd = spi->controller_state;
+> >> -	unsigned		gpio = (unsigned long) spi->controller_data;
+> >>  
+> >>  	if (!asd)
+> >>  		return;
+> >>  
+> >>  	spi->controller_state = NULL;
+> >> -	gpio_free(gpio);
+> >>  	kfree(asd);
+> >>  }
+> >>  
+> >> @@ -1499,6 +1490,39 @@ static void atmel_get_caps(struct atmel_spi *as)
+> >>  }
+> >>  
+> >>  /*-------------------------------------------------------------------------*/
+> >> +static int atmel_spi_gpio_cs(struct platform_device *pdev)
+> >> +{
+> >> +	struct spi_master	*master = platform_get_drvdata(pdev);
+> >> +	struct atmel_spi	*as = spi_master_get_devdata(master);
+> >> +	struct device_node	*np = master->dev.of_node;
+> >> +	int			i;
+> >> +	int			ret = 0;
+> >> +	int			nb = 0;
+> >> +
+> >> +	if (!as->use_cs_gpios)
+> >> +		return 0;
+> >> +
+> >> +	if (!np)
+> >> +		return 0;
+> >> +
+> >> +	nb = of_gpio_named_count(np, "cs-gpios");
+> >> +	for (i = 0; i < nb; i++) {
+> >> +		int cs_gpio = of_get_named_gpio(pdev->dev.of_node,
+> >> +						"cs-gpios", i);
+> >> +
+> >> +			if (cs_gpio == -EPROBE_DEFER)
+> >> +				return cs_gpio;
+> >> +
+> >> +			if (gpio_is_valid(cs_gpio)) {
+> >> +				ret = devm_gpio_request(&pdev->dev, cs_gpio,
+> >> +							dev_name(&pdev->dev));
+> >> +				if (ret)
+> >> +					return ret;
+> >> +			}
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> >>  
+> >>  static int atmel_spi_probe(struct platform_device *pdev)
+> >>  {
+> >> @@ -1577,6 +1601,10 @@ static int atmel_spi_probe(struct platform_device *pdev)
+> >>  		master->num_chipselect = 4;
+> >>  	}
+> >>  
+> >> +	ret = atmel_spi_gpio_cs(pdev);
+> >> +	if (ret)
+> >> +		goto out_unmap_regs;
+> >> +
+> >>  	as->use_dma = false;
+> >>  	as->use_pdc = false;
+> >>  	if (as->caps.has_dma_support) {
+> >> -- 
+> >> 2.9.0
+> >>
+> > 
+> 
+> 
+> -- 
+> Nicolas Ferre
+
 -- 
-2.1.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
