@@ -1,72 +1,56 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 09 Nov 2016 11:21:06 +0100
-Subject: [PATCH v3 1/3] i2c: pxa: Add support for the I2C units found in
- Armada 3700
-In-Reply-To: <20161109101349.18722-2-romain.perier@free-electrons.com> (Romain
- Perier's message of "Wed, 9 Nov 2016 11:13:47 +0100")
-References: <20161109101349.18722-1-romain.perier@free-electrons.com>
- <20161109101349.18722-2-romain.perier@free-electrons.com>
-Message-ID: <87y40tkl7x.fsf@free-electrons.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Wed, 9 Nov 2016 16:14:40 +0530
+Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
+ Djtag driver
+In-Reply-To: <1609380.NN50qvVsP7@wuerfel>
+References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
+ <2030692.HPgjBCTYG6@wuerfel>
+ <2bac1a34-591b-6557-15bf-40db25c3d129@huawei.com>
+ <1609380.NN50qvVsP7@wuerfel>
+Message-ID: <5822FE18.5000901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
 
 
-You was too fast I didn't have time to commnent about Baruch suggestion.
-
- On mer., nov. 09 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
-
-> The Armada 3700 has two I2C controllers that is compliant with the I2C
-> Bus Specificiation 2.1, supports multi-master and different bus speed:
-> Standard mode (up to 100 KHz), Fast mode (up to 400 KHz),
-> High speed mode (up to 3.4 Mhz).
+On Tuesday 08 November 2016 08:40 PM, Arnd Bergmann wrote:
+> On Tuesday, November 8, 2016 1:49:43 PM CET John Garry wrote:
+>> Hi Arnd,
+>>
+>> Thanks for the reference.
+>>
+>> I think the i2c interface doesn't fully satisfy our requirements as we
+>> need more than just a slave bus address when accessing the slave device
+>> (which I think is what i2c uses). We also need to pass "offset" and
+>> "mod_mask" arguments to the djtag adapter to access specific registers
+>> in the slave device.
+> Ok. Are those values constant per device, or maybe a range? We may want to
+> include those in the reg property as well then.
 >
-> This IP block has a lot of similarity with the PXA, except some register
-> offsets and bitfield. This commits adds a basic support for this I2C
-> unit.
+> 	Arnd
 >
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->
-> Changes in v3:
->  - Replaced the type of hm_mask and fm_mask by unsigned int,
->    instead of unsigned long.
+Hi Arnd,
 
-[...]
+The "mod_mask" is to select the sub-module within a module. This 
+parameter is
+used for djtag write operation.
+In the case of L3 cache, this will select the L3 cache bank. 0xFFFF 
+select all banks.
+This value will  change based on the L3 cache bank to be written to. I 
+think this value
+can be in the driver itself.
 
+For djtag read operation, the "mod_mask" is ignored. instead the input 
+parameter
+"chain_id" is used. this will identify the sub-module or bank.
 
->  #define ISR_RWM		(1 << 0)	   /* read/write mode */
-> @@ -193,6 +204,8 @@ struct pxa_i2c {
->  	unsigned char		master_code;
->  	unsigned long		rate;
->  	bool			highmode_enter;
-> +	unsigned int		fm_mask;
-> +	unsigned int		hs_mask;
+For djtag-v1, the "chain_id" is different for each L3 cache bank, But in 
+the case of
+djtag-v2 the "chain_id" is fixed and the value is 0 as In djtag-v2 there 
+is separate
+"module-id" for each sub-module.
 
-These masks are used with writel and readl which use an u32. So the
-better is to use this type.
+The "offset" is the register offset and this value is a range for a module.
 
-Gregory
-
->  };
->  
->  #define _IBMR(i2c)	((i2c)->reg_ibmr)
-> @@ -503,8 +516,8 @@ static void i2c_pxa_reset(struct pxa_i2c *i2c)
->  		writel(i2c->slave_addr, _ISAR(i2c));
->  
->  	/* set control register values */
-> -	writel(I2C_ICR_INIT | (i2c->fast_mode ? ICR_FM : 0), _ICR(i2c));
-> -	writel(readl(_ICR(i2c)) | (i2c->high_mode ? ICR_HS : 0), _ICR(i2c));
-> +	writel(I2C_ICR_INIT | (i2c->fast_mode ? i2c->fm_mask : 0), _ICR(i2c));
-> +	writel(readl(_ICR(i2c)) | (i2c->high_mode ? i2c->hs_mask : 0), _ICR(i2c));
->  
-
-
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Anurup
