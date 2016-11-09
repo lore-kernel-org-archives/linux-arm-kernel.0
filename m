@@ -1,25 +1,88 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Nov 2016 15:23:50 -0700
-Subject: [PATCH v3 3/4] ARM: dts: am33xx: add DMA properties for tscadc
-In-Reply-To: <1a339132-9dd9-6f29-dd66-3125f0e90555@kernel.org>
-References: <20161005090443.24576-1-mugunthanvnm@ti.com>
- <20161005090443.24576-4-mugunthanvnm@ti.com>
- <1a339132-9dd9-6f29-dd66-3125f0e90555@kernel.org>
-Message-ID: <20161109222349.GH2428@atomide.com>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Wed, 9 Nov 2016 14:23:42 -0800
+Subject: [PATCH 1/6] dt-bindings: mdio-mux: Add documentation for mdio mux
+ for NSP SoC
+In-Reply-To: <1478683994-12008-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1478683994-12008-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1478683994-12008-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <54363ca1-333a-52e6-911c-cc394256be97@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jonathan Cameron <jic23@kernel.org> [161105 10:35]:
-> On 05/10/16 10:04, Mugunthan V N wrote:
-> > Add DMA properties for tscadc
-> > 
-> > Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> The support in the driver is now working it's way through iio.git towards
-> linux-next. I'm guessing this and the next patch will ultimately go through
-> arm-soc.
-> 
-> Shout if you'd rather I took them through the iio tree.
+One change
 
-Applying the dts related patches 3 and 4 into omap-for-v4.10/dt thanks.
+On 16-11-09 01:33 AM, Yendapally Reddy Dhananjaya Reddy wrote:
+> Add documentation for mdio mux available in Broadcom NSP SoC
+>
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> ---
+>  .../devicetree/bindings/net/brcm,mdio-mux-nsp.txt  | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
+> new file mode 100644
+> index 0000000..b749a2b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-nsp.txt
+> @@ -0,0 +1,57 @@
+> +Properties for an MDIO bus multiplexer available in Broadcom NSP SoC.
+> +
+> +This MDIO bus multiplexer defines buses that could access the internal
+> +phys as well as external to SoCs. When child bus is selected, one needs
+> +to select the below properties to generate desired MDIO transaction on
+> +appropriate bus.
+> +
+> +Required properties in addition to the generic multiplexer properties:
+> +
+> +MDIO multiplexer node:
+> +- compatible: brcm,mdio-mux-iproc.
+This should be brcm,mdio-mux-nsp
 
-Tony
+> +- reg: Should contain registers location and length.
+> +- reg-names: Should contain the resource reg names.
+> +	- bus-ctrl: mdio bus control register address space required to
+> +	  select the bus master. This property is not required for SoC's
+> +	  that doesn't provide master selection.
+> +	- mgmt-ctrl: mdio management control register address space
+> +
+> +Sub-nodes:
+> +   Each bus master should be represented as a sub-node.
+> +
+> +Sub-nodes required properties:
+> +- reg: Bus master number. Should be 0x10 to access the external mdio devices.
+> +- address-cells: should be 1
+> +- size-cells: should be 0
+> +
+> +Every non-ethernet PHY requires a compatible property so that it could be
+> +probed based on this compatible string.
+> +
+> +Additional information regarding generic multiplexer properties can be found
+> +at- Documentation/devicetree/bindings/net/mdio-mux.txt
+> +
+> +example:
+> +
+> +	mdio_mux: mdio-mux at 3f190 {
+> +		compatible = "brcm,mdio-mux-nsp";
+> +		reg = <0x3f190 0x4>,
+> +		      <0x32000 0x4>;
+> +		reg-names = "bus-ctrl", "mgmt-ctrl";
+> +		mdio-parent-bus = <&mdio>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		mdio at 0 {
+> +			reg = <0x0>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			usb3_phy: usb3-phy at 10 {
+> +				compatible = "brcm,nsp-usb3-phy";
+> +				reg = <0x10>;
+> +				usb3-ctrl-syscon = <&usb3_ctrl>;
+> +				#phy-cells = <0>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +	};
+>
