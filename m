@@ -1,47 +1,36 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 8 Nov 2016 16:20:32 -0800
-Subject: [PATCH v7 1/3] input: touchscreen: TOUCHSCREEN_SUN4I depends on
- !SUN4I_GPADC
-In-Reply-To: <20161103101601.24529-2-quentin.schulz@free-electrons.com>
-References: <20161103101601.24529-1-quentin.schulz@free-electrons.com>
- <20161103101601.24529-2-quentin.schulz@free-electrons.com>
-Message-ID: <20161109002032.GD8719@dtor-ws>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 8 Nov 2016 18:23:29 -0600
+Subject: [PATCH] ARM: socfpga_defconfig: enable FS configs to support
+ Angstrom filesystem
+In-Reply-To: <2911351.Izg0zkPBzd@wuerfel>
+References: <20161108224750.30242-1-dinguyen@kernel.org>
+ <2911351.Izg0zkPBzd@wuerfel>
+Message-ID: <CADhT+wenXK0w4+yrBs0j4wEFZiQM3kbUKPVF660tGne-SH_qbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 11:15:59AM +0100, Quentin Schulz wrote:
-> SUN4I_GPADC and TOUCHSCREEN_SUN4I are incompatible (both are drivers
-> for Allwinner SoCs' ADC). This makes sure TOUCHSCREEN_SUN4I isn't
-> enabled while SUN4I_GPADC is enabled.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+On Tue, Nov 8, 2016 at 4:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday, November 8, 2016 4:47:50 PM CET Dinh Nguyen wrote:
+>> Enables:
+>>
+>> CONFIG_AUTOFS4_FS=y
+>> CONFIG_NFSD=y
+>> CONFIG_NFS_V3_ACL=y
+>> CONFIG_NFSD_V3_ACL=y
+>> CONFIG_NFSD_V4=y
+>>
+>> Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
+>> Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+>>
+>
+> No objections to the patch, but the changelog should not state what
+> the patch clearly shows already but instead it should explain why
+> you do this.
+>
+> The subject line mentions "to support Angstrom filesystem", but
+> it's not clear (at least not to me) what that filesystem is.
+>
 
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Thanks for the review Arnd. I'll update with a better changelog message.
 
-Please merge with SUN4I_GPADC driver patch.
-
-> ---
-> 
-> added in v7
-> 
->  drivers/input/touchscreen/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index efca013..c618cb9 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -1120,6 +1120,7 @@ config TOUCHSCREEN_SUN4I
->  	depends on ARCH_SUNXI || COMPILE_TEST
->  	depends on HWMON
->  	depends on THERMAL || !THERMAL_OF
-> +	depends on !SUN4I_GPADC
->  	help
->  	  This selects support for the resistive touchscreen controller
->  	  found on Allwinner sunxi SoCs.
-> -- 
-> 2.9.3
-> 
-
--- 
-Dmitry
+Dinh
