@@ -1,48 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 09 Nov 2016 22:33:17 +0100
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <6dee9821-5145-2113-e391-6317e4533c06@huawei.com>
+Date: Wed, 09 Nov 2016 22:34:38 +0100
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8F1A7A@lhreml507-mbx>
 References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <2479288.4UmF9SBrq1@wuerfel>
- <6dee9821-5145-2113-e391-6317e4533c06@huawei.com>
-Message-ID: <2939462.W2yy62pjEE@wuerfel>
+ <1555494.4IFvGxvsfe@wuerfel>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8F1A7A@lhreml507-mbx>
+Message-ID: <2825537.ADCNsGqGxn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 9, 2016 11:29:46 AM CET John Garry wrote:
-> On 08/11/2016 22:35, Arnd Bergmann wrote:
-> > On Tuesday, November 8, 2016 4:49:49 PM CET Will Deacon wrote:
-> >> On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
-> >>> On 08/11/2016 16:12, Will Deacon wrote:
-> >>>> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
-> >
-> >>>> Is there no way to make this slightly more generic, so that it can be
-> >>>> re-used elsewhere? For example, if struct extio_ops was common, then
-> >>>> you could have the singleton (which maybe should be an interval tree?),
-> >>>> type definition, setter function and the BUILD_EXTIO invocations
-> >>>> somewhere generic, rather than squirelled away in the arch backend.
-> >>>>
-> >>> The concern would be that some architecture which uses generic higher-level
-> >>> ISA accessor ops, but have IO space, could be affected.
-> >>
-> >> You're already adding a Kconfig symbol for this stuff, so you can keep
-> >> that if you don't want it on other architectures. I'm just arguing that
-> >> plumbing drivers directly into arch code via arm64_set_extops is not
-> >> something I'm particularly fond of, especially when it looks like it
-> >> could be avoided with a small amount of effort.
-> >
-> > Agreed, I initially suggested putting this into arch/arm64/, but there isn't
-> > really a reason why it couldn't just live in lib/ with the header file
-> > bits moved to include/asm-generic/io.h which we already use.
-> >
+On Wednesday, November 9, 2016 12:10:43 PM CET Gabriele Paoloni wrote:
+> > On Tuesday, November 8, 2016 11:47:09 AM CET zhichang.yuan wrote:
+> > > +       /*
+> > > +        * The first PCIBIOS_MIN_IO is reserved specifically for
+> > indirectIO.
+> > > +        * It will separate indirectIO range from pci host bridge to
+> > > +        * avoid the possible PIO conflict.
+> > > +        * Set the indirectIO range directly here.
+> > > +        */
+> > > +       lpcdev->io_ops.start = 0;
+> > > +       lpcdev->io_ops.end = PCIBIOS_MIN_IO - 1;
+> > > +       lpcdev->io_ops.devpara = lpcdev;
+> > > +       lpcdev->io_ops.pfin = hisilpc_comm_in;
+> > > +       lpcdev->io_ops.pfout = hisilpc_comm_out;
+> > > +       lpcdev->io_ops.pfins = hisilpc_comm_ins;
+> > > +       lpcdev->io_ops.pfouts = hisilpc_comm_outs;
+> > 
+> > I have to look at patch 2 in more detail again, after missing a few
+> > review
+> > rounds. I'm still a bit skeptical about hardcoding a logical I/O port
+> > range here, and would hope that we can just go through the same
+> > assignment of logical port ranges that we have for PCI buses,
+> > decoupling
+> > the bus addresses from the linux-internal ones.
 > 
-> Right, Zhichang will check the logistics of this. The generic io.h is 
-> quite clean, so as long as you don't mind new build switches of this 
-> nature being added, it should be ok; and we'll plan on moving extio.h 
-> into include/asm-generic as well.
+> The point here is that we want to avoid any conflict/overlap between
+> the LPC I/O space and the PCI I/O space. With the assignment above
+> we make sure that LPC never interfere with PCI I/O space.
 
-I think all we need is an #ifdef CONFIG_something around the existing
-defintion, with the alternative being "extern" declarations, after that
-all the interesting logic can sit in a file in lib/.
+But we already abstract the PCI I/O space using dynamic registration.
+There is no need to hardcode the logical address for ISA, though
+I think we can hardcode the bus address to start at zero here.
 
 	Arnd
