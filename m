@@ -1,33 +1,32 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  9 Nov 2016 12:47:25 +0000
-Subject: [PATCH 2/5] iommu/arm-smmu: Fix group refcounting
+Date: Wed,  9 Nov 2016 12:47:26 +0000
+Subject: [PATCH 3/5] iommu/amd: Fix group refcounting
 In-Reply-To: <3922e1f14d8ecb50440b2d9b0d1123f3c9307fc5.1478695557.git.robin.murphy@arm.com>
 References: <3922e1f14d8ecb50440b2d9b0d1123f3c9307fc5.1478695557.git.robin.murphy@arm.com>
-Message-ID: <5142017efd33fd22637878140a05fe3db007f217.1478695557.git.robin.murphy@arm.com>
+Message-ID: <afa2d74af82b161db0de3eb550b91519f0ad535f.1478695557.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When arm_smmu_device_group() finds an existing group due to Stream ID
-aliasing, it should be taking an additional reference on that group.
+If acpihid_device_group() finds an existing group for the relevant
+devid, it should be taking an additional reference on that group.
 
-Reported-by: Sricharan R <sricharan@codeaurora.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/amd_iommu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 8f7281444551..9f760cfba4fa 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1478,7 +1478,7 @@ static struct iommu_group *arm_smmu_device_group(struct device *dev)
- 	}
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 754595ee11b6..4ef05691ceb1 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -373,6 +373,8 @@ static struct iommu_group *acpihid_device_group(struct device *dev)
  
- 	if (group)
--		return group;
-+		return __iommu_group_get(group);
+ 	if (!entry->group)
+ 		entry->group = generic_device_group(dev);
++	else
++		__iommu_group_get(entry->group);
  
- 	if (dev_is_pci(dev))
- 		group = pci_device_group(dev);
+ 	return entry->group;
+ }
 -- 
 2.10.2.dirty
