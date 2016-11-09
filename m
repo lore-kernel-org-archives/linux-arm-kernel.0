@@ -1,88 +1,75 @@
-From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
-Date: Wed, 9 Nov 2016 15:42:40 +0100
-Subject: [PATCH 3/3] ipmi/bt-bmc: add a sysfs file to configure a maximum
- response time
-In-Reply-To: <3a1f8e6d-c935-3404-ffa0-81b19d170731@acm.org>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <1478073426-3714-4-git-send-email-clg@kaod.org>
- <3a1f8e6d-c935-3404-ffa0-81b19d170731@acm.org>
-Message-ID: <aa4804b0-4084-6d34-c1db-68bdb5efb20a@kaod.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 9 Nov 2016 14:43:18 +0000
+Subject: [PATCH v7 05/16] drivers: iommu: arm-smmu: convert struct device
+ of_node to fwnode usage
+In-Reply-To: <20161109141948.19244-6-lorenzo.pieralisi@arm.com>
+References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
+ <20161109141948.19244-6-lorenzo.pieralisi@arm.com>
+Message-ID: <7ab465a8-f1ae-91ef-12fd-50f498af3d6e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2016 07:37 PM, Corey Minyard wrote:
-> Sorry, I was at Plumbers and extra busy with other stuff.  Just getting around to reviewing this.
+On 09/11/16 14:19, Lorenzo Pieralisi wrote:
+> Current ARM SMMU driver rely on the struct device.of_node pointer for
+> device look-up and iommu_ops retrieval.
 > 
-> On 11/02/2016 02:57 AM, C?dric Le Goater wrote:
->> We could also use an ioctl for that purpose. sysfs seems a better
->> approach.
->>
->> Signed-off-by: C?dric Le Goater <clg@kaod.org>
->> ---
->>   drivers/char/ipmi/bt-bmc.c | 31 +++++++++++++++++++++++++++++++
->>   1 file changed, 31 insertions(+)
->>
->> diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
->> index e751e4a754b7..d7146f0e900e 100644
->> --- a/drivers/char/ipmi/bt-bmc.c
->> +++ b/drivers/char/ipmi/bt-bmc.c
->> @@ -84,6 +84,33 @@ struct bt_bmc {
->>     static atomic_t open_count = ATOMIC_INIT(0);
->>   +static ssize_t bt_bmc_show_response_time(struct device *dev,
->> +                     struct device_attribute *attr,
->> +                     char *buf)
->> +{
->> +    struct bt_bmc *bt_bmc = dev_get_drvdata(dev);
->> +
->> +    return snprintf(buf, PAGE_SIZE - 1, "%d\n", bt_bmc->response_time);
->> +}
->> +
->> +static ssize_t bt_bmc_set_response_time(struct device *dev,
->> +                    struct device_attribute *attr,
->> +                    const char *buf, size_t count)
->> +{
->> +    struct bt_bmc *bt_bmc = dev_get_drvdata(dev);
->> +    unsigned long val;
->> +    int err;
->> +
->> +    err = kstrtoul(buf, 0, &val);
->> +    if (err)
->> +        return err;
->> +    bt_bmc->response_time = val;
->> +    return count;
->> +}
->> +
->> +static DEVICE_ATTR(response_time, 0644,
->> +           bt_bmc_show_response_time, bt_bmc_set_response_time);
->> +
->>   static u8 bt_inb(struct bt_bmc *bt_bmc, int reg)
->>   {
->>       return ioread8(bt_bmc->base + reg);
->> @@ -572,6 +599,10 @@ static int bt_bmc_probe(struct platform_device *pdev)
->>       bt_bmc_config_irq(bt_bmc, pdev);
->>         bt_bmc->response_time = BT_BMC_RESPONSE_TIME;
->> +    rc = device_create_file(&pdev->dev, &dev_attr_response_time);
->> +    if (rc)
->> +        dev_warn(&pdev->dev, "can't create response_time file\n");
->> +
+> In preparation for ACPI probing enablement, convert the driver to use
+> the struct device.fwnode member for device and iommu_ops look-up so that
+> the driver infrastructure can be used also on systems that do not
+> associate an of_node pointer to a struct device (eg ACPI), making the
+> device look-up and iommu_ops retrieval firmware agnostic.
 > 
-> You added an extra space here.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Tested-by: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Robin Murphy <robin.murphy@arm.com>
 
-yes. I will remove it in the next version. 
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-The patch raises a few questions on the "BT Interface Capabilities" :
-
- - should we use sysfs or a specific ioctl to configure the driver ? 
- - should the driver handle directly the response to the "Get BT 
-   Interface Capabilities" command ? 
-
-What is your opinion ? 
-
-Thanks,
-
-C.
-
->>         if (bt_bmc->irq) {
->>           dev_info(dev, "Using IRQ %d\n", bt_bmc->irq);
+> ---
+>  drivers/iommu/arm-smmu.c | 11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
 > 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 8f72814..8a3c2a4 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1379,13 +1379,14 @@ static bool arm_smmu_capable(enum iommu_cap cap)
+>  
+>  static int arm_smmu_match_node(struct device *dev, void *data)
+>  {
+> -	return dev->of_node == data;
+> +	return dev->fwnode == data;
+>  }
+>  
+> -static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
+> +static
+> +struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
+>  {
+>  	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
+> -						np, arm_smmu_match_node);
+> +						fwnode, arm_smmu_match_node);
+>  	put_device(dev);
+>  	return dev ? dev_get_drvdata(dev) : NULL;
+>  }
+> @@ -1403,7 +1404,7 @@ static int arm_smmu_add_device(struct device *dev)
+>  		if (ret)
+>  			goto out_free;
+>  	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+> -		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
+> +		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
+>  	} else {
+>  		return -ENODEV;
+>  	}
+> @@ -2007,7 +2008,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
+> +	fwnode_iommu_set_ops(dev->fwnode, &arm_smmu_ops);
+>  	platform_set_drvdata(pdev, smmu);
+>  	arm_smmu_device_reset(smmu);
+>  
 > 
