@@ -1,45 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed,  9 Nov 2016 09:24:10 +0100
-Subject: [PATCH v2] arm64: dts: marvell: Fix typo in label name on Armada 37xx
-Message-ID: <20161109082410.29786-1-gregory.clement@free-electrons.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 09 Nov 2016 17:40:09 +0900
+Subject: [PATCH v4 0/2] pinctrl: samsung: Add the support the multiple
+ IORESOURCE_MEM
+Message-ID: <1478680811-24835-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The label names of the peripheral clocks have a typo. Fix it before it is
-more widely used.
+This patches support the multiple IORESOURCE_MEM resources for one pin-bank
+to support tye GPF of Samsung 64-bit Exynos5433 SoC. The exynos5433 device-tree
+patches were already merged.
 
-Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-Changelog:
+Changes from v3:
+- Merged the Exynos5433, TM2/TM2E Device-tree patch.
+- Fix the build error of pinctrl-s3c64xx/s3c24xx.c driver.
+- Move the exynos5433 pinctrl compatible to patch2.
+- Add the reviewed-by tag of Krzysztof Kozlowski on patch1.
 
-v1 -> v2
-Fix missing space
+Changes from v2:
+(https://lkml.org/lkml/2016/8/24/426)
+- Add new pctl_base and eint_base instead of virt_base on patch1.
+- Modify the documentation of pinctrl-samsung.txt on patch1.
+- Modify the cooling level for big.LITTLE cores.
+- Use the GIC_SPI definition on dtsi file.
+- Removes the unneeded 'regulator-always-on' property.
+- Fix the kbuild report of the compatible string for TM2/TM2E patches.
+- Two patches(exynos-mct, exynos5433-pmu) were merged.
+- Add the reviewed-by tag of Javier Martinez Canillas on patch3/4/5
+- Add the reviewed-by tag of Krzysztof Kozlowski on patch4/5
+- Add the acked-by tag of Rob Herring on patch5
+- Fix the minor issues.
 
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes from v1:
+(https://lkml.org/lkml/2016/8/16/61)
+- Merge the cpufreq patch for exynos5433[3] on PM/cpufreq tree.
+- Add new patch to support the multiple IORESOURCE_MAP for samsung pinctrl driver.
+- Drop the SYSMMU Device-Tree node which will be posted by Marek Szyprowski.
+- Fix the code clean issue by Krzysztof Kozlowski and Rob Herring's comment.
+- Delete the unnecessary alias from exynos5433-tm2.dts.
+- Expand the range of cooling level of CPU device.
+- Update the binding method of 'Exynos5433 audio subsystem'
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index c4762538ec01..e9bd58793464 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -105,7 +105,7 @@
- 				status = "disabled";
- 			};
- 
--			nb_perih_clk: nb-periph-clk at 13000{
-+			nb_periph_clk: nb-periph-clk at 13000 {
- 				compatible = "marvell,armada-3700-periph-clock-nb";
- 				reg = <0x13000 0x100>;
- 				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
-@@ -113,7 +113,7 @@
- 				#clock-cells = <1>;
- 			};
- 
--			sb_perih_clk: sb-periph-clk at 18000{
-+			sb_periph_clk: sb-periph-clk at 18000 {
- 				compatible = "marvell,armada-3700-periph-clock-sb";
- 				reg = <0x18000 0x100>;
- 				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
+Chanwoo Choi (2):
+  pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank
+  pinctrl: samsung: Add GPF support for Exynos5433
+
+ .../bindings/pinctrl/samsung-pinctrl.txt           | 19 +++++++++
+ drivers/pinctrl/samsung/pinctrl-exynos.c           | 45 +++++++++++-----------
+ drivers/pinctrl/samsung/pinctrl-exynos.h           | 11 ++++++
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c          | 37 ++++++++----------
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c          | 40 ++++++++++---------
+ drivers/pinctrl/samsung/pinctrl-samsung.c          | 40 ++++++++++++-------
+ drivers/pinctrl/samsung/pinctrl-samsung.h          | 10 ++++-
+ 7 files changed, 124 insertions(+), 78 deletions(-)
+
 -- 
-2.10.1
+1.9.1
