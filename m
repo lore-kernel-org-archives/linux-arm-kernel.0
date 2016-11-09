@@ -1,66 +1,78 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 9 Nov 2016 22:10:29 +0200
-Subject: [PATCH 10/13] ARM: dts: exynos: replace to "max-frequecy"
- instead of "clock-freq-min-max"
-In-Reply-To: <72612112-3b79-8fd3-8be4-a8f60ab3b68a@samsung.com>
-References: <20161103062135.10697-1-jh80.chung@samsung.com>
- <20161103184112.GB11071@kozik-lap>
- <ecf4fac2-0ab7-d4c4-69e3-d498ee5b601c@samsung.com>
- <4066252.a1W9ejEKHX@phil>
- <CGME20161104150527epcas4p4004d2c3a8686cccef97760dacdb2892c@epcas4p4.samsung.com>
- <20161104150447.GA4829@kozik-lap>
- <72612112-3b79-8fd3-8be4-a8f60ab3b68a@samsung.com>
-Message-ID: <20161109201029.GE23534@kozik-lap>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 9 Nov 2016 20:11:16 +0000
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <582371FB.2040808@redhat.com>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
+ <20161108202922.GC15676@cbox> <20161108163508.1bcae0c2@t450s.home>
+ <58228F71.6020108@redhat.com> <20161109170326.GG17771@arm.com>
+ <582371FB.2040808@redhat.com>
+Message-ID: <e59e9a17-e943-a227-5ea4-d028232155a8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 09:38:15AM +0900, Jaehoon Chung wrote:
-> On 11/05/2016 12:04 AM, Krzysztof Kozlowski wrote:
-> > On Fri, Nov 04, 2016 at 12:19:49PM +0100, Heiko Stuebner wrote:
-> >> Hi Jaehoon,
-> >>
-> >> Am Freitag, 4. November 2016, 19:21:30 CET schrieb Jaehoon Chung:
-> >>> On 11/04/2016 03:41 AM, Krzysztof Kozlowski wrote:
-> >>>> On Thu, Nov 03, 2016 at 03:21:32PM +0900, Jaehoon Chung wrote:
-> >>>>> In drivers/mmc/core/host.c, there is "max-frequency" property.
-> >>>>> It should be same behavior. So Use the "max-frequency" instead of
-> >>>>> "clock-freq-min-max".
-> >>>>>
-> >>>>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-> >>>>> ---
-> >>>>>
-> >>>>>  arch/arm/boot/dts/exynos3250-artik5-eval.dts | 2 +-
-> >>>>>  arch/arm/boot/dts/exynos3250-artik5.dtsi     | 2 +-
-> >>>>>  arch/arm/boot/dts/exynos3250-monk.dts        | 2 +-
-> >>>>>  arch/arm/boot/dts/exynos3250-rinato.dts      | 2 +-
-> >>>>>  4 files changed, 4 insertions(+), 4 deletions(-)
-> >>>>
-> >>>> This looks totally independent to rest of patches so it can be applied
-> >>>> separately without any functional impact (except lack of minimum
-> >>>> frequency). Is that correct?
-> >>>
-> >>> You're right. I will split the patches. And will resend.
-> >>> Thanks!
-> >>
-> >> I think what Krzysztof was asking was just if he can simply pick up this patch 
-> >> alone, as it does not require any of the previous changes.
-> >>
-> >> Same is true for the Rockchip patches I guess, so we could just take them 
-> >> individually into samsung/rockchip dts branches.
-> > 
-> > Yes, I wanted to get exactly this information. I couldn't find it in
-> > cover letter.
-> 
-> In drivers/mmc/core/host.c, there already is "max-frequency" property.
-> It's same functionality with "clock-freq-min-max". 
-> Minimum clock value can be fixed to 100K. because MMC core will check clock value from 400K to 100K.
-> But max-frequency can be difference.
-> If we can use "max-frequency" property, we don't need to use "clock-freq-min-max" property anymore.
-> I will resend the deprecated property instead of removing "clock-freq-min-max".
-> 
-> If you want to pick this, it's possible to pick. Then i will resend the patches without dt patches.
+On 09/11/16 18:59, Don Dutile wrote:
+> On 11/09/2016 12:03 PM, Will Deacon wrote:
+>> On Tue, Nov 08, 2016 at 09:52:33PM -0500, Don Dutile wrote:
+>>> On 11/08/2016 06:35 PM, Alex Williamson wrote:
+>>>> On Tue, 8 Nov 2016 21:29:22 +0100
+>>>> Christoffer Dall <christoffer.dall@linaro.org> wrote:
+>>>>> Is my understanding correct, that you need to tell userspace about the
+>>>>> location of the doorbell (in the IOVA space) in case (2), because even
+>>>>> though the configuration of the device is handled by the (host) kernel
+>>>>> through trapping of the BARs, we have to avoid the VFIO user
+>>>>> programming
+>>>>> the device to create other DMA transactions to this particular
+>>>>> address,
+>>>>> since that will obviously conflict and either not produce the desired
+>>>>> DMA transactions or result in unintended weird interrupts?
+>>
+>> Yes, that's the crux of the issue.
+>>
+>>>> Correct, if the MSI doorbell IOVA range overlaps RAM in the VM, then
+>>>> it's potentially a DMA target and we'll get bogus data on DMA read from
+>>>> the device, and lose data and potentially trigger spurious
+>>>> interrupts on
+>>>> DMA write from the device.  Thanks,
+>>>>
+>>> That's b/c the MSI doorbells are not positioned *above* the SMMU, i.e.,
+>>> they address match before the SMMU checks are done.  if
+>>> all DMA addrs had to go through SMMU first, then the DMA access could
+>>> be ignored/rejected.
+>>
+>> That's actually not true :( The SMMU can't generally distinguish
+>> between MSI
+>> writes and DMA writes, so it would just see a write transaction to the
+>> doorbell address, regardless of how it was generated by the endpoint.
+>>
+>> Will
+>>
+> So, we have real systems where MSI doorbells are placed at the same IOVA
+> that could have memory for a guest, but not at the same IOVA as memory
+> on real hw ?
 
-Thanks, applied.
+MSI doorbells integral to PCIe root complexes (and thus untranslatable)
+typically have a programmable address, so could be anywhere. In the more
+general category of "special hardware addresses", QEMU's default ARM
+guest memory map puts RAM starting at 0x40000000; on the ARM Juno
+platform, that happens to be where PCI config space starts; as Juno's
+PCIe doesn't support ACS, peer-to-peer or anything clever, if you assign
+the PCI bus to a guest (all of it, given the lack of ACS), the root
+complex just sees the guest's attempts to DMA to "memory" as the device
+attempting to access config space and aborts them.
 
-Best regards,
-Krzysztof
+> How are memory holes passed to SMMU so it doesn't have this issue for
+> bare-metal
+> (assign an IOVA that overlaps an MSI doorbell address)?
+
+When we *are* in full control of the IOVA space, we just carve out what
+we can find as best we can - see iova_reserve_pci_windows() in
+dma-iommu.c, which isn't really all that different to what x86 does
+(e.g. init_reserved_iova_ranges() in amd-iommu.c). Note that we don't
+actually have any way currently to discover upstream MSI doorbells
+(ponder dw_pcie_msi_init() in pcie-designware.c for an example of the
+problem) - the specific MSI support we have in DMA ops at the moment
+only covers GICv2m or GICv3 ITS downstream of translation, but
+fortunately that's the typical relevant use-case on current platforms.
+
+Robin.
