@@ -1,104 +1,121 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 9 Nov 2016 14:24:49 +0100
-Subject: [PATCH v6 13/16] drivers: iommu: arm-smmu: add IORT configuration
-In-Reply-To: <20161018160414.1228-14-lorenzo.pieralisi@arm.com>
-References: <20161018160414.1228-1-lorenzo.pieralisi@arm.com>
- <20161018160414.1228-14-lorenzo.pieralisi@arm.com>
-Message-ID: <f8ec1ef0-9fbd-7dd6-822a-ca91aafe986a@semihalf.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 9 Nov 2016 14:34:33 +0100
+Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
+References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
+ <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
+Message-ID: <CAMuHMdUmpMpizZpq1V-sLA8Cf2q5oOgOVxGOvKXqTHvn+Mj7Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Hi Arnd,
 
-On 18.10.2016 18:04, Lorenzo Pieralisi wrote:
-> In ACPI bases systems, in order to be able to create platform
-> devices and initialize them for ARM SMMU components, the IORT
-> kernel implementation requires a set of static functions to be
-> used by the IORT kernel layer to configure platform devices for
-> ARM SMMU components.
+On Mon, Nov 7, 2016 at 10:35 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Mon, Oct 31, 2016 at 12:30 PM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+>> Some Renesas SoCs may exist in different revisions, providing slightly
+>> different functionalities (e.g. R-Car H3 ES1.x and ES2.0), and behavior
+>> (errate and quirks).  This needs to be catered for by drivers and/or
+>> platform code.  The recently proposed soc_device_match() API seems like
+>> a good fit to handle this.
+>>
+>> This patch series implements the core infrastructure to provide SoC and
+>> revision information through the SoC bus for Renesas ARM SoCs. It
+>> consists of 7 patches:
+>>   - Patches 1-4 provide soc_device_match(), with some related fixes,
+>>   - Patches 5-7 implement identification of Renesas SoCs and
+>>     registration with the SoC bus,
+>>
+>> Changes compared to v1:
+>>   - Add Acked-by,
+>>   - New patches:
+>>       - "[4/7] base: soc: Provide a dummy implementation of
+>>                soc_device_match()",
+>>       - "[5/7] ARM: shmobile: Document DT bindings for CCCR and PRR",
+>>       - "[6/7] arm64: dts: r8a7795: Add device node for PRR"
+>>         (more similar patches available, I'm not yet spamming you all
+>>          with them),
+>>   - Drop SoC families and family names; use fixed "Renesas" instead,
+>>   - Drop EMEV2, which doesn't have a chip ID register, and doesn't share
+>>     devices with other SoCs,
+>>   - Drop RZ/A1H and R-CAR M1A, which don't have chip ID registers (for
+>>     M1A: not accessible from the ARM core?),
+>>   - On arm, move "select SOC_BUS" from ARCH_RENESAS to Kconfig symbols
+>>     for SoCs that provide a chip ID register,
+>>   - Build renesas-soc only if SOC_BUS is enabled,
+>>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
+>>     available, else fall back to hardcoded addresses for compatibility
+>>     with existing DTBs,
+>>   - Remove verification of product IDs; just print the ID instead,
+>>   - Don't register the SoC bus if the chip ID register is missing,
+>>   - Change R-Mobile APE6 fallback to use PRR instead of CCCR (it has
+>>     both).
+>>
+>> Merge strategy:
+>>   - In theory, patches 1-4 should go through Greg's driver core tree.
+>>     But it's a hard dependency for all users.
+>>     If people agree, I can provide an immutable branch in my
+>>     renesas-drivers repository, to be merged by all interested parties.
+>>     So far I'm aware of Freescale/NXP, and Renesas.
 >
-> Add static configuration functions to the IORT kernel layer for
-> the ARM SMMU components, so that the ARM SMMU driver can
-> initialize its respective platform device by relying on the IORT
-> kernel infrastructure and by adding a corresponding ACPI device
-> early probe section entry.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> ---
->  drivers/acpi/arm64/iort.c | 81 +++++++++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/arm-smmu.c  | 84 ++++++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/acpi_iort.h |  3 ++
->  3 files changed, 167 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index ea90bc8..04cc5f7 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -548,6 +548,78 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
->  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
->  }
->
-[...]
-> +
-> +static int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-> +				      struct arm_smmu_device *smmu)
-> +{
-> +	struct device *dev = smmu->dev;
-> +	struct acpi_iort_node *node =
-> +		*(struct acpi_iort_node **)dev_get_platdata(dev);
-> +	struct acpi_iort_smmu *iort_smmu;
-> +	u64 *glb_irq;
-> +	int ret;
-> +
-> +	/* Retrieve SMMU1/2 specific data */
-> +	iort_smmu = (struct acpi_iort_smmu *)node->node_data;
-> +
-> +	ret = acpi_smmu_get_data(iort_smmu->model, &smmu->version,
-> +						   &smmu->model);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	glb_irq = ACPI_ADD_PTR(u64, iort_smmu,
-> +			iort_smmu->global_interrupt_offset);
+> And Samsung.
+> Shall I create the immutable branch now?
 
-One bug that I found:
+Arnd: are you happy with the new patches and changes?
 
--	glb_irq = ACPI_ADD_PTR(u64, iort_smmu,
--			iort_smmu->global_interrupt_offset);
-+	glb_irq = ACPI_ADD_PTR(u64, node,
-+			iort_smmu->global_interrupt_offset);
+Thanks again!
 
-With this fix, I run VM with several PCI devices (NIC, SATA) in 
-passthrough mode successfully on ACPI host using ThunderX 1-socket board.
+>>   - Patches 5-7 obviously have to go through Simon's Renesas tree (after
+>>     merging the soc_device_match() core), and arm-soc.
+>>
+>> Tested on (machine, soc_id, optional revision):
+>>     EMEV2 KZM9D Board, emev2
+>>     Genmai, r7s72100
+>>     APE6EVM, r8a73a4, ES1.0
+>>     armadillo 800 eva, r8a7740, ES2.0
+>>     bockw, r8a7778
+>>     marzen, r8a7779, ES1.0
+>>     Lager, r8a7790, ES1.0
+>>     Koelsch, r8a7791, ES1.0
+>>     Porter, r8a7791, ES3.0
+>>     Blanche, r8a7792, ES1.1
+>>     Gose, r8a7793, ES1.0
+>>     Alt, r8a7794, ES1.0
+>>     Renesas Salvator-X board based on r8a7795, r8a7795, ES1.0
+>>     Renesas Salvator-X board based on r8a7795, r8a7795, ES1.1
+>>     Renesas Salvator-X board based on r8a7796, r8a7796, ES1.0
+>>     KZM-A9-GT, sh73a0, ES2.0
+>>
+>> For your convenience, this series (incl. more DT updates to add device
+>> nodes for CCCR and PRR to all other Renesas ARM SoCs) is also available
+>> in the topic/renesas-soc-id-v2 branch of my renesas-drivers git
+>> repository at
+>> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
+>> Its first user is support for R-Car H3 ES2.0 in branch
+>> topic/r8a7795-es2-v1-rebased2.
+>>
+>> Thanks for your comments!
+>>
+>> Arnd Bergmann (1):
+>>   base: soc: Introduce soc_device_match() interface
+>>
+>> Geert Uytterhoeven (6):
+>>   base: soc: Early register bus when needed
+>>   base: soc: Check for NULL SoC device attributes
+>>   base: soc: Provide a dummy implementation of soc_device_match()
+>>   ARM: shmobile: Document DT bindings for CCCR and PRR
+>>   arm64: dts: r8a7795: Add device node for PRR
+>>   soc: renesas: Identify SoC and register with the SoC bus
 
-Also, for my tests I used Eric's patches:
-https://github.com/eauger/linux/commits/v4.9-rc3-reserved-rfc-v2
+Gr{oetje,eeting}s,
 
-Including bug fix above:
-Tested-by: Tomasz Nowicki <tn@semihalf.com> for all series.
+                        Geert
 
-> +
-> +	if (!IORT_IRQ_MASK(glb_irq[1]))	/* 0 means not implemented */
-> +		smmu->num_global_irqs = 1;
-> +	else
-> +		smmu->num_global_irqs = 2;
-> +
-> +	if (iort_smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK)
-> +		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int arm_smmu_device_acpi_probe(struct platform_device *pdev,
-> +					     struct arm_smmu_device *smmu)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif
-> +
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-Tomasz
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
