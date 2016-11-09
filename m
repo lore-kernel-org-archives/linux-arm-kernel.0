@@ -1,69 +1,219 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 09 Nov 2016 17:45:53 +0530
-Subject: [PATCH v3 0/2] Remove static mapping of SCU from mach-exynos
-Message-ID: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Wed, 09 Nov 2016 17:45:54 +0530
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1478693755-11953-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is part of patch series [1], which adds support of SCU
-device node for Cortex-A9 based Exynos4 SoC. First two patches of the same
-has been accepted and hence not included them in v3.
+Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based
+boards. Instead use mapping from device tree node of SCU.
 
-This patch series does some cleanup for Exynos4 SoC based boards.
-We are currently statically mapping SCU SFRs in mach-exynos/exynos.c
-which can be avoided if map this from device node of SCU
+NOTE: This patch has dependency on DT file of any such CORTEX-A9 SoC
+based boards, in the absence of SCU device node in DTS file, only single
+CPU will boot. So if you are using OUT-OF-TREE DTS file of CORTEX-A9 based
+Exynos SoC make sure to add SCU device node to DTS file for SMP boot.
 
-[1]: https://www.spinics.net/lists/arm-kernel/msg540498.html
-
-This patch series is prepared on Krzysztof's for-next
-(SHA_ID: b33c7bb9d59c3f4100d4)
-
-I have tested these patches on Exynos4210 based on Origen board for SMP boot.
-Patchset v1 was tested by Marek Szyprowski on Exynos4412-based Odroid U3
-for SMP boot and S2R.
-
-To confirm concern raised by Alim, I intentionally removed SCU device node
-from exynos4.dtsi and tested on Origen board, I can see code handles this
-case gracefully without any crash and system boot was fine. Of-course in such
-case only single core will be able to boot.
-
-Following boot message observed on Origen in case of missing SCU node
--------------
-[    0.000864] CPU: Testing write buffer coherency: ok
-[    0.001068] CPU0: thread -1, cpu 0, socket 9, mpidr 80000900
-[    0.001456] exynos_scu_enable failed to map scu_base
-[    0.001477] Setting up static identity map for 0x40100000 - 0x40100058
-[    1.120003] CPU1: failed to come online
-[    1.120059] Brought up 1 CPUs
-[    1.120068] SMP: Total of 1 processors activated (48.00 BogoMIPS).
-[    1.120076] CPU: All CPU(s) started in SVC mode.
--------------
-
-Changes since v2:
- - Removed unnecessary header file inclusion from pm.c.
- - Move out call_firmware_op call from CORTEX-A9 check.
- - Update commit log for 1/2 patch describing dependency on DTS and affect of
-   the patch on out-of-tree DTS
-
-Changes since v1:
- - Address review comments from Krzysztof
- - Moved scu_enable from pm.c and suspend.c to single place in platsmp.c
- - Added error handling during scu_enable in platsmp.c
- - Added Reviewed-by tag from Alim.
-
-
-Pankaj Dubey (2):
-  ARM: EXYNOS: Remove static mapping of SCU SFR
-  ARM: EXYNOS: Remove unused soc_is_exynos{4,5}
-
- arch/arm/mach-exynos/common.h                |  6 +----
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ arch/arm/mach-exynos/common.h                |  1 +
  arch/arm/mach-exynos/exynos.c                | 22 ------------------
  arch/arm/mach-exynos/include/mach/map.h      |  2 --
  arch/arm/mach-exynos/platsmp.c               | 34 +++++++++++++++++++++-------
  arch/arm/mach-exynos/pm.c                    |  4 +---
  arch/arm/mach-exynos/suspend.c               |  4 +---
  arch/arm/plat-samsung/include/plat/map-s5p.h |  4 ----
- 7 files changed, 29 insertions(+), 47 deletions(-)
+ 7 files changed, 29 insertions(+), 42 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 9424a8a..dd5d8e8 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -161,6 +161,7 @@ extern void exynos_cpu_restore_register(void);
+ extern void exynos_pm_central_suspend(void);
+ extern int exynos_pm_central_resume(void);
+ extern void exynos_enter_aftr(void);
++extern int exynos_scu_enable(void);
+ 
+ extern struct cpuidle_exynos_data cpuidle_coupled_exynos_data;
+ 
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index 757fc11..fa08ef9 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -28,15 +28,6 @@
+ 
+ #include "common.h"
+ 
+-static struct map_desc exynos4_iodesc[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)S5P_VA_COREPERI_BASE,
+-		.pfn		= __phys_to_pfn(EXYNOS4_PA_COREPERI),
+-		.length		= SZ_8K,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+ static struct platform_device exynos_cpuidle = {
+ 	.name              = "exynos_cpuidle",
+ #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
+@@ -99,17 +90,6 @@ static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+ 	return 1;
+ }
+ 
+-/*
+- * exynos_map_io
+- *
+- * register the standard cpu IO areas
+- */
+-static void __init exynos_map_io(void)
+-{
+-	if (soc_is_exynos4())
+-		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
+-}
+-
+ static void __init exynos_init_io(void)
+ {
+ 	debug_ll_io_init();
+@@ -118,8 +98,6 @@ static void __init exynos_init_io(void)
+ 
+ 	/* detect cpu id and rev. */
+ 	s5p_init_cpu(S5P_VA_CHIPID);
+-
+-	exynos_map_io();
+ }
+ 
+ /*
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 5fb0040..0eef407 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -18,6 +18,4 @@
+ 
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+-#define EXYNOS4_PA_COREPERI		0x10500000
+-
+ #endif /* __ASM_ARCH_MAP_H */
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index a5d6841..94405c7 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -168,6 +168,27 @@ int exynos_cluster_power_state(int cluster)
+ 		S5P_CORE_LOCAL_PWR_EN);
+ }
+ 
++/**
++ * exynos_scu_enable : enables SCU for Cortex-A9 based system
++ * returns 0 on success else non-zero error code
++ */
++int exynos_scu_enable(void)
++{
++	struct device_node *np;
++	void __iomem *scu_base;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++	scu_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!scu_base) {
++		pr_err("%s failed to map scu_base\n", __func__);
++		return -ENOMEM;
++	}
++	scu_enable(scu_base);
++	iounmap(scu_base);
++	return 0;
++}
++
+ static void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+@@ -224,11 +245,6 @@ static void write_pen_release(int val)
+ 	sync_cache_w(&pen_release);
+ }
+ 
+-static void __iomem *scu_base_addr(void)
+-{
+-	return (void __iomem *)(S5P_VA_SCU);
+-}
+-
+ static DEFINE_SPINLOCK(boot_lock);
+ 
+ static void exynos_secondary_init(unsigned int cpu)
+@@ -393,9 +409,11 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	exynos_set_delayed_reset_assertion(true);
+ 
+-	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9)
+-		scu_enable(scu_base_addr());
+-
++	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
++		/* if exynos_scu_enable fails, return */
++		if (exynos_scu_enable())
++			return;
++	}
+ 	/*
+ 	 * Write the address of secondary startup into the
+ 	 * system-wide flags register. The boot monitor waits
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index 487295f..c0b46c3 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -26,8 +26,6 @@
+ #include <asm/suspend.h>
+ #include <asm/cacheflush.h>
+ 
+-#include <mach/map.h>
+-
+ #include "common.h"
+ 
+ static inline void __iomem *exynos_boot_vector_addr(void)
+@@ -177,7 +175,7 @@ void exynos_enter_aftr(void)
+ 	cpu_suspend(0, exynos_aftr_finisher);
+ 
+ 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
+-		scu_enable(S5P_VA_SCU);
++		exynos_scu_enable();
+ 		if (call_firmware_op(resume) == -ENOSYS)
+ 			exynos_cpu_restore_register();
+ 	}
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index 06332f6..73df9f3 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -34,8 +34,6 @@
+ #include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ 
+-#include <mach/map.h>
+-
+ #include <plat/pm-common.h>
+ 
+ #include "common.h"
+@@ -462,7 +460,7 @@ static void exynos_pm_resume(void)
+ 	exynos_pm_release_retention();
+ 
+ 	if (cpuid == ARM_CPU_PART_CORTEX_A9)
+-		scu_enable(S5P_VA_SCU);
++		exynos_scu_enable();
+ 
+ 	if (call_firmware_op(resume) == -ENOSYS
+ 	    && cpuid == ARM_CPU_PART_CORTEX_A9)
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index 0fe2828..512ed1f 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -15,10 +15,6 @@
+ 
+ #define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
+ 
+-#define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
+-#define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
+-#define S5P_VA_SCU		S5P_VA_COREPERI(0x0)
+-
+ #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+ #define VA_VIC0			VA_VIC(0)
+ #define VA_VIC1			VA_VIC(1)
 -- 
 2.7.4
