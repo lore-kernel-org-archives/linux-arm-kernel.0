@@ -1,91 +1,80 @@
-From: john3909@gmail.com (John Syne)
-Date: Wed, 9 Nov 2016 15:53:37 -0800
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <d7fadbf6-8026-d821-1ef8-981f536a8fdf@ti.com>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
- <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com> <20161026084811.GI8574@dell>
- <A5F6974F-5793-4E85-BF82-2D9309980991@gmail.com>
- <d7fadbf6-8026-d821-1ef8-981f536a8fdf@ti.com>
-Message-ID: <D0AA78D0-9562-4E4D-A949-A771289D7570@gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 9 Nov 2016 16:59:57 -0700
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161109233847.GT17771@arm.com>
+References: <20161108202922.GC15676@cbox> <20161108163508.1bcae0c2@t450s.home>
+ <58228F71.6020108@redhat.com> <20161109170326.GG17771@arm.com>
+ <582371FB.2040808@redhat.com> <20161109192303.GD15676@cbox>
+ <20161109203145.GO17771@arm.com>
+ <20161109151709.74927f83@t450s.home>
+ <20161109222522.GS17771@arm.com>
+ <20161109162458.39594fdb@t450s.home>
+ <20161109233847.GT17771@arm.com>
+Message-ID: <20161109165957.62c1eb61@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 9 Nov 2016 23:38:50 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-> On Oct 31, 2016, at 4:39 AM, Vignesh R <vigneshr@ti.com> wrote:
+> On Wed, Nov 09, 2016 at 04:24:58PM -0700, Alex Williamson wrote:
+> > On Wed, 9 Nov 2016 22:25:22 +0000
+> > Will Deacon <will.deacon@arm.com> wrote:
+> >   
+> > > On Wed, Nov 09, 2016 at 03:17:09PM -0700, Alex Williamson wrote:  
+> > > > On Wed, 9 Nov 2016 20:31:45 +0000
+> > > > Will Deacon <will.deacon@arm.com> wrote:    
+> > > > > On Wed, Nov 09, 2016 at 08:23:03PM +0100, Christoffer Dall wrote:    
+> > > > > > 
+> > > > > > (I suppose it's technically possible to get around this issue by letting
+> > > > > > QEMU place RAM wherever it wants but tell the guest to never use a
+> > > > > > particular subset of its RAM for DMA, because that would conflict with
+> > > > > > the doorbell IOVA or be seen as p2p transactions.  But I think we all
+> > > > > > probably agree that it's a disgusting idea.)      
+> > > > > 
+> > > > > Disgusting, yes, but Ben's idea of hotplugging on the host controller with
+> > > > > firmware tables describing the reserved regions is something that we could
+> > > > > do in the distant future. In the meantime, I don't think that VFIO should
+> > > > > explicitly reject overlapping mappings if userspace asks for them.    
+> > > > 
+> > > > I'm confused by the last sentence here, rejecting user mappings that
+> > > > overlap reserved ranges, such as MSI doorbell pages, is exactly how
+> > > > we'd reject hot-adding a device when we meet such a conflict.  If we
+> > > > don't reject such a mapping, we're knowingly creating a situation that
+> > > > potentially leads to data loss.  Minimally, QEMU would need to know
+> > > > about the reserved region, map around it through VFIO, and take
+> > > > responsibility (somehow) for making sure that region is never used for
+> > > > DMA.  Thanks,    
+> > > 
+> > > Yes, but my point is that it should be up to QEMU to abort the hotplug, not
+> > > the host kernel, since there may be ways in which a guest can tolerate the
+> > > overlapping region (e.g. by avoiding that range of memory for DMA).  
+> > 
+> > The VFIO_IOMMU_MAP_DMA ioctl is a contract, the user ask to map a range
+> > of IOVAs to a range of virtual addresses for a given device.  If VFIO
+> > cannot reasonably fulfill that contract, it must fail.  It's up to QEMU
+> > how to manage the hotplug and what memory regions it asks VFIO to map
+> > for a device, but VFIO must reject mappings that it (or the SMMU by
+> > virtue of using the IOMMU API) know to overlap reserved ranges.  So I
+> > still disagree with the referenced statement.  Thanks,  
 > 
+> I think that's a pity. Not only does it mean that both QEMU and the kernel
+> have more work to do (the former has to carve up its mapping requests,
+> whilst the latter has to check that it is indeed doing this), but it also
+> precludes the use of hugepage mappings on the IOMMU because of reserved
+> regions. For example, a 4k hole someplace may mean we can't put down 1GB
+> table entries for the guest memory in the SMMU.
 > 
-> 
-> On Friday 28 October 2016 02:47 AM, John Syne wrote:
-> 
->>>>>>>>>>> 
->>>>>>>>>>> ---
->>>>>>>>>>> include/linux/mfd/ti_am335x_tscadc.h | 4 ++--
->>>>>>>>>>> 1 file changed, 2 insertions(+), 2 deletions(-)
->>>>>>>>>>> 
->>>>>>>>>>> diff --git a/include/linux/mfd/ti_am335x_tscadc.h b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>>>> index b9a53e0..96c4207 100644
->>>>>>>>>>> --- a/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>>>> +++ b/include/linux/mfd/ti_am335x_tscadc.h
->>>>>>>>>>> @@ -90,7 +90,7 @@
->>>>>>>>>>> /* Delay register */
->>>>>>>>>>> #define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
->>>>>>>>>>> #define STEPDELAY_OPEN(val)	((val) << 0)
->>>>>>>>>>> -#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
->>>>>>>>> Wouldn?t this be better to add this to the devicetree?
->>>>>>>>> 
->>>>>>>>> 	ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->>>>>>>>> 	ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->>>>>>>>> 	ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->>>>>>>> 
->>>>>>>> For a touch screen, there is not need to change in these parameter
->>>>>>>> settings, so my opinion is to keep it as is. Or am I missing something?
->>>>>>> I was thinking that if you are using this driver as an ADC, you may want the flexibility to make these changes in the DT. I?m doing this by connecting sensors to the ADC inputs. I?m not using this driver for a touchscreen. 
->>>>>> 
->>>>>> Here is a DT overlay were this gets using on the BeagleBoneBlack.  
->>>>>> 
->>>>>> https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
->>>>>> 
->>>>>> Besides, these DT features are already implemented in the driver so it is just a matter of adding these entries to the am33xx.dtsi & am4372.dtsi, which you modified in this patch series.
->>>>> 
->>>>> This looks like configuration, no?
->>>>> 
->>>>> DT should be used to describe the hardware.
->>>> You may be right, but how is this different to setting the baud rate on a serial channel or sampling rate on a audio channel? Looking through the DT, there are many configuration settings, so I?m not sure what is the correct way to handle this. Surely it is better to handle this in DT vs hard coding these settings?
->>> 
->>> I think setting the UART baud rate is also an invalid DT entry.
->>> 
->>> It's okay to list all of the options in DT, but to actually select
->>> one, that should be done either in userspace or as a kernel option.
->>> Perhaps as a Kconfig selection.
->> Yeah, this has been inconsistent for a long time. My only point was that these DT parameters had already been implemented in the ti_am335x_adc KM and I thought that this was better than hard coding these settings. Implementing this in Kconfig means rebuilding the KM, which isn?t desirable. 
-> 
->> Perhaps this should be done via sysfs attributes so as you say, a userspace app can configure this driver. 
-> 
-> This was discussed when DT properties were added.  Patches are welcome
-> to add sysfs entries. There is nothing wrong with specifying an initial
-> value in the DT.
-> 
->> I guess the DT code in ti_am335x_adc.c should be removed. 
->> 
-> 
-> Removing DT properties is not an option as it will break DT backward
-> compatibility.
-Hi Vignesh,
+> All this seems to do is add complexity and decrease performance. For what?
+> QEMU has to go read the reserved regions from someplace anyway. It's also
+> the way that VFIO works *today* on arm64 wrt reserved regions, it just has
+> no way to identify those holes at present.
 
-OK, then back to my original question. Given that these DT properties are supported in the driver, shouldn?t the following be added to am33xx.dtsi and am4372.dtsi?
+Sure, that sucks, but how is the alternative even an option?  The user
+asked to map something, we can't, if we allow that to happen now it's a
+bug.  Put the MSI doorbells somewhere that this won't be an issue.  If
+the platform has it fixed somewhere that this is an issue, don't use
+that platform.  The correctness of the interface is more important than
+catering to a poorly designed system layout IMO.  Thanks,
 
-ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
-ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
-ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
-
-Regards,
-John
-> 
-> -- 
-> Regards
-> Vignesh
+Alex
