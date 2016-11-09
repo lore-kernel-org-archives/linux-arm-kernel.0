@@ -1,66 +1,40 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 9 Nov 2016 08:19:47 +0100
-Subject: [PATCHv3] ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
-In-Reply-To: <20161108022830.29303-1-dinguyen@kernel.org>
-References: <20161108022830.29303-1-dinguyen@kernel.org>
-Message-ID: <20161109071947.pup6x6rfodycjtsv@pengutronix.de>
+Date: Wed,  9 Nov 2016 08:35:01 +0100
+Subject: [PATCH] ARM: dts: socfpga: add nand controller nodes
+Message-ID: <20161109073501.2010-1-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 08:28:30PM -0600, Dinh Nguyen wrote:
-> From: Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> Enable the QSPI node and add the flash chip.
-> 
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
-> v3: Use n25q00 for the compatible entry for the flash part and
->     tested on SoCKit
-> v2: Remove partition entries for the SoCKIT
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index 02e22f5..d59f6f2 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -175,6 +175,27 @@
->  	status = "okay";
->  };
->  
-> +&qspi {
-> +	status = "okay";
-> +
-> +	flash: flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "n25q00";
-> +		reg = <0>;
-> +		spi-max-frequency = <100000000>;
-> +
-> +		m25p,fast-read;
-> +		cdns,page-size = <256>;
-> +		cdns,block-size = <16>;
-> +		cdns,read-delay = <4>;
-> +		cdns,tshsl-ns = <50>;
-> +		cdns,tsd2d-ns = <50>;
-> +		cdns,tchsh-ns = <4>;
-> +		cdns,tslch-ns = <4>;
-> +	};
-> +};
-> +
->  &usb1 {
->  	status = "okay";
->  };
+Add the denali nand controller to the socfpga dtsi.
 
-Looks good to me.
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/boot/dts/socfpga.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Thanks,
-Steffen
-
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 9f48141270b8..6b0c23ca5e88 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -700,6 +700,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		nand0: nand at ff900000 {
++			#address-cells = <0x1>;
++			#size-cells = <0x1>;
++			compatible = "denali,denali-nand-dt";
++			reg = <0xff900000 0x100000>,
++			      <0xffb80000 0x10000>;
++			reg-names = "nand_data", "denali_reg";
++			interrupts = <0x0 0x90 0x4>;
++			dma-mask = <0xffffffff>;
++			clocks = <&nand_clk>;
++			status = "disabled";
++		};
++
+ 		ocram: sram at ffff0000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0xffff0000 0x10000>;
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.10.1
