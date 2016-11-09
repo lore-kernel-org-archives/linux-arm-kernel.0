@@ -1,51 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 9 Nov 2016 18:25:39 +0000
-Subject: [PATCH] arm64: acpi: arch_apei_get_mem_attributes() should use
- memblock
-In-Reply-To: <5823677D.3050803@arm.com>
-References: <20161108102714.29931-1-james.morse@arm.com>
- <CAKv+Gu9+T0TYqk+uTUWa5K0E49WXDBpUK4Px_q=52jR0ON1zGA@mail.gmail.com>
- <5823677D.3050803@arm.com>
-Message-ID: <20161109182538.GL17771@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Nov 2016 12:26:10 -0600
+Subject: [RFC PATCH v2 1/5] net: mdio-mux-mmioreg: Add support for 16bit
+ and 32bit register sizes
+In-Reply-To: <1477932987-27871-2-git-send-email-narmstrong@baylibre.com>
+References: <1477932987-27871-1-git-send-email-narmstrong@baylibre.com>
+ <1477932987-27871-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20161109182610.thzm5bxfwusi4kjk@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 06:14:21PM +0000, James Morse wrote:
-> On 09/11/16 12:12, Ard Biesheuvel wrote:
-> > This means that in this case, you may be returning PAGE_KERNEL for
-> > regions that are lacking the EFI_MEMORY_WB attribute, which kind of
-> > defeats the purpose of this function (AIUI), to align the kernel's
-> > view of the region's attributes with the view of the firmware. I would
-> > expect that, for use cases like this one, the burden is on the
-> > firmware to ensure that only a single EFI_MEMORY_xx attribute is set
-> > if any kind of coherency between UEFI and the kernel is expected. If
-> > that single attribute is WT or WC, PAGE_KERNEL is most certainly
-> > wrong.
+On Mon, Oct 31, 2016 at 05:56:23PM +0100, Neil Armstrong wrote:
+> In order to support PHY switching on Amlogic GXL SoCs, add support for
+> 16bit and 32bit registers sizes.
 > 
-> I've been trying to test some of the APEI code using some hacks on top of
-> kvmtool. (actually, quite a lot of hacks).
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/net/mdio-mux-mmioreg.txt   |  4 +-
+>  drivers/net/phy/mdio-mux-mmioreg.c                 | 60 +++++++++++++++++-----
+>  2 files changed, 49 insertions(+), 15 deletions(-)
 > 
-> When I trigger an event, I see efi_mem_attributes() always return 0 because the
-> EFI memory map isn't mapped. This turns out to be because I have 'efi=noruntime'
-> on the command line. I stopped digging when I found this previously-dead code,
-> but should have gone further.
-> 
-> If this is an expected interaction, we can ignore this as a bug in my test
-> setup. (and I have to work out how to get efi runtime services going...)
-> 
-> If not, I can try always mapping the EFI memory map in
-> arm_enable_runtime_services() if we booted via ACPI, as in this case runtime
-> services isn't the only user of the memory map.
-> 
-> 
-> My intention here was to just mirror acpi_os_ioremap(), which will call
-> ioremap_cache() for WB/WC/WT regions, which (also) ends up using PROT_NORMAL. We
-> may get away with this, but you're right, we are less likely to here.
+> diff --git a/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt b/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
+> index 8516929..065e8bd 100644
+> --- a/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
+> +++ b/Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
+> @@ -3,7 +3,7 @@ Properties for an MDIO bus multiplexer controlled by a memory-mapped device
+>  This is a special case of a MDIO bus multiplexer.  A memory-mapped device,
+>  like an FPGA, is used to control which child bus is connected.  The mdio-mux
+>  node must be a child of the memory-mapped device.  The driver currently only
 
-I'd certainly be interested in opinions as to what acpi_os_ioremap is
-supposed to do, since it has fingers in the NOMAP pie and if we change the
-polarity of pfn_valid() for NOMAP mappings (as suggested by Robert Richter
-to fix his NUMA issue), then acpi_os_ioremap will actually *fail* for
-these WB/WC regions.
+As you're touching this sentence, this describes the binding, not a 
+driver. With that,
 
-Will
+Acked-by: Rob Herring <robh@kernel.org>
+
+> -supports devices with eight-bit registers.
+> +supports devices with 8, 16 or 32-bit registers.
+>  
+>  Required properties in addition to the generic multiplexer properties:
+>  
+> @@ -11,7 +11,7 @@ Required properties in addition to the generic multiplexer properties:
+>  
+>  - reg : integer, contains the offset of the register that controls the bus
+>  	multiplexer.  The size field in the 'reg' property is the size of
+> -	register, and must therefore be 1.
+> +	register, and must therefore be 1, 2, or 4.
+>  
+>  - mux-mask : integer, contains an eight-bit mask that specifies which
+>  	bits in the register control the actual bus multiplexer.  The
