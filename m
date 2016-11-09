@@ -1,111 +1,206 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Wed, 9 Nov 2016 18:31:19 +0100
-Subject: [PATCH] fpga zynq: Check the bitstream for validity
-In-Reply-To: <20161109155651.GA15076@obsidianresearch.com>
-References: <20161028202619.GA29625@obsidianresearch.com>
- <20161028210015.GA19901@live.com>
- <20161028220546.GA19693@obsidianresearch.com>
- <20161029000926.GA30169@live.com>
- <20161031162327.GA28817@obsidianresearch.com>
- <7117d821-a1b1-7c07-806a-483be99131e6@xilinx.com>
- <20161101153326.GA6193@obsidianresearch.com>
- <4e2c7e1c-7c33-a552-5b91-dbdefac58e37@xilinx.com>
- <20161108000538.GA13959@obsidianresearch.com>
- <609bc971-bb6d-8cd2-8e64-23c0082a6216@topic.nl>
- <20161109155651.GA15076@obsidianresearch.com>
-Message-ID: <58235D67.2070003@topic.nl>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 9 Nov 2016 23:08:35 +0530
+Subject: [PATCH V2 2/5] arm64: Allow hw watchpoint at varied offset from
+ base address
+In-Reply-To: <20161108032658.GB20591@arm.com>
+References: <cover.1476941895.git.panand@redhat.com>
+ <9394621e1b9709178ba54133a1469937fedae355.1476941895.git.panand@redhat.com>
+ <20161108032658.GB20591@arm.com>
+Message-ID: <308df167-0392-49c0-17c0-28e221bd030b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 09-11-16 16:56, Jason Gunthorpe wrote:
-> On Wed, Nov 09, 2016 at 03:21:52PM +0100, Mike Looijmans wrote:
->> I think the basic idea behind the commit is flawed to begin with and the
->> patch should be discarded completely. The same discussion was done for the
->> Xilinx FPGA manager driver, which resulted in the decision that the tooling
->> should create a proper file.
+Hi Will,
+
+Thanks a lot for your review.
+
+On Tuesday 08 November 2016 08:56 AM, Will Deacon wrote:
+> Hi Pratyush,
 >
-> That hasn't changed at all, this just produces a clear and obvious
-> message about what is wrong instead of 'timed out'.
+> On Thu, Oct 20, 2016 at 11:18:14AM +0530, Pratyush Anand wrote:
+>> ARM64 hardware supports watchpoint at any double word aligned address.
+>> However, it can select any consecutive bytes from offset 0 to 7 from that
+>> base address. For example, if base address is programmed as 0x420030 and
+>> byte select is 0x1C, then access of 0x420032,0x420033 and 0x420034 will
+>> generate a watchpoint exception.
+>>
+>> Currently, we do not have such modularity. We can only program byte,
+>> halfword, word and double word access exception from any base address.
+>>
+>> This patch adds support to overcome above limitations.
+>>
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>> ---
+>>  arch/arm64/include/asm/hw_breakpoint.h |  2 +-
+>>  arch/arm64/kernel/hw_breakpoint.c      | 45 ++++++++++++++++------------------
+>>  arch/arm64/kernel/ptrace.c             |  5 ++--
+>>  3 files changed, 25 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
+>> index 115ea2a64520..4f4e58bee9bc 100644
+>> --- a/arch/arm64/include/asm/hw_breakpoint.h
+>> +++ b/arch/arm64/include/asm/hw_breakpoint.h
+>> @@ -118,7 +118,7 @@ struct perf_event;
+>>  struct pmu;
+>>
+>>  extern int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+>> -				  int *gen_len, int *gen_type);
+>> +				  int *gen_len, int *gen_type, int *offset);
+>>  extern int arch_check_bp_in_kernelspace(struct perf_event *bp);
+>>  extern int arch_validate_hwbkpt_settings(struct perf_event *bp);
+>>  extern int hw_breakpoint_exceptions_notify(struct notifier_block *unused,
+>> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+>> index 26a6bf77d272..3c2b96803eba 100644
+>> --- a/arch/arm64/kernel/hw_breakpoint.c
+>> +++ b/arch/arm64/kernel/hw_breakpoint.c
+>> @@ -349,7 +349,7 @@ int arch_check_bp_in_kernelspace(struct perf_event *bp)
+>>   * to generic breakpoint descriptions.
+>>   */
+>>  int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+>> -			   int *gen_len, int *gen_type)
+>> +			   int *gen_len, int *gen_type, int *offset)
+>>  {
+>>  	/* Type */
+>>  	switch (ctrl.type) {
+>> @@ -369,8 +369,10 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
+>>  		return -EINVAL;
+>>  	}
+>>
+>> +	*offset = ffs(ctrl.len) - 1;
 >
-> Remember, again, the Xilinx tools do not produce an acceptable
-> bitstream file by default. You need to do very strange and special
-> things to get something acceptable to this driver. It is a very easy
-> mistake to make and hard to track down if you don't already know these
-> details.
+> Do we want to fail the length == 0 case early? If you do add that check,
+> then you can use __ffs here instead.
+
+Yes, I think, your point can be taken.
+
 >
->> This driver should either become obsolete or at least move into the
->> same direction as the FPGA manager rather than away from that.
+>>  	/* Len */
+>> -	switch (ctrl.len) {
+>> +	switch (ctrl.len >> *offset) {
+>>  	case ARM_BREAKPOINT_LEN_1:
+>>  		*gen_len = HW_BREAKPOINT_LEN_1;
+>>  		break;
+>> @@ -517,18 +519,17 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+>>  		default:
+>>  			return -EINVAL;
+>>  		}
+>> -
+>> -		info->address &= ~alignment_mask;
+>> -		info->ctrl.len <<= offset;
+>>  	} else {
+>>  		if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE)
+>>  			alignment_mask = 0x3;
+>>  		else
+>>  			alignment_mask = 0x7;
+>> -		if (info->address & alignment_mask)
+>> -			return -EINVAL;
+>> +		offset = info->address & alignment_mask;
+>>  	}
+>>
+>> +	info->address &= ~alignment_mask;
+>> +	info->ctrl.len <<= offset;
 >
-> I don't understand what you are talking about here, this is a fpga mgr
-> driver already, and is consistent with the FPGA manger - the auto
-> detect stuff was removed a while ago and isn't coming back.
+> Urgh, I really hate all this converting to and fro to keep perf happy.
+> FWIW, I'm at the point where I would seriously consider ripping out the
+> hw_breakpoint code and replacing it with a ptrace-specific backend so we
+> just drop all this crap. The only people that seem to use the perf interface
+> are those running the (failing) selftests. Given that we have to have
+> a bloody thread switch notifier *anyway*, all perf seems to give us is
+> complexity and restrictions.
 
-That's exactly what I mean - the code was kept simple.
+Yes, I agree.
 
-> It is perfectly reasonable for fpga manager drivers to pre-validate
-> the proposed bitstream, IMHO all of the drivers should try and do
-> that step.
 >
-> Remember, it is deeply unlikely but sending garbage to an FPGA could
-> damage it.
-
-Then what's the purpose of pre-validation? Sending valid data should be 
-the normal case, not the exception.
-
->> Besides political arguments, there's a more pressing technical argument
->> against this theck as well: The whole check is pointless since the hardware
->> itself already verifies the validity of the stream.
+>>  	/*
+>>  	 * Disallow per-task kernel breakpoints since these would
+>>  	 * complicate the stepping code.
+>> @@ -665,8 +666,8 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>>  			      struct pt_regs *regs)
+>>  {
+>>  	int i, step = 0, *kernel_step, access;
+>> -	u32 ctrl_reg;
+>> -	u64 val, alignment_mask;
+>> +	u32 ctrl_reg, lens, lene;
+>> +	u64 val;
+>>  	struct perf_event *wp, **slots;
+>>  	struct debug_info *debug_info;
+>>  	struct arch_hw_breakpoint *info;
+>> @@ -684,25 +685,21 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+>>  			goto unlock;
+>>
+>>  		info = counter_arch_bp(wp);
+>> -		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
+>> -		if (is_compat_task()) {
+>> -			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
+>> -				alignment_mask = 0x7;
+>> -			else
+>> -				alignment_mask = 0x3;
+>> -		} else {
+>> -			alignment_mask = 0x7;
+>> -		}
+>>
+>> -		/* Check if the watchpoint value matches. */
+>> +		/* Check if the watchpoint value and byte select match. */
+>>  		val = read_wb_reg(AARCH64_DBG_REG_WVR, i);
+>> -		if (val != (addr & ~alignment_mask))
+>> -			goto unlock;
+>> -
+>> -		/* Possible match, check the byte address select to confirm. */
+>>  		ctrl_reg = read_wb_reg(AARCH64_DBG_REG_WCR, i);
+>>  		decode_ctrl_reg(ctrl_reg, &ctrl);
+>> -		if (!((1 << (addr & alignment_mask)) & ctrl.len))
+>> +		lens = ffs(ctrl.len) - 1;
+>> +		lene = fls(ctrl.len) - 1;
 >
-> The purpose of the check is not to protect the hardware. The check is
-> to help the user provide the correct input because the hardware
-> provides no feedback at all on what is wrong with the input.
+> Again, you can use the '__' variants to avoid the '- 1'.
+
+Ok.
+
 >
-> And again, the out-of-tree Xilinx driver accepted files that this
-> driver does not, so having a clear and understandable message is going
-> to be very important for users.
-
-Then just create a "validate my bitstream" tool.
-
-I wrote a Python script to do what Xilinx refused to do years ago:
-https://github.com/topic-embedded-products/meta-topic/blob/master/recipes-bsp/fpga/fpga-bit-to-bin/fpga-bit-to-bin.py
-So apparently it wasn't hard to figure out what to do.
-
->> doesn't have any effect, the hardware will discard it. There's no reason to
->> waste CPU cycles duplicating this check in software.
+>> +		/*
+>> +		 * FIXME: reported address can be anywhere between "the
+>> +		 * lowest address accessed by the memory access that
+>> +		 * triggered the watchpoint" and "the highest watchpointed
+>> +		 * address accessed by the memory access". So, it may not
+>> +		 * lie in the interval of watchpoint address range.
+>> +		 */
+>> +		if (addr < val + lens || addr > val + lene)
+>>  			goto unlock;
+>>
+>>  		/*
+>> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+>> index e0c81da60f76..0eb366a94382 100644
+>> --- a/arch/arm64/kernel/ptrace.c
+>> +++ b/arch/arm64/kernel/ptrace.c
+>> @@ -327,13 +327,13 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
+>>  				     struct arch_hw_breakpoint_ctrl ctrl,
+>>  				     struct perf_event_attr *attr)
+>>  {
+>> -	int err, len, type, disabled = !ctrl.enabled;
+>> +	int err, len, type, offset, disabled = !ctrl.enabled;
+>>
+>>  	attr->disabled = disabled;
+>>  	if (disabled)
+>>  		return 0;
+>>
+>> -	err = arch_bp_generic_fields(ctrl, &len, &type);
+>> +	err = arch_bp_generic_fields(ctrl, &len, &type, &offset);
+>>  	if (err)
+>>  		return err;
+>>
+>> @@ -352,6 +352,7 @@ static int ptrace_hbp_fill_attr_ctrl(unsigned int note_type,
+>>
+>>  	attr->bp_len	= len;
+>>  	attr->bp_type	= type;
+>> +	attr->bp_addr	+= offset;
 >
-> In the typical success case we are talking about 5 32 bit compares,
-> which isn't even worth considering.
+> That's going to look pretty bizarre from userspace if it decides to read
+> back the address registers to find that they've mysteriously changed.
+>
+> Perhaps ptrace_hbp_get_addr needs to retrieve the address from the
+> arch_hw_breakpoint, like we do for the ctrl register. What do you think?
 
-I'm mostly against the complication of the code. The code is more 
-complex, and that's bad. It's firmware loading code, and it need not be 
-aware of exactly what it is doing. I did not see any checks like this in 
-other firmware loading code I've come across.
+..and that should help...I will give it a try and will test before next 
+revision.
 
-What you're creating here will require active maintenance.
-There are already 7007 and 7012 devices which aren't in your list so the 
-driver will refuse to load them until someone fills in the IDs.
-The bitstream format is actually proprietary and undocumented. Any 
-"checks" in code are likely based on guesswork and reverse engineering.
-We also use partial reprogramming a lot. Did you test that? On all 
-devices? And we're actually planning to go beyond that. Maybe I'll be 
-providing parts of the data through ICAP and some through PCAP, that 
-might even work, but the driver would block it for no apparent reason.
-
-
--- 
-Mike Looijmans
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Products
-Materiaalweg 4, NL-5681 RJ Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+~Pratyush
