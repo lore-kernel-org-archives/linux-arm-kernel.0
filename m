@@ -1,30 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 8 Nov 2016 16:01:20 -0800
-Subject: [PATCH v15 2/4] reset: mediatek: Add MT2701 reset driver
-In-Reply-To: <1478245388-1412-3-git-send-email-erin.lo@mediatek.com>
-References: <1478245388-1412-1-git-send-email-erin.lo@mediatek.com>
- <1478245388-1412-3-git-send-email-erin.lo@mediatek.com>
-Message-ID: <20161109000120.GQ16026@codeaurora.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 8 Nov 2016 16:20:32 -0800
+Subject: [PATCH v7 1/3] input: touchscreen: TOUCHSCREEN_SUN4I depends on
+ !SUN4I_GPADC
+In-Reply-To: <20161103101601.24529-2-quentin.schulz@free-electrons.com>
+References: <20161103101601.24529-1-quentin.schulz@free-electrons.com>
+ <20161103101601.24529-2-quentin.schulz@free-electrons.com>
+Message-ID: <20161109002032.GD8719@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04, Erin Lo wrote:
-> From: Shunli Wang <shunli.wang@mediatek.com>
+On Thu, Nov 03, 2016 at 11:15:59AM +0100, Quentin Schulz wrote:
+> SUN4I_GPADC and TOUCHSCREEN_SUN4I are incompatible (both are drivers
+> for Allwinner SoCs' ADC). This makes sure TOUCHSCREEN_SUN4I isn't
+> enabled while SUN4I_GPADC is enabled.
 > 
-> In infrasys and perifsys, there are many reset
-> control bits for kinds of modules. These bits are
-> used as actual reset controllers to be registered
-> into kernel's generic reset controller framework.
-> 
-> Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> Tested-by: John Crispin <blogic@openwrt.org>
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Applied to clk-next
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+Please merge with SUN4I_GPADC driver patch.
+
+> ---
+> 
+> added in v7
+> 
+>  drivers/input/touchscreen/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+> index efca013..c618cb9 100644
+> --- a/drivers/input/touchscreen/Kconfig
+> +++ b/drivers/input/touchscreen/Kconfig
+> @@ -1120,6 +1120,7 @@ config TOUCHSCREEN_SUN4I
+>  	depends on ARCH_SUNXI || COMPILE_TEST
+>  	depends on HWMON
+>  	depends on THERMAL || !THERMAL_OF
+> +	depends on !SUN4I_GPADC
+>  	help
+>  	  This selects support for the resistive touchscreen controller
+>  	  found on Allwinner sunxi SoCs.
+> -- 
+> 2.9.3
+> 
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Dmitry
