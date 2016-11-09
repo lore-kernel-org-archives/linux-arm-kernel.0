@@ -1,26 +1,67 @@
 From: romain.perier@free-electrons.com (Romain Perier)
-Date: Wed,  9 Nov 2016 11:13:46 +0100
-Subject: [PATCH v3 0/3] Add basic support for the I2C units of the Armada 3700
-Message-ID: <20161109101349.18722-1-romain.perier@free-electrons.com>
+Date: Wed,  9 Nov 2016 11:13:48 +0100
+Subject: [PATCH v3 2/3] arm64: dts: marvell: Add I2C definitions for the
+ Armada 3700
+In-Reply-To: <20161109101349.18722-1-romain.perier@free-electrons.com>
+References: <20161109101349.18722-1-romain.perier@free-electrons.com>
+Message-ID: <20161109101349.18722-3-romain.perier@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add basic support for the I2C bus interface units present
-in the Armada 3700 to the pxa-i2c driver. It also add the definitions of
-the device nodes to the devicetree at the SoC level and for its official
-development board: the Armada 3720 DB.
+The Armada 3700 has two i2c bus interface units, this commit adds the
+definitions of the corresponding device nodes. It also enables the node
+on the development board for this SoC.
 
-Romain Perier (3):
-  i2c: pxa: Add support for the I2C units found in Armada 3700
-  arm64: dts: marvell: Add I2C definitions for the Armada 3700
-  dt-bindings: i2c: pxa: Update the documentation for the Armada 3700
+Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts |  4 ++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 18 ++++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
- Documentation/devicetree/bindings/i2c/i2c-pxa.txt |  1 +
- arch/arm64/boot/dts/marvell/armada-3720-db.dts    |  4 ++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi      | 18 ++++++++++++++++
- drivers/i2c/busses/Kconfig                        |  2 +-
- drivers/i2c/busses/i2c-pxa.c                      | 25 +++++++++++++++++++++--
- 5 files changed, 47 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 1372e9a6..16d84af 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -62,6 +62,10 @@
+ 	};
+ };
+ 
++&i2c0 {
++	status = "okay";
++};
++
+ /* CON3 */
+ &sata {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index c476253..bf2d73d 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -98,6 +98,24 @@
+ 			/* 32M internal register @ 0xd000_0000 */
+ 			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+ 
++			i2c0: i2c at 11000 {
++				compatible = "marvell,armada-3700-i2c";
++				reg = <0x11000 0x24>;
++				clocks = <&nb_perih_clk 10>;
++				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++				mrvl,i2c-fast-mode;
++				status = "disabled";
++			};
++
++			i2c1: i2c at 11080 {
++				compatible = "marvell,armada-3700-i2c";
++				reg = <0x11080 0x24>;
++				clocks = <&nb_perih_clk 9>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				mrvl,i2c-fast-mode;
++				status = "disabled";
++			};
++
+ 			uart0: serial at 12000 {
+ 				compatible = "marvell,armada-3700-uart";
+ 				reg = <0x12000 0x400>;
 -- 
 2.9.3
