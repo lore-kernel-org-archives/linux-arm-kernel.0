@@ -1,56 +1,50 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Wed, 9 Nov 2016 16:14:40 +0530
-Subject: [PATCH v1 03/11] drivers: soc: hisi: Add support for Hisilicon
- Djtag driver
-In-Reply-To: <1609380.NN50qvVsP7@wuerfel>
-References: <1478101374-18778-1-git-send-email-anurup.m@huawei.com>
- <2030692.HPgjBCTYG6@wuerfel>
- <2bac1a34-591b-6557-15bf-40db25c3d129@huawei.com>
- <1609380.NN50qvVsP7@wuerfel>
-Message-ID: <5822FE18.5000901@gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 09 Nov 2016 10:48:43 +0000
+Subject: [PATCH] arm64: acpi: arch_apei_get_mem_attributes() should use
+ memblock
+In-Reply-To: <168e341f-2377-2962-34a4-63043d5ab6d6@codeaurora.org>
+References: <20161108102714.29931-1-james.morse@arm.com>
+ <168e341f-2377-2962-34a4-63043d5ab6d6@codeaurora.org>
+Message-ID: <5822FF0B.2080109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tyler,
+
+On 08/11/16 18:41, Baicar, Tyler wrote:
+> This patch seems fine, APEI/GHES functionality still works properly for me.
+> I tested on a 4.8 kernel with the patch you mention below from Jonathan and
+> my patchset https://lkml.org/lkml/2016/10/21/746
+
+What are the memory attributes of the region your firmware writes the error
+status data to?
+
+I guess its attributes in the UEFI memory map must be 'NC' or <empty>. In which
+case the current default of Device_nGnRnE isn't so wrong. Otherwise your
+firmware must be doing some cache cleaning, which shouldn't be necessary.
 
 
-On Tuesday 08 November 2016 08:40 PM, Arnd Bergmann wrote:
-> On Tuesday, November 8, 2016 1:49:43 PM CET John Garry wrote:
->> Hi Arnd,
->>
->> Thanks for the reference.
->>
->> I think the i2c interface doesn't fully satisfy our requirements as we
->> need more than just a slave bus address when accessing the slave device
->> (which I think is what i2c uses). We also need to pass "offset" and
->> "mod_mask" arguments to the djtag adapter to access specific registers
->> in the slave device.
-> Ok. Are those values constant per device, or maybe a range? We may want to
-> include those in the reg property as well then.
->
-> 	Arnd
->
-Hi Arnd,
+> My only question is when you say that this may be called from an NMI context.
+> arch_apei_get_mem_attributes() only gets called from ghes_ioremap_pfn_irq()
+> which only appears to get called if we are not in an NMI context.
 
-The "mod_mask" is to select the sub-module within a module. This 
-parameter is
-used for djtag write operation.
-In the case of L3 cache, this will select the L3 cache bank. 0xFFFF 
-select all banks.
-This value will  change based on the L3 cache bank to be written to. I 
-think this value
-can be in the driver itself.
+Yes, that's broken too.
+ghes_ioremap_pfn_nmi() assumes PAGE_KERNEL. If firmware writes the error data
+via a non-cachable mapping, it will tell us this via the UEFI memory map, which
+we currently misread.
 
-For djtag read operation, the "mod_mask" is ignored. instead the input 
-parameter
-"chain_id" is used. this will identify the sub-module or bank.
+I have patches to fix this too, but it isn't needed until someone turns on
+CONFIG_HAVE_ACPI_APEI_NMI on arm64 (or ia64...).
 
-For djtag-v1, the "chain_id" is different for each L3 cache bank, But in 
-the case of
-djtag-v2 the "chain_id" is fixed and the value is 0 as In djtag-v2 there 
-is separate
-"module-id" for each sub-module.
 
-The "offset" is the register offset and this value is a range for a module.
+> So can this really be called from an NMI context?
+
+Not today, but it may be in the future. Re-mapping the EFI memory map to read it
+is possible in the short term, but generates more work if we ever want to
+support CONFIG_HAVE_ACPI_APEI_NMI. I implied all this into the word 'may', I
+will try to be clearer next time!
+
 
 Thanks,
-Anurup
+
+James
