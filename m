@@ -1,38 +1,64 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 9 Nov 2016 10:38:38 -0800
-Subject: [PATCH v2 2/2] mmc: sdhci-iproc: support standard byte register
- accesses
-In-Reply-To: <c94dc018-5a2d-d50b-5746-43ae7fc258ce@intel.com>
-References: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
- <1478018277-10097-3-git-send-email-scott.branden@broadcom.com>
- <c94dc018-5a2d-d50b-5746-43ae7fc258ce@intel.com>
-Message-ID: <132c772b-d4b9-c4b6-2eca-0393e7c995f9@broadcom.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 9 Nov 2016 18:30:17 +0000
+Subject: KASAN & the vmalloc area
+In-Reply-To: <CACT4Y+Ye+nxj=bQ9q9V2nEUpO+3sSWN1E2d_0KZapYyxx0Y69Q@mail.gmail.com>
+References: <20161108190302.GH15297@leverpostej>
+ <CACT4Y+ZSgfK-=wFFswMmQ+636Arz4kgwxdxz+FvEJHXvjZ8ckg@mail.gmail.com>
+ <20161109105624.GA17020@leverpostej>
+ <CACT4Y+Ye+nxj=bQ9q9V2nEUpO+3sSWN1E2d_0KZapYyxx0Y69Q@mail.gmail.com>
+Message-ID: <20161109183017.GA837@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian/Ulf,
+On Wed, Nov 09, 2016 at 10:16:03AM -0800, Dmitry Vyukov wrote:
+> On Wed, Nov 9, 2016 at 2:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Tue, Nov 08, 2016 at 02:09:27PM -0800, Dmitry Vyukov wrote:
+> >> On Tue, Nov 8, 2016 at 11:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> I've seen the same iteration slowness problem on x86 with
+> >> CONFIG_DEBUG_RODATA which walks all pages. The is about 1 minute, but
+> >> it is enough to trigger rcu stall warning.
+> >
+> > Interesting; do you know where that happens? I can't spot any obvious
+> > case where we'd have to walk all the page tables for DEBUG_RODATA.
+> 
+> As far as I remember it was this path:
+> 
+> mark_readonly in main.c -> mark_rodata_ro -> debug_checkwx ->
+> ptdump_walk_pgd_level_checkwx -> ptdump_walk_pgd_level_core.
 
-On 16-11-08 01:55 AM, Adrian Hunter wrote:
-> On 01/11/16 18:37, Scott Branden wrote:
->> Add bytewise register accesses support for newer versions of IPROC
->> SDHCI controllers.
->> Previous sdhci-iproc versions of SDIO controllers
->> (such as Raspberry Pi and Cygnus) only allowed for 32-bit register
->> accesses.
->>
->> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
->> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
->
-> This is unchanged from V1 which I acked, so:
-I updated the binding name in the documentation but forgot to change it 
-in this patch.  Now that Rob has ack'd the binding documentation I will 
-send out an updated patch with binding string in the code matching the 
-ack'd documentation.
+Ah, that's x86's equivalent DEBUG_WX checks.
 
->
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
->
-With the minor change I will add your ack to the next version I send out.
+> >> The zero pud and vmalloc-ed stacks looks like different problems.
+> >> To overcome the slowness we could map zero shadow for vmalloc area lazily.
+> >> However for vmalloc-ed stacks we need to map actual memory, because
+> >> stack instrumentation will read/write into the shadow.
+> >
+> > Sure. The point I was trying to make is that there' be fewer page tables
+> > to walk (unless the vmalloc area was exhausted), assuming we also lazily
+> > mapped the common zero shadow for the vmalloc area.
+> >
+> >> One downside here is that vmalloc shadow can be as large as 1:1 (if we
+> >> allocate 1 page in vmalloc area we need to allocate 1 page for
+> >> shadow).
+> >
+> > I thought per prior discussion we'd only need to allocate new pages for
+> > the stacks in the vmalloc region, and we could re-use the zero pages?
+> 
+> We can't reuse zero ro pages for stacks, because stack instrumentation
+> writes to stack shadow.
+
+Sorry, I'd meant we'd use the zero pages for everything else but stacks.
+I understand we'd have to allocate real shadow for the stacks.
+
+> When we have a large continuous range of memory, shadow for it is
+> 1/8th. However, if we have a separate page, we will need to map whole
+> page of shadow for it, i.e. 1:1 shadow overhead.
+
+Sure, but for everything but stacks we can re-use the same zero pages,
+no?
+
+For everything else, the cost would be dominated by the page tables for
+the shadow.
 
 Thanks,
-  Scott
+Mark.
