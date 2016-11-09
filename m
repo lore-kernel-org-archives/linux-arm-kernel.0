@@ -1,70 +1,126 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed,  9 Nov 2016 17:39:48 -0600
-Subject: [PATCH V10 1/6] arm64: Rename the common MADT parse routine
+Date: Wed,  9 Nov 2016 17:39:51 -0600
+Subject: [PATCH V10 4/6] arm: arm64: pmu: Assign platform PMU CPU affinity
 In-Reply-To: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com>
 References: <1478734793-6341-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1478734793-6341-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1478734793-6341-5-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MADT parser in smp.c is now being used to parse
-out NUMA, PMU and ACPI parking protocol information as
-well as the GIC information for which it was originally
-created. Rename it to avoid a misleading name.
+On systems with multiple PMU types the PMU to CPU affinity
+needs to be detected and set. The CPU to interrupt affinity
+should also be set.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/smp.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/perf/arm_pmu.c | 63 ++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 53 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 8507703..f3f1c90 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -511,13 +511,14 @@ static unsigned int cpu_count = 1;
- 
- #ifdef CONFIG_ACPI
- /*
-- * acpi_map_gic_cpu_interface - parse processor MADT entry
-+ * acpi_verify_and_map_madt - parse processor MADT entry
-  *
-  * Carry out sanity checks on MADT processor entry and initialize
-- * cpu_logical_map on success
-+ * cpu_logical_map, the ACPI parking protocol, NUMA mapping
-+ * and the PMU interrupts on success
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index b37b572..6008be9 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -11,6 +11,7 @@
   */
- static void __init
--acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-+acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
- {
- 	u64 hwid = processor->arm_mpidr;
+ #define pr_fmt(fmt) "hw perfevents: " fmt
  
-@@ -571,7 +572,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
++#include <linux/acpi.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_pm.h>
+@@ -24,6 +25,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqdesc.h>
+ 
++#include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+ 
+@@ -889,25 +891,67 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
  }
  
- static int __init
--acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-+acpi_parse_madt_common(struct acpi_subtable_header *header,
- 			     const unsigned long end)
+ /*
+- * CPU PMU identification and probing.
++ * CPU PMU identification and probing. Its possible to have
++ * multiple CPU types in an ARM machine. Assure that we are
++ * picking the right PMU types based on the CPU in question
+  */
+-static int probe_current_pmu(struct arm_pmu *pmu,
+-			     const struct pmu_probe_info *info)
++static int probe_plat_pmu(struct arm_pmu *pmu,
++			     const struct pmu_probe_info *info,
++			     unsigned int pmuid)
  {
- 	struct acpi_madt_generic_interrupt *processor;
-@@ -582,7 +583,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+-	int cpu = get_cpu();
+-	unsigned int cpuid = read_cpuid_id();
+ 	int ret = -ENODEV;
++	int cpu;
++	int aff_ctr = 0;
++	static int duplicate_pmus;
++	struct platform_device *pdev = pmu->plat_device;
++	int irq = platform_get_irq(pdev, 0);
  
- 	acpi_table_print_madt_entry(header);
+-	pr_info("probing PMU on CPU %d\n", cpu);
++	if (irq >= 0 && !irq_is_percpu(irq)) {
++		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
++					    GFP_KERNEL);
++		if (!pmu->irq_affinity)
++			return -ENOMEM;
++	}
  
--	acpi_map_gic_cpu_interface(processor);
-+	acpi_verify_and_map_madt(processor);
++	for_each_possible_cpu(cpu) {
++		unsigned int cpuid = read_specific_cpuid(cpu);
++
++		if (cpuid == pmuid) {
++			cpumask_set_cpu(cpu, &pmu->supported_cpus);
++			if (pmu->irq_affinity) {
++				pmu->irq_affinity[aff_ctr] = cpu;
++				aff_ctr++;
++			}
++		}
++	}
++
++	/* find the type of PMU given the CPU */
+ 	for (; info->init != NULL; info++) {
+-		if ((cpuid & info->mask) != info->cpuid)
++		if ((pmuid & info->mask) != info->cpuid)
+ 			continue;
+ 		ret = info->init(pmu);
++		/*
++		 * if this pmu declaration is unspecified and we have
++		 * previously found a PMU on this platform then append
++		 * a PMU number to the pmu name. This avoids changing
++		 * the names of PMUs that are specific to a class of CPUs.
++		 * The assumption is that if we match a specific PMU in the
++		 * provided pmu_probe_info then it's unique, and another PMU
++		 * in the system will match a different entry rather than
++		 * needing the _number to assure its unique.
++		 */
++		if ((!info->cpuid) && (duplicate_pmus)) {
++			pmu->name = kasprintf(GFP_KERNEL, "%s_%d",
++					    pmu->name, duplicate_pmus);
++			if (!pmu->name) {
++				kfree(pmu->irq_affinity);
++				ret = -ENOMEM;
++			}
++		}
++		duplicate_pmus++;
+ 		break;
+ 	}
  
- 	return 0;
+-	put_cpu();
+ 	return ret;
  }
-@@ -666,7 +667,7 @@ void __init smp_init_cpus(void)
- 		 * we need for SMP init
- 		 */
- 		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
--				      acpi_parse_gic_cpu_interface, 0);
-+				      acpi_parse_madt_common, 0);
  
- 	if (cpu_count > nr_cpu_ids)
- 		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
+@@ -1043,8 +1087,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		if (!ret)
+ 			ret = init_fn(pmu);
+ 	} else if (probe_table) {
+-		cpumask_setall(&pmu->supported_cpus);
+-		ret = probe_current_pmu(pmu, probe_table);
++		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
+ 	}
+ 
+ 	if (ret) {
 -- 
 2.5.5
