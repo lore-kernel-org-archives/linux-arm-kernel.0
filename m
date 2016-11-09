@@ -1,12 +1,12 @@
 From: ayaka@soulik.info (ayaka)
-Date: Wed, 9 Nov 2016 22:08:42 +0800
+Date: Wed, 9 Nov 2016 22:10:58 +0800
 Subject: [PATCH] drm/rockchip: analogix_dp: add supports for regulators in
  edp IP
 In-Reply-To: <16dfbe16-eae7-8da9-4108-07e623210d35@rock-chips.com>
 References: <1477163933-13140-1-git-send-email-ayaka@soulik.info>
  <6d050f06-996f-5ecc-20f9-587299ee34c7@rock-chips.com>
  <16dfbe16-eae7-8da9-4108-07e623210d35@rock-chips.com>
-Message-ID: <47328a44-617b-b0a8-2006-c5d3c835a0d8@soulik.info>
+Message-ID: <050e7c65-0c48-01d3-a8b7-a4a20b795f5e@soulik.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
