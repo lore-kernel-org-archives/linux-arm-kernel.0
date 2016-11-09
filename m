@@ -1,153 +1,92 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 9 Nov 2016 16:05:06 -0600
-Subject: ACPI namespace details for ARM64
-Message-ID: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 9 Nov 2016 22:14:52 +0000
+Subject: [PATCH RFC 00/12] tda998x updates
+In-Reply-To: <1478691905.2835.12.camel@linaro.org>
+References: <20161108122420.GP1041@n2100.armlinux.org.uk>
+ <2264579a-3273-d9c4-761a-f50f547eb39b@arm.com>
+ <20161108133215.GQ1041@n2100.armlinux.org.uk>
+ <20161108133411.GA31754@n2100.armlinux.org.uk>
+ <1478625636.27416.7.camel@linaro.org>
+ <20161108182434.GX1041@n2100.armlinux.org.uk>
+ <1478691905.2835.12.camel@linaro.org>
+Message-ID: <20161109221451.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Nov 09, 2016 at 11:45:05AM +0000, Jon Medhurst (Tixy) wrote:
+> On Tue, 2016-11-08 at 18:24 +0000, Russell King - ARM Linux wrote:
+> > On Tue, Nov 08, 2016 at 05:20:36PM +0000, Jon Medhurst (Tixy) wrote:
+> > > On Tue, 2016-11-08 at 13:34 +0000, Russell King - ARM Linux wrote:
+> > > > On Tue, Nov 08, 2016 at 01:32:15PM +0000, Russell King - ARM Linux wrote:
+> > > > > Unfortunately, my drm-tda998x-devel branch is slightly out of date with
+> > > > > these patches it's the original set of 10 patches.  I've not pushed
+> > > > > these ones out to that branch yet, as I've three additional patches on
+> > > > > top of these which aren't "ready" for pushing out.
+> > > > 
+> > > > Here's the delta between the branch and what I just posted:
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> > > [...]
+> > > 
+> > > I have a working setup for HDMI audio on Juno an would like to test this
+> > > series but am struggling to work out which patches to apply in what
+> > > order to what branch, can you be specific? (I've tried various
+> > > combinations of patches series from the list, drm-tda998x-devel, and the
+> > > diff you posted)
+> > 
+> > Hmm, I guess this is going to be annoyingly rather difficult then.
+> > The structure of my git tree is:
+> > 
+> > v4.8 ---------------- mali patch ------------------ merge --- these patches
+> > v4.7 -- tda998x audio patches (up to df0bd1e8f3c5) --^
+> > 
+> > which makes it rather difficult to send out a series that people can
+> > apply as patches without first replicating that merge.  I guess the
+> > answer is... use the _patches_ for review, and I'll push out the
+> > changes into drm-tda998x-devel... should be there soon.  Look for
+> > commit hash d61fa2e50f2a.  (Bah, slow 'net connections.)
+> 
+> Testing gets more complicated as I'm using 4.9-rc? which has a DMA fix
+> needed for audio [1] and breaks hdmi-codec which I hope I fixed [2].
 
-We've been working through the details of getting ACPI to work on
-arm64, and there have been lots of questions about what this means for
-PCI.  I've outlined this for several people individually, but I'm
-going to send this separately, apart from a specific patch series, to
-make sure we're all on the same page.  Please correct my errors and
-misunderstandings.
+Well, ultimately it's going to be merged during the 4.10 merge window,
+so it's going to be combined with lots of other changes along the way.
+I'm testing it against 4.8 on the Dove Cubox, and build testing it
+against 4.9-rc, so it's good someone is hardware testing with 4.9-rc
+merged.
 
-Bjorn
+> Anyway, I merged in drm-tda998x-devel and audio continued to work on my
+> HDMI connected monitor. So I guess that's
+> 
+> Tested-by: Jon Medhurst <tixy@linaro.org>
 
+Thanks.
 
-The basic requirement is that the ACPI namespace should describe
-*everything* that consumes address space unless there's another
-standard way for the OS to find it [1, 2]. ?For example, windows that
-are forwarded to PCI by a PCI host bridge should be described via ACPI
-devices, since the OS can't locate the host bridge by itself. ?PCI
-devices *below* the host bridge do not need to be described via ACPI,
-because the resources they consume are inside the host bridge windows,
-and the OS can discover them via the standard PCI enumeration
-mechanism (using config accesses to read and size the BARs).
+> I also reviewed the patches in this series. They look like a mostly
+> mechanical code organisation improvement, and whilst I'm not very
+> familiar with the driver and DRM, the other actual code changes look OK
+> too. So, FWIW:
 
-This ACPI resource description is done via _CRS methods of devices in
-the ACPI namespace [2]. ? _CRS methods are like generalized PCI BARs:
-the OS can read _CRS and figure out what resource is being consumed
-even if it doesn't have a driver for the device [3]. ?That's important
-because it means an old OS can work correctly even on a system with
-new devices unknown to the OS. ?The new devices won't do anything, but
-the OS can at least make sure no resources conflict with them.
+Yes, much of it is a code reorganisation, its mainly preparation for
+converting the driver to be DRM bridge based, but in reviewing the
+initial DRM bridge conversion patch, I spotted some weaknesses in the
+existing code which the first few patches of this series address.  I
+don't think they're serious enough to warrant submission into -rc
+though.
 
-Static tables like MCFG, HPET, ECDT, etc., are *not* mechanisms for
-reserving address space!  The static tables are for things the OS
-needs to know early in boot, before it can parse the ACPI namespace.
-If a new table is defined, an old OS needs to operate correctly even
-though it ignores the table.  _CRS allows that because it is generic
-and understood by the old OS; a static table does not.
+The next three patches I'll post in the coming days (once I've finished
+evaluating one of them) should reduce power consumption of the device
+by shutting down some blocks we never use, and some preparation to
+support CEC (I've had CEC working with Hans Verkil's patches for some
+time now, I'm mostly waiting for the CEC core to move out of staging,
+at which point it can end up in a saner place other than
+drivers/gpu/drm/i2c.)
 
-If the OS is expected to manage an ACPI device, that device will have
-a specific _HID/_CID that tells the OS what driver to bind to it, and
-the _CRS tells the OS and the driver where the device's registers are.
+> Acked-by: Jon Medhurst <tixy@linaro.org>
 
-PNP0C02 "motherboard" devices are basically a catch-all. ?There's no
-programming model for them other than "don't use these resources for
-anything else." ?So any address space that is (1) not claimed by some
-other ACPI device and (2) should not be assigned by the OS to
-something else, should be claimed by a PNP0C02 _CRS method.
+Thanks, and thanks for testing.  
 
-PCI host bridges are PNP0A03 or PNP0A08 devices. ?Their _CRS should
-describe all the address space they consume. ?In principle, this would
-be all the windows they forward down to the PCI bus, as well as the
-bridge registers themselves. ?The bridge registers include things like
-secondary/subordinate bus registers that determine the bus range below
-the bridge, window registers that describe the apertures, etc. ?These
-are all device-specific, non-architected things, so the only way a
-PNP0A03/PNP0A08 driver can manage them is via _PRS/_CRS/_SRS, which
-contain the device-specific details. ?These bridge registers also
-include ECAM space, since it is consumed by the bridge.
-
-ACPI defined a Producer/Consumer bit that was intended to distinguish
-the bridge apertures from the bridge registers [4, 5]. ?However,
-BIOSes didn't use that bit correctly, and the result is that OSes have
-to assume that everything in a PCI host bridge _CRS is a window. ?That
-leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
-device itself.
-
-The workaround is to describe the bridge registers (including ECAM
-space) in PNP0C02 catch-all devices [6]. ?With the exception of ECAM,
-the bridge register space is device-specific anyway, so the generic
-PNP0A03/PNP0A08 driver (pci_root.c) has no need to know about it. ?For
-ECAM, pci_root.c learns about the space from either MCFG or the _CBA
-method.
-
-Note that the PCIe spec actually does require ECAM unless there's a
-standard firmware interface for config access, e.g., the ia64 SAL
-interface [7].  One reason is that we want a generic host bridge
-driver (pci_root.c), and a generic driver requires a generic way to
-access config space.
-
-
-[1] ACPI 6.0, sec 6.1:
-    For any device that is on a non-enumerable type of bus (for
-    example, an ISA bus), OSPM enumerates the devices' identifier(s)
-    and the ACPI system firmware must supply an _HID object ... for
-    each device to enable OSPM to do that.
-
-[2] ACPI 6.0, sec 3.7:
-    The OS enumerates motherboard devices simply by reading through
-    the ACPI Namespace looking for devices with hardware IDs.
-
-    Each device enumerated by ACPI includes ACPI-defined objects in
-    the ACPI Namespace that report the hardware resources the device
-    could occupy [_PRS], an object that reports the resources that are
-    currently used by the device [_CRS], and objects for configuring
-    those resources [_SRS].  The information is used by the Plug and
-    Play OS (OSPM) to configure the devices.
-
-[3] ACPI 6.0, sec 6.2:
-    OSPM uses device configuration objects to configure hardware
-    resources for devices enumerated via ACPI.  Device configuration
-    objects provide information about current and possible resource
-    requirements, the relationship between shared resources, and
-    methods for configuring hardware resources.
-
-    When OSPM enumerates a device, it calls _PRS to determine the
-    resource requirements of the device.  It may also call _CRS to
-    find the current resource settings for the device.  Using this
-    information, the Plug and Play system determines what resources
-    the device should consume and sets those resources by calling the
-    device?s _SRS control method.
-
-    In ACPI, devices can consume resources (for example, legacy
-    keyboards), provide resources (for example, a proprietary PCI
-    bridge), or do both.  Unless otherwise specified, resources for a
-    device are assumed to be taken from the nearest matching resource
-    above the device in the device hierarchy.
-
-[4] ACPI 6.0, sec 6.4.3.5.4:
-    Extended Address Space Descriptor
-    General Flags: Bit [0] Consumer/Producer:
-	1?This device consumes this resource
-	0?This device produces and consumes this resource
-
-[5] ACPI 6.0, sec 19.6.43:
-    ResourceUsage specifies whether the Memory range is consumed by
-    this device (ResourceConsumer) or passed on to child devices
-    (ResourceProducer).  If nothing is specified, then
-    ResourceConsumer is assumed.
-
-[6] PCI Firmware 3.0, sec 4.1.2:
-    If the operating system does not natively comprehend reserving the
-    MMCFG region, the MMCFG region must be reserved by firmware.  The
-    address range reported in the MCFG table or by _CBA method (see
-    Section 4.1.3) must be reserved by declaring a motherboard
-    resource.  For most systems, the motherboard resource would appear
-    at the root of the ACPI namespace (under \_SB) in a node with a
-    _HID of EISAID (PNP0C02), and the resources in this case should
-    not be claimed in the root PCI bus?s _CRS.  The resources can
-    optionally be returned in Int15 E820 or EFIGetMemoryMap as
-    reserved memory but must always be reported through ACPI as a
-    motherboard resource.
-
-[7] PCI Express 3.0, sec 7.2.2:
-    For systems that are PC-compatible, or that do not implement a
-    processor-architecture-specific firmware interface standard that
-    allows access to the Configuration Space, the ECAM is required as
-    defined in this section.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
