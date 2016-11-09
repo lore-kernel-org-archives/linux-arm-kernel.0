@@ -1,94 +1,35 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  9 Nov 2016 14:19:33 +0000
-Subject: [PATCH v7 01/16] drivers: acpi: add FWNODE_ACPI_STATIC fwnode type
-In-Reply-To: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161109141948.19244-2-lorenzo.pieralisi@arm.com>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Wed,  9 Nov 2016 15:17:06 +0100
+Subject: [PATCH] pinctrl: single: check for any error when getting rows
+Message-ID: <20161109141706.12624-1-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems booting with a device tree, every struct device is associated
-with a struct device_node, that provides its DT firmware representation.
-The device node can be used in generic kernel contexts (eg IRQ
-translation, IOMMU streamid mapping), to retrieve the properties
-associated with the device and carry out kernel operations accordingly.
-Owing to the 1:1 relationship between the device and its device_node,
-the device_node can also be used as a look-up token for the device (eg
-looking up a device through its device_node), to retrieve the device in
-kernel paths where the device_node is available.
+pinctrl_count_index_with_args returns -ENOENT not
+-EINVAL. The return check would pass, and we would
+try to kzalloc with a negative error size throwing
+a warning.
 
-On systems booting with ACPI, the same abstraction provided by
-the device_node is required to provide look-up functionality.
+Instead of checking for -EINVAL specifically, lets
+check for any error and avoid negative size allocations.
 
-The struct acpi_device, that represents firmware objects in the
-ACPI namespace already includes a struct fwnode_handle of
-type FWNODE_ACPI as their member; the same abstraction is missing
-though for devices that are instantiated out of static ACPI tables
-entries (eg ARM SMMU devices).
-
-Add a new fwnode_handle type to associate devices created out
-of static ACPI table entries to the respective firmware components
-and create a simple ACPI core layer interface to dynamically allocate
-and free the corresponding firmware nodes so that kernel subsystems
-can use it to instantiate the nodes and associate them with the
-respective devices.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Tomasz Nowicki <tn@semihalf.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 ---
- include/linux/acpi.h   | 21 +++++++++++++++++++++
- include/linux/fwnode.h |  3 ++-
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ drivers/pinctrl/pinctrl-single.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 689a8b9..6efb13c 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -56,6 +56,27 @@ static inline acpi_handle acpi_device_handle(struct acpi_device *adev)
- 	acpi_fwnode_handle(adev) : NULL)
- #define ACPI_HANDLE(dev)		acpi_device_handle(ACPI_COMPANION(dev))
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 539f31c..56e22be 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1228,7 +1228,7 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
+ 	struct pcs_function *function;
  
-+static inline struct fwnode_handle *acpi_alloc_fwnode_static(void)
-+{
-+	struct fwnode_handle *fwnode;
-+
-+	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
-+	if (!fwnode)
-+		return NULL;
-+
-+	fwnode->type = FWNODE_ACPI_STATIC;
-+
-+	return fwnode;
-+}
-+
-+static inline void acpi_free_fwnode_static(struct fwnode_handle *fwnode)
-+{
-+	if (WARN_ON(!fwnode || fwnode->type != FWNODE_ACPI_STATIC))
-+		return;
-+
-+	kfree(fwnode);
-+}
-+
- /**
-  * ACPI_DEVICE_CLASS - macro used to describe an ACPI device with
-  * the PCI-defined class-code information
-diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-index 8516717..8bd28ce 100644
---- a/include/linux/fwnode.h
-+++ b/include/linux/fwnode.h
-@@ -17,8 +17,9 @@ enum fwnode_type {
- 	FWNODE_OF,
- 	FWNODE_ACPI,
- 	FWNODE_ACPI_DATA,
-+	FWNODE_ACPI_STATIC,
- 	FWNODE_PDATA,
--	FWNODE_IRQCHIP,
-+	FWNODE_IRQCHIP
- };
+ 	rows = pinctrl_count_index_with_args(np, name);
+-	if (rows == -EINVAL)
++	if (rows < 0)
+ 		return rows;
  
- struct fwnode_handle {
+ 	npins_in_row = pcs->width / pcs->bits_per_pin;
 -- 
-2.10.0
+2.10.1
