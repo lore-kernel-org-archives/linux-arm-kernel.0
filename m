@@ -1,82 +1,50 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Wed, 9 Nov 2016 10:16:03 -0800
-Subject: KASAN & the vmalloc area
-In-Reply-To: <20161109105624.GA17020@leverpostej>
-References: <20161108190302.GH15297@leverpostej>
- <CACT4Y+ZSgfK-=wFFswMmQ+636Arz4kgwxdxz+FvEJHXvjZ8ckg@mail.gmail.com>
- <20161109105624.GA17020@leverpostej>
-Message-ID: <CACT4Y+Ye+nxj=bQ9q9V2nEUpO+3sSWN1E2d_0KZapYyxx0Y69Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 9 Nov 2016 18:16:53 +0000
+Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <20161109175413.GE17020@leverpostej>
+References: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
+ <20161109175413.GE17020@leverpostej>
+Message-ID: <20161109181652.GK17771@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2016 at 2:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Nov 08, 2016 at 02:09:27PM -0800, Dmitry Vyukov wrote:
->> On Tue, Nov 8, 2016 at 11:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > When KASAN is selected, we allocate shadow for the whole vmalloc area,
->> > using common zero pte, pmd, pud tables. Walking over these in the ptdump
->> > code takes a *very* long time (I've seen up to 15 minutes with
->> > KASAN_OUTLINE enabled). For DEBUG_WX [3], this means boot hangs for that
->> > long, too.
->
-> [...]
->
->> I've seen the same iteration slowness problem on x86 with
->> CONFIG_DEBUG_RODATA which walks all pages. The is about 1 minute, but
->> it is enough to trigger rcu stall warning.
->
-> Interesting; do you know where that happens? I can't spot any obvious
-> case where we'd have to walk all the page tables for DEBUG_RODATA.
+On Wed, Nov 09, 2016 at 05:54:13PM +0000, Mark Rutland wrote:
+> On Fri, Oct 28, 2016 at 04:50:13PM -0400, Neil Leeder wrote:
+> > +	struct perf_event *events[MAX_L2_CTRS];
+> > +	struct l2cache_pmu *l2cache_pmu;
+> > +	DECLARE_BITMAP(used_counters, MAX_L2_CTRS);
+> > +	DECLARE_BITMAP(used_groups, L2_EVT_GROUP_MAX + 1);
+> > +	int group_to_counter[L2_EVT_GROUP_MAX + 1];
+> > +	int irq;
+> > +	/* The CPU that is used for collecting events on this cluster */
+> > +	int on_cpu;
+> > +	/* All the CPUs associated with this cluster */
+> > +	cpumask_t cluster_cpus;
+> 
+> I'm still uncertain about aggregating all cluster PMUs into a larger
+> PMU, given the cluster PMUs are logically independent (at least in terms
+> of the programming model).
+> 
+> However, from what I understand the x86 uncore PMU drivers aggregate
+> symmetric instances of uncore PMUs (and also aggregate across packages
+> to the same logical PMU).
+> 
+> Whatever we do, it would be nice for the uncore drivers to align on a
+> common behaviour (and I think we're currently going the oppposite route
+> with Cavium's uncore PMU). Will, thoughts?
 
-As far as I remember it was this path:
+I'm not a big fan of aggregating this stuff. Ultimately, the user in the
+driving seat of perf is going to need some knowledge about the toplogy of
+the system in order to perform sensible profiling using an uncore PMU.
+If the kernel tries to present a single, unified PMU then we paint ourselves
+into a corner when the hardware isn't as symmetric as we want it to be
+(big/little on the CPU side is the extreme example of this). If we want
+to be consistent, then exposing each uncore unit as a separate PMU is
+the way to go. That doesn't mean we can't aggregate the components of a
+distributed PMU (e.g. the CCN or the SMMU), but we don't want to aggregate
+at the programming interface/IP block level.
 
-mark_readonly in main.c -> mark_rodata_ro -> debug_checkwx ->
-ptdump_walk_pgd_level_checkwx -> ptdump_walk_pgd_level_core.
+We could consider exposing some topology information in sysfs if that's
+seen as an issue with the non-aggregated case.
 
-
->> The zero pud and vmalloc-ed stacks looks like different problems.
->> To overcome the slowness we could map zero shadow for vmalloc area lazily.
->> However for vmalloc-ed stacks we need to map actual memory, because
->> stack instrumentation will read/write into the shadow.
->
-> Sure. The point I was trying to make is that there' be fewer page tables
-> to walk (unless the vmalloc area was exhausted), assuming we also lazily
-> mapped the common zero shadow for the vmalloc area.
->
->> One downside here is that vmalloc shadow can be as large as 1:1 (if we
->> allocate 1 page in vmalloc area we need to allocate 1 page for
->> shadow).
->
-> I thought per prior discussion we'd only need to allocate new pages for
-> the stacks in the vmalloc region, and we could re-use the zero pages?
-
-We can't reuse zero ro pages for stacks, because stack instrumentation
-writes to stack shadow.
-When we have a large continuous range of memory, shadow for it is
-1/8th. However, if we have a separate page, we will need to map whole
-page of shadow for it, i.e. 1:1 shadow overhead.
-
-
-> ... or are you trying to quantify the cost of the page tables?
->
->> Re slowness: could we just skip the KASAN zero puds (the top level)
->> while walking? Can they be interesting for anybody?
->
-> They're interesting for the ptdump case (which allows privileged users
-> to dump the tables via /sys/kernel/debug/kernel_page_tables). I've seen
-> 25+ minute hangs there.
->
->> We can just pretend that they are not there. Looks like a trivial
->> solution for the problem at hand.
->
-> For the boot time hang it's option. Though I'd prefer that the sanity
-> checks applied to all of tables, shadow regions included.
->
-> Thanks,
-> Mark.
->
-> --
-> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe at googlegroups.com.
-> To post to this group, send email to kasan-dev at googlegroups.com.
-> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/20161109105624.GA17020%40leverpostej.
-> For more options, visit https://groups.google.com/d/optout.
+Will
