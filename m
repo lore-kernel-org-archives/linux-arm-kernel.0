@@ -1,135 +1,112 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 9 Nov 2016 08:43:12 +0100
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <5822214F.2070500@redhat.com>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
- <dae12190-1eb6-20a9-5740-9e5be8bb65fc@redhat.com>
- <20161108175457.GK20591@arm.com> <5822214F.2070500@redhat.com>
-Message-ID: <001659cd-5806-7729-8cea-dd6982010c9f@redhat.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Wed, 09 Nov 2016 09:53:25 +0200
+Subject: [PATCH 01/30] usb: dwc2: Deprecate g-use-dma binding
+In-Reply-To: <6e90b835-73b1-3970-24a4-eab72381b469@synopsys.com>
+References: <cover.1478558343.git.johnyoun@synopsys.com>
+ <e99e9d8df77884671f94734109a1a8d76a0222c1.1478558343.git.johnyoun@synopsys.com>
+ <87wpgeibdh.fsf@linux.intel.com>
+ <6e90b835-73b1-3970-24a4-eab72381b469@synopsys.com>
+Message-ID: <87zil9gkcq.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-On 08/11/2016 20:02, Don Dutile wrote:
-> On 11/08/2016 12:54 PM, Will Deacon wrote:
->> On Tue, Nov 08, 2016 at 03:27:23PM +0100, Auger Eric wrote:
->>> On 08/11/2016 03:45, Will Deacon wrote:
->>>> Rather than treat these as separate problems, a better interface is to
->>>> tell userspace about a set of reserved regions, and have this include
->>>> the MSI doorbell, irrespective of whether or not it can be remapped.
->>>> Don suggested that we statically pick an address for the doorbell in a
->>>> similar way to x86, and have the kernel map it there. We could even
->>>> pick
->>>> 0xfee00000. If it conflicts with a reserved region on the platform (due
->>>> to (4)), then we'd obviously have to (deterministically?) allocate it
->>>> somewhere else, but probably within the bottom 4G.
->>> This is tentatively achieved now with
->>> [1] [RFC v2 0/8] KVM PCIe/MSI passthrough on ARM/ARM64 - Alt II
->>> (http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1264506.html)
->>>
->> Yup, I saw that fly by. Hopefully some of the internals can be reused
->> with the current thinking on user ABI.
->>
->>>> The next question is how to tell userspace about all of the reserved
->>>> regions. Initially, the idea was to extend VFIO, however Alex pointed
->>>> out a horrible scenario:
->>>>
->>>>    1. QEMU spawns a VM on system 0
->>>>    2. VM is migrated to system 1
->>>>    3. QEMU attempts to passthrough a device using PCI hotplug
->>>>
->>>> In this scenario, the guest memory map is chosen at step (1), yet there
->>>> is no VFIO fd available to determine the reserved regions. Furthermore,
->>>> the reserved regions may vary between system 0 and system 1. This
->>>> pretty
->>>> much rules out using VFIO to determine the reserved regions.Alex
->>>> suggested
->>>> that the SMMU driver can advertise the regions via
->>>> /sys/class/iommu/. This
->>>> would solve part of the problem, but migration between systems with
->>>> different memory maps can still cause problems if the reserved regions
->>>> of the new system conflict with the guest memory map chosen by QEMU.
->>>
->>> OK so I understand we do not want anymore the VFIO chain capability API
->>> (patch 5 of above series) but we prefer a sysfs approach instead.
->> Right.
->>
->>> I understand the sysfs approach which allows the userspace to get the
->>> info earlier and independently on VFIO. Keeping in mind current QEMU
->>> virt - which is not the only userspace - will not do much from this info
->>> until we bring upheavals in virt address space management. So if I am
->>> not wrong, at the moment the main action to be undertaken is the
->>> rejection of the PCI hotplug in case we detect a collision.
->> I don't think so; it should be up to userspace to reject the hotplug.
->> If userspace doesn't have support for the regions, then that's fine --
->> you just end up in a situation where the CPU page table maps memory
->> somewhere that the device can't see. In other words, you'll end up with
->> spurious DMA failures, but that's exactly what happens with current
->> systems
->> if you passthrough an overlapping region (Robin demonstrated this on
->> Juno).
->>
->> Additionally, you can imagine some future support where you can tell the
->> guest not to use certain regions of its memory for DMA. In this case, you
->> wouldn't want to refuse the hotplug in the case of overlapping regions.
->>
->> Really, I think the kernel side just needs to enumerate the fixed
->> reserved
->> regions, place the doorbell at a fixed address and then advertise these
->> via sysfs.
->>
->>> I can respin [1]
->>> - studying and taking into account Robin's comments about dm_regions
->>> similarities
->>> - removing the VFIO capability chain and replacing this by a sysfs API
->> Ideally, this would be reusable between different SMMU drivers so the
->> sysfs
->> entries have the same format etc.
->>
->>> Would that be OK?
->> Sounds good to me. Are you in a position to prototype something on the
->> qemu
->> side once we've got kernel-side agreement?
-yes sure.
->>
->>> What about Alex comments who wanted to report the usable memory ranges
->>> instead of unusable memory ranges?
->>>
->>> Also did you have a chance to discuss the following items:
->>> 1) the VFIO irq safety assessment
->> The discussion really focussed on system topology, as opposed to
->> properties
->> of the doorbell. Regardless of how the device talks to the doorbell, if
->> the doorbell can't protect against things like MSI spoofing, then it's
->> unsafe. My opinion is that we shouldn't allow passthrough by default on
->> systems with unsafe doorbells (we could piggyback on
->> allow_unsafe_interrupts
->> cmdline option to VFIO).
-OK.
->>
->> A first step would be making all this opt-in, and only supporting GICv3
->> ITS for now.
-> You're trying to support a config that is < GICv3 and no ITS ? ...
-> That would be the equiv. of x86 pre-intr-remap, and that's why
-> allow_unsafe_interrupts
-> hook was created ... to enable devel/kick-the-tires.
->>> 2) the MSI reserved size computation (is an arbitrary size OK?)
->> If we fix the base address, we could fix a size too. However, we'd still
->> need to enumerate the doorbells to check that they fit in the region we
->> have. If not, then we can warn during boot and treat it the same way as
->> a resource conflict (that is, reallocate the region in some deterministic
->> way).
-OK
 
-Thanks
+Hi,
 
-Eric
->>
->> Will
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+John Youn <John.Youn@synopsys.com> writes:
+> On 11/8/2016 1:12 AM, Felipe Balbi wrote:
+>> 
+>> Hi,
+>> 
+>> John Youn <johnyoun@synopsys.com> writes:
+>>> Add a vendor prefix and make the name more consistent by renaming it to
+>>> "snps,gadget-dma-enable".
+>>>
+>>> Signed-off-by: John Youn <johnyoun@synopsys.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/usb/dwc2.txt | 5 ++++-
+>>>  arch/arm/boot/dts/rk3036.dtsi                  | 2 +-
+>>>  arch/arm/boot/dts/rk3288.dtsi                  | 2 +-
+>>>  arch/arm/boot/dts/rk3xxx.dtsi                  | 2 +-
+>>>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi      | 2 +-
+>>>  arch/arm64/boot/dts/rockchip/rk3368.dtsi       | 2 +-
+>>>  drivers/usb/dwc2/params.c                      | 9 ++++++++-
+>>>  drivers/usb/dwc2/pci.c                         | 2 +-
+>>>  8 files changed, 18 insertions(+), 8 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+>>> index 9472111..389a461 100644
+>>> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+>>> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+>>> @@ -26,11 +26,14 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
+>>>  - dr_mode: shall be one of "host", "peripheral" and "otg"
+>>>    Refer to usb/generic.txt
+>>>  - snps,host-dma-disable: disable host DMA mode.
+>>> -- g-use-dma: enable dma usage in gadget driver.
+>>> +- snps,gadget-dma-enable: enable gadget DMA mode.
+>> 
+>> I don't see why you even have this binding. Looking through the code,
+>> you have:
+>> 
+>> #define GHWCFG2_SLAVE_ONLY_ARCH			0
+>> #define GHWCFG2_EXT_DMA_ARCH			1
+>> #define GHWCFG2_INT_DMA_ARCH			2
+>> 
+>> void dwc2_set_param_dma_enable(struct dwc2_hsotg *hsotg, int val)
+>> {
+>> 	int valid = 1;
+>> 
+>> 	if (val > 0 && hsotg->hw_params.arch == GHWCFG2_SLAVE_ONLY_ARCH)
+>> 		valid = 0;
+>> 	if (val < 0)
+>> 		valid = 0;
+>> 
+>> 	if (!valid) {
+>> 		if (val >= 0)
+>> 			dev_err(hsotg->dev,
+>> 				"%d invalid for dma_enable parameter. Check HW configuration.\n",
+>> 				val);
+>> 		val = hsotg->hw_params.arch != GHWCFG2_SLAVE_ONLY_ARCH;
+>> 		dev_dbg(hsotg->dev, "Setting dma_enable to %d\n", val);
+>> 	}
+>> 
+>> 	hsotg->core_params->dma_enable = val;
+>> }
+>> 
+>> which seems to hint that DMA support is discoverable. If there is DMA,
+>> why would disable it?
+>> 
+>
+> Yes that's the case and I would prefer to make it discoverable and
+> enabled by default.
+>
+> But the legacy behavior has always been like this because DMA was
+> never fully implemented in the gadget driver and it was an opt-in
+> feature. Periodic support was only added recently.
+
+legacy behavior can be changed if another 'policy' makes more
+sense. IMHO, whatever can be discovered in runtime, should be enabled by
+default. That way, we force people to use it and find bugs in certain
+features.
+
+> What do you think about enabling it by default now? I think most
+> platforms already use DMA.
+
+I think it should be discovered. Drop all these "*-use-dma" bindings
+because they're not needed if you can probe a register to answer the
+same question.
+
+> We would still need a "disable" binding for IP validation purposes at
+> least.
+
+Yeah, could be a quirk.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 800 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161109/0691c4a0/attachment.sig>
