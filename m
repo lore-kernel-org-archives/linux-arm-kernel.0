@@ -1,45 +1,33 @@
 From: ahaslam@baylibre.com (Axel Haslam)
-Date: Wed,  9 Nov 2016 15:53:59 +0100
-Subject: [PATCH v2 0/2] pinctrl: single: fixes for davinci
-Message-ID: <20161109145401.25327-1-ahaslam@baylibre.com>
+Date: Wed,  9 Nov 2016 15:54:01 +0100
+Subject: [PATCH v2 2/2] pinctrl: single: search for the bits property when
+ parsing bits
+In-Reply-To: <20161109145401.25327-1-ahaslam@baylibre.com>
+References: <20161109145401.25327-1-ahaslam@baylibre.com>
+Message-ID: <20161109145401.25327-3-ahaslam@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After recent pinctl patches we see a warning when booting davinci
-due to a bad memory allocation:
+The pcs_parse_bits_in_pinctrl_entry function should search
+for the "pinctrl-single,bits" and not "pinctrl-single,pins"
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 1 at mm/page_alloc.c:3511 __alloc_pages_nodemask+0x16c/0xb18
-Modules linked in:
-CPU: 0 PID: 1 Comm: swapper Not tainted 4.9.0-rc2-00023-g22d5127-dirty #1019
-Hardware name: Generic DA850/OMAP-L138/AM18x
-Backtrace: 
-[<c000d670>] (dump_backtrace) from [<c000d794>] (show_stack+0x18/0x1c)
-[<c000d77c>] (show_stack) from [<c021a0d0>] (dump_stack+0x20/0x28)
-[<c021a0b0>] (dump_stack) from [<c001bb10>] (__warn+0xe8/0x100)
-[<c001ba28>] (__warn) from [<c001bb50>] (warn_slowpath_null+0x28/0x30)
-[<c001bb28>] (warn_slowpath_null) from [<c0097e7c>] (__alloc_pages_nodemask+0x16c/0xb18)
-[<c0097d10>] (__alloc_pages_nodemask) from [<c00afef4>] (kmalloc_order+0x20/0x58)
-[<c00afed4>] (kmalloc_order) from [<c00ce7ac>] (__kmalloc_track_caller+0x188/0x190)
-[<c00ce624>] (__kmalloc_track_caller) from [<c02a762c>] (devm_kmalloc+0x24/0x70)
-[<c02a7608>] (devm_kmalloc) from [<c0247d10>] (pcs_dt_node_to_map+0x1d0/0xa40)
-[<c0245ec8>] (pinctrl_dt_to_map) from [<c0242fd0>] (pinctrl_get+0xe8/0x484)
-[snip]
+Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
+---
+ drivers/pinctrl/pinctrl-single.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This series fixes this error.
-
-Changes form v1 -> v2
-* Add an error message, and correct also other places where the
-issue is seen
-
-* Add patch to parse for bits instead of pins
-
-Axel Haslam (2):
-  pinctrl: single: check for any error when getting rows
-  pinctrl: single: search for the bits property when parsing bits
-
- drivers/pinctrl/pinctrl-single.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index f36a9f1..2b196e5 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1223,7 +1223,7 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
+ 						unsigned *num_maps,
+ 						const char **pgnames)
+ {
+-	const char *name = "pinctrl-single,pins";
++	const char *name = "pinctrl-single,bits";
+ 	struct pcs_func_vals *vals;
+ 	int rows, *pins, found = 0, res = -ENOMEM, i;
+ 	int npins_in_row;
 -- 
 2.10.1
