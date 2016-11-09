@@ -1,171 +1,89 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 9 Nov 2016 14:11:50 +0100
-Subject: [alsa-devel] [PATCH 2/9] ALSA: ac97: add an ac97 bus
-In-Reply-To: <87eg2ly8k6.fsf@belgarion.home>
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
- <1477510907-23495-3-git-send-email-robert.jarzmik@free.fr>
- <d57cdfba-da22-652d-3d75-6d1b754cf1d5@metafoo.de>
- <87eg2ly8k6.fsf@belgarion.home>
-Message-ID: <5ae15e01-eaaf-4996-27ec-1179041c0268@metafoo.de>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed,  9 Nov 2016 21:21:52 +0800
+Subject: [PATCH v2 0/9] rockchip: add more power domain and devices dts for
+ rk3399
+Message-ID: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2016 10:18 PM, Robert Jarzmik wrote:
-[...]
->>> +/**
->>> + * struct ac97_controller - The AC97 controller of the AC-Link
->>> + * @ops:		the AC97 operations.
->>> + * @controllers:	linked list of all existing controllers.
->>> + * @dev:		the device providing the AC97 controller.
->>> + * @slots_available:	the mask of accessible/scanable codecs.
->>> + * @codecs:		the 4 possible AC97 codecs (NULL if none found).
->>> + * @codecs_pdata:	platform_data for each codec (NULL if no pdata).
->>> + *
->>> + * This structure is internal to AC97 bus, and should not be used by the
->>> + * controllers themselves, excepting for using @dev.
->>> + */
->>> +struct ac97_controller {
->>> +	const struct ac97_controller_ops *ops;
->>> +	struct list_head controllers;
->>> +	struct device *dev;
->>
->> I'd make the controller itself a struct dev, rather than just having the
->> pointer to the parent. This is more idiomatic and matches what other
->> subsystems do. It has several advantages, you get proper refcounting of your
->> controller structure, the controller gets its own sysfs directory where the
->> CODECs appear as children, you don't need the manual sysfs attribute
->> creation and removal in ac97_controler_{un,}register().
-> 
-> If you mean having "struct device dev" instead of "struct device *dev", it has
-> also a drawback : all the legacy platforms have already a probing method, be
-> that platform data, device-tree or something else.
-> 
-> I'm a bit converned about the conversion toll. Maybe I've not understood your
-> point fully, so please feel free to explain, with an actual example even better.
+Hi all,
 
-This would be a struct device that is not bound to a driver, but just acts
-as a shell for the controller and places it inside the device hierarchy. You
-get reference counting and other management functions as well as a
-consistent naming scheme. E.g. you can call the devices ac97c%d (or
-something similar) and then call the CODEC ac97c%d.%d.
+Please allow me to integrate these patches.
+They are missing or losing for upstream, then there are some patches
+are  always depending on them.
 
-This is how most frameworks implementing some kind of control bus are
-structured in the Linux kernel. E.g. take a look at I2C or SPI.
+The following patches are releated to PD.
+git log --oneline
+827198c arm64: dts: rockchip: add the usb3 pd for rk3399
+95e95b4 arm64: dts: rockchip: support dwc3 USB for rk3399
+3ced49c arm64: dts: rockchip: add pd_edp node for rk3399
+e19db3f arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
+eb92079 arm64: dts: rockchip: add backlight support for rk3399 evb board
+20b8135 arm64: dts: rockchip: add eDP device node for rk3399
+480a1bb arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
+4964c0a arm64: dts: rockchip: add pd_sd power node for rk3399
+c407a4c arm64: dts: rockchip: add eMMC's power domain support for rk3399
 
-Your controller driver itself is unaffected by this, you still call
-snd_ac97_controller_register() from the probe function and so on.
+----
+Hi Heiko & guys,
 
-> 
->>> +	void (*wait)(struct ac97_controller *adrv, int slot);
->>> +	void (*init)(struct ac97_controller *adrv, int slot);
->>
->> Neither wait nor init are ever used.
-> This is because I've not begun to porting sound/pci/ac97_codec.c into
-> sound/ac97.
+This series patches support the below PDs.
 
-Ok, makes sense. But maybe just leave them out for now and add them when
-they are used.
+1) sd & emmc pd
+4964c0a arm64: dts: rockchip: add pd_sd power node for rk3399
+c407a4c arm64: dts: rockchip: add eMMC's power domain support for rk3399
 
-[...]
->>> +	ret = sysfs_create_link(&codec->dev.kobj, &ac97_ctrl->dev->kobj,
->>> +				"ac97_controller");
->>
->> Since the CODEC is a child of the controller this should not be necessary as
->> this just points one directory up. It's like `ln -s .. parent`
-> This creates :
-> /sys/bus/ac97/devices/pxa2xx-ac97\:0/ac97_controller
-> 
-> Of course as you pointed out, it's a 'ln -s .. parent' like link, but it seems
-> to me very unfriendly to have :
->  - /sys/bus/ac97/devices/pxa2xx-ac97\:0/../ac97_operations
->  - while /sys/bus/ac97/devices/ac97_operations doesn't exist (obviously)
-> 
-> Mmm, I don't know for this one, my mind is not set, it's a bit hard to tell if
-> it's only an unecessary link bringing "comfort", or something usefull.
+2) edp pd
+3ced49c arm64: dts: rockchip: add pd_edp node for rk3399
+e19db3f arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
+eb92079 arm64: dts: rockchip: add backlight support for rk3399 evb board
+20b8135 arm64: dts: rockchip: add eDP device node for rk3399
+480a1bb arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
 
-It is additional ABI and we do not have this for any other bus either (e.g.
-you don't see a backlink for a I2C or SPI device to the parent). In my
-opinion for the sake of keeping things consistent and simple we should not
-add this.
+3) usb3 pd
+827198c arm64: dts: rockchip: add the usb3 pd for rk3399
+95e95b4 arm64: dts: rockchip: support dwc3 USB for rk3399
 
->>
->>> +	if (ret)
->>> +		goto err_unregister_device;
->>> +
->>> +	return 0;
->>> +err_unregister_device:
->>> +	put_device(&codec->dev);
->>> +err_free_codec:
->>> +	kfree(codec);
->>
->> Since the struct is reference counted, the freeing is done in the release
->> callback and this leads to a double free.
-> A yes in the "goto err_unregister_device" case right, while it's necessary in
-> the "goto err_free_codec" case ... I need to rework that a bit.
+Thanks,
+Caesar
 
-It should use put_device() in both cases, check the the device_register()
-documentation. It says that put_device() must be used, even if
-device_register() fails.
 
-> 
->>> +int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
->>> +{
->>> +	int ret;
->>> +
->>> +	drv->driver.bus = &ac97_bus_type;
->>> +
->>> +	ret = driver_register(&drv->driver);
->>> +	if (!ret)
->>> +		ac97_rescan_all_controllers();
->>
->> Rescanning the bus when a new codec driver is registered should not be
->> neccessary. The bus is scanned once when the controller is registered, this
->> creates the device. The device driver core will take care of binding the
->> device to the driver, if the driver is registered after thed evice.
-> That's because you suppose the initial scanning found all the ac97 codecs.
-> But that's an incomplete vision as a codec might be powered off at that time and
-> not seen by the first scanning, while the new scanning will discover it.
+Changes in v2:
+- Reviewed-on: https://chromium-review.googlesource.com/376558
+- Verified on ChromeOS kernel4.4
+- v1 on https://patchwork.kernel.org/patch/9322553/
+- Reviewed-on: https://chromium-review.googlesource.com/386483
+- Verified on ChromeOS kernel4.4
+- Yakir posted the original patch on
+- https://patchwork.kernel.org/patch/9191777
+- the original patches from brian posting on
+  https://chromium-review.googlesource.com/343603
+- Reviewed-on: https://chromium-review.googlesource.com/384280
 
-But why would the device become suddenly visible when the driver is
-registered. This seems to be an as arbitrary point in time as any other.
+Brian Norris (1):
+  arm64: dts: rockchip: support dwc3 USB for rk3399
 
-Also consider that when you build a driver as a module, the module will
-typically only be auto-loaded after the device has been detected, based on
-the device ID. On the other hand, if the driver is built-in driver
-registration will happen either before or shortly after the controller
-registration.
+Caesar Wang (1):
+  arm64: dts: rockchip: add the usb3 pd for rk3399
 
-If there is the expectation that the AC97 CODEC might randomly appear on the
-bus, the core should periodically scan the bus.
+Mark Yao (1):
+  arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
 
-[...]
->>> +	ac97_ctrl->ops->warm_reset(ac97_ctrl);
->>> +	return len;
->>> +}
->>> +static DEVICE_ATTR_WO(warm_reset);
->>> +
->>> +static struct attribute *ac97_controller_device_attrs[] = {
->>> +	&dev_attr_cold_reset.attr,
->>> +	&dev_attr_warm_reset.attr,
->>> +	NULL
->>> +};
->>
->> This adds new userspace ABI that is not documented at the moment.
-> Very true. And as all userspace interface, it needs to be discussed. If nobody
-> complains, I'll add the documentation for next patch round.
->>
->>> +int snd_ac97_controller_register(const struct ac97_controller_ops *ops,
->>> +				 struct device *dev,
->>> +				 unsigned short slots_available,
->>> +				 void **codecs_pdata)
->>
->> In my opinion this should return a handle to a ac97 controller which can
->> then be passed to snd_ac97_controller_unregister(). This is in my opinion
->> the better approach rather than looking up the controller by parent device.
-> This is another "legacy drivers" issue.
-> 
-> The legacy driver (the one probed by platform_data or devicetree) doesn't
-> necessarily have a private structure to store this ac97_controller pointer.
+Yakir Yang (3):
+  arm64: dts: rockchip: add eDP device node for rk3399
+  arm64: dts: rockchip: add backlight support for rk3399 evb board
+  arm64: dts: rockchip: introduce pclk_vio_grf in eDP device node
 
-I might be missing something, but I'm not convinced by this. Can you point
-me to such a legacy driver where you think this would not work?
+Ziyuan Xu (1):
+  arm64: dts: rockchip: add eMMC's power domain support for rk3399
+
+zhangqing (2):
+  arm64: dts: rockchip: add pd_sd power node for rk3399
+  arm64: dts: rockchip: add pd_edp node for rk3399
+
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  40 ++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 210 ++++++++++++++++++++++++++++
+ 2 files changed, 250 insertions(+)
+
+-- 
+2.7.4
