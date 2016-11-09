@@ -1,114 +1,129 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed,  9 Nov 2016 15:58:15 -0700
-Subject: [PATCH fpga 1/9] fpga zynq: Add missing \n to messages
+Date: Wed,  9 Nov 2016 15:58:22 -0700
+Subject: [PATCH fpga 8/9] fpga socfpga: Use the scatterlist interface
 In-Reply-To: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
 References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <1478732303-13718-2-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <1478732303-13718-9-git-send-email-jgunthorpe@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+socfpga just uses the CPU to memory copy the bitstream, so there is
+no reason it needs contiguous kernel memory. Switch to use the sg
+interface.
+
 Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 ---
- drivers/fpga/zynq-fpga.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ drivers/fpga/socfpga.c | 56 +++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 37 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index c2fb4120bd62..e72340ea7323 100644
---- a/drivers/fpga/zynq-fpga.c
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -217,7 +217,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
- 					     INIT_POLL_DELAY,
- 					     INIT_POLL_TIMEOUT);
- 		if (err) {
--			dev_err(priv->dev, "Timeout waiting for PCFG_INIT");
-+			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
- 			goto out_err;
- 		}
+diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+index 27d2ff28132c..f3f390b2eecf 100644
+--- a/drivers/fpga/socfpga.c
++++ b/drivers/fpga/socfpga.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/pm.h>
++#include <linux/scatterlist.h>
  
-@@ -231,7 +231,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
- 					     INIT_POLL_DELAY,
- 					     INIT_POLL_TIMEOUT);
- 		if (err) {
--			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT");
-+			dev_err(priv->dev, "Timeout waiting for !PCFG_INIT\n");
- 			goto out_err;
- 		}
+ /* Register offsets */
+ #define SOCFPGA_FPGMGR_STAT_OFST				0x0
+@@ -408,10 +409,22 @@ static int socfpga_fpga_reset(struct fpga_manager *mgr)
+  * Prepare the FPGA to receive the configuration data.
+  */
+ static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
+-					   const char *buf, size_t count)
++					   struct sg_table *sgt)
+ {
+ 	struct socfpga_fpga_priv *priv = mgr->priv;
+-	int ret;
++	struct scatterlist *sg;
++	int ret, i;
++
++	/* We use the CPU to read the bitstream 32 bits at a time, and thus
++	 * require alignment.
++	 */
++	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
++		if ((sg->offset % 4) != 0) {
++			dev_err(&mgr->dev,
++				"Invalid bitstream, chunks must be aligned\n");
++			return -EINVAL;
++		}
++	}
  
-@@ -245,7 +245,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
- 					     INIT_POLL_DELAY,
- 					     INIT_POLL_TIMEOUT);
- 		if (err) {
--			dev_err(priv->dev, "Timeout waiting for PCFG_INIT");
-+			dev_err(priv->dev, "Timeout waiting for PCFG_INIT\n");
- 			goto out_err;
- 		}
- 	}
-@@ -262,7 +262,7 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
- 	/* check that we have room in the command queue */
- 	status = zynq_fpga_read(priv, STATUS_OFFSET);
- 	if (status & STATUS_DMA_Q_F) {
--		dev_err(priv->dev, "DMA command queue full");
-+		dev_err(priv->dev, "DMA command queue full\n");
- 		err = -EBUSY;
- 		goto out_err;
- 	}
-@@ -331,7 +331,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
- 	zynq_fpga_write(priv, INT_STS_OFFSET, intr_status);
+ 	if (flags & FPGA_MGR_PARTIAL_RECONFIG) {
+ 		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
+@@ -440,40 +453,45 @@ static int socfpga_fpga_ops_configure_init(struct fpga_manager *mgr, u32 flags,
+ /*
+  * Step 9: write data to the FPGA data register
+  */
+-static int socfpga_fpga_ops_configure_write(struct fpga_manager *mgr,
+-					    const char *buf, size_t count)
++static void socfpga_write_buf(struct socfpga_fpga_priv *priv, const u32 *buf,
++			      size_t count)
+ {
+-	struct socfpga_fpga_priv *priv = mgr->priv;
+-	u32 *buffer_32 = (u32 *)buf;
+ 	size_t i = 0;
  
- 	if (!((intr_status & IXR_D_P_DONE_MASK) == IXR_D_P_DONE_MASK)) {
--		dev_err(priv->dev, "Error configuring FPGA");
-+		dev_err(priv->dev, "Error configuring FPGA\n");
- 		err = -EFAULT;
- 	}
- 
-@@ -426,7 +426,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	priv->slcr = syscon_regmap_lookup_by_phandle(dev->of_node,
- 		"syscon");
- 	if (IS_ERR(priv->slcr)) {
--		dev_err(dev, "unable to get zynq-slcr regmap");
-+		dev_err(dev, "unable to get zynq-slcr regmap\n");
- 		return PTR_ERR(priv->slcr);
- 	}
- 
-@@ -434,26 +434,26 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 
- 	priv->irq = platform_get_irq(pdev, 0);
- 	if (priv->irq < 0) {
--		dev_err(dev, "No IRQ available");
-+		dev_err(dev, "No IRQ available\n");
- 		return priv->irq;
+-	if (count <= 0)
+-		return -EINVAL;
+-
+ 	/* Write out the complete 32-bit chunks. */
+ 	while (count >= sizeof(u32)) {
+-		socfpga_fpga_data_writel(priv, buffer_32[i++]);
++		socfpga_fpga_data_writel(priv, buf[i++]);
+ 		count -= sizeof(u32);
  	}
  
- 	err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0,
- 			       dev_name(dev), priv);
- 	if (err) {
--		dev_err(dev, "unable to request IRQ");
-+		dev_err(dev, "unable to request IRQ\n");
- 		return err;
+ 	/* Write out remaining non 32-bit chunks. */
+ 	switch (count) {
+ 	case 3:
+-		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x00ffffff);
++		socfpga_fpga_data_writel(priv, buf[i++] & 0x00ffffff);
+ 		break;
+ 	case 2:
+-		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x0000ffff);
++		socfpga_fpga_data_writel(priv, buf[i++] & 0x0000ffff);
+ 		break;
+ 	case 1:
+-		socfpga_fpga_data_writel(priv, buffer_32[i++] & 0x000000ff);
+-		break;
+-	case 0:
++		socfpga_fpga_data_writel(priv, buf[i++] & 0x000000ff);
+ 		break;
+ 	default:
+-		/* This will never happen. */
+-		return -EFAULT;
++		break;
  	}
++}
++
++static int socfpga_fpga_ops_configure_write(struct fpga_manager *mgr,
++					    struct sg_table *sgt)
++{
++	struct socfpga_fpga_priv *priv = mgr->priv;
++	struct sg_mapping_iter miter;
++
++	sg_miter_start(&miter, sgt->sgl, sgt->nents, SG_MITER_FROM_SG);
++
++	while (sg_miter_next(&miter))
++		socfpga_write_buf(priv, miter.addr, miter.length);
  
- 	priv->clk = devm_clk_get(dev, "ref_clk");
- 	if (IS_ERR(priv->clk)) {
--		dev_err(dev, "input clock not found");
-+		dev_err(dev, "input clock not found\n");
- 		return PTR_ERR(priv->clk);
- 	}
++	sg_miter_stop(&miter);
+ 	return 0;
+ }
  
- 	err = clk_prepare_enable(priv->clk);
- 	if (err) {
--		dev_err(dev, "unable to enable clock");
-+		dev_err(dev, "unable to enable clock\n");
- 		return err;
- 	}
+@@ -545,8 +563,8 @@ static enum fpga_mgr_states socfpga_fpga_ops_state(struct fpga_manager *mgr)
  
-@@ -465,7 +465,7 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
- 				&zynq_fpga_ops, priv);
- 	if (err) {
--		dev_err(dev, "unable to register FPGA manager");
-+		dev_err(dev, "unable to register FPGA manager\n");
- 		clk_unprepare(priv->clk);
- 		return err;
- 	}
+ static const struct fpga_manager_ops socfpga_fpga_ops = {
+ 	.state = socfpga_fpga_ops_state,
+-	.write_init = socfpga_fpga_ops_configure_init,
+-	.write = socfpga_fpga_ops_configure_write,
++	.write_init_sg = socfpga_fpga_ops_configure_init,
++	.write_sg = socfpga_fpga_ops_configure_write,
+ 	.write_complete = socfpga_fpga_ops_configure_complete,
+ };
+ 
 -- 
 2.1.4
