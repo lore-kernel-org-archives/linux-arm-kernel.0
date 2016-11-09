@@ -1,50 +1,60 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 09 Nov 2016 10:48:43 +0000
-Subject: [PATCH] arm64: acpi: arch_apei_get_mem_attributes() should use
- memblock
-In-Reply-To: <168e341f-2377-2962-34a4-63043d5ab6d6@codeaurora.org>
-References: <20161108102714.29931-1-james.morse@arm.com>
- <168e341f-2377-2962-34a4-63043d5ab6d6@codeaurora.org>
-Message-ID: <5822FF0B.2080109@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 9 Nov 2016 10:56:24 +0000
+Subject: KASAN & the vmalloc area
+In-Reply-To: <CACT4Y+ZSgfK-=wFFswMmQ+636Arz4kgwxdxz+FvEJHXvjZ8ckg@mail.gmail.com>
+References: <20161108190302.GH15297@leverpostej>
+ <CACT4Y+ZSgfK-=wFFswMmQ+636Arz4kgwxdxz+FvEJHXvjZ8ckg@mail.gmail.com>
+Message-ID: <20161109105624.GA17020@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On Tue, Nov 08, 2016 at 02:09:27PM -0800, Dmitry Vyukov wrote:
+> On Tue, Nov 8, 2016 at 11:03 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > When KASAN is selected, we allocate shadow for the whole vmalloc area,
+> > using common zero pte, pmd, pud tables. Walking over these in the ptdump
+> > code takes a *very* long time (I've seen up to 15 minutes with
+> > KASAN_OUTLINE enabled). For DEBUG_WX [3], this means boot hangs for that
+> > long, too.
 
-On 08/11/16 18:41, Baicar, Tyler wrote:
-> This patch seems fine, APEI/GHES functionality still works properly for me.
-> I tested on a 4.8 kernel with the patch you mention below from Jonathan and
-> my patchset https://lkml.org/lkml/2016/10/21/746
+[...]
+ 
+> I've seen the same iteration slowness problem on x86 with
+> CONFIG_DEBUG_RODATA which walks all pages. The is about 1 minute, but
+> it is enough to trigger rcu stall warning.
 
-What are the memory attributes of the region your firmware writes the error
-status data to?
+Interesting; do you know where that happens? I can't spot any obvious
+case where we'd have to walk all the page tables for DEBUG_RODATA.
 
-I guess its attributes in the UEFI memory map must be 'NC' or <empty>. In which
-case the current default of Device_nGnRnE isn't so wrong. Otherwise your
-firmware must be doing some cache cleaning, which shouldn't be necessary.
+> The zero pud and vmalloc-ed stacks looks like different problems.
+> To overcome the slowness we could map zero shadow for vmalloc area lazily.
+> However for vmalloc-ed stacks we need to map actual memory, because
+> stack instrumentation will read/write into the shadow. 
 
+Sure. The point I was trying to make is that there' be fewer page tables
+to walk (unless the vmalloc area was exhausted), assuming we also lazily
+mapped the common zero shadow for the vmalloc area.
 
-> My only question is when you say that this may be called from an NMI context.
-> arch_apei_get_mem_attributes() only gets called from ghes_ioremap_pfn_irq()
-> which only appears to get called if we are not in an NMI context.
+> One downside here is that vmalloc shadow can be as large as 1:1 (if we
+> allocate 1 page in vmalloc area we need to allocate 1 page for
+> shadow).
 
-Yes, that's broken too.
-ghes_ioremap_pfn_nmi() assumes PAGE_KERNEL. If firmware writes the error data
-via a non-cachable mapping, it will tell us this via the UEFI memory map, which
-we currently misread.
+I thought per prior discussion we'd only need to allocate new pages for
+the stacks in the vmalloc region, and we could re-use the zero pages?
 
-I have patches to fix this too, but it isn't needed until someone turns on
-CONFIG_HAVE_ACPI_APEI_NMI on arm64 (or ia64...).
+... or are you trying to quantify the cost of the page tables?
 
+> Re slowness: could we just skip the KASAN zero puds (the top level)
+> while walking? Can they be interesting for anybody?
 
-> So can this really be called from an NMI context?
+They're interesting for the ptdump case (which allows privileged users
+to dump the tables via /sys/kernel/debug/kernel_page_tables). I've seen
+25+ minute hangs there.
 
-Not today, but it may be in the future. Re-mapping the EFI memory map to read it
-is possible in the short term, but generates more work if we ever want to
-support CONFIG_HAVE_ACPI_APEI_NMI. I implied all this into the word 'may', I
-will try to be clearer next time!
+> We can just pretend that they are not there. Looks like a trivial
+> solution for the problem at hand.
 
+For the boot time hang it's option. Though I'd prefer that the sanity
+checks applied to all of tables, shadow regions included.
 
 Thanks,
-
-James
+Mark.
