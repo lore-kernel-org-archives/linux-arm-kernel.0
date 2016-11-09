@@ -1,41 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 9 Nov 2016 18:19:06 +0100
-Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <1626072.dpWPnWgGl9@wuerfel>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <CAMuHMdV4HG0aOr4Qp_OZXU=3jLeOJ2QaMKp09a3v4489ABbRcA@mail.gmail.com>
- <CAMuHMdUmpMpizZpq1V-sLA8Cf2q5oOgOVxGOvKXqTHvn+Mj7Tg@mail.gmail.com>
- <1626072.dpWPnWgGl9@wuerfel>
-Message-ID: <CAMuHMdVrdjqWruY=dBjWP=jZuZkc=aTBTMijOyTDfZFcaD_jsA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 9 Nov 2016 18:20:21 +0100
+Subject: [PATCH v15 4/4] arm: dts: mt2701: Use real clock for UARTs
+In-Reply-To: <1478245388-1412-5-git-send-email-erin.lo@mediatek.com>
+References: <1478245388-1412-1-git-send-email-erin.lo@mediatek.com>
+ <1478245388-1412-5-git-send-email-erin.lo@mediatek.com>
+Message-ID: <eece3eba-fd24-ad96-ca20-c08403894b00@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Wed, Nov 9, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, November 9, 2016 2:34:33 PM CET Geert Uytterhoeven wrote:
->> > And Samsung.
->> > Shall I create the immutable branch now?
->>
->> Arnd: are you happy with the new patches and changes?
+
+On 11/04/2016 08:43 AM, Erin Lo wrote:
+> We used to use a fixed rate clock for the UARTs. Now that we have clock
+> support we can associate the correct clocks to the UARTs and drop the
+> 26MHz fixed rate UART clock.
 >
-> I still had some comments for patch 7, but that shouldn't stop
-> you from creating a branch for the first three so everyone can
-> build on top of that.
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 
-Thanks!
+Applied, thanks.
 
-What about patch [4/7]?
-Haven't you received it? Your address was in the To-line for all 7 patches.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> ---
+>  arch/arm/boot/dts/mt2701.dtsi | 18 ++++++++----------
+>  1 file changed, 8 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index c9a8dbf..7eab6f4 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -73,12 +73,6 @@
+>  		#clock-cells = <0>;
+>  	};
+>
+> -	uart_clk: dummy26m {
+> -		compatible = "fixed-clock";
+> -		clock-frequency = <26000000>;
+> -		#clock-cells = <0>;
+> -	};
+> -
+>  	clk26m: oscillator at 0 {
+>  		compatible = "fixed-clock";
+>  		#clock-cells = <0>;
+> @@ -186,7 +180,8 @@
+>  			     "mediatek,mt6577-uart";
+>  		reg = <0 0x11002000 0 0x400>;
+>  		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+> -		clocks = <&uart_clk>;
+> +		clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
+> +		clock-names = "baud", "bus";
+>  		status = "disabled";
+>  	};
+>
+> @@ -195,7 +190,8 @@
+>  			     "mediatek,mt6577-uart";
+>  		reg = <0 0x11003000 0 0x400>;
+>  		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
+> -		clocks = <&uart_clk>;
+> +		clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
+> +		clock-names = "baud", "bus";
+>  		status = "disabled";
+>  	};
+>
+> @@ -204,7 +200,8 @@
+>  			     "mediatek,mt6577-uart";
+>  		reg = <0 0x11004000 0 0x400>;
+>  		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+> -		clocks = <&uart_clk>;
+> +		clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
+> +		clock-names = "baud", "bus";
+>  		status = "disabled";
+>  	};
+>
+> @@ -213,7 +210,8 @@
+>  			     "mediatek,mt6577-uart";
+>  		reg = <0 0x11005000 0 0x400>;
+>  		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
+> -		clocks = <&uart_clk>;
+> +		clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
+> +		clock-names = "baud", "bus";
+>  		status = "disabled";
+>  	};
+>  };
+>
