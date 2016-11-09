@@ -1,37 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 9 Nov 2016 11:20:00 +0000
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <1478646779.7430.66.camel@kernel.crashing.org>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 9 Nov 2016 11:29:46 +0000
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <2479288.4UmF9SBrq1@wuerfel>
 References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
- <20161108114953.GB15297@leverpostej>
- <1478646779.7430.66.camel@kernel.crashing.org>
-Message-ID: <20161109111959.GB17020@leverpostej>
+ <8adfe182-4939-479d-6013-25ec40021b20@huawei.com>
+ <20161108164948.GG20591@arm.com> <2479288.4UmF9SBrq1@wuerfel>
+Message-ID: <6dee9821-5145-2113-e391-6317e4533c06@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 10:12:59AM +1100, Benjamin Herrenschmidt wrote:
-> On Tue, 2016-11-08 at 11:49 +0000, Mark Rutland wrote:
-> > I believe that we could theoretically have multiple independent LPC/ISA
-> > busses, as is possible with PCI on !x86 systems. If the current ISA code
-> > assumes a singleton bus, I think that's something that needs to be fixed
-> > up more generically.
-> > 
-> > I don't see why we should need any architecture-specific code here. Why
-> > can we not fix up the ISA bus code in drivers/of/address.c such that it
-> > handles multiple ISA bus instances, and translates all sub-device
-> > addresses relative to the specific bus instance?
-> 
-> What in that code prevents that today ?
+On 08/11/2016 22:35, Arnd Bergmann wrote:
+> On Tuesday, November 8, 2016 4:49:49 PM CET Will Deacon wrote:
+>> On Tue, Nov 08, 2016 at 04:33:44PM +0000, John Garry wrote:
+>>> On 08/11/2016 16:12, Will Deacon wrote:
+>>>> On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
+>
+>>>> Is there no way to make this slightly more generic, so that it can be
+>>>> re-used elsewhere? For example, if struct extio_ops was common, then
+>>>> you could have the singleton (which maybe should be an interval tree?),
+>>>> type definition, setter function and the BUILD_EXTIO invocations
+>>>> somewhere generic, rather than squirelled away in the arch backend.
+>>>>
+>>> The concern would be that some architecture which uses generic higher-level
+>>> ISA accessor ops, but have IO space, could be affected.
+>>
+>> You're already adding a Kconfig symbol for this stuff, so you can keep
+>> that if you don't want it on other architectures. I'm just arguing that
+>> plumbing drivers directly into arch code via arm64_set_extops is not
+>> something I'm particularly fond of, especially when it looks like it
+>> could be avoided with a small amount of effort.
+>
+> Agreed, I initially suggested putting this into arch/arm64/, but there isn't
+> really a reason why it couldn't just live in lib/ with the header file
+> bits moved to include/asm-generic/io.h which we already use.
+>
 
-It appears I was mistaken w.r.t. the singleton comment. We can already
-translate MMIO->MMIO addresses per-instance (in the presence of a ranges
-property).
+Right, Zhichang will check the logistics of this. The generic io.h is 
+quite clean, so as long as you don't mind new build switches of this 
+nature being added, it should be ok; and we'll plan on moving extio.h 
+into include/asm-generic as well.
 
-The big change would be to handle !MMIO translations, for which we'd
-need a runtime registry of ISA bus instance to find the relevant
-accessor ops and instance-specific data.
+Cheers,
+John
 
-Thanks,
-Mark.
+> 	Arnd
+>
+> .
+>
