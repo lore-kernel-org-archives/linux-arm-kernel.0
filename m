@@ -1,96 +1,43 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Tue, 8 Nov 2016 21:52:33 -0500
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161108163508.1bcae0c2@t450s.home>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home> <20161108024559.GA20591@arm.com>
- <20161108202922.GC15676@cbox> <20161108163508.1bcae0c2@t450s.home>
-Message-ID: <58228F71.6020108@redhat.com>
+From: longpeng2@huawei.com (Longpeng(Mike))
+Date: Wed, 9 Nov 2016 10:50:14 +0800
+Subject: [PATCH] arm/arm64: KVM: clean up useless code in kvm_timer_enable
+Message-ID: <1478659814-364872-1-git-send-email-longpeng2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2016 06:35 PM, Alex Williamson wrote:
-> On Tue, 8 Nov 2016 21:29:22 +0100
-> Christoffer Dall <christoffer.dall@linaro.org> wrote:
->
->> Hi Will,
->>
->> On Tue, Nov 08, 2016 at 02:45:59AM +0000, Will Deacon wrote:
->>> Hi all,
->>>
->>> I figured this was a reasonable post to piggy-back on for the LPC minutes
->>> relating to guest MSIs on arm64.
->>>
->>> On Thu, Nov 03, 2016 at 10:02:05PM -0600, Alex Williamson wrote:
->>>> We can always have QEMU reject hot-adding the device if the reserved
->>>> region overlaps existing guest RAM, but I don't even really see how we
->>>> advise users to give them a reasonable chance of avoiding that
->>>> possibility.  Apparently there are also ARM platforms where MSI pages
->>>> cannot be remapped to support the previous programmable user/VM
->>>> address, is it even worthwhile to support those platforms?  Does that
->>>> decision influence whether user programmable MSI reserved regions are
->>>> really a second class citizen to fixed reserved regions?  I expect
->>>> we'll be talking about this tomorrow morning, but I certainly haven't
->>>> come up with any viable solutions to this.  Thanks,
->>>
->>> At LPC last week, we discussed guest MSIs on arm64 as part of the PCI
->>> microconference. I presented some slides to illustrate some of the issues
->>> we're trying to solve:
->>>
->>>    http://www.willdeacon.ukfsn.org/bitbucket/lpc-16/msi-in-guest-arm64.pdf
->>>
->>> Punit took some notes (thanks!) on the etherpad here:
->>>
->>>    https://etherpad.openstack.org/p/LPC2016_PCI
->>>
->>> although the discussion was pretty lively and jumped about, so I've had
->>> to go from memory where the notes didn't capture everything that was
->>> said.
->>>
->>> To summarise, arm64 platforms differ in their handling of MSIs when compared
->>> to x86:
->>>
->>>    1. The physical memory map is not standardised (Jon pointed out that
->>>       this is something that was realised late on)
->>>    2. MSIs are usually treated the same as DMA writes, in that they must be
->>>       mapped by the SMMU page tables so that they target a physical MSI
->>>       doorbell
->>>    3. On some platforms, MSIs bypass the SMMU entirely (e.g. due to an MSI
->>>       doorbell built into the PCI RC)
->>>    4. Platforms typically have some set of addresses that abort before
->>>       reaching the SMMU (e.g. because the PCI identifies them as P2P).
->>>
->>> All of this means that userspace (QEMU) needs to identify the memory
->>> regions corresponding to points (3) and (4) and ensure that they are
->>> not allocated in the guest physical (IPA) space. For platforms that can
->>> remap the MSI doorbell as in (2), then some space also needs to be
->>> allocated for that.
->>>
->>> Rather than treat these as separate problems, a better interface is to
->>> tell userspace about a set of reserved regions, and have this include
->>> the MSI doorbell, irrespective of whether or not it can be remapped.
->>
->> Is my understanding correct, that you need to tell userspace about the
->> location of the doorbell (in the IOVA space) in case (2), because even
->> though the configuration of the device is handled by the (host) kernel
->> through trapping of the BARs, we have to avoid the VFIO user programming
->> the device to create other DMA transactions to this particular address,
->> since that will obviously conflict and either not produce the desired
->> DMA transactions or result in unintended weird interrupts?
->
-> Correct, if the MSI doorbell IOVA range overlaps RAM in the VM, then
-> it's potentially a DMA target and we'll get bogus data on DMA read from
-> the device, and lose data and potentially trigger spurious interrupts on
-> DMA write from the device.  Thanks,
->
-> Alex
->
-That's b/c the MSI doorbells are not positioned *above* the SMMU, i.e.,
-they address match before the SMMU checks are done.  if
-all DMA addrs had to go through SMMU first, then the DMA access could
-be ignored/rejected.
-For bare-metal, memory can't be put in the same place as MSI addrs, or
-DMA could never reach it.  So, only a virt issue, unless the VMs mem address
-range mimic the host layout.
+1) Since commit:41a54482 changed timer enabled variable to per-vcpu,
+   the correlative comment in kvm_timer_enable is useless now.
 
-- Don
+2) After the kvm module init successfully, the timecounter is always
+   non-null, so we can remove the checking of timercounter.
+
+Signed-off-by: Longpeng(Mike) <longpeng2@huawei.com>
+---
+ virt/kvm/arm/arch_timer.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 27a1f63..17b8fa5 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -498,17 +498,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 	if (ret)
+ 		return ret;
+ 
+-
+-	/*
+-	 * There is a potential race here between VCPUs starting for the first
+-	 * time, which may be enabling the timer multiple times.  That doesn't
+-	 * hurt though, because we're just setting a variable to the same
+-	 * variable that it already was.  The important thing is that all
+-	 * VCPUs have the enabled variable set, before entering the guest, if
+-	 * the arch timers are enabled.
+-	 */
+-	if (timecounter)
+-		timer->enabled = 1;
++	timer->enabled = 1;
+ 
+ 	return 0;
+ }
+-- 
+1.8.3.1
