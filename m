@@ -1,30 +1,30 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  9 Nov 2016 08:44:10 -0800
-Subject: [PATCH] i.MX: Kconfig: Drop errata 769419 for Vybrid
-Message-ID: <1478709850-9361-1-git-send-email-andrew.smirnov@gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 9 Nov 2016 11:45:31 -0500
+Subject: [PATCH] ata: xgene: Enable NCQ support for APM X-Gene SATA
+ controller hardware v1.1
+In-Reply-To: <CAFd313x-mXpy0N3aKx2rfoag1FNOrN-LzKb5UHkY2L+GGc0B-A@mail.gmail.com>
+References: <1469524857-3720-1-git-send-email-rsahu@apm.com>
+ <CAFd313x-mXpy0N3aKx2rfoag1FNOrN-LzKb5UHkY2L+GGc0B-A@mail.gmail.com>
+Message-ID: <20161109164531.GA14630@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, VF610 uses revision r3p2 of the L2C-310
-block, same as i.MX6Q+, which does not require a software workaround for
-ARM errata 769419.
+Hello,
 
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- arch/arm/mach-imx/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+On Wed, Sep 14, 2016 at 04:15:00PM +0530, Rameshwar Sahu wrote:
+> > @@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device
+> > *pdev)
+> >                                 dev_warn(&pdev->dev, "%s: Error reading
+> > device info. Assume version1\n",
+> >                                         __func__);
+> >                                 version = XGENE_AHCI_V1;
+> > -                       } else if (info->valid & ACPI_VALID_CID) {
+> > -                               version = XGENE_AHCI_V2;
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 9155b63..936c59d 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -557,7 +557,6 @@ config SOC_VF610
- 	bool "Vybrid Family VF610 support"
- 	select ARM_GIC if ARCH_MULTI_V7
- 	select PINCTRL_VF610
--	select PL310_ERRATA_769419 if CACHE_L2X0
- 
- 	help
- 	  This enables support for Freescale Vybrid VF610 processor.
+Can you please explain this part a bit?  Everything else looks good to
+me.
+
+Thanks.
+
 -- 
-2.5.5
+tejun
