@@ -1,293 +1,279 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Wed, 9 Nov 2016 16:50:44 +0000
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8F27C0@lhreml507-mbx>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
- <20161109113955.GD10219@e106497-lin.cambridge.arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F27C0@lhreml507-mbx>
-Message-ID: <20161109165044.GE10219@e106497-lin.cambridge.arm.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 9 Nov 2016 08:51:58 -0800
+Subject: [PATCH] mfd: qcom-pm8xxx: Clean up PM8XXX namespace
+In-Reply-To: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+References: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20161109165158.GR25787@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 04:16:17PM +0000, Gabriele Paoloni wrote:
-> Hi Liviu
-> 
-> Thanks for reviewing
-> 
+On Wed 26 Oct 06:10 PDT 2016, Linus Walleij wrote:
 
-[removed some irrelevant part of discussion, avoid crazy formatting]
+> The Kconfig and file naming for the PM8xxx driver is totally
+> confusing:
+> 
+> - Kconfig options MFD_PM8XXX and MFD_PM8921_CORE, some in-kernel
+>   users depending on or selecting either at random.
+> - A driver file named pm8921-core.c even if it is indeed
+>   used by the whole PM8xxx family of chips.
+> - An irqchip named pm8xxx since it was (I guess) realized that
+>   the driver was generic for all pm8xxx PMICs.
+> 
+> As I may want to add support for PM8901 this is starting to get
+> really messy. Fix this situation by:
+> 
+> - Remove the MFD_PM8921_CORE symbol and rely solely on MFD_PM8XXX
+>   and convert all users, including LEDs Kconfig and ARM defconfigs
+>   for qcom and multi_v7 to use that single symbol.
+> - Renaming the driver to qcom-pm8xxx.c to fit along the two
+>   other qcom* prefixed drivers.
+> - Rename functions withing the driver from 8921 to 8xxx to
+>   indicate it is generic.
+> - Just drop the =m config from the pxa_defconfig, I have no clue
+>   why it is even there, it is not a Qualcomm platform. (Possibly
+>   older Kconfig noise from saveconfig.)
+> 
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-> > > +/**
-> > > + * addr_is_indirect_io - check whether the input taddr is for
-> > indirectIO.
-> > > + * @taddr: the io address to be checked.
-> > > + *
-> > > + * Returns 1 when taddr is in the range; otherwise return 0.
-> > > + */
-> > > +int addr_is_indirect_io(u64 taddr)
-> > > +{
-> > > +	if (arm64_extio_ops->start > taddr || arm64_extio_ops->end <
-> > taddr)
-> > 
-> > start >= taddr ?
-> 
-> Nope... if  (taddr < arm64_extio_ops->start || taddr > arm64_extio_ops->end)
-> then taddr is outside the range [start; end] and will return 0; otherwise
-> it will return 1...
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Oops, sorry, did not pay attention to the returned value. The check is
-correct as it is, no need to change then.
+Regards,
+Bjorn
 
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I do NOT think it is a good idea to try to split this commit up,
+> I rather prefer that Lee simply merge it into MFD.
 > 
-> > 
-> > > +		return 0;
-> > > +
-> > > +	return 1;
-> > > +}
-> > >
-> > >  BUILD_EXTIO(b, u8)
-> > >
-> > > diff --git a/drivers/of/address.c b/drivers/of/address.c
-> > > index 02b2903..cc2a05d 100644
-> > > --- a/drivers/of/address.c
-> > > +++ b/drivers/of/address.c
-> > > @@ -479,6 +479,50 @@ static int of_empty_ranges_quirk(struct
-> > device_node *np)
-> > >  	return false;
-> > >  }
-> > >
-> > > +
-> > > +/*
-> > > + * of_isa_indirect_io - get the IO address from some isa reg
-> > property value.
-> > > + *	For some isa/lpc devices, no ranges property in ancestor node.
-> > > + *	The device addresses are described directly in their regs
-> > property.
-> > > + *	This fixup function will be called to get the IO address of
-> > isa/lpc
-> > > + *	devices when the normal of_translation failed.
-> > > + *
-> > > + * @parent:	points to the parent dts node;
-> > > + * @bus:		points to the of_bus which can be used to parse
-> > address;
-> > > + * @addr:	the address from reg property;
-> > > + * @na:		the address cell counter of @addr;
-> > > + * @presult:	store the address paresed from @addr;
-> > > + *
-> > > + * return 1 when successfully get the I/O address;
-> > > + * 0 will return for some failures.
-> > 
-> > Bah, you are returning a signed int, why 0 for failure? Return a
-> > negative value with
-> > error codes. Otherwise change the return value into a bool.
+> The reason is that files like qcom_defconfig already contain both
+> the right symbols, but the MFD_PM8921_CORE symbol cannot be removed
+> until this rename has happened, whereas multi_v7_defconfig needs
+> it added etc, and this is just a clean nice cut.
 > 
-> Yes we'll move to bool
+> Jacek, ARM SoC person: please ACK this patch to get merged into
+> MFD.
+> ---
+>  arch/arm/configs/multi_v7_defconfig          |  2 +-
+>  arch/arm/configs/pxa_defconfig               |  1 -
+>  arch/arm/configs/qcom_defconfig              |  1 -
+>  drivers/leds/Kconfig                         |  2 +-
+>  drivers/mfd/Kconfig                          | 14 ++++------
+>  drivers/mfd/Makefile                         |  2 +-
+>  drivers/mfd/{pm8921-core.c => qcom-pm8xxx.c} | 42 ++++++++++++++--------------
+>  7 files changed, 29 insertions(+), 35 deletions(-)
+>  rename drivers/mfd/{pm8921-core.c => qcom-pm8xxx.c} (92%)
 > 
-> > 
-> > > + */
-> > > +static int of_get_isa_indirect_io(struct device_node *parent,
-> > > +				struct of_bus *bus, __be32 *addr,
-> > > +				int na, u64 *presult)
-> > > +{
-> > > +	unsigned int flags;
-> > > +	unsigned int rlen;
-> > > +
-> > > +	/* whether support indirectIO */
-> > > +	if (!indirect_io_enabled())
-> > > +		return 0;
-> > > +
-> > > +	if (!of_bus_isa_match(parent))
-> > > +		return 0;
-> > > +
-> > > +	flags = bus->get_flags(addr);
-> > > +	if (!(flags & IORESOURCE_IO))
-> > > +		return 0;
-> > > +
-> > > +	/* there is ranges property, apply the normal translation
-> > directly. */
-> > 
-> > s/there is ranges/if we have a 'ranges'/
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 437d0740dec6..4280de7b9b4e 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -489,7 +489,7 @@ CONFIG_MFD_MAX8907=y
+>  CONFIG_MFD_MAX8997=y
+>  CONFIG_MFD_MAX8998=y
+>  CONFIG_MFD_RK808=y
+> -CONFIG_MFD_PM8921_CORE=y
+> +CONFIG_MFD_PM8XXX=y
+>  CONFIG_MFD_QCOM_RPM=y
+>  CONFIG_MFD_SPMI_PMIC=y
+>  CONFIG_MFD_SEC_CORE=y
+> diff --git a/arch/arm/configs/pxa_defconfig b/arch/arm/configs/pxa_defconfig
+> index a016ecc0084b..e4314b1227a3 100644
+> --- a/arch/arm/configs/pxa_defconfig
+> +++ b/arch/arm/configs/pxa_defconfig
+> @@ -411,7 +411,6 @@ CONFIG_MFD_MAX77693=y
+>  CONFIG_MFD_MAX8907=m
+>  CONFIG_EZX_PCAP=y
+>  CONFIG_UCB1400_CORE=m
+> -CONFIG_MFD_PM8921_CORE=m
+>  CONFIG_MFD_SEC_CORE=y
+>  CONFIG_MFD_PALMAS=y
+>  CONFIG_MFD_TPS65090=y
+> diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+> index c2dff4fd5fc4..74e9cd759b99 100644
+> --- a/arch/arm/configs/qcom_defconfig
+> +++ b/arch/arm/configs/qcom_defconfig
+> @@ -119,7 +119,6 @@ CONFIG_POWER_RESET=y
+>  CONFIG_POWER_RESET_MSM=y
+>  CONFIG_THERMAL=y
+>  CONFIG_MFD_PM8XXX=y
+> -CONFIG_MFD_PM8921_CORE=y
+>  CONFIG_MFD_QCOM_RPM=y
+>  CONFIG_MFD_SPMI_PMIC=y
+>  CONFIG_REGULATOR=y
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index 7a628c6516f6..86bb1515a00e 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -645,7 +645,7 @@ config LEDS_VERSATILE
+>  
+>  config LEDS_PM8058
+>  	tristate "LED Support for the Qualcomm PM8058 PMIC"
+> -	depends on MFD_PM8921_CORE
+> +	depends on MFD_PM8XXX
+>  	depends on LEDS_CLASS
+>  	help
+>  	  Choose this option if you want to use the LED drivers in
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index c6df6442ba2b..1ed0584f494e 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -756,24 +756,20 @@ config UCB1400_CORE
+>  	  module will be called ucb1400_core.
+>  
+>  config MFD_PM8XXX
+> -	tristate
+> -
+> -config MFD_PM8921_CORE
+> -	tristate "Qualcomm PM8921 PMIC chip"
+> +	tristate "Qualcomm PM8xxx PMIC chips driver"
+>  	depends on (ARM || HEXAGON)
+>  	select IRQ_DOMAIN
+>  	select MFD_CORE
+> -	select MFD_PM8XXX
+>  	select REGMAP
+>  	help
+>  	  If you say yes to this option, support will be included for the
+> -	  built-in PM8921 PMIC chip.
+> +	  built-in PM8xxx PMIC chips.
+>  
+> -	  This is required if your board has a PM8921 and uses its features,
+> +	  This is required if your board has a PM8xxx and uses its features,
+>  	  such as: MPPs, GPIOs, regulators, interrupts, and PWM.
+>  
+> -	  Say M here if you want to include support for PM8921 chip as a module.
+> -	  This will build a module called "pm8921-core".
+> +	  Say M here if you want to include support for PM8xxx chips as a
+> +	  module. This will build a module called "pm8xxx-core".
+>  
+>  config MFD_QCOM_RPM
+>  	tristate "Qualcomm Resource Power Manager (RPM)"
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 9834e669d985..7bb5a50127cb 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -172,7 +172,7 @@ obj-$(CONFIG_MFD_SI476X_CORE)	+= si476x-core.o
+>  
+>  obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
+>  obj-$(CONFIG_MFD_OMAP_USB_HOST)	+= omap-usb-host.o omap-usb-tll.o
+> -obj-$(CONFIG_MFD_PM8921_CORE) 	+= pm8921-core.o ssbi.o
+> +obj-$(CONFIG_MFD_PM8XXX) 	+= qcom-pm8xxx.o ssbi.o
+>  obj-$(CONFIG_MFD_QCOM_RPM)	+= qcom_rpm.o
+>  obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
+>  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
+> diff --git a/drivers/mfd/pm8921-core.c b/drivers/mfd/qcom-pm8xxx.c
+> similarity index 92%
+> rename from drivers/mfd/pm8921-core.c
+> rename to drivers/mfd/qcom-pm8xxx.c
+> index 0e3a2ea25942..7f9620ec61e8 100644
+> --- a/drivers/mfd/pm8921-core.c
+> +++ b/drivers/mfd/qcom-pm8xxx.c
+> @@ -53,7 +53,7 @@
+>  #define REG_HWREV		0x002  /* PMIC4 revision */
+>  #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
+>  
+> -#define PM8921_NR_IRQS		256
+> +#define PM8XXX_NR_IRQS		256
+>  
+>  struct pm_irq_chip {
+>  	struct regmap		*regmap;
+> @@ -308,22 +308,22 @@ static const struct regmap_config ssbi_regmap_config = {
+>  	.reg_write = ssbi_reg_write
+>  };
+>  
+> -static const struct of_device_id pm8921_id_table[] = {
+> +static const struct of_device_id pm8xxx_id_table[] = {
+>  	{ .compatible = "qcom,pm8018", },
+>  	{ .compatible = "qcom,pm8058", },
+>  	{ .compatible = "qcom,pm8921", },
+>  	{ }
+>  };
+> -MODULE_DEVICE_TABLE(of, pm8921_id_table);
+> +MODULE_DEVICE_TABLE(of, pm8xxx_id_table);
+>  
+> -static int pm8921_probe(struct platform_device *pdev)
+> +static int pm8xxx_probe(struct platform_device *pdev)
+>  {
+>  	struct regmap *regmap;
+>  	int irq, rc;
+>  	unsigned int val;
+>  	u32 rev;
+>  	struct pm_irq_chip *chip;
+> -	unsigned int nirqs = PM8921_NR_IRQS;
+> +	unsigned int nirqs = PM8XXX_NR_IRQS;
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0)
+> @@ -384,46 +384,46 @@ static int pm8921_probe(struct platform_device *pdev)
+>  	return rc;
+>  }
+>  
+> -static int pm8921_remove_child(struct device *dev, void *unused)
+> +static int pm8xxx_remove_child(struct device *dev, void *unused)
+>  {
+>  	platform_device_unregister(to_platform_device(dev));
+>  	return 0;
+>  }
+>  
+> -static int pm8921_remove(struct platform_device *pdev)
+> +static int pm8xxx_remove(struct platform_device *pdev)
+>  {
+>  	int irq = platform_get_irq(pdev, 0);
+>  	struct pm_irq_chip *chip = platform_get_drvdata(pdev);
+>  
+> -	device_for_each_child(&pdev->dev, NULL, pm8921_remove_child);
+> +	device_for_each_child(&pdev->dev, NULL, pm8xxx_remove_child);
+>  	irq_set_chained_handler_and_data(irq, NULL, NULL);
+>  	irq_domain_remove(chip->irqdomain);
+>  
+>  	return 0;
+>  }
+>  
+> -static struct platform_driver pm8921_driver = {
+> -	.probe		= pm8921_probe,
+> -	.remove		= pm8921_remove,
+> +static struct platform_driver pm8xxx_driver = {
+> +	.probe		= pm8xxx_probe,
+> +	.remove		= pm8xxx_remove,
+>  	.driver		= {
+> -		.name	= "pm8921-core",
+> -		.of_match_table = pm8921_id_table,
+> +		.name	= "pm8xxx-core",
+> +		.of_match_table = pm8xxx_id_table,
+>  	},
+>  };
+>  
+> -static int __init pm8921_init(void)
+> +static int __init pm8xxx_init(void)
+>  {
+> -	return platform_driver_register(&pm8921_driver);
+> +	return platform_driver_register(&pm8xxx_driver);
+>  }
+> -subsys_initcall(pm8921_init);
+> +subsys_initcall(pm8xxx_init);
+>  
+> -static void __exit pm8921_exit(void)
+> +static void __exit pm8xxx_exit(void)
+>  {
+> -	platform_driver_unregister(&pm8921_driver);
+> +	platform_driver_unregister(&pm8xxx_driver);
+>  }
+> -module_exit(pm8921_exit);
+> +module_exit(pm8xxx_exit);
+>  
+>  MODULE_LICENSE("GPL v2");
+> -MODULE_DESCRIPTION("PMIC 8921 core driver");
+> +MODULE_DESCRIPTION("PMIC 8xxx core driver");
+>  MODULE_VERSION("1.0");
+> -MODULE_ALIAS("platform:pm8921-core");
+> +MODULE_ALIAS("platform:pm8xxx-core");
+> -- 
+> 2.7.4
 > 
-> Thanks for spotting this
 > 
-> > 
-> > > +	if (of_get_property(parent, "ranges", &rlen))
-> > > +		return 0;
-> > > +
-> > > +	*presult = of_read_number(addr + 1, na - 1);
-> > > +	/* this fixup is only valid for specific I/O range. */
-> > > +	return addr_is_indirect_io(*presult);
-> > > +}
-> > > +
-> > >  static int of_translate_one(struct device_node *parent, struct
-> > of_bus *bus,
-> > >  			    struct of_bus *pbus, __be32 *addr,
-> > >  			    int na, int ns, int pna, const char *rprop)
-> > > @@ -595,6 +639,15 @@ static u64 __of_translate_address(struct
-> > device_node *dev,
-> > >  			result = of_read_number(addr, na);
-> > >  			break;
-> > >  		}
-> > > +		/*
-> > > +		 * For indirectIO device which has no ranges property, get
-> > > +		 * the address from reg directly.
-> > > +		 */
-> > > +		if (of_get_isa_indirect_io(dev, bus, addr, na, &result)) {
-> > > +			pr_debug("isa indirectIO matched(%s)..addr =
-> > 0x%llx\n",
-> > > +				of_node_full_name(dev), result);
-> > > +			break;
-> > > +		}
-> > >
-> > >  		/* Get new parent bus and counts */
-> > >  		pbus = of_match_bus(parent);
-> > > @@ -688,8 +741,9 @@ static int __of_address_to_resource(struct
-> > device_node *dev,
-> > >  	if (taddr == OF_BAD_ADDR)
-> > >  		return -EINVAL;
-> > >  	memset(r, 0, sizeof(struct resource));
-> > > -	if (flags & IORESOURCE_IO) {
-> > > +	if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
-> > >  		unsigned long port;
-> > > +
-> > >  		port = pci_address_to_pio(taddr);
-> > >  		if (port == (unsigned long)-1)
-> > >  			return -EINVAL;
-> > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > > index ba34907..1a08511 100644
-> > > --- a/drivers/pci/pci.c
-> > > +++ b/drivers/pci/pci.c
-> > > @@ -3263,7 +3263,7 @@ int __weak pci_register_io_range(phys_addr_t
-> > addr, resource_size_t size)
-> > >
-> > >  #ifdef PCI_IOBASE
-> > >  	struct io_range *range;
-> > > -	resource_size_t allocated_size = 0;
-> > > +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
-> > >
-> > >  	/* check if the range hasn't been previously recorded */
-> > >  	spin_lock(&io_range_lock);
-> > > @@ -3312,7 +3312,7 @@ phys_addr_t pci_pio_to_address(unsigned long
-> > pio)
-> > >
-> > >  #ifdef PCI_IOBASE
-> > >  	struct io_range *range;
-> > > -	resource_size_t allocated_size = 0;
-> > > +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
-> > 
-> > Have you checked that pci_pio_to_address still returns valid values
-> > after this? I know that
-> > you are trying to take into account PCIBIOS_MIN_IO limit when
-> > allocating reserving the IO ranges,
-> > but the values added in the io_range_list are still starting from zero,
-> > no from PCIBIOS_MIN_IO,
-> 
-> I think you're wrong here as in pci_address_to_pio we have:
-> +	resource_size_t offset = PCIBIOS_MIN_IO;
-> 
-> This should be enough to guarantee that the PIOs start at
-> PCIBIOS_MIN_IO...right?
-
-I don't think you can guarantee that the pio value that gets passed into
-pci_pio_to_address() always comes from a previously returned value by
-pci_address_to_pio(). Maybe you can add a check in pci_pio_to_address()
-
-	if (pio < PCIBIOS_MIN_IO)
-		return address;
-
-to avoid adding more checks in the list_for_each_entry() loop.
-
-Best regards,
-Liviu
-
-> 
-> 
-> > so the calculation of the address in this function could return
-> > negative values casted to pci_addr_t.
-> > 
-> > Maybe you want to adjust the range->start value in
-> > pci_register_io_range() as well to have it
-> > offset by PCIBIOS_MIN_IO as well.
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> > >
-> > >  	if (pio > IO_SPACE_LIMIT)
-> > >  		return address;
-> > > @@ -3335,7 +3335,7 @@ unsigned long __weak
-> > pci_address_to_pio(phys_addr_t address)
-> > >  {
-> > >  #ifdef PCI_IOBASE
-> > >  	struct io_range *res;
-> > > -	resource_size_t offset = 0;
-> > > +	resource_size_t offset = PCIBIOS_MIN_IO;
-> > >  	unsigned long addr = -1;
-> > >
-> > >  	spin_lock(&io_range_lock);
-> > > diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> > > index 3786473..deec469 100644
-> > > --- a/include/linux/of_address.h
-> > > +++ b/include/linux/of_address.h
-> > > @@ -24,6 +24,23 @@ struct of_pci_range {
-> > >  #define for_each_of_pci_range(parser, range) \
-> > >  	for (; of_pci_range_parser_one(parser, range);)
-> > >
-> > > +
-> > > +#ifndef indirect_io_enabled
-> > > +#define indirect_io_enabled indirect_io_enabled
-> > > +static inline bool indirect_io_enabled(void)
-> > > +{
-> > > +	return false;
-> > > +}
-> > > +#endif
-> > > +
-> > > +#ifndef addr_is_indirect_io
-> > > +#define addr_is_indirect_io addr_is_indirect_io
-> > > +static inline int addr_is_indirect_io(u64 taddr)
-> > > +{
-> > > +	return 0;
-> > > +}
-> > > +#endif
-> > > +
-> > >  /* Translate a DMA address from device space to CPU space */
-> > >  extern u64 of_translate_dma_address(struct device_node *dev,
-> > >  				    const __be32 *in_addr);
-> > > diff --git a/include/linux/pci.h b/include/linux/pci.h
-> > > index 0e49f70..7f6bbb6 100644
-> > > --- a/include/linux/pci.h
-> > > +++ b/include/linux/pci.h
-> > > @@ -2130,4 +2130,12 @@ static inline bool pci_ari_enabled(struct
-> > pci_bus *bus)
-> > >  /* provide the legacy pci_dma_* API */
-> > >  #include <linux/pci-dma-compat.h>
-> > >
-> > > +/*
-> > > + * define this macro here to refrain from compilation error for some
-> > > + * platforms. Please keep this macro at the end of this header file.
-> > > + */
-> > > +#ifndef PCIBIOS_MIN_IO
-> > > +#define PCIBIOS_MIN_IO		0
-> > > +#endif
-> > > +
-> > >  #endif /* LINUX_PCI_H */
-> > > --
-> > > 1.9.1
-> > >
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
