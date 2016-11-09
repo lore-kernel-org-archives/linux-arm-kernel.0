@@ -1,72 +1,89 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  9 Nov 2016 14:19:38 +0000
-Subject: [PATCH v7 06/16] drivers: iommu: arm-smmu-v3: convert struct device
- of_node to fwnode usage
+Date: Wed,  9 Nov 2016 14:19:47 +0000
+Subject: [PATCH v7 15/16] drivers: acpi: iort: add single mapping function
 In-Reply-To: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
 References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20161109141948.19244-7-lorenzo.pieralisi@arm.com>
+Message-ID: <20161109141948.19244-16-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ARM SMMU v3 driver rely on the struct device.of_node pointer for
-device look-up and iommu_ops retrieval.
+The current IORT id mapping API requires components to provide
+an input requester ID (a Bus-Device-Function (BDF) identifier for
+PCI devices) to translate an input identifier to an output
+identifier through an IORT range mapping.
 
-In preparation for ACPI probing enablement, convert the driver to use
-the struct device.fwnode member for device and iommu_ops look-up so that
-the driver infrastructure can be used also on systems that do not
-associate an of_node pointer to a struct device (eg ACPI), making the
-device look-up and iommu_ops retrieval firmware agnostic.
+Named components do not have an identifiable source ID therefore
+their respective input/output mapping can only be defined in
+IORT tables through single mappings, that provide a translation
+that does not require any input identifier.
+
+Current IORT interface for requester id mappings (iort_node_map_rid())
+is not suitable for components that do not provide a requester id,
+so it cannot be used for IORT named components.
+
+Add an interface to the IORT API to enable retrieval of id
+by allowing an indexed walk of the single mappings array for
+a given component, therefore completing the IORT mapping API.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Tomasz Nowicki <tn@semihalf.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/iommu/arm-smmu-v3.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/acpi/arm64/iort.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e6f9b2d..fef9f60 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1723,13 +1723,14 @@ static struct platform_driver arm_smmu_driver;
- 
- static int arm_smmu_match_node(struct device *dev, void *data)
- {
--	return dev->of_node == data;
-+	return dev->fwnode == data;
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 62057c6..7d30605 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -318,6 +318,45 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 	return 0;
  }
  
--static struct arm_smmu_device *arm_smmu_get_by_node(struct device_node *np)
 +static
-+struct arm_smmu_device *arm_smmu_get_by_fwnode(struct fwnode_handle *fwnode)
- {
- 	struct device *dev = driver_find_device(&arm_smmu_driver.driver, NULL,
--						np, arm_smmu_match_node);
-+						fwnode, arm_smmu_match_node);
- 	put_device(dev);
- 	return dev ? dev_get_drvdata(dev) : NULL;
- }
-@@ -1765,7 +1766,7 @@ static int arm_smmu_add_device(struct device *dev)
- 		master = fwspec->iommu_priv;
- 		smmu = master->smmu;
- 	} else {
--		smmu = arm_smmu_get_by_node(to_of_node(fwspec->iommu_fwnode));
-+		smmu = arm_smmu_get_by_fwnode(fwspec->iommu_fwnode);
- 		if (!smmu)
- 			return -ENODEV;
- 		master = kzalloc(sizeof(*master), GFP_KERNEL);
-@@ -2634,7 +2635,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		return ret;
- 
- 	/* And we're up. Go go go! */
--	of_iommu_set_ops(dev->of_node, &arm_smmu_ops);
-+	fwnode_iommu_set_ops(dev->fwnode, &arm_smmu_ops);
++struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
++					u32 *id_out, u8 type_mask,
++					int index)
++{
++	struct acpi_iort_node *parent;
++	struct acpi_iort_id_mapping *map;
 +
- #ifdef CONFIG_PCI
- 	if (pci_bus_type.iommu_ops != &arm_smmu_ops) {
- 		pci_request_acs();
++	if (!node->mapping_offset || !node->mapping_count ||
++				     index >= node->mapping_count)
++		return NULL;
++
++	map = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
++			   node->mapping_offset);
++
++	/* Firmware bug! */
++	if (!map->output_reference) {
++		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
++		       node, node->type);
++		return NULL;
++	}
++
++	parent = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
++			       map->output_reference);
++
++	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
++		return NULL;
++
++	if (map[index].flags & ACPI_IORT_ID_SINGLE_MAPPING) {
++		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
++		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++			*id_out = map[index].output_base;
++			return parent;
++		}
++	}
++
++	return NULL;
++}
++
+ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+ 						u32 rid_in, u32 *rid_out,
+ 						u8 type_mask)
 -- 
 2.10.0
