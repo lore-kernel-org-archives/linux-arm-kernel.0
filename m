@@ -1,89 +1,169 @@
 From: johnyoun@synopsys.com (John Youn)
-Date: Wed, 09 Nov 2016 19:27:36 -0800
-Subject: [PATCH v2 00/30] usb: dwc2: Gadget descriptor DMA and IOT
-Message-ID: <cover.1478748145.git.johnyoun@synopsys.com>
+Date: Wed, 09 Nov 2016 19:27:40 -0800
+Subject: [PATCH v2 01/30] usb: dwc2: Deprecate g-use-dma binding
+In-Reply-To: <cover.1478748145.git.johnyoun@synopsys.com>
+References: <cover.1478748145.git.johnyoun@synopsys.com>
+Message-ID: <966d342a5a7fee9ac3ef8140b60c228c4a87c7d3.1478748145.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements gadget-side descriptor DMA for the DWC_hsotg
-controller.
+This is not needed as the gadget now fully supports DMA and it can
+autodetect it. This was initially added because gadget DMA mode was only
+partially implemented so could not be automatically enabled.
 
-It also includes support for DWC USB IOT controllers which use the
-descriptor DMA mode of operation exclusively. These are two new
-device-only USB controller IPs based on DWC_hsotg.
+Signed-off-by: John Youn <johnyoun@synopsys.com>
+---
+ Documentation/devicetree/bindings/usb/dwc2.txt |  4 +++-
+ arch/arm/boot/dts/rk3036.dtsi                  |  1 -
+ arch/arm/boot/dts/rk3288.dtsi                  |  1 -
+ arch/arm/boot/dts/rk3xxx.dtsi                  |  1 -
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  1 -
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi       |  1 -
+ drivers/usb/dwc2/core.h                        |  4 +---
+ drivers/usb/dwc2/params.c                      | 17 ++++++++++++++---
+ drivers/usb/dwc2/pci.c                         |  1 -
+ 9 files changed, 18 insertions(+), 13 deletions(-)
 
-Tested on HAPS platform with:
-* HSOTG IP version 3.30a
-* FS/LS IOT IP version 1.00a
-* HS IOT IP version 1.00a
-
-
-v2:
-* Remove the DMA 'enable' bindings and make them autodetected.
-* Add DMA 'disable' bindings to override.
-* Separate out commit to add '__packed' attribute.
-* Don't print errors on -ENOMEM.
-* Remove unnecessary GFP_ATOMIC flags.
-* Remove unnecessary patch removing a WARN_ON.
-* Reorganize and clarify BNA interrupt.
-* Fix issue with enabling STSPHSERCVD interrupt.
-
-Regards,
-John
-
-
-John Youn (4):
-  usb: dwc2: Deprecate g-use-dma binding
-  usb: dwc2: Update DMA descriptor structure
-  usb: dwc2: Make the DMA descriptor structure packed
-  usb: dwc2: Add bindings to disable gadget DMA modes
-
-Vahram Aharonyan (23):
-  usb: dwc2: gadget: Add descriptor DMA parameter
-  usb: dwc2: gadget: Add DMA descriptor status quadlet fields
-  usb: dwc2: gadget: Add DMA descriptor chains for EP 0
-  usb: dwc2: host: Rename MAX_DMA_DESC_SIZE to HOST_DMA_NBYTES_LIMIT
-  usb: dwc2: gadget: Transfer length limit checking for DDMA
-  usb: dwc2: gadget: Add DDMA chain pointers to dwc2_hsotg_ep structure
-  usb: dwc2: gadget: Add DDMA chain fill and parse functions
-  usb: dwc2: gadget: EP 0 specific DDMA programming
-  usb: dwc2: gadget: DDMA transfer start and complete
-  usb: dwc2: gadget: Fixes for StsPhseRcvd interrupt
-  usb: dwc2: gadget: Start DDMA IN status phase in StsPhseRcvd handler
-  usb: dwc2: gadget: Enable descriptor DMA mode
-  usb: dwc2: gadget: Add DDMA isoc related fields to dwc2_hsotg_ep
-  usb: dwc2: gadget: Fill isoc descriptor and start transfer in DDMA
-  usb: dwc2: gadget: Add completions for DDMA isoc transfers
-  usb: dwc2: gadget: In DDMA keep incompISOOUT and incompISOIN masked
-  usb: dwc2: gadget: Add start and complete calls for DDMA ISOC
-  usb: dwc2: gadget: Enable the BNA interrupt
-  usb: dwc2: gadget: Adjust ISOC OUT request's actual len for DDMA
-  usb: dwc2: gadget: For DDMA parse setup only after SetUp interrupt
-  usb: dwc2: gadget: Correct dwc2_hsotg_ep_stop_xfr() function
-  usb: dwc2: gadget: Disable enabled HW endpoint in
-    dwc2_hsotg_ep_disable
-  usb: dwc2: Add support of dedicated full-speed PHY interface
-
-Vardan Mikayelyan (3):
-  usb: dwc2: gadget: Add IOT device IDs, configure core accordingly
-  usb: dwc2: gadget: Program ep0_mps for LS
-  usb: dwc2: gadget: Add new core parameter for low speed
-
- Documentation/devicetree/bindings/usb/dwc2.txt |   6 +-
- arch/arm/boot/dts/rk3036.dtsi                  |   1 -
- arch/arm/boot/dts/rk3288.dtsi                  |   1 -
- arch/arm/boot/dts/rk3xxx.dtsi                  |   1 -
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |   1 -
- arch/arm64/boot/dts/rockchip/rk3368.dtsi       |   1 -
- drivers/usb/dwc2/core.h                        |  50 +-
- drivers/usb/dwc2/gadget.c                      | 968 ++++++++++++++++++++++---
- drivers/usb/dwc2/hcd.c                         |  12 +-
- drivers/usb/dwc2/hcd.h                         |   2 +-
- drivers/usb/dwc2/hcd_ddma.c                    |  52 +-
- drivers/usb/dwc2/hw.h                          |  48 +-
- drivers/usb/dwc2/params.c                      |  45 +-
- drivers/usb/dwc2/pci.c                         |   1 -
- 14 files changed, 1023 insertions(+), 166 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index 9472111..389bb13 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -26,11 +26,13 @@ Refer to phy/phy-bindings.txt for generic phy consumer properties
+ - dr_mode: shall be one of "host", "peripheral" and "otg"
+   Refer to usb/generic.txt
+ - snps,host-dma-disable: disable host DMA mode.
+-- g-use-dma: enable dma usage in gadget driver.
+ - g-rx-fifo-size: size of rx fifo size in gadget mode.
+ - g-np-tx-fifo-size: size of non-periodic tx fifo size in gadget mode.
+ - g-tx-fifo-size: size of periodic tx fifo per endpoint (except ep0) in gadget mode.
+ 
++Deprecated properties:
++- g-use-dma: gadget DMA mode is automatically detected
++
+ Example:
+ 
+         usb at 101c0000 {
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index a935523..7c2dc19 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -204,7 +204,6 @@
+ 		g-np-tx-fifo-size = <16>;
+ 		g-rx-fifo-size = <275>;
+ 		g-tx-fifo-size = <256 128 128 64 64 32>;
+-		g-use-dma;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 17ec2e2..74a749c 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -596,7 +596,6 @@
+ 		g-np-tx-fifo-size = <16>;
+ 		g-rx-fifo-size = <275>;
+ 		g-tx-fifo-size = <256 128 128 64 64 32>;
+-		g-use-dma;
+ 		phys = <&usbphy0>;
+ 		phy-names = "usb2-phy";
+ 		status = "disabled";
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index e15beb3..8fbd3c8 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -181,7 +181,6 @@
+ 		g-np-tx-fifo-size = <16>;
+ 		g-rx-fifo-size = <275>;
+ 		g-tx-fifo-size = <256 128 128 64 64 32>;
+-		g-use-dma;
+ 		phys = <&usbphy0>;
+ 		phy-names = "usb2-phy";
+ 		status = "disabled";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 17839db..e0ea603 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -747,7 +747,6 @@
+ 			clocks = <&sys_ctrl HI6220_USBOTG_HCLK>;
+ 			clock-names = "otg";
+ 			dr_mode = "otg";
+-			g-use-dma;
+ 			g-rx-fifo-size = <512>;
+ 			g-np-tx-fifo-size = <128>;
+ 			g-tx-fifo-size = <128 128 128 128 128 128>;
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 0fcb214..df231c4 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -537,7 +537,6 @@
+ 		g-np-tx-fifo-size = <16>;
+ 		g-rx-fifo-size = <275>;
+ 		g-tx-fifo-size = <256 128 128 64 64 32>;
+-		g-use-dma;
+ 		status = "disabled";
+ 	};
+ 
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index a1075ad..f8c97f5 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -418,9 +418,7 @@ enum dwc2_ep0_state {
+  *			needed.
+  *			0 - No (default)
+  *			1 - Yes
+- * @g_dma:              If true, enables dma usage on the device. This
+- *                      setting is not auto-detected. It must be
+- *                      explicitly enabled (default: false).
++ * @g_dma:              Enables gadget dma usage (default: autodetect).
+  * @g_rx_fifo_size:	The periodic rx fifo size for the device, in
+  *			DWORDS from 16-32768 (default: 2048 if
+  *			possible, otherwise autodetect).
+diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+index 2eb79e8..74c3728 100644
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -1086,6 +1086,19 @@ static void dwc2_set_param_tx_fifo_sizes(struct dwc2_hsotg *hsotg)
+ 	}
+ }
+ 
++static void dwc2_set_gadget_dma(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_hw_params *hw = &hsotg->hw_params;
++	struct dwc2_core_params *p = &hsotg->params;
++	bool dma_capable = !(hw->arch == GHWCFG2_SLAVE_ONLY_ARCH);
++
++	/* Buffer DMA */
++	dwc2_set_param_bool(hsotg, &p->g_dma,
++			    false, "gadget-dma",
++			    true, false,
++			    dma_capable);
++}
++
+ /**
+  * dwc2_set_parameters() - Set all core parameters.
+  *
+@@ -1161,9 +1174,7 @@ static void dwc2_set_parameters(struct dwc2_hsotg *hsotg,
+ 	    (hsotg->dr_mode == USB_DR_MODE_OTG)) {
+ 		dev_dbg(hsotg->dev, "Setting peripheral device properties\n");
+ 
+-		dwc2_set_param_bool(hsotg, &p->g_dma, true, "g-use-dma",
+-				    false, false,
+-				    dma_capable);
++		dwc2_set_gadget_dma(hsotg);
+ 
+ 		/*
+ 		 * The values for g_rx_fifo_size (2048) and
+diff --git a/drivers/usb/dwc2/pci.c b/drivers/usb/dwc2/pci.c
+index b3f3b58..a23329e 100644
+--- a/drivers/usb/dwc2/pci.c
++++ b/drivers/usb/dwc2/pci.c
+@@ -67,7 +67,6 @@ static int dwc2_pci_quirks(struct pci_dev *pdev, struct platform_device *dwc2)
+ 	if (pdev->vendor == PCI_VENDOR_ID_SYNOPSYS &&
+ 	    pdev->device == PCI_PRODUCT_ID_HAPS_HSOTG) {
+ 		struct property_entry properties[] = {
+-			PROPERTY_ENTRY_BOOL("g-use-dma"),
+ 			{ },
+ 		};
+ 
 -- 
 2.10.0
