@@ -1,77 +1,48 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 10 Nov 2016 10:44:27 +0800
-Subject: [arm-soc:to-build 12/13] drivers/block/rbd.c:3690:5: warning:
- 'struct_v' may be used uninitialized in this function
-Message-ID: <201611101012.DLJRSQBL%fengguang.wu@intel.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 10 Nov 2016 13:16:13 +1030
+Subject: [PATCH 3/3] ipmi/bt-bmc: add a sysfs file to configure a maximum
+ response time
+In-Reply-To: <7e7e5cde-341a-ecca-9c9c-b41695703b08@acm.org>
+References: <1478073426-3714-1-git-send-email-clg@kaod.org>
+ <1478073426-3714-4-git-send-email-clg@kaod.org>
+ <3a1f8e6d-c935-3404-ffa0-81b19d170731@acm.org>
+ <aa4804b0-4084-6d34-c1db-68bdb5efb20a@kaod.org>
+ <7e7e5cde-341a-ecca-9c9c-b41695703b08@acm.org>
+Message-ID: <CACPK8XdiBFvPo5toh0UcPtOzx2XhhXC-EMgpj4mitfo3Samw8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
-head:   694200c14d09069de036d1b4269b582b3118f575
-commit: 3becf66c6faa12e51bd6d97df3706c8bef1b65d6 [12/13] Kbuild: enable -Wmaybe-uninitialized warnings by default
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 3becf66c6faa12e51bd6d97df3706c8bef1b65d6
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+On Thu, Nov 10, 2016 at 2:34 AM, Corey Minyard <minyard@acm.org> wrote:
+> On 11/09/2016 08:42 AM, C?dric Le Goater wrote:
+>> The patch raises a few questions on the "BT Interface Capabilities" :
+>>
+>>   - should we use sysfs or a specific ioctl to configure the driver ?
+>
+>
+> I should probably say sysfs, but really I don't care.  The hard part about
+> ioctls is the compat, and there shouldn't be any compat issues with this
+> interface.  An ioctl is probably easier, especially if you add an ioctl for
+> the header size thing I talked about in the previous email.
+>
+> The only thing that matters to the driver is the timeout.  If you want to
+> make the timeout per fd, then it will have to be an ioctl.
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+I vote for an ioctl as it's simpler for userspace.
 
-All warnings (new ones prefixed by >>):
+In another driver we use on the BMCs we have a character device and a
+few sysfs files for configuration. This means userspace needs to
+discover and open > 1 fd, which is annoying.
 
-   drivers/block/rbd.c: In function 'rbd_watch_cb':
->> drivers/block/rbd.c:3690:5: warning: 'struct_v' may be used uninitialized in this function [-Wmaybe-uninitialized]
-     if (struct_v >= 2) {
-        ^
-   drivers/block/rbd.c:3759:5: note: 'struct_v' was declared here
-     u8 struct_v;
-        ^
+Cheers,
 
-vim +/struct_v +3690 drivers/block/rbd.c
+Joel
 
-ed95b21a Ilya Dryomov 2016-08-12  3674  	} else {
-ed95b21a Ilya Dryomov 2016-08-12  3675  		down_read(&rbd_dev->lock_rwsem);
-ed95b21a Ilya Dryomov 2016-08-12  3676  	}
-ed95b21a Ilya Dryomov 2016-08-12  3677  
-ed95b21a Ilya Dryomov 2016-08-12  3678  	if (!__rbd_is_lock_owner(rbd_dev))
-ed95b21a Ilya Dryomov 2016-08-12  3679  		wake_requests(rbd_dev, false);
-ed95b21a Ilya Dryomov 2016-08-12  3680  	up_read(&rbd_dev->lock_rwsem);
-ed95b21a Ilya Dryomov 2016-08-12  3681  }
-ed95b21a Ilya Dryomov 2016-08-12  3682  
-ed95b21a Ilya Dryomov 2016-08-12  3683  static bool rbd_handle_request_lock(struct rbd_device *rbd_dev, u8 struct_v,
-ed95b21a Ilya Dryomov 2016-08-12  3684  				    void **p)
-ed95b21a Ilya Dryomov 2016-08-12  3685  {
-ed95b21a Ilya Dryomov 2016-08-12  3686  	struct rbd_client_id my_cid = rbd_get_cid(rbd_dev);
-ed95b21a Ilya Dryomov 2016-08-12  3687  	struct rbd_client_id cid = { 0 };
-ed95b21a Ilya Dryomov 2016-08-12  3688  	bool need_to_send;
-ed95b21a Ilya Dryomov 2016-08-12  3689  
-ed95b21a Ilya Dryomov 2016-08-12 @3690  	if (struct_v >= 2) {
-ed95b21a Ilya Dryomov 2016-08-12  3691  		cid.gid = ceph_decode_64(p);
-ed95b21a Ilya Dryomov 2016-08-12  3692  		cid.handle = ceph_decode_64(p);
-ed95b21a Ilya Dryomov 2016-08-12  3693  	}
-ed95b21a Ilya Dryomov 2016-08-12  3694  
-ed95b21a Ilya Dryomov 2016-08-12  3695  	dout("%s rbd_dev %p cid %llu-%llu\n", __func__, rbd_dev, cid.gid,
-ed95b21a Ilya Dryomov 2016-08-12  3696  	     cid.handle);
-ed95b21a Ilya Dryomov 2016-08-12  3697  	if (rbd_cid_equal(&cid, &my_cid))
-ed95b21a Ilya Dryomov 2016-08-12  3698  		return false;
-
-:::::: The code at line 3690 was first introduced by commit
-:::::: ed95b21a4b0a71ef89306cdeb427d53cc9cb343f rbd: support for exclusive-lock feature
-
-:::::: TO: Ilya Dryomov <idryomov@gmail.com>
-:::::: CC: Ilya Dryomov <idryomov@gmail.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47027 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/0247dbdf/attachment-0001.gz>
+>>   - should the driver handle directly the response to the "Get BT
+>>     Interface Capabilities" command ?
+>
+>
+> That probably belongs in userspace.  The only reason I can think of
+> to have it in the driver would be so the host driver can fetch it if the
+> BMC userspace is down, but I can't see how that's a good idea.
+>
+> Hope my wishy-washy answer helps :-).
