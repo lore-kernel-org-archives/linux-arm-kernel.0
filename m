@@ -1,147 +1,86 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Nov 2016 17:23:21 +0000
-Subject: [RESEND PATCH v1 02/11] dt-bindings: hisi: Add Hisilicon
- HiP05/06/07 Sysctrl and Djtag dts bindings
-In-Reply-To: <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
-References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
- <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
-Message-ID: <20161110172320.GA10137@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Nov 2016 17:27:20 +0000
+Subject: [PATCH v27 1/9] memblock: add memblock_cap_memory_range()
+In-Reply-To: <20161102045153.12008-1-takahiro.akashi@linaro.org>
+References: <20161102044959.11954-1-takahiro.akashi@linaro.org>
+ <20161102045153.12008-1-takahiro.akashi@linaro.org>
+Message-ID: <20161110172720.GB17134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 03, 2016 at 01:41:58AM -0400, Anurup M wrote:
-> From: Tan Xiaojun <tanxiaojun@huawei.com>
+On Wed, Nov 02, 2016 at 01:51:53PM +0900, AKASHI Takahiro wrote:
+> Add memblock_cap_memory_range() which will remove all the memblock regions
+> except the range specified in the arguments.
 > 
-> 	1) Add Hisilicon HiP05/06/07 CPU and ALGSUB system controller dts
-> 	   bindings.
-> 	2) Add Hisilicon Djtag dts binding.
+> This function, like memblock_mem_limit_remove_map(), will not remove
+> memblocks with MEMMAP_NOMAP attribute as they may be mapped and accessed
+> later as "device memory."
+> See the commit a571d4eb55d8 ("mm/memblock.c: add new infrastructure to
+> address the mem limit issue").
 > 
-> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> This function is used, in a succeeding patch in the series of arm64 kdump
+> suuport, to limit the range of usable memory, System RAM, on crash dump
+> kernel.
+> (Please note that "mem=" parameter is of little use for this purpose.)
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: linux-mm at kvack.org
+> Cc: Andrew Morton <akpm@linux-foundation.org>
 > ---
->  .../bindings/arm/hisilicon/hisilicon.txt           | 82 ++++++++++++++++++++++
->  1 file changed, 82 insertions(+)
+>  include/linux/memblock.h |  1 +
+>  mm/memblock.c            | 28 ++++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index 7df79a7..341cbb9 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -270,3 +270,85 @@ Required Properties:
->    [1]: bootwrapper size
->    [2]: relocation physical address
->    [3]: relocation size
-
-
-> +-----------------------------------------------------------------------
-> +The Hisilicon Djtag in CPU die is an independent component which connects with
-> +some other components in the SoC by Debug Bus. This driver can be configured
-> +to access the registers of connecting components (like L3 cache, l3 cache PMU
-> + etc.) during real time debugging by sysctrl. These components appear as child
-> +nodes of djtag.
-
-Please put the djtag binding in a new file. 
-
-It's clearly unrelated to many other things in this file, which should
-also be split out.
-
-> +The Hip05/06/07 CPU system controller(sysctrl) support to manage some important
-> +components (such as clock, reset, soft reset, secure debugger, etc.).
-> +The CPU sysctrl registers in hip05/06/07 doesnot use syscon but will be mapped
-> +by djtag driver for use by connecting components.
-
-The djtag driver is irrelvant here.
-
-If there's a realtionship between the two, please define that in the
-binding rather than implicitly assuming it in the driver.
-
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index 5b759c9..0e770af 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -334,6 +334,7 @@ phys_addr_t memblock_start_of_DRAM(void);
+>  phys_addr_t memblock_end_of_DRAM(void);
+>  void memblock_enforce_memory_limit(phys_addr_t memory_limit);
+>  void memblock_mem_limit_remove_map(phys_addr_t limit);
+> +void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
+>  bool memblock_is_memory(phys_addr_t addr);
+>  int memblock_is_map_memory(phys_addr_t addr);
+>  int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 7608bc3..eb53876 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1544,6 +1544,34 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+>  			      (phys_addr_t)ULLONG_MAX);
+>  }
+>  
+> +void __init memblock_cap_memory_range(phys_addr_t base, phys_addr_t size)
+> +{
+> +	int start_rgn, end_rgn;
+> +	int i, ret;
 > +
-> +Required properties:
-> +  - compatible : "hisilicon,hip05-cpu-djtag-v1"
-> +  - reg : Register address and size
+> +	if (!size)
+> +		return;
 > +
-> +Hisilicon HiP06 djtag for CPU sysctrl
-> +Required properties:
-> +- compatible : "hisilicon,hip06-sysctrl", "syscon", "simple-mfd";
-
-This looks messy. Why is this syscon and a simple-mfd?
-
-We should kill off / deprecate the syscon binding. It's completely
-meaningless.
-
-> +- reg : Register address and size
-> +- djtag :
-> +  - compatible : "hisilicon,hip06-cpu-djtag-v1"
-> +  - reg : Register address and size
+> +	ret = memblock_isolate_range(&memblock.memory, base, size,
+> +						&start_rgn, &end_rgn);
+> +	if (ret)
+> +		return;
 > +
-> +Hisilicon HiP07 djtag for CPU sysctrl
-> +Required properties:
-> +  - compatible : "hisilicon,hip07-cpu-djtag-v2"
-> +  - reg : Register address and size
+> +	/* remove all the MAP regions */
+> +	for (i = memblock.memory.cnt - 1; i >= end_rgn; i--)
+> +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
+> +			memblock_remove_region(&memblock.memory, i);
 > +
-> +Example:
-> +	/* for Hisilicon HiP05 djtag for CPU sysctrl */
-> +	djtag0: djtag at 80010000 {
-> +		compatible = "hisilicon,hip05-cpu-djtag-v1";
-> +		reg = <0x0 0x80010000 0x0 0x10000>;
+> +	for (i = start_rgn - 1; i >= 0; i--)
+> +		if (!memblock_is_nomap(&memblock.memory.regions[i]))
+> +			memblock_remove_region(&memblock.memory, i);
 > +
-> +		/* For L3 cache PMU */
-> +		pmul3c0 {
-> +			compatible = "hisilicon,hisi-pmu-l3c-v1";
-> +			scl-id = <0x02>;
-> +			num-events = <0x16>;
-> +			num-counters = <0x08>;
-> +			module-id = <0x04>;
-> +			num-banks = <0x04>;
-> +			cfgen-map = <0x02 0x04 0x01 0x08>;
-> +			counter-reg = <0x170>;
-> +			evctrl-reg = <0x04>;
-> +			event-en = <0x1000000>;
-> +			evtype-reg = <0x140>;
-> +		};
+> +	/* truncate the reserved regions */
+> +	memblock_remove_range(&memblock.reserved, 0, base);
+> +	memblock_remove_range(&memblock.reserved,
+> +			base + size, (phys_addr_t)ULLONG_MAX);
+> +}
 
-This sub-node needs a binding document.
+This duplicates a bunch of the logic in memblock_mem_limit_remove_map. Can
+you not implement that in terms of your new, more general, function? e.g.
+by passing base == 0, and size == limit?
 
-These properties are completely opaque
-
-> +	};
-> +
-> +-----------------------------------------------------------------------
-> +The Hisilicon HiP05/06/07 ALGSUB system controller(sysctrl) is in IO die
-> +of SoC. It has a similar function as the Hisilicon HiP05/06/07 CPU system
-> +controller in CPU die and it manage different components, like RSA, etc.
-> +The Hisilicon Djtag in IO die has a similar function as in CPU die and maps
-> +the sysctrl registers for use by connecting components.
-> +All connecting components shall appear as child nodes of djtag.
-
-I don't follow the above. This describes an ALGSUB system controllerm
-but the documentation below is all about djtag.
-
-Thanks,
-Mark.
-
-> +Hisilicon HiP05 djtag for ALGSUB sysctrl
-> +Required properties:
-> +  - compatible : "hisilicon,hip05-io-djtag-v1"
-> +  - reg : Register address and size
-> +
-> +Hisilicon HiP06 djtag for ALGSUB sysctrl
-> +Required properties:
-> +  - compatible : "hisilicon,hip06-io-djtag-v2"
-> +  - reg : Register address and size
-> +
-> +Hisilicon HiP07 djtag for ALGSUB sysctrl
-> +Required properties:
-> +  - compatible : "hisilicon,hip07-io-djtag-v2"
-> +  - reg : Register address and size
-> +
-> +Example:
-> +	/* for Hisilicon HiP05 djtag for alg sysctrl */
-> +	djtag0: djtag at d0000000 {
-> +	       compatible = "hisilicon,hip05-io-djtag-v1";
-> +		reg = <0x0 0xd0000000 0x0 0x10000>;
-> +	};
-> -- 
-> 2.1.4
-> 
+Will
