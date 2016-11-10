@@ -1,59 +1,57 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Thu, 10 Nov 2016 14:40:26 +0800
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <2825537.ADCNsGqGxn@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1555494.4IFvGxvsfe@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F1A7A@lhreml507-mbx>
- <2825537.ADCNsGqGxn@wuerfel>
-Message-ID: <5824165A.4040303@hisilicon.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Thu, 10 Nov 2016 15:03:51 +0800
+Subject: [PATCH v2 2/2] mm: hugetlb: support gigantic surplus pages
+In-Reply-To: <20161109165549.1cf320c5@thinkpad>
+References: <1478141499-13825-3-git-send-email-shijie.huang@arm.com>
+ <1478675294-2507-1-git-send-email-shijie.huang@arm.com>
+ <20161109165549.1cf320c5@thinkpad>
+Message-ID: <20161110070348.GA2057@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
-
-On 2016/11/10 5:34, Arnd Bergmann wrote:
-> On Wednesday, November 9, 2016 12:10:43 PM CET Gabriele Paoloni wrote:
->>> On Tuesday, November 8, 2016 11:47:09 AM CET zhichang.yuan wrote:
->>>> +       /*
->>>> +        * The first PCIBIOS_MIN_IO is reserved specifically for
->>> indirectIO.
->>>> +        * It will separate indirectIO range from pci host bridge to
->>>> +        * avoid the possible PIO conflict.
->>>> +        * Set the indirectIO range directly here.
->>>> +        */
->>>> +       lpcdev->io_ops.start = 0;
->>>> +       lpcdev->io_ops.end = PCIBIOS_MIN_IO - 1;
->>>> +       lpcdev->io_ops.devpara = lpcdev;
->>>> +       lpcdev->io_ops.pfin = hisilpc_comm_in;
->>>> +       lpcdev->io_ops.pfout = hisilpc_comm_out;
->>>> +       lpcdev->io_ops.pfins = hisilpc_comm_ins;
->>>> +       lpcdev->io_ops.pfouts = hisilpc_comm_outs;
->>>
->>> I have to look at patch 2 in more detail again, after missing a few
->>> review
->>> rounds. I'm still a bit skeptical about hardcoding a logical I/O port
->>> range here, and would hope that we can just go through the same
->>> assignment of logical port ranges that we have for PCI buses,
->>> decoupling
->>> the bus addresses from the linux-internal ones.
->>
->> The point here is that we want to avoid any conflict/overlap between
->> the LPC I/O space and the PCI I/O space. With the assignment above
->> we make sure that LPC never interfere with PCI I/O space.
+On Wed, Nov 09, 2016 at 04:55:49PM +0100, Gerald Schaefer wrote:
+> > index 9fdfc24..5dbfd62 100644
+> > --- a/mm/hugetlb.c
+> > +++ b/mm/hugetlb.c
+> > @@ -1095,6 +1095,9 @@ static struct page *alloc_gigantic_page(int nid, unsigned int order)
+> >  	unsigned long ret, pfn, flags;
+> >  	struct zone *z;
+> > 
+> > +	if (nid == NUMA_NO_NODE)
+> > +		nid = numa_mem_id();
+> > +
 > 
-> But we already abstract the PCI I/O space using dynamic registration.
-> There is no need to hardcode the logical address for ISA, though
-> I think we can hardcode the bus address to start at zero here.
+> Now counter.sh works (on s390) w/o the lockdep warning. However, it looks
+Good news to me :)
+We have found the root cause of the s390 issue.
 
-Do you means that we can pick up the maximal I/O address from all children's
-device resources??
-
-Thanks,
-Zhichang
+> like this change will now result in inconsistent behavior compared to the
+> normal sized hugepages, regarding surplus page allocation. Setting nid to
+> numa_mem_id() means that only the node of the current CPU will be considered
+> for allocating a gigantic page, as opposed to just "preferring" the current
+> node in the normal size case (__hugetlb_alloc_buddy_huge_page() ->
+> alloc_pages_node()) with a fallback to using other nodes.
+Yes.
 
 > 
-> 	Arnd
+> I am not really familiar with NUMA, and I might be wrong here, but if
+> this is true then gigantic pages, which may be hard allocate at runtime
+> in general, will be even harder to find (as surplus pages) because you
+> only look on the current node.
+Okay, I will try to fix this in the next version.
+
 > 
-> .
+> I honestly do not understand why alloc_gigantic_page() needs a nid
+> parameter at all, since it looks like it will only be called from
+> alloc_fresh_gigantic_page_node(), which in turn is only called
+> from alloc_fresh_gigantic_page() in a "for_each_node" loop (at least
+> before your patch).
 > 
+> Now it could be an option to also use alloc_fresh_gigantic_page()
+> in your patch, instead of directly calling alloc_gigantic_page(),
+Yes, a good suggestion. But I need to do some change to the
+alloc_fresh_gigantic_page().	
+
+
+Thanks
+Huang Shijie
