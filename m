@@ -1,67 +1,52 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Nov 2016 13:58:32 -0600
-Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
-In-Reply-To: <CAPDyKFoCjf1qSBDWUY_wNx21_78fRrFqcqrFbsSmabzAZJxQAQ@mail.gmail.com>
-References: <1478210075-92045-1-git-send-email-lina.iyer@linaro.org>
- <1478210075-92045-2-git-send-email-lina.iyer@linaro.org>
- <CAPDyKFoCjf1qSBDWUY_wNx21_78fRrFqcqrFbsSmabzAZJxQAQ@mail.gmail.com>
-Message-ID: <20161110195832.4nz7lxlmshaemcbb@rob-hp-laptop>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 10 Nov 2016 21:29:10 +0100
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <20161110175537.GF27724@atomide.com>
+References: <20161109192301.GS26979@atomide.com>
+ <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
+ <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
+ <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+ <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
+ <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
+Message-ID: <20161110202910.GE28832@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 07, 2016 at 12:14:28PM +0100, Ulf Hansson wrote:
-> On 3 November 2016 at 22:54, Lina Iyer <lina.iyer@linaro.org> wrote:
-> > Re-using idle state definition provided by arm,idle-state for domain
-> > idle states creates a lot of confusion and limits further evolution of
-> > the domain idle definition. To keep things clear and simple, define a
-> > idle states for domain using a new compatible "domain-idle-state".
-> >
-> > Fix existing PM domains code to look for the newly defined compatible.
-> >
-> > Cc: <devicetree@vger.kernel.org>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> > ---
-> >  .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
-> >  .../devicetree/bindings/power/power_domain.txt     |  8 +++---
-> >  drivers/base/power/domain.c                        |  2 +-
-> >  3 files changed, 38 insertions(+), 5 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-> > new file mode 100644
-> > index 0000000..eefc7ed
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
-> > @@ -0,0 +1,33 @@
-> > +PM Domain Idle State Node:
-> > +
-> > +A domain idle state node represents the state parameters that will be used to
-> > +select the state when there are no active components in the domain.
-> > +
-> > +The state node has the following parameters -
-> > +
-> > +- compatible:
-> > +       Usage: Required
-> > +       Value type: <string>
-> > +       Definition: Must be "domain-idle-state".
-> > +
-> > +- entry-latency-us
-> > +       Usage: Required
-> > +       Value type: <prop-encoded-array>
-> > +       Definition: u32 value representing worst case latency in
-> > +                   microseconds required to enter the idle state.
-> > +                   The exit-latency-us duration may be guaranteed
-> > +                   only after entry-latency-us has passed.
+On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [161110 09:29]:
+> > Hi!
+> > 
+> > > >>>Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
+> > > >>>the sysfs brightness attr for changes.") breaks runtime PM for me.
+> > > >>>
+> > > >>>On my omap dm3730 based test system, idle power consumption is over 70
+> > > >>>times higher now with this patch! It goes from about 6mW for the core
+> > > >>>system to over 440mW during idle meaning there's some busy timer now
+> > > >>>active.
+> > > >>>
+> > > >>>Reverting this patch fixes the issue. Any ideas?
+> > 
+> > Are you using any LED that toggles with high frequency? Like perhaps
+> > LED that is lit when CPU is active?
 > 
-> As we anyway are going to change this, why not use an u64 and have the
-> value in ns instead of us?
+> Yeah one of them seems to have cpu0 as the default trigger.
 
-I can't imagine that you would need more resolution or range. For times 
-less than 1us, s/w and register access times are going to dominate the 
-time.
+Aha. Its quite obvious we don't want to notify sysfs each time that
+one is toggled, right?
 
-Unless there is a real need, I'd keep alignment with the existing 
-binding.
+IMO brightness should display max brightness for the trigger, as Hans
+suggested, anything else is madness for trigger such as cpu activity.
 
-Rob
+Thanks and best regards,
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/db73f569/attachment.sig>
