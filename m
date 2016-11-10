@@ -1,74 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Nov 2016 15:32:12 +0000
-Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions to
- asm/perf_event.h
-In-Reply-To: <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
-References: <1478721480-24852-1-git-send-email-wei@redhat.com>
- <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
- <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
-Message-ID: <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
+From: ben.whitten@gmail.com (ben.whitten at gmail.com)
+Date: Thu, 10 Nov 2016 15:34:50 +0000
+Subject: [PATCH] spi: atmel: Fix scheduling while atomic
+Message-ID: <1478792090-6376-1-git-send-email-ben.whitten@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/16 15:12, Wei Huang wrote:
-> 
-> 
-> On 11/10/2016 03:10 AM, Marc Zyngier wrote:
->> Hi Wei,
->>
->> On 09/11/16 19:57, Wei Huang wrote:
->>> This patch moves ARMv8-related perf event definitions from perf_event.c
->>> to asm/perf_event.h; so KVM code can use them directly. This also help
->>> remove a duplicated definition of SW_INCR in perf_event.h.
->>>
->>> Signed-off-by: Wei Huang <wei@redhat.com>
->>> ---
->>>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
->>>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
->>>  2 files changed, 160 insertions(+), 162 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
->>> index 2065f46..6c7b18b 100644
->>> --- a/arch/arm64/include/asm/perf_event.h
->>> +++ b/arch/arm64/include/asm/perf_event.h
->>> @@ -46,7 +46,166 @@
->>>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
->>>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
->>>  
->>> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
->>> +/*
->>> + * ARMv8 PMUv3 Performance Events handling code.
->>> + * Common event types.
->>> + */
->>> +
->>> +/* Required events. */
->>> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
->>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
->>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
->>> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
->>> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
->>> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
->>
->> In my initial review, I asked for the "required" events to be moved to a
->> shared location. What's the rational for moving absolutely everything?
-> 
-> I did notice the phrase "required" in the original email. However I
-> think it is weird to have two places for a same set of PMU definitions.
-> Other developers might think these two are missing if they don't search
-> kernel files carefully.
-> 
-> If Will Deacon and you insist, I can move only two defs to perf_event.h,
-> consolidated with the 2nd patch into a single one.
+From: Ben Whitten <ben.whitten@lairdtech.com>
 
-My personal feeling is that only architected events should be in a
-public header. The CPU-specific ones are probably better kept private,
-as it is doubtful that other users would appear).
+A call to clk_get_rate appears to be called in the context of an interrupt,
+cache the bus clock for the frequency calculations in transmission.
 
-I'll leave it up to Will to decide, as all I want to avoid is the
-duplication of constants between the PMU and KVM code bases.
+This fixes a 'BUG: scheduling while atomic' and
+'WARNING: CPU: 0 PID: 777 at kernel/sched/core.c:2960 atmel_spi_unlock'
 
-Thanks,
+Signed-off-by: Ben Whitten <ben.whitten@lairdtech.com>
+Signed-off-by: Steve deRosier <steve.derosier@lairdtech.com>
+---
+ drivers/spi/spi-atmel.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-	M.
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 8feac59..c281d1a 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -295,6 +295,7 @@ struct atmel_spi {
+ 	int			irq;
+ 	struct clk		*clk;
+ 	struct platform_device	*pdev;
++	unsigned long		spi_clk;
+ 
+ 	struct spi_transfer	*current_transfer;
+ 	int			current_remaining_bytes;
+@@ -864,7 +865,7 @@ static int atmel_spi_set_xfer_speed(struct atmel_spi *as,
+ 	unsigned long		bus_hz;
+ 
+ 	/* v1 chips start out at half the peripheral bus speed. */
+-	bus_hz = clk_get_rate(as->clk);
++	bus_hz = as->spi_clk;
+ 	if (!atmel_spi_is_v2(as))
+ 		bus_hz /= 2;
+ 
+@@ -1606,6 +1607,9 @@ static int atmel_spi_probe(struct platform_device *pdev)
+ 	ret = clk_prepare_enable(clk);
+ 	if (ret)
+ 		goto out_free_irq;
++
++	as->spi_clk = clk_get_rate(clk);
++
+ 	spi_writel(as, CR, SPI_BIT(SWRST));
+ 	spi_writel(as, CR, SPI_BIT(SWRST)); /* AT91SAM9263 Rev B workaround */
+ 	if (as->caps.has_wdrbt) {
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
