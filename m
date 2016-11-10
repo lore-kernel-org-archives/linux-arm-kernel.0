@@ -1,147 +1,114 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 Nov 2016 11:54:39 +0000
-Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
- iommu_domain
-In-Reply-To: <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
- <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
- <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
-Message-ID: <6851a74a-775a-bd20-cdea-4cf06f5f0289@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Nov 2016 12:54:44 +0100
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <1478693755-11953-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478693755-11953-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5066943.nydi3GQ3KP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-On 10/11/16 11:22, Auger Eric wrote:
-> Hi Robin,
+On Wednesday, November 9, 2016 5:45:54 PM CET Pankaj Dubey wrote:
+> Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based
+> boards. Instead use mapping from device tree node of SCU.
 > 
-> On 04/11/2016 15:00, Robin Murphy wrote:
->> Hi Eric,
->>
->> Thanks for posting this new series - the bottom-up approach is a lot
->> easier to reason about :)
->>
->> On 04/11/16 11:24, Eric Auger wrote:
->>> Introduce a new iommu_reserved_region struct. This embodies
->>> an IOVA reserved region that cannot be used along with the IOMMU
->>> API. The list is protected by a dedicated mutex.
->>
->> In the light of these patches, I think I'm settling into agreement that
->> the iommu_domain is the sweet spot for accessing this information - the
->> underlying magic address ranges might be properties of various bits of
->> hardware many of which aren't the IOMMU itself, but they only start to
->> matter at the point you start wanting to use an IOMMU domain at the
->> higher level. Therefore, having a callback in the domain ops to pull
->> everything together fits rather neatly.
-> Using get_dm_regions could have make sense but this approach now is
-> ruled out by sysfs API approach. If attribute file is bound to be used
-> before iommu domains are created, we cannot rely on any iommu_domain
-> based callback. Back to square 1?
-
-I think it's still OK. The thing about these reserved regions is that as
-a property of the underlying hardware they must be common to any domain
-for a given group, therefore without loss of generality we can simply
-query group->domain->ops->get_dm_regions(), and can expect the reserved
-ones will be the same regardless of what domain that points to
-(identity-mapped IVMD/RMRR/etc. regions may not be, but we'd be
-filtering those out anyway). The default DMA domains need this
-information too, and since those are allocated at group creation,
-group->domain should always be non-NULL and interrogable.
-
-Plus, the groups are already there in sysfs, and, being representative
-of device topology, would seem to be an ideal place to expose the
-addressing limitations relevant to the devices within them. This really
-feels like it's all falling into place (on the kernel end, at least, I'm
-sticking to the sidelines on the userspace discussion ;)).
-
-Robin.
-
+> NOTE: This patch has dependency on DT file of any such CORTEX-A9 SoC
+> based boards, in the absence of SCU device node in DTS file, only single
+> CPU will boot. So if you are using OUT-OF-TREE DTS file of CORTEX-A9 based
+> Exynos SoC make sure to add SCU device node to DTS file for SMP boot.
 > 
-> Thanks
-> 
-> Eric
->>
->>>
->>> An iommu domain now owns a list of those.
->>>
->>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>
->>> ---
->>> ---
->>>  drivers/iommu/iommu.c |  2 ++
->>>  include/linux/iommu.h | 17 +++++++++++++++++
->>>  2 files changed, 19 insertions(+)
->>>
->>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>> index 9a2f196..0af07492 100644
->>> --- a/drivers/iommu/iommu.c
->>> +++ b/drivers/iommu/iommu.c
->>> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
->>>  
->>>  	domain->ops  = bus->iommu_ops;
->>>  	domain->type = type;
->>> +	INIT_LIST_HEAD(&domain->reserved_regions);
->>> +	mutex_init(&domain->resv_mutex);
->>>  	/* Assume all sizes by default; the driver may override this later */
->>>  	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
->>>  
->>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->>> index 436dc21..0f2eb64 100644
->>> --- a/include/linux/iommu.h
->>> +++ b/include/linux/iommu.h
->>> @@ -84,6 +84,8 @@ struct iommu_domain {
->>>  	void *handler_token;
->>>  	struct iommu_domain_geometry geometry;
->>>  	void *iova_cookie;
->>> +	struct list_head reserved_regions;
->>> +	struct mutex resv_mutex; /* protects the reserved region list */
->>>  };
->>>  
->>>  enum iommu_cap {
->>> @@ -131,6 +133,21 @@ struct iommu_dm_region {
->>>  	int			prot;
->>>  };
->>>  
->>> +/**
->>> + * struct iommu_reserved_region - descriptor for a reserved iova region
->>> + * @list: Linked list pointers
->>> + * @start: IOVA base address of the region
->>> + * @length: Length of the region in bytes
->>> + */
->>> +struct iommu_reserved_region {
->>> +	struct list_head	list;
->>> +	dma_addr_t		start;
->>> +	size_t			length;
->>> +};
->>
->> Looking at this in context with the dm_region above, though, I come to
->> the surprising realisation that these *are* dm_regions, even at the
->> fundamental level - on the one hand you've got physical addresses which
->> can't be remapped (because something is already using them), while on
->> the other you've got physical addresses which can't be remapped (because
->> the IOMMU is incapable). In fact for reserved regions *other* than our
->> faked-up MSI region there's no harm if the IOMMU were to actually
->> identity-map them.
->>
->> Let's just add this to the existing infrastructure, either with some
->> kind of IOMMU_NOMAP flag or simply prot = 0. That way it automatically
->> gets shared between the VFIO and DMA cases for free!
->>
->> Robin.
->>
->>> +
->>> +#define iommu_reserved_region_for_each(resv, d) \
->>> +	list_for_each_entry(resv, &(d)->reserved_regions, list)
->>> +
->>>  #ifdef CONFIG_IOMMU_API
->>>  
->>>  /**
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+With CONFIG_SMP disabled, I now get this build failure:
+
+arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
+arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
+
+Please fix. I have applied a patch locally (see below), but don't know
+if that is the best solution. As we seem to duplicate that code across
+several platforms, I wonder why we don't just put it into the core scu
+implementation.
+
+	Arnd
+
+
+commit ad63b863bb78188fbe9608cfad629c86bd579dc0
+Author: Arnd Bergmann <arnd@arndb.de>
+Date:   Thu Nov 10 12:51:43 2016 +0100
+
+    ARM: exynos: move exynos_scu_enable to main file
+    
+    arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+    pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
+    arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+    suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
+    
+    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index fa08ef99b4ad..784c6d47af17 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -39,6 +39,27 @@ static struct platform_device exynos_cpuidle = {
+ void __iomem *sysram_base_addr;
+ void __iomem *sysram_ns_base_addr;
+ 
++/**
++ * exynos_scu_enable : enables SCU for Cortex-A9 based system
++ * returns 0 on success else non-zero error code
++ */
++int exynos_scu_enable(void)
++{
++	struct device_node *np;
++	void __iomem *scu_base;
++
++	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++	scu_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!scu_base) {
++		pr_err("%s failed to map scu_base\n", __func__);
++		return -ENOMEM;
++	}
++	scu_enable(scu_base);
++	iounmap(scu_base);
++	return 0;
++}
++
+ void __init exynos_sysram_init(void)
+ {
+ 	struct device_node *node;
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index 94405c72d245..4ad376637a34 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -168,27 +168,6 @@ int exynos_cluster_power_state(int cluster)
+ 		S5P_CORE_LOCAL_PWR_EN);
+ }
+ 
+-/**
+- * exynos_scu_enable : enables SCU for Cortex-A9 based system
+- * returns 0 on success else non-zero error code
+- */
+-int exynos_scu_enable(void)
+-{
+-	struct device_node *np;
+-	void __iomem *scu_base;
+-
+-	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
+-	scu_base = of_iomap(np, 0);
+-	of_node_put(np);
+-	if (!scu_base) {
+-		pr_err("%s failed to map scu_base\n", __func__);
+-		return -ENOMEM;
+-	}
+-	scu_enable(scu_base);
+-	iounmap(scu_base);
+-	return 0;
+-}
+-
+ static void __iomem *cpu_boot_reg_base(void)
+ {
+ 	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
