@@ -1,68 +1,55 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Nov 2016 10:22:13 +0100
-Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <6723536.97ljqcB8tS@wuerfel>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <1626072.dpWPnWgGl9@wuerfel>
- <CAMuHMdVrdjqWruY=dBjWP=jZuZkc=aTBTMijOyTDfZFcaD_jsA@mail.gmail.com>
- <6723536.97ljqcB8tS@wuerfel>
-Message-ID: <CAMuHMdWox5ksj1xhJ6_n0wNA9j6veX0AzAE0V9Gs26Kvw5C_sw@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 10 Nov 2016 17:21:29 +0800
+Subject: [PATCH] regulator: gpio: properly check return value of
+ of_get_named_gpio
+Message-ID: <20161110092129.2203-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+The function of_get_named_gpio() could return -ENOENT, -EPROBE_DEFER
+-EINVAL and so on. Currently, for the optional property "enable-gpio",
+we only check -EPROBE_DEFER, this is not enough since there may be
+misconfigured "enable-gpio" in the DTB, of_get_named_gpio() will return
+-EINVAL in this case, we should return immediately here. And for the
+optional property "gpios", we didn't check the return value, the driver
+will continue to the point where gpio_request_array() is called, it
+doesn't make sense to continue if we got -EPROBE_DEFER or -EINVAL here.
 
-On Wed, Nov 9, 2016 at 10:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday, November 9, 2016 6:19:06 PM CET Geert Uytterhoeven wrote:
->> On Wed, Nov 9, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Wednesday, November 9, 2016 2:34:33 PM CET Geert Uytterhoeven wrote:
->> >> > And Samsung.
->> >> > Shall I create the immutable branch now?
->> >>
->> >> Arnd: are you happy with the new patches and changes?
->> >
->> > I still had some comments for patch 7, but that shouldn't stop
->> > you from creating a branch for the first three so everyone can
->> > build on top of that.
->>
->> Thanks!
->>
->> What about patch [4/7]?
->> Haven't you received it? Your address was in the To-line for all 7 patches.
->
-> Ok, I see it now, looks good. That should be included as well then.
+This patch tries to address these two issues by properly checking the
+return value of of_get_named_gpio.
 
-Thanks, I've created the branch/tag :
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/regulator/gpio-regulator.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-    git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
-    branch soc-device-match
-    signed tag soc-device-match-tag1
-
-In the mean time, Ulf has applied the first two patches to mmc/next, on top
-of lots of MMC work :-(
-
-Ulf, as this is not only a dependency for Freescale/NXP (for sdhci-of-esdhc),
-but also for Samsung and Renesas, would it still be possible to replace these
-two commits
-
-    8b82c17a8ae533d6 base: soc: introduce soc_device_match() interface
-    6fa350172b098f0f base: soc: Check for NULL SoC device attributes
-
-by a merge of soc-device-match-tag1?
-
-You can find more info in the full thread at
-https://www.spinics.net/lists/devicetree/msg148558.html
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
+index 83e89e5..0fce06a 100644
+--- a/drivers/regulator/gpio-regulator.c
++++ b/drivers/regulator/gpio-regulator.c
+@@ -162,8 +162,8 @@ of_get_gpio_regulator_config(struct device *dev, struct device_node *np,
+ 	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
+ 
+ 	config->enable_gpio = of_get_named_gpio(np, "enable-gpio", 0);
+-	if (config->enable_gpio == -EPROBE_DEFER)
+-		return ERR_PTR(-EPROBE_DEFER);
++	if (config->enable_gpio < 0 && config->enable_gpio != -ENOENT)
++		return ERR_PTR(config->enable_gpio);
+ 
+ 	/* Fetch GPIOs. - optional property*/
+ 	ret = of_gpio_count(np);
+@@ -190,8 +190,11 @@ of_get_gpio_regulator_config(struct device *dev, struct device_node *np,
+ 
+ 		for (i = 0; i < config->nr_gpios; i++) {
+ 			gpio = of_get_named_gpio(np, "gpios", i);
+-			if (gpio < 0)
++			if (gpio < 0) {
++				if (gpio != -ENOENT)
++					return ERR_PTR(gpio);
+ 				break;
++			}
+ 			config->gpios[i].gpio = gpio;
+ 			if (proplen > 0) {
+ 				of_property_read_u32_index(np, "gpios-states",
+-- 
+2.10.2
