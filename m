@@ -1,165 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Nov 2016 12:37:01 +0100
-Subject: [PATCH v2 7/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <CAMuHMdX+T=Y--F6KXZwFmZwWFdfP5mL5Tar-wKwRM2p6Hh2-sg@mail.gmail.com>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <3693445.TSdZGaiT9S@wuerfel>
- <CAMuHMdX+T=Y--F6KXZwFmZwWFdfP5mL5Tar-wKwRM2p6Hh2-sg@mail.gmail.com>
-Message-ID: <25057157.YlGi2v6RrE@wuerfel>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 10 Nov 2016 12:38:40 +0100
+Subject: [alsa-devel] [PATCH 2/9] ALSA: ac97: add an ac97 bus
+In-Reply-To: <87mvh8uywm.fsf@belgarion.home>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-3-git-send-email-robert.jarzmik@free.fr>
+ <d57cdfba-da22-652d-3d75-6d1b754cf1d5@metafoo.de>
+ <87eg2ly8k6.fsf@belgarion.home>
+ <5ae15e01-eaaf-4996-27ec-1179041c0268@metafoo.de>
+ <87mvh8uywm.fsf@belgarion.home>
+Message-ID: <6b97a129-bd10-b9be-616d-a3ea3b91b103@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 10, 2016 11:19:20 AM CET Geert Uytterhoeven wrote:
-> Hi Arnd,
+On 11/09/2016 10:27 PM, Robert Jarzmik wrote:
+[...]
+>>>>> +int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
+>>>>> +{
+>>>>> +	int ret;
+>>>>> +
+>>>>> +	drv->driver.bus = &ac97_bus_type;
+>>>>> +
+>>>>> +	ret = driver_register(&drv->driver);
+>>>>> +	if (!ret)
+>>>>> +		ac97_rescan_all_controllers();
+>>>>
+>>>> Rescanning the bus when a new codec driver is registered should not be
+>>>> neccessary. The bus is scanned once when the controller is registered, this
+>>>> creates the device. The device driver core will take care of binding the
+>>>> device to the driver, if the driver is registered after thed evice.
+>>> That's because you suppose the initial scanning found all the ac97 codecs.
+>>> But that's an incomplete vision as a codec might be powered off at that time and
+>>> not seen by the first scanning, while the new scanning will discover it.
+>>
+>> But why would the device become suddenly visible when the driver is
+>> registered. This seems to be an as arbitrary point in time as any other.
+> Because in the meantime, a regulator or something else provided power to the
+> AC97 IP, or a clock, and it can answer to requests after that.
 > 
-> Thanks for your comments!
+> And another point if that the clock of controller might be provided by the AC97
+> codec, and the scan will only succeed once the codec is actually providing this
+> clock, which it might do only once the module_init() is done.
 > 
-> On Wed, Nov 9, 2016 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Monday, October 31, 2016 12:30:55 PM CET Geert Uytterhoeven wrote:
-> >> v2:
-> >>   - Drop SoC families and family names; use fixed "Renesas" instead,
-> >
-> > I think I'd rather have seen the family names left in there, but it's
-> > not important, so up to you.
+>> Also consider that when you build a driver as a module, the module will
+>> typically only be auto-loaded after the device has been detected, based on
+>> the device ID. On the other hand, if the driver is built-in driver
+>> registration will happen either before or shortly after the controller
+>> registration.
+>> If there is the expectation that the AC97 CODEC might randomly appear on the
+>> bus, the core should periodically scan the bus.
+> Power wise a periodical scan doesn't look good, at all.
 > 
-> They're not useful for matching, as family names may change anytime, and don't
-> always say much about the hardware capabilities.
-> E.g. SH-Mobile -> R-Mobile -> R-Car | RZ/A | RZ/G
-> Some SH-Mobile (even some R-Car) parts are SuperH only, others have ARM and
-> SuperH.
+> More globally, I don't see if there is an actual issue we're trying to address
+> here, ie. that the rescan is a bug, or if it's more an "Occam's razor"
+> discussion ?
+
+It's a framework design discussion. In my opinion the driver being
+registered and the device becoming visible on the physical bus are two
+completely unrelated operations. Especially in the Linux device driver model.
+
+You have a generic driver that calls ac97_codec_driver_register() in its
+module_init() section. This generic driver does (at module_init() time) not
+know anything about a device instance specific clocks, regulators or other
+resources. Resources are handled on a per device instance basis, and you
+won't have a device instance until the device has been detected, which
+happens in ac97_bus_scan(). So you have a cyclic dependency loop here.
+
+Maybe we can just leave the rescanning out for now and think about how to
+best handle it when the need arises.
+
 > 
-> At least the SoC part numbers are stable (hmm, sh73a0 == r8a73a0).
+>>>> In my opinion this should return a handle to a ac97 controller which can
+>>>> then be passed to snd_ac97_controller_unregister(). This is in my opinion
+>>>> the better approach rather than looking up the controller by parent device.
+>>> This is another "legacy drivers" issue.
+>>>
+>>> The legacy driver (the one probed by platform_data or devicetree) doesn't
+>>> necessarily have a private structure to store this ac97_controller pointer.
+>>
+>> I might be missing something, but I'm not convinced by this. Can you point
+>> me to such a legacy driver where you think this would not work?
+> The first one that popped out:
+>  - hac_soc_platform_probe()
 
-I think the marketing names are much more useful for humans looking
-at the sysfs files than the kernel doing matching on, but both use
-cases are important.
-
-> >>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
-> >>     available, else fall back to hardcoded addresses for compatibility
-> >>     with existing DTBs,
-> >
-> > I only see patches 2, 3, 5, and 7 in my inbox, so I'm lacking the DT
-> > binding for these, among other things.
-> 
-> I understand you've received them in the mean time?
-
-Yes, I found them in my inbox later, not sure why I didn't see them
-at first.
-
-> > It does seem wrong to have a device node for a specific register though.
-> > Shouldn't the node be for the block of registers that these are inside
-> > of?
-> 
-> On R-Mobile APE6, R-Car Gen2 and Gen3, PRR is a lone register.
-> On R-Car Gen1, it's not even documented (and doesn't exist on all parts).
-
-It just seems odd to have it at address 0xff000044 when all the other
-devices are at page-aligned addresses. Do you mean that accessing
-0xff000040 or 0xff000048 will result in a bus-level exception for a
-missing register and just 0xff000044 is actually valid for access,
-or is it just the only thing that is documented?
-
-> On SH-Mobile/R-Mobile, CCCR may be part of the HPB/APB register block, which
-> we further don't touch at all.
-> On R-Car Gen2, it's not documented, but does exist.
-
-This is where the family names would come in handy ;-) I now have
-no idea which chip(s) you are referring to.
-
-If you know the name of the register block, just put it into DT with
-that name. The driver can trivially add the right offset.
-
-> >>   - Don't register the SoC bus if the chip ID register is missing,
-> >
-> > Why? My objection was to hardcoding the register, not to registering
-> > the device? I think I'd rather see the device registered with an
-> > empty revision string.
-> 
-> If there's no chip ID register, there's no reason to use soc_device_match(),
-> as we can always look at a compatible value. All SoCs listed in this driver
-> have a chip ID register.
-
-But you may still have user space tools looking into sysfs, e.g. to
-figure out how to install a kernel that the boot loader can find,
-or which hardware specific distro packages to install.
-
-> if you want me to register the soc_bus for  those SoCs regardless, I want to
-> re-add r7s72100 (RZ/A) and r8a7778 (R-Car M1A), who don't have chip ID
-> registers ;-)
-
-Right. Just don't encode too much knowledge about the SoCs into the
-driver, so we are prepared for adding new ones: We should still look
-for the registers in DT on all chips.
-
-> >> +#define CCCR   0xe600101c      /* Common Chip Code Register */
-> >> +#define PRR    0xff000044      /* Product Register */
-> >> +#define PRR3   0xfff00044      /* Product Register on R-Car Gen3 */
-> >> +
-> >> +static const struct of_device_id renesas_socs[] __initconst = {
-> >> +#ifdef CONFIG_ARCH_R8A73A4
-> >> +       { .compatible = "renesas,r8a73a4",      .data = (void *)PRR, },
-> >> +#endif
-> >> +#ifdef CONFIG_ARCH_R8A7740
-> >> +       { .compatible = "renesas,r8a7740",      .data = (void *)CCCR, },
-> >> +#endif
-> >
-> > My preference here would be to list the register address only for
-> > SoCs that are known to need them, while also having .dtb files that
-> > don't have the nodes.
-> 
-> Even if drivers don't have to handle differences, there's been a long
-> outstanding request to print SoC revision information during bootup
-> (E.g. "Does it still work on ES1.0?"). Hence that covers all SoCs.
-
-Ok, fair enough.
-
-> >> +static int __init renesas_soc_init(void)
-> >> +{
-> >> +       struct soc_device_attribute *soc_dev_attr;
-> >> +       const struct of_device_id *match;
-> >> +       void __iomem *chipid = NULL;
-> >> +       struct soc_device *soc_dev;
-> >> +       struct device_node *np;
-> >> +       unsigned int product;
-> >> +
-> >> +       np = of_find_matching_node_and_match(NULL, renesas_socs, &match);
-> >> +       if (!np)
-> >> +               return -ENODEV;
-> >> +
-> >> +       of_node_put(np);
-> >> +
-> >> +       /* Try PRR first, then CCCR, then hardcoded fallback */
-> >> +       np = of_find_compatible_node(NULL, NULL, "renesas,prr");
-> >> +       if (!np)
-> >> +               np = of_find_compatible_node(NULL, NULL, "renesas,cccr");
-> >> +       if (np) {
-> >> +               chipid = of_iomap(np, 0);
-> >> +               of_node_put(np);
-> >> +       } else if (match->data) {
-> >> +               chipid = ioremap((uintptr_t)match->data, 4);
-> >> +       }
-> >> +       if (!chipid)
-> >>
-> >
-> > Here, I'd turn the order around and look for the DT nodes of the
-> > devices first. Only if they are not found, look at the compatible
-> > string of the root node. No need to search for a node though,
-> > you know which one it is when you look for a compatible =
-> > "renesas,r8a73a4".
-> 
-> "renesas,r8a73a4" is the root node, not the device, so it does not have the
-> "reg" property for reading the chip ID?
-
-I mean replace of_find_matching_node_and_match() with
-of_match_node(renesas_socs, of_root).
-
-It does the same thing, just more efficiently.
- 
-> There is no SoC part number in the "renesas,prr" and "renesas,cccr" nodes.
-> Hence I always need to look at the root nodes.
-
-Not sure what that would protect you from. Could you have a renesas,cccr
-
-
-	Arnd
+I think that driver should be able to use platform_set_drvdata() to store
+the pointer.
