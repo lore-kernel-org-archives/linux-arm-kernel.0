@@ -1,73 +1,85 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Thu, 10 Nov 2016 22:34:07 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <20161110202910.GE28832@amd>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd>
-Message-ID: <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Nov 2016 15:42:12 -0600
+Subject: [PATCH v5 02/23] of: device: Export of_device_{get_modalias,
+ uvent_modalias} to modules
+In-Reply-To: <CAGb2v66C15fU1b2+xNDV8Fv2kmmKXyUknA8=9wXztUcs8CNKLg@mail.gmail.com>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-3-stephen.boyd@linaro.org>
+ <CAGb2v66t8t3o0PxzaaBKnRvNP=CWG5nYud7Wjp27Q1x2baM4hg@mail.gmail.com>
+ <147733850401.29612.2343965740004706258@sboyd-linaro>
+ <20161025011632.GA23876@b29397-desktop>
+ <147829269430.21688.2345895151880009021@sboyd-linaro>
+ <20161107012920.GA10559@b29397-desktop>
+ <CAGb2v66C15fU1b2+xNDV8Fv2kmmKXyUknA8=9wXztUcs8CNKLg@mail.gmail.com>
+Message-ID: <CAL_Jsq+Bw4XVEJY6V4Hn+D_OmqEcp_nLLrVT0_i+jX_guCqzfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 11/10/2016 09:29 PM, Pavel Machek wrote:
-> On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
->> * Pavel Machek <pavel@ucw.cz> [161110 09:29]:
->>> Hi!
+On Sun, Nov 6, 2016 at 7:56 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, Nov 7, 2016 at 9:29 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+>> On Fri, Nov 04, 2016 at 01:51:34PM -0700, Stephen Boyd wrote:
+>>> Quoting Peter Chen (2016-10-24 18:16:32)
+>>> > On Mon, Oct 24, 2016 at 12:48:24PM -0700, Stephen Boyd wrote:
+>>> > > Quoting Chen-Yu Tsai (2016-10-24 05:19:05)
+>>> > > > Hi,
+>>> > > >
+>>> > > > On Tue, Oct 18, 2016 at 9:56 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+>>> > > > > The ULPI bus can be built as a module, and it will soon be
+>>> > > > > calling these functions when it supports probing devices from DT.
+>>> > > > > Export them so they can be used by the ULPI module.
+>>> > > > >
+>>> > > > > Acked-by: Rob Herring <robh@kernel.org>
+>>> > > > > Cc: <devicetree@vger.kernel.org>
+>>> > > > > Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+>>> > > > > ---
+>>> > > > >  drivers/of/device.c | 2 ++
+>>> > > > >  1 file changed, 2 insertions(+)
+>>> > > > >
+>>> > > > > diff --git a/drivers/of/device.c b/drivers/of/device.c
+>>> > > > > index 8a22a253a830..6719ab35b62e 100644
+>>> > > > > --- a/drivers/of/device.c
+>>> > > > > +++ b/drivers/of/device.c
+>>> > > > > @@ -225,6 +225,7 @@ ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+>>> > > > >
+>>> > > > >         return tsize;
+>>> > > > >  }
+>>> > > > > +EXPORT_SYMBOL_GPL(of_device_get_modalias);
+>>> > > > >
+>>> > > > >  int of_device_request_module(struct device *dev)
+>>> > > > >  {
+>>> > > > > @@ -290,6 +291,7 @@ void of_device_uevent(struct device *dev, struct kobj_uevent_env *env)
+>>> > > > >         }
+>>> > > > >         mutex_unlock(&of_mutex);
+>>> > > > >  }
+>>> > > > > +EXPORT_SYMBOL_GPL(of_device_uevent_modalias);
+>>> > > >
+>>> > > > This is trailing the wrong function.
+>>> > > >
+>>> > >
+>>> > > Good catch. Must have been some bad rebase.
+>>> > >
+>>> > > Peter, can you fix it while applying or should I resend this patch?
+>>> > >
+>>> >
+>>> > But, this is device tree patch. I can only get chipidea part and other
+>>> > USB patches if Greg agrees.
+>>> >
 >>>
->>>>>>> Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
->>>>>>> the sysfs brightness attr for changes.") breaks runtime PM for me.
->>>>>>>
->>>>>>> On my omap dm3730 based test system, idle power consumption is over 70
->>>>>>> times higher now with this patch! It goes from about 6mW for the core
->>>>>>> system to over 440mW during idle meaning there's some busy timer now
->>>>>>> active.
->>>>>>>
->>>>>>> Reverting this patch fixes the issue. Any ideas?
->>>
->>> Are you using any LED that toggles with high frequency? Like perhaps
->>> LED that is lit when CPU is active?
+>>> Were you expecting Rob to take the drivers/of/* patches? Sorry I thought
+>>> Rob acked them so they could go through usb with the other changes.
 >>
->> Yeah one of them seems to have cpu0 as the default trigger.
+>> I am just worried about possible merge error when linus pulls both OF
+>> and USB tree. Greg, is it ok the OF patches through USB tree with OF
+>> maintainer's ack?
 >
-> Aha. Its quite obvious we don't want to notify sysfs each time that
-> one is toggled, right?
->
-> IMO brightness should display max brightness for the trigger, as Hans
-> suggested, anything else is madness for trigger such as cpu activity.
+> May I suggest putting the OF patches on an immutable branch so other
+> subsystems can pull them in without pulling in the USB patches? At
+> least I want to use them in the I2C subsystem, and in the sunxi-rsb
+> driver.
 
-Are you suggesting that we should revert changes introduced
-by below patch?
+Do you have patches using this already. If not, it is starting to get
+a bit late for v4.10.
 
-commit 29d76dfa29fe22583aefddccda0bc56aa81035dc
-Author: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
-Date:   Tue Mar 18 09:47:48 2008 +0000
+I can apply this, but then you'll just be pulling in other DT patches.
 
-     leds: Add support to leds with readable status
-
-     Some led hardware allows drivers to query the led state, and this patch
-     adds a hook to let the led class take advantage of that information 
-when
-     available.
-
-     Without this functionality, when access to the led hardware is not
-     exclusive (i.e. firmware or hardware might change its state behind the
-     kernel's back), reality goes out of sync with the led class' idea 
-of what
-     the led is doing, which is annoying at best.
-
-     Behaviour for drivers that do not or cannot read the led status is
-     unchanged.
-
-     Signed-off-by: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
-     Signed-off-by: Richard Purdie <rpurdie@rpsys.net>
-
-
--- 
-Best regards,
-Jacek Anaszewski
+Rob
