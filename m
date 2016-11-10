@@ -1,40 +1,76 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 10 Nov 2016 10:07:04 -0700
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161110144007.GC2078@8bytes.org>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home>
- <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
- <20161108163508.1bcae0c2@t450s.home> <58228F71.6020108@redhat.com>
- <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
- <20161109192303.GD15676@cbox> <20161109130114.3e17bba9@t450s.home>
- <20161110144007.GC2078@8bytes.org>
-Message-ID: <20161110100704.7dd16e2f@t450s.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Nov 2016 17:17:32 +0000
+Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions
+ to asm/perf_event.h
+In-Reply-To: <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
+References: <1478721480-24852-1-git-send-email-wei@redhat.com>
+ <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
+ <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
+ <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
+Message-ID: <20161110171732.GA17134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Nov 2016 15:40:07 +0100
-Joerg Roedel <joro@8bytes.org> wrote:
-
-> On Wed, Nov 09, 2016 at 01:01:14PM -0700, Alex Williamson wrote:
-> > Well, it's not like QEMU or libvirt stumbling through sysfs to figure
-> > out where holes could be in order to instantiate a VM with matching
-> > holes, just in case someone might decide to hot-add a device into the
-> > VM, at some point, and hopefully they don't migrate the VM to another
-> > host with a different layout first, is all that much less disgusting or
-> > foolproof. It's just that in order to dynamically remove a page as a
-> > possible DMA target we require a paravirt channel, such as a balloon
-> > driver that's able to pluck a specific page.  In some ways it's
-> > actually less disgusting, but it puts some prerequisites on
-> > enlightening the guest OS.  Thanks,  
+On Thu, Nov 10, 2016 at 03:32:12PM +0000, Marc Zyngier wrote:
+> On 10/11/16 15:12, Wei Huang wrote:
+> > 
+> > 
+> > On 11/10/2016 03:10 AM, Marc Zyngier wrote:
+> >> Hi Wei,
+> >>
+> >> On 09/11/16 19:57, Wei Huang wrote:
+> >>> This patch moves ARMv8-related perf event definitions from perf_event.c
+> >>> to asm/perf_event.h; so KVM code can use them directly. This also help
+> >>> remove a duplicated definition of SW_INCR in perf_event.h.
+> >>>
+> >>> Signed-off-by: Wei Huang <wei@redhat.com>
+> >>> ---
+> >>>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
+> >>>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
+> >>>  2 files changed, 160 insertions(+), 162 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+> >>> index 2065f46..6c7b18b 100644
+> >>> --- a/arch/arm64/include/asm/perf_event.h
+> >>> +++ b/arch/arm64/include/asm/perf_event.h
+> >>> @@ -46,7 +46,166 @@
+> >>>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+> >>>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
+> >>>  
+> >>> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
+> >>> +/*
+> >>> + * ARMv8 PMUv3 Performance Events handling code.
+> >>> + * Common event types.
+> >>> + */
+> >>> +
+> >>> +/* Required events. */
+> >>> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+> >>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+> >>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+> >>> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+> >>> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+> >>> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+> >>
+> >> In my initial review, I asked for the "required" events to be moved to a
+> >> shared location. What's the rational for moving absolutely everything?
+> > 
+> > I did notice the phrase "required" in the original email. However I
+> > think it is weird to have two places for a same set of PMU definitions.
+> > Other developers might think these two are missing if they don't search
+> > kernel files carefully.
+> > 
+> > If Will Deacon and you insist, I can move only two defs to perf_event.h,
+> > consolidated with the 2nd patch into a single one.
 > 
-> I think it is much simpler if libvirt/qemu just go through all
-> potentially assignable devices on a system and pre-exclude any addresses
-> from guest RAM beforehand, rather than doing something like this with
-> paravirt/ballooning when a device is hot-added. There is no guarantee
-> that you can take a page away from a linux-guest.
+> My personal feeling is that only architected events should be in a
+> public header. The CPU-specific ones are probably better kept private,
+> as it is doubtful that other users would appear).
+> 
+> I'll leave it up to Will to decide, as all I want to avoid is the
+> duplication of constants between the PMU and KVM code bases.
 
-Right, I'm not advocating a paravirt ballooning approach, just pointing
-out that they're both terrible, just in different ways.  Thanks,
+Yeah, just take the sets that you need (i.e. the architected events).
 
-Alex
+Also, check that it builds.
+
+Will
