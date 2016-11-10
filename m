@@ -1,129 +1,335 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 Nov 2016 16:07:08 +0000
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161110154606.GH2078@8bytes.org>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
-Message-ID: <b347ddbc-5066-641c-8101-289fb28624a3@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 10 Nov 2016 16:06:40 +0000
+Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
+ special ISA
+In-Reply-To: <20161109165044.GE10219@e106497-lin.cambridge.arm.com>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
+ <20161109113955.GD10219@e106497-lin.cambridge.arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F8F27C0@lhreml507-mbx>
+ <20161109165044.GE10219@e106497-lin.cambridge.arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8F5F06@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/16 15:46, Joerg Roedel wrote:
-> On Fri, Nov 04, 2016 at 11:24:06AM +0000, Eric Auger wrote:
->> The function populates the list of reserved regions with the
->> PCI host bridge windows and the MSI IOVA range.
->>
->> At the moment an arbitray MSI IOVA window is set at 0x8000000
->> of size 1MB.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->>
->> RFC v1 -> v2: use defines for MSI IOVA base and length
->> ---
->>  drivers/iommu/arm-smmu.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 66 insertions(+)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index c841eb7..c07ea41 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -278,6 +278,9 @@ enum arm_smmu_s2cr_privcfg {
->>  
->>  #define FSYNR0_WNR			(1 << 4)
->>  
->> +#define MSI_IOVA_BASE			0x8000000
->> +#define MSI_IOVA_LENGTH			0x100000
->> +
->>  static int force_stage;
->>  module_param(force_stage, int, S_IRUGO);
->>  MODULE_PARM_DESC(force_stage,
->> @@ -1533,6 +1536,68 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->>  }
->>  
->> +static int add_pci_window_reserved_regions(struct iommu_domain *domain,
->> +					   struct pci_dev *dev)
->> +{
->> +	struct pci_host_bridge *bridge = pci_find_host_bridge(dev->bus);
->> +	struct iommu_reserved_region *region;
->> +	struct resource_entry *window;
->> +	phys_addr_t start;
->> +	size_t length;
->> +
->> +	resource_list_for_each_entry(window, &bridge->windows) {
->> +		if (resource_type(window->res) != IORESOURCE_MEM &&
->> +		    resource_type(window->res) != IORESOURCE_IO)
->> +			continue;
+Hi Liviu
+
+> -----Original Message-----
+> From: liviu.dudau at arm.com [mailto:liviu.dudau at arm.com]
+> Sent: 09 November 2016 16:51
+> To: Gabriele Paoloni
+> Cc: Yuanzhichang; catalin.marinas at arm.com; will.deacon at arm.com;
+> robh+dt at kernel.org; bhelgaas at google.com; mark.rutland at arm.com;
+> olof at lixom.net; arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
+> lorenzo.pieralisi at arm.com; linux-kernel at vger.kernel.org; Linuxarm;
+> devicetree at vger.kernel.org; linux-pci at vger.kernel.org; linux-
+> serial at vger.kernel.org; minyard at acm.org; benh at kernel.crashing.org;
+> zourongrong at gmail.com; John Garry; zhichang.yuan02 at gmail.com;
+> kantyzc at 163.com; xuwei (O)
+> Subject: Re: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
+> special ISA
 > 
-> Why do you care about IO resources?
-
-[since this is essentially code I wrote]
-
-Because they occupy some area of the PCI address space, therefore I
-assumed that, like memory windows, they would be treated as P2P. Is that
-not the case?
-
->> +
->> +		start = window->res->start - window->offset;
->> +		length = window->res->end - window->res->start + 1;
->> +
->> +		iommu_reserved_region_for_each(region, domain) {
->> +			if (region->start == start && region->length == length)
->> +				continue;
->> +		}
->> +		region = kzalloc(sizeof(*region), GFP_KERNEL);
->> +		if (!region)
->> +			return -ENOMEM;
->> +
->> +		region->start = start;
->> +		region->length = length;
->> +
->> +		list_add_tail(&region->list, &domain->reserved_regions);
->> +	}
->> +	return 0;
->> +}
->> +
->> +static int arm_smmu_add_reserved_regions(struct iommu_domain *domain,
->> +					 struct device *device)
->> +{
->> +	struct iommu_reserved_region *region;
->> +	int ret = 0;
->> +
->> +	/* An arbitrary 1MB region starting at 0x8000000 is reserved for MSIs */
->> +	if (!domain->iova_cookie) {
->> +
->> +		region = kzalloc(sizeof(*region), GFP_KERNEL);
->> +		if (!region)
->> +			return -ENOMEM;
->> +
->> +		region->start = MSI_IOVA_BASE;
->> +		region->length = MSI_IOVA_LENGTH;
->> +		list_add_tail(&region->list, &domain->reserved_regions);
->> +
->> +		ret = iommu_get_dma_msi_region_cookie(domain,
->> +						region->start, region->length);
->> +		if (ret)
->> +			return ret;
+> On Wed, Nov 09, 2016 at 04:16:17PM +0000, Gabriele Paoloni wrote:
+> > Hi Liviu
+> >
+> > Thanks for reviewing
+> >
 > 
-> Gah, I hate this. Is there no other and simpler way to get the MSI
-> region than allocating an iova-domain? In that regard, I also _hate_ the
-> patch before introducing this weird iommu_get_dma_msi_region_cookie()
-> function.
+> [removed some irrelevant part of discussion, avoid crazy formatting]
+> 
+> > > > +/**
+> > > > + * addr_is_indirect_io - check whether the input taddr is for
+> > > indirectIO.
+> > > > + * @taddr: the io address to be checked.
+> > > > + *
+> > > > + * Returns 1 when taddr is in the range; otherwise return 0.
+> > > > + */
+> > > > +int addr_is_indirect_io(u64 taddr)
+> > > > +{
+> > > > +	if (arm64_extio_ops->start > taddr || arm64_extio_ops->end
+> <
+> > > taddr)
+> > >
+> > > start >= taddr ?
+> >
+> > Nope... if  (taddr < arm64_extio_ops->start || taddr >
+> arm64_extio_ops->end)
+> > then taddr is outside the range [start; end] and will return 0;
+> otherwise
+> > it will return 1...
+> 
+> Oops, sorry, did not pay attention to the returned value. The check is
+> correct as it is, no need to change then.
+> 
+> >
+> > >
+> > > > +		return 0;
+> > > > +
+> > > > +	return 1;
+> > > > +}
+> > > >
+> > > >  BUILD_EXTIO(b, u8)
+> > > >
+> > > > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > > > index 02b2903..cc2a05d 100644
+> > > > --- a/drivers/of/address.c
+> > > > +++ b/drivers/of/address.c
+> > > > @@ -479,6 +479,50 @@ static int of_empty_ranges_quirk(struct
+> > > device_node *np)
+> > > >  	return false;
+> > > >  }
+> > > >
+> > > > +
+> > > > +/*
+> > > > + * of_isa_indirect_io - get the IO address from some isa reg
+> > > property value.
+> > > > + *	For some isa/lpc devices, no ranges property in ancestor
+> node.
+> > > > + *	The device addresses are described directly in their regs
+> > > property.
+> > > > + *	This fixup function will be called to get the IO address of
+> > > isa/lpc
+> > > > + *	devices when the normal of_translation failed.
+> > > > + *
+> > > > + * @parent:	points to the parent dts node;
+> > > > + * @bus:		points to the of_bus which can be used to parse
+> > > address;
+> > > > + * @addr:	the address from reg property;
+> > > > + * @na:		the address cell counter of @addr;
+> > > > + * @presult:	store the address paresed from @addr;
+> > > > + *
+> > > > + * return 1 when successfully get the I/O address;
+> > > > + * 0 will return for some failures.
+> > >
+> > > Bah, you are returning a signed int, why 0 for failure? Return a
+> > > negative value with
+> > > error codes. Otherwise change the return value into a bool.
+> >
+> > Yes we'll move to bool
+> >
+> > >
+> > > > + */
+> > > > +static int of_get_isa_indirect_io(struct device_node *parent,
+> > > > +				struct of_bus *bus, __be32 *addr,
+> > > > +				int na, u64 *presult)
+> > > > +{
+> > > > +	unsigned int flags;
+> > > > +	unsigned int rlen;
+> > > > +
+> > > > +	/* whether support indirectIO */
+> > > > +	if (!indirect_io_enabled())
+> > > > +		return 0;
+> > > > +
+> > > > +	if (!of_bus_isa_match(parent))
+> > > > +		return 0;
+> > > > +
+> > > > +	flags = bus->get_flags(addr);
+> > > > +	if (!(flags & IORESOURCE_IO))
+> > > > +		return 0;
+> > > > +
+> > > > +	/* there is ranges property, apply the normal translation
+> > > directly. */
+> > >
+> > > s/there is ranges/if we have a 'ranges'/
+> >
+> > Thanks for spotting this
+> >
+> > >
+> > > > +	if (of_get_property(parent, "ranges", &rlen))
+> > > > +		return 0;
+> > > > +
+> > > > +	*presult = of_read_number(addr + 1, na - 1);
+> > > > +	/* this fixup is only valid for specific I/O range. */
+> > > > +	return addr_is_indirect_io(*presult);
+> > > > +}
+> > > > +
+> > > >  static int of_translate_one(struct device_node *parent, struct
+> > > of_bus *bus,
+> > > >  			    struct of_bus *pbus, __be32 *addr,
+> > > >  			    int na, int ns, int pna, const char *rprop)
+> > > > @@ -595,6 +639,15 @@ static u64 __of_translate_address(struct
+> > > device_node *dev,
+> > > >  			result = of_read_number(addr, na);
+> > > >  			break;
+> > > >  		}
+> > > > +		/*
+> > > > +		 * For indirectIO device which has no ranges
+> property, get
+> > > > +		 * the address from reg directly.
+> > > > +		 */
+> > > > +		if (of_get_isa_indirect_io(dev, bus, addr, na,
+> &result)) {
+> > > > +			pr_debug("isa indirectIO matched(%s)..addr =
+> > > 0x%llx\n",
+> > > > +				of_node_full_name(dev), result);
+> > > > +			break;
+> > > > +		}
+> > > >
+> > > >  		/* Get new parent bus and counts */
+> > > >  		pbus = of_match_bus(parent);
+> > > > @@ -688,8 +741,9 @@ static int __of_address_to_resource(struct
+> > > device_node *dev,
+> > > >  	if (taddr == OF_BAD_ADDR)
+> > > >  		return -EINVAL;
+> > > >  	memset(r, 0, sizeof(struct resource));
+> > > > -	if (flags & IORESOURCE_IO) {
+> > > > +	if (flags & IORESOURCE_IO && taddr >= PCIBIOS_MIN_IO) {
+> > > >  		unsigned long port;
+> > > > +
+> > > >  		port = pci_address_to_pio(taddr);
+> > > >  		if (port == (unsigned long)-1)
+> > > >  			return -EINVAL;
+> > > > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > > > index ba34907..1a08511 100644
+> > > > --- a/drivers/pci/pci.c
+> > > > +++ b/drivers/pci/pci.c
+> > > > @@ -3263,7 +3263,7 @@ int __weak
+> pci_register_io_range(phys_addr_t
+> > > addr, resource_size_t size)
+> > > >
+> > > >  #ifdef PCI_IOBASE
+> > > >  	struct io_range *range;
+> > > > -	resource_size_t allocated_size = 0;
+> > > > +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
+> > > >
+> > > >  	/* check if the range hasn't been previously recorded */
+> > > >  	spin_lock(&io_range_lock);
+> > > > @@ -3312,7 +3312,7 @@ phys_addr_t pci_pio_to_address(unsigned
+> long
+> > > pio)
+> > > >
+> > > >  #ifdef PCI_IOBASE
+> > > >  	struct io_range *range;
+> > > > -	resource_size_t allocated_size = 0;
+> > > > +	resource_size_t allocated_size = PCIBIOS_MIN_IO;
+> > >
+> > > Have you checked that pci_pio_to_address still returns valid values
+> > > after this? I know that
+> > > you are trying to take into account PCIBIOS_MIN_IO limit when
+> > > allocating reserving the IO ranges,
+> > > but the values added in the io_range_list are still starting from
+> zero,
+> > > no from PCIBIOS_MIN_IO,
+> >
+> > I think you're wrong here as in pci_address_to_pio we have:
+> > +	resource_size_t offset = PCIBIOS_MIN_IO;
+> >
+> > This should be enough to guarantee that the PIOs start at
+> > PCIBIOS_MIN_IO...right?
+> 
+> I don't think you can guarantee that the pio value that gets passed
+> into
+> pci_pio_to_address() always comes from a previously returned value by
+> pci_address_to_pio(). Maybe you can add a check in pci_pio_to_address()
 
-Mea culpa ;)
+Maybe I am missing something...could you make an exampleof a case
+where an IO toke doesn?t come from pci_address_to_pio() ?
 
-> Allocation an iova-domain is pretty expensive, as it also includes
-> per-cpu data-structures and all, so please don't do this just for the
-> purpose of compiling a list of reserved regions.
+Thanks
 
-Yeah, this was really more of a "get it working" thing - the automatic
-MSI mapping stuff is already plumbed in for DMA domains, so faking up a
-DMA domain is the easy way in. I'll have a look at factoring out the
-relevant parts a bit so that MSI-only regions can have an alternate
-cookie with a lightweight allocator.
+Gab
 
-Robin.
+
+> 
+> 	if (pio < PCIBIOS_MIN_IO)
+> 		return address;
+> 
+> to avoid adding more checks in the list_for_each_entry() loop.
+> 
+> Best regards,
+> Liviu
+> 
+> >
+> >
+> > > so the calculation of the address in this function could return
+> > > negative values casted to pci_addr_t.
+> > >
+> > > Maybe you want to adjust the range->start value in
+> > > pci_register_io_range() as well to have it
+> > > offset by PCIBIOS_MIN_IO as well.
+> > >
+> > > Best regards,
+> > > Liviu
+> > >
+> > > >
+> > > >  	if (pio > IO_SPACE_LIMIT)
+> > > >  		return address;
+> > > > @@ -3335,7 +3335,7 @@ unsigned long __weak
+> > > pci_address_to_pio(phys_addr_t address)
+> > > >  {
+> > > >  #ifdef PCI_IOBASE
+> > > >  	struct io_range *res;
+> > > > -	resource_size_t offset = 0;
+> > > > +	resource_size_t offset = PCIBIOS_MIN_IO;
+> > > >  	unsigned long addr = -1;
+> > > >
+> > > >  	spin_lock(&io_range_lock);
+> > > > diff --git a/include/linux/of_address.h
+> b/include/linux/of_address.h
+> > > > index 3786473..deec469 100644
+> > > > --- a/include/linux/of_address.h
+> > > > +++ b/include/linux/of_address.h
+> > > > @@ -24,6 +24,23 @@ struct of_pci_range {
+> > > >  #define for_each_of_pci_range(parser, range) \
+> > > >  	for (; of_pci_range_parser_one(parser, range);)
+> > > >
+> > > > +
+> > > > +#ifndef indirect_io_enabled
+> > > > +#define indirect_io_enabled indirect_io_enabled
+> > > > +static inline bool indirect_io_enabled(void)
+> > > > +{
+> > > > +	return false;
+> > > > +}
+> > > > +#endif
+> > > > +
+> > > > +#ifndef addr_is_indirect_io
+> > > > +#define addr_is_indirect_io addr_is_indirect_io
+> > > > +static inline int addr_is_indirect_io(u64 taddr)
+> > > > +{
+> > > > +	return 0;
+> > > > +}
+> > > > +#endif
+> > > > +
+> > > >  /* Translate a DMA address from device space to CPU space */
+> > > >  extern u64 of_translate_dma_address(struct device_node *dev,
+> > > >  				    const __be32 *in_addr);
+> > > > diff --git a/include/linux/pci.h b/include/linux/pci.h
+> > > > index 0e49f70..7f6bbb6 100644
+> > > > --- a/include/linux/pci.h
+> > > > +++ b/include/linux/pci.h
+> > > > @@ -2130,4 +2130,12 @@ static inline bool pci_ari_enabled(struct
+> > > pci_bus *bus)
+> > > >  /* provide the legacy pci_dma_* API */
+> > > >  #include <linux/pci-dma-compat.h>
+> > > >
+> > > > +/*
+> > > > + * define this macro here to refrain from compilation error for
+> some
+> > > > + * platforms. Please keep this macro at the end of this header
+> file.
+> > > > + */
+> > > > +#ifndef PCIBIOS_MIN_IO
+> > > > +#define PCIBIOS_MIN_IO		0
+> > > > +#endif
+> > > > +
+> > > >  #endif /* LINUX_PCI_H */
+> > > > --
+> > > > 1.9.1
+> > > >
+> > > > --
+> > > > To unsubscribe from this list: send the line "unsubscribe linux-
+> pci"
+> > > in
+> > > > the body of a message to majordomo at vger.kernel.org
+> > > > More majordomo info at  http://vger.kernel.org/majordomo-
+> info.html
+> 
+> --
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
