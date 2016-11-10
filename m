@@ -1,185 +1,134 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 Nov 2016 12:48:52 +0000
-Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
- iommu_domain
-In-Reply-To: <6c2e1c81-e951-a284-b547-733369128e7e@redhat.com>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
- <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
- <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
- <6851a74a-775a-bd20-cdea-4cf06f5f0289@arm.com>
- <6c2e1c81-e951-a284-b547-733369128e7e@redhat.com>
-Message-ID: <7c6095e8-1f7c-317b-3df7-02c8a4cfe5b7@arm.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 10 Nov 2016 13:56:27 +0100
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+References: <20161109192301.GS26979@atomide.com>
+ <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
+ <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
+ <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+Message-ID: <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/16 12:14, Auger Eric wrote:
-> Hi Robin,
-> 
-> On 10/11/2016 12:54, Robin Murphy wrote:
->> Hi Eric,
+Hi,
+
+On 11/10/2016 09:49 AM, Hans de Goede wrote:
+> Hi,
+>
+> On 09-11-16 21:45, Jacek Anaszewski wrote:
+>> Hi Tony,
 >>
->> On 10/11/16 11:22, Auger Eric wrote:
->>> Hi Robin,
+>> On 11/09/2016 08:23 PM, Tony Lindgren wrote:
+>>> Hi,
 >>>
->>> On 04/11/2016 15:00, Robin Murphy wrote:
->>>> Hi Eric,
->>>>
->>>> Thanks for posting this new series - the bottom-up approach is a lot
->>>> easier to reason about :)
->>>>
->>>> On 04/11/16 11:24, Eric Auger wrote:
->>>>> Introduce a new iommu_reserved_region struct. This embodies
->>>>> an IOVA reserved region that cannot be used along with the IOMMU
->>>>> API. The list is protected by a dedicated mutex.
->>>>
->>>> In the light of these patches, I think I'm settling into agreement that
->>>> the iommu_domain is the sweet spot for accessing this information - the
->>>> underlying magic address ranges might be properties of various bits of
->>>> hardware many of which aren't the IOMMU itself, but they only start to
->>>> matter at the point you start wanting to use an IOMMU domain at the
->>>> higher level. Therefore, having a callback in the domain ops to pull
->>>> everything together fits rather neatly.
->>> Using get_dm_regions could have make sense but this approach now is
->>> ruled out by sysfs API approach. If attribute file is bound to be used
->>> before iommu domains are created, we cannot rely on any iommu_domain
->>> based callback. Back to square 1?
->>
->> I think it's still OK. The thing about these reserved regions is that as
->> a property of the underlying hardware they must be common to any domain
->> for a given group, therefore without loss of generality we can simply
->> query group->domain->ops->get_dm_regions(), and can expect the reserved
->> ones will be the same regardless of what domain that points to
->> (identity-mapped IVMD/RMRR/etc.
-> Are they really? P2P reserved regions depend on iommu_domain right?
-
-Indeed. To use the SMMU example, reprogramming S2CRs to target a
-different context bank (i.e. attaching to a different domain) won't
-affect the fact that the transactions aren't even reaching the SMMU in
-the first place. That's why we need the exact same information for DMA
-domains, thus why getting it for free via the dm_regions mechanism would
-be really neat.
-
-The visibility of P2P regions, doorbells, etc. for a given device is
-ultimately a property of the hardware topology, and topology happens to
-be what the iommu_group already represents*. There looks to be a snag
-when we try to consider the addresses of such regions, since addresses
-are the business of iommu_domains, not groups, but as there is a 1:1
-relationship between a group and its default domain, things end up tying
-together quite neatly.
-
-Robin.
-
-*in fact, I've just had an idea that way we check ACS paths to determine
-groups might similarly be a finer-grained way to detect what P2P
-regions, if any, are actually relevant.
-
-> Now I did not consider default_domain usability, I acknowledge. I will
-> send a POC anyway.
-> 
->  regions may not be, but we'd be
->> filtering those out anyway). The default DMA domains need this
->> information too, and since those are allocated at group creation,
->> group->domain should always be non-NULL and interrogable.
->>
->> Plus, the groups are already there in sysfs, and, being representative
->> of device topology, would seem to be an ideal place to expose the
->> addressing limitations relevant to the devices within them. This really
->> feels like it's all falling into place (on the kernel end, at least, I'm
->> sticking to the sidelines on the userspace discussion ;)).
-> 
-> Thanks
-> 
-> Eric
->>
->> Robin.
->>
+>>> Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
+>>> the sysfs brightness attr for changes.") breaks runtime PM for me.
 >>>
->>> Thanks
+>>> On my omap dm3730 based test system, idle power consumption is over 70
+>>> times higher now with this patch! It goes from about 6mW for the core
+>>> system to over 440mW during idle meaning there's some busy timer now
+>>> active.
 >>>
->>> Eric
->>>>
->>>>>
->>>>> An iommu domain now owns a list of those.
->>>>>
->>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>>>>
->>>>> ---
->>>>> ---
->>>>>  drivers/iommu/iommu.c |  2 ++
->>>>>  include/linux/iommu.h | 17 +++++++++++++++++
->>>>>  2 files changed, 19 insertions(+)
->>>>>
->>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->>>>> index 9a2f196..0af07492 100644
->>>>> --- a/drivers/iommu/iommu.c
->>>>> +++ b/drivers/iommu/iommu.c
->>>>> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
->>>>>  
->>>>>  	domain->ops  = bus->iommu_ops;
->>>>>  	domain->type = type;
->>>>> +	INIT_LIST_HEAD(&domain->reserved_regions);
->>>>> +	mutex_init(&domain->resv_mutex);
->>>>>  	/* Assume all sizes by default; the driver may override this later */
->>>>>  	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
->>>>>  
->>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->>>>> index 436dc21..0f2eb64 100644
->>>>> --- a/include/linux/iommu.h
->>>>> +++ b/include/linux/iommu.h
->>>>> @@ -84,6 +84,8 @@ struct iommu_domain {
->>>>>  	void *handler_token;
->>>>>  	struct iommu_domain_geometry geometry;
->>>>>  	void *iova_cookie;
->>>>> +	struct list_head reserved_regions;
->>>>> +	struct mutex resv_mutex; /* protects the reserved region list */
->>>>>  };
->>>>>  
->>>>>  enum iommu_cap {
->>>>> @@ -131,6 +133,21 @@ struct iommu_dm_region {
->>>>>  	int			prot;
->>>>>  };
->>>>>  
->>>>> +/**
->>>>> + * struct iommu_reserved_region - descriptor for a reserved iova region
->>>>> + * @list: Linked list pointers
->>>>> + * @start: IOVA base address of the region
->>>>> + * @length: Length of the region in bytes
->>>>> + */
->>>>> +struct iommu_reserved_region {
->>>>> +	struct list_head	list;
->>>>> +	dma_addr_t		start;
->>>>> +	size_t			length;
->>>>> +};
->>>>
->>>> Looking at this in context with the dm_region above, though, I come to
->>>> the surprising realisation that these *are* dm_regions, even at the
->>>> fundamental level - on the one hand you've got physical addresses which
->>>> can't be remapped (because something is already using them), while on
->>>> the other you've got physical addresses which can't be remapped (because
->>>> the IOMMU is incapable). In fact for reserved regions *other* than our
->>>> faked-up MSI region there's no harm if the IOMMU were to actually
->>>> identity-map them.
->>>>
->>>> Let's just add this to the existing infrastructure, either with some
->>>> kind of IOMMU_NOMAP flag or simply prot = 0. That way it automatically
->>>> gets shared between the VFIO and DMA cases for free!
->>>>
->>>> Robin.
->>>>
->>>>> +
->>>>> +#define iommu_reserved_region_for_each(resv, d) \
->>>>> +	list_for_each_entry(resv, &(d)->reserved_regions, list)
->>>>> +
->>>>>  #ifdef CONFIG_IOMMU_API
->>>>>  
->>>>>  /**
->>>>>
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
+>>> Reverting this patch fixes the issue. Any ideas?
 >>
+>> Thanks for the report. This is probably caused by sysfs_notify_dirent().
+>> I'm afraid that we can't keep this feature in the current shape.
+>> Hans, I'm dropping the patch. We probably will have to delegate this
+>> call to a workqueue task. Think about use cases when the LED is blinked
+>> with high frequency e.g. from ledtrig-disk.c.
+>
+> sysfs_notify_dirent() already uses a workqueue, here is the actual
+> implementation of it (from fs/kernfs/file.c) :
+>
+> void kernfs_notify(struct kernfs_node *kn)
+> {
+>         static DECLARE_WORK(kernfs_notify_work, kernfs_notify_workfn);
+>         unsigned long flags;
+>
+>         if (WARN_ON(kernfs_type(kn) != KERNFS_FILE))
+>                 return;
+>
+>         spin_lock_irqsave(&kernfs_notify_lock, flags);
+>         if (!kn->attr.notify_next) {
+>                 kernfs_get(kn);
+>                 kn->attr.notify_next = kernfs_notify_list;
+>                 kernfs_notify_list = kn;
+>                 schedule_work(&kernfs_notify_work);
+>         }
+>         spin_unlock_irqrestore(&kernfs_notify_lock, flags);
+> }
+
+Indeed. As a next step of this investigation Tony could disable
+particular calls made in kernfs_notify_workfn to check what
+exactly causes excessive power consumption.
+
+> So using a workqueue is not going to help. Note that I already
+> feared this, which is why my initial implementation only called
+> sysfs_notify_dirent() for user initiated changes and not for
+> triggers / blinking.
+
+AFAIR there were no calls to led_notify_brightness_change() in
+the initial implementation and it was entirely predestined for
+being called by LED class drivers on brightness changes made
+by firmware.
+
+> I think we may need to reconsider what getting the brightness
+> sysfs atrribute actually returns. Currently when a LED is
+> blinking it will return 0 resp. the actual brightness depending
+> on when in the blink cycle the user reads the brightness
+> sysfs atrribute.
+>
+> So a user can do "echo 128 > brightness && cat brightness" and
+> get out 0, or 128, depending purely on timing.
+>
+> This seems to contradict what Documentation/ABI/testing/sysfs-class-led
+> has to say:
+>
+> What:           /sys/class/leds/<led>/brightness
+> Date:           March 2006
+> KernelVersion:  2.6.17
+> Contact:        Richard Purdie <rpurdie@rpsys.net>
+> Description:
+>                 Set the brightness of the LED. Most LEDs don't
+>                 have hardware brightness support, so will just be turned
+> on for
+>                 non-zero brightness settings. The value is between 0 and
+>                 /sys/class/leds/<led>/max_brightness.
+>
+>                 Writing 0 to this file clears active trigger.
+>
+>                 Writing non-zero to this file while trigger is active
+> changes the
+>                 top brightness trigger is going to use.
+>
+> Even though it only talks about writing, the logical thing would be for
+> reading to be the exact opposite of writing, so we would get:
+>
+>                 Reading from this file while a trigger is active returns
+> the
+>                 top brightness trigger is going to use.
+>
+> The current docs say not about (sw) blinking, but that should be treated
+> just
+> like a trigger IMHO.
+
+You'r right, we should describe the semantics on reading, but it would
+have to be as follows:
+
+Reading from this file returns LED brightness at given moment, i.e.
+even though LED class device brightness setting is greater than 0, the
+momentary brightness can be 0 if the readout occurred during low phase
+of blink cycle.
+
+> If we can get consensus on what the read behavior for the brightness
+> attribute
+> should be, then I think that a better poll() behavior will automatically
+> follow
+> from that.
+
+It seems that we should get back to your initial approach. i.e. only
+brightness changes caused by hardware should be reported.
+
+-- 
+Best regards,
+Jacek Anaszewski
