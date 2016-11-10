@@ -1,27 +1,162 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 10 Nov 2016 13:02:53 +0100
-Subject: [PATCH v3 00/10] Add DT support for ohci-da8xx
-In-Reply-To: <CAKXjFTN04Wz5jsaHsyvDD7G8QqXQvCE4D-YbHtGT=jUqELiS_w@mail.gmail.com>
-References: <20161107203948.28324-1-ahaslam@baylibre.com>
- <CAKXjFTN04Wz5jsaHsyvDD7G8QqXQvCE4D-YbHtGT=jUqELiS_w@mail.gmail.com>
-Message-ID: <20161110120253.GA5385@kroah.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 10 Nov 2016 13:14:06 +0100
+Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
+ iommu_domain
+In-Reply-To: <6851a74a-775a-bd20-cdea-4cf06f5f0289@arm.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
+ <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
+ <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
+ <6851a74a-775a-bd20-cdea-4cf06f5f0289@arm.com>
+Message-ID: <6c2e1c81-e951-a284-b547-733369128e7e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 05:37:41PM +0100, Axel Haslam wrote:
-> Hi,
+Hi Robin,
+
+On 10/11/2016 12:54, Robin Murphy wrote:
+> Hi Eric,
 > 
-> On Mon, Nov 7, 2016 at 9:39 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
-> > The purpose of this patch series is to add DT support for the davinci
-> > ohci driver.
-> >
+> On 10/11/16 11:22, Auger Eric wrote:
+>> Hi Robin,
+>>
+>> On 04/11/2016 15:00, Robin Murphy wrote:
+>>> Hi Eric,
+>>>
+>>> Thanks for posting this new series - the bottom-up approach is a lot
+>>> easier to reason about :)
+>>>
+>>> On 04/11/16 11:24, Eric Auger wrote:
+>>>> Introduce a new iommu_reserved_region struct. This embodies
+>>>> an IOVA reserved region that cannot be used along with the IOMMU
+>>>> API. The list is protected by a dedicated mutex.
+>>>
+>>> In the light of these patches, I think I'm settling into agreement that
+>>> the iommu_domain is the sweet spot for accessing this information - the
+>>> underlying magic address ranges might be properties of various bits of
+>>> hardware many of which aren't the IOMMU itself, but they only start to
+>>> matter at the point you start wanting to use an IOMMU domain at the
+>>> higher level. Therefore, having a callback in the domain ops to pull
+>>> everything together fits rather neatly.
+>> Using get_dm_regions could have make sense but this approach now is
+>> ruled out by sysfs API approach. If attribute file is bound to be used
+>> before iommu domains are created, we cannot rely on any iommu_domain
+>> based callback. Back to square 1?
 > 
-> To make it easier to review. I will split the arch/arm and driver
-> patches into separate series.
+> I think it's still OK. The thing about these reserved regions is that as
+> a property of the underlying hardware they must be common to any domain
+> for a given group, therefore without loss of generality we can simply
+> query group->domain->ops->get_dm_regions(), and can expect the reserved
+> ones will be the same regardless of what domain that points to
+> (identity-mapped IVMD/RMRR/etc.
+Are they really? P2P reserved regions depend on iommu_domain right?
 
-I don't think it's easier, as now I have no idea what order, or what
-tree it should go through :(
+Now I did not consider default_domain usability, I acknowledge. I will
+send a POC anyway.
 
-I'm guessing not mine, so all are now deleted from my patch queue...
+ regions may not be, but we'd be
+> filtering those out anyway). The default DMA domains need this
+> information too, and since those are allocated at group creation,
+> group->domain should always be non-NULL and interrogable.
+> 
+> Plus, the groups are already there in sysfs, and, being representative
+> of device topology, would seem to be an ideal place to expose the
+> addressing limitations relevant to the devices within them. This really
+> feels like it's all falling into place (on the kernel end, at least, I'm
+> sticking to the sidelines on the userspace discussion ;)).
 
-greg k-h
+Thanks
+
+Eric
+> 
+> Robin.
+> 
+>>
+>> Thanks
+>>
+>> Eric
+>>>
+>>>>
+>>>> An iommu domain now owns a list of those.
+>>>>
+>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>
+>>>> ---
+>>>> ---
+>>>>  drivers/iommu/iommu.c |  2 ++
+>>>>  include/linux/iommu.h | 17 +++++++++++++++++
+>>>>  2 files changed, 19 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>>> index 9a2f196..0af07492 100644
+>>>> --- a/drivers/iommu/iommu.c
+>>>> +++ b/drivers/iommu/iommu.c
+>>>> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+>>>>  
+>>>>  	domain->ops  = bus->iommu_ops;
+>>>>  	domain->type = type;
+>>>> +	INIT_LIST_HEAD(&domain->reserved_regions);
+>>>> +	mutex_init(&domain->resv_mutex);
+>>>>  	/* Assume all sizes by default; the driver may override this later */
+>>>>  	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
+>>>>  
+>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>>> index 436dc21..0f2eb64 100644
+>>>> --- a/include/linux/iommu.h
+>>>> +++ b/include/linux/iommu.h
+>>>> @@ -84,6 +84,8 @@ struct iommu_domain {
+>>>>  	void *handler_token;
+>>>>  	struct iommu_domain_geometry geometry;
+>>>>  	void *iova_cookie;
+>>>> +	struct list_head reserved_regions;
+>>>> +	struct mutex resv_mutex; /* protects the reserved region list */
+>>>>  };
+>>>>  
+>>>>  enum iommu_cap {
+>>>> @@ -131,6 +133,21 @@ struct iommu_dm_region {
+>>>>  	int			prot;
+>>>>  };
+>>>>  
+>>>> +/**
+>>>> + * struct iommu_reserved_region - descriptor for a reserved iova region
+>>>> + * @list: Linked list pointers
+>>>> + * @start: IOVA base address of the region
+>>>> + * @length: Length of the region in bytes
+>>>> + */
+>>>> +struct iommu_reserved_region {
+>>>> +	struct list_head	list;
+>>>> +	dma_addr_t		start;
+>>>> +	size_t			length;
+>>>> +};
+>>>
+>>> Looking at this in context with the dm_region above, though, I come to
+>>> the surprising realisation that these *are* dm_regions, even at the
+>>> fundamental level - on the one hand you've got physical addresses which
+>>> can't be remapped (because something is already using them), while on
+>>> the other you've got physical addresses which can't be remapped (because
+>>> the IOMMU is incapable). In fact for reserved regions *other* than our
+>>> faked-up MSI region there's no harm if the IOMMU were to actually
+>>> identity-map them.
+>>>
+>>> Let's just add this to the existing infrastructure, either with some
+>>> kind of IOMMU_NOMAP flag or simply prot = 0. That way it automatically
+>>> gets shared between the VFIO and DMA cases for free!
+>>>
+>>> Robin.
+>>>
+>>>> +
+>>>> +#define iommu_reserved_region_for_each(resv, d) \
+>>>> +	list_for_each_entry(resv, &(d)->reserved_regions, list)
+>>>> +
+>>>>  #ifdef CONFIG_IOMMU_API
+>>>>  
+>>>>  /**
+>>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+> 
