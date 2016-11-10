@@ -1,27 +1,56 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Thu, 10 Nov 2016 18:08:27 +1100
-Subject: [PATCH V5 2/3] ARM64 LPC: Add missing range exception for
- special ISA
-In-Reply-To: <20161109111959.GB17020@leverpostej>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-3-git-send-email-yuanzhichang@hisilicon.com>
- <20161108114953.GB15297@leverpostej>
- <1478646779.7430.66.camel@kernel.crashing.org>
- <20161109111959.GB17020@leverpostej>
-Message-ID: <1478761707.7430.119.camel@kernel.crashing.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 10 Nov 2016 15:41:40 +0800
+Subject: [PATCH 1/2] mfd: pm8921: add support to pm8821
+In-Reply-To: <1478622577-20699-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <201611101507.6LoqLlKA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-11-09 at 11:20 +0000, Mark Rutland wrote:
-> The big change would be to handle !MMIO translations, for which we'd
-> need a runtime registry of ISA bus instance to find the relevant
-> accessor ops and instance-specific data.
+Hi Srinivas,
 
-Yes. We do something a bit like that on ppc, we find the PCI bus
-for which the IO ports match and I have a hook to register the
-special indirect ISA.
+[auto build test ERROR on ljones-mfd/for-mfd-next]
+[also build test ERROR on v4.9-rc4 next-20161110]
+[cannot apply to robh/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-It's a bit messy, we could do something nicer generically.
+url:    https://github.com/0day-ci/linux/commits/Srinivas-Kandagatla/mfd-pm8921-add-support-to-pm8821/20161109-013248
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+config: arm-pxa_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Cheers,
-Ben.
+All error/warnings (new ones prefixed by >>):
+
+   drivers/mfd/pm8921-core.c: In function 'pm8921_probe':
+>> drivers/mfd/pm8921-core.c:630:58: warning: dereferencing 'void *' pointer
+     data = of_match_node(pm8921_id_table, pdev->dev.of_node)->data;
+                                                             ^~
+>> drivers/mfd/pm8921-core.c:630:58: error: request for member 'data' in something not a structure or union
+
+vim +/data +630 drivers/mfd/pm8921-core.c
+
+   624		const struct pm8xxx_data *data;
+   625		int irq, rc;
+   626		unsigned int val;
+   627		u32 rev;
+   628		struct pm_irq_chip *chip;
+   629	
+ > 630		data = of_match_node(pm8921_id_table, pdev->dev.of_node)->data;
+   631		if (!data) {
+   632			dev_err(&pdev->dev, "No matching driver data found\n");
+   633			return -EINVAL;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 30088 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/a54a422b/attachment-0001.gz>
