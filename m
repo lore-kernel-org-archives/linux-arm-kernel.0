@@ -1,46 +1,83 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Nov 2016 08:11:49 -0700
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <621758ce-dd3f-41ad-d9b8-b8e34538700e@redhat.com>
-References: <20161109192301.GS26979@atomide.com>
- <621758ce-dd3f-41ad-d9b8-b8e34538700e@redhat.com>
-Message-ID: <20161110151149.GB27724@atomide.com>
+From: wei@redhat.com (Wei Huang)
+Date: Thu, 10 Nov 2016 09:12:35 -0600
+Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions to
+ asm/perf_event.h
+In-Reply-To: <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
+References: <1478721480-24852-1-git-send-email-wei@redhat.com>
+ <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
+Message-ID: <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hans de Goede <hdegoede@redhat.com> [161110 01:35]:
-> Hi,
+
+
+On 11/10/2016 03:10 AM, Marc Zyngier wrote:
+> Hi Wei,
 > 
-> On 09-11-16 20:23, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
-> > the sysfs brightness attr for changes.") breaks runtime PM for me.
-> > 
-> > On my omap dm3730 based test system, idle power consumption is over 70
-> > times higher now with this patch! It goes from about 6mW for the core
-> > system to over 440mW during idle meaning there's some busy timer now
-> > active.
+> On 09/11/16 19:57, Wei Huang wrote:
+>> This patch moves ARMv8-related perf event definitions from perf_event.c
+>> to asm/perf_event.h; so KVM code can use them directly. This also help
+>> remove a duplicated definition of SW_INCR in perf_event.h.
+>>
+>> Signed-off-by: Wei Huang <wei@redhat.com>
+>> ---
+>>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
+>>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
+>>  2 files changed, 160 insertions(+), 162 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+>> index 2065f46..6c7b18b 100644
+>> --- a/arch/arm64/include/asm/perf_event.h
+>> +++ b/arch/arm64/include/asm/perf_event.h
+>> @@ -46,7 +46,166 @@
+>>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+>>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
+>>  
+>> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
+>> +/*
+>> + * ARMv8 PMUv3 Performance Events handling code.
+>> + * Common event types.
+>> + */
+>> +
+>> +/* Required events. */
+>> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+>> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+>> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+>> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
 > 
-> Do you have any blinking LEDs or LED triggers defined on the system ?
+> In my initial review, I asked for the "required" events to be moved to a
+> shared location. What's the rational for moving absolutely everything?
 
-There are some configured in the dts file:
+I did notice the phrase "required" in the original email. However I
+think it is weird to have two places for a same set of PMU definitions.
+Other developers might think these two are missing if they don't search
+kernel files carefully.
 
-$ grep -i led arch/arm/boot/dts/*torpedo*.dts*
+If Will Deacon and you insist, I can move only two defs to perf_event.h,
+consolidated with the 2nd patch into a single one.
 
-And the gpio controlled led1 is configured to blink with
-linux,default-trigger = "cpu0".
-
-> > Reverting this patch fixes the issue. Any ideas?
+> KVM only needs to know about ARMV8_PMUV3_PERFCTR_SW_INCR and
+> ARMV8_PMUV3_PERFCTR_CPU_CYCLES, so I thought that moving the above six
+> events (and maybe the following two) would be enough.
 > 
-> All I can think of is something calling led_set_brightness quite often,
-> the patch in question makes led_set_brightness somewhat more expensive,
-> but it should not cause such a big difference unless something is
-> really calling led_set_brightness quite often maybe something is calling
-> it with the same value all the time ?
+> Also, you've now broken the build by dropping
+> ARMV8_PMU_EVTYPE_EVENT_SW_INCR without amending it use in the KVM PMU
+> code (see the kbuild report).
+> 
 
-I don't think this one has any brightness control.
+My bad. I tested compilation only after two patches applied. Will fix it.
 
-Regards,
+<snip>
 
-Tony
+>> +
+>>  /* PMUv3 HW events mapping. */
+>>  
+>>  /*
+>>
+> 
+> Thanks,
+> 
+> 	M.
+> 
