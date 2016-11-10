@@ -1,85 +1,111 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 10 Nov 2016 17:18:57 +0100
-Subject: [PATCH v2 5/6] ARM: dts: stm32f429: Add adc support
+Date: Thu, 10 Nov 2016 17:18:53 +0100
+Subject: [PATCH v2 1/6] Documentation: dt-bindings: Document STM32 ADC DT
+ bindings
 In-Reply-To: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
 References: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1478794738-28933-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1478794738-28933-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add adc support & pinctrl analog phandle (adc3_in8) to stm32f429.
+This patch adds documentation of device tree bindings for the STM32 ADC.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 85 ++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 336ee4f..f198132 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -172,6 +172,49 @@
- 			status = "disabled";
- 		};
- 
-+		adc: adc at 40012000 {
-+			compatible = "st,stm32f4-adc-core";
-+			reg = <0x40012000 0x400>;
-+			interrupts = <18>;
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+new file mode 100644
+index 0000000..8b20c23
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -0,0 +1,85 @@
++STMicroelectronics STM32 ADC device driver
++
++STM32 ADC is a successive approximation analog-to-digital converter.
++It has several multiplexed input channels. Conversions can be performed
++in single, continuous, scan or discontinuous mode. Result of the ADC is
++stored in a left-aligned or right-aligned 32-bit data register.
++Conversions can be launched in software or using hardware triggers.
++
++The analog watchdog feature allows the application to detect if the input
++voltage goes beyond the user-defined, higher or lower thresholds.
++
++Each STM32 ADC block can have up to 3 ADC instances.
++
++Each instance supports two contexts to manage conversions, each one has its
++own configurable sequence and trigger:
++- regular conversion can be done in sequence, running in background
++- injected conversions have higher priority, and so have the ability to
++  interrupt regular conversion sequence (either triggered in SW or HW).
++  Regular sequence is resumed, in case it has been interrupted.
++
++Contents of a stm32 adc root node:
++-----------------------------------
++Required properties:
++- compatible: Should be "st,stm32f4-adc-core".
++- reg: Offset and length of the ADC block register set.
++- interrupts: Must contain the interrupt for ADC block.
++- clocks: Clock for the analog circuitry (common to all ADCs).
++- clock-names: Must be "adc".
++- interrupt-controller: Identifies the controller node as interrupt-parent
++- vref-supply: Phandle to the vref input analog reference voltage.
++- #interrupt-cells = <1>;
++- #address-cells = <1>;
++- #size-cells = <0>;
++
++Optional properties:
++- A pinctrl state named "default" for each ADC channel may be defined to set
++  inX ADC pins in mode of operation for analog input on external pin.
++
++Contents of a stm32 adc child node:
++-----------------------------------
++An ADC block node should contain at least one subnode, representing an
++ADC instance available on the machine.
++
++Required properties:
++- compatible: Should be "st,stm32f4-adc".
++- reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
++- st,adc-channels: List of single-ended channels muxed for this ADC.
++  It can have up to 16 channels, numbered from 0 to 15 (resp. for in0..in15).
++- interrupt-parent: Phandle to the parent interrupt controller.
++- interrupts: IRQ Line for the ADC (e.g. may be 0 for adc at 0, 1 for adc at 100 or
++  2 for adc at 200).
++- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
++  Documentation/devicetree/bindings/iio/iio-bindings.txt
++
++Optional properties:
++- clocks: Input clock private to this ADC instance.
++
++Example:
++	adc: adc at 40012000 {
++		compatible = "st,stm32f4-adc-core";
++		reg = <0x40012000 0x400>;
++		interrupts = <18>;
++		clocks = <&rcc 0 168>;
++		clock-names = "adc";
++		vref-supply = <&reg_vref>;
++		interrupt-controller;
++		pinctrl-names = "default";
++		pinctrl-0 = <&adc3_in8_pin>;
++
++		#interrupt-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		adc at 0 {
++			compatible = "st,stm32f4-adc";
++			#io-channel-cells = <1>;
++			reg = <0x0>;
 +			clocks = <&rcc 0 168>;
-+			clock-names = "adc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			adc1: adc at 0 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x0>;
-+				clocks = <&rcc 0 168>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <0>;
-+				status = "disabled";
-+			};
-+
-+			adc2: adc at 100 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x100>;
-+				clocks = <&rcc 0 169>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <1>;
-+				status = "disabled";
-+			};
-+
-+			adc3: adc at 200 {
-+				compatible = "st,stm32f4-adc";
-+				#io-channel-cells = <1>;
-+				reg = <0x200>;
-+				clocks = <&rcc 0 170>;
-+				interrupt-parent = <&adc>;
-+				interrupts = <2>;
-+				status = "disabled";
-+			};
++			interrupt-parent = <&adc>;
++			interrupts = <0>;
++			st,adc-channels = <8>;
 +		};
-+
- 		syscfg: system-config at 40013800 {
- 			compatible = "syscon";
- 			reg = <0x40013800 0x400>;
-@@ -332,6 +375,12 @@
- 					slew-rate = <2>;
- 				};
- 			};
-+
-+			adc3_in8_pin: adc at 200 {
-+				pins {
-+					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
++		...
++		other adc child nodes follow...
++	};
 -- 
 1.9.1
