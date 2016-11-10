@@ -1,171 +1,106 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 10 Nov 2016 18:07:54 +0530
-Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
-In-Reply-To: <5066943.nydi3GQ3KP@wuerfel>
-References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
- <1478693755-11953-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20161110115456epcas2p4524185a083cd7173e354f46b94be9183@epcas2p4.samsung.com>
- <5066943.nydi3GQ3KP@wuerfel>
-Message-ID: <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
+From: yuanzhichang@hisilicon.com (zhichang.yuan)
+Date: Thu, 10 Nov 2016 20:36:24 +0800
+Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
+In-Reply-To: <17821285.aIcTyCGn5n@wuerfel>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <2825537.ADCNsGqGxn@wuerfel> <5824165A.4040303@hisilicon.com>
+ <17821285.aIcTyCGn5n@wuerfel>
+Message-ID: <582469C8.9090609@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi, Arnd,
 
-On Thursday 10 November 2016 05:24 PM, Arnd Bergmann wrote:
-> On Wednesday, November 9, 2016 5:45:54 PM CET Pankaj Dubey wrote:
->> Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based
->> boards. Instead use mapping from device tree node of SCU.
+On 2016/11/10 17:12, Arnd Bergmann wrote:
+> On Thursday, November 10, 2016 2:40:26 PM CET zhichang.yuan wrote:
+>> On 2016/11/10 5:34, Arnd Bergmann wrote:
+>>> On Wednesday, November 9, 2016 12:10:43 PM CET Gabriele Paoloni wrote:
+>>>>> On Tuesday, November 8, 2016 11:47:09 AM CET zhichang.yuan wrote:
+>>>>>> +       /*
+>>>>>> +        * The first PCIBIOS_MIN_IO is reserved specifically for
+>>>>> indirectIO.
+>>>>>> +        * It will separate indirectIO range from pci host bridge to
+>>>>>> +        * avoid the possible PIO conflict.
+>>>>>> +        * Set the indirectIO range directly here.
+>>>>>> +        */
+>>>>>> +       lpcdev->io_ops.start = 0;
+>>>>>> +       lpcdev->io_ops.end = PCIBIOS_MIN_IO - 1;
+>>>>>> +       lpcdev->io_ops.devpara = lpcdev;
+>>>>>> +       lpcdev->io_ops.pfin = hisilpc_comm_in;
+>>>>>> +       lpcdev->io_ops.pfout = hisilpc_comm_out;
+>>>>>> +       lpcdev->io_ops.pfins = hisilpc_comm_ins;
+>>>>>> +       lpcdev->io_ops.pfouts = hisilpc_comm_outs;
+>>>>>
+>>>>> I have to look at patch 2 in more detail again, after missing a few
+>>>>> review
+>>>>> rounds. I'm still a bit skeptical about hardcoding a logical I/O port
+>>>>> range here, and would hope that we can just go through the same
+>>>>> assignment of logical port ranges that we have for PCI buses,
+>>>>> decoupling
+>>>>> the bus addresses from the linux-internal ones.
+>>>>
+>>>> The point here is that we want to avoid any conflict/overlap between
+>>>> the LPC I/O space and the PCI I/O space. With the assignment above
+>>>> we make sure that LPC never interfere with PCI I/O space.
+>>>
+>>> But we already abstract the PCI I/O space using dynamic registration.
+>>> There is no need to hardcode the logical address for ISA, though
+>>> I think we can hardcode the bus address to start at zero here.
 >>
->> NOTE: This patch has dependency on DT file of any such CORTEX-A9 SoC
->> based boards, in the absence of SCU device node in DTS file, only single
->> CPU will boot. So if you are using OUT-OF-TREE DTS file of CORTEX-A9 based
->> Exynos SoC make sure to add SCU device node to DTS file for SMP boot.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> Do you means that we can pick up the maximal I/O address from all children's
+>> device resources??
 > 
-> With CONFIG_SMP disabled, I now get this build failure:
+> The driver should not look at the resources of its children, just
+> register a range of addresses dynamically, as I suggested in an
+> earlier review.
+>
+Sorry! I can't catch your idea yet:(
+
+When to register the I/O range? Is it done just after the successfully
+of_translate_address() during the children scanning?
+
+If yes, when a child is scanning, there is no range data in arm64_extio_ops. The
+addr_is_indirect_io() calling in of_get_isa_indirect_io() don't need. All we can
+check is just whether the address to be translated is IO and is under a parent
+device which has no 'ranges' property.
+
 > 
-
-Sorry, I missed this part and did not check with CONFIG_SMP disabled.
-
-> arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
-> pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
-> arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
-> suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
+> Your current version has
 > 
-> Please fix. I have applied a patch locally (see below), but don't know
-> if that is the best solution. As we seem to duplicate that code across
-> several platforms, I wonder why we don't just put it into the core scu
-> implementation.
+>         if (arm64_extio_ops->pfout)                             \
+>                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
+>                        addr, value, sizeof(type));             \
 > 
+> Instead, just subtract the start of the range from the logical
+> port number to transform it back into a bus-local port number:
+> 
+>         if (arm64_extio_ops->pfout)                             \
+>                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
+>                        addr - arm64_extio_ops->start, value, sizeof(type)); \
+> 
+I think there is some information needed sync.
+In the old patch-set, we don't bypass the pci_address_to_pio() after
+successfully of_translate_address(). In this way, we don't need to reserve any
+PIO space for our LPC since the logical port are from the same mapping
+algorithm. Based on this way, the port number in the device resource is logical
+one, then we need to subtract the start of the resource to get back the
+bus-local port.
 
-When I checked scu_enable declaration it is defined in
-arch/arm/include/asm/smp_scu.h as:
+>From V3, we don't apply the mapping based on pci_address_to_pio(), the
+of_translate_address() return the bus-local port directly and store into
+relevant device resource. So, in the current arm64_extio_ops->pfout(), the
+reverse translation don't need anymore. The input "addr" is bus-local port now.
 
-#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-void scu_enable(void __iomem *scu_base);
-#else
-static inline void scu_enable(void __iomem *scu_base) {}
-#endif
-
-So if CONFIG_SMP is disable then there is no sense of exynos_scu_enable
-as well. So wow about using below patch?
-
---------------------------------------------------------
-
-Subject: [PATCH] ARM: exynos: fix build fail due to exynos_scu_enable
-
-Build failed if we disable CONFIG_SMP as shown below:
-
-arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
-pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to
-`exynos_scu_enable'
-arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
-suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to
-`exynos_scu_enable'
-
-Since scu_enable is defined only in case CONFIG_SMP and CONFIG_HAVE_ARM_SCU
-lets move exynos_scu_enable also under these two macros.
-
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/common.h | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index fb12d11..03fdb79 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -156,7 +156,12 @@ extern void exynos_cpu_restore_register(void);
- extern void exynos_pm_central_suspend(void);
- extern int exynos_pm_central_resume(void);
- extern void exynos_enter_aftr(void);
-+#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
- extern int exynos_scu_enable(void);
-+#else
-+static inline void exynos_scu_enable(void) {}
-+#endif
-+
-
-------------------------------------------------------
-
-Of-course your idea to move it in core SCU file is also good that we
-lots of duplication in different architecture can be avoided.
-
-In that case I can think of following patch:
-
-[PATCH] ARM: scu: use SCU device node to enable SCU
-
-Many platforms are duplicating code for enabling SCU, lets add
-common code to enable SCU using SCU device node so the duplication in
-each platform can be avoided.
-
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/include/asm/smp_scu.h |  2 ++
- arch/arm/kernel/smp_scu.c      | 17 +++++++++++++++++
- 2 files changed, 19 insertions(+)
-
-diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-index bfe163c..e5e2492 100644
---- a/arch/arm/include/asm/smp_scu.h
-+++ b/arch/arm/include/asm/smp_scu.h
-@@ -38,8 +38,10 @@ static inline int scu_power_mode(void __iomem
-*scu_base, unsigned int mode)
- #endif
-
- #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-+int of_scu_enable(void);
- void scu_enable(void __iomem *scu_base);
- #else
-+static inline int of_scu_enable(void) {return 0;}
- static inline void scu_enable(void __iomem *scu_base) {}
- #endif
-
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 72f9241..7c16d16 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -34,6 +34,23 @@ unsigned int __init scu_get_core_count(void __iomem
-*scu_base)
- 	return (ncores & 0x03) + 1;
- }
-
-+int of_scu_enable(void)
-+{
-+	struct device_node *np;
-+	void __iomem *scu_base;
-+
-+	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	scu_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!scu_base) {
-+		pr_err("%s failed to map scu_base\n", __func__);
-+		return -ENOMEM;
-+	}
-+	scu_enable(scu_base);
-+	iounmap(scu_base);
-+	return 0;
-+}
-+
- /*
-  * Enable the SCU
-  */
--- 
-
-
-Followed by cleanup in various architecture where this piece of code is
-duplicated and all of them can call directly of_scu_enable()
-
-
-Please let me know which one you will prefer for fixing build issue.
-
-@Krzysztof, please let me know if I need to resubmit SCU series again
-with fix or you will accept build fix patch on top of already taken patch.
 
 Thanks,
-Pankaj Dubey
+Zhichang
+
+
+> We know that the ISA/LPC bus can only have up to 65536 ports,
+> so you can register all of those, or possibly limit it further to
+> 1024 or 4096 ports, whichever matches the bus implementation.
+> 
+> 	Arnd
+> 
+> .
+> 
