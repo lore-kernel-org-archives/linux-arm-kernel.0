@@ -1,150 +1,60 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 10 Nov 2016 12:14:40 +0100
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161110020130.GA19108@arm.com>
-References: <582371FB.2040808@redhat.com> <20161109192303.GD15676@cbox>
- <20161109203145.GO17771@arm.com> <20161109151709.74927f83@t450s.home>
- <20161109222522.GS17771@arm.com> <20161109162458.39594fdb@t450s.home>
- <20161109233847.GT17771@arm.com> <20161109165957.62c1eb61@t450s.home>
- <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
- <20161109175517.174e7803@t450s.home> <20161110020130.GA19108@arm.com>
-Message-ID: <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Thu, 10 Nov 2016 19:15:58 +0800
+Subject: [PATCH v16 0/5] Mediatek MT8173 CMDQ support
+In-Reply-To: <1477999698-6288-1-git-send-email-hs.liao@mediatek.com>
+References: <1477999698-6288-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1478776558.15447.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Alex,
+On Tue, 2016-11-01 at 19:28 +0800, HS Liao wrote:
+> Hi,
+> 
+> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+> to help write registers with critical time limitation, such as
+> updating display configuration during the vblank. It controls Global
+> Command Engine (GCE) hardware to achieve this requirement.
+> 
+> These patches have a build dependency on top of v4.9-rc1.
+> 
+> Changes since v15:
+>  - separate "suspend and resume" patch from "save energy" patch
+>  - don't stop running tasks in cmdq_suspend()
+>    (i.e. leave no running tasks guarantee to clients)
+> 
+> Best regards,
+> HS Liao
+> 
+> HS Liao (5):
+>   dt-bindings: soc: Add documentation for the MediaTek GCE unit
+>   CMDQ: Mediatek CMDQ driver
+>   arm64: dts: mt8173: Add GCE node
+>   CMDQ: suspend and resume
+>   CMDQ: save energy
+> 
+>  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 ++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+>  drivers/mailbox/Kconfig                            |  10 +
+>  drivers/mailbox/Makefile                           |   2 +
+>  drivers/mailbox/mtk-cmdq-mailbox.c                 | 632 +++++++++++++++++++++
+>  drivers/soc/mediatek/Kconfig                       |  11 +
+>  drivers/soc/mediatek/Makefile                      |   1 +
+>  drivers/soc/mediatek/mtk-cmdq-helper.c             | 310 ++++++++++
+>  include/linux/mailbox/mtk-cmdq-mailbox.h           |  67 +++
+>  include/linux/soc/mediatek/mtk-cmdq.h              | 182 ++++++
+>  10 files changed, 1268 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+>  create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
+>  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+>  create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+>  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> 
 
-On 10/11/2016 03:01, Will Deacon wrote:
-> On Wed, Nov 09, 2016 at 05:55:17PM -0700, Alex Williamson wrote:
->> On Thu, 10 Nov 2016 01:14:42 +0100
->> Auger Eric <eric.auger@redhat.com> wrote:
->>> On 10/11/2016 00:59, Alex Williamson wrote:
->>>> On Wed, 9 Nov 2016 23:38:50 +0000
->>>> Will Deacon <will.deacon@arm.com> wrote:
->>>>> On Wed, Nov 09, 2016 at 04:24:58PM -0700, Alex Williamson wrote:  
->>>>>> The VFIO_IOMMU_MAP_DMA ioctl is a contract, the user ask to map a range
->>>>>> of IOVAs to a range of virtual addresses for a given device.  If VFIO
->>>>>> cannot reasonably fulfill that contract, it must fail.  It's up to QEMU
->>>>>> how to manage the hotplug and what memory regions it asks VFIO to map
->>>>>> for a device, but VFIO must reject mappings that it (or the SMMU by
->>>>>> virtue of using the IOMMU API) know to overlap reserved ranges.  So I
->>>>>> still disagree with the referenced statement.  Thanks,    
->>>>>
->>>>> I think that's a pity. Not only does it mean that both QEMU and the kernel
->>>>> have more work to do (the former has to carve up its mapping requests,
->>>>> whilst the latter has to check that it is indeed doing this), but it also
->>>>> precludes the use of hugepage mappings on the IOMMU because of reserved
->>>>> regions. For example, a 4k hole someplace may mean we can't put down 1GB
->>>>> table entries for the guest memory in the SMMU.
->>>>>
->>>>> All this seems to do is add complexity and decrease performance. For what?
->>>>> QEMU has to go read the reserved regions from someplace anyway. It's also
->>>>> the way that VFIO works *today* on arm64 wrt reserved regions, it just has
->>>>> no way to identify those holes at present.  
->>>>
->>>> Sure, that sucks, but how is the alternative even an option?  The user
->>>> asked to map something, we can't, if we allow that to happen now it's a
->>>> bug.  Put the MSI doorbells somewhere that this won't be an issue.  If
->>>> the platform has it fixed somewhere that this is an issue, don't use
->>>> that platform.  The correctness of the interface is more important than
->>>> catering to a poorly designed system layout IMO.  Thanks,  
->>>
->>> Besides above problematic, I started to prototype the sysfs API. A first
->>> issue I face is the reserved regions become global to the iommu instead
->>> of characterizing the iommu_domain, ie. the "reserved_regions" attribute
->>> file sits below an iommu instance (~
->>> /sys/class/iommu/dmar0/intel-iommu/reserved_regions ||
->>> /sys/class/iommu/arm-smmu0/arm-smmu/reserved_regions).
->>>
->>> MSI reserved window can be considered global to the IOMMU. However PCIe
->>> host bridge P2P regions rather are per iommu-domain.
-> 
-> I don't think we can treat them as per-domain, given that we want to
-> enumerate this stuff before we've decided to do a hotplug (and therefore
-> don't have a domain).
-That's the issue indeed. We need to wait for the PCIe device to be
-connected to the iommu. Only on the VFIO SET_IOMMU we get the
-comprehensive list of P2P regions that can impact IOVA mapping for this
-iommu. This removes any advantage of sysfs API over previous VFIO
-capability chain API for P2P IOVA range enumeration at early stage.
 
-> 
->>>
->>> Do you confirm the attribute file should contain both global reserved
->>> regions and all per iommu_domain reserved regions?
->>>
->>> Thoughts?
->>
->> I don't think we have any business describing IOVA addresses consumed
->> by peer devices in an IOMMU sysfs file.  If it's a separate device it
->> should be exposed by examining the rest of the topology.  Regions
->> consumed by PCI endpoints and interconnects are already exposed in
->> sysfs.  In fact, is this perhaps a more accurate model for these MSI
->> controllers too?  Perhaps they should be exposed in the bus topology
->> somewhere as consuming the IOVA range.
-Currently on x86 the P2P regions are not checked when allowing
-passthrough. Aren't we more papist that the pope? As Don mentioned,
-shouldn't we simply consider that a platform that does not support
-proper ACS is not candidate for safe passthrough, like Juno?
+Hi Jassi, Matthias,
 
-At least we can state the feature also is missing on x86 and it would be
-nice to report the risk to the userspace and urge him to opt-in.
+Sorry to disturb you.
+Do you have any further comment on CMDQ v16?
 
-To me taking into account those P2P still is controversial and induce
-the bulk of the complexity. Considering the migration use case discussed
-at LPC while only handling the MSI problem looks much easier.
-host can choose an MSI base that is QEMU mach-virt friendly, ie. non RAM
-region. Problem is to satisfy all potential uses though. When migrating,
-mach-virt still is being used so there should not be any collision. Am I
-missing some migration weird use cases here? Of course if we take into
-consideration new host PCIe P2P regions this becomes completely different.
-
-We still have the good old v14 where the user space chose where MSI
-IOVA's are put without any risk of collision ;-)
-
->>  If DMA to an IOVA is consumed
->> by an intermediate device before it hits the IOMMU vs not being
->> translated as specified by the user at the IOMMU, I'm less inclined to
->> call that something VFIO should reject.
-> 
-> Oh, so perhaps we've been talking past each other. In all of these cases,
-> the SMMU can translate the access if it makes it that far. The issue is
-> that not all accesses do make it that far, because they may be "consumed"
-> by another device, such as an MSI doorbell or another endpoint. In other
-> words, I don't envisage a scenario where e.g. some address range just
-> bypasses the SMMU straight to memory. I realise now that that's not clear
-> from the slides I presented.
-> 
->> However, instantiating a VM
->> with holes to account for every potential peer device seems like it
->> borders on insanity.  Thanks,
-> 
-> Ok, so rather than having a list of reserved regions under the iommu node,
-> you're proposing that each region is attributed to the device that "owns"
-> (consumes) it? I think that can work, but we need to make sure that:
-> 
->  (a) The topology is walkable from userspace (where do you start?)
-> 
->  (b) It also works for platform (non-PCI) devices, that lack much in the
->      way of bus hierarchy
-> 
->  (c) It doesn't require Linux to have a driver bound to a device in order
->      for the ranges consumed by that device to be advertised (again,
->      more of an issue for non-PCI).
-Looks a long way ...
-
-Thanks
-
-Eric
-
-> 
-> How is this currently advertised for PCI? I'd really like to use the same
-> scheme irrespective of the bus type.
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks.
+HS
