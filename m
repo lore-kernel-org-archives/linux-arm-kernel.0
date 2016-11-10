@@ -1,66 +1,178 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Thu, 10 Nov 2016 11:03:23 +0000
-Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
-In-Reply-To: <f53d533d-163f-31f3-4efb-0e39d201589d@samsung.com>
-References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
- <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
- <20161108144445.GD1575@localhost.localdomain>
- <CGME20161108145620epcas2p4b8e2ec5ffdd4bf04ab3bf0728b46e3f2@epcas2p4.samsung.com>
- <20161108145534.GE1575@localhost.localdomain>
- <f53d533d-163f-31f3-4efb-0e39d201589d@samsung.com>
-Message-ID: <20161110110323.GG1575@localhost.localdomain>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Nov 2016 11:05:29 +0000
+Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
+ agnostic
+In-Reply-To: <c3136fae-144c-5949-3933-671b783671c8@arm.com>
+References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
+ <20161109141948.19244-5-lorenzo.pieralisi@arm.com>
+ <c3136fae-144c-5949-3933-671b783671c8@arm.com>
+Message-ID: <20161110110529.GB20209@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 08, 2016 at 04:53:40PM +0100, Sylwester Nawrocki wrote:
-> On 11/08/2016 03:55 PM, Charles Keepax wrote:
-> >>> diff --git a/arch/arm/mach-s3c64xx/pl080.c b/arch/arm/mach-s3c64xx/pl080.c
-> >>> > > index 89c5a62..8c88680 100644
-> >>> > > --- a/arch/arm/mach-s3c64xx/pl080.c
-> >>> > > +++ b/arch/arm/mach-s3c64xx/pl080.c
-> >> > <snip>
-> >>> > > @@ -134,6 +153,8 @@ struct pl08x_platform_data s3c64xx_dma0_plat_data = {
-> >>> > >  	.put_xfer_signal = pl08x_put_xfer_signal,
-> >>> > >  	.slave_channels = s3c64xx_dma0_info,
-> >>> > >  	.num_slave_channels = ARRAY_SIZE(s3c64xx_dma0_info),
-> >>> > > +	.slave_map = s3c64xx_dma0_slave_map,
-> >>> > > +	.slavecnt = ARRAY_SIZE(s3c64xx_dma0_slave_map),
-> >>> > >  };
-> >> > 
-> >> > Here we add a .slavecnt but the pl08x_platform_data structure doesn't
-> >> > contain that field. I can't see it on the branch you linked in
-> >> > the cover letter either, is it added by a patch on another branch
-> >> > I am missing?
-> >> > 
-> > Ah I think I see it should be .slave_map_len here.
+On Wed, Nov 09, 2016 at 02:40:08PM +0000, Robin Murphy wrote:
+
+[...]
+
+> > +void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
+> > +			  const struct iommu_ops *ops)
+> > +{
+> > +	struct iommu_fwentry *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
+> > +
+> > +	if (WARN_ON(!iommu))
+> > +		return;
+> > +
+> > +	if (is_of_node(fwnode))
 > 
-> Yeah, sorry, I fixed it after getting report from the kbuild test
-> but have forgotten to push changes to the git tree.
+> Nit: this check is actually redundant, since to_of_node() already does
+> the right thing and of_node_get() is NULL-safe - iommu_fwspec_init()
+> already works that way. On the other hand, though, it is perhaps more
+> intuitive to see it explicitly, and since to_of_node() is inline it
+> ought to result in the same object code (I've not checked, though).
+
+I can easily fold this change in the final code and I think we
+should keep this consistent so I am happy to change my code and
+make the is_of_node() check implicit.
+
+> Either way:
 > 
-> I pushed now to branch for-v4.10/dma/pl080-s3c64xx-v2 with this
-> issue fixed and added initialization of the filer function.
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Apologies for the delay got somewhat swamped with internal stuff
-yesterday. Yeah using that branch it looks good to me, the SPI and
-I2S are both working fine. I can download code to the wm0010
-which should be a good work out of the SPI and play audio
-correctly so the I2S should be fine. So for the series:
+Thank you !
+Lorenzo
 
-Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-
-
-I do still need to revert these two patches to get the I2S to
-work properly:
-
-commit d70e861a3154833467023123e218e9b1ba558809
-ASoC: samsung: Remove SND_DMAENGINE_PCM_FLAG_NO_RESIDUE flag
-
-commit acde50a7bf1fd6ae0baa4402f0a02c4b1bd4c990
-ASoC: dmaengine_pcm: Make FLAG_NO_RESIDUE internal
-
-But that is clearly an unrelated issue, which I haven't found
-time to look into yet as we don't use this platform that often
-these days.
-
-Thanks,
-Charles
+> > +		of_node_get(to_of_node(fwnode));
+> > +
+> > +	INIT_LIST_HEAD(&iommu->list);
+> > +	iommu->fwnode = fwnode;
+> > +	iommu->ops = ops;
+> > +	spin_lock(&iommu_fwentry_lock);
+> > +	list_add_tail(&iommu->list, &iommu_fwentry_list);
+> > +	spin_unlock(&iommu_fwentry_lock);
+> > +}
+> > +
+> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
+> > +{
+> > +	struct iommu_fwentry *node;
+> > +	const struct iommu_ops *ops = NULL;
+> > +
+> > +	spin_lock(&iommu_fwentry_lock);
+> > +	list_for_each_entry(node, &iommu_fwentry_list, list)
+> > +		if (node->fwnode == fwnode) {
+> > +			ops = node->ops;
+> > +			break;
+> > +		}
+> > +	spin_unlock(&iommu_fwentry_lock);
+> > +	return ops;
+> > +}
+> > +
+> >  int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
+> >  		      const struct iommu_ops *ops)
+> >  {
+> > diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> > index 5b82862..0f57ddc 100644
+> > --- a/drivers/iommu/of_iommu.c
+> > +++ b/drivers/iommu/of_iommu.c
+> > @@ -96,45 +96,6 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_get_dma_window);
+> >  
+> > -struct of_iommu_node {
+> > -	struct list_head list;
+> > -	struct device_node *np;
+> > -	const struct iommu_ops *ops;
+> > -};
+> > -static LIST_HEAD(of_iommu_list);
+> > -static DEFINE_SPINLOCK(of_iommu_lock);
+> > -
+> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops)
+> > -{
+> > -	struct of_iommu_node *iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
+> > -
+> > -	if (WARN_ON(!iommu))
+> > -		return;
+> > -
+> > -	of_node_get(np);
+> > -	INIT_LIST_HEAD(&iommu->list);
+> > -	iommu->np = np;
+> > -	iommu->ops = ops;
+> > -	spin_lock(&of_iommu_lock);
+> > -	list_add_tail(&iommu->list, &of_iommu_list);
+> > -	spin_unlock(&of_iommu_lock);
+> > -}
+> > -
+> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> > -{
+> > -	struct of_iommu_node *node;
+> > -	const struct iommu_ops *ops = NULL;
+> > -
+> > -	spin_lock(&of_iommu_lock);
+> > -	list_for_each_entry(node, &of_iommu_list, list)
+> > -		if (node->np == np) {
+> > -			ops = node->ops;
+> > -			break;
+> > -		}
+> > -	spin_unlock(&of_iommu_lock);
+> > -	return ops;
+> > -}
+> > -
+> >  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+> >  {
+> >  	struct of_phandle_args *iommu_spec = data;
+> > diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> > index 436dc21..15d5478 100644
+> > --- a/include/linux/iommu.h
+> > +++ b/include/linux/iommu.h
+> > @@ -351,6 +351,9 @@ int iommu_fwspec_init(struct device *dev, struct fwnode_handle *iommu_fwnode,
+> >  		      const struct iommu_ops *ops);
+> >  void iommu_fwspec_free(struct device *dev);
+> >  int iommu_fwspec_add_ids(struct device *dev, u32 *ids, int num_ids);
+> > +void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
+> > +			  const struct iommu_ops *ops);
+> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode);
+> >  
+> >  #else /* CONFIG_IOMMU_API */
+> >  
+> > @@ -580,6 +583,17 @@ static inline int iommu_fwspec_add_ids(struct device *dev, u32 *ids,
+> >  	return -ENODEV;
+> >  }
+> >  
+> > +static inline void fwnode_iommu_set_ops(struct fwnode_handle *fwnode,
+> > +					const struct iommu_ops *ops)
+> > +{
+> > +}
+> > +
+> > +static inline
+> > +const struct iommu_ops *fwnode_iommu_get_ops(struct fwnode_handle *fwnode)
+> > +{
+> > +	return NULL;
+> > +}
+> > +
+> >  #endif /* CONFIG_IOMMU_API */
+> >  
+> >  #endif /* __LINUX_IOMMU_H */
+> > diff --git a/include/linux/of_iommu.h b/include/linux/of_iommu.h
+> > index e80b9c7..7681007 100644
+> > --- a/include/linux/of_iommu.h
+> > +++ b/include/linux/of_iommu.h
+> > @@ -31,8 +31,16 @@ static inline const struct iommu_ops *of_iommu_configure(struct device *dev,
+> >  
+> >  #endif	/* CONFIG_OF_IOMMU */
+> >  
+> > -void of_iommu_set_ops(struct device_node *np, const struct iommu_ops *ops);
+> > -const struct iommu_ops *of_iommu_get_ops(struct device_node *np);
+> > +static inline void of_iommu_set_ops(struct device_node *np,
+> > +				    const struct iommu_ops *ops)
+> > +{
+> > +	fwnode_iommu_set_ops(&np->fwnode, ops);
+> > +}
+> > +
+> > +static inline const struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+> > +{
+> > +	return fwnode_iommu_get_ops(&np->fwnode);
+> > +}
+> >  
+> >  extern struct of_device_id __iommu_of_table;
+> >  
+> > 
+> 
