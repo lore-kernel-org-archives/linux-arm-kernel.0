@@ -1,125 +1,158 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 10 Nov 2016 11:42:53 -0600
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
- <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
- <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
- <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
-Message-ID: <20161110174253.GC10384@bhelgaas-glaptop.roam.corp.google.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 10 Nov 2016 19:43:20 +0200
+Subject: [PATCH] ARM: OMAP2+: Remove unused MUSB initialization code
+Message-ID: <1478799800-27945-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 06:25:16PM +0800, Ard Biesheuvel wrote:
-> On 10 November 2016 at 06:49, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Wed, Nov 09, 2016 at 08:29:23PM +0000, Ard Biesheuvel wrote:
-> >> Hi Bjorn,
-> >>
-> >> On 9 November 2016 at 20:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> >> > On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
-> >> >> Hi Bjorn,
-> >> >>
-> >> [...]
-> >> >>
-> >> >> We're working to add the PNP0C02 resource to future firmware, but it's
-> >> >> not in the current firmware. Are dmesg and /proc/iomem from the
-> >> >> current firmware interesting or should we wait for the update to file?
-> >> >
-> >> > Note that the ECAM space is not the only thing that should be
-> >> > described via these PNP0C02 devices.  *All* non-enumerable resources
-> >> > should be described by the _CRS method of some ACPI device.  Here's a
-> >> > sample from my laptop:
-> >> >
-> >> >   PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
-> >> >   system 00:01: [io  0x1800-0x189f] could not be reserved
-> >> >   system 00:01: [io  0x0800-0x087f] has been reserved
-> >> >   system 00:01: [io  0x0880-0x08ff] has been reserved
-> >> >   system 00:01: [io  0x0900-0x097f] has been reserved
-> >> >   system 00:01: [io  0x0980-0x09ff] has been reserved
-> >> >   system 00:01: [io  0x0a00-0x0a7f] has been reserved
-> >> >   system 00:01: [io  0x0a80-0x0aff] has been reserved
-> >> >   system 00:01: [io  0x0b00-0x0b7f] has been reserved
-> >> >   system 00:01: [io  0x0b80-0x0bff] has been reserved
-> >> >   system 00:01: [io  0x15e0-0x15ef] has been reserved
-> >> >   system 00:01: [io  0x1600-0x167f] has been reserved
-> >> >   system 00:01: [io  0x1640-0x165f] has been reserved
-> >> >   system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
-> >> >   system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
-> >> >   system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
-> >> >   system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
-> >> >   system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
-> >> >   system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
-> >> >   system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
-> >> >   system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
-> >> >   system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
-> >> >
-> >> > Do you have firmware in the field that may not get updated?  If so,
-> >> > I'd like to see the whole solution for that firmware, including the
-> >> > MCFG quirk (which tells the PCI core where the ECAM region is) and
-> >> > whatever PNP0C02 quirk you figure out to actually reserve the region.
-> >> >
-> >> > I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
-> >> > don't actually know if it's feasible, but it didn't look as bad as I
-> >> > expected, so I'd kind of like somebody to try it out.  I think you
-> >> > would have to call this via a DMI hook (do you have DMI on arm64?),
-> >> > maybe from pnp_init() or similar.
-> >>
-> >> We do have SMBIOS/DMI on arm64, but we have been successful so far not
-> >> to rely on it for quirks, and we'd very much like to keep it that way.
-> >>
-> >> Since this ACPI _CRS method has nothing to do with SMBIOS/DMI, surely
-> >> there is a better way to wire up the reservation code to the
-> >> information exposed by ACPI?
-> >
-> > I'm open to other ways, feel free to propose one :)
-> >
-> > If you do a quirk, you need some way to identify the machine/firmware
-> > combination, because you don't want to apply the quirk on every
-> > machine.  You're trying to work around a firmware issue, so you
-> > probably want something tied to the firmware version.  On x86, that's
-> > typically done with DMI.
-> >
-> 
-> I think I misunderstood the purpose of the example: that should only
-> be necessary if the _CRS methods are missing from the firmware, right?
-> If we update the firmware to cover all non-enumerable resources by
-> such a method, we shouldn't need any such quirks at all IIUC
+With the removal of board-ldp.c and board-rx51.c, the last users of the
+MUSB initialization board code are gone. Remove it.
 
-Right: if the firmware provides a PNP0C02 device with _CRS that
-includes the ECAM area, we don't need any PNP/ACPI quirks.  We will
-still need the MCFG quirks since the hardware doesn't fully support
-ECAM.
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ arch/arm/mach-omap2/Makefile   |   1 -
+ arch/arm/mach-omap2/usb-musb.c | 106 -----------------------------------------
+ arch/arm/mach-omap2/usb.h      |   1 -
+ 3 files changed, 108 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/usb-musb.c
 
-For the PNP/ACPI quirks, there are two interesting cases:
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 5b37ec29996e..76e8ba70d952 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -242,7 +242,6 @@ obj-y					+= $(omap-flash-y) $(omap-flash-m)
+ omap-hsmmc-$(CONFIG_MMC_OMAP_HS)	:= hsmmc.o
+ obj-y					+= $(omap-hsmmc-m) $(omap-hsmmc-y)
+ 
+-obj-y					+= usb-musb.o
+ obj-y					+= omap_phy_internal.o
+ 
+ obj-$(CONFIG_MACH_OMAP2_TUSB6010)	+= usb-tusb6010.o
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+deleted file mode 100644
+index e4562b2b973b..000000000000
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ /dev/null
+@@ -1,106 +0,0 @@
+-/*
+- * linux/arch/arm/mach-omap2/usb-musb.c
+- *
+- * This file will contain the board specific details for the
+- * MENTOR USB OTG controller on OMAP3430
+- *
+- * Copyright (C) 2007-2008 Texas Instruments
+- * Copyright (C) 2008 Nokia Corporation
+- * Author: Vikram Pandita
+- *
+- * Generalization by:
+- * Felipe Balbi <felipe.balbi@nokia.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/types.h>
+-#include <linux/errno.h>
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-#include <linux/clk.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/io.h>
+-#include <linux/usb/musb.h>
+-
+-#include "omap_device.h"
+-#include "soc.h"
+-#include "mux.h"
+-#include "usb.h"
+-
+-static struct musb_hdrc_config musb_config = {
+-	.multipoint	= 1,
+-	.dyn_fifo	= 1,
+-	.num_eps	= 16,
+-	.ram_bits	= 12,
+-};
+-
+-static struct musb_hdrc_platform_data musb_plat = {
+-	.mode		= MUSB_OTG,
+-
+-	/* .clock is set dynamically */
+-	.config		= &musb_config,
+-
+-	/* REVISIT charge pump on TWL4030 can supply up to
+-	 * 100 mA ... but this value is board-specific, like
+-	 * "mode", and should be passed to usb_musb_init().
+-	 */
+-	.power		= 50,			/* up to 100 mA */
+-};
+-
+-static u64 musb_dmamask = DMA_BIT_MASK(32);
+-
+-static struct omap_musb_board_data musb_default_board_data = {
+-	.interface_type		= MUSB_INTERFACE_ULPI,
+-	.mode			= MUSB_OTG,
+-	.power			= 100,
+-};
+-
+-void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+-{
+-	struct omap_hwmod		*oh;
+-	struct platform_device		*pdev;
+-	struct device			*dev;
+-	int				bus_id = -1;
+-	const char			*oh_name, *name;
+-	struct omap_musb_board_data	*board_data;
+-
+-	if (musb_board_data)
+-		board_data = musb_board_data;
+-	else
+-		board_data = &musb_default_board_data;
+-
+-	/*
+-	 * REVISIT: This line can be removed once all the platforms using
+-	 * musb_core.c have been converted to use use clkdev.
+-	 */
+-	musb_plat.clock = "ick";
+-	musb_plat.board_data = board_data;
+-	musb_plat.power = board_data->power >> 1;
+-	musb_plat.mode = board_data->mode;
+-	musb_plat.extvbus = board_data->extvbus;
+-
+-	oh_name = "usb_otg_hs";
+-	name = "musb-omap2430";
+-
+-        oh = omap_hwmod_lookup(oh_name);
+-        if (WARN(!oh, "%s: could not find omap_hwmod for %s\n",
+-                 __func__, oh_name))
+-                return;
+-
+-	pdev = omap_device_build(name, bus_id, oh, &musb_plat,
+-				 sizeof(musb_plat));
+-	if (IS_ERR(pdev)) {
+-		pr_err("Could not build omap_device for %s %s\n",
+-						name, oh_name);
+-		return;
+-	}
+-
+-	dev = &pdev->dev;
+-	get_device(dev);
+-	dev->dma_mask = &musb_dmamask;
+-	dev->coherent_dma_mask = musb_dmamask;
+-	put_device(dev);
+-}
+diff --git a/arch/arm/mach-omap2/usb.h b/arch/arm/mach-omap2/usb.h
+index 3395365ef1db..1951535646d2 100644
+--- a/arch/arm/mach-omap2/usb.h
++++ b/arch/arm/mach-omap2/usb.h
+@@ -60,7 +60,6 @@ struct usbhs_phy_data {
+ 	bool vcc_polarity;	/* 1 active high, 0 active low */
+ };
+ 
+-extern void usb_musb_init(struct omap_musb_board_data *board_data);
+ extern void usbhs_init(struct usbhs_omap_platform_data *pdata);
+ extern int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys);
+ 
+-- 
+Regards,
 
-  1) Firmware provides a PNP0C02 device, but its _CRS doesn't include
-     the ECAM space, and
-
-  2) Firmware doesn't provide a PNP0C02 device at all.
-
-For case 1, we could consider adding the ECAM space to the existing
-device.  This is essentially what quirk_amd_mmconfig_area() does.
-
-For case 2, we would have to fabricate the PNP0C02 device itself, then
-add the ECAM space to it.  I don't think there's any existing code
-that does this, so this is what the example I proposed in this thread
-does.  
-
-One could argue that it might be cleaner to use case 2 instead of the
-case 1 approach because it avoids mucking with an ACPI device from
-firmware.  For devices that support _SRS, case 1 might break things
-because _CRS and _SRS are supposed to use the same resource descriptor
-buffer, and if we add resources the firmware doesn't know about, I
-don't think we'll encode the _SRS buffer correctly.  But this is only
-a theoretical risk because we basically never use _SRS today.
-
-In either case, there has to be a mechanism to do the quirk only on
-the machine/firmware that needs it, of course.
-
-Bjorn
+Laurent Pinchart
