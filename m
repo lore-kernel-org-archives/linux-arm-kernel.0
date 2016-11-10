@@ -1,76 +1,147 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Nov 2016 17:17:32 +0000
-Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions
- to asm/perf_event.h
-In-Reply-To: <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
-References: <1478721480-24852-1-git-send-email-wei@redhat.com>
- <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
- <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
- <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
-Message-ID: <20161110171732.GA17134@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Nov 2016 17:23:21 +0000
+Subject: [RESEND PATCH v1 02/11] dt-bindings: hisi: Add Hisilicon
+ HiP05/06/07 Sysctrl and Djtag dts bindings
+In-Reply-To: <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
+References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
+ <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
+Message-ID: <20161110172320.GA10137@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 03:32:12PM +0000, Marc Zyngier wrote:
-> On 10/11/16 15:12, Wei Huang wrote:
-> > 
-> > 
-> > On 11/10/2016 03:10 AM, Marc Zyngier wrote:
-> >> Hi Wei,
-> >>
-> >> On 09/11/16 19:57, Wei Huang wrote:
-> >>> This patch moves ARMv8-related perf event definitions from perf_event.c
-> >>> to asm/perf_event.h; so KVM code can use them directly. This also help
-> >>> remove a duplicated definition of SW_INCR in perf_event.h.
-> >>>
-> >>> Signed-off-by: Wei Huang <wei@redhat.com>
-> >>> ---
-> >>>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
-> >>>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
-> >>>  2 files changed, 160 insertions(+), 162 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-> >>> index 2065f46..6c7b18b 100644
-> >>> --- a/arch/arm64/include/asm/perf_event.h
-> >>> +++ b/arch/arm64/include/asm/perf_event.h
-> >>> @@ -46,7 +46,166 @@
-> >>>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
-> >>>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
-> >>>  
-> >>> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
-> >>> +/*
-> >>> + * ARMv8 PMUv3 Performance Events handling code.
-> >>> + * Common event types.
-> >>> + */
-> >>> +
-> >>> +/* Required events. */
-> >>> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
-> >>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
-> >>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
-> >>> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
-> >>> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
-> >>> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
-> >>
-> >> In my initial review, I asked for the "required" events to be moved to a
-> >> shared location. What's the rational for moving absolutely everything?
-> > 
-> > I did notice the phrase "required" in the original email. However I
-> > think it is weird to have two places for a same set of PMU definitions.
-> > Other developers might think these two are missing if they don't search
-> > kernel files carefully.
-> > 
-> > If Will Deacon and you insist, I can move only two defs to perf_event.h,
-> > consolidated with the 2nd patch into a single one.
+Hi,
+
+On Thu, Nov 03, 2016 at 01:41:58AM -0400, Anurup M wrote:
+> From: Tan Xiaojun <tanxiaojun@huawei.com>
 > 
-> My personal feeling is that only architected events should be in a
-> public header. The CPU-specific ones are probably better kept private,
-> as it is doubtful that other users would appear).
+> 	1) Add Hisilicon HiP05/06/07 CPU and ALGSUB system controller dts
+> 	   bindings.
+> 	2) Add Hisilicon Djtag dts binding.
 > 
-> I'll leave it up to Will to decide, as all I want to avoid is the
-> duplication of constants between the PMU and KVM code bases.
+> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> ---
+>  .../bindings/arm/hisilicon/hisilicon.txt           | 82 ++++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index 7df79a7..341cbb9 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -270,3 +270,85 @@ Required Properties:
+>    [1]: bootwrapper size
+>    [2]: relocation physical address
+>    [3]: relocation size
 
-Yeah, just take the sets that you need (i.e. the architected events).
 
-Also, check that it builds.
+> +-----------------------------------------------------------------------
+> +The Hisilicon Djtag in CPU die is an independent component which connects with
+> +some other components in the SoC by Debug Bus. This driver can be configured
+> +to access the registers of connecting components (like L3 cache, l3 cache PMU
+> + etc.) during real time debugging by sysctrl. These components appear as child
+> +nodes of djtag.
 
-Will
+Please put the djtag binding in a new file. 
+
+It's clearly unrelated to many other things in this file, which should
+also be split out.
+
+> +The Hip05/06/07 CPU system controller(sysctrl) support to manage some important
+> +components (such as clock, reset, soft reset, secure debugger, etc.).
+> +The CPU sysctrl registers in hip05/06/07 doesnot use syscon but will be mapped
+> +by djtag driver for use by connecting components.
+
+The djtag driver is irrelvant here.
+
+If there's a realtionship between the two, please define that in the
+binding rather than implicitly assuming it in the driver.
+
+> +
+> +Required properties:
+> +  - compatible : "hisilicon,hip05-cpu-djtag-v1"
+> +  - reg : Register address and size
+> +
+> +Hisilicon HiP06 djtag for CPU sysctrl
+> +Required properties:
+> +- compatible : "hisilicon,hip06-sysctrl", "syscon", "simple-mfd";
+
+This looks messy. Why is this syscon and a simple-mfd?
+
+We should kill off / deprecate the syscon binding. It's completely
+meaningless.
+
+> +- reg : Register address and size
+> +- djtag :
+> +  - compatible : "hisilicon,hip06-cpu-djtag-v1"
+> +  - reg : Register address and size
+> +
+> +Hisilicon HiP07 djtag for CPU sysctrl
+> +Required properties:
+> +  - compatible : "hisilicon,hip07-cpu-djtag-v2"
+> +  - reg : Register address and size
+> +
+> +Example:
+> +	/* for Hisilicon HiP05 djtag for CPU sysctrl */
+> +	djtag0: djtag at 80010000 {
+> +		compatible = "hisilicon,hip05-cpu-djtag-v1";
+> +		reg = <0x0 0x80010000 0x0 0x10000>;
+> +
+> +		/* For L3 cache PMU */
+> +		pmul3c0 {
+> +			compatible = "hisilicon,hisi-pmu-l3c-v1";
+> +			scl-id = <0x02>;
+> +			num-events = <0x16>;
+> +			num-counters = <0x08>;
+> +			module-id = <0x04>;
+> +			num-banks = <0x04>;
+> +			cfgen-map = <0x02 0x04 0x01 0x08>;
+> +			counter-reg = <0x170>;
+> +			evctrl-reg = <0x04>;
+> +			event-en = <0x1000000>;
+> +			evtype-reg = <0x140>;
+> +		};
+
+This sub-node needs a binding document.
+
+These properties are completely opaque
+
+> +	};
+> +
+> +-----------------------------------------------------------------------
+> +The Hisilicon HiP05/06/07 ALGSUB system controller(sysctrl) is in IO die
+> +of SoC. It has a similar function as the Hisilicon HiP05/06/07 CPU system
+> +controller in CPU die and it manage different components, like RSA, etc.
+> +The Hisilicon Djtag in IO die has a similar function as in CPU die and maps
+> +the sysctrl registers for use by connecting components.
+> +All connecting components shall appear as child nodes of djtag.
+
+I don't follow the above. This describes an ALGSUB system controllerm
+but the documentation below is all about djtag.
+
+Thanks,
+Mark.
+
+> +Hisilicon HiP05 djtag for ALGSUB sysctrl
+> +Required properties:
+> +  - compatible : "hisilicon,hip05-io-djtag-v1"
+> +  - reg : Register address and size
+> +
+> +Hisilicon HiP06 djtag for ALGSUB sysctrl
+> +Required properties:
+> +  - compatible : "hisilicon,hip06-io-djtag-v2"
+> +  - reg : Register address and size
+> +
+> +Hisilicon HiP07 djtag for ALGSUB sysctrl
+> +Required properties:
+> +  - compatible : "hisilicon,hip07-io-djtag-v2"
+> +  - reg : Register address and size
+> +
+> +Example:
+> +	/* for Hisilicon HiP05 djtag for alg sysctrl */
+> +	djtag0: djtag at d0000000 {
+> +	       compatible = "hisilicon,hip05-io-djtag-v1";
+> +		reg = <0x0 0xd0000000 0x0 0x10000>;
+> +	};
+> -- 
+> 2.1.4
+> 
