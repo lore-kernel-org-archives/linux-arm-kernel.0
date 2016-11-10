@@ -1,57 +1,42 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 10 Nov 2016 16:14:34 +0100
-Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
- randomness
-In-Reply-To: <20161025132648.txeo3rw6yz5wutrg@lukather>
-References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
- <20161024201020.h6akyqad2o42xkhq@lukather>
- <20161025053855.GA901@Red>
- <20161025132648.txeo3rw6yz5wutrg@lukather>
-Message-ID: <20161110151434.GA1209@Red>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Thu, 10 Nov 2016 15:18:16 +0000
+Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
+In-Reply-To: <b654d5f7-7b67-7216-760f-d29e49a29296@samsung.com>
+References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+ <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
+ <20161108144445.GD1575@localhost.localdomain>
+ <CGME20161108145620epcas2p4b8e2ec5ffdd4bf04ab3bf0728b46e3f2@epcas2p4.samsung.com>
+ <20161108145534.GE1575@localhost.localdomain>
+ <f53d533d-163f-31f3-4efb-0e39d201589d@samsung.com>
+ <20161110110323.GG1575@localhost.localdomain>
+ <b654d5f7-7b67-7216-760f-d29e49a29296@samsung.com>
+Message-ID: <20161110151816.GI1575@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 03:26:48PM +0200, Maxime Ripard wrote:
-> On Tue, Oct 25, 2016 at 07:38:55AM +0200, LABBE Corentin wrote:
-> > On Mon, Oct 24, 2016 at 10:10:20PM +0200, Maxime Ripard wrote:
-> > > On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
-> > > > Since SID's content is constant over reboot,
-> > > 
-> > > That's not true, at least not across all the Allwinner SoCs, and
-> > > especially not on the A10 and A20 that this driver supports.
-> > > 
+On Thu, Nov 10, 2016 at 04:10:56PM +0100, Sylwester Nawrocki wrote:
+> On 11/10/2016 12:03 PM, Charles Keepax wrote:
+> >> On Tue, Nov 08, 2016 at 04:53:40PM +0100, Sylwester Nawrocki wrote:
+> [...]
+> >> I pushed now to branch for-v4.10/dma/pl080-s3c64xx-v2 with this
+> >> issue fixed and added initialization of the filer function.
 > > 
-> > On my cubieboard2 (A20)
-> > hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000200
-> > cubiedev ~ # reboot
-> > cubiedev ~ # hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
-> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
-> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
-> > *
-> > 00000200
+> > Apologies for the delay got somewhat swamped with internal stuff
+> > yesterday. Yeah using that branch it looks good to me, the SPI and
+> > I2S are both working fine. I can download code to the wm0010
+> > which should be a good work out of the SPI and play audio
+> > correctly so the I2S should be fine. So for the series:
 > > 
-> > So clearly for me its constant.
+> > Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 > 
-> It's constant across reboots, but not across devices. Each device have
-> a different SID content, therefore it's a relevant source of entropy
-> in the system.
+> Great, thanks a lot!  I'm going to post the next iteration with
+> modified pl080 DMAC patches, addressing comments from Arnd.
+> I would be grateful if you could confirm it also works on your
+> platform.
 > 
 
-Not the 3 leading digit and not the tailing zeros which are the same accross device.
-So only 50% of data are really different accross devices.
-Perhaps a "random-range" property could be used ?
+Yeah, no problem, I should be able to find time to test those as
+well.
 
-Herbert, does it is safe to add that 50% duplicate content via add_device_randomness() ?
-Reading add_device_randomness doc, it seems finally it is safe, but if you could confirm it.
-
-Regards
+Thanks,
+Charles
