@@ -1,30 +1,81 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 10 Nov 2016 16:18:48 +0100
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <e59e9a17-e943-a227-5ea4-d028232155a8@arm.com>
-References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
- <20161103220205.37715b49@t450s.home>
- <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
- <20161108163508.1bcae0c2@t450s.home> <58228F71.6020108@redhat.com>
- <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
- <e59e9a17-e943-a227-5ea4-d028232155a8@arm.com>
-Message-ID: <20161110151848.GE2078@8bytes.org>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 10 Nov 2016 16:17:51 +0100
+Subject: [PATCH 3/8] spi: s3c64xx: Do not use platform_data for DMA parameters
+In-Reply-To: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1478791076-19528-4-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 08:11:16PM +0000, Robin Murphy wrote:
-> When we *are* in full control of the IOVA space, we just carve out what
-> we can find as best we can - see iova_reserve_pci_windows() in
-> dma-iommu.c, which isn't really all that different to what x86 does
-> (e.g. init_reserved_iova_ranges() in amd-iommu.c).
+All related platforms use either devicetree or the DMA slave
+map API for mapping DMA channels to DMA slaves so we can now
+stop using platform_data for passing DMA details.
 
-Yeah, that code was actually written with a look at what the Intel
-driver does. I don't really like that it goes over all resources and
-reserves them individually (not only because it is not hotplug-safe).
+Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Tested-by: Andi Shyti <andi.shyti@samsung.com>
+Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Acked-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-s3c64xx.c | 21 ++++-----------------
+ 1 file changed, 4 insertions(+), 17 deletions(-)
 
-I have to check whether there is a nice and generic way to find out the
-root-bridge windows and just reserve them in the iova-space. That would
-be easier and more reliable.
-
-
-	Joerg
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 3c09e94..28dfdce 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -341,27 +341,20 @@ static void s3c64xx_spi_set_cs(struct spi_device *spi, bool enable)
+ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ {
+ 	struct s3c64xx_spi_driver_data *sdd = spi_master_get_devdata(spi);
+-	dma_filter_fn filter = sdd->cntrlr_info->filter;
+ 	struct device *dev = &sdd->pdev->dev;
+-	dma_cap_mask_t mask;
+ 
+ 	if (is_polling(sdd))
+ 		return 0;
+ 
+-	dma_cap_zero(mask);
+-	dma_cap_set(DMA_SLAVE, mask);
+-
+ 	/* Acquire DMA channels */
+-	sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-			   sdd->cntrlr_info->dma_rx, dev, "rx");
++	sdd->rx_dma.ch = dma_request_slave_channel(dev, "rx");
+ 	if (!sdd->rx_dma.ch) {
+ 		dev_err(dev, "Failed to get RX DMA channel\n");
+ 		return -EBUSY;
+ 	}
+ 	spi->dma_rx = sdd->rx_dma.ch;
+ 
+-	sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-			   sdd->cntrlr_info->dma_tx, dev, "tx");
++	sdd->tx_dma.ch = dma_request_slave_channel(dev, "tx");
+ 	if (!sdd->tx_dma.ch) {
+ 		dev_err(dev, "Failed to get TX DMA channel\n");
+ 		dma_release_channel(sdd->rx_dma.ch);
+@@ -1091,11 +1084,6 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	sdd->cur_bpw = 8;
+ 
+-	if (!sdd->pdev->dev.of_node && (!sci->dma_tx || !sci->dma_rx)) {
+-		dev_warn(&pdev->dev, "Unable to get SPI tx/rx DMA data. Switching to poll mode\n");
+-		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+-	}
+-
+ 	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
+ 	sdd->rx_dma.direction = DMA_DEV_TO_MEM;
+ 
+@@ -1205,9 +1193,8 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
+ 					sdd->port_id, master->num_chipselect);
+-	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
+-					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
+-					sci->dma_rx, sci->dma_tx);
++	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\n",
++					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1);
+ 
+ 	pm_runtime_mark_last_busy(&pdev->dev);
+ 	pm_runtime_put_autosuspend(&pdev->dev);
+-- 
+1.9.1
