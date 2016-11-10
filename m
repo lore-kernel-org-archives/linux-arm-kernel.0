@@ -1,83 +1,77 @@
-From: nathan@nathanrossi.com (Nathan Rossi)
-Date: Thu, 10 Nov 2016 19:57:11 +1000
-Subject: [PATCH] ARM: zynq: Reserve correct amount of non-DMA RAM
-In-Reply-To: <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
-References: <20161031162617.10565-1-kyle.roeschley@ni.com>
- <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
- <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
-Message-ID: <CA+aJhH2yZqrwR=U2pgWZfxuF63FF75-NVwGHbDU=fFs7cmcg9w@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 10 Nov 2016 11:15:06 +0100
+Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
+In-Reply-To: <87wpgbekwg.fsf@free-electrons.com>
+References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+ <20161110001000.10619-5-gregory.clement@free-electrons.com>
+ <20161110092221.0219490b@free-electrons.com>
+ <87wpgbekwg.fsf@free-electrons.com>
+Message-ID: <20161110111506.02842cbd@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2016 at 19:33, Nathan Rossi <nathan@nathanrossi.com> wrote:
-> On 10 November 2016 at 18:41, Michal Simek <monstr@monstr.eu> wrote:
->> + Nathan
->>
->> 2016-10-31 17:26 GMT+01:00 Kyle Roeschley <kyle.roeschley@ni.com>:
->>>
->>> On Zynq, we haven't been reserving the correct amount of DMA-incapable
->>> RAM to keep DMA away from it (per the Zynq TRM Section 4.1, it should be
->>> the first 512k). In older kernels, this was masked by the
->>> memblock_reserve call in arm_memblock_init(). Now, reserve the correct
->>> amount excplicitly rather than relying on swapper_pg_dir, which is an
->>> address and not a size anyway.
->>>
->>> Fixes: 46f5b96 ("ARM: zynq: Reserve not DMAable space in front of the
->>> kernel")
->>>
->>> Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
->
-> Tested-by: Nathan Rossi <nathan@nathanrossi.com>
->
-> For reference this causes problems with DEBUG_RODATA (which changed to
+Hello,
 
-Sorry typo -> s/causes/caused/, as in "... this [incorrect reserving
-of the lower 512K] caused ...".
+On Thu, 10 Nov 2016 10:36:47 +0100, Gregory CLEMENT wrote:
 
-Regards,
-Nathan
+> >> -		bootrom {
+> >> +		bootrom at 0 {
+> >>  			compatible = "marvell,bootrom";
+> >>  			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;  
+> >
+> > I am still not sure whether this "0" unit address is correct compared
+> > to the reg property being passed.  
+> 
+> I chose to use the adress register inside the window memory.
 
-> default yes for CPU_V7 in v4.6) due to padding memory between
-> .head.text and .text, allowing memory below 0x80000 to be available
-> for allocation as non-reserved memory.
->
-> Regards,
-> Nathan
->
->>> ---
->>> Found when migrating from 4.1 to 4.6.
->>>
->>>  arch/arm/mach-zynq/common.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->>> index 6cefdb8..75885bc 100644
->>> --- a/arch/arm/mach-zynq/common.c
->>> +++ b/arch/arm/mach-zynq/common.c
->>> @@ -59,7 +59,7 @@ void __iomem *zynq_scu_base;
->>>  static void __init zynq_memory_init(void)
->>>  {
->>>         if (!__pa(PAGE_OFFSET))
->>> -               memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
->>> +               memblock_reserve(__pa(PAGE_OFFSET), 0x80000);
->>>  }
->>>
->>>  static struct platform_device zynq_cpuidle_device = {
->>> --
->>> 2.9.3
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
->>
->> --
->> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
->> w: www.monstr.eu p: +42-0-721842854
->> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
->> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
->> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+Which I think is bogus, as my example below highlighted.
+
+> > A good example of why I'm worried is the sa-sram case:
+> >
+> > +		crypto_sram0: sa-sram0 at 0 {
+> >  			compatible = "mmio-sram";
+> >  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+> >
+> > +		crypto_sram1: sa-sram1 at 0 {
+> >  			compatible = "mmio-sram";
+> >  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+> >
+> > The node names should be just "sram" without a number. Indeed for UARTs
+> > for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
+> > uart1 at ABC. But then, if you do that, with your scheme, you end up with
+> > both nodes named sa-sram at 0.
+> >
+> > Which clearly shows that the way you set this unit-address is not
+> > correct: those two devices are mapped at completely different
+> > locations, but you end up with an identical unit address.
+> >
+> > I have no idea what is the rule for setting the unit address in this
+> > case, but I'm pretty sure the rule you've chosen is not good.  
+> 
+> I don't know if there is an existing rules for this case. But I see your
+> concern. What I propose then is to expose the memory windows ID by
+> adding the target and the attributes like this:
+> 
+> 		crypto_sram0: sa-sram at 09_09_0 {
+>  			compatible = "mmio-sram";
+>   			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+> 
+> 
+> 		crypto_sram1: sa-sram at 09_05_0 {
+>   			compatible = "mmio-sram";
+>   			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+
+I have no idea if 09_05_0 is considered a valid unit address. Indeed
+the _ character in an address looks a bit weird.
+
+I guess we need guidance from the DT binding maintainers on this, since
+it's really a matter of interpreting what "unit address" means in
+relation to the value of the "reg" property.
+
+Rob, Mark?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
