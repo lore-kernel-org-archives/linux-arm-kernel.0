@@ -1,85 +1,76 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Nov 2016 16:17:52 +0100
-Subject: [PATCH 4/8] ARM: s3c64xx: Drop unused DMA fields from struct
- s3c64xx_spi_csinfo
+Date: Thu, 10 Nov 2016 16:17:53 +0100
+Subject: [PATCH 5/8] ASoC: samsung: i2s: Do not use platform_data for DMA
+ parameters
 In-Reply-To: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
 References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1478791076-19528-5-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1478791076-19528-6-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no drivers using those fields so remove them and
-the remaining initializations.
+All related platforms use either devicetree or the DMA slave
+map API for mapping DMA channels to slave devices so we can now
+stop using platform_data for passing DMA details.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Acked-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/plat-samsung/devs.c              | 24 ------------------------
- include/linux/platform_data/spi-s3c64xx.h |  3 ---
- 2 files changed, 27 deletions(-)
+ sound/soc/samsung/i2s.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index e93aa67..cf7b95f 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1124,15 +1124,6 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
--	pd.dma_tx = (void *)DMACH_SPI0_TX;
--	pd.dma_rx = (void *)DMACH_SPI0_RX;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
--	pd.filter = pl08x_filter_id;
--#elif defined(CONFIG_S3C24XX_DMAC)
--	pd.filter = s3c24xx_dma_filter;
--#endif
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi0);
- }
-@@ -1169,14 +1160,6 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
--	pd.dma_tx = (void *)DMACH_SPI1_TX;
--	pd.dma_rx = (void *)DMACH_SPI1_RX;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
--	pd.filter = pl08x_filter_id;
--#endif
--
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi1);
- }
-@@ -1213,13 +1196,6 @@ void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
--	pd.dma_tx = (void *)DMACH_SPI2_TX;
--	pd.dma_rx = (void *)DMACH_SPI2_RX;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
--	pd.filter = pl08x_filter_id;
--#endif
- 
- 	s3c_set_platdata(&pd, sizeof(pd), &s3c64xx_device_spi2);
- }
-diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
-index 5c1e21c..da79774 100644
---- a/include/linux/platform_data/spi-s3c64xx.h
-+++ b/include/linux/platform_data/spi-s3c64xx.h
-@@ -40,9 +40,6 @@ struct s3c64xx_spi_info {
- 	int num_cs;
- 	bool no_cs;
- 	int (*cfg_gpio)(void);
+diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+index 7e32cf4..95a9a3f 100644
+--- a/sound/soc/samsung/i2s.c
++++ b/sound/soc/samsung/i2s.c
+@@ -90,7 +90,6 @@ struct i2s_dai {
+ 	struct snd_dmaengine_dai_dma_data dma_playback;
+ 	struct snd_dmaengine_dai_dma_data dma_capture;
+ 	struct snd_dmaengine_dai_dma_data idma_playback;
 -	dma_filter_fn filter;
--	void *dma_tx;
--	void *dma_rx;
- };
+ 	u32	quirks;
+ 	u32	suspend_i2smod;
+ 	u32	suspend_i2scon;
+@@ -1244,7 +1243,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 			return ret;
  
- /**
+ 		return samsung_asoc_dma_platform_register(&pdev->dev,
+-					sec_dai->filter, "tx-sec", NULL);
++						NULL, "tx-sec", NULL);
+ 	}
+ 
+ 	pri_dai = i2s_alloc_dai(pdev, false);
+@@ -1262,10 +1261,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 			return -EINVAL;
+ 		}
+ 
+-		pri_dai->dma_playback.filter_data = i2s_pdata->dma_playback;
+-		pri_dai->dma_capture.filter_data = i2s_pdata->dma_capture;
+-		pri_dai->filter = i2s_pdata->dma_filter;
+-
+ 		if (&i2s_pdata->type)
+ 			i2s_cfg = &i2s_pdata->type.i2s;
+ 
+@@ -1327,11 +1322,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 		sec_dai->dma_playback.addr = regs_base + I2STXDS;
+ 		sec_dai->dma_playback.chan_name = "tx-sec";
+ 
+-		if (!np) {
+-			sec_dai->dma_playback.filter_data = i2s_pdata->dma_play_sec;
+-			sec_dai->filter = i2s_pdata->dma_filter;
+-		}
+-
+ 		sec_dai->dma_playback.addr_width = 4;
+ 		sec_dai->addr = pri_dai->addr;
+ 		sec_dai->clk = pri_dai->clk;
+@@ -1353,7 +1343,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		goto err_free_dai;
+ 
+-	ret = samsung_asoc_dma_platform_register(&pdev->dev, pri_dai->filter,
++	ret = samsung_asoc_dma_platform_register(&pdev->dev, NULL,
+ 						 NULL, NULL);
+ 	if (ret < 0)
+ 		goto err_free_dai;
 -- 
 1.9.1
