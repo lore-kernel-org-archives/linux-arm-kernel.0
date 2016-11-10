@@ -1,40 +1,50 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 10 Nov 2016 15:52:00 +0100
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
-References: <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
- <20161109192303.GD15676@cbox> <20161109203145.GO17771@arm.com>
- <20161109151709.74927f83@t450s.home>
- <20161109222522.GS17771@arm.com>
- <20161109162458.39594fdb@t450s.home>
- <20161109233847.GT17771@arm.com>
- <20161109165957.62c1eb61@t450s.home>
- <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
-Message-ID: <20161110145200.GD2078@8bytes.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Nov 2016 15:56:30 +0100
+Subject: [PATCH 5/5] drm/sun4i: Add support for the overscan profiles
+In-Reply-To: <20161108085927.ibyett46cjgyfwu2@phenom.ffwll.local>
+References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <b980759ad766658d7bc3d67c18f505c5bf727ef5.1476779323.git-series.maxime.ripard@free-electrons.com>
+ <20161108085927.ibyett46cjgyfwu2@phenom.ffwll.local>
+Message-ID: <20161110145630.wvzlh6rxusrufv2r@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 01:14:42AM +0100, Auger Eric wrote:
-> Besides above problematic, I started to prototype the sysfs API. A first
-> issue I face is the reserved regions become global to the iommu instead
-> of characterizing the iommu_domain, ie. the "reserved_regions" attribute
-> file sits below an iommu instance (~
-> /sys/class/iommu/dmar0/intel-iommu/reserved_regions ||
-> /sys/class/iommu/arm-smmu0/arm-smmu/reserved_regions).
-> 
-> MSI reserved window can be considered global to the IOMMU. However PCIe
-> host bridge P2P regions rather are per iommu-domain.
-> 
-> Do you confirm the attribute file should contain both global reserved
-> regions and all per iommu_domain reserved regions?
-> 
-> Thoughts?
+Hi Daniel,
 
-This information is best attached to the sysfs-representation of
-iommu-groups. The file should then contain the superset of all reserved
-regions of the devices the group contains. This makes it usable later to
-also describe RMRR/Unity-mapped regions on x86 there and make them
-assignable to guests as well.
+On Tue, Nov 08, 2016 at 09:59:27AM +0100, Daniel Vetter wrote:
+> On Tue, Oct 18, 2016 at 10:29:38AM +0200, Maxime Ripard wrote:
+> > Create overscan profiles reducing the displayed zone.
+> > 
+> > For each TV standard (PAL and NTSC so far), we create 4 more reduced modes
+> > by steps of 5% that the user will be able to select.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> tbh I think if we agree to do this (and that still seems an open question)
+> I think there should be a generic helper to add these overscan modes with
+> increased porches. Anything that only depends upon the sink (and
+> overscanning is something the sink does) should imo be put into a suitable
+> helper library for everyone to share.
+> 
+> Or maybe even stash it into the probe helpers and call it for all TV
+> connectors. Definitely not a driver-private thing.
 
+Last time we discussed it, my recollection was that you didn't want to
+have generic code for it, but I'd be happy to implement it.
 
-	Joerg
+I'll come up with something like that.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/40bb0b9b/attachment.sig>
