@@ -1,76 +1,71 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Nov 2016 16:17:53 +0100
-Subject: [PATCH 5/8] ASoC: samsung: i2s: Do not use platform_data for DMA
- parameters
+Date: Thu, 10 Nov 2016 16:17:56 +0100
+Subject: [PATCH 8/8] ARM: s3c24xx: Drop unused struct s3c_audio_pdata entries
 In-Reply-To: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
 References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1478791076-19528-6-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1478791076-19528-9-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All related platforms use either devicetree or the DMA slave
-map API for mapping DMA channels to slave devices so we can now
-stop using platform_data for passing DMA details.
+The s3c24xx-iis driver is now converted to use the dma_slave_map API
+and the samsung-ac97 driver got removed from the tree so remove
+the unused platform data structure instances.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
-Acked-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/samsung/i2s.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/plat-samsung/devs.c | 19 -------------------
+ 1 file changed, 19 deletions(-)
 
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 7e32cf4..95a9a3f 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -90,7 +90,6 @@ struct i2s_dai {
- 	struct snd_dmaengine_dai_dma_data dma_playback;
- 	struct snd_dmaengine_dai_dma_data dma_capture;
- 	struct snd_dmaengine_dai_dma_data idma_playback;
--	dma_filter_fn filter;
- 	u32	quirks;
- 	u32	suspend_i2smod;
- 	u32	suspend_i2scon;
-@@ -1244,7 +1243,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 			return ret;
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index cf7b95f..03fac12 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -77,15 +77,6 @@
+ 	[1] = DEFINE_RES_IRQ(IRQ_S3C244X_AC97),
+ };
  
- 		return samsung_asoc_dma_platform_register(&pdev->dev,
--					sec_dai->filter, "tx-sec", NULL);
-+						NULL, "tx-sec", NULL);
+-static struct s3c_audio_pdata s3c_ac97_pdata = {
+-#ifdef CONFIG_S3C24XX_DMAC
+-	.dma_filter = s3c24xx_dma_filter,
+-#endif
+-	.dma_playback = (void *)DMACH_PCM_OUT,
+-	.dma_capture = (void *)DMACH_PCM_IN,
+-	.dma_capture_mic = (void *)DMACH_MIC_IN,
+-};
+-
+ struct platform_device s3c_device_ac97 = {
+ 	.name		= "samsung-ac97",
+ 	.id		= -1,
+@@ -94,7 +85,6 @@ struct platform_device s3c_device_ac97 = {
+ 	.dev		= {
+ 		.dma_mask		= &samsung_device_dma_mask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.platform_data		= &s3c_ac97_pdata,
  	}
+ };
+ #endif /* CONFIG_CPU_S3C2440 */
+@@ -574,14 +564,6 @@ void __init s3c_i2c7_set_platdata(struct s3c2410_platform_i2c *pd)
+ 	[0] = DEFINE_RES_MEM(S3C24XX_PA_IIS, S3C24XX_SZ_IIS),
+ };
  
- 	pri_dai = i2s_alloc_dai(pdev, false);
-@@ -1262,10 +1261,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 			return -EINVAL;
- 		}
- 
--		pri_dai->dma_playback.filter_data = i2s_pdata->dma_playback;
--		pri_dai->dma_capture.filter_data = i2s_pdata->dma_capture;
--		pri_dai->filter = i2s_pdata->dma_filter;
+-static struct s3c_audio_pdata s3c_iis_platdata = {
+-#ifdef CONFIG_S3C24XX_DMAC
+-	.dma_filter = s3c24xx_dma_filter,
+-#endif
+-	.dma_playback = (void *)DMACH_I2S_OUT,
+-	.dma_capture = (void *)DMACH_I2S_IN,
+-};
 -
- 		if (&i2s_pdata->type)
- 			i2s_cfg = &i2s_pdata->type.i2s;
- 
-@@ -1327,11 +1322,6 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 		sec_dai->dma_playback.addr = regs_base + I2STXDS;
- 		sec_dai->dma_playback.chan_name = "tx-sec";
- 
--		if (!np) {
--			sec_dai->dma_playback.filter_data = i2s_pdata->dma_play_sec;
--			sec_dai->filter = i2s_pdata->dma_filter;
--		}
--
- 		sec_dai->dma_playback.addr_width = 4;
- 		sec_dai->addr = pri_dai->addr;
- 		sec_dai->clk = pri_dai->clk;
-@@ -1353,7 +1343,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_free_dai;
- 
--	ret = samsung_asoc_dma_platform_register(&pdev->dev, pri_dai->filter,
-+	ret = samsung_asoc_dma_platform_register(&pdev->dev, NULL,
- 						 NULL, NULL);
- 	if (ret < 0)
- 		goto err_free_dai;
+ struct platform_device s3c_device_iis = {
+ 	.name		= "s3c24xx-iis",
+ 	.id		= -1,
+@@ -590,7 +572,6 @@ struct platform_device s3c_device_iis = {
+ 	.dev		= {
+ 		.dma_mask		= &samsung_device_dma_mask,
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-		.platform_data		= &s3c_iis_platdata,
+ 	}
+ };
+ #endif /* CONFIG_PLAT_S3C24XX */
 -- 
 1.9.1
