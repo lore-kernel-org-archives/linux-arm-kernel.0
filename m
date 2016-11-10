@@ -1,79 +1,68 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 10 Nov 2016 10:21:51 +0100
-Subject: [PATCH] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <9eeb3d84-f850-4b76-ce6a-67cc92d6de3b@rock-chips.com>
-References: <1478523658-9400-1-git-send-email-wulf@rock-chips.com>
- <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
- <9eeb3d84-f850-4b76-ce6a-67cc92d6de3b@rock-chips.com>
-Message-ID: <2283070.Hkeafucara@diego>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Nov 2016 10:22:13 +0100
+Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <6723536.97ljqcB8tS@wuerfel>
+References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
+ <1626072.dpWPnWgGl9@wuerfel>
+ <CAMuHMdVrdjqWruY=dBjWP=jZuZkc=aTBTMijOyTDfZFcaD_jsA@mail.gmail.com>
+ <6723536.97ljqcB8tS@wuerfel>
+Message-ID: <CAMuHMdWox5ksj1xhJ6_n0wNA9j6veX0AzAE0V9Gs26Kvw5C_sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 10. November 2016, 10:54:49 schrieb wlf:
-> Hi Doug,
-> 
-> ? 2016?11?10? 04:54, Doug Anderson ??:
-> > Hi,
-> > 
-> > On Mon, Nov 7, 2016 at 5:00 AM, William Wu <wulf@rock-chips.com> wrote:
-> >> We found that the system crashed due to 480MHz output clock of
-> >> USB2 PHY was unstable after clock had been enabled by gpu module.
-> >> 
-> >> Theoretically, 1 millisecond is a critical value for 480MHz
-> >> output clock stable time, so we try to change the delay time
-> >> to 1.2 millisecond to avoid this issue.
-> >> 
-> >> Signed-off-by: William Wu <wulf@rock-chips.com>
-> >> ---
-> >> 
-> >>   drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
-> >>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >> 
-> >> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c
-> >> b/drivers/phy/phy-rockchip-inno-usb2.c index ecfd7d1..8f2d2b6 100644
-> >> --- a/drivers/phy/phy-rockchip-inno-usb2.c
-> >> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
-> >> @@ -267,7 +267,7 @@ static int rockchip_usb2phy_clk480m_enable(struct
-> >> clk_hw *hw)>> 
-> >>                          return ret;
-> >>                  
-> >>                  /* waitting for the clk become stable */
-> >> 
-> >> -               mdelay(1);
-> >> +               udelay(1200);
-> > 
-> > Several people who have seen this patch have expressed concern that a
-> > 1.2 ms delay is pretty long for something that's supposed to be
-> > "atomic" like a clk_enable().  Consider that someone might call
-> > clk_enable() while interrupts are disabled and that a 1.2 ms interrupt
-> > latency is not so great.
-> > 
-> > It seems like this clock should be moved to be enabled in "prepare"
-> > and the "enable" should be a no-op.  This is a functionality change,
-> > but I don't think there are any real users for this clock at the
-> > moment so it should be fine.
-> > 
-> > (of course, the 1 ms latency that existed before this patch was still
-> > pretty bad, but ...)
-> 
-> Thanks a lot for your suggestion.
-> I agree with you.  clk_enable() will call spin_lock_irqsave() to disable
-> interrupt, and we add
-> more than 1ms in clk_enable may cause big latency.
-> 
-> And according to clk_prepare() description:
->   In a simple case, clk_prepare can be used instead of clk_enable to
-> ungate a clk if the
->   operation may sleep.  One example is a clk which is accessed over I2c.
-> 
-> So maybe we can remove the clock to clk_prepare.
-> 
-> Hi Heiko, Frank,
->         What  do you think of it?
+Hi Ulf,
 
-moving to clk_prepare sounds sensible. That way you can switch from delay to 
-sleep functions as well.
+On Wed, Nov 9, 2016 at 10:12 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday, November 9, 2016 6:19:06 PM CET Geert Uytterhoeven wrote:
+>> On Wed, Nov 9, 2016 at 5:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Wednesday, November 9, 2016 2:34:33 PM CET Geert Uytterhoeven wrote:
+>> >> > And Samsung.
+>> >> > Shall I create the immutable branch now?
+>> >>
+>> >> Arnd: are you happy with the new patches and changes?
+>> >
+>> > I still had some comments for patch 7, but that shouldn't stop
+>> > you from creating a branch for the first three so everyone can
+>> > build on top of that.
+>>
+>> Thanks!
+>>
+>> What about patch [4/7]?
+>> Haven't you received it? Your address was in the To-line for all 7 patches.
+>
+> Ok, I see it now, looks good. That should be included as well then.
 
+Thanks, I've created the branch/tag :
 
-Heiko
+    git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
+    branch soc-device-match
+    signed tag soc-device-match-tag1
+
+In the mean time, Ulf has applied the first two patches to mmc/next, on top
+of lots of MMC work :-(
+
+Ulf, as this is not only a dependency for Freescale/NXP (for sdhci-of-esdhc),
+but also for Samsung and Renesas, would it still be possible to replace these
+two commits
+
+    8b82c17a8ae533d6 base: soc: introduce soc_device_match() interface
+    6fa350172b098f0f base: soc: Check for NULL SoC device attributes
+
+by a merge of soc-device-match-tag1?
+
+You can find more info in the full thread at
+https://www.spinics.net/lists/devicetree/msg148558.html
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
