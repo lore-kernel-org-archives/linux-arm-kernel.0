@@ -1,358 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 10 Nov 2016 19:10:58 +0000
-Subject: [RESEND PATCH v1 07/11] perf: hisi: Add support for Hisilicon
- SoC event counters
-In-Reply-To: <1478151727-20250-8-git-send-email-anurup.m@huawei.com>
-References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
- <1478151727-20250-8-git-send-email-anurup.m@huawei.com>
-Message-ID: <20161110191058.GE10137@leverpostej>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Fri, 11 Nov 2016 06:32:33 +1100
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <20161110112224.GB4418@leverpostej>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108120323.GC15297@leverpostej>
+ <1478647002.7430.69.camel@kernel.crashing.org>
+ <20161110112224.GB4418@leverpostej>
+Message-ID: <1478806353.7430.137.camel@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 03, 2016 at 01:42:03AM -0400, Anurup M wrote:
-> +	do {
-> +		/* Get count from individual L3C banks and sum them up */
-> +		for (i = 0; i < num_banks; i++) {
-> +			total_raw_count += hisi_read_l3c_counter(l3c_hwmod_data,
-> +									idx, i);
-> +		}
-> +		prev_raw_count = local64_read(&hwc->prev_count);
-> +
-> +		/*
-> +		 * As prev_raw_count is updated with average value of
-> +		 * L3 cache banks, we multiply it by no of banks and
-> +		 * compute the delta
-> +		 */
-> +		delta = (total_raw_count - (prev_raw_count * num_banks)) &
-> +								HISI_MAX_PERIOD;
-> +
-> +		local64_add(delta, &event->count);
-> +
-> +		/*
-> +		 * Divide by num of banks to get average count and
-> +		 * update prev_count with this value
-> +		 */
-> +		avg_raw_count = total_raw_count / num_banks;
-> +	} while (local64_cmpxchg(
-> +			 &hwc->prev_count, prev_raw_count, avg_raw_count) !=
-> +							 prev_raw_count);
+On Thu, 2016-11-10 at 11:22 +0000, Mark Rutland wrote:
+> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
+> > firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
+> 
+> Just to check, do you hook that in your inb/outb/etc?
 
-Please don't aggregate like this; expose separate PMUs instead.
+Yes.
 
-This is racy, and by averaging and multiplying we're making up and/or
-throwing away data.
+> Generally, it would seem nicer if we could have higher-level
+> isa_{inb,outb,whatever} accessors that we could hook separately from
+> other IO.
 
-[...]
+Maybe but generally speaking, we don't discriminate accessors per bus,
+ie, readl etc... work on all memory mapped busses, inb... works on all
+busses with an "IO space", at least that's been the idea. It probably
+all comes from the fact that PCI IO and ISA are the same space on
+x86 and most other platforms (not all).
 
-> +	event_value = (val -
-> +			HISI_HWEVENT_L3C_READ_ALLOCATE);
-> +
-> +	/* Select the appropriate Event select register */
-> +	if (idx > 3)
-> +		reg_offset += 4;
-> +
-> +	/* Value to write to event type register */
-> +	val = event_value << (8 * idx);
-> +
+> We don't necessarily have to move all ISA drivers over to that if we had
+> a separate symbol for that interface.
 
-Please add helpers for these, and explain *why* the transformations are
-necessary.
+What I do on ppc today is that I have a chunk of virtual address space
+that is reserved for "IO space". The first 64k are "reserved" in that
+they route to "the primary" ISA bus (for legacy crap that uses hard
+coded addresses, though I use that for my LPC bus too). I "allocate"
+space for the PCI IO spaces higher in that space. Was I to support more
+LPC busses I could allocate them up there too.
 
-> +	/* Find the djtag Identifier of the Unit */
-> +	client = l3c_hwmod_data->client;
-> +
-> +	/*
-> +	 * Set the event in L3C_EVENT_TYPEx Register
-> +	 * for all L3C banks
-> +	 */
+The IO resource of a given device thus becomes the actual IO port plus
+the offset of the base of the segment it's in.
 
-As above, it seems like you should expose a separate PMU per bank
-instead. That applies for all the other instances where you iterate over
-banks.
+For memory mapped IO, inb/outb will just add the virtual address of
+the base of all IO space to that. The hooking mechanism will pickup
+the stuff that isn't memory mapped.
 
-[...]
+It's a bit messy but then IO space performance has never been a huge
+worry since IO cycles tend to be very slow to begin with.
 
-> +	for (i = 0; i < l3c_hwmod_data->l3c_hwcfg.num_banks; i++) {
-> +		module_id = l3c_hwmod_data->l3c_hwcfg.module_id[i];
-> +		cfg_en = l3c_hwmod_data->l3c_hwcfg.bank_cfgen[i];
-> +		ret = hisi_djtag_writereg(module_id,
-> +					cfg_en,
-> +					reg_offset,
-> +					value,
-> +					client);
-> +		if (!ret)
-> +			ret = value;
-> +	}
+Note: We also have the ISA memory and ISA FW spaces that we don't have
+good accessors for. They somewhat exist (I think the fbdev layer uses
+some for vga) but it's messy.
 
-This is impossible to read. Please factor this into helpers such that
-you don't need this amount of indentation.
-
-Please do similarly elsewhere when you see this indentation pattern.
-
-[...]
-
-> +static int hisi_l3c_get_event_idx(struct hisi_pmu *pl3c_pmu)
-> +{
-> +	struct hisi_l3c_data *l3c_hwmod_data = pl3c_pmu->hwmod_data;
-> +	int event_idx;
-> +
-> +	event_idx =
-> +		find_first_zero_bit(
-> +			l3c_hwmod_data->hisi_l3c_event_used_mask,
-> +					 pl3c_pmu->num_counters);
-> +
-> +	if (event_idx == HISI_MAX_CFG_L3C_CNTR)
-> +		return -EAGAIN;
-> +
-> +	__set_bit(event_idx,
-> +		l3c_hwmod_data->hisi_l3c_event_used_mask);
-> +
-> +	return event_idx;
-> +}
-
-Please get rid of the weird hungarian notation (i.e. don't use 'p' as a
-prefix for pointers), and use temporary variables consistently, e.g.
-
-static int hisi_l3c_get_event_idx(struct hisi_pmu *l3c_pmu)
-{
-	struct hisi_l3c_data *l3c_hwmod_data = l3c_pmu->hwmod_data;
-	unsigned long *used_mask = l3c_hwmod_data->hisi_l3c_event_used_mask;
-	int num_counters = pl3c_pmu->num_counters
-	int idx;
-
-	idx = find_first_zero_bit(used_mask, num_counters);
-	if (idx == num_counters)
-		return -EAGAIN;
-
-	set_bit(idx, used_mask);
-
-	return idx;
-}
-
-[...]
-
-> +	if (of_property_read_u32(node, "counter-reg",
-> +				     &pl3c_hwcfg->counter_reg0_off)) {
-> +		dev_err(dev, "DT:Couldnot read counter-reg!\n");
-> +		return -EINVAL;
-> +	}
-
-Please use spaces in these messages.
-
-Otherwise, my comments on the binding apply here.
-
-[...]
-
-> +static int init_hisi_l3c_data(struct device *dev,
-> +					struct hisi_pmu *pl3c_pmu,
-> +					struct hisi_djtag_client *client)
-> +{
-> +	struct hisi_l3c_data *l3c_hwmod_data = NULL;
-> +	int ret;
-> +
-> +	l3c_hwmod_data = kzalloc(sizeof(struct hisi_l3c_data),
-> +							GFP_KERNEL);
-
-Use:
-
-	l3c_hwmod_data = kzalloc(sizeof(*l3c_hwmod_data, GFP_KERNEL):
-
-[...]
-
-> +static int hisi_pmu_l3c_dev_probe(struct hisi_djtag_client *client)
-> +{
-> +	struct hisi_pmu *pl3c_pmu = NULL;
-> +	struct device *dev = &client->dev;
-> +	int ret;
-> +
-> +	pl3c_pmu = hisi_pmu_alloc(dev);
-> +	if (IS_ERR(pl3c_pmu))
-> +		return PTR_ERR(pl3c_pmu);
-
-Why use error pointers for this?
-
-hisi_pmu_alloc() only ever returns ERR_PTR(-ENOMEM) if it failed to
-allocate.
-
-It's far simpler to have it pass on NULL there, and here do:
-
-	pl3c_pmu = hisi_pmu_alloc(dev);
-	if (!pl3c_pmu)
-		return -ENOMEM;
-
-Please also s/pl3c_pmu/l3c_pmu/ here, and elsewhere throughout the
-driver. The 'p' only serves to make this harder to read.
-
-[...]
-
-> +	/* Register with perf PMU */
-> +	pl3c_pmu->pmu = (struct pmu) {
-> +		.name = pl3c_pmu->name,
-> +		.task_ctx_nr = perf_invalid_context,
-> +		.event_init = hisi_uncore_pmu_event_init,
-> +		.add = hisi_uncore_pmu_add,
-> +		.del = hisi_uncore_pmu_del,
-> +		.start = hisi_uncore_pmu_start,
-> +		.stop = hisi_uncore_pmu_stop,
-> +		.read = hisi_uncore_pmu_read,
-> +	};
-
-Please remove the comment above this.
-
-[...]
-
-> +int hisi_uncore_pmu_event_init(struct perf_event *event)
-> +{
-> +	int err;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-
-This is undefined behaviour. This must be done *after* we check the
-event->pmu->type.
-
-> +
-> +	if (event->attr.type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	/* we do not support sampling as the counters are all
-> +	 * shared by all CPU cores in a CPU die(SCCL). Also we
-> +	 * donot support attach to a task(per-process mode)
-> +	 */
-> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
-> +		return -EOPNOTSUPP;
-> +
-> +	/* counters do not have these bits */
-> +	if (event->attr.exclude_user	||
-> +	    event->attr.exclude_kernel	||
-> +	    event->attr.exclude_host	||
-> +	    event->attr.exclude_guest	||
-> +	    event->attr.exclude_hv	||
-> +	    event->attr.exclude_idle)
-> +		return -EINVAL;
-> +
-> +	if (event->cpu < 0)
-> +		return -EINVAL;
-> +
-> +	event->cpu = cpumask_first(&phisi_pmu->cpu);
-
-You should also check the event grouping.
-
-Take a look at what we do in arch/arm/mm/cache-l2x0-pmu.c.
-
-[...]
-
-> +/*
-> + * Enable counter and set the counter to count
-> + * the event that we're interested in.
-> + */
-> +void hisi_uncore_pmu_enable_event(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +
-> +	/* Disable the hardware event counting */
-> +	if (phisi_pmu->ops->disable_counter)
-> +		phisi_pmu->ops->disable_counter(phisi_pmu, GET_CNTR_IDX(hwc));
-
-Why isn't the counter already disabled?
-
-> +	/*
-> +	 * Set event (if destined for Hisilicon SoC counters).
-> +	 */
-> +	if (phisi_pmu->ops->set_evtype)
-> +		phisi_pmu->ops->set_evtype(phisi_pmu, GET_CNTR_IDX(hwc),
-> +							hwc->config_base);
-
-Why isn't this done in the pmu::event_add callback?
-
-> +
-> +	/* Enable the hardware event counting */
-> +	if (phisi_pmu->ops->enable_counter)
-> +		phisi_pmu->ops->enable_counter(phisi_pmu, GET_CNTR_IDX(hwc));
-
-This should be the only necessary part of this function.
-
-> +}
-> +
-> +void hisi_pmu_set_event_period(struct perf_event *event)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +
-> +	/*
-> +	 * The Hisilicon PMU counters have a period of 2^32. To account for the
-> +	 * possiblity of extreme interrupt latency we program for a period of
-> +	 * half that. Hopefully we can handle the interrupt before another 2^31
-> +	 * events occur and the counter overtakes its previous value.
-> +	 */
-> +	u64 val = 1ULL << 31;
-> +
-> +	local64_set(&hwc->prev_count, val);
-> +
-> +	/* Write to the hardware event counter */
-> +	phisi_pmu->ops->write_counter(phisi_pmu, hwc, val);
-> +}
-> +
-> +void hisi_uncore_pmu_start(struct perf_event *event, int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +	struct hisi_pmu_hw_events *hw_events;
-> +
-> +	hw_events = &phisi_pmu->hw_events;
-> +
-> +	if (WARN_ON_ONCE(!(hwc->state & PERF_HES_STOPPED)))
-> +		return;
-> +
-> +	WARN_ON_ONCE(!(hwc->state & PERF_HES_UPTODATE));
-> +	hwc->state = 0;
-> +
-> +	if (phisi_pmu->ops->set_event_period)
-> +		phisi_pmu->ops->set_event_period(event);
-
-When will this differ from hisi_pmu_set_event_period() above?
-
-> +	if (flags & PERF_EF_RELOAD) {
-> +		u64 prev_raw_count =  local64_read(&hwc->prev_count);
-> +
-> +		phisi_pmu->ops->write_counter(phisi_pmu, hwc,
-> +						(u32)prev_raw_count);
-> +	}
-
-If we always go through hisi_pmu_set_event_period(), this looks
-redundant.
-
-> +
-> +	hisi_uncore_pmu_enable_event(event);
-
-There's no matching disable_event() call in this function, so this looks
-suspicious.
-
-> +	perf_event_update_userpage(event);
-> +}
-> +
-> +void hisi_uncore_pmu_stop(struct perf_event *event, int flags)
-> +{
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	struct hisi_pmu *phisi_pmu = to_hisi_pmu(event->pmu);
-> +
-> +	if (hwc->state & PERF_HES_UPTODATE)
-> +		return;
-
-Why?
-
-[...]
-
-> +int hisi_uncore_common_fwprop_read(struct device *dev,
-> +					struct hisi_pmu *phisi_pmu)
-> +{
-> +	if (device_property_read_u32(dev, "num-events",
-> +					&phisi_pmu->num_events)) {
-> +		dev_err(dev, "Cant read num-events from DT!\n");
-> +		return -EINVAL;
-> +	}
-
-For consistency with the rest of the driver, and given there is no ACPI
-support, please use the of_property_* API here.
-
-Thanks,
-Mark.
+Cheers,
+Ben.
