@@ -1,74 +1,82 @@
-From: nathan@nathanrossi.com (Nathan Rossi)
-Date: Thu, 10 Nov 2016 19:33:38 +1000
-Subject: [PATCH] ARM: zynq: Reserve correct amount of non-DMA RAM
-In-Reply-To: <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
-References: <20161031162617.10565-1-kyle.roeschley@ni.com>
- <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
-Message-ID: <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Nov 2016 10:36:47 +0100
+Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
+In-Reply-To: <20161110092221.0219490b@free-electrons.com> (Thomas Petazzoni's
+ message of "Thu, 10 Nov 2016 09:22:21 +0100")
+References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+ <20161110001000.10619-5-gregory.clement@free-electrons.com>
+ <20161110092221.0219490b@free-electrons.com>
+Message-ID: <87wpgbekwg.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2016 at 18:41, Michal Simek <monstr@monstr.eu> wrote:
-> + Nathan
->
-> 2016-10-31 17:26 GMT+01:00 Kyle Roeschley <kyle.roeschley@ni.com>:
->>
->> On Zynq, we haven't been reserving the correct amount of DMA-incapable
->> RAM to keep DMA away from it (per the Zynq TRM Section 4.1, it should be
->> the first 512k). In older kernels, this was masked by the
->> memblock_reserve call in arm_memblock_init(). Now, reserve the correct
->> amount excplicitly rather than relying on swapper_pg_dir, which is an
->> address and not a size anyway.
->>
->> Fixes: 46f5b96 ("ARM: zynq: Reserve not DMAable space in front of the
->> kernel")
->>
->> Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
+Hi Thomas,
+ 
+ On jeu., nov. 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Tested-by: Nathan Rossi <nathan@nathanrossi.com>
+> Hello,
+>
+> On Thu, 10 Nov 2016 01:09:50 +0100, Gregory CLEMENT wrote:
+>
+>> -		bootrom {
+>> +		bootrom at 0 {
+>>  			compatible = "marvell,bootrom";
+>>  			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+>
+> I am still not sure whether this "0" unit address is correct compared
+> to the reg property being passed.
 
-For reference this causes problems with DEBUG_RODATA (which changed to
-default yes for CPU_V7 in v4.6) due to padding memory between
-.head.text and .text, allowing memory below 0x80000 to be available
-for allocation as non-reserved memory.
+I chose to use the adress register inside the window memory.
 
-Regards,
-Nathan
+>
+> A good example of why I'm worried is the sa-sram case:
+>
+> +		crypto_sram0: sa-sram0 at 0 {
+>  			compatible = "mmio-sram";
+>  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+>
+> +		crypto_sram1: sa-sram1 at 0 {
+>  			compatible = "mmio-sram";
+>  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+>
+> The node names should be just "sram" without a number. Indeed for UARTs
+> for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
+> uart1 at ABC. But then, if you do that, with your scheme, you end up with
+> both nodes named sa-sram at 0.
+>
+> Which clearly shows that the way you set this unit-address is not
+> correct: those two devices are mapped at completely different
+> locations, but you end up with an identical unit address.
+>
+> I have no idea what is the rule for setting the unit address in this
+> case, but I'm pretty sure the rule you've chosen is not good.
 
->> ---
->> Found when migrating from 4.1 to 4.6.
->>
->>  arch/arm/mach-zynq/common.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
->> index 6cefdb8..75885bc 100644
->> --- a/arch/arm/mach-zynq/common.c
->> +++ b/arch/arm/mach-zynq/common.c
->> @@ -59,7 +59,7 @@ void __iomem *zynq_scu_base;
->>  static void __init zynq_memory_init(void)
->>  {
->>         if (!__pa(PAGE_OFFSET))
->> -               memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
->> +               memblock_reserve(__pa(PAGE_OFFSET), 0x80000);
->>  }
->>
->>  static struct platform_device zynq_cpuidle_device = {
->> --
->> 2.9.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I don't know if there is an existing rules for this case. But I see your
+concern. What I propose then is to expose the memory windows ID by
+adding the target and the attributes like this:
+
+		crypto_sram0: sa-sram at 09_09_0 {
+ 			compatible = "mmio-sram";
+  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+
+
+		crypto_sram1: sa-sram at 09_05_0 {
+  			compatible = "mmio-sram";
+  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+
+Gregory
+
 >
+> Best regards,
 >
->
->
-> --
-> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-> w: www.monstr.eu p: +42-0-721842854
-> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
