@@ -1,48 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 10 Nov 2016 09:22:21 +0100
-Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
-In-Reply-To: <20161110001000.10619-5-gregory.clement@free-electrons.com>
-References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
- <20161110001000.10619-5-gregory.clement@free-electrons.com>
-Message-ID: <20161110092221.0219490b@free-electrons.com>
+Date: Thu, 10 Nov 2016 09:30:37 +0100
+Subject: [PATCH] PCI: mvebu: Take control of mbus windows setup by the
+ firmware
+In-Reply-To: <20161026174440.GA24717@obsidianresearch.com>
+References: <20161026174440.GA24717@obsidianresearch.com>
+Message-ID: <20161110093037.376ae79d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, 10 Nov 2016 01:09:50 +0100, Gregory CLEMENT wrote:
+On Wed, 26 Oct 2016 11:44:40 -0600, Jason Gunthorpe wrote:
+> The firmware may setup the mbus to access PCI-E and indicate this
+> has happened with a ranges mapping for the PCI-E ID. If this happens
+> then the mbus setup and the pci dynamic setup conflict, creating
+> problems.
+> 
+> Have PCI-E assume control of the firmware specified default mapping by
+> setting the value of the bridge window to match the firmware mapping.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-> -		bootrom {
-> +		bootrom at 0 {
->  			compatible = "marvell,bootrom";
->  			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+Sorry for the late feedback. I am not sure to fully understand what you
+are trying to do here.
 
-I am still not sure whether this "0" unit address is correct compared
-to the reg property being passed.
+However, one thing that confuses me specifically is how can the kernel
+get any MBus mapping set up by the firmware? Indeed, when the
+mvebu-mbus driver initializes, it destroys all existing MBus windows
+that might have been left by the firmware/bootloader:
 
-A good example of why I'm worried is the sa-sram case:
+static int __init mvebu_mbus_common_init(struct mvebu_mbus_state *mbus,
+                                         phys_addr_t mbuswins_phys_base,
+                                         size_t mbuswins_size,
+                                         phys_addr_t sdramwins_phys_base,
+                                         size_t sdramwins_size,
+                                         phys_addr_t mbusbridge_phys_base,
+                                         size_t mbusbridge_size,
+                                         bool is_coherent)
+[...]
+        for (win = 0; win < mbus->soc->num_wins; win++)
+                mvebu_mbus_disable_window(mbus, win);
 
-+		crypto_sram0: sa-sram0 at 0 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+Why does Linux needs to rely on what the firmware has setup in terms of
+MBus windows? Why can't Linux just find out the right BAR base/size
+like it is doing for all other devices?
 
-+		crypto_sram1: sa-sram1 at 0 {
- 			compatible = "mmio-sram";
- 			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
-
-The node names should be just "sram" without a number. Indeed for UARTs
-for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
-uart1 at ABC. But then, if you do that, with your scheme, you end up with
-both nodes named sa-sram at 0.
-
-Which clearly shows that the way you set this unit-address is not
-correct: those two devices are mapped at completely different
-locations, but you end up with an identical unit address.
-
-I have no idea what is the rule for setting the unit address in this
-case, but I'm pretty sure the rule you've chosen is not good.
-
-Best regards,
+Thanks,
 
 Thomas
 -- 
