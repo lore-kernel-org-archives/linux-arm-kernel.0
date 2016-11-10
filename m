@@ -1,99 +1,68 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 10 Nov 2016 11:43:51 +0100
-Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
-In-Reply-To: <20161110111506.02842cbd@free-electrons.com> (Thomas Petazzoni's
- message of "Thu, 10 Nov 2016 11:15:06 +0100")
-References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
- <20161110001000.10619-5-gregory.clement@free-electrons.com>
- <20161110092221.0219490b@free-electrons.com>
- <87wpgbekwg.fsf@free-electrons.com>
- <20161110111506.02842cbd@free-electrons.com>
-Message-ID: <87fumzehso.fsf@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 10 Nov 2016 11:53:48 +0100
+Subject: [PATCH 3/3] ARM: gr8: evb: Add i2s codec
+In-Reply-To: <CAGb2v6557B5dooERbKc709Hbrzb3vP8eoSj3nh6rKek7UwrgEQ@mail.gmail.com>
+References: <cover.9296840e0b7438e0ae63b4ec0d64957640b64a78.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <4d99da31af41b26d9109113e19223ee8b88f76ae.1478524066.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65bzWJpEnmwk89Qkn+_QawcPtpCJdA+90Dgc68FLRNQqw@mail.gmail.com>
+ <20161108074414.vvnjj7aa26sloi2f@lukather>
+ <CAGb2v6557B5dooERbKc709Hbrzb3vP8eoSj3nh6rKek7UwrgEQ@mail.gmail.com>
+Message-ID: <20161110105348.hvpjpl5rn4zx5h2y@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On jeu., nov. 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+1;4600;0c
+On Tue, Nov 08, 2016 at 03:57:48PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 8, 2016 at 3:44 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > On Mon, Nov 07, 2016 at 10:11:45PM +0800, Chen-Yu Tsai wrote:
+> >> On Mon, Nov 7, 2016 at 9:08 PM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > The GR8-EVB comes with a wm8978 codec connected to the i2s bus.
+> >> >
+> >> > Add a card in order to have it working
+> >> >
+> >> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> > ---
+> >> >  arch/arm/boot/dts/ntc-gr8-evb.dts | 14 ++++++++++++++
+> >> >  1 file changed, 14 insertions(+), 0 deletions(-)
+> >> >
+> >> > diff --git a/arch/arm/boot/dts/ntc-gr8-evb.dts b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > index 12b4317a4383..5291e425caf9 100644
+> >> > --- a/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > +++ b/arch/arm/boot/dts/ntc-gr8-evb.dts
+> >> > @@ -76,6 +76,20 @@
+> >> >                 default-brightness-level = <8>;
+> >> >         };
+> >> >
+> >> > +       i2s {
+> >>
+> >> "sound" might be a better node name? The I2S controllers are also
+> >> named "i2s".
+> >
+> > I know, but we also had the codec and SPDIF on this board, so sound
+> > was too generic to be meaningful I guess. I don't really care about
+> > the name though, if you have any suggestion...
+> 
+> Well people seem to use "sound" for the sound card nodes...
+> 
+> What about "sound-analog" for this one, and "sound-spdif" for the
+> SPDIF simple card? Or "analog-sound" and "spdif-sound" if that looks
+> better.
 
-[...]
+I fixed it and applied.
 
->> > A good example of why I'm worried is the sa-sram case:
->> >
->> > +		crypto_sram0: sa-sram0 at 0 {
->> >  			compatible = "mmio-sram";
->> >  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
->> >
->> > +		crypto_sram1: sa-sram1 at 0 {
->> >  			compatible = "mmio-sram";
->> >  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
->> >
->> > The node names should be just "sram" without a number. Indeed for UARTs
->> > for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
->> > uart1 at ABC. But then, if you do that, with your scheme, you end up with
->> > both nodes named sa-sram at 0.
->> >
->> > Which clearly shows that the way you set this unit-address is not
->> > correct: those two devices are mapped at completely different
->> > locations, but you end up with an identical unit address.
->> >
->> > I have no idea what is the rule for setting the unit address in this
->> > case, but I'm pretty sure the rule you've chosen is not good.  
->> 
->> I don't know if there is an existing rules for this case. But I see your
->> concern. What I propose then is to expose the memory windows ID by
->> adding the target and the attributes like this:
->> 
->> 		crypto_sram0: sa-sram at 09_09_0 {
->>  			compatible = "mmio-sram";
->>   			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
->> 
->> 
->> 		crypto_sram1: sa-sram at 09_05_0 {
->>   			compatible = "mmio-sram";
->>   			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
->
-> I have no idea if 09_05_0 is considered a valid unit address. Indeed
-> the _ character in an address looks a bit weird.
->
-> I guess we need guidance from the DT binding maintainers on this, since
-> it's really a matter of interpreting what "unit address" means in
-> relation to the value of the "reg" property.
-
-So I looked for in the reference: Power_ePAPR_APPROVED_v1.0, and in
-paragraph "2.2.1.1 Node Name Requirements" we have:
-
-"The unit-address component of the name is specific to the bus type on
-which the node sits. It consists of one or more ASCII characters from
-the set of characters in Table 2-1. The fundamental requirement is that
-at any level of the device tree the unit-address be unique in order to
-differentiate nodes with the same name at the same level in the
-tree. The binding for a particular bus may specify additional, more
-specific requirements for the format of a unit-address."
-
-In Table 2-1 we have the following characters:
-0-9
-a-z
-A-z
-,
-.
-_
-+
--
-
-So the underscore is valid. And by adding information about the memory
-windows we match the fundamental requirement :"at any level of the
-device tree the unit-address be unique".
-
-Gregory
-
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Thanks!
+Maxime
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/e93f3889/attachment.sig>
