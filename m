@@ -1,35 +1,50 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 9 Nov 2016 21:58:49 -0700
-Subject: [PATCH fpga 2/9] fpga zynq: Check the bitstream for validity
-In-Reply-To: <17912798-e55d-253f-42fc-c7287d067e00@gmail.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-3-git-send-email-jgunthorpe@obsidianresearch.com>
- <17912798-e55d-253f-42fc-c7287d067e00@gmail.com>
-Message-ID: <20161110045849.GA22004@obsidianresearch.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 10 Nov 2016 10:37:12 +0530
+Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
+ 24MHz
+In-Reply-To: <D0AA78D0-9562-4E4D-A949-A771289D7570@gmail.com>
+References: <20161024060226.4170-1-mugunthanvnm@ti.com>
+ <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
+ <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
+ <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
+ <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
+ <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com> <20161026084811.GI8574@dell>
+ <A5F6974F-5793-4E85-BF82-2D9309980991@gmail.com>
+ <d7fadbf6-8026-d821-1ef8-981f536a8fdf@ti.com>
+ <D0AA78D0-9562-4E4D-A949-A771289D7570@gmail.com>
+Message-ID: <b7232421-10f7-2bac-0ad8-847804126bf2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 04:04:07PM -0800, Joshua Clayton wrote:
+Hi,
 
-> > +		if (!zynq_fpga_has_sync(buf, count)) {
-> > +			dev_err(priv->dev,
-> > +				"Invalid bitstream, could not find a sync word. Bitstream must be a byte swaped .bin file\n");
-> Nitpick: byte swaped is a misspelling...
+On Thursday 10 November 2016 05:23 AM, John Syne wrote:
+> OK, then back to my original question. Given that these DT properties are supported in the driver
+> 
 
-oops, sure.
+Below properties are supported by only by ti_am3335x_adc driver and not
+ti_am335x_tsc driver. As author of this patch pointed out in another
+reply, there is no need to change step-opendelay for tsc. AFAIK, I don't
+see a use case where these values needs to be tweaked for tsc channels,
+therefore it does not make sense to be DT properties.
 
-> and I'm not sure I like the second half of this message.  Maybe
-> something like "Bitstream must be lsb first" (if that is what is
-> meant).
+> shouldn?t the following be added to am33xx.dtsi and am4372.dtsi?
 
-I intended it to be a recipe to follow, not a specification. It
-literally means take the .bin file and dword byte swap it to make it
-work with the driver.
+Its totally upto board dts files to allocate channels for tsc and adc.
+So, how could these be added to dtsi files?
 
-Describing it as LSB first would be consistent with UG470, but I doubt
-many people know Xilinx tools emit the bitstream in 32 bit MSB format
-and probably even fewer people know that the relavent difference
-between .bit and .bin boils down to the alignment of the sync word -
-which is why I prefered the recipe style..
+> ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
+> ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
+> ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
+> 
+> Regards,
+> John
+>>
+>> -- 
+>> Regards
+>> Vignesh
+> 
 
-Jason
+-- 
+Regards
+Vignesh
