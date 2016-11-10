@@ -1,45 +1,26 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 10 Nov 2016 08:46:40 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d3_uart: fix reg sizes to match
- documentation
-Message-ID: <1478764000-32233-1-git-send-email-peda@axentia.se>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 10 Nov 2016 08:48:54 +0100
+Subject: [PATCH] mfd: qcom-pm8xxx: Clean up PM8XXX namespace
+In-Reply-To: <CACRpkdZe0VO=ABfbven8mU0FGb=sJNY_tjk2_GpAP30wsiDkvQ@mail.gmail.com>
+References: <1477487453-15801-1-git-send-email-linus.walleij@linaro.org>
+ <20161109154727.GG13127@dell>
+ <CGME20161109221937epcas2p45582be6705b50a24f46f6323b887a3b7@epcas2p4.samsung.com>
+ <CACRpkdZe0VO=ABfbven8mU0FGb=sJNY_tjk2_GpAP30wsiDkvQ@mail.gmail.com>
+Message-ID: <9869ff14-6389-dc36-b22a-cfdeff37b983@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new size (0x100) also matches the size given in sama5d3.dtsi
+On 11/09/2016 11:19 PM, Linus Walleij wrote:
+> On Wed, Nov 9, 2016 at 4:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>
+>> How many more Acks do we need?
+>
+> Jacek and one of the ARM SoC people ideally...
+>
+> Jacek? Arnd/Olof?
 
-Documentation reference: section 43.6 "Universal Asynchronous
-Receiver Transmitter (UART) User Interface", table 43-4 "Register
-Mapping" in [1].
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
-[1] Atmel-11121F-ATARM-SAMA5D3-Series-Datasheet_02-Feb-16
-
-Signed-off-by: Peter Rosin <peda@axentia.se>
----
- arch/arm/boot/dts/sama5d3_uart.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sama5d3_uart.dtsi b/arch/arm/boot/dts/sama5d3_uart.dtsi
-index 2511d748867b..186377d41c91 100644
---- a/arch/arm/boot/dts/sama5d3_uart.dtsi
-+++ b/arch/arm/boot/dts/sama5d3_uart.dtsi
-@@ -55,7 +55,7 @@
- 
- 			uart0: serial at f0024000 {
- 				compatible = "atmel,at91sam9260-usart";
--				reg = <0xf0024000 0x200>;
-+				reg = <0xf0024000 0x100>;
- 				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart0>;
-@@ -66,7 +66,7 @@
- 
- 			uart1: serial at f8028000 {
- 				compatible = "atmel,at91sam9260-usart";
--				reg = <0xf8028000 0x200>;
-+				reg = <0xf8028000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_uart1>;
 -- 
-2.1.4
+Best regards,
+Jacek Anaszewski
