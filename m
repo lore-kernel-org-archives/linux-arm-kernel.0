@@ -1,57 +1,144 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 11 Nov 2016 07:20:45 +0800
-Subject: [clk:clk-qcom-8994 2/2] include/linux/module.h:213:1: error:
- expected ',' or ';' before 'extern'
-Message-ID: <201611110732.1ceuZvsr%fengguang.wu@intel.com>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Thu, 10 Nov 2016 18:25:47 -0500
+Subject: [PATCH v7] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <20161109175413.GE17020@leverpostej>
+References: <1477687813-11412-1-git-send-email-nleeder@codeaurora.org>
+ <20161109175413.GE17020@leverpostej>
+Message-ID: <50feb4f2-f042-5f75-732e-5a99653b51f2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-qcom-8994
-head:   cc800227108710c8f02255e61659b956b041eec3
-commit: cc800227108710c8f02255e61659b956b041eec3 [2/2] clk: qcom: Add support for msm8994 global clock controller
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout cc800227108710c8f02255e61659b956b041eec3
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Hi Mark,
+Thanks for the review. I'll handle all the syntactic comments, so I 
+won't reply to them all individually here.
 
-All error/warnings (new ones prefixed by >>):
+For the aggregation, I'll reply separately to Will's post to
+keep all those comments together.
 
-   In file included from drivers/clk/qcom/gcc-msm8994.c:20:0:
->> include/linux/module.h:213:1: error: expected ',' or ';' before 'extern'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-    ^
->> drivers/clk/qcom/gcc-msm8994.c:2265:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
-    MODULE_DEVICE_TABLE(of, gcc_msm8994_match_table);
-    ^~~~~~~~~~~~~~~~~~~
+On 11/9/2016 12:54 PM, Mark Rutland wrote:
+>> +
+>> +/*
+>> + * The cache is made up of one or more clusters, each cluster has its own PMU.
+>> + * Each cluster is associated with one or more CPUs.
+>> + * This structure represents one of the hardware PMUs.
+>> + *
+>> + * Events can be envisioned as a 2-dimensional array. Each column represents
+>> + * a group of events. There are 8 groups. Only one entry from each
+>> + * group can be in use at a time. When an event is assigned a counter
+>> + * by *_event_add(), the counter index is assigned to group_to_counter[group].
+>
+> If I've followed correctly, this means each group has a dedicated
+> counter?
+>
+> I take it groups are not symmetric (i.e. each column has different
+> events)? Or does each column contain the same events?
+>
+> Is there any overlap?
 
-vim +213 include/linux/module.h
+Each group will have at most one counter, but it's not dedicated.
+There's no requirement that an implementation have as many counters as 
+there are groups, so an event can be assigned to any available counter.
 
-^1da177e Linus Torvalds  2005-04-16  207  /* What your module does. */
-^1da177e Linus Torvalds  2005-04-16  208  #define MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
-^1da177e Linus Torvalds  2005-04-16  209  
-cff26a51 Rusty Russell   2014-02-03  210  #ifdef MODULE
-cff26a51 Rusty Russell   2014-02-03  211  /* Creates an alias so file2alias.c can find device table. */
-^1da177e Linus Torvalds  2005-04-16  212  #define MODULE_DEVICE_TABLE(type, name)					\
-6301939d Andrey Ryabinin 2015-02-13 @213  extern const typeof(name) __mod_##type##__##name##_device_table		\
-cff26a51 Rusty Russell   2014-02-03  214    __attribute__ ((unused, alias(__stringify(name))))
-cff26a51 Rusty Russell   2014-02-03  215  #else  /* !MODULE */
-cff26a51 Rusty Russell   2014-02-03  216  #define MODULE_DEVICE_TABLE(type, name)
+Every entry in the 2-dimensional array is unique, so no duplicates. Once 
+you have used an event, you cannot use any other event from its column. 
+As an aside, hardware designers put in some effort to ensure that events 
+which may need to be collected at the same time are located in different 
+columns.
 
-:::::: The code at line 213 was first introduced by commit
-:::::: 6301939d97d079f0d3dbe71e750f4daf5d39fc33 module: fix types of device tables aliases
+>> +static int l2_cache__event_init(struct perf_event *event)
+>> +{
+[...]
+>> +	/* Don't allow groups with mixed PMUs, except for s/w events */
+>> +	if (event->group_leader->pmu != event->pmu &&
+>> +	    !is_software_event(event->group_leader)) {
+>> +		dev_warn(&l2cache_pmu->pdev->dev,
+>> +			 "Can't create mixed PMU group\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
+>> +			    group_entry)
+>> +		if (sibling->pmu != event->pmu &&
+>> +		    !is_software_event(sibling)) {
+>> +			dev_warn(&l2cache_pmu->pdev->dev,
+>> +				 "Can't create mixed PMU group\n");
+>> +			return -EINVAL;
+>> +		}
+>> +
+>> +	/* Ensure all events in a group are on the same cpu */
+>> +	cluster = get_hml2_pmu(event->cpu);
+>> +	if ((event->group_leader != event) &&
+>> +	    (cluster->on_cpu != event->group_leader->cpu)) {
+>> +		dev_warn(&l2cache_pmu->pdev->dev,
+>> +			 "Can't create group on CPUs %d and %d",
+>> +			 event->cpu, event->group_leader->cpu);
+>> +		return -EINVAL;
+>> +	}
+>
+> It's probably worth also checking that the events are co-schedulable
+> (e.g. they don't conflict column-wise).
 
-:::::: TO: Andrey Ryabinin <a.ryabinin@samsung.com>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+That's what filter_match() is doing - stopping column-conflicting events 
+from even getting to init(). In init() we don't have a record of which 
+other events are being co-scheduled. We could keep a list of groups used 
+by other events to compare against, but because there's no matching 
+term() function there's no obvious way of removing them from the list.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/9bf381ab/attachment-0001.gz>
+In my very first patchset I had the check inside event_add() because 
+entries could be removed in event_del(). That was where you suggested 
+that I use filter_match().
+
+>
+>> +	if (acpi_bus_get_device(ACPI_HANDLE(dev), &device))
+>> +		return -ENODEV;
+>> +
+>> +	if (kstrtol(device->pnp.unique_id, 10, &fw_cluster_id) < 0) {
+>> +		dev_err(&pdev->dev, "unable to read ACPI uid\n");
+>> +		return -ENODEV;
+>> +	}
+>
+>> +	cluster->l2cache_pmu = l2cache_pmu;
+>> +	for_each_present_cpu(cpu) {
+>> +		if (topology_physical_package_id(cpu) == fw_cluster_id) {
+>> +			cpumask_set_cpu(cpu, &cluster->cluster_cpus);
+>> +			per_cpu(pmu_cluster, cpu) = cluster;
+>> +		}
+>> +	}
+>
+> I'm still uneasy about this.
+>
+> The topology_* API doesn't have a well-defined mapping to the MPIDR.Aff*
+> levels, which itself also don't have a well-defined mapping to your
+> hardware's clusters (and therefore fw_cluster_id).
+>
+> Thus, I'm rather worried that this is going to get broken easily, either
+> by changes in the kernel, or in future HW revisions where the mapping of
+> clusters to MPIDR.Aff* fields changes.
+
+I'm not sure how else to get a mapping of CPU to cluster which doesn't 
+eventually end with MPIDR.
+
+This is the definition of topology_physical_package_id() from 
+asm/topology.h:
+
+#define topology_physical_package_id(cpu) 
+(cpu_topology[cpu].cluster_id)
+
+It seems to be a pretty solid connection between cpu and cluster. I 
+don't think this is an abuse of this function. Unless there is some 
+other way of getting this mapping I'd suggest using this, and if some 
+future chip should change MPIDR usage it can be addressed it then.
+
+>
+> Thanks,
+> Mark.
+>
+
+Thanks,
+
+Neil
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
