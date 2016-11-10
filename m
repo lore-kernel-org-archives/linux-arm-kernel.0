@@ -1,140 +1,90 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Nov 2016 11:19:20 +0100
-Subject: [PATCH v2 7/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <3693445.TSdZGaiT9S@wuerfel>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <1477913455-5314-8-git-send-email-geert+renesas@glider.be>
- <3693445.TSdZGaiT9S@wuerfel>
-Message-ID: <CAMuHMdX+T=Y--F6KXZwFmZwWFdfP5mL5Tar-wKwRM2p6Hh2-sg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 10 Nov 2016 18:25:16 +0800
+Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
+In-Reply-To: <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
+References: <20160921173129.GA20006@localhost>
+ <20160921223805.21652-1-cov@codeaurora.org>
+ <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
+ <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
+ <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
+ <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
+ <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
+ <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-Thanks for your comments!
-
-On Wed, Nov 9, 2016 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday, October 31, 2016 12:30:55 PM CET Geert Uytterhoeven wrote:
->> v2:
->>   - Drop SoC families and family names; use fixed "Renesas" instead,
->
-> I think I'd rather have seen the family names left in there, but it's
-> not important, so up to you.
-
-They're not useful for matching, as family names may change anytime, and don't
-always say much about the hardware capabilities.
-E.g. SH-Mobile -> R-Mobile -> R-Car | RZ/A | RZ/G
-Some SH-Mobile (even some R-Car) parts are SuperH only, others have ARM and
-SuperH.
-
-At least the SoC part numbers are stable (hmm, sh73a0 == r8a73a0).
-
->>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
->>     available, else fall back to hardcoded addresses for compatibility
->>     with existing DTBs,
->
-> I only see patches 2, 3, 5, and 7 in my inbox, so I'm lacking the DT
-> binding for these, among other things.
-
-I understand you've received them in the mean time?
-
-> It does seem wrong to have a device node for a specific register though.
-> Shouldn't the node be for the block of registers that these are inside
-> of?
-
-On R-Mobile APE6, R-Car Gen2 and Gen3, PRR is a lone register.
-On R-Car Gen1, it's not even documented (and doesn't exist on all parts).
-
-On SH-Mobile/R-Mobile, CCCR may be part of the HPB/APB register block, which
-we further don't touch at all.
-On R-Car Gen2, it's not documented, but does exist.
-
-BTW, see why I'd prefer not to have it in DT at all, and go for KISS in code
-we can change at any time? To avoid mistakes we have to keep on supporting
-forever.
-
->>   - Don't register the SoC bus if the chip ID register is missing,
->
-> Why? My objection was to hardcoding the register, not to registering
-> the device? I think I'd rather see the device registered with an
-> empty revision string.
-
-If there's no chip ID register, there's no reason to use soc_device_match(),
-as we can always look at a compatible value. All SoCs listed in this driver
-have a chip ID register.
-
-if you want me to register the soc_bus for  those SoCs regardless, I want to
-re-add r7s72100 (RZ/A) and r8a7778 (R-Car M1A), who don't have chip ID
-registers ;-)
-
->> +#define CCCR   0xe600101c      /* Common Chip Code Register */
->> +#define PRR    0xff000044      /* Product Register */
->> +#define PRR3   0xfff00044      /* Product Register on R-Car Gen3 */
->> +
->> +static const struct of_device_id renesas_socs[] __initconst = {
->> +#ifdef CONFIG_ARCH_R8A73A4
->> +       { .compatible = "renesas,r8a73a4",      .data = (void *)PRR, },
->> +#endif
->> +#ifdef CONFIG_ARCH_R8A7740
->> +       { .compatible = "renesas,r8a7740",      .data = (void *)CCCR, },
->> +#endif
->
-> My preference here would be to list the register address only for
-> SoCs that are known to need them, while also having .dtb files that
-> don't have the nodes.
-
-Even if drivers don't have to handle differences, there's been a long
-outstanding request to print SoC revision information during bootup
-(E.g. "Does it still work on ES1.0?"). Hence that covers all SoCs.
-
->> +static int __init renesas_soc_init(void)
->> +{
->> +       struct soc_device_attribute *soc_dev_attr;
->> +       const struct of_device_id *match;
->> +       void __iomem *chipid = NULL;
->> +       struct soc_device *soc_dev;
->> +       struct device_node *np;
->> +       unsigned int product;
->> +
->> +       np = of_find_matching_node_and_match(NULL, renesas_socs, &match);
->> +       if (!np)
->> +               return -ENODEV;
->> +
->> +       of_node_put(np);
->> +
->> +       /* Try PRR first, then CCCR, then hardcoded fallback */
->> +       np = of_find_compatible_node(NULL, NULL, "renesas,prr");
->> +       if (!np)
->> +               np = of_find_compatible_node(NULL, NULL, "renesas,cccr");
->> +       if (np) {
->> +               chipid = of_iomap(np, 0);
->> +               of_node_put(np);
->> +       } else if (match->data) {
->> +               chipid = ioremap((uintptr_t)match->data, 4);
->> +       }
->> +       if (!chipid)
+On 10 November 2016 at 06:49, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Wed, Nov 09, 2016 at 08:29:23PM +0000, Ard Biesheuvel wrote:
+>> Hi Bjorn,
 >>
+>> On 9 November 2016 at 20:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
+>> > On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
+>> >> Hi Bjorn,
+>> >>
+>> [...]
+>> >>
+>> >> We're working to add the PNP0C02 resource to future firmware, but it's
+>> >> not in the current firmware. Are dmesg and /proc/iomem from the
+>> >> current firmware interesting or should we wait for the update to file?
+>> >
+>> > Note that the ECAM space is not the only thing that should be
+>> > described via these PNP0C02 devices.  *All* non-enumerable resources
+>> > should be described by the _CRS method of some ACPI device.  Here's a
+>> > sample from my laptop:
+>> >
+>> >   PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
+>> >   system 00:01: [io  0x1800-0x189f] could not be reserved
+>> >   system 00:01: [io  0x0800-0x087f] has been reserved
+>> >   system 00:01: [io  0x0880-0x08ff] has been reserved
+>> >   system 00:01: [io  0x0900-0x097f] has been reserved
+>> >   system 00:01: [io  0x0980-0x09ff] has been reserved
+>> >   system 00:01: [io  0x0a00-0x0a7f] has been reserved
+>> >   system 00:01: [io  0x0a80-0x0aff] has been reserved
+>> >   system 00:01: [io  0x0b00-0x0b7f] has been reserved
+>> >   system 00:01: [io  0x0b80-0x0bff] has been reserved
+>> >   system 00:01: [io  0x15e0-0x15ef] has been reserved
+>> >   system 00:01: [io  0x1600-0x167f] has been reserved
+>> >   system 00:01: [io  0x1640-0x165f] has been reserved
+>> >   system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
+>> >   system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
+>> >   system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
+>> >   system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
+>> >   system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
+>> >   system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
+>> >   system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
+>> >   system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
+>> >   system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
+>> >
+>> > Do you have firmware in the field that may not get updated?  If so,
+>> > I'd like to see the whole solution for that firmware, including the
+>> > MCFG quirk (which tells the PCI core where the ECAM region is) and
+>> > whatever PNP0C02 quirk you figure out to actually reserve the region.
+>> >
+>> > I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
+>> > don't actually know if it's feasible, but it didn't look as bad as I
+>> > expected, so I'd kind of like somebody to try it out.  I think you
+>> > would have to call this via a DMI hook (do you have DMI on arm64?),
+>> > maybe from pnp_init() or similar.
+>>
+>> We do have SMBIOS/DMI on arm64, but we have been successful so far not
+>> to rely on it for quirks, and we'd very much like to keep it that way.
+>>
+>> Since this ACPI _CRS method has nothing to do with SMBIOS/DMI, surely
+>> there is a better way to wire up the reservation code to the
+>> information exposed by ACPI?
 >
-> Here, I'd turn the order around and look for the DT nodes of the
-> devices first. Only if they are not found, look at the compatible
-> string of the root node. No need to search for a node though,
-> you know which one it is when you look for a compatible =
-> "renesas,r8a73a4".
+> I'm open to other ways, feel free to propose one :)
+>
+> If you do a quirk, you need some way to identify the machine/firmware
+> combination, because you don't want to apply the quirk on every
+> machine.  You're trying to work around a firmware issue, so you
+> probably want something tied to the firmware version.  On x86, that's
+> typically done with DMI.
+>
 
-"renesas,r8a73a4" is the root node, not the device, so it does not have the
-"reg" property for reading the chip ID?
-
-There is no SoC part number in the "renesas,prr" and "renesas,cccr" nodes.
-Hence I always need to look at the root nodes.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+I think I misunderstood the purpose of the example: that should only
+be necessary if the _CRS methods are missing from the firmware, right?
+If we update the firmware to cover all non-enumerable resources by
+such a method, we shouldn't need any such quirks at all IIUC
