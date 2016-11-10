@@ -1,41 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Nov 2016 11:56:12 +0100
-Subject: [PATCH v2 0/7] soc: renesas: Identify SoC and register with the
- SoC bus
-In-Reply-To: <CAMuHMdWox5ksj1xhJ6_n0wNA9j6veX0AzAE0V9Gs26Kvw5C_sw@mail.gmail.com>
-References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
- <1626072.dpWPnWgGl9@wuerfel>
- <CAMuHMdVrdjqWruY=dBjWP=jZuZkc=aTBTMijOyTDfZFcaD_jsA@mail.gmail.com>
- <6723536.97ljqcB8tS@wuerfel>
- <CAMuHMdWox5ksj1xhJ6_n0wNA9j6veX0AzAE0V9Gs26Kvw5C_sw@mail.gmail.com>
-Message-ID: <CAMuHMdWPk7zZKAHtxcYekS2Ot6j+M8dKJuFe87dxc7U6Z4Ti5w@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Nov 2016 10:58:06 +0000
+Subject: [PATCH v7 00/16] ACPI IORT ARM SMMU support
+In-Reply-To: <CAJZ5v0j09fsp4Y66v2UANOGnW4FNO7PWxpZY=Pgw=bUccEL_eA@mail.gmail.com>
+References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
+ <CAJZ5v0j09fsp4Y66v2UANOGnW4FNO7PWxpZY=Pgw=bUccEL_eA@mail.gmail.com>
+Message-ID: <20161110105806.GA20209@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 10:22 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Thanks, I've created the branch/tag :
->
->     git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
->     branch soc-device-match
->     signed tag soc-device-match-tag1
+Hi Rafael,
 
-Tested by kbuild test robot:
+On Thu, Nov 10, 2016 at 12:36:12AM +0100, Rafael J. Wysocki wrote:
+> Hi Lorenzo,
+> 
+> On Wed, Nov 9, 2016 at 3:19 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > This patch series is v7 of a previous posting:
+> >
+> > https://lkml.org/lkml/2016/10/18/506
+> 
+> I don't see anything objectionable in this series.
 
-    https://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git
- soc-device-match
-    da65a1589dacc7ec44ea0557a14d70a39d991f32  base: soc: Provide a
-dummy implementation of soc_device_match()
-    elapsed time: 101m
-    configs tested: 85
+Thank you very much !
 
-Gr{oetje,eeting}s,
+> Please let me know which patches in particular to look at in detail.
 
-                        Geert
+Apart from patch 1, patch 7 (and patch 16 that adds on top of it)
+requires an ack from an ACPI core perspective. acpi_dma_configure()
+should not affect x86/ia64 systems at all so those patches should
+not really be controversial (patch 16 adds an IORT hook into
+acpi_dma_configure() that is a nop by design on anything other than
+ARM64), please let me know if they are ok.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thank you again for your time,
+Lorenzo
