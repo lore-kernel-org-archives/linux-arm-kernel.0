@@ -1,38 +1,51 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 10 Nov 2016 09:04:17 +0100
-Subject: [PATCH v2] ARM: at91/dt: fixes dbgu pinctrl, set pullup on rx,
- clear pullup on tx
-In-Reply-To: <20161110000923.ltpouekbkx7onzm7@piout.net>
-References: <20161020153535.7e2b4frcukk2ce2i@piout.net>
- <4e332daa-7d2a-1481-c8fc-7119033b68e3@axentia.se>
- <20161110000923.ltpouekbkx7onzm7@piout.net>
-Message-ID: <889dcb3b-6702-d718-edf1-44a87197925b@axentia.se>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 10 Nov 2016 09:22:21 +0100
+Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
+In-Reply-To: <20161110001000.10619-5-gregory.clement@free-electrons.com>
+References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+ <20161110001000.10619-5-gregory.clement@free-electrons.com>
+Message-ID: <20161110092221.0219490b@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-11-10 01:09, Alexandre Belloni wrote:
-> On 10/11/2016 at 00:41:37 +0100, Peter Rosin wrote :
->> On 2016-10-20 15:35, Alexandre Belloni wrote
->>> On 16/10/2016 at 18:21:45 +0200, Sylvain Rochet wrote :
->>>> Remove pullup on dbgu DTXD signal, it is a push-pull output thus the
->>>> pullup is pointless.
->>>>
->>>> Add pullup on dbgu DRXD signal, it prevents the DRXD signal to be left
->>>> floating and so consuming a useless extra amount of power in crowbarred
->>>> state if nothing is externally connected to dbgu.
->>> Applied, thanks.
->>
->> I can't seem to find this patch in any of the repos I'm looking at,
->> so I'm wondering where it was applied and when it might hit mainline?
->>
-> 
-> It is applied there:
-> http://git.kernel.org/cgit/linux/kernel/git/abelloni/linux.git/log/?h=at91-dt
-> 
-> It will land in 4.10. I'll do the PR to arm-soc soon.
+Hello,
 
-Great, thanks! (expected it to be in -next by now and got worried, and
-couldn't find it in https://github.com/linux4sam/linux-at91 either...)
+On Thu, 10 Nov 2016 01:09:50 +0100, Gregory CLEMENT wrote:
 
-Cheers,
-Peter
+> -		bootrom {
+> +		bootrom at 0 {
+>  			compatible = "marvell,bootrom";
+>  			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;
+
+I am still not sure whether this "0" unit address is correct compared
+to the reg property being passed.
+
+A good example of why I'm worried is the sa-sram case:
+
++		crypto_sram0: sa-sram0 at 0 {
+ 			compatible = "mmio-sram";
+ 			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+
++		crypto_sram1: sa-sram1 at 0 {
+ 			compatible = "mmio-sram";
+ 			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+
+The node names should be just "sram" without a number. Indeed for UARTs
+for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
+uart1 at ABC. But then, if you do that, with your scheme, you end up with
+both nodes named sa-sram at 0.
+
+Which clearly shows that the way you set this unit-address is not
+correct: those two devices are mapped at completely different
+locations, but you end up with an identical unit address.
+
+I have no idea what is the rule for setting the unit address in this
+case, but I'm pretty sure the rule you've chosen is not good.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
