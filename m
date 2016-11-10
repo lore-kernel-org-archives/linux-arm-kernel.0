@@ -1,122 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Nov 2016 15:07:06 +0100
-Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
-In-Reply-To: <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
-References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
- <5066943.nydi3GQ3KP@wuerfel>
- <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
-Message-ID: <3268366.06J2EThgp2@wuerfel>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Nov 2016 14:08:21 +0000
+Subject: [PATCH] iommu/dma-iommu: properly respect configured address
+ space size
+In-Reply-To: <6f2f3d37-dc6c-abdb-9692-8dcc9cad36f3@samsung.com>
+References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
+ <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
+ <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
+ <8286728f-fab3-8179-5215-e156da426244@samsung.com>
+ <d215c05c-b922-4bee-a2dc-695669a801f6@arm.com>
+ <6f2f3d37-dc6c-abdb-9692-8dcc9cad36f3@samsung.com>
+Message-ID: <89438c46-5066-ab1a-efce-8e97fc614b93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 10, 2016 6:07:54 PM CET pankaj.dubey wrote:
-> On Thursday 10 November 2016 05:24 PM, Arnd Bergmann wrote:
-> > On Wednesday, November 9, 2016 5:45:54 PM CET Pankaj Dubey wrote:
+On 08/11/16 14:53, Marek Szyprowski wrote:
+> Hi Robin,
 > 
-> Sorry, I missed this part and did not check with CONFIG_SMP disabled.
 > 
-> > arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
-> > pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
-> > arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
-> > suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
-> > 
-> > Please fix. I have applied a patch locally (see below), but don't know
-> > if that is the best solution. As we seem to duplicate that code across
-> > several platforms, I wonder why we don't just put it into the core scu
-> > implementation.
-> > 
+> On 2016-11-08 15:44, Robin Murphy wrote:
+>> On 08/11/16 13:41, Marek Szyprowski wrote:
+>>> On 2016-11-08 12:37, Robin Murphy wrote:
+>>>> On 07/11/16 13:06, Marek Szyprowski wrote:
+>>>>> When one called iommu_dma_init_domain() with size smaller than
+>>>>> device's
+>>>>> DMA mask, the alloc_iova() will not respect it and always assume that
+>>>>> all
+>>>>> IOVA addresses will be allocated from the the (base ...
+>>>>> dev->dma_mask) range.
+>>>> Is that actually a problem for anything?
+>>> Yes, I found this issue while working on next version of ARM & ARM64
+>>> DMA-mapping/IOMMU integration patchset and adapting Exynos drivers
+>>> for the
+>>> new IOMMU/DMA-mapping glue.
+>>>
+>>> Some Exynos devices (codec and camera isp) operate only on the
+>>> limited (and
+>>> really small: 256M for example) DMA window. They use non-standard way of
+>>> addressing memory: an offset from the firmware base. However they still
+>>> have
+>>> 32bit DMA mask, as the firmware can be located basically everywhere
+>>> in the
+>>> real DMA address space, but then they can access only next 256M from
+>>> that
+>>> firmware base.
+>> OK, that's good to know, thanks. However, I think in this case it sounds
+>> like it's really the DMA mask that's the underlying problem - if those
+>> blocks themselves can only drive 28 address bits, then the struct
+>> devices representing them should have 28-bit DMA masks, and the
+>> "firmware base" of whoever's driving the upper bits modelled with a
+>> dma_pfn_offset. Even if they do have full 32-bit interfaces themselves,
+>> but are constrained to segment-offset addressing internally, I still
+>> think it would be tidier to represent things that way.
+>>
+>> At some point in dma-iommu development I did have support for DMA
+>> offsets upstream of the IOMMU, and am happy to reinstate it if there's a
+>> real use case (assuming you can't simply always set the firmware base to
+>> 0 when using the IOMMU).
 > 
-> When I checked scu_enable declaration it is defined in
-> arch/arm/include/asm/smp_scu.h as:
-> 
-> #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-> void scu_enable(void __iomem *scu_base);
-> #else
-> static inline void scu_enable(void __iomem *scu_base) {}
-> #endif
-> 
-> So if CONFIG_SMP is disable then there is no sense of exynos_scu_enable
-> as well. So wow about using below patch?
-> 
-> --------------------------------------------------------
-> 
-> Subject: [PATCH] ARM: exynos: fix build fail due to exynos_scu_enable
-> 
-> Build failed if we disable CONFIG_SMP as shown below:
-> 
-> arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
-> pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to
-> `exynos_scu_enable'
-> arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
-> suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to
-> `exynos_scu_enable'
-> 
-> Since scu_enable is defined only in case CONFIG_SMP and CONFIG_HAVE_ARM_SCU
-> lets move exynos_scu_enable also under these two macros.
-> 
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index fb12d11..03fdb79 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -156,7 +156,12 @@ extern void exynos_cpu_restore_register(void);
->  extern void exynos_pm_central_suspend(void);
->  extern int exynos_pm_central_resume(void);
->  extern void exynos_enter_aftr(void);
-> +#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
->  extern int exynos_scu_enable(void);
-> +#else
-> +static inline void exynos_scu_enable(void) {}
-> +#endif
+> That would indeed look a bit simpler, but I've already tried such approach
+> and the firmware crashes when its base in real DMA address space is set to
+> zero.
 
-Yes, I think that would work, but you can drop the CONFIG_HAVE_ARM_SCU
-check because of
+Ah, sadly I'm not too surprised... ;)
 
-menuconfig ARCH_EXYNOS
-        ....
-        select HAVE_ARM_SCU if SMP
-        ...
+Having pondered it a little more, what if the firmware base is instead
+set equal to the max offset, then you can have a power-of-two DMA mask
+at twice that size (e.g. 512M) such that the top-down IOVA allocations
+start in the right place. That would appear to achieve pretty much the
+same result as this patch, but more robustly.
 
-> Of-course your idea to move it in core SCU file is also good that we
-> lots of duplication in different architecture can be avoided.
+Incidentally, how do the init size and DMA mask end up different in the
+first place? Is this another case of the "dma-ranges" info from
+of_dma_configure() getting clobbered by a driver calling dma_set_mask()
+later?
+
+Robin.
+
+>>>>> This patch fixes this issue by taking the configured address space
+>>>>> size
+>>>>> parameter into account (if it is smaller than the device's dma_mask).
+>>>> TBH I've been pondering ripping the size stuff out of dma-iommu, as it
+>>>> all stems from me originally failing to understand what
+>>>> dma_32bit_pfn is
+>>>> actually for. The truth is that iova_domains just don't have a size or
+>>>> upper limit; however if devices with both large and small DMA masks
+>>>> share a domain, then the top-down nature of the allocator means that
+>>>> allocating for the less-capable devices would involve walking through
+>>>> every out-of-range entry in the tree every time. Having cached32_node
+>>>> based on dma_32bit_pfn just provides an optimised starting point for
+>>>> searching within the smaller mask.
+>>> Right, this dma_32bit_pfn was really misleading at the first glance,
+>>> but then I found that this was something like end_pfn in case of
+>>> dma-iommu
+>>> code.
+>> Yes, that was my incorrect assumption - at the time I interpreted it as
+>> a de-facto upper limit which was still possible to allocate above in
+>> special circumstances, which turns out to be almost entirely backwards.
+>> I'd rather not bake that into the dma-iommu code any further if we can
+>> avoid it (I'll try throwing an RFC together to clear up what's there
+>> already).
 > 
-> In that case I can think of following patch:
+> Okay.
 > 
-> [PATCH] ARM: scu: use SCU device node to enable SCU
-> 
-> Many platforms are duplicating code for enabling SCU, lets add
-> common code to enable SCU using SCU device node so the duplication in
-> each platform can be avoided.
-> 
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
-
-That looks good too. I also checked the other callers of
-scu_enable(), and we have only three classes here:
-
-a) of_iomap: berlin, exynos, mvebu, realview, rockchip, socfpga, sti, ux500, vexpress
-b) ioremap(scu_a9_get_base()): bcm63xx, bcm, hisi, zx
-c) iotable_init, scu_a9_get_base(): imx, omap4, tegra, zynq
-d) ioremap(constant): shmobile, spear13xx
-
-I checked that none of the ones in category c) actually use the address early,
-so we can easily change four into b).
-
-I also think that we need to keep both a) and b) because the output of
-scu_a9_get_base() might be incorrect in some chips, and not all dtb
-files have an SCU in them.
-
-If we make the common SCU setup check DT first and then fall back to
-scu_a9_get_base(), that means we have covered almost all cases, unless
-I'm missing a problem with that approach. It would be nice to
-check spear13xx and the Cortex-A9 based mach-shmobile variants
-(emev2, r8a7779, and sh73a0) to see if they could also share
-that implementation.
-
-	Arnd
+> Best regards
