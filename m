@@ -1,111 +1,155 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Nov 2016 02:01:31 +0000
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161109175517.174e7803@t450s.home>
-References: <582371FB.2040808@redhat.com> <20161109192303.GD15676@cbox>
- <20161109203145.GO17771@arm.com>
- <20161109151709.74927f83@t450s.home>
- <20161109222522.GS17771@arm.com>
- <20161109162458.39594fdb@t450s.home>
- <20161109233847.GT17771@arm.com>
- <20161109165957.62c1eb61@t450s.home>
- <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
- <20161109175517.174e7803@t450s.home>
-Message-ID: <20161110020130.GA19108@arm.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 10 Nov 2016 10:08:10 +0800
+Subject: [PATCH 4/4] dts: arm64: enable mmc3 for supporting sdio feature
+In-Reply-To: <1478585341-6749-5-git-send-email-yong.mao@mediatek.com>
+References: <1478585341-6749-1-git-send-email-yong.mao@mediatek.com>
+ <1478585341-6749-5-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1478743690.19253.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 05:55:17PM -0700, Alex Williamson wrote:
-> On Thu, 10 Nov 2016 01:14:42 +0100
-> Auger Eric <eric.auger@redhat.com> wrote:
-> > On 10/11/2016 00:59, Alex Williamson wrote:
-> > > On Wed, 9 Nov 2016 23:38:50 +0000
-> > > Will Deacon <will.deacon@arm.com> wrote:
-> > >> On Wed, Nov 09, 2016 at 04:24:58PM -0700, Alex Williamson wrote:  
-> > >>> The VFIO_IOMMU_MAP_DMA ioctl is a contract, the user ask to map a range
-> > >>> of IOVAs to a range of virtual addresses for a given device.  If VFIO
-> > >>> cannot reasonably fulfill that contract, it must fail.  It's up to QEMU
-> > >>> how to manage the hotplug and what memory regions it asks VFIO to map
-> > >>> for a device, but VFIO must reject mappings that it (or the SMMU by
-> > >>> virtue of using the IOMMU API) know to overlap reserved ranges.  So I
-> > >>> still disagree with the referenced statement.  Thanks,    
-> > >>
-> > >> I think that's a pity. Not only does it mean that both QEMU and the kernel
-> > >> have more work to do (the former has to carve up its mapping requests,
-> > >> whilst the latter has to check that it is indeed doing this), but it also
-> > >> precludes the use of hugepage mappings on the IOMMU because of reserved
-> > >> regions. For example, a 4k hole someplace may mean we can't put down 1GB
-> > >> table entries for the guest memory in the SMMU.
-> > >>
-> > >> All this seems to do is add complexity and decrease performance. For what?
-> > >> QEMU has to go read the reserved regions from someplace anyway. It's also
-> > >> the way that VFIO works *today* on arm64 wrt reserved regions, it just has
-> > >> no way to identify those holes at present.  
-> > > 
-> > > Sure, that sucks, but how is the alternative even an option?  The user
-> > > asked to map something, we can't, if we allow that to happen now it's a
-> > > bug.  Put the MSI doorbells somewhere that this won't be an issue.  If
-> > > the platform has it fixed somewhere that this is an issue, don't use
-> > > that platform.  The correctness of the interface is more important than
-> > > catering to a poorly designed system layout IMO.  Thanks,  
-> > 
-> > Besides above problematic, I started to prototype the sysfs API. A first
-> > issue I face is the reserved regions become global to the iommu instead
-> > of characterizing the iommu_domain, ie. the "reserved_regions" attribute
-> > file sits below an iommu instance (~
-> > /sys/class/iommu/dmar0/intel-iommu/reserved_regions ||
-> > /sys/class/iommu/arm-smmu0/arm-smmu/reserved_regions).
-> > 
-> > MSI reserved window can be considered global to the IOMMU. However PCIe
-> > host bridge P2P regions rather are per iommu-domain.
-
-I don't think we can treat them as per-domain, given that we want to
-enumerate this stuff before we've decided to do a hotplug (and therefore
-don't have a domain).
-
-> > 
-> > Do you confirm the attribute file should contain both global reserved
-> > regions and all per iommu_domain reserved regions?
-> > 
-> > Thoughts?
+On Tue, 2016-11-08 at 14:09 +0800, Yong Mao wrote:
+> From: yong mao <yong.mao@mediatek.com>
 > 
-> I don't think we have any business describing IOVA addresses consumed
-> by peer devices in an IOMMU sysfs file.  If it's a separate device it
-> should be exposed by examining the rest of the topology.  Regions
-> consumed by PCI endpoints and interconnects are already exposed in
-> sysfs.  In fact, is this perhaps a more accurate model for these MSI
-> controllers too?  Perhaps they should be exposed in the bus topology
-> somewhere as consuming the IOVA range.  If DMA to an IOVA is consumed
-> by an intermediate device before it hits the IOMMU vs not being
-> translated as specified by the user at the IOMMU, I'm less inclined to
-> call that something VFIO should reject.
+> Add description of mmc3 for supporting sdio feature
+> 
+> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   82 +++++++++++++++++++++++++++
+>  1 file changed, 82 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> index 2a7f731..4dbd299 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> @@ -43,6 +43,14 @@
+>  		enable-active-high;
+>  	};
+>  
+> +	sdio_fixed_3v3: fixedregulator at 0 {
 
-Oh, so perhaps we've been talking past each other. In all of these cases,
-the SMMU can translate the access if it makes it that far. The issue is
-that not all accesses do make it that far, because they may be "consumed"
-by another device, such as an MSI doorbell or another endpoint. In other
-words, I don't envisage a scenario where e.g. some address range just
-bypasses the SMMU straight to memory. I realise now that that's not clear
-from the slides I presented.
+This should be regulator at 1 instead of fixedregulator.
 
-> However, instantiating a VM
-> with holes to account for every potential peer device seems like it
-> borders on insanity.  Thanks,
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&pio 85 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+>  	connector {
+>  		compatible = "hdmi-connector";
+>  		label = "hdmi";
+> @@ -139,6 +147,25 @@
+>  	vqmmc-supply = <&mt6397_vmc_reg>;
+>  };
+>  
+> +&mmc3 {
+> +	status = "okay";
+> +	pinctrl-names = "default", "state_uhs";
+> +	pinctrl-0 = <&mmc3_pins_default>;
+> +	pinctrl-1 = <&mmc3_pins_uhs>;
+> +	bus-width = <4>;
+> +	max-frequency = <200000000>;
+> +	cap-sd-highspeed;
+> +	sd-uhs-sdr50;
+> +	sd-uhs-sdr104;
+> +	sdr104-clk-delay = <5>;
+> +	keep-power-in-suspend;
+> +	enable-sdio-wakeup;
+> +	cap-sdio-irq;
+> +	vmmc-supply = <&sdio_fixed_3v3>;
+> +	vqmmc-supply = <&mt6397_vgp3_reg>;
+> +	non-removable;
+> +};
+> +
+>  &pio {
+>  	disp_pwm0_pins: disp_pwm0_pins {
+>  		pins1 {
+> @@ -197,6 +224,36 @@
+>  		};
+>  	};
+>  
+> +	mmc3_pins_default: mmc3default {
 
-Ok, so rather than having a list of reserved regions under the iommu node,
-you're proposing that each region is attributed to the device that "owns"
-(consumes) it? I think that can work, but we need to make sure that:
+Please keep nodes in &pio sorted, move this one after mmc1_pins_uhs.
 
- (a) The topology is walkable from userspace (where do you start?)
+> +		pins_dat {
+> +			pinmux = <MT8173_PIN_22_MSDC3_DAT0__FUNC_MSDC3_DAT0>,
+> +				 <MT8173_PIN_23_MSDC3_DAT1__FUNC_MSDC3_DAT1>,
+> +				 <MT8173_PIN_24_MSDC3_DAT2__FUNC_MSDC3_DAT2>,
+> +				 <MT8173_PIN_25_MSDC3_DAT3__FUNC_MSDC3_DAT3>;
+> +			input-enable;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> +		};
+> +
+> +		pins_cmd {
+> +			pinmux = <MT8173_PIN_27_MSDC3_CMD__FUNC_MSDC3_CMD>;
+> +			input-enable;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> +		};
+> +
+> +		pins_clk {
+> +			pinmux = <MT8173_PIN_26_MSDC3_CLK__FUNC_MSDC3_CLK>;
+> +			bias-pull-down;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +		};
+> +
+> +		pins_pdn {
+> +			pinmux = <MT8173_PIN_85_AUD_DAT_MOSI__FUNC_GPIO85>;
+> +			output-low;
+> +		};
 
- (b) It also works for platform (non-PCI) devices, that lack much in the
-     way of bus hierarchy
+This one is used in regulator, not really an mmc pin.
+Also, you don't need to add node for gpio usage, request_gpio will set
+mode for you.
+So please remove pins_pdn node.
 
- (c) It doesn't require Linux to have a driver bound to a device in order
-     for the ranges consumed by that device to be advertised (again,
-     more of an issue for non-PCI).
 
-How is this currently advertised for PCI? I'd really like to use the same
-scheme irrespective of the bus type.
+> +	};
+> +
+>  	mmc0_pins_uhs: mmc0 {
+>  		pins_cmd_dat {
+>  			pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
+> @@ -243,6 +300,31 @@
+>  			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+>  		};
+>  	};
+> +
+> +	mmc3_pins_uhs: mmc3 {
 
-Will
+
+Please keep nodes in &pio sorted, move this one after mmc1_pins_uhs.
+
+
+Joe.C
+
+> +		pins_dat {
+> +			pinmux = <MT8173_PIN_22_MSDC3_DAT0__FUNC_MSDC3_DAT0>,
+> +				 <MT8173_PIN_23_MSDC3_DAT1__FUNC_MSDC3_DAT1>,
+> +				 <MT8173_PIN_24_MSDC3_DAT2__FUNC_MSDC3_DAT2>,
+> +				 <MT8173_PIN_25_MSDC3_DAT3__FUNC_MSDC3_DAT3>;
+> +			input-enable;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> +		};
+> +
+> +		pins_cmd {
+> +			pinmux = <MT8173_PIN_27_MSDC3_CMD__FUNC_MSDC3_CMD>;
+> +			input-enable;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> +		};
+> +
+> +		pins_clk {
+> +			pinmux = <MT8173_PIN_26_MSDC3_CLK__FUNC_MSDC3_CLK>;
+> +			drive-strength = <MTK_DRIVE_8mA>;
+> +			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
+> +		};
+> +	};
+>  };
+>  
+>  &pwm0 {
