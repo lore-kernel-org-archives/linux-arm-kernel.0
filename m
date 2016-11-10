@@ -1,77 +1,140 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 10 Nov 2016 11:15:06 +0100
-Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
-In-Reply-To: <87wpgbekwg.fsf@free-electrons.com>
-References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
- <20161110001000.10619-5-gregory.clement@free-electrons.com>
- <20161110092221.0219490b@free-electrons.com>
- <87wpgbekwg.fsf@free-electrons.com>
-Message-ID: <20161110111506.02842cbd@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Nov 2016 11:19:20 +0100
+Subject: [PATCH v2 7/7] soc: renesas: Identify SoC and register with the
+ SoC bus
+In-Reply-To: <3693445.TSdZGaiT9S@wuerfel>
+References: <1477913455-5314-1-git-send-email-geert+renesas@glider.be>
+ <1477913455-5314-8-git-send-email-geert+renesas@glider.be>
+ <3693445.TSdZGaiT9S@wuerfel>
+Message-ID: <CAMuHMdX+T=Y--F6KXZwFmZwWFdfP5mL5Tar-wKwRM2p6Hh2-sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Arnd,
 
-On Thu, 10 Nov 2016 10:36:47 +0100, Gregory CLEMENT wrote:
+Thanks for your comments!
 
-> >> -		bootrom {
-> >> +		bootrom at 0 {
-> >>  			compatible = "marvell,bootrom";
-> >>  			reg = <MBUS_ID(0x01, 0x1d) 0 0x100000>;  
-> >
-> > I am still not sure whether this "0" unit address is correct compared
-> > to the reg property being passed.  
-> 
-> I chose to use the adress register inside the window memory.
+On Wed, Nov 9, 2016 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday, October 31, 2016 12:30:55 PM CET Geert Uytterhoeven wrote:
+>> v2:
+>>   - Drop SoC families and family names; use fixed "Renesas" instead,
+>
+> I think I'd rather have seen the family names left in there, but it's
+> not important, so up to you.
 
-Which I think is bogus, as my example below highlighted.
+They're not useful for matching, as family names may change anytime, and don't
+always say much about the hardware capabilities.
+E.g. SH-Mobile -> R-Mobile -> R-Car | RZ/A | RZ/G
+Some SH-Mobile (even some R-Car) parts are SuperH only, others have ARM and
+SuperH.
 
-> > A good example of why I'm worried is the sa-sram case:
-> >
-> > +		crypto_sram0: sa-sram0 at 0 {
-> >  			compatible = "mmio-sram";
-> >  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
-> >
-> > +		crypto_sram1: sa-sram1 at 0 {
-> >  			compatible = "mmio-sram";
-> >  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
-> >
-> > The node names should be just "sram" without a number. Indeed for UARTs
-> > for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
-> > uart1 at ABC. But then, if you do that, with your scheme, you end up with
-> > both nodes named sa-sram at 0.
-> >
-> > Which clearly shows that the way you set this unit-address is not
-> > correct: those two devices are mapped at completely different
-> > locations, but you end up with an identical unit address.
-> >
-> > I have no idea what is the rule for setting the unit address in this
-> > case, but I'm pretty sure the rule you've chosen is not good.  
-> 
-> I don't know if there is an existing rules for this case. But I see your
-> concern. What I propose then is to expose the memory windows ID by
-> adding the target and the attributes like this:
-> 
-> 		crypto_sram0: sa-sram at 09_09_0 {
->  			compatible = "mmio-sram";
->   			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
-> 
-> 
-> 		crypto_sram1: sa-sram at 09_05_0 {
->   			compatible = "mmio-sram";
->   			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+At least the SoC part numbers are stable (hmm, sh73a0 == r8a73a0).
 
-I have no idea if 09_05_0 is considered a valid unit address. Indeed
-the _ character in an address looks a bit weird.
+>>   - Use "renesas,prr" and "renesas,cccr" device nodes in DT if
+>>     available, else fall back to hardcoded addresses for compatibility
+>>     with existing DTBs,
+>
+> I only see patches 2, 3, 5, and 7 in my inbox, so I'm lacking the DT
+> binding for these, among other things.
 
-I guess we need guidance from the DT binding maintainers on this, since
-it's really a matter of interpreting what "unit address" means in
-relation to the value of the "reg" property.
+I understand you've received them in the mean time?
 
-Rob, Mark?
+> It does seem wrong to have a device node for a specific register though.
+> Shouldn't the node be for the block of registers that these are inside
+> of?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On R-Mobile APE6, R-Car Gen2 and Gen3, PRR is a lone register.
+On R-Car Gen1, it's not even documented (and doesn't exist on all parts).
+
+On SH-Mobile/R-Mobile, CCCR may be part of the HPB/APB register block, which
+we further don't touch at all.
+On R-Car Gen2, it's not documented, but does exist.
+
+BTW, see why I'd prefer not to have it in DT at all, and go for KISS in code
+we can change at any time? To avoid mistakes we have to keep on supporting
+forever.
+
+>>   - Don't register the SoC bus if the chip ID register is missing,
+>
+> Why? My objection was to hardcoding the register, not to registering
+> the device? I think I'd rather see the device registered with an
+> empty revision string.
+
+If there's no chip ID register, there's no reason to use soc_device_match(),
+as we can always look at a compatible value. All SoCs listed in this driver
+have a chip ID register.
+
+if you want me to register the soc_bus for  those SoCs regardless, I want to
+re-add r7s72100 (RZ/A) and r8a7778 (R-Car M1A), who don't have chip ID
+registers ;-)
+
+>> +#define CCCR   0xe600101c      /* Common Chip Code Register */
+>> +#define PRR    0xff000044      /* Product Register */
+>> +#define PRR3   0xfff00044      /* Product Register on R-Car Gen3 */
+>> +
+>> +static const struct of_device_id renesas_socs[] __initconst = {
+>> +#ifdef CONFIG_ARCH_R8A73A4
+>> +       { .compatible = "renesas,r8a73a4",      .data = (void *)PRR, },
+>> +#endif
+>> +#ifdef CONFIG_ARCH_R8A7740
+>> +       { .compatible = "renesas,r8a7740",      .data = (void *)CCCR, },
+>> +#endif
+>
+> My preference here would be to list the register address only for
+> SoCs that are known to need them, while also having .dtb files that
+> don't have the nodes.
+
+Even if drivers don't have to handle differences, there's been a long
+outstanding request to print SoC revision information during bootup
+(E.g. "Does it still work on ES1.0?"). Hence that covers all SoCs.
+
+>> +static int __init renesas_soc_init(void)
+>> +{
+>> +       struct soc_device_attribute *soc_dev_attr;
+>> +       const struct of_device_id *match;
+>> +       void __iomem *chipid = NULL;
+>> +       struct soc_device *soc_dev;
+>> +       struct device_node *np;
+>> +       unsigned int product;
+>> +
+>> +       np = of_find_matching_node_and_match(NULL, renesas_socs, &match);
+>> +       if (!np)
+>> +               return -ENODEV;
+>> +
+>> +       of_node_put(np);
+>> +
+>> +       /* Try PRR first, then CCCR, then hardcoded fallback */
+>> +       np = of_find_compatible_node(NULL, NULL, "renesas,prr");
+>> +       if (!np)
+>> +               np = of_find_compatible_node(NULL, NULL, "renesas,cccr");
+>> +       if (np) {
+>> +               chipid = of_iomap(np, 0);
+>> +               of_node_put(np);
+>> +       } else if (match->data) {
+>> +               chipid = ioremap((uintptr_t)match->data, 4);
+>> +       }
+>> +       if (!chipid)
+>>
+>
+> Here, I'd turn the order around and look for the DT nodes of the
+> devices first. Only if they are not found, look at the compatible
+> string of the root node. No need to search for a node though,
+> you know which one it is when you look for a compatible =
+> "renesas,r8a73a4".
+
+"renesas,r8a73a4" is the root node, not the device, so it does not have the
+"reg" property for reading the chip ID?
+
+There is no SoC part number in the "renesas,prr" and "renesas,cccr" nodes.
+Hence I always need to look at the root nodes.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
