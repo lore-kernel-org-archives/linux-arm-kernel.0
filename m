@@ -1,90 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 10 Nov 2016 18:25:16 +0800
-Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
-In-Reply-To: <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
-References: <20160921173129.GA20006@localhost>
- <20160921223805.21652-1-cov@codeaurora.org>
- <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
- <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
- <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
- <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
- <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
- <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 10 Nov 2016 10:26:50 +0000
+Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
+ to legacy SCPI protocol
+In-Reply-To: <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
+References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
+ <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
+ <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
+Message-ID: <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2016 at 06:49, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Wed, Nov 09, 2016 at 08:29:23PM +0000, Ard Biesheuvel wrote:
->> Hi Bjorn,
+
+
+On 10/11/16 01:22, Rob Herring wrote:
+> On Wed, Nov 02, 2016 at 10:52:09PM -0600, Sudeep Holla wrote:
+>> This patch adds specific compatible to support legacy SCPI protocol.
 >>
->> On 9 November 2016 at 20:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
->> > On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
->> >> Hi Bjorn,
->> >>
->> [...]
->> >>
->> >> We're working to add the PNP0C02 resource to future firmware, but it's
->> >> not in the current firmware. Are dmesg and /proc/iomem from the
->> >> current firmware interesting or should we wait for the update to file?
->> >
->> > Note that the ECAM space is not the only thing that should be
->> > described via these PNP0C02 devices.  *All* non-enumerable resources
->> > should be described by the _CRS method of some ACPI device.  Here's a
->> > sample from my laptop:
->> >
->> >   PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
->> >   system 00:01: [io  0x1800-0x189f] could not be reserved
->> >   system 00:01: [io  0x0800-0x087f] has been reserved
->> >   system 00:01: [io  0x0880-0x08ff] has been reserved
->> >   system 00:01: [io  0x0900-0x097f] has been reserved
->> >   system 00:01: [io  0x0980-0x09ff] has been reserved
->> >   system 00:01: [io  0x0a00-0x0a7f] has been reserved
->> >   system 00:01: [io  0x0a80-0x0aff] has been reserved
->> >   system 00:01: [io  0x0b00-0x0b7f] has been reserved
->> >   system 00:01: [io  0x0b80-0x0bff] has been reserved
->> >   system 00:01: [io  0x15e0-0x15ef] has been reserved
->> >   system 00:01: [io  0x1600-0x167f] has been reserved
->> >   system 00:01: [io  0x1640-0x165f] has been reserved
->> >   system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
->> >   system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
->> >   system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
->> >   system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
->> >   system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
->> >   system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
->> >   system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
->> >   system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
->> >   system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
->> >
->> > Do you have firmware in the field that may not get updated?  If so,
->> > I'd like to see the whole solution for that firmware, including the
->> > MCFG quirk (which tells the PCI core where the ECAM region is) and
->> > whatever PNP0C02 quirk you figure out to actually reserve the region.
->> >
->> > I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
->> > don't actually know if it's feasible, but it didn't look as bad as I
->> > expected, so I'd kind of like somebody to try it out.  I think you
->> > would have to call this via a DMI hook (do you have DMI on arm64?),
->> > maybe from pnp_init() or similar.
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
 >>
->> We do have SMBIOS/DMI on arm64, but we have been successful so far not
->> to rely on it for quirks, and we'd very much like to keep it that way.
+>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> index d1882c4540d0..ebd03fc93135 100644
+>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>> @@ -7,7 +7,9 @@ by Linux to initiate various system control and power operations.
 >>
->> Since this ACPI _CRS method has nothing to do with SMBIOS/DMI, surely
->> there is a better way to wire up the reservation code to the
->> information exposed by ACPI?
+>>  Required properties:
+>>
+>> -- compatible : should be "arm,scpi"
+>> +- compatible : should be
+>> +	* "arm,scpi" : For implementations complying to SCPI v1.0 or above
+>> +	* "arm,legacy-scpi" : For implementations complying pre SCPI v1.0
 >
-> I'm open to other ways, feel free to propose one :)
->
-> If you do a quirk, you need some way to identify the machine/firmware
-> combination, because you don't want to apply the quirk on every
-> machine.  You're trying to work around a firmware issue, so you
-> probably want something tied to the firmware version.  On x86, that's
-> typically done with DMI.
+> I'd prefer that we explicitly enumerate the old versions. Are there
+> many?
 >
 
-I think I misunderstood the purpose of the example: that should only
-be necessary if the _CRS methods are missing from the firmware, right?
-If we update the firmware to cover all non-enumerable resources by
-such a method, we shouldn't need any such quirks at all IIUC
+I understand your concern, but this legacy SCPI protocol was not
+officially released. It was just WIP which vendors picked up from very
+early releases. Since they are not numbered, it's hard to have specific
+compatibles with different versions until v1.0. That's one of the reason
+to retain platform specific compatible so that we can add any quirks
+based on them if needed.
+
+I will probably add these information in the commit log so that it's
+clear why we can't do version based compatible.
+
+-- 
+Regards,
+Sudeep
