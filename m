@@ -1,244 +1,341 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 10 Nov 2016 11:18:50 -0700
-Subject: [PATCH 4/8] coresight: reset "enable_sink" flag when need be
+Date: Thu, 10 Nov 2016 11:18:51 -0700
+Subject: [PATCH 5/8] coresight: tmc: Cleanup operation mode handling
 In-Reply-To: <1478801934-26904-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1478801934-26904-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1478801934-26904-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1478801934-26904-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using coresight from the perf interface sinks are specified
-as part of the perf command line.  As such the sink needs to be
-disabled once it has been acknowledged by the coresight framework.
-Otherwise the sink stays enabled, which may interfere with other
-sessions.
+From: "Suzuki K. Poulose" <Suzuki.Poulose@arm.com>
 
-This patch removes the sink selection check from the build path
-process and make it a function on it's own.  The function is
-then used when operating from sysFS or perf to determine what
-sink has been selected.
+The mode of operation of the TMC tracked in drvdata->mode is defined
+as a local_t type. This is always checked and modified under the
+drvdata->spinlock and hence we don't need local_t for it and the
+unnecessary synchronisation instructions that comes with it. This
+change makes the code a bit more cleaner.
 
-If operated from perf the status of the "enable_sink" flag is
-reset so that concurrent session can use a different sink.  When
-used from sysFS the status of the flag is left untouched since
-users have full control.
+Also fixes the order in which we update the drvdata->mode to
+CS_MODE_DISABLED. i.e, in tmc_disable_etX_sink we change the
+mode to CS_MODE_DISABLED before invoking tmc_disable_etX_hw()
+which in turn depends on the mode to decide whether to dump the
+trace to a buffer.
 
-The implementation doesn't handle a scenario where a sink has
-been enabled from sysFS and another sink is selected from the
-perf command line as both modes of operation are mutually
-exclusive.
+Applies on mathieu's coresight/next tree [1]
 
+https://git.linaro.org/kernel/coresight.git next
+
+Reported-by: Venkatesh Vivekanandan <venkatesh.vivekanandan@broadcom.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 31 +++++-----
- drivers/hwtracing/coresight/coresight-priv.h     |  4 +-
- drivers/hwtracing/coresight/coresight.c          | 74 ++++++++++++++++++++++--
- 3 files changed, 87 insertions(+), 22 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 32 +++++++++++--------------
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 26 +++++++++-----------
+ drivers/hwtracing/coresight/coresight-tmc.h     |  2 +-
+ 3 files changed, 26 insertions(+), 34 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 2cd7c718198a..5a346fc8ce06 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -202,6 +202,21 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	if (!event_data)
- 		return NULL;
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index d6941ea24d8d..e80a8f4cd12e 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -70,7 +70,7 @@ static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ 	 * When operating in sysFS mode the content of the buffer needs to be
+ 	 * read before the TMC is disabled.
+ 	 */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etb_dump_hw(drvdata);
+ 	tmc_disable_hw(drvdata);
  
-+	/*
-+	 * In theory nothing prevent tracers in a trace session from being
-+	 * associated with different sinks, nor having a sink per tracer.  But
-+	 * until we have HW with this kind of topology we need to assume tracers
-+	 * in a trace session are using the same sink.  Therefore go through
-+	 * the coresight bus and pick the first enabled sink.
-+	 *
-+	 * When operated from sysFS users are responsible to enable the sink
-+	 * while from perf, the perf tools will do it based on the choice made
-+	 * on the cmd line.  As such the "enable_sink" flag in sysFS is reset.
-+	 */
-+	sink = coresight_get_enabled_sink(true);
-+	if (!sink)
-+		return NULL;
-+
- 	INIT_WORK(&event_data->work, free_event_data);
+@@ -108,7 +108,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ 	int ret = 0;
+ 	bool used = false;
+ 	char *buf = NULL;
+-	long val;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
- 	mask = &event_data->mask;
-@@ -219,25 +234,11 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 		 * list of devices from source to sink that can be
- 		 * referenced later when the path is actually needed.
- 		 */
--		event_data->path[cpu] = coresight_build_path(csdev);
-+		event_data->path[cpu] = coresight_build_path(csdev, sink);
- 		if (IS_ERR(event_data->path[cpu]))
- 			goto err;
+@@ -138,13 +137,12 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ 		goto out;
  	}
  
--	/*
--	 * In theory nothing prevent tracers in a trace session from being
--	 * associated with different sinks, nor having a sink per tracer.  But
--	 * until we have HW with this kind of topology and a way to convey
--	 * sink assignement from the perf cmd line we need to assume tracers
--	 * in a trace session are using the same sink.  Therefore pick the sink
--	 * found at the end of the first available path.
--	 */
--	cpu = cpumask_first(mask);
--	/* Grab the sink at the end of the path */
--	sink = coresight_get_sink(event_data->path[cpu]);
--	if (!sink)
--		goto err;
--
- 	if (!sink_ops(sink)->alloc_buffer)
- 		goto err;
- 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 196a14be4b3d..ef9d8e93e3b2 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -111,7 +111,9 @@ static inline void CS_UNLOCK(void __iomem *addr)
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
--struct list_head *coresight_build_path(struct coresight_device *csdev);
-+struct coresight_device *coresight_get_enabled_sink(bool reset);
-+struct list_head *coresight_build_path(struct coresight_device *csdev,
-+				       struct coresight_device *sink);
- void coresight_release_path(struct list_head *path);
- 
- #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 7bf00a0beb6f..0c37356e417c 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -368,6 +368,52 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
- 	return csdev;
- }
- 
-+static int coresight_enabled_sink(struct device *dev, void *data)
-+{
-+	bool *reset = data;
-+	struct coresight_device *csdev = to_coresight_device(dev);
-+
-+	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-+	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
-+	     csdev->activated) {
-+		/*
-+		 * Now that we have a handle on the sink for this session,
-+		 * disable the sysFS "enable_sink" flag so that possible
-+		 * concurrent perf session that wish to use another sink don't
-+		 * trip on it.  Doing so has no ramification for the current
-+		 * session.
-+		 */
-+		if (*reset)
-+			csdev->activated = false;
-+
-+		return 1;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * coresight_get_enabled_sink - returns the first enabled sink found on the bus
-+ * @deactivate:	Whether the 'enable_sink' flag should be reset
-+ *
-+ * When operated from perf the deactivate parameter should be set to 'true'.
-+ * That way the "enabled_sink" flag of the sink that was selected can be reset,
-+ * allowing for other concurrent perf sessions to choose a different sink.
-+ *
-+ * When operated from sysFS users have full control and as such the deactivate
-+ * parameter should be set to 'false', hence mandating users to explicitly
-+ * clear the flag.
-+ */
-+struct coresight_device *coresight_get_enabled_sink(bool deactivate)
-+{
-+	struct device *dev = NULL;
-+
-+	dev = bus_find_device(&coresight_bustype, NULL, &deactivate,
-+			      coresight_enabled_sink);
-+
-+	return dev ? to_coresight_device(dev) : NULL;
-+}
-+
- /**
-  * _coresight_build_path - recursively build a path from a @csdev to a sink.
-  * @csdev:	The device to start from.
-@@ -380,6 +426,7 @@ struct coresight_device *coresight_get_sink(struct list_head *path)
-  * last one.
-  */
- static int _coresight_build_path(struct coresight_device *csdev,
-+				 struct coresight_device *sink,
- 				 struct list_head *path)
- {
- 	int i;
-@@ -387,15 +434,15 @@ static int _coresight_build_path(struct coresight_device *csdev,
- 	struct coresight_node *node;
- 
- 	/* An activated sink has been found.  Enqueue the element */
--	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
--	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
-+	if (csdev == sink)
+-	val = local_xchg(&drvdata->mode, mode);
+ 	/*
+ 	 * In sysFS mode we can have multiple writers per sink.  Since this
+ 	 * sink is already enabled no memory is needed and the HW need not be
+ 	 * touched.
+ 	 */
+-	if (val == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
  		goto out;
  
- 	/* Not a sink - recursively explore each port found on this element */
- 	for (i = 0; i < csdev->nr_outport; i++) {
- 		struct coresight_device *child_dev = csdev->conns[i].child_dev;
+ 	/*
+@@ -163,6 +161,7 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ 		drvdata->buf = buf;
+ 	}
  
--		if (child_dev && _coresight_build_path(child_dev, path) == 0) {
-+		if (child_dev &&
-+		    _coresight_build_path(child_dev, sink, path) == 0) {
- 			found = true;
- 			break;
- 		}
-@@ -422,18 +469,22 @@ static int _coresight_build_path(struct coresight_device *csdev,
- 	return 0;
- }
- 
--struct list_head *coresight_build_path(struct coresight_device *csdev)
-+struct list_head *coresight_build_path(struct coresight_device *source,
-+				       struct coresight_device *sink)
++	drvdata->mode = CS_MODE_SYSFS;
+ 	tmc_etb_enable_hw(drvdata);
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+@@ -180,7 +179,6 @@ static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
  {
- 	struct list_head *path;
- 	int rc;
+ 	int ret = 0;
+-	long val;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
-+	if (!sink)
-+		return ERR_PTR(-EINVAL);
-+
- 	path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
- 	if (!path)
- 		return ERR_PTR(-ENOMEM);
+@@ -194,17 +192,17 @@ static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32 mode)
+ 		goto out;
+ 	}
  
- 	INIT_LIST_HEAD(path);
+-	val = local_xchg(&drvdata->mode, mode);
+ 	/*
+ 	 * In Perf mode there can be only one writer per sink.  There
+ 	 * is also no need to continue if the ETB/ETR is already operated
+ 	 * from sysFS.
+ 	 */
+-	if (val != CS_MODE_DISABLED) {
++	if (drvdata->mode != CS_MODE_DISABLED) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
  
--	rc = _coresight_build_path(csdev, path);
-+	rc = _coresight_build_path(source, sink, path);
- 	if (rc) {
- 		kfree(path);
- 		return ERR_PTR(rc);
-@@ -497,6 +548,7 @@ static int coresight_validate_source(struct coresight_device *csdev,
- int coresight_enable(struct coresight_device *csdev)
++	drvdata->mode = mode;
+ 	tmc_etb_enable_hw(drvdata);
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+@@ -227,7 +225,6 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+ 
+ static void tmc_disable_etf_sink(struct coresight_device *csdev)
  {
- 	int cpu, ret = 0;
-+	struct coresight_device *sink;
- 	struct list_head *path;
+-	long val;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
  
- 	mutex_lock(&coresight_mutex);
-@@ -508,7 +560,17 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (csdev->enable)
+@@ -237,10 +234,11 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
+ 		return;
+ 	}
+ 
+-	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
+ 	/* Disable the TMC only if it needs to */
+-	if (val != CS_MODE_DISABLED)
++	if (drvdata->mode != CS_MODE_DISABLED) {
+ 		tmc_etb_disable_hw(drvdata);
++		drvdata->mode = CS_MODE_DISABLED;
++	}
+ 
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+@@ -260,7 +258,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
+ 	}
+ 
+ 	tmc_etf_enable_hw(drvdata);
+-	local_set(&drvdata->mode, CS_MODE_SYSFS);
++	drvdata->mode = CS_MODE_SYSFS;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+ 	dev_info(drvdata->dev, "TMC-ETF enabled\n");
+@@ -280,7 +278,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
+ 	}
+ 
+ 	tmc_etf_disable_hw(drvdata);
+-	local_set(&drvdata->mode, CS_MODE_DISABLED);
++	drvdata->mode = CS_MODE_DISABLED;
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+ 	dev_info(drvdata->dev, "TMC disabled\n");
+@@ -383,7 +381,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 		return;
+ 
+ 	/* This shouldn't happen */
+-	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
++	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
+ 		return;
+ 
+ 	CS_UNLOCK(drvdata->base);
+@@ -504,7 +502,6 @@ const struct coresight_ops tmc_etf_cs_ops = {
+ 
+ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ {
+-	long val;
+ 	enum tmc_mode mode;
+ 	int ret = 0;
+ 	unsigned long flags;
+@@ -528,9 +525,8 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
+-	val = local_read(&drvdata->mode);
+ 	/* Don't interfere if operated from Perf */
+-	if (val == CS_MODE_PERF) {
++	if (drvdata->mode == CS_MODE_PERF) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+@@ -542,7 +538,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Disable the TMC if need be */
+-	if (val == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etb_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+@@ -573,7 +569,7 @@ int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Re-enable the TMC if need be */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
++	if (drvdata->mode == CS_MODE_SYSFS) {
+ 		/*
+ 		 * The trace run will continue with the same allocated trace
+ 		 * buffer. As such zero-out the buffer so that we don't end
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 886ea83c68e0..f23ef0c23303 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -86,7 +86,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ 	 * When operating in sysFS mode the content of the buffer needs to be
+ 	 * read before the TMC is disabled.
+ 	 */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etr_dump_hw(drvdata);
+ 	tmc_disable_hw(drvdata);
+ 
+@@ -97,7 +97,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ {
+ 	int ret = 0;
+ 	bool used = false;
+-	long val;
+ 	unsigned long flags;
+ 	void __iomem *vaddr = NULL;
+ 	dma_addr_t paddr;
+@@ -134,13 +133,12 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ 		goto out;
+ 	}
+ 
+-	val = local_xchg(&drvdata->mode, mode);
+ 	/*
+ 	 * In sysFS mode we can have multiple writers per sink.  Since this
+ 	 * sink is already enabled no memory is needed and the HW need not be
+ 	 * touched.
+ 	 */
+-	if (val == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
  		goto out;
  
--	path = coresight_build_path(csdev);
-+	/*
-+	 * Search for a valid sink for this session but don't reset the
-+	 * "enable_sink" flag in sysFS.  Users get to do that explicitly.
-+	 */
-+	sink = coresight_get_enabled_sink(false);
-+	if (!sink) {
-+		ret = -EINVAL;
-+		goto out;
+ 	/*
+@@ -157,6 +155,7 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ 
+ 	memset(drvdata->vaddr, 0, drvdata->size);
+ 
++	drvdata->mode = CS_MODE_SYSFS;
+ 	tmc_etr_enable_hw(drvdata);
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+@@ -174,7 +173,6 @@ static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32 mode)
+ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
+ {
+ 	int ret = 0;
+-	long val;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+@@ -188,17 +186,17 @@ static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32 mode)
+ 		goto out;
+ 	}
+ 
+-	val = local_xchg(&drvdata->mode, mode);
+ 	/*
+ 	 * In Perf mode there can be only one writer per sink.  There
+ 	 * is also no need to continue if the ETR is already operated
+ 	 * from sysFS.
+ 	 */
+-	if (val != CS_MODE_DISABLED) {
++	if (drvdata->mode != CS_MODE_DISABLED) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+ 
++	drvdata->mode = CS_MODE_PERF;
+ 	tmc_etr_enable_hw(drvdata);
+ out:
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+@@ -221,7 +219,6 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+ 
+ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+ {
+-	long val;
+ 	unsigned long flags;
+ 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+ 
+@@ -231,10 +228,11 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
+ 		return;
+ 	}
+ 
+-	val = local_xchg(&drvdata->mode, CS_MODE_DISABLED);
+ 	/* Disable the TMC only if it needs to */
+-	if (val != CS_MODE_DISABLED)
++	if (drvdata->mode != CS_MODE_DISABLED) {
+ 		tmc_etr_disable_hw(drvdata);
++		drvdata->mode = CS_MODE_DISABLED;
 +	}
-+
-+	path = coresight_build_path(csdev, sink);
- 	if (IS_ERR(path)) {
- 		pr_err("building path(s) failed\n");
- 		ret = PTR_ERR(path);
+ 
+ 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+ 
+@@ -253,7 +251,6 @@ const struct coresight_ops tmc_etr_cs_ops = {
+ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ {
+ 	int ret = 0;
+-	long val;
+ 	unsigned long flags;
+ 
+ 	/* config types are set a boot time and never change */
+@@ -266,9 +263,8 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 		goto out;
+ 	}
+ 
+-	val = local_read(&drvdata->mode);
+ 	/* Don't interfere if operated from Perf */
+-	if (val == CS_MODE_PERF) {
++	if (drvdata->mode == CS_MODE_PERF) {
+ 		ret = -EINVAL;
+ 		goto out;
+ 	}
+@@ -280,7 +276,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+ 	}
+ 
+ 	/* Disable the TMC if need be */
+-	if (val == CS_MODE_SYSFS)
++	if (drvdata->mode == CS_MODE_SYSFS)
+ 		tmc_etr_disable_hw(drvdata);
+ 
+ 	drvdata->reading = true;
+@@ -303,7 +299,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+ 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ 
+ 	/* RE-enable the TMC if need be */
+-	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
++	if (drvdata->mode == CS_MODE_SYSFS) {
+ 		/*
+ 		 * The trace run will continue with the same allocated trace
+ 		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+index 44b3ae346118..51c01851533e 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
++++ b/drivers/hwtracing/coresight/coresight-tmc.h
+@@ -117,7 +117,7 @@ struct tmc_drvdata {
+ 	void __iomem		*vaddr;
+ 	u32			size;
+ 	u32			len;
+-	local_t			mode;
++	u32			mode;
+ 	enum tmc_config_type	config_type;
+ 	enum tmc_mem_intf_width	memwidth;
+ 	u32			trigger_cntr;
 -- 
 2.7.4
