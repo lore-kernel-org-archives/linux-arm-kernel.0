@@ -1,47 +1,55 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 10 Nov 2016 16:37:24 +0100
-Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
- iommu_domain
-In-Reply-To: <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 10 Nov 2016 16:41:59 +0100
+Subject: [RFC v2 2/8] iommu/iova: fix __alloc_and_insert_iova_range
+In-Reply-To: <20161110152241.GF2078@8bytes.org>
 References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
-Message-ID: <20161110153724.GG2078@8bytes.org>
+ <1478258646-3117-3-git-send-email-eric.auger@redhat.com>
+ <20161110152241.GF2078@8bytes.org>
+Message-ID: <e2e328c3-ac1f-cef6-2137-660ccefda8c9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 04, 2016 at 11:24:02AM +0000, Eric Auger wrote:
-> Introduce a new iommu_reserved_region struct. This embodies
-> an IOVA reserved region that cannot be used along with the IOMMU
-> API. The list is protected by a dedicated mutex.
-> 
-> An iommu domain now owns a list of those.
-> 
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> 
-> ---
-> ---
->  drivers/iommu/iommu.c |  2 ++
->  include/linux/iommu.h | 17 +++++++++++++++++
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 9a2f196..0af07492 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
->  
->  	domain->ops  = bus->iommu_ops;
->  	domain->type = type;
-> +	INIT_LIST_HEAD(&domain->reserved_regions);
-> +	mutex_init(&domain->resv_mutex);
+Hi Joerg,
 
-These regions are a property of the iommu-group, they are specific to a
-device or a group of devices, not to a particular domain where devics
-(iommu-groups) can come and go.
+On 10/11/2016 16:22, Joerg Roedel wrote:
+> On Fri, Nov 04, 2016 at 11:24:00AM +0000, Eric Auger wrote:
+>> Fix the size check within start_pfn and limit_pfn.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>
+>> ---
+>>
+>> the issue was observed when playing with 1 page iova domain with
+>> higher iova reserved.
+>> ---
+>>  drivers/iommu/iova.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
+>> index e23001b..ee29dbf 100644
+>> --- a/drivers/iommu/iova.c
+>> +++ b/drivers/iommu/iova.c
+>> @@ -147,7 +147,7 @@ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
+>>  	if (!curr) {
+>>  		if (size_aligned)
+>>  			pad_size = iova_get_pad_size(size, limit_pfn);
+>> -		if ((iovad->start_pfn + size + pad_size) > limit_pfn) {
+>> +		if ((iovad->start_pfn + size + pad_size - 1) > limit_pfn) {
+> 
+> A >= check is more readable here.
 
-Further I agree with Robin that this is similar to the
-get_dm_regions/set_dm_regions approach, which should be changed/extended
-for this instead of adding something new.
+Sure
 
+Thanks
 
-	Joerg
+Eric
+> 
+> 
+> 	Joerg
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
