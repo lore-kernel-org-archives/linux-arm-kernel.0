@@ -1,54 +1,99 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 Nov 2016 10:26:50 +0000
-Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
- to legacy SCPI protocol
-In-Reply-To: <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
-References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
- <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
- <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
-Message-ID: <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Nov 2016 11:43:51 +0100
+Subject: [PATCH 04/14] ARM: dts: armada-375: Fixup bootrom DT warning
+In-Reply-To: <20161110111506.02842cbd@free-electrons.com> (Thomas Petazzoni's
+ message of "Thu, 10 Nov 2016 11:15:06 +0100")
+References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+ <20161110001000.10619-5-gregory.clement@free-electrons.com>
+ <20161110092221.0219490b@free-electrons.com>
+ <87wpgbekwg.fsf@free-electrons.com>
+ <20161110111506.02842cbd@free-electrons.com>
+Message-ID: <87fumzehso.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thomas,
+ 
+ On jeu., nov. 10 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
+[...]
 
-On 10/11/16 01:22, Rob Herring wrote:
-> On Wed, Nov 02, 2016 at 10:52:09PM -0600, Sudeep Holla wrote:
->> This patch adds specific compatible to support legacy SCPI protocol.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 4 +++-
->>  1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> index d1882c4540d0..ebd03fc93135 100644
->> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->> @@ -7,7 +7,9 @@ by Linux to initiate various system control and power operations.
->>
->>  Required properties:
->>
->> -- compatible : should be "arm,scpi"
->> +- compatible : should be
->> +	* "arm,scpi" : For implementations complying to SCPI v1.0 or above
->> +	* "arm,legacy-scpi" : For implementations complying pre SCPI v1.0
+>> > A good example of why I'm worried is the sa-sram case:
+>> >
+>> > +		crypto_sram0: sa-sram0 at 0 {
+>> >  			compatible = "mmio-sram";
+>> >  			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+>> >
+>> > +		crypto_sram1: sa-sram1 at 0 {
+>> >  			compatible = "mmio-sram";
+>> >  			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
+>> >
+>> > The node names should be just "sram" without a number. Indeed for UARTs
+>> > for example, you use uart at XYZ, uart at ABC and not uart0 at XYZ and
+>> > uart1 at ABC. But then, if you do that, with your scheme, you end up with
+>> > both nodes named sa-sram at 0.
+>> >
+>> > Which clearly shows that the way you set this unit-address is not
+>> > correct: those two devices are mapped at completely different
+>> > locations, but you end up with an identical unit address.
+>> >
+>> > I have no idea what is the rule for setting the unit address in this
+>> > case, but I'm pretty sure the rule you've chosen is not good.  
+>> 
+>> I don't know if there is an existing rules for this case. But I see your
+>> concern. What I propose then is to expose the memory windows ID by
+>> adding the target and the attributes like this:
+>> 
+>> 		crypto_sram0: sa-sram at 09_09_0 {
+>>  			compatible = "mmio-sram";
+>>   			reg = <MBUS_ID(0x09, 0x09) 0 0x800>;
+>> 
+>> 
+>> 		crypto_sram1: sa-sram at 09_05_0 {
+>>   			compatible = "mmio-sram";
+>>   			reg = <MBUS_ID(0x09, 0x05) 0 0x800>;
 >
-> I'd prefer that we explicitly enumerate the old versions. Are there
-> many?
+> I have no idea if 09_05_0 is considered a valid unit address. Indeed
+> the _ character in an address looks a bit weird.
 >
+> I guess we need guidance from the DT binding maintainers on this, since
+> it's really a matter of interpreting what "unit address" means in
+> relation to the value of the "reg" property.
 
-I understand your concern, but this legacy SCPI protocol was not
-officially released. It was just WIP which vendors picked up from very
-early releases. Since they are not numbered, it's hard to have specific
-compatibles with different versions until v1.0. That's one of the reason
-to retain platform specific compatible so that we can add any quirks
-based on them if needed.
+So I looked for in the reference: Power_ePAPR_APPROVED_v1.0, and in
+paragraph "2.2.1.1 Node Name Requirements" we have:
 
-I will probably add these information in the commit log so that it's
-clear why we can't do version based compatible.
+"The unit-address component of the name is specific to the bus type on
+which the node sits. It consists of one or more ASCII characters from
+the set of characters in Table 2-1. The fundamental requirement is that
+at any level of the device tree the unit-address be unique in order to
+differentiate nodes with the same name at the same level in the
+tree. The binding for a particular bus may specify additional, more
+specific requirements for the format of a unit-address."
+
+In Table 2-1 we have the following characters:
+0-9
+a-z
+A-z
+,
+.
+_
++
+-
+
+So the underscore is valid. And by adding information about the memory
+windows we match the fundamental requirement :"at any level of the
+device tree the unit-address be unique".
+
+Gregory
+
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
 -- 
-Regards,
-Sudeep
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
