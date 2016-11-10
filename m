@@ -1,54 +1,85 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 10 Nov 2016 17:18:52 +0100
-Subject: [PATCH v2 0/6] Add support for STM32 ADC
-Message-ID: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
+Date: Thu, 10 Nov 2016 17:18:57 +0100
+Subject: [PATCH v2 5/6] ARM: dts: stm32f429: Add adc support
+In-Reply-To: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
+References: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1478794738-28933-6-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for STM32F4 ADC into IIO framework.
-STM32F4 ADC is a 12-bit successive approximation analog-to-digital
-converter with multiplexed input channels. Conversions can
-be performed in single, continuous, scan or discontinuous mode.
-Conversions can be launched in software or using hardware triggers.
+Add adc support & pinctrl analog phandle (adc3_in8) to stm32f429.
 
-This driver has been developed and tested on STM32F429 eval board.
-It consist of a MFD core driver, to manage common resources shared
-between up to 3 ADC instances.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 49 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-Changes in v2:
-- Replace single driver model by MFD approach, to handle up to 3 ADCs
-  as separate devices. Each ADC device then registers a unique IIO
-  device.
-- Make driver as simple as possible for the first instance, to ease
-  review. For now, I dropped complexity by removing injected support,
-  triggered buffer mode, dmas.
-- Removed abstraction layer (indirection routines, ops) as only stm32f4
-  is supported.
-
-Fabrice Gasnier (6):
-  Documentation: dt-bindings: Document STM32 ADC DT bindings
-  mfd: stm32-adc: Add support for stm32 ADC
-  iio: adc: Add support for STM32 ADC
-  ARM: configs: stm32: enable ADC driver
-  ARM: dts: stm32f429: Add adc support
-  ARM: dts: stm32f429: enable adc on eval board
-
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |  85 ++++
- arch/arm/boot/dts/stm32429i-eval.dts               |  25 +
- arch/arm/boot/dts/stm32f429.dtsi                   |  49 ++
- arch/arm/configs/stm32_defconfig                   |   3 +
- drivers/iio/adc/Kconfig                            |  10 +
- drivers/iio/adc/Makefile                           |   1 +
- drivers/iio/adc/stm32-adc.c                        | 525 +++++++++++++++++++++
- drivers/mfd/Kconfig                                |  14 +
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/stm32-adc-core.c                       | 301 ++++++++++++
- include/linux/mfd/stm32-adc-core.h                 |  52 ++
- 11 files changed, 1066 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
- create mode 100644 drivers/iio/adc/stm32-adc.c
- create mode 100644 drivers/mfd/stm32-adc-core.c
- create mode 100644 include/linux/mfd/stm32-adc-core.h
-
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 336ee4f..f198132 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -172,6 +172,49 @@
+ 			status = "disabled";
+ 		};
+ 
++		adc: adc at 40012000 {
++			compatible = "st,stm32f4-adc-core";
++			reg = <0x40012000 0x400>;
++			interrupts = <18>;
++			clocks = <&rcc 0 168>;
++			clock-names = "adc";
++			interrupt-controller;
++			#interrupt-cells = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			adc1: adc at 0 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x0>;
++				clocks = <&rcc 0 168>;
++				interrupt-parent = <&adc>;
++				interrupts = <0>;
++				status = "disabled";
++			};
++
++			adc2: adc at 100 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x100>;
++				clocks = <&rcc 0 169>;
++				interrupt-parent = <&adc>;
++				interrupts = <1>;
++				status = "disabled";
++			};
++
++			adc3: adc at 200 {
++				compatible = "st,stm32f4-adc";
++				#io-channel-cells = <1>;
++				reg = <0x200>;
++				clocks = <&rcc 0 170>;
++				interrupt-parent = <&adc>;
++				interrupts = <2>;
++				status = "disabled";
++			};
++		};
++
+ 		syscfg: system-config at 40013800 {
+ 			compatible = "syscon";
+ 			reg = <0x40013800 0x400>;
+@@ -332,6 +375,12 @@
+ 					slew-rate = <2>;
+ 				};
+ 			};
++
++			adc3_in8_pin: adc at 200 {
++				pins {
++					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023810 {
 -- 
 1.9.1
