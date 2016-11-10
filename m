@@ -1,83 +1,34 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 10 Nov 2016 14:34:07 +0000
-Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
- to legacy SCPI protocol
-In-Reply-To: <CAL_JsqLW4JZHb0ncVUEefnKySA231EDgvCkY3xPdaJGf=uMJYg@mail.gmail.com>
-References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
- <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
- <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
- <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
- <CAL_JsqLW4JZHb0ncVUEefnKySA231EDgvCkY3xPdaJGf=uMJYg@mail.gmail.com>
-Message-ID: <7ccc12bc-9a05-47e3-8ab8-d1b0ad31159e@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 10 Nov 2016 15:40:07 +0100
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161109130114.3e17bba9@t450s.home>
+References: <1478209178-3009-1-git-send-email-eric.auger@redhat.com>
+ <20161103220205.37715b49@t450s.home>
+ <20161108024559.GA20591@arm.com> <20161108202922.GC15676@cbox>
+ <20161108163508.1bcae0c2@t450s.home> <58228F71.6020108@redhat.com>
+ <20161109170326.GG17771@arm.com> <582371FB.2040808@redhat.com>
+ <20161109192303.GD15676@cbox> <20161109130114.3e17bba9@t450s.home>
+Message-ID: <20161110144007.GC2078@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 09, 2016 at 01:01:14PM -0700, Alex Williamson wrote:
+> Well, it's not like QEMU or libvirt stumbling through sysfs to figure
+> out where holes could be in order to instantiate a VM with matching
+> holes, just in case someone might decide to hot-add a device into the
+> VM, at some point, and hopefully they don't migrate the VM to another
+> host with a different layout first, is all that much less disgusting or
+> foolproof. It's just that in order to dynamically remove a page as a
+> possible DMA target we require a paravirt channel, such as a balloon
+> driver that's able to pluck a specific page.  In some ways it's
+> actually less disgusting, but it puts some prerequisites on
+> enlightening the guest OS.  Thanks,
+
+I think it is much simpler if libvirt/qemu just go through all
+potentially assignable devices on a system and pre-exclude any addresses
+from guest RAM beforehand, rather than doing something like this with
+paravirt/ballooning when a device is hot-added. There is no guarantee
+that you can take a page away from a linux-guest.
 
 
-On 10/11/16 14:12, Rob Herring wrote:
-> On Thu, Nov 10, 2016 at 4:26 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->>
->> On 10/11/16 01:22, Rob Herring wrote:
->>>
->>> On Wed, Nov 02, 2016 at 10:52:09PM -0600, Sudeep Holla wrote:
->>>>
->>>> This patch adds specific compatible to support legacy SCPI protocol.
->>>>
->>>> Cc: Rob Herring <robh+dt@kernel.org>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 4 +++-
->>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt
->>>> b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->>>> index d1882c4540d0..ebd03fc93135 100644
->>>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
->>>> @@ -7,7 +7,9 @@ by Linux to initiate various system control and power
->>>> operations.
->>>>
->>>>  Required properties:
->>>>
->>>> -- compatible : should be "arm,scpi"
->>>> +- compatible : should be
->>>> +       * "arm,scpi" : For implementations complying to SCPI v1.0 or
->>>> above
->>>> +       * "arm,legacy-scpi" : For implementations complying pre SCPI v1.0
->>>
->>>
->>> I'd prefer that we explicitly enumerate the old versions. Are there
->>> many?
->>>
->>
->> I understand your concern, but this legacy SCPI protocol was not
->> officially released. It was just WIP which vendors picked up from very
->> early releases. Since they are not numbered, it's hard to have specific
->> compatibles with different versions until v1.0. That's one of the reason
->> to retain platform specific compatible so that we can add any quirks
->> based on them if needed.
->>
->> I will probably add these information in the commit log so that it's
->> clear why we can't do version based compatible.
->
-> This is exactly my point. By enumerate, I meant having platform
-> specific compatibles. Having "arm,legacy-scpi" is pointless because
-> who knows what version they followed and they may all be different.
->
-
-OK, but IIUC Olof's concern wanted a generic one along with the platform
-specific compatible which kind of makes sense as so far we have seen
-some commonality between Amlogic and Rockchip.
-
-E.g. Amlogic follows most of the legacy protocol though it deviates in
-couple of things which we can handle with platform specific compatible
-(in the following patch in the series). When another user(Rockchip ?)
-make use of this legacy protocol, we can start using those platform
-specific compatible for deviations only.
-
-Is that not acceptable ?
-
--- 
-Regards,
-Sudeep
+	Joerg
