@@ -1,124 +1,45 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 10 Nov 2016 12:22:26 +0100
-Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
- iommu_domain
-In-Reply-To: <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
- <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
-Message-ID: <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 10 Nov 2016 11:22:24 +0000
+Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
+In-Reply-To: <1478647002.7430.69.camel@kernel.crashing.org>
+References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
+ <20161108120323.GC15297@leverpostej>
+ <1478647002.7430.69.camel@kernel.crashing.org>
+Message-ID: <20161110112224.GB4418@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wed, Nov 09, 2016 at 10:16:42AM +1100, Benjamin Herrenschmidt wrote:
+> On Tue, 2016-11-08 at 12:03 +0000, Mark Rutland wrote:
+> > On Tue, Nov 08, 2016 at 11:47:07AM +0800, zhichang.yuan wrote:
+> > > 
+> > > For arm64, there is no I/O space as other architectural platforms, such as
+> > > X86. Most I/O accesses are achieved based on MMIO. But for some arm64 SoCs,
+> > > such as Hip06, when accessing some legacy ISA devices connected to LPC, those
+> > > known port addresses are used to control the corresponding target devices, for
+> > > example, 0x2f8 is for UART, 0xe4 is for ipmi-bt. It is different from the
+> > > normal MMIO mode in using.
+> > 
+> > This has nothing to do with arm64. Hardware with this kind of indirect
+> > bus access could be integrated with a variety of CPU architectures. It
+> > simply hasn't been, yet.
+> 
+> On some ppc's we also use similar indirect access methods for IOs. We
+> have a generic infrastructure for re-routing some memory or IO regions
+> to hooks.
+> 
+> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
+> firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
 
-On 04/11/2016 15:00, Robin Murphy wrote:
-> Hi Eric,
-> 
-> Thanks for posting this new series - the bottom-up approach is a lot
-> easier to reason about :)
-> 
-> On 04/11/16 11:24, Eric Auger wrote:
->> Introduce a new iommu_reserved_region struct. This embodies
->> an IOVA reserved region that cannot be used along with the IOMMU
->> API. The list is protected by a dedicated mutex.
-> 
-> In the light of these patches, I think I'm settling into agreement that
-> the iommu_domain is the sweet spot for accessing this information - the
-> underlying magic address ranges might be properties of various bits of
-> hardware many of which aren't the IOMMU itself, but they only start to
-> matter at the point you start wanting to use an IOMMU domain at the
-> higher level. Therefore, having a callback in the domain ops to pull
-> everything together fits rather neatly.
-Using get_dm_regions could have make sense but this approach now is
-ruled out by sysfs API approach. If attribute file is bound to be used
-before iommu domains are created, we cannot rely on any iommu_domain
-based callback. Back to square 1?
+Just to check, do you hook that in your inb/outb/etc?
 
-Thanks
+Generally, it would seem nicer if we could have higher-level
+isa_{inb,outb,whatever} accessors that we could hook separately from
+other IO.
 
-Eric
-> 
->>
->> An iommu domain now owns a list of those.
->>
->> Signed-off-by: Eric Auger <eric.auger@redhat.com>
->>
->> ---
->> ---
->>  drivers/iommu/iommu.c |  2 ++
->>  include/linux/iommu.h | 17 +++++++++++++++++
->>  2 files changed, 19 insertions(+)
->>
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index 9a2f196..0af07492 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
->>  
->>  	domain->ops  = bus->iommu_ops;
->>  	domain->type = type;
->> +	INIT_LIST_HEAD(&domain->reserved_regions);
->> +	mutex_init(&domain->resv_mutex);
->>  	/* Assume all sizes by default; the driver may override this later */
->>  	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
->>  
->> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->> index 436dc21..0f2eb64 100644
->> --- a/include/linux/iommu.h
->> +++ b/include/linux/iommu.h
->> @@ -84,6 +84,8 @@ struct iommu_domain {
->>  	void *handler_token;
->>  	struct iommu_domain_geometry geometry;
->>  	void *iova_cookie;
->> +	struct list_head reserved_regions;
->> +	struct mutex resv_mutex; /* protects the reserved region list */
->>  };
->>  
->>  enum iommu_cap {
->> @@ -131,6 +133,21 @@ struct iommu_dm_region {
->>  	int			prot;
->>  };
->>  
->> +/**
->> + * struct iommu_reserved_region - descriptor for a reserved iova region
->> + * @list: Linked list pointers
->> + * @start: IOVA base address of the region
->> + * @length: Length of the region in bytes
->> + */
->> +struct iommu_reserved_region {
->> +	struct list_head	list;
->> +	dma_addr_t		start;
->> +	size_t			length;
->> +};
-> 
-> Looking at this in context with the dm_region above, though, I come to
-> the surprising realisation that these *are* dm_regions, even at the
-> fundamental level - on the one hand you've got physical addresses which
-> can't be remapped (because something is already using them), while on
-> the other you've got physical addresses which can't be remapped (because
-> the IOMMU is incapable). In fact for reserved regions *other* than our
-> faked-up MSI region there's no harm if the IOMMU were to actually
-> identity-map them.
-> 
-> Let's just add this to the existing infrastructure, either with some
-> kind of IOMMU_NOMAP flag or simply prot = 0. That way it automatically
-> gets shared between the VFIO and DMA cases for free!
-> 
-> Robin.
-> 
->> +
->> +#define iommu_reserved_region_for_each(resv, d) \
->> +	list_for_each_entry(resv, &(d)->reserved_regions, list)
->> +
->>  #ifdef CONFIG_IOMMU_API
->>  
->>  /**
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+We don't necessarily have to move all ISA drivers over to that if we had
+a separate symbol for that interface.
+
+Thanks,
+Mark.
