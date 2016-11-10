@@ -1,74 +1,54 @@
-From: wulf@rock-chips.com (wlf)
-Date: Thu, 10 Nov 2016 10:54:49 +0800
-Subject: [PATCH] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
-References: <1478523658-9400-1-git-send-email-wulf@rock-chips.com>
- <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
-Message-ID: <9eeb3d84-f850-4b76-ce6a-67cc92d6de3b@rock-chips.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Thu, 10 Nov 2016 13:49:05 +1030
+Subject: [PATCH v2 2/6] mfd: dt: Add bindings for the Aspeed SoC Display
+ Controller (GFX)
+In-Reply-To: <20161109182630.tg3puvwurgx6iinw@rob-hp-laptop>
+References: <1478097481-14895-1-git-send-email-andrew@aj.id.au>
+ <1478097481-14895-3-git-send-email-andrew@aj.id.au>
+ <20161109182630.tg3puvwurgx6iinw@rob-hp-laptop>
+Message-ID: <CACPK8XeG2WnpNuHUf9VD+mZenWboq-4wei=LOkN4qVR72QbGXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-? 2016?11?10? 04:54, Doug Anderson ??:
-> Hi,
->
-> On Mon, Nov 7, 2016 at 5:00 AM, William Wu <wulf@rock-chips.com> wrote:
->> We found that the system crashed due to 480MHz output clock of
->> USB2 PHY was unstable after clock had been enabled by gpu module.
+On Thu, Nov 10, 2016 at 4:56 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Nov 03, 2016 at 01:07:57AM +1030, Andrew Jeffery wrote:
+>> The Aspeed SoC Display Controller is presented as a syscon device to
+>> arbitrate access by display and pinmux drivers. Video pinmux
+>> configuration on fifth generation SoCs depends on bits in both the
+>> System Control Unit and the Display Controller.
 >>
->> Theoretically, 1 millisecond is a critical value for 480MHz
->> output clock stable time, so we try to change the delay time
->> to 1.2 millisecond to avoid this issue.
->>
->> Signed-off-by: William Wu <wulf@rock-chips.com>
+>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
 >> ---
->>   drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
->> index ecfd7d1..8f2d2b6 100644
->> --- a/drivers/phy/phy-rockchip-inno-usb2.c
->> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
->> @@ -267,7 +267,7 @@ static int rockchip_usb2phy_clk480m_enable(struct clk_hw *hw)
->>                          return ret;
->>
->>                  /* waitting for the clk become stable */
->> -               mdelay(1);
->> +               udelay(1200);
-> Several people who have seen this patch have expressed concern that a
-> 1.2 ms delay is pretty long for something that's supposed to be
-> "atomic" like a clk_enable().  Consider that someone might call
-> clk_enable() while interrupts are disabled and that a 1.2 ms interrupt
-> latency is not so great.
+>>  Documentation/devicetree/bindings/mfd/aspeed-gfx.txt | 17 +++++++++++++++++
 >
-> It seems like this clock should be moved to be enabled in "prepare"
-> and the "enable" should be a no-op.  This is a functionality change,
-> but I don't think there are any real users for this clock at the
-> moment so it should be fine.
->
-> (of course, the 1 ms latency that existed before this patch was still
-> pretty bad, but ...)
-Thanks a lot for your suggestion.
-I agree with you.  clk_enable() will call spin_lock_irqsave() to disable 
-interrupt, and we add
-more than 1ms in clk_enable may cause big latency.
+> The register space can't be split to 2 nodes?
 
-And according to clk_prepare() description:
-  In a simple case, clk_prepare can be used instead of clk_enable to 
-ungate a clk if the
-  operation may sleep.  One example is a clk which is accessed over I2c.
+Do you mean splitting the GFX IP and enable register into two nodes?
 
-So maybe we can remove the clock to clk_prepare.
+We can't. Pinmux needs to check bit 6 and 7 in GFX064, which is in the
+middle the IP block:
 
-Hi Heiko, Frank,
-        What  do you think of it?
+GFX060: CRT Control Register I
+GFX064: CRT Control Register II
+GFX068: CRT Status Register
+GFX06C: CRT Misc Setting Register
 
-Best regards,
-         wulf
+>> +The Aspeed SoC Display Controller primarily does as its name suggests, but also
+>> +participates in pinmux requests on the g5 SoCs. It is therefore considered a
+>> +syscon device.
+>> +
+>> +Required properties:
+>> +- compatible:                "aspeed,ast2500-gfx", "syscon"
 >
-> -Doug
->
->
->
+> I think perhaps we should drop the syscon here and the driver should
+> just register as a syscon.
+
+We want the regmap to be present whenever the GFX driver or pinmux is
+loaded. If we register it in pinmux but chose to not build in that
+driver, we lack the regmap. Same for the case where a user builds in
+the GFX driver and not pinmux. I think this means we want the syscon
+compatible string, unless my understanding is wrong?
+
+Cheers,
+
+Joel
