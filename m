@@ -1,57 +1,43 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Fri, 11 Nov 2016 06:32:33 +1100
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <20161110112224.GB4418@leverpostej>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108120323.GC15297@leverpostej>
- <1478647002.7430.69.camel@kernel.crashing.org>
- <20161110112224.GB4418@leverpostej>
-Message-ID: <1478806353.7430.137.camel@kernel.crashing.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 10 Nov 2016 19:46:59 +0000
+Subject: [PATCH v4 1/5] arm64: perf: Basic uncore counter support for
+ Cavium ThunderX SOC
+In-Reply-To: <20161110165405.GH4418@leverpostej>
+References: <cover.1477741719.git.jglauber@cavium.com>
+ <73173d6ad2430eead5e9da40564a90a60961b6d9.1477741719.git.jglauber@cavium.com>
+ <20161110165405.GH4418@leverpostej>
+Message-ID: <20161110194659.GD17134@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-11-10 at 11:22 +0000, Mark Rutland wrote:
-> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
-> > firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
+On Thu, Nov 10, 2016 at 04:54:06PM +0000, Mark Rutland wrote:
+> On Sat, Oct 29, 2016 at 01:55:29PM +0200, Jan Glauber wrote:
+> > diff --git a/drivers/perf/uncore/uncore_cavium.c b/drivers/perf/uncore/uncore_cavium.c
+> > new file mode 100644
+> > index 0000000..a7b4277
+> > --- /dev/null
+> > +++ b/drivers/perf/uncore/uncore_cavium.c
+> > + * Some notes about the various counters supported by this "uncore" PMU
+> > + * and the design:
+> > + *
+> > + * All counters are 64 bit long.
+> > + * There are no overflow interrupts.
+> > + * Counters are summarized per node/socket.
+> > + * Most devices appear as separate PCI devices per socket with the exception
+> > + * of OCX TLK which appears as one PCI device per socket and contains several
+> > + * units with counters that are merged.
 > 
-> Just to check, do you hook that in your inb/outb/etc?
+> As a general note, as I commented on the QC L2 PMU driver [1,2], we need
+> to figure out if we should be aggregating physical PMUs or not.
+> 
+> Judging by subsequent patches, each unit has individual counters and
+> controls, and thus we cannot atomically read/write counters or controls
+> across them. As such, I do not think we should aggregate them, and
+> should expose them separately to userspace.
 
-Yes.
+I thought each unit was registered as a separate PMU to perf? Or are you
+specifically commenting on the OCX TLK? The comment there suggests that
+the units cannot be individually enabled/disabled and, without docs, I
+trust that's the case.
 
-> Generally, it would seem nicer if we could have higher-level
-> isa_{inb,outb,whatever} accessors that we could hook separately from
-> other IO.
-
-Maybe but generally speaking, we don't discriminate accessors per bus,
-ie, readl etc... work on all memory mapped busses, inb... works on all
-busses with an "IO space", at least that's been the idea. It probably
-all comes from the fact that PCI IO and ISA are the same space on
-x86 and most other platforms (not all).
-
-> We don't necessarily have to move all ISA drivers over to that if we had
-> a separate symbol for that interface.
-
-What I do on ppc today is that I have a chunk of virtual address space
-that is reserved for "IO space". The first 64k are "reserved" in that
-they route to "the primary" ISA bus (for legacy crap that uses hard
-coded addresses, though I use that for my LPC bus too). I "allocate"
-space for the PCI IO spaces higher in that space. Was I to support more
-LPC busses I could allocate them up there too.
-
-The IO resource of a given device thus becomes the actual IO port plus
-the offset of the base of the segment it's in.
-
-For memory mapped IO, inb/outb will just add the virtual address of
-the base of all IO space to that. The hooking mechanism will pickup
-the stuff that isn't memory mapped.
-
-It's a bit messy but then IO space performance has never been a huge
-worry since IO cycles tend to be very slow to begin with.
-
-Note: We also have the ISA memory and ISA FW spaces that we don't have
-good accessors for. They somewhat exist (I think the fbdev layer uses
-some for vga) but it's messy.
-
-Cheers,
-Ben.
+Will
