@@ -1,24 +1,39 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 10 Nov 2016 18:28:25 +0100
-Subject: [PATCH 1/5] iommu: Allow taking a reference on a group directly
-In-Reply-To: <20161109180059.GJ17771@arm.com>
-References: <3922e1f14d8ecb50440b2d9b0d1123f3c9307fc5.1478695557.git.robin.murphy@arm.com>
- <20161109172543.GI17771@arm.com>
- <8b35afe8-7e09-c2d3-91ae-5d2a10da6fc8@arm.com>
- <20161109180059.GJ17771@arm.com>
-Message-ID: <20161110172824.GM2078@8bytes.org>
+From: ahaslam@baylibre.com (Axel Haslam)
+Date: Thu, 10 Nov 2016 18:28:42 +0100
+Subject: [PATCH v3 00/10] Add DT support for ohci-da8xx
+In-Reply-To: <20161110120253.GA5385@kroah.com>
+References: <20161107203948.28324-1-ahaslam@baylibre.com>
+ <CAKXjFTN04Wz5jsaHsyvDD7G8QqXQvCE4D-YbHtGT=jUqELiS_w@mail.gmail.com>
+ <20161110120253.GA5385@kroah.com>
+Message-ID: <CAKXjFTMGPsZxSWmX0_+n=9dGX5J=QdxeWQDEXHzC70bOT_4uwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 06:00:59PM +0000, Will Deacon wrote:
-> I'd still rather the new function was renamed. We already have the group,
-> so calling a weird underscore version of iommu_group_get is really
-> counter-intuitive.
-> 
-> Joerg -- do you have a preference?
+On Thu, Nov 10, 2016 at 1:02 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Tue, Nov 08, 2016 at 05:37:41PM +0100, Axel Haslam wrote:
+>> Hi,
+>>
+>> On Mon, Nov 7, 2016 at 9:39 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
+>> > The purpose of this patch series is to add DT support for the davinci
+>> > ohci driver.
+>> >
+>>
+>> To make it easier to review. I will split the arch/arm and driver
+>> patches into separate series.
+>
+> I don't think it's easier, as now I have no idea what order, or what
+> tree it should go through :(
 
-iommu_group_ref_get sound best to me. Unfortunatly C has no function
-overloading ;)
+Hi Greg,
 
+i will resend the series one by one and wait for each to be merged
+before sending the next, so that there is no confusion on the ordering
+or on what tree they should apply.
 
-	Joerg
+Regards
+Axel.
+
+>
+> I'm guessing not mine, so all are now deleted from my patch queue...
+>
+> greg k-h
