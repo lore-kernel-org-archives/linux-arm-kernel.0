@@ -1,60 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Nov 2016 17:07:21 +0100
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F8F5D75@lhreml507-mbx>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <17821285.aIcTyCGn5n@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F5D75@lhreml507-mbx>
-Message-ID: <10334260.ztLXZ2Oynd@wuerfel>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 10 Nov 2016 17:13:31 +0100
+Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
+ callback
+In-Reply-To: <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
+ <20161110154606.GH2078@8bytes.org>
+ <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+Message-ID: <20161110161331.GJ2078@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 10, 2016 3:36:49 PM CET Gabriele Paoloni wrote:
-> 
-> Where should we get the range from? For LPC we know that it is going
-> Work on anything that is not used by PCI I/O space, and this is 
-> why we use [0, PCIBIOS_MIN_IO]
+On Thu, Nov 10, 2016 at 04:57:51PM +0100, Auger Eric wrote:
+> It does not only serve the purpose to register the MSI IOVA region. We
+> also need to allocate an iova_domain where MSI IOVAs will be allocated
+> upon the request of the relevant MSI controllers. Do you mean you don't
+> like to use the iova allocator for this purpose?
 
-It should be allocated the same way we allocate PCI config space
-segments. This is currently done with the io_range list in
-drivers/pci/pci.c, which isn't perfect but could be extended
-if necessary. Based on what others commented here, I'd rather
-make the differences between ISA/LPC and PCI I/O ranges smaller
-than larger.
+Yes, it looks like the only purpose of iommu_get_dma_msi_region_cookie()
+is to get the msi-region information into into the reserved-list.
 
-> > Your current version has
-> > 
-> >         if (arm64_extio_ops->pfout)                             \
-> >                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> >                        addr, value, sizeof(type));             \
-> > 
-> > Instead, just subtract the start of the range from the logical
-> > port number to transform it back into a bus-local port number:
-> 
-> These accessors do not operate on IO tokens:
-> 
-> If (arm64_extio_ops->start > addr || arm64_extio_ops->end < addr)
-> addr is not going to be an I/O token; in fact patch 2/3 imposes that
-> the I/O tokens will start at PCIBIOS_MIN_IO. So from 0 to PCIBIOS_MIN_IO
-> we have free physical addresses that the accessors can operate on.
+Why do you need to 'allocate' the MSI region after all? Except for
+IOMMU_DOMAIN_DMA domains the iommu-core code does not care about address
+allocation. This is up to the users of the domain, which includes that
+the user has to take care of the MSI region.
 
-Ah, I missed that part. I'd rather not use PCIBIOS_MIN_IO to refer to
-the logical I/O tokens, the purpose of that macro is really meant
-for allocating PCI I/O port numbers within the address space of
-one bus.
+Besides that, 'iommu_get_dma_msi_region_cookie' is a terrible function
+name and does not describe at all what the function does or is supposed
+to do.
 
-Note that it's equally likely that whichever next platform needs
-non-mapped I/O access like this actually needs them for PCI I/O space,
-and that will use it on addresses registered to a PCI host bridge.
 
-If we separate the two steps:
-
-a) assign a range of logical I/O port numbers to a bus
-b) register a set of helpers for redirecting logical I/O
-   port to a helper function
-
-then I think the code will get cleaner and more flexible.
-It should actually then be able to replace the powerpc
-specific implementation.
-
-	Arnd
+	Joerg
