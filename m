@@ -1,27 +1,48 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 10 Nov 2016 14:35:59 +0100
-Subject: [PATCH 0/2] mmc: allow mmc_alloc_host() and tmio_mmc_host_alloc()
-In-Reply-To: <1478784263-18777-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1478784263-18777-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20161110133559.GA10191@kroah.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Nov 2016 13:37:30 +0000
+Subject: [PATCH] arm64: dts: Add ARM PMU node for exynos7
+In-Reply-To: <1478748643-3081-1-git-send-email-alim.akhtar@samsung.com>
+References: <1478748643-3081-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <4922ada9-2eb2-f0cf-e4b1-a74f4397f97c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 10:24:21PM +0900, Masahiro Yamada wrote:
+Hi Alim,
+
+On 10/11/16 03:30, Alim Akhtar wrote:
+> This patch adds ARM Performance Monitor Unit dt node for exynos7.
+> PMU provides various statistics on the operation of the CPU and
+> memory system at runtime, which are very useful when debugging or
+> profiling code. This enables the same.
 > 
-> sdhci_alloc_host() returns an error pointer when it fails.
-> but mmc_alloc_host() cannot.
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi |    8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> This series allow to propagate a proper error code
-> when host-allocation fails.
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> index e0d0d01..53ce4be 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> @@ -472,6 +472,14 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		arm-pmu {
+> +			compatible = "arm,cortex-a57-pmu", "arm,armv8-pmuv3";
+> +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
 
-Why?  What can we really do about the error except give up?  Why does
-having a explicit error value make any difference to the caller, they
-can't do anything different, right?
+Per Documentation/devicetree/bindings/arm/pmu.txt there should also be
+an "interrupt-affinity" property describing which SPI belongs to which core.
 
-I suggest just leaving it as-is, it's simple, and you don't have to mess
-with PTR_ERR() anywhere.
+Robin.
 
-thanks,
-
-greg k-h
+> +		};
+> +
+>  		timer {
+>  			compatible = "arm,armv8-timer";
+>  			interrupts = <GIC_PPI 13
+> 
