@@ -1,67 +1,98 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 10 Nov 2016 19:00:52 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161110161331.GJ2078@8bytes.org>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
- <20161110161331.GJ2078@8bytes.org>
-Message-ID: <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+From: wei@redhat.com (Wei Huang)
+Date: Thu, 10 Nov 2016 12:09:41 -0600
+Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions to
+ asm/perf_event.h
+In-Reply-To: <20161110171732.GA17134@arm.com>
+References: <1478721480-24852-1-git-send-email-wei@redhat.com>
+ <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
+ <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
+ <733f067d-7f3b-df28-eab7-a15abba947fc@arm.com>
+ <20161110171732.GA17134@arm.com>
+Message-ID: <21d9733a-94de-b16d-9bff-583497297a61@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
 
-On 10/11/2016 17:13, Joerg Roedel wrote:
-> On Thu, Nov 10, 2016 at 04:57:51PM +0100, Auger Eric wrote:
->> It does not only serve the purpose to register the MSI IOVA region. We
->> also need to allocate an iova_domain where MSI IOVAs will be allocated
->> upon the request of the relevant MSI controllers. Do you mean you don't
->> like to use the iova allocator for this purpose?
+
+On 11/10/2016 11:17 AM, Will Deacon wrote:
+> On Thu, Nov 10, 2016 at 03:32:12PM +0000, Marc Zyngier wrote:
+>> On 10/11/16 15:12, Wei Huang wrote:
+>>>
+>>>
+>>> On 11/10/2016 03:10 AM, Marc Zyngier wrote:
+>>>> Hi Wei,
+>>>>
+>>>> On 09/11/16 19:57, Wei Huang wrote:
+>>>>> This patch moves ARMv8-related perf event definitions from perf_event.c
+>>>>> to asm/perf_event.h; so KVM code can use them directly. This also help
+>>>>> remove a duplicated definition of SW_INCR in perf_event.h.
+>>>>>
+>>>>> Signed-off-by: Wei Huang <wei@redhat.com>
+>>>>> ---
+>>>>>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
+>>>>>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
+>>>>>  2 files changed, 160 insertions(+), 162 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
+>>>>> index 2065f46..6c7b18b 100644
+>>>>> --- a/arch/arm64/include/asm/perf_event.h
+>>>>> +++ b/arch/arm64/include/asm/perf_event.h
+>>>>> @@ -46,7 +46,166 @@
+>>>>>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
+>>>>>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
+>>>>>  
+>>>>> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
+>>>>> +/*
+>>>>> + * ARMv8 PMUv3 Performance Events handling code.
+>>>>> + * Common event types.
+>>>>> + */
+>>>>> +
+>>>>> +/* Required events. */
+>>>>> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
+>>>>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
+>>>>> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
+>>>>> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
+>>>>> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
+>>>>> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
+>>>>
+>>>> In my initial review, I asked for the "required" events to be moved to a
+>>>> shared location. What's the rational for moving absolutely everything?
+>>>
+>>> I did notice the phrase "required" in the original email. However I
+>>> think it is weird to have two places for a same set of PMU definitions.
+>>> Other developers might think these two are missing if they don't search
+>>> kernel files carefully.
+>>>
+>>> If Will Deacon and you insist, I can move only two defs to perf_event.h,
+>>> consolidated with the 2nd patch into a single one.
+>>
+>> My personal feeling is that only architected events should be in a
+>> public header. The CPU-specific ones are probably better kept private,
+>> as it is doubtful that other users would appear).
+>>
+>> I'll leave it up to Will to decide, as all I want to avoid is the
+>> duplication of constants between the PMU and KVM code bases.
 > 
-> Yes, it looks like the only purpose of iommu_get_dma_msi_region_cookie()
-> is to get the msi-region information into into the reserved-list.
+> Yeah, just take the sets that you need (i.e. the architected events).
+
+Hi Will,
+
+Just to clarify what "architected" means:
+
+We need two for KVM: SW_INCR (architectural) and CPU_CYCLES
+(micro-architectural). Looking at perf_event.c file, I can either
+relocate the  "Required events" (6 events) or the whole set of
+ARMV8_PMUV3_PERFCTR_* (~50 events) to perf_event.h. Which way you prefer?
+
+Thanks,
+-Wei
+
 > 
-> Why do you need to 'allocate' the MSI region after all? Except for
-> IOMMU_DOMAIN_DMA domains the iommu-core code does not care about address
-> allocation. This is up to the users of the domain, which includes that
-> the user has to take care of the MSI region.
-The purpose is to reuse the transparent MSI IOVA allocation scheme
-introduced by Robin in [PATCH v7 00/22] Generic DT bindings for PCI
-IOMMUs and ARM SMMU (commit 44bb7e243bd4b4e5c79de2452cd9762582f58925).
-
-GICv2m and GICV3 ITS use dma-mapping iommu_dma_map_msi_msg to allocate
-an MSI IOVA on-demand. This relies on the existence of an allocated
-iova_domain whose handle is stored in domain->iova_cookie.
-
-the iommu_dma_init_domain could be done in VFIO instead of in the
-IOMMU-code, on the basis of dm region info. But we would need to
-differentiate the MSI window from P2P windows.
-
-msi-region start/length are arbitrarily chosen and the setup of the
-reserved region list does not depend on iommu_get_dma_msi_region_cookie;
-but maybe I completely misunderstand your question.
-
-
-> Besides that, 'iommu_get_dma_msi_region_cookie' is a terrible function
-> name and does not describe at all what the function does or is supposed
-> to do.
-Yes this was discussed with Alex& Robin already
-(https://patchwork.kernel.org/patch/9363989/). I proposed to rename into
-iommu_setup_dma_msi_region but this was not validated.
-
-Thanks
-
-Eric
+> Also, check that it builds.
 > 
-> 
-> 	Joerg
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Will
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
