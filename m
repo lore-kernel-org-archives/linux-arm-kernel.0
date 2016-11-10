@@ -1,76 +1,74 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Nov 2016 10:26:04 +0100
-Subject: [v16, 0/7] Fix eSDHC host version register bug
-In-Reply-To: <CAPDyKFrcAN_pqgtGaUanfB2zh97zGcL23m5VDtJ3g==NJeRrfA@mail.gmail.com>
-References: <1478661252-42439-1-git-send-email-yangbo.lu@nxp.com>
- <CAPDyKFrcAN_pqgtGaUanfB2zh97zGcL23m5VDtJ3g==NJeRrfA@mail.gmail.com>
-Message-ID: <CAMuHMdVH0-3qbZiOHnSY8BtWaFESC6poyD-Z6H-wfaSvyd4k+g@mail.gmail.com>
+From: nathan@nathanrossi.com (Nathan Rossi)
+Date: Thu, 10 Nov 2016 19:33:38 +1000
+Subject: [PATCH] ARM: zynq: Reserve correct amount of non-DMA RAM
+In-Reply-To: <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
+References: <20161031162617.10565-1-kyle.roeschley@ni.com>
+ <CAHTX3d+8kBYQwcUUcL1Z71Geij4EU3pjcv29=r8ndqSLW8iZDw@mail.gmail.com>
+Message-ID: <CA+aJhH11ty3xWQ5-CLCrPA5xH-dr_nVb8JCKZEvgJcm6Ha3xaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 10 November 2016 at 18:41, Michal Simek <monstr@monstr.eu> wrote:
+> + Nathan
+>
+> 2016-10-31 17:26 GMT+01:00 Kyle Roeschley <kyle.roeschley@ni.com>:
+>>
+>> On Zynq, we haven't been reserving the correct amount of DMA-incapable
+>> RAM to keep DMA away from it (per the Zynq TRM Section 4.1, it should be
+>> the first 512k). In older kernels, this was masked by the
+>> memblock_reserve call in arm_memblock_init(). Now, reserve the correct
+>> amount excplicitly rather than relying on swapper_pg_dir, which is an
+>> address and not a size anyway.
+>>
+>> Fixes: 46f5b96 ("ARM: zynq: Reserve not DMAable space in front of the
+>> kernel")
+>>
+>> Signed-off-by: Kyle Roeschley <kyle.roeschley@ni.com>
 
-On Wed, Nov 9, 2016 at 7:27 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 9 November 2016 at 04:14, Yangbo Lu <yangbo.lu@nxp.com> wrote:
->> This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
->> eSDHC controller. To match the SoC version and revision, 15 previous version
->> patchsets had tried many methods but all of them were rejected by reviewers.
->> Such as
->>         - dts compatible method
->>         - syscon method
->>         - ifdef PPC method
->>         - GUTS driver getting SVR method
->> Anrd suggested a soc_device_match method in v10, and this is the only available
->> method left now. This v11 patchset introduces the soc_device_match interface in
->> soc driver.
->>
->> The first four patches of Yangbo are to add the GUTS driver. This is used to
->> register a soc device which contain soc version and revision information.
->> The other three patches introduce the soc_device_match method in soc driver
->> and apply it on esdhc driver to fix this bug.
->>
+Tested-by: Nathan Rossi <nathan@nathanrossi.com>
+
+For reference this causes problems with DEBUG_RODATA (which changed to
+default yes for CPU_V7 in v4.6) due to padding memory between
+.head.text and .text, allowing memory below 0x80000 to be available
+for allocation as non-reserved memory.
+
+Regards,
+Nathan
+
 >> ---
->> Changes for v15:
->>         - Dropped patch 'dt: bindings: update Freescale DCFG compatible'
->>           since the work had been done by below patch on ShawnGuo's linux tree.
->>           'dt-bindings: fsl: add LS1043A/LS1046A/LS2080A compatible for SCFG
->>            and DCFG'
->>         - Fixed error code issue in guts driver
->> Changes for v16:
->>         - Dropped patch 'powerpc/fsl: move mpc85xx.h to include/linux/fsl'
->>         - Added a bug-fix patch from Geert
->> ---
+>> Found when migrating from 4.1 to 4.6.
 >>
->> Arnd Bergmann (1):
->>   base: soc: introduce soc_device_match() interface
+>>  arch/arm/mach-zynq/common.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> Geert Uytterhoeven (1):
->>   base: soc: Check for NULL SoC device attributes
-
-> Thanks, applied on my mmc tree for next!
-
-Oops, the above two commits (plus two more enhancements) are also a dependency
-for Samsung and Renesas. Hence the plan was to use an immutable branch for
-that...
-
-Ulf, would it still be possible to replace these two commits in mmc/next:
-
-    8b82c17a8ae533d6 base: soc: introduce soc_device_match() interface
-    6fa350172b098f0f base: soc: Check for NULL SoC device attributes
-
-by a merge of the immutable branch I've just created?
-Cfr, the other thread  "[PATCH v2 0/7] soc: renesas: Identify SoC and register
-with the SoC bus".
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>> index 6cefdb8..75885bc 100644
+>> --- a/arch/arm/mach-zynq/common.c
+>> +++ b/arch/arm/mach-zynq/common.c
+>> @@ -59,7 +59,7 @@ void __iomem *zynq_scu_base;
+>>  static void __init zynq_memory_init(void)
+>>  {
+>>         if (!__pa(PAGE_OFFSET))
+>> -               memblock_reserve(__pa(PAGE_OFFSET), __pa(swapper_pg_dir));
+>> +               memblock_reserve(__pa(PAGE_OFFSET), 0x80000);
+>>  }
+>>
+>>  static struct platform_device zynq_cpuidle_device = {
+>> --
+>> 2.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+>
+> --
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
