@@ -1,169 +1,97 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Thu, 10 Nov 2016 14:55:18 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <d2941e6f-d277-a68d-2837-00b628dd3be7@redhat.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <d2941e6f-d277-a68d-2837-00b628dd3be7@redhat.com>
-Message-ID: <7cc1ba55-1bd0-ae3f-5c9b-f16efb8dcc80@samsung.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 10 Nov 2016 13:57:33 +0000
+Subject: [PATCHv2] PCI: QDF2432 32 bit config space accessors
+In-Reply-To: <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
+References: <20160921173129.GA20006@localhost>
+ <20160921223805.21652-1-cov@codeaurora.org>
+ <20161031214833.GB14603@bhelgaas-glaptop.roam.corp.google.com>
+ <dbf40b73baa71155f39e13d6e51073aa@codeaurora.org>
+ <20161102160820.GA6568@bhelgaas-glaptop.roam.corp.google.com>
+ <aa37ca67-9909-e8f2-1a3e-b724cdb46c7b@codeaurora.org>
+ <20161109200635.GM14322@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu82+5oHMeSvcOL1VG4vw-kVnhq4LjCRtLMw4Nmn0rK2CA@mail.gmail.com>
+ <20161109224955.GO14322@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu9_sdcoN7rjQp-R=2vKY3rECt0BC3eWGpse32o2Q4LHXg@mail.gmail.com>
+Message-ID: <20161110135733.GA20403@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 10, 2016 at 06:25:16PM +0800, Ard Biesheuvel wrote:
+> On 10 November 2016 at 06:49, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > On Wed, Nov 09, 2016 at 08:29:23PM +0000, Ard Biesheuvel wrote:
+> >> Hi Bjorn,
+> >>
+> >> On 9 November 2016 at 20:06, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> >> > On Wed, Nov 09, 2016 at 02:25:56PM -0500, Christopher Covington wrote:
+> >> >> Hi Bjorn,
+> >> >>
+> >> [...]
+> >> >>
+> >> >> We're working to add the PNP0C02 resource to future firmware, but it's
+> >> >> not in the current firmware. Are dmesg and /proc/iomem from the
+> >> >> current firmware interesting or should we wait for the update to file?
+> >> >
+> >> > Note that the ECAM space is not the only thing that should be
+> >> > described via these PNP0C02 devices.  *All* non-enumerable resources
+> >> > should be described by the _CRS method of some ACPI device.  Here's a
+> >> > sample from my laptop:
+> >> >
+> >> >   PCI: MMCONFIG for domain 0000 [bus 00-3f] at [mem 0xf8000000-0xfbffffff] (base 0xf8000000)
+> >> >   system 00:01: [io  0x1800-0x189f] could not be reserved
+> >> >   system 00:01: [io  0x0800-0x087f] has been reserved
+> >> >   system 00:01: [io  0x0880-0x08ff] has been reserved
+> >> >   system 00:01: [io  0x0900-0x097f] has been reserved
+> >> >   system 00:01: [io  0x0980-0x09ff] has been reserved
+> >> >   system 00:01: [io  0x0a00-0x0a7f] has been reserved
+> >> >   system 00:01: [io  0x0a80-0x0aff] has been reserved
+> >> >   system 00:01: [io  0x0b00-0x0b7f] has been reserved
+> >> >   system 00:01: [io  0x0b80-0x0bff] has been reserved
+> >> >   system 00:01: [io  0x15e0-0x15ef] has been reserved
+> >> >   system 00:01: [io  0x1600-0x167f] has been reserved
+> >> >   system 00:01: [io  0x1640-0x165f] has been reserved
+> >> >   system 00:01: [mem 0xf8000000-0xfbffffff] could not be reserved
+> >> >   system 00:01: [mem 0xfed10000-0xfed13fff] has been reserved
+> >> >   system 00:01: [mem 0xfed18000-0xfed18fff] has been reserved
+> >> >   system 00:01: [mem 0xfed19000-0xfed19fff] has been reserved
+> >> >   system 00:01: [mem 0xfeb00000-0xfebfffff] has been reserved
+> >> >   system 00:01: [mem 0xfed20000-0xfed3ffff] has been reserved
+> >> >   system 00:01: [mem 0xfed90000-0xfed93fff] has been reserved
+> >> >   system 00:01: [mem 0xf7fe0000-0xf7ffffff] has been reserved
+> >> >   system 00:01: Plug and Play ACPI device, IDs PNP0c02 (active)
+> >> >
+> >> > Do you have firmware in the field that may not get updated?  If so,
+> >> > I'd like to see the whole solution for that firmware, including the
+> >> > MCFG quirk (which tells the PCI core where the ECAM region is) and
+> >> > whatever PNP0C02 quirk you figure out to actually reserve the region.
+> >> >
+> >> > I proposed a PNP0C02 quirk to Duc along these lines of the below.  I
+> >> > don't actually know if it's feasible, but it didn't look as bad as I
+> >> > expected, so I'd kind of like somebody to try it out.  I think you
+> >> > would have to call this via a DMI hook (do you have DMI on arm64?),
+> >> > maybe from pnp_init() or similar.
+> >>
+> >> We do have SMBIOS/DMI on arm64, but we have been successful so far not
+> >> to rely on it for quirks, and we'd very much like to keep it that way.
+> >>
+> >> Since this ACPI _CRS method has nothing to do with SMBIOS/DMI, surely
+> >> there is a better way to wire up the reservation code to the
+> >> information exposed by ACPI?
+> >
+> > I'm open to other ways, feel free to propose one :)
+> >
+> > If you do a quirk, you need some way to identify the machine/firmware
+> > combination, because you don't want to apply the quirk on every
+> > machine.  You're trying to work around a firmware issue, so you
+> > probably want something tied to the firmware version.  On x86, that's
+> > typically done with DMI.
+> >
+> 
+> I think I misunderstood the purpose of the example: that should only
+> be necessary if the _CRS methods are missing from the firmware, right?
+> If we update the firmware to cover all non-enumerable resources by
+> such a method, we shouldn't need any such quirks at all IIUC
 
-On 11/10/2016 02:04 PM, Hans de Goede wrote:
-> Hi,
->
-> On 10-11-16 13:56, Jacek Anaszewski wrote:
->> Hi,
->>
->> On 11/10/2016 09:49 AM, Hans de Goede wrote:
->>> Hi,
->>>
->>> On 09-11-16 21:45, Jacek Anaszewski wrote:
->>>> Hi Tony,
->>>>
->>>> On 11/09/2016 08:23 PM, Tony Lindgren wrote:
->>>>> Hi,
->>>>>
->>>>> Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
->>>>> the sysfs brightness attr for changes.") breaks runtime PM for me.
->>>>>
->>>>> On my omap dm3730 based test system, idle power consumption is over 70
->>>>> times higher now with this patch! It goes from about 6mW for the core
->>>>> system to over 440mW during idle meaning there's some busy timer now
->>>>> active.
->>>>>
->>>>> Reverting this patch fixes the issue. Any ideas?
->>>>
->>>> Thanks for the report. This is probably caused by
->>>> sysfs_notify_dirent().
->>>> I'm afraid that we can't keep this feature in the current shape.
->>>> Hans, I'm dropping the patch. We probably will have to delegate this
->>>> call to a workqueue task. Think about use cases when the LED is blinked
->>>> with high frequency e.g. from ledtrig-disk.c.
->>>
->>> sysfs_notify_dirent() already uses a workqueue, here is the actual
->>> implementation of it (from fs/kernfs/file.c) :
->>>
->>> void kernfs_notify(struct kernfs_node *kn)
->>> {
->>>         static DECLARE_WORK(kernfs_notify_work, kernfs_notify_workfn);
->>>         unsigned long flags;
->>>
->>>         if (WARN_ON(kernfs_type(kn) != KERNFS_FILE))
->>>                 return;
->>>
->>>         spin_lock_irqsave(&kernfs_notify_lock, flags);
->>>         if (!kn->attr.notify_next) {
->>>                 kernfs_get(kn);
->>>                 kn->attr.notify_next = kernfs_notify_list;
->>>                 kernfs_notify_list = kn;
->>>                 schedule_work(&kernfs_notify_work);
->>>         }
->>>         spin_unlock_irqrestore(&kernfs_notify_lock, flags);
->>> }
->>
->> Indeed. As a next step of this investigation Tony could disable
->> particular calls made in kernfs_notify_workfn to check what
->> exactly causes excessive power consumption.
->>
->>> So using a workqueue is not going to help. Note that I already
->>> feared this, which is why my initial implementation only called
->>> sysfs_notify_dirent() for user initiated changes and not for
->>> triggers / blinking.
->>
->> AFAIR there were no calls to led_notify_brightness_change() in
->> the initial implementation and it was entirely predestined for
->> being called by LED class drivers on brightness changes made
->> by firmware.
->>
->>> I think we may need to reconsider what getting the brightness
->>> sysfs atrribute actually returns. Currently when a LED is
->>> blinking it will return 0 resp. the actual brightness depending
->>> on when in the blink cycle the user reads the brightness
->>> sysfs atrribute.
->>>
->>> So a user can do "echo 128 > brightness && cat brightness" and
->>> get out 0, or 128, depending purely on timing.
->>>
->>> This seems to contradict what Documentation/ABI/testing/sysfs-class-led
->>> has to say:
->>>
->>> What:           /sys/class/leds/<led>/brightness
->>> Date:           March 2006
->>> KernelVersion:  2.6.17
->>> Contact:        Richard Purdie <rpurdie@rpsys.net>
->>> Description:
->>>                 Set the brightness of the LED. Most LEDs don't
->>>                 have hardware brightness support, so will just be turned
->>> on for
->>>                 non-zero brightness settings. The value is between 0 and
->>>                 /sys/class/leds/<led>/max_brightness.
->>>
->>>                 Writing 0 to this file clears active trigger.
->>>
->>>                 Writing non-zero to this file while trigger is active
->>> changes the
->>>                 top brightness trigger is going to use.
->>>
->>> Even though it only talks about writing, the logical thing would be for
->>> reading to be the exact opposite of writing, so we would get:
->>>
->>>                 Reading from this file while a trigger is active returns
->>> the
->>>                 top brightness trigger is going to use.
->>>
->>> The current docs say not about (sw) blinking, but that should be treated
->>> just
->>> like a trigger IMHO.
->>
->> You'r right, we should describe the semantics on reading, but it would
->> have to be as follows:
->>
->> Reading from this file returns LED brightness at given moment, i.e.
->> even though LED class device brightness setting is greater than 0, the
->> momentary brightness can be 0 if the readout occurred during low phase
->> of blink cycle.
->
-> Why would it need to read like this, because this is the current behavior ?
+Yes that's correct you need a quirk to fabricate a PNP0c02 motherboard
+resource if it is not present in FW.
 
-We have led_update_brightness() which was introduced long time ago and
-is used in brightness_show(). Note that if LED controller changed
-actual LED brightness e.g. due to battery voltage dropping below
-certain threshold, we wouldn't be able to find it out otherwise
-(except if we added separate sysfs file for that).
-
->
-> I doubt anyone is relying on this current behavior because it is really
-> unpredictable which value one can get.
->
-> I believe it would be better to change the read semantics to follow
-> the write semantics, this would be much more consistent.
->
-> Making the read behavior match the write behavior should be easy I would
-> be happy to write a patch for this.
-
-Let's better agree on the description of the current semantics.
-It has been around for a long time.
-
->>> If we can get consensus on what the read behavior for the brightness
->>> attribute
->>> should be, then I think that a better poll() behavior will automatically
->>> follow
->>> from that.
->>
->> It seems that we should get back to your initial approach. i.e. only
->> brightness changes caused by hardware should be reported.
->
-> Ok, if you really want to keep the read behavior as is, I can provide
-> an updated patch for this.
-
-Yes please.
-
--- 
-Best regards,
-Jacek Anaszewski
+Lorenzo
