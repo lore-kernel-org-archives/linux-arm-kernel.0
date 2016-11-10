@@ -1,47 +1,74 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 10 Nov 2016 13:19:51 +1030
-Subject: [PATCH 1/3] ipmi/bt-bmc: change compatible node to 'aspeed,
- ast2400-ibt-bmc'
-In-Reply-To: <2278270.0oJqDfoDd9@wuerfel>
-References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <a886778e-a85e-758e-3a61-c4909652e39d@kaod.org>
- <c749ff0a-bc71-bc9f-0e8c-326db2cea0fb@acm.org>
- <2278270.0oJqDfoDd9@wuerfel>
-Message-ID: <CACPK8Xd+EcefOs7ZCNPSOUV67TQA0X8NQMZfjZvm3TWYiFqTdg@mail.gmail.com>
+From: wulf@rock-chips.com (wlf)
+Date: Thu, 10 Nov 2016 10:54:49 +0800
+Subject: [PATCH] phy: rockchip-inno-usb2: correct 480MHz output clock
+ stable time
+In-Reply-To: <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
+References: <1478523658-9400-1-git-send-email-wulf@rock-chips.com>
+ <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
+Message-ID: <9eeb3d84-f850-4b76-ce6a-67cc92d6de3b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 2:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday, November 8, 2016 12:15:57 PM CET Corey Minyard wrote:
->> On 11/08/2016 09:52 AM, C?dric Le Goater wrote:
->> > O
->> snip
->>
->> >>>> While we're modifying the binding, should we add a compat string for
->> >>>> the ast2500?
->> >>> Well, if the change in this patch is fine for all, may be we can add
->> >>> the ast2500 compat string in a followup patch ?
->> >> Sounds good to me.
->> > OK. So, how do we proceed with this patch ? Who would include it in its
->> > tree ?
->>
->> I don't have anything for 4.9 at the moment.  Arnd, if you have
->> something, can
->> you take this?  Otherwise I will.
->>
->> And I guess I should add:
->>
->> Acked-by: Corey Minyard <cminyard@mvista.com>
+Hi Doug,
+
+? 2016?11?10? 04:54, Doug Anderson ??:
+> Hi,
 >
-> Thanks, I've added it to my todo folder.
+> On Mon, Nov 7, 2016 at 5:00 AM, William Wu <wulf@rock-chips.com> wrote:
+>> We found that the system crashed due to 480MHz output clock of
+>> USB2 PHY was unstable after clock had been enabled by gpu module.
+>>
+>> Theoretically, 1 millisecond is a critical value for 480MHz
+>> output clock stable time, so we try to change the delay time
+>> to 1.2 millisecond to avoid this issue.
+>>
+>> Signed-off-by: William Wu <wulf@rock-chips.com>
+>> ---
+>>   drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
+>> index ecfd7d1..8f2d2b6 100644
+>> --- a/drivers/phy/phy-rockchip-inno-usb2.c
+>> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
+>> @@ -267,7 +267,7 @@ static int rockchip_usb2phy_clk480m_enable(struct clk_hw *hw)
+>>                          return ret;
+>>
+>>                  /* waitting for the clk become stable */
+>> -               mdelay(1);
+>> +               udelay(1200);
+> Several people who have seen this patch have expressed concern that a
+> 1.2 ms delay is pretty long for something that's supposed to be
+> "atomic" like a clk_enable().  Consider that someone might call
+> clk_enable() while interrupts are disabled and that a 1.2 ms interrupt
+> latency is not so great.
 >
-> Olof, if you do fixes before I do, please pick up this patch with
-> Corey's Ack.
+> It seems like this clock should be moved to be enabled in "prepare"
+> and the "enable" should be a no-op.  This is a functionality change,
+> but I don't think there are any real users for this clock at the
+> moment so it should be fine.
+>
+> (of course, the 1 ms latency that existed before this patch was still
+> pretty bad, but ...)
+Thanks a lot for your suggestion.
+I agree with you.  clk_enable() will call spin_lock_irqsave() to disable 
+interrupt, and we add
+more than 1ms in clk_enable may cause big latency.
 
-Thank you!
+And according to clk_prepare() description:
+  In a simple case, clk_prepare can be used instead of clk_enable to 
+ungate a clk if the
+  operation may sleep.  One example is a clk which is accessed over I2c.
 
-Acked-by: Joel Stanley <joel@jms.id.au>
+So maybe we can remove the clock to clk_prepare.
 
-Cheers,
+Hi Heiko, Frank,
+        What  do you think of it?
 
-Joel
+Best regards,
+         wulf
+>
+> -Doug
+>
+>
+>
