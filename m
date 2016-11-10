@@ -1,79 +1,474 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Thu, 10 Nov 2016 14:07:50 -0800
-Subject: [PATCH fpga 9/9] fpga: Remove support for non-sg drivers
-In-Reply-To: <20161110163315.GB22004@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-10-git-send-email-jgunthorpe@obsidianresearch.com>
- <bad801c5-fe3a-665b-de67-bf69c42fb2b4@gmail.com>
- <20161110163315.GB22004@obsidianresearch.com>
-Message-ID: <8078ce27-5df0-c882-ffa3-d0c9316b7c54@gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 10 Nov 2016 17:14:35 -0500
+Subject: [PATCH v6 5/9] drm/hisilicon/hibmc: Add crtc for DE
+In-Reply-To: <1477639682-22520-6-git-send-email-zourongrong@gmail.com>
+References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
+ <1477639682-22520-6-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAOw6vbJCu96jcWUDS_zwqGDOa3LiF00adyCijuk7v24Nxe_ivg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
+> Add crtc funcs and helper funcs for DE.
+>
+> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+> ---
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c  | 318 ++++++++++++++++++++++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c |   6 +
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |   2 +
+>  3 files changed, 326 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> index 9c1a68c..9b5d0d0 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+> @@ -23,6 +23,7 @@
+>
+>  #include "hibmc_drm_drv.h"
+>  #include "hibmc_drm_regs.h"
+> +#include "hibmc_drm_de.h"
+>  #include "hibmc_drm_power.h"
+
+nit: alphabetize
+
+>
+>  /* ---------------------------------------------------------------------- */
+
+Remove
+
+> @@ -168,3 +169,320 @@ int hibmc_plane_init(struct hibmc_drm_device *hidev)
+>         drm_plane_helper_add(plane, &hibmc_plane_helper_funcs);
+>         return 0;
+>  }
+> +
+> +static void hibmc_crtc_enable(struct drm_crtc *crtc)
+> +{
+> +       unsigned int reg;
+> +       /* power mode 0 is default. */
+
+This comment seems to be in the wrong place
+
+> +       struct hibmc_drm_device *hidev = crtc->dev->dev_private;
+> +
+> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
+> +
+> +       /* Enable display power gate & LOCALMEM power gate*/
+> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
+> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
+> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
+> +       reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
+> +       reg |= HIBMC_CURR_GATE_DISPLAY(ON);
+> +       hibmc_set_current_gate(hidev, reg);
+> +       drm_crtc_vblank_on(crtc);
+> +}
+> +
+> +static void hibmc_crtc_disable(struct drm_crtc *crtc)
+> +{
+> +       unsigned int reg;
+> +       struct hibmc_drm_device *hidev = crtc->dev->dev_private;
+> +
+> +       drm_crtc_vblank_off(crtc);
+> +
+> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_SLEEP);
+> +
+> +       /* Enable display power gate & LOCALMEM power gate*/
+> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
+> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
+> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
+> +       reg |= HIBMC_CURR_GATE_LOCALMEM(OFF);
+> +       reg |= HIBMC_CURR_GATE_DISPLAY(OFF);
+> +       hibmc_set_current_gate(hidev, reg);
+> +}
+> +
+> +static int hibmc_crtc_atomic_check(struct drm_crtc *crtc,
+> +                                  struct drm_crtc_state *state)
+> +{
+> +       return 0;
+> +}
+
+Caller NULL-checks, no need for stub
+
+> +
+> +static unsigned int format_pll_reg(void)
+> +{
+> +       unsigned int pllreg = 0;
+> +       struct panel_pll pll = {0};
+> +
+> +       /* Note that all PLL's have the same format. Here,
+> +        * we just use Panel PLL parameter to work out the bit
+> +        * fields in the register.On returning a 32 bit number, the value can
+> +        * be applied to any PLL in the calling function.
+> +        */
+> +       pllreg |= HIBMC_PLL_CTRL_BYPASS(OFF) & HIBMC_PLL_CTRL_BYPASS_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_POWER(ON) & HIBMC_PLL_CTRL_POWER_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_INPUT(OSC) & HIBMC_PLL_CTRL_INPUT_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_POD(pll.POD) & HIBMC_PLL_CTRL_POD_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_OD(pll.OD) & HIBMC_PLL_CTRL_OD_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_N(pll.N) & HIBMC_PLL_CTRL_N_MASK;
+> +       pllreg |= HIBMC_PLL_CTRL_M(pll.M) & HIBMC_PLL_CTRL_M_MASK;
+> +
+> +       return pllreg;
+> +}
+> +
+> +static void set_vclock_hisilicon(struct drm_device *dev, unsigned long pll)
+> +{
+> +       unsigned long tmp0, tmp1;
+> +       struct hibmc_drm_device *hidev = dev->dev_private;
+> +
+> +       /* 1. outer_bypass_n=0 */
+> +       tmp0 = readl(hidev->mmio + CRT_PLL1_HS);
+> +       tmp0 &= 0xBFFFFFFF;
+> +       writel(tmp0, hidev->mmio + CRT_PLL1_HS);
+> +
+> +       /* 2. pll_pd=1?inter_bypass=1 */
+> +       writel(0x21000000, hidev->mmio + CRT_PLL1_HS);
+> +
+> +       /* 3. config pll */
+> +       writel(pll, hidev->mmio + CRT_PLL1_HS);
+> +
+> +       /* 4. delay  */
+> +       mdelay(1);
+
+These should be usleep_range() see
+https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+
+> +
+> +       /* 5. pll_pd =0 */
+> +       tmp1 = pll & ~0x01000000;
+> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
+> +
+> +       /* 6. delay  */
+> +       mdelay(1);
+> +
+> +       /* 7. inter_bypass=0 */
+> +       tmp1 &= ~0x20000000;
+> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
+> +
+> +       /* 8. delay  */
+> +       mdelay(1);
+> +
+> +       /* 9. outer_bypass_n=1 */
+> +       tmp1 |= 0x40000000;
+> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
+
+This function is a whole lot of magic. Any chance you can pull the
+values out into #defines?
+
+> +}
+> +
+> +/* This function takes care the extra registers and bit fields required to
+
+nit: multi-line comments have a leading /* line with the comment
+starting on the following line
+
+applies below as well
 
 
-On 11/10/2016 08:33 AM, Jason Gunthorpe wrote:
->>>  struct fpga_manager_ops {
->>>  	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
->>> -	int (*write_init)(struct fpga_manager *mgr, u32 flags,
->>> -			  const char *buf, size_t count);
->>> -	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
->>>  	int (*write_init_sg)(struct fpga_manager *mgr, u32 flags,
->>>  			     struct sg_table *sgt);
->>>  	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
->>> @@ -118,6 +113,8 @@ struct fpga_manager {
->>>  
->>>  int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
->>>  		      const char *buf, size_t count);
->>> +int fpga_mgr_buf_load_sg(struct fpga_manager *mgr, u32 flags,
->>> +			 struct sg_table *sgt);
->>>  
->>>  int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
->>>  			   const char *image_name);
->> I don't have any feeling either way about switching to scatter-gather.
->> (Not zynq or socfpga user)
->> But I do object to renaming the API.
->> write_init() and write() do not imply a particular implementation, nor even that
->> the buffer is coherent.
-> Neither the sg or old linear interface imply any particular
-> underlying driver implementation.
+> + *setup a mode in board.
+
+nit: space between * and comment, ie: * setup a mode in board
+
+applies to the rest of the comment too
+
+
+> + *Explanation about Display Control register:
+> + *FPGA only supports 7 predefined pixel clocks, and clock select is
+> + *in bit 4:0 of new register 0x802a8.
+> + */
+> +static unsigned int display_ctrl_adjust(struct drm_device *dev,
+> +                                       struct drm_display_mode *mode,
+> +                                       unsigned int ctrl)
+> +{
+> +       unsigned long x, y;
+> +       unsigned long pll1; /* bit[31:0] of PLL */
+> +       unsigned long pll2; /* bit[63:32] of PLL */
+> +       struct hibmc_drm_device *hidev = dev->dev_private;
+> +
+> +       x = mode->hdisplay;
+> +       y = mode->vdisplay;
+> +
+> +       /* Hisilicon has to set up a new register for PLL control
+> +        *(CRT_PLL1_HS & CRT_PLL2_HS).
+> +        */
+> +       if (x == 800 && y == 600) {
+> +               pll1 = CRT_PLL1_HS_40MHZ;
+> +               pll2 = CRT_PLL2_HS_40MHZ;
+> +       } else if (x == 1024 && y == 768) {
+> +               pll1 = CRT_PLL1_HS_65MHZ;
+> +               pll2 = CRT_PLL2_HS_65MHZ;
+> +       } else if (x == 1152 && y == 864) {
+> +               pll1 = CRT_PLL1_HS_80MHZ_1152;
+> +               pll2 = CRT_PLL2_HS_80MHZ;
+> +       } else if (x == 1280 && y == 768) {
+> +               pll1 = CRT_PLL1_HS_80MHZ;
+> +               pll2 = CRT_PLL2_HS_80MHZ;
+> +       } else if (x == 1280 && y == 720) {
+> +               pll1 = CRT_PLL1_HS_74MHZ;
+> +               pll2 = CRT_PLL2_HS_74MHZ;
+> +       } else if (x == 1280 && y == 960) {
+> +               pll1 = CRT_PLL1_HS_108MHZ;
+> +               pll2 = CRT_PLL2_HS_108MHZ;
+> +       } else if (x == 1280 && y == 1024) {
+> +               pll1 = CRT_PLL1_HS_108MHZ;
+> +               pll2 = CRT_PLL2_HS_108MHZ;
+> +       } else if (x == 1600 && y == 1200) {
+> +               pll1 = CRT_PLL1_HS_162MHZ;
+> +               pll2 = CRT_PLL2_HS_162MHZ;
+> +       } else if (x == 1920 && y == 1080) {
+> +               pll1 = CRT_PLL1_HS_148MHZ;
+> +               pll2 = CRT_PLL2_HS_148MHZ;
+> +       } else if (x == 1920 && y == 1200) {
+> +               pll1 = CRT_PLL1_HS_193MHZ;
+> +               pll2 = CRT_PLL2_HS_193MHZ;
+> +       } else /* default to VGA clock */ {
+> +               pll1 = CRT_PLL1_HS_25MHZ;
+> +               pll2 = CRT_PLL2_HS_25MHZ;
+> +       }
+
+This seems like something that should be checked in atomic_check so
+you can be sure the mode is supported.
+
+It would also be nice to pull this out into a separate function (and a
+lookup table if you're feeling adventurous)
+
+> +
+> +       writel(pll2, hidev->mmio + CRT_PLL2_HS);
+> +       set_vclock_hisilicon(dev, pll1);
+> +
+> +       /* Hisilicon has to set up the top-left and bottom-right
+> +        * registers as well.
+> +        * Note that normal chip only use those two register for
+> +        * auto-centering mode.
+> +        */
+> +       writel((HIBMC_CRT_AUTO_CENTERING_TL_TOP(0) &
+> +               HIBMC_CRT_AUTO_CENTERING_TL_TOP_MSK) |
+> +              (HIBMC_CRT_AUTO_CENTERING_TL_LEFT(0) &
+> +               HIBMC_CRT_AUTO_CENTERING_TL_LEFT_MSK),
+> +              hidev->mmio + HIBMC_CRT_AUTO_CENTERING_TL);
+> +
+> +       writel((HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM(y - 1) &
+> +               HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM_MASK) |
+> +              (HIBMC_CRT_AUTO_CENTERING_BR_RIGHT(x - 1) &
+> +               HIBMC_CRT_AUTO_CENTERING_BR_RIGHT_MASK),
+> +               hidev->mmio + HIBMC_CRT_AUTO_CENTERING_BR);
+> +
+> +       /* Assume common fields in ctrl have been properly set before
+> +        * calling this function.
+> +        * This function only sets the extra fields in ctrl.
+> +        */
+> +
+> +       /* Set bit 25 of display controller: Select CRT or VGA clock */
+> +       ctrl &= ~HIBMC_CRT_DISP_CTL_CRTSELECT_MASK;
+> +       ctrl &= ~HIBMC_CRT_DISP_CTL_CLOCK_PHASE_MASK;
+> +
+> +       ctrl |= HIBMC_CRT_DISP_CTL_CRTSELECT(CRTSELECT_CRT);
+> +
+> +       /*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL, CRTSELECT, CRT);*/
+
+What's the deal with this commented code?
+
+> +
+> +       /* Set bit 14 of display controller */
+> +       /*ctrl &= FIELD_CLEAR(HIBMC_CRT_DISP_CTL, CLOCK_PHASE);*/
+> +
+> +       /* clock_phase_polarity is 0 */
+> +       ctrl |= HIBMC_CRT_DISP_CTL_CLOCK_PHASE(PHASE_ACTIVE_HIGH);
+> +       /*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL,*/
+> +       /*CLOCK_PHASE, ACTIVE_HIGH);*/
+
+Here too...
+
+> +
+> +       writel(ctrl, hidev->mmio + HIBMC_CRT_DISP_CTL);
+> +
+> +       return ctrl;
+> +}
+> +
+> +static void hibmc_crtc_mode_set_nofb(struct drm_crtc *crtc)
+> +{
+> +       unsigned int val;
+> +       struct drm_display_mode *mode = &crtc->state->mode;
+> +       struct drm_device *dev = crtc->dev;
+> +       struct hibmc_drm_device *hidev = dev->dev_private;
+> +
+> +       writel(format_pll_reg(), hidev->mmio + HIBMC_CRT_PLL_CTRL);
+> +       writel((HIBMC_CRT_HORZ_TOTAL_TOTAL(mode->htotal - 1) &
+> +               HIBMC_CRT_HORZ_TOTAL_TOTAL_MASK) |
+> +               (HIBMC_CRT_HORZ_TOTAL_DISPLAY_END(mode->hdisplay - 1) &
+> +               HIBMC_CRT_HORZ_TOTAL_DISPLAY_END_MASK),
+
+You could probably macroize this code to make it more readable
+
+> +               hidev->mmio + HIBMC_CRT_HORZ_TOTAL);
+> +
+> +       writel((HIBMC_CRT_HORZ_SYNC_WIDTH(mode->hsync_end - mode->hsync_start)
+> +               & HIBMC_CRT_HORZ_SYNC_WIDTH_MASK) |
+> +               (HIBMC_CRT_HORZ_SYNC_START(mode->hsync_start - 1)
+> +               & HIBMC_CRT_HORZ_SYNC_START_MASK),
+> +               hidev->mmio + HIBMC_CRT_HORZ_SYNC);
+> +
+> +       writel((HIBMC_CRT_VERT_TOTAL_TOTAL(mode->vtotal - 1) &
+> +               HIBMC_CRT_VERT_TOTAL_TOTAL_MASK) |
+> +               (HIBMC_CRT_VERT_TOTAL_DISPLAY_END(mode->vdisplay - 1) &
+> +               HIBMC_CRT_VERT_TOTAL_DISPLAY_END_MASK),
+> +               hidev->mmio + HIBMC_CRT_VERT_TOTAL);
+> +
+> +       writel((HIBMC_CRT_VERT_SYNC_HEIGHT(mode->vsync_end - mode->vsync_start)
+> +               & HIBMC_CRT_VERT_SYNC_HEIGHT_MASK) |
+> +              (HIBMC_CRT_VERT_SYNC_START(mode->vsync_start - 1) &
+> +               HIBMC_CRT_VERT_SYNC_START_MASK),
+> +               hidev->mmio + HIBMC_CRT_VERT_SYNC);
+> +
+> +       val = HIBMC_CRT_DISP_CTL_VSYNC_PHASE(0) &
+> +             HIBMC_CRT_DISP_CTL_VSYNC_PHASE_MASK;
+> +       val |= HIBMC_CRT_DISP_CTL_HSYNC_PHASE(0) &
+> +              HIBMC_CRT_DISP_CTL_HSYNC_PHASE_MASK;
+> +       val |= HIBMC_CRT_DISP_CTL_TIMING(ENABLE);
+> +       val |= HIBMC_CRT_DISP_CTL_PLANE(ENABLE);
+> +
+> +       display_ctrl_adjust(dev, mode, val);
+> +}
+> +
+> +static void hibmc_crtc_atomic_begin(struct drm_crtc *crtc,
+> +                                   struct drm_crtc_state *old_state)
+> +{
+> +       unsigned int reg;
+> +       struct drm_device *dev = crtc->dev;
+> +       struct hibmc_drm_device *hidev = dev->dev_private;
+> +
+> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
+> +
+> +       /* Enable display power gate & LOCALMEM power gate*/
+> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
+> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
+> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
+> +       reg |= HIBMC_CURR_GATE_DISPLAY(ON);
+> +       reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
+> +       hibmc_set_current_gate(hidev, reg);
+> +
+> +       /* We can add more initialization as needed. */
+> +}
+> +
+> +static void hibmc_crtc_atomic_flush(struct drm_crtc *crtc,
+> +                                   struct drm_crtc_state *old_state)
+> +
+> +{
+> +       unsigned long flags;
+> +
+> +       spin_lock_irqsave(&crtc->dev->event_lock, flags);
+> +       if (crtc->state->event)
+> +               drm_crtc_send_vblank_event(crtc, crtc->state->event);
+> +       crtc->state->event = NULL;
+> +
+> +       spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
+> +}
+> +
+> +/* These provide the minimum set of functions required to handle a CRTC */
+
+nit: don't need this comment
+
+> +static const struct drm_crtc_funcs hibmc_crtc_funcs = {
+> +       .page_flip = drm_atomic_helper_page_flip,
+> +       .set_config = drm_atomic_helper_set_config,
+> +       .destroy = drm_crtc_cleanup,
+> +       .reset = drm_atomic_helper_crtc_reset,
+> +       .atomic_duplicate_state =  drm_atomic_helper_crtc_duplicate_state,
+> +       .atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
+> +};
+> +
+> +static const struct drm_crtc_helper_funcs hibmc_crtc_helper_funcs = {
+> +       .enable         = hibmc_crtc_enable,
+> +       .disable        = hibmc_crtc_disable,
+> +       .mode_set_nofb  = hibmc_crtc_mode_set_nofb,
+> +       .atomic_check   = hibmc_crtc_atomic_check,
+> +       .atomic_begin   = hibmc_crtc_atomic_begin,
+> +       .atomic_flush   = hibmc_crtc_atomic_flush,
+> +};
+> +
+> +int hibmc_crtc_init(struct hibmc_drm_device *hidev)
+> +{
+> +       struct drm_device *dev = hidev->dev;
+> +       struct drm_crtc *crtc = &hidev->crtc;
+> +       struct drm_plane *plane = &hidev->plane;
+> +       int ret;
+> +
+> +       ret = drm_crtc_init_with_planes(dev, crtc, plane,
+> +                                       NULL, &hibmc_crtc_funcs, NULL);
+> +       if (ret) {
+> +               DRM_ERROR("failed to init crtc.\n");
+
+print return code
+
+> +               return ret;
+> +       }
+> +
+> +       drm_mode_crtc_set_gamma_size(crtc, 256);
+
+check return code
+
+> +       drm_crtc_helper_add(crtc, &hibmc_crtc_helper_funcs);
+> +       return 0;
+> +}
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> index 7d96583..303cd36 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> @@ -119,6 +119,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
+>                 return ret;
+>         }
 >
-> All that is being changed is how the list of physical pages gets
-> passed to the driver. The linear interface requires them to be
-> contiguously mapped (eg in a vmap) while the SG interface
-> directly passes a list of physical page addresses.
+> +       ret = hibmc_crtc_init(hidev);
+> +       if (ret) {
+> +               DRM_ERROR("failed to init crtc.\n");
+> +               return ret;
+> +       }
+
+Typically the plane is initialized internally in the crtc driver. I
+think this is a good design pattern, and you should probably use it.
+
+So how about squashing this down with the plane patch and keeping the
+plane inside hibmc_drm_de.c?
+
+> +
+>         return 0;
+>  }
 >
-> Any alogrithm that works with the old interface can run on the new
-> interface, and the new interface can support much better options for
-> DMA drivers, while not requiring the higher layers to perform a high
-> order allocation (vmap or otherwise) to create the contiguous memory.
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> index 49e39d2..5731ec2 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> @@ -46,6 +46,7 @@ struct hibmc_drm_device {
+>         /* drm */
+>         struct drm_device  *dev;
+>         struct drm_plane plane;
+
+I don't think you should be keeping track of plane here. plane is only
+used in the crtc init, which should be addressed by the previous
+comment.
+
+
+> +       struct drm_crtc crtc;
+
+crtc is only used in the irq handler, so you could remove this here
+and just call drm_handle_vblank(dev, 0) in the handler.
+
+
+>         bool mode_config_initialized;
 >
-> The reason the old interface is being deleted here is so the fpga mgr
-> API can be expanded to accept a sg list directly. Since we cannot
-> convert a general sg list to linear memory the liner option must be
-> totally removed.
-OK. That sounds reasonable.
->> I am working to merge an fpga manager which uses SPI to load the bitstream
->> (see https://www.spinics.net/lists/arm-kernel/msg539328.html)
->> Any dma in use there would come from the spi driver. write_init_sg, and write_sg
->> don't make any sense in my case.
-> No, it still make lots of sense.
+>         /* ttm */
+> @@ -85,6 +86,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
+>  #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
 >
-> SPI has been slowly transforming to use the same sort of SG scheme
-> universally, including facing the client. (see
-> 6ad45a27cbe343ec8d7888e5edf6335499a4b555)
-Thanks for sharing that link.
+>  int hibmc_plane_init(struct hibmc_drm_device *hidev);
+> +int hibmc_crtc_init(struct hibmc_drm_device *hidev);
+>  int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
+>  void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
 >
-> Some day your driver can just pass the SGs directly to spi and
-> everything will be great.
+> --
+> 1.9.1
 >
-> In the mean time it can do sg_miter_next to get mapped buffers.
-..so I have a way forward if this series gets merged.
-That was my main concern.
-And as a dma n00b, learning to use dma engine structures to do
-non-dma xfer was not very high on my list.
->> Would it not make sense to keep the top level API the same?
-> Fundamentally no.
 >
-> Jason
-Joshua
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
