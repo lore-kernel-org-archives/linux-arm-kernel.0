@@ -1,50 +1,297 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 10 Nov 2016 01:09:23 +0100
-Subject: [PATCH v2] ARM: at91/dt: fixes dbgu pinctrl, set pullup on rx,
- clear pullup on tx
-In-Reply-To: <4e332daa-7d2a-1481-c8fc-7119033b68e3@axentia.se>
-References: <20161020153535.7e2b4frcukk2ce2i@piout.net>
- <4e332daa-7d2a-1481-c8fc-7119033b68e3@axentia.se>
-Message-ID: <20161110000923.ltpouekbkx7onzm7@piout.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 10 Nov 2016 01:09:48 +0100
+Subject: [PATCH 02/14] ARM: dts: armada-375: Use the node labels
+In-Reply-To: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+References: <20161110001000.10619-1-gregory.clement@free-electrons.com>
+Message-ID: <20161110001000.10619-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2016 at 00:41:37 +0100, Peter Rosin wrote :
-> On 2016-10-20 15:35, Alexandre Belloni wrote
-> > On 16/10/2016 at 18:21:45 +0200, Sylvain Rochet wrote :
-> >> Remove pullup on dbgu DTXD signal, it is a push-pull output thus the
-> >> pullup is pointless.
-> >> 
-> >> Add pullup on dbgu DRXD signal, it prevents the DRXD signal to be left
-> >> floating and so consuming a useless extra amount of power in crowbarred
-> >> state if nothing is externally connected to dbgu.
-> >> 
-> >> Signed-off-by: Sylvain Rochet <sylvain.rochet@finsecur.com>
-> >> ---
-> >>  arch/arm/boot/dts/at91rm9200.dtsi  | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9260.dtsi | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9261.dtsi | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9263.dtsi | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9g45.dtsi | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9n12.dtsi | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9rl.dtsi  | 4 ++--
-> >>  arch/arm/boot/dts/at91sam9x5.dtsi  | 4 ++--
-> >>  arch/arm/boot/dts/sama5d3.dtsi     | 4 ++--
-> >>  arch/arm/boot/dts/sama5d4.dtsi     | 4 ++--
-> >>  10 files changed, 20 insertions(+), 20 deletions(-)
-> >> 
-> > Applied, thanks.
-> 
-> I can't seem to find this patch in any of the repos I'm looking at,
-> so I'm wondering where it was applied and when it might hit mainline?
-> 
+Use the node label when possible. As a result it flattens the device tree
 
-It is applied there:
-http://git.kernel.org/cgit/linux/kernel/git/abelloni/linux.git/log/?h=at91-dt
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-375-db.dts | 269 ++++++++++++++++++------------------
+ 1 file changed, 136 insertions(+), 133 deletions(-)
 
-It will land in 4.10. I'll do the PR to arm-soc soon.
-
+diff --git a/arch/arm/boot/dts/armada-375-db.dts b/arch/arm/boot/dts/armada-375-db.dts
+index cded5f0a262d..b33a674088ed 100644
+--- a/arch/arm/boot/dts/armada-375-db.dts
++++ b/arch/arm/boot/dts/armada-375-db.dts
+@@ -69,138 +69,141 @@
+ 			  MBUS_ID(0x09, 0x09) 0 0xf1100000 0x10000
+ 			  MBUS_ID(0x09, 0x05) 0 0xf1110000 0x10000>;
+ 
+-		internal-regs {
+-			spi at 10600 {
+-				pinctrl-0 = <&spi0_pins>;
+-				pinctrl-names = "default";
+-				/*
+-				 * SPI conflicts with NAND, so we disable it
+-				 * here, and select NAND as the enabled device
+-				 * by default.
+-				 */
+-				status = "disabled";
+-
+-				spi-flash at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <1>;
+-					compatible = "n25q128a13", "jedec,spi-nor";
+-					reg = <0>; /* Chip select 0 */
+-					spi-max-frequency = <108000000>;
+-				};
+-			};
+-
+-			i2c at 11000 {
+-				status = "okay";
+-				clock-frequency = <100000>;
+-				pinctrl-0 = <&i2c0_pins>;
+-				pinctrl-names = "default";
+-			};
+-
+-			i2c at 11100 {
+-				status = "okay";
+-				clock-frequency = <100000>;
+-				pinctrl-0 = <&i2c1_pins>;
+-				pinctrl-names = "default";
+-			};
+-
+-			serial at 12000 {
+-				status = "okay";
+-			};
+-
+-			pinctrl {
+-				sdio_st_pins: sdio-st-pins {
+-					marvell,pins = "mpp44", "mpp45";
+-					marvell,function = "gpio";
+-				};
+-			};
+-
+-			sata at a0000 {
+-				status = "okay";
+-				nr-ports = <2>;
+-			};
+-
+-			nand: nand at d0000 {
+-				pinctrl-0 = <&nand_pins>;
+-				pinctrl-names = "default";
+-				status = "okay";
+-				num-cs = <1>;
+-				marvell,nand-keep-config;
+-				marvell,nand-enable-arbiter;
+-				nand-on-flash-bbt;
+-				nand-ecc-strength = <4>;
+-				nand-ecc-step-size = <512>;
+-
+-				partition at 0 {
+-					label = "U-Boot";
+-					reg = <0 0x800000>;
+-				};
+-				partition at 800000 {
+-					label = "Linux";
+-					reg = <0x800000 0x800000>;
+-				};
+-				partition at 1000000 {
+-					label = "Filesystem";
+-					reg = <0x1000000 0x3f000000>;
+-				};
+-			};
+-
+-			usb at 54000 {
+-				status = "okay";
+-			};
+-
+-			usb3 at 58000 {
+-				status = "okay";
+-			};
+-
+-			mvsdio at d4000 {
+-				pinctrl-0 = <&sdio_pins &sdio_st_pins>;
+-				pinctrl-names = "default";
+-				status = "okay";
+-				cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+-				wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+-			};
+-
+-			mdio {
+-				phy0: ethernet-phy at 0 {
+-					reg = <0>;
+-				};
+-
+-				phy3: ethernet-phy at 3 {
+-					reg = <3>;
+-				};
+-			};
+-
+-			ethernet at f0000 {
+-				status = "okay";
+-
+-				eth0 at c4000 {
+-					status = "okay";
+-					phy = <&phy0>;
+-					phy-mode = "rgmii-id";
+-				};
+-
+-				eth1 at c5000 {
+-					status = "okay";
+-					phy = <&phy3>;
+-					phy-mode = "gmii";
+-				};
+-			};
+-		};
+-
+-		pcie-controller {
+-			status = "okay";
+-			/*
+-			 * The two PCIe units are accessible through
+-			 * standard PCIe slots on the board.
+-			 */
+-			pcie at 1,0 {
+-				/* Port 0, Lane 0 */
+-				status = "okay";
+-			};
+-			pcie at 2,0 {
+-				/* Port 1, Lane 0 */
+-				status = "okay";
+-			};
+-		};
+ 	};
+ };
++&pciec {
++	status = "okay";
++};
++
++/*
++ * The two PCIe units are accessible through
++ * standard PCIe slots on the board.
++ */
++&pcie0 {
++	/* Port 0, Lane 0 */
++	status = "okay";
++};
++
++&pcie1 {
++	/* Port 1, Lane 0 */
++	status = "okay";
++};
++
++
++&spi0 {
++	pinctrl-0 = <&spi0_pins>;
++	pinctrl-names = "default";
++
++	/*
++	 * SPI conflicts with NAND, so we disable it here, and
++	 * select NAND as the enabled device by default.
++	 */
++
++	status = "disabled";
++
++	spi-flash at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q128a13", "jedec,spi-nor";
++		reg = <0>; /* Chip select 0 */
++		spi-max-frequency = <108000000>;
++	};
++};
++
++&i2c0 {
++	status = "okay";
++	clock-frequency = <100000>;
++	pinctrl-0 = <&i2c0_pins>;
++	pinctrl-names = "default";
++};
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <100000>;
++	pinctrl-0 = <&i2c1_pins>;
++	pinctrl-names = "default";
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&pinctrl {
++	sdio_st_pins: sdio-st-pins {
++		marvell,pins = "mpp44", "mpp45";
++		marvell,function = "gpio";
++	};
++};
++
++&sata {
++	status = "okay";
++	nr-ports = <2>;
++};
++
++&nand {
++	pinctrl-0 = <&nand_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++	num-cs = <1>;
++	marvell,nand-keep-config;
++	marvell,nand-enable-arbiter;
++	nand-on-flash-bbt;
++	nand-ecc-strength = <4>;
++	nand-ecc-step-size = <512>;
++
++	partition at 0 {
++		label = "U-Boot";
++		reg = <0 0x800000>;
++	};
++	partition at 800000 {
++		label = "Linux";
++		reg = <0x800000 0x800000>;
++	};
++	partition at 1000000 {
++		label = "Filesystem";
++		reg = <0x1000000 0x3f000000>;
++	};
++};
++
++&usb1 {
++	status = "okay";
++};
++
++&usb2 {
++	status = "okay";
++};
++
++&sdio {
++	pinctrl-0 = <&sdio_pins &sdio_st_pins>;
++	pinctrl-names = "default";
++	status = "okay";
++	cd-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++	wp-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
++};
++
++&mdio {
++	phy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
++
++	phy3: ethernet-phy at 3 {
++		reg = <3>;
++	};
++};
++
++&ethernet {
++	status = "okay";
++};
++
++
++&eth0 {
++	status = "okay";
++	phy = <&phy0>;
++	phy-mode = "rgmii-id";
++};
++
++&eth1 {
++	status = "okay";
++	phy = <&phy3>;
++	phy-mode = "gmii";
++};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.10.1
