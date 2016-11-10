@@ -1,422 +1,171 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu, 10 Nov 2016 17:49:15 +0530
-Subject: [PATCH v3] spi: spi-fsl-dspi: Add DMA support for Vybrid
-Message-ID: <836dd6a84fa149cafdbb0b53e792d305febf6207.1478778329.git.maitysanchayan@gmail.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Thu, 10 Nov 2016 18:07:54 +0530
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <5066943.nydi3GQ3KP@wuerfel>
+References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+ <1478693755-11953-2-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20161110115456epcas2p4524185a083cd7173e354f46b94be9183@epcas2p4.samsung.com>
+ <5066943.nydi3GQ3KP@wuerfel>
+Message-ID: <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DMA support for Vybrid.
+Hi Arnd,
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+On Thursday 10 November 2016 05:24 PM, Arnd Bergmann wrote:
+> On Wednesday, November 9, 2016 5:45:54 PM CET Pankaj Dubey wrote:
+>> Lets remove static mapping of SCU SFR mainly used in CORTEX-A9 SoC based
+>> boards. Instead use mapping from device tree node of SCU.
+>>
+>> NOTE: This patch has dependency on DT file of any such CORTEX-A9 SoC
+>> based boards, in the absence of SCU device node in DTS file, only single
+>> CPU will boot. So if you are using OUT-OF-TREE DTS file of CORTEX-A9 based
+>> Exynos SoC make sure to add SCU device node to DTS file for SMP boot.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> 
+> With CONFIG_SMP disabled, I now get this build failure:
+> 
+
+Sorry, I missed this part and did not check with CONFIG_SMP disabled.
+
+> arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+> pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
+> arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+> suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
+> 
+> Please fix. I have applied a patch locally (see below), but don't know
+> if that is the best solution. As we seem to duplicate that code across
+> several platforms, I wonder why we don't just put it into the core scu
+> implementation.
+> 
+
+When I checked scu_enable declaration it is defined in
+arch/arm/include/asm/smp_scu.h as:
+
+#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+void scu_enable(void __iomem *scu_base);
+#else
+static inline void scu_enable(void __iomem *scu_base) {}
+#endif
+
+So if CONFIG_SMP is disable then there is no sense of exynos_scu_enable
+as well. So wow about using below patch?
+
+--------------------------------------------------------
+
+Subject: [PATCH] ARM: exynos: fix build fail due to exynos_scu_enable
+
+Build failed if we disable CONFIG_SMP as shown below:
+
+arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to
+`exynos_scu_enable'
+arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to
+`exynos_scu_enable'
+
+Since scu_enable is defined only in case CONFIG_SMP and CONFIG_HAVE_ARM_SCU
+lets move exynos_scu_enable also under these two macros.
+
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
-Changes since v2:
-1. Rebase on top of Shawn's latest for-next branch
-2. Make DMA mode the default for Vybrid. We no longer use the EOQ mode.
-Since devtype_data has been constantified it's no longer makes sense to
-change the trans_mode at run time.
+ arch/arm/mach-exynos/common.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Tested on Toradex Colibri Vybrid VF61 module using spidev and MCP CAN.
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index fb12d11..03fdb79 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -156,7 +156,12 @@ extern void exynos_cpu_restore_register(void);
+ extern void exynos_pm_central_suspend(void);
+ extern int exynos_pm_central_resume(void);
+ extern void exynos_enter_aftr(void);
++#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+ extern int exynos_scu_enable(void);
++#else
++static inline void exynos_scu_enable(void) {}
++#endif
++
 
-v1 Patch:
-https://patchwork.kernel.org/patch/9360583/
+------------------------------------------------------
 
-v2 Patch:
-https://patchwork.kernel.org/patch/9361601/
+Of-course your idea to move it in core SCU file is also good that we
+lots of duplication in different architecture can be avoided.
 
-Regards,
-Sanchayan.
+In that case I can think of following patch:
+
+[PATCH] ARM: scu: use SCU device node to enable SCU
+
+Many platforms are duplicating code for enabling SCU, lets add
+common code to enable SCU using SCU device node so the duplication in
+each platform can be avoided.
+
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 ---
- drivers/spi/spi-fsl-dspi.c | 301 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 300 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/smp_scu.h |  2 ++
+ arch/arm/kernel/smp_scu.c      | 17 +++++++++++++++++
+ 2 files changed, 19 insertions(+)
 
-diff --git a/drivers/spi/spi-fsl-dspi.c b/drivers/spi/spi-fsl-dspi.c
-index 35c0dd9..bc64700 100644
---- a/drivers/spi/spi-fsl-dspi.c
-+++ b/drivers/spi/spi-fsl-dspi.c
-@@ -15,6 +15,8 @@
- 
- #include <linux/clk.h>
- #include <linux/delay.h>
-+#include <linux/dmaengine.h>
-+#include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/errno.h>
- #include <linux/interrupt.h>
-@@ -40,6 +42,7 @@
- #define TRAN_STATE_WORD_ODD_NUM	0x04
- 
- #define DSPI_FIFO_SIZE			4
-+#define DSPI_DMA_BUFSIZE		(DSPI_FIFO_SIZE * 1024)
- 
- #define SPI_MCR		0x00
- #define SPI_MCR_MASTER		(1 << 31)
-@@ -71,6 +74,11 @@
- #define SPI_SR_EOQF		0x10000000
- #define SPI_SR_TCFQF		0x80000000
- 
-+#define SPI_RSER_TFFFE		BIT(25)
-+#define SPI_RSER_TFFFD		BIT(24)
-+#define SPI_RSER_RFDFE		BIT(17)
-+#define SPI_RSER_RFDFD		BIT(16)
-+
- #define SPI_RSER		0x30
- #define SPI_RSER_EOQFE		0x10000000
- #define SPI_RSER_TCFQE		0x80000000
-@@ -108,6 +116,8 @@
- 
- #define SPI_TCR_TCNT_MAX	0x10000
- 
-+#define DMA_COMPLETION_TIMEOUT	msecs_to_jiffies(3000)
-+
- struct chip_data {
- 	u32 mcr_val;
- 	u32 ctar_val;
-@@ -117,6 +127,7 @@ struct chip_data {
- enum dspi_trans_mode {
- 	DSPI_EOQ_MODE = 0,
- 	DSPI_TCFQ_MODE,
-+	DSPI_DMA_MODE,
- };
- 
- struct fsl_dspi_devtype_data {
-@@ -125,7 +136,7 @@ struct fsl_dspi_devtype_data {
- };
- 
- static const struct fsl_dspi_devtype_data vf610_data = {
--	.trans_mode = DSPI_EOQ_MODE,
-+	.trans_mode = DSPI_DMA_MODE,
- 	.max_clock_factor = 2,
- };
- 
-@@ -139,6 +150,22 @@ static const struct fsl_dspi_devtype_data ls2085a_data = {
- 	.max_clock_factor = 8,
- };
- 
-+struct fsl_dspi_dma {
-+	u32 curr_xfer_len;
-+
-+	u32 *tx_dma_buf;
-+	struct dma_chan *chan_tx;
-+	dma_addr_t tx_dma_phys;
-+	struct completion cmd_tx_complete;
-+	struct dma_async_tx_descriptor *tx_desc;
-+
-+	u32 *rx_dma_buf;
-+	struct dma_chan *chan_rx;
-+	dma_addr_t rx_dma_phys;
-+	struct completion cmd_rx_complete;
-+	struct dma_async_tx_descriptor *rx_desc;
-+};
-+
- struct fsl_dspi {
- 	struct spi_master	*master;
- 	struct platform_device	*pdev;
-@@ -165,6 +192,7 @@ struct fsl_dspi {
- 	u32			waitflags;
- 
- 	u32			spi_tcnt;
-+	struct fsl_dspi_dma	*dma;
- };
- 
- static inline int is_double_byte_mode(struct fsl_dspi *dspi)
-@@ -176,6 +204,263 @@ static inline int is_double_byte_mode(struct fsl_dspi *dspi)
- 	return ((val & SPI_FRAME_BITS_MASK) == SPI_FRAME_BITS(8)) ? 0 : 1;
+diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
+index bfe163c..e5e2492 100644
+--- a/arch/arm/include/asm/smp_scu.h
++++ b/arch/arm/include/asm/smp_scu.h
+@@ -38,8 +38,10 @@ static inline int scu_power_mode(void __iomem
+*scu_base, unsigned int mode)
+ #endif
+
+ #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
++int of_scu_enable(void);
+ void scu_enable(void __iomem *scu_base);
+ #else
++static inline int of_scu_enable(void) {return 0;}
+ static inline void scu_enable(void __iomem *scu_base) {}
+ #endif
+
+diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
+index 72f9241..7c16d16 100644
+--- a/arch/arm/kernel/smp_scu.c
++++ b/arch/arm/kernel/smp_scu.c
+@@ -34,6 +34,23 @@ unsigned int __init scu_get_core_count(void __iomem
+*scu_base)
+ 	return (ncores & 0x03) + 1;
  }
- 
-+static void dspi_tx_dma_callback(void *arg)
+
++int of_scu_enable(void)
 +{
-+	struct fsl_dspi *dspi = arg;
-+	struct fsl_dspi_dma *dma = dspi->dma;
++	struct device_node *np;
++	void __iomem *scu_base;
 +
-+	complete(&dma->cmd_tx_complete);
-+}
-+
-+static void dspi_rx_dma_callback(void *arg)
-+{
-+	struct fsl_dspi *dspi = arg;
-+	struct fsl_dspi_dma *dma = dspi->dma;
-+	int rx_word;
-+	int i, len;
-+	u16 d;
-+
-+	rx_word = is_double_byte_mode(dspi);
-+
-+	len = rx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
-+
-+	if (!(dspi->dataflags & TRAN_STATE_RX_VOID)) {
-+		for (i = 0; i < len; i++) {
-+			d = dspi->dma->rx_dma_buf[i];
-+			rx_word ? (*(u16 *)dspi->rx = d) :
-+						(*(u8 *)dspi->rx = d);
-+			dspi->rx += rx_word + 1;
-+		}
-+	}
-+
-+	complete(&dma->cmd_rx_complete);
-+}
-+
-+static int dspi_next_xfer_dma_submit(struct fsl_dspi *dspi)
-+{
-+	struct fsl_dspi_dma *dma = dspi->dma;
-+	struct device *dev = &dspi->pdev->dev;
-+	int time_left;
-+	int tx_word;
-+	int i, len;
-+	u16 val;
-+
-+	tx_word = is_double_byte_mode(dspi);
-+
-+	len = tx_word ? (dma->curr_xfer_len / 2) : dma->curr_xfer_len;
-+
-+	for (i = 0; i < len - 1; i++) {
-+		val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-+		dspi->dma->tx_dma_buf[i] =
-+			SPI_PUSHR_TXDATA(val) | SPI_PUSHR_PCS(dspi->cs) |
-+			SPI_PUSHR_CTAS(0) | SPI_PUSHR_CONT;
-+		dspi->tx += tx_word + 1;
-+	}
-+
-+	val = tx_word ? *(u16 *) dspi->tx : *(u8 *) dspi->tx;
-+	dspi->dma->tx_dma_buf[i] = SPI_PUSHR_TXDATA(val) |
-+					SPI_PUSHR_PCS(dspi->cs) |
-+					SPI_PUSHR_CTAS(0);
-+	dspi->tx += tx_word + 1;
-+
-+	dma->tx_desc = dmaengine_prep_slave_single(dma->chan_tx,
-+					dma->tx_dma_phys,
-+					DSPI_DMA_BUFSIZE, DMA_MEM_TO_DEV,
-+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!dma->tx_desc) {
-+		dev_err(dev, "Not able to get desc for DMA xfer\n");
-+		return -EIO;
-+	}
-+
-+	dma->tx_desc->callback = dspi_tx_dma_callback;
-+	dma->tx_desc->callback_param = dspi;
-+	if (dma_submit_error(dmaengine_submit(dma->tx_desc))) {
-+		dev_err(dev, "DMA submit failed\n");
-+		return -EINVAL;
-+	}
-+
-+	dma->rx_desc = dmaengine_prep_slave_single(dma->chan_rx,
-+					dma->rx_dma_phys,
-+					DSPI_DMA_BUFSIZE, DMA_DEV_TO_MEM,
-+					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-+	if (!dma->rx_desc) {
-+		dev_err(dev, "Not able to get desc for DMA xfer\n");
-+		return -EIO;
-+	}
-+
-+	dma->rx_desc->callback = dspi_rx_dma_callback;
-+	dma->rx_desc->callback_param = dspi;
-+	if (dma_submit_error(dmaengine_submit(dma->rx_desc))) {
-+		dev_err(dev, "DMA submit failed\n");
-+		return -EINVAL;
-+	}
-+
-+	reinit_completion(&dspi->dma->cmd_rx_complete);
-+	reinit_completion(&dspi->dma->cmd_tx_complete);
-+
-+	dma_async_issue_pending(dma->chan_rx);
-+	dma_async_issue_pending(dma->chan_tx);
-+
-+	time_left = wait_for_completion_timeout(&dspi->dma->cmd_tx_complete,
-+					DMA_COMPLETION_TIMEOUT);
-+	if (time_left == 0) {
-+		dev_err(dev, "DMA tx timeout\n");
-+		dmaengine_terminate_all(dma->chan_tx);
-+		dmaengine_terminate_all(dma->chan_rx);
-+		return -ETIMEDOUT;
-+	}
-+
-+	time_left = wait_for_completion_timeout(&dspi->dma->cmd_rx_complete,
-+					DMA_COMPLETION_TIMEOUT);
-+	if (time_left == 0) {
-+		dev_err(dev, "DMA rx timeout\n");
-+		dmaengine_terminate_all(dma->chan_tx);
-+		dmaengine_terminate_all(dma->chan_rx);
-+		return -ETIMEDOUT;
-+	}
-+
-+	return 0;
-+}
-+
-+static int dspi_dma_xfer(struct fsl_dspi *dspi)
-+{
-+	struct fsl_dspi_dma *dma = dspi->dma;
-+	struct device *dev = &dspi->pdev->dev;
-+	int curr_remaining_bytes;
-+	int bytes_per_buffer;
-+	int tx_word;
-+	int ret = 0;
-+
-+	tx_word = is_double_byte_mode(dspi);
-+	curr_remaining_bytes = dspi->len;
-+	while (curr_remaining_bytes) {
-+		/* Check if current transfer fits the DMA buffer */
-+		dma->curr_xfer_len = curr_remaining_bytes;
-+		bytes_per_buffer = DSPI_DMA_BUFSIZE /
-+				(DSPI_FIFO_SIZE / (tx_word ? 2 : 1));
-+		if (curr_remaining_bytes > bytes_per_buffer)
-+			dma->curr_xfer_len = bytes_per_buffer;
-+
-+		ret = dspi_next_xfer_dma_submit(dspi);
-+		if (ret) {
-+			dev_err(dev, "DMA transfer failed\n");
-+			goto exit;
-+
-+		} else {
-+			curr_remaining_bytes -= dma->curr_xfer_len;
-+			if (curr_remaining_bytes < 0)
-+				curr_remaining_bytes = 0;
-+			dspi->len = curr_remaining_bytes;
-+		}
-+	}
-+
-+exit:
-+	return ret;
-+}
-+
-+static int dspi_request_dma(struct fsl_dspi *dspi, phys_addr_t phy_addr)
-+{
-+	struct fsl_dspi_dma *dma;
-+	struct dma_slave_config cfg;
-+	struct device *dev = &dspi->pdev->dev;
-+	int ret;
-+
-+	dma = devm_kzalloc(dev, sizeof(*dma), GFP_KERNEL);
-+	if (!dma)
++	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++	scu_base = of_iomap(np, 0);
++	of_node_put(np);
++	if (!scu_base) {
++		pr_err("%s failed to map scu_base\n", __func__);
 +		return -ENOMEM;
-+
-+	dma->chan_rx = dma_request_slave_channel(dev, "rx");
-+	if (!dma->chan_rx) {
-+		dev_err(dev, "rx dma channel not available\n");
-+		ret = -ENODEV;
-+		return ret;
 +	}
-+
-+	dma->chan_tx = dma_request_slave_channel(dev, "tx");
-+	if (!dma->chan_tx) {
-+		dev_err(dev, "tx dma channel not available\n");
-+		ret = -ENODEV;
-+		goto err_tx_channel;
-+	}
-+
-+	dma->tx_dma_buf = dma_alloc_coherent(dev, DSPI_DMA_BUFSIZE,
-+					&dma->tx_dma_phys, GFP_KERNEL);
-+	if (!dma->tx_dma_buf) {
-+		ret = -ENOMEM;
-+		goto err_tx_dma_buf;
-+	}
-+
-+	dma->rx_dma_buf = dma_alloc_coherent(dev, DSPI_DMA_BUFSIZE,
-+					&dma->rx_dma_phys, GFP_KERNEL);
-+	if (!dma->rx_dma_buf) {
-+		ret = -ENOMEM;
-+		goto err_rx_dma_buf;
-+	}
-+
-+	cfg.src_addr = phy_addr + SPI_POPR;
-+	cfg.dst_addr = phy_addr + SPI_PUSHR;
-+	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-+	cfg.src_maxburst = 1;
-+	cfg.dst_maxburst = 1;
-+
-+	cfg.direction = DMA_DEV_TO_MEM;
-+	ret = dmaengine_slave_config(dma->chan_rx, &cfg);
-+	if (ret) {
-+		dev_err(dev, "can't configure rx dma channel\n");
-+		ret = -EINVAL;
-+		goto err_slave_config;
-+	}
-+
-+	cfg.direction = DMA_MEM_TO_DEV;
-+	ret = dmaengine_slave_config(dma->chan_tx, &cfg);
-+	if (ret) {
-+		dev_err(dev, "can't configure tx dma channel\n");
-+		ret = -EINVAL;
-+		goto err_slave_config;
-+	}
-+
-+	dspi->dma = dma;
-+	init_completion(&dma->cmd_tx_complete);
-+	init_completion(&dma->cmd_rx_complete);
-+
++	scu_enable(scu_base);
++	iounmap(scu_base);
 +	return 0;
-+
-+err_slave_config:
-+	devm_kfree(dev, dma->rx_dma_buf);
-+err_rx_dma_buf:
-+	devm_kfree(dev, dma->tx_dma_buf);
-+err_tx_dma_buf:
-+	dma_release_channel(dma->chan_tx);
-+err_tx_channel:
-+	dma_release_channel(dma->chan_rx);
-+
-+	devm_kfree(dev, dma);
-+	dspi->dma = NULL;
-+
-+	return ret;
 +}
 +
-+static void dspi_release_dma(struct fsl_dspi *dspi)
-+{
-+	struct fsl_dspi_dma *dma = dspi->dma;
-+	struct device *dev = &dspi->pdev->dev;
-+
-+	if (dma) {
-+		if (dma->chan_tx) {
-+			dma_unmap_single(dev, dma->tx_dma_phys,
-+					DSPI_DMA_BUFSIZE, DMA_TO_DEVICE);
-+			dma_release_channel(dma->chan_tx);
-+		}
-+
-+		if (dma->chan_rx) {
-+			dma_unmap_single(dev, dma->rx_dma_phys,
-+					DSPI_DMA_BUFSIZE, DMA_FROM_DEVICE);
-+			dma_release_channel(dma->chan_rx);
-+		}
-+	}
-+}
-+
- static void hz_to_spi_baud(char *pbr, char *br, int speed_hz,
- 		unsigned long clkrate)
- {
-@@ -424,6 +709,12 @@ static int dspi_transfer_one_message(struct spi_master *master,
- 			regmap_write(dspi->regmap, SPI_RSER, SPI_RSER_TCFQE);
- 			dspi_tcfq_write(dspi);
- 			break;
-+		case DSPI_DMA_MODE:
-+			regmap_write(dspi->regmap, SPI_RSER,
-+				SPI_RSER_TFFFE | SPI_RSER_TFFFD |
-+				SPI_RSER_RFDFE | SPI_RSER_RFDFD);
-+			status = dspi_dma_xfer(dspi);
-+			goto out;
- 		default:
- 			dev_err(&dspi->pdev->dev, "unsupported trans_mode %u\n",
- 				trans_mode);
-@@ -733,6 +1024,13 @@ static int dspi_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_master_put;
- 
-+	if (dspi->devtype_data->trans_mode == DSPI_DMA_MODE) {
-+		if (dspi_request_dma(dspi, res->start)) {
-+			dev_err(&pdev->dev, "can't get dma channels\n");
-+			goto out_clk_put;
-+		}
-+	}
-+
- 	master->max_speed_hz =
- 		clk_get_rate(dspi->clk) / dspi->devtype_data->max_clock_factor;
- 
-@@ -761,6 +1059,7 @@ static int dspi_remove(struct platform_device *pdev)
- 	struct fsl_dspi *dspi = spi_master_get_devdata(master);
- 
- 	/* Disconnect from the SPI framework */
-+	dspi_release_dma(dspi);
- 	clk_disable_unprepare(dspi->clk);
- 	spi_unregister_master(dspi->master);
- 
+ /*
+  * Enable the SCU
+  */
 -- 
-2.10.2
+
+
+Followed by cleanup in various architecture where this piece of code is
+duplicated and all of them can call directly of_scu_enable()
+
+
+Please let me know which one you will prefer for fixing build issue.
+
+@Krzysztof, please let me know if I need to resubmit SCU series again
+with fix or you will accept build fix patch on top of already taken patch.
+
+Thanks,
+Pankaj Dubey
