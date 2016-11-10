@@ -1,65 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Nov 2016 18:37:28 +0000
-Subject: [PATCH v2 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
-In-Reply-To: <1ae5dc0f-2e59-3e10-a61a-1f5452ad560f@arm.com>
-References: <4e84146ae49a4edd5f1226d76617be9aa92a58ee.1477503578.git.robin.murphy@arm.com>
- <20161110122420.GH9996@8bytes.org>
- <1ae5dc0f-2e59-3e10-a61a-1f5452ad560f@arm.com>
-Message-ID: <20161110183728.GH15943@e104818-lin.cambridge.arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 10 Nov 2016 13:38:43 -0500
+Subject: [PATCH V2 5/5] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1474056395-21843-6-git-send-email-okaya@codeaurora.org>
+References: <1474056395-21843-1-git-send-email-okaya@codeaurora.org>
+ <1474056395-21843-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <f006cd09-f21f-1d3c-d613-0bbca0a2e236@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 02:30:04PM +0000, Robin Murphy wrote:
-> On 10/11/16 12:24, Joerg Roedel wrote:
-> > On Wed, Oct 26, 2016 at 06:43:56PM +0100, Robin Murphy wrote:
-> >> With the new dma_{map,unmap}_resource() functions added to the DMA API
-> >> for the benefit of cases like slave DMA, add suitable implementations to
-> >> the arsenal of our generic layer. Since cache maintenance should not be
-> >> a concern, these can both be standalone callback implementations without
-> >> the need for arch code wrappers.
-> >>
-> >> CC: Joerg Roedel <joro@8bytes.org>
-> >> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> >> ---
-> >>
-> >> v2: Use iommu_dma_unmap_page for symmetry, instead of being sneaky.
-> >>
-> >>  drivers/iommu/dma-iommu.c | 13 +++++++++++++
-> >>  include/linux/dma-iommu.h |  4 ++++
-> >>  2 files changed, 17 insertions(+)
-> >>
-> >> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> >> index c5ab8667e6f2..a2fd90a6a782 100644
-> >> --- a/drivers/iommu/dma-iommu.c
-> >> +++ b/drivers/iommu/dma-iommu.c
-> >> @@ -624,6 +624,19 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
-> >>  	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), sg_dma_address(sg));
-> >>  }
-> >>  
-> >> +dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-> >> +		size_t size, enum dma_data_direction dir, unsigned long attrs)
-> >> +{
-> >> +	return iommu_dma_map_page(dev, phys_to_page(phys), offset_in_page(phys),
-> >> +			size, dma_direction_to_prot(dir, false) | IOMMU_MMIO);
-> >> +}
-> > 
-> > Isn't the whole point of map_resource that we can map regions which have
-> > no 'struct page' associated? The use phys_to_page() will certainly not
-> > do the right thing here.
+On 9/16/2016 4:06 PM, Sinan Kaya wrote:
+> An endpoint is allowed to issue CRS following an FLR request to indicate
+> that it is not ready to accept new requests. Changing the polling mechanism
+> in FLR wait function to go read the vendor ID instead of the command/status
+> register. A CRS indication will only be given if the address to be read is
+> vendor ID.
 > 
-> Perhaps it's a bit cheeky, but the struct page pointer is never
-> dereferenced - the only thing iommu_dma_map_page() does with it is
-> immediately convert it back again. Is there ever a case where
-> page_to_phys(phys_to_page(phys)) != phys ?
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index e913467..1def11e 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3729,7 +3729,8 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  
+>  	do {
+>  		msleep(100);
+> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> +		pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +					   60 * 1000);
 
-Without SPARSEMEM_VMEMMAP or FLATMEM, it wouldn't work. For example,
-__page_to_pfn() in the SPARSEMEM case, used by page_to_phys(), even
-accesses the page structure (through page_to_section()).
+We found out during Mellanox CX3 testing that the card returns the vendor
+ID earlier during FLR while other cards are OK with this implementaiton. 
 
-If the page struct is not relevant to the iommu code in question, you
-could factor it out into an __iommu_dma_map_pfn(). Or maybe move the
-whole logic to iommu_dma_map_resource() and call it from
-iommu_dma_map_page() with the page_to_phys(page) argument.
+I think we need both of the reads to support the CRS for the endpoints
+and also the command id register read to make sure endpoint init is complete.
+
+
+>  	} while (i++ < 10 && id == ~0);
+>  
+>  	if (id == ~0)
+> 
+
 
 -- 
-Catalin
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
