@@ -1,191 +1,50 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Nov 2016 17:20:27 -0500
-Subject: [PATCH v6 6/9] drm/hisilicon/hibmc: Add encoder for VDAC
-In-Reply-To: <1477639682-22520-7-git-send-email-zourongrong@gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-7-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbKZ5kRbWPOep8soyMWp+Y14eFYALYiUhyyy04yGgMjQgQ@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 10 Nov 2016 23:21:17 +0100
+Subject: [PATCH v2 1/2] mmc: sdhci-iproc: Add brcm,sdhci-iproc compat
+ string in bindings document
+In-Reply-To: <1478018277-10097-2-git-send-email-scott.branden@broadcom.com>
+References: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
+ <1478018277-10097-2-git-send-email-scott.branden@broadcom.com>
+Message-ID: <CAPDyKFrGwqYEjfOBjbcDiLDsOatf_wZ7pc90CpCENtbTHdXkvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Add encoder funcs and helpers for VDAC.
+On 1 November 2016 at 17:37, Scott Branden <scott.branden@broadcom.com> wrote:
+> Adds brcm,sdhci-iproc compat string to DT bindings document for
+> the iProc SDHCI driver.
 >
-> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+
+Thanks, applied for next!
+
+Kind regards
+Uffe
+
 > ---
->  drivers/gpu/drm/hisilicon/hibmc/Makefile         |  2 +-
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |  6 ++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  2 +
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 89 ++++++++++++++++++++++++
->  4 files changed, 98 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+>  Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> index 72e107e..e04f114 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> @@ -1,5 +1,5 @@
->  ccflags-y := -Iinclude/drm
-> -hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
-> +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
+> diff --git a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+> index be56d2b..954561d 100644
+> --- a/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/brcm,sdhci-iproc.txt
+> @@ -7,6 +7,15 @@ Required properties:
+>  - compatible : Should be one of the following
+>                "brcm,bcm2835-sdhci"
+>                "brcm,sdhci-iproc-cygnus"
+> +              "brcm,sdhci-iproc"
+> +
+> +Use brcm2835-sdhci for Rasperry PI.
+> +
+> +Use sdhci-iproc-cygnus for Broadcom SDHCI Controllers
+> +restricted to 32bit host accesses to SDHCI registers.
+> +
+> +Use sdhci-iproc for Broadcom SDHCI Controllers that allow standard
+> +8, 16, 32-bit host access to SDHCI register.
 >
->  obj-$(CONFIG_DRM_HISI_HIBMC)   +=hibmc-drm.o
->  #obj-y += hibmc-drm.o
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> index 303cd36..ba191e1 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> @@ -125,6 +125,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
->                 return ret;
->         }
+>  - clocks : The clock feeding the SDHCI controller.
 >
-> +       ret = hibmc_encoder_init(hidev);
-> +       if (ret) {
-> +               DRM_ERROR("failed to init encoder\n");
-> +               return ret;
-> +       }
-> +
->         return 0;
->  }
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> index 5731ec2..401cea4 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> @@ -47,6 +47,7 @@ struct hibmc_drm_device {
->         struct drm_device  *dev;
->         struct drm_plane plane;
->         struct drm_crtc crtc;
-> +       struct drm_encoder encoder;
-
-Same comment here, you don't need to keep track of this
-
->         bool mode_config_initialized;
->
->         /* ttm */
-> @@ -87,6 +88,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
->
->  int hibmc_plane_init(struct hibmc_drm_device *hidev);
->  int hibmc_crtc_init(struct hibmc_drm_device *hidev);
-> +int hibmc_encoder_init(struct hibmc_drm_device *hidev);
->  int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
->  void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-> new file mode 100644
-> index 0000000..953f659
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-> @@ -0,0 +1,89 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <drm/drm_atomic_helper.h>
-> +#include <drm/drm_crtc_helper.h>
-> +
-> +#include "hibmc_drm_drv.h"
-> +#include "hibmc_drm_regs.h"
-> +
-> +static int defx = 800;
-> +static int defy = 600;
-> +
-> +module_param(defx, int, 0444);
-> +module_param(defy, int, 0444);
-> +MODULE_PARM_DESC(defx, "default x resolution");
-> +MODULE_PARM_DESC(defy, "default y resolution");
-
-Not used, and I'm not sure these are a good idea
-
-> +
-> +static void hibmc_encoder_disable(struct drm_encoder *encoder)
-> +{
-> +}
-> +
-> +static void hibmc_encoder_enable(struct drm_encoder *encoder)
-> +{
-> +}
-
-Null-checked, no need to stub
-
-> +
-> +static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
-> +                                  struct drm_display_mode *mode,
-> +                                  struct drm_display_mode *adj_mode)
-> +{
-> +       u32 reg;
-> +       struct drm_device *dev = encoder->dev;
-> +       struct hibmc_drm_device *hidev = dev->dev_private;
-> +
-> +       /* just open DISPLAY_CONTROL_HISILE register bit 3:0*/
-> +       reg = readl(hidev->mmio + DISPLAY_CONTROL_HISILE);
-> +       reg |= 0xf;
-
-Can you just pull this into a #define instead of explaining in the comment?
-
-> +       writel(reg, hidev->mmio + DISPLAY_CONTROL_HISILE);
-> +}
-> +
-> +static int hibmc_encoder_atomic_check(struct drm_encoder *encoder,
-> +                                     struct drm_crtc_state *crtc_state,
-> +                                     struct drm_connector_state *conn_state)
-> +{
-> +       return 0;
-> +}
-
-null-checked, remove stub
-
-> +
-> +static const struct drm_encoder_helper_funcs hibmc_encoder_helper_funcs = {
-> +       .mode_set = hibmc_encoder_mode_set,
-> +       .disable = hibmc_encoder_disable,
-> +       .enable = hibmc_encoder_enable,
-> +       .atomic_check = hibmc_encoder_atomic_check,
-> +};
-> +
-> +static const struct drm_encoder_funcs hibmc_encoder_encoder_funcs = {
-> +       .destroy = drm_encoder_cleanup,
-> +};
-> +
-> +int hibmc_encoder_init(struct hibmc_drm_device *hidev)
-> +{
-> +       struct drm_device *dev = hidev->dev;
-> +       struct drm_encoder *encoder = &hidev->encoder;
-> +       int ret;
-> +
-> +       encoder->possible_crtcs = 0x1;
-> +       ret = drm_encoder_init(dev, encoder, &hibmc_encoder_encoder_funcs,
-> +                              DRM_MODE_ENCODER_DAC, NULL);
-> +       if (ret) {
-> +               DRM_ERROR("failed to init encoder\n");
-
-print ret
-
-> +               return ret;
-> +       }
-> +
-> +       drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
-> +       return 0;
-> +}
 > --
-> 1.9.1
+> 2.5.0
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
