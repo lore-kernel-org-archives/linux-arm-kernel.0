@@ -1,322 +1,122 @@
-From: uwe@kleine-koenig.org (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 10 Nov 2016 14:57:21 +0100
-Subject: [PATCH v2 2/2] ARM: dts: add support for Turris Omnia
-In-Reply-To: <20161110135721.13098-1-uwe@kleine-koenig.org>
-References: <20161110135721.13098-1-uwe@kleine-koenig.org>
-Message-ID: <20161110135721.13098-2-uwe@kleine-koenig.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Nov 2016 15:07:06 +0100
+Subject: [PATCH v3 1/2] ARM: EXYNOS: Remove static mapping of SCU SFR
+In-Reply-To: <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
+References: <1478693755-11953-1-git-send-email-pankaj.dubey@samsung.com>
+ <5066943.nydi3GQ3KP@wuerfel>
+ <a43af947-6002-bc65-f73b-02d57a78d6cb@samsung.com>
+Message-ID: <3268366.06J2EThgp2@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This machine is an open hardware router by cz.nic driven by a
-Marvell Armada 385.
+On Thursday, November 10, 2016 6:07:54 PM CET pankaj.dubey wrote:
+> On Thursday 10 November 2016 05:24 PM, Arnd Bergmann wrote:
+> > On Wednesday, November 9, 2016 5:45:54 PM CET Pankaj Dubey wrote:
+> 
+> Sorry, I missed this part and did not check with CONFIG_SMP disabled.
+> 
+> > arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+> > pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to `exynos_scu_enable'
+> > arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+> > suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to `exynos_scu_enable'
+> > 
+> > Please fix. I have applied a patch locally (see below), but don't know
+> > if that is the best solution. As we seem to duplicate that code across
+> > several platforms, I wonder why we don't just put it into the core scu
+> > implementation.
+> > 
+> 
+> When I checked scu_enable declaration it is defined in
+> arch/arm/include/asm/smp_scu.h as:
+> 
+> #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+> void scu_enable(void __iomem *scu_base);
+> #else
+> static inline void scu_enable(void __iomem *scu_base) {}
+> #endif
+> 
+> So if CONFIG_SMP is disable then there is no sense of exynos_scu_enable
+> as well. So wow about using below patch?
+> 
+> --------------------------------------------------------
+> 
+> Subject: [PATCH] ARM: exynos: fix build fail due to exynos_scu_enable
+> 
+> Build failed if we disable CONFIG_SMP as shown below:
+> 
+> arch/arm/mach-exynos/pm.o: In function `exynos_enter_aftr':
+> pm.c:(.text.exynos_enter_aftr+0xec): undefined reference to
+> `exynos_scu_enable'
+> arch/arm/mach-exynos/suspend.o: In function `exynos_pm_resume':
+> suspend.c:(.text.exynos_pm_resume+0x78): undefined reference to
+> `exynos_scu_enable'
+> 
+> Since scu_enable is defined only in case CONFIG_SMP and CONFIG_HAVE_ARM_SCU
+> lets move exynos_scu_enable also under these two macros.
+> 
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/common.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> index fb12d11..03fdb79 100644
+> --- a/arch/arm/mach-exynos/common.h
+> +++ b/arch/arm/mach-exynos/common.h
+> @@ -156,7 +156,12 @@ extern void exynos_cpu_restore_register(void);
+>  extern void exynos_pm_central_suspend(void);
+>  extern int exynos_pm_central_resume(void);
+>  extern void exynos_enter_aftr(void);
+> +#if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
+>  extern int exynos_scu_enable(void);
+> +#else
+> +static inline void exynos_scu_enable(void) {}
+> +#endif
 
-Signed-off-by: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
----
-Compared to the (implict) v1, the following was changed:
+Yes, I think that would work, but you can drop the CONFIG_HAVE_ARM_SCU
+check because of
 
- - disable rtc
- - change compatible to cznic,turris-omnia
+menuconfig ARCH_EXYNOS
+        ....
+        select HAVE_ARM_SCU if SMP
+        ...
 
-The following components are working:
+> Of-course your idea to move it in core SCU file is also good that we
+> lots of duplication in different architecture can be avoided.
+> 
+> In that case I can think of following patch:
+> 
+> [PATCH] ARM: scu: use SCU device node to enable SCU
+> 
+> Many platforms are duplicating code for enabling SCU, lets add
+> common code to enable SCU using SCU device node so the duplication in
+> each platform can be avoided.
+> 
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
 
- - WAN port
- - eMMC
- - UART0
- - USB
- - mSATA
+That looks good too. I also checked the other callers of
+scu_enable(), and we have only three classes here:
 
-Wireless fails to probe, didn't debug this up to now.
-I already see the DSA devices (with an additional change not included here),
-but sending and receiving doesn't work yet.
+a) of_iomap: berlin, exynos, mvebu, realview, rockchip, socfpga, sti, ux500, vexpress
+b) ioremap(scu_a9_get_base()): bcm63xx, bcm, hisi, zx
+c) iotable_init, scu_a9_get_base(): imx, omap4, tegra, zynq
+d) ioremap(constant): shmobile, spear13xx
 
-SFP is missing as I cannot test it. UART1 is untested, but I'd be
-surprised if it didn't work.
+I checked that none of the ones in category c) actually use the address early,
+so we can easily change four into b).
 
-IMHO it makes sense to add the current state and fix the remaining stuff
-incrementally.
+I also think that we need to keep both a) and b) because the output of
+scu_a9_get_base() might be incorrect in some chips, and not all dtb
+files have an SCU in them.
 
-Best regards
-Uwe
----
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/armada-385-turris-omnia.dts | 257 ++++++++++++++++++++++++++
- 2 files changed, 258 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-385-turris-omnia.dts
+If we make the common SCU setup check DT first and then fall back to
+scu_a9_get_base(), that means we have covered almost all cases, unless
+I'm missing a problem with that approach. It would be nice to
+check spear13xx and the Cortex-A9 based mach-shmobile variants
+(emev2, r8a7779, and sh73a0) to see if they could also share
+that implementation.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index befcd2619902..f1d3b9ff257e 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -920,6 +920,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
- 	armada-385-db-ap.dtb \
- 	armada-385-linksys-caiman.dtb \
- 	armada-385-linksys-cobra.dtb \
-+	armada-385-turris-omnia.dtb \
- 	armada-388-clearfog.dtb \
- 	armada-388-db.dtb \
- 	armada-388-gp.dtb \
-diff --git a/arch/arm/boot/dts/armada-385-turris-omnia.dts b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-new file mode 100644
-index 000000000000..28e45d816120
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-385-turris-omnia.dts
-@@ -0,0 +1,257 @@
-+/*
-+ * Device Tree file for the Turris Omnia
-+ * Schematic available at https://www.turris.cz/doc/_media/rtrom01-schema.pdf
-+ *
-+ * Copyright (C) 2016 Uwe Kleine-K?nig <uwe@kleine-koenig.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is licensed under the terms of the GNU General Public
-+ *     License version 2.  This program is licensed "as is" without
-+ *     any warranty of any kind, whether express or implied.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "armada-385.dtsi"
-+
-+/ {
-+	model = "Turris Omnia";
-+	compatible = "cznic,turris-omnia", "marvell,armada385", "marvell,armada380";
-+
-+	chosen {
-+		stdout-path = &uart0;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x40000000>; /* 1024 MB */
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
-+			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000>;
-+
-+		internal-regs {
-+
-+			/* USB part of the eSATA/USB 2.0 port */
-+			usb at 58000 {
-+				status = "okay";
-+			};
-+
-+			rtc at a3800 {
-+				/*
-+				 * There are several errata for this device
-+				 * still unimplemented. Without some love it only reports 
-+				 * 2016-12-19 22:00:24. So disable for now.
-+				 */
-+				status = "disabled";
-+			};
-+
-+			sata at a8000 {
-+				status = "okay";
-+			};
-+
-+			sdhci at d8000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&sdhci_pins>;
-+				status = "okay";
-+
-+				bus-width = <8>;
-+				no-1-8-v;
-+				non-removable;
-+			};
-+
-+			usb3 at f0000 {
-+				status = "okay";
-+			};
-+
-+			usb3 at f8000 {
-+				status = "okay";
-+			};
-+		};
-+
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				/* Port 0, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 2,0 {
-+				/* Port 2, Lane 0 */
-+				status = "okay";
-+			};
-+
-+			pcie at 3,0 {
-+				/* Port 3, Lane 0 */
-+				status = "okay";
-+			};
-+		};
-+	};
-+};
-+
-+&eth0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ge0_rgmii_pins>;
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+};
-+
-+&eth1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ge1_rgmii_pins>;
-+	status = "okay";
-+	phy-mode = "rgmii-id";
-+
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+};
-+
-+/* WAN port */
-+&eth2 {
-+	status = "okay";
-+	phy-mode = "sgmii";
-+	phy = <&phy1>;
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+	status = "okay";
-+
-+	i2cmux at 70 {
-+		compatible = "nxp,pca9547";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x70>;
-+		status = "okay";
-+
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			status = "okay";
-+
-+			/* STM32F0 at address 0x2a */
-+			/* leds device at address 0x2b */
-+
-+			eeprom at 54 {
-+				/* holds configuration about RAM, evaluated by bootloader */
-+				compatible = "at,24c64";
-+				reg = <0x54>;
-+			};
-+		};
-+
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+
-+			/* ATSHA204A at address 0x64 */
-+		};
-+
-+		i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+
-+			/* exposed on pin header */
-+		};
-+	};
-+};
-+
-+&mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mdio_pins>;
-+	status = "okay";
-+
-+	phy1: phy at 1 {
-+		status = "okay";
-+		compatible = "ethernet-phy-id0141.0DD1", "ethernet-phy-ieee802.3-c22";
-+		reg = <1>;
-+	};
-+
-+	/* There is a Switch (MV88E7176) at address 0x10 */
-+};
-+
-+&pinctrl {
-+	spi0cs1_pins: spi0-pins-0cs1 {
-+		marvell,pins = "mpp26";
-+		marvell,function = "spi0";
-+	};
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins &spi0cs1_pins>;
-+	status = "okay";
-+
-+	spi-nor at 0 {
-+		compatible = "spansion,s25fl164k", "jedec,spi-nor";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+
-+		partition at 0 {
-+			reg = <0x0 0x00100000>;
-+			label = "U-Boot";
-+		};
-+
-+		partition at 1 {
-+			reg = <0x00100000 0x00700000>;
-+			label = "Rescue system";
-+		};
-+	};
-+
-+	/* @1 is on pin header */
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "okay";
-+};
--- 
-2.10.2
+	Arnd
