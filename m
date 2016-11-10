@@ -1,40 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  9 Nov 2016 17:13:57 -0800
-Subject: [PATCH] arm: dts: qcom: Fix ipq board clock rates
-Message-ID: <20161110011357.25853-1-sboyd@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Nov 2016 19:18:27 -0600
+Subject: [PATCH v5 5/8] Documentation: bindings: decouple juno specific
+ details from generic binding
+In-Reply-To: <1478148731-11712-6-git-send-email-sudeep.holla@arm.com>
+References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
+ <1478148731-11712-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20161110011827.pzbiiv47osty4pzf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ipq board has these rates as 25MHz, and not 19.2 and 27. I
-copy/pasted from other boards that have those rates but forgot
-to fix the rates here.
+On Wed, Nov 02, 2016 at 10:52:08PM -0600, Sudeep Holla wrote:
+> Since SCPI is a generic protocol and the bindings are intended to be
+> generic, we need to decouple all the platform specific binding details
+> out of the generic bindings.
+> 
+> This patch moves are the Juno platform specific details into a separate
+> binding document.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 20 ++++++-----------
+>  .../devicetree/bindings/arm/juno,scpi.txt          | 26 ++++++++++++++++++++++
+>  2 files changed, 33 insertions(+), 13 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/juno,scpi.txt
 
-Fixes: 30fc4212d541 ("arm: dts: qcom: Add more board clocks")
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-ipq8064.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/qcom-ipq8064.dtsi b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-index 2e375576ffd0..76f4e8921d58 100644
---- a/arch/arm/boot/dts/qcom-ipq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq8064.dtsi
-@@ -65,13 +65,13 @@
- 		cxo_board {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-frequency = <19200000>;
-+			clock-frequency = <25000000>;
- 		};
- 
- 		pxo_board {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
--			clock-frequency = <27000000>;
-+			clock-frequency = <25000000>;
- 		};
- 
- 		sleep_clk: sleep_clk {
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Rob Herring <robh@kernel.org>
