@@ -1,35 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 10 Nov 2016 17:16:19 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <b347ddbc-5066-641c-8101-289fb28624a3@arm.com>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <b347ddbc-5066-641c-8101-289fb28624a3@arm.com>
-Message-ID: <20161110161619.GK2078@8bytes.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Nov 2016 16:17:30 +0000
+Subject: [PATCH] iommu/dma-iommu: properly respect configured address
+ space size
+In-Reply-To: <20161110155938.GI2078@8bytes.org>
+References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
+ <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
+ <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
+ <20161110155938.GI2078@8bytes.org>
+Message-ID: <9d239c5c-a4ed-f177-319f-7c467a6059ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 04:07:08PM +0000, Robin Murphy wrote:
-> On 10/11/16 15:46, Joerg Roedel wrote:
-> > On Fri, Nov 04, 2016 at 11:24:06AM +0000, Eric Auger wrote:
-> >> +	resource_list_for_each_entry(window, &bridge->windows) {
-> >> +		if (resource_type(window->res) != IORESOURCE_MEM &&
-> >> +		    resource_type(window->res) != IORESOURCE_IO)
-> >> +			continue;
-> > 
-> > Why do you care about IO resources?
+On 10/11/16 15:59, Joerg Roedel wrote:
+> On Tue, Nov 08, 2016 at 11:37:23AM +0000, Robin Murphy wrote:
+>> TBH I've been pondering ripping the size stuff out of dma-iommu, as it
+>> all stems from me originally failing to understand what dma_32bit_pfn is
+>> actually for.
 > 
-> [since this is essentially code I wrote]
+> The point of dma_32bit_pfn is to allocate dma-address below 4G by
+> default. This is a performance optimization so that even devices capable
+> of 64bit DMA are using SAC by default instead of DAC.
 > 
-> Because they occupy some area of the PCI address space, therefore I
-> assumed that, like memory windows, they would be treated as P2P. Is that
-> not the case?
+> Since it is the goal to share a dma-iommu implemenation between
+> architectures, I would rather prefer not to rip this stuff out.
 
-No, not at all. The IO-space is completly seperate from the MEM-space.
-They are two different address-spaces, addressing different things. And
-the IO-space is also not translated by any IOMMU I am aware of.
+Oh, I didn't mean rip it out entirely, just get rid of the bogus
+assumption that it's the "size" of the domain, especially when given a
+>32-bit DMA mask, since that defeats the very optimisation I do now
+understand (although it might still be OK for platform devices where
+SAC/DAC doesn't apply, to avoid the rb_last() overhead every time).
 
+>From the patch I've started, "rip it out" turns out to actually be
+mostly "rewrite the comments" anyway - I'll post something soon.
 
-	Joerg
+Robin.
