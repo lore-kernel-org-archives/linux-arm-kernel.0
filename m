@@ -1,859 +1,213 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Nov 2016 12:35:18 -0500
-Subject: [PATCH v6 1/9] drm/hisilicon/hibmc: Add hisilicon hibmc drm
- master driver
-In-Reply-To: <1477639682-22520-2-git-send-email-zourongrong@gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-2-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbJTzmMNLXauNjrXE3-fZCus=Q4S8Hm=hyo_GoyC-QOs1A@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 10 Nov 2016 10:46:01 -0700
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
+References: <582371FB.2040808@redhat.com> <20161109192303.GD15676@cbox>
+ <20161109203145.GO17771@arm.com>
+ <20161109151709.74927f83@t450s.home>
+ <20161109222522.GS17771@arm.com>
+ <20161109162458.39594fdb@t450s.home>
+ <20161109233847.GT17771@arm.com>
+ <20161109165957.62c1eb61@t450s.home>
+ <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
+ <20161109175517.174e7803@t450s.home>
+ <20161110020130.GA19108@arm.com>
+ <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
+Message-ID: <20161110104601.0939ba9a@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Add DRM master driver for Hisilicon Hibmc SoC which used for
-> Out-of-band management. Blow is the general hardware connection,
-> both the Hibmc and the host CPU are on the same mother board.
->
-> +----------+       +----------+
-> |          | PCIe  |  Hibmc   |
-> |host CPU( |<----->| display  |
-> |arm64,x86)|       |subsystem |
-> +----------+       +----------+
->
-> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
-> ---
->  drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
->  drivers/gpu/drm/hisilicon/Makefile                |   1 +
->  drivers/gpu/drm/hisilicon/hibmc/Kconfig           |   7 +
->  drivers/gpu/drm/hisilicon/hibmc/Makefile          |   5 +
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 269 ++++++++++++++++++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  35 +++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c |  85 +++++++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h |  28 +++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 212 +++++++++++++++++
->  9 files changed, 643 insertions(+)
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
->  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
->
-> diff --git a/drivers/gpu/drm/hisilicon/Kconfig b/drivers/gpu/drm/hisilicon/Kconfig
-> index 558c61b..2fd2724 100644
-> --- a/drivers/gpu/drm/hisilicon/Kconfig
-> +++ b/drivers/gpu/drm/hisilicon/Kconfig
-> @@ -2,4 +2,5 @@
->  # hisilicon drm device configuration.
->  # Please keep this list sorted alphabetically
->
-> +source "drivers/gpu/drm/hisilicon/hibmc/Kconfig"
->  source "drivers/gpu/drm/hisilicon/kirin/Kconfig"
-> diff --git a/drivers/gpu/drm/hisilicon/Makefile b/drivers/gpu/drm/hisilicon/Makefile
-> index e3f6d49..c8155bf 100644
-> --- a/drivers/gpu/drm/hisilicon/Makefile
-> +++ b/drivers/gpu/drm/hisilicon/Makefile
-> @@ -2,4 +2,5 @@
->  # Makefile for hisilicon drm drivers.
->  # Please keep this list sorted alphabetically
->
-> +obj-$(CONFIG_DRM_HISI_HIBMC) += hibmc/
->  obj-$(CONFIG_DRM_HISI_KIRIN) += kirin/
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/Kconfig b/drivers/gpu/drm/hisilicon/hibmc/Kconfig
-> new file mode 100644
-> index 0000000..a9af90d
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/Kconfig
-> @@ -0,0 +1,7 @@
-> +config DRM_HISI_HIBMC
-> +       tristate "DRM Support for Hisilicon Hibmc"
-> +       depends on DRM && PCI
-> +
-> +       help
-> +         Choose this option if you have a Hisilicon Hibmc soc chipset.
-> +         If M is selected the module will be called hibmc-drm.
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> new file mode 100644
-> index 0000000..97cf4a0
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-> @@ -0,0 +1,5 @@
-> +ccflags-y := -Iinclude/drm
-> +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_power.o
-> +
-> +obj-$(CONFIG_DRM_HISI_HIBMC)   +=hibmc-drm.o
+On Thu, 10 Nov 2016 12:14:40 +0100
+Auger Eric <eric.auger@redhat.com> wrote:
 
-nit: Improper spacing here
+> Hi Will, Alex,
+> 
+> On 10/11/2016 03:01, Will Deacon wrote:
+> > On Wed, Nov 09, 2016 at 05:55:17PM -0700, Alex Williamson wrote:  
+> >> On Thu, 10 Nov 2016 01:14:42 +0100
+> >> Auger Eric <eric.auger@redhat.com> wrote:  
+> >>> On 10/11/2016 00:59, Alex Williamson wrote:  
+> >>>> On Wed, 9 Nov 2016 23:38:50 +0000
+> >>>> Will Deacon <will.deacon@arm.com> wrote:  
+> >>>>> On Wed, Nov 09, 2016 at 04:24:58PM -0700, Alex Williamson wrote:    
+> >>>>>> The VFIO_IOMMU_MAP_DMA ioctl is a contract, the user ask to map a range
+> >>>>>> of IOVAs to a range of virtual addresses for a given device.  If VFIO
+> >>>>>> cannot reasonably fulfill that contract, it must fail.  It's up to QEMU
+> >>>>>> how to manage the hotplug and what memory regions it asks VFIO to map
+> >>>>>> for a device, but VFIO must reject mappings that it (or the SMMU by
+> >>>>>> virtue of using the IOMMU API) know to overlap reserved ranges.  So I
+> >>>>>> still disagree with the referenced statement.  Thanks,      
+> >>>>>
+> >>>>> I think that's a pity. Not only does it mean that both QEMU and the kernel
+> >>>>> have more work to do (the former has to carve up its mapping requests,
+> >>>>> whilst the latter has to check that it is indeed doing this), but it also
+> >>>>> precludes the use of hugepage mappings on the IOMMU because of reserved
+> >>>>> regions. For example, a 4k hole someplace may mean we can't put down 1GB
+> >>>>> table entries for the guest memory in the SMMU.
+> >>>>>
+> >>>>> All this seems to do is add complexity and decrease performance. For what?
+> >>>>> QEMU has to go read the reserved regions from someplace anyway. It's also
+> >>>>> the way that VFIO works *today* on arm64 wrt reserved regions, it just has
+> >>>>> no way to identify those holes at present.    
+> >>>>
+> >>>> Sure, that sucks, but how is the alternative even an option?  The user
+> >>>> asked to map something, we can't, if we allow that to happen now it's a
+> >>>> bug.  Put the MSI doorbells somewhere that this won't be an issue.  If
+> >>>> the platform has it fixed somewhere that this is an issue, don't use
+> >>>> that platform.  The correctness of the interface is more important than
+> >>>> catering to a poorly designed system layout IMO.  Thanks,    
+> >>>
+> >>> Besides above problematic, I started to prototype the sysfs API. A first
+> >>> issue I face is the reserved regions become global to the iommu instead
+> >>> of characterizing the iommu_domain, ie. the "reserved_regions" attribute
+> >>> file sits below an iommu instance (~
+> >>> /sys/class/iommu/dmar0/intel-iommu/reserved_regions ||
+> >>> /sys/class/iommu/arm-smmu0/arm-smmu/reserved_regions).
+> >>>
+> >>> MSI reserved window can be considered global to the IOMMU. However PCIe
+> >>> host bridge P2P regions rather are per iommu-domain.  
+> > 
+> > I don't think we can treat them as per-domain, given that we want to
+> > enumerate this stuff before we've decided to do a hotplug (and therefore
+> > don't have a domain).  
+> That's the issue indeed. We need to wait for the PCIe device to be
+> connected to the iommu. Only on the VFIO SET_IOMMU we get the
+> comprehensive list of P2P regions that can impact IOVA mapping for this
+> iommu. This removes any advantage of sysfs API over previous VFIO
+> capability chain API for P2P IOVA range enumeration at early stage.
 
-> +#obj-y += hibmc-drm.o
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> new file mode 100644
-> index 0000000..4669d42
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> @@ -0,0 +1,269 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/console.h>
-> +
-> +#include "hibmc_drm_drv.h"
-> +#include "hibmc_drm_regs.h"
-> +#include "hibmc_drm_power.h"
+For use through vfio we know that an iommu_domain is minimally composed
+of an iommu_group and we can find all the p2p resources of that group
+referencing /proc/iomem, at least for PCI-based groups.  This is the
+part that I don't think any sort of iommu sysfs attributes should be
+duplicating.
 
-nit: Alphabetize headers
+> >>> Do you confirm the attribute file should contain both global reserved
+> >>> regions and all per iommu_domain reserved regions?
+> >>>
+> >>> Thoughts?  
+> >>
+> >> I don't think we have any business describing IOVA addresses consumed
+> >> by peer devices in an IOMMU sysfs file.  If it's a separate device it
+> >> should be exposed by examining the rest of the topology.  Regions
+> >> consumed by PCI endpoints and interconnects are already exposed in
+> >> sysfs.  In fact, is this perhaps a more accurate model for these MSI
+> >> controllers too?  Perhaps they should be exposed in the bus topology
+> >> somewhere as consuming the IOVA range.  
+> Currently on x86 the P2P regions are not checked when allowing
+> passthrough. Aren't we more papist that the pope? As Don mentioned,
+> shouldn't we simply consider that a platform that does not support
+> proper ACS is not candidate for safe passthrough, like Juno?
 
-> +
-> +static const struct file_operations hibmc_fops = {
-> +       .owner          = THIS_MODULE,
-> +       .open           = drm_open,
-> +       .release        = drm_release,
-> +       .unlocked_ioctl = drm_ioctl,
-> +#ifdef CONFIG_COMPAT
+There are two sides here, there's the kernel side vfio and there's how
+QEMU makes use of vfio.  On the kernel side, we create iommu groups as
+the set of devices we consider isolated, that doesn't necessarily mean
+that there isn't p2p within the group, in fact that potential often
+determines the composition of the group.  It's the user's problem how
+to deal with that potential.  When I talk about the contract with
+userspace, I consider that to be at the iommu mapping, ie. for
+transactions that actually make it to the iommu.  In the case of x86,
+we know that DMA mappings overlapping the MSI doorbells won't be
+translated correctly, it's not a valid mapping for that range, and
+therefore the iommu driver backing the IOMMU API should describe that
+reserved range and reject mappings to it.  For devices downstream of
+the IOMMU, whether they be p2p or MSI controllers consuming fixed IOVA
+space, I consider these to be problems beyond the scope of the IOMMU
+API, and maybe that's where we've been going wrong all along.
 
-drm_compat_ioctl is now initialized to NULL, so you can remove the #ifdef
+Users like QEMU can currently discover potential p2p conflicts by
+looking at the composition of an iommu group and taking into account
+the host PCI resources of each device.  We don't currently do this,
+though we probably should.  The reason we typically don't run into
+problems with this is that (again) x86 has a fairly standard memory
+layout.  Potential p2p regions are typically in an MMIO hole in the
+host that sufficiently matches an MMIO hole in the guest.  So we don't
+often have VM RAM, which could be a DMA target, matching those p2p
+addresses.  We also hope that any serious device assignment users have
+singleton iommu groups, ie. the IO subsystem is designed to support
+proper, fine grained isolation.
+ 
+> At least we can state the feature also is missing on x86 and it would be
+> nice to report the risk to the userspace and urge him to opt-in.
 
-> +       .compat_ioctl   = drm_compat_ioctl,
-> +#endif
-> +       .poll           = drm_poll,
-> +       .read           = drm_read,
-> +       .llseek         = no_llseek,
-> +};
-> +
-> +static int hibmc_enable_vblank(struct drm_device *dev, unsigned int pipe)
-> +{
-> +       return 0;
-> +}
-> +
-> +static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
-> +{
-> +}
-> +
-> +static struct drm_driver hibmc_driver = {
-> +       .fops                   = &hibmc_fops,
-> +       .name                   = "hibmc",
-> +       .date                   = "20160828",
-> +       .desc                   = "hibmc drm driver",
-> +       .major                  = 1,
-> +       .minor                  = 0,
-> +       .get_vblank_counter     = drm_vblank_no_hw_counter,
-> +       .enable_vblank          = hibmc_enable_vblank,
-> +       .disable_vblank         = hibmc_disable_vblank,
-> +};
-> +
-> +static int hibmc_pm_suspend(struct device *dev)
-> +{
-> +       return 0;
-> +}
-> +
-> +static int hibmc_pm_resume(struct device *dev)
-> +{
-> +       return 0;
-> +}
-> +
-> +static const struct dev_pm_ops hibmc_pm_ops = {
-> +       SET_SYSTEM_SLEEP_PM_OPS(hibmc_pm_suspend,
-> +                               hibmc_pm_resume)
-> +};
-> +
-> +static int hibmc_hw_config(struct hibmc_drm_device *hidev)
-> +{
-> +       unsigned int reg;
-> +
-> +       /* On hardware reset, power mode 0 is default. */
-> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
-> +
-> +       /* Enable display power gate & LOCALMEM power gate*/
-> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
-> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
-> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
-> +       reg |= HIBMC_CURR_GATE_DISPLAY(ON);
-> +       reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
-> +
-> +       hibmc_set_current_gate(hidev, reg);
-> +
-> +       /* Reset the memory controller. If the memory controller
-> +        * is not reset in chip,the system might hang when sw accesses
-> +        * the memory.The memory should be resetted after
-> +        * changing the MXCLK.
-> +        */
-> +       reg = readl(hidev->mmio + HIBMC_MISC_CTRL);
-> +       reg &= ~HIBMC_MSCCTL_LOCALMEM_RESET_MASK;
-> +       reg |= HIBMC_MSCCTL_LOCALMEM_RESET(RESET);
-> +       writel(reg, hidev->mmio + HIBMC_MISC_CTRL);
-> +
-> +       reg &= ~HIBMC_MSCCTL_LOCALMEM_RESET_MASK;
-> +       reg |= HIBMC_MSCCTL_LOCALMEM_RESET(NORMAL);
-> +
-> +       writel(reg, hidev->mmio + HIBMC_MISC_CTRL);
-> +
-> +       /* We can add more initialization as needed. */
-> +
-> +       return 0;
+Sure, but the information is already there, it's "just" a matter of
+QEMU taking it into account, which has some implications that VMs with
+any potential of doing device assignment need to be instantiated with
+address maps compatible with the host system, which is not an easy feat
+for something often considered the ugly step-child of virtualization.
 
-Consider using void return type here to simplify error checking in the
-caller, especially since it looks like you aren't checking the return
-code, anyways :)
+> To me taking into account those P2P still is controversial and induce
+> the bulk of the complexity. Considering the migration use case discussed
+> at LPC while only handling the MSI problem looks much easier.
+> host can choose an MSI base that is QEMU mach-virt friendly, ie. non RAM
+> region. Problem is to satisfy all potential uses though. When migrating,
+> mach-virt still is being used so there should not be any collision. Am I
+> missing some migration weird use cases here? Of course if we take into
+> consideration new host PCIe P2P regions this becomes completely different.
 
-> +}
-> +
-> +static int hibmc_hw_map(struct hibmc_drm_device *hidev)
-> +{
-> +       struct drm_device *dev = hidev->dev;
-> +       struct pci_dev *pdev = dev->pdev;
-> +       resource_size_t addr, size, ioaddr, iosize;
-> +
-> +       ioaddr = pci_resource_start(pdev, 1);
-> +       iosize = MB(2);
-> +
-> +       hidev->mmio = ioremap_nocache(ioaddr, iosize);
+Yep, x86 having a standard MSI range is a nice happenstance, so long as
+we're running an x86 VM, we don't worry about that being a DMA target.
+Running non-x86 VMs on x86 hosts hits this problem, but is several
+orders of magnitude lower priority.
 
-Use devm_ioremap_nocache to avoid managing the resource directly
+> We still have the good old v14 where the user space chose where MSI
+> IOVA's are put without any risk of collision ;-)
+> 
+> >>  If DMA to an IOVA is consumed
+> >> by an intermediate device before it hits the IOMMU vs not being
+> >> translated as specified by the user at the IOMMU, I'm less inclined to
+> >> call that something VFIO should reject.  
+> > 
+> > Oh, so perhaps we've been talking past each other. In all of these cases,
+> > the SMMU can translate the access if it makes it that far. The issue is
+> > that not all accesses do make it that far, because they may be "consumed"
+> > by another device, such as an MSI doorbell or another endpoint. In other
+> > words, I don't envisage a scenario where e.g. some address range just
+> > bypasses the SMMU straight to memory. I realise now that that's not clear
+> > from the slides I presented.
 
-> +
+As above, so long as a transaction that does make it to the iommu is
+translated as prescribed by the user, I have no basis for rejecting a
+user requested translation.  Downstream MSI controllers consuming IOVA
+space is no different than the existing p2p problem that vfio considers
+a userspace issue.
 
-nit: extra space
+> >> However, instantiating a VM
+> >> with holes to account for every potential peer device seems like it
+> >> borders on insanity.  Thanks,  
+> > 
+> > Ok, so rather than having a list of reserved regions under the iommu node,
+> > you're proposing that each region is attributed to the device that "owns"
+> > (consumes) it? I think that can work, but we need to make sure that:
+> > 
+> >  (a) The topology is walkable from userspace (where do you start?)
 
-> +       if (!hidev->mmio) {
-> +               DRM_ERROR("Cannot map mmio region\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       addr = pci_resource_start(pdev, 0);
-> +       size = MB(32);
+For PCI devices userspace can examine the topology of the iommu group
+and exclude MMIO ranges of peer devices based on the BARs, which are
+exposed in various places, pci-sysfs as well as /proc/iomem.  For
+non-PCI or MSI controllers... ???
 
-Pull size and iosize out into #defines with descriptive names
+> >  (b) It also works for platform (non-PCI) devices, that lack much in the
+> >      way of bus hierarchy
 
-> +
-> +       hidev->fb_map = ioremap(addr, size);
+No idea here, without a userspace visible topology the user is in the
+dark as to what devices potentially sit between them and the iommu.
 
-Use devm_ioremap to avoid managing the resource directly.
+> >  (c) It doesn't require Linux to have a driver bound to a device in order
+> >      for the ranges consumed by that device to be advertised (again,
+> >      more of an issue for non-PCI).  
 
-> +       if (!hidev->fb_map) {
-> +               DRM_ERROR("Cannot map framebuffer\n");
-> +               return -ENOMEM;
-> +       }
-> +       hidev->fb_base = addr;
-> +       hidev->fb_size = size;
-> +
-> +       return 0;
-> +}
-> +
-> +static void hibmc_hw_fini(struct hibmc_drm_device *hidev)
-> +{
-> +       if (hidev->mmio)
-> +               iounmap(hidev->mmio);
-> +       if (hidev->fb_map)
-> +               iounmap(hidev->fb_map);
-> +}
+Right, PCI has this problem solved, be more like PCI ;)
 
-You don't need this function if you use the devm variants above
+> > How is this currently advertised for PCI? I'd really like to use the same
+> > scheme irrespective of the bus type.
 
-> +
-> +static int hibmc_hw_init(struct hibmc_drm_device *hidev)
-> +{
-> +       int ret;
-> +
-> +       ret = hibmc_hw_map(hidev);
-> +       if (ret)
-> +               return ret;
-> +
-> +       hibmc_hw_config(hidev);
-> +
-> +       return 0;
-> +}
-> +
-> +static int hibmc_unload(struct drm_device *dev)
-> +{
-> +       struct hibmc_drm_device *hidev = dev->dev_private;
-> +
-> +       hibmc_hw_fini(hidev);
-> +       dev->dev_private = NULL;
-> +       return 0;
-> +}
-> +
-> +static int hibmc_load(struct drm_device *dev, unsigned long flags)
+For all devices within an IOMMU group, /proc/iomem might be the
+solution, but I don't know how the MSI controller works.  If the MSI
+controller belongs to the group, then maybe it's a matter of creating a
+struct device for it that consumes resources and making it show up in
+both the iommu group and /proc/iomem.  An MSI controller shared between
+groups, which already sounds like a bit of a violation of iommu groups,
+would need to be discoverable some other way.  Thanks,
 
-flags isn't used anywhere?
-
-> +{
-> +       struct hibmc_drm_device *hidev;
-> +       int ret;
-> +
-> +       hidev = devm_kzalloc(dev->dev, sizeof(*hidev), GFP_KERNEL);
-> +       if (!hidev)
-
-Print error here?
-
-> +               return -ENOMEM;
-> +       dev->dev_private = hidev;
-> +       hidev->dev = dev;
-> +
-> +       ret = hibmc_hw_init(hidev);
-> +       if (ret)
-> +               goto err;
-> +
-> +       return 0;
-> +
-> +err:
-> +       hibmc_unload(dev);
-> +       DRM_ERROR("failed to initialize drm driver.\n");
-
-Print the return value
-
-> +       return ret;
-> +}
-> +
-> +static int hibmc_pci_probe(struct pci_dev *pdev,
-> +                          const struct pci_device_id *ent)
-> +{
-> +       struct drm_device *dev;
-> +       int ret;
-> +
-> +       dev = drm_dev_alloc(&hibmc_driver, &pdev->dev);
-> +       if (!dev)
-
-Print error here
-
-> +               return -ENOMEM;
-> +
-> +       dev->pdev = pdev;
-> +       pci_set_drvdata(pdev, dev);
-> +
-> +       ret = pci_enable_device(pdev);
-> +       if (ret)
-
-and here, and in other failure paths
-
-> +               goto err_free;
-> +
-> +       ret = hibmc_load(dev, 0);
-> +       if (ret)
-> +               goto err_disable;
-> +
-> +       ret = drm_dev_register(dev, 0);
-> +       if (ret)
-> +               goto err_unload;
-> +
-> +       return 0;
-> +
-> +err_unload:
-> +       hibmc_unload(dev);
-> +err_disable:
-> +       pci_disable_device(pdev);
-> +err_free:
-> +       drm_dev_unref(dev);
-> +
-> +       return ret;
-> +}
-> +
-> +static void hibmc_pci_remove(struct pci_dev *pdev)
-> +{
-> +       struct drm_device *dev = pci_get_drvdata(pdev);
-> +
-> +       drm_dev_unregister(dev);
-> +       hibmc_unload(dev);
-> +       drm_dev_unref(dev);
-> +}
-> +
-> +static struct pci_device_id hibmc_pci_table[] = {
-> +       {0x19e5, 0x1711, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-> +       {0,}
-> +};
-> +
-> +static struct pci_driver hibmc_pci_driver = {
-> +       .name =         "hibmc-drm",
-> +       .id_table =     hibmc_pci_table,
-> +       .probe =        hibmc_pci_probe,
-> +       .remove =       hibmc_pci_remove,
-> +       .driver.pm =    &hibmc_pm_ops,
-> +};
-> +
-> +static int __init hibmc_init(void)
-> +{
-> +       return pci_register_driver(&hibmc_pci_driver);
-> +}
-> +
-> +static void __exit hibmc_exit(void)
-> +{
-> +       return pci_unregister_driver(&hibmc_pci_driver);
-> +}
-> +
-> +module_init(hibmc_init);
-> +module_exit(hibmc_exit);
-> +
-> +MODULE_DEVICE_TABLE(pci, hibmc_pci_table);
-> +MODULE_AUTHOR("RongrongZou <zourongrong@huawei.com>");
-> +MODULE_DESCRIPTION("DRM Driver for Hisilicon Hibmc");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> new file mode 100644
-> index 0000000..0037341
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> @@ -0,0 +1,35 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#ifndef HIBMC_DRM_DRV_H
-> +#define HIBMC_DRM_DRV_H
-> +
-> +#include <drm/drmP.h>
-> +
-> +struct hibmc_drm_device {
-
-nit: Calling this hibmc_drm_priv would probably make things easier to
-read. When I read hibmc_drm_device, it makes me think that it's an
-extension of drm_device, which this isn't.
-
-
-> +       /* hw */
-> +       void __iomem   *mmio;
-> +       void __iomem   *fb_map;
-> +       unsigned long  fb_base;
-> +       unsigned long  fb_size;
-> +
-> +       /* drm */
-> +       struct drm_device  *dev;
-> +};
-> +
-> +#endif
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
-> new file mode 100644
-> index 0000000..1036542
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
-
-I don't think you need a new file for these functions. Just stash them
-in hibmc_drm_drv.c
-
-> @@ -0,0 +1,85 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include "hibmc_drm_drv.h"
-> +#include "hibmc_drm_regs.h"
-> +
-> +/*
-> + * It can operate in one of three modes: 0, 1 or Sleep.
-> + */
-> +void hibmc_set_power_mode(struct hibmc_drm_device *hidev,
-> +                         unsigned int power_mode)
-> +{
-> +       unsigned int control_value = 0;
-> +       void __iomem   *mmio = hidev->mmio;
-> +
-> +       if (power_mode > HIBMC_PW_MODE_CTL_MODE_SLEEP)
-> +               return;
-> +
-> +       control_value = readl(mmio + HIBMC_POWER_MODE_CTRL);
-> +       control_value &= ~HIBMC_PW_MODE_CTL_MODE_MASK;
-> +
-> +       control_value |= HIBMC_PW_MODE_CTL_MODE(power_mode) &
-> +                        HIBMC_PW_MODE_CTL_MODE_MASK;
-> +
-> +    /* Set up other fields in Power Control Register */
-> +       if (power_mode == HIBMC_PW_MODE_CTL_MODE_SLEEP) {
-> +               control_value &= ~HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-
-You do this in both branches of the conditional
-
-> +               control_value |= HIBMC_PW_MODE_CTL_OSC_INPUT(0) &
-> +                                HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-> +       } else {
-> +               control_value &= ~HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-> +               control_value |= HIBMC_PW_MODE_CTL_OSC_INPUT(1) &
-> +                                HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-> +       }
-
-I think you could simplify this by adding a new local.
-
-unsigned int input = 1;
-
-if (power_mode == HIBMC_PW_MODE_CTL_MODE_SLEEP)
-        input = 0;
-
-control_value = readl(mmio + HIBMC_POWER_MODE_CTRL);
-control_value &= ~(HIBMC_PW_MODE_CTL_MODE_MASK |
-                   HIBMC_PW_MODE_CTL_OSC_INPUT_MASK);
-control_value |= HIBMC_PW_MODE_CTL_MODE(power_mode) &
-                 HIBMC_PW_MODE_CTL_MODE_MASK;
-control_value |= HIBMC_PW_MODE_CTL_OSC_INPUT(input) &
-                 HIBMC_PW_MODE_CTL_OSC_INPUT_MASK;
-
-
-> +       /* Program new power mode. */
-> +       writel(control_value, mmio + HIBMC_POWER_MODE_CTRL);
-> +}
-> +
-> +static unsigned int hibmc_get_power_mode(struct hibmc_drm_device *hidev)
-> +{
-> +       void __iomem   *mmio = hidev->mmio;
-> +
-> +       return (readl(mmio + HIBMC_POWER_MODE_CTRL) &
-> +               HIBMC_PW_MODE_CTL_MODE_MASK) >> HIBMC_PW_MODE_CTL_MODE_SHIFT;
-
-nit: You're doing a lot of work in the return statement here.
-
-> +}
-> +
-> +void hibmc_set_current_gate(struct hibmc_drm_device *hidev, unsigned int gate)
-> +{
-> +       unsigned int gate_reg;
-> +       unsigned int mode;
-> +       void __iomem   *mmio = hidev->mmio;
-> +
-> +       /* Get current power mode. */
-
-nit: try to avoid comments that don't add value
-
-> +       mode = hibmc_get_power_mode(hidev);
-> +
-> +       switch (mode) {
-> +       case HIBMC_PW_MODE_CTL_MODE_MODE0:
-> +               gate_reg = HIBMC_MODE0_GATE;
-> +               break;
-> +
-> +       case HIBMC_PW_MODE_CTL_MODE_MODE1:
-> +               gate_reg = HIBMC_MODE1_GATE;
-> +               break;
-> +
-> +       default:
-> +               gate_reg = HIBMC_MODE0_GATE;
-> +               break;
-> +       }
-> +       writel(gate, mmio + gate_reg);
-> +}
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
-> new file mode 100644
-> index 0000000..e20e1aa
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
-> @@ -0,0 +1,28 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#ifndef HIBMC_DRM_POWER_H
-> +#define HIBMC_DRM_POWER_H
-> +
-> +#include "hibmc_drm_drv.h"
-> +
-> +void hibmc_set_power_mode(struct hibmc_drm_device *hidev,
-> +                         unsigned int power_mode);
-> +void hibmc_set_current_gate(struct hibmc_drm_device *hidev,
-> +                           unsigned int gate);
-> +#endif
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
-> new file mode 100644
-> index 0000000..9c804ca
-> --- /dev/null
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
-> @@ -0,0 +1,212 @@
-> +/* Hisilicon Hibmc SoC drm driver
-> + *
-> + * Based on the bochs drm driver.
-> + *
-> + * Copyright (c) 2016 Huawei Limited.
-> + *
-> + * Author:
-> + *     Rongrong Zou <zourongrong@huawei.com>
-> + *     Rongrong Zou <zourongrong@gmail.com>
-> + *     Jianhua Li <lijianhua@huawei.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#ifndef HIBMC_DRM_HW_H
-> +#define HIBMC_DRM_HW_H
-> +
-> +#define OFF 0
-> +#define ON  1
-> +#define DISABLE               0
-> +#define ENABLE                1
-
-These are not good names. I think you can probably hardcode the 0's
-and 1's in the code instead of these. However, if you want to use
-them, at least add a HIBMC_ prefix
-
-> +
-> +/* register definition */
-> +#define HIBMC_MISC_CTRL                                0x4
-> +
-> +#define HIBMC_MSCCTL_LOCALMEM_RESET(x)         ((x) << 6)
-> +#define HIBMC_MSCCTL_LOCALMEM_RESET_MASK       0x40
-> +
-> +#define RESET                0
-> +#define NORMAL               1
-
-Same naming nit here. Add a prefix
-
-> +
-> +#define HIBMC_CURRENT_GATE                     0x000040
-> +#define HIBMC_CURR_GATE_DISPLAY(x)             ((x) << 2)
-> +#define HIBMC_CURR_GATE_DISPLAY_MASK           0x4
-> +
-> +#define HIBMC_CURR_GATE_LOCALMEM(x)            ((x) << 1)
-> +#define HIBMC_CURR_GATE_LOCALMEM_MASK          0x2
-> +
-> +#define HIBMC_MODE0_GATE                       0x000044
-> +#define HIBMC_MODE1_GATE                       0x000048
-> +#define HIBMC_POWER_MODE_CTRL                  0x00004C
-> +
-> +#define HIBMC_PW_MODE_CTL_OSC_INPUT(x)         ((x) << 3)
-> +#define HIBMC_PW_MODE_CTL_OSC_INPUT_MASK       0x8
-> +
-> +#define HIBMC_PW_MODE_CTL_MODE(x)              ((x) << 0)
-> +#define HIBMC_PW_MODE_CTL_MODE_MASK            0x03
-> +#define HIBMC_PW_MODE_CTL_MODE_SHIFT           0
-> +
-> +#define HIBMC_PW_MODE_CTL_MODE_MODE0           0
-> +#define HIBMC_PW_MODE_CTL_MODE_MODE1           1
-> +#define HIBMC_PW_MODE_CTL_MODE_SLEEP           2
-> +
-> +#define HIBMC_PANEL_PLL_CTRL                   0x00005C
-> +#define HIBMC_CRT_PLL_CTRL                     0x000060
-> +
-> +#define HIBMC_PLL_CTRL_BYPASS(x)               ((x) << 18)
-> +#define HIBMC_PLL_CTRL_BYPASS_MASK             0x40000
-> +
-> +#define HIBMC_PLL_CTRL_POWER(x)                        ((x) << 17)
-> +#define HIBMC_PLL_CTRL_POWER_MASK              0x20000
-> +
-> +#define HIBMC_PLL_CTRL_INPUT(x)                        ((x) << 16)
-> +#define HIBMC_PLL_CTRL_INPUT_MASK              0x10000
-> +
-> +#define OSC                                    0
-
-Naming
-
-> +#define TESTCLK                                        1
-
-This doesn't seem to be used?
-
-> +
-> +#define HIBMC_PLL_CTRL_POD(x)                  ((x) << 14)
-> +#define HIBMC_PLL_CTRL_POD_MASK                        0xC000
-> +
-> +#define HIBMC_PLL_CTRL_OD(x)                   ((x) << 12)
-> +#define HIBMC_PLL_CTRL_OD_MASK                 0x3000
-> +
-> +#define HIBMC_PLL_CTRL_N(x)                    ((x) << 8)
-> +#define HIBMC_PLL_CTRL_N_MASK                  0xF00
-> +
-> +#define HIBMC_PLL_CTRL_M(x)                    ((x) << 0)
-> +#define HIBMC_PLL_CTRL_M_MASK                  0xFF
-> +
-> +#define HIBMC_CRT_DISP_CTL                     0x80200
-> +
-> +#define HIBMC_CRT_DISP_CTL_CRTSELECT(x)                ((x) << 25)
-> +#define HIBMC_CRT_DISP_CTL_CRTSELECT_MASK      0x2000000
-> +
-> +#define CRTSELECT_VGA                0
-> +#define CRTSELECT_CRT                1
-> +
-> +#define HIBMC_CRT_DISP_CTL_CLOCK_PHASE(x)      ((x) << 14)
-> +#define HIBMC_CRT_DISP_CTL_CLOCK_PHASE_MASK    0x4000
-> +
-> +#define PHASE_ACTIVE_HIGH      0
-> +#define PHASE_ACTIVE_LOW       1
-> +
-> +#define HIBMC_CRT_DISP_CTL_VSYNC_PHASE(x)      ((x) << 13)
-> +#define HIBMC_CRT_DISP_CTL_VSYNC_PHASE_MASK    0x2000
-> +
-> +#define HIBMC_CRT_DISP_CTL_HSYNC_PHASE(x)      ((x) << 12)
-> +#define HIBMC_CRT_DISP_CTL_HSYNC_PHASE_MASK    0x1000
-> +
-> +#define HIBMC_CRT_DISP_CTL_TIMING(x)           ((x) << 8)
-> +#define HIBMC_CRT_DISP_CTL_TIMING_MASK         0x100
-> +
-> +#define HIBMC_CRT_DISP_CTL_PLANE(x)            ((x) << 2)
-> +#define HIBMC_CRT_DISP_CTL_PLANE_MASK          4
-> +
-> +#define HIBMC_CRT_DISP_CTL_FORMAT(x)           ((x) << 0)
-> +#define HIBMC_CRT_DISP_CTL_FORMAT_MASK         0x03
-> +
-> +#define HIBMC_CRT_FB_ADDRESS                   0x080204
-> +
-> +#define HIBMC_CRT_FB_WIDTH                     0x080208
-> +#define HIBMC_CRT_FB_WIDTH_WIDTH(x)            ((x) << 16)
-> +#define HIBMC_CRT_FB_WIDTH_WIDTH_MASK          0x3FFF0000
-> +#define HIBMC_CRT_FB_WIDTH_OFFS(x)             ((x) << 0)
-> +#define HIBMC_CRT_FB_WIDTH_OFFS_MASK           0x3FFF
-> +
-> +#define HIBMC_CRT_HORZ_TOTAL                   0x08020C
-> +#define HIBMC_CRT_HORZ_TOTAL_TOTAL(x)          ((x) << 16)
-> +#define HIBMC_CRT_HORZ_TOTAL_TOTAL_MASK                0xFFF0000
-> +
-> +#define HIBMC_CRT_HORZ_TOTAL_DISPLAY_END(x)    ((x) << 0)
-> +#define HIBMC_CRT_HORZ_TOTAL_DISPLAY_END_MASK  0xFFF
-> +
-> +#define HIBMC_CRT_HORZ_SYNC                    0x080210
-> +#define HIBMC_CRT_HORZ_SYNC_WIDTH(x)           ((x) << 16)
-> +#define HIBMC_CRT_HORZ_SYNC_WIDTH_MASK         0xFF0000
-> +
-> +#define HIBMC_CRT_HORZ_SYNC_START(x)           ((x) << 0)
-> +#define HIBMC_CRT_HORZ_SYNC_START_MASK         0xFFF
-> +
-> +#define HIBMC_CRT_VERT_TOTAL                   0x080214
-> +#define HIBMC_CRT_VERT_TOTAL_TOTAL(x)          ((x) << 16)
-> +#define HIBMC_CRT_VERT_TOTAL_TOTAL_MASK                0x7FFF0000
-> +
-> +#define HIBMC_CRT_VERT_TOTAL_DISPLAY_END(x)    ((x) << 0)
-> +#define HIBMC_CRT_VERT_TOTAL_DISPLAY_END_MASK  0x7FF
-> +
-> +#define HIBMC_CRT_VERT_SYNC                    0x080218
-> +#define HIBMC_CRT_VERT_SYNC_HEIGHT(x)          ((x) << 16)
-> +#define HIBMC_CRT_VERT_SYNC_HEIGHT_MASK                0x3F0000
-> +
-> +#define HIBMC_CRT_VERT_SYNC_START(x)           ((x) << 0)
-> +#define HIBMC_CRT_VERT_SYNC_START_MASK         0x7FF
-> +
-> +/* Auto Centering */
-> +#define HIBMC_CRT_AUTO_CENTERING_TL            0x080280
-> +#define HIBMC_CRT_AUTO_CENTERING_TL_TOP(x)     ((x) << 16)
-> +#define HIBMC_CRT_AUTO_CENTERING_TL_TOP_MSK    0x7FF0000
-> +
-> +#define HIBMC_CRT_AUTO_CENTERING_TL_LEFT(x)    ((x) << 0)
-> +#define HIBMC_CRT_AUTO_CENTERING_TL_LEFT_MSK   0x7FF
-> +
-> +#define HIBMC_CRT_AUTO_CENTERING_BR            0x080284
-> +#define HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM(x)  ((x) << 16)
-> +#define HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM_MASK        0x7FF0000
-> +
-> +#define HIBMC_CRT_AUTO_CENTERING_BR_RIGHT(x)   ((x) << 0)
-> +#define HIBMC_CRT_AUTO_CENTERING_BR_RIGHT_MASK 0x7FF
-> +
-> +/* register to control panel output */
-> +#define DISPLAY_CONTROL_HISILE                 0x80288
-> +
-> +#define HIBMC_RAW_INTERRUPT                    0x80290
-> +#define HIBMC_RAW_INTERRUPT_VBLANK(x)          ((x) << 2)
-> +#define HIBMC_RAW_INTERRUPT_VBLANK_MASK                0x4
-> +
-> +#define HIBMC_RAW_INTERRUPT_EN                 0x80298
-> +#define HIBMC_RAW_INTERRUPT_EN_VBLANK(x)       ((x) << 2)
-> +#define HIBMC_RAW_INTERRUPT_EN_VBLANK_MASK     0x4
-> +
-> +/* register and values for PLL control */
-> +#define CRT_PLL1_HS                            0x802a8
-> +#define CRT_PLL1_HS_25MHZ                      0x23d40f02
-> +#define CRT_PLL1_HS_40MHZ                      0x23940801
-> +#define CRT_PLL1_HS_65MHZ                      0x23940d01
-> +#define CRT_PLL1_HS_78MHZ                      0x23540F82
-> +#define CRT_PLL1_HS_74MHZ                      0x23941dc2
-> +#define CRT_PLL1_HS_80MHZ                      0x23941001
-> +#define CRT_PLL1_HS_80MHZ_1152                 0x23540fc2
-> +#define CRT_PLL1_HS_108MHZ                     0x23b41b01
-> +#define CRT_PLL1_HS_162MHZ                     0x23480681
-> +#define CRT_PLL1_HS_148MHZ                     0x23541dc2
-> +#define CRT_PLL1_HS_193MHZ                     0x234807c1
-> +
-> +#define CRT_PLL2_HS                            0x802ac
-> +#define CRT_PLL2_HS_25MHZ                      0x206B851E
-> +#define CRT_PLL2_HS_40MHZ                      0x30000000
-> +#define CRT_PLL2_HS_65MHZ                      0x40000000
-> +#define CRT_PLL2_HS_78MHZ                      0x50E147AE
-> +#define CRT_PLL2_HS_74MHZ                      0x602B6AE7
-> +#define CRT_PLL2_HS_80MHZ                      0x70000000
-> +#define CRT_PLL2_HS_108MHZ                     0x80000000
-> +#define CRT_PLL2_HS_162MHZ                     0xA0000000
-> +#define CRT_PLL2_HS_148MHZ                     0xB0CCCCCD
-> +#define CRT_PLL2_HS_193MHZ                     0xC0872B02
-> +
-> +/* Global macros */
-> +#define RGB(r, g, b) \
-
-Not used anywhere?
-
-> +( \
-> +       (unsigned long)(((r) << 16) | ((g) << 8) | (b)) \
-> +)
-> +
-> +#define PADDING(align, data) (((data) + (align) - 1) & (~((align) - 1)))
-> +
-
-This is only used in hibmc_drm_de.c, move it in there. It might also
-be nice to make it a type-checked function while you're at it.
-
-
-> +#define MB(x) ((x) << 20)
-> +
-
-This is only used in 2 places, I think you can just hardcode the value
-in their respective #defines
-
-> +#endif
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Alex
