@@ -1,75 +1,58 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 10 Nov 2016 17:44:42 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <20161110162925.GA28832@amd>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd>
-Message-ID: <de3b4ae7-6a08-2a03-d80e-059c71c58aed@redhat.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 10 Nov 2016 09:45:48 -0700
+Subject: [PATCH] PCI: mvebu: Take control of mbus windows setup by the
+ firmware
+In-Reply-To: <20161110093037.376ae79d@free-electrons.com>
+References: <20161026174440.GA24717@obsidianresearch.com>
+ <20161110093037.376ae79d@free-electrons.com>
+Message-ID: <20161110164548.GC22004@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 10, 2016 at 09:30:37AM +0100, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Wed, 26 Oct 2016 11:44:40 -0600, Jason Gunthorpe wrote:
+> > The firmware may setup the mbus to access PCI-E and indicate this
+> > has happened with a ranges mapping for the PCI-E ID. If this happens
+> > then the mbus setup and the pci dynamic setup conflict, creating
+> > problems.
+> > 
+> > Have PCI-E assume control of the firmware specified default mapping by
+> > setting the value of the bridge window to match the firmware mapping.
+> > 
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> 
+> Sorry for the late feedback. I am not sure to fully understand what you
+> are trying to do here.
 
-On 10-11-16 17:29, Pavel Machek wrote:
-> Hi!
->
->>>>> Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
->>>>> the sysfs brightness attr for changes.") breaks runtime PM for me.
->>>>>
->>>>> On my omap dm3730 based test system, idle power consumption is over 70
->>>>> times higher now with this patch! It goes from about 6mW for the core
->>>>> system to over 440mW during idle meaning there's some busy timer now
->>>>> active.
->>>>>
->>>>> Reverting this patch fixes the issue. Any ideas?
->
-> Are you using any LED that toggles with high frequency? Like perhaps
-> LED that is lit when CPU is active?
->
->>> So a user can do "echo 128 > brightness && cat brightness" and
->>> get out 0, or 128, depending purely on timing.
-> ...
->>>                Reading from this file while a trigger is active returns
->>> the
->>>                top brightness trigger is going to use.
->
-> Yes, that sounds sane.
->
->> It seems that we should get back to your initial approach. i.e. only
->> brightness changes caused by hardware should be reported.
->
-> I don't think enabling poll() here is good idea. Some hardware won't
-> be able to tell you that it changed the state. Returning maximum
-> brightness trigger is going to use seems easier/better.
+> However, one thing that confuses me specifically is how can the kernel
+> get any MBus mapping set up by the firmware? Indeed, when the
+> mvebu-mbus driver initializes, it destroys all existing MBus windows
+> that might have been left by the firmware/bootloader:
 
-The idea here is to allow userspace to poll() on the brightness
-sysfs atrribute to detect changes autonomously done by the hardware,
-such as e.g. happens on both Dell and Thinkpad laptops when pressing
-the keyboard backlight cycle hotkey. Note that these keys do not
-generate key-press events, the cycling through the brightness levels
-(including off) is done entirely in firmware.
+Sort of, yes, it wipes out the hardware, but then it parses the DT
+and puts back the ranges via mbus_dt_setup.
 
-But we do get other ACPI events for this which we can use to let
-userspace know this happens, which is something which user-
-interfaces which allow control over the kbd backlight want to know.
+The issue is what happens if mbus_dt_setup adds a mapping for PCI
+aperature from the firmware's DT - in this case the PCI driver does not
+know that the mbus driver created the mapping and becomes unable to
+manipulate the mbus windows due to the conflict detection logic.
 
-I understand that we will not always be able to do this, here is the
-Documentation/ABI/testing/sysfs-class-led text I have in mind:
+The solution is to have the PCI driver read the current state of the
+mbus window - out of the mbus registers that were programmed from the
+DT ranges by mbus_dt_setup. Then it knows to delete the DT described
+window before setting a new window and the conflicts are avoided.
 
-		The file supports poll() to detect changes, changes are only
-		signalled when this file is written or when the hardware /
-		firmware changes the brightness itself and the driver can detect
-		this. Changes done by kernel triggers / software blinking are
-		not signalled.
+> Why does Linux needs to rely on what the firmware has setup in terms of
+> MBus windows? Why can't Linux just find out the right BAR base/size
+> like it is doing for all other devices?
 
-Note the "and the driver can detect this" language, that has been there
-since v1 of the poll() notification patch since I already expected not
-all hardware to be able to signal this.
+Unfortunately that is sort of how DT is expected to work, in my case I
+have DT sub nodes off the PCI device in DT and I need DT address
+translation to work for those nodes.
 
-Regards,
+In DT land the PCI stuff expects the firmware to provide a complete
+address map, and my firmware does, but in doing so I hit this bug :)
 
-Hans
+Jason
