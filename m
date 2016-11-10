@@ -1,45 +1,53 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Thu, 10 Nov 2016 16:09:31 +0100
-Subject: [GIT PULL]: ARM ARTPEC changes for 4.10
-Message-ID: <20161110150930.GB19804@axis.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 10 Nov 2016 16:10:56 +0100
+Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
+In-Reply-To: <20161110110323.GG1575@localhost.localdomain>
+References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
+ <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
+ <20161108144445.GD1575@localhost.localdomain>
+ <CGME20161108145620epcas2p4b8e2ec5ffdd4bf04ab3bf0728b46e3f2@epcas2p4.samsung.com>
+ <20161108145534.GE1575@localhost.localdomain>
+ <f53d533d-163f-31f3-4efb-0e39d201589d@samsung.com>
+ <20161110110323.GG1575@localhost.localdomain>
+Message-ID: <b654d5f7-7b67-7216-760f-d29e49a29296@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 11/10/2016 12:03 PM, Charles Keepax wrote:
+>> On Tue, Nov 08, 2016 at 04:53:40PM +0100, Sylwester Nawrocki wrote:
+[...]
+>> I pushed now to branch for-v4.10/dma/pl080-s3c64xx-v2 with this
+>> issue fixed and added initialization of the filer function.
+> 
+> Apologies for the delay got somewhat swamped with internal stuff
+> yesterday. Yeah using that branch it looks good to me, the SPI and
+> I2S are both working fine. I can download code to the wm0010
+> which should be a good work out of the SPI and play audio
+> correctly so the I2S should be fine. So for the series:
+> 
+> Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 
-Please pull the below signed tag for a trio of minor changes
-adding PCIe for the ARM ARTPEC SoC.
+Great, thanks a lot!  I'm going to post the next iteration with
+modified pl080 DMAC patches, addressing comments from Arnd.
+I would be grateful if you could confirm it also works on your
+platform.
 
-Thanks!
+> I do still need to revert these two patches to get the I2S to
+> work properly:
+> 
+> commit d70e861a3154833467023123e218e9b1ba558809
+> ASoC: samsung: Remove SND_DMAENGINE_PCM_FLAG_NO_RESIDUE flag
+> 
+> commit acde50a7bf1fd6ae0baa4402f0a02c4b1bd4c990
+> ASoC: dmaengine_pcm: Make FLAG_NO_RESIDUE internal
+> 
+> But that is clearly an unrelated issue, which I haven't found
+> time to look into yet as we don't use this platform that often
+> these days.
 
-/Jesper
+Thanks for reporting this, I will see if I can find time to look
+into this issue as well.
 
-The following changes since commit bc33b0ca11e3df467777a4fa7639ba488c9d4911:
-
-  Linux 4.9-rc4 (2016-11-05 16:23:36 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/jesper/artpec.git tags/artpec-for-4.10
-
-for you to fetch changes up to fa5541fc806771a108cd2a48245a229f1ba539ea:
-
-  ARM: dts: artpec: add pcie support (2016-11-10 15:51:10 +0100)
-
-----------------------------------------------------------------
-ARTPEC changes for 4.10
-
-----------------------------------------------------------------
-Niklas Cassel (3):
-      ARM: ARTPEC-6: add select MFD_SYSCON to MACH_ARTPEC6
-      ARM: ARTPEC-6: add pcie related options
-      ARM: dts: artpec: add pcie support
-
- arch/arm/boot/dts/artpec6-devboard.dts |  4 ++++
- arch/arm/boot/dts/artpec6.dtsi         | 29 ++++++++++++++++++++++++++++-
- arch/arm/mach-artpec/Kconfig           |  3 +++
- 3 files changed, 35 insertions(+), 1 deletion(-)
-
-/^JN - Jesper Nilsson
 -- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Thanks,
+Sylwester
