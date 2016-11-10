@@ -1,56 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 10 Nov 2016 17:29:25 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
-Message-ID: <20161110162925.GA28832@amd>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 10 Nov 2016 09:33:15 -0700
+Subject: [PATCH fpga 9/9] fpga: Remove support for non-sg drivers
+In-Reply-To: <bad801c5-fe3a-665b-de67-bf69c42fb2b4@gmail.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-10-git-send-email-jgunthorpe@obsidianresearch.com>
+ <bad801c5-fe3a-665b-de67-bf69c42fb2b4@gmail.com>
+Message-ID: <20161110163315.GB22004@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+> >  struct fpga_manager_ops {
+> >  	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
+> > -	int (*write_init)(struct fpga_manager *mgr, u32 flags,
+> > -			  const char *buf, size_t count);
+> > -	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
+> >  	int (*write_init_sg)(struct fpga_manager *mgr, u32 flags,
+> >  			     struct sg_table *sgt);
+> >  	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+> > @@ -118,6 +113,8 @@ struct fpga_manager {
+> >  
+> >  int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
+> >  		      const char *buf, size_t count);
+> > +int fpga_mgr_buf_load_sg(struct fpga_manager *mgr, u32 flags,
+> > +			 struct sg_table *sgt);
+> >  
+> >  int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
+> >  			   const char *image_name);
+> I don't have any feeling either way about switching to scatter-gather.
+> (Not zynq or socfpga user)
+> But I do object to renaming the API.
+> write_init() and write() do not imply a particular implementation, nor even that
+> the buffer is coherent.
 
-> >>>Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
-> >>>the sysfs brightness attr for changes.") breaks runtime PM for me.
-> >>>
-> >>>On my omap dm3730 based test system, idle power consumption is over 70
-> >>>times higher now with this patch! It goes from about 6mW for the core
-> >>>system to over 440mW during idle meaning there's some busy timer now
-> >>>active.
-> >>>
-> >>>Reverting this patch fixes the issue. Any ideas?
+Neither the sg or old linear interface imply any particular
+underlying driver implementation.
 
-Are you using any LED that toggles with high frequency? Like perhaps
-LED that is lit when CPU is active?
+All that is being changed is how the list of physical pages gets
+passed to the driver. The linear interface requires them to be
+contiguously mapped (eg in a vmap) while the SG interface
+directly passes a list of physical page addresses.
 
-> >So a user can do "echo 128 > brightness && cat brightness" and
-> >get out 0, or 128, depending purely on timing.
-...
-> >                Reading from this file while a trigger is active returns
-> >the
-> >                top brightness trigger is going to use.
+Any alogrithm that works with the old interface can run on the new
+interface, and the new interface can support much better options for
+DMA drivers, while not requiring the higher layers to perform a high
+order allocation (vmap or otherwise) to create the contiguous memory.
 
-Yes, that sounds sane.
+The reason the old interface is being deleted here is so the fpga mgr
+API can be expanded to accept a sg list directly. Since we cannot
+convert a general sg list to linear memory the liner option must be
+totally removed.
 
-> It seems that we should get back to your initial approach. i.e. only
-> brightness changes caused by hardware should be reported.
+> I am working to merge an fpga manager which uses SPI to load the bitstream
+> (see https://www.spinics.net/lists/arm-kernel/msg539328.html)
+> Any dma in use there would come from the spi driver. write_init_sg, and write_sg
+> don't make any sense in my case.
 
-I don't think enabling poll() here is good idea. Some hardware won't
-be able to tell you that it changed the state. Returning maximum
-brightness trigger is going to use seems easier/better.
+No, it still make lots of sense.
 
-Best regards,
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161110/4ee8fe9c/attachment.sig>
+SPI has been slowly transforming to use the same sort of SG scheme
+universally, including facing the client. (see
+6ad45a27cbe343ec8d7888e5edf6335499a4b555)
+
+Some day your driver can just pass the SGs directly to spi and
+everything will be great.
+
+In the mean time it can do sg_miter_next to get mapped buffers.
+
+> Would it not make sense to keep the top level API the same?
+
+Fundamentally no.
+
+Jason
