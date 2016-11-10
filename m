@@ -1,105 +1,64 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 Nov 2016 14:08:21 +0000
-Subject: [PATCH] iommu/dma-iommu: properly respect configured address
- space size
-In-Reply-To: <6f2f3d37-dc6c-abdb-9692-8dcc9cad36f3@samsung.com>
-References: <CGME20161107130625eucas1p2dd23c07010b4f3eddb6c6540ed802246@eucas1p2.samsung.com>
- <1478523973-8828-1-git-send-email-m.szyprowski@samsung.com>
- <68e7a18b-739e-b73e-eacf-3cb6c1bd279a@arm.com>
- <8286728f-fab3-8179-5215-e156da426244@samsung.com>
- <d215c05c-b922-4bee-a2dc-695669a801f6@arm.com>
- <6f2f3d37-dc6c-abdb-9692-8dcc9cad36f3@samsung.com>
-Message-ID: <89438c46-5066-ab1a-efce-8e97fc614b93@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Nov 2016 08:12:15 -0600
+Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
+ to legacy SCPI protocol
+In-Reply-To: <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
+References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
+ <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
+ <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
+ <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
+Message-ID: <CAL_JsqLW4JZHb0ncVUEefnKySA231EDgvCkY3xPdaJGf=uMJYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/16 14:53, Marek Szyprowski wrote:
-> Hi Robin,
-> 
-> 
-> On 2016-11-08 15:44, Robin Murphy wrote:
->> On 08/11/16 13:41, Marek Szyprowski wrote:
->>> On 2016-11-08 12:37, Robin Murphy wrote:
->>>> On 07/11/16 13:06, Marek Szyprowski wrote:
->>>>> When one called iommu_dma_init_domain() with size smaller than
->>>>> device's
->>>>> DMA mask, the alloc_iova() will not respect it and always assume that
->>>>> all
->>>>> IOVA addresses will be allocated from the the (base ...
->>>>> dev->dma_mask) range.
->>>> Is that actually a problem for anything?
->>> Yes, I found this issue while working on next version of ARM & ARM64
->>> DMA-mapping/IOMMU integration patchset and adapting Exynos drivers
->>> for the
->>> new IOMMU/DMA-mapping glue.
->>>
->>> Some Exynos devices (codec and camera isp) operate only on the
->>> limited (and
->>> really small: 256M for example) DMA window. They use non-standard way of
->>> addressing memory: an offset from the firmware base. However they still
->>> have
->>> 32bit DMA mask, as the firmware can be located basically everywhere
->>> in the
->>> real DMA address space, but then they can access only next 256M from
->>> that
->>> firmware base.
->> OK, that's good to know, thanks. However, I think in this case it sounds
->> like it's really the DMA mask that's the underlying problem - if those
->> blocks themselves can only drive 28 address bits, then the struct
->> devices representing them should have 28-bit DMA masks, and the
->> "firmware base" of whoever's driving the upper bits modelled with a
->> dma_pfn_offset. Even if they do have full 32-bit interfaces themselves,
->> but are constrained to segment-offset addressing internally, I still
->> think it would be tidier to represent things that way.
+On Thu, Nov 10, 2016 at 4:26 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 10/11/16 01:22, Rob Herring wrote:
 >>
->> At some point in dma-iommu development I did have support for DMA
->> offsets upstream of the IOMMU, and am happy to reinstate it if there's a
->> real use case (assuming you can't simply always set the firmware base to
->> 0 when using the IOMMU).
-> 
-> That would indeed look a bit simpler, but I've already tried such approach
-> and the firmware crashes when its base in real DMA address space is set to
-> zero.
+>> On Wed, Nov 02, 2016 at 10:52:09PM -0600, Sudeep Holla wrote:
+>>>
+>>> This patch adds specific compatible to support legacy SCPI protocol.
+>>>
+>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 4 +++-
+>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>> b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>> index d1882c4540d0..ebd03fc93135 100644
+>>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>> @@ -7,7 +7,9 @@ by Linux to initiate various system control and power
+>>> operations.
+>>>
+>>>  Required properties:
+>>>
+>>> -- compatible : should be "arm,scpi"
+>>> +- compatible : should be
+>>> +       * "arm,scpi" : For implementations complying to SCPI v1.0 or
+>>> above
+>>> +       * "arm,legacy-scpi" : For implementations complying pre SCPI v1.0
+>>
+>>
+>> I'd prefer that we explicitly enumerate the old versions. Are there
+>> many?
+>>
+>
+> I understand your concern, but this legacy SCPI protocol was not
+> officially released. It was just WIP which vendors picked up from very
+> early releases. Since they are not numbered, it's hard to have specific
+> compatibles with different versions until v1.0. That's one of the reason
+> to retain platform specific compatible so that we can add any quirks
+> based on them if needed.
+>
+> I will probably add these information in the commit log so that it's
+> clear why we can't do version based compatible.
 
-Ah, sadly I'm not too surprised... ;)
+This is exactly my point. By enumerate, I meant having platform
+specific compatibles. Having "arm,legacy-scpi" is pointless because
+who knows what version they followed and they may all be different.
 
-Having pondered it a little more, what if the firmware base is instead
-set equal to the max offset, then you can have a power-of-two DMA mask
-at twice that size (e.g. 512M) such that the top-down IOVA allocations
-start in the right place. That would appear to achieve pretty much the
-same result as this patch, but more robustly.
-
-Incidentally, how do the init size and DMA mask end up different in the
-first place? Is this another case of the "dma-ranges" info from
-of_dma_configure() getting clobbered by a driver calling dma_set_mask()
-later?
-
-Robin.
-
->>>>> This patch fixes this issue by taking the configured address space
->>>>> size
->>>>> parameter into account (if it is smaller than the device's dma_mask).
->>>> TBH I've been pondering ripping the size stuff out of dma-iommu, as it
->>>> all stems from me originally failing to understand what
->>>> dma_32bit_pfn is
->>>> actually for. The truth is that iova_domains just don't have a size or
->>>> upper limit; however if devices with both large and small DMA masks
->>>> share a domain, then the top-down nature of the allocator means that
->>>> allocating for the less-capable devices would involve walking through
->>>> every out-of-range entry in the tree every time. Having cached32_node
->>>> based on dma_32bit_pfn just provides an optimised starting point for
->>>> searching within the smaller mask.
->>> Right, this dma_32bit_pfn was really misleading at the first glance,
->>> but then I found that this was something like end_pfn in case of
->>> dma-iommu
->>> code.
->> Yes, that was my incorrect assumption - at the time I interpreted it as
->> a de-facto upper limit which was still possible to allocate above in
->> special circumstances, which turns out to be almost entirely backwards.
->> I'd rather not bake that into the dma-iommu code any further if we can
->> avoid it (I'll try throwing an RFC together to clear up what's there
->> already).
-> 
-> Okay.
-> 
-> Best regards
+Rob
