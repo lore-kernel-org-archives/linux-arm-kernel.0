@@ -1,100 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 10 Nov 2016 23:21:24 +0100
-Subject: [PATCH v2 2/2] mmc: sdhci-iproc: support standard byte register
- accesses
-In-Reply-To: <1478018277-10097-3-git-send-email-scott.branden@broadcom.com>
-References: <1478018277-10097-1-git-send-email-scott.branden@broadcom.com>
- <1478018277-10097-3-git-send-email-scott.branden@broadcom.com>
-Message-ID: <CAPDyKFrPwwXoAgJ7XGYSWDOiZiJqdjF3p6D0t5bUiPYEnn6ysg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 10 Nov 2016 23:50:16 +0100
+Subject: [PATCH] staging: vc04_services: add vchiq_pagelist_info structure
+In-Reply-To: <1478533287.17065.1.camel@crowfest.net>
+References: <20161031081035.22677-1-mzoran@crowfest.net>
+ <20161107100331.GA19666@kroah.com>
+ <1478533287.17065.1.camel@crowfest.net>
+Message-ID: <20161110225016.GA11453@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 November 2016 at 17:37, Scott Branden <scott.branden@broadcom.com> wrote:
-> Add bytewise register accesses support for newer versions of IPROC
-> SDHCI controllers.
-> Previous sdhci-iproc versions of SDIO controllers
-> (such as Raspberry Pi and Cygnus) only allowed for 32-bit register
-> accesses.
->
-> Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+On Mon, Nov 07, 2016 at 07:41:27AM -0800, Michael Zoran wrote:
+> On Mon, 2016-11-07 at 11:03 +0100, Greg KH wrote:
+> > On Mon, Oct 31, 2016 at 01:10:35AM -0700, Michael Zoran wrote:
+> > > The current dma_map_sg based implementation for bulk messages
+> > > computes many offsets into a single allocation multiple times in
+> > > both the create and free code paths.??This is inefficient,
+> > > error prone and in fact still has a few lingering issues
+> > > with arm64.
+> > > 
+> > > This change replaces a small portion of that inplementation with
+> > > new code that uses a new struct vchiq_pagelist_info to store the
+> > > needed information rather then complex offset calculations.
+> > > 
+> > > This improved implementation should be more efficient and easier
+> > > to understand and maintain.
+> > > 
+> > > Tests Run(Both Pass):
+> > > vchiq_test -p 1
+> > > vchiq_test -f 10
+> > > 
+> > > Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> > > ---
+> > > ?.../interface/vchiq_arm/vchiq_2835_arm.c???????????| 223
+> > > +++++++++++----------
+> > > ?1 file changed, 113 insertions(+), 110 deletions(-)
+> > 
+> > This doesn't apply to the tree anymore because of your previous patch
+> > :(
+> > 
+> > Can you refresh it and resend?
+> > 
+> > thanks,
+> > 
+> > greg k-h
+> 
+> OK, I resubmitted it.
+> 
+> Once this patch gets applied 64-bit should be in decent shape.  I'm not
+> seeing any warnings or errors anymore and functional tests from a 64-
+> bit OS look good.
+> 
+> The only remaining issue that I know of is that it needs a 32-bit
+> compatibility layer for the ioctls when running a 32-bit OS(Raspbian)
+> on top of a 64-bit kernel.
 
-Thanks, applied for next!
+Ok, let's turn off BROKEN for the module, and enable CONFIG_TEST and see
+if the 0-day bot barfs all over it or not :)
 
-Kind regards
-Uffe
+thanks,
 
-> ---
->  drivers/mmc/host/sdhci-iproc.c | 35 +++++++++++++++++++++++++++++++++--
->  1 file changed, 33 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/sdhci-iproc.c b/drivers/mmc/host/sdhci-iproc.c
-> index 7262466..d7046d6 100644
-> --- a/drivers/mmc/host/sdhci-iproc.c
-> +++ b/drivers/mmc/host/sdhci-iproc.c
-> @@ -143,6 +143,14 @@ static void sdhci_iproc_writeb(struct sdhci_host *host, u8 val, int reg)
->  }
->
->  static const struct sdhci_ops sdhci_iproc_ops = {
-> +       .set_clock = sdhci_set_clock,
-> +       .get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> +       .set_bus_width = sdhci_set_bus_width,
-> +       .reset = sdhci_reset,
-> +       .set_uhs_signaling = sdhci_set_uhs_signaling,
-> +};
-> +
-> +static const struct sdhci_ops sdhci_iproc_32only_ops = {
->         .read_l = sdhci_iproc_readl,
->         .read_w = sdhci_iproc_readw,
->         .read_b = sdhci_iproc_readb,
-> @@ -156,6 +164,28 @@ static const struct sdhci_ops sdhci_iproc_ops = {
->         .set_uhs_signaling = sdhci_set_uhs_signaling,
->  };
->
-> +static const struct sdhci_pltfm_data sdhci_iproc_cygnus_pltfm_data = {
-> +       .quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
-> +       .quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN,
-> +       .ops = &sdhci_iproc_32only_ops,
-> +};
-> +
-> +static const struct sdhci_iproc_data iproc_cygnus_data = {
-> +       .pdata = &sdhci_iproc_cygnus_pltfm_data,
-> +       .caps = ((0x1 << SDHCI_MAX_BLOCK_SHIFT)
-> +                       & SDHCI_MAX_BLOCK_MASK) |
-> +               SDHCI_CAN_VDD_330 |
-> +               SDHCI_CAN_VDD_180 |
-> +               SDHCI_CAN_DO_SUSPEND |
-> +               SDHCI_CAN_DO_HISPD |
-> +               SDHCI_CAN_DO_ADMA2 |
-> +               SDHCI_CAN_DO_SDMA,
-> +       .caps1 = SDHCI_DRIVER_TYPE_C |
-> +                SDHCI_DRIVER_TYPE_D |
-> +                SDHCI_SUPPORT_DDR50,
-> +       .mmc_caps = MMC_CAP_1_8V_DDR,
-> +};
-> +
->  static const struct sdhci_pltfm_data sdhci_iproc_pltfm_data = {
->         .quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK,
->         .quirks2 = SDHCI_QUIRK2_ACMD23_BROKEN,
-> @@ -182,7 +212,7 @@ static const struct sdhci_pltfm_data sdhci_bcm2835_pltfm_data = {
->         .quirks = SDHCI_QUIRK_BROKEN_CARD_DETECTION |
->                   SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
->                   SDHCI_QUIRK_MISSING_CAPS,
-> -       .ops = &sdhci_iproc_ops,
-> +       .ops = &sdhci_iproc_32only_ops,
->  };
->
->  static const struct sdhci_iproc_data bcm2835_data = {
-> @@ -194,7 +224,8 @@ static const struct sdhci_iproc_data bcm2835_data = {
->
->  static const struct of_device_id sdhci_iproc_of_match[] = {
->         { .compatible = "brcm,bcm2835-sdhci", .data = &bcm2835_data },
-> -       { .compatible = "brcm,sdhci-iproc-cygnus", .data = &iproc_data },
-> +       { .compatible = "brcm,sdhci-iproc-cygnus", .data = &iproc_cygnus_data},
-> +       { .compatible = "brcm,sdhci-iproc", .data = &iproc_data },
->         { }
->  };
->  MODULE_DEVICE_TABLE(of, sdhci_iproc_of_match);
-> --
-> 2.5.0
->
+greg k-h
