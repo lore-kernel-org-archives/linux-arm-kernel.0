@@ -1,66 +1,25 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 10 Nov 2016 13:39:45 -0500
-Subject: [PATCH V3 1/2] PCI: add CRS support to error handling path
-In-Reply-To: <1475473021-14251-2-git-send-email-okaya@codeaurora.org>
-References: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
- <1475473021-14251-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <695a43f5-68cb-04ee-b4ec-db205e5fd959@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 10 Nov 2016 20:42:10 +0200
+Subject: [PATCH 0/8] DMA: s3c64xx: Conversion to the new channel request
+ API
+In-Reply-To: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+References: <1478791076-19528-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <20161110184210.GA11835@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/3/2016 1:36 AM, Sinan Kaya wrote:
-> The PCIE spec allows an endpoint device to extend the initialization time
-> beyond 1 second by issuing Configuration Request Retry Status (CRS) for a
-> vendor ID read request.
+On Thu, Nov 10, 2016 at 04:17:48PM +0100, Sylwester Nawrocki wrote:
+> This patch series aims to convert the s3c64xx platform to use
+> the new DMA channel request API, i.e. this is only meaningful 
+> for non-dt systems using s3c64xx SoCs.
 > 
-> This basically means "I'm busy now, please call me back later".
-> 
-> There are two moving parts to CRS support from the SW perspective. One part
-> is to determine if CRS is supported or not. The second part is to set the
-> CRS visibility register.
-> 
-> As part of the probe, the Linux kernel sets the above two conditions in
-> pci_enable_crs function. The kernel is also honoring the returned CRS in
-> pci_bus_read_dev_vendor_id function if supported. The function will poll up
-> to specified amount of time while endpoint is returning CRS response.
-> 
-> The PCIe spec also allows CRS to be issued during cold, warm, hot and FLR
-> resets.
-> 
-> The hot reset is initiated by starting a secondary bus reset. A bus/device
-> restore follows the reset.  This patch is adding vendor ID read into dev
-> restore function to validate that the device is accessible before writing
-> the register contents. If the device issues CRS, the code might poll up
-> to 60 seconds.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index aab9d51..c8749b9 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4020,6 +4020,12 @@ static void pci_dev_save_and_disable(struct pci_dev *dev)
->  
->  static void pci_dev_restore(struct pci_dev *dev)
->  {
-> +	u32 l;
-> +
-> +	/* see if the device is accessible first */
-> +	if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &l, 60 * 1000))
-> +		return;
-> +
->  	pci_restore_state(dev);
->  	pci_reset_notify(dev, false);
->  }
-> 
+> Presumably the first 2 or 4 patches in this series could be queued 
+> for v4.10-rc1 and the remaining patches could be left for subsequent
+> release, to avoid non-trivial conflict with patches already applied 
+> in the ASoC tree.
 
-Any feedback on this direction?
+Sounds good to me. Should I put the ARM/s3c64xx commits on separate
+branch in case someone would like to pull a tag with it?
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best regards,
+Krzysztof
