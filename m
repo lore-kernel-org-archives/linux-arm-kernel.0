@@ -1,106 +1,185 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Thu, 10 Nov 2016 20:36:24 +0800
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <17821285.aIcTyCGn5n@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <2825537.ADCNsGqGxn@wuerfel> <5824165A.4040303@hisilicon.com>
- <17821285.aIcTyCGn5n@wuerfel>
-Message-ID: <582469C8.9090609@hisilicon.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Nov 2016 12:48:52 +0000
+Subject: [RFC v2 4/8] iommu: Add a list of iommu_reserved_region in
+ iommu_domain
+In-Reply-To: <6c2e1c81-e951-a284-b547-733369128e7e@redhat.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-5-git-send-email-eric.auger@redhat.com>
+ <71bfe2a5-455e-9335-ba81-097ef24399ee@arm.com>
+ <fd35f7e3-6d97-7e67-a5c5-bb633ce0e8fd@redhat.com>
+ <6851a74a-775a-bd20-cdea-4cf06f5f0289@arm.com>
+ <6c2e1c81-e951-a284-b547-733369128e7e@redhat.com>
+Message-ID: <7c6095e8-1f7c-317b-3df7-02c8a4cfe5b7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd,
-
-On 2016/11/10 17:12, Arnd Bergmann wrote:
-> On Thursday, November 10, 2016 2:40:26 PM CET zhichang.yuan wrote:
->> On 2016/11/10 5:34, Arnd Bergmann wrote:
->>> On Wednesday, November 9, 2016 12:10:43 PM CET Gabriele Paoloni wrote:
->>>>> On Tuesday, November 8, 2016 11:47:09 AM CET zhichang.yuan wrote:
->>>>>> +       /*
->>>>>> +        * The first PCIBIOS_MIN_IO is reserved specifically for
->>>>> indirectIO.
->>>>>> +        * It will separate indirectIO range from pci host bridge to
->>>>>> +        * avoid the possible PIO conflict.
->>>>>> +        * Set the indirectIO range directly here.
->>>>>> +        */
->>>>>> +       lpcdev->io_ops.start = 0;
->>>>>> +       lpcdev->io_ops.end = PCIBIOS_MIN_IO - 1;
->>>>>> +       lpcdev->io_ops.devpara = lpcdev;
->>>>>> +       lpcdev->io_ops.pfin = hisilpc_comm_in;
->>>>>> +       lpcdev->io_ops.pfout = hisilpc_comm_out;
->>>>>> +       lpcdev->io_ops.pfins = hisilpc_comm_ins;
->>>>>> +       lpcdev->io_ops.pfouts = hisilpc_comm_outs;
->>>>>
->>>>> I have to look at patch 2 in more detail again, after missing a few
->>>>> review
->>>>> rounds. I'm still a bit skeptical about hardcoding a logical I/O port
->>>>> range here, and would hope that we can just go through the same
->>>>> assignment of logical port ranges that we have for PCI buses,
->>>>> decoupling
->>>>> the bus addresses from the linux-internal ones.
->>>>
->>>> The point here is that we want to avoid any conflict/overlap between
->>>> the LPC I/O space and the PCI I/O space. With the assignment above
->>>> we make sure that LPC never interfere with PCI I/O space.
->>>
->>> But we already abstract the PCI I/O space using dynamic registration.
->>> There is no need to hardcode the logical address for ISA, though
->>> I think we can hardcode the bus address to start at zero here.
+On 10/11/16 12:14, Auger Eric wrote:
+> Hi Robin,
+> 
+> On 10/11/2016 12:54, Robin Murphy wrote:
+>> Hi Eric,
 >>
->> Do you means that we can pick up the maximal I/O address from all children's
->> device resources??
-> 
-> The driver should not look at the resources of its children, just
-> register a range of addresses dynamically, as I suggested in an
-> earlier review.
->
-Sorry! I can't catch your idea yet:(
+>> On 10/11/16 11:22, Auger Eric wrote:
+>>> Hi Robin,
+>>>
+>>> On 04/11/2016 15:00, Robin Murphy wrote:
+>>>> Hi Eric,
+>>>>
+>>>> Thanks for posting this new series - the bottom-up approach is a lot
+>>>> easier to reason about :)
+>>>>
+>>>> On 04/11/16 11:24, Eric Auger wrote:
+>>>>> Introduce a new iommu_reserved_region struct. This embodies
+>>>>> an IOVA reserved region that cannot be used along with the IOMMU
+>>>>> API. The list is protected by a dedicated mutex.
+>>>>
+>>>> In the light of these patches, I think I'm settling into agreement that
+>>>> the iommu_domain is the sweet spot for accessing this information - the
+>>>> underlying magic address ranges might be properties of various bits of
+>>>> hardware many of which aren't the IOMMU itself, but they only start to
+>>>> matter at the point you start wanting to use an IOMMU domain at the
+>>>> higher level. Therefore, having a callback in the domain ops to pull
+>>>> everything together fits rather neatly.
+>>> Using get_dm_regions could have make sense but this approach now is
+>>> ruled out by sysfs API approach. If attribute file is bound to be used
+>>> before iommu domains are created, we cannot rely on any iommu_domain
+>>> based callback. Back to square 1?
+>>
+>> I think it's still OK. The thing about these reserved regions is that as
+>> a property of the underlying hardware they must be common to any domain
+>> for a given group, therefore without loss of generality we can simply
+>> query group->domain->ops->get_dm_regions(), and can expect the reserved
+>> ones will be the same regardless of what domain that points to
+>> (identity-mapped IVMD/RMRR/etc.
+> Are they really? P2P reserved regions depend on iommu_domain right?
 
-When to register the I/O range? Is it done just after the successfully
-of_translate_address() during the children scanning?
+Indeed. To use the SMMU example, reprogramming S2CRs to target a
+different context bank (i.e. attaching to a different domain) won't
+affect the fact that the transactions aren't even reaching the SMMU in
+the first place. That's why we need the exact same information for DMA
+domains, thus why getting it for free via the dm_regions mechanism would
+be really neat.
 
-If yes, when a child is scanning, there is no range data in arm64_extio_ops. The
-addr_is_indirect_io() calling in of_get_isa_indirect_io() don't need. All we can
-check is just whether the address to be translated is IO and is under a parent
-device which has no 'ranges' property.
+The visibility of P2P regions, doorbells, etc. for a given device is
+ultimately a property of the hardware topology, and topology happens to
+be what the iommu_group already represents*. There looks to be a snag
+when we try to consider the addresses of such regions, since addresses
+are the business of iommu_domains, not groups, but as there is a 1:1
+relationship between a group and its default domain, things end up tying
+together quite neatly.
 
-> 
-> Your current version has
-> 
->         if (arm64_extio_ops->pfout)                             \
->                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
->                        addr, value, sizeof(type));             \
-> 
-> Instead, just subtract the start of the range from the logical
-> port number to transform it back into a bus-local port number:
-> 
->         if (arm64_extio_ops->pfout)                             \
->                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
->                        addr - arm64_extio_ops->start, value, sizeof(type)); \
-> 
-I think there is some information needed sync.
-In the old patch-set, we don't bypass the pci_address_to_pio() after
-successfully of_translate_address(). In this way, we don't need to reserve any
-PIO space for our LPC since the logical port are from the same mapping
-algorithm. Based on this way, the port number in the device resource is logical
-one, then we need to subtract the start of the resource to get back the
-bus-local port.
+Robin.
 
->From V3, we don't apply the mapping based on pci_address_to_pio(), the
-of_translate_address() return the bus-local port directly and store into
-relevant device resource. So, in the current arm64_extio_ops->pfout(), the
-reverse translation don't need anymore. The input "addr" is bus-local port now.
+*in fact, I've just had an idea that way we check ACS paths to determine
+groups might similarly be a finer-grained way to detect what P2P
+regions, if any, are actually relevant.
 
-
-Thanks,
-Zhichang
-
-
-> We know that the ISA/LPC bus can only have up to 65536 ports,
-> so you can register all of those, or possibly limit it further to
-> 1024 or 4096 ports, whichever matches the bus implementation.
+> Now I did not consider default_domain usability, I acknowledge. I will
+> send a POC anyway.
 > 
-> 	Arnd
+>  regions may not be, but we'd be
+>> filtering those out anyway). The default DMA domains need this
+>> information too, and since those are allocated at group creation,
+>> group->domain should always be non-NULL and interrogable.
+>>
+>> Plus, the groups are already there in sysfs, and, being representative
+>> of device topology, would seem to be an ideal place to expose the
+>> addressing limitations relevant to the devices within them. This really
+>> feels like it's all falling into place (on the kernel end, at least, I'm
+>> sticking to the sidelines on the userspace discussion ;)).
 > 
-> .
+> Thanks
 > 
+> Eric
+>>
+>> Robin.
+>>
+>>>
+>>> Thanks
+>>>
+>>> Eric
+>>>>
+>>>>>
+>>>>> An iommu domain now owns a list of those.
+>>>>>
+>>>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>>>>
+>>>>> ---
+>>>>> ---
+>>>>>  drivers/iommu/iommu.c |  2 ++
+>>>>>  include/linux/iommu.h | 17 +++++++++++++++++
+>>>>>  2 files changed, 19 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>>>> index 9a2f196..0af07492 100644
+>>>>> --- a/drivers/iommu/iommu.c
+>>>>> +++ b/drivers/iommu/iommu.c
+>>>>> @@ -1061,6 +1061,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+>>>>>  
+>>>>>  	domain->ops  = bus->iommu_ops;
+>>>>>  	domain->type = type;
+>>>>> +	INIT_LIST_HEAD(&domain->reserved_regions);
+>>>>> +	mutex_init(&domain->resv_mutex);
+>>>>>  	/* Assume all sizes by default; the driver may override this later */
+>>>>>  	domain->pgsize_bitmap  = bus->iommu_ops->pgsize_bitmap;
+>>>>>  
+>>>>> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>>>>> index 436dc21..0f2eb64 100644
+>>>>> --- a/include/linux/iommu.h
+>>>>> +++ b/include/linux/iommu.h
+>>>>> @@ -84,6 +84,8 @@ struct iommu_domain {
+>>>>>  	void *handler_token;
+>>>>>  	struct iommu_domain_geometry geometry;
+>>>>>  	void *iova_cookie;
+>>>>> +	struct list_head reserved_regions;
+>>>>> +	struct mutex resv_mutex; /* protects the reserved region list */
+>>>>>  };
+>>>>>  
+>>>>>  enum iommu_cap {
+>>>>> @@ -131,6 +133,21 @@ struct iommu_dm_region {
+>>>>>  	int			prot;
+>>>>>  };
+>>>>>  
+>>>>> +/**
+>>>>> + * struct iommu_reserved_region - descriptor for a reserved iova region
+>>>>> + * @list: Linked list pointers
+>>>>> + * @start: IOVA base address of the region
+>>>>> + * @length: Length of the region in bytes
+>>>>> + */
+>>>>> +struct iommu_reserved_region {
+>>>>> +	struct list_head	list;
+>>>>> +	dma_addr_t		start;
+>>>>> +	size_t			length;
+>>>>> +};
+>>>>
+>>>> Looking at this in context with the dm_region above, though, I come to
+>>>> the surprising realisation that these *are* dm_regions, even at the
+>>>> fundamental level - on the one hand you've got physical addresses which
+>>>> can't be remapped (because something is already using them), while on
+>>>> the other you've got physical addresses which can't be remapped (because
+>>>> the IOMMU is incapable). In fact for reserved regions *other* than our
+>>>> faked-up MSI region there's no harm if the IOMMU were to actually
+>>>> identity-map them.
+>>>>
+>>>> Let's just add this to the existing infrastructure, either with some
+>>>> kind of IOMMU_NOMAP flag or simply prot = 0. That way it automatically
+>>>> gets shared between the VFIO and DMA cases for free!
+>>>>
+>>>> Robin.
+>>>>
+>>>>> +
+>>>>> +#define iommu_reserved_region_for_each(resv, d) \
+>>>>> +	list_for_each_entry(resv, &(d)->reserved_regions, list)
+>>>>> +
+>>>>>  #ifdef CONFIG_IOMMU_API
+>>>>>  
+>>>>>  /**
+>>>>>
+>>>>
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>>
+>>
