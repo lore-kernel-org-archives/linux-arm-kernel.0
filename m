@@ -1,83 +1,57 @@
-From: wei@redhat.com (Wei Huang)
-Date: Thu, 10 Nov 2016 09:12:35 -0600
-Subject: [PATCH 1/2] arm64: perf: Move ARMv8 PMU perf event definitions to
- asm/perf_event.h
-In-Reply-To: <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
-References: <1478721480-24852-1-git-send-email-wei@redhat.com>
- <aa5b2275-374f-4d74-d9d9-0959d90454ca@arm.com>
-Message-ID: <d9ef10b9-44f2-b02e-9d90-02cf348aa49c@redhat.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 10 Nov 2016 16:14:34 +0100
+Subject: [PATCH] nvmem: sunxi-sid: SID content is not a valid source of
+ randomness
+In-Reply-To: <20161025132648.txeo3rw6yz5wutrg@lukather>
+References: <1477144408-15896-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20161024201020.h6akyqad2o42xkhq@lukather>
+ <20161025053855.GA901@Red>
+ <20161025132648.txeo3rw6yz5wutrg@lukather>
+Message-ID: <20161110151434.GA1209@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/10/2016 03:10 AM, Marc Zyngier wrote:
-> Hi Wei,
+On Tue, Oct 25, 2016 at 03:26:48PM +0200, Maxime Ripard wrote:
+> On Tue, Oct 25, 2016 at 07:38:55AM +0200, LABBE Corentin wrote:
+> > On Mon, Oct 24, 2016 at 10:10:20PM +0200, Maxime Ripard wrote:
+> > > On Sat, Oct 22, 2016 at 03:53:28PM +0200, Corentin Labbe wrote:
+> > > > Since SID's content is constant over reboot,
+> > > 
+> > > That's not true, at least not across all the Allwinner SoCs, and
+> > > especially not on the A10 and A20 that this driver supports.
+> > > 
+> > 
+> > On my cubieboard2 (A20)
+> > hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
+> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> > *
+> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> > *
+> > 00000200
+> > cubiedev ~ # reboot
+> > cubiedev ~ # hexdump -C /sys/devices/platform/soc\@01c00000/1c23800.eeprom/sunxi-sid0/nvmem 
+> > 00000000  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> > 00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> > *
+> > 00000100  16 51 66 83 80 48 50 72  56 54 48 48 03 c2 75 72  |.Qf..HPrVTHH..ur|
+> > 00000110  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+> > *
+> > 00000200
+> > 
+> > So clearly for me its constant.
 > 
-> On 09/11/16 19:57, Wei Huang wrote:
->> This patch moves ARMv8-related perf event definitions from perf_event.c
->> to asm/perf_event.h; so KVM code can use them directly. This also help
->> remove a duplicated definition of SW_INCR in perf_event.h.
->>
->> Signed-off-by: Wei Huang <wei@redhat.com>
->> ---
->>  arch/arm64/include/asm/perf_event.h | 161 +++++++++++++++++++++++++++++++++++-
->>  arch/arm64/kernel/perf_event.c      | 161 ------------------------------------
->>  2 files changed, 160 insertions(+), 162 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
->> index 2065f46..6c7b18b 100644
->> --- a/arch/arm64/include/asm/perf_event.h
->> +++ b/arch/arm64/include/asm/perf_event.h
->> @@ -46,7 +46,166 @@
->>  #define	ARMV8_PMU_EVTYPE_MASK	0xc800ffff	/* Mask for writable bits */
->>  #define	ARMV8_PMU_EVTYPE_EVENT	0xffff		/* Mask for EVENT bits */
->>  
->> -#define ARMV8_PMU_EVTYPE_EVENT_SW_INCR	0	/* Software increment event */
->> +/*
->> + * ARMv8 PMUv3 Performance Events handling code.
->> + * Common event types.
->> + */
->> +
->> +/* Required events. */
->> +#define ARMV8_PMUV3_PERFCTR_SW_INCR				0x00
->> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL			0x03
->> +#define ARMV8_PMUV3_PERFCTR_L1D_CACHE				0x04
->> +#define ARMV8_PMUV3_PERFCTR_BR_MIS_PRED				0x10
->> +#define ARMV8_PMUV3_PERFCTR_CPU_CYCLES				0x11
->> +#define ARMV8_PMUV3_PERFCTR_BR_PRED				0x12
-> 
-> In my initial review, I asked for the "required" events to be moved to a
-> shared location. What's the rational for moving absolutely everything?
-
-I did notice the phrase "required" in the original email. However I
-think it is weird to have two places for a same set of PMU definitions.
-Other developers might think these two are missing if they don't search
-kernel files carefully.
-
-If Will Deacon and you insist, I can move only two defs to perf_event.h,
-consolidated with the 2nd patch into a single one.
-
-> KVM only needs to know about ARMV8_PMUV3_PERFCTR_SW_INCR and
-> ARMV8_PMUV3_PERFCTR_CPU_CYCLES, so I thought that moving the above six
-> events (and maybe the following two) would be enough.
-> 
-> Also, you've now broken the build by dropping
-> ARMV8_PMU_EVTYPE_EVENT_SW_INCR without amending it use in the KVM PMU
-> code (see the kbuild report).
+> It's constant across reboots, but not across devices. Each device have
+> a different SID content, therefore it's a relevant source of entropy
+> in the system.
 > 
 
-My bad. I tested compilation only after two patches applied. Will fix it.
+Not the 3 leading digit and not the tailing zeros which are the same accross device.
+So only 50% of data are really different accross devices.
+Perhaps a "random-range" property could be used ?
 
-<snip>
+Herbert, does it is safe to add that 50% duplicate content via add_device_randomness() ?
+Reading add_device_randomness doc, it seems finally it is safe, but if you could confirm it.
 
->> +
->>  /* PMUv3 HW events mapping. */
->>  
->>  /*
->>
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Regards
