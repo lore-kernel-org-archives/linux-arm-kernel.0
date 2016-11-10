@@ -1,53 +1,46 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Nov 2016 16:10:56 +0100
-Subject: [PATCH RFC 2/7] ARM: S3C64XX: Add DMA slave maps for PL080 devices
-In-Reply-To: <20161110110323.GG1575@localhost.localdomain>
-References: <1478276094-19135-1-git-send-email-s.nawrocki@samsung.com>
- <1478276094-19135-4-git-send-email-s.nawrocki@samsung.com>
- <20161108144445.GD1575@localhost.localdomain>
- <CGME20161108145620epcas2p4b8e2ec5ffdd4bf04ab3bf0728b46e3f2@epcas2p4.samsung.com>
- <20161108145534.GE1575@localhost.localdomain>
- <f53d533d-163f-31f3-4efb-0e39d201589d@samsung.com>
- <20161110110323.GG1575@localhost.localdomain>
-Message-ID: <b654d5f7-7b67-7216-760f-d29e49a29296@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Nov 2016 08:11:49 -0700
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <621758ce-dd3f-41ad-d9b8-b8e34538700e@redhat.com>
+References: <20161109192301.GS26979@atomide.com>
+ <621758ce-dd3f-41ad-d9b8-b8e34538700e@redhat.com>
+Message-ID: <20161110151149.GB27724@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2016 12:03 PM, Charles Keepax wrote:
->> On Tue, Nov 08, 2016 at 04:53:40PM +0100, Sylwester Nawrocki wrote:
-[...]
->> I pushed now to branch for-v4.10/dma/pl080-s3c64xx-v2 with this
->> issue fixed and added initialization of the filer function.
+* Hans de Goede <hdegoede@redhat.com> [161110 01:35]:
+> Hi,
 > 
-> Apologies for the delay got somewhat swamped with internal stuff
-> yesterday. Yeah using that branch it looks good to me, the SPI and
-> I2S are both working fine. I can download code to the wm0010
-> which should be a good work out of the SPI and play audio
-> correctly so the I2S should be fine. So for the series:
+> On 09-11-16 20:23, Tony Lindgren wrote:
+> > Hi,
+> > 
+> > Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
+> > the sysfs brightness attr for changes.") breaks runtime PM for me.
+> > 
+> > On my omap dm3730 based test system, idle power consumption is over 70
+> > times higher now with this patch! It goes from about 6mW for the core
+> > system to over 440mW during idle meaning there's some busy timer now
+> > active.
 > 
-> Tested-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+> Do you have any blinking LEDs or LED triggers defined on the system ?
 
-Great, thanks a lot!  I'm going to post the next iteration with
-modified pl080 DMAC patches, addressing comments from Arnd.
-I would be grateful if you could confirm it also works on your
-platform.
+There are some configured in the dts file:
 
-> I do still need to revert these two patches to get the I2S to
-> work properly:
-> 
-> commit d70e861a3154833467023123e218e9b1ba558809
-> ASoC: samsung: Remove SND_DMAENGINE_PCM_FLAG_NO_RESIDUE flag
-> 
-> commit acde50a7bf1fd6ae0baa4402f0a02c4b1bd4c990
-> ASoC: dmaengine_pcm: Make FLAG_NO_RESIDUE internal
-> 
-> But that is clearly an unrelated issue, which I haven't found
-> time to look into yet as we don't use this platform that often
-> these days.
+$ grep -i led arch/arm/boot/dts/*torpedo*.dts*
 
-Thanks for reporting this, I will see if I can find time to look
-into this issue as well.
+And the gpio controlled led1 is configured to blink with
+linux,default-trigger = "cpu0".
 
--- 
-Thanks,
-Sylwester
+> > Reverting this patch fixes the issue. Any ideas?
+> 
+> All I can think of is something calling led_set_brightness quite often,
+> the patch in question makes led_set_brightness somewhat more expensive,
+> but it should not cause such a big difference unless something is
+> really calling led_set_brightness quite often maybe something is calling
+> it with the same value all the time ?
+
+I don't think this one has any brightness control.
+
+Regards,
+
+Tony
