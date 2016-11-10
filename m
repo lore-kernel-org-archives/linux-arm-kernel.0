@@ -1,37 +1,63 @@
-From: wuchengli@chromium.org (Wu-Cheng Li)
-Date: Thu, 10 Nov 2016 13:24:05 +0800
-Subject: [PATCH v1] mtk-vcodec: add index check in decoder vidioc_qbuf.
-In-Reply-To: <1478755445-23494-1-git-send-email-wuchengli@chromium.org>
-References: <1478755445-23494-1-git-send-email-wuchengli@chromium.org>
-Message-ID: <1478755445-23494-2-git-send-email-wuchengli@chromium.org>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 10 Nov 2016 10:59:15 +0530
+Subject: [PATCH v4] regulator: lp873x: Add support for populating input supply
+Message-ID: <20161110052915.4898-1-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wu-Cheng Li <wuchengli@google.com>
+In order to have a proper topology of regulators for a platform, each
+registering regulator needs to populate supply_name field for identifying
+its supply's name. Add supply_name field for lp873x regulators.
 
-vb2_qbuf will check the buffer index. If a driver overrides
-vidioc_qbuf and use the buffer index, the driver needs to check
-the index.
-
-Signed-off-by: Wu-Cheng Li <wuchengli@chromium.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Changes since v3:
+- Applied Rob's ack.
+- Sending this patch separately so that this can be merged via Regulator tree.
+- Link to v3: https://patchwork.kernel.org/patch/9408545/
 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-index 0520919..0746592 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-@@ -533,6 +533,10 @@ static int vidioc_vdec_qbuf(struct file *file, void *priv,
- 	}
+ Documentation/devicetree/bindings/mfd/lp873x.txt | 8 ++++++++
+ drivers/regulator/lp873x-regulator.c             | 1 +
+ 2 files changed, 9 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mfd/lp873x.txt b/Documentation/devicetree/bindings/mfd/lp873x.txt
+index 52766c2..ae9cf39 100644
+--- a/Documentation/devicetree/bindings/mfd/lp873x.txt
++++ b/Documentation/devicetree/bindings/mfd/lp873x.txt
+@@ -7,6 +7,9 @@ Required properties:
+   - #gpio-cells:	Should be two.  The first cell is the pin number and
+ 			the second cell is used to specify flags.
+ 			See ../gpio/gpio.txt for more information.
++  - xxx-in-supply:	Phandle to parent supply node of each regulator
++			populated under regulators node. xxx can be
++			buck0, buck1, ldo0 or ldo1.
+   - regulators:	List of child nodes that specify the regulator
+ 			initialization data.
+ Example:
+@@ -17,6 +20,11 @@ pmic: lp8733 at 60 {
+ 	gpio-controller;
+ 	#gpio-cells = <2>;
  
- 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, buf->type);
-+	if (buf->index >= vq->num_buffers) {
-+		mtk_v4l2_debug(1, "buffer index %d out of range", buf->index);
-+		return -EINVAL;
-+	}
- 	vb = vq->bufs[buf->index];
- 	vb2_v4l2 = container_of(vb, struct vb2_v4l2_buffer, vb2_buf);
- 	mtkbuf = container_of(vb2_v4l2, struct mtk_video_dec_buf, vb);
++	buck0-in-supply = <&vsys_3v3>;
++	buck1-in-supply = <&vsys_3v3>;
++	ldo0-in-supply = <&vsys_3v3>;
++	ldo1-in-supply = <&vsys_3v3>;
++
+ 	regulators {
+ 		lp8733_buck0: buck0 {
+ 			regulator-name = "lp8733-buck0";
+diff --git a/drivers/regulator/lp873x-regulator.c b/drivers/regulator/lp873x-regulator.c
+index e504b91..70e3df6 100644
+--- a/drivers/regulator/lp873x-regulator.c
++++ b/drivers/regulator/lp873x-regulator.c
+@@ -24,6 +24,7 @@
+ 	[_id] = {							\
+ 		.desc = {						\
+ 			.name			= _name,		\
++			.supply_name		= _of "-in",		\
+ 			.id			= _id,			\
+ 			.of_match		= of_match_ptr(_of),	\
+ 			.regulators_node	= of_match_ptr("regulators"),\
 -- 
-2.8.0.rc3.226.g39d4020
+2.10.1
