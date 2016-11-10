@@ -1,48 +1,47 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 10 Nov 2016 13:16:13 +1030
-Subject: [PATCH 3/3] ipmi/bt-bmc: add a sysfs file to configure a maximum
- response time
-In-Reply-To: <7e7e5cde-341a-ecca-9c9c-b41695703b08@acm.org>
+Date: Thu, 10 Nov 2016 13:19:51 +1030
+Subject: [PATCH 1/3] ipmi/bt-bmc: change compatible node to 'aspeed,
+ ast2400-ibt-bmc'
+In-Reply-To: <2278270.0oJqDfoDd9@wuerfel>
 References: <1478073426-3714-1-git-send-email-clg@kaod.org>
- <1478073426-3714-4-git-send-email-clg@kaod.org>
- <3a1f8e6d-c935-3404-ffa0-81b19d170731@acm.org>
- <aa4804b0-4084-6d34-c1db-68bdb5efb20a@kaod.org>
- <7e7e5cde-341a-ecca-9c9c-b41695703b08@acm.org>
-Message-ID: <CACPK8XdiBFvPo5toh0UcPtOzx2XhhXC-EMgpj4mitfo3Samw8w@mail.gmail.com>
+ <a886778e-a85e-758e-3a61-c4909652e39d@kaod.org>
+ <c749ff0a-bc71-bc9f-0e8c-326db2cea0fb@acm.org>
+ <2278270.0oJqDfoDd9@wuerfel>
+Message-ID: <CACPK8Xd+EcefOs7ZCNPSOUV67TQA0X8NQMZfjZvm3TWYiFqTdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 2:34 AM, Corey Minyard <minyard@acm.org> wrote:
-> On 11/09/2016 08:42 AM, C?dric Le Goater wrote:
->> The patch raises a few questions on the "BT Interface Capabilities" :
+On Thu, Nov 10, 2016 at 2:39 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday, November 8, 2016 12:15:57 PM CET Corey Minyard wrote:
+>> On 11/08/2016 09:52 AM, C?dric Le Goater wrote:
+>> > O
+>> snip
 >>
->>   - should we use sysfs or a specific ioctl to configure the driver ?
+>> >>>> While we're modifying the binding, should we add a compat string for
+>> >>>> the ast2500?
+>> >>> Well, if the change in this patch is fine for all, may be we can add
+>> >>> the ast2500 compat string in a followup patch ?
+>> >> Sounds good to me.
+>> > OK. So, how do we proceed with this patch ? Who would include it in its
+>> > tree ?
+>>
+>> I don't have anything for 4.9 at the moment.  Arnd, if you have
+>> something, can
+>> you take this?  Otherwise I will.
+>>
+>> And I guess I should add:
+>>
+>> Acked-by: Corey Minyard <cminyard@mvista.com>
 >
+> Thanks, I've added it to my todo folder.
 >
-> I should probably say sysfs, but really I don't care.  The hard part about
-> ioctls is the compat, and there shouldn't be any compat issues with this
-> interface.  An ioctl is probably easier, especially if you add an ioctl for
-> the header size thing I talked about in the previous email.
->
-> The only thing that matters to the driver is the timeout.  If you want to
-> make the timeout per fd, then it will have to be an ioctl.
+> Olof, if you do fixes before I do, please pick up this patch with
+> Corey's Ack.
 
-I vote for an ioctl as it's simpler for userspace.
+Thank you!
 
-In another driver we use on the BMCs we have a character device and a
-few sysfs files for configuration. This means userspace needs to
-discover and open > 1 fd, which is annoying.
+Acked-by: Joel Stanley <joel@jms.id.au>
 
 Cheers,
 
 Joel
-
->>   - should the driver handle directly the response to the "Get BT
->>     Interface Capabilities" command ?
->
->
-> That probably belongs in userspace.  The only reason I can think of
-> to have it in the driver would be so the host driver can fetch it if the
-> BMC userspace is down, but I can't see how that's a good idea.
->
-> Hope my wishy-washy answer helps :-).
