@@ -1,39 +1,57 @@
-From: al.stone@linaro.org (Al Stone)
-Date: Thu, 10 Nov 2016 16:18:54 -0700
-Subject: [Linaro-acpi] ACPI namespace details for ARM64
-In-Reply-To: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 11 Nov 2016 07:20:45 +0800
+Subject: [clk:clk-qcom-8994 2/2] include/linux/module.h:213:1: error:
+ expected ',' or ';' before 'extern'
+Message-ID: <201611110732.1ceuZvsr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2016 03:05 PM, Bjorn Helgaas wrote:
-> Hi all,
-> 
-> We've been working through the details of getting ACPI to work on
-> arm64, and there have been lots of questions about what this means for
-> PCI.  I've outlined this for several people individually, but I'm
-> going to send this separately, apart from a specific patch series, to
-> make sure we're all on the same page.  Please correct my errors and
-> misunderstandings.
-> 
-> Bjorn
-> 
->[snip....]
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-qcom-8994
+head:   cc800227108710c8f02255e61659b956b041eec3
+commit: cc800227108710c8f02255e61659b956b041eec3 [2/2] clk: qcom: Add support for msm8994 global clock controller
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout cc800227108710c8f02255e61659b956b041eec3
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-A big +1 to all of this.  This also looks like something that should
-be added to either PCI, ACPI or arm64 documentation (or even all three).
-What do you think?
+All error/warnings (new ones prefixed by >>):
 
-Thank you for putting this together, Bjorn.
+   In file included from drivers/clk/qcom/gcc-msm8994.c:20:0:
+>> include/linux/module.h:213:1: error: expected ',' or ';' before 'extern'
+    extern const typeof(name) __mod_##type##__##name##_device_table  \
+    ^
+>> drivers/clk/qcom/gcc-msm8994.c:2265:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
+    MODULE_DEVICE_TABLE(of, gcc_msm8994_match_table);
+    ^~~~~~~~~~~~~~~~~~~
 
+vim +213 include/linux/module.h
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Linaro Enterprise Group
-al.stone at linaro.org
------------------------------------
+^1da177e Linus Torvalds  2005-04-16  207  /* What your module does. */
+^1da177e Linus Torvalds  2005-04-16  208  #define MODULE_DESCRIPTION(_description) MODULE_INFO(description, _description)
+^1da177e Linus Torvalds  2005-04-16  209  
+cff26a51 Rusty Russell   2014-02-03  210  #ifdef MODULE
+cff26a51 Rusty Russell   2014-02-03  211  /* Creates an alias so file2alias.c can find device table. */
+^1da177e Linus Torvalds  2005-04-16  212  #define MODULE_DEVICE_TABLE(type, name)					\
+6301939d Andrey Ryabinin 2015-02-13 @213  extern const typeof(name) __mod_##type##__##name##_device_table		\
+cff26a51 Rusty Russell   2014-02-03  214    __attribute__ ((unused, alias(__stringify(name))))
+cff26a51 Rusty Russell   2014-02-03  215  #else  /* !MODULE */
+cff26a51 Rusty Russell   2014-02-03  216  #define MODULE_DEVICE_TABLE(type, name)
+
+:::::: The code at line 213 was first introduced by commit
+:::::: 6301939d97d079f0d3dbe71e750f4daf5d39fc33 module: fix types of device tables aliases
+
+:::::: TO: Andrey Ryabinin <a.ryabinin@samsung.com>
+:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/9bf381ab/attachment-0001.gz>
