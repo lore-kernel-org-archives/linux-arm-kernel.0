@@ -1,39 +1,59 @@
-From: mail@kchr.de (Bastian =?ISO-8859-1?Q?K=F6cher?=)
-Date: Fri, 11 Nov 2016 08:35:13 +0100
-Subject: [clk:clk-qcom-8994 2/2] include/linux/module.h:213:1: error:
- expected ',' or '; ' before 'extern'
-In-Reply-To: <20161110234515.GO16026@codeaurora.org>
-References: <201611110732.1ceuZvsr%fengguang.wu@intel.com>
- <20161110234515.GO16026@codeaurora.org>
-Message-ID: <19999499.Yz2FylxFTS@bastiultrabook>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Nov 2016 18:05:58 +0800
+Subject: [PATCH] clk: sunxi-ng: sun8i-h3: Set CLK_SET_RATE_PARENT for audio
+ module clocks
+In-Reply-To: <20161111100558.14629-1-wens@csie.org>
+References: <20161111100558.14629-1-wens@csie.org>
+Message-ID: <20161111100558.14629-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for doing that :)
+The audio module clocks are supposed to be set according to the sample
+rate of the audio stream. The audio PLL provides the clock signal for
+thees module clocks, and only it is freely tunable.
 
-On Donnerstag, 10. November 2016 15:45:15 CET Stephen Boyd wrote:
-> On 11/11, kbuild test robot wrote:
-> > tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-qcom-8994
-> > head:   cc800227108710c8f02255e61659b956b041eec3
-> > commit: cc800227108710c8f02255e61659b956b041eec3 [2/2] clk: qcom: Add support for msm8994 global clock controller
-> > config: i386-allmodconfig (attached as .config)
-> > compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> > reproduce:
-> >         git checkout cc800227108710c8f02255e61659b956b041eec3
-> >         # save the attached .config to linux build tree
-> >         make ARCH=i386 
-> > 
-> > All error/warnings (new ones prefixed by >>):
-> > 
-> >    In file included from drivers/clk/qcom/gcc-msm8994.c:20:0:
-> > >> include/linux/module.h:213:1: error: expected ',' or ';' before 'extern'
-> >     extern const typeof(name) __mod_##type##__##name##_device_table  \
-> >     ^
-> > >> drivers/clk/qcom/gcc-msm8994.c:2265:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
-> >     MODULE_DEVICE_TABLE(of, gcc_msm8994_match_table);
-> 
-> Urgh that's sad. Too bad MODULE_DEVICE_TABLE doesn't have
-> something in it in the !MODULE case to cause compilation problems
-> like this to come out. I'll go fix this up.
-> 
-> 
+Set CLK_SET_RATE_PARENT for the audio module clocks so their users can
+properly tune the clock rate.
+
+Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+index 4d70590f05e3..21c427d86f28 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+@@ -394,16 +394,16 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents, 0x0a4,
+ static const char * const i2s_parents[] = { "pll-audio-8x", "pll-audio-4x",
+ 					    "pll-audio-2x", "pll-audio" };
+ static SUNXI_CCU_MUX_WITH_GATE(i2s0_clk, "i2s0", i2s_parents,
+-			       0x0b0, 16, 2, BIT(31), 0);
++			       0x0b0, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_MUX_WITH_GATE(i2s1_clk, "i2s1", i2s_parents,
+-			       0x0b4, 16, 2, BIT(31), 0);
++			       0x0b4, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_MUX_WITH_GATE(i2s2_clk, "i2s2", i2s_parents,
+-			       0x0b8, 16, 2, BIT(31), 0);
++			       0x0b8, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_M_WITH_GATE(spdif_clk, "spdif", "pll-audio",
+-			     0x0c0, 0, 4, BIT(31), 0);
++			     0x0c0, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
+ 
+ static SUNXI_CCU_GATE(usb_phy0_clk,	"usb-phy0",	"osc24M",
+ 		      0x0cc, BIT(8), 0);
+@@ -466,7 +466,7 @@ static SUNXI_CCU_M_WITH_GATE(ve_clk, "ve", "pll-ve",
+ 			     0x13c, 16, 3, BIT(31), 0);
+ 
+ static SUNXI_CCU_GATE(ac_dig_clk,	"ac-dig",	"pll-audio",
+-		      0x140, BIT(31), 0);
++		      0x140, BIT(31), CLK_SET_RATE_PARENT);
+ static SUNXI_CCU_GATE(avs_clk,		"avs",		"osc24M",
+ 		      0x144, BIT(31), 0);
+ 
+-- 
+2.10.2
