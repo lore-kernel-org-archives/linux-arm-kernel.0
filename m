@@ -1,46 +1,41 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Nov 2016 15:42:02 -0600
-Subject: [PATCH -next] PCI: layerscape: Remove redundant dev_err call in
- ls_pcie_probe()
-In-Reply-To: <1476716140-30608-1-git-send-email-weiyj.lk@gmail.com>
-References: <1476716140-30608-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20161111214202.GJ9868@bhelgaas-glaptop.roam.corp.google.com>
+Date: Fri, 11 Nov 2016 15:45:28 -0600
+Subject: [PATCH -next] PCI: rockchip: Add missing of_node_put() in
+ rockchip_pcie_init_irq_domain()
+In-Reply-To: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
+References: <1476716242-31684-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20161111214528.GL9868@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 02:55:40PM +0000, Wei Yongjun wrote:
+On Mon, Oct 17, 2016 at 02:57:22PM +0000, Wei Yongjun wrote:
 > From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> There is a error message within devm_ioremap_resource
-> already, so remove the dev_err call to avoid redundant
-> error message.
+> This node pointer is returned by of_get_next_child() with refcount
+> incremented in this function. of_node_put() on it before exitting
+> this function on error.
+> 
+> This is detected by Coccinelle semantic patch.
 > 
 > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-Applied to pci/host-layerscape for v4.10, thanks!
+Applied with Shawn's ack to pci/host-rockchip for v4.10, thanks!
 
 > ---
->  drivers/pci/host/pci-layerscape.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+>  drivers/pci/host/pcie-rockchip.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 2cb7315..bbd3d23 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -251,10 +251,8 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
->  
->  	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
->  	pcie->pp.dbi_base = devm_ioremap_resource(dev, dbi_base);
-> -	if (IS_ERR(pcie->pp.dbi_base)) {
-> -		dev_err(dev, "missing *regs* space\n");
-> +	if (IS_ERR(pcie->pp.dbi_base))
->  		return PTR_ERR(pcie->pp.dbi_base);
-> -	}
->  
->  	pcie->drvdata = match->data;
->  	pcie->lut = pcie->pp.dbi_base + pcie->drvdata->lut_offset;
-> 
-> 
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index e0b22da..ab88859 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -949,6 +949,7 @@ static int rockchip_pcie_init_irq_domain(struct rockchip_pcie *rockchip)
+>  						    &intx_domain_ops, rockchip);
+>  	if (!rockchip->irq_domain) {
+>  		dev_err(dev, "failed to get a INTx IRQ domain\n");
+> +		of_node_put(intc);
+>  		return -EINVAL;
+>  	}
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
