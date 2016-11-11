@@ -1,43 +1,78 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Nov 2016 09:32:26 +0000
-Subject: [Linaro-acpi] ACPI namespace details for ARM64
-In-Reply-To: <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
- <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
-Message-ID: <20161111093226.GA13333@red-moon>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Fri, 11 Nov 2016 17:34:58 +0800
+Subject: [PATCH v16 0/5] Mediatek MT8173 CMDQ support
+In-Reply-To: <CABb+yY3mi3M0xqNao=DRYN6Np0LOBfS669iUa_hWo2w1MmM1sw@mail.gmail.com>
+References: <1477999698-6288-1-git-send-email-hs.liao@mediatek.com>
+ <1478776558.15447.2.camel@mtksdaap41>
+ <CABb+yY3mi3M0xqNao=DRYN6Np0LOBfS669iUa_hWo2w1MmM1sw@mail.gmail.com>
+Message-ID: <1478856898.8781.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 04:18:54PM -0700, Al Stone wrote:
-> On 11/09/2016 03:05 PM, Bjorn Helgaas wrote:
-> > Hi all,
-> > 
-> > We've been working through the details of getting ACPI to work on
-> > arm64, and there have been lots of questions about what this means for
-> > PCI.  I've outlined this for several people individually, but I'm
-> > going to send this separately, apart from a specific patch series, to
-> > make sure we're all on the same page.  Please correct my errors and
-> > misunderstandings.
-> > 
-> > Bjorn
-> > 
-> >[snip....]
+On Fri, 2016-11-11 at 11:15 +0530, Jassi Brar wrote:
+> On Thu, Nov 10, 2016 at 4:45 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> > On Tue, 2016-11-01 at 19:28 +0800, HS Liao wrote:
+> >> Hi,
+> >>
+> >> This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+> >> to help write registers with critical time limitation, such as
+> >> updating display configuration during the vblank. It controls Global
+> >> Command Engine (GCE) hardware to achieve this requirement.
+> >>
+> >> These patches have a build dependency on top of v4.9-rc1.
+> >>
+> >> Changes since v15:
+> >>  - separate "suspend and resume" patch from "save energy" patch
+> >>  - don't stop running tasks in cmdq_suspend()
+> >>    (i.e. leave no running tasks guarantee to clients)
+> >>
+> >> Best regards,
+> >> HS Liao
+> >>
+> >> HS Liao (5):
+> >>   dt-bindings: soc: Add documentation for the MediaTek GCE unit
+> >>   CMDQ: Mediatek CMDQ driver
+> >>   arm64: dts: mt8173: Add GCE node
+> >>   CMDQ: suspend and resume
+> >>   CMDQ: save energy
+> >>
+> >>  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 ++
+> >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
+> >>  drivers/mailbox/Kconfig                            |  10 +
+> >>  drivers/mailbox/Makefile                           |   2 +
+> >>  drivers/mailbox/mtk-cmdq-mailbox.c                 | 632 +++++++++++++++++++++
+> >>  drivers/soc/mediatek/Kconfig                       |  11 +
+> >>  drivers/soc/mediatek/Makefile                      |   1 +
+> >>  drivers/soc/mediatek/mtk-cmdq-helper.c             | 310 ++++++++++
+> >>  include/linux/mailbox/mtk-cmdq-mailbox.h           |  67 +++
+> >>  include/linux/soc/mediatek/mtk-cmdq.h              | 182 ++++++
+> >>  10 files changed, 1268 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
+> >>  create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
+> >>  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
+> >>  create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
+> >>  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> >>
+> >
+> >
+> > Hi Jassi, Matthias,
+> >
+> > Sorry to disturb you.
+> >
+> No, you don't disturb, but the controller driver and protocol driver,
+> introduced in the same patch, does :)   So does the suspend/resume
+> support (patch 4&5) added  separately as a patch on top. Please
+> reorganise the patchset.
 > 
-> A big +1 to all of this.  This also looks like something that should
-> be added to either PCI, ACPI or arm64 documentation (or even all three).
+> Thanks.
 
-And to arm64 platforms FW :)
+Hi Jassi,
 
-> What do you think?
+Do you mean
+1. split controller driver and protocol driver as two patches,
+2. merge patch 4&5 into one patch, and
+3. reorganize the patchset as "(1) binding doc (2) controller driver
+   (3) protocol driver (4) devicetree (5) energy patch" ?
 
-I do not think there is anything ARM64 specific in Bjorn's description,
-but I do think it is very useful to have it in documentation, these
-bits of information are scattered around ACPI specs and PCI FW specs,
-having a single source would help and would have prevented asking
-Bjorn the same questions 100 times.
-
-> Thank you for putting this together, Bjorn.
-
-+1, Thank you very much for this nice summary Bjorn.
-
-Lorenzo
+Thanks,
+HS
