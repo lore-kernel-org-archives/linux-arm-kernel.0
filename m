@@ -1,45 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 11 Nov 2016 08:42:31 +0000
-Subject: [PATCH v2 2/6] mfd: stm32-adc: Add support for stm32 ADC
-In-Reply-To: <201611110537.S7AVN9F6%fengguang.wu@intel.com>
-References: <1478794738-28933-3-git-send-email-fabrice.gasnier@st.com>
- <201611110537.S7AVN9F6%fengguang.wu@intel.com>
-Message-ID: <20161111084231.GA13638@dell>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Nov 2016 16:45:49 +0800
+Subject: [PATCH v2 3/3] pinctrl: sunxi: Make sunxi_pconf_group_set use
+ sunxi_pconf_reg helper
+In-Reply-To: <20161111083852.yacy33g6pag6ucon@lukather>
+References: <20161111024455.16883-1-wens@csie.org>
+ <20161111024455.16883-4-wens@csie.org>
+ <20161111083852.yacy33g6pag6ucon@lukather>
+Message-ID: <CAGb2v64=FrhdGyT1UybqRfLHXRb--LwFn31G7VdndBbhDGV4-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Nov 2016, kbuild test robot wrote:
+On Fri, Nov 11, 2016 at 4:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Nov 11, 2016 at 10:44:55AM +0800, Chen-Yu Tsai wrote:
+>> The sunxi_pconf_reg helper introduced in the last patch gives us the
+>> chance to rework sunxi_pconf_group_set to have it match the structure
+>> of sunxi_pconf_(group_)get and make it easier to understand.
+>>
+>> For each config to set, it:
+>>
+>>     1. checks if the parameter is supported.
+>>     2. checks if the argument is within limits.
+>>     3. converts argument to the register value.
+>>     4. writes to the register with spinlock held.
+>>
+>> As a result the function now blocks unsupported config parameters,
+>> instead of silently ignoring them.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> But I think the config variable removal should be part of patch 2, as
+> discussed there.
 
-> Hi Fabrice,
-> 
-> [auto build test ERROR on ljones-mfd/for-mfd-next]
-> [also build test ERROR on v4.9-rc4 next-20161110]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Fabrice-Gasnier/Add-support-for-STM32-ADC/20161111-011922
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-> config: s390-allmodconfig (attached as .config)
-> compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=s390 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/mfd/stm32-adc-core: struct of_device_id is 200 bytes.  The last of 1 is:
->    0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x73 0x74 0x2c 0x73 0x74 0x6d 0x33 0x32 0x66 0x34 0x2d 0x61 0x64 0x63 0x2d 0x63 0x6f 0x72 0x65 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 
-> >> FATAL: drivers/mfd/stm32-adc-core: struct of_device_id is not terminated with a NULL entry!
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+OK. I think that makes sense. Re-reading my patches, I can't figure out,
+which patch I meant for it to go in. :(
 
-Please fix this and re-submit.
+I'll send out a v3.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ChenYu
