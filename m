@@ -1,26 +1,23 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 11 Nov 2016 09:29:14 +0100
-Subject: [PATCH] pinctrl: sunxi: Free configs in pinctrl_map only if it
- is a config map
-In-Reply-To: <20161111023510.14146-1-wens@csie.org>
-References: <20161111023510.14146-1-wens@csie.org>
-Message-ID: <20161111082914.yz52rlhevzvnoac3@lukather>
+Date: Fri, 11 Nov 2016 09:34:37 +0100
+Subject: [PATCH v2 1/3] pinctrl: sunxi: Fix
+ PIN_CONFIG_BIAS_PULL_{DOWN,UP} argument
+In-Reply-To: <20161111024455.16883-2-wens@csie.org>
+References: <20161111024455.16883-1-wens@csie.org>
+ <20161111024455.16883-2-wens@csie.org>
+Message-ID: <20161111083437.i3iotrwpjvpzmi2h@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 10:35:10AM +0800, Chen-Yu Tsai wrote:
-> In the recently refactored sunxi pinctrl library, we are only allocating
-> one set of pin configs for each pinmux setting node. When the pinctrl_map
-> structure is freed, the pin configs should also be freed. However the
-> code assumed the first map would contain the configs, which actually
-> never happens, as the mux function map gets added first.
+On Fri, Nov 11, 2016 at 10:44:53AM +0800, Chen-Yu Tsai wrote:
+> According to pinconf-generic.h, the argument for
+> PIN_CONFIG_BIAS_PULL_{DOWN,UP} is non-zero if the bias is enabled
+> with a pull up/down resistor, zero if it is directly connected
+> to VDD or ground.
 > 
-> The proper way to do this is to look through all the maps and free the
-> first one whose type is actually PIN_MAP_TYPE_CONFIGS_GROUP.
+> Since Allwinner hardware uses a weak pull resistor internally,
+> the argument should be 1.
 > 
-> Also slightly expand the comment explaining this.
-> 
-> Fixes: f233dbca6227 ("pinctrl: sunxi: Rework the pin config building code")
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -38,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/e741e672/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/bc2bfaf0/attachment.sig>
