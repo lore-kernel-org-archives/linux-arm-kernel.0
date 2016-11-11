@@ -1,93 +1,69 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 Nov 2016 18:27:34 +0000
-Subject: [PATCH v3 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
-Message-ID: <7d54803d32968be46a1a525d7160feb13af72f00.1478887214.git.robin.murphy@arm.com>
+Date: Fri, 11 Nov 2016 18:30:45 +0000
+Subject: [PATCH] iommu/dma: Stop getting dma_32bit_pfn wrong
+Message-ID: <f9c96106e6253f7033be8dd975392f0edb12e603.1478889045.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the new dma_{map,unmap}_resource() functions added to the DMA API
-for the benefit of cases like slave DMA, add suitable implementations to
-the arsenal of our generic layer. Since cache maintenance should not be
-a concern, these can both be standalone callback implementations without
-the need for arch code wrappers.
+iommu_dma_init_domain() was originally written under the misconception
+that dma_32bit_pfn represented some sort of size limit for IOVA domains.
+Since the truth is almost the exact opposite of that, rework the logic
+and comments to reflect its real purpose of optimising lookups when
+allocating from a subset of the available space.
 
-CC: Joerg Roedel <joro@8bytes.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
-
-v3: Don't misuse phys_to_page()
-
- drivers/iommu/dma-iommu.c | 24 +++++++++++++++++++++---
- include/linux/dma-iommu.h |  4 ++++
- 2 files changed, 25 insertions(+), 3 deletions(-)
+ drivers/iommu/dma-iommu.c | 23 ++++++++++++++++++-----
+ 1 file changed, 18 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index c5ab8667e6f2..8b745260b3bc 100644
+index c5ab8667e6f2..ae045a14b530 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -432,13 +432,12 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
- 	return ret;
- }
- 
--dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
--		unsigned long offset, size_t size, int prot)
-+dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
-+		size_t size, int prot)
+@@ -139,6 +139,7 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
  {
- 	dma_addr_t dma_addr;
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
  	struct iova_domain *iovad = cookie_iovad(domain);
--	phys_addr_t phys = page_to_phys(page) + offset;
- 	size_t iova_off = iova_offset(iovad, phys);
- 	size_t len = iova_align(iovad, size + iova_off);
- 	struct iova *iova = __alloc_iova(domain, len, dma_get_mask(dev));
-@@ -454,6 +453,12 @@ dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
- 	return dma_addr + iova_off;
- }
+ 	unsigned long order, base_pfn, end_pfn;
++	bool pci = dev && dev_is_pci(dev);
  
-+dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
-+		unsigned long offset, size_t size, int prot)
-+{
-+	return __iommu_dma_map(dev, page_to_phys(page) + offset, size, prot);
-+}
-+
- void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs)
- {
-@@ -624,6 +629,19 @@ void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), sg_dma_address(sg));
- }
+ 	if (!iovad)
+ 		return -ENODEV;
+@@ -161,19 +162,31 @@ int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
+ 		end_pfn = min_t(unsigned long, end_pfn,
+ 				domain->geometry.aperture_end >> order);
+ 	}
++	/*
++	 * PCI devices may have larger DMA masks, but still prefer allocating
++	 * within a 32-bit mask to avoid DAC addressing. Such limitations don't
++	 * apply to the typical platform device, so for those we may as well
++	 * leave the cache limit at the top of the range they're likely to use.
++	 */
++	if (pci)
++		end_pfn = min_t(unsigned long, end_pfn,
++				DMA_BIT_MASK(32) >> order);
  
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
-+{
-+	return __iommu_dma_map(dev, phys, size,
-+			dma_direction_to_prot(dir, false) | IOMMU_MMIO);
-+}
-+
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs)
-+{
-+	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle);
-+}
-+
- int iommu_dma_supported(struct device *dev, u64 mask)
- {
- 	/*
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 32c589062bd9..7f7e9a7e3839 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -61,6 +61,10 @@ void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
- 		enum dma_data_direction dir, unsigned long attrs);
- void iommu_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
- 		enum dma_data_direction dir, unsigned long attrs);
-+dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
-+void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
-+		size_t size, enum dma_data_direction dir, unsigned long attrs);
- int iommu_dma_supported(struct device *dev, u64 mask);
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
- 
+-	/* All we can safely do with an existing domain is enlarge it */
++	/* start_pfn is always nonzero for an already-initialised domain */
+ 	if (iovad->start_pfn) {
+ 		if (1UL << order != iovad->granule ||
+-		    base_pfn != iovad->start_pfn ||
+-		    end_pfn < iovad->dma_32bit_pfn) {
++		    base_pfn != iovad->start_pfn) {
+ 			pr_warn("Incompatible range for DMA domain\n");
+ 			return -EFAULT;
+ 		}
+-		iovad->dma_32bit_pfn = end_pfn;
++		/*
++		 * If we have devices with different DMA masks, move the free
++		 * area cache limit down for the benefit of the smaller one.
++		 */
++		iovad->dma_32bit_pfn = min(end_pfn, iovad->dma_32bit_pfn);
+ 	} else {
+ 		init_iova_domain(iovad, 1UL << order, base_pfn, end_pfn);
+-		if (dev && dev_is_pci(dev))
++		if (pci)
+ 			iova_reserve_pci_windows(to_pci_dev(dev), iovad);
+ 	}
+ 	return 0;
 -- 
 2.10.2.dirty
