@@ -1,59 +1,74 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 12 Nov 2016 00:46:52 +0800
-Subject: [PATCH 1/3] ARM: sunxi: add support for H2+ SoC
-Message-ID: <20161111164654.15273-1-icenowy@aosc.xyz>
+Date: Sat, 12 Nov 2016 00:46:53 +0800
+Subject: [PATCH 2/3] ARM: dts: sunxi: add Allwinner H2+ dtsi
+In-Reply-To: <20161111164654.15273-1-icenowy@aosc.xyz>
+References: <20161111164654.15273-1-icenowy@aosc.xyz>
+Message-ID: <20161111164654.15273-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H2+ is a quad-core Cortex-A7 SoC.
+Allwinner H2+ is a SoC so similar with H3 that H3 drivers and memory map
+is known to work well on H2+, with both BSP kernel/firmware or the
+mainline ones.
 
-It is very like H3, that they share the same SoC ID (0x1680), and H3
-memory maps as well as drivers works well on the SoC.
+So add a dtsi file which only include the H3 dtsi only, so we can add
+H2+-specified nodes in the dtsi file when we find any software
+difference between H2+ and H3.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- Documentation/arm/sunxi/README                  | 4 ++++
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- arch/arm/mach-sunxi/sunxi.c                     | 1 +
- 3 files changed, 6 insertions(+)
+ arch/arm/boot/dts/sun8i-h2plus.dtsi | 43 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h2plus.dtsi
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index cd02433..1fe4d99c 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -63,6 +63,10 @@ SunXi family
-         + User Manual
-           http://dl.linux-sunxi.org/A33/A33%20user%20manual%20release%201.1.pdf
- 
-+      - Allwinner H2+ (sun8i)
-+        + No document available now, but is known to be working properly with
-+          H3 drivers and memory map.
+diff --git a/arch/arm/boot/dts/sun8i-h2plus.dtsi b/arch/arm/boot/dts/sun8i-h2plus.dtsi
+new file mode 100644
+index 0000000..76fc3d0
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h2plus.dtsi
+@@ -0,0 +1,43 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-       - Allwinner H3 (sun8i)
-         + Datasheet
-           http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index 3975d0a..0c0f277 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -13,5 +13,6 @@ using one of the following compatible strings:
-   allwinner,sun8i-a33
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h3
-+  allwinner,sun8i-h2plus
-   allwinner,sun9i-a80
-   nextthing,gr8
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 2e2bde2..3647ad7 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -63,6 +63,7 @@ static const char * const sun8i_board_dt_compat[] = {
- 	"allwinner,sun8i-a23",
- 	"allwinner,sun8i-a33",
- 	"allwinner,sun8i-a83t",
-+	"allwinner,sun8i-h2plus",
- 	"allwinner,sun8i-h3",
- 	NULL,
- };
++#include "sun8i-h3.dtsi"
 -- 
 2.10.1
