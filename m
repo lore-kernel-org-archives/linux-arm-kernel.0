@@ -1,119 +1,281 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 11 Nov 2016 11:33:38 +0800
-Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD
- Host Controller
-In-Reply-To: <20161111112243.7431625d@xhacker>
-References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
- <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
- <20161109182426.vfrpb4i2mfatdzz3@rob-hp-laptop>
- <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
- <20161111112243.7431625d@xhacker>
-Message-ID: <20161111113324.377b8841@xhacker>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Fri, 11 Nov 2016 11:38:45 +0800
+Subject: No subject
+Message-ID: <CAG2=9p_3nLD6MuLXPsbfC8LqK76LbwD3BDRUjX3uEUrijZnYCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Nov 2016 11:22:43 +0800 Jisheng Zhang wrote:
+Hi Steven,
 
-> Hi Rob, Ziji,
-> 
-> On Thu, 10 Nov 2016 19:44:19 +0800 Ziji Hu wrote:
-> 
-> > Hi Rob,
-> > 
-> > On 2016/11/10 2:24, Rob Herring wrote:  
-> > > On Mon, Oct 31, 2016 at 12:09:54PM +0100, Gregory CLEMENT wrote:    
-> > >> From: Ziji Hu <huziji@marvell.com>
-> > >>
-> > >> Marvell Xenon SDHC can support eMMC/SD/SDIO.
-> > >> Add Xenon-specific properties.
-> > >> Also add properties for Xenon PHY setting.
-> > >>
-> > >> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > >> ---
-> > >>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 161 +++++++-
-> > >>  MAINTAINERS                                                   |   1 +-
-> > >>  2 files changed, 162 insertions(+), 0 deletions(-)
-> > >>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-> > >>
-> > >> diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-> > >> new file mode 100644
-> > >> index 000000000000..0d2d139494d3
-> > >> --- /dev/null
-> > >> +++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-> > >> @@ -0,0 +1,161 @@
-> > >> +Marvell's Xenon SDHCI Controller device tree bindings
-> > >> +This file documents differences between the core mmc properties
-> > >> +described by mmc.txt and the properties used by the Xenon implementation.
-> > >> +
-> > >> +A single Xenon IP can support multiple slots.
-> > >> +Each slot acts as an independent SDHC. It owns independent resources, such
-> > >> +as register sets clock and PHY.
-> > >> +Each slot should have an independent device tree node.
-> > >> +
-> > >> +Required Properties:
-> > >> +- compatible: should be one of the following
-> > >> +  - "marvell,armada-3700-sdhci": For controllers on Armada-3700 SOC.
-> > >> +  Must provide a second register area and marvell,pad-type.
-> > >> +  - "marvell,xenon-sdhci": For controllers on all the SOCs, other than
-> > >> +  Armada-3700.    
-> > > 
-> > > Need SoC specific compatible strings.
-> > >     
-> > 
-> > 	Xenon SDHC is a common IP for all Marvell SOCs.
-> > 	It is difficult to use a single SOC specific compatible to represent Xenon SDHC.
-> > 	There will be so many SOC compatible strings in list if each specific SOC owns a compatible.
-> > 	Actually only few SOCs require special properties.
-> > 	Any suggestion please?
-> >   
-> > >> +
-> > >> +- clocks:
-> > >> +  Array of clocks required for SDHCI.
-> > >> +  Requires at least one for Xenon IP core.
-> > >> +  Some SOCs require additional clock for AXI bus.
-> > >> +
-> > >> +- clock-names:
-> > >> +  Array of names corresponding to clocks property.
-> > >> +  The input clock for Xenon IP core should be named as "core".
-> > >> +  The optional AXI clock should be named as "axi".    
-> > > 
-> > > When is AXI clock optional? This should be required for ?? compatible 
-> > > strings.
-> > >     
-> > 	It is required on some SOCs.
-> > 	I will double check if a suitable compatible string can be determined for those SOCs.  
-> 
-> Besides the core clk, berlin SoCs have one AXI clock. Usually, we have two
-> solutions:
-> 
-> solA: as current patch does, take "marvell,xenon-sdhci" as compatible string
-> and make the AXI clock property optional. Usually for berlin SoCs, we don't need
-> special properties.
+On 21 October 2016 at 20:13, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> On 18 October 2016 at 23:44, Steven Rostedt <rostedt@goodmis.org> wrote:
+>> On Tue, 18 Oct 2016 16:08:58 +0800
+>> Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+>>
+>>> Currently Function traces can be only exported to ring buffer, this
+>>> patch added trace_export concept which can process traces and export
+>>> them to a registered destination as an addition to the current only
+>>> one output of Ftrace - i.e. ring buffer.
+>>>
+>>> In this way, if we want Function traces to be sent to other destination
+>>> rather than ring buffer only, we just need to register a new trace_export
+>>> and implement its own .write() function for writing traces to storage.
+>>>
+>>> With this patch, only Function trace (trace type is TRACE_FN)
+>>> is supported.
+>>
+>> This is getting better, but I still have some nits.
+>>
+>
+> Thanks.
+>
+>>>
+>>> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+>>> ---
+>>>  include/linux/trace.h |  28 +++++++++++
+>>>  kernel/trace/trace.c  | 132 +++++++++++++++++++++++++++++++++++++++++++++++++-
+>>>  2 files changed, 159 insertions(+), 1 deletion(-)
+>>>  create mode 100644 include/linux/trace.h
+>>>
+>>> diff --git a/include/linux/trace.h b/include/linux/trace.h
+>>> new file mode 100644
+>>> index 0000000..eb1c5b8
+>>> --- /dev/null
+>>> +++ b/include/linux/trace.h
+>>> @@ -0,0 +1,28 @@
+>>> +#ifndef _LINUX_TRACE_H
+>>> +#define _LINUX_TRACE_H
+>>> +
+>>> +#ifdef CONFIG_TRACING
+>>> +/*
+>>> + * The trace export - an export of Ftrace output. The trace_export
+>>> + * can process traces and export them to a registered destination as
+>>> + * an addition to the current only output of Ftrace - i.e. ring buffer.
+>>> + *
+>>> + * If you want traces to be sent to some other place rather than ring
+>>> + * buffer only, just need to register a new trace_export and implement
+>>> + * its own .write() function for writing traces to the storage.
+>>> + *
+>>> + * next              - pointer to the next trace_export
+>>> + * write     - copy traces which have been delt with ->commit() to
+>>> + *             the destination
+>>> + */
+>>> +struct trace_export {
+>>> +     struct trace_export __rcu       *next;
+>>> +     void (*write)(const char *, unsigned int);
+>>
+>> Why const char*? Why not const void *? This will never be a string.
+>>
+>
+> Will revise this.
+>
+>>
+>>> +};
+>>> +
+>>> +int register_ftrace_export(struct trace_export *export);
+>>> +int unregister_ftrace_export(struct trace_export *export);
+>>> +
+>>> +#endif       /* CONFIG_TRACING */
+>>> +
+>>> +#endif       /* _LINUX_TRACE_H */
+>>> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
+>>> index 8696ce6..db94ec1 100644
+>>> --- a/kernel/trace/trace.c
+>>> +++ b/kernel/trace/trace.c
+>>> @@ -40,6 +40,7 @@
+>>>  #include <linux/poll.h>
+>>>  #include <linux/nmi.h>
+>>>  #include <linux/fs.h>
+>>> +#include <linux/trace.h>
+>>>  #include <linux/sched/rt.h>
+>>>
+>>>  #include "trace.h"
+>>> @@ -2128,6 +2129,132 @@ void trace_buffer_unlock_commit_regs(struct trace_array *tr,
+>>>       ftrace_trace_userstack(buffer, flags, pc);
+>>>  }
+>>>
+>>> +static void
+>>> +trace_process_export(struct trace_export *export,
+>>> +            struct ring_buffer_event *event)
+>>> +{
+>>> +     struct trace_entry *entry;
+>>> +     unsigned int size = 0;
+>>> +
+>>> +     entry = ring_buffer_event_data(event);
+>>> +
+>>> +     size = ring_buffer_event_length(event);
+>>> +
+>>> +     if (export->write)
+>>> +             export->write((char *)entry, size);
+>>
+>> Is there ever going to be a time where export->write wont be set?
+>
+> There hasn't been since only one trace_export (i.e. stm_ftrace) was
+> added in this patch-set , I just wanted to make sure the write() has
+> been set before registering trace_export like what I added in 2/3 of
+> this series.
+>
+>>
+>> And if there is, this can be racy. As in
+>>
+>>
+>>         CPU 0:                  CPU 1:
+>>         ------                  ------
+>>         if (export->write)
+>>
+>>                                 export->write = NULL;
+>
+> Is there going to be this kind of use case? Why some one needs to
+> change export->write() rather than register a new trace_export?
+>
+> I probably haven't understood your point thoroughly, please correct me
+> if my guess was wrong.
+>
 
-Personally, I prefer solA: use the IP name as compatible string. This is IP
-specific rather than SoC specific. The HW itself supports two clks
+Any further comments? :)
 
 Thanks,
-Jisheng
+Chunyan
 
-> 
-> PS: this solution is also what sdhci-pxav3.c takes
-> 
-> solB: As Rob said, add extra SoC compatible strings, so we'll have
-> something like:
-> 
-> static const struct of_device_id sdhci_xenon_of_match[] = {
-> 	{ .compatible = "marvell,armada-3700-sdhci", },
-> 	{ .compatible = "marvell,berlin4ct-sdhci", },
-> 	...
-> 	{ .compatible = "marvell,berlinxxx-mmc", },
-> }
-> 
-> then we take care the AXI clk for berlin SoCs in the code.
-> 
-> 
-> Which solution do you prefer?
-> 
-> Thanks,
-> Jisheng
+>
+> Thanks for the review,
+> Chunyan
+>
+>>
+>>         export->write(entry, size);
+>>
+>>         BOOM!
+>>
+>>
+>> -- Steve
+>>
+>>> +}
+>>> +
+>>> +static DEFINE_MUTEX(ftrace_export_lock);
+>>> +
+>>> +static struct trace_export __rcu *ftrace_exports_list __read_mostly;
+>>> +
+>>> +static DEFINE_STATIC_KEY_FALSE(ftrace_exports_enabled);
+>>> +
+>>> +static inline void ftrace_exports_enable(void)
+>>> +{
+>>> +     static_branch_enable(&ftrace_exports_enabled);
+>>> +}
+>>> +
+>>> +static inline void ftrace_exports_disable(void)
+>>> +{
+>>> +     static_branch_disable(&ftrace_exports_enabled);
+>>> +}
+>>> +
+>>> +void ftrace_exports(struct ring_buffer_event *event)
+>>> +{
+>>> +     struct trace_export *export;
+>>> +
+>>> +     preempt_disable_notrace();
+>>> +
+>>> +     export = rcu_dereference_raw_notrace(ftrace_exports_list);
+>>> +     while (export) {
+>>> +             trace_process_export(export, event);
+>>> +             export = rcu_dereference_raw_notrace(export->next);
+>>> +     }
+>>> +
+>>> +     preempt_enable_notrace();
+>>> +}
+>>> +
+>>> +static inline void
+>>> +add_trace_export(struct trace_export **list, struct trace_export *export)
+>>> +{
+>>> +     rcu_assign_pointer(export->next, *list);
+>>> +     /*
+>>> +      * We are entering export into the list but another
+>>> +      * CPU might be walking that list. We need to make sure
+>>> +      * the export->next pointer is valid before another CPU sees
+>>> +      * the export pointer included into the list.
+>>> +      */
+>>> +     rcu_assign_pointer(*list, export);
+>>> +}
+>>> +
+>>> +static inline int
+>>> +rm_trace_export(struct trace_export **list, struct trace_export *export)
+>>> +{
+>>> +     struct trace_export **p;
+>>> +
+>>> +     for (p = list; *p != NULL; p = &(*p)->next)
+>>> +             if (*p == export)
+>>> +                     break;
+>>> +
+>>> +     if (*p != export)
+>>> +             return -1;
+>>> +
+>>> +     rcu_assign_pointer(*p, (*p)->next);
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +
+>>> +static inline void
+>>> +add_ftrace_export(struct trace_export **list, struct trace_export *export)
+>>> +{
+>>> +     if (*list == NULL)
+>>> +             ftrace_exports_enable();
+>>> +
+>>> +     add_trace_export(list, export);
+>>> +}
+>>> +
+>>> +static inline int
+>>> +rm_ftrace_export(struct trace_export **list, struct trace_export *export)
+>>> +{
+>>> +     int ret;
+>>> +
+>>> +     ret = rm_trace_export(list, export);
+>>> +     if (*list == NULL)
+>>> +             ftrace_exports_disable();
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +
+>>> +int register_ftrace_export(struct trace_export *export)
+>>> +{
+>>> +     if (WARN_ON_ONCE(!export->write))
+>>> +             return -1;
+>>> +
+>>> +     mutex_lock(&ftrace_export_lock);
+>>> +
+>>> +     add_ftrace_export(&ftrace_exports_list, export);
+>>> +
+>>> +     mutex_unlock(&ftrace_export_lock);
+>>> +
+>>> +     return 0;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(register_ftrace_export);
+>>> +
+>>> +int unregister_ftrace_export(struct trace_export *export)
+>>> +{
+>>> +     int ret;
+>>> +
+>>> +     mutex_lock(&ftrace_export_lock);
+>>> +
+>>> +     ret = rm_ftrace_export(&ftrace_exports_list, export);
+>>> +
+>>> +     mutex_unlock(&ftrace_export_lock);
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(unregister_ftrace_export);
+>>> +
+>>>  void
+>>>  trace_function(struct trace_array *tr,
+>>>              unsigned long ip, unsigned long parent_ip, unsigned long flags,
+>>> @@ -2146,8 +2273,11 @@ trace_function(struct trace_array *tr,
+>>>       entry->ip                       = ip;
+>>>       entry->parent_ip                = parent_ip;
+>>>
+>>> -     if (!call_filter_check_discard(call, entry, buffer, event))
+>>> +     if (!call_filter_check_discard(call, entry, buffer, event)) {
+>>> +             if (static_branch_unlikely(&ftrace_exports_enabled))
+>>> +                     ftrace_exports(event);
+>>>               __buffer_unlock_commit(buffer, event);
+>>> +     }
+>>>  }
+>>>
+>>>  #ifdef CONFIG_STACKTRACE
+>>
