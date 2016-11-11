@@ -1,134 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 11 Nov 2016 16:39:01 +0800
-Subject: [PATCH v2 2/3] pinctrl: sunxi: Add support for fetching pinconf
- settings from hardware
-In-Reply-To: <20161111083627.yooctcxqs4ow7sn3@lukather>
-References: <20161111024455.16883-1-wens@csie.org>
- <20161111024455.16883-3-wens@csie.org>
- <20161111083627.yooctcxqs4ow7sn3@lukather>
-Message-ID: <CAGb2v65UfxZP4R5_=QF-=P1ebsKb9SbRNT10gr5yi7qdnrd4hg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 11 Nov 2016 08:42:31 +0000
+Subject: [PATCH v2 2/6] mfd: stm32-adc: Add support for stm32 ADC
+In-Reply-To: <201611110537.S7AVN9F6%fengguang.wu@intel.com>
+References: <1478794738-28933-3-git-send-email-fabrice.gasnier@st.com>
+ <201611110537.S7AVN9F6%fengguang.wu@intel.com>
+Message-ID: <20161111084231.GA13638@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 4:36 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Fri, Nov 11, 2016 at 10:44:54AM +0800, Chen-Yu Tsai wrote:
->> The sunxi pinctrl driver only caches whatever pinconf setting was last
->> set on a given pingroup. This is not particularly helpful, nor is it
->> correct.
->>
->> Fix this by actually reading the hardware registers and returning
->> the correct results or error codes. Also filter out unsupported
->> pinconf settings. Since this driver has a peculiar setup of 1 pin
->> per group, we can support both pin and pingroup pinconf setting
->> read back with the same code. The sunxi_pconf_reg helper and code
->> structure is inspired by pinctrl-msm.
->>
->> With this done we can also claim to support generic pinconf, by
->> setting .is_generic = true in pinconf_ops.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 84 +++++++++++++++++++++++++++++++++--
->>  1 file changed, 81 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> index e04edda8629d..3e9f7c675d36 100644
->> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
->> @@ -438,15 +438,91 @@ static const struct pinctrl_ops sunxi_pctrl_ops = {
->>       .get_group_pins         = sunxi_pctrl_get_group_pins,
->>  };
->>
->> +static int sunxi_pconf_reg(unsigned pin, enum pin_config_param param,
->> +                        u32 *offset, u32 *shift, u32 *mask)
->> +{
->> +     switch (param) {
->> +     case PIN_CONFIG_DRIVE_STRENGTH:
->> +             *offset = sunxi_dlevel_reg(pin);
->> +             *shift = sunxi_dlevel_offset(pin);
->> +             *mask = DLEVEL_PINS_MASK;
->> +             break;
->> +
->> +     case PIN_CONFIG_BIAS_PULL_UP:
->> +     case PIN_CONFIG_BIAS_PULL_DOWN:
->> +     case PIN_CONFIG_BIAS_DISABLE:
->> +             *offset = sunxi_pull_reg(pin);
->> +             *shift = sunxi_pull_offset(pin);
->> +             *mask = PULL_PINS_MASK;
->> +             break;
->> +
->> +     default:
->> +             return -ENOTSUPP;
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +static int sunxi_pconf_get(struct pinctrl_dev *pctldev, unsigned pin,
->> +                        unsigned long *config)
->> +{
->> +     struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
->> +     enum pin_config_param param = pinconf_to_config_param(*config);
->> +     u32 offset, shift, mask, val;
->> +     u16 arg;
->> +     int ret;
->> +
->> +     pin -= pctl->desc->pin_base;
->> +
->> +     ret = sunxi_pconf_reg(pin, param, &offset, &shift, &mask);
->> +     if (ret < 0)
->> +             return ret;
->> +
->> +     val = (readl(pctl->membase + offset) >> shift) & mask;
->> +
->> +     switch (pinconf_to_config_param(*config)) {
->> +     case PIN_CONFIG_DRIVE_STRENGTH:
->> +             arg = (val + 1) * 10;
->> +             break;
->> +
->> +     case PIN_CONFIG_BIAS_PULL_UP:
->> +             if (val != SUN4I_PINCTRL_PULL_UP)
->> +                     return -EINVAL;
->> +             arg = 1; /* hardware is weak pull-up */
->> +             break;
->> +
->> +     case PIN_CONFIG_BIAS_PULL_DOWN:
->> +             if (val != SUN4I_PINCTRL_PULL_DOWN)
->> +                     return -EINVAL;
->> +             arg = 1; /* hardware is weak pull-down */
->> +             break;
->> +
->> +     case PIN_CONFIG_BIAS_DISABLE:
->> +             if (val != SUN4I_PINCTRL_NO_PULL)
->> +                     return -EINVAL;
->> +             arg = 0;
->> +             break;
->> +
->> +     default:
->> +             /* sunxi_pconf_reg should catch anything unsupported */
->> +             WARN_ON(1);
->> +             return -ENOTSUPP;
->> +     }
->> +
->> +     *config = pinconf_to_config_packed(param, arg);
->> +
->> +     return 0;
->> +}
->> +
->>  static int sunxi_pconf_group_get(struct pinctrl_dev *pctldev,
->>                                unsigned group,
->>                                unsigned long *config)
->>  {
->>       struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
->> +     struct sunxi_pinctrl_group *g = &pctl->groups[group];
->>
->> -     *config = pctl->groups[group].config;
->
-> Do we still need this variable? Looking at the code, it doesn't look
-> that way, and we can remove the caching in the _group_set function and
-> the variable itslef in the sunxi_pincttrl_group structure.
+On Fri, 11 Nov 2016, kbuild test robot wrote:
 
-It's actually removed in the next patch. :)
+> Hi Fabrice,
+> 
+> [auto build test ERROR on ljones-mfd/for-mfd-next]
+> [also build test ERROR on v4.9-rc4 next-20161110]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Fabrice-Gasnier/Add-support-for-STM32-ADC/20161111-011922
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+> config: s390-allmodconfig (attached as .config)
+> compiler: s390x-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=s390 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/mfd/stm32-adc-core: struct of_device_id is 200 bytes.  The last of 1 is:
+>    0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x73 0x74 0x2c 0x73 0x74 0x6d 0x33 0x32 0x66 0x34 0x2d 0x61 0x64 0x63 0x2d 0x63 0x6f 0x72 0x65 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 
+> >> FATAL: drivers/mfd/stm32-adc-core: struct of_device_id is not terminated with a NULL entry!
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 
-ChenYu
+Please fix this and re-submit.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
