@@ -1,45 +1,28 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 11 Nov 2016 12:19:44 +0100
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161110104601.0939ba9a@t450s.home>
-References: <20161109151709.74927f83@t450s.home>
- <20161109222522.GS17771@arm.com>
- <20161109162458.39594fdb@t450s.home>
- <20161109233847.GT17771@arm.com>
- <20161109165957.62c1eb61@t450s.home>
- <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
- <20161109175517.174e7803@t450s.home>
- <20161110020130.GA19108@arm.com>
- <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
- <20161110104601.0939ba9a@t450s.home>
-Message-ID: <20161111111944.GO2078@8bytes.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Nov 2016 11:28:29 +0000
+Subject: ACPI namespace details for ARM64
+In-Reply-To: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20161111112829.GB13333@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 10:46:01AM -0700, Alex Williamson wrote:
-> In the case of x86, we know that DMA mappings overlapping the MSI
-> doorbells won't be translated correctly, it's not a valid mapping for
-> that range, and therefore the iommu driver backing the IOMMU API
-> should describe that reserved range and reject mappings to it.
+On Wed, Nov 09, 2016 at 04:05:06PM -0600, Bjorn Helgaas wrote:
 
-The drivers actually allow mappings to the MSI region via the IOMMU-API,
-and I think it should stay this way also for other reserved ranges.
-Address space management is done by the IOMMU-API user already (and has
-to be done there nowadays), be it a DMA-API implementation which just
-reserves these regions in its address space allocator or be it VFIO with
-QEMU, which don't map RAM there anyway. So there is no point of checking
-this again in the IOMMU drivers and we can keep that out of the
-mapping/unmapping fast-path.
+[...]
 
-> For PCI devices userspace can examine the topology of the iommu group
-> and exclude MMIO ranges of peer devices based on the BARs, which are
-> exposed in various places, pci-sysfs as well as /proc/iomem.  For
-> non-PCI or MSI controllers... ???
+> ACPI defined a Producer/Consumer bit that was intended to distinguish
+> the bridge apertures from the bridge registers [4, 5]. However, BIOSes
+> didn't use that bit correctly, and the result is that OSes have to
+> assume that everything in a PCI host bridge _CRS is a window. That
+> leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
+> device itself.
 
-Right, the hardware resources can be examined. But maybe this can be
-extended to also cover RMRR ranges? Then we would be able to assign
-devices with RMRR mappings to guests.
+ACPI 6.1 states that in the revision changes 4.0a Apr.2010 (xiii)
+"Consumer/Producer bit is ignored (Restored 2.0C change that had
+been lost)" and still that bit is marked as valid. If it is not
+reliable it should be set as "ignored" in the specs (as it was
+on ACPI 2.0C, BTW), as it is it is just a source of confusion.
 
-
-
-	Joerg
+Thanks again !
+Lorenzo
