@@ -1,54 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 11 Nov 2016 19:56:07 +0000
-Subject: [PATCH] crypto: arm64/sha2: integrate OpenSSL implementations of
- SHA256/SHA512
-In-Reply-To: <1478872273-16382-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1478872273-16382-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20161111195607.GB4457@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 11 Nov 2016 21:29:02 +0100
+Subject: [PATCH v2 1/2] pinctrl: single: check for any error when getting
+ rows
+In-Reply-To: <20161109145401.25327-2-ahaslam@baylibre.com>
+References: <20161109145401.25327-1-ahaslam@baylibre.com>
+ <20161109145401.25327-2-ahaslam@baylibre.com>
+Message-ID: <CACRpkdYuC6rWJJf1wdrjEvLc1_3RtEKcpKwCn4SQ_Kby2BP7bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 09:51:13PM +0800, Ard Biesheuvel wrote:
-> This integrates both the accelerated scalar and the NEON implementations
-> of SHA-224/256 as well as SHA-384/512 from the OpenSSL project.
-> 
-> Relative performance compared to the respective generic C versions:
-> 
->                  |  SHA256-scalar  | SHA256-NEON* |  SHA512  |
->      ------------+-----------------+--------------+----------+
->      Cortex-A53  |      1.63x      |     1.63x    |   2.34x  |
->      Cortex-A57  |      1.43x      |     1.59x    |   1.95x  |
->      Cortex-A73  |      1.26x      |     1.56x    |     ?    |
-> 
-> The core crypto code was authored by Andy Polyakov of the OpenSSL
-> project, in collaboration with whom the upstream code was adapted so
-> that this module can be built from the same version of sha512-armv8.pl.
-> 
-> The version in this patch was taken from OpenSSL commit
-> 
->    866e505e0d66 sha/asm/sha512-armv8.pl: add NEON version of SHA256.
-> 
-> * The core SHA algorithm is fundamentally sequential, but there is a
->   secondary transformation involved, called the schedule update, which
->   can be performed independently. The NEON version of SHA-224/SHA-256
->   only implements this part of the algorithm using NEON instructions,
->   the sequential part is always done using scalar instructions.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> This supersedes the SHA-256-NEON-only patch I sent out about 6 weeks ago.
-> 
-> Will, Catalin: note that this pulls in a .pl script, and adds a build rule
-> locally in arch/arm64/crypto to generate .S files on the fly from Perl
-> scripts. I will leave it to you to decide whether you are ok with this as
-> is, or whether you prefer .S_shipped files, in which case the Perl script
-> is only included as a reference (this is how we did it for arch/arm in the
-> past, but given that it adds about 3000 lines of generated code to the patch,
-> I think we may want to simply keep it as below)
+On Wed, Nov 9, 2016 at 3:54 PM, Axel Haslam <ahaslam@baylibre.com> wrote:
 
-I think we should include the shipped files too. 3000 lines isn't that much
-in the grand scheme of things, and there will be people who complain about
-the unconditional perl dependency.
+> pinctrl_count_index_with_args returns -ENOENT not
+> -EINVAL. The return check would pass, and we would
+> try to kzalloc with a negative error size throwing
+> a warning.
+>
+> Instead of checking for -EINVAL specifically, lets
+> check for any error and avoid negative size allocations.
+>
+> Signed-off-by: Axel Haslam <ahaslam@baylibre.com>
 
-Will
+Patch applied with Tony's ACK.
+
+Yours,
+Linus Walleij
