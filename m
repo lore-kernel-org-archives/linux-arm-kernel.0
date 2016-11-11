@@ -1,55 +1,66 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 11 Nov 2016 17:45:19 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161111162211.GU2078@8bytes.org>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
- <20161110161331.GJ2078@8bytes.org>
- <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
- <20161111114223.GP2078@8bytes.org>
- <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
- <20161111162211.GU2078@8bytes.org>
-Message-ID: <634ac375-3507-6926-164f-e67f7c798c98@redhat.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 11 Nov 2016 16:46:10 +0000
+Subject: [PATCH v2 1/2] regulator: Add coupled regulator
+In-Reply-To: <20161107154738.ewliwzx5plams4ni@lukather>
+References: <1452605842-9317-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20160112143100.GA14628@rob-hp-laptop>
+ <20160115085734.GG4581@lukather>
+ <20160117000434.GB7774@rob-hp-laptop>
+ <20160118162538.GH6588@sirena.org.uk>
+ <20160121154649.GE3997@lukather>
+ <20160121162802.GL6588@sirena.org.uk>
+ <20160205143328.GD31506@lukather>
+ <20160205153258.GW4455@sirena.org.uk>
+ <20161107154738.ewliwzx5plams4ni@lukather>
+Message-ID: <20161111164610.rocq76fopcxjkafa@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Mon, Nov 07, 2016 at 04:47:38PM +0100, Maxime Ripard wrote:
 
-On 11/11/2016 17:22, Joerg Roedel wrote:
-> Hi Eric,
-> 
-> On Fri, Nov 11, 2016 at 04:47:01PM +0100, Auger Eric wrote:
->> Effectively in passthrough use case, the userspace defines the address
->> space layout and maps guest RAM PA=IOVA to PAs (using
->> VFIO_IOMMU_MAP_DMA). But this address space does not comprise the MSI
->> IOVAs. Userspace does not care about MSI IOMMU mapping. So the MSI IOVA
->> region must be allocated by either the VFIO driver or the IOMMU driver I
->> think. Who else could initialize the IOVA allocator domain?
-> 
-> So I think we need a way to tell userspace about the reserved regions
-> (per iommu-group) so that userspace knows where it can not map anything,
-Current plan is to expose that info through an iommu-group sysfs
-attribute, as you and Robin advised.
-> and VFIO can enforce that. But the right struct here is not an
-> iova-allocator rb-tree, a ordered linked list should be sufficient.
-I plan a linked list to store the reserved regions (P2P regions, MSI
-region, ...). get_dma_regions is called with a list local to a function
-for that. Might be needed to move that list head in the iommu_group to
-avoid calling the get_dm_regions again in the attribute show function?
+> Since regulator_get returns a struct regulator pointer, it felt
+> logical to try to add the list of parent regulators to it, especially
+> as this structure is per-consumer, and different consumers might have
+> different combinations of regulators.
 
-But to allocate the IOVAs within the MSI reserved region, I understand
-you don't want us to use the iova.c allocator, is that correct? We need
-an allocator though, even a very basic one based on bitmap or whatever.
-There potentially have several different physical MSI frame pages to map.
+> However, this structure embeds a pointer to a struct regulator_dev,
+> which seems to model the regulator itself, but will also contain
+> pointer to the struct regulator, probably to model its parent? I guess
 
-Best Regards
+It'd be a lot easier to follow this if you named the fields...  The rdev
+in the struct regulator is indeed the physical device.  The struct
+regulator called supply in struct regulator_dev is indeed the parent
+regulator.
 
-Eric
+> my first question would be do we care about nesting? or having a
+> regulator with multiple parents?
 
-> 
-> 
-> 	Joerg
-> 
+Well, it seems that your use case here is multiple parents so I guess we
+do care about it.  :)
+
+> It also contains the constraints on each regulator, which might or
+> might not be different for each of the coupled regulators, but I'm
+> guessing the couple might have contraints of its own too I guess. Is
+> it something that might happen? Should we care about it?
+
+I can't see how one could physically have constraints that didn't apply
+to both parents.
+
+> And finally, my real question is, do we want to aggregate them in
+> struct regulator, at the consumer level, which might make the more
+> sense, or do we want to create an intermediate regulator internally?
+> What is your take on this?
+
+My initial thought without having tried to implement this is that doing
+things in an intermediate regulator might do a better job of
+encapsulating things it if it works out but I've got a feeling that it's
+not going to work out well and that therefore doing it in the consumer
+with multiple rdevs will be better.  But really either approach is fine
+if it doesn't look horrible.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 455 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/8ecde8e8/attachment.sig>
