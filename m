@@ -1,84 +1,112 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Fri, 11 Nov 2016 10:48:57 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <10334260.ztLXZ2Oynd@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <17821285.aIcTyCGn5n@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F5D75@lhreml507-mbx>
- <10334260.ztLXZ2Oynd@wuerfel>
-Message-ID: <20161111104857.GI10219@e106497-lin.cambridge.arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 11 Nov 2016 11:51:57 +0100
+Subject: [PATCH] [media] mtk-mdp: allocate video_device dynamically
+In-Reply-To: <1478522529-57129-2-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1478522529-57129-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <1478522529-57129-2-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <d21cd419-e1fc-4d2e-a2a9-74c535865762@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Almost correct:
 
-On Thu, Nov 10, 2016 at 05:07:21PM +0100, Arnd Bergmann wrote:
-> On Thursday, November 10, 2016 3:36:49 PM CET Gabriele Paoloni wrote:
-> > 
-> > Where should we get the range from? For LPC we know that it is going
-> > Work on anything that is not used by PCI I/O space, and this is 
-> > why we use [0, PCIBIOS_MIN_IO]
+On 11/07/2016 01:42 PM, Minghsiu Tsai wrote:
+> It can fix known problems with embedded video_device structs.
 > 
-> It should be allocated the same way we allocate PCI config space
-> segments. This is currently done with the io_range list in
-> drivers/pci/pci.c, which isn't perfect but could be extended
-> if necessary. Based on what others commented here, I'd rather
-> make the differences between ISA/LPC and PCI I/O ranges smaller
-> than larger.
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> ---
+>  drivers/media/platform/mtk-mdp/mtk_mdp_core.h |  2 +-
+>  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c  | 33 ++++++++++++++++-----------
+>  2 files changed, 21 insertions(+), 14 deletions(-)
 > 
-> > > Your current version has
-> > > 
-> > >         if (arm64_extio_ops->pfout)                             \
-> > >                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> > >                        addr, value, sizeof(type));             \
-> > > 
-> > > Instead, just subtract the start of the range from the logical
-> > > port number to transform it back into a bus-local port number:
-> > 
-> > These accessors do not operate on IO tokens:
-> > 
-> > If (arm64_extio_ops->start > addr || arm64_extio_ops->end < addr)
-> > addr is not going to be an I/O token; in fact patch 2/3 imposes that
-> > the I/O tokens will start at PCIBIOS_MIN_IO. So from 0 to PCIBIOS_MIN_IO
-> > we have free physical addresses that the accessors can operate on.
-> 
-> Ah, I missed that part. I'd rather not use PCIBIOS_MIN_IO to refer to
-> the logical I/O tokens, the purpose of that macro is really meant
-> for allocating PCI I/O port numbers within the address space of
-> one bus.
-> 
-> Note that it's equally likely that whichever next platform needs
-> non-mapped I/O access like this actually needs them for PCI I/O space,
-> and that will use it on addresses registered to a PCI host bridge.
-> 
-> If we separate the two steps:
-> 
-> a) assign a range of logical I/O port numbers to a bus
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> index 848569d..ad1cff3 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
+> @@ -167,7 +167,7 @@ struct mtk_mdp_dev {
+>  	struct mtk_mdp_comp		*comp[MTK_MDP_COMP_ID_MAX];
+>  	struct v4l2_m2m_dev		*m2m_dev;
+>  	struct list_head		ctx_list;
+> -	struct video_device		vdev;
+> +	struct video_device		*vdev;
+>  	struct v4l2_device		v4l2_dev;
+>  	struct workqueue_struct		*job_wq;
+>  	struct platform_device		*vpu_dev;
+> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> index 9a747e7..b8dee1c 100644
+> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+> @@ -1236,16 +1236,22 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
+>  	int ret;
+>  
+>  	mdp->variant = &mtk_mdp_default_variant;
+> -	mdp->vdev.device_caps = V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_STREAMING;
+> -	mdp->vdev.fops = &mtk_mdp_m2m_fops;
+> -	mdp->vdev.ioctl_ops = &mtk_mdp_m2m_ioctl_ops;
+> -	mdp->vdev.release = video_device_release_empty;
+> -	mdp->vdev.lock = &mdp->lock;
+> -	mdp->vdev.vfl_dir = VFL_DIR_M2M;
+> -	mdp->vdev.v4l2_dev = &mdp->v4l2_dev;
+> -	snprintf(mdp->vdev.name, sizeof(mdp->vdev.name), "%s:m2m",
+> +	mdp->vdev = video_device_alloc();
+> +	if (!mdp->vdev) {
+> +		dev_err(dev, "failed to allocate video device\n");
+> +		ret = -ENOMEM;
+> +		goto err_video_alloc;
+> +	}
+> +	mdp->vdev->device_caps = V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_STREAMING;
+> +	mdp->vdev->fops = &mtk_mdp_m2m_fops;
+> +	mdp->vdev->ioctl_ops = &mtk_mdp_m2m_ioctl_ops;
+> +	mdp->vdev->release = video_device_release;
+> +	mdp->vdev->lock = &mdp->lock;
+> +	mdp->vdev->vfl_dir = VFL_DIR_M2M;
+> +	mdp->vdev->v4l2_dev = &mdp->v4l2_dev;
+> +	snprintf(mdp->vdev->name, sizeof(mdp->vdev->name), "%s:m2m",
+>  		 MTK_MDP_MODULE_NAME);
+> -	video_set_drvdata(&mdp->vdev, mdp);
+> +	video_set_drvdata(mdp->vdev, mdp);
+>  
+>  	mdp->m2m_dev = v4l2_m2m_init(&mtk_mdp_m2m_ops);
+>  	if (IS_ERR(mdp->m2m_dev)) {
+> @@ -1254,26 +1260,27 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
+>  		goto err_m2m_init;
+>  	}
+>  
+> -	ret = video_register_device(&mdp->vdev, VFL_TYPE_GRABBER, 2);
+> +	ret = video_register_device(mdp->vdev, VFL_TYPE_GRABBER, 2);
+>  	if (ret) {
+>  		dev_err(dev, "failed to register video device\n");
+>  		goto err_vdev_register;
+>  	}
+>  
+>  	v4l2_info(&mdp->v4l2_dev, "driver registered as /dev/video%d",
+> -		  mdp->vdev.num);
+> +		  mdp->vdev->num);
+>  	return 0;
+>  
+>  err_vdev_register:
+>  	v4l2_m2m_release(mdp->m2m_dev);
+>  err_m2m_init:
+> -	video_device_release(&mdp->vdev);
+> +	video_unregister_device(mdp->vdev);
 
-Except that currently when we add ranges to io_range_list we don't have
-a bus number yet, because the parsing happens before the host bridge
-has been created. Maybe register_io_range() can take a bus number as an
-argument, but I'm not sure how we are going to use that in pci_pio_to_address()
-or pci_address_to_pio().
+This should remain video_device_release: the video_register_device call failed, so
+the device hasn't been registered. In that case just release the device (i.e.
+free the allocated memory).
 
-Best regards,
-Liviu
-
-> b) register a set of helpers for redirecting logical I/O
->    port to a helper function
+> +err_video_alloc:
+>  
+>  	return ret;
+>  }
+>  
+>  void mtk_mdp_unregister_m2m_device(struct mtk_mdp_dev *mdp)
+>  {
+> -	video_device_release(&mdp->vdev);
+> +	video_unregister_device(mdp->vdev);
+>  	v4l2_m2m_release(mdp->m2m_dev);
+>  }
 > 
-> then I think the code will get cleaner and more flexible.
-> It should actually then be able to replace the powerpc
-> specific implementation.
-> 
-> 	Arnd
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Regards,
+
+	Hans
