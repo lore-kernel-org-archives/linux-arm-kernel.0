@@ -1,45 +1,43 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 11 Nov 2016 10:17:55 +0100
-Subject: [PATCH 5/5] drm/sun4i: Add support for the overscan profiles
-In-Reply-To: <20161110145630.wvzlh6rxusrufv2r@lukather>
-References: <cover.bb9be34c7fd7767e31823f78a15ae1c127293c34.1476779323.git-series.maxime.ripard@free-electrons.com>
- <b980759ad766658d7bc3d67c18f505c5bf727ef5.1476779323.git-series.maxime.ripard@free-electrons.com>
- <20161108085927.ibyett46cjgyfwu2@phenom.ffwll.local>
- <20161110145630.wvzlh6rxusrufv2r@lukather>
-Message-ID: <20161111091755.tfqizju5voazjrmm@phenom.ffwll.local>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Nov 2016 09:32:26 +0000
+Subject: [Linaro-acpi] ACPI namespace details for ARM64
+In-Reply-To: <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
+References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+ <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
+Message-ID: <20161111093226.GA13333@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 03:56:30PM +0100, Maxime Ripard wrote:
-> Hi Daniel,
-> 
-> On Tue, Nov 08, 2016 at 09:59:27AM +0100, Daniel Vetter wrote:
-> > On Tue, Oct 18, 2016 at 10:29:38AM +0200, Maxime Ripard wrote:
-> > > Create overscan profiles reducing the displayed zone.
-> > > 
-> > > For each TV standard (PAL and NTSC so far), we create 4 more reduced modes
-> > > by steps of 5% that the user will be able to select.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu, Nov 10, 2016 at 04:18:54PM -0700, Al Stone wrote:
+> On 11/09/2016 03:05 PM, Bjorn Helgaas wrote:
+> > Hi all,
 > > 
-> > tbh I think if we agree to do this (and that still seems an open question)
-> > I think there should be a generic helper to add these overscan modes with
-> > increased porches. Anything that only depends upon the sink (and
-> > overscanning is something the sink does) should imo be put into a suitable
-> > helper library for everyone to share.
+> > We've been working through the details of getting ACPI to work on
+> > arm64, and there have been lots of questions about what this means for
+> > PCI.  I've outlined this for several people individually, but I'm
+> > going to send this separately, apart from a specific patch series, to
+> > make sure we're all on the same page.  Please correct my errors and
+> > misunderstandings.
 > > 
-> > Or maybe even stash it into the probe helpers and call it for all TV
-> > connectors. Definitely not a driver-private thing.
+> > Bjorn
+> > 
+> >[snip....]
 > 
-> Last time we discussed it, my recollection was that you didn't want to
-> have generic code for it, but I'd be happy to implement it.
-> 
-> I'll come up with something like that.
+> A big +1 to all of this.  This also looks like something that should
+> be added to either PCI, ACPI or arm64 documentation (or even all three).
 
-Well I can flip-flop around with the nonsense I'm sometimes emitting ;-)
-Since you called me out, feel free to do whatever you want ...
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+And to arm64 platforms FW :)
+
+> What do you think?
+
+I do not think there is anything ARM64 specific in Bjorn's description,
+but I do think it is very useful to have it in documentation, these
+bits of information are scattered around ACPI specs and PCI FW specs,
+having a single source would help and would have prevented asking
+Bjorn the same questions 100 times.
+
+> Thank you for putting this together, Bjorn.
+
++1, Thank you very much for this nice summary Bjorn.
+
+Lorenzo
