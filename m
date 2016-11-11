@@ -1,14 +1,14 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Nov 2016 15:50:37 -0600
-Subject: [PATCH -next] PCI: xilinx: Add missing of_node_put() in
- xilinx_pcie_init_irq_domain()
-In-Reply-To: <1476716344-1050-1-git-send-email-weiyj.lk@gmail.com>
-References: <1476716344-1050-1-git-send-email-weiyj.lk@gmail.com>
-Message-ID: <20161111215037.GM9868@bhelgaas-glaptop.roam.corp.google.com>
+Date: Fri, 11 Nov 2016 15:51:08 -0600
+Subject: [PATCH -next] PCI: xilinx-nwl: Add missing of_node_put() in
+ nwl_pcie_init_irq_domain()
+In-Reply-To: <1476716297-31808-1-git-send-email-weiyj.lk@gmail.com>
+References: <1476716297-31808-1-git-send-email-weiyj.lk@gmail.com>
+Message-ID: <20161111215107.GN9868@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 02:59:04PM +0000, Wei Yongjun wrote:
+On Mon, Oct 17, 2016 at 02:58:17PM +0000, Wei Yongjun wrote:
 > From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
 > This node pointer is returned by of_get_next_child() with refcount
@@ -19,36 +19,23 @@ On Mon, Oct 17, 2016 at 02:59:04PM +0000, Wei Yongjun wrote:
 > 
 > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-Applied to pci/host-xilinx for v4.10, thanks!
-
-See below for another possible issue.
+Applied to pci/host-xilinx for v.10, thanks!
 
 > ---
->  drivers/pci/host/pcie-xilinx.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/pci/host/pcie-xilinx-nwl.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index c8616fa..7100ee5 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -529,6 +529,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  						 port);
->  	if (!port->leg_domain) {
->  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
-> +		of_node_put(pcie_intc_node);
->  		return -ENODEV;
->  	}
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> index 43eaa4a..c16b26c 100644
+> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> @@ -535,6 +535,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 >  
-> @@ -540,6 +541,7 @@ static int xilinx_pcie_init_irq_domain(struct xilinx_pcie_port *port)
->  							 &xilinx_pcie_msi_chip);
->  		if (!port->msi_domain) {
->  			dev_err(dev, "Failed to get a MSI IRQ domain\n");
-> +			of_node_put(pcie_intc_node);
-
-We also leak port->leg_domain here, don't we?
-
->  			return -ENODEV;
->  		}
+>  	if (!pcie->legacy_irq_domain) {
+>  		dev_err(dev, "failed to create IRQ domain\n");
+> +		of_node_put(legacy_intc_node);
+>  		return -ENOMEM;
+>  	}
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
