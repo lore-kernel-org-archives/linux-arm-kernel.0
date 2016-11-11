@@ -1,32 +1,88 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 11 Nov 2016 17:27:36 +0100
-Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
-In-Reply-To: <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
- <20161109141948.19244-5-lorenzo.pieralisi@arm.com>
- <20161111152248.GS2078@8bytes.org>
- <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
-Message-ID: <20161111162736.GV2078@8bytes.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 11 Nov 2016 08:36:02 -0800
+Subject: [PATCH] ARM: davinci: enable PM for DT boot
+In-Reply-To: <6c73eab0-dadd-f8a0-f822-84296d319443@ti.com> (Sekhar Nori's
+ message of "Fri, 11 Nov 2016 16:32:13 +0530")
+References: <20161025214738.27744-1-khilman@baylibre.com>
+ <c3a69359-bcec-40fe-e25c-048b97bab726@ti.com>
+ <m2shr16dr7.fsf@baylibre.com>
+ <6c73eab0-dadd-f8a0-f822-84296d319443@ti.com>
+Message-ID: <m2mvh6km8d.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 04:17:37PM +0000, Robin Murphy wrote:
-> In the original of_iommu_configure design, the thought was that an ops
-> structure could be IOMMU-instance-specific (hence the later-removed
-> "priv" member), so I suppose right now it is mostly a hangover from
-> that. However, it's also what we initialise a device's fwspec with, so
-> becomes important again if we're ever going to get past the limitations
-> of buses-which-are-not-actually-buses[1].
+Sekhar Nori <nsekhar@ti.com> writes:
 
-Yeah, I discussed this with a few others at LPC. My current idea is to
-tell the iommu-core which hardware-iommus exist in the system and a
-seperate iommu_ops ptr for each of them. Then every struct device can
-link to the iommu-instance it is translated by.
+> On Tuesday 08 November 2016 11:43 PM, Kevin Hilman wrote:
+>> Hi Sekhar,
+>> 
+>> Sekhar Nori <nsekhar@ti.com> writes:
+>> 
+>>> On Wednesday 26 October 2016 03:17 AM, Kevin Hilman wrote:
+>>>> Currently system PM is only enabled for legacy (non-DT) boot.  Enable
+>>>> for DT boot also.
+>>>>
+>>>> Tested on da850-lcdk using "rtcwake -m mem -s5 -d rtc0".
+>>>>
+>>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>>>> ---
+>>>>  arch/arm/mach-davinci/da8xx-dt.c | 18 ++++++++++++++++++
+>>>>  1 file changed, 18 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+>>>> index c9f7e9274aa8..a8089fa40d86 100644
+>>>> --- a/arch/arm/mach-davinci/da8xx-dt.c
+>>>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+>>>> @@ -43,8 +43,26 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>>>>  
+>>>>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>>>>  
+>>>> +static struct davinci_pm_config da850_pm_pdata = {
+>>>> +	.sleepcount = 128,
+>>>> +};
+>>>> +
+>>>> +static struct platform_device da850_pm_device = {
+>>>> +	.name           = "pm-davinci",
+>>>> +	.dev = {
+>>>> +		.platform_data	= &da850_pm_pdata,
+>>>> +	},
+>>>> +	.id             = -1,
+>>>> +};
+>>>> +
+>>>>  static void __init da850_init_machine(void)
+>>>>  {
+>>>> +	int ret;
+>>>> +
+>>>> +	ret = da850_register_pm(&da850_pm_device);
+>>>
+>>> I am not sure if it makes sense to keep the "pm device" around anymore.
+>>> I think for both DT and non-DT boot, we can get rid of the fake PM
+>>> device and combine da850_register_pm() and davinci_pm_probe() into a
+>>> single davinci_init_suspend() function which can then be called both for
+>>> DT and non-DT boot.
+>> 
+>> Looking closer at this, where do you propose the pdata comes from for
+>> the non-DT boot?
+>> 
+>> It seems to me that we can't currently remove the pdata dependency
+>> without breaking the non-DT platforms, so the approach proposed here is
+>> the least invasive.
+>
+> There is a single value of sleep count that is used today (128). So I
+> was thinking we can hardcode that in pm.c. We are not going to add more
+> board files anyway so there is no risk here.
+>
+> For future, if a different sleepcount value is needed, it will need to
+> be a new DT property.
 
-We are not there yet, but this will give you the same per-device
-iommu-ops as implemented here.
+Right, but getting rid of the pdata is more than just hard-coding the
+sleep count. There are a bunch of other fields in the pdata, which are
+filled out to some standard defaults in da850.c.  Are you proposing to
+hard-code those in pm.c also?
 
+An intermediate step might be to start by removing the
+platform_device/pdata from the board files, but keep it in da850.c for
+now.  Then, a follow-up cleanup could be done to either move all of that
+into pm.c, or use DT.
 
-
-	Joerg
+Kevin
