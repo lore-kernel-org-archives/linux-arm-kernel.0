@@ -1,35 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 Nov 2016 16:17:37 +0000
-Subject: [PATCH v7 04/16] drivers: iommu: make of_iommu_set/get_ops() DT
- agnostic
-In-Reply-To: <20161111152248.GS2078@8bytes.org>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
- <20161109141948.19244-5-lorenzo.pieralisi@arm.com>
- <20161111152248.GS2078@8bytes.org>
-Message-ID: <552e674a-f434-f08f-8e16-a94544ce8e6e@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 11 Nov 2016 17:22:11 +0100
+Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
+ callback
+In-Reply-To: <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
+ <20161110154606.GH2078@8bytes.org>
+ <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+ <20161110161331.GJ2078@8bytes.org>
+ <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+ <20161111114223.GP2078@8bytes.org>
+ <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
+Message-ID: <20161111162211.GU2078@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/16 15:22, Joerg Roedel wrote:
-> On Wed, Nov 09, 2016 at 02:19:36PM +0000, Lorenzo Pieralisi wrote:
->> +struct iommu_fwentry {
->> +	struct list_head list;
->> +	struct fwnode_handle *fwnode;
->> +	const struct iommu_ops *ops;
->> +};
-> 
-> Is there a reason the iommu_ops need to be stored there? Currently it
-> seems that the ops are only needed to get the of_xlate fn-ptr later. And
-> the place where it is called the iommu-ops should also be available
-> through pdev->dev->bus->iommu_ops.
+Hi Eric,
 
-In the original of_iommu_configure design, the thought was that an ops
-structure could be IOMMU-instance-specific (hence the later-removed
-"priv" member), so I suppose right now it is mostly a hangover from
-that. However, it's also what we initialise a device's fwspec with, so
-becomes important again if we're ever going to get past the limitations
-of buses-which-are-not-actually-buses[1].
+On Fri, Nov 11, 2016 at 04:47:01PM +0100, Auger Eric wrote:
+> Effectively in passthrough use case, the userspace defines the address
+> space layout and maps guest RAM PA=IOVA to PAs (using
+> VFIO_IOMMU_MAP_DMA). But this address space does not comprise the MSI
+> IOVAs. Userspace does not care about MSI IOMMU mapping. So the MSI IOVA
+> region must be allocated by either the VFIO driver or the IOMMU driver I
+> think. Who else could initialize the IOVA allocator domain?
 
-Robin.
+So I think we need a way to tell userspace about the reserved regions
+(per iommu-group) so that userspace knows where it can not map anything,
+and VFIO can enforce that. But the right struct here is not an
+iova-allocator rb-tree, a ordered linked list should be sufficient.
 
-[1]:http://www.mail-archive.com/iommu at lists.linux-foundation.org/msg14576.html
+
+	Joerg
