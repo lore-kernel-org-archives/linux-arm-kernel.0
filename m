@@ -1,39 +1,55 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Nov 2016 20:50:39 -0500
-Subject: [PATCH v6 9/9] MAINTAINERS: Update HISILICON DRM entries
-In-Reply-To: <1477639682-22520-10-git-send-email-zourongrong@gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-10-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbJ9OfRP4D6xFKezL1h+zQXR_v1whL9WMeSTA9J_CTGaxg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Nov 2016 10:35:10 +0800
+Subject: [PATCH] pinctrl: sunxi: Free configs in pinctrl_map only if it is a
+ config map
+Message-ID: <20161111023510.14146-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 3:28 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+In the recently refactored sunxi pinctrl library, we are only allocating
+one set of pin configs for each pinmux setting node. When the pinctrl_map
+structure is freed, the pin configs should also be freed. However the
+code assumed the first map would contain the configs, which actually
+never happens, as the mux function map gets added first.
 
-Acked-by: Sean Paul <seanpaul@chromium.org>
+The proper way to do this is to look through all the maps and free the
+first one whose type is actually PIN_MAP_TYPE_CONFIGS_GROUP.
 
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index c447953..cc5ee3a 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4117,6 +4117,7 @@ F:        drivers/gpu/drm/gma500/
->
->  DRM DRIVERS FOR HISILICON
->  M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
-> +M:     Rongrong Zou <zourongrong@gmail.com>
->  R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
->  R:     Chen Feng <puck.chen@hisilicon.com>
->  L:     dri-devel at lists.freedesktop.org
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Also slightly expand the comment explaining this.
+
+Fixes: f233dbca6227 ("pinctrl: sunxi: Rework the pin config building code")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index ebe2c73d211e..e199d95af8c0 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -408,8 +408,21 @@ static void sunxi_pctrl_dt_free_map(struct pinctrl_dev *pctldev,
+ 				    struct pinctrl_map *map,
+ 				    unsigned num_maps)
+ {
+-	/* All the maps have the same pin config, free only the first one */
+-	kfree(map[0].data.configs.configs);
++	int i;
++
++	/* pin config is never in the first map */
++	for (i = 1; i < num_maps; i++) {
++		if (map[i].type != PIN_MAP_TYPE_CONFIGS_GROUP)
++			continue;
++
++		/*
++		 * All the maps share the same pin config,
++		 * free only the first one we find.
++		 */
++		kfree(map[i].data.configs.configs);
++		break;
++	}
++
+ 	kfree(map);
+ }
+ 
+-- 
+2.10.2
