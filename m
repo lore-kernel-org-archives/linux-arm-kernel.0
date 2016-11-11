@@ -1,47 +1,50 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 11 Nov 2016 16:47:01 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <20161111114223.GP2078@8bytes.org>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
- <20161110161331.GJ2078@8bytes.org>
- <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
- <20161111114223.GP2078@8bytes.org>
-Message-ID: <79da09b8-ac1e-cebf-5393-7d67f002b3e3@redhat.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 11 Nov 2016 12:50:19 -0300
+Subject: [RFC PATCH 6/6] [media] davinci: vpif_capture: get subdevs from DT
+In-Reply-To: <dad6e38b-093b-bd36-3e0d-a0c10bddea58@xs4all.nl>
+References: <20161025235536.7342-1-khilman@baylibre.com>
+ <20161025235536.7342-7-khilman@baylibre.com>
+ <dad6e38b-093b-bd36-3e0d-a0c10bddea58@xs4all.nl>
+Message-ID: <CABxcv==ZR0=4GhXECiKtFJZ3WEY_5h-Egvs3hjBK56FiQeF6Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hello,
 
-On 11/11/2016 12:42, Joerg Roedel wrote:
-> On Thu, Nov 10, 2016 at 07:00:52PM +0100, Auger Eric wrote:
->> GICv2m and GICV3 ITS use dma-mapping iommu_dma_map_msi_msg to allocate
->> an MSI IOVA on-demand.
-> 
-> Yes, and it the right thing to do there because as a DMA-API
-> implementation the dma-iommu code cares about the address space
-> allocation.
-> 
-> As I understand it this is different in your case, as someone else is
-> defining the address space layout. So why do you need to allocate it
-> yourself?
-Effectively in passthrough use case, the userspace defines the address
-space layout and maps guest RAM PA=IOVA to PAs (using
-VFIO_IOMMU_MAP_DMA). But this address space does not comprise the MSI
-IOVAs. Userspace does not care about MSI IOMMU mapping. So the MSI IOVA
-region must be allocated by either the VFIO driver or the IOMMU driver I
-think. Who else could initialize the IOVA allocator domain?
+On Fri, Nov 11, 2016 at 12:36 PM, Hans Verkuil <hverkuil@xs4all.nl> wrote:
+> On 10/26/2016 01:55 AM, Kevin Hilman wrote:
+>> First pass at getting subdevs from DT ports and endpoints.
+>>
+>> The _get_pdata() function was larely inspired by (i.e. stolen from)
+>> am437x-vpfe.c
+>>
+>> Questions:
+>> - Legacy board file passes subdev input & output routes via pdata
+>>   (e.g. tvp514x svideo or composite selection.)  How is this supposed
+>>   to be done via DT?
+>
+> We have plans to model connectors as well in the device tree, but no
+> implementation exists yet. I think Laurent has some code in progress for this,
+> but I may be mistaken.
+>
 
-That's true that we have a mix of unmanaged addresses and "managed"
-addresses which is not neat. But how to manage otherwise?
+I posted a RFC series [0] some time ago, that proposed a DT binding
+for input connectors [1] using OF graphs.
 
-Thanks
+I never re-spin the series because Laurent had some comments on the DT
+bindings and I was waiting for a response on to my latest email [2].
+So if you can comment on this and see if the DT bindings fits your,
+would be very useful.
 
-Eric
-> 
-> 
-> 	Joerg
-> 
+> Anyway, hard-coding it like you do now is for now the only way.
+>
+>         Hans
+>
+>>
+
+[0]: https://www.mail-archive.com/linux-media at vger.kernel.org/msg96393.html
+[1]: http://www.spinics.net/lists/linux-media/msg99421.html
+[2]: http://www.spinics.net/lists/linux-media/msg99987.html
+
+Best regards,
+Javier
