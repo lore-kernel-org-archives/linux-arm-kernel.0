@@ -1,93 +1,75 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 10 Nov 2016 16:44:39 -0800
-Subject: [PATCH fpga 3/9] fpga zynq: Fix incorrect ISR state on bootup
-In-Reply-To: <1478732303-13718-4-git-send-email-jgunthorpe@obsidianresearch.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-4-git-send-email-jgunthorpe@obsidianresearch.com>
-Message-ID: <CAAtXAHeaaxf4L7aQ455Yrpm1fgqr=L-LxMd7yDQOKjLsBvp38w@mail.gmail.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Thu, 10 Nov 2016 16:17:55 -0800
+Subject: [PATCH] arm: kprobe: replace patch_lock to raw lock
+Message-ID: <1478823475-15087-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+When running kprobe on -rt kernel, the below bug is caught:
 
-On Wed, Nov 9, 2016 at 2:58 PM, Jason Gunthorpe
-<jgunthorpe@obsidianresearch.com> wrote:
-> It is best practice to clear and mask all interrupts before
-> associating the IRQ, and this should be done after the clock
-> is enabled.
->
-> This corrects a bad result from zynq_fpga_ops_state on bootup
-> where left over latched values in INT_STS_OFFSET caused it to
-> report an unconfigured FPGA as configured.
->
-> After this change the boot up operating state for an unconfigured
-> FPGA reports 'unknown'.
->
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> ---
->  drivers/fpga/zynq-fpga.c | 17 ++++++++++-------
->  1 file changed, 10 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-> index 86f4377e2b52..40cf0feaca7c 100644
-> --- a/drivers/fpga/zynq-fpga.c
-> +++ b/drivers/fpga/zynq-fpga.c
-> @@ -460,13 +460,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
->                 return priv->irq;
->         }
->
-> -       err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0,
-> -                              dev_name(dev), priv);
-> -       if (err) {
-> -               dev_err(dev, "unable to request IRQ\n");
-> -               return err;
-> -       }
-> -
->         priv->clk = devm_clk_get(dev, "ref_clk");
->         if (IS_ERR(priv->clk)) {
->                 dev_err(dev, "input clock not found\n");
-> @@ -482,6 +475,16 @@ static int zynq_fpga_probe(struct platform_device *pdev)
->         /* unlock the device */
->         zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
->
-> +       zynq_fpga_write(priv, INT_MASK_OFFSET, 0xFFFFFFFF);
+BUG: sleeping function called from invalid context at kernel/locking/rtmutex.c:931
+in_atomic(): 1, irqs_disabled(): 128, pid: 14, name: migration/0
+INFO: lockdep is turned off.
+irq event stamp: 238
+hardirqs last enabled at (237): [<80b5aecc>] _raw_spin_unlock_irqrestore+0x88/0x90
+hardirqs last disabled at (238): [<80b56d88>] __schedule+0xec/0x94c
+softirqs last enabled at (0): [<80225584>] copy_process.part.5+0x30c/0x1994
+softirqs last disabled at (0): [< (null)>] (null)
+Preemption disabled at:[<802f2b98>] cpu_stopper_thread+0xc0/0x140
 
-Named constant please.
+CPU: 0 PID: 14 Comm: migration/0 Tainted: G O 4.8.3-rt2 #1
+Hardware name: Freescale LS1021A
+[<80212e7c>] (unwind_backtrace) from [<8020cd2c>] (show_stack+0x20/0x24)
+[<8020cd2c>] (show_stack) from [<80689e14>] (dump_stack+0xa0/0xcc)
+[<80689e14>] (dump_stack) from [<8025a43c>] (___might_sleep+0x1b8/0x2a4)
+[<8025a43c>] (___might_sleep) from [<80b5b324>] (rt_spin_lock+0x34/0x74)
+[<80b5b324>] (rt_spin_lock) from [<80b5c31c>] (__patch_text_real+0x70/0xe8)
+[<80b5c31c>] (__patch_text_real) from [<80b5c3ac>] (patch_text_stop_machine+0x18/0x20)
+[<80b5c3ac>] (patch_text_stop_machine) from [<802f2920>] (multi_cpu_stop+0xfc/0x134)
+[<802f2920>] (multi_cpu_stop) from [<802f2ba0>] (cpu_stopper_thread+0xc8/0x140)
+[<802f2ba0>] (cpu_stopper_thread) from [<802563a4>] (smpboot_thread_fn+0x1a4/0x354)
+[<802563a4>] (smpboot_thread_fn) from [<80251d38>] (kthread+0x104/0x11c)
+[<80251d38>] (kthread) from [<80207f70>] (ret_from_fork+0x14/0x24)
 
-> +       zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
-> +       err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0, dev_name(dev),
-> +                              priv);
-> +       if (err) {
-> +               dev_err(dev, "unable to request IRQ\n");
-> +               clk_unprepare(priv->clk);
+Since patch_text_stop_machine() is called in stop_machine() which disables IRQ,
+sleepable lock should be not used in this atomic context, so replace patch_lock
+to raw lock.
 
-Your enable count is off in that case. This should be a clk_disable_unprepare()
-call.
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm/kernel/patch.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-<snip>
-
-clk_prepare_enable()
-
-if(err) {
-    clk_unprepare();
-    return err; /* enable count = 1? <- huh? */
-}
-
-clk_disable() enable count = 0
-clk_unprepare() prepare count = 0
-
-</snip>
-
-> +               return err;
-> +       }
-> +
->         clk_disable(priv->clk);
->
->         err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
-> --
-> 2.1.4
->
-
-Thanks,
-
-Moritz
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 69bda1a..1f665ac 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -15,7 +15,7 @@ struct patch {
+ 	unsigned int insn;
+ };
+ 
+-static DEFINE_SPINLOCK(patch_lock);
++static DEFINE_RAW_SPINLOCK(patch_lock);
+ 
+ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 	__acquires(&patch_lock)
+@@ -32,7 +32,7 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 		return addr;
+ 
+ 	if (flags)
+-		spin_lock_irqsave(&patch_lock, *flags);
++		raw_spin_lock_irqsave(&patch_lock, *flags);
+ 	else
+ 		__acquire(&patch_lock);
+ 
+@@ -47,7 +47,7 @@ static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+ 	clear_fixmap(fixmap);
+ 
+ 	if (flags)
+-		spin_unlock_irqrestore(&patch_lock, *flags);
++		raw_spin_unlock_irqrestore(&patch_lock, *flags);
+ 	else
+ 		__release(&patch_lock);
+ }
+-- 
+2.0.2
