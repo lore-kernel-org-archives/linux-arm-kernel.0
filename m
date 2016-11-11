@@ -1,89 +1,28 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 11 Nov 2016 13:01:14 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd>
- <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
-Message-ID: <20161111120114.GA1076@amd>
+From: andrew-ct.chen@mediatek.com (Andrew-CT Chen)
+Date: Fri, 11 Nov 2016 20:09:08 +0800
+Subject: pull request: linux-firmware: Update Mediatek MT8173 VPU firmware
+Message-ID: <1478866149-2023-1-git-send-email-andrew-ct.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-11-10 22:34:07, Jacek Anaszewski wrote:
-> Hi,
-> 
-> On 11/10/2016 09:29 PM, Pavel Machek wrote:
-> >On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
-> >>* Pavel Machek <pavel@ucw.cz> [161110 09:29]:
-> >>>Hi!
-> >>>
-> >>>>>>>Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
-> >>>>>>>the sysfs brightness attr for changes.") breaks runtime PM for me.
-> >>>>>>>
-> >>>>>>>On my omap dm3730 based test system, idle power consumption is over 70
-> >>>>>>>times higher now with this patch! It goes from about 6mW for the core
-> >>>>>>>system to over 440mW during idle meaning there's some busy timer now
-> >>>>>>>active.
-> >>>>>>>
-> >>>>>>>Reverting this patch fixes the issue. Any ideas?
-> >>>
-> >>>Are you using any LED that toggles with high frequency? Like perhaps
-> >>>LED that is lit when CPU is active?
-> >>
-> >>Yeah one of them seems to have cpu0 as the default trigger.
-> >
-> >Aha. Its quite obvious we don't want to notify sysfs each time that
-> >one is toggled, right?
-> >
-> >IMO brightness should display max brightness for the trigger, as Hans
-> >suggested, anything else is madness for trigger such as cpu activity.
-> 
-> Are you suggesting that we should revert changes introduced
-> by below patch?
-> 
-> commit 29d76dfa29fe22583aefddccda0bc56aa81035dc
-> Author: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
-> Date:   Tue Mar 18 09:47:48 2008 +0000
-> 
->     leds: Add support to leds with readable status
-> 
->     Some led hardware allows drivers to query the led state, and this patch
->     adds a hook to let the led class take advantage of that information when
->     available.
-> 
->     Without this functionality, when access to the led hardware is not
->     exclusive (i.e. firmware or hardware might change its state behind the
->     kernel's back), reality goes out of sync with the led class' idea of
-> what
->     the led is doing, which is annoying at best.
+Hi linux-firmware maintainers,
 
-Hmm. So userland can read the LED state, and it can get _some_ value
-back, but it can not know if it is current state or not.
+The following changes since commit a179db97914da5e650c21ba8f9b0bae04a0f8a41:
 
-I don't think that's a good interface. I see it is from 2008... is
-someone using it? Maybe it is too late for revert.
+  amdgpu: update SMC firmware for VI parts (2016-10-05 10:30:11 -0700)
 
-But I'd certainly not extend it with poll.
+are available in the git repository at:
 
-IMO reading/polling should only be available with some triggers. It
-does not make sense with "CPU load" trigger. It makes sense with
-"keyboard light changeable by hardware" trigger.
+  https://github.com/andrewct-chen/linux_fw_vpu_v1.0.3.git v1.0.3
 
-Best regards,
-									
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/cdf0fc1a/attachment.sig>
+for you to fetch changes up to f52fd5b4f156bd1eef672d29abbdc57cf310ac1b:
+
+  mediatek: update MT8173 VPU firmware for idle state (2016-11-11 19:34:56 +0800)
+
+----------------------------------------------------------------
+Andrew-CT Chen (1):
+      mediatek: update MT8173 VPU firmware for idle state
+
+ vpu_d.bin | Bin 4082928 -> 4082928 bytes
+ vpu_p.bin | Bin 131160 -> 131160 bytes
+ 2 files changed, 0 insertions(+), 0 deletions(-)
