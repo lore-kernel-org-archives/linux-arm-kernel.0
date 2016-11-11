@@ -1,56 +1,118 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 11 Nov 2016 15:40:17 +0800
-Subject: [PATCH v5 00/23] Support qcom's HSIC USB and rewrite USB2 HS
- support
-In-Reply-To: <147682389932.20076.4186408979552866325@sboyd-linaro>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018093139.GB6294@b29397-desktop>
- <147682389932.20076.4186408979552866325@sboyd-linaro>
-Message-ID: <20161111074017.GA21045@b29397-desktop>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 11 Nov 2016 07:48:31 +0000
+Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
+ to legacy SCPI protocol
+In-Reply-To: <CAOesGMj3TYLkvfGbq6BKqr+9i6mjArjRPuqeAN1-rGO2OhoSyw@mail.gmail.com>
+References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
+ <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
+ <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
+ <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
+ <CAL_JsqLW4JZHb0ncVUEefnKySA231EDgvCkY3xPdaJGf=uMJYg@mail.gmail.com>
+ <7ccc12bc-9a05-47e3-8ab8-d1b0ad31159e@arm.com>
+ <CAOesGMj3TYLkvfGbq6BKqr+9i6mjArjRPuqeAN1-rGO2OhoSyw@mail.gmail.com>
+Message-ID: <ed58424e-e538-227a-37b5-b35fbe4f96ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 18, 2016 at 01:51:39PM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-10-18 02:31:40)
-> > On Mon, Oct 17, 2016 at 06:56:13PM -0700, Stephen Boyd wrote:
-> > > I've also sent separate patches for other minor pieces to make this
-> > > all work. The full tree can be found here[2], hacks and all to get
-> > > things working. I've tested this on the db410c, apq8074 dragonboard,
-> > > and ifc6410 with configfs gadgets and otg cables.
-> > > 
-> > > Patches based on v4.8-rc1
-> 
-> Oops should be v4.9-rc1 here.
-> 
-> > > 
-> > > Changes from v4:
-> > >  * Picked up Acks from Rob
-> > >  * Updated HS phy init sequence DT property to restrict it to offsets
-> > 
-> > I remembered that you got all my acks for chipidea patches, right? I did
-> > not check for this series.
-> 
-> Sorry I've added in one more patch
-> 
->    usb: chipidea: Emulate OTGSC interrupt enable path
-> 
-> to fix extcon interrupt emulation even further.
-> 
-> > 
-> > Besides, the patch "gpu: Remove depends on RESET_CONTROLLER when not a
-> > provider" [1]  still not be accepted, I need this patch to be merged
-> > first, then apply your chipidea part, otherwise, there is a building
-> > warning.
-> > 
-> > [1] https://patchwork.kernel.org/patch/9322583/
-> 
-> Yes, I'm going to resend that patch now. I hope that David will apply it
-> for -rc2.
 
-Stephen, just a mind. I have rebased Greg's usb-next tree (v4.9-rc3 on
-it), your GPU fix is still not there.
 
--- 
+On 10/11/16 19:03, Olof Johansson wrote:
+> On Thu, Nov 10, 2016 at 6:34 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>
+>>
+>> On 10/11/16 14:12, Rob Herring wrote:
+>>>
+>>> On Thu, Nov 10, 2016 at 4:26 AM, Sudeep Holla <sudeep.holla@arm.com>
+>>> wrote:
+>>>>
+>>>>
+>>>>
+>>>> On 10/11/16 01:22, Rob Herring wrote:
+>>>>>
+>>>>>
+>>>>> On Wed, Nov 02, 2016 at 10:52:09PM -0600, Sudeep Holla wrote:
+>>>>>>
+>>>>>>
+>>>>>> This patch adds specific compatible to support legacy SCPI protocol.
+>>>>>>
+>>>>>> Cc: Rob Herring <robh+dt@kernel.org>
+>>>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>>> ---
+>>>>>>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 4 +++-
+>>>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>>>>> b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>>>>> index d1882c4540d0..ebd03fc93135 100644
+>>>>>> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>>>>> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+>>>>>> @@ -7,7 +7,9 @@ by Linux to initiate various system control and power
+>>>>>> operations.
+>>>>>>
+>>>>>>  Required properties:
+>>>>>>
+>>>>>> -- compatible : should be "arm,scpi"
+>>>>>> +- compatible : should be
+>>>>>> +       * "arm,scpi" : For implementations complying to SCPI v1.0 or
+>>>>>> above
+>>>>>> +       * "arm,legacy-scpi" : For implementations complying pre SCPI
+>>>>>> v1.0
+>>>>>
+>>>>>
+>>>>>
+>>>>> I'd prefer that we explicitly enumerate the old versions. Are there
+>>>>> many?
+>>>>>
+>>>>
+>>>> I understand your concern, but this legacy SCPI protocol was not
+>>>> officially released. It was just WIP which vendors picked up from very
+>>>> early releases. Since they are not numbered, it's hard to have specific
+>>>> compatibles with different versions until v1.0. That's one of the reason
+>>>> to retain platform specific compatible so that we can add any quirks
+>>>> based on them if needed.
+>>>>
+>>>> I will probably add these information in the commit log so that it's
+>>>> clear why we can't do version based compatible.
+>>>
+>>>
+>>> This is exactly my point. By enumerate, I meant having platform
+>>> specific compatibles. Having "arm,legacy-scpi" is pointless because
+>>> who knows what version they followed and they may all be different.
+>>>
+>>
+>> OK, but IIUC Olof's concern wanted a generic one along with the platform
+>> specific compatible which kind of makes sense as so far we have seen
+>> some commonality between Amlogic and Rockchip.
+>>
+>> E.g. Amlogic follows most of the legacy protocol though it deviates in
+>> couple of things which we can handle with platform specific compatible
+>> (in the following patch in the series). When another user(Rockchip ?)
+>> make use of this legacy protocol, we can start using those platform
+>> specific compatible for deviations only.
+>>
+>> Is that not acceptable ?
+>
+> If there's no shared legacy feature set, then it's probably less
+> useful to have a shared less precise compatible value.
+>
 
-Best Regards,
-Peter Chen
+There is and will be some shared feature set for sure. At the least the
+standard command set will be shared.
+
+> What the main point I was trying to get across was that we shouldn't
+> expand the generic binding with per-vendor compatible fields, instead
+> we should have those as extensions on the side.
+>
+
+Yes I get the point. We will have per-vendor compatibles for handle the
+deviations but generic one to handle the shared set.
+
+> I'm also a little apprehensive of using "legacy", it goes in the same
+> bucket as "misc". At some point 1.0 will be legacy too, etc.
+>
+
+True and I agree, how about "arm,scpi-pre-1.0" instead ?
+
+--
+Regards,
+Sudeep
