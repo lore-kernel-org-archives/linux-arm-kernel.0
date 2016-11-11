@@ -1,74 +1,58 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Nov 2016 14:58:01 -0600
-Subject: [PATCH] PCI: enable extended tags support for PCIe endpoints
-In-Reply-To: <420a9a23-79f8-41d8-c44f-b53f5000c957@codeaurora.org>
-References: <1474769434-5756-1-git-send-email-okaya@codeaurora.org>
- <420a9a23-79f8-41d8-c44f-b53f5000c957@codeaurora.org>
-Message-ID: <20161111205801.GC9868@bhelgaas-glaptop.roam.corp.google.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 11 Nov 2016 14:59:14 -0600
+Subject: [GIT PULL 1/2] SoCFPGA DTS updates for v4.10
+Message-ID: <20161111205915.22173-1-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 01:35:41PM -0500, Sinan Kaya wrote:
-> On 9/24/2016 10:10 PM, Sinan Kaya wrote:
-> > Each PCIe device can issue up to 32 transactions at a time by default.
-> > Each transaction is tracked by a tag number on the bus. 32 outstanding
-> > transactions is not enough for some performance critical applications
-> > especially when a lot of small sized frames are transmitted.
-> > 
-> > Extended tags support increases this number to 256. Devices not
-> > supporting extended tags tie-off this field to 0. According to ECN, it
-> > is safe to enable this feature for all PCIe endpoints.
-> > 
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> > ---
-> >  drivers/pci/probe.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> > index 93f280d..2424f38 100644
-> > --- a/drivers/pci/probe.c
-> > +++ b/drivers/pci/probe.c
-> > @@ -1505,12 +1505,19 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
-> >  	 */
-> >  }
-> >  
-> > +static int pci_configure_extended_tags(struct pci_dev *dev)
-> > +{
-> 
-> I should have checked the capability here before trying to enable it. 
-> I'll post a follow up patch on this. 
-> 
-> Is there any other feedback?
+Hi Arnd, Kevin, and Olof:
 
-If this were completely safe to enable for every device that supported
-it, why would there be an enable bit in Device Control?
+Please pull in part 2 of these DTS updates for v4.10.
 
-I don't know anything about extended tags, but it worries me a little
-when there's a "go-fast" switch and no explanation about when and why
-we might need to go slow.
+Thanks,
+Dinh
 
-> > +	return pcie_capability_set_word(dev, PCI_EXP_DEVCTL,
-> > +					 PCI_EXP_DEVCTL_EXT_TAG);
-> > +}
-> > +
-> >  static void pci_configure_device(struct pci_dev *dev)
-> >  {
-> >  	struct hotplug_params hpp;
-> >  	int ret;
-> >  
-> >  	pci_configure_mps(dev);
-> > +	pci_configure_extended_tags(dev);
-> >  
-> >  	memset(&hpp, 0, sizeof(hpp));
-> >  	ret = pci_get_hp_params(dev, &hpp);
-> > 
-> 
-> 
-> -- 
-> Sinan Kaya
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The following changes since commit c96f5919e6b0d132aa9afe9f1adc872fc107d5bb:
+
+  ARM: dts: socfpga: socrates: enable qspi (2016-10-18 22:18:14 -0500)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.10_part_2
+
+for you to fetch changes up to d837a80d19505d74ee5941eebf9dd53fed6f36a6:
+
+  ARM: dts: socfpga: add nand controller nodes (2016-11-09 12:40:52 -0600)
+
+----------------------------------------------------------------
+SoCFPGA DTS update for v4.10, part 2
+- Add specific compatible strings for variants of Cyclone5 boards
+- Add QSPI node on Arria10
+- Enable QSPI on Arria5 and Arria10 devkit, and Cyclone5 SoCKit
+- Add NAND controller node on Cyclone5
+
+----------------------------------------------------------------
+Dinh Nguyen (6):
+      ARM: dts: socfpga: add specific compatible strings for boards
+      ARM: dts: socfpga: enable qspi on the Cyclone5 devkit
+      ARM: dts: socfpga: Add QSPI node for the Arria10
+      ARM: dts: socfpga: Enable QSPI in Arria10 devkit
+      ARM: dts: socfpga: Enable QSPI on the Cyclone5 sockit
+      ARM: dts: socfpga: Enable QSPI on the Arria5 devkit
+
+Steffen Trumtrar (1):
+      ARM: dts: socfpga: add nand controller nodes
+
+ arch/arm/boot/dts/Makefile                         |  1 +
+ arch/arm/boot/dts/socfpga.dtsi                     | 13 ++++++
+ arch/arm/boot/dts/socfpga_arria10.dtsi             | 14 +++++++
+ arch/arm/boot/dts/socfpga_arria10_socdk_qspi.dts   | 49 ++++++++++++++++++++++
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts         | 33 +++++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts  |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_mcvevk.dts      |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       | 35 +++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      | 23 +++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5_sodia.dts       |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts |  2 +-
+ 11 files changed, 170 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_arria10_socdk_qspi.dts
