@@ -1,37 +1,93 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 10 Nov 2016 15:45:15 -0800
-Subject: [clk:clk-qcom-8994 2/2] include/linux/module.h:213:1: error:
- expected ',' or ';' before 'extern'
-In-Reply-To: <201611110732.1ceuZvsr%fengguang.wu@intel.com>
-References: <201611110732.1ceuZvsr%fengguang.wu@intel.com>
-Message-ID: <20161110234515.GO16026@codeaurora.org>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Thu, 10 Nov 2016 16:44:39 -0800
+Subject: [PATCH fpga 3/9] fpga zynq: Fix incorrect ISR state on bootup
+In-Reply-To: <1478732303-13718-4-git-send-email-jgunthorpe@obsidianresearch.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-4-git-send-email-jgunthorpe@obsidianresearch.com>
+Message-ID: <CAAtXAHeaaxf4L7aQ455Yrpm1fgqr=L-LxMd7yDQOKjLsBvp38w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-qcom-8994
-> head:   cc800227108710c8f02255e61659b956b041eec3
-> commit: cc800227108710c8f02255e61659b956b041eec3 [2/2] clk: qcom: Add support for msm8994 global clock controller
-> config: i386-allmodconfig (attached as .config)
-> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-> reproduce:
->         git checkout cc800227108710c8f02255e61659b956b041eec3
->         # save the attached .config to linux build tree
->         make ARCH=i386 
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->    In file included from drivers/clk/qcom/gcc-msm8994.c:20:0:
-> >> include/linux/module.h:213:1: error: expected ',' or ';' before 'extern'
->     extern const typeof(name) __mod_##type##__##name##_device_table  \
->     ^
-> >> drivers/clk/qcom/gcc-msm8994.c:2265:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
->     MODULE_DEVICE_TABLE(of, gcc_msm8994_match_table);
+Hi Jason,
 
-Urgh that's sad. Too bad MODULE_DEVICE_TABLE doesn't have
-something in it in the !MODULE case to cause compilation problems
-like this to come out. I'll go fix this up.
+On Wed, Nov 9, 2016 at 2:58 PM, Jason Gunthorpe
+<jgunthorpe@obsidianresearch.com> wrote:
+> It is best practice to clear and mask all interrupts before
+> associating the IRQ, and this should be done after the clock
+> is enabled.
+>
+> This corrects a bad result from zynq_fpga_ops_state on bootup
+> where left over latched values in INT_STS_OFFSET caused it to
+> report an unconfigured FPGA as configured.
+>
+> After this change the boot up operating state for an unconfigured
+> FPGA reports 'unknown'.
+>
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 17 ++++++++++-------
+>  1 file changed, 10 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index 86f4377e2b52..40cf0feaca7c 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -460,13 +460,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>                 return priv->irq;
+>         }
+>
+> -       err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0,
+> -                              dev_name(dev), priv);
+> -       if (err) {
+> -               dev_err(dev, "unable to request IRQ\n");
+> -               return err;
+> -       }
+> -
+>         priv->clk = devm_clk_get(dev, "ref_clk");
+>         if (IS_ERR(priv->clk)) {
+>                 dev_err(dev, "input clock not found\n");
+> @@ -482,6 +475,16 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>         /* unlock the device */
+>         zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+>
+> +       zynq_fpga_write(priv, INT_MASK_OFFSET, 0xFFFFFFFF);
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Named constant please.
+
+> +       zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+> +       err = devm_request_irq(dev, priv->irq, zynq_fpga_isr, 0, dev_name(dev),
+> +                              priv);
+> +       if (err) {
+> +               dev_err(dev, "unable to request IRQ\n");
+> +               clk_unprepare(priv->clk);
+
+Your enable count is off in that case. This should be a clk_disable_unprepare()
+call.
+
+<snip>
+
+clk_prepare_enable()
+
+if(err) {
+    clk_unprepare();
+    return err; /* enable count = 1? <- huh? */
+}
+
+clk_disable() enable count = 0
+clk_unprepare() prepare count = 0
+
+</snip>
+
+> +               return err;
+> +       }
+> +
+>         clk_disable(priv->clk);
+>
+>         err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+> --
+> 2.1.4
+>
+
+Thanks,
+
+Moritz
