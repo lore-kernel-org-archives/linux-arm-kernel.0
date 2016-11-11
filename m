@@ -1,17 +1,14 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 11 Nov 2016 20:36:40 -0200
-Subject: [PATCH] i.MX: Kconfig: Drop errata 769419 for Vybrid
-In-Reply-To: <1478709850-9361-1-git-send-email-andrew.smirnov@gmail.com>
-References: <1478709850-9361-1-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <CAOMZO5DGkXf6kiLmoE7kheX+vW4HT2F_-RWE3b_BULb8H7zcCw@mail.gmail.com>
+Date: Fri, 11 Nov 2016 20:46:12 -0200
+Subject: [PATCH] ARM: dts: vfxxx: Enable DMA for DSPI2 and DSPI3
+In-Reply-To: <20161110114505.17618-1-maitysanchayan@gmail.com>
+References: <20161110114505.17618-1-maitysanchayan@gmail.com>
+Message-ID: <CAOMZO5BAE=6pE9DMGhXTMm5CeLh+DmhSqGtdSYHf8+yyZkfEVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2016 at 2:44 PM, Andrey Smirnov <andrew.smirnov@gmail.com> wrote:
-> According to the datasheet, VF610 uses revision r3p2 of the L2C-310
-> block, same as i.MX6Q+, which does not require a software workaround for
-> ARM errata 769419.
->
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+On Thu, Nov 10, 2016 at 9:45 AM, Sanchayan Maity
+<maitysanchayan@gmail.com> wrote:
+> Enable DMA for DSPI2 and DSPI3 on Vybrid.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+You missed your Signed-off-by line.
