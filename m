@@ -1,42 +1,75 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 11 Nov 2016 21:55:03 +0800
-Subject: [PATCH v14 5/9] clocksource/drivers/arm_arch_timer: Simplify
- ACPI support code.
-In-Reply-To: <20161021112120.GC16630@leverpostej>
-References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
- <1475086637-1914-6-git-send-email-fu.wei@linaro.org>
- <20161020165747.GD27598@leverpostej> <20161021111352.GA16630@leverpostej>
- <20161021112120.GC16630@leverpostej>
-Message-ID: <5825CDB7.40606@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Nov 2016 21:57:05 +0800
+Subject: [PATCH v3 2/3] pinctrl: sunxi: Add support for fetching pinconf
+ settings from hardware
+In-Reply-To: <20161111135159.zqjqjjn7azg4gkzx@lukather>
+References: <20161111095036.11803-1-wens@csie.org>
+ <20161111095036.11803-3-wens@csie.org>
+ <20161111135159.zqjqjjn7azg4gkzx@lukather>
+Message-ID: <CAGb2v669W-mVDxV112r99b-g6bniRJt-wV8pTRRLAbJ2ZRyMUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2016 07:21 PM, Mark Rutland wrote:
-> On Fri, Oct 21, 2016 at 12:14:01PM +0100, Mark Rutland wrote:
->> On Thu, Oct 20, 2016 at 05:58:17PM +0100, Mark Rutland wrote:
->>> On Thu, Sep 29, 2016 at 02:17:13AM +0800, fu.wei at linaro.org wrote:
->>>> +	arch_timer_ppi[PHYS_NONSECURE_PPI] = acpi_gtdt_map_ppi(PHYS_NONSECURE_PPI);
->>>> +	arch_timer_ppi[VIRT_PPI] = acpi_gtdt_map_ppi(VIRT_PPI);
->>>> +	arch_timer_ppi[HYP_PPI] = acpi_gtdt_map_ppi(HYP_PPI);
->>>> +	/* Always-on capability */
->>>> +	arch_timer_c3stop = acpi_gtdt_c3stop();
->>>
->>> ... I think we should check the flag on the relevant interrupt, though
->>> that's worth clarifying.
+On Fri, Nov 11, 2016 at 9:51 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Nov 11, 2016 at 05:50:35PM +0800, Chen-Yu Tsai wrote:
+>> The sunxi pinctrl driver only caches whatever pinconf setting was last
+>> set on a given pingroup. This is not particularly helpful, nor is it
+>> correct.
 >>
->> I see I misread the spec; this is part of the common flags.
+>> Fix this by actually reading the hardware registers and returning
+>> the correct results or error codes. Also filter out unsupported
+>> pinconf settings. Since this driver has a peculiar setup of 1 pin
+>> per group, we can support both pin and pingroup pinconf setting
+>> read back with the same code. The sunxi_pconf_reg helper and code
+>> structure is inspired by pinctrl-msm.
 >>
->> Please ignore this point; sorry for the noise.
+>> With this done we can also claim to support generic pinconf, by
+>> setting .is_generic = true in pinconf_ops.
+>>
+>> Also remove the cached config value. The behavior of this was never
+>> correct, as it only cached 1 setting instead of all of them. Since
+>> we can now read back settings directly from the hardware, it is no
+>> longer required.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.c | 86 +++++++++++++++++++++++++++++++++--
+>>  drivers/pinctrl/sunxi/pinctrl-sunxi.h |  1 -
+>>  2 files changed, 81 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> index e04edda8629d..ed71bff39869 100644
+>> --- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+>> @@ -438,15 +438,91 @@ static const struct pinctrl_ops sunxi_pctrl_ops = {
+>>       .get_group_pins         = sunxi_pctrl_get_group_pins,
+>>  };
+>>
+>> +static int sunxi_pconf_reg(unsigned pin, enum pin_config_param param,
 >
-> Actually, I misread the spec this time around; the flag *can* differ per
-> interrupt for the sysreg/cp15 timer, but not for the MMIO timers where
-> the flag is in a common field.
+> Sorry, this went unnoticed in your previous version, but checkpatch
+> reports:
 >
-> So please *do* consider the above.
+> WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
+>
+> For this one and the next function.
 
-Sorry, misread the email as well...
+I know, but the function pointer definition in pinconf.h says
+'unsigned', not 'unsigned int'.
 
-Check the spec again and it's per interrupt flag.
+Having a mismatch between the two is even more confusing...
 
-Thanks
-Hanjun
+ChenYu
+
+>
+> Once fixed,
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
