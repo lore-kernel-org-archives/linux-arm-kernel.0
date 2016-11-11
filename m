@@ -1,30 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Nov 2016 09:27:11 +0100
-Subject: [PATCH v8 0/3] ARM, arm64: renesas: Enable UHS-I SDR-104
-In-Reply-To: <20161110114659.GD1436@katana>
-References: <1478185645-25556-1-git-send-email-horms+renesas@verge.net.au>
- <20161110114659.GD1436@katana>
-Message-ID: <20161111082710.GB7252@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 11 Nov 2016 09:29:14 +0100
+Subject: [PATCH] pinctrl: sunxi: Free configs in pinctrl_map only if it
+ is a config map
+In-Reply-To: <20161111023510.14146-1-wens@csie.org>
+References: <20161111023510.14146-1-wens@csie.org>
+Message-ID: <20161111082914.yz52rlhevzvnoac3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 12:47:00PM +0100, Wolfram Sang wrote:
-> On Thu, Nov 03, 2016 at 04:07:22PM +0100, Simon Horman wrote:
-> > Hi,
-> > 
-> > this series enables SDHI UHS-I SDR-104 on:
-> > * r8a7790/lager
-> > * r8a7791/koelsch
-> > * r8a7794/alt
-> > 
-> > It is based on renesas-next-20161102-v4.9-rc1.
+On Fri, Nov 11, 2016 at 10:35:10AM +0800, Chen-Yu Tsai wrote:
+> In the recently refactored sunxi pinctrl library, we are only allocating
+> one set of pin configs for each pinmux setting node. When the pinctrl_map
+> structure is freed, the pin configs should also be freed. However the
+> code assumed the first map would contain the configs, which actually
+> never happens, as the mux function map gets added first.
 > 
-> For the whole series:
+> The proper way to do this is to look through all the maps and free the
+> first one whose type is actually PIN_MAP_TYPE_CONFIGS_GROUP.
 > 
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Also slightly expand the comment explaining this.
 > 
-> For Lager:
-> 
-> Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Fixes: f233dbca6227 ("pinctrl: sunxi: Rework the pin config building code")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Thanks, I have queued these up.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/e741e672/attachment.sig>
