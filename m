@@ -1,112 +1,50 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 11 Nov 2016 11:51:57 +0100
-Subject: [PATCH] [media] mtk-mdp: allocate video_device dynamically
-In-Reply-To: <1478522529-57129-2-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1478522529-57129-1-git-send-email-minghsiu.tsai@mediatek.com>
- <1478522529-57129-2-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <d21cd419-e1fc-4d2e-a2a9-74c535865762@xs4all.nl>
+From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
+Date: Fri, 11 Nov 2016 13:02:48 +0200
+Subject: [PATCH v5 03/23] usb: ulpi: Support device discovery via DT
+In-Reply-To: <20161018015636.11701-4-stephen.boyd@linaro.org>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018015636.11701-4-stephen.boyd@linaro.org>
+Message-ID: <20161111110248.GA22706@kuha.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Almost correct:
-
-On 11/07/2016 01:42 PM, Minghsiu Tsai wrote:
-> It can fix known problems with embedded video_device structs.
+On Mon, Oct 17, 2016 at 06:56:16PM -0700, Stephen Boyd wrote:
+> The qcom HSIC ULPI phy doesn't have any bits set in the vendor or
+> product ID registers. This makes it impossible to make a ULPI
+> driver match against the ID registers. Add support to discover
+> the ULPI phys via DT help alleviate this problem. In the DT case,
+> we'll look for a ULPI bus node underneath the device registering
+> the ULPI viewport (or the parent of that device to support
+> chipidea's device layout) and then match up the phy node
+> underneath that with the ULPI device that's created.
 > 
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> ---
->  drivers/media/platform/mtk-mdp/mtk_mdp_core.h |  2 +-
->  drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c  | 33 ++++++++++++++++-----------
->  2 files changed, 21 insertions(+), 14 deletions(-)
+> The side benefit of this is that we can use standard properties
+> in the phy node like clks, regulators, gpios, etc. because we
+> don't have firmware like ACPI to turn these things on for us. And
+> we can use the DT phy binding to point our phy consumer to the
+> phy provider.
 > 
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
-> index 848569d..ad1cff3 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_core.h
-> @@ -167,7 +167,7 @@ struct mtk_mdp_dev {
->  	struct mtk_mdp_comp		*comp[MTK_MDP_COMP_ID_MAX];
->  	struct v4l2_m2m_dev		*m2m_dev;
->  	struct list_head		ctx_list;
-> -	struct video_device		vdev;
-> +	struct video_device		*vdev;
->  	struct v4l2_device		v4l2_dev;
->  	struct workqueue_struct		*job_wq;
->  	struct platform_device		*vpu_dev;
-> diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> index 9a747e7..b8dee1c 100644
-> --- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> +++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
-> @@ -1236,16 +1236,22 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
->  	int ret;
->  
->  	mdp->variant = &mtk_mdp_default_variant;
-> -	mdp->vdev.device_caps = V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_STREAMING;
-> -	mdp->vdev.fops = &mtk_mdp_m2m_fops;
-> -	mdp->vdev.ioctl_ops = &mtk_mdp_m2m_ioctl_ops;
-> -	mdp->vdev.release = video_device_release_empty;
-> -	mdp->vdev.lock = &mdp->lock;
-> -	mdp->vdev.vfl_dir = VFL_DIR_M2M;
-> -	mdp->vdev.v4l2_dev = &mdp->v4l2_dev;
-> -	snprintf(mdp->vdev.name, sizeof(mdp->vdev.name), "%s:m2m",
-> +	mdp->vdev = video_device_alloc();
-> +	if (!mdp->vdev) {
-> +		dev_err(dev, "failed to allocate video device\n");
-> +		ret = -ENOMEM;
-> +		goto err_video_alloc;
-> +	}
-> +	mdp->vdev->device_caps = V4L2_CAP_VIDEO_M2M_MPLANE | V4L2_CAP_STREAMING;
-> +	mdp->vdev->fops = &mtk_mdp_m2m_fops;
-> +	mdp->vdev->ioctl_ops = &mtk_mdp_m2m_ioctl_ops;
-> +	mdp->vdev->release = video_device_release;
-> +	mdp->vdev->lock = &mdp->lock;
-> +	mdp->vdev->vfl_dir = VFL_DIR_M2M;
-> +	mdp->vdev->v4l2_dev = &mdp->v4l2_dev;
-> +	snprintf(mdp->vdev->name, sizeof(mdp->vdev->name), "%s:m2m",
->  		 MTK_MDP_MODULE_NAME);
-> -	video_set_drvdata(&mdp->vdev, mdp);
-> +	video_set_drvdata(mdp->vdev, mdp);
->  
->  	mdp->m2m_dev = v4l2_m2m_init(&mtk_mdp_m2m_ops);
->  	if (IS_ERR(mdp->m2m_dev)) {
-> @@ -1254,26 +1260,27 @@ int mtk_mdp_register_m2m_device(struct mtk_mdp_dev *mdp)
->  		goto err_m2m_init;
->  	}
->  
-> -	ret = video_register_device(&mdp->vdev, VFL_TYPE_GRABBER, 2);
-> +	ret = video_register_device(mdp->vdev, VFL_TYPE_GRABBER, 2);
->  	if (ret) {
->  		dev_err(dev, "failed to register video device\n");
->  		goto err_vdev_register;
->  	}
->  
->  	v4l2_info(&mdp->v4l2_dev, "driver registered as /dev/video%d",
-> -		  mdp->vdev.num);
-> +		  mdp->vdev->num);
->  	return 0;
->  
->  err_vdev_register:
->  	v4l2_m2m_release(mdp->m2m_dev);
->  err_m2m_init:
-> -	video_device_release(&mdp->vdev);
-> +	video_unregister_device(mdp->vdev);
-
-This should remain video_device_release: the video_register_device call failed, so
-the device hasn't been registered. In that case just release the device (i.e.
-free the allocated memory).
-
-> +err_video_alloc:
->  
->  	return ret;
->  }
->  
->  void mtk_mdp_unregister_m2m_device(struct mtk_mdp_dev *mdp)
->  {
-> -	video_device_release(&mdp->vdev);
-> +	video_unregister_device(mdp->vdev);
->  	v4l2_m2m_release(mdp->m2m_dev);
->  }
+> The ULPI bus code supports native enumeration by reading the
+> vendor ID and product ID registers at device creation time, but
+> we can't be certain that those register reads will succeed if the
+> phy is not powered up. To avoid any problems with reading the ID
+> registers before the phy is powered we fallback to DT matching
+> when the ID reads fail.
 > 
+> If the ULPI spec had some generic power sequencing for these
+> registers we could put that into the ULPI bus layer and power up
+> the device before reading the ID registers. Unfortunately this
+> doesn't exist and the power sequence is usually device specific.
+> By having the device matched up with DT we can avoid this
+> problem.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 
-Regards,
+Acked-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
 
-	Hans
+-- 
+heikki
