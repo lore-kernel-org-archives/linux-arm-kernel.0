@@ -1,48 +1,180 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 11 Nov 2016 09:45:00 +0800
-Subject: [PATCH] drm/rockchip: return ERR_PTR instead of NULL
-In-Reply-To: <1478812256-26189-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1478812256-26189-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <5825229C.8080704@rock-chips.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 10 Nov 2016 20:45:44 -0500
+Subject: [PATCH v6 7/9] drm/hisilicon/hibmc: Add connector for VDAC
+In-Reply-To: <1477639682-22520-8-git-send-email-zourongrong@gmail.com>
+References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
+ <1477639682-22520-8-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAOw6vbJA3Oe3GmRZBZjF24wtu_5hyTdVL2HK-1p3BLbiY1G7Tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?11?11? 05:10, Julia Lawall wrote:
-> rockchip_drm_framebuffer_init is only used in one case, in
-> rockchip_drm_fbdev.c, where its return value is tested using IS_ERR.  To
-> enable propagating the reason for the error, change the definition so that
-> it returns an ERR_PTR value.
+On Fri, Oct 28, 2016 at 3:28 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
+> Add connector funcs and helper funcs for VDAC.
 >
-> Problem found with the help of Coccinelle.
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Thanks for the fix.
-
-Applied to my drm-next.
-
->
+> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 > ---
->   drivers/gpu/drm/rockchip/rockchip_drm_fb.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |  8 +++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  2 +
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 76 ++++++++++++++++++++++++
+>  3 files changed, 86 insertions(+)
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> index 0f6eda0..01e11bf 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> @@ -213,7 +213,7 @@ struct drm_framebuffer *
->   
->   	rockchip_fb = rockchip_fb_alloc(dev, mode_cmd, &obj, 1);
->   	if (IS_ERR(rockchip_fb))
-> -		return NULL;
-> +		return ERR_CAST(rockchip_fb);
->   
->   	return &rockchip_fb->fb;
->   }
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> index ba191e1..4253603 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> @@ -131,6 +131,14 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
+>                 return ret;
+>         }
 >
+> +       ret = hibmc_connector_init(hidev);
+> +       if (ret) {
+> +               DRM_ERROR("failed to init connector\n");
+> +               return ret;
+> +       }
+> +
+> +       drm_mode_connector_attach_encoder(&hidev->connector,
+> +                                         &hidev->encoder);
+
+The connector should be initialized in the vdac driver with the
+encoder, not in the drv file (same as plane/crtc)
+
+>         return 0;
+>  }
 >
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> index 401cea4..450247d 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> @@ -48,6 +48,7 @@ struct hibmc_drm_device {
+>         struct drm_plane plane;
+>         struct drm_crtc crtc;
+>         struct drm_encoder encoder;
+> +       struct drm_connector connector;
+
+No need to keep track here
+
+>         bool mode_config_initialized;
 >
+>         /* ttm */
+> @@ -89,6 +90,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
+>  int hibmc_plane_init(struct hibmc_drm_device *hidev);
+>  int hibmc_crtc_init(struct hibmc_drm_device *hidev);
+>  int hibmc_encoder_init(struct hibmc_drm_device *hidev);
+> +int hibmc_connector_init(struct hibmc_drm_device *hidev);
+>  int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
+>  void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
 >
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+> index 953f659..ebefcd1 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+> @@ -87,3 +87,79 @@ int hibmc_encoder_init(struct hibmc_drm_device *hidev)
+>         drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
+>         return 0;
+>  }
+> +
+> +static int hibmc_connector_get_modes(struct drm_connector *connector)
+> +{
+> +       int count;
+> +
+> +       count = drm_add_modes_noedid(connector, 800, 600);
+> +       drm_set_preferred_mode(connector, defx, defy);
+
+So you have defx/defy as module parameters, but then hardcode the
+800x600 mode. If defx/defy is anything other than 800/600, this won't
+work. I think you should just remove the defx/defy module params and
+rely on userspace adding modes as appropriate.
+
+> +       return count;
+> +}
+> +
+> +static int hibmc_connector_mode_valid(struct drm_connector *connector,
+> +                                     struct drm_display_mode *mode)
+> +{
+> +       struct hibmc_drm_device *hiprivate =
+> +        container_of(connector, struct hibmc_drm_device, connector);
+> +       unsigned long size = mode->hdisplay * mode->vdisplay * 4;
+
+Why * 4 here and why * 2 below? You support formats less than 32 bpp,
+so the * 4 isn't necessarily correct for all formats. Is the * 2 to
+account for front & back buffer?
 
 
--- 
-?ark Yao
+> +
+> +       if (size * 2 > hiprivate->fb_size)
+> +               return MODE_BAD;
+> +
+> +       return MODE_OK;
+> +}
+> +
+> +static struct drm_encoder *
+> +hibmc_connector_best_encoder(struct drm_connector *connector)
+> +{
+> +       int enc_id = connector->encoder_ids[0];
+> +
+> +       /* pick the encoder ids */
+> +       if (enc_id)
+> +               return drm_encoder_find(connector->dev, enc_id);
+
+Can't you just do return drm_encoder_find(connector->dev,
+connector->encoder_ids[0]); ?
+
+ie: won't drm_encoder_find do the right thing if you pass in id == 0?
+
+> +
+> +       return NULL;
+> +}
+> +
+> +static enum drm_connector_status hibmc_connector_detect(struct drm_connector
+> +                                                *connector, bool force)
+> +{
+> +       return connector_status_connected;
+
+Perhaps this should be connector_status_unknown, since you don't
+necessarily know it's connected.
+
+> +}
+> +
+> +static const struct drm_connector_helper_funcs
+> +       hibmc_connector_connector_helper_funcs = {
+> +       .get_modes = hibmc_connector_get_modes,
+> +       .mode_valid = hibmc_connector_mode_valid,
+> +       .best_encoder = hibmc_connector_best_encoder,
+> +};
+> +
+> +static const struct drm_connector_funcs hibmc_connector_connector_funcs = {
+> +       .dpms = drm_atomic_helper_connector_dpms,
+> +       .detect = hibmc_connector_detect,
+> +       .fill_modes = drm_helper_probe_single_connector_modes,
+> +       .destroy = drm_connector_cleanup,
+> +       .reset = drm_atomic_helper_connector_reset,
+> +       .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> +       .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+> +};
+> +
+> +int hibmc_connector_init(struct hibmc_drm_device *hidev)
+> +{
+> +       struct drm_device *dev = hidev->dev;
+> +       struct drm_connector *connector = &hidev->connector;
+> +       int ret;
+> +
+> +       ret = drm_connector_init(dev, connector,
+> +                                &hibmc_connector_connector_funcs,
+> +                                DRM_MODE_CONNECTOR_VGA);
+> +       if (ret) {
+> +               DRM_ERROR("failed to init connector\n");
+> +               return ret;
+> +       }
+> +       drm_connector_helper_add(connector,
+> +                                &hibmc_connector_connector_helper_funcs);
+> +
+> +       return 0;
+> +}
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
