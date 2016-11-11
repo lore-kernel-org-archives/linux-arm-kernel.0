@@ -1,60 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 11 Nov 2016 13:41:37 +0000
-Subject: [PATCH v3 0/2] arm64: Support systems without FP/ASIMD
-In-Reply-To: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
-References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 11 Nov 2016 21:43:26 +0800
+Subject: [PATCH v14 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-5-git-send-email-fu.wei@linaro.org>
+ <20161020163719.GC27598@leverpostej>
+ <CADyBb7tLJpPiMqWs4KZE=uCpo3HX3WcNVju2UKNuPOR0+M4UDw@mail.gmail.com>
+Message-ID: <5825CAFE.2080005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/16 13:56, Suzuki K Poulose wrote:
-> This series adds supports to the kernel and KVM hyp to handle
-> systems without FP/ASIMD properly. At the moment the kernel
-> doesn't check if the FP unit is available before accessing
-> the registers (e.g during context switch). Also for KVM,
-> we trap the FP/ASIMD accesses and handle it by injecting an
-> undefined instruction into the VM on systems without FP.
-> 
-> Tested on a FVP_Base-AEM-v8A model by disabling VFP on at
-> least one CPU ( -C clusterX.cpuY.vfp-present=0 ).
-> 
-> Changes since V2:
->  - Dropped cleanup patch for arm64/crypto/aes-ce-ccm-glue.c
->  - Removed static_key check from cpus_have_cap. All users with
->    constant caps should use the new API to make use of static_keys.
->  - Removed a dedicated static_key used in irqchip-gic-v3.c for
->    Cavium errata with the new API.
-> 
-> Applies on v4.9-rc4 + [1] (which is pushed for rc5)
-> 
-> [1] http://marc.info/?l=linux-arm-kernel&m=147819889813214&w=2
-> 
-> 
-> Suzuki K Poulose (2):
->   arm64: Add hypervisor safe helper for checking constant capabilities
->   arm64: Support systems without FP/ASIMD
-> 
->  arch/arm64/include/asm/cpucaps.h    |  3 ++-
->  arch/arm64/include/asm/cpufeature.h | 24 +++++++++++++++++-------
->  arch/arm64/include/asm/neon.h       |  3 ++-
->  arch/arm64/kernel/cpufeature.c      | 17 ++++++++++++++++-
->  arch/arm64/kernel/fpsimd.c          | 14 ++++++++++++++
->  arch/arm64/kernel/process.c         |  2 +-
->  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
->  arch/arm64/kvm/hyp/hyp-entry.S      |  9 ++++++++-
->  arch/arm64/kvm/hyp/switch.c         |  5 ++++-
->  drivers/irqchip/irq-gic-v3.c        | 13 +------------
->  10 files changed, 76 insertions(+), 25 deletions(-)
-> 
+On 10/26/2016 07:10 PM, Fu Wei wrote:
+> Hi Mark,
+>
+> On 21 October 2016 at 00:37, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi,
+>>
+>> As a heads-up, on v4.9-rc1 I see conflicts at least against
+>> arch/arm64/Kconfig. Luckily git am -3 seems to be able to fix that up
+>> automatically, but this will need to be rebased before the next posting
+>> and/or merging.
+>>
+>> On Thu, Sep 29, 2016 at 02:17:12AM +0800, fu.wei at linaro.org wrote:
+>>> +static int __init map_gt_gsi(u32 interrupt, u32 flags)
+>>> +{
+>>> +     int trigger, polarity;
+>>> +
+>>> +     if (!interrupt)
+>>> +             return 0;
+>>
+>> Urgh.
+>>
+>> Only the secure interrupt (which we do not need) is optional in this
+>> manner, and (hilariously), zero appears to also be a valid GSIV, per
+>> figure 5-24 in the ACPI 6.1 spec.
+>>
+>> So, I think that:
+>>
+>> (a) we should not bother parsing the secure interrupt
+>
+> If I understand correctly, from this point of view, kernel don't
+> handle the secure interrupt.
+> But the current arm_arch_timer driver still enable/disable/request
+> PHYS_SECURE_PPI
+> with PHYS_NONSECURE_PPI.
+> That means we still need to parse the secure interrupt.
+> Please correct me, if I misunderstand something? :-)
+>
+>> (b) we should drop the check above
+>
+> yes, if zero is a valid GSIV, this makes sense.
+>
+>> (c) we should report the spec issue to the ASWG
+>>
+>>> +/*
+>>> + * acpi_gtdt_c3stop - got c3stop info from GTDT
+>>> + *
+>>> + * Returns 1 if the timer is powered in deep idle state, 0 otherwise.
+>>> + */
+>>> +bool __init acpi_gtdt_c3stop(void)
+>>> +{
+>>> +     struct acpi_table_gtdt *gtdt = acpi_gtdt_desc.gtdt;
+>>> +
+>>> +     return !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
+>>> +}
+>>
+>> It looks like this can differ per interrupt. Shouldn't we check the
+>> appropriate one?
+>
+> yes, I think you are right.
 
-For the series:
+I think Mark already clarified this it's a global flag which defined
+in the spec, and we don't need to update it.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-How do we plan on merging this? Catalin, are you willing to take it all?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Hanjun
