@@ -1,26 +1,59 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 11 Nov 2016 20:44:38 +0800
-Subject: [PATCH v7 00/16] ACPI IORT ARM SMMU support
-In-Reply-To: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-References: <20161109141948.19244-1-lorenzo.pieralisi@arm.com>
-Message-ID: <5825BD36.1040600@linaro.org>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 11 Nov 2016 18:31:21 +0530
+Subject: [PATCH] arm64: dts: Add ARM PMU node for exynos7
+In-Reply-To: <4922ada9-2eb2-f0cf-e4b1-a74f4397f97c@arm.com>
+References: <1478748643-3081-1-git-send-email-alim.akhtar@samsung.com>
+ <CGME20161110133734epcas3p2b271260900216d3e3a4b2b8e133a327b@epcas3p2.samsung.com>
+ <4922ada9-2eb2-f0cf-e4b1-a74f4397f97c@arm.com>
+Message-ID: <5825C121.6050708@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2016 10:19 PM, Lorenzo Pieralisi wrote:
-> This patch series is v7 of a previous posting:
->
-> https://lkml.org/lkml/2016/10/18/506
->
-> v6 -> v7
-> 	- Rebased against v4.9-rc4
-> 	- Fixed IORT probing on ACPI systems with missing IORT table
-> 	- Fixed SMMUv1/v2 global interrupt detection
-> 	- Updated iommu_ops firmware look-up
+Hi Robin,
 
-Although no major update for the new version, I tested
-this patchset again on hisilicon d03, and the platform
-device works as before with SMMUv3.
+On 11/10/2016 07:07 PM, Robin Murphy wrote:
+> Hi Alim,
+>
+> On 10/11/16 03:30, Alim Akhtar wrote:
+>> This patch adds ARM Performance Monitor Unit dt node for exynos7.
+>> PMU provides various statistics on the operation of the CPU and
+>> memory system at runtime, which are very useful when debugging or
+>> profiling code. This enables the same.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>>   arch/arm64/boot/dts/exynos/exynos7.dtsi |    8 ++++++++
+>>   1 file changed, 8 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> index e0d0d01..53ce4be 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> @@ -472,6 +472,14 @@
+>>   			status = "disabled";
+>>   		};
+>>
+>> +		arm-pmu {
+>> +			compatible = "arm,cortex-a57-pmu", "arm,armv8-pmuv3";
+>> +			interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
+>
+> Per Documentation/devicetree/bindings/arm/pmu.txt there should also be
+> an "interrupt-affinity" property describing which SPI belongs to which core.
+>
+Thanks for review, will resend after adding "interrupt-affinity" property.
 
-Thanks
-Hanjun
+> Robin.
+>
+>> +		};
+>> +
+>>   		timer {
+>>   			compatible = "arm,armv8-timer";
+>>   			interrupts = <GIC_PPI 13
+>>
+>
+>
+>
+>
