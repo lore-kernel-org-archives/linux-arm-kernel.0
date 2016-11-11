@@ -1,66 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 11 Nov 2016 15:27:00 +0000
-Subject: [PATCH RFC 00/12] tda998x updates
-In-Reply-To: <964260d7-af7f-fefb-2adb-0e10ff750883@ti.com>
-References: <20161108122420.GP1041@n2100.armlinux.org.uk>
- <964260d7-af7f-fefb-2adb-0e10ff750883@ti.com>
-Message-ID: <20161111152700.GD1041@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Nov 2016 15:32:05 +0000
+Subject: [PATCH v14 4/9] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <5825CBB5.8090104@linaro.org>
+References: <1475086637-1914-1-git-send-email-fu.wei@linaro.org>
+ <1475086637-1914-5-git-send-email-fu.wei@linaro.org>
+ <20161020163719.GC27598@leverpostej> <5825CBB5.8090104@linaro.org>
+Message-ID: <20161111153205.GI11945@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 05:10:09PM +0200, Jyri Sarha wrote:
-> On 11/08/16 14:24, Russell King - ARM Linux wrote:
-> > As no one responded to the previous round, I'm not spending soo much
-> > time writing up a description of these changes again.  It's also been
-> > quite a long time, so I've forgotten all the details of the changes,
-> > so I'll do my best.
-> > 
-> > Changes from the previous series include:
-> > - reorder the initial three patches
-> > - change the (now third patch)... I think to increase the size of the
-> >   locked region.
-> > - fix edid parsing for infoframe generation - as was pointed out for
-> >   dw-hdmi, parsing the EDID in get_modes() is incorrect, as that method
-> >   will not be called when an override-edid is in effect.  We need to
-> >   parse the override-edid.  Moreover, infoframe generation should not
-> >   be keyed to whether the monitor is HDMI or not, CEA-861B allows non-
-> >   HDMI to send infoframes.
-> > - only send audio if audio and infoframes are supported.
-> > 
-> > Otherwise, these are very much like the previous posting of the series,
-> > except rebased upon the mali/hdlcd/tda998x change to remove the
-> > drm_connector_register() call.
-> > 
-> > https://www.spinics.net/lists/dri-devel/msg121495.html
-> > 
-> > It'd be nice to have other tda998x users ack and test these patches,
-> > I've tried to test on Juno, but the Juno situation seems to be a huge
-> > fail.  (HBI0282B completely fails with latest firmware - (a) FPGA image
-> > incompatibilities io_b118 causes all FPGA AMBA devices to vanish, (b)
-> > seems no way to get SCPI support on it - adding the BL0 executable
-> > start address in the SCC registers seems to be incompatible with the
-> > devchip, causing the PLLs to fail.  In discussion with Sudeep over
-> > these issues, but no idea where things are with it at the moment, other
-> > than Sudeep needs to investigate.  All Linaro firmware releases are
-> > broken on HBI0282B.)
-> > 
-> >  drivers/gpu/drm/i2c/tda998x_drv.c | 826 ++++++++++++++++++++------------------
-> >  1 file changed, 429 insertions(+), 397 deletions(-)
-> > 
+On Fri, Nov 11, 2016 at 09:46:29PM +0800, Hanjun Guo wrote:
+> On 10/21/2016 12:37 AM, Mark Rutland wrote:
+> >On Thu, Sep 29, 2016 at 02:17:12AM +0800, fu.wei at linaro.org wrote:
+> >>+static int __init map_gt_gsi(u32 interrupt, u32 flags)
+> >>+{
+> >>+	int trigger, polarity;
+> >>+
+> >>+	if (!interrupt)
+> >>+		return 0;
+> >
+> >Urgh.
+> >
+> >Only the secure interrupt (which we do not need) is optional in this
+> >manner, and (hilariously), zero appears to also be a valid GSIV, per
+> >figure 5-24 in the ACPI 6.1 spec.
+> >
+> >So, I think that:
+> >
+> >(a) we should not bother parsing the secure interrupt
+> >(b) we should drop the check above
+> >(c) we should report the spec issue to the ASWG
 > 
-> Reviewed-by: Jyri Sarha <jsarha@ti.com>
-> 
-> For the whole series. I am also happy to test these patches if I can
-> fetch them from some git repo.
+> Sorry, I willing to do that, but I need to figure out the issue here.
+> What kind of issue in detail? do you mean that zero should not be valid
+> for arch timer interrupts?
 
-git://git.armlinux.org.uk/~rmk/linux-arm.git drm-tda998x-devel
+As above, zero is a valid GSIV, and is valid for the non-secure timer
+interrupts. The check is wrong for non-secure interrupts.
 
-The commit IDs are unstable, because I'll have to recommit them to add
-your r-by and any other tags you later give me. :)
+We can ignore the secure timer interrupt since it's irrelevant to us,
+and remove the check.
 
-Thanks.
+Regardless, the spec is inconsistent w.r.t. the secure interrupt being
+zero if not present, since zero is a valid GSIV. That should be reported
+to the ASWG.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Mark.
