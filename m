@@ -1,53 +1,58 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Fri, 11 Nov 2016 11:00:41 -0500
-Subject: Summary of LPC guest MSI discussion in Santa Fe
-In-Reply-To: <20161111111944.GO2078@8bytes.org>
-References: <20161109151709.74927f83@t450s.home>
- <20161109222522.GS17771@arm.com> <20161109162458.39594fdb@t450s.home>
- <20161109233847.GT17771@arm.com> <20161109165957.62c1eb61@t450s.home>
- <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
- <20161109175517.174e7803@t450s.home> <20161110020130.GA19108@arm.com>
- <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
- <20161110104601.0939ba9a@t450s.home> <20161111111944.GO2078@8bytes.org>
-Message-ID: <5825EB29.3040805@redhat.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 11 Nov 2016 11:01:23 -0500
+Subject: ??
+In-Reply-To: <CAG2=9p_3nLD6MuLXPsbfC8LqK76LbwD3BDRUjX3uEUrijZnYCg@mail.gmail.com>
+References: <CAG2=9p_3nLD6MuLXPsbfC8LqK76LbwD3BDRUjX3uEUrijZnYCg@mail.gmail.com>
+Message-ID: <20161111110123.019fc088@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2016 06:19 AM, Joerg Roedel wrote:
-> On Thu, Nov 10, 2016 at 10:46:01AM -0700, Alex Williamson wrote:
->> In the case of x86, we know that DMA mappings overlapping the MSI
->> doorbells won't be translated correctly, it's not a valid mapping for
->> that range, and therefore the iommu driver backing the IOMMU API
->> should describe that reserved range and reject mappings to it.
->
-> The drivers actually allow mappings to the MSI region via the IOMMU-API,
-> and I think it should stay this way also for other reserved ranges.
-> Address space management is done by the IOMMU-API user already (and has
-> to be done there nowadays), be it a DMA-API implementation which just
-> reserves these regions in its address space allocator or be it VFIO with
-> QEMU, which don't map RAM there anyway. So there is no point of checking
-> this again in the IOMMU drivers and we can keep that out of the
-> mapping/unmapping fast-path.
->
->> For PCI devices userspace can examine the topology of the iommu group
->> and exclude MMIO ranges of peer devices based on the BARs, which are
->> exposed in various places, pci-sysfs as well as /proc/iomem.  For
->> non-PCI or MSI controllers... ???
->
-> Right, the hardware resources can be examined. But maybe this can be
-> extended to also cover RMRR ranges? Then we would be able to assign
-> devices with RMRR mappings to guests.
->
-eh gads no!
-
-Assigning devices w/RMRR's is a security issue waiting to happen, if
-it doesn't crash the system before the guest even gets the device --
-reset the device before assignment; part of device is gathering system
-environmental data; if BIOS/SMM support doesn't get env. data update,
-it NMI's the system..... in fear that it may overheat ...
+On Fri, 11 Nov 2016 11:38:45 +0800
+Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
 
 
->
->
-> 	Joerg
->
+What happened to the subject?
+
+> >>> +static void
+> >>> +trace_process_export(struct trace_export *export,
+> >>> +            struct ring_buffer_event *event)
+> >>> +{
+> >>> +     struct trace_entry *entry;
+> >>> +     unsigned int size = 0;
+> >>> +
+> >>> +     entry = ring_buffer_event_data(event);
+> >>> +
+> >>> +     size = ring_buffer_event_length(event);
+> >>> +
+> >>> +     if (export->write)
+> >>> +             export->write((char *)entry, size);  
+> >>
+> >> Is there ever going to be a time where export->write wont be set?  
+> >
+> > There hasn't been since only one trace_export (i.e. stm_ftrace) was
+> > added in this patch-set , I just wanted to make sure the write() has
+> > been set before registering trace_export like what I added in 2/3 of
+> > this series.
+> >  
+> >>
+> >> And if there is, this can be racy. As in
+> >>
+> >>
+> >>         CPU 0:                  CPU 1:
+> >>         ------                  ------
+> >>         if (export->write)
+> >>
+> >>                                 export->write = NULL;  
+> >
+> > Is there going to be this kind of use case? Why some one needs to
+> > change export->write() rather than register a new trace_export?
+> >
+> > I probably haven't understood your point thoroughly, please correct me
+> > if my guess was wrong.
+> >  
+> 
+> Any further comments? :)
+
+I don't remember which patch series this goes to, so right now, no.
+
+-- Steve
