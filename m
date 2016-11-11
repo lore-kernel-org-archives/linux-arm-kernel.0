@@ -1,1172 +1,1986 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Fri, 11 Nov 2016 11:32:29 +0530
-Subject: [v17 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <CAFqH_52A4=GubRjPa8X1=STExXFZy2HdoASEGUBYwqGt0BEFcw@mail.gmail.com>
-References: <1472280263-18177-1-git-send-email-jitao.shi@mediatek.com>
- <1472280263-18177-2-git-send-email-jitao.shi@mediatek.com>
- <CAFqH_52A4=GubRjPa8X1=STExXFZy2HdoASEGUBYwqGt0BEFcw@mail.gmail.com>
-Message-ID: <30b2f209-d957-b0ed-2805-7038e4be6cf1@codeaurora.org>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Thu, 10 Nov 2016 22:15:31 -0800
+Subject: [PATCH v2] staging: vc04_services: rework ioctl code path
+Message-ID: <20161111061531.23507-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+VCHIQ/vc04_services has a userland device interface
+that includes ioctls. The current ioctl implementation
+is a single monolithic function over 1,000+ lines
+that handles 17 different ioctls through a complex
+maze of switch and if statements.
 
-I couldn't locate the original mail, so posting on this thread instead.
-Some comments below.
+The change reimplements that code path by breaking
+up the code into smaller, easier to maintain functions
+and uses a dispatch table to invoke the correct function.
 
-On 11/10/2016 10:09 PM, Enric Balletbo Serra wrote:
-> Hi Jitao,
->
-> 2016-08-27 8:44 GMT+02:00 Jitao Shi <jitao.shi@mediatek.com>:
->> This patch adds drm_bridge driver for parade DSI to eDP bridge chip.
->>
->> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
->> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
->> ---
->> Changes since v16:
->>  - Disable ps8640 DSI MCS Function.
->>  - Rename gpios name more clearly.
->>  - Tune the ps8640 power on sequence.
->>
->> Changes since v15:
->>  - Drop drm_connector_(un)register calls from parade ps8640.
->>    The main DRM driver mtk_drm_drv now calls
->>    drm_connector_register_all() after drm_dev_register() in the
->>    mtk_drm_bind() function. That function should iterate over all
->>    connectors and call drm_connector_register() for each of them.
->>    So, remove drm_connector_(un)register calls from parade ps8640.
->>
->> Changes since v14:
->>  - update copyright info.
->>  - change bridge_to_ps8640 and connector_to_ps8640 to inline function.
->>  - fix some coding style.
->>  - use sizeof as array counter.
->>  - use drm_get_edid when read edid.
->>  - add mutex when firmware updating.
->>
->> Changes since v13:
->>  - add const on data, ps8640_write_bytes(struct i2c_client *client, const u8 *data, u16 data_len)
->>  - fix PAGE2_SW_REST tyro.
->>  - move the buf[3] init to entrance of the function.
->>
->> Changes since v12:
->>  - fix hw_chip_id build warning
->>
->> Changes since v11:
->>  - Remove depends on I2C, add DRM depends
->>  - Reuse ps8640_write_bytes() in ps8640_write_byte()
->>  - Use timer check for polling like the routines in <linux/iopoll.h>
->>  - Fix no drm_connector_unregister/drm_connector_cleanup when ps8640_bridge_attach fail
->>  - Check the ps8640 hardware id in ps8640_validate_firmware
->>  - Remove fw_version check
->>  - Move ps8640_validate_firmware before ps8640_enter_bl
->>  - Add ddc_i2c unregister when probe fail and ps8640_remove
->> ---
->>  drivers/gpu/drm/bridge/Kconfig         |   12 +
->>  drivers/gpu/drm/bridge/Makefile        |    1 +
->>  drivers/gpu/drm/bridge/parade-ps8640.c | 1077 ++++++++++++++++++++++++++++++++
->>  3 files changed, 1090 insertions(+)
->>  create mode 100644 drivers/gpu/drm/bridge/parade-ps8640.c
->>
->> diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
->> index b590e67..c59d043 100644
->> --- a/drivers/gpu/drm/bridge/Kconfig
->> +++ b/drivers/gpu/drm/bridge/Kconfig
->> @@ -50,6 +50,18 @@ config DRM_PARADE_PS8622
->>         ---help---
->>           Parade eDP-LVDS bridge chip driver.
->>
->> +config DRM_PARADE_PS8640
->> +       tristate "Parade PS8640 MIPI DSI to eDP Converter"
->> +       depends on DRM
->> +       depends on OF
->> +       select DRM_KMS_HELPER
->> +       select DRM_MIPI_DSI
->> +       select DRM_PANEL
->> +       ---help---
->> +         Choose this option if you have PS8640 for display
->> +         The PS8640 is a high-performance and low-power
->> +         MIPI DSI to eDP converter
->> +
->>  config DRM_SII902X
->>         tristate "Silicon Image sii902x RGB/HDMI bridge"
->>         depends on OF
->> diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
->> index efdb07e..3360537 100644
->> --- a/drivers/gpu/drm/bridge/Makefile
->> +++ b/drivers/gpu/drm/bridge/Makefile
->> @@ -5,6 +5,7 @@ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
->>  obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
->>  obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
->>  obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
->> +obj-$(CONFIG_DRM_PARADE_PS8640) += parade-ps8640.o
->>  obj-$(CONFIG_DRM_SII902X) += sii902x.o
->>  obj-$(CONFIG_DRM_TOSHIBA_TC358767) += tc358767.o
->>  obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
->> diff --git a/drivers/gpu/drm/bridge/parade-ps8640.c b/drivers/gpu/drm/bridge/parade-ps8640.c
->> new file mode 100644
->> index 0000000..7d67431
->> --- /dev/null
->> +++ b/drivers/gpu/drm/bridge/parade-ps8640.c
->> @@ -0,0 +1,1077 @@
->> +/*
->> + * Copyright (c) 2016 MediaTek Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/err.h>
->> +#include <linux/firmware.h>
->> +#include <linux/gpio.h>
+Testing:
 
-Not needed.
+1. vchiq_test -f 10 and vchiq_test -p 1 were run from a native
+64-bit OS(debian sid).
 
->> +#include <linux/gpio/consumer.h>
->> +#include <linux/i2c.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_gpio.h>
+2. vchiq_test -f 10 and vchiq_test -p 1 where run from a 32-bit
+chroot install from the same OS.
 
-The above 2 aren't needed.
+Both test cases pass.
 
->> +#include <linux/of_graph.h>
->> +#include <linux/regulator/consumer.h>
->> +#include <asm/unaligned.h>
->> +#include <drm/drm_panel.h>
->> +
->> +#include <drmP.h>
->> +#include <drm_atomic_helper.h>
->> +#include <drm_crtc_helper.h>
->> +#include <drm_crtc.h>
+This is V2 of this patch.  Changes include:
 
-Not needed.
+1. More code has been moved to the dispatch routine.
+The dispatch routine is now responsible for copying the top-level
+data into and out of kernel space by using the data encoded in
+the ioctl command number.
 
->> +#include <drm_edid.h>
->> +#include <drm_mipi_dsi.h>
->> +
->> +#define PAGE1_VSTART           0x6b
->> +#define PAGE2_SPI_CFG3         0x82
->> +#define I2C_TO_SPI_RESET       0x20
->> +#define PAGE2_ROMADD_BYTE1     0x8e
->> +#define PAGE2_ROMADD_BYTE2     0x8f
->> +#define PAGE2_SWSPI_WDATA      0x90
->> +#define PAGE2_SWSPI_RDATA      0x91
->> +#define PAGE2_SWSPI_LEN                0x92
->> +#define PAGE2_SWSPI_CTL                0x93
->> +#define TRIGGER_NO_READBACK    0x05
->> +#define TRIGGER_READBACK       0x01
->> +#define PAGE2_SPI_STATUS       0x9e
->> +#define SPI_READY              0x0c
->> +#define PAGE2_GPIO_L           0xa6
->> +#define PAGE2_GPIO_H           0xa7
->> +#define PS_GPIO9               BIT(1)
->> +#define PAGE2_IROM_CTRL                0xb0
->> +#define IROM_ENABLE            0xc0
->> +#define IROM_DISABLE           0x80
->> +#define PAGE2_SW_RESET         0xbc
->> +#define SPI_SW_RESET           BIT(7)
->> +#define MPU_SW_RESET           BIT(6)
->> +#define PAGE2_ENCTLSPI_WR      0xda
->> +#define PAGE2_I2C_BYPASS       0xea
->> +#define I2C_BYPASS_EN          0xd0
->> +#define PAGE2_MCS_EN           0xf3
->> +#define MCS_EN                 BIT(0)
->> +#define PAGE3_SET_ADD          0xfe
->> +#define PAGE3_SET_VAL          0xff
->> +#define VDO_CTL_ADD            0x13
->> +#define VDO_DIS                        0x18
->> +#define VDO_EN                 0x1c
->> +#define PAGE4_REV_L            0xf0
->> +#define PAGE4_REV_H            0xf1
->> +#define PAGE4_CHIP_L           0xf2
->> +#define PAGE4_CHIP_H           0xf3
->> +
->> +/* Firmware */
->> +#define PS_FW_NAME             "ps864x_fw.bin"
->> +
->
-> About the firmware discussion I think that if you want to maintain the
-> upgrade firmware thing you should also include this patch in the
-> series.
->
->  https://chromium-review.googlesource.com/#/c/317221/
->
-> Otherwise, if this is not really needed I think that remove this from
-> the driver is the best. Just an opinion, this is something the
-> maintainer should decide.
+2. The number of parameters have been reduced for the handling
+functions by giving a different prototype to ioctls that pass
+no arguments.
 
-Was there a conclusion on this? As Daniel Kurtz suggested, can we drop
-the update firmware stuff for now and try to get the functional part
-for 4.10?
+3. Macros in linux/compat.h are now used for compatibility data
+structures.
 
->
->> +#define FW_CHIP_ID_OFFSET      0
->> +#define FW_VERSION_OFFSET      2
->> +#define EDID_I2C_ADDR          0x50
->> +
->> +#define WRITE_STATUS_REG_CMD   0x01
->> +#define READ_STATUS_REG_CMD    0x05
->> +#define BUSY                   BIT(0)
->> +#define CLEAR_ALL_PROTECT      0x00
->> +#define BLK_PROTECT_BITS       0x0c
->> +#define STATUS_REG_PROTECT     BIT(7)
->> +#define WRITE_ENABLE_CMD       0x06
->> +#define CHIP_ERASE_CMD         0xc7
->> +#define MAX_DEVS               0x8
->> +
->> +struct ps8640_info {
->> +       u8 family_id;
->> +       u8 variant_id;
->> +       u16 version;
->> +};
->> +
->> +struct ps8640 {
->> +       struct drm_connector connector;
->> +       struct drm_bridge bridge;
->> +       struct edid *edid;
->> +       struct mipi_dsi_device dsi;
->> +       struct i2c_client *page[MAX_DEVS];
->> +       struct i2c_client *ddc_i2c;
->> +       struct regulator_bulk_data supplies[2];
->> +       struct drm_panel *panel;
->> +       struct gpio_desc *gpio_reset;
->> +       struct gpio_desc *gpio_power_down;
->> +       struct gpio_desc *gpio_mode_sel;
->> +       bool enabled;
->> +
->> +       /* firmware file info */
->> +       struct ps8640_info info;
->> +       bool in_fw_update;
->> +       /* for firmware update protect */
->> +       struct mutex fw_mutex;
->> +};
->> +
->> +static const u8 enc_ctrl_code[6] = { 0xaa, 0x55, 0x50, 0x41, 0x52, 0x44 };
->> +static const u8 hw_chip_id[4] = { 0x00, 0x0a, 0x00, 0x30 };
->> +
->> +static inline struct ps8640 *bridge_to_ps8640(struct drm_bridge *e)
->> +{
->> +       return container_of(e, struct ps8640, bridge);
->> +}
->> +
->> +static inline struct ps8640 *connector_to_ps8640(struct drm_connector *e)
->> +{
->> +       return container_of(e, struct ps8640, connector);
->> +}
->> +
->> +static int ps8640_read(struct i2c_client *client, u8 reg, u8 *data,
->> +                      u16 data_len)
->> +{
->> +       int ret;
->> +       struct i2c_msg msgs[] = {
->> +               {
->> +                .addr = client->addr,
->> +                .flags = 0,
->> +                .len = 1,
->> +                .buf = &reg,
->> +               },
->> +               {
->> +                .addr = client->addr,
->> +                .flags = I2C_M_RD,
->> +                .len = data_len,
->> +                .buf = data,
->> +               }
->> +       };
->> +
->> +       ret = i2c_transfer(client->adapter, msgs, 2);
->> +
->> +       if (ret == 2)
->> +               return 0;
->> +       if (ret < 0)
->> +               return ret;
->> +       else
->> +               return -EIO;
->> +}
->> +
->> +static int ps8640_write_bytes(struct i2c_client *client, const u8 *data,
->> +                             u16 data_len)
->> +{
->> +       int ret;
->> +       struct i2c_msg msg;
->> +
->> +       msg.addr = client->addr;
->> +       msg.flags = 0;
->> +       msg.len = data_len;
->> +       msg.buf = (u8 *)data;
->> +
->> +       ret = i2c_transfer(client->adapter, &msg, 1);
->> +       if (ret == 1)
->> +               return 0;
->> +       if (ret < 0)
->> +               return ret;
->> +       else
->> +               return -EIO;
->> +}
->> +
->> +static int ps8640_write_byte(struct i2c_client *client, u8 reg,  u8 data)
->> +{
->> +       u8 buf[] = { reg, data };
->> +
->> +       return ps8640_write_bytes(client, buf, sizeof(buf));
->> +}
->> +
->> +static void ps8640_get_mcu_fw_version(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[5];
->> +       u8 fw_ver[2];
->> +
->> +       ps8640_read(client, 0x4, fw_ver, sizeof(fw_ver));
->> +       ps_bridge->info.version = (fw_ver[0] << 8) | fw_ver[1];
->> +
->> +       DRM_INFO_ONCE("ps8640 rom fw version %d.%d\n", fw_ver[0], fw_ver[1]);
->> +}
->> +
->> +static int ps8640_bridge_unmute(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[3];
->> +       u8 vdo_ctrl_buf[3] = { PAGE3_SET_ADD, VDO_CTL_ADD, VDO_EN };
->> +
->> +       return ps8640_write_bytes(client, vdo_ctrl_buf, sizeof(vdo_ctrl_buf));
->> +}
->> +
->> +static int ps8640_bridge_mute(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[3];
->> +       u8 vdo_ctrl_buf[3] = { PAGE3_SET_ADD, VDO_CTL_ADD, VDO_DIS };
->> +
->> +       return ps8640_write_bytes(client, vdo_ctrl_buf, sizeof(vdo_ctrl_buf));
->> +}
->> +
->> +static void ps8640_pre_enable(struct drm_bridge *bridge)
->> +{
->> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       struct i2c_client *page1 = ps_bridge->page[1];
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ .../vc04_services/interface/vchiq_arm/vchiq_arm.c  | 1733 +++++++++++++-------
+ .../interface/vchiq_arm/vchiq_ioctl.h              |   96 ++
+ 2 files changed, 1200 insertions(+), 629 deletions(-)
 
-It's a bit hard to follow what page[3] or page[5] means without going to the
-bottom and reading the dummy devices comment. It would be nice to have some
-macros here.
-
->> +       int err;
->> +       u8 set_vdo_done, mcs_en, vstart;
->> +       ktime_t timeout;
->> +
->> +       if (ps_bridge->in_fw_update)
->> +               return;
->> +
->> +       if (ps_bridge->enabled)
->> +               return;
->> +
->> +       err = drm_panel_prepare(ps_bridge->panel);
->> +       if (err < 0) {
->> +               DRM_ERROR("failed to prepare panel: %d\n", err);
->> +               return;
->> +       }
->> +
->> +       err = regulator_bulk_enable(ARRAY_SIZE(ps_bridge->supplies),
->> +                                   ps_bridge->supplies);
->> +       if (err < 0) {
->> +               DRM_ERROR("cannot enable regulators %d\n", err);
->> +               goto err_panel_unprepare;
->> +       }
->> +
->> +       gpiod_set_value(ps_bridge->gpio_power_down, 1);
->> +       gpiod_set_value(ps_bridge->gpio_reset, 0);
->> +       usleep_range(2000, 2500);
->> +       gpiod_set_value(ps_bridge->gpio_reset, 1);
->> +
->> +       /*
->> +        * Wait for the ps8640 embed mcu ready
->> +        * First wait 200ms and then check the mcu ready flag every 20ms
->> +        */
->> +       msleep(200);
->> +
->> +       timeout = ktime_add_ms(ktime_get(), 200);
->> +       for (;;) {
->> +               err = ps8640_read(client, PAGE2_GPIO_H, &set_vdo_done, 1);
->> +               if (err < 0) {
->> +                       DRM_ERROR("failed read PAGE2_GPIO_H: %d\n", err);
->> +                       goto err_regulators_disable;
->> +               }
->> +               if ((set_vdo_done & PS_GPIO9) == PS_GPIO9)
->> +                       break;
->> +               if (ktime_compare(ktime_get(), timeout) > 0)
->> +                       break;
->> +               msleep(20);
->> +       }
->> +
->> +       msleep(50);
->> +
->> +       ps8640_read(page1, PAGE1_VSTART, &vstart, 1);
->> +       DRM_INFO("PS8640 PAGE1.0x6B = 0x%x\n", vstart);
->> +
->> +       /**
->> +        * The Manufacturer Command Set (MCS) is a device dependent interface
->> +        * intended for factory programming of the display module default
->> +        * parameters. Once the display module is configured, the MCS shall be
->> +        * disabled by the manufacturer. Once disabled, all MCS commands are
->> +        * ignored by the display interface.
->> +        */
->> +       ps8640_read(client, PAGE2_MCS_EN, &mcs_en, 1);
->> +       ps8640_write_byte(client, PAGE2_MCS_EN, mcs_en & ~MCS_EN);
->> +
->> +       if (ps_bridge->info.version == 0)
->> +               ps8640_get_mcu_fw_version(ps_bridge);
->> +
->> +       err = ps8640_bridge_unmute(ps_bridge);
->> +       if (err)
->> +               DRM_ERROR("failed to enable unmutevideo: %d\n", err);
->> +       /* Switch access edp panel's edid through i2c */
->> +       ps8640_write_byte(client, PAGE2_I2C_BYPASS, I2C_BYPASS_EN);
->> +       ps_bridge->enabled = true;
->> +
->> +       return;
->> +
->> +err_regulators_disable:
->> +       regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
->> +                              ps_bridge->supplies);
->> +err_panel_unprepare:
->> +       drm_panel_unprepare(ps_bridge->panel);
->> +}
->> +
->> +static void ps8640_enable(struct drm_bridge *bridge)
->> +{
->> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
->> +       int err;
->> +
->> +       err = drm_panel_enable(ps_bridge->panel);
->> +       if (err < 0)
->> +               DRM_ERROR("failed to enable panel: %d\n", err);
->> +}
->> +
->> +static void ps8640_disable(struct drm_bridge *bridge)
->> +{
->> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
->> +       int err;
->> +
->> +       err = drm_panel_disable(ps_bridge->panel);
->> +       if (err < 0)
->> +               DRM_ERROR("failed to disable panel: %d\n", err);
->> +}
->> +
->> +static void ps8640_post_disable(struct drm_bridge *bridge)
->> +{
->> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
->> +       int err;
->> +
->> +       if (ps_bridge->in_fw_update)
->> +               return;
->> +
->> +       if (!ps_bridge->enabled)
->> +               return;
->> +
->> +       ps_bridge->enabled = false;
->> +
->> +       err = ps8640_bridge_mute(ps_bridge);
->> +       if (err < 0)
->> +               DRM_ERROR("failed to unmutevideo: %d\n", err);
->> +
->> +       gpiod_set_value(ps_bridge->gpio_reset, 0);
->> +       gpiod_set_value(ps_bridge->gpio_power_down, 0);
->> +       err = regulator_bulk_disable(ARRAY_SIZE(ps_bridge->supplies),
->> +                                    ps_bridge->supplies);
->> +       if (err < 0)
->> +               DRM_ERROR("cannot disable regulators %d\n", err);
->> +
->> +       err = drm_panel_unprepare(ps_bridge->panel);
->> +       if (err)
->> +               DRM_ERROR("failed to unprepare panel: %d\n", err);
->> +}
->> +
->> +static int ps8640_get_modes(struct drm_connector *connector)
->> +{
->> +       struct ps8640 *ps_bridge = connector_to_ps8640(connector);
->> +       struct edid *edid;
->> +       int num_modes = 0;
->> +       bool power_off;
->> +
->> +       if (ps_bridge->edid)
->> +               return drm_add_edid_modes(connector, ps_bridge->edid);
->> +
->> +       power_off = !ps_bridge->enabled;
->> +       ps8640_pre_enable(&ps_bridge->bridge);
->> +
->> +       edid = drm_get_edid(connector, ps_bridge->ddc_i2c->adapter);
-
-See comments related to this in ps8640_probe.
-
->> +       if (!edid)
->> +               goto out;
->> +
->> +       ps_bridge->edid = edid;
->> +       drm_mode_connector_update_edid_property(connector, ps_bridge->edid);
->> +       num_modes = drm_add_edid_modes(connector, ps_bridge->edid);
->> +
->> +out:
->> +       if (power_off)
->> +               ps8640_post_disable(&ps_bridge->bridge);
->> +
->> +       return num_modes;
->> +}
->> +
->> +static struct drm_encoder *ps8640_best_encoder(struct drm_connector *connector)
->> +{
->> +       struct ps8640 *ps_bridge = connector_to_ps8640(connector);
->> +
->> +       return ps_bridge->bridge.encoder;
->> +}
-
-We can drop the above func.
-
->> +
->> +static const struct drm_connector_helper_funcs ps8640_connector_helper_funcs = {
->> +       .get_modes = ps8640_get_modes,
->> +       .best_encoder = ps8640_best_encoder,
->> +};
->> +
->> +static enum drm_connector_status ps8640_detect(struct drm_connector *connector,
->> +                                              bool force)
->> +{
->> +       return connector_status_connected;
->> +}
->> +
->> +static const struct drm_connector_funcs ps8640_connector_funcs = {
->> +       .dpms = drm_atomic_helper_connector_dpms,
->> +       .fill_modes = drm_helper_probe_single_connector_modes,
->> +       .detect = ps8640_detect,
->> +       .reset = drm_atomic_helper_connector_reset,
->> +       .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
->> +       .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
->> +};
->> +
->> +int ps8640_bridge_attach(struct drm_bridge *bridge)
->> +{
->> +       struct ps8640 *ps_bridge = bridge_to_ps8640(bridge);
->> +       struct device *dev = &ps_bridge->page[0]->dev;
->> +       struct device_node *port, *in_ep;
->> +       struct device_node *dsi_node = NULL;
->> +       struct mipi_dsi_host *host = NULL;
->> +       int ret;
->> +
->> +       ret = drm_connector_init(bridge->dev, &ps_bridge->connector,
->> +                                &ps8640_connector_funcs,
->> +                                DRM_MODE_CONNECTOR_eDP);
->> +
->> +       if (ret) {
->> +               DRM_ERROR("Failed to initialize connector with drm: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       drm_connector_helper_add(&ps_bridge->connector,
->> +                                &ps8640_connector_helper_funcs);
->> +
->> +       ps_bridge->connector.dpms = DRM_MODE_DPMS_ON;
->> +       drm_mode_connector_attach_encoder(&ps_bridge->connector,
->> +                                         bridge->encoder);
->> +
->> +       if (ps_bridge->panel)
->> +               drm_panel_attach(ps_bridge->panel, &ps_bridge->connector);
->> +
->> +       /* port at 0 is ps8640 dsi input port */
->> +       port = of_graph_get_port_by_id(dev->of_node, 0);
->> +       if (port) {
->> +               in_ep = of_get_child_by_name(port, "endpoint");
->> +               of_node_put(port);
-
-The above 2 funcs can be done by a single func: of_graph_get_endpoint_by_regs().
-
->> +               if (in_ep) {
->> +                       dsi_node = of_graph_get_remote_port_parent(in_ep);
->> +                       of_node_put(in_ep);
->> +               }
->> +       }
->> +       if (dsi_node) {
->> +               host = of_find_mipi_dsi_host_by_node(dsi_node);
->> +               of_node_put(dsi_node);
->> +               if (!host) {
->> +                       ret = -ENODEV;
->> +                       goto err;
->> +               }
->> +       }
->> +
-
-We haven't created a DSI device for this yet. Don't we need to call
-mipi_dsi_device_register_full() here?
-
->> +       ps_bridge->dsi.host = host;
-
-The code above proceeds even if we don't find a dsi host. In that
-case, the host would be a NULL pointer. We shouldn't call
-mipi_dsi_attach() with a NULL host. We should have returned earlier with
-an error.
-
->> +       ps_bridge->dsi.mode_flags = MIPI_DSI_MODE_VIDEO |
->> +                                    MIPI_DSI_MODE_VIDEO_SYNC_PULSE;
->> +       ps_bridge->dsi.format = MIPI_DSI_FMT_RGB888;
->> +       ps_bridge->dsi.lanes = 4;
->> +       ret = mipi_dsi_attach(&ps_bridge->dsi);
->> +       if (ret)
->> +               goto err;
->> +
->> +       return 0;
->> +err:
->> +       if (ps_bridge->panel)
->> +               drm_panel_detach(ps_bridge->panel);
->> +       drm_connector_cleanup(&ps_bridge->connector);
->> +       return ret;
->> +}
->> +
->> +static const struct drm_bridge_funcs ps8640_bridge_funcs = {
->> +       .attach = ps8640_bridge_attach,
->> +       .disable = ps8640_disable,
->> +       .post_disable = ps8640_post_disable,
->> +       .pre_enable = ps8640_pre_enable,
->> +       .enable = ps8640_enable,
->> +};
->> +
->> +/* Firmware Version is returned as Major.Minor */
->> +static ssize_t ps8640_fw_version_show(struct device *dev,
->> +                                     struct device_attribute *attr, char *buf)
->> +{
->> +       struct ps8640 *ps_bridge = dev_get_drvdata(dev);
->> +       struct ps8640_info *info = &ps_bridge->info;
->> +
->> +       return scnprintf(buf, PAGE_SIZE, "%u.%u\n", info->version >> 8,
->> +                        info->version & 0xff);
->> +}
->> +
->> +/* Hardware Version is returned as FamilyID.VariantID */
->> +static ssize_t ps8640_hw_version_show(struct device *dev,
->> +                                     struct device_attribute *attr, char *buf)
->> +{
->> +       struct ps8640 *ps_bridge = dev_get_drvdata(dev);
->> +       struct ps8640_info *info = &ps_bridge->info;
->> +
->> +       return scnprintf(buf, PAGE_SIZE, "ps%u.%u\n", info->family_id,
->> +                        info->variant_id);
->> +}
->> +
->> +static int ps8640_spi_send_cmd(struct ps8640 *ps_bridge, u8 *cmd, u8 cmd_len)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       u8 i, buf[3] = { PAGE2_SWSPI_LEN, cmd_len - 1, TRIGGER_NO_READBACK };
->> +       int ret;
->> +
->> +       ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
->> +       if (ret)
->> +               goto err;
->> +
->> +       /* write command in write port */
->> +       for (i = 0; i < cmd_len; i++) {
->> +               ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA, cmd[i]);
->> +               if (ret)
->> +                       goto err_irom_disable;
->> +       }
->> +
->> +       ret = ps8640_write_bytes(client, buf, sizeof(buf));
->> +       if (ret)
->> +               goto err_irom_disable;
->> +
->> +       ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
->> +       if (ret)
->> +               goto err;
->> +
->> +       return 0;
->> +err_irom_disable:
->> +       ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
->> +err:
->> +       dev_err(&client->dev, "send command err: %d\n", ret);
->> +       return ret;
->> +}
->> +
->> +static int ps8640_wait_spi_ready(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       u8 spi_rdy_st;
->> +       ktime_t timeout;
->> +
->> +       timeout = ktime_add_ms(ktime_get(), 200);
->> +       for (;;) {
->> +               ps8640_read(client, PAGE2_SPI_STATUS, &spi_rdy_st, 1);
->> +               if ((spi_rdy_st & SPI_READY) != SPI_READY)
->> +                       break;
->> +
->> +               if (ktime_compare(ktime_get(), timeout) > 0) {
->> +                       dev_err(&client->dev, "wait spi ready timeout\n");
->> +                       return -EBUSY;
->> +               }
->> +
->> +               msleep(20);
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int ps8640_wait_spi_nobusy(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       u8 spi_status, buf[3] = { PAGE2_SWSPI_LEN, 0, TRIGGER_READBACK };
->> +       int ret;
->> +       ktime_t timeout;
->> +
->> +       timeout = ktime_add_ms(ktime_get(), 500);
->> +       for (;;) {
->> +               /* 0x05 RDSR; Read-Status-Register */
->> +               ret = ps8640_write_byte(client, PAGE2_SWSPI_WDATA,
->> +                                       READ_STATUS_REG_CMD);
->> +               if (ret)
->> +                       goto err_send_cmd_exit;
->> +
->> +               ret = ps8640_write_bytes(client, buf, 3);
->> +               if (ret)
->> +                       goto err_send_cmd_exit;
->> +
->> +               /* delay for cmd send */
->> +               usleep_range(300, 500);
->> +               /* wait for SPI ROM until not busy */
->> +               ret = ps8640_read(client, PAGE2_SWSPI_RDATA, &spi_status, 1);
->> +               if (ret)
->> +                       goto err_send_cmd_exit;
->> +
->> +               if (!(spi_status & BUSY))
->> +                       break;
->> +
->> +               if (ktime_compare(ktime_get(), timeout) > 0) {
->> +                       dev_err(&client->dev, "wait spi no busy timeout: %d\n",
->> +                               ret);
->> +                       return -EBUSY;
->> +               }
->> +       }
->> +
->> +       return 0;
->> +
->> +err_send_cmd_exit:
->> +       dev_err(&client->dev, "send command err: %d\n", ret);
->> +       return ret;
->> +}
->> +
->> +static int ps8640_wait_rom_idle(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[0];
->> +       int ret;
->> +
->> +       ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
->> +       if (ret)
->> +               goto exit;
->> +
->> +       ret = ps8640_wait_spi_ready(ps_bridge);
->> +       if (ret)
->> +               goto err_spi;
->> +
->> +       ret = ps8640_wait_spi_nobusy(ps_bridge);
->> +       if (ret)
->> +               goto err_spi;
->> +
->> +       ret = ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
->> +       if (ret)
->> +               goto exit;
->> +
->> +       return 0;
->> +
->> +err_spi:
->> +       ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
->> +exit:
->> +       dev_err(&client->dev, "wait ps8640 rom idle fail: %d\n", ret);
->> +
->> +       return ret;
->> +}
->> +
->> +static int ps8640_spi_dl_mode(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       int ret;
->> +
->> +       /* switch ps8640 mode to spi dl mode */
->> +       if (ps_bridge->gpio_mode_sel)
->> +               gpiod_set_value(ps_bridge->gpio_mode_sel, 0);
->> +
->> +       /* reset spi interface */
->> +       ret = ps8640_write_byte(client, PAGE2_SW_RESET,
->> +                               SPI_SW_RESET | MPU_SW_RESET);
->> +       if (ret)
->> +               goto exit;
->> +
->> +       ret = ps8640_write_byte(client, PAGE2_SW_RESET, MPU_SW_RESET);
->> +       if (ret)
->> +               goto exit;
->> +
->> +       return 0;
->> +
->> +exit:
->> +       dev_err(&client->dev, "fail reset spi interface: %d\n", ret);
->> +
->> +       return ret;
->> +}
->> +
->> +static int ps8640_rom_prepare(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +       struct device *dev = &client->dev;
->> +       u8 i, cmd[2];
->> +       int ret;
->> +
->> +       cmd[0] = WRITE_ENABLE_CMD;
->> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
->> +       if (ret) {
->> +               dev_err(dev, "failed enable-write-status-register: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       cmd[0] = WRITE_STATUS_REG_CMD;
->> +       cmd[1] = CLEAR_ALL_PROTECT;
->> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 2);
->> +       if (ret) {
->> +               dev_err(dev, "fail disable all protection: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       /* wait for SPI module ready */
->> +       ret = ps8640_wait_rom_idle(ps_bridge);
->> +       if (ret) {
->> +               dev_err(dev, "fail wait rom idle: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_ENABLE);
->> +       for (i = 0; i < ARRAY_SIZE(enc_ctrl_code); i++)
->> +               ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, enc_ctrl_code[i]);
->> +       ps8640_write_byte(client, PAGE2_IROM_CTRL, IROM_DISABLE);
->> +
->> +       /* Enable-Write-Status-Register */
->> +       cmd[0] = WRITE_ENABLE_CMD;
->> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
->> +       if (ret) {
->> +               dev_err(dev, "fail enable-write-status-register: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       /* chip erase command */
->> +       cmd[0] = CHIP_ERASE_CMD;
->> +       ret = ps8640_spi_send_cmd(ps_bridge, cmd, 1);
->> +       if (ret) {
->> +               dev_err(dev, "fail disable all protection: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       ret = ps8640_wait_rom_idle(ps_bridge);
->> +       if (ret) {
->> +               dev_err(dev, "fail wait rom idle: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int ps8640_check_chip_id(struct ps8640 *ps_bridge)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[4];
->> +       u8 buf[4];
->> +
->> +       ps8640_read(client, PAGE4_REV_L, buf, 4);
->> +       return memcmp(buf, hw_chip_id, sizeof(buf));
->> +}
->> +
->> +static int ps8640_validate_firmware(struct ps8640 *ps_bridge,
->> +                                   const struct firmware *fw)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[0];
->> +       u16 fw_chip_id;
->> +
->> +       /*
->> +        * Get the chip_id from the firmware. Make sure that it is the
->> +        * right controller to do the firmware and config update.
->> +        */
->> +       fw_chip_id = get_unaligned_le16(fw->data + FW_CHIP_ID_OFFSET);
->> +
->> +       if (fw_chip_id != 0x8640 && ps8640_check_chip_id(ps_bridge) == 0) {
->> +               dev_err(&client->dev,
->> +                       "chip id mismatch: fw 0x%x vs. chip 0x8640\n",
->> +                       fw_chip_id);
->> +               return -EINVAL;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int ps8640_write_rom(struct ps8640 *ps_bridge, const struct firmware *fw)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[0];
->> +       struct device *dev = &client->dev;
->> +       struct i2c_client *client2 = ps_bridge->page[2];
->> +       struct i2c_client *client7 = ps_bridge->page[7];
->> +       size_t pos, cpy_len;
->> +       u8 buf[257];
->> +       int ret;
->> +
->> +       ps8640_write_byte(client2, PAGE2_SPI_CFG3, I2C_TO_SPI_RESET);
->> +       msleep(100);
->> +       ps8640_write_byte(client2, PAGE2_SPI_CFG3, 0x00);
->> +
->> +       for (pos = 0; pos < fw->size; pos += cpy_len) {
->> +               buf[0] = PAGE2_ROMADD_BYTE1;
->> +               buf[1] = pos >> 8;
->> +               buf[2] = pos >> 16;
->> +               ret = ps8640_write_bytes(client2, buf, 3);
->> +               if (ret)
->> +                       goto error;
->> +               cpy_len = fw->size >= 256 + pos ? 256 : fw->size - pos;
->> +               buf[0] = 0;
->> +               memcpy(buf + 1, fw->data + pos, cpy_len);
->> +               ret = ps8640_write_bytes(client7, buf, cpy_len + 1);
->> +               if (ret)
->> +                       goto error;
->> +
->> +               dev_dbg(dev, "fw update completed %zu / %zu bytes\n", pos,
->> +                       fw->size);
->> +       }
->> +       return 0;
->> +
->> +error:
->> +       dev_err(dev, "failed write external flash, %d\n", ret);
->> +       return ret;
->> +}
->> +
->> +static int ps8640_spi_normal_mode(struct ps8640 *ps_bridge)
->> +{
->> +       u8 cmd[2];
->> +       struct i2c_client *client = ps_bridge->page[2];
->> +
->> +       /* Enable-Write-Status-Register */
->> +       cmd[0] = WRITE_ENABLE_CMD;
->> +       ps8640_spi_send_cmd(ps_bridge, cmd, 1);
->> +
->> +       /* protect BPL/BP0/BP1 */
->> +       cmd[0] = WRITE_STATUS_REG_CMD;
->> +       cmd[1] = BLK_PROTECT_BITS | STATUS_REG_PROTECT;
->> +       ps8640_spi_send_cmd(ps_bridge, cmd, 2);
->> +
->> +       /* wait for SPI rom ready */
->> +       ps8640_wait_rom_idle(ps_bridge);
->> +
->> +       /* disable PS8640 mapping function */
->> +       ps8640_write_byte(client, PAGE2_ENCTLSPI_WR, 0x00);
->> +
->> +       if (ps_bridge->gpio_mode_sel)
->> +               gpiod_set_value(ps_bridge->gpio_mode_sel, 1);
->> +       return 0;
->> +}
->> +
->> +static int ps8640_enter_bl(struct ps8640 *ps_bridge)
->> +{
->> +       ps_bridge->in_fw_update = true;
->> +       return ps8640_spi_dl_mode(ps_bridge);
->> +}
->> +
->> +static void ps8640_exit_bl(struct ps8640 *ps_bridge, const struct firmware *fw)
->> +{
->> +       ps8640_spi_normal_mode(ps_bridge);
->> +       ps_bridge->in_fw_update = false;
->> +}
->> +
->> +static int ps8640_load_fw(struct ps8640 *ps_bridge, const struct firmware *fw)
->> +{
->> +       struct i2c_client *client = ps_bridge->page[0];
->> +       struct device *dev = &client->dev;
->> +       int ret;
->> +       bool ps8640_status_backup = ps_bridge->enabled;
->> +
->> +       ret = ps8640_validate_firmware(ps_bridge, fw);
->> +       if (ret)
->> +               return ret;
->> +
->> +       mutex_lock(&ps_bridge->fw_mutex);
->> +       if (!ps_bridge->in_fw_update) {
->> +               if (!ps8640_status_backup)
->> +                       ps8640_pre_enable(&ps_bridge->bridge);
->> +
->> +               ret = ps8640_enter_bl(ps_bridge);
->> +               if (ret)
->> +                       goto exit;
->> +       }
->> +
->> +       ret = ps8640_rom_prepare(ps_bridge);
->> +       if (ret)
->> +               goto exit;
->> +
->> +       ret = ps8640_write_rom(ps_bridge, fw);
->> +
->> +exit:
->> +       if (ret)
->> +               dev_err(dev, "Failed to load firmware, %d\n", ret);
->> +
->> +       ps8640_exit_bl(ps_bridge, fw);
->> +       if (!ps8640_status_backup)
->> +               ps8640_post_disable(&ps_bridge->bridge);
->> +       mutex_unlock(&ps_bridge->fw_mutex);
->> +       return ret;
->> +}
->> +
->> +static ssize_t ps8640_update_fw_store(struct device *dev,
->> +                                     struct device_attribute *attr,
->> +                                     const char *buf, size_t count)
->> +{
->> +       struct i2c_client *client = to_i2c_client(dev);
->> +       struct ps8640 *ps_bridge = i2c_get_clientdata(client);
->> +       const struct firmware *fw;
->> +       int error;
->> +
->> +       error = request_firmware(&fw, PS_FW_NAME, dev);
->> +       if (error) {
->> +               dev_err(dev, "Unable to open firmware %s: %d\n",
->> +                       PS_FW_NAME, error);
->> +               return error;
->> +       }
->> +
->> +       error = ps8640_load_fw(ps_bridge, fw);
->> +       if (error)
->> +               dev_err(dev, "The firmware update failed(%d)\n", error);
->> +       else
->> +               dev_info(dev, "The firmware update succeeded\n");
->> +
->> +       release_firmware(fw);
->> +       return error ? error : count;
->> +}
->> +
->> +static DEVICE_ATTR(fw_version, S_IRUGO, ps8640_fw_version_show, NULL);
->> +static DEVICE_ATTR(hw_version, S_IRUGO, ps8640_hw_version_show, NULL);
->> +static DEVICE_ATTR(update_fw, S_IWUSR, NULL, ps8640_update_fw_store);
->> +
->> +static struct attribute *ps8640_attrs[] = {
->> +       &dev_attr_fw_version.attr,
->> +       &dev_attr_hw_version.attr,
->> +       &dev_attr_update_fw.attr,
->> +       NULL
->> +};
->> +
->> +static const struct attribute_group ps8640_attr_group = {
->> +       .attrs = ps8640_attrs,
->> +};
->> +
->> +static void ps8640_remove_sysfs_group(void *data)
->> +{
->> +       struct ps8640 *ps_bridge = data;
->> +
->> +       sysfs_remove_group(&ps_bridge->page[0]->dev.kobj, &ps8640_attr_group);
->> +}
->> +
->> +static int ps8640_probe(struct i2c_client *client,
->> +                       const struct i2c_device_id *id)
->> +{
->> +       struct device *dev = &client->dev;
->> +       struct ps8640 *ps_bridge;
->> +       struct device_node *np = dev->of_node;
->> +       struct device_node *port, *out_ep;
->> +       struct device_node *panel_node = NULL;
->> +       int ret;
->> +       u32 i;
->> +
->> +       ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
->> +       if (!ps_bridge)
->> +               return -ENOMEM;
->> +
->> +       /* port at 1 is ps8640 output port */
->> +       port = of_graph_get_port_by_id(np, 1);
->> +       if (port) {
->> +               out_ep = of_get_child_by_name(port, "endpoint");
->> +               of_node_put(port);
->> +               if (out_ep) {
->> +                       panel_node = of_graph_get_remote_port_parent(out_ep);
->> +                       of_node_put(out_ep);
->> +               }
->> +       }
->> +       if (panel_node) {
->> +               ps_bridge->panel = of_drm_find_panel(panel_node);
->> +               of_node_put(panel_node);
->> +               if (!ps_bridge->panel)
->> +                       return -EPROBE_DEFER;
->> +       }
->> +
->> +       mutex_init(&ps_bridge->fw_mutex);
->> +       ps_bridge->supplies[0].supply = "vdd33";
->> +       ps_bridge->supplies[1].supply = "vdd12";
->> +       ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(ps_bridge->supplies),
->> +                                     ps_bridge->supplies);
->> +       if (ret) {
->> +               dev_info(dev, "failed to get regulators: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       ps_bridge->gpio_mode_sel = devm_gpiod_get_optional(&client->dev,
->> +                                                            "mode-sel",
->> +                                                            GPIOD_OUT_HIGH);
->> +       if (IS_ERR(ps_bridge->gpio_mode_sel)) {
->> +               ret = PTR_ERR(ps_bridge->gpio_mode_sel);
->> +               dev_err(dev, "cannot get mode-sel %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       ps_bridge->gpio_power_down = devm_gpiod_get(&client->dev, "sleep",
->> +                                              GPIOD_OUT_LOW);
->> +       if (IS_ERR(ps_bridge->gpio_power_down)) {
->> +               ret = PTR_ERR(ps_bridge->gpio_power_down);
->> +               dev_err(dev, "cannot get sleep: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       /*
->> +        * Request the reset pin low to avoid the bridge being
->> +        * initialized prematurely
->> +        */
->> +       ps_bridge->gpio_reset = devm_gpiod_get(&client->dev, "reset",
->> +                                              GPIOD_OUT_LOW);
->> +       if (IS_ERR(ps_bridge->gpio_reset)) {
->> +               ret = PTR_ERR(ps_bridge->gpio_reset);
->> +               dev_err(dev, "cannot get reset: %d\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       ps_bridge->bridge.funcs = &ps8640_bridge_funcs;
->> +       ps_bridge->bridge.of_node = dev->of_node;
->> +
->> +       ps_bridge->page[0] = client;
->> +       ps_bridge->ddc_i2c = i2c_new_dummy(client->adapter, EDID_I2C_ADDR);
-
-I don't see why we need to create this dummy client. The drm edid helper
-drm_get_edid() just needs the i2c adapter to which the client is connected.
-It will internally initiate a read form the address EDID_I2C_ADDR.
-
-I guess "drm_get_edid(connector, ps_bridge->page[0]->adapter)" should work.
-
->> +       if (!ps_bridge->ddc_i2c) {
->> +               dev_err(dev, "failed ddc_i2c dummy device, address%02x\n",
->> +                       EDID_I2C_ADDR);
->> +               return -EBUSY;
->> +       }
->> +       /*
->> +        * ps8640 uses multiple addresses, use dummy devices for them
->> +        * page[0]: for DP control
->> +        * page[1]: for VIDEO Bridge
->> +        * page[2]: for control top
->> +        * page[3]: for DSI Link Control1
->> +        * page[4]: for MIPI Phy
->> +        * page[5]: for VPLL
->> +        * page[6]: for DSI Link Control2
-
-Does this chip support 2 DSI inputs, and we're just exposing one for now?
-If so, we should probably revisit the DT bindings, so that port at 2 doesn't
-need to represent the 2nd DSI link.
-
-Thanks,
-Archit
-
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 8fcd940..4eb5d73 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -503,709 +503,1181 @@ vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
+ 				   &context, total_size);
+ }
+ 
+-/****************************************************************************
+-*
+-*   vchiq_ioctl
+-*
+-***************************************************************************/
++struct vchiq_ioctl_entry;
++
++struct vchiq_ioctl_call_context {
++	VCHIQ_INSTANCE_T instance;
++	unsigned int cmd;
++	unsigned long arg;
++	const struct vchiq_ioctl_entry *ioctl_entry;
++	VCHIQ_SERVICE_T *service;
++	void *prev_kmalloc;
++	bool stackmem_used;
++	unsigned long stackmem[32 / sizeof(unsigned long)];
++};
++
++static void
++vchiq_init_ioctl_call_context(struct vchiq_ioctl_call_context *ctxt)
++{
++	ctxt->service = NULL;
++	ctxt->prev_kmalloc = NULL;
++	ctxt->stackmem_used = false;
++}
++
++static void vchiq_destroy_ioctl_call_context(struct vchiq_ioctl_call_context *ctxt)
++{
++	void *prev_kmalloc = ctxt->prev_kmalloc;
++
++	while (prev_kmalloc) {
++		void *tmp = prev_kmalloc;
++
++		prev_kmalloc = *(void **)prev_kmalloc;
++		kfree(tmp);
++	}
++
++	if (ctxt->service)
++		unlock_service(ctxt->service);
++}
++
++static void *
++vchiq_ioctl_kmalloc(struct vchiq_ioctl_call_context *ctxt, size_t size)
++{
++	void *mem;
++
++	if (!ctxt->stackmem_used && size < sizeof(ctxt->stackmem)) {
++		ctxt->stackmem_used = true;
++		return ctxt->stackmem;
++	}
++
++	mem = kmalloc(size + sizeof(void *), GFP_KERNEL);
++	if (!mem)
++		return NULL;
++
++	*(void **)mem = ctxt->prev_kmalloc;
++	ctxt->prev_kmalloc = mem;
++
++	return mem + sizeof(void *);
++}
++
++typedef long (*vchiq_ioctl_no_arg_func_t)(struct vchiq_ioctl_call_context *);
++
++typedef long (*vchiq_ioctl_ptr_arg_func_t)(struct vchiq_ioctl_call_context*,
++					   void *arg);
++
++struct vchiq_ioctl_entry {
++	void *func;
++	unsigned int ioctl;
++	void *aux_data;
++};
++
++static long
++vchiq_ioctl_dispatch(const struct vchiq_ioctl_entry *ioctl_entry,
++		     struct file *file, unsigned int cmd, unsigned long arg)
++{
++	long ret = 0;
++	unsigned int ioctl_dir;
++	unsigned int ioctl_size;
++	struct vchiq_ioctl_call_context ctxt;
++
++	if (ioctl_entry->ioctl != cmd)
++		return -ENOTTY;
++
++	ioctl_dir  = _IOC_DIR(cmd);
++	ioctl_size = _IOC_SIZE(cmd);
++
++	vchiq_init_ioctl_call_context(&ctxt);
++
++	ctxt.instance = file->private_data;
++	ctxt.cmd = cmd;
++	ctxt.arg = arg;
++	ctxt.ioctl_entry = ioctl_entry;
++
++	if (ioctl_dir == _IOC_NONE) {
++		vchiq_ioctl_no_arg_func_t func;
++
++		func = (vchiq_ioctl_no_arg_func_t)ioctl_entry->func;
++		ret = func(&ctxt);
++	} else {
++		vchiq_ioctl_ptr_arg_func_t func;
++		void *kptr;
++
++		kptr = vchiq_ioctl_kmalloc(&ctxt, ioctl_size);
++
++		if (!kptr) {
++			vchiq_destroy_ioctl_call_context(&ctxt);
++			return -ENOMEM;
++		}
++
++		if (ioctl_dir & _IOC_WRITE) {
++			if (copy_from_user(kptr, (void __user *)arg,
++					   ioctl_size)) {
++				vchiq_destroy_ioctl_call_context(&ctxt);
++				return -EFAULT;
++			}
++		}
++
++		func = (vchiq_ioctl_ptr_arg_func_t)ioctl_entry->func;
++		ret = func(&ctxt, kptr);
++
++		if (ret < 0) {
++			vchiq_destroy_ioctl_call_context(&ctxt);
++			return ret;
++		}
++
++		if (ioctl_dir & _IOC_READ) {
++			if (copy_to_user((void __user *)arg, kptr,
++					 ioctl_size)) {
++				vchiq_destroy_ioctl_call_context(&ctxt);
++				return -EFAULT;
++			}
++		}
++	}
++
++	vchiq_destroy_ioctl_call_context(&ctxt);
++	return ret;
++}
++
++static long vchiq_map_status(VCHIQ_STATUS_T status)
++{
++	if (status == VCHIQ_ERROR)
++		return -EIO;
++
++	if (status == VCHIQ_RETRY)
++		return -EINTR;
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_shutdown(VCHIQ_INSTANCE_T instance) {
++	VCHIQ_SERVICE_T *service = NULL;
++	int i;
++
++	if (!instance->connected)
++		return 0;
++
++	/* Remove all services */
++	i = 0;
++	while ((service = next_service_by_instance(instance->state,
++						   instance, &i)) != NULL) {
++		VCHIQ_STATUS_T status;
++
++		status = vchiq_remove_service(service->handle);
++		unlock_service(service);
++
++		if (status != VCHIQ_SUCCESS)
++			return vchiq_map_status(status);
++	}
++
++	/* Wake the completion thread and ask it to exit */
++	instance->closing = 1;
++	up(&instance->insert_event);
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_connect(VCHIQ_INSTANCE_T instance)
++{
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	int rc;
++
++	if (instance->connected)
++		return -EINVAL;
++
++	rc = mutex_lock_interruptible(&instance->state->mutex);
++	if (rc) {
++		vchiq_log_error(vchiq_arm_log_level,
++			"vchiq: connect: could not lock mutex for state %d: %d",
++			instance->state->id, rc);
++		return -EINTR;
++	}
++
++	status = vchiq_connect_internal(instance->state, instance);
++	mutex_unlock(&instance->state->mutex);
++
++	if (status != VCHIQ_SUCCESS) {
++		vchiq_log_error(vchiq_arm_log_level,
++				"vchiq: could not connect: %d", status);
++		return vchiq_map_status(status);
++	}
++
++	instance->connected = 1;
++	return 0;
++}
++
++static long
++vchiq_ioctl_instance_adapter(struct vchiq_ioctl_call_context *ctxt)
++{
++	long (*func)(VCHIQ_INSTANCE_T) = ctxt->ioctl_entry->aux_data;
++
++	return func(ctxt->instance);
++}
++
++static long
++vchiq_ioctl_create_service(struct vchiq_ioctl_call_context *ctxt,
++			   VCHIQ_CREATE_SERVICE_T *args)
++{
++	VCHIQ_INSTANCE_T instance = ctxt->instance;
++	VCHIQ_SERVICE_T *service = NULL;
++	USER_SERVICE_T *user_service = NULL;
++	void *userdata;
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	int srvstate;
++
++	user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
++	if (!user_service)
++		return -ENOMEM;
++
++	if (args->is_open) {
++		if (!instance->connected) {
++			kfree(user_service);
++			return -ENOTCONN;
++		}
++		srvstate = VCHIQ_SRVSTATE_OPENING;
++	} else {
++		srvstate =
++			instance->connected ?
++			VCHIQ_SRVSTATE_LISTENING :
++			VCHIQ_SRVSTATE_HIDDEN;
++	}
++
++	userdata = args->params.userdata;
++	args->params.callback = service_callback;
++	args->params.userdata = user_service;
++	service = vchiq_add_service_internal(
++		instance->state,
++		&args->params, srvstate,
++		instance, user_service_free);
++
++	if (!service) {
++		kfree(user_service);
++		return -EEXIST;
++	}
++
++	user_service->service = service;
++	user_service->userdata = userdata;
++	user_service->instance = instance;
++	user_service->is_vchi = (args->is_vchi != 0);
++	user_service->dequeue_pending = 0;
++	user_service->close_pending = 0;
++	user_service->message_available_pos = instance->completion_remove - 1;
++	user_service->msg_insert = 0;
++	user_service->msg_remove = 0;
++	sema_init(&user_service->insert_event, 0);
++	sema_init(&user_service->remove_event, 0);
++	sema_init(&user_service->close_event, 0);
++
++	if (args->is_open) {
++		status = vchiq_open_service_internal
++			(service, instance->pid);
++		if (status != VCHIQ_SUCCESS) {
++			vchiq_remove_service(service->handle);
++			return vchiq_map_status(status);
++		}
++	}
++
++	args->handle = service->handle;
++	return 0;
++}
++
++static long
++vchiq_ioctl_close_service(VCHIQ_SERVICE_T *service)
++{
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	USER_SERVICE_T *user_service;
++
++	user_service =	(USER_SERVICE_T *)service->base.userdata;
++
++	/*
++	 * close_pending is false on first entry, and when the
++	 * wait in vchiq_close_service has been interrupted.
++	 */
++	if (!user_service->close_pending) {
++		status = vchiq_close_service(service->handle);
++		if (status != VCHIQ_SUCCESS)
++			return vchiq_map_status(status);
++	}
++
++	/*
++	 * close_pending is true once the underlying service
++	 * has been closed until the client library calls the
++	 * CLOSE_DELIVERED ioctl, signalling close_event.
++	 */
++	if (user_service->close_pending &&
++	    down_interruptible(&user_service->close_event))
++			return vchiq_map_status(VCHIQ_RETRY);
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_remove_service(VCHIQ_SERVICE_T *service) {
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	USER_SERVICE_T *user_service;
++
++	user_service =	(USER_SERVICE_T *)service->base.userdata;
++
++	/*
++	 * close_pending is false on first entry, and when the
++	 * wait in vchiq_close_service has been interrupted.
++	 */
++	if (!user_service->close_pending) {
++		status = vchiq_remove_service(service->handle);
++		if (status != VCHIQ_SUCCESS)
++			return vchiq_map_status(status);
++	}
++
++	/*
++	 * close_pending is true once the underlying service
++	 * has been closed until the client library calls the
++	 * CLOSE_DELIVERED ioctl, signaling close_event.
++	 */
++	if (user_service->close_pending &&
++	    down_interruptible(&user_service->close_event))
++			return vchiq_map_status(VCHIQ_RETRY);
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_use_service(VCHIQ_SERVICE_T *service) {
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++
++	status = vchiq_use_service_internal(service);
++
++	if (status != VCHIQ_SUCCESS) {
++		vchiq_log_error(vchiq_susp_log_level,
++			"vchiq_ioctl: cmd VCHIQ_IOC_USE_SERVICE returned error %d for service %c%c%c%c:%03d",
++			status,
++			VCHIQ_FOURCC_AS_4CHARS(
++			service->base.fourcc),
++			service->client_id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_release_service(VCHIQ_SERVICE_T *service) {
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++
++	status = vchiq_release_service_internal(service);
++
++	if (status != VCHIQ_SUCCESS) {
++		vchiq_log_error(vchiq_susp_log_level,
++			"vchiq_ioctl: cmd VCHIQ_IOC_RELEASE_SERVICE returned error %d for service %c%c%c%c:%03d",
++			status,
++			VCHIQ_FOURCC_AS_4CHARS(
++			service->base.fourcc),
++			service->client_id);
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static long
++vchiq_ioctl_service_adapter(struct vchiq_ioctl_call_context *ctxt)
++{
++	long (*func)(VCHIQ_SERVICE_T *) = ctxt->ioctl_entry->aux_data;
++	VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)ctxt->arg;
++	long ret;
++
++	ctxt->service = find_service_for_instance(ctxt->instance, handle);
++
++	if (!ctxt->service)
++		return -EINVAL;
++
++	ret = func(ctxt->service);
++
++	return ret;
++}
++
++static long
++vchiq_ioctl_queue_message(struct vchiq_ioctl_call_context *ctxt,
++			  VCHIQ_QUEUE_MESSAGE_T *args) {
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	VCHIQ_ELEMENT_T *elements;
++
++	ctxt->service = find_service_for_instance(ctxt->instance, args->handle);
++
++	if (!ctxt->service)
++		return -EINVAL;
++
++	elements = vchiq_ioctl_kmalloc(ctxt,
++				       args->count * sizeof(VCHIQ_ELEMENT_T));
++
++	if (!elements)
++		return -ENOMEM;
++
++	if (copy_from_user(elements, args->elements,
++			   args->count * sizeof(VCHIQ_ELEMENT_T)))
++		return -EINVAL;
++
++	status = vchiq_ioc_queue_message(args->handle,
++					 elements, args->count);
++
++	return vchiq_map_status(status);
++}
++
++static long
++vchiq_ioctl_bulk_transfer(struct vchiq_ioctl_call_context *ctxt,
++			  VCHIQ_QUEUE_BULK_TRANSFER_T *args,
++			  VCHIQ_BULK_DIR_T dir)
++{
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	struct bulk_waiter_node *waiter = NULL;
++	void *userdata = args->userdata;
++
++	ctxt->service = find_service_for_instance(ctxt->instance, args->handle);
++	if (!ctxt->service)
++		return -EINVAL;
++
++	if (args->mode == VCHIQ_BULK_MODE_BLOCKING) {
++		waiter = kzalloc(sizeof(struct bulk_waiter_node), GFP_KERNEL);
++		if (!waiter)
++			return -ENOMEM;
++
++		userdata = &waiter->bulk_waiter;
++	} else if (args->mode == VCHIQ_BULK_MODE_WAITING) {
++		struct list_head *pos;
++
++		mutex_lock(&ctxt->instance->bulk_waiter_list_mutex);
++
++		list_for_each(pos, &ctxt->instance->bulk_waiter_list)
++		{
++			if (list_entry(pos, struct bulk_waiter_node,
++				       list)->pid == current->pid) {
++				waiter = list_entry(pos,
++						    struct bulk_waiter_node,
++					list);
++				list_del(pos);
++				break;
++			}
++		}
++		mutex_unlock(&ctxt->instance->bulk_waiter_list_mutex);
++		if (!waiter) {
++			vchiq_log_error(vchiq_arm_log_level,
++					"no bulk_waiter found for pid %d",
++				current->pid);
++			return -ESRCH;
++		}
++		vchiq_log_info(vchiq_arm_log_level,
++			       "found bulk_waiter %pK for pid %d", waiter,
++			current->pid);
++		userdata = &waiter->bulk_waiter;
++	}
++
++	status = vchiq_bulk_transfer(args->handle,
++				     VCHI_MEM_HANDLE_INVALID,
++				     args->data,
++				     args->size,
++				     userdata,
++				     args->mode,
++				     dir);
++
++	if (!waiter)
++		return vchiq_map_status(status);
++
++	if ((status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
++	    !waiter->bulk_waiter.bulk) {
++		if (waiter->bulk_waiter.bulk) {
++			/*
++			 * Cancel the signal when the transfer
++			 * completes.
++			 */
++			spin_lock(&bulk_waiter_spinlock);
++			waiter->bulk_waiter.bulk->userdata = NULL;
++			spin_unlock(&bulk_waiter_spinlock);
++		}
++		kfree(waiter);
++	} else {
++		waiter->pid = current->pid;
++		mutex_lock(&ctxt->instance->bulk_waiter_list_mutex);
++		list_add(&waiter->list, &ctxt->instance->bulk_waiter_list);
++		mutex_unlock(&ctxt->instance->bulk_waiter_list_mutex);
++		vchiq_log_info(vchiq_arm_log_level,
++			       "saved bulk_waiter %pK for pid %d",
++			waiter, current->pid);
++
++		args->mode = VCHIQ_BULK_MODE_WAITING;
++	}
++
++	return vchiq_map_status(status);
++}
++
++static long
++vchiq_ioctl_bulk_transmit(struct vchiq_ioctl_call_context *ctxt,
++			  VCHIQ_QUEUE_BULK_TRANSFER_T *args) {
++	return vchiq_ioctl_bulk_transfer(ctxt, args, VCHIQ_BULK_TRANSMIT);
++};
++
++static long
++vchiq_ioctl_bulk_receive(struct vchiq_ioctl_call_context *ctxt,
++			 VCHIQ_QUEUE_BULK_TRANSFER_T *args) {
++	return vchiq_ioctl_bulk_transfer(ctxt, args, VCHIQ_BULK_RECEIVE);
++};
++
++typedef bool (*vchiq_get_msgbuf_ptr_callback_t)(void *context,
++						unsigned int msgbufcount,
++						void __user **msgbuf);
++
++typedef bool (*vchiq_put_completion_callback_t)(void *context,
++						unsigned int num,
++						VCHIQ_COMPLETION_DATA_T *completion);
++
++static long
++vchiq_ioctl_await_completion_internal(VCHIQ_INSTANCE_T instance,
++				      unsigned int count,
++				      unsigned int msgbufsize,
++				      unsigned int *argmsgbufcount,
++				      void *context,
++				      vchiq_get_msgbuf_ptr_callback_t get_msgbuf,
++				      vchiq_put_completion_callback_t put_completion)
++{
++	long ret = 0;
++	int msgbufcount;
++
++	DEBUG_INITIALISE(g_state.local);
++
++	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++
++	if (!instance->connected)
++		return -ENOTCONN;
++
++	mutex_lock(&instance->completion_mutex);
++
++	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++	while ((instance->completion_remove == instance->completion_insert)
++		&& !instance->closing) {
++		int rc;
++
++		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++		mutex_unlock(&instance->completion_mutex);
++		rc = down_interruptible(&instance->insert_event);
++		mutex_lock(&instance->completion_mutex);
++		if (rc != 0) {
++			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++			vchiq_log_info(vchiq_arm_log_level,
++				       "AWAIT_COMPLETION interrupted");
++			mutex_unlock(&instance->completion_mutex);
++			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++			return -EINTR;
++		}
++	}
++	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++
++	/*
++	 * A read memory barrier is needed to stop prefetch of a stale
++	 * completion record.
++	 */
++	rmb();
++
++	msgbufcount = *argmsgbufcount;
++	for (ret = 0; ret < count; ret++) {
++		VCHIQ_COMPLETION_DATA_T *completion;
++		VCHIQ_SERVICE_T *service;
++		USER_SERVICE_T *user_service;
++		VCHIQ_HEADER_T *header;
++
++		if (instance->completion_remove == instance->completion_insert)
++			break;
++		completion = &instance->completions[
++			instance->completion_remove &
++			(MAX_COMPLETIONS - 1)];
++
++		service = completion->service_userdata;
++		user_service = service->base.userdata;
++		completion->service_userdata = user_service->userdata;
++
++		header = completion->header;
++		if (header) {
++			void __user *msgbuf;
++			int msglen;
++
++			msglen = header->size + sizeof(VCHIQ_HEADER_T);
++			/* This must be a VCHIQ-style service */
++			if (msgbufsize < msglen) {
++				vchiq_log_error(
++					vchiq_arm_log_level,
++					"header %pK: msgbufsize %x < msglen %x",
++					header, msgbufsize,
++					msglen);
++				WARN(1, "invalid message size\n");
++				if (ret == 0)
++					ret = -EMSGSIZE;
++				break;
++			}
++			if (msgbufcount <= 0)
++				/*
++				 * Stall here for lack of a
++				 * buffer for the message.
++				 */
++				break;
++			/* Get the pointer from user space */
++			msgbufcount--;
++
++			if (get_msgbuf(context, msgbufcount, &msgbuf)) {
++				if (ret == 0)
++					ret = -EFAULT;
++				break;
++			}
++
++			/* Copy the message to user space */
++			if (copy_to_user(msgbuf, header,
++					 msglen) != 0) {
++				if (ret == 0)
++					ret = -EFAULT;
++				break;
++			}
++
++			/*
++			 * Now it has been copied, the message
++			 * can be released.
++			 */
++			vchiq_release_message(service->handle,
++					      header);
++
++			/*
++			 * The completion must point to the
++			 * msgbuf.
++			 */
++			completion->header = msgbuf;
++		}
++
++		if ((completion->reason ==
++			VCHIQ_SERVICE_CLOSED) &&
++			!instance->use_close_delivered)
++			unlock_service(service);
++
++		if (put_completion(context, (unsigned int)ret, completion)) {
++			if (ret == 0)
++				ret = -EFAULT;
++		}
++
++		instance->completion_remove++;
++	}
++
++	*argmsgbufcount = msgbufcount;
++
++	if (ret != 0)
++		up(&instance->remove_event);
++	mutex_unlock(&instance->completion_mutex);
++	DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++
++	return ret;
++}
++
++static bool
++vchiq_ioctl_get_msgbuf(void *context,
++		       unsigned int msgbufcount,
++		       void __user **msgbuf)
++{
++	VCHIQ_AWAIT_COMPLETION_T *args = (VCHIQ_AWAIT_COMPLETION_T *)context;
++
++	return !!copy_from_user(msgbuf,
++				(const void __user *)
++				&args->msgbufs[msgbufcount],
++				sizeof(*msgbuf));
++}
++
++static bool
++vchiq_ioctl_put_completion(void *context,
++			   unsigned int num,
++			   VCHIQ_COMPLETION_DATA_T *completion)
++{
++	VCHIQ_AWAIT_COMPLETION_T *args = (VCHIQ_AWAIT_COMPLETION_T *)context;
++
++	return !!copy_to_user((void __user *)(
++			      (size_t)args->buf +
++			      num * sizeof(VCHIQ_COMPLETION_DATA_T)),
++			      completion,
++			      sizeof(VCHIQ_COMPLETION_DATA_T));
++}
++
++static long
++vchiq_ioctl_await_completion(struct vchiq_ioctl_call_context *ctxt,
++			     VCHIQ_AWAIT_COMPLETION_T *args)
++{
++	return vchiq_ioctl_await_completion_internal(ctxt->instance,
++						     args->count,
++						     args->msgbufsize,
++						     &args->msgbufcount,
++						     args,
++						     vchiq_ioctl_get_msgbuf,
++						     vchiq_ioctl_put_completion);
++}
++
++static long
++vchiq_ioctl_dequeue_message(struct vchiq_ioctl_call_context *ctxt,
++			    VCHIQ_DEQUEUE_MESSAGE_T *args)
++{
++	USER_SERVICE_T *user_service;
++	VCHIQ_HEADER_T *header;
++	long ret;
++
++	DEBUG_INITIALISE(g_state.local);
++
++	ctxt->service = find_service_for_instance(ctxt->instance,
++					    args->handle);
++	if (!ctxt->service)
++		return -EINVAL;
++
++	user_service = (USER_SERVICE_T *)ctxt->service->base.userdata;
++	if (user_service->is_vchi == 0)
++		return -EINVAL;
++
++	spin_lock(&msg_queue_spinlock);
++	if (user_service->msg_remove == user_service->msg_insert) {
++		if (!args->blocking) {
++			spin_unlock(&msg_queue_spinlock);
++			DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
++			return -EWOULDBLOCK;
++		}
++		user_service->dequeue_pending = 1;
++		do {
++			spin_unlock(&msg_queue_spinlock);
++			DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
++			if (down_interruptible(
++				&user_service->insert_event) != 0) {
++				vchiq_log_info(vchiq_arm_log_level,
++					       "DEQUEUE_MESSAGE interrupted");
++				return -EINTR;
++			}
++			spin_lock(&msg_queue_spinlock);
++		} while (user_service->msg_remove == user_service->msg_insert);
++	}
++
++	BUG_ON((int)(user_service->msg_insert - user_service->msg_remove) < 0);
++
++	header = user_service->msg_queue[user_service->msg_remove &
++		(MSG_QUEUE_SIZE - 1)];
++	user_service->msg_remove++;
++	spin_unlock(&msg_queue_spinlock);
++
++	up(&user_service->remove_event);
++	if (!header)
++		return -ENOTCONN;
++
++	if (header->size > args->bufsize) {
++		vchiq_log_error(vchiq_arm_log_level,
++				"header %pK: bufsize %x < size %x",
++			header, args->bufsize, header->size);
++		WARN(1, "invalid size\n");
++		return -EMSGSIZE;
++	}
++
++	if (!args->buf)
++		return -EMSGSIZE;
++
++	if (copy_to_user(args->buf,
++			 header->data,
++			 header->size))
++		return -EFAULT;
++
++	ret = header->size;
++	vchiq_release_message(ctxt->service->handle, header);
++
++	DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
++	return ret;
++}
++
+ static long
+-vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++vchiq_ioctl_get_client_handle(struct vchiq_ioctl_call_context *ctxt)
+ {
+-	VCHIQ_INSTANCE_T instance = file->private_data;
++	VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)ctxt->arg;
++
++	return vchiq_get_client_id(handle);
++}
++
++static long
++vchiq_ioctl_get_config(struct vchiq_ioctl_call_context *ctxt,
++		       VCHIQ_GET_CONFIG_T *args)
++{
++	VCHIQ_CONFIG_T config;
+ 	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
+-	VCHIQ_SERVICE_T *service = NULL;
+-	long ret = 0;
+-	int i, rc;
+-	DEBUG_INITIALISE(g_state.local)
+ 
+-	vchiq_log_trace(vchiq_arm_log_level,
+-		"vchiq_ioctl - instance %pK, cmd %s, arg %lx",
+-		instance,
+-		((_IOC_TYPE(cmd) == VCHIQ_IOC_MAGIC) &&
+-		(_IOC_NR(cmd) <= VCHIQ_IOC_MAX)) ?
+-		ioctl_names[_IOC_NR(cmd)] : "<invalid>", arg);
+-
+-	switch (cmd) {
+-	case VCHIQ_IOC_SHUTDOWN:
+-		if (!instance->connected)
+-			break;
++	if (args->config_size > sizeof(config))
++		return -EFAULT;
+ 
+-		/* Remove all services */
+-		i = 0;
+-		while ((service = next_service_by_instance(instance->state,
+-			instance, &i)) != NULL) {
+-			status = vchiq_remove_service(service->handle);
+-			unlock_service(service);
+-			if (status != VCHIQ_SUCCESS)
+-				break;
+-		}
+-		service = NULL;
++	status = vchiq_get_config(ctxt->instance, args->config_size, &config);
+ 
+-		if (status == VCHIQ_SUCCESS) {
+-			/* Wake the completion thread and ask it to exit */
+-			instance->closing = 1;
+-			up(&instance->insert_event);
+-		}
++	if (status != VCHIQ_SUCCESS)
++		return vchiq_map_status(status);
+ 
+-		break;
++	if (copy_to_user((void __user *)args->pconfig,
++			 &config, args->config_size))
++		return -EFAULT;
+ 
+-	case VCHIQ_IOC_CONNECT:
+-		if (instance->connected) {
+-			ret = -EINVAL;
+-			break;
+-		}
+-		rc = mutex_lock_interruptible(&instance->state->mutex);
+-		if (rc != 0) {
+-			vchiq_log_error(vchiq_arm_log_level,
+-				"vchiq: connect: could not lock mutex for "
+-				"state %d: %d",
+-				instance->state->id, rc);
+-			ret = -EINTR;
+-			break;
+-		}
+-		status = vchiq_connect_internal(instance->state, instance);
+-		mutex_unlock(&instance->state->mutex);
++	return 0;
++}
+ 
+-		if (status == VCHIQ_SUCCESS)
+-			instance->connected = 1;
+-		else
+-			vchiq_log_error(vchiq_arm_log_level,
+-				"vchiq: could not connect: %d", status);
+-		break;
++static long
++vchiq_ioctl_set_service_option(struct vchiq_ioctl_call_context *ctxt,
++			       VCHIQ_SET_SERVICE_OPTION_T *args)
++{
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
+ 
+-	case VCHIQ_IOC_CREATE_SERVICE: {
+-		VCHIQ_CREATE_SERVICE_T args;
+-		USER_SERVICE_T *user_service = NULL;
+-		void *userdata;
+-		int srvstate;
++	ctxt->service = find_service_for_instance(ctxt->instance, args->handle);
++	if (!ctxt->service)
++		return -EINVAL;
+ 
+-		if (copy_from_user
+-			 (&args, (const void __user *)arg,
+-			  sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
++	status = vchiq_set_service_option(
++		args->handle, args->option, args->value);
+ 
+-		user_service = kmalloc(sizeof(USER_SERVICE_T), GFP_KERNEL);
+-		if (!user_service) {
+-			ret = -ENOMEM;
+-			break;
+-		}
++	return vchiq_map_status(status);
++}
+ 
+-		if (args.is_open) {
+-			if (!instance->connected) {
+-				ret = -ENOTCONN;
+-				kfree(user_service);
+-				break;
+-			}
+-			srvstate = VCHIQ_SRVSTATE_OPENING;
+-		} else {
+-			srvstate =
+-				 instance->connected ?
+-				 VCHIQ_SRVSTATE_LISTENING :
+-				 VCHIQ_SRVSTATE_HIDDEN;
+-		}
++static long
++vchiq_ioctl_dump_phys_mem(struct vchiq_ioctl_call_context *ctxt,
++			  VCHIQ_DUMP_MEM_T *args)
++{
++	dump_phys_mem(args->virt_addr, args->num_bytes);
+ 
+-		userdata = args.params.userdata;
+-		args.params.callback = service_callback;
+-		args.params.userdata = user_service;
+-		service = vchiq_add_service_internal(
+-				instance->state,
+-				&args.params, srvstate,
+-				instance, user_service_free);
+-
+-		if (service != NULL) {
+-			user_service->service = service;
+-			user_service->userdata = userdata;
+-			user_service->instance = instance;
+-			user_service->is_vchi = (args.is_vchi != 0);
+-			user_service->dequeue_pending = 0;
+-			user_service->close_pending = 0;
+-			user_service->message_available_pos =
+-				instance->completion_remove - 1;
+-			user_service->msg_insert = 0;
+-			user_service->msg_remove = 0;
+-			sema_init(&user_service->insert_event, 0);
+-			sema_init(&user_service->remove_event, 0);
+-			sema_init(&user_service->close_event, 0);
+-
+-			if (args.is_open) {
+-				status = vchiq_open_service_internal
+-					(service, instance->pid);
+-				if (status != VCHIQ_SUCCESS) {
+-					vchiq_remove_service(service->handle);
+-					service = NULL;
+-					ret = (status == VCHIQ_RETRY) ?
+-						-EINTR : -EIO;
+-					break;
+-				}
+-			}
++	return 0;
++}
+ 
+-			if (copy_to_user((void __user *)
+-				&(((VCHIQ_CREATE_SERVICE_T __user *)
+-					arg)->handle),
+-				(const void *)&service->handle,
+-				sizeof(service->handle)) != 0) {
+-				ret = -EFAULT;
+-				vchiq_remove_service(service->handle);
+-			}
++static long
++vchiq_ioctl_lib_version(struct vchiq_ioctl_call_context *ctxt)
++{
++	unsigned int lib_version = (unsigned int)ctxt->arg;
+ 
+-			service = NULL;
+-		} else {
+-			ret = -EEXIST;
+-			kfree(user_service);
+-		}
+-	} break;
++	if (lib_version < VCHIQ_VERSION_MIN)
++		return -EINVAL;
+ 
+-	case VCHIQ_IOC_CLOSE_SERVICE: {
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
+-
+-		service = find_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			USER_SERVICE_T *user_service =
+-				(USER_SERVICE_T *)service->base.userdata;
+-			/* close_pending is false on first entry, and when the
+-                           wait in vchiq_close_service has been interrupted. */
+-			if (!user_service->close_pending) {
+-				status = vchiq_close_service(service->handle);
+-				if (status != VCHIQ_SUCCESS)
+-					break;
+-			}
++	if (lib_version >= VCHIQ_VERSION_CLOSE_DELIVERED)
++		ctxt->instance->use_close_delivered = 1;
+ 
+-			/* close_pending is true once the underlying service
+-			   has been closed until the client library calls the
+-			   CLOSE_DELIVERED ioctl, signalling close_event. */
+-			if (user_service->close_pending &&
+-				down_interruptible(&user_service->close_event))
+-				status = VCHIQ_RETRY;
+-		}
+-		else
+-			ret = -EINVAL;
+-	} break;
++	return 0;
++}
+ 
+-	case VCHIQ_IOC_REMOVE_SERVICE: {
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
+-
+-		service = find_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			USER_SERVICE_T *user_service =
+-				(USER_SERVICE_T *)service->base.userdata;
+-			/* close_pending is false on first entry, and when the
+-                           wait in vchiq_close_service has been interrupted. */
+-			if (!user_service->close_pending) {
+-				status = vchiq_remove_service(service->handle);
+-				if (status != VCHIQ_SUCCESS)
+-					break;
+-			}
++static long
++vchiq_ioctl_close_delivered(struct vchiq_ioctl_call_context *ctxt)
++{
++	VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)ctxt->arg;
+ 
+-			/* close_pending is true once the underlying service
+-			   has been closed until the client library calls the
+-			   CLOSE_DELIVERED ioctl, signalling close_event. */
+-			if (user_service->close_pending &&
+-				down_interruptible(&user_service->close_event))
+-				status = VCHIQ_RETRY;
+-		}
+-		else
+-			ret = -EINVAL;
+-	} break;
++	ctxt->service = find_closed_service_for_instance(ctxt->instance, handle);
++	if (!ctxt->service)
++		return -EINVAL;
+ 
+-	case VCHIQ_IOC_USE_SERVICE:
+-	case VCHIQ_IOC_RELEASE_SERVICE:	{
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
++	close_delivered((USER_SERVICE_T *)ctxt->service->base.userdata);
++	return 0;
++}
+ 
+-		service = find_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			status = (cmd == VCHIQ_IOC_USE_SERVICE)	?
+-				vchiq_use_service_internal(service) :
+-				vchiq_release_service_internal(service);
+-			if (status != VCHIQ_SUCCESS) {
+-				vchiq_log_error(vchiq_susp_log_level,
+-					"%s: cmd %s returned error %d for "
+-					"service %c%c%c%c:%03d",
+-					__func__,
+-					(cmd == VCHIQ_IOC_USE_SERVICE) ?
+-						"VCHIQ_IOC_USE_SERVICE" :
+-						"VCHIQ_IOC_RELEASE_SERVICE",
+-					status,
+-					VCHIQ_FOURCC_AS_4CHARS(
+-						service->base.fourcc),
+-					service->client_id);
+-				ret = -EINVAL;
+-			}
+-		} else
+-			ret = -EINVAL;
+-	} break;
++#define VCHIQ_MK_IOCTL(__ioctl, __func, __aux_data)	\
++	[_IOC_NR(__ioctl)] = {.func = __func, .ioctl = __ioctl, .aux_data = __aux_data}
++
++static const struct vchiq_ioctl_entry vchiq_ioctl_table[] = {
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_CONNECT, vchiq_ioctl_instance_adapter, vchiq_ioctl_connect),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_SHUTDOWN, vchiq_ioctl_instance_adapter, vchiq_ioctl_shutdown),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_CREATE_SERVICE, vchiq_ioctl_create_service, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_CLOSE_SERVICE, vchiq_ioctl_service_adapter, vchiq_ioctl_close_service),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_REMOVE_SERVICE, vchiq_ioctl_service_adapter, vchiq_ioctl_remove_service),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_USE_SERVICE, vchiq_ioctl_service_adapter, vchiq_ioctl_use_service),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_RELEASE_SERVICE, vchiq_ioctl_service_adapter, vchiq_ioctl_release_service),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_MESSAGE, vchiq_ioctl_queue_message, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_BULK_TRANSMIT, vchiq_ioctl_bulk_transmit, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_BULK_RECEIVE, vchiq_ioctl_bulk_receive, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_AWAIT_COMPLETION, vchiq_ioctl_await_completion, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_DEQUEUE_MESSAGE, vchiq_ioctl_dequeue_message, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_GET_CLIENT_ID, vchiq_ioctl_get_client_handle, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_GET_CONFIG, vchiq_ioctl_get_config, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_SET_SERVICE_OPTION, vchiq_ioctl_set_service_option, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_DUMP_PHYS_MEM, vchiq_ioctl_dump_phys_mem, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_LIB_VERSION, vchiq_ioctl_lib_version, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_CLOSE_DELIVERED, vchiq_ioctl_close_delivered, NULL),
++};
+ 
+-	case VCHIQ_IOC_QUEUE_MESSAGE: {
+-		VCHIQ_QUEUE_MESSAGE_T args;
+-		if (copy_from_user
+-			 (&args, (const void __user *)arg,
+-			  sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
++/**************************************************************************
++ *
++ * vchiq_ioctl
++ *
++ **************************************************************************/
++static long
++vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	VCHIQ_INSTANCE_T instance = file->private_data;
++	long ret = 0;
++	unsigned int ioctl_nr;
+ 
+-		service = find_service_for_instance(instance, args.handle);
++	ioctl_nr = _IOC_NR(cmd);
+ 
+-		if ((service != NULL) && (args.count <= MAX_ELEMENTS)) {
+-			/* Copy elements into kernel space */
+-			VCHIQ_ELEMENT_T elements[MAX_ELEMENTS];
+-			if (copy_from_user(elements, args.elements,
+-				args.count * sizeof(VCHIQ_ELEMENT_T)) == 0)
+-				status = vchiq_ioc_queue_message
+-					(args.handle,
+-					elements, args.count);
+-			else
+-				ret = -EFAULT;
+-		} else {
+-			ret = -EINVAL;
+-		}
+-	} break;
++	vchiq_log_trace(vchiq_arm_log_level,
++			"vchiq_ioctl - instance %pK, cmd %s, arg %lx",
++			instance,
++			((_IOC_TYPE(cmd) == VCHIQ_IOC_MAGIC) &&
++			(ioctl_nr <= VCHIQ_IOC_MAX)) ?
++			ioctl_names[ioctl_nr] : "<invalid>", arg);
+ 
+-	case VCHIQ_IOC_QUEUE_BULK_TRANSMIT:
+-	case VCHIQ_IOC_QUEUE_BULK_RECEIVE: {
+-		VCHIQ_QUEUE_BULK_TRANSFER_T args;
+-		struct bulk_waiter_node *waiter = NULL;
+-		VCHIQ_BULK_DIR_T dir =
+-			(cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT) ?
+-			VCHIQ_BULK_TRANSMIT : VCHIQ_BULK_RECEIVE;
+-
+-		if (copy_from_user
+-			(&args, (const void __user *)arg,
+-			sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
++	if (ioctl_nr > VCHIQ_IOC_MAX) {
++		ret = -ENOTTY;
++	} else {
++		ret = vchiq_ioctl_dispatch(&vchiq_ioctl_table[ioctl_nr],
++					   file, cmd, arg);
++	}
+ 
+-		service = find_service_for_instance(instance, args.handle);
+-		if (!service) {
+-			ret = -EINVAL;
+-			break;
+-		}
++	if ((ret < 0) && (ret != -EINTR) && (ret != -EWOULDBLOCK))
++		vchiq_log_info(vchiq_arm_log_level,
++			       "  ioctl instance %lx, cmd %s, %ld",
++			       (unsigned long)instance,
++			       (ioctl_nr <= VCHIQ_IOC_MAX) ?
++			       ioctl_names[ioctl_nr] :
++			       "<invalid>",
++			       ret);
++	else
++		vchiq_log_trace(vchiq_arm_log_level,
++				"  ioctl instance %lx, cmd %s, %ld",
++				(unsigned long)instance,
++				(ioctl_nr <= VCHIQ_IOC_MAX) ?
++				ioctl_names[ioctl_nr] :
++				"<invalid>",
++				ret);
+ 
+-		if (args.mode == VCHIQ_BULK_MODE_BLOCKING) {
+-			waiter = kzalloc(sizeof(struct bulk_waiter_node),
+-				GFP_KERNEL);
+-			if (!waiter) {
+-				ret = -ENOMEM;
+-				break;
+-			}
+-			args.userdata = &waiter->bulk_waiter;
+-		} else if (args.mode == VCHIQ_BULK_MODE_WAITING) {
+-			struct list_head *pos;
+-			mutex_lock(&instance->bulk_waiter_list_mutex);
+-			list_for_each(pos, &instance->bulk_waiter_list) {
+-				if (list_entry(pos, struct bulk_waiter_node,
+-					list)->pid == current->pid) {
+-					waiter = list_entry(pos,
+-						struct bulk_waiter_node,
+-						list);
+-					list_del(pos);
+-					break;
+-				}
+ 
+-			}
+-			mutex_unlock(&instance->bulk_waiter_list_mutex);
+-			if (!waiter) {
+-				vchiq_log_error(vchiq_arm_log_level,
+-					"no bulk_waiter found for pid %d",
+-					current->pid);
+-				ret = -ESRCH;
+-				break;
+-			}
+-			vchiq_log_info(vchiq_arm_log_level,
+-				"found bulk_waiter %pK for pid %d", waiter,
+-				current->pid);
+-			args.userdata = &waiter->bulk_waiter;
+-		}
+-		status = vchiq_bulk_transfer
+-			(args.handle,
+-			 VCHI_MEM_HANDLE_INVALID,
+-			 args.data, args.size,
+-			 args.userdata, args.mode,
+-			 dir);
+-		if (!waiter)
+-			break;
+-		if ((status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
+-			!waiter->bulk_waiter.bulk) {
+-			if (waiter->bulk_waiter.bulk) {
+-				/* Cancel the signal when the transfer
+-				** completes. */
+-				spin_lock(&bulk_waiter_spinlock);
+-				waiter->bulk_waiter.bulk->userdata = NULL;
+-				spin_unlock(&bulk_waiter_spinlock);
+-			}
+-			kfree(waiter);
+-		} else {
+-			const VCHIQ_BULK_MODE_T mode_waiting =
+-				VCHIQ_BULK_MODE_WAITING;
+-			waiter->pid = current->pid;
+-			mutex_lock(&instance->bulk_waiter_list_mutex);
+-			list_add(&waiter->list, &instance->bulk_waiter_list);
+-			mutex_unlock(&instance->bulk_waiter_list_mutex);
+-			vchiq_log_info(vchiq_arm_log_level,
+-				"saved bulk_waiter %pK for pid %d",
+-				waiter, current->pid);
+-
+-			if (copy_to_user((void __user *)
+-				&(((VCHIQ_QUEUE_BULK_TRANSFER_T __user *)
+-					arg)->mode),
+-				(const void *)&mode_waiting,
+-				sizeof(mode_waiting)) != 0)
+-				ret = -EFAULT;
+-		}
+-	} break;
++	return ret;
++}
+ 
+-	case VCHIQ_IOC_AWAIT_COMPLETION: {
+-		VCHIQ_AWAIT_COMPLETION_T args;
++#if defined(CONFIG_COMPAT)
+ 
+-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+-		if (!instance->connected) {
+-			ret = -ENOTCONN;
+-			break;
+-		}
++static long
++vchiq_ioctl_compat_create_service(struct vchiq_ioctl_call_context *ctxt,
++				  struct vchiq_create_service32 *args32)
++{
++	VCHIQ_CREATE_SERVICE_T args;
++	long ret;
+ 
+-		if (copy_from_user(&args, (const void __user *)arg,
+-			sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
++	args.params.fourcc   = args32->params.fourcc;
++	args.params.callback = NULL;
++	args.params.userdata = compat_ptr(args32->params.userdata);
++	args.params.version = args32->params.version;
++	args.params.version_min = args32->params.version_min;
++	args.is_open = args32->is_open;
++	args.is_vchi = args32->is_vchi;
++	args.handle  = args32->handle;
+ 
+-		mutex_lock(&instance->completion_mutex);
++	ret = vchiq_ioctl_create_service(ctxt, &args);
+ 
+-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+-		while ((instance->completion_remove ==
+-			instance->completion_insert)
+-			&& !instance->closing) {
+-			int rc;
+-			DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+-			mutex_unlock(&instance->completion_mutex);
+-			rc = down_interruptible(&instance->insert_event);
+-			mutex_lock(&instance->completion_mutex);
+-			if (rc != 0) {
+-				DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+-				vchiq_log_info(vchiq_arm_log_level,
+-					"AWAIT_COMPLETION interrupted");
+-				ret = -EINTR;
+-				break;
+-			}
+-		}
+-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
++	if (ret >= 0)
++		args32->handle = args.handle;
+ 
+-		/* A read memory barrier is needed to stop prefetch of a stale
+-		** completion record
+-		*/
+-		rmb();
+-
+-		if (ret == 0) {
+-			int msgbufcount = args.msgbufcount;
+-			for (ret = 0; ret < args.count; ret++) {
+-				VCHIQ_COMPLETION_DATA_T *completion;
+-				VCHIQ_SERVICE_T *service;
+-				USER_SERVICE_T *user_service;
+-				VCHIQ_HEADER_T *header;
+-				if (instance->completion_remove ==
+-					instance->completion_insert)
+-					break;
+-				completion = &instance->completions[
+-					instance->completion_remove &
+-					(MAX_COMPLETIONS - 1)];
+-
+-				service = completion->service_userdata;
+-				user_service = service->base.userdata;
+-				completion->service_userdata =
+-					user_service->userdata;
+-
+-				header = completion->header;
+-				if (header) {
+-					void __user *msgbuf;
+-					int msglen;
+-
+-					msglen = header->size +
+-						sizeof(VCHIQ_HEADER_T);
+-					/* This must be a VCHIQ-style service */
+-					if (args.msgbufsize < msglen) {
+-						vchiq_log_error(
+-							vchiq_arm_log_level,
+-							"header %pK: msgbufsize %x < msglen %x",
+-							header, args.msgbufsize,
+-							msglen);
+-						WARN(1, "invalid message "
+-							"size\n");
+-						if (ret == 0)
+-							ret = -EMSGSIZE;
+-						break;
+-					}
+-					if (msgbufcount <= 0)
+-						/* Stall here for lack of a
+-						** buffer for the message. */
+-						break;
+-					/* Get the pointer from user space */
+-					msgbufcount--;
+-					if (copy_from_user(&msgbuf,
+-						(const void __user *)
+-						&args.msgbufs[msgbufcount],
+-						sizeof(msgbuf)) != 0) {
+-						if (ret == 0)
+-							ret = -EFAULT;
+-						break;
+-					}
+-
+-					/* Copy the message to user space */
+-					if (copy_to_user(msgbuf, header,
+-						msglen) != 0) {
+-						if (ret == 0)
+-							ret = -EFAULT;
+-						break;
+-					}
+-
+-					/* Now it has been copied, the message
+-					** can be released. */
+-					vchiq_release_message(service->handle,
+-						header);
++	return ret;
++}
+ 
+-					/* The completion must point to the
+-					** msgbuf. */
+-					completion->header = msgbuf;
+-				}
++static long
++vchiq_ioctl_compat_queue_message(struct vchiq_ioctl_call_context *ctxt,
++				 struct vchiq_queue_message32 *args32) {
++	VCHIQ_STATUS_T status = VCHIQ_SUCCESS;
++	VCHIQ_ELEMENT_T *elements;
++	struct vchiq_element32 *elements32;
++	unsigned int i;
+ 
+-				if ((completion->reason ==
+-					VCHIQ_SERVICE_CLOSED) &&
+-					!instance->use_close_delivered)
+-					unlock_service(service);
+-
+-				if (copy_to_user((void __user *)(
+-					(size_t)args.buf +
+-					ret * sizeof(VCHIQ_COMPLETION_DATA_T)),
+-					completion,
+-					sizeof(VCHIQ_COMPLETION_DATA_T)) != 0) {
+-						if (ret == 0)
+-							ret = -EFAULT;
+-					break;
+-				}
++	ctxt->service = find_service_for_instance(ctxt->instance, args32->handle);
+ 
+-				instance->completion_remove++;
+-			}
++	if (!ctxt->service)
++		return -EINVAL;
+ 
+-			if (msgbufcount != args.msgbufcount) {
+-				if (copy_to_user((void __user *)
+-					&((VCHIQ_AWAIT_COMPLETION_T *)arg)->
+-						msgbufcount,
+-					&msgbufcount,
+-					sizeof(msgbufcount)) != 0) {
+-					ret = -EFAULT;
+-				}
+-			}
+-		}
++	elements = vchiq_ioctl_kmalloc(ctxt,
++				       args32->count * sizeof(VCHIQ_ELEMENT_T));
+ 
+-		if (ret != 0)
+-			up(&instance->remove_event);
+-		mutex_unlock(&instance->completion_mutex);
+-		DEBUG_TRACE(AWAIT_COMPLETION_LINE);
+-	} break;
++	if (!elements)
++		return -ENOMEM;
+ 
+-	case VCHIQ_IOC_DEQUEUE_MESSAGE: {
+-		VCHIQ_DEQUEUE_MESSAGE_T args;
+-		USER_SERVICE_T *user_service;
+-		VCHIQ_HEADER_T *header;
++	elements32 =
++		vchiq_ioctl_kmalloc(ctxt,
++				    args32->count * sizeof(struct vchiq_element32));
+ 
+-		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+-		if (copy_from_user
+-			 (&args, (const void __user *)arg,
+-			  sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
+-		service = find_service_for_instance(instance, args.handle);
+-		if (!service) {
+-			ret = -EINVAL;
+-			break;
+-		}
+-		user_service = (USER_SERVICE_T *)service->base.userdata;
+-		if (user_service->is_vchi == 0) {
+-			ret = -EINVAL;
+-			break;
+-		}
++	if (!elements32)
++		return -ENOMEM;
+ 
+-		spin_lock(&msg_queue_spinlock);
+-		if (user_service->msg_remove == user_service->msg_insert) {
+-			if (!args.blocking) {
+-				spin_unlock(&msg_queue_spinlock);
+-				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+-				ret = -EWOULDBLOCK;
+-				break;
+-			}
+-			user_service->dequeue_pending = 1;
+-			do {
+-				spin_unlock(&msg_queue_spinlock);
+-				DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+-				if (down_interruptible(
+-					&user_service->insert_event) != 0) {
+-					vchiq_log_info(vchiq_arm_log_level,
+-						"DEQUEUE_MESSAGE interrupted");
+-					ret = -EINTR;
+-					break;
+-				}
+-				spin_lock(&msg_queue_spinlock);
+-			} while (user_service->msg_remove ==
+-				user_service->msg_insert);
++	if (copy_from_user(elements32, compat_ptr(args32->elements),
++			   args32->count * sizeof(struct vchiq_element32)))
++		return -EINVAL;
+ 
+-			if (ret)
+-				break;
+-		}
++	for (i = 0; i < args32->count; i++) {
++		elements[i].data = compat_ptr(elements32[i].data);
++		elements[i].size = elements32[i].size;
++	}
+ 
+-		BUG_ON((int)(user_service->msg_insert -
+-			user_service->msg_remove) < 0);
++	status = vchiq_ioc_queue_message(args32->handle,
++					 elements, args32->count);
+ 
+-		header = user_service->msg_queue[user_service->msg_remove &
+-			(MSG_QUEUE_SIZE - 1)];
+-		user_service->msg_remove++;
+-		spin_unlock(&msg_queue_spinlock);
++	return vchiq_map_status(status);
++}
+ 
+-		up(&user_service->remove_event);
+-		if (header == NULL)
+-			ret = -ENOTCONN;
+-		else if (header->size <= args.bufsize) {
+-			/* Copy to user space if msgbuf is not NULL */
+-			if ((args.buf == NULL) ||
+-				(copy_to_user((void __user *)args.buf,
+-				header->data,
+-				header->size) == 0)) {
+-				ret = header->size;
+-				vchiq_release_message(
+-					service->handle,
+-					header);
+-			} else
+-				ret = -EFAULT;
+-		} else {
+-			vchiq_log_error(vchiq_arm_log_level,
+-				"header %pK: bufsize %x < size %x",
+-				header, args.bufsize, header->size);
+-			WARN(1, "invalid size\n");
+-			ret = -EMSGSIZE;
+-		}
+-		DEBUG_TRACE(DEQUEUE_MESSAGE_LINE);
+-	} break;
++static long
++vchiq_ioctl_compat_bulk_transfer(struct vchiq_ioctl_call_context *ctxt,
++				 struct vchiq_queue_bulk_transfer32 *args32)
++{
++	VCHIQ_QUEUE_BULK_TRANSFER_T args;
++	long ret;
+ 
+-	case VCHIQ_IOC_GET_CLIENT_ID: {
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
++	args.handle = args32->handle;
++	args.data   = compat_ptr(args32->data);
++	args.size   = args32->size;
++	args.userdata = compat_ptr(args32->userdata);
++	args.mode   = args32->mode;
+ 
+-		ret = vchiq_get_client_id(handle);
+-	} break;
++	if (ctxt->cmd == VCHIQ_IOC_QUEUE_BULK_TRANSMIT32)
++		ret = vchiq_ioctl_bulk_transmit(ctxt, &args);
++	else
++		ret = vchiq_ioctl_bulk_receive(ctxt, &args);
+ 
+-	case VCHIQ_IOC_GET_CONFIG: {
+-		VCHIQ_GET_CONFIG_T args;
+-		VCHIQ_CONFIG_T config;
++	args32->mode = args.mode;
+ 
+-		if (copy_from_user(&args, (const void __user *)arg,
+-			sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
+-		if (args.config_size > sizeof(config)) {
+-			ret = -EINVAL;
+-			break;
+-		}
+-		status = vchiq_get_config(instance, args.config_size, &config);
+-		if (status == VCHIQ_SUCCESS) {
+-			if (copy_to_user((void __user *)args.pconfig,
+-				    &config, args.config_size) != 0) {
+-				ret = -EFAULT;
+-				break;
+-			}
+-		}
+-	} break;
++	return ret;
++}
+ 
+-	case VCHIQ_IOC_SET_SERVICE_OPTION: {
+-		VCHIQ_SET_SERVICE_OPTION_T args;
++static bool
++vchiq_ioctl_compat_get_msgbuf(void *context,
++			      unsigned int msgbufcount,
++			      void __user **msgbuf)
++{
++	struct vchiq_await_completion32 *args32 =
++		(struct vchiq_await_completion32 *)context;
++	u32 msgbuf32;
++
++	if (copy_from_user(&msgbuf32,
++			   compat_ptr(args32->msgbufs) +
++			   (sizeof(u32) * msgbufcount),
++			   sizeof(msgbuf32)))
++		return true;
++
++	*msgbuf = compat_ptr(msgbuf32);
++	return false;
++}
+ 
+-		if (copy_from_user(
+-			&args, (const void __user *)arg,
+-			sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
++static bool
++vchiq_ioctl_compat_put_completion(void *context,
++				  unsigned int num,
++				  VCHIQ_COMPLETION_DATA_T *completion)
++{
++	struct vchiq_await_completion32 *args32 =
++		(struct vchiq_await_completion32 *)context;
++	struct vchiq_completion_data32 completion32;
++
++	completion32.reason = completion->reason;
++	completion32.header = ptr_to_compat(completion->header);
++	completion32.service_userdata =
++		ptr_to_compat(completion->service_userdata);
++	completion32.bulk_userdata =
++		ptr_to_compat(completion->bulk_userdata);
++
++	return !!copy_to_user(compat_ptr(args32->buf) +
++			      num * sizeof(struct vchiq_completion_data32),
++			      &completion32,
++			      sizeof(struct vchiq_completion_data32));
++}
+ 
+-		service = find_service_for_instance(instance, args.handle);
+-		if (!service) {
+-			ret = -EINVAL;
+-			break;
+-		}
++static long
++vchiq_ioctl_compat_await_completion(struct vchiq_ioctl_call_context *ctxt,
++				    struct vchiq_await_completion32 *args32)
++{
++	return vchiq_ioctl_await_completion_internal(ctxt->instance,
++						     args32->count,
++						     args32->msgbufsize,
++						     &args32->msgbufcount,
++						     args32,
++						     vchiq_ioctl_compat_get_msgbuf,
++						     vchiq_ioctl_compat_put_completion);
++}
+ 
+-		status = vchiq_set_service_option(
+-				args.handle, args.option, args.value);
+-	} break;
++static long
++vchiq_ioctl_compat_dequeue_message(struct vchiq_ioctl_call_context *ctxt,
++				   struct vchiq_dequeue_message32 *args32)
++{
++	VCHIQ_DEQUEUE_MESSAGE_T args;
+ 
+-	case VCHIQ_IOC_DUMP_PHYS_MEM: {
+-		VCHIQ_DUMP_MEM_T  args;
++	args.handle = args32->handle;
++	args.blocking = args32->blocking;
++	args.bufsize = args32->bufsize;
++	args.buf = compat_ptr(args32->buf);
+ 
+-		if (copy_from_user
+-			 (&args, (const void __user *)arg,
+-			  sizeof(args)) != 0) {
+-			ret = -EFAULT;
+-			break;
+-		}
+-		dump_phys_mem(args.virt_addr, args.num_bytes);
+-	} break;
++	return vchiq_ioctl_dequeue_message(ctxt, &args);
++}
+ 
+-	case VCHIQ_IOC_LIB_VERSION: {
+-		unsigned int lib_version = (unsigned int)arg;
++static long
++vchiq_ioctl_compat_get_config(struct vchiq_ioctl_call_context *ctxt,
++			      struct vchiq_get_config32 *args32)
++{
++	VCHIQ_GET_CONFIG_T args;
+ 
+-		if (lib_version < VCHIQ_VERSION_MIN)
+-			ret = -EINVAL;
+-		else if (lib_version >= VCHIQ_VERSION_CLOSE_DELIVERED)
+-			instance->use_close_delivered = 1;
+-	} break;
++	args.pconfig = compat_ptr(args32->pconfig);
++	args.config_size = args32->config_size;
+ 
+-	case VCHIQ_IOC_CLOSE_DELIVERED: {
+-		VCHIQ_SERVICE_HANDLE_T handle = (VCHIQ_SERVICE_HANDLE_T)arg;
++	return vchiq_ioctl_get_config(ctxt, &args);
++}
+ 
+-		service = find_closed_service_for_instance(instance, handle);
+-		if (service != NULL) {
+-			USER_SERVICE_T *user_service =
+-				(USER_SERVICE_T *)service->base.userdata;
+-			close_delivered(user_service);
+-		}
+-		else
+-			ret = -EINVAL;
+-	} break;
++static long
++vchiq_ioctl_compat_dump_phys_mem(struct vchiq_ioctl_call_context *ctxt,
++				 struct vchiq_dump_mem32 *args32)
++{
++	dump_phys_mem(compat_ptr(args32->virt_addr), args32->num_bytes);
++	return 0;
++}
+ 
+-	default:
+-		ret = -ENOTTY;
+-		break;
+-	}
++static const struct vchiq_ioctl_entry vchiq_ioctl_compat_table[] = {
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_CREATE_SERVICE32, vchiq_ioctl_compat_create_service, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_MESSAGE32, vchiq_ioctl_compat_queue_message, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_BULK_TRANSMIT32, vchiq_ioctl_compat_bulk_transfer, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_QUEUE_BULK_RECEIVE32, vchiq_ioctl_compat_bulk_transfer, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_AWAIT_COMPLETION32, vchiq_ioctl_compat_await_completion, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_DEQUEUE_MESSAGE32, vchiq_ioctl_compat_dequeue_message, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_GET_CONFIG32, vchiq_ioctl_compat_get_config, NULL),
++	VCHIQ_MK_IOCTL(VCHIQ_IOC_DUMP_PHYS_MEM32, vchiq_ioctl_compat_dump_phys_mem, NULL),
++};
+ 
+-	if (service)
+-		unlock_service(service);
++static long
++vchiq_ioctl_compat(struct file *file, unsigned int cmd, unsigned long arg)
++{
++	VCHIQ_INSTANCE_T instance = file->private_data;
++	long ret = 0;
++	unsigned int ioctl_nr;
+ 
+-	if (ret == 0) {
+-		if (status == VCHIQ_ERROR)
+-			ret = -EIO;
+-		else if (status == VCHIQ_RETRY)
+-			ret = -EINTR;
++	ioctl_nr = _IOC_NR(cmd);
++
++	vchiq_log_trace(vchiq_arm_log_level,
++			"vchiq_ioctl(compat) - instance %pK, cmd %s, arg %lx",
++			instance,
++			((_IOC_TYPE(cmd) == VCHIQ_IOC_MAGIC) &&
++			(ioctl_nr <= VCHIQ_IOC_MAX)) ?
++			ioctl_names[ioctl_nr] : "<invalid>", arg);
++
++	if (ioctl_nr > VCHIQ_IOC_MAX) {
++		ret = -ENOTTY;
++	} else if (ioctl_nr < ARRAY_SIZE(vchiq_ioctl_compat_table) &&
++		   vchiq_ioctl_compat_table[ioctl_nr].func) {
++		ret = vchiq_ioctl_dispatch(&vchiq_ioctl_compat_table[ioctl_nr],
++					   file, cmd, arg);
++
++	} else {
++		ret = vchiq_ioctl_dispatch(&vchiq_ioctl_table[ioctl_nr],
++					   file, cmd, arg);
+ 	}
+ 
+-	if ((status == VCHIQ_SUCCESS) && (ret < 0) && (ret != -EINTR) &&
+-		(ret != -EWOULDBLOCK))
++	if ((ret < 0) && (ret != -EINTR) && (ret != -EWOULDBLOCK))
+ 		vchiq_log_info(vchiq_arm_log_level,
+-			"  ioctl instance %lx, cmd %s -> status %d, %ld",
+-			(unsigned long)instance,
+-			(_IOC_NR(cmd) <= VCHIQ_IOC_MAX) ?
+-				ioctl_names[_IOC_NR(cmd)] :
+-				"<invalid>",
+-			status, ret);
++			       "  ioctl(compat) instance %lx, cmd %s, %ld",
++			       (unsigned long)instance,
++			       (ioctl_nr <= VCHIQ_IOC_MAX) ?
++			       ioctl_names[ioctl_nr] :
++			       "<invalid>",
++			       ret);
+ 	else
+ 		vchiq_log_trace(vchiq_arm_log_level,
+-			"  ioctl instance %lx, cmd %s -> status %d, %ld",
+-			(unsigned long)instance,
+-			(_IOC_NR(cmd) <= VCHIQ_IOC_MAX) ?
+-				ioctl_names[_IOC_NR(cmd)] :
++				"  ioctl(compat) instance %lx, cmd %s, %ld",
++				(unsigned long)instance,
++				(ioctl_nr <= VCHIQ_IOC_MAX) ?
++				ioctl_names[ioctl_nr] :
+ 				"<invalid>",
+-			status, ret);
++				ret);
+ 
+ 	return ret;
+ }
+ 
++#endif
++
+ /****************************************************************************
+ *
+ *   vchiq_open
+@@ -1660,6 +2132,9 @@ static const struct file_operations
+ vchiq_fops = {
+ 	.owner = THIS_MODULE,
+ 	.unlocked_ioctl = vchiq_ioctl,
++#if defined(CONFIG_COMPAT)
++	.compat_ioctl = vchiq_ioctl_compat,
++#endif
+ 	.open = vchiq_open,
+ 	.release = vchiq_release,
+ 	.read = vchiq_read
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
+index 6137ae9..1681b77 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_ioctl.h
+@@ -35,6 +35,9 @@
+ #define VCHIQ_IOCTLS_H
+ 
+ #include <linux/ioctl.h>
++#if defined(CONFIG_COMPAT)
++#include <linux/compat.h>
++#endif
+ #include "vchiq_if.h"
+ 
+ #define VCHIQ_IOC_MAGIC 0xc4
+@@ -128,4 +131,97 @@ typedef struct {
+ #define VCHIQ_IOC_CLOSE_DELIVERED      _IO(VCHIQ_IOC_MAGIC,   17)
+ #define VCHIQ_IOC_MAX                  17
+ 
++#if defined(CONFIG_COMPAT)
++
++struct vchiq_element32 {
++	compat_uptr_t data;
++	unsigned int size;
++};
++
++struct vchiq_service_base32 {
++	int fourcc;
++	compat_uptr_t callback;
++	compat_uptr_t userdata;
++};
++
++struct vchiq_service_params32 {
++	int fourcc;
++	compat_uptr_t callback;
++	compat_uptr_t userdata;
++	short version;       /* Increment for non-trivial changes */
++	short version_min;   /* Update for incompatible changes */
++};
++
++struct vchiq_create_service32 {
++	struct vchiq_service_params32 params;
++	int is_open;
++	int is_vchi;
++	unsigned int handle;       /* OUT */
++};
++
++struct vchiq_queue_message32 {
++	unsigned int handle;
++	unsigned int count;
++	compat_uptr_t elements;
++};
++
++struct vchiq_queue_bulk_transfer32 {
++	unsigned int handle;
++	compat_uptr_t data;
++	unsigned int size;
++	compat_uptr_t userdata;
++	VCHIQ_BULK_MODE_T mode;
++};
++
++struct vchiq_completion_data32 {
++	VCHIQ_REASON_T reason;
++	compat_uptr_t header;
++	compat_uptr_t service_userdata;
++	compat_uptr_t bulk_userdata;
++};
++
++struct vchiq_await_completion32 {
++	unsigned int count;
++	compat_uptr_t buf;
++	unsigned int msgbufsize;
++	unsigned int msgbufcount; /* IN/OUT */
++	compat_uptr_t msgbufs;
++};
++
++struct vchiq_dequeue_message32 {
++	unsigned int handle;
++	int blocking;
++	unsigned int bufsize;
++	compat_uptr_t buf;
++};
++
++struct vchiq_get_config32 {
++	unsigned int config_size;
++	compat_uptr_t pconfig;
++};
++
++struct vchiq_dump_mem32 {
++	compat_uptr_t virt_addr;
++	u32 num_bytes;
++};
++
++#define VCHIQ_IOC_CREATE_SERVICE32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 2, struct vchiq_create_service32)
++#define VCHIQ_IOC_QUEUE_MESSAGE32 \
++	_IOW(VCHIQ_IOC_MAGIC,  4, struct vchiq_queue_message32)
++#define VCHIQ_IOC_QUEUE_BULK_TRANSMIT32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 5, struct vchiq_queue_bulk_transfer32)
++#define VCHIQ_IOC_QUEUE_BULK_RECEIVE32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 6, struct vchiq_queue_bulk_transfer32)
++#define VCHIQ_IOC_AWAIT_COMPLETION32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 7, struct vchiq_await_completion32)
++#define VCHIQ_IOC_DEQUEUE_MESSAGE32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 8, struct vchiq_dequeue_message32)
++#define VCHIQ_IOC_GET_CONFIG32 \
++	_IOWR(VCHIQ_IOC_MAGIC, 10, struct vchiq_get_config32)
++#define VCHIQ_IOC_DUMP_PHYS_MEM32 \
++	_IOW(VCHIQ_IOC_MAGIC,  15, struct vchiq_dump_mem32)
++
++#endif
++
+ #endif
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.10.2
