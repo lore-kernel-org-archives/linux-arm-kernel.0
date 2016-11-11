@@ -1,50 +1,74 @@
-From: heikki.krogerus@linux.intel.com (Heikki Krogerus)
-Date: Fri, 11 Nov 2016 13:02:48 +0200
-Subject: [PATCH v5 03/23] usb: ulpi: Support device discovery via DT
-In-Reply-To: <20161018015636.11701-4-stephen.boyd@linaro.org>
-References: <20161018015636.11701-1-stephen.boyd@linaro.org>
- <20161018015636.11701-4-stephen.boyd@linaro.org>
-Message-ID: <20161111110248.GA22706@kuha.fi.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 11 Nov 2016 16:32:13 +0530
+Subject: [PATCH] ARM: davinci: enable PM for DT boot
+In-Reply-To: <m2shr16dr7.fsf@baylibre.com>
+References: <20161025214738.27744-1-khilman@baylibre.com>
+ <c3a69359-bcec-40fe-e25c-048b97bab726@ti.com> <m2shr16dr7.fsf@baylibre.com>
+Message-ID: <6c73eab0-dadd-f8a0-f822-84296d319443@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 17, 2016 at 06:56:16PM -0700, Stephen Boyd wrote:
-> The qcom HSIC ULPI phy doesn't have any bits set in the vendor or
-> product ID registers. This makes it impossible to make a ULPI
-> driver match against the ID registers. Add support to discover
-> the ULPI phys via DT help alleviate this problem. In the DT case,
-> we'll look for a ULPI bus node underneath the device registering
-> the ULPI viewport (or the parent of that device to support
-> chipidea's device layout) and then match up the phy node
-> underneath that with the ULPI device that's created.
+On Tuesday 08 November 2016 11:43 PM, Kevin Hilman wrote:
+> Hi Sekhar,
 > 
-> The side benefit of this is that we can use standard properties
-> in the phy node like clks, regulators, gpios, etc. because we
-> don't have firmware like ACPI to turn these things on for us. And
-> we can use the DT phy binding to point our phy consumer to the
-> phy provider.
+> Sekhar Nori <nsekhar@ti.com> writes:
 > 
-> The ULPI bus code supports native enumeration by reading the
-> vendor ID and product ID registers at device creation time, but
-> we can't be certain that those register reads will succeed if the
-> phy is not powered up. To avoid any problems with reading the ID
-> registers before the phy is powered we fallback to DT matching
-> when the ID reads fail.
+>> On Wednesday 26 October 2016 03:17 AM, Kevin Hilman wrote:
+>>> Currently system PM is only enabled for legacy (non-DT) boot.  Enable
+>>> for DT boot also.
+>>>
+>>> Tested on da850-lcdk using "rtcwake -m mem -s5 -d rtc0".
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>>> ---
+>>>  arch/arm/mach-davinci/da8xx-dt.c | 18 ++++++++++++++++++
+>>>  1 file changed, 18 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+>>> index c9f7e9274aa8..a8089fa40d86 100644
+>>> --- a/arch/arm/mach-davinci/da8xx-dt.c
+>>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+>>> @@ -43,8 +43,26 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>>>  
+>>>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+>>>  
+>>> +static struct davinci_pm_config da850_pm_pdata = {
+>>> +	.sleepcount = 128,
+>>> +};
+>>> +
+>>> +static struct platform_device da850_pm_device = {
+>>> +	.name           = "pm-davinci",
+>>> +	.dev = {
+>>> +		.platform_data	= &da850_pm_pdata,
+>>> +	},
+>>> +	.id             = -1,
+>>> +};
+>>> +
+>>>  static void __init da850_init_machine(void)
+>>>  {
+>>> +	int ret;
+>>> +
+>>> +	ret = da850_register_pm(&da850_pm_device);
+>>
+>> I am not sure if it makes sense to keep the "pm device" around anymore.
+>> I think for both DT and non-DT boot, we can get rid of the fake PM
+>> device and combine da850_register_pm() and davinci_pm_probe() into a
+>> single davinci_init_suspend() function which can then be called both for
+>> DT and non-DT boot.
 > 
-> If the ULPI spec had some generic power sequencing for these
-> registers we could put that into the ULPI bus layer and power up
-> the device before reading the ID registers. Unfortunately this
-> doesn't exist and the power sequence is usually device specific.
-> By having the device matched up with DT we can avoid this
-> problem.
+> Looking closer at this, where do you propose the pdata comes from for
+> the non-DT boot?
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
-> Cc: <devicetree@vger.kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> It seems to me that we can't currently remove the pdata dependency
+> without breaking the non-DT platforms, so the approach proposed here is
+> the least invasive.
 
-Acked-by: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+There is a single value of sleep count that is used today (128). So I
+was thinking we can hardcode that in pm.c. We are not going to add more
+board files anyway so there is no risk here.
 
--- 
-heikki
+For future, if a different sleepcount value is needed, it will need to
+be a new DT property.
+
+Thanks,
+Sekhar
