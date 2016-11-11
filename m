@@ -1,72 +1,90 @@
-From: jsarha@ti.com (Jyri Sarha)
-Date: Fri, 11 Nov 2016 18:24:48 +0200
-Subject: [PATCH RFC 00/12] tda998x updates
-In-Reply-To: <20161111152700.GD1041@n2100.armlinux.org.uk>
-References: <20161108122420.GP1041@n2100.armlinux.org.uk>
- <964260d7-af7f-fefb-2adb-0e10ff750883@ti.com>
- <20161111152700.GD1041@n2100.armlinux.org.uk>
-Message-ID: <2f1bc473-1d78-b37a-0c1c-2b8c661477cf@ti.com>
+From: ddutile@redhat.com (Don Dutile)
+Date: Fri, 11 Nov 2016 11:25:25 -0500
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161111085056.4cf8989d@t450s.home>
+References: <20161109151709.74927f83@t450s.home>
+ <20161109222522.GS17771@arm.com> <20161109162458.39594fdb@t450s.home>
+ <20161109233847.GT17771@arm.com> <20161109165957.62c1eb61@t450s.home>
+ <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
+ <20161109175517.174e7803@t450s.home> <20161110020130.GA19108@arm.com>
+ <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
+ <20161110104601.0939ba9a@t450s.home> <20161111111944.GO2078@8bytes.org>
+ <20161111085056.4cf8989d@t450s.home>
+Message-ID: <5825F0F5.3070001@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/16 17:27, Russell King - ARM Linux wrote:
-> On Fri, Nov 11, 2016 at 05:10:09PM +0200, Jyri Sarha wrote:
->> On 11/08/16 14:24, Russell King - ARM Linux wrote:
->>> As no one responded to the previous round, I'm not spending soo much
->>> time writing up a description of these changes again.  It's also been
->>> quite a long time, so I've forgotten all the details of the changes,
->>> so I'll do my best.
->>>
->>> Changes from the previous series include:
->>> - reorder the initial three patches
->>> - change the (now third patch)... I think to increase the size of the
->>>   locked region.
->>> - fix edid parsing for infoframe generation - as was pointed out for
->>>   dw-hdmi, parsing the EDID in get_modes() is incorrect, as that method
->>>   will not be called when an override-edid is in effect.  We need to
->>>   parse the override-edid.  Moreover, infoframe generation should not
->>>   be keyed to whether the monitor is HDMI or not, CEA-861B allows non-
->>>   HDMI to send infoframes.
->>> - only send audio if audio and infoframes are supported.
->>>
->>> Otherwise, these are very much like the previous posting of the series,
->>> except rebased upon the mali/hdlcd/tda998x change to remove the
->>> drm_connector_register() call.
->>>
->>> https://www.spinics.net/lists/dri-devel/msg121495.html
->>>
->>> It'd be nice to have other tda998x users ack and test these patches,
->>> I've tried to test on Juno, but the Juno situation seems to be a huge
->>> fail.  (HBI0282B completely fails with latest firmware - (a) FPGA image
->>> incompatibilities io_b118 causes all FPGA AMBA devices to vanish, (b)
->>> seems no way to get SCPI support on it - adding the BL0 executable
->>> start address in the SCC registers seems to be incompatible with the
->>> devchip, causing the PLLs to fail.  In discussion with Sudeep over
->>> these issues, but no idea where things are with it at the moment, other
->>> than Sudeep needs to investigate.  All Linaro firmware releases are
->>> broken on HBI0282B.)
->>>
->>>  drivers/gpu/drm/i2c/tda998x_drv.c | 826 ++++++++++++++++++++------------------
->>>  1 file changed, 429 insertions(+), 397 deletions(-)
->>>
+On 11/11/2016 10:50 AM, Alex Williamson wrote:
+> On Fri, 11 Nov 2016 12:19:44 +0100
+> Joerg Roedel <joro@8bytes.org> wrote:
+>
+>> On Thu, Nov 10, 2016 at 10:46:01AM -0700, Alex Williamson wrote:
+>>> In the case of x86, we know that DMA mappings overlapping the MSI
+>>> doorbells won't be translated correctly, it's not a valid mapping for
+>>> that range, and therefore the iommu driver backing the IOMMU API
+>>> should describe that reserved range and reject mappings to it.
 >>
->> Reviewed-by: Jyri Sarha <jsarha@ti.com>
+>> The drivers actually allow mappings to the MSI region via the IOMMU-API,
+>> and I think it should stay this way also for other reserved ranges.
+>> Address space management is done by the IOMMU-API user already (and has
+>> to be done there nowadays), be it a DMA-API implementation which just
+>> reserves these regions in its address space allocator or be it VFIO with
+>> QEMU, which don't map RAM there anyway. So there is no point of checking
+>> this again in the IOMMU drivers and we can keep that out of the
+>> mapping/unmapping fast-path.
+>
+> It's really just a happenstance that we don't map RAM over the x86 MSI
+> range though.  That property really can't be guaranteed once we mix
+> architectures, such as running an aarch64 VM on x86 host via TCG.
+> AIUI, the MSI range is actually handled differently than other DMA
+> ranges, so a iommu_map() overlapping a range that the iommu cannot map
+> should fail just like an attempt to map beyond the address width of the
+> iommu.
+>
++1. As was stated at Plumbers, x86 MSI is in a fixed, hw location, so:
+1) that memory space is never a valid page to the system to be used for IOVA,
+    therefore, nothing to micro-manage in the iommu mapping (fast) path.
+2) migration btwn different systems isn't an issue b/c all x86 systems have this mapping.
+3) ACS resolves DMA writes to mem going to a device(-mmio space).
+
+For aarch64, without such a 'fixed' MSI location, whatever hole/used-space-struct
+concept that is contrived for MSI (DMA) writes on aarch64 won't guarantee migration
+failure across mixed aarch64 systems (migrate guest-G from sys-vendor-A to
+sys-vendor-B; sys-vendor-A has MSI at addr-A; sys-vendor-B has MSI at addr-B).
+Without agreement, migration only possilbe across the same systems (can even
+be broken btwn two sytems from same vendor).  ACS in the PCIe path handles
+the iova->dev-mmio collision problem. q.e.d.
+
+ergo, my proposal to put MSI space as the upper-most, space of any system....
+FFFF.FFFF.FFFE0.0000 ... and hw drops the upper 1's/F's, and uses that for MSI.
+Allows it to vary on each system based on max-memory.  pseudo-fixed, but not
+right smack in the middle of mem-space.
+
+There is an inverse scenario for host phys addr's as well:
+     Wiring the upper-most bit of HPA to be 1==mmio, 0=mem simplifies a lot of
+     design issues in the cores & chipsets as well.  Alpha-EV6, case in point
+     (18+ yr old design decision). another q.e.d.
+
+I hate to admit it, but jcm has it right wrt 'fixed sys addr map', at least in this IO area.
+
+
+>>> For PCI devices userspace can examine the topology of the iommu group
+>>> and exclude MMIO ranges of peer devices based on the BARs, which are
+>>> exposed in various places, pci-sysfs as well as /proc/iomem.  For
+>>> non-PCI or MSI controllers... ???
 >>
->> For the whole series. I am also happy to test these patches if I can
->> fetch them from some git repo.
-> 
-> git://git.armlinux.org.uk/~rmk/linux-arm.git drm-tda998x-devel
-> 
-> The commit IDs are unstable, because I'll have to recommit them to add
-> your r-by and any other tags you later give me. :)
-> 
-
-I tested the branch with my Beaglebone-black and couple of TVs. I played
-audio on different sample-rates while plugging and unplugging the cable
-to the TVs and changing video modes. Everything worked as it should. I
-let you decide whether or not this adhoc testing qualifies:
-
-Tested-by: Jyri Sarha <jsarha@ti.com>
-
-Best regards,
-Jyri
+>> Right, the hardware resources can be examined. But maybe this can be
+>> extended to also cover RMRR ranges? Then we would be able to assign
+>> devices with RMRR mappings to guests.
+>
+> RMRRs are special in a different way, the VT-d spec requires that the
+> OS honor RMRRs, the user has no responsibility (and currently no
+> visibility) to make that same arrangement.  In order to potentially
+> protect the physical host platform, the iommu drivers should prevent a
+> user from remapping RMRRS.  Maybe there needs to be a different
+> interface used by untrusted users vs in-kernel drivers, but I think the
+> kernel really needs to be defensive in the case of user mappings, which
+> is where the IOMMU API is rooted.  Thanks,
+>
+> Alex
+>
