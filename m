@@ -1,28 +1,29 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Nov 2016 11:28:29 +0000
-Subject: ACPI namespace details for ARM64
-In-Reply-To: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20161111112829.GB13333@red-moon>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 11 Nov 2016 12:42:23 +0100
+Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
+ callback
+In-Reply-To: <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
+ <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
+ <20161110154606.GH2078@8bytes.org>
+ <04ed9694-707d-260b-70c6-f367d292ceca@redhat.com>
+ <20161110161331.GJ2078@8bytes.org>
+ <f4537e43-0237-e478-eacd-b107458628b8@redhat.com>
+Message-ID: <20161111114223.GP2078@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 09, 2016 at 04:05:06PM -0600, Bjorn Helgaas wrote:
+On Thu, Nov 10, 2016 at 07:00:52PM +0100, Auger Eric wrote:
+> GICv2m and GICV3 ITS use dma-mapping iommu_dma_map_msi_msg to allocate
+> an MSI IOVA on-demand.
 
-[...]
+Yes, and it the right thing to do there because as a DMA-API
+implementation the dma-iommu code cares about the address space
+allocation.
 
-> ACPI defined a Producer/Consumer bit that was intended to distinguish
-> the bridge apertures from the bridge registers [4, 5]. However, BIOSes
-> didn't use that bit correctly, and the result is that OSes have to
-> assume that everything in a PCI host bridge _CRS is a window. That
-> leaves no way to describe the bridge registers in the PNP0A03/PNP0A08
-> device itself.
+As I understand it this is different in your case, as someone else is
+defining the address space layout. So why do you need to allocate it
+yourself?
 
-ACPI 6.1 states that in the revision changes 4.0a Apr.2010 (xiii)
-"Consumer/Producer bit is ignored (Restored 2.0C change that had
-been lost)" and still that bit is marked as valid. If it is not
-reliable it should be set as "ignored" in the specs (as it was
-on ACPI 2.0C, BTW), as it is it is just a source of confusion.
 
-Thanks again !
-Lorenzo
+	Joerg
