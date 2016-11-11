@@ -1,138 +1,60 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 11 Nov 2016 13:39:35 +0000
-Subject: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on Hip06
-In-Reply-To: <10334260.ztLXZ2Oynd@wuerfel>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <17821285.aIcTyCGn5n@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F8F5D75@lhreml507-mbx>
- <10334260.ztLXZ2Oynd@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F8F900A@lhreml507-mbx>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 11 Nov 2016 13:41:37 +0000
+Subject: [PATCH v3 0/2] arm64: Support systems without FP/ASIMD
+In-Reply-To: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
+References: <1478613381-5718-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <d9b41cca-9a9c-ab92-d3e5-ee1870bb70d4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 10 November 2016 16:07
-> To: Gabriele Paoloni
-> Cc: linux-arm-kernel at lists.infradead.org; Yuanzhichang;
-> mark.rutland at arm.com; devicetree at vger.kernel.org;
-> lorenzo.pieralisi at arm.com; minyard at acm.org; linux-pci at vger.kernel.org;
-> benh at kernel.crashing.org; John Garry; will.deacon at arm.com; linux-
-> kernel at vger.kernel.org; xuwei (O); Linuxarm; zourongrong at gmail.com;
-> robh+dt at kernel.org; kantyzc at 163.com; linux-serial at vger.kernel.org;
-> catalin.marinas at arm.com; olof at lixom.net; liviu.dudau at arm.com;
-> bhelgaas at googl e.com; zhichang.yuan02 at gmail.com
-> Subject: Re: [PATCH V5 3/3] ARM64 LPC: LPC driver implementation on
-> Hip06
+On 08/11/16 13:56, Suzuki K Poulose wrote:
+> This series adds supports to the kernel and KVM hyp to handle
+> systems without FP/ASIMD properly. At the moment the kernel
+> doesn't check if the FP unit is available before accessing
+> the registers (e.g during context switch). Also for KVM,
+> we trap the FP/ASIMD accesses and handle it by injecting an
+> undefined instruction into the VM on systems without FP.
 > 
-> On Thursday, November 10, 2016 3:36:49 PM CET Gabriele Paoloni wrote:
-> >
-> > Where should we get the range from? For LPC we know that it is going
-> > Work on anything that is not used by PCI I/O space, and this is
-> > why we use [0, PCIBIOS_MIN_IO]
+> Tested on a FVP_Base-AEM-v8A model by disabling VFP on at
+> least one CPU ( -C clusterX.cpuY.vfp-present=0 ).
 > 
-> It should be allocated the same way we allocate PCI config space
-> segments. This is currently done with the io_range list in
-> drivers/pci/pci.c, which isn't perfect but could be extended
-> if necessary. Based on what others commented here, I'd rather
-> make the differences between ISA/LPC and PCI I/O ranges smaller
-> than larger.
-
-I am not sure this would make sense...
-
-IMHO all the mechanism around io_range_list is needed to provide the
-"mapping" between I/O tokens and physical CPU addresses.
-
-Currently the available tokens range from 0 to IO_SPACE_LIMIT.
-
-As you know the I/O memory accessors operate on whatever
-__of_address_to_resource sets into the resource (start, end).
-
-With this special device in place we cannot know if a resource is
-assigned with an I/O token or a physical address, unless we forbid
-the I/O tokens to be in a specific range.
-
-So this is why we are changing the offsets of all the functions
-handling io_range_list (to make sure that a range is forbidden to
-the tokens and is available to the physical addresses).
-
-We have chosen this forbidden range to be [0, PCIBIOS_MIN_IO)
-because this is the maximum physical I/O range that a non PCI device
-can operate on and because we believe this does not impose much
-restriction on the available I/O token range; that now is 
-[PCIBIOS_MIN_IO, IO_SPACE_LIMIT].
-So we believe that the chosen forbidden range can accommodate
-any special ISA bus device with no much constraint on the rest
-of I/O tokens...
-
+> Changes since V2:
+>  - Dropped cleanup patch for arm64/crypto/aes-ce-ccm-glue.c
+>  - Removed static_key check from cpus_have_cap. All users with
+>    constant caps should use the new API to make use of static_keys.
+>  - Removed a dedicated static_key used in irqchip-gic-v3.c for
+>    Cavium errata with the new API.
 > 
-> > > Your current version has
-> > >
-> > >         if (arm64_extio_ops->pfout)                             \
-> > >                 arm64_extio_ops->pfout(arm64_extio_ops->devpara,\
-> > >                        addr, value, sizeof(type));             \
-> > >
-> > > Instead, just subtract the start of the range from the logical
-> > > port number to transform it back into a bus-local port number:
-> >
-> > These accessors do not operate on IO tokens:
-> >
-> > If (arm64_extio_ops->start > addr || arm64_extio_ops->end < addr)
-> > addr is not going to be an I/O token; in fact patch 2/3 imposes that
-> > the I/O tokens will start at PCIBIOS_MIN_IO. So from 0 to
-> PCIBIOS_MIN_IO
-> > we have free physical addresses that the accessors can operate on.
+> Applies on v4.9-rc4 + [1] (which is pushed for rc5)
 > 
-> Ah, I missed that part. I'd rather not use PCIBIOS_MIN_IO to refer to
-> the logical I/O tokens, the purpose of that macro is really meant
-> for allocating PCI I/O port numbers within the address space of
-> one bus.
-
-As I mentioned above, special devices operate on CPU addresses directly,
-not I/O tokens. For them there is no way to distinguish....
-
+> [1] http://marc.info/?l=linux-arm-kernel&m=147819889813214&w=2
 > 
-> Note that it's equally likely that whichever next platform needs
-> non-mapped I/O access like this actually needs them for PCI I/O space,
-> and that will use it on addresses registered to a PCI host bridge.
-
-Ok so here you are talking about a platform that has got an I/O range
-under the PCI host controller, right?
-And this I/O range cannot be directly memory mapped but needs special
-redirections for the I/O tokens, right?
-
-In this scenario registering the I/O ranges with the forbidden range
-implemented by the current patch would still allow to redirect I/O
-tokens as long as arm64_extio_ops->start >= PCIBIOS_MIN_IO
-
-So effectively the special PCI host controller
-1) knows the physical range that needs special redirection
-2) register such range
-3) uses pci_pio_to_address() to retrieve the IO tokens for the
-   special accessors
-4) sets arm64_extio_ops->start/end to the IO tokens retrieved in 3)
-
-So to be honest I think this patch can fit well both with
-special PCI controllers that need I/O tokens redirection and with
-special non-PCI controllers that need non-PCI I/O physical
-address redirection...
-
-Thanks (and sorry for the long reply but I didn't know how
-to make the explanation shorter :) )
-
-Gab
-
 > 
-> If we separate the two steps:
+> Suzuki K Poulose (2):
+>   arm64: Add hypervisor safe helper for checking constant capabilities
+>   arm64: Support systems without FP/ASIMD
 > 
-> a) assign a range of logical I/O port numbers to a bus
-> b) register a set of helpers for redirecting logical I/O
->    port to a helper function
+>  arch/arm64/include/asm/cpucaps.h    |  3 ++-
+>  arch/arm64/include/asm/cpufeature.h | 24 +++++++++++++++++-------
+>  arch/arm64/include/asm/neon.h       |  3 ++-
+>  arch/arm64/kernel/cpufeature.c      | 17 ++++++++++++++++-
+>  arch/arm64/kernel/fpsimd.c          | 14 ++++++++++++++
+>  arch/arm64/kernel/process.c         |  2 +-
+>  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
+>  arch/arm64/kvm/hyp/hyp-entry.S      |  9 ++++++++-
+>  arch/arm64/kvm/hyp/switch.c         |  5 ++++-
+>  drivers/irqchip/irq-gic-v3.c        | 13 +------------
+>  10 files changed, 76 insertions(+), 25 deletions(-)
 > 
-> then I think the code will get cleaner and more flexible.
-> It should actually then be able to replace the powerpc
-> specific implementation.
-> 
-> 	Arnd
+
+For the series:
+
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+How do we plan on merging this? Catalin, are you willing to take it all?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
