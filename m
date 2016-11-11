@@ -1,93 +1,68 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Fri, 11 Nov 2016 18:07:07 +0800
-Subject: [PATCH V5 1/3] ARM64 LPC: Indirect ISA port IO introduced
-In-Reply-To: <1478806353.7430.137.camel@kernel.crashing.org>
-References: <1478576829-112707-1-git-send-email-yuanzhichang@hisilicon.com>
- <1478576829-112707-2-git-send-email-yuanzhichang@hisilicon.com>
- <20161108120323.GC15297@leverpostej>
- <1478647002.7430.69.camel@kernel.crashing.org>
- <20161110112224.GB4418@leverpostej>
- <1478806353.7430.137.camel@kernel.crashing.org>
-Message-ID: <5825984B.3030303@hisilicon.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Fri, 11 Nov 2016 11:10:44 +0100
+Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: sun8i-h3: Set
+ CLK_SET_RATE_PARENT for audio module clocks
+In-Reply-To: <20161111100558.14629-2-wens@csie.org>
+References: <20161111100558.14629-1-wens@csie.org>
+ <20161111100558.14629-2-wens@csie.org>
+Message-ID: <CAEKpxBkseMg2JvP7rrm2qFSCTsn60JyzoWFNFDrWNFDHkMuQtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Ben, Mark,
-
-Thanks for your comments! These are helpful!
-
-
-On 2016/11/11 3:32, Benjamin Herrenschmidt wrote:
-> On Thu, 2016-11-10 at 11:22 +0000, Mark Rutland wrote:
->> On POWER8, our PCIe doesn't do IO at all, but we have an LPC bus behind
->>> firmware calls ;-) We use that infrastructure to plumb in the LPC bus.
->>
->> Just to check, do you hook that in your inb/outb/etc?
-> 
-> Yes.
-> 
->> Generally, it would seem nicer if we could have higher-level
->> isa_{inb,outb,whatever} accessors that we could hook separately from
->> other IO.
-> 
-> Maybe but generally speaking, we don't discriminate accessors per bus,
-> ie, readl etc... work on all memory mapped busses, inb... works on all
-> busses with an "IO space", at least that's been the idea. It probably
-> all comes from the fact that PCI IO and ISA are the same space on
-> x86 and most other platforms (not all).
-> 
->> We don't necessarily have to move all ISA drivers over to that if we had
->> a separate symbol for that interface.
-> 
-> What I do on ppc today is that I have a chunk of virtual address space
-> that is reserved for "IO space". The first 64k are "reserved" in that
-> they route to "the primary" ISA bus (for legacy crap that uses hard
-> coded addresses, though I use that for my LPC bus too). I "allocate"
-> space for the PCI IO spaces higher in that space. Was I to support more
-> LPC busses I could allocate them up there too.
+On 11 November 2016 at 11:05, Chen-Yu Tsai <wens@csie.org> wrote:
+> The audio module clocks are supposed to be set according to the sample
+> rate of the audio stream. The audio PLL provides the clock signal for
+> thees module clocks, and only it is freely tunable.
+nick! these
+CK
 >
-
-I have similar idea as your PPC MMIO.
-
-We notice the prototype of {in/out()} is something like that:
-
-static inline u8 inb(unsigned long addr)
-static inline void outb(u8 value, unsigned long addr)
-
-The type of parameter 'addr' is unsigned long. For I/O space, it is big enough.
-So, could you divide this 'addr' into several bit segments? The top 8 bits is
-defined as bus index. For normal direct IO, the bus index is 0. For those bus
-device which need indirectIO or some special I/O accessors, when these devices
-are initializing, can request to allocate an unique ID to them, and register
-their own accessors to the entry which is corresponding to the ID.
-
-In this way, we can support multiple domains, I think.
-But I am not sure whether it is feasible, for example, are there some
-architectures/platforms had populated the top 8 bits? Do we need to request IO
-region from ioport_resource for those devices?  etc...
-
-
-Thanks,
-Zhichang
-
-
-> The IO resource of a given device thus becomes the actual IO port plus
-> the offset of the base of the segment it's in.
-> 
-> For memory mapped IO, inb/outb will just add the virtual address of
-> the base of all IO space to that. The hooking mechanism will pickup
-> the stuff that isn't memory mapped.
-> 
-> It's a bit messy but then IO space performance has never been a huge
-> worry since IO cycles tend to be very slow to begin with.
-> 
-> Note: We also have the ISA memory and ISA FW spaces that we don't have
-> good accessors for. They somewhat exist (I think the fbdev layer uses
-> some for vga) but it's messy.
-> 
-> Cheers,
-> Ben.
-> 
-> 
-> .
-> 
+> Set CLK_SET_RATE_PARENT for the audio module clocks so their users can
+> properly tune the clock rate.
+>
+> Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> index 4d70590f05e3..21c427d86f28 100644
+> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> @@ -394,16 +394,16 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents, 0x0a4,
+>  static const char * const i2s_parents[] = { "pll-audio-8x", "pll-audio-4x",
+>                                             "pll-audio-2x", "pll-audio" };
+>  static SUNXI_CCU_MUX_WITH_GATE(i2s0_clk, "i2s0", i2s_parents,
+> -                              0x0b0, 16, 2, BIT(31), 0);
+> +                              0x0b0, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_MUX_WITH_GATE(i2s1_clk, "i2s1", i2s_parents,
+> -                              0x0b4, 16, 2, BIT(31), 0);
+> +                              0x0b4, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_MUX_WITH_GATE(i2s2_clk, "i2s2", i2s_parents,
+> -                              0x0b8, 16, 2, BIT(31), 0);
+> +                              0x0b8, 16, 2, BIT(31), CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_M_WITH_GATE(spdif_clk, "spdif", "pll-audio",
+> -                            0x0c0, 0, 4, BIT(31), 0);
+> +                            0x0c0, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
+>
+>  static SUNXI_CCU_GATE(usb_phy0_clk,    "usb-phy0",     "osc24M",
+>                       0x0cc, BIT(8), 0);
+> @@ -466,7 +466,7 @@ static SUNXI_CCU_M_WITH_GATE(ve_clk, "ve", "pll-ve",
+>                              0x13c, 16, 3, BIT(31), 0);
+>
+>  static SUNXI_CCU_GATE(ac_dig_clk,      "ac-dig",       "pll-audio",
+> -                     0x140, BIT(31), 0);
+> +                     0x140, BIT(31), CLK_SET_RATE_PARENT);
+>  static SUNXI_CCU_GATE(avs_clk,         "avs",          "osc24M",
+>                       0x144, BIT(31), 0);
+>
+> --
+> 2.10.2
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
