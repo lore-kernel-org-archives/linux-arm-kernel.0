@@ -1,78 +1,43 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 11 Nov 2016 14:19:10 +0000
-Subject: [PATCH v5 6/8] Documentation: bindings: add compatible specific
- to legacy SCPI protocol
-In-Reply-To: <CAL_JsqJ5PxzM_VMP55m+6snkqyWSMSsdCOiUzYWkMTb3LkD5Mw@mail.gmail.com>
-References: <1478148731-11712-1-git-send-email-sudeep.holla@arm.com>
- <1478148731-11712-7-git-send-email-sudeep.holla@arm.com>
- <20161110012249.ed56ik6kdffoikym@rob-hp-laptop>
- <14e563ae-36c5-4bf9-0d51-3b07830de3db@arm.com>
- <CAL_JsqLW4JZHb0ncVUEefnKySA231EDgvCkY3xPdaJGf=uMJYg@mail.gmail.com>
- <7ccc12bc-9a05-47e3-8ab8-d1b0ad31159e@arm.com>
- <CAOesGMj3TYLkvfGbq6BKqr+9i6mjArjRPuqeAN1-rGO2OhoSyw@mail.gmail.com>
- <ed58424e-e538-227a-37b5-b35fbe4f96ba@arm.com>
- <CAL_JsqJ5PxzM_VMP55m+6snkqyWSMSsdCOiUzYWkMTb3LkD5Mw@mail.gmail.com>
-Message-ID: <4e31f1d9-61b9-53a9-bd0c-dd5e452faece@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Nov 2016 09:24:28 -0500
+Subject: [Linaro-acpi] ACPI namespace details for ARM64
+In-Reply-To: <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
+References: <20161109220506.GN14322@bhelgaas-glaptop.roam.corp.google.com>
+ <a0829be4-6324-758b-2fe6-a274f715a3a9@linaro.org>
+Message-ID: <98c9564d-17f9-f549-6dd4-5c6abc1ba1a3@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/10/2016 6:18 PM, Al Stone wrote:
+> On 11/09/2016 03:05 PM, Bjorn Helgaas wrote:
+>> Hi all,
+>>
+>> We've been working through the details of getting ACPI to work on
+>> arm64, and there have been lots of questions about what this means for
+>> PCI.  I've outlined this for several people individually, but I'm
+>> going to send this separately, apart from a specific patch series, to
+>> make sure we're all on the same page.  Please correct my errors and
+>> misunderstandings.
+>>
+>> Bjorn
+>>
+>> [snip....]
+> 
+> A big +1 to all of this.  This also looks like something that should
+> be added to either PCI, ACPI or arm64 documentation (or even all three).
+> What do you think?
 
 
-On 11/11/16 13:34, Rob Herring wrote:
-> On Fri, Nov 11, 2016 at 1:48 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 10/11/16 19:03, Olof Johansson wrote:
->>> On Thu, Nov 10, 2016 at 6:34 AM, Sudeep Holla <sudeep.holla@arm.com>
->>> wrote:
->
-> [...]
->
->>>> E.g. Amlogic follows most of the legacy protocol though it deviates in
->>>> couple of things which we can handle with platform specific compatible
->>>> (in the following patch in the series). When another user(Rockchip ?)
->>>> make use of this legacy protocol, we can start using those platform
->>>> specific compatible for deviations only.
->>>>
->>>> Is that not acceptable ?
->>>
->>>
->>> If there's no shared legacy feature set, then it's probably less
->>> useful to have a shared less precise compatible value.
->>>
->>
->> There is and will be some shared feature set for sure. At the least the
->> standard command set will be shared.
->>
->>> What the main point I was trying to get across was that we shouldn't
->>> expand the generic binding with per-vendor compatible fields, instead
->>> we should have those as extensions on the side.
->>>
->>
->> Yes I get the point. We will have per-vendor compatibles for handle the
->> deviations but generic one to handle the shared set.
->>
->>> I'm also a little apprehensive of using "legacy", it goes in the same
->>> bucket as "misc". At some point 1.0 will be legacy too, etc.
->>>
->>
->> True and I agree, how about "arm,scpi-pre-1.0" instead ?
->
-> That's still meaningless. Convince me that multiple implementations
-> are identical, then we can have a common property. For example, how
-> many releases did ARM make before 1.0.
->
+I agree. In order to have compliant systems, we have to make PNP0C02 required
+in the PCIe appendix of the SBSA specification.
 
-None officially, so I tend to agree with you on this.
+> 
+> Thank you for putting this together, Bjorn.
+> 
+> 
 
-But so far we have seen some commonality between Rockchip and Amlogic
-implementations, which in fact shares some commonality with early
-release of SCPI from ARM (there are based on the same SCP code base,
-which is closed source and released to partners only). ARM improved the
-specification and the code base before the official release but by then
-it was adopted(as usual we were late ;))
-
-IMO, it's might be useful to have more generic say "arm,scpi-pre-1.0"
-and platform specific "amlogic,meson-gxbb-scpi"
 
 -- 
-Regards,
-Sudeep
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
