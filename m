@@ -1,89 +1,109 @@
-From: wulf@rock-chips.com (wlf)
-Date: Fri, 11 Nov 2016 11:23:49 +0800
-Subject: [PATCH] phy: rockchip-inno-usb2: correct 480MHz output clock
- stable time
-In-Reply-To: <2283070.Hkeafucara@diego>
-References: <1478523658-9400-1-git-send-email-wulf@rock-chips.com>
- <CAD=FV=VC15_QAs7+DOoqCeWrU6-qqnUku2SSPFLOvLanu8xL3g@mail.gmail.com>
- <9eeb3d84-f850-4b76-ce6a-67cc92d6de3b@rock-chips.com>
- <2283070.Hkeafucara@diego>
-Message-ID: <e6d038f6-c324-fc06-5cf1-e03d6ec6d4e3@rock-chips.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 11 Nov 2016 11:22:43 +0800
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
+ <20161109182426.vfrpb4i2mfatdzz3@rob-hp-laptop>
+ <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
+Message-ID: <20161111112243.7431625d@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko?
+Hi Rob, Ziji,
 
-? 2016?11?10? 17:21, Heiko St?bner ??:
-> Am Donnerstag, 10. November 2016, 10:54:49 schrieb wlf:
->> Hi Doug,
->>
->> ? 2016?11?10? 04:54, Doug Anderson ??:
->>> Hi,
->>>
->>> On Mon, Nov 7, 2016 at 5:00 AM, William Wu <wulf@rock-chips.com> wrote:
->>>> We found that the system crashed due to 480MHz output clock of
->>>> USB2 PHY was unstable after clock had been enabled by gpu module.
->>>>
->>>> Theoretically, 1 millisecond is a critical value for 480MHz
->>>> output clock stable time, so we try to change the delay time
->>>> to 1.2 millisecond to avoid this issue.
->>>>
->>>> Signed-off-by: William Wu <wulf@rock-chips.com>
->>>> ---
->>>>
->>>>    drivers/phy/phy-rockchip-inno-usb2.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c
->>>> b/drivers/phy/phy-rockchip-inno-usb2.c index ecfd7d1..8f2d2b6 100644
->>>> --- a/drivers/phy/phy-rockchip-inno-usb2.c
->>>> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
->>>> @@ -267,7 +267,7 @@ static int rockchip_usb2phy_clk480m_enable(struct
->>>> clk_hw *hw)>>
->>>>                           return ret;
->>>>                   
->>>>                   /* waitting for the clk become stable */
->>>>
->>>> -               mdelay(1);
->>>> +               udelay(1200);
->>> Several people who have seen this patch have expressed concern that a
->>> 1.2 ms delay is pretty long for something that's supposed to be
->>> "atomic" like a clk_enable().  Consider that someone might call
->>> clk_enable() while interrupts are disabled and that a 1.2 ms interrupt
->>> latency is not so great.
->>>
->>> It seems like this clock should be moved to be enabled in "prepare"
->>> and the "enable" should be a no-op.  This is a functionality change,
->>> but I don't think there are any real users for this clock at the
->>> moment so it should be fine.
->>>
->>> (of course, the 1 ms latency that existed before this patch was still
->>> pretty bad, but ...)
->> Thanks a lot for your suggestion.
->> I agree with you.  clk_enable() will call spin_lock_irqsave() to disable
->> interrupt, and we add
->> more than 1ms in clk_enable may cause big latency.
->>
->> And according to clk_prepare() description:
->>    In a simple case, clk_prepare can be used instead of clk_enable to
->> ungate a clk if the
->>    operation may sleep.  One example is a clk which is accessed over I2c.
->>
->> So maybe we can remove the clock to clk_prepare.
->>
->> Hi Heiko, Frank,
->>          What  do you think of it?
-> moving to clk_prepare sounds sensible. That way you can switch from delay to
-> sleep functions as well.
-Thanks very much.
-I will try to update a new patch.
+On Thu, 10 Nov 2016 19:44:19 +0800 Ziji Hu wrote:
 
-Best regards,
-          Wulf
+> Hi Rob,
+> 
+> On 2016/11/10 2:24, Rob Herring wrote:
+> > On Mon, Oct 31, 2016 at 12:09:54PM +0100, Gregory CLEMENT wrote:  
+> >> From: Ziji Hu <huziji@marvell.com>
+> >>
+> >> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+> >> Add Xenon-specific properties.
+> >> Also add properties for Xenon PHY setting.
+> >>
+> >> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 161 +++++++-
+> >>  MAINTAINERS                                                   |   1 +-
+> >>  2 files changed, 162 insertions(+), 0 deletions(-)
+> >>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> >> new file mode 100644
+> >> index 000000000000..0d2d139494d3
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> >> @@ -0,0 +1,161 @@
+> >> +Marvell's Xenon SDHCI Controller device tree bindings
+> >> +This file documents differences between the core mmc properties
+> >> +described by mmc.txt and the properties used by the Xenon implementation.
+> >> +
+> >> +A single Xenon IP can support multiple slots.
+> >> +Each slot acts as an independent SDHC. It owns independent resources, such
+> >> +as register sets clock and PHY.
+> >> +Each slot should have an independent device tree node.
+> >> +
+> >> +Required Properties:
+> >> +- compatible: should be one of the following
+> >> +  - "marvell,armada-3700-sdhci": For controllers on Armada-3700 SOC.
+> >> +  Must provide a second register area and marvell,pad-type.
+> >> +  - "marvell,xenon-sdhci": For controllers on all the SOCs, other than
+> >> +  Armada-3700.  
+> > 
+> > Need SoC specific compatible strings.
+> >   
+> 
+> 	Xenon SDHC is a common IP for all Marvell SOCs.
+> 	It is difficult to use a single SOC specific compatible to represent Xenon SDHC.
+> 	There will be so many SOC compatible strings in list if each specific SOC owns a compatible.
+> 	Actually only few SOCs require special properties.
+> 	Any suggestion please?
+> 
+> >> +
+> >> +- clocks:
+> >> +  Array of clocks required for SDHCI.
+> >> +  Requires at least one for Xenon IP core.
+> >> +  Some SOCs require additional clock for AXI bus.
+> >> +
+> >> +- clock-names:
+> >> +  Array of names corresponding to clocks property.
+> >> +  The input clock for Xenon IP core should be named as "core".
+> >> +  The optional AXI clock should be named as "axi".  
+> > 
+> > When is AXI clock optional? This should be required for ?? compatible 
+> > strings.
+> >   
+> 	It is required on some SOCs.
+> 	I will double check if a suitable compatible string can be determined for those SOCs.
 
->
->
-> Heiko
->
->
->
+Besides the core clk, berlin SoCs have one AXI clock. Usually, we have two
+solutions:
+
+solA: as current patch does, take "marvell,xenon-sdhci" as compatible string
+and make the AXI clock property optional. Usually for berlin SoCs, we don't need
+special properties.
+
+PS: this solution is also what sdhci-pxav3.c takes
+
+solB: As Rob said, add extra SoC compatible strings, so we'll have
+something like:
+
+static const struct of_device_id sdhci_xenon_of_match[] = {
+	{ .compatible = "marvell,armada-3700-sdhci", },
+	{ .compatible = "marvell,berlin4ct-sdhci", },
+	...
+	{ .compatible = "marvell,berlinxxx-mmc", },
+}
+
+then we take care the AXI clk for berlin SoCs in the code.
+
+
+Which solution do you prefer?
+
+Thanks,
+Jisheng
