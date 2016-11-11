@@ -1,47 +1,56 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Fri, 11 Nov 2016 08:37:35 +0100
-Subject: [PATCH v4 1/5] arm64: perf: Basic uncore counter support for
- Cavium ThunderX SOC
-In-Reply-To: <20161110165405.GH4418@leverpostej>
-References: <cover.1477741719.git.jglauber@cavium.com>
- <73173d6ad2430eead5e9da40564a90a60961b6d9.1477741719.git.jglauber@cavium.com>
- <20161110165405.GH4418@leverpostej>
-Message-ID: <20161111073735.GB16907@hardcore>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 11 Nov 2016 15:40:17 +0800
+Subject: [PATCH v5 00/23] Support qcom's HSIC USB and rewrite USB2 HS
+ support
+In-Reply-To: <147682389932.20076.4186408979552866325@sboyd-linaro>
+References: <20161018015636.11701-1-stephen.boyd@linaro.org>
+ <20161018093139.GB6294@b29397-desktop>
+ <147682389932.20076.4186408979552866325@sboyd-linaro>
+Message-ID: <20161111074017.GA21045@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 10, 2016 at 04:54:06PM +0000, Mark Rutland wrote:
-> > +/*
-> > + * Some notes about the various counters supported by this "uncore" PMU
-> > + * and the design:
-> > + *
-> > + * All counters are 64 bit long.
-> > + * There are no overflow interrupts.
-> > + * Counters are summarized per node/socket.
-> > + * Most devices appear as separate PCI devices per socket with the exception
-> > + * of OCX TLK which appears as one PCI device per socket and contains several
-> > + * units with counters that are merged.
+On Tue, Oct 18, 2016 at 01:51:39PM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-10-18 02:31:40)
+> > On Mon, Oct 17, 2016 at 06:56:13PM -0700, Stephen Boyd wrote:
+> > > I've also sent separate patches for other minor pieces to make this
+> > > all work. The full tree can be found here[2], hacks and all to get
+> > > things working. I've tested this on the db410c, apq8074 dragonboard,
+> > > and ifc6410 with configfs gadgets and otg cables.
+> > > 
+> > > Patches based on v4.8-rc1
 > 
-> As a general note, as I commented on the QC L2 PMU driver [1,2], we need
-> to figure out if we should be aggregating physical PMUs or not.
+> Oops should be v4.9-rc1 here.
+> 
+> > > 
+> > > Changes from v4:
+> > >  * Picked up Acks from Rob
+> > >  * Updated HS phy init sequence DT property to restrict it to offsets
+> > 
+> > I remembered that you got all my acks for chipidea patches, right? I did
+> > not check for this series.
+> 
+> Sorry I've added in one more patch
+> 
+>    usb: chipidea: Emulate OTGSC interrupt enable path
+> 
+> to fix extcon interrupt emulation even further.
+> 
+> > 
+> > Besides, the patch "gpu: Remove depends on RESET_CONTROLLER when not a
+> > provider" [1]  still not be accepted, I need this patch to be merged
+> > first, then apply your chipidea part, otherwise, there is a building
+> > warning.
+> > 
+> > [1] https://patchwork.kernel.org/patch/9322583/
+> 
+> Yes, I'm going to resend that patch now. I hope that David will apply it
+> for -rc2.
 
-As said before, although it would be possible to create separate PMUs
-for each unit, the individual counters are not interesting. For example
-we are not interested in individual counters of Tag-and-data unit 0..7,
-we just want the global view.
+Stephen, just a mind. I have rebased Greg's usb-next tree (v4.9-rc3 on
+it), your GPU fix is still not there.
 
-> Judging by subsequent patches, each unit has individual counters and
-> controls, and thus we cannot atomically read/write counters or controls
-> across them. As such, I do not think we should aggregate them, and
-> should expose them separately to userspace.
+-- 
 
-That sounds like just moving the problem of aggregating the counters to
-user-space. And would make the results even worse, if the user needs
-several calls to summarize the counters, given how slow a perf counter
-read is.
-
-
-> That will simplify a number of things (e.g. the CPU migration code no
-> longer has to iterate over a list of units).
-
-Sure, it simplifies the kernel part, but it moves the cost to the user.
+Best Regards,
+Peter Chen
