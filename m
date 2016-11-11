@@ -1,180 +1,103 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Thu, 10 Nov 2016 20:45:44 -0500
-Subject: [PATCH v6 7/9] drm/hisilicon/hibmc: Add connector for VDAC
-In-Reply-To: <1477639682-22520-8-git-send-email-zourongrong@gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-8-git-send-email-zourongrong@gmail.com>
-Message-ID: <CAOw6vbJA3Oe3GmRZBZjF24wtu_5hyTdVL2HK-1p3BLbiY1G7Tw@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 11 Nov 2016 09:53:03 +0800
+Subject: [PATCH v9 2/8] power: add power sequence library
+In-Reply-To: <CAJZ5v0ioqMqoaJqK0CTXafWRKoohmZSiOWKRgVZ9DR3_8+-YDw@mail.gmail.com>
+References: <1478573472-29516-1-git-send-email-peter.chen@nxp.com>
+ <1478573472-29516-3-git-send-email-peter.chen@nxp.com>
+ <CAJZ5v0ioqMqoaJqK0CTXafWRKoohmZSiOWKRgVZ9DR3_8+-YDw@mail.gmail.com>
+Message-ID: <20161111015303.GA12742@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 28, 2016 at 3:28 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
-> Add connector funcs and helper funcs for VDAC.
->
-> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
-> ---
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |  8 +++
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  2 +
->  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 76 ++++++++++++++++++++++++
->  3 files changed, 86 insertions(+)
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> index ba191e1..4253603 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-> @@ -131,6 +131,14 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
->                 return ret;
->         }
->
-> +       ret = hibmc_connector_init(hidev);
-> +       if (ret) {
-> +               DRM_ERROR("failed to init connector\n");
-> +               return ret;
-> +       }
-> +
-> +       drm_mode_connector_attach_encoder(&hidev->connector,
-> +                                         &hidev->encoder);
+On Fri, Nov 11, 2016 at 02:05:01AM +0100, Rafael J. Wysocki wrote:
+> On Tue, Nov 8, 2016 at 3:51 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > We have an well-known problem that the device needs to do some power
+> > sequence before it can be recognized by related host, the typical
+> > example like hard-wired mmc devices and usb devices.
+> >
+> > This power sequence is hard to be described at device tree and handled by
+> > related host driver, so we have created a common power sequence
+> > library to cover this requirement. The core code has supplied
+> > some common helpers for host driver, and individual power sequence
+> > libraries handle kinds of power sequence for devices. The pwrseq
+> > librares always need to allocate extra instance for compatible
+> > string match.
+> >
+> > pwrseq_generic is intended for general purpose of power sequence, which
+> > handles gpios and clocks currently, and can cover other controls in
+> > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence is needed, else call of_pwrseq_on_list
+> > /of_pwrseq_off_list instead (eg, USB hub driver).
+> >
+> > For new power sequence library, it can add its compatible string
+> > to pwrseq_of_match_table, then the pwrseq core will match it with
+> > DT's, and choose this library at runtime.
+> 
+> In the first place, please document this stuff better than you have so
+> far.  To a minimum, add kerneldoc comments to all new non-trivial new
+> functions to document what they are for and how they are expected to
+> be used (especially the ones exported to drivers).
+> 
 
-The connector should be initialized in the vdac driver with the
-encoder, not in the drv file (same as plane/crtc)
+Thanks for your comments.
 
->         return 0;
->  }
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> index 401cea4..450247d 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-> @@ -48,6 +48,7 @@ struct hibmc_drm_device {
->         struct drm_plane plane;
->         struct drm_crtc crtc;
->         struct drm_encoder encoder;
-> +       struct drm_connector connector;
+I will add kerneldoc for main APIs.
 
-No need to keep track here
+> Also, is there any guidance available for people who may want to use it?
 
->         bool mode_config_initialized;
->
->         /* ttm */
-> @@ -89,6 +90,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
->  int hibmc_plane_init(struct hibmc_drm_device *hidev);
->  int hibmc_crtc_init(struct hibmc_drm_device *hidev);
->  int hibmc_encoder_init(struct hibmc_drm_device *hidev);
-> +int hibmc_connector_init(struct hibmc_drm_device *hidev);
->  int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
->  void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
->
-> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-> index 953f659..ebefcd1 100644
-> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
-> @@ -87,3 +87,79 @@ int hibmc_encoder_init(struct hibmc_drm_device *hidev)
->         drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
->         return 0;
->  }
-> +
-> +static int hibmc_connector_get_modes(struct drm_connector *connector)
-> +{
-> +       int count;
-> +
-> +       count = drm_add_modes_noedid(connector, 800, 600);
-> +       drm_set_preferred_mode(connector, defx, defy);
+No doc now, only some guidance in this commit log.
 
-So you have defx/defy as module parameters, but then hardcode the
-800x600 mode. If defx/defy is anything other than 800/600, this won't
-work. I think you should just remove the defx/defy module params and
-rely on userspace adding modes as appropriate.
+> > +config PWRSEQ_GENERIC
+> > +       bool "Generic power sequence control"
+> > +       depends on OF
+> > +       select POWER_SEQUENCE
+> > +       help
+> > +          It is used for drivers which needs to do power sequence
+> > +          (eg, turn on clock, toggle reset gpio) before the related
+> > +          devices can be found by hardware. This generic one can be
+> > +          used for common power sequence control.
+> 
+> I wouldn't set it up this way.
+> 
+> There are two problems here.
+> 
+> First, say a distro is going to ship a multiplatform generic kernel.
+> How they are going to figure out whether or not to set the new symbol
+> in that kernel?
+> 
+> Second, how users are supposed to know whether or not they will need
+> it even if they build the kernel by themselves?
+> 
+> It would be better IMO to set things up to select the new symbol from
+> places making use of the code depending on it.
+> 
 
-> +       return count;
-> +}
-> +
-> +static int hibmc_connector_mode_valid(struct drm_connector *connector,
-> +                                     struct drm_display_mode *mode)
-> +{
-> +       struct hibmc_drm_device *hiprivate =
-> +        container_of(connector, struct hibmc_drm_device, connector);
-> +       unsigned long size = mode->hdisplay * mode->vdisplay * 4;
+Will change it like below:
 
-Why * 4 here and why * 2 below? You support formats less than 32 bpp,
-so the * 4 isn't necessarily correct for all formats. Is the * 2 to
-account for front & back buffer?
+#
+# Power Sequence library
+#
 
+menuconfig POWER_SEQUENCE
+	bool "Power sequence control"
+	depends on OF
+	help
+	   It is used for drivers which needs to do power sequence
+	   (eg, turn on clock, toggle reset gpio) before the related
+	   devices can be found by hardware. 
 
-> +
-> +       if (size * 2 > hiprivate->fb_size)
-> +               return MODE_BAD;
-> +
-> +       return MODE_OK;
-> +}
-> +
-> +static struct drm_encoder *
-> +hibmc_connector_best_encoder(struct drm_connector *connector)
-> +{
-> +       int enc_id = connector->encoder_ids[0];
-> +
-> +       /* pick the encoder ids */
-> +       if (enc_id)
-> +               return drm_encoder_find(connector->dev, enc_id);
+if POWER_SEQUENCE
 
-Can't you just do return drm_encoder_find(connector->dev,
-connector->encoder_ids[0]); ?
+config PWRSEQ_GENERIC
+	bool "Generic power sequence control"
+	default y
+	help
+	   This is the generic power sequence control library, and is
+	   supposed to support common power sequence usage.
+endif
 
-ie: won't drm_encoder_find do the right thing if you pass in id == 0?
+And the current user usb core will select POWER_SEQUENCE.
+-- 
 
-> +
-> +       return NULL;
-> +}
-> +
-> +static enum drm_connector_status hibmc_connector_detect(struct drm_connector
-> +                                                *connector, bool force)
-> +{
-> +       return connector_status_connected;
-
-Perhaps this should be connector_status_unknown, since you don't
-necessarily know it's connected.
-
-> +}
-> +
-> +static const struct drm_connector_helper_funcs
-> +       hibmc_connector_connector_helper_funcs = {
-> +       .get_modes = hibmc_connector_get_modes,
-> +       .mode_valid = hibmc_connector_mode_valid,
-> +       .best_encoder = hibmc_connector_best_encoder,
-> +};
-> +
-> +static const struct drm_connector_funcs hibmc_connector_connector_funcs = {
-> +       .dpms = drm_atomic_helper_connector_dpms,
-> +       .detect = hibmc_connector_detect,
-> +       .fill_modes = drm_helper_probe_single_connector_modes,
-> +       .destroy = drm_connector_cleanup,
-> +       .reset = drm_atomic_helper_connector_reset,
-> +       .atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-> +       .atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-> +};
-> +
-> +int hibmc_connector_init(struct hibmc_drm_device *hidev)
-> +{
-> +       struct drm_device *dev = hidev->dev;
-> +       struct drm_connector *connector = &hidev->connector;
-> +       int ret;
-> +
-> +       ret = drm_connector_init(dev, connector,
-> +                                &hibmc_connector_connector_funcs,
-> +                                DRM_MODE_CONNECTOR_VGA);
-> +       if (ret) {
-> +               DRM_ERROR("failed to init connector\n");
-> +               return ret;
-> +       }
-> +       drm_connector_helper_add(connector,
-> +                                &hibmc_connector_connector_helper_funcs);
-> +
-> +       return 0;
-> +}
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards,
+Peter Chen
