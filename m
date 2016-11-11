@@ -1,83 +1,119 @@
-From: john3909@gmail.com (John Syne)
-Date: Thu, 10 Nov 2016 19:30:45 -0800
-Subject: [PATCH] drivers: mfd: ti_am335x_tscadc: increase ADC ref clock to
- 24MHz
-In-Reply-To: <b7232421-10f7-2bac-0ad8-847804126bf2@ti.com>
-References: <20161024060226.4170-1-mugunthanvnm@ti.com>
- <038C6B01-8443-4321-9C65-BAC4095237D3@gmail.com>
- <086ab2fa-63ee-c5ab-2715-b2efd78270d7@ti.com>
- <12725C92-9BB8-4F77-A7B4-F3C3DA9F8B0B@gmail.com>
- <DB09B26E-C5AB-427A-82D5-6FE857E7C218@gmail.com> <20161025063847.GD8574@dell>
- <CC15CFB4-60D0-4A63-A3D3-2079CFA31274@gmail.com> <20161026084811.GI8574@dell>
- <A5F6974F-5793-4E85-BF82-2D9309980991@gmail.com>
- <d7fadbf6-8026-d821-1ef8-981f536a8fdf@ti.com>
- <D0AA78D0-9562-4E4D-A949-A771289D7570@gmail.com>
- <b7232421-10f7-2bac-0ad8-847804126bf2@ti.com>
-Message-ID: <30CF3CC1-A4F1-4C31-B51F-A1AB1D352AF5@gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 11 Nov 2016 11:33:38 +0800
+Subject: [PATCH 5/10] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <20161111112243.7431625d@xhacker>
+References: <cover.86006f271b60cf7c0b4c5a51762a9dacca4c4718.1477911954.git-series.gregory.clement@free-electrons.com>
+ <ee296deafdcbeb431a592b591ae38a758ba4cce7.1477911954.git-series.gregory.clement@free-electrons.com>
+ <20161109182426.vfrpb4i2mfatdzz3@rob-hp-laptop>
+ <15b06a12-ed69-03a7-ccc7-0c133ce1ac1e@marvell.com>
+ <20161111112243.7431625d@xhacker>
+Message-ID: <20161111113324.377b8841@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 11 Nov 2016 11:22:43 +0800 Jisheng Zhang wrote:
 
-> On Nov 9, 2016, at 9:07 PM, Vignesh R <vigneshr@ti.com> wrote:
+> Hi Rob, Ziji,
 > 
-> Hi,
+> On Thu, 10 Nov 2016 19:44:19 +0800 Ziji Hu wrote:
 > 
-> On Thursday 10 November 2016 05:23 AM, John Syne wrote:
->> OK, then back to my original question. Given that these DT properties are supported in the driver
->> 
+> > Hi Rob,
+> > 
+> > On 2016/11/10 2:24, Rob Herring wrote:  
+> > > On Mon, Oct 31, 2016 at 12:09:54PM +0100, Gregory CLEMENT wrote:    
+> > >> From: Ziji Hu <huziji@marvell.com>
+> > >>
+> > >> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+> > >> Add Xenon-specific properties.
+> > >> Also add properties for Xenon PHY setting.
+> > >>
+> > >> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> > >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > >> ---
+> > >>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 161 +++++++-
+> > >>  MAINTAINERS                                                   |   1 +-
+> > >>  2 files changed, 162 insertions(+), 0 deletions(-)
+> > >>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> > >>
+> > >> diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> > >> new file mode 100644
+> > >> index 000000000000..0d2d139494d3
+> > >> --- /dev/null
+> > >> +++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+> > >> @@ -0,0 +1,161 @@
+> > >> +Marvell's Xenon SDHCI Controller device tree bindings
+> > >> +This file documents differences between the core mmc properties
+> > >> +described by mmc.txt and the properties used by the Xenon implementation.
+> > >> +
+> > >> +A single Xenon IP can support multiple slots.
+> > >> +Each slot acts as an independent SDHC. It owns independent resources, such
+> > >> +as register sets clock and PHY.
+> > >> +Each slot should have an independent device tree node.
+> > >> +
+> > >> +Required Properties:
+> > >> +- compatible: should be one of the following
+> > >> +  - "marvell,armada-3700-sdhci": For controllers on Armada-3700 SOC.
+> > >> +  Must provide a second register area and marvell,pad-type.
+> > >> +  - "marvell,xenon-sdhci": For controllers on all the SOCs, other than
+> > >> +  Armada-3700.    
+> > > 
+> > > Need SoC specific compatible strings.
+> > >     
+> > 
+> > 	Xenon SDHC is a common IP for all Marvell SOCs.
+> > 	It is difficult to use a single SOC specific compatible to represent Xenon SDHC.
+> > 	There will be so many SOC compatible strings in list if each specific SOC owns a compatible.
+> > 	Actually only few SOCs require special properties.
+> > 	Any suggestion please?
+> >   
+> > >> +
+> > >> +- clocks:
+> > >> +  Array of clocks required for SDHCI.
+> > >> +  Requires at least one for Xenon IP core.
+> > >> +  Some SOCs require additional clock for AXI bus.
+> > >> +
+> > >> +- clock-names:
+> > >> +  Array of names corresponding to clocks property.
+> > >> +  The input clock for Xenon IP core should be named as "core".
+> > >> +  The optional AXI clock should be named as "axi".    
+> > > 
+> > > When is AXI clock optional? This should be required for ?? compatible 
+> > > strings.
+> > >     
+> > 	It is required on some SOCs.
+> > 	I will double check if a suitable compatible string can be determined for those SOCs.  
 > 
-> Below properties are supported by only by ti_am3335x_adc driver and not
-> ti_am335x_tsc driver. As author of this patch pointed out in another
-> reply, there is no need to change step-opendelay for tsc. AFAIK, I don't
-> see a use case where these values needs to be tweaked for tsc channels,
-> therefore it does not make sense to be DT properties.
-Yeah, the confusion was mine because the author of this patch series was proposing to hard code these settings while DT properties already existed in the ti_am335x_adc driver. I use the ADC for sensor measurement and do not use the touchscreen features. I already pointed out where these DT parameters should be added by referencing how this was done in one of the BBB DT overlay files [1]. I am just proposing the same is done as a default in the AM33xx.dtsi and AM4372.dtsi files. Here is what I was proposing. Granted, the adc-channels should be restricted to the subset of channels not used by tsc, but you get the idea.
+> Besides the core clk, berlin SoCs have one AXI clock. Usually, we have two
+> solutions:
+> 
+> solA: as current patch does, take "marvell,xenon-sdhci" as compatible string
+> and make the AXI clock property optional. Usually for berlin SoCs, we don't need
+> special properties.
 
-tscadc: tscadc at 44e0d000 {
-			compatible = "ti,am3359-tscadc";
-			reg = <0x44e0d000 0x1000>;
-			interrupt-parent = <&intc>;
-			interrupts = <16>;
-			ti,hwmods = "adc_tsc";
-			status = "disabled";
-			dmas = <&edma 53 0>, <&edma 57 0>;
-			dma-names = "fifo0", "fifo1?;
+Personally, I prefer solA: use the IP name as compatible string. This is IP
+specific rather than SoC specific. The HW itself supports two clks
 
-			tsc {
-				compatible = "ti,am3359-tsc";
-			};
-			am335x_adc: adc {
-				#io-channel-cells = <1>;
-				ti,adc-channels = <0 1 2 3 4 5 6>;
-				ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
-				ti,chan-step-opendelay = <0x98 0x98 0x98 0x98 0x98 0x98 0x98>;
-				ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
-				compatible = "ti,am3359-adc";
-			};
-};
+Thanks,
+Jisheng
 
-[1]https://github.com/RobertCNelson/bb.org-overlays/blob/master/src/arm/BB-ADC-00A0.dts
-
-Regards,
-John
 > 
->> shouldn?t the following be added to am33xx.dtsi and am4372.dtsi?
+> PS: this solution is also what sdhci-pxav3.c takes
 > 
-> Its totally upto board dts files to allocate channels for tsc and adc.
-> So, how could these be added to dtsi files?
+> solB: As Rob said, add extra SoC compatible strings, so we'll have
+> something like:
 > 
->> ti,chan-step-avg = <0x16 0x16 0x16 0x16 0x16 0x16 0x16>;
->> ti,chan-step-opendelay = <0x500 0x500 0x500 0x500 0x500 0x500 0x500>;
->> ti,chan-step-sampledelay = <0x0 0x0 0x0 0x0 0x0 0x0 0x0>;
->> 
->> Regards,
->> John
->>> 
->>> -- 
->>> Regards
->>> Vignesh
->> 
+> static const struct of_device_id sdhci_xenon_of_match[] = {
+> 	{ .compatible = "marvell,armada-3700-sdhci", },
+> 	{ .compatible = "marvell,berlin4ct-sdhci", },
+> 	...
+> 	{ .compatible = "marvell,berlinxxx-mmc", },
+> }
 > 
-> -- 
-> Regards
-> Vignesh
+> then we take care the AXI clk for berlin SoCs in the code.
+> 
+> 
+> Which solution do you prefer?
+> 
+> Thanks,
+> Jisheng
