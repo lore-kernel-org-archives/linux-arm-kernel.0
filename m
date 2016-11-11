@@ -1,103 +1,145 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 11 Nov 2016 09:53:03 +0800
-Subject: [PATCH v9 2/8] power: add power sequence library
-In-Reply-To: <CAJZ5v0ioqMqoaJqK0CTXafWRKoohmZSiOWKRgVZ9DR3_8+-YDw@mail.gmail.com>
-References: <1478573472-29516-1-git-send-email-peter.chen@nxp.com>
- <1478573472-29516-3-git-send-email-peter.chen@nxp.com>
- <CAJZ5v0ioqMqoaJqK0CTXafWRKoohmZSiOWKRgVZ9DR3_8+-YDw@mail.gmail.com>
-Message-ID: <20161111015303.GA12742@b29397-desktop>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 10 Nov 2016 20:49:39 -0500
+Subject: [PATCH v6 8/9] drm/hisilicon/hibmc: Add vblank interruput
+In-Reply-To: <1477639682-22520-9-git-send-email-zourongrong@gmail.com>
+References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
+ <1477639682-22520-9-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAOw6vbKx88Bz4RcD3a0K7m-uomHx9wOGN6y7eOuq+yeUdRjZ5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 02:05:01AM +0100, Rafael J. Wysocki wrote:
-> On Tue, Nov 8, 2016 at 3:51 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> > We have an well-known problem that the device needs to do some power
-> > sequence before it can be recognized by related host, the typical
-> > example like hard-wired mmc devices and usb devices.
-> >
-> > This power sequence is hard to be described at device tree and handled by
-> > related host driver, so we have created a common power sequence
-> > library to cover this requirement. The core code has supplied
-> > some common helpers for host driver, and individual power sequence
-> > libraries handle kinds of power sequence for devices. The pwrseq
-> > librares always need to allocate extra instance for compatible
-> > string match.
-> >
-> > pwrseq_generic is intended for general purpose of power sequence, which
-> > handles gpios and clocks currently, and can cover other controls in
-> > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > if only one power sequence is needed, else call of_pwrseq_on_list
-> > /of_pwrseq_off_list instead (eg, USB hub driver).
-> >
-> > For new power sequence library, it can add its compatible string
-> > to pwrseq_of_match_table, then the pwrseq core will match it with
-> > DT's, and choose this library at runtime.
-> 
-> In the first place, please document this stuff better than you have so
-> far.  To a minimum, add kerneldoc comments to all new non-trivial new
-> functions to document what they are for and how they are expected to
-> be used (especially the ones exported to drivers).
-> 
+On Fri, Oct 28, 2016 at 3:28 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
+> Add vblank interrupt.
+>
+> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+> ---
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c | 56 ++++++++++++++++++++++++-
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |  1 +
+>  2 files changed, 56 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> index 4253603..b668e3e 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+> @@ -40,16 +40,46 @@
+>
+>  static int hibmc_enable_vblank(struct drm_device *dev, unsigned int pipe)
+>  {
+> +       struct hibmc_drm_device *hidev =
+> +               (struct hibmc_drm_device *)dev->dev_private;
+> +
+> +       writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(1),
+> +              hidev->mmio + HIBMC_RAW_INTERRUPT_EN);
+> +
+>         return 0;
+>  }
+>
+>  static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+>  {
+> +       struct hibmc_drm_device *hidev =
+> +               (struct hibmc_drm_device *)dev->dev_private;
+> +
+> +       writel(HIBMC_RAW_INTERRUPT_EN_VBLANK(0),
+> +              hidev->mmio + HIBMC_RAW_INTERRUPT_EN);
+> +}
+> +
+> +irqreturn_t hibmc_drm_interrupt(int irq, void *arg)
+> +{
+> +       struct drm_device *dev = (struct drm_device *)arg;
+> +       struct hibmc_drm_device *hidev =
+> +               (struct hibmc_drm_device *)dev->dev_private;
+> +       struct drm_crtc *crtc = &hidev->crtc;
+> +       u32 status;
+> +
+> +       status = readl(hidev->mmio + HIBMC_RAW_INTERRUPT);
+> +
+> +       if (status & HIBMC_RAW_INTERRUPT_VBLANK(1)) {
+> +               writel(HIBMC_RAW_INTERRUPT_VBLANK(1),
+> +                      hidev->mmio + HIBMC_RAW_INTERRUPT);
+> +               drm_crtc_handle_vblank(crtc);
+> +       }
+> +
+> +       return IRQ_HANDLED;
+>  }
+>
+>  static struct drm_driver hibmc_driver = {
+>         .driver_features        = DRIVER_GEM | DRIVER_MODESET |
+> -                                 DRIVER_ATOMIC,
+> +                                 DRIVER_ATOMIC | DRIVER_HAVE_IRQ,
+>         .fops                   = &hibmc_fops,
+>         .name                   = "hibmc",
+>         .date                   = "20160828",
+> @@ -63,6 +93,7 @@ static void hibmc_disable_vblank(struct drm_device *dev, unsigned int pipe)
+>         .dumb_create            = hibmc_dumb_create,
+>         .dumb_map_offset        = hibmc_dumb_mmap_offset,
+>         .dumb_destroy           = drm_gem_dumb_destroy,
+> +       .irq_handler            = hibmc_drm_interrupt,
+>  };
+>
+>  static int hibmc_pm_suspend(struct device *dev)
+> @@ -242,6 +273,13 @@ static int hibmc_unload(struct drm_device *dev)
+>         struct hibmc_drm_device *hidev = dev->dev_private;
+>
+>         hibmc_fbdev_fini(hidev);
+> +
+> +       if (dev->irq_enabled)
+> +               drm_irq_uninstall(dev);
+> +       if (hidev->msi_enabled)
+> +               pci_disable_msi(dev->pdev);
+> +       drm_vblank_cleanup(dev);
+> +
+>         hibmc_kms_fini(hidev);
+>         hibmc_mm_fini(hidev);
+>         hibmc_hw_fini(hidev);
+> @@ -272,6 +310,22 @@ static int hibmc_load(struct drm_device *dev, unsigned long flags)
+>         if (ret)
+>                 goto err;
+>
+> +       ret = drm_vblank_init(dev, dev->mode_config.num_crtc);
+> +       if (ret) {
+> +               DRM_ERROR("failed to initialize vblank.\n");
+> +               goto err;
+> +       }
+> +
+> +       hidev->msi_enabled = 0;
+> +       if (pci_enable_msi(dev->pdev)) {
 
-Thanks for your comments.
+It would be useful to check and print the return value of this.
 
-I will add kerneldoc for main APIs.
+> +               DRM_ERROR("Enabling MSI failed!\n");
+> +       } else {
+> +               hidev->msi_enabled = 1;
+> +               ret = drm_irq_install(dev, dev->pdev->irq);
+> +               if (ret)
+> +                       DRM_ERROR("install irq failed , ret = %d\n", ret);
 
-> Also, is there any guidance available for people who may want to use it?
+DRM_WARN might be more appropriate, given that this isn't considered fatal.
 
-No doc now, only some guidance in this commit log.
+> +       }
+> +
+>         /* reset all the states of crtc/plane/encoder/connector */
+>         drm_mode_config_reset(dev);
+>
+> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> index 450247d..f1706fb 100644
+> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+> @@ -42,6 +42,7 @@ struct hibmc_drm_device {
+>         void __iomem   *fb_map;
+>         unsigned long  fb_base;
+>         unsigned long  fb_size;
+> +       int msi_enabled;
 
-> > +config PWRSEQ_GENERIC
-> > +       bool "Generic power sequence control"
-> > +       depends on OF
-> > +       select POWER_SEQUENCE
-> > +       help
-> > +          It is used for drivers which needs to do power sequence
-> > +          (eg, turn on clock, toggle reset gpio) before the related
-> > +          devices can be found by hardware. This generic one can be
-> > +          used for common power sequence control.
-> 
-> I wouldn't set it up this way.
-> 
-> There are two problems here.
-> 
-> First, say a distro is going to ship a multiplatform generic kernel.
-> How they are going to figure out whether or not to set the new symbol
-> in that kernel?
-> 
-> Second, how users are supposed to know whether or not they will need
-> it even if they build the kernel by themselves?
-> 
-> It would be better IMO to set things up to select the new symbol from
-> places making use of the code depending on it.
-> 
+Why not bool?
 
-Will change it like below:
-
-#
-# Power Sequence library
-#
-
-menuconfig POWER_SEQUENCE
-	bool "Power sequence control"
-	depends on OF
-	help
-	   It is used for drivers which needs to do power sequence
-	   (eg, turn on clock, toggle reset gpio) before the related
-	   devices can be found by hardware. 
-
-if POWER_SEQUENCE
-
-config PWRSEQ_GENERIC
-	bool "Generic power sequence control"
-	default y
-	help
-	   This is the generic power sequence control library, and is
-	   supposed to support common power sequence usage.
-endif
-
-And the current user usb core will select POWER_SEQUENCE.
--- 
-
-Best Regards,
-Peter Chen
+>
+>         /* drm */
+>         struct drm_device  *dev;
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
