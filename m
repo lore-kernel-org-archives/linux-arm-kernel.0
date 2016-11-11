@@ -1,55 +1,55 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 11 Nov 2016 16:03:16 +0100
-Subject: [RFC v2 8/8] iommu/arm-smmu: implement add_reserved_regions
- callback
-In-Reply-To: <479aeac0-71f9-a6b8-af6d-e2c25184a818@arm.com>
-References: <1478258646-3117-1-git-send-email-eric.auger@redhat.com>
- <1478258646-3117-9-git-send-email-eric.auger@redhat.com>
- <20161110154606.GH2078@8bytes.org>
- <b347ddbc-5066-641c-8101-289fb28624a3@arm.com>
- <20161110161619.GK2078@8bytes.org>
- <479aeac0-71f9-a6b8-af6d-e2c25184a818@arm.com>
-Message-ID: <20161111150316.GR2078@8bytes.org>
+From: jsarha@ti.com (Jyri Sarha)
+Date: Fri, 11 Nov 2016 17:10:09 +0200
+Subject: [PATCH RFC 00/12] tda998x updates
+In-Reply-To: <20161108122420.GP1041@n2100.armlinux.org.uk>
+References: <20161108122420.GP1041@n2100.armlinux.org.uk>
+Message-ID: <964260d7-af7f-fefb-2adb-0e10ff750883@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 02:34:39PM +0000, Robin Murphy wrote:
-> On 10/11/16 16:16, Joerg Roedel wrote:
-> > On Thu, Nov 10, 2016 at 04:07:08PM +0000, Robin Murphy wrote:
-> >> On 10/11/16 15:46, Joerg Roedel wrote:
-> >>> On Fri, Nov 04, 2016 at 11:24:06AM +0000, Eric Auger wrote:
-> >>>> +	resource_list_for_each_entry(window, &bridge->windows) {
-> >>>> +		if (resource_type(window->res) != IORESOURCE_MEM &&
-> >>>> +		    resource_type(window->res) != IORESOURCE_IO)
-> >>>> +			continue;
-> >>>
-> >>> Why do you care about IO resources?
-> >>
-> >> [since this is essentially code I wrote]
-> >>
-> >> Because they occupy some area of the PCI address space, therefore I
-> >> assumed that, like memory windows, they would be treated as P2P. Is that
-> >> not the case?
-> > 
-> > No, not at all. The IO-space is completly seperate from the MEM-space.
-> > They are two different address-spaces, addressing different things. And
-> > the IO-space is also not translated by any IOMMU I am aware of.
+On 11/08/16 14:24, Russell King - ARM Linux wrote:
+> As no one responded to the previous round, I'm not spending soo much
+> time writing up a description of these changes again.  It's also been
+> quite a long time, so I've forgotten all the details of the changes,
+> so I'll do my best.
 > 
-> OK. On the particular root complex I have to hand, though, any DMA to
-> IOVAs between 0x5f800000 and 0x5fffffff sends an error back to the
-> endpoint, and that just so happens to be where the I/O window is placed
-> (both on the PCI side and the AXI (i.e. CPU MMIO) side. Whether it's
-> that the external MMIO view of the RC's I/O window is explicitly
-> duplicated in its PCI memory space as some side-effect of the PCI/AXI
-> bridge, or that the thing just doesn't actually respect the access type
-> on the PCI side I don't know, but that's how it is (and I spent this
-> morning recreating it to make sure I wasn't mistaken).
+> Changes from the previous series include:
+> - reorder the initial three patches
+> - change the (now third patch)... I think to increase the size of the
+>   locked region.
+> - fix edid parsing for infoframe generation - as was pointed out for
+>   dw-hdmi, parsing the EDID in get_modes() is incorrect, as that method
+>   will not be called when an override-edid is in effect.  We need to
+>   parse the override-edid.  Moreover, infoframe generation should not
+>   be keyed to whether the monitor is HDMI or not, CEA-861B allows non-
+>   HDMI to send infoframes.
+> - only send audio if audio and infoframes are supported.
+> 
+> Otherwise, these are very much like the previous posting of the series,
+> except rebased upon the mali/hdlcd/tda998x change to remove the
+> drm_connector_register() call.
+> 
+> https://www.spinics.net/lists/dri-devel/msg121495.html
+> 
+> It'd be nice to have other tda998x users ack and test these patches,
+> I've tried to test on Juno, but the Juno situation seems to be a huge
+> fail.  (HBI0282B completely fails with latest firmware - (a) FPGA image
+> incompatibilities io_b118 causes all FPGA AMBA devices to vanish, (b)
+> seems no way to get SCPI support on it - adding the BL0 executable
+> start address in the SCC registers seems to be incompatible with the
+> devchip, causing the PLLs to fail.  In discussion with Sudeep over
+> these issues, but no idea where things are with it at the moment, other
+> than Sudeep needs to investigate.  All Linaro firmware releases are
+> broken on HBI0282B.)
+> 
+>  drivers/gpu/drm/i2c/tda998x_drv.c | 826 ++++++++++++++++++++------------------
+>  1 file changed, 429 insertions(+), 397 deletions(-)
+> 
 
-What you see is that on your platform the io-ports are accessed by an
-mmio-window. On x86 you have dedicated instructions to access io-ports.
-And the io-port ranges are what is what the io-resources describe. These
-resources do no tell you where the mmio-region for that devices io-ports
-are.
+Reviewed-by: Jyri Sarha <jsarha@ti.com>
 
+For the whole series. I am also happy to test these patches if I can
+fetch them from some git repo.
 
-	Joerg
+Best regards,
+Jyri
