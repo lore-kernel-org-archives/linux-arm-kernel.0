@@ -1,56 +1,130 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 11 Nov 2016 17:50:33 +0800
-Subject: [PATCH v3 0/3] pinctrl: sunxi: Support generic pinconf functions
-Message-ID: <20161111095036.11803-1-wens@csie.org>
+Date: Fri, 11 Nov 2016 17:50:36 +0800
+Subject: [PATCH v3 3/3] pinctrl: sunxi: Make sunxi_pconf_group_set use
+ sunxi_pconf_reg helper
+In-Reply-To: <20161111095036.11803-1-wens@csie.org>
+References: <20161111095036.11803-1-wens@csie.org>
+Message-ID: <20161111095036.11803-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The sunxi_pconf_reg helper introduced in the last patch gives us the
+chance to rework sunxi_pconf_group_set to have it match the structure
+of sunxi_pconf_(group_)get and make it easier to understand.
 
-This series fixes up generic pinconf support for the sunxi pinctrl driver
-library. The driver was doing some bits wrong, like a) storing the pinconf
-config value in its struct, and not actually reading the hardware to get
-the current config, and b) not using the right arguments for the bias
-parameters.
+For each config to set, it:
 
-Patch 1 fixes the pin bias parameter arguments.
+    1. checks if the parameter is supported.
+    2. checks if the argument is within limits.
+    3. converts argument to the register value.
+    4. writes to the register with spinlock held.
 
-Patch 2 makes the driver read out pinconf settings from the hardware, and
-returns the correct value for unsupported features and disable features.
-With this in place it also declares itself as generic pinconf compatible,
-which enables us to read the config through the debugfs pinconf interface.
+As a result the function now blocks unsupported config parameters,
+instead of silently ignoring them.
 
-Patch 3 makes the sunxi_pconf_group_set callback use the helper function
-introduced in patch 1. 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 64 +++++++++++++++++------------------
+ 1 file changed, 32 insertions(+), 32 deletions(-)
 
-Changes since v2:
-
-  - Added Maxime's ack.
-
-  - Moved the removal of the cached config value from patch 3 to patch 2
-    at Maxime's request.
-
-Changes since v1:
-
-  - Rebased onto the updated sunxi pinctrl driver with support for the
-    generic pinconf bindings
-
-  - Use separate value for what is written to the register in the pinconf
-    set function, as Maxime requested.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (3):
-  pinctrl: sunxi: Fix PIN_CONFIG_BIAS_PULL_{DOWN,UP} argument
-  pinctrl: sunxi: Add support for fetching pinconf settings from
-    hardware
-  pinctrl: sunxi: Make sunxi_pconf_group_set use sunxi_pconf_reg helper
-
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 156 +++++++++++++++++++++++++---------
- drivers/pinctrl/sunxi/pinctrl-sunxi.h |   1 -
- 2 files changed, 118 insertions(+), 39 deletions(-)
-
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index ed71bff39869..fa11a3100346 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -532,23 +532,27 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+ {
+ 	struct sunxi_pinctrl *pctl = pinctrl_dev_get_drvdata(pctldev);
+ 	struct sunxi_pinctrl_group *g = &pctl->groups[group];
+-	unsigned long flags;
+ 	unsigned pin = g->pin - pctl->desc->pin_base;
+-	u32 val, mask;
+-	u16 strength;
+-	u8 dlevel;
+ 	int i;
+ 
+-	spin_lock_irqsave(&pctl->lock, flags);
+-
+ 	for (i = 0; i < num_configs; i++) {
+-		switch (pinconf_to_config_param(configs[i])) {
++		enum pin_config_param param;
++		unsigned long flags;
++		u32 offset, shift, mask, reg;
++		u16 arg, val;
++		int ret;
++
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		ret = sunxi_pconf_reg(pin, param, &offset, &shift, &mask);
++		if (ret < 0)
++			return ret;
++
++		switch (param) {
+ 		case PIN_CONFIG_DRIVE_STRENGTH:
+-			strength = pinconf_to_config_argument(configs[i]);
+-			if (strength > 40) {
+-				spin_unlock_irqrestore(&pctl->lock, flags);
++			if (arg < 10 || arg > 40)
+ 				return -EINVAL;
+-			}
+ 			/*
+ 			 * We convert from mA to what the register expects:
+ 			 *   0: 10mA
+@@ -556,37 +560,33 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+ 			 *   2: 30mA
+ 			 *   3: 40mA
+ 			 */
+-			dlevel = strength / 10 - 1;
+-			val = readl(pctl->membase + sunxi_dlevel_reg(pin));
+-			mask = DLEVEL_PINS_MASK << sunxi_dlevel_offset(pin);
+-			writel((val & ~mask)
+-				| dlevel << sunxi_dlevel_offset(pin),
+-				pctl->membase + sunxi_dlevel_reg(pin));
++			val = arg / 10 - 1;
+ 			break;
+ 		case PIN_CONFIG_BIAS_DISABLE:
+-			val = readl(pctl->membase + sunxi_pull_reg(pin));
+-			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+-			writel((val & ~mask),
+-			       pctl->membase + sunxi_pull_reg(pin));
++			val = 0;
+ 			break;
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+-			val = readl(pctl->membase + sunxi_pull_reg(pin));
+-			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+-			writel((val & ~mask) | 1 << sunxi_pull_offset(pin),
+-				pctl->membase + sunxi_pull_reg(pin));
++			if (arg == 0)
++				return -EINVAL;
++			val = 1;
+ 			break;
+ 		case PIN_CONFIG_BIAS_PULL_DOWN:
+-			val = readl(pctl->membase + sunxi_pull_reg(pin));
+-			mask = PULL_PINS_MASK << sunxi_pull_offset(pin);
+-			writel((val & ~mask) | 2 << sunxi_pull_offset(pin),
+-				pctl->membase + sunxi_pull_reg(pin));
++			if (arg == 0)
++				return -EINVAL;
++			val = 2;
+ 			break;
+ 		default:
+-			break;
++			/* sunxi_pconf_reg should catch anything unsupported */
++			WARN_ON(1);
++			return -ENOTSUPP;
+ 		}
+-	} /* for each config */
+ 
+-	spin_unlock_irqrestore(&pctl->lock, flags);
++		spin_lock_irqsave(&pctl->lock, flags);
++		reg = readl(pctl->membase + offset);
++		reg &= ~(mask << shift);
++		writel(reg | val << shift, pctl->membase + offset);
++		spin_unlock_irqrestore(&pctl->lock, flags);
++	} /* for each config */
+ 
+ 	return 0;
+ }
 -- 
 2.10.2
