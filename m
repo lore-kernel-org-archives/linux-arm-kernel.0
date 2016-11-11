@@ -1,99 +1,53 @@
-From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Fri, 11 Nov 2016 16:59:39 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6q-utilite-pro: i2c1 is muxed
-In-Reply-To: <20161111155939.446-1-christopher.spinrath@rwth-aachen.de>
-References: <20161111155939.446-1-christopher.spinrath@rwth-aachen.de>
-Message-ID: <9380efa7a5b749ee8b9c6433f925b20b@rwthex-s1-b.rwth-ad.de>
+From: ddutile@redhat.com (Don Dutile)
+Date: Fri, 11 Nov 2016 11:00:41 -0500
+Subject: Summary of LPC guest MSI discussion in Santa Fe
+In-Reply-To: <20161111111944.GO2078@8bytes.org>
+References: <20161109151709.74927f83@t450s.home>
+ <20161109222522.GS17771@arm.com> <20161109162458.39594fdb@t450s.home>
+ <20161109233847.GT17771@arm.com> <20161109165957.62c1eb61@t450s.home>
+ <83b6440a-31eb-c1b4-642c-a4c311f37ef2@redhat.com>
+ <20161109175517.174e7803@t450s.home> <20161110020130.GA19108@arm.com>
+ <ddd8af9d-ad8f-78d8-3048-3d640b74470e@redhat.com>
+ <20161110104601.0939ba9a@t450s.home> <20161111111944.GO2078@8bytes.org>
+Message-ID: <5825EB29.3040805@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+On 11/11/2016 06:19 AM, Joerg Roedel wrote:
+> On Thu, Nov 10, 2016 at 10:46:01AM -0700, Alex Williamson wrote:
+>> In the case of x86, we know that DMA mappings overlapping the MSI
+>> doorbells won't be translated correctly, it's not a valid mapping for
+>> that range, and therefore the iommu driver backing the IOMMU API
+>> should describe that reserved range and reject mappings to it.
+>
+> The drivers actually allow mappings to the MSI region via the IOMMU-API,
+> and I think it should stay this way also for other reserved ranges.
+> Address space management is done by the IOMMU-API user already (and has
+> to be done there nowadays), be it a DMA-API implementation which just
+> reserves these regions in its address space allocator or be it VFIO with
+> QEMU, which don't map RAM there anyway. So there is no point of checking
+> this again in the IOMMU drivers and we can keep that out of the
+> mapping/unmapping fast-path.
+>
+>> For PCI devices userspace can examine the topology of the iommu group
+>> and exclude MMIO ranges of peer devices based on the BARs, which are
+>> exposed in various places, pci-sysfs as well as /proc/iomem.  For
+>> non-PCI or MSI controllers... ???
+>
+> Right, the hardware resources can be examined. But maybe this can be
+> extended to also cover RMRR ranges? Then we would be able to assign
+> devices with RMRR mappings to guests.
+>
+eh gads no!
 
-It turns out that the i2c1 adapter is connected to a multiplexer
-controlled by a gpio line. The first (default) mux option connects
-i2c1 to a bus connected to the already known peripherals. The other
-one connects the adapter to the ddc pins of the DVI port.
+Assigning devices w/RMRR's is a security issue waiting to happen, if
+it doesn't crash the system before the guest even gets the device --
+reset the device before assignment; part of device is gathering system
+environmental data; if BIOS/SMM support doesn't get env. data update,
+it NMI's the system..... in fear that it may overheat ...
 
-Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
----
- arch/arm/boot/dts/imx6q-utilite-pro.dts | 51 ++++++++++++++++++++++++++-------
- 1 file changed, 40 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-index 6199063..246979a 100644
---- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -71,6 +71,40 @@
- 			gpio-key,wakeup;
- 		};
- 	};
-+
-+	i2cmux {
-+		compatible = "i2c-mux-gpio";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_i2c1mux>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mux-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		i2c-parent = <&i2c1>;
-+
-+		i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			eeprom at 50 {
-+				compatible = "at24,24c02";
-+				reg = <0x50>;
-+				pagesize = <16>;
-+			};
-+
-+			em3027: rtc at 56 {
-+				compatible = "emmicro,em3027";
-+				reg = <0x56>;
-+			};
-+		};
-+
-+		i2c_dvi_ddc: i2c at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
- };
- 
- &hdmi {
-@@ -82,17 +116,6 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_i2c1>;
- 	status = "okay";
--
--	eeprom at 50 {
--		compatible = "at24,24c02";
--		reg = <0x50>;
--		pagesize = <16>;
--	};
--
--	em3027: rtc at 56 {
--		compatible = "emmicro,em3027";
--		reg = <0x56>;
--	};
- };
- 
- &i2c2 {
-@@ -115,6 +138,12 @@
- 		>;
- 	};
- 
-+	pinctrl_i2c1mux: i2c1muxgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_2__GPIO1_IO02 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_i2c2: i2c2grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
--- 
-2.10.2
+>
+>
+> 	Joerg
+>
