@@ -1,74 +1,188 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 11 Nov 2016 16:32:13 +0530
-Subject: [PATCH] ARM: davinci: enable PM for DT boot
-In-Reply-To: <m2shr16dr7.fsf@baylibre.com>
-References: <20161025214738.27744-1-khilman@baylibre.com>
- <c3a69359-bcec-40fe-e25c-048b97bab726@ti.com> <m2shr16dr7.fsf@baylibre.com>
-Message-ID: <6c73eab0-dadd-f8a0-f822-84296d319443@ti.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Fri, 11 Nov 2016 16:49:03 +0530
+Subject: [RESEND PATCH v1 02/11] dt-bindings: hisi: Add Hisilicon
+ HiP05/06/07 Sysctrl and Djtag dts bindings
+In-Reply-To: <20161110172320.GA10137@leverpostej>
+References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
+ <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
+ <20161110172320.GA10137@leverpostej>
+Message-ID: <5825A927.2000202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 08 November 2016 11:43 PM, Kevin Hilman wrote:
-> Hi Sekhar,
-> 
-> Sekhar Nori <nsekhar@ti.com> writes:
-> 
->> On Wednesday 26 October 2016 03:17 AM, Kevin Hilman wrote:
->>> Currently system PM is only enabled for legacy (non-DT) boot.  Enable
->>> for DT boot also.
->>>
->>> Tested on da850-lcdk using "rtcwake -m mem -s5 -d rtc0".
->>>
->>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
->>> ---
->>>  arch/arm/mach-davinci/da8xx-dt.c | 18 ++++++++++++++++++
->>>  1 file changed, 18 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
->>> index c9f7e9274aa8..a8089fa40d86 100644
->>> --- a/arch/arm/mach-davinci/da8xx-dt.c
->>> +++ b/arch/arm/mach-davinci/da8xx-dt.c
->>> @@ -43,8 +43,26 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->>>  
->>>  #ifdef CONFIG_ARCH_DAVINCI_DA850
->>>  
->>> +static struct davinci_pm_config da850_pm_pdata = {
->>> +	.sleepcount = 128,
->>> +};
->>> +
->>> +static struct platform_device da850_pm_device = {
->>> +	.name           = "pm-davinci",
->>> +	.dev = {
->>> +		.platform_data	= &da850_pm_pdata,
->>> +	},
->>> +	.id             = -1,
->>> +};
->>> +
->>>  static void __init da850_init_machine(void)
->>>  {
->>> +	int ret;
->>> +
->>> +	ret = da850_register_pm(&da850_pm_device);
+
+
+On Thursday 10 November 2016 10:53 PM, Mark Rutland wrote:
+> Hi,
+>
+> On Thu, Nov 03, 2016 at 01:41:58AM -0400, Anurup M wrote:
+>> From: Tan Xiaojun <tanxiaojun@huawei.com>
 >>
->> I am not sure if it makes sense to keep the "pm device" around anymore.
->> I think for both DT and non-DT boot, we can get rid of the fake PM
->> device and combine da850_register_pm() and davinci_pm_probe() into a
->> single davinci_init_suspend() function which can then be called both for
->> DT and non-DT boot.
-> 
-> Looking closer at this, where do you propose the pdata comes from for
-> the non-DT boot?
-> 
-> It seems to me that we can't currently remove the pdata dependency
-> without breaking the non-DT platforms, so the approach proposed here is
-> the least invasive.
+>> 	1) Add Hisilicon HiP05/06/07 CPU and ALGSUB system controller dts
+>> 	   bindings.
+>> 	2) Add Hisilicon Djtag dts binding.
+>>
+>> Signed-off-by: Tan Xiaojun <tanxiaojun@huawei.com>
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+>> ---
+>>   .../bindings/arm/hisilicon/hisilicon.txt           | 82 ++++++++++++++++++++++
+>>   1 file changed, 82 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> index 7df79a7..341cbb9 100644
+>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> @@ -270,3 +270,85 @@ Required Properties:
+>>     [1]: bootwrapper size
+>>     [2]: relocation physical address
+>>     [3]: relocation size
+>
+>> +-----------------------------------------------------------------------
+>> +The Hisilicon Djtag in CPU die is an independent component which connects with
+>> +some other components in the SoC by Debug Bus. This driver can be configured
+>> +to access the registers of connecting components (like L3 cache, l3 cache PMU
+>> + etc.) during real time debugging by sysctrl. These components appear as child
+>> +nodes of djtag.
+> Please put the djtag binding in a new file.
+>
+> It's clearly unrelated to many other things in this file, which should
+> also be split out.
+Ok. Shall move the djtag bindings to hisilicon/djtag.txt.
 
-There is a single value of sleep count that is used today (128). So I
-was thinking we can hardcode that in pm.c. We are not going to add more
-board files anyway so there is no risk here.
+>> +The Hip05/06/07 CPU system controller(sysctrl) support to manage some important
+>> +components (such as clock, reset, soft reset, secure debugger, etc.).
+>> +The CPU sysctrl registers in hip05/06/07 doesnot use syscon but will be mapped
+>> +by djtag driver for use by connecting components.
+> The djtag driver is irrelvant here.
+>
+> If there's a realtionship between the two, please define that in the
+> binding rather than implicitly assuming it in the driver.
+Ok. I shall remove "djtag driver" and shall modify as
 
-For future, if a different sleepcount value is needed, it will need to
-be a new DT property.
++The Hisilicon Djtag in CPU die is an independent component which connects with
++some other components in the SoC by Debug Bus. The djtag will use the system controller
++registers to access the connecting components in CPU die (like L3 cache, l3 cache PMU
++etc.) during real time debugging. These components appear as child nodes of djtag.
+
+>> +
+>> +Required properties:
+>> +  - compatible : "hisilicon,hip05-cpu-djtag-v1"
+>> +  - reg : Register address and size
+>> +
+>> +Hisilicon HiP06 djtag for CPU sysctrl
+>> +Required properties:
+>> +- compatible : "hisilicon,hip06-sysctrl", "syscon", "simple-mfd";
+> This looks messy. Why is this syscon and a simple-mfd?
+>
+> We should kill off / deprecate the syscon binding. It's completely
+> meaningless.
+My Apologies. The syscon is not used now. Mistake in file version used 
+for patch creation.
+The compatible filed will be "hisilicon,hisi-cpu-djtag-v1"
+>> +- reg : Register address and size
+>> +- djtag :
+>> +  - compatible : "hisilicon,hip06-cpu-djtag-v1"
+>> +  - reg : Register address and size
+>> +
+>> +Hisilicon HiP07 djtag for CPU sysctrl
+>> +Required properties:
+>> +  - compatible : "hisilicon,hip07-cpu-djtag-v2"
+>> +  - reg : Register address and size
+>> +
+>> +Example:
+>> +	/* for Hisilicon HiP05 djtag for CPU sysctrl */
+>> +	djtag0: djtag at 80010000 {
+>> +		compatible = "hisilicon,hip05-cpu-djtag-v1";
+>> +		reg = <0x0 0x80010000 0x0 0x10000>;
+>> +
+>> +		/* For L3 cache PMU */
+>> +		pmul3c0 {
+>> +			compatible = "hisilicon,hisi-pmu-l3c-v1";
+>> +			scl-id = <0x02>;
+>> +			num-events = <0x16>;
+>> +			num-counters = <0x08>;
+>> +			module-id = <0x04>;
+>> +			num-banks = <0x04>;
+>> +			cfgen-map = <0x02 0x04 0x01 0x08>;
+>> +			counter-reg = <0x170>;
+>> +			evctrl-reg = <0x04>;
+>> +			event-en = <0x1000000>;
+>> +			evtype-reg = <0x140>;
+>> +		};
+> This sub-node needs a binding document.
+>
+> These properties are completely opaque
+The L3 cache PMU bindings are defined @bindings/arm/hisilicon/pmu.txt.
+Is it OK that I document here(hisilicon/djtag.txt), a reference to the 
+PMU bindings doc ?
+
+>> +	};
+>> +
+>> +-----------------------------------------------------------------------
+>> +The Hisilicon HiP05/06/07 ALGSUB system controller(sysctrl) is in IO die
+>> +of SoC. It has a similar function as the Hisilicon HiP05/06/07 CPU system
+>> +controller in CPU die and it manage different components, like RSA, etc.
+>> +The Hisilicon Djtag in IO die has a similar function as in CPU die and maps
+>> +the sysctrl registers for use by connecting components.
+>> +All connecting components shall appear as child nodes of djtag.
+> I don't follow the above. This describes an ALGSUB system controllerm
+> but the documentation below is all about djtag.
+The ALGSUB is the name of the sysctrl of IO die. I shall remove ALGSUB 
+to avoid confusion.
+
+I would also add the below details in the introduction.
+
+The Hisilicon djtag will use the system controller registers to control 
+access to connecting modules
+of CPU and IO die in the chip. There are separate system controller 
+registers for CPU and IO die  in the chip.
+
+And the section will be modified as
+
++Hisilicon HiP05 djtag for IO sysctrl
++Required properties:
++  - compatible : "hisilicon,hisi-io-djtag-v1"
++  - reg : Register address and size
++
++Hisilicon HiP06/07 djtag for IO sysctrl
++Required properties:
++  - compatible : "hisilicon,hip06-io-djtag-v2"
++  - reg : Register address and size
++
++Example:
++	/* for Hisilicon HiP05 djtag for IO sysctrl */
++	djtag0: djtag at d0000000 {
++	       compatible = "hisilicon,hisi-io-djtag-v1";
++		reg = <0x0 0xd0000000 0x0 0x10000>;
++	};
 
 Thanks,
-Sekhar
+Anurup
+
+> Thanks,
+> Mark.
+>
+>> +Hisilicon HiP05 djtag for ALGSUB sysctrl
+>> +Required properties:
+>> +  - compatible : "hisilicon,hip05-io-djtag-v1"
+>> +  - reg : Register address and size
+>> +
+>> +Hisilicon HiP06 djtag for ALGSUB sysctrl
+>> +Required properties:
+>> +  - compatible : "hisilicon,hip06-io-djtag-v2"
+>> +  - reg : Register address and size
+>> +
+>> +Hisilicon HiP07 djtag for ALGSUB sysctrl
+>> +Required properties:
+>> +  - compatible : "hisilicon,hip07-io-djtag-v2"
+>> +  - reg : Register address and size
+>> +
+>> +Example:
+>> +	/* for Hisilicon HiP05 djtag for alg sysctrl */
+>> +	djtag0: djtag at d0000000 {
+>> +	       compatible = "hisilicon,hip05-io-djtag-v1";
+>> +		reg = <0x0 0xd0000000 0x0 0x10000>;
+>> +	};
+>> -- 
+>> 2.1.4
+>>
