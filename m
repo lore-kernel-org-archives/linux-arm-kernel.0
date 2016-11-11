@@ -1,54 +1,89 @@
-From: anurupvasu@gmail.com (Anurup M)
-Date: Fri, 11 Nov 2016 17:29:05 +0530
-Subject: [RESEND PATCH v1 02/11] dt-bindings: hisi: Add Hisilicon
- HiP05/06/07 Sysctrl and Djtag dts bindings
-In-Reply-To: <20161111115346.GC11945@leverpostej>
-References: <1478151727-20250-1-git-send-email-anurup.m@huawei.com>
- <1478151727-20250-3-git-send-email-anurup.m@huawei.com>
- <20161110172320.GA10137@leverpostej> <5825A927.2000202@gmail.com>
- <20161111115346.GC11945@leverpostej>
-Message-ID: <5825B289.9020606@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 11 Nov 2016 13:01:14 +0100
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+References: <20161109192301.GS26979@atomide.com>
+ <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
+ <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
+ <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+ <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
+ <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
+ <20161110202910.GE28832@amd>
+ <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+Message-ID: <20161111120114.GA1076@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu 2016-11-10 22:34:07, Jacek Anaszewski wrote:
+> Hi,
+> 
+> On 11/10/2016 09:29 PM, Pavel Machek wrote:
+> >On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
+> >>* Pavel Machek <pavel@ucw.cz> [161110 09:29]:
+> >>>Hi!
+> >>>
+> >>>>>>>Looks like commit 883d32ce3385 ("leds: core: Add support for poll()ing
+> >>>>>>>the sysfs brightness attr for changes.") breaks runtime PM for me.
+> >>>>>>>
+> >>>>>>>On my omap dm3730 based test system, idle power consumption is over 70
+> >>>>>>>times higher now with this patch! It goes from about 6mW for the core
+> >>>>>>>system to over 440mW during idle meaning there's some busy timer now
+> >>>>>>>active.
+> >>>>>>>
+> >>>>>>>Reverting this patch fixes the issue. Any ideas?
+> >>>
+> >>>Are you using any LED that toggles with high frequency? Like perhaps
+> >>>LED that is lit when CPU is active?
+> >>
+> >>Yeah one of them seems to have cpu0 as the default trigger.
+> >
+> >Aha. Its quite obvious we don't want to notify sysfs each time that
+> >one is toggled, right?
+> >
+> >IMO brightness should display max brightness for the trigger, as Hans
+> >suggested, anything else is madness for trigger such as cpu activity.
+> 
+> Are you suggesting that we should revert changes introduced
+> by below patch?
+> 
+> commit 29d76dfa29fe22583aefddccda0bc56aa81035dc
+> Author: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
+> Date:   Tue Mar 18 09:47:48 2008 +0000
+> 
+>     leds: Add support to leds with readable status
+> 
+>     Some led hardware allows drivers to query the led state, and this patch
+>     adds a hook to let the led class take advantage of that information when
+>     available.
+> 
+>     Without this functionality, when access to the led hardware is not
+>     exclusive (i.e. firmware or hardware might change its state behind the
+>     kernel's back), reality goes out of sync with the led class' idea of
+> what
+>     the led is doing, which is annoying at best.
 
+Hmm. So userland can read the LED state, and it can get _some_ value
+back, but it can not know if it is current state or not.
 
-On Friday 11 November 2016 05:23 PM, Mark Rutland wrote:
-> On Fri, Nov 11, 2016 at 04:49:03PM +0530, Anurup M wrote:
->> On Thursday 10 November 2016 10:53 PM, Mark Rutland wrote:
->>> On Thu, Nov 03, 2016 at 01:41:58AM -0400, Anurup M wrote:
->>>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->>>> +Example:
->>>> +	/* for Hisilicon HiP05 djtag for CPU sysctrl */
->>>> +	djtag0: djtag at 80010000 {
->>>> +		compatible = "hisilicon,hip05-cpu-djtag-v1";
->>>> +		reg = <0x0 0x80010000 0x0 0x10000>;
->>>> +
->>>> +		/* For L3 cache PMU */
->>>> +		pmul3c0 {
->>>> +			compatible = "hisilicon,hisi-pmu-l3c-v1";
->>>> +			scl-id = <0x02>;
->>>> +			num-events = <0x16>;
->>>> +			num-counters = <0x08>;
->>>> +			module-id = <0x04>;
->>>> +			num-banks = <0x04>;
->>>> +			cfgen-map = <0x02 0x04 0x01 0x08>;
->>>> +			counter-reg = <0x170>;
->>>> +			evctrl-reg = <0x04>;
->>>> +			event-en = <0x1000000>;
->>>> +			evtype-reg = <0x140>;
->>>> +		};
->>> This sub-node needs a binding document.
->>>
->>> These properties are completely opaque
->> The L3 cache PMU bindings are defined @bindings/arm/hisilicon/pmu.txt.
->> Is it OK that I document here(hisilicon/djtag.txt), a reference to
->> the PMU bindings doc ?
-> At this point in the series, that file does not exist yet, and this is
-> an undocumented beinding.
->
-> Please introduce this sub-node long with the PMU bindings, later in the
-> series.
-Thanks, I got your suggestion. Will add this later in series.
-> Thanks,
-> Mark.
+I don't think that's a good interface. I see it is from 2008... is
+someone using it? Maybe it is too late for revert.
+
+But I'd certainly not extend it with poll.
+
+IMO reading/polling should only be available with some triggers. It
+does not make sense with "CPU load" trigger. It makes sense with
+"keyboard light changeable by hardware" trigger.
+
+Best regards,
+									
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161111/cdf0fc1a/attachment.sig>
