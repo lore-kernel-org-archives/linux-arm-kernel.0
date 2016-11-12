@@ -1,113 +1,85 @@
-From: agustinv@codeaurora.org (agustinv at codeaurora.org)
-Date: Fri, 11 Nov 2016 22:01:03 -0500
-Subject: [PATCH V6 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <5825C8A2.3040302@linaro.org>
-References: <1477687696-1509-1-git-send-email-agustinv@codeaurora.org>
- <1477687696-1509-3-git-send-email-agustinv@codeaurora.org>
- <42ff0a81-7836-11f6-58e0-979bd1d0be20@linaro.org>
- <60c1d53146c0aebd3a05095823229224@codeaurora.org>
- <20161110175814.GA12446@red-moon> <5825C8A2.3040302@linaro.org>
-Message-ID: <713f102418c0fffacf67acb16dbdeec2@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 11 Nov 2016 19:39:14 -0800
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+In-Reply-To: <alpine.LFD.2.20.1611112034520.1618@knanqh.ubzr>
+References: <20161112004449.30566-1-f.fainelli@gmail.com>
+ <alpine.LFD.2.20.1611112034520.1618@knanqh.ubzr>
+Message-ID: <55bd0bb5-c11c-12bc-7d73-520ae3901f03@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Lorenzo, Hanjun,
-
-On 2016-11-11 08:33, Hanjun Guo wrote:
-> Hi Lorenzo,
+Le 11/11/2016 ? 17:49, Nicolas Pitre a ?crit :
+> On Fri, 11 Nov 2016, Florian Fainelli wrote:
 > 
-> On 11/11/2016 01:58 AM, Lorenzo Pieralisi wrote:
->> On Thu, Nov 10, 2016 at 10:02:35AM -0500, agustinv at codeaurora.org 
->> wrote:
->>> Hey Hanjun,
->>> 
->>> On 2016-11-09 21:36, Hanjun Guo wrote:
->>>> Hi Marc, Rafael, Lorenzo,
->>>> 
->>>> Since we agreed to add a probe deferral if we failed to get irq
->>>> resources which mirroring the DT does (patch 1 in this patch set),
->>>> I think the last blocker to make things work both for Agustin and
->>>> me [1] is this patch, which makes the interrupt producer and 
->>>> consumer
->>>> work in ACPI, we have two different solution for one thing, we'd 
->>>> happy
->>>> to work together for one solution, could you give some suggestions
->>>> please?
->>>> 
->>>> [1]: 
->>>> https://mail-archive.com/linux-kernel at vger.kernel.org/msg1257419.html
->>>> 
->>>> Agustin, I have some comments below.
->>>> 
->>>> On 2016/10/29 4:48, Agustin Vega-Frias wrote:
->>>>> This allows irqchip drivers to associate an ACPI DSDT device to
->>>>> an IRQ domain and provides support for using the ResourceSource
->>>>> in Extended IRQ Resources to find the domain and map the IRQs
->>>>> specified on that domain.
->>>>> 
->>>>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
->>>>> ---
->>>>> drivers/acpi/Makefile    |   1 +
->>>>> drivers/acpi/irqdomain.c | 119
->>>>> +++++++++++++++++++++++++++++++++++++++++++++++
->>>> 
->>>> Could we just reuse the gsi.c and not introduce a new
->>>> file, probably we can change the gsi.c to irqdomain.c
->>>> or something similar, then reuse the code in gsi.c.
->>> 
->>> I was thinking just that after we chatted off-list.
->> 
->> Yes, that's a fair point.
->> 
->>> I might revisit and see what I come up with given that we already 
->>> have
->>> a device argument and we could pass the IRQ source there.
->> 
->> I agree with the approach taken by this patch, I do not like much
->> passing around struct acpi_resource_source *source (in particular
->> the dummy struct) I do not think it is needed, I will comment on
->> the code.
+>> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+>> debug_virt_to_phys() which helps catch vmalloc space addresses being
+>> passed. This is helpful in debugging bogus drivers that just assume
+>> linear mappings all over the place.
+>>
+>> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+>> __virt_to_phys() as being the functional implementation of the address
+>> translation, so we special case the debug stub to call into
+>> __virt_to_phys directly.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/include/asm/memory.h      |  4 ++++
+>>  arch/arm64/include/asm/memory.h    |  4 ++++
+>>  include/asm-generic/memory_model.h |  4 ++++
+>>  mm/debug.c                         | 15 +++++++++++++++
+>>  4 files changed, 27 insertions(+)
+>>
+>> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+>> index 76cbd9c674df..448dec9b8b00 100644
+>> --- a/arch/arm/include/asm/memory.h
+>> +++ b/arch/arm/include/asm/memory.h
+>> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+>>   * translation for translating DMA addresses.  Use the driver
+>>   * DMA support - see dma-mapping.h.
+>>   */
+>> +#ifndef CONFIG_DEBUG_VM
+>>  #define virt_to_phys virt_to_phys
+>>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>>  {
+>>  	return __virt_to_phys((unsigned long)(x));
+>>  }
+>> +#else
+>> +#define virt_to_phys debug_virt_to_phys
+>> +#endif
+> [...]
 > 
-> thanks for your time to have a look:)
+> Why don't you do something more like:
 > 
->> 
->> Hopefully there is not any buggy FW out there that does use the
->> resource source inappropriately otherwise we will notice on x86/ia64
->> (ie you can't blame FW if it breaks the kernel) but I suspect the
->> only way to find out is by trying, the patch has to go through 
->> Rafael's
->> review anyway before getting there so it is fine.
+>  static inline phys_addr_t virt_to_phys(const volatile void *x)
+>  {
+> +        debug_virt_to_phys(x);
+>          return __virt_to_phys((unsigned long)(x));
+>  }
 > 
-> I think we can avoid that by not touching the logic that x86/ia64
-> already used, but only adding interrupt producer/consumer function.
+> [...]
+> 
+> static inline void debug_virt_to_phys(const void *address)
+> {
+> #ifdef CONFIG_DEBUG_VM
+>         BUG_ON(is_vmalloc_addr(address));
+> #endif
+> }
+> 
+> ?
 
-I looked at this more today and implemented a new patch that I plan to
-test over the weekend, but I wanted to let you know the approach I am
-pursuing.
+This is how I started doing it initially, but to get the
+is_vmalloc_addr() definition, we need to include linux/mm.h and then
+everything falls apart because of the include and dependencies chain. We
+could open code the is_vmalloc_addr() check because that's simple
+enough, but we still need VMALLOC_START and VMALLOC_END and to get there
+we need to include pgtable.h, and there are still some inclusion
+problems in doing so.
 
-On the new patch use of ResourceSource when parsing ACPI Extended IRQ
-Resources is conditional on CONFIG_ACPI_GENERIC_GSI. The reason for this
-is two fold:
+The other reason was to avoid putting the same checks in architecture
+specific code, except for those like ARM/ARM64/Unicore32/Microblaze
+where I could not find a simple way to undefined virt_to_phys and
+redefine it to debug_virt_to_phys.
 
-1. Since we wanted to reduce duplication and place the new APIs on the
-    same source file as acpi_register_gsi, which is already under that
-    config flag.
-2. So the patch does not have effect on platforms not using the generic
-    GSI support, including x86/ia64.
-
-If support for this is needed outside platforms using the generic GSI
-implementation, we can move these APIs out to their own source file
-and eliminate the CONFIG_ACPI_GENERIC_GSI conditionality.
-
-I'll send the new patch, hopefully some time tomorrow, but please let
-me know if you have concerns with this approach.
-
-Thanks,
-Agustin
-
+Do you see an other way around this? Thanks!
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+Florian
