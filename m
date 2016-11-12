@@ -1,47 +1,39 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 12 Nov 2016 14:46:44 +0800
-Subject: [PATCH 06/10] ARM: dts: sun8i-a23: Add device node for internal audio
- codec
+Date: Sat, 12 Nov 2016 14:46:48 +0800
+Subject: [PATCH 10/10] ARM: dts: sun8i-h3: orange-pi-pc: Enable audio codec
 In-Reply-To: <20161112064648.26779-1-wens@csie.org>
 References: <20161112064648.26779-1-wens@csie.org>
-Message-ID: <20161112064648.26779-7-wens@csie.org>
+Message-ID: <20161112064648.26779-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a device tree binding and driver for the A23's
-internal audio codec, add a device node for it.
+The Orange Pi PC routes the LINEOUT pins to the audio out jack on the
+board. The onboard microphone is routed to MIC1, with MBIAS providing
+power.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
-index 54d045dab825..4d1f929780a8 100644
---- a/arch/arm/boot/dts/sun8i-a23.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23.dtsi
-@@ -48,6 +48,22 @@
- 	memory {
- 		reg = <0x40000000 0x40000000>;
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 3ec971285aa3..2b1e68d0f2fa 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -90,6 +90,14 @@
  	};
-+
-+	soc at 01c00000 {
-+		codec: codec at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a23-codec";
-+			reg = <0x01c22c00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "codec";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			allwinner,codec-analog-controls = <&codec_analog>;
-+			status = "disabled";
-+		};
-+	};
  };
  
- &ccu {
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
+ &ehci1 {
+ 	status = "okay";
+ };
 -- 
 2.10.2
