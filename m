@@ -1,59 +1,64 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 12 Nov 2016 14:46:39 +0800
-Subject: [PATCH 01/10] ASoC: sunxi: Add bindings for A23/A33/H3 codec's analog
- path controls
+Date: Sat, 12 Nov 2016 14:46:41 +0800
+Subject: [PATCH 03/10] mfd: sun6i-prcm: Add codec analog controls sub-device
+ for Allwinner A23
 In-Reply-To: <20161112064648.26779-1-wens@csie.org>
 References: <20161112064648.26779-1-wens@csie.org>
-Message-ID: <20161112064648.26779-2-wens@csie.org>
+Message-ID: <20161112064648.26779-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The internal codec on A23/A33/H3 is split into 2 parts. The
-analog path controls are routed through an embedded custom register
-bus accessed through the PRCM block.
+The PRCM block on the A23 contains a message box like interface to
+the registers for the analog path controls of the internal codec.
 
-The SoCs share a common set of inputs, outputs, and audio paths.
-The following table lists the differences.
-
-    ----------------------------------------
-    | Feature \ SoC |  A23  |  A33  |  H3  |
-    ----------------------------------------
-    | Headphone     |   v   |   v   |      |
-    ----------------------------------------
-    | Line Out      |       |       |  v   |
-    ----------------------------------------
-    | Phone In/Out  |   v   |   v   |      |
-    ----------------------------------------
-
-Add a binding for this hardware.
+Add a sub-device for it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- .../devicetree/bindings/sound/sun8i-codec-analog.txt     | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+ drivers/mfd/sun6i-prcm.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-new file mode 100644
-index 000000000000..779b735781ba
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-@@ -0,0 +1,16 @@
-+* Allwinner Codec Analog Controls
+diff --git a/drivers/mfd/sun6i-prcm.c b/drivers/mfd/sun6i-prcm.c
+index 011fcc555945..4abbf2ede944 100644
+--- a/drivers/mfd/sun6i-prcm.c
++++ b/drivers/mfd/sun6i-prcm.c
+@@ -12,6 +12,9 @@
+ #include <linux/init.h>
+ #include <linux/of.h>
+ 
++#define SUN8I_CODEC_ANALOG_BASE	0x1c0
++#define SUN8I_CODEC_ANALOG_END	(SUN8I_CODEC_ANALOG_BASE + 0x4 - 1)
 +
-+Required properties:
-+- compatible: must be one of the following compatibles:
-+		- "allwinner,sun8i-a23-codec-analog"
-+		- "allwinner,sun8i-h3-codec-analog"
-+
-+Required properties if not a sub-node of the PRCM node:
-+- reg: must contain the registers location and length
-+
-+Example:
-+prcm: prcm at 01f01400 {
-+	codec_analog: codec-analog {
-+		compatible = "allwinner,sun8i-a23-codec-analog";
-+	};
+ struct prcm_data {
+ 	int nsubdevs;
+ 	const struct mfd_cell *subdevs;
+@@ -57,6 +60,14 @@ static const struct resource sun6i_a31_apb0_rstc_res[] = {
+ 	},
+ };
+ 
++static const struct resource sun8i_codec_analog_res[] = {
++	{
++		.start	= SUN8I_CODEC_ANALOG_BASE,
++		.end	= SUN8I_CODEC_ANALOG_END,
++		.flags	= IORESOURCE_MEM,
++	},
 +};
++
+ static const struct mfd_cell sun6i_a31_prcm_subdevs[] = {
+ 	{
+ 		.name = "sun6i-a31-ar100-clk",
+@@ -109,6 +120,12 @@ static const struct mfd_cell sun8i_a23_prcm_subdevs[] = {
+ 		.num_resources = ARRAY_SIZE(sun6i_a31_apb0_rstc_res),
+ 		.resources = sun6i_a31_apb0_rstc_res,
+ 	},
++	{
++		.name		= "sun8i-codec-analog",
++		.of_compatible	= "allwinner,sun8i-a23-codec-analog",
++		.num_resources	= ARRAY_SIZE(sun8i_codec_analog_res),
++		.resources	= sun8i_codec_analog_res,
++	},
+ };
+ 
+ static const struct prcm_data sun6i_a31_prcm_data = {
 -- 
 2.10.2
