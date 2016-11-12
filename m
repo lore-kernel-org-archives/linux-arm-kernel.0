@@ -1,29 +1,36 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 12 Nov 2016 18:45:30 +0100 (CET)
-Subject: [PATCH v2] staging: vc04_services: rework ioctl code path
-In-Reply-To: <20161111061531.23507-1-mzoran@crowfest.net>
-References: <20161111061531.23507-1-mzoran@crowfest.net>
-Message-ID: <897162311.351896.9a53158f-312d-40ce-80ce-8bf792d8db34.open-xchange@email.1und1.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 12 Nov 2016 21:13:15 +0200
+Subject: [PATCH v2 1/2] arm64: dts: Add level for cpu dt node for exynos7
+In-Reply-To: <CAGOxZ50Ttd1hP0x+Z527wc7mLLpz+Dom0TXFk08+mL0vnaxWwA@mail.gmail.com>
+References: <1478945832-1826-1-git-send-email-alim.akhtar@samsung.com>
+ <8a63bfe0-b23c-3583-6e5e-c17fe412e34d@osg.samsung.com>
+ <CAGOxZ50Ttd1hP0x+Z527wc7mLLpz+Dom0TXFk08+mL0vnaxWwA@mail.gmail.com>
+Message-ID: <CAJKOXPc5aJi9nVv4rd3pB_dkkoJWUjmkEyXF2Kxtp+6Y7VZdWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+On Sat, Nov 12, 2016 at 6:00 PM, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> Hi Javier,
+>
+> On Sat, Nov 12, 2016 at 7:54 PM, Javier Martinez Canillas
+> <javier@osg.samsung.com> wrote:
+>> Hello Alim,
+>>
+>> On 11/12/2016 07:17 AM, Alim Akhtar wrote:
+>>> This patch adds level for cpu dt node, so that these levels can be used
+>>
+>> Do you mean s/level/label here? I'm asking because you are using level
+>> consistently in the subject line and commit message but I'm not sure
+>> what it means in this context.
+>>
+>
+> Ah!! my bad. Its __label__. If required, will respin.
+> Thanks for review.
 
-> Michael Zoran <mzoran@crowfest.net> hat am 11. November 2016 um 07:15
-> geschrieben:
-> 
-> 
-> VCHIQ/vc04_services has a userland device interface
-> that includes ioctls. The current ioctl implementation
-> is a single monolithic function over 1,000+ lines
-> that handles 17 different ioctls through a complex
-> maze of switch and if statements.
-> 
-> The change reimplements that code path by breaking
-> up the code into smaller, easier to maintain functions
-> and uses a dispatch table to invoke the correct function.
+I think there is no need of respin because this should be squashed
+with previous patch. This is quite small and there are no functional
+changes here (labels are transparent, except of course conflict
+cases). Without the 2/2,  this patch does not have much sense yet.
 
-nice. But please always use scripts/checkpatch.pl before submitting your
-patches. 
-
-And yes it is not necessary to fix all "line over 80 chars" warnings.
+Best regards,
+Krzysztof
