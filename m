@@ -1,53 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 12 Nov 2016 16:36:25 +0100
-Subject: [GIT PULL 3/3] Rockchip dts64 changes for 4.10
-In-Reply-To: <1698724.ZQnZMjf8xY@phil>
-References: <1698724.ZQnZMjf8xY@phil>
-Message-ID: <4932547.OPNQihgQS9@phil>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Sat, 12 Nov 2016 21:30:50 +0530
+Subject: [PATCH v2 1/2] arm64: dts: Add level for cpu dt node for exynos7
+In-Reply-To: <8a63bfe0-b23c-3583-6e5e-c17fe412e34d@osg.samsung.com>
+References: <1478945832-1826-1-git-send-email-alim.akhtar@samsung.com>
+ <8a63bfe0-b23c-3583-6e5e-c17fe412e34d@osg.samsung.com>
+Message-ID: <CAGOxZ50Ttd1hP0x+Z527wc7mLLpz+Dom0TXFk08+mL0vnaxWwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
+Hi Javier,
 
-  Linux 4.9-rc1 (2016-10-15 12:17:50 -0700)
+On Sat, Nov 12, 2016 at 7:54 PM, Javier Martinez Canillas
+<javier@osg.samsung.com> wrote:
+> Hello Alim,
+>
+> On 11/12/2016 07:17 AM, Alim Akhtar wrote:
+>> This patch adds level for cpu dt node, so that these levels can be used
+>
+> Do you mean s/level/label here? I'm asking because you are using level
+> consistently in the subject line and commit message but I'm not sure
+> what it means in this context.
+>
 
-are available in the git repository at:
+Ah!! my bad. Its __label__. If required, will respin.
+Thanks for review.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.10-rockchip-dts64-1
+>> as a phandle whenever required. For example, adding a "interrupt-affinity"
+>> for arm pmu node.
+>>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>
+> The change looks good to me though.
+>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+> Best regards,
+> --
+> Javier Martinez Canillas
+> Open Source Group
+> Samsung Research America
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-for you to fetch changes up to c49590691f3819bb6be3f77938ef39038eb76643:
 
-  arm64: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max" (2016-11-09 15:08:55 +0100)
 
-----------------------------------------------------------------
-64bit devicetree changes including the px5 evaluation board
-a fix for wrong i2c registers on rk3368 a new nvmem cell and
-power-domain on rk3399 as well as moving mmc frequency
-properties to the more generic max-frequency one.
-
-----------------------------------------------------------------
-Andy Yan (2):
-      arm64: dts: rockchip: fix i2c resource error of rk3368
-      arm64: dts: rockchip: Add PX5 Evaluation board
-
-Chris Zhong (1):
-      arm64: dts: rockchip: add powerdomain for typec on rk3399
-
-Jaehoon Chung (1):
-      arm64: dts: rockchip: replace to "max-frequency" instead of "clock-freq-min-max"
-
-Shawn Lin (2):
-      arm64: dts: rockchip: Add more properties for emmc on px5-evb
-      arm64: dts: rockchip: add sdmmc support for px5-evb
-
-Ziyuan Xu (1):
-      arm64: dts: rockchip: add cpu-id nvmem cell node for rk3399
-
- Documentation/devicetree/bindings/arm/rockchip.txt |   8 +
- arch/arm64/boot/dts/rockchip/Makefile              |   1 +
- .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    |   2 +-
- arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 314 +++++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  18 +-
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   9 +-
- 6 files changed, 340 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts
+-- 
+Regards,
+Alim
