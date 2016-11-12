@@ -1,222 +1,52 @@
-From: zourongrong@huawei.com (Rongrong Zou)
-Date: Sat, 12 Nov 2016 18:36:15 +0800
-Subject: [PATCH v6 6/9] drm/hisilicon/hibmc: Add encoder for VDAC
-In-Reply-To: <CAOw6vbKZ5kRbWPOep8soyMWp+Y14eFYALYiUhyyy04yGgMjQgQ@mail.gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-7-git-send-email-zourongrong@gmail.com>
- <CAOw6vbKZ5kRbWPOep8soyMWp+Y14eFYALYiUhyyy04yGgMjQgQ@mail.gmail.com>
-Message-ID: <5826F09F.20303@huawei.com>
+From: Nicolae_Rosia@mentor.com (Nicolae Rosia)
+Date: Sat, 12 Nov 2016 13:38:13 +0200
+Subject: [PATCH] mfd: twl-core: export twl_get_regmap
+Message-ID: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/11/11 6:20, Sean Paul ??:
-> On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
->> Add encoder funcs and helpers for VDAC.
->>
->> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
->> ---
->>   drivers/gpu/drm/hisilicon/hibmc/Makefile         |  2 +-
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |  6 ++
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  2 +
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 89 ++++++++++++++++++++++++
->>   4 files changed, 98 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
->> index 72e107e..e04f114 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
->> @@ -1,5 +1,5 @@
->>   ccflags-y := -Iinclude/drm
->> -hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
->> +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
->>
->>   obj-$(CONFIG_DRM_HISI_HIBMC)   +=hibmc-drm.o
->>   #obj-y += hibmc-drm.o
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> index 303cd36..ba191e1 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> @@ -125,6 +125,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
->>                  return ret;
->>          }
->>
->> +       ret = hibmc_encoder_init(hidev);
->> +       if (ret) {
->> +               DRM_ERROR("failed to init encoder\n");
->> +               return ret;
->> +       }
->> +
->>          return 0;
->>   }
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> index 5731ec2..401cea4 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> @@ -47,6 +47,7 @@ struct hibmc_drm_device {
->>          struct drm_device  *dev;
->>          struct drm_plane plane;
->>          struct drm_crtc crtc;
->> +       struct drm_encoder encoder;
->
-> Same comment here, you don't need to keep track of this
+We want to get rid of global twl_i2c_{write/read}.
+As a first step, allow clients to get the regmap and write directly
 
-ok, it can be dealt with like crtc.
+Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
+---
+ drivers/mfd/twl-core.c  | 3 ++-
+ include/linux/i2c/twl.h | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
->
->>          bool mode_config_initialized;
->>
->>          /* ttm */
->> @@ -87,6 +88,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
->>
->>   int hibmc_plane_init(struct hibmc_drm_device *hidev);
->>   int hibmc_crtc_init(struct hibmc_drm_device *hidev);
->> +int hibmc_encoder_init(struct hibmc_drm_device *hidev);
->>   int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
->>   void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->> new file mode 100644
->> index 0000000..953f659
->> --- /dev/null
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
->> @@ -0,0 +1,89 @@
->> +/* Hisilicon Hibmc SoC drm driver
->> + *
->> + * Based on the bochs drm driver.
->> + *
->> + * Copyright (c) 2016 Huawei Limited.
->> + *
->> + * Author:
->> + *     Rongrong Zou <zourongrong@huawei.com>
->> + *     Rongrong Zou <zourongrong@gmail.com>
->> + *     Jianhua Li <lijianhua@huawei.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + */
->> +
->> +#include <drm/drm_atomic_helper.h>
->> +#include <drm/drm_crtc_helper.h>
->> +
->> +#include "hibmc_drm_drv.h"
->> +#include "hibmc_drm_regs.h"
->> +
->> +static int defx = 800;
->> +static int defy = 600;
->> +
->> +module_param(defx, int, 0444);
->> +module_param(defy, int, 0444);
->> +MODULE_PARM_DESC(defx, "default x resolution");
->> +MODULE_PARM_DESC(defy, "default y resolution");
->
-> Not used, and I'm not sure these are a good idea
-
-it is used in following patch, i think it is put in wrong place.
-
->
->> +
->> +static void hibmc_encoder_disable(struct drm_encoder *encoder)
->> +{
->> +}
->> +
->> +static void hibmc_encoder_enable(struct drm_encoder *encoder)
->> +{
->> +}
->
-> Null-checked, no need to stub
-
-thanks for pointing it out.
-
->
->> +
->> +static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
->> +                                  struct drm_display_mode *mode,
->> +                                  struct drm_display_mode *adj_mode)
->> +{
->> +       u32 reg;
->> +       struct drm_device *dev = encoder->dev;
->> +       struct hibmc_drm_device *hidev = dev->dev_private;
->> +
->> +       /* just open DISPLAY_CONTROL_HISILE register bit 3:0*/
->> +       reg = readl(hidev->mmio + DISPLAY_CONTROL_HISILE);
->> +       reg |= 0xf;
->
-> Can you just pull this into a #define instead of explaining in the comment?
-
-ok, thanks.
-
->
->> +       writel(reg, hidev->mmio + DISPLAY_CONTROL_HISILE);
->> +}
->> +
->> +static int hibmc_encoder_atomic_check(struct drm_encoder *encoder,
->> +                                     struct drm_crtc_state *crtc_state,
->> +                                     struct drm_connector_state *conn_state)
->> +{
->> +       return 0;
->> +}
->
-> null-checked, remove stub
-
-ok, will do.
-
->
->> +
->> +static const struct drm_encoder_helper_funcs hibmc_encoder_helper_funcs = {
->> +       .mode_set = hibmc_encoder_mode_set,
->> +       .disable = hibmc_encoder_disable,
->> +       .enable = hibmc_encoder_enable,
->> +       .atomic_check = hibmc_encoder_atomic_check,
->> +};
->> +
->> +static const struct drm_encoder_funcs hibmc_encoder_encoder_funcs = {
->> +       .destroy = drm_encoder_cleanup,
->> +};
->> +
->> +int hibmc_encoder_init(struct hibmc_drm_device *hidev)
->> +{
->> +       struct drm_device *dev = hidev->dev;
->> +       struct drm_encoder *encoder = &hidev->encoder;
->> +       int ret;
->> +
->> +       encoder->possible_crtcs = 0x1;
->> +       ret = drm_encoder_init(dev, encoder, &hibmc_encoder_encoder_funcs,
->> +                              DRM_MODE_ENCODER_DAC, NULL);
->> +       if (ret) {
->> +               DRM_ERROR("failed to init encoder\n");
->
-> print ret
-
-will do, thanks.
-
->
->> +               return ret;
->> +       }
->> +
->> +       drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
->> +       return 0;
->> +}
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->
-> .
->
-
-
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index c64615d..49e6a4b 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -421,7 +421,7 @@ EXPORT_SYMBOL(twl_rev);
+  *
+  * Returns the regmap pointer or NULL in case of failure.
+  */
+-static struct regmap *twl_get_regmap(u8 mod_no)
++struct regmap *twl_get_regmap(u8 mod_no)
+ {
+ 	int sid;
+ 	struct twl_client *twl;
+@@ -440,6 +440,7 @@ static struct regmap *twl_get_regmap(u8 mod_no)
+ 
+ 	return twl->regmap;
+ }
++EXPORT_SYMBOL(twl_get_regmap);
+ 
+ /**
+  * twl_i2c_write - Writes a n bit register in TWL4030/TWL5030/TWL60X0
+diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
+index 9ad7828..4c43cdb3 100644
+--- a/include/linux/i2c/twl.h
++++ b/include/linux/i2c/twl.h
+@@ -174,6 +174,8 @@ static inline int twl_class_is_ ##class(void)	\
+ TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
+ TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
+ 
++struct regmap *twl_get_regmap(u8 mod_no);
++
+ /* Set the regcache bypass for the regmap associated with the nodule */
+ int twl_set_regcache_bypass(u8 mod_no, bool enable);
+ 
 -- 
-Regards, Rongrong
+2.5.5
