@@ -1,51 +1,65 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sat, 12 Nov 2016 19:57:50 +0100
-Subject: [PATCH 1/4] ARM: dts: mxs: Add new M28EVK manufacturer compat
-In-Reply-To: <20161024065002.GX30578@tiger>
-References: <20160919214044.9615-1-marex@denx.de>
- <20161023130143.GT30578@tiger> <3ec3e368-c8f1-3bee-7b7b-6de5cef72325@denx.de>
- <20161024065002.GX30578@tiger>
-Message-ID: <3c283fda-4f66-ee4f-16ce-c786b8cea2be@denx.de>
+From: linux@rempel-privat.de (Oleksij Rempel)
+Date: Sat, 12 Nov 2016 20:24:01 +0100
+Subject: [PATCH RFT] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
+In-Reply-To: <1478885208-18821-1-git-send-email-stefan.wahren@i2se.com>
+References: <1478885208-18821-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <40c3be7e-08c3-955c-746a-6906160e1e0a@rempel-privat.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2016 08:50 AM, Shawn Guo wrote:
-> On Sun, Oct 23, 2016 at 03:30:32PM +0200, Marek Vasut wrote:
->> On 10/23/2016 03:01 PM, Shawn Guo wrote:
->>> On Mon, Sep 19, 2016 at 11:40:41PM +0200, Marek Vasut wrote:
->>>> The board is now manufactured by Aries Embedded GmbH, update compat string.
->>>>
->>>> Signed-off-by: Marek Vasut <marex@denx.de>
->>>> Cc: Shawn Guo <shawnguo@kernel.org>
->>>> ---
->>>>  arch/arm/boot/dts/imx28-m28.dtsi   | 4 ++--
->>>>  arch/arm/boot/dts/imx28-m28evk.dts | 4 ++--
->>>>  2 files changed, 4 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/imx28-m28.dtsi b/arch/arm/boot/dts/imx28-m28.dtsi
->>>> index 214bb15..a69856e 100644
->>>> --- a/arch/arm/boot/dts/imx28-m28.dtsi
->>>> +++ b/arch/arm/boot/dts/imx28-m28.dtsi
->>>> @@ -12,8 +12,8 @@
->>>>  #include "imx28.dtsi"
->>>>  
->>>>  / {
->>>> -	model = "DENX M28";
->>>> -	compatible = "denx,m28", "fsl,imx28";
->>>> +	model = "Aries/DENX M28";
->>>> +	compatible = "aries,m28", "denx,m28", "fsl,imx28";
->>>
->>> Do we have an entry for Aries Embedded GmbH in vendor-prefixes.txt?
->>
->> The patch was submitted, not yet applied though:
->> http://www.spinics.net/lists/arm-kernel/msg533000.html
+Am 11.11.2016 um 18:26 schrieb Stefan Wahren:
+> The ICOLL controller doesn't provide any facility to configure the
+> wakeup sources. That's the reason why this implementation lacks
+> the irq_set_wake implementation. But this prevent us from properly
+> entering power management states like "suspend to idle".
 > 
-> Okay.  Ping me when it gets applied.
+> So enable the flags IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND
+> to let the irqchip core allows and handles the power management.
+> 
+> This patch has been tested with a MX23 and a MX28 board. Any further
+> tests especially with ASM9260 would be appreciated.
 
-Ping, it's in.
+Hi, I wont be able to test this patch on ASM9260 until March.
+Please roll it out, so far it looks ok for me.
 
-http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/Documentation/devicetree/bindings/vendor-prefixes.txt?id=553a8bcd6a103f518d1f6a021b8442d8dfec5e6d
+
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  drivers/irqchip/irq-mxs.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+> index 1730470..05fa9f7 100644
+> --- a/drivers/irqchip/irq-mxs.c
+> +++ b/drivers/irqchip/irq-mxs.c
+> @@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
+>  	.irq_ack = icoll_ack_irq,
+>  	.irq_mask = icoll_mask_irq,
+>  	.irq_unmask = icoll_unmask_irq,
+> +	.flags = IRQCHIP_MASK_ON_SUSPEND |
+> +		 IRQCHIP_SKIP_SET_WAKE,
+>  };
+>  
+>  static struct irq_chip asm9260_icoll_chip = {
+>  	.irq_ack = icoll_ack_irq,
+>  	.irq_mask = asm9260_mask_irq,
+>  	.irq_unmask = asm9260_unmask_irq,
+> +	.flags = IRQCHIP_MASK_ON_SUSPEND |
+> +		 IRQCHIP_SKIP_SET_WAKE,
+>  };
+>  
+>  asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+> 
+
 
 -- 
-Best regards,
-Marek Vasut
+Regards,
+Oleksij
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 213 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161112/bdb33c52/attachment-0001.sig>
