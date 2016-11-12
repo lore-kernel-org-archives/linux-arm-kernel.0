@@ -1,20 +1,35 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Sat, 12 Nov 2016 10:46:58 +0530
-Subject: [PATCH] ARM: dts: vfxxx: Enable DMA for DSPI2 and DSPI3
-In-Reply-To: <CAOMZO5BAE=6pE9DMGhXTMm5CeLh+DmhSqGtdSYHf8+yyZkfEVQ@mail.gmail.com>
-References: <20161110114505.17618-1-maitysanchayan@gmail.com>
- <CAOMZO5BAE=6pE9DMGhXTMm5CeLh+DmhSqGtdSYHf8+yyZkfEVQ@mail.gmail.com>
-Message-ID: <20161112051658.GA2198@Sanchayan-Arch.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 12 Nov 2016 05:43:19 +0000
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+In-Reply-To: <20161112004449.30566-1-f.fainelli@gmail.com>
+References: <20161112004449.30566-1-f.fainelli@gmail.com>
+Message-ID: <20161112054318.GB24127@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-11-11 20:46:12, Fabio Estevam wrote:
-> On Thu, Nov 10, 2016 at 9:45 AM, Sanchayan Maity
-> <maitysanchayan@gmail.com> wrote:
-> > Enable DMA for DSPI2 and DSPI3 on Vybrid.
+On Fri, Nov 11, 2016 at 04:44:43PM -0800, Florian Fainelli wrote:
+> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+> debug_virt_to_phys() which helps catch vmalloc space addresses being
+> passed. This is helpful in debugging bogus drivers that just assume
+> linear mappings all over the place.
 > 
-> You missed your Signed-off-by line.
+> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+> __virt_to_phys() as being the functional implementation of the address
+> translation, so we special case the debug stub to call into
+> __virt_to_phys directly.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/include/asm/memory.h      |  4 ++++
+>  arch/arm64/include/asm/memory.h    |  4 ++++
+>  include/asm-generic/memory_model.h |  4 ++++
+>  mm/debug.c                         | 15 +++++++++++++++
+>  4 files changed, 27 insertions(+)
 
-Argh...Sorry about that...Will send a follow patch with this fixed.
+What's the interaction between this and the DEBUG_VIRTUAL patches from Laura?
 
-- Sanchayan.
+http://lkml.kernel.org/r/20161102210054.16621-7-labbott at redhat.com
+
+They seem to be tackling the exact same problem afaict.
+
+Will
