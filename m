@@ -1,99 +1,106 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Nov 2016 16:46:33 -0600
-Subject: [PATCH] pci: layerscape: add LS1046a support
-In-Reply-To: <1477399016-22826-1-git-send-email-Minghuan.Lian@nxp.com>
-References: <1477399016-22826-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <20161111224633.GV9868@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 11 Nov 2016 16:44:43 -0800
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+Message-ID: <20161112004449.30566-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 25, 2016 at 08:36:56PM +0800, Minghuan Lian wrote:
-> From: "mingkai.hu at nxp.com" <mingkai.hu@nxp.com>
-> 
-> 1. LS1046a PCIe controller has a different LUT_DBG offset.
-> Available "lut_dbg" is added to ls_pcie_drvdata to describe
-> this difference.
-> 2. Match LS1046 PCIe compatible
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-> Signed-off-by: Mingkai Hu <mingkai.hu@nxp.com>
+When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+debug_virt_to_phys() which helps catch vmalloc space addresses being
+passed. This is helpful in debugging bogus drivers that just assume
+linear mappings all over the place.
 
-Applied to pci/host-layerscape for v4.10, thanks!
+For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+__virt_to_phys() as being the functional implementation of the address
+translation, so we special case the debug stub to call into
+__virt_to_phys directly.
 
-I removed the now-unused PCIE_LUT_DBG definition for you.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/include/asm/memory.h      |  4 ++++
+ arch/arm64/include/asm/memory.h    |  4 ++++
+ include/asm-generic/memory_model.h |  4 ++++
+ mm/debug.c                         | 15 +++++++++++++++
+ 4 files changed, 27 insertions(+)
 
-> ---
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt |  1 +
->  drivers/pci/host/pci-layerscape.c                        | 13 ++++++++++++-
->  2 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 41e9f55..ee1c72d5 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  - compatible: should contain the platform identifier such as:
->          "fsl,ls1021a-pcie", "snps,dw-pcie"
->          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-> +        "fsl,ls1046a-pcie"
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 958187f..8cebf9a 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -41,6 +41,7 @@
->  struct ls_pcie_drvdata {
->  	u32 lut_offset;
->  	u32 ltssm_shift;
-> +	u32 lut_dbg;
->  	struct pcie_host_ops *ops;
->  };
->  
-> @@ -134,7 +135,7 @@ static int ls_pcie_link_up(struct pcie_port *pp)
->  	struct ls_pcie *pcie = to_ls_pcie(pp);
->  	u32 state;
->  
-> -	state = (ioread32(pcie->lut + PCIE_LUT_DBG) >>
-> +	state = (ioread32(pcie->lut + pcie->drvdata->lut_dbg) >>
->  		 pcie->drvdata->ltssm_shift) &
->  		 LTSSM_STATE_MASK;
->  
-> @@ -196,18 +197,28 @@ static int ls_pcie_msi_host_init(struct pcie_port *pp,
->  static struct ls_pcie_drvdata ls1043_drvdata = {
->  	.lut_offset = 0x10000,
->  	.ltssm_shift = 24,
-> +	.lut_dbg = 0x7fc,
-> +	.ops = &ls_pcie_host_ops,
-> +};
-> +
-> +static struct ls_pcie_drvdata ls1046_drvdata = {
-> +	.lut_offset = 0x80000,
-> +	.ltssm_shift = 24,
-> +	.lut_dbg = 0x407fc,
->  	.ops = &ls_pcie_host_ops,
->  };
->  
->  static struct ls_pcie_drvdata ls2080_drvdata = {
->  	.lut_offset = 0x80000,
->  	.ltssm_shift = 0,
-> +	.lut_dbg = 0x7fc,
->  	.ops = &ls_pcie_host_ops,
->  };
->  
->  static const struct of_device_id ls_pcie_of_match[] = {
->  	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
->  	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
-> +	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
->  	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
->  	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
->  	{ },
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 76cbd9c674df..448dec9b8b00 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
+  * translation for translating DMA addresses.  Use the driver
+  * DMA support - see dma-mapping.h.
+  */
++#ifndef CONFIG_DEBUG_VM
+ #define virt_to_phys virt_to_phys
+ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ {
+ 	return __virt_to_phys((unsigned long)(x));
+ }
++#else
++#define virt_to_phys debug_virt_to_phys
++#endif
+ 
+ #define phys_to_virt phys_to_virt
+ static inline void *phys_to_virt(phys_addr_t x)
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index b71086d25195..c9e436b28523 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -186,11 +186,15 @@ extern u64			kimage_voffset;
+  * translation for translating DMA addresses.  Use the driver
+  * DMA support - see dma-mapping.h.
+  */
++#ifndef CONFIG_DEBUG_VM
+ #define virt_to_phys virt_to_phys
+ static inline phys_addr_t virt_to_phys(const volatile void *x)
+ {
+ 	return __virt_to_phys((unsigned long)(x));
+ }
++#else
++#define virt_to_phys debug_virt_to_phys
++#endif
+ 
+ #define phys_to_virt phys_to_virt
+ static inline void *phys_to_virt(phys_addr_t x)
+diff --git a/include/asm-generic/memory_model.h b/include/asm-generic/memory_model.h
+index 5148150cc80b..426085757258 100644
+--- a/include/asm-generic/memory_model.h
++++ b/include/asm-generic/memory_model.h
+@@ -80,6 +80,10 @@
+ #define page_to_pfn __page_to_pfn
+ #define pfn_to_page __pfn_to_page
+ 
++#ifdef CONFIG_DEBUG_VM
++unsigned long debug_virt_to_phys(volatile void *address);
++#endif /* CONFIG_DEBUG_VM */
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
+diff --git a/mm/debug.c b/mm/debug.c
+index 9feb699c5d25..72b2ca9b11f4 100644
+--- a/mm/debug.c
++++ b/mm/debug.c
+@@ -161,4 +161,19 @@ void dump_mm(const struct mm_struct *mm)
+ 	);
+ }
+ 
++#include <asm/memory.h>
++#include <linux/mm.h>
++
++unsigned long debug_virt_to_phys(volatile void *address)
++{
++	BUG_ON(is_vmalloc_addr((const void *)address));
++#if defined(CONFIG_ARM) || defined(CONFIG_ARM64) || defined(CONFIG_UNICORE32) || \
++	defined(CONFIG_MICROBLAZE)
++	return __virt_to_phys(address);
++#else
++	return virt_to_phys(address);
++#endif
++}
++EXPORT_SYMBOL(debug_virt_to_phys);
++
+ #endif		/* CONFIG_DEBUG_VM */
+-- 
+2.9.3
