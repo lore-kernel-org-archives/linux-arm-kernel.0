@@ -1,52 +1,32 @@
-From: Nicolae_Rosia@mentor.com (Nicolae Rosia)
-Date: Sat, 12 Nov 2016 13:38:13 +0200
-Subject: [PATCH] mfd: twl-core: export twl_get_regmap
-Message-ID: <1478950693-13959-1-git-send-email-Nicolae_Rosia@mentor.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sat, 12 Nov 2016 20:02:31 +0800
+Subject: [PATCH 1/3] clk: Hi6220: enable stub clock driver for ARCH_HISI
+In-Reply-To: <20160831224049.GK12510@codeaurora.org>
+References: <1472633417-9330-1-git-send-email-leo.yan@linaro.org>
+ <1472633417-9330-2-git-send-email-leo.yan@linaro.org>
+ <20160831224049.GK12510@codeaurora.org>
+Message-ID: <20161112120231.GB23848@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to get rid of global twl_i2c_{write/read}.
-As a first step, allow clients to get the regmap and write directly
+Hi Stephen,
 
-Signed-off-by: Nicolae Rosia <Nicolae_Rosia@mentor.com>
----
- drivers/mfd/twl-core.c  | 3 ++-
- include/linux/i2c/twl.h | 2 ++
- 2 files changed, 4 insertions(+), 1 deletion(-)
+On Wed, Aug 31, 2016 at 03:40:49PM -0700, Stephen Boyd wrote:
+> On 08/31, Leo Yan wrote:
+> > In current kernel config 'CONFIG_STUB_CLK_HI6220' is disabled by
+> > default, as result stub clock driver has not been registered and
+> > CPUFreq driver cannot work.
+> > 
+> > This patch is to enable stub clock driver in config for ARCH_HISI.
+> > 
+> > Reported-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> 
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index c64615d..49e6a4b 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -421,7 +421,7 @@ EXPORT_SYMBOL(twl_rev);
-  *
-  * Returns the regmap pointer or NULL in case of failure.
-  */
--static struct regmap *twl_get_regmap(u8 mod_no)
-+struct regmap *twl_get_regmap(u8 mod_no)
- {
- 	int sid;
- 	struct twl_client *twl;
-@@ -440,6 +440,7 @@ static struct regmap *twl_get_regmap(u8 mod_no)
- 
- 	return twl->regmap;
- }
-+EXPORT_SYMBOL(twl_get_regmap);
- 
- /**
-  * twl_i2c_write - Writes a n bit register in TWL4030/TWL5030/TWL60X0
-diff --git a/include/linux/i2c/twl.h b/include/linux/i2c/twl.h
-index 9ad7828..4c43cdb3 100644
---- a/include/linux/i2c/twl.h
-+++ b/include/linux/i2c/twl.h
-@@ -174,6 +174,8 @@ static inline int twl_class_is_ ##class(void)	\
- TWL_CLASS_IS(4030, TWL4030_CLASS_ID)
- TWL_CLASS_IS(6030, TWL6030_CLASS_ID)
- 
-+struct regmap *twl_get_regmap(u8 mod_no);
-+
- /* Set the regcache bypass for the regmap associated with the nodule */
- int twl_set_regcache_bypass(u8 mod_no, bool enable);
- 
--- 
-2.5.5
+We found this patch is missed mainline kernel. So could you help pick
+it? Or do you need me resend this patch?
+
+Thanks,
+Leo Yan
