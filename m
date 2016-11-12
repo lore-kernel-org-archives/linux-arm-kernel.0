@@ -1,65 +1,42 @@
-From: linux@rempel-privat.de (Oleksij Rempel)
-Date: Sat, 12 Nov 2016 20:24:01 +0100
-Subject: [PATCH RFT] irqchip: mxs: Enable SKIP_SET_WAKE and MASK_ON_SUSPEND
-In-Reply-To: <1478885208-18821-1-git-send-email-stefan.wahren@i2se.com>
-References: <1478885208-18821-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <40c3be7e-08c3-955c-746a-6906160e1e0a@rempel-privat.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 12 Nov 2016 11:29:38 -0800
+Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
+In-Reply-To: <20161112054318.GB24127@arm.com>
+References: <20161112004449.30566-1-f.fainelli@gmail.com>
+ <20161112054318.GB24127@arm.com>
+Message-ID: <abb97b87-db44-e25a-608e-161b57a0439b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 11.11.2016 um 18:26 schrieb Stefan Wahren:
-> The ICOLL controller doesn't provide any facility to configure the
-> wakeup sources. That's the reason why this implementation lacks
-> the irq_set_wake implementation. But this prevent us from properly
-> entering power management states like "suspend to idle".
+Le 11/11/2016 ? 21:43, Will Deacon a ?crit :
+> On Fri, Nov 11, 2016 at 04:44:43PM -0800, Florian Fainelli wrote:
+>> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
+>> debug_virt_to_phys() which helps catch vmalloc space addresses being
+>> passed. This is helpful in debugging bogus drivers that just assume
+>> linear mappings all over the place.
+>>
+>> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
+>> __virt_to_phys() as being the functional implementation of the address
+>> translation, so we special case the debug stub to call into
+>> __virt_to_phys directly.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  arch/arm/include/asm/memory.h      |  4 ++++
+>>  arch/arm64/include/asm/memory.h    |  4 ++++
+>>  include/asm-generic/memory_model.h |  4 ++++
+>>  mm/debug.c                         | 15 +++++++++++++++
+>>  4 files changed, 27 insertions(+)
 > 
-> So enable the flags IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND
-> to let the irqchip core allows and handles the power management.
+> What's the interaction between this and the DEBUG_VIRTUAL patches from Laura?
 > 
-> This patch has been tested with a MX23 and a MX28 board. Any further
-> tests especially with ASM9260 would be appreciated.
-
-Hi, I wont be able to test this patch on ASM9260 until March.
-Please roll it out, so far it looks ok for me.
-
-
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/irqchip/irq-mxs.c |    4 ++++
->  1 file changed, 4 insertions(+)
+> http://lkml.kernel.org/r/20161102210054.16621-7-labbott at redhat.com
 > 
-> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-> index 1730470..05fa9f7 100644
-> --- a/drivers/irqchip/irq-mxs.c
-> +++ b/drivers/irqchip/irq-mxs.c
-> @@ -131,12 +131,16 @@ static void asm9260_unmask_irq(struct irq_data *d)
->  	.irq_ack = icoll_ack_irq,
->  	.irq_mask = icoll_mask_irq,
->  	.irq_unmask = icoll_unmask_irq,
-> +	.flags = IRQCHIP_MASK_ON_SUSPEND |
-> +		 IRQCHIP_SKIP_SET_WAKE,
->  };
->  
->  static struct irq_chip asm9260_icoll_chip = {
->  	.irq_ack = icoll_ack_irq,
->  	.irq_mask = asm9260_mask_irq,
->  	.irq_unmask = asm9260_unmask_irq,
-> +	.flags = IRQCHIP_MASK_ON_SUSPEND |
-> +		 IRQCHIP_SKIP_SET_WAKE,
->  };
->  
->  asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
-> 
+> They seem to be tackling the exact same problem afaict.
 
+Indeed thanks for pointing that out, I guess I could piggy back on this
+patchset and try to cover ARM.
 
+Thanks!
 -- 
-Regards,
-Oleksij
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 213 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161112/bdb33c52/attachment-0001.sig>
+Florian
