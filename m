@@ -1,114 +1,150 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 12 Nov 2016 22:14:35 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
- <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
- <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
- <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
-Message-ID: <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 12 Nov 2016 22:44:03 +0100
+Subject: [PATCH 2/6] pinctrl: rockchip: add support for rk1108
+In-Reply-To: <CAFLEztRW8P4kiPZzVX2jM5UZMZun=TBBCij4B7j2TiesCuJYWA@mail.gmail.com>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
+ <CAFLEztRW8P4kiPZzVX2jM5UZMZun=TBBCij4B7j2TiesCuJYWA@mail.gmail.com>
+Message-ID: <2910206.ioRrj8ivkn@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jacob,
 
-On 12-11-16 20:14, Jacek Anaszewski wrote:
+Am Sonntag, 13. November 2016, 01:41:21 schrieb ??:
+> 2016-11-03 20:34 GMT+08:00 Andy Yan <andy.yan@rock-chips.com>:
+> > Add basic support for rk1108 soc
+> > 
+> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> > ---
+> > 
+> >  drivers/pinctrl/pinctrl-rockchip.c | 27 ++++++++++++++++++++++++++-
+> >  1 file changed, 26 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> > b/drivers/pinctrl/pinctrl-rockchip.c index 49bf7dc..9f324b1 100644
+> > --- a/drivers/pinctrl/pinctrl-rockchip.c
+> > +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> > @@ -59,6 +59,7 @@
+> > 
+> >  #define GPIO_LS_SYNC           0x60
+> >  
+> >  enum rockchip_pinctrl_type {
+> > 
+> > +       RK1108,
+> > 
+> >         RK2928,
+> >         RK3066B,
+> >         RK3188,
+> > 
+> > @@ -1123,6 +1124,7 @@ static int rockchip_get_pull(struct
+> > rockchip_pin_bank *bank, int pin_num)> 
+> >                 return !(data & BIT(bit))
+> >                 
+> >                                 ? PIN_CONFIG_BIAS_PULL_PIN_DEFAULT
+> >                                 
+> >                                 : PIN_CONFIG_BIAS_DISABLE;
+> > 
+> > +       case RK1108:
+> >         case RK3188:
+> >         case RK3288:
+> > 
+> >         case RK3368:
+> > @@ -1169,6 +1171,7 @@ static int rockchip_set_pull(struct
+> > rockchip_pin_bank *bank,> 
+> >                 spin_unlock_irqrestore(&bank->slock, flags);
+> >                 break;
+> > 
+> > +       case RK1108:
+> >         case RK3188:
+> >         case RK3288:
+> > 
+> >         case RK3368:
+> > @@ -1358,6 +1361,7 @@ static bool rockchip_pinconf_pull_valid(struct
+> > rockchip_pin_ctrl *ctrl,> 
+> >                                         pull == PIN_CONFIG_BIAS_DISABLE);
+> >         
+> >         case RK3066B:
+> >                 return pull ? false : true;
+> > 
+> > +       case RK1108:
+> >         case RK3188:
+> >         case RK3288:
+> > 
+> >         case RK3368:
+> > @@ -1385,7 +1389,6 @@ static int rockchip_pinconf_set(struct pinctrl_dev
+> > *pctldev, unsigned int pin,> 
+> >         for (i = 0; i < num_configs; i++) {
+> >         
+> >                 param = pinconf_to_config_param(configs[i]);
+> >                 arg = pinconf_to_config_argument(configs[i]);
+> > 
+> > -
+> > 
+> >                 switch (param) {
+> >                 
+> >                 case PIN_CONFIG_BIAS_DISABLE:
+> >                         rc =  rockchip_set_pull(bank, pin -
+> >                         bank->pin_base,
+> > 
+> > @@ -2455,6 +2458,26 @@ static int rockchip_pinctrl_probe(struct
+> > platform_device *pdev)> 
+> >         return 0;
+> >  
+> >  }
+> > 
+> > +static struct rockchip_pin_bank rk1108_pin_banks[] = {
+> > +       PIN_BANK_IOMUX_FLAGS(0, 32, "gpio0", IOMUX_SOURCE_PMU,
+> > +                                            IOMUX_SOURCE_PMU,
+> > +                                            IOMUX_SOURCE_PMU,
+> > +                                            IOMUX_SOURCE_PMU),
+> > +       PIN_BANK_IOMUX_FLAGS(1, 32, "gpio1", 0, 0, 0, 0),
+> > +       PIN_BANK_IOMUX_FLAGS(2, 32, "gpio2", 0, 0, 0, 0),
+> > +       PIN_BANK_IOMUX_FLAGS(3, 32, "gpio3", 0, 0, 0, 0),
+> > +};
+> > +
+> > +static struct rockchip_pin_ctrl rk1108_pin_ctrl = {
+> > +       .pin_banks              = rk1108_pin_banks,
+> > +       .nr_banks               = ARRAY_SIZE(rk1108_pin_banks),
+> > +       .label                  = "RK1108-GPIO",
+> > +       .type                   = RK1108,
+> > +       .grf_mux_offset         = 0x10,
+> > +       .pmu_mux_offset         = 0x0,
+> > +       .pull_calc_reg          = rk3288_calc_pull_reg_and_bit,
+> > +};
+> > +
+> > 
+> >  static struct rockchip_pin_bank rk2928_pin_banks[] = {
+> >  
+> >         PIN_BANK(0, 32, "gpio0"),
+> >         PIN_BANK(1, 32, "gpio1"),
+> > 
+> > @@ -2684,6 +2707,8 @@ static struct rockchip_pin_ctrl rk3399_pin_ctrl = {
+> > 
+> >  };
+> >  
+> >  static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+> > 
+> > +       { .compatible = "rockchip,rk1108-pinctrl",
+> > +               .data = (void *)&rk1108_pin_ctrl },
+> > 
+> >         { .compatible = "rockchip,rk2928-pinctrl",
+> >         
+> >                 .data = (void *)&rk2928_pin_ctrl },
+> >         
+> >         { .compatible = "rockchip,rk3036-pinctrl",
+> > 
+> > --
+> > 2.7.4
+> 
+> rk3288_calc_pull_reg_and_bit can't be used directly in rk1108.
+> rk1108 have a different PULL_PMU_OFFSET and PULL_OFFSET.
 
-<snip>
+yes, you're right, the offsets are different, so need a new function.
 
->>>> Why a dedicated file? Are we going to mirror brightness here
->>>> wrt r/w (show/store) behavior ? If not userspace now needs
->>>> 2 open fds which is not really nice. If we are and we are
->>>> not going to use poll for something else on brightness itself
->>>> then why not just poll directly on brightness ?
->>>
->>> My main concern is that reporting only hw brightness changes
->>> wouldn't be consistent with general brightness file purpose.
->>> One could expect that brightness changes made by triggers
->>> should be also reported.
->>
->> Ok, I agree that not notifying poll() while an actual
->> read() would result in a different value is not really good
->> semantics.
->>
->> I don't like to call it hw_brightness_change though, as
->> mentioned before I believe that if we were to start with
->> a clean slate we would make the brightness file's read/write
->> behavior more a mirror of itself.
->>
->> So I would like to propose creating a new read-write
->> user_brightness file.
->>
->> The write behavior would be 100% identical to the brightness
->> file (in code terms it will call the same store function).
->>
->> The the read behavior otoh will be different: it will shows
->> the last brightness as set by the user, this would show the
->> read behavior we really want of brightness: show the real
->> brightness when not blinking / triggers are active and show
->> the brightness used when on when blinking / triggers are active.
->>
->> We could then add poll support on this new user_brightness
->> file, thus avoiding the problem with the extra cpu-load on
->> notifications on blinking / triggers.
->
-> I agree that user_brightness allows to solve the issues you raised
-> about inconsistent write and read brightness' semantics
-> (which is not that painful IMHO).
->
-> Reporting non-user brightness changes on user_brightness file
-> doesn't sound reasonable though.
+Andy, when at it, you might also want to include drive-strength functionality? 
+It is missing here but from looking at the TRM, it should be pretty easy to 
+add, as everything looks similar to what other rockchip socs do.
 
-The changes I'm interested in are user brightness changes they
-are just not done through sysfs, but through a hardwired hotkey,
-they are however very much done by the user.
 
-> Also, how would we read the
-> brightness set by the firmware? We'd have to read brightness
-> file, so still two files would have to be opened which is
-> a second drawback of this approach.
-
-No, look carefully at the definition of the read behavior
-I plan to put in the ABI doc:
-
-"Reading this file will return the actual led brightness
-when not blinking and no triggers are active; reading this
-file will return the brightness used when the led is on
-when blinking or triggers are active."
-
-So for e.g. the backlit keyboard case reading this single
-file will return the actual brightness of the backlight,
-since this does not involve blinking or triggers.
-
-Basically the idea is that the user_brightness file
-will have the semantics which IMHO the brightness file
-itself should have had from the beginning, but which
-we can't change now due to ABI reasons.
-
-> Having no difference in this area between the two approaches
-> I'm still in favour of the read-only file for notifying
-> brightness changes procured by hardware.
-
-That brings back the needing 2 fds problem; and does
-not solve userspace not being able to reliably read
-the led on brightness when blinking or using triggers.
-
-And this also has the issue that one is doing poll() on
-one fd to detect changes on another fd, which is completely
-unheard of in any kernel API, so I still vote NACK for the
-entire idea of having a different file purely for notifying
-changes. The way unix defines poll to work means that the
-poll() and read() must be on the same fd, anything else
-does not make sense.
-
-Regards,
-
-Hans
+Heiko
