@@ -1,132 +1,106 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 12 Nov 2016 18:19:58 +0100
-Subject: [PATCH] drm/sun4i: constify component_ops structures
-Message-ID: <1478971198-3659-1-git-send-email-Julia.Lawall@lip6.fr>
+From: jacobchen110@gmail.com (=?UTF-8?B?6ZmI6LGq?=)
+Date: Sun, 13 Nov 2016 01:41:21 +0800
+Subject: [PATCH 2/6] pinctrl: rockchip: add support for rk1108
+In-Reply-To: <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
+References: <1478175975-11779-1-git-send-email-andy.yan@rock-chips.com>
+ <1478176470-11956-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CAFLEztRW8P4kiPZzVX2jM5UZMZun=TBBCij4B7j2TiesCuJYWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These component_ops structures are only used as the second argument to
-component_add and component_del, which are declared as const, so the
-structures can be declared as const as well.
+2016-11-03 20:34 GMT+08:00 Andy Yan <andy.yan@rock-chips.com>:
+> Add basic support for rk1108 soc
+>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> ---
+>
+>  drivers/pinctrl/pinctrl-rockchip.c | 27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
+> index 49bf7dc..9f324b1 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -59,6 +59,7 @@
+>  #define GPIO_LS_SYNC           0x60
+>
+>  enum rockchip_pinctrl_type {
+> +       RK1108,
+>         RK2928,
+>         RK3066B,
+>         RK3188,
+> @@ -1123,6 +1124,7 @@ static int rockchip_get_pull(struct rockchip_pin_bank *bank, int pin_num)
+>                 return !(data & BIT(bit))
+>                                 ? PIN_CONFIG_BIAS_PULL_PIN_DEFAULT
+>                                 : PIN_CONFIG_BIAS_DISABLE;
+> +       case RK1108:
+>         case RK3188:
+>         case RK3288:
+>         case RK3368:
+> @@ -1169,6 +1171,7 @@ static int rockchip_set_pull(struct rockchip_pin_bank *bank,
+>
+>                 spin_unlock_irqrestore(&bank->slock, flags);
+>                 break;
+> +       case RK1108:
+>         case RK3188:
+>         case RK3288:
+>         case RK3368:
+> @@ -1358,6 +1361,7 @@ static bool rockchip_pinconf_pull_valid(struct rockchip_pin_ctrl *ctrl,
+>                                         pull == PIN_CONFIG_BIAS_DISABLE);
+>         case RK3066B:
+>                 return pull ? false : true;
+> +       case RK1108:
+>         case RK3188:
+>         case RK3288:
+>         case RK3368:
+> @@ -1385,7 +1389,6 @@ static int rockchip_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+>         for (i = 0; i < num_configs; i++) {
+>                 param = pinconf_to_config_param(configs[i]);
+>                 arg = pinconf_to_config_argument(configs[i]);
+> -
+>                 switch (param) {
+>                 case PIN_CONFIG_BIAS_DISABLE:
+>                         rc =  rockchip_set_pull(bank, pin - bank->pin_base,
+> @@ -2455,6 +2458,26 @@ static int rockchip_pinctrl_probe(struct platform_device *pdev)
+>         return 0;
+>  }
+>
+> +static struct rockchip_pin_bank rk1108_pin_banks[] = {
+> +       PIN_BANK_IOMUX_FLAGS(0, 32, "gpio0", IOMUX_SOURCE_PMU,
+> +                                            IOMUX_SOURCE_PMU,
+> +                                            IOMUX_SOURCE_PMU,
+> +                                            IOMUX_SOURCE_PMU),
+> +       PIN_BANK_IOMUX_FLAGS(1, 32, "gpio1", 0, 0, 0, 0),
+> +       PIN_BANK_IOMUX_FLAGS(2, 32, "gpio2", 0, 0, 0, 0),
+> +       PIN_BANK_IOMUX_FLAGS(3, 32, "gpio3", 0, 0, 0, 0),
+> +};
+> +
+> +static struct rockchip_pin_ctrl rk1108_pin_ctrl = {
+> +       .pin_banks              = rk1108_pin_banks,
+> +       .nr_banks               = ARRAY_SIZE(rk1108_pin_banks),
+> +       .label                  = "RK1108-GPIO",
+> +       .type                   = RK1108,
+> +       .grf_mux_offset         = 0x10,
+> +       .pmu_mux_offset         = 0x0,
+> +       .pull_calc_reg          = rk3288_calc_pull_reg_and_bit,
+> +};
+> +
+>  static struct rockchip_pin_bank rk2928_pin_banks[] = {
+>         PIN_BANK(0, 32, "gpio0"),
+>         PIN_BANK(1, 32, "gpio1"),
+> @@ -2684,6 +2707,8 @@ static struct rockchip_pin_ctrl rk3399_pin_ctrl = {
+>  };
+>
+>  static const struct of_device_id rockchip_pinctrl_dt_match[] = {
+> +       { .compatible = "rockchip,rk1108-pinctrl",
+> +               .data = (void *)&rk1108_pin_ctrl },
+>         { .compatible = "rockchip,rk2928-pinctrl",
+>                 .data = (void *)&rk2928_pin_ctrl },
+>         { .compatible = "rockchip,rk3036-pinctrl",
+> --
+> 2.7.4
+>
+>
 
-The semantic patch that makes this change is as follows:
-(http://coccinelle.lip6.fr/)
-
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-
-static struct component_ops i at p = { ... };
-
-@ok1@
-identifier r.i;
-expression e1;
-position p;
-@@
-
-component_add(e1,&i at p)
-
-@ok2@
-identifier r.i;
-expression e1;
-position p;
-@@
-
-component_del(e1, &i at p)
-
-@bad@
-position p != {r.p,ok1.p,ok2.p};
-identifier r.i;
-struct component_ops e;
-@@
-
-e at i@p
-
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-
-static
-+const
- struct component_ops i = { ... };
-// </smpl>
-
-The result of the size command before the change is (arm):
-
-   text       data         bss     dec      hex filename
-   5266        236           8    5510     1586 sun4i_backend.o
-   6393        236           8    6637     19ed sun4i_tcon.o
-   3700        368           8    4076      fec sun4i_tv.o
-   1668        108           0    1776      6f0 sun6i_drc.o
-
-and after the change:
-
-   text       data         bss     dec     hex filename
-   5274        228           8    5510    1586 sun4i_backend.o
-   6401        228           8    6637    19ed sun4i_tcon.o
-   3708        360           8    4076     fec sun4i_tv.o
-   1676        100           0    1776     6f0 sun6i_drc.o
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/gpu/drm/sun4i/sun4i_backend.c |    2 +-
- drivers/gpu/drm/sun4i/sun4i_tcon.c    |    2 +-
- drivers/gpu/drm/sun4i/sun4i_tv.c      |    2 +-
- drivers/gpu/drm/sun4i/sun6i_drc.c     |    2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 7eb2a96..2e08f96 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -409,7 +409,7 @@ static void sun4i_backend_unbind(struct device *dev, struct device *master,
- 	reset_control_assert(backend->reset);
- }
- 
--static struct component_ops sun4i_backend_ops = {
-+static const struct component_ops sun4i_backend_ops = {
- 	.bind	= sun4i_backend_bind,
- 	.unbind	= sun4i_backend_unbind,
- };
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c6afb24..ea2906f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -545,7 +545,7 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
- 	sun4i_tcon_free_clocks(tcon);
- }
- 
--static struct component_ops sun4i_tcon_ops = {
-+static const struct component_ops sun4i_tcon_ops = {
- 	.bind	= sun4i_tcon_bind,
- 	.unbind	= sun4i_tcon_unbind,
- };
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 1dd3d9e..d430b331 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -667,7 +667,7 @@ static void sun4i_tv_unbind(struct device *dev, struct device *master,
- 	clk_disable_unprepare(tv->clk);
- }
- 
--static struct component_ops sun4i_tv_ops = {
-+static const struct component_ops sun4i_tv_ops = {
- 	.bind	= sun4i_tv_bind,
- 	.unbind	= sun4i_tv_unbind,
- };
-diff --git a/drivers/gpu/drm/sun4i/sun6i_drc.c b/drivers/gpu/drm/sun4i/sun6i_drc.c
-index 6ef707c..09bba85 100644
---- a/drivers/gpu/drm/sun4i/sun6i_drc.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_drc.c
-@@ -80,7 +80,7 @@ static void sun6i_drc_unbind(struct device *dev, struct device *master,
- 	reset_control_assert(drc->reset);
- }
- 
--static struct component_ops sun6i_drc_ops = {
-+static const struct component_ops sun6i_drc_ops = {
- 	.bind	= sun6i_drc_bind,
- 	.unbind	= sun6i_drc_unbind,
- };
+rk3288_calc_pull_reg_and_bit can't be used directly in rk1108.
+rk1108 have a different PULL_PMU_OFFSET and PULL_OFFSET.
