@@ -1,85 +1,79 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 11 Nov 2016 19:39:14 -0800
-Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
-In-Reply-To: <alpine.LFD.2.20.1611112034520.1618@knanqh.ubzr>
-References: <20161112004449.30566-1-f.fainelli@gmail.com>
- <alpine.LFD.2.20.1611112034520.1618@knanqh.ubzr>
-Message-ID: <55bd0bb5-c11c-12bc-7d73-520ae3901f03@gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Sat, 12 Nov 2016 12:22:19 +0800
+Subject: [PATCH v2 1/9] arm64: dts: rockchip: add eMMC's power domain
+ support for rk3399
+In-Reply-To: <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
+References: <1478697721-2323-1-git-send-email-wxt@rock-chips.com>
+ <1478697721-2323-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <bce1a5eb-fbb3-9ed9-46b9-72a95eefed3e@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/11/2016 ? 17:49, Nicolas Pitre a ?crit :
-> On Fri, 11 Nov 2016, Florian Fainelli wrote:
-> 
->> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
->> debug_virt_to_phys() which helps catch vmalloc space addresses being
->> passed. This is helpful in debugging bogus drivers that just assume
->> linear mappings all over the place.
->>
->> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
->> __virt_to_phys() as being the functional implementation of the address
->> translation, so we special case the debug stub to call into
->> __virt_to_phys directly.
->>
->> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->> ---
->>  arch/arm/include/asm/memory.h      |  4 ++++
->>  arch/arm64/include/asm/memory.h    |  4 ++++
->>  include/asm-generic/memory_model.h |  4 ++++
->>  mm/debug.c                         | 15 +++++++++++++++
->>  4 files changed, 27 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
->> index 76cbd9c674df..448dec9b8b00 100644
->> --- a/arch/arm/include/asm/memory.h
->> +++ b/arch/arm/include/asm/memory.h
->> @@ -260,11 +260,15 @@ static inline unsigned long __phys_to_virt(phys_addr_t x)
->>   * translation for translating DMA addresses.  Use the driver
->>   * DMA support - see dma-mapping.h.
->>   */
->> +#ifndef CONFIG_DEBUG_VM
->>  #define virt_to_phys virt_to_phys
->>  static inline phys_addr_t virt_to_phys(const volatile void *x)
->>  {
->>  	return __virt_to_phys((unsigned long)(x));
->>  }
->> +#else
->> +#define virt_to_phys debug_virt_to_phys
->> +#endif
-> [...]
-> 
-> Why don't you do something more like:
-> 
->  static inline phys_addr_t virt_to_phys(const volatile void *x)
->  {
-> +        debug_virt_to_phys(x);
->          return __virt_to_phys((unsigned long)(x));
->  }
-> 
-> [...]
-> 
-> static inline void debug_virt_to_phys(const void *address)
-> {
-> #ifdef CONFIG_DEBUG_VM
->         BUG_ON(is_vmalloc_addr(address));
-> #endif
-> }
-> 
-> ?
+On 2016/11/9 21:21, Caesar Wang wrote:
+> From: Ziyuan Xu <xzy.xu@rock-chips.com>
+>
+> Control power domain for eMMC via genpd to reduce power consumption.
+>
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Ziyuan Xu <xzy.xu@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-This is how I started doing it initially, but to get the
-is_vmalloc_addr() definition, we need to include linux/mm.h and then
-everything falls apart because of the include and dependencies chain. We
-could open code the is_vmalloc_addr() check because that's simple
-enough, but we still need VMALLOC_START and VMALLOC_END and to get there
-we need to include pgtable.h, and there are still some inclusion
-problems in doing so.
+It was verified on my rk3399 evb with kernel4.4, so
+free feel to add my tag,
 
-The other reason was to avoid putting the same checks in architecture
-specific code, except for those like ARM/ARM64/Unicore32/Microblaze
-where I could not find a simple way to undefined virt_to_phys and
-redefine it to debug_virt_to_phys.
+Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Do you see an other way around this? Thanks!
+BTW, it seems my reply is bounced form Yakir's address, so please
+remove him from CC list if he changed his mail address.
+
+> ---
+>
+> Changes in v2:
+> - Reviewed-on: https://chromium-review.googlesource.com/376558
+> - Verified on ChromeOS kernel4.4
+>
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index cbb7f8b..b401176 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -269,6 +269,7 @@
+>  		#clock-cells = <0>;
+>  		phys = <&emmc_phy>;
+>  		phy-names = "phy_arasan";
+> +		power-domains = <&power RK3399_PD_EMMC>;
+>  		status = "disabled";
+>  	};
+>
+> @@ -690,6 +691,11 @@
+>  		status = "disabled";
+>  	};
+>
+> +	qos_emmc: qos at ffa58000 {
+> +		compatible = "syscon";
+> +		reg = <0x0 0xffa58000 0x0 0x20>;
+> +	};
+> +
+>  	qos_gmac: qos at ffa5c000 {
+>  		compatible = "syscon";
+>  		reg = <0x0 0xffa5c000 0x0 0x20>;
+> @@ -823,6 +829,11 @@
+>  			};
+>
+>  			/* These power domains are grouped by VD_LOGIC */
+> +			pd_emmc at RK3399_PD_EMMC {
+> +				reg = <RK3399_PD_EMMC>;
+> +				clocks = <&cru ACLK_EMMC>;
+> +				pm_qos = <&qos_emmc>;
+> +			};
+>  			pd_gmac at RK3399_PD_GMAC {
+>  				reg = <RK3399_PD_GMAC>;
+>  				clocks = <&cru ACLK_GMAC>;
+>
+
+
 -- 
-Florian
+Best Regards
+Shawn Lin
