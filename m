@@ -1,59 +1,47 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 12 Nov 2016 14:46:45 +0800
-Subject: [PATCH 07/10] ARM: dts: sun8i-a23: q8-tablet: Enable internal audio
+Date: Sat, 12 Nov 2016 14:46:44 +0800
+Subject: [PATCH 06/10] ARM: dts: sun8i-a23: Add device node for internal audio
  codec
 In-Reply-To: <20161112064648.26779-1-wens@csie.org>
 References: <20161112064648.26779-1-wens@csie.org>
-Message-ID: <20161112064648.26779-8-wens@csie.org>
+Message-ID: <20161112064648.26779-7-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A23 Q8 tablets have an internal mono speaker w/ external amp
-which has a shutdown control tied to a GPIO pin. Both the speaker
-amp and the headphone jack are tied to the HP output pins. While
-the speaker is mono, the headset jack is stereo. Unfortunately
-the driver does not support automatic switching of this.
-
-In addition, the headset is DC coupled, or "direct drive" enabled.
-The headset's microphone is tied to MIC2 with HBIAS providing power.
-A separate internal microphone is tied to MIC1 with MBIAS providing
-power.
+Now that we have a device tree binding and driver for the A23's
+internal audio codec, add a device node for it.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a23-q8-tablet.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/sun8i-a23.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-index 956320a6cc78..3ab5c0c09d93 100644
---- a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-@@ -48,3 +48,26 @@
- 	model = "Q8 A23 Tablet";
- 	compatible = "allwinner,q8-a23", "allwinner,sun8i-a23";
- };
+diff --git a/arch/arm/boot/dts/sun8i-a23.dtsi b/arch/arm/boot/dts/sun8i-a23.dtsi
+index 54d045dab825..4d1f929780a8 100644
+--- a/arch/arm/boot/dts/sun8i-a23.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23.dtsi
+@@ -48,6 +48,22 @@
+ 	memory {
+ 		reg = <0x40000000 0x40000000>;
+ 	};
 +
-+&codec {
-+	pinctrl-0 = <&codec_pa_pin>;
-+	allwinner,pa-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	allwinner,audio-routing =
-+		"Headphone", "HP",
-+		"Headphone", "HPCOM",
-+		"Speaker", "HP",
-+		"MIC1", "Mic",
-+		"MIC2", "Headset Mic",
-+		"Mic",  "MBIAS",
-+		"Headset Mic", "HBIAS";
-+	status = "okay";
-+};
-+
-+&pio {
-+	codec_pa_pin: codec_pa_pin at 0 {
-+		allwinner,pins = "PH9";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	soc at 01c00000 {
++		codec: codec at 01c22c00 {
++			#sound-dai-cells = <0>;
++			compatible = "allwinner,sun8i-a23-codec";
++			reg = <0x01c22c00 0x400>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
++			clock-names = "apb", "codec";
++			resets = <&ccu RST_BUS_CODEC>;
++			dmas = <&dma 15>, <&dma 15>;
++			dma-names = "rx", "tx";
++			allwinner,codec-analog-controls = <&codec_analog>;
++			status = "disabled";
++		};
 +	};
-+};
+ };
+ 
+ &ccu {
 -- 
 2.10.2
