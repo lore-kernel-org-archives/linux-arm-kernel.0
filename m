@@ -1,165 +1,222 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 12 Nov 2016 11:33:26 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
- <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
-Message-ID: <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
+From: zourongrong@huawei.com (Rongrong Zou)
+Date: Sat, 12 Nov 2016 18:36:15 +0800
+Subject: [PATCH v6 6/9] drm/hisilicon/hibmc: Add encoder for VDAC
+In-Reply-To: <CAOw6vbKZ5kRbWPOep8soyMWp+Y14eFYALYiUhyyy04yGgMjQgQ@mail.gmail.com>
+References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
+ <1477639682-22520-7-git-send-email-zourongrong@gmail.com>
+ <CAOw6vbKZ5kRbWPOep8soyMWp+Y14eFYALYiUhyyy04yGgMjQgQ@mail.gmail.com>
+Message-ID: <5826F09F.20303@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 12-11-16 11:24, Jacek Anaszewski wrote:
-> Hi,
->
-> On 11/11/2016 08:28 PM, Hans de Goede wrote:
->> Hi,
+? 2016/11/11 6:20, Sean Paul ??:
+> On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
+>> Add encoder funcs and helpers for VDAC.
 >>
->> On 11-11-16 18:03, Jacek Anaszewski wrote:
->>> On 11/11/2016 01:01 PM, Pavel Machek wrote:
->>>> On Thu 2016-11-10 22:34:07, Jacek Anaszewski wrote:
->>>>> Hi,
->>>>>
->>>>> On 11/10/2016 09:29 PM, Pavel Machek wrote:
->>>>>> On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
->>>>>>> * Pavel Machek <pavel@ucw.cz> [161110 09:29]:
->>>>>>>> Hi!
->>>>>>>>
->>>>>>>>>>>> Looks like commit 883d32ce3385 ("leds: core: Add support for
->>>>>>>>>>>> poll()ing
->>>>>>>>>>>> the sysfs brightness attr for changes.") breaks runtime PM
->>>>>>>>>>>> for me.
->>>>>>>>>>>>
->>>>>>>>>>>> On my omap dm3730 based test system, idle power consumption
->>>>>>>>>>>> is over 70
->>>>>>>>>>>> times higher now with this patch! It goes from about 6mW for
->>>>>>>>>>>> the core
->>>>>>>>>>>> system to over 440mW during idle meaning there's some busy
->>>>>>>>>>>> timer now
->>>>>>>>>>>> active.
->>>>>>>>>>>>
->>>>>>>>>>>> Reverting this patch fixes the issue. Any ideas?
->>>>>>>>
->>>>>>>> Are you using any LED that toggles with high frequency? Like perhaps
->>>>>>>> LED that is lit when CPU is active?
->>>>>>>
->>>>>>> Yeah one of them seems to have cpu0 as the default trigger.
->>>>>>
->>>>>> Aha. Its quite obvious we don't want to notify sysfs each time that
->>>>>> one is toggled, right?
->>>>>>
->>>>>> IMO brightness should display max brightness for the trigger, as Hans
->>>>>> suggested, anything else is madness for trigger such as cpu activity.
->>>>>
->>>>> Are you suggesting that we should revert changes introduced
->>>>> by below patch?
->>>>>
->>>>> commit 29d76dfa29fe22583aefddccda0bc56aa81035dc
->>>>> Author: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
->>>>> Date:   Tue Mar 18 09:47:48 2008 +0000
->>>>>
->>>>>     leds: Add support to leds with readable status
->>>>>
->>>>>     Some led hardware allows drivers to query the led state, and
->>>>> this patch
->>>>>     adds a hook to let the led class take advantage of that
->>>>> information when
->>>>>     available.
->>>>>
->>>>>     Without this functionality, when access to the led hardware is not
->>>>>     exclusive (i.e. firmware or hardware might change its state
->>>>> behind the
->>>>>     kernel's back), reality goes out of sync with the led class'
->>>>> idea of
->>>>> what
->>>>>     the led is doing, which is annoying at best.
->>>>
->>>> Hmm. So userland can read the LED state, and it can get _some_ value
->>>> back, but it can not know if it is current state or not.
->>>>
->>>> I don't think that's a good interface. I see it is from 2008... is
->>>> someone using it? Maybe it is too late for revert.
->>>
->>> I can imagine it being used in flash LED use case. E.g. one
->>> could use oneshot trigger to trigger flash strobe, and then
->>> he could periodically read brightness file to check, for whatever
->>> reason, whether the flash is strobing.
->>>
->>>> But I'd certainly not extend it with poll.
->>>
->>> We could add a dedicated file e.g. hw_brightness_change for that
->>> (maybe someone will have a better candidate for the file name).
+>> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+>> ---
+>>   drivers/gpu/drm/hisilicon/hibmc/Makefile         |  2 +-
+>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  |  6 ++
+>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  2 +
+>>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 89 ++++++++++++++++++++++++
+>>   4 files changed, 98 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
 >>
->> Why a dedicated file? Are we going to mirror brightness here
->> wrt r/w (show/store) behavior ? If not userspace now needs
->> 2 open fds which is not really nice. If we are and we are
->> not going to use poll for something else on brightness itself
->> then why not just poll directly on brightness ?
+>> diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
+>> index 72e107e..e04f114 100644
+>> --- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
+>> +++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
+>> @@ -1,5 +1,5 @@
+>>   ccflags-y := -Iinclude/drm
+>> -hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
+>> +hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_fbdev.o hibmc_drm_power.o hibmc_ttm.o
+>>
+>>   obj-$(CONFIG_DRM_HISI_HIBMC)   +=hibmc-drm.o
+>>   #obj-y += hibmc-drm.o
+>> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+>> index 303cd36..ba191e1 100644
+>> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+>> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+>> @@ -125,6 +125,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
+>>                  return ret;
+>>          }
+>>
+>> +       ret = hibmc_encoder_init(hidev);
+>> +       if (ret) {
+>> +               DRM_ERROR("failed to init encoder\n");
+>> +               return ret;
+>> +       }
+>> +
+>>          return 0;
+>>   }
+>>
+>> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+>> index 5731ec2..401cea4 100644
+>> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+>> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+>> @@ -47,6 +47,7 @@ struct hibmc_drm_device {
+>>          struct drm_device  *dev;
+>>          struct drm_plane plane;
+>>          struct drm_crtc crtc;
+>> +       struct drm_encoder encoder;
 >
-> My main concern is that reporting only hw brightness changes
-> wouldn't be consistent with general brightness file purpose.
-> One could expect that brightness changes made by triggers
-> should be also reported.
+> Same comment here, you don't need to keep track of this
 
-Ok, I agree that not notifying poll() while an actual
-read() would result in a different value is not really good
-semantics.
-
-I don't like to call it hw_brightness_change though, as
-mentioned before I believe that if we were to start with
-a clean slate we would make the brightness file's read/write
-behavior more a mirror of itself.
-
-So I would like to propose creating a new read-write
-user_brightness file.
-
-The write behavior would be 100% identical to the brightness
-file (in code terms it will call the same store function).
-
-The the read behavior otoh will be different: it will shows
-the last brightness as set by the user, this would show the
-read behavior we really want of brightness: show the real
-brightness when not blinking / triggers are active and show
-the brightness used when on when blinking / triggers are active.
-
-We could then add poll support on this new user_brightness
-file, thus avoiding the problem with the extra cpu-load on
-notifications on blinking / triggers.
-
-> I'd make it only readable, so it wouldn't mirror brightness
-> file behavior.
-
-Then userspace which wants to be able to read + write + poll
-the brightness again needs to open 2 fds, as suggested
-above for the new user_brightness file it will be easy
-to just make it mimic the brightness file write behavior
-and then userspace only needs to open one fd.
-
-Regards,
-
-Hans
-
-
-
+ok, it can be dealt with like crtc.
 
 >
-> Its purpose would be clear: notify hw brightness changes
-> and provide the brightness value that was set by the hardware
-> last time. It implies that this value could be different from
-> the one the brightness file reports. E.g. hw could have changed
-> brightness, which could be later updated through brightness
-> file, but hw_brightness_change would still report brightness level
-> that was set by the hardware last time. It could be useful
-> e.g. in case of showing the difference between the desired
-> value and the currently allowed configuration (e.g. if the
-> firmware automatically adjusted the value set by the user).
+>>          bool mode_config_initialized;
+>>
+>>          /* ttm */
+>> @@ -87,6 +88,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
+>>
+>>   int hibmc_plane_init(struct hibmc_drm_device *hidev);
+>>   int hibmc_crtc_init(struct hibmc_drm_device *hidev);
+>> +int hibmc_encoder_init(struct hibmc_drm_device *hidev);
+>>   int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
+>>   void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
+>>
+>> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+>> new file mode 100644
+>> index 0000000..953f659
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+>> @@ -0,0 +1,89 @@
+>> +/* Hisilicon Hibmc SoC drm driver
+>> + *
+>> + * Based on the bochs drm driver.
+>> + *
+>> + * Copyright (c) 2016 Huawei Limited.
+>> + *
+>> + * Author:
+>> + *     Rongrong Zou <zourongrong@huawei.com>
+>> + *     Rongrong Zou <zourongrong@gmail.com>
+>> + *     Jianhua Li <lijianhua@huawei.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + */
+>> +
+>> +#include <drm/drm_atomic_helper.h>
+>> +#include <drm/drm_crtc_helper.h>
+>> +
+>> +#include "hibmc_drm_drv.h"
+>> +#include "hibmc_drm_regs.h"
+>> +
+>> +static int defx = 800;
+>> +static int defy = 600;
+>> +
+>> +module_param(defx, int, 0444);
+>> +module_param(defy, int, 0444);
+>> +MODULE_PARM_DESC(defx, "default x resolution");
+>> +MODULE_PARM_DESC(defy, "default y resolution");
 >
+> Not used, and I'm not sure these are a good idea
+
+it is used in following patch, i think it is put in wrong place.
+
+>
+>> +
+>> +static void hibmc_encoder_disable(struct drm_encoder *encoder)
+>> +{
+>> +}
+>> +
+>> +static void hibmc_encoder_enable(struct drm_encoder *encoder)
+>> +{
+>> +}
+>
+> Null-checked, no need to stub
+
+thanks for pointing it out.
+
+>
+>> +
+>> +static void hibmc_encoder_mode_set(struct drm_encoder *encoder,
+>> +                                  struct drm_display_mode *mode,
+>> +                                  struct drm_display_mode *adj_mode)
+>> +{
+>> +       u32 reg;
+>> +       struct drm_device *dev = encoder->dev;
+>> +       struct hibmc_drm_device *hidev = dev->dev_private;
+>> +
+>> +       /* just open DISPLAY_CONTROL_HISILE register bit 3:0*/
+>> +       reg = readl(hidev->mmio + DISPLAY_CONTROL_HISILE);
+>> +       reg |= 0xf;
+>
+> Can you just pull this into a #define instead of explaining in the comment?
+
+ok, thanks.
+
+>
+>> +       writel(reg, hidev->mmio + DISPLAY_CONTROL_HISILE);
+>> +}
+>> +
+>> +static int hibmc_encoder_atomic_check(struct drm_encoder *encoder,
+>> +                                     struct drm_crtc_state *crtc_state,
+>> +                                     struct drm_connector_state *conn_state)
+>> +{
+>> +       return 0;
+>> +}
+>
+> null-checked, remove stub
+
+ok, will do.
+
+>
+>> +
+>> +static const struct drm_encoder_helper_funcs hibmc_encoder_helper_funcs = {
+>> +       .mode_set = hibmc_encoder_mode_set,
+>> +       .disable = hibmc_encoder_disable,
+>> +       .enable = hibmc_encoder_enable,
+>> +       .atomic_check = hibmc_encoder_atomic_check,
+>> +};
+>> +
+>> +static const struct drm_encoder_funcs hibmc_encoder_encoder_funcs = {
+>> +       .destroy = drm_encoder_cleanup,
+>> +};
+>> +
+>> +int hibmc_encoder_init(struct hibmc_drm_device *hidev)
+>> +{
+>> +       struct drm_device *dev = hidev->dev;
+>> +       struct drm_encoder *encoder = &hidev->encoder;
+>> +       int ret;
+>> +
+>> +       encoder->possible_crtcs = 0x1;
+>> +       ret = drm_encoder_init(dev, encoder, &hibmc_encoder_encoder_funcs,
+>> +                              DRM_MODE_ENCODER_DAC, NULL);
+>> +       if (ret) {
+>> +               DRM_ERROR("failed to init encoder\n");
+>
+> print ret
+
+will do, thanks.
+
+>
+>> +               return ret;
+>> +       }
+>> +
+>> +       drm_encoder_helper_add(encoder, &hibmc_encoder_helper_funcs);
+>> +       return 0;
+>> +}
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+>
+> .
+>
+
+
+-- 
+Regards, Rongrong
