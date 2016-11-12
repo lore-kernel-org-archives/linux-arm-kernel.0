@@ -1,35 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 12 Nov 2016 05:43:19 +0000
-Subject: [PATCH RFC] mm: Add debug_virt_to_phys()
-In-Reply-To: <20161112004449.30566-1-f.fainelli@gmail.com>
-References: <20161112004449.30566-1-f.fainelli@gmail.com>
-Message-ID: <20161112054318.GB24127@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 12 Nov 2016 14:46:39 +0800
+Subject: [PATCH 01/10] ASoC: sunxi: Add bindings for A23/A33/H3 codec's analog
+ path controls
+In-Reply-To: <20161112064648.26779-1-wens@csie.org>
+References: <20161112064648.26779-1-wens@csie.org>
+Message-ID: <20161112064648.26779-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 04:44:43PM -0800, Florian Fainelli wrote:
-> When CONFIG_DEBUG_VM is turned on, virt_to_phys() maps to
-> debug_virt_to_phys() which helps catch vmalloc space addresses being
-> passed. This is helpful in debugging bogus drivers that just assume
-> linear mappings all over the place.
-> 
-> For ARM, ARM64, Unicore32 and Microblaze, the architectures define
-> __virt_to_phys() as being the functional implementation of the address
-> translation, so we special case the debug stub to call into
-> __virt_to_phys directly.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  arch/arm/include/asm/memory.h      |  4 ++++
->  arch/arm64/include/asm/memory.h    |  4 ++++
->  include/asm-generic/memory_model.h |  4 ++++
->  mm/debug.c                         | 15 +++++++++++++++
->  4 files changed, 27 insertions(+)
+The internal codec on A23/A33/H3 is split into 2 parts. The
+analog path controls are routed through an embedded custom register
+bus accessed through the PRCM block.
 
-What's the interaction between this and the DEBUG_VIRTUAL patches from Laura?
+The SoCs share a common set of inputs, outputs, and audio paths.
+The following table lists the differences.
 
-http://lkml.kernel.org/r/20161102210054.16621-7-labbott at redhat.com
+    ----------------------------------------
+    | Feature \ SoC |  A23  |  A33  |  H3  |
+    ----------------------------------------
+    | Headphone     |   v   |   v   |      |
+    ----------------------------------------
+    | Line Out      |       |       |  v   |
+    ----------------------------------------
+    | Phone In/Out  |   v   |   v   |      |
+    ----------------------------------------
 
-They seem to be tackling the exact same problem afaict.
+Add a binding for this hardware.
 
-Will
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ .../devicetree/bindings/sound/sun8i-codec-analog.txt     | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+
+diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+new file mode 100644
+index 000000000000..779b735781ba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+@@ -0,0 +1,16 @@
++* Allwinner Codec Analog Controls
++
++Required properties:
++- compatible: must be one of the following compatibles:
++		- "allwinner,sun8i-a23-codec-analog"
++		- "allwinner,sun8i-h3-codec-analog"
++
++Required properties if not a sub-node of the PRCM node:
++- reg: must contain the registers location and length
++
++Example:
++prcm: prcm at 01f01400 {
++	codec_analog: codec-analog {
++		compatible = "allwinner,sun8i-a23-codec-analog";
++	};
++};
+-- 
+2.10.2
