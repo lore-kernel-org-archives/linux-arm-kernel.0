@@ -1,556 +1,125 @@
-From: zourongrong@huawei.com (Rongrong Zou)
-Date: Sat, 12 Nov 2016 18:19:18 +0800
-Subject: [PATCH v6 5/9] drm/hisilicon/hibmc: Add crtc for DE
-In-Reply-To: <CAOw6vbJCu96jcWUDS_zwqGDOa3LiF00adyCijuk7v24Nxe_ivg@mail.gmail.com>
-References: <1477639682-22520-1-git-send-email-zourongrong@gmail.com>
- <1477639682-22520-6-git-send-email-zourongrong@gmail.com>
- <CAOw6vbJCu96jcWUDS_zwqGDOa3LiF00adyCijuk7v24Nxe_ivg@mail.gmail.com>
-Message-ID: <5826ECA6.6030900@huawei.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Sat, 12 Nov 2016 11:24:20 +0100
+Subject: PM regression with LED changes in next-20161109
+In-Reply-To: <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+References: <20161109192301.GS26979@atomide.com>
+ <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
+ <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
+ <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
+ <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
+ <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
+ <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+ <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
+ <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+Message-ID: <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/11/11 6:14, Sean Paul ??:
-> On Fri, Oct 28, 2016 at 3:27 AM, Rongrong Zou <zourongrong@gmail.com> wrote:
->> Add crtc funcs and helper funcs for DE.
+Hi,
+
+On 11/11/2016 08:28 PM, Hans de Goede wrote:
+> Hi,
+>
+> On 11-11-16 18:03, Jacek Anaszewski wrote:
+>> On 11/11/2016 01:01 PM, Pavel Machek wrote:
+>>> On Thu 2016-11-10 22:34:07, Jacek Anaszewski wrote:
+>>>> Hi,
+>>>>
+>>>> On 11/10/2016 09:29 PM, Pavel Machek wrote:
+>>>>> On Thu 2016-11-10 10:55:37, Tony Lindgren wrote:
+>>>>>> * Pavel Machek <pavel@ucw.cz> [161110 09:29]:
+>>>>>>> Hi!
+>>>>>>>
+>>>>>>>>>>> Looks like commit 883d32ce3385 ("leds: core: Add support for
+>>>>>>>>>>> poll()ing
+>>>>>>>>>>> the sysfs brightness attr for changes.") breaks runtime PM
+>>>>>>>>>>> for me.
+>>>>>>>>>>>
+>>>>>>>>>>> On my omap dm3730 based test system, idle power consumption
+>>>>>>>>>>> is over 70
+>>>>>>>>>>> times higher now with this patch! It goes from about 6mW for
+>>>>>>>>>>> the core
+>>>>>>>>>>> system to over 440mW during idle meaning there's some busy
+>>>>>>>>>>> timer now
+>>>>>>>>>>> active.
+>>>>>>>>>>>
+>>>>>>>>>>> Reverting this patch fixes the issue. Any ideas?
+>>>>>>>
+>>>>>>> Are you using any LED that toggles with high frequency? Like perhaps
+>>>>>>> LED that is lit when CPU is active?
+>>>>>>
+>>>>>> Yeah one of them seems to have cpu0 as the default trigger.
+>>>>>
+>>>>> Aha. Its quite obvious we don't want to notify sysfs each time that
+>>>>> one is toggled, right?
+>>>>>
+>>>>> IMO brightness should display max brightness for the trigger, as Hans
+>>>>> suggested, anything else is madness for trigger such as cpu activity.
+>>>>
+>>>> Are you suggesting that we should revert changes introduced
+>>>> by below patch?
+>>>>
+>>>> commit 29d76dfa29fe22583aefddccda0bc56aa81035dc
+>>>> Author: Henrique de Moraes Holschuh <hmh@hmh.eng.br>
+>>>> Date:   Tue Mar 18 09:47:48 2008 +0000
+>>>>
+>>>>     leds: Add support to leds with readable status
+>>>>
+>>>>     Some led hardware allows drivers to query the led state, and
+>>>> this patch
+>>>>     adds a hook to let the led class take advantage of that
+>>>> information when
+>>>>     available.
+>>>>
+>>>>     Without this functionality, when access to the led hardware is not
+>>>>     exclusive (i.e. firmware or hardware might change its state
+>>>> behind the
+>>>>     kernel's back), reality goes out of sync with the led class'
+>>>> idea of
+>>>> what
+>>>>     the led is doing, which is annoying at best.
+>>>
+>>> Hmm. So userland can read the LED state, and it can get _some_ value
+>>> back, but it can not know if it is current state or not.
+>>>
+>>> I don't think that's a good interface. I see it is from 2008... is
+>>> someone using it? Maybe it is too late for revert.
 >>
->> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
->> ---
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c  | 318 ++++++++++++++++++++++++
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c |   6 +
->>   drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h |   2 +
->>   3 files changed, 326 insertions(+)
+>> I can imagine it being used in flash LED use case. E.g. one
+>> could use oneshot trigger to trigger flash strobe, and then
+>> he could periodically read brightness file to check, for whatever
+>> reason, whether the flash is strobing.
 >>
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->> index 9c1a68c..9b5d0d0 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
->> @@ -23,6 +23,7 @@
+>>> But I'd certainly not extend it with poll.
 >>
->>   #include "hibmc_drm_drv.h"
->>   #include "hibmc_drm_regs.h"
->> +#include "hibmc_drm_de.h"
->>   #include "hibmc_drm_power.h"
+>> We could add a dedicated file e.g. hw_brightness_change for that
+>> (maybe someone will have a better candidate for the file name).
 >
-> nit: alphabetize
+> Why a dedicated file? Are we going to mirror brightness here
+> wrt r/w (show/store) behavior ? If not userspace now needs
+> 2 open fds which is not really nice. If we are and we are
+> not going to use poll for something else on brightness itself
+> then why not just poll directly on brightness ?
 
-ok, thanks.
+My main concern is that reporting only hw brightness changes
+wouldn't be consistent with general brightness file purpose.
+One could expect that brightness changes made by triggers
+should be also reported.
 
->
->>
->>   /* ---------------------------------------------------------------------- */
->
-> Remove
+I'd make it only readable, so it wouldn't mirror brightness
+file behavior.
 
-will do, thanks.
-
->
->> @@ -168,3 +169,320 @@ int hibmc_plane_init(struct hibmc_drm_device *hidev)
->>          drm_plane_helper_add(plane, &hibmc_plane_helper_funcs);
->>          return 0;
->>   }
->> +
->> +static void hibmc_crtc_enable(struct drm_crtc *crtc)
->> +{
->> +       unsigned int reg;
->> +       /* power mode 0 is default. */
->
-> This comment seems to be in the wrong place
-
-will remove it, thanks.
-
->
->> +       struct hibmc_drm_device *hidev = crtc->dev->dev_private;
->> +
->> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
->> +
->> +       /* Enable display power gate & LOCALMEM power gate*/
->> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
->> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
->> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
->> +       reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
->> +       reg |= HIBMC_CURR_GATE_DISPLAY(ON);
->> +       hibmc_set_current_gate(hidev, reg);
->> +       drm_crtc_vblank_on(crtc);
->> +}
->> +
->> +static void hibmc_crtc_disable(struct drm_crtc *crtc)
->> +{
->> +       unsigned int reg;
->> +       struct hibmc_drm_device *hidev = crtc->dev->dev_private;
->> +
->> +       drm_crtc_vblank_off(crtc);
->> +
->> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_SLEEP);
->> +
->> +       /* Enable display power gate & LOCALMEM power gate*/
->> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
->> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
->> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
->> +       reg |= HIBMC_CURR_GATE_LOCALMEM(OFF);
->> +       reg |= HIBMC_CURR_GATE_DISPLAY(OFF);
->> +       hibmc_set_current_gate(hidev, reg);
->> +}
->> +
->> +static int hibmc_crtc_atomic_check(struct drm_crtc *crtc,
->> +                                  struct drm_crtc_state *state)
->> +{
->> +       return 0;
->> +}
->
-> Caller NULL-checks, no need for stub
-
-thanks for pointing it out.
-
->
->> +
->> +static unsigned int format_pll_reg(void)
->> +{
->> +       unsigned int pllreg = 0;
->> +       struct panel_pll pll = {0};
->> +
->> +       /* Note that all PLL's have the same format. Here,
->> +        * we just use Panel PLL parameter to work out the bit
->> +        * fields in the register.On returning a 32 bit number, the value can
->> +        * be applied to any PLL in the calling function.
->> +        */
->> +       pllreg |= HIBMC_PLL_CTRL_BYPASS(OFF) & HIBMC_PLL_CTRL_BYPASS_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_POWER(ON) & HIBMC_PLL_CTRL_POWER_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_INPUT(OSC) & HIBMC_PLL_CTRL_INPUT_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_POD(pll.POD) & HIBMC_PLL_CTRL_POD_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_OD(pll.OD) & HIBMC_PLL_CTRL_OD_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_N(pll.N) & HIBMC_PLL_CTRL_N_MASK;
->> +       pllreg |= HIBMC_PLL_CTRL_M(pll.M) & HIBMC_PLL_CTRL_M_MASK;
->> +
->> +       return pllreg;
->> +}
->> +
->> +static void set_vclock_hisilicon(struct drm_device *dev, unsigned long pll)
->> +{
->> +       unsigned long tmp0, tmp1;
->> +       struct hibmc_drm_device *hidev = dev->dev_private;
->> +
->> +       /* 1. outer_bypass_n=0 */
->> +       tmp0 = readl(hidev->mmio + CRT_PLL1_HS);
->> +       tmp0 &= 0xBFFFFFFF;
->> +       writel(tmp0, hidev->mmio + CRT_PLL1_HS);
->> +
->> +       /* 2. pll_pd=1?inter_bypass=1 */
->> +       writel(0x21000000, hidev->mmio + CRT_PLL1_HS);
->> +
->> +       /* 3. config pll */
->> +       writel(pll, hidev->mmio + CRT_PLL1_HS);
->> +
->> +       /* 4. delay  */
->> +       mdelay(1);
->
-> These should be usleep_range() see
-> https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
-
-This looks better to me. i think a 'usleep_range(1000, 2000)' is ok.
-
->
->> +
->> +       /* 5. pll_pd =0 */
->> +       tmp1 = pll & ~0x01000000;
->> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
->> +
->> +       /* 6. delay  */
->> +       mdelay(1);
->> +
->> +       /* 7. inter_bypass=0 */
->> +       tmp1 &= ~0x20000000;
->> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
->> +
->> +       /* 8. delay  */
->> +       mdelay(1);
->> +
->> +       /* 9. outer_bypass_n=1 */
->> +       tmp1 |= 0x40000000;
->> +       writel(tmp1, hidev->mmio + CRT_PLL1_HS);
->
-> This function is a whole lot of magic. Any chance you can pull the
-> values out into #defines?
-
-will do. thanks.
-
->
->> +}
->> +
->> +/* This function takes care the extra registers and bit fields required to
->
-> nit: multi-line comments have a leading /* line with the comment
-> starting on the following line
-
-thanks for pointing it out.
-
->
-> applies below as well
->
->
->> + *setup a mode in board.
->
-> nit: space between * and comment, ie: * setup a mode in board
-
-understood, thanks.
-
->
-> applies to the rest of the comment too
->
->
->> + *Explanation about Display Control register:
->> + *FPGA only supports 7 predefined pixel clocks, and clock select is
->> + *in bit 4:0 of new register 0x802a8.
->> + */
->> +static unsigned int display_ctrl_adjust(struct drm_device *dev,
->> +                                       struct drm_display_mode *mode,
->> +                                       unsigned int ctrl)
->> +{
->> +       unsigned long x, y;
->> +       unsigned long pll1; /* bit[31:0] of PLL */
->> +       unsigned long pll2; /* bit[63:32] of PLL */
->> +       struct hibmc_drm_device *hidev = dev->dev_private;
->> +
->> +       x = mode->hdisplay;
->> +       y = mode->vdisplay;
->> +
->> +       /* Hisilicon has to set up a new register for PLL control
->> +        *(CRT_PLL1_HS & CRT_PLL2_HS).
->> +        */
->> +       if (x == 800 && y == 600) {
->> +               pll1 = CRT_PLL1_HS_40MHZ;
->> +               pll2 = CRT_PLL2_HS_40MHZ;
->> +       } else if (x == 1024 && y == 768) {
->> +               pll1 = CRT_PLL1_HS_65MHZ;
->> +               pll2 = CRT_PLL2_HS_65MHZ;
->> +       } else if (x == 1152 && y == 864) {
->> +               pll1 = CRT_PLL1_HS_80MHZ_1152;
->> +               pll2 = CRT_PLL2_HS_80MHZ;
->> +       } else if (x == 1280 && y == 768) {
->> +               pll1 = CRT_PLL1_HS_80MHZ;
->> +               pll2 = CRT_PLL2_HS_80MHZ;
->> +       } else if (x == 1280 && y == 720) {
->> +               pll1 = CRT_PLL1_HS_74MHZ;
->> +               pll2 = CRT_PLL2_HS_74MHZ;
->> +       } else if (x == 1280 && y == 960) {
->> +               pll1 = CRT_PLL1_HS_108MHZ;
->> +               pll2 = CRT_PLL2_HS_108MHZ;
->> +       } else if (x == 1280 && y == 1024) {
->> +               pll1 = CRT_PLL1_HS_108MHZ;
->> +               pll2 = CRT_PLL2_HS_108MHZ;
->> +       } else if (x == 1600 && y == 1200) {
->> +               pll1 = CRT_PLL1_HS_162MHZ;
->> +               pll2 = CRT_PLL2_HS_162MHZ;
->> +       } else if (x == 1920 && y == 1080) {
->> +               pll1 = CRT_PLL1_HS_148MHZ;
->> +               pll2 = CRT_PLL2_HS_148MHZ;
->> +       } else if (x == 1920 && y == 1200) {
->> +               pll1 = CRT_PLL1_HS_193MHZ;
->> +               pll2 = CRT_PLL2_HS_193MHZ;
->> +       } else /* default to VGA clock */ {
->> +               pll1 = CRT_PLL1_HS_25MHZ;
->> +               pll2 = CRT_PLL2_HS_25MHZ;
->> +       }
->
-> This seems like something that should be checked in atomic_check so
-> you can be sure the mode is supported.
->
-> It would also be nice to pull this out into a separate function (and a
-> lookup table if you're feeling adventurous)
-
-a lookup table seems good, thanks.
-
->
->> +
->> +       writel(pll2, hidev->mmio + CRT_PLL2_HS);
->> +       set_vclock_hisilicon(dev, pll1);
->> +
->> +       /* Hisilicon has to set up the top-left and bottom-right
->> +        * registers as well.
->> +        * Note that normal chip only use those two register for
->> +        * auto-centering mode.
->> +        */
->> +       writel((HIBMC_CRT_AUTO_CENTERING_TL_TOP(0) &
->> +               HIBMC_CRT_AUTO_CENTERING_TL_TOP_MSK) |
->> +              (HIBMC_CRT_AUTO_CENTERING_TL_LEFT(0) &
->> +               HIBMC_CRT_AUTO_CENTERING_TL_LEFT_MSK),
->> +              hidev->mmio + HIBMC_CRT_AUTO_CENTERING_TL);
->> +
->> +       writel((HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM(y - 1) &
->> +               HIBMC_CRT_AUTO_CENTERING_BR_BOTTOM_MASK) |
->> +              (HIBMC_CRT_AUTO_CENTERING_BR_RIGHT(x - 1) &
->> +               HIBMC_CRT_AUTO_CENTERING_BR_RIGHT_MASK),
->> +               hidev->mmio + HIBMC_CRT_AUTO_CENTERING_BR);
->> +
->> +       /* Assume common fields in ctrl have been properly set before
->> +        * calling this function.
->> +        * This function only sets the extra fields in ctrl.
->> +        */
->> +
->> +       /* Set bit 25 of display controller: Select CRT or VGA clock */
->> +       ctrl &= ~HIBMC_CRT_DISP_CTL_CRTSELECT_MASK;
->> +       ctrl &= ~HIBMC_CRT_DISP_CTL_CLOCK_PHASE_MASK;
->> +
->> +       ctrl |= HIBMC_CRT_DISP_CTL_CRTSELECT(CRTSELECT_CRT);
->> +
->> +       /*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL, CRTSELECT, CRT);*/
->
-> What's the deal with this commented code?
-
-sorry, will clean up.
-
->
->> +
->> +       /* Set bit 14 of display controller */
->> +       /*ctrl &= FIELD_CLEAR(HIBMC_CRT_DISP_CTL, CLOCK_PHASE);*/
->> +
->> +       /* clock_phase_polarity is 0 */
->> +       ctrl |= HIBMC_CRT_DISP_CTL_CLOCK_PHASE(PHASE_ACTIVE_HIGH);
->> +       /*ctrl = FIELD_SET(ctrl, HIBMC_CRT_DISP_CTL,*/
->> +       /*CLOCK_PHASE, ACTIVE_HIGH);*/
->
-> Here too...
-
-ditto.
-
->
->> +
->> +       writel(ctrl, hidev->mmio + HIBMC_CRT_DISP_CTL);
->> +
->> +       return ctrl;
->> +}
->> +
->> +static void hibmc_crtc_mode_set_nofb(struct drm_crtc *crtc)
->> +{
->> +       unsigned int val;
->> +       struct drm_display_mode *mode = &crtc->state->mode;
->> +       struct drm_device *dev = crtc->dev;
->> +       struct hibmc_drm_device *hidev = dev->dev_private;
->> +
->> +       writel(format_pll_reg(), hidev->mmio + HIBMC_CRT_PLL_CTRL);
->> +       writel((HIBMC_CRT_HORZ_TOTAL_TOTAL(mode->htotal - 1) &
->> +               HIBMC_CRT_HORZ_TOTAL_TOTAL_MASK) |
->> +               (HIBMC_CRT_HORZ_TOTAL_DISPLAY_END(mode->hdisplay - 1) &
->> +               HIBMC_CRT_HORZ_TOTAL_DISPLAY_END_MASK),
->
-> You could probably macroize this code to make it more readable
-
-
-	#define HIBMC_FIELD(field, value) (field(value) & filed##_MASK)
-
-	writel(HIBMC_FIELD(HIBMC_CRT_HORZ_TOTAL_TOTAL, mode->htotal - 1) |
-	       HIBMC_FIELD(HIBMC_CRT_HORZ_TOTAL_DISPLAY_END, mode->hdisplay - 1),
-	       hidev->mmio + HIBMC_CRT_HORZ_TOTAL);
-
-Is above ok?
-	
-
-
->
->> +               hidev->mmio + HIBMC_CRT_HORZ_TOTAL);
->> +
->> +       writel((HIBMC_CRT_HORZ_SYNC_WIDTH(mode->hsync_end - mode->hsync_start)
->> +               & HIBMC_CRT_HORZ_SYNC_WIDTH_MASK) |
->> +               (HIBMC_CRT_HORZ_SYNC_START(mode->hsync_start - 1)
->> +               & HIBMC_CRT_HORZ_SYNC_START_MASK),
->> +               hidev->mmio + HIBMC_CRT_HORZ_SYNC);
->> +
->> +       writel((HIBMC_CRT_VERT_TOTAL_TOTAL(mode->vtotal - 1) &
->> +               HIBMC_CRT_VERT_TOTAL_TOTAL_MASK) |
->> +               (HIBMC_CRT_VERT_TOTAL_DISPLAY_END(mode->vdisplay - 1) &
->> +               HIBMC_CRT_VERT_TOTAL_DISPLAY_END_MASK),
->> +               hidev->mmio + HIBMC_CRT_VERT_TOTAL);
->> +
->> +       writel((HIBMC_CRT_VERT_SYNC_HEIGHT(mode->vsync_end - mode->vsync_start)
->> +               & HIBMC_CRT_VERT_SYNC_HEIGHT_MASK) |
->> +              (HIBMC_CRT_VERT_SYNC_START(mode->vsync_start - 1) &
->> +               HIBMC_CRT_VERT_SYNC_START_MASK),
->> +               hidev->mmio + HIBMC_CRT_VERT_SYNC);
->> +
->> +       val = HIBMC_CRT_DISP_CTL_VSYNC_PHASE(0) &
->> +             HIBMC_CRT_DISP_CTL_VSYNC_PHASE_MASK;
->> +       val |= HIBMC_CRT_DISP_CTL_HSYNC_PHASE(0) &
->> +              HIBMC_CRT_DISP_CTL_HSYNC_PHASE_MASK;
->> +       val |= HIBMC_CRT_DISP_CTL_TIMING(ENABLE);
->> +       val |= HIBMC_CRT_DISP_CTL_PLANE(ENABLE);
->> +
->> +       display_ctrl_adjust(dev, mode, val);
->> +}
->> +
->> +static void hibmc_crtc_atomic_begin(struct drm_crtc *crtc,
->> +                                   struct drm_crtc_state *old_state)
->> +{
->> +       unsigned int reg;
->> +       struct drm_device *dev = crtc->dev;
->> +       struct hibmc_drm_device *hidev = dev->dev_private;
->> +
->> +       hibmc_set_power_mode(hidev, HIBMC_PW_MODE_CTL_MODE_MODE0);
->> +
->> +       /* Enable display power gate & LOCALMEM power gate*/
->> +       reg = readl(hidev->mmio + HIBMC_CURRENT_GATE);
->> +       reg &= ~HIBMC_CURR_GATE_DISPLAY_MASK;
->> +       reg &= ~HIBMC_CURR_GATE_LOCALMEM_MASK;
->> +       reg |= HIBMC_CURR_GATE_DISPLAY(ON);
->> +       reg |= HIBMC_CURR_GATE_LOCALMEM(ON);
->> +       hibmc_set_current_gate(hidev, reg);
->> +
->> +       /* We can add more initialization as needed. */
->> +}
->> +
->> +static void hibmc_crtc_atomic_flush(struct drm_crtc *crtc,
->> +                                   struct drm_crtc_state *old_state)
->> +
->> +{
->> +       unsigned long flags;
->> +
->> +       spin_lock_irqsave(&crtc->dev->event_lock, flags);
->> +       if (crtc->state->event)
->> +               drm_crtc_send_vblank_event(crtc, crtc->state->event);
->> +       crtc->state->event = NULL;
->> +
->> +       spin_unlock_irqrestore(&crtc->dev->event_lock, flags);
->> +}
->> +
->> +/* These provide the minimum set of functions required to handle a CRTC */
->
-> nit: don't need this comment
-
-will delete, thanks.
-
->
->> +static const struct drm_crtc_funcs hibmc_crtc_funcs = {
->> +       .page_flip = drm_atomic_helper_page_flip,
->> +       .set_config = drm_atomic_helper_set_config,
->> +       .destroy = drm_crtc_cleanup,
->> +       .reset = drm_atomic_helper_crtc_reset,
->> +       .atomic_duplicate_state =  drm_atomic_helper_crtc_duplicate_state,
->> +       .atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
->> +};
->> +
->> +static const struct drm_crtc_helper_funcs hibmc_crtc_helper_funcs = {
->> +       .enable         = hibmc_crtc_enable,
->> +       .disable        = hibmc_crtc_disable,
->> +       .mode_set_nofb  = hibmc_crtc_mode_set_nofb,
->> +       .atomic_check   = hibmc_crtc_atomic_check,
->> +       .atomic_begin   = hibmc_crtc_atomic_begin,
->> +       .atomic_flush   = hibmc_crtc_atomic_flush,
->> +};
->> +
->> +int hibmc_crtc_init(struct hibmc_drm_device *hidev)
->> +{
->> +       struct drm_device *dev = hidev->dev;
->> +       struct drm_crtc *crtc = &hidev->crtc;
->> +       struct drm_plane *plane = &hidev->plane;
->> +       int ret;
->> +
->> +       ret = drm_crtc_init_with_planes(dev, crtc, plane,
->> +                                       NULL, &hibmc_crtc_funcs, NULL);
->> +       if (ret) {
->> +               DRM_ERROR("failed to init crtc.\n");
->
-> print return code
-
-agreed, thanks.
-
->
->> +               return ret;
->> +       }
->> +
->> +       drm_mode_crtc_set_gamma_size(crtc, 256);
->
-> check return code
-
-agreed though none of other drivers has done this,
-thanks.
-
->
->> +       drm_crtc_helper_add(crtc, &hibmc_crtc_helper_funcs);
->> +       return 0;
->> +}
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> index 7d96583..303cd36 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
->> @@ -119,6 +119,12 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
->>                  return ret;
->>          }
->>
->> +       ret = hibmc_crtc_init(hidev);
->> +       if (ret) {
->> +               DRM_ERROR("failed to init crtc.\n");
->> +               return ret;
->> +       }
->
-> Typically the plane is initialized internally in the crtc driver. I
-> think this is a good design pattern, and you should probably use it.
->
-> So how about squashing this down with the plane patch and keeping the
-> plane inside hibmc_drm_de.c?
-
-understood after i looked at intel_display.c, this file will be merged
-with patch 4/9, and the tile will be: 'drm/hisilicon/hibmc: Add display
-engine'.
-
->
->> +
->>          return 0;
->>   }
->>
->> diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> index 49e39d2..5731ec2 100644
->> --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
->> @@ -46,6 +46,7 @@ struct hibmc_drm_device {
->>          /* drm */
->>          struct drm_device  *dev;
->>          struct drm_plane plane;
->
-> I don't think you should be keeping track of plane here. plane is only
-> used in the crtc init, which should be addressed by the previous
-> comment.
-
-so allocate with devm_kzalloc(sizeof(*plane)) and remove it from
-hibmc_drm_device?
-
->
->
->> +       struct drm_crtc crtc;
->
-> crtc is only used in the irq handler, so you could remove this here
-> and just call drm_handle_vblank(dev, 0) in the handler.
-
-so allocate with devm_kzalloc(sizeof(*crtc)) and remove it from
-hibmc_drm_device, when driver unload drm_crtc_cleanup() will be
-called and finally memory will be freed before quit.
-
->
->
->>          bool mode_config_initialized;
->>
->>          /* ttm */
->> @@ -85,6 +86,7 @@ static inline struct hibmc_bo *gem_to_hibmc_bo(struct drm_gem_object *gem)
->>   #define DRM_FILE_PAGE_OFFSET (0x100000000ULL >> PAGE_SHIFT)
->>
->>   int hibmc_plane_init(struct hibmc_drm_device *hidev);
->> +int hibmc_crtc_init(struct hibmc_drm_device *hidev);
->>   int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
->>   void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
->>
->> --
->> 1.9.1
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
->
-> .
->
-
+Its purpose would be clear: notify hw brightness changes
+and provide the brightness value that was set by the hardware
+last time. It implies that this value could be different from
+the one the brightness file reports. E.g. hw could have changed
+brightness, which could be later updated through brightness
+file, but hw_brightness_change would still report brightness level
+that was set by the hardware last time. It could be useful
+e.g. in case of showing the difference between the desired
+value and the currently allowed configuration (e.g. if the
+firmware automatically adjusted the value set by the user).
 
 -- 
-Regards, Rongrong
+Best regards,
+Jacek Anaszewski
