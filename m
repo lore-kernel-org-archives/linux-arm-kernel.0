@@ -1,98 +1,113 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 11 Nov 2016 18:38:44 -0800
-Subject: [RFC 00/17] clk: Add per-controller locks to fix deadlocks
-In-Reply-To: <7933d51e-92a8-ca6d-84f0-70b22fe17568@samsung.com>
-References: <1471354514-24224-1-git-send-email-k.kozlowski@samsung.com>
- <20160909002432.GE13062@codeaurora.org>
- <CGME20161104105318eucas1p2e9458dbe7039f2a81419fae8cf6bc4c8@eucas1p2.samsung.com>
- <7933d51e-92a8-ca6d-84f0-70b22fe17568@samsung.com>
-Message-ID: <20161112023844.GG5177@codeaurora.org>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Fri, 11 Nov 2016 22:01:03 -0500
+Subject: [PATCH V6 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <5825C8A2.3040302@linaro.org>
+References: <1477687696-1509-1-git-send-email-agustinv@codeaurora.org>
+ <1477687696-1509-3-git-send-email-agustinv@codeaurora.org>
+ <42ff0a81-7836-11f6-58e0-979bd1d0be20@linaro.org>
+ <60c1d53146c0aebd3a05095823229224@codeaurora.org>
+ <20161110175814.GA12446@red-moon> <5825C8A2.3040302@linaro.org>
+Message-ID: <713f102418c0fffacf67acb16dbdeec2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04, Marek Szyprowski wrote:
-> Hi Stephen,
-> 
-> Krzysztof has left Samsung, but we would like to continue this task, because
-> the ABBA dead-locks related to global prepare lock becomes more and more
-> problematic for us to workaround.
+Hey Lorenzo, Hanjun,
 
-Hmm. Ok. Thanks for the info.
+On 2016-11-11 08:33, Hanjun Guo wrote:
+> Hi Lorenzo,
+> 
+> On 11/11/2016 01:58 AM, Lorenzo Pieralisi wrote:
+>> On Thu, Nov 10, 2016 at 10:02:35AM -0500, agustinv at codeaurora.org 
+>> wrote:
+>>> Hey Hanjun,
+>>> 
+>>> On 2016-11-09 21:36, Hanjun Guo wrote:
+>>>> Hi Marc, Rafael, Lorenzo,
+>>>> 
+>>>> Since we agreed to add a probe deferral if we failed to get irq
+>>>> resources which mirroring the DT does (patch 1 in this patch set),
+>>>> I think the last blocker to make things work both for Agustin and
+>>>> me [1] is this patch, which makes the interrupt producer and 
+>>>> consumer
+>>>> work in ACPI, we have two different solution for one thing, we'd 
+>>>> happy
+>>>> to work together for one solution, could you give some suggestions
+>>>> please?
+>>>> 
+>>>> [1]: 
+>>>> https://mail-archive.com/linux-kernel at vger.kernel.org/msg1257419.html
+>>>> 
+>>>> Agustin, I have some comments below.
+>>>> 
+>>>> On 2016/10/29 4:48, Agustin Vega-Frias wrote:
+>>>>> This allows irqchip drivers to associate an ACPI DSDT device to
+>>>>> an IRQ domain and provides support for using the ResourceSource
+>>>>> in Extended IRQ Resources to find the domain and map the IRQs
+>>>>> specified on that domain.
+>>>>> 
+>>>>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+>>>>> ---
+>>>>> drivers/acpi/Makefile    |   1 +
+>>>>> drivers/acpi/irqdomain.c | 119
+>>>>> +++++++++++++++++++++++++++++++++++++++++++++++
+>>>> 
+>>>> Could we just reuse the gsi.c and not introduce a new
+>>>> file, probably we can change the gsi.c to irqdomain.c
+>>>> or something similar, then reuse the code in gsi.c.
+>>> 
+>>> I was thinking just that after we chatted off-list.
+>> 
+>> Yes, that's a fair point.
+>> 
+>>> I might revisit and see what I come up with given that we already 
+>>> have
+>>> a device argument and we could pass the IRQ source there.
+>> 
+>> I agree with the approach taken by this patch, I do not like much
+>> passing around struct acpi_resource_source *source (in particular
+>> the dummy struct) I do not think it is needed, I will comment on
+>> the code.
+> 
+> thanks for your time to have a look:)
+> 
+>> 
+>> Hopefully there is not any buggy FW out there that does use the
+>> resource source inappropriately otherwise we will notice on x86/ia64
+>> (ie you can't blame FW if it breaks the kernel) but I suspect the
+>> only way to find out is by trying, the patch has to go through 
+>> Rafael's
+>> review anyway before getting there so it is fine.
+> 
+> I think we can avoid that by not touching the logic that x86/ia64
+> already used, but only adding interrupt producer/consumer function.
 
-> 
-> On 2016-09-09 02:24, Stephen Boyd wrote:
-> 
-> >So I'm not very fond of this design because the locking scheme is
-> >pretty much out of the hands of the framework and can be easily
-> >broken.
-> 
-> Well, switching from a single global lock to more granular locking
-> is always a good approach. Please note that the global lock sooner
-> or later became a serious bottleneck if one wants to make somehow
-> more aggressive power management and clock gating.
+I looked at this more today and implemented a new patch that I plan to
+test over the weekend, but I wanted to let you know the approach I am
+pursuing.
 
-I'm not so sure switching from a global lock to a more granular
-lock is _always_ a great idea. Sometimes simpler code is better,
-even if it doesn't scale to a million clk nodes. The largest
-systems I've seen only have clocks in the hundreds, and a
-majority of those aren't rate changing in parallel, so it's not
-like we're suffering from VFS type scalability problems here with
-tens of thousands of inodes.
+On the new patch use of ResourceSource when parsing ACPI Extended IRQ
+Resources is conditional on CONFIG_ACPI_GENERIC_GSI. The reason for this
+is two fold:
 
-That isn't to say I don't agree there's a scalability problem
-here, but I'd like to actually see numbers to prove that there's
-some sort of scalability problem before making drastic changes.
+1. Since we wanted to reduce duplication and place the new APIs on the
+    same source file as acpi_register_gsi, which is already under that
+    config flag.
+2. So the patch does not have effect on platforms not using the generic
+    GSI support, including x86/ia64.
 
-> 
-> >  I'm biased of course, because I'd prefer we go with my
-> >wwmutex design of per-clk locks[1]. Taking locks in any order
-> >works fine there, and we resolve quite a few long standing
-> >locking problems that we have while improving scalability. The
-> >problem there is that we don't get the recursive mutex design
-> >(maybe that's a benefit!).
-> 
-> Do you have any plan to continue working on your approach? per-clk
-> wwmutex looks like an overkill on the first glance, but that's probably
-> the only working solution if you want to get rid of recursive locks.
-> I'm still not really convinced that we really need wwmutex here,
-> especially if it is possible to guarantee the same order of locking
-> operations inside the clock core. This requires a bit of cooperation
-> from clock providers (with proper documentation and a list of
-> DO/DON'T it shouldn't be that hard).
+If support for this is needed outside platforms using the generic GSI
+implementation, we can move these APIs out to their own source file
+and eliminate the CONFIG_ACPI_GENERIC_GSI conditionality.
 
-So far I haven't gotten around to resurrecting the wwmutex stuff.
-If you have interest in doing it that's great. Having a locking
-scheme with rules of DO/DON'T sounds brittle to me, unless it can
-be automated to find problems. I know that I'm not going to spend
-time policing that.
+I'll send the new patch, hopefully some time tomorrow, but please let
+me know if you have concerns with this approach.
 
-> 
-> >Once a clk_op reenters the framework
-> >with consumer APIs and tries to grab the same lock we deadlock.
-> >This is why I've been slowly splitting consumers from providers
-> >so we can easily identify these cases. If we had something like
-> >coordinated clk rate switching, we could get rid of clk_ops
-> >reentering the framework and avoid this problem (and we really do
-> >need to do that).
-> 
-> I'm not sure that this makes really sense split consumers and
-> providers. You will get recursive calls to clk core anyway with
-> consumers calls if you are implementing i2c clock, for which an i2c
-> bus driver does it's own clock gating (i2c controller uses
-> consumer clk api).
-> 
-> 
-
-I suppose this is a different topic. Regardless of the recursive
-call or not, we can easily see that a clk consumer is also a clk
-provider and just knowing that is useful. Once we know that, we
-can look to see if they're calling clk consumer APIs from their
-provider callbacks which is not desired because it makes it
-impossible to get rid of the recursive lock design. If the lock
-is per-clock, then recursion doesn't happen when the provider is
-also a consumer. If it does, that's bad and lockdep should tell
-us.
+Thanks,
+Agustin
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
