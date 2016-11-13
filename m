@@ -1,55 +1,25 @@
-From: appro@openssl.org (Andy Polyakov)
-Date: Sun, 13 Nov 2016 16:12:35 +0100
-Subject: [PATCH v3] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
-References: <1478953953-11523-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161112221520.GD24127@arm.com>
- <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
-Message-ID: <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 13 Nov 2016 18:12:07 +0000
+Subject: [PATCH 0/2] ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
+Message-ID: <1479060729-25769-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> (+ Andy)
-> 
-> ...
->>
->> Looking at the generated code, I see references to __ARMEB__ and
-> __ILP32__.
->> The former is probably a bug,
+This patch series should fix and extend the patch V4 "ARM: bcm2835: Add names
+for the Raspberry Pi GPIO lines" from Linus Walleij and Eric Anholt.
 
-Oh! You mean that it should be __AARCH64EB__/__AARCH64EL__! Apparently I
-simply went on assuming that it would be __ARMEB__/__ARMEL__ even in
-64-bit case. As Ard mentioned, there is a number of modules that can be
-compiled for either 32- or 64-bit case, and supposedly that's where this
-blunder stems from. Will fix... As for it being actually tested. No, I
-don't have big-endian AArch64 setup, and big-endian segments in AArch64
-are based on experience with endian neutrality elsewhere. I.e. it's
-based on observations what it takes to achieve the neutrality elsewhere,
-e.g. ARM, MIPS, PPC, and then exercising equivalent approach even here.
-Modulo fact that I apparently got macros wrong :-(
+Stefan Wahren (2):
+  ARM: bcm2835: Fix names for the Raspberry Pi GPIO lines
+  ARM: bcm2835: Add names for the Raspberry Pi Zero GPIO lines
 
->> whilst the second is not required.
+ arch/arm/boot/dts/bcm2835-rpi-a-plus-gpio.dtsi |   75 +++++++++++++++++++++++
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts       |   76 +-----------------------
+ arch/arm/boot/dts/bcm2835-rpi-a.dts            |    4 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts       |    2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts            |    4 +-
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts         |   11 +---
+ 6 files changed, 82 insertions(+), 90 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-a-plus-gpio.dtsi
 
-Note that references to __ILP32__ are also inside #ifndef
-__KERNEL__/#endif, i.e. they won't be even evaluated when compiled for
-kernel. Or in other words it's shared code artefact just like #if[n]def
-__KERNEL__ itself. You either disregard it or remove altogether, but
-then code becomes specific and not shared :-)
-
->> There are
->> also some commented out instructions, which is weird.
-
-Commented instructions denote those that are moved into next round in
-order to improve instruction scheduling on either of processors. In
-other words it means that you should spot it further below [in generated
-code]. Yes, it's weird, but it helps me to remember which instructions
-are moved. On side note it's not uncommon that instruction scheduling is
-result of compromise. In general I attempt to schedule instruction for
-near-optimal performance on *multiple* processors, but sometimes you
-have to make compromises. One is mentioned in commentary section for
-this very module, the Apple A7 vs. Cortex-A53 thing. Well, it's not like
-the commented instruction you're observing is the only result of the
-compromise, it's merely an example of how said compromises can manifest
-themselves, as somewhat weird irregularities in the code, possibly with
-commented instructions.
+-- 
+1.7.9.5
