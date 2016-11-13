@@ -1,82 +1,100 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 13 Nov 2016 21:45:25 +0100
-Subject: Three different LED brightnesses (was Re: PM regression with LED
- changes in next-20161109)
-In-Reply-To: <3a3bb3f8-e54a-e7d0-da30-7f90b00c29b3@redhat.com>
-References: <20161110175537.GF27724@atomide.com> <20161110202910.GE28832@amd>
- <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
- <20161111120114.GA1076@amd>
- <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <20161111221224.GB10983@amd>
- <3ca04742-6376-5a88-8d10-5b88fcd8f5e5@redhat.com>
- <20161113091054.GA17790@amd>
- <3a3bb3f8-e54a-e7d0-da30-7f90b00c29b3@redhat.com>
-Message-ID: <20161113204525.GA15072@amd>
+From: atull@opensource.altera.com (atull)
+Date: Sun, 13 Nov 2016 14:44:51 -0600
+Subject: [PATCH fpga 9/9] fpga: Remove support for non-sg drivers
+In-Reply-To: <8078ce27-5df0-c882-ffa3-d0c9316b7c54@gmail.com>
+References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
+ <1478732303-13718-10-git-send-email-jgunthorpe@obsidianresearch.com>
+ <bad801c5-fe3a-665b-de67-bf69c42fb2b4@gmail.com>
+ <20161110163315.GB22004@obsidianresearch.com>
+ <8078ce27-5df0-c882-ffa3-d0c9316b7c54@gmail.com>
+Message-ID: <alpine.DEB.2.10.1611131439190.2735@atull-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, 10 Nov 2016, Joshua Clayton wrote:
 
-> >No, that's just adding more mess on the system.
+> 
+> 
+> On 11/10/2016 08:33 AM, Jason Gunthorpe wrote:
+> >>>  struct fpga_manager_ops {
+> >>>  	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
+> >>> -	int (*write_init)(struct fpga_manager *mgr, u32 flags,
+> >>> -			  const char *buf, size_t count);
+> >>> -	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
+> >>>  	int (*write_init_sg)(struct fpga_manager *mgr, u32 flags,
+> >>>  			     struct sg_table *sgt);
+> >>>  	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
+> >>> @@ -118,6 +113,8 @@ struct fpga_manager {
+> >>>  
+> >>>  int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
+> >>>  		      const char *buf, size_t count);
+> >>> +int fpga_mgr_buf_load_sg(struct fpga_manager *mgr, u32 flags,
+> >>> +			 struct sg_table *sgt);
+> >>>  
+> >>>  int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
+> >>>  			   const char *image_name);
+> >> I don't have any feeling either way about switching to scatter-gather.
+> >> (Not zynq or socfpga user)
+> >> But I do object to renaming the API.
+> >> write_init() and write() do not imply a particular implementation, nor even that
+> >> the buffer is coherent.
+> > Neither the sg or old linear interface imply any particular
+> > underlying driver implementation.
 > >
-> >Here's better proposal:
+> > All that is being changed is how the list of physical pages gets
+> > passed to the driver. The linear interface requires them to be
+> > contiguously mapped (eg in a vmap) while the SG interface
+> > directly passes a list of physical page addresses.
 > >
-> >brightness (write): what we do today. (Mess, but too late to change it)
-> >	   (read): -Esomething or what we do today (if someone
-> >	   	   	       	       	  	   acutally uses it)
-> 
-> As said Jacek has already nacked any changes to read behavior.
-> 
-> >           (poll): -Esomething
-> 
-> Making poll() on sysfs attributes return -Esomething is not possible,
-> the internal sysfs API does not allow this.
-> 
-> >current_brightness (write): -Esomething, or maybe change brightness
-> >		   for triggers that can work with that
-> >              (read, poll): if the current trigger can get current
-> >	             state of led, do it, otherwise -Esomething...
-> >		     or maybe file should be simply hidden from sysfs.
-> 
-> So write is -EINVAL and read is the same as what brightness currently does,
-> so I see no use in introducing this new file.
+> > Any alogrithm that works with the old interface can run on the new
+> > interface, and the new interface can support much better options for
+> > DMA drivers, while not requiring the higher layers to perform a high
+> > order allocation (vmap or otherwise) to create the contiguous memory.
+> >
+> > The reason the old interface is being deleted here is so the fpga mgr
+> > API can be expanded to accept a sg list directly. Since we cannot
+> > convert a general sg list to linear memory the liner option must be
+> > totally removed.
+> OK. That sounds reasonable.
+> >> I am working to merge an fpga manager which uses SPI to load the bitstream
+> >> (see https://www.spinics.net/lists/arm-kernel/msg539328.html)
+> >> Any dma in use there would come from the spi driver. write_init_sg, and write_sg
+> >> don't make any sense in my case.
+> > No, it still make lots of sense.
+> >
+> > SPI has been slowly transforming to use the same sort of SG scheme
+> > universally, including facing the client. (see
+> > 6ad45a27cbe343ec8d7888e5edf6335499a4b555)
+> Thanks for sharing that link.
+> >
+> > Some day your driver can just pass the SGs directly to spi and
+> > everything will be great.
+> >
+> > In the mean time it can do sg_miter_next to get mapped buffers.
+> ..so I have a way forward if this series gets merged.
+> That was my main concern.
+> And as a dma n00b, learning to use dma engine structures to do
+> non-dma xfer was not very high on my list.
+> >> Would it not make sense to keep the top level API the same?
+> > Fundamentally no.
 
-No, read is not same as current brightness file. Currently, reading
-brightness file returns either current brightness or maximum
-brightness, and userspace can't tell which is which.
+NACK for now.  Let's slow down here a bit.
 
-> >trigger_max_brightness (read,write): change the maximum brightness for
-> >		       a trigger.
-> >	       (poll): -Esomething
+I don't see any rush in getting rid of the contiguous
+buffer interface.
+
+At the very least, my socfpga-a10 driver is using the old
+interface and has been just applied.  And currently your
+socfpga changes are untested whereas my original driver
+has been in use and is known to work.
+
+Let's wait on that patch until we have quite a few FPGA's
+supported and can be sure that we won't miss the old
+interface.
+
+Alan
+
+> >
+> > Jason
+> Joshua
 > 
-> The write behavior here is the same as what brightness currently does
-> and the read behavior is that of what I suggested for
-
-No, it is not. "brightness" behaviour is currently broken, as it sets
-either current brightness or maximum trigger brightness.
-
-> We've 2 sorts of brightness really:
-> 
-> 1) transient brightness, aka current brightness, when blinking or
-> triggers are used this will switch many times a second
-> between off and some on level.
-> 
-> 2) non-transient brightness, for non blinking leds this is the
-> actual brightness, for blinking leds this is the brightness
-> level used when the led is on.
-
-Yes, and we want reasonable interface where userspace sees those two
-brightnesses.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161113/f90abee5/attachment.sig>
