@@ -1,155 +1,970 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 13 Nov 2016 14:52:30 +0100
-Subject: PM regression with LED changes in next-20161109
-In-Reply-To: <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
-References: <20161109192301.GS26979@atomide.com>
- <28234714-3994-6747-9cf8-1ff0b3257f7a@gmail.com>
- <CGME20161110084919epcas3p2e8fbdd2905cabe15c5301b7a8e22416c@epcas3p2.samsung.com>
- <f627c778-4378-e5da-09dd-3e0fb2ea4aba@redhat.com>
- <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
- <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
- <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
- <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
- <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
- <4c31faef-144d-289c-0e32-83e76aff6178@gmail.com>
- <3eb60c78-d891-27e5-6b7b-a54a5b547a1c@redhat.com>
- <c01cac8b-a921-56d1-7e57-8071d4b9faf6@gmail.com>
- <cb0aa3ce-ee48-66b8-510c-bd70917afec9@redhat.com>
- <b5ae20d7-8394-7ad5-1830-13173e9105c4@gmail.com>
-Message-ID: <9b476f85-d45e-deb6-335d-fc56f6d90350@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 13 Nov 2016 23:01:27 +0800
+Subject: [PATCH 9/10] ARM: sun5i: Convert to CCU
+In-Reply-To: <4046893c1810045bac3eeb1ea3a35c5771d250e0.1478625788.git-series.maxime.ripard@free-electrons.com>
+References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
+ <4046893c1810045bac3eeb1ea3a35c5771d250e0.1478625788.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64vOePTQ0a7cmSmimVrkYOxxRwRZnGbsC2ZQ4Su59oJaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 13-11-16 12:44, Jacek Anaszewski wrote:
-> Hi,
+On Wed, Nov 9, 2016 at 1:23 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Now that we have drivers for all of them, convert all the SoCs that share
+> the sun5i DTSI to the new CCU driver.
 >
-> On 11/12/2016 10:14 PM, Hans de Goede wrote:
-
-<snip>
-
->>>> So I would like to propose creating a new read-write
->>>> user_brightness file.
->>>>
->>>> The write behavior would be 100% identical to the brightness
->>>> file (in code terms it will call the same store function).
->>>>
->>>> The the read behavior otoh will be different: it will shows
->>>> the last brightness as set by the user, this would show the
->>>> read behavior we really want of brightness: show the real
->>>> brightness when not blinking / triggers are active and show
->>>> the brightness used when on when blinking / triggers are active.
->>>>
->>>> We could then add poll support on this new user_brightness
->>>> file, thus avoiding the problem with the extra cpu-load on
->>>> notifications on blinking / triggers.
->>>
->>> I agree that user_brightness allows to solve the issues you raised
->>> about inconsistent write and read brightness' semantics
->>> (which is not that painful IMHO).
->>>
->>> Reporting non-user brightness changes on user_brightness file
->>> doesn't sound reasonable though.
->>
->> The changes I'm interested in are user brightness changes they
->> are just not done through sysfs, but through a hardwired hotkey,
->> they are however very much done by the user.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun5i-a10s.dtsi |  94 +-------
+>  arch/arm/boot/dts/sun5i-a13.dtsi  | 140 +-----------
+>  arch/arm/boot/dts/sun5i-r8.dtsi   |  10 +-
+>  arch/arm/boot/dts/sun5i.dtsi      | 368 ++++---------------------------
+>  4 files changed, 90 insertions(+), 522 deletions(-)
 >
-> Ah, so this file name would be misleading especially taking into account
-> the context in which "user" is used in kernel, which predominantly
-> means "userspace", e.g. copy_to_user(), copy_from_user().
+> diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> index 7aa8c7aa0153..1d26ae7267dc 100644
+> --- a/arch/arm/boot/dts/sun5i-a10s.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+> @@ -61,99 +61,33 @@
+>                 #size-cells = <1>;
+>                 ranges;
 >
->>> Also, how would we read the
->>> brightness set by the firmware? We'd have to read brightness
->>> file, so still two files would have to be opened which is
->>> a second drawback of this approach.
->>
->> No, look carefully at the definition of the read behavior
->> I plan to put in the ABI doc:
+> -               framebuffer at 0 {
+> -                       compatible = "allwinner,simple-framebuffer",
+> -                                    "simple-framebuffer";
+> -                       allwinner,pipeline = "de_be0-lcd0-hdmi";
+> -                       clocks = <&pll3>, <&pll5 1>, <&ahb_gates 36>,
+> -                                <&ahb_gates 43>, <&ahb_gates 44>;
+> -                       status = "disabled";
+> -               };
+> -
+>                 framebuffer at 1 {
+>                         compatible = "allwinner,simple-framebuffer",
+>                                      "simple-framebuffer";
+> -                       allwinner,pipeline = "de_be0-lcd0";
+> -                       clocks = <&pll3>, <&pll5 1>, <&ahb_gates 36>,
+> -                                <&ahb_gates 44>;
+> +                       allwinner,pipeline = "de_be0-lcd0-tve0";
+> +                       clocks = <&ccu CLK_AHB_TVE>, <&ccu CLK_AHB_LCD>,
+> +                                <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+> +                                <&ccu CLK_TCON_CH1>, <&ccu CLK_DRAM_DE_BE>;
+>                         status = "disabled";
+>                 };
 >
-> OK, "user" was what confused me. So in this case changes made
-> by the firmware even if in a result of user activity
-> (pressing hardware key) obviously cannot be treated similarly
-> to the changes made from the userspace context.
+>                 framebuffer at 2 {
+>                         compatible = "allwinner,simple-framebuffer",
+>                                      "simple-framebuffer";
+> -                       allwinner,pipeline = "de_be0-lcd0-tve0";
+> -                       clocks = <&pll3>, <&pll5 1>, <&ahb_gates 34>,
+> -                                <&ahb_gates 36>, <&ahb_gates 44>;
+> +                       allwinner,pipeline = "de_be0-lcd0-hdmi";
+> +                       clocks = <&ccu CLK_AHB_LCD>, <&ccu CLK_AHB_HDMI>,
+> +                                <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DRAM_DE_BE>,
+> +                                <&ccu CLK_DE_BE>, <&ccu CLK_HDMI>;
 
-In the end both result on the brightness of the device
-changing, so any userspace process interested in monitoring
-the brightness will want to know about both type of changes.
+You might want to mention you moved the framebuffer nodes around.
+Or maybe do it in a separate patch.
 
-> Unless you're able to give references to the kernel code which
-> contradict my judgement.
-
-AFAIK the audio code will signal volume changes done by
-hardwired buttons the same way as audio changes done
-by userspace calling into the kernel. This also makes
-sense because in the end, what is interesting for a
-mixer app, is that the volume changed, and what the
-new volume is.
-
->> "Reading this file will return the actual led brightness
->> when not blinking and no triggers are active; reading this
->> file will return the brightness used when the led is on
->> when blinking or triggers are active."
+>                         status = "disabled";
+>                 };
+>         };
 >
-> This is unnecessarily entangled. Blinking means timer trigger
-> is active.
-
-Ok.
-
->> So for e.g. the backlit keyboard case reading this single
->> file will return the actual brightness of the backlight,
->> since this does not involve blinking or triggers.
->>
->> Basically the idea is that the user_brightness file
->> will have the semantics which IMHO the brightness file
->> itself should have had from the beginning, but which
->> we can't change now due to ABI reasons.
+> -       clocks {
+> -               ahb_gates: clk at 01c20060 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a10s-ahb-gates-clk";
+> -                       reg = <0x01c20060 0x8>;
+> -                       clocks = <&ahb>;
+> -                       clock-indices = <0>, <1>,
+> -                                       <2>, <5>, <6>,
+> -                                       <7>, <8>, <9>,
+> -                                       <10>, <13>,
+> -                                       <14>, <17>, <18>,
+> -                                       <20>, <21>, <22>,
+> -                                       <26>, <28>, <32>,
+> -                                       <34>, <36>, <40>,
+> -                                       <43>, <44>,
+> -                                       <46>, <51>,
+> -                                       <52>;
+> -                       clock-output-names = "ahb_usbotg", "ahb_ehci",
+> -                                            "ahb_ohci", "ahb_ss", "ahb_dma",
+> -                                            "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+> -                                            "ahb_mmc2", "ahb_nand",
+> -                                            "ahb_sdram", "ahb_emac", "ahb_ts",
+> -                                            "ahb_spi0", "ahb_spi1", "ahb_spi2",
+> -                                            "ahb_gps", "ahb_stimer", "ahb_ve",
+> -                                            "ahb_tve", "ahb_lcd", "ahb_csi",
+> -                                            "ahb_hdmi", "ahb_de_be",
+> -                                            "ahb_de_fe", "ahb_iep",
+> -                                            "ahb_mali400";
+> -               };
+> -
+> -               apb0_gates: clk at 01c20068 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a10s-apb0-gates-clk";
+> -                       reg = <0x01c20068 0x4>;
+> -                       clocks = <&apb0>;
+> -                       clock-indices = <0>, <3>,
+> -                                       <5>, <6>,
+> -                                       <10>;
+> -                       clock-output-names = "apb0_codec", "apb0_iis",
+> -                                            "apb0_pio", "apb0_ir",
+> -                                            "apb0_keypad";
+> -               };
+> -
+> -               apb1_gates: clk at 01c2006c {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a10s-apb1-gates-clk";
+> -                       reg = <0x01c2006c 0x4>;
+> -                       clocks = <&apb1>;
+> -                       clock-indices = <0>, <1>,
+> -                                       <2>, <16>,
+> -                                       <17>, <18>,
+> -                                       <19>;
+> -                       clock-output-names = "apb1_i2c0", "apb1_i2c1",
+> -                                            "apb1_i2c2", "apb1_uart0",
+> -                                            "apb1_uart1", "apb1_uart2",
+> -                                            "apb1_uart3";
+> -               };
+> -       };
+> -
+>         soc at 01c00000 {
+>                 emac: ethernet at 01c0b000 {
+>                         compatible = "allwinner,sun4i-a10-emac";
+>                         reg = <0x01c0b000 0x1000>;
+>                         interrupts = <55>;
+> -                       clocks = <&ahb_gates 17>;
+> +                       clocks = <&ccu CLK_AHB_EMAC>;
+>                         allwinner,sram = <&emac_sram 1>;
+>                         status = "disabled";
+>                 };
+> @@ -169,7 +103,7 @@
+>                 pwm: pwm at 01c20e00 {
+>                         compatible = "allwinner,sun5i-a10s-pwm";
+>                         reg = <0x01c20e00 0xc>;
+> -                       clocks = <&osc24M>;
+> +                       clocks = <&ccu CLK_HOSC>;
+>                         #pwm-cells = <3>;
+>                         status = "disabled";
+>                 };
+> @@ -180,7 +114,7 @@
+>                         interrupts = <1>;
+>                         reg-shift = <2>;
+>                         reg-io-width = <4>;
+> -                       clocks = <&apb1_gates 16>;
+> +                       clocks = <&ccu CLK_APB1_UART0>;
+>                         status = "disabled";
+>                 };
 >
-> And in fact introducing user_brightness file would indeed
-> fix that shortcoming. However without providing notifications
-> of hw brightness changes on it.
-
-See above, I believe such a file should report any
-changes in brightness, except those caused by triggers,
-so it would report hw brightness changes.
-
-Anyways if you're not interested in fixing the
-shortcomings of the current read behavior on the
-brightness file (I'm fine with that, I can live
-with the shortcomings) I suggest that we simply go
-with v2 of my poll() patch.
-
->>> Having no difference in this area between the two approaches
->>> I'm still in favour of the read-only file for notifying
->>> brightness changes procured by hardware.
->>
->> That brings back the needing 2 fds problem; and does
->> not solve userspace not being able to reliably read
->> the led on brightness when blinking or using triggers.
->>
->> And this also has the issue that one is doing poll() on
->> one fd to detect changes on another fd,
+> @@ -190,12 +124,16 @@
+>                         interrupts = <3>;
+>                         reg-shift = <2>;
+>                         reg-io-width = <4>;
+> -                       clocks = <&apb1_gates 18>;
+> +                       clocks = <&ccu CLK_APB1_UART2>;
+>                         status = "disabled";
+>                 };
+>         };
+>  };
 >
-> It is not necessarily true. We can treat the polling on
-> hw_brightness_change file as a means to detect brightness
-> changes procured by hardware and we can read that brightness
-> by executing read on this same fd. It could return -ENODATA
-> if no such an event has occurred so far.
+> +&ccu {
+> +       compatible = "allwinner,sun5i-a10s-ccu";
+> +};
+> +
+>  &pio {
+>         compatible = "allwinner,sun5i-a10s-pinctrl";
+>
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index a17ba0243db3..0330304f1d42 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -61,8 +61,8 @@
+>                         compatible = "allwinner,simple-framebuffer",
+>                                      "simple-framebuffer";
+>                         allwinner,pipeline = "de_be0-lcd0";
+> -                       clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
+> -                                <&tcon_ch0_clk>, <&dram_gates 26>;
+> +                       clocks = <&ccu CLK_AHB_LCD>, <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+> +                                <&ccu CLK_TCON_CH0>, <&ccu CLK_DRAM_DE_BE>;
+>                         status = "disabled";
+>                 };
+>         };
+> @@ -99,114 +99,6 @@
+>                 };
+>         };
+>
+> -       clocks {
+> -               ahb_gates: clk at 01c20060 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-ahb-gates-clk";
+> -                       reg = <0x01c20060 0x8>;
+> -                       clocks = <&ahb>;
+> -                       clock-indices = <0>, <1>,
+> -                                       <2>, <5>, <6>,
+> -                                       <7>, <8>, <9>,
+> -                                       <10>, <13>,
+> -                                       <14>, <20>,
+> -                                       <21>, <22>,
+> -                                       <28>, <32>, <34>,
+> -                                       <36>, <40>, <44>,
+> -                                       <46>, <51>,
+> -                                       <52>;
+> -                       clock-output-names = "ahb_usbotg", "ahb_ehci",
+> -                                            "ahb_ohci", "ahb_ss", "ahb_dma",
+> -                                            "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+> -                                            "ahb_mmc2", "ahb_nand",
+> -                                            "ahb_sdram", "ahb_spi0",
+> -                                            "ahb_spi1", "ahb_spi2",
+> -                                            "ahb_stimer", "ahb_ve", "ahb_tve",
+> -                                            "ahb_lcd", "ahb_csi", "ahb_de_be",
+> -                                            "ahb_de_fe", "ahb_iep",
+> -                                            "ahb_mali400";
+> -               };
+> -
+> -               apb0_gates: clk at 01c20068 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-apb0-gates-clk";
+> -                       reg = <0x01c20068 0x4>;
+> -                       clocks = <&apb0>;
+> -                       clock-indices = <0>, <5>,
+> -                                       <6>;
+> -                       clock-output-names = "apb0_codec", "apb0_pio",
+> -                                            "apb0_ir";
+> -               };
+> -
+> -               apb1_gates: clk at 01c2006c {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-apb1-gates-clk";
+> -                       reg = <0x01c2006c 0x4>;
+> -                       clocks = <&apb1>;
+> -                       clock-indices = <0>, <1>,
+> -                                       <2>, <17>,
+> -                                       <19>;
+> -                       clock-output-names = "apb1_i2c0", "apb1_i2c1",
+> -                                            "apb1_i2c2", "apb1_uart1",
+> -                                            "apb1_uart3";
+> -               };
+> -
+> -               dram_gates: clk at 01c20100 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-dram-gates-clk",
+> -                                    "allwinner,sun4i-a10-gates-clk";
+> -                       reg = <0x01c20100 0x4>;
+> -                       clocks = <&pll5 0>;
+> -                       clock-indices = <0>,
+> -                                       <1>,
+> -                                       <25>,
+> -                                       <26>,
+> -                                       <29>,
+> -                                       <31>;
+> -                       clock-output-names = "dram_ve",
+> -                                            "dram_csi",
+> -                                            "dram_de_fe",
+> -                                            "dram_de_be",
+> -                                            "dram_ace",
+> -                                            "dram_iep";
+> -               };
+> -
+> -               de_be_clk: clk at 01c20104 {
+> -                       #clock-cells = <0>;
+> -                       #reset-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-display-clk";
+> -                       reg = <0x01c20104 0x4>;
+> -                       clocks = <&pll3>, <&pll7>, <&pll5 1>;
+> -                       clock-output-names = "de-be";
+> -               };
+> -
+> -               de_fe_clk: clk at 01c2010c {
+> -                       #clock-cells = <0>;
+> -                       #reset-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-display-clk";
+> -                       reg = <0x01c2010c 0x4>;
+> -                       clocks = <&pll3>, <&pll7>, <&pll5 1>;
+> -                       clock-output-names = "de-fe";
+> -               };
+> -
+> -               tcon_ch0_clk: clk at 01c20118 {
+> -                       #clock-cells = <0>;
+> -                       #reset-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
+> -                       reg = <0x01c20118 0x4>;
+> -                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+> -                       clock-output-names = "tcon-ch0-sclk";
+> -               };
+> -
+> -               tcon_ch1_clk: clk at 01c2012c {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
+> -                       reg = <0x01c2012c 0x4>;
+> -                       clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+> -                       clock-output-names = "tcon-ch1-sclk";
+> -               };
+> -       };
+> -
+>         display-engine {
+>                 compatible = "allwinner,sun5i-a13-display-engine";
+>                 allwinner,pipelines = <&fe0>;
+> @@ -217,11 +109,11 @@
+>                         compatible = "allwinner,sun5i-a13-tcon";
+>                         reg = <0x01c0c000 0x1000>;
+>                         interrupts = <44>;
+> -                       resets = <&tcon_ch0_clk 1>;
+> +                       resets = <&ccu RST_LCD>;
+>                         reset-names = "lcd";
+> -                       clocks = <&ahb_gates 36>,
+> -                                <&tcon_ch0_clk>,
+> -                                <&tcon_ch1_clk>;
+> +                       clocks = <&ccu CLK_AHB_LCD>,
+> +                                <&ccu CLK_TCON_CH0>,
+> +                                <&ccu CLK_TCON_CH1>;
 
-That would still require 2 fds as userspace also wants to
-be able to set the keyboard backlight, but allowing read()
-on the hw_brightness_change file at least fixes the weirdness
-where userspace gets woken from poll() without being able to
-read. So if you insist on going the hw_brightness_change file
-route, then I can live with that (and upower will simply
-need to open 2 fds, that is doable).
+Just curious, is CLK_TCON_CH1_SCLK ever used?
 
-But, BUT, I would greatly prefer to just go for v4 of my
-patch, which fixes the only real problem we've seen with
-my patch as original merged without adding a new, somewhat
-convoluted sysfs attribute.
+>                         clock-names = "ahb",
+>                                       "tcon-ch0",
+>                                       "tcon-ch1";
+> @@ -254,7 +146,7 @@
+>                 pwm: pwm at 01c20e00 {
+>                         compatible = "allwinner,sun5i-a13-pwm";
+>                         reg = <0x01c20e00 0xc>;
+> -                       clocks = <&osc24M>;
+> +                       clocks = <&ccu CLK_HOSC>;
+>                         #pwm-cells = <3>;
+>                         status = "disabled";
+>                 };
+> @@ -263,11 +155,11 @@
+>                         compatible = "allwinner,sun5i-a13-display-frontend";
+>                         reg = <0x01e00000 0x20000>;
+>                         interrupts = <47>;
+> -                       clocks = <&ahb_gates 46>, <&de_fe_clk>,
+> -                                <&dram_gates 25>;
+> +                       clocks = <&ccu CLK_DE_FE>, <&ccu CLK_DE_FE>,
+> +                                <&ccu CLK_DRAM_DE_FE>;
+>                         clock-names = "ahb", "mod",
+>                                       "ram";
+> -                       resets = <&de_fe_clk>;
+> +                       resets = <&ccu RST_DE_FE>;
+>                         status = "disabled";
+>
+>                         ports {
+> @@ -290,14 +182,14 @@
+>                 be0: display-backend at 01e60000 {
+>                         compatible = "allwinner,sun5i-a13-display-backend";
+>                         reg = <0x01e60000 0x10000>;
+> -                       clocks = <&ahb_gates 44>, <&de_be_clk>,
+> -                                <&dram_gates 26>;
+> +                       clocks = <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+> +                                <&ccu CLK_DRAM_DE_BE>;
+>                         clock-names = "ahb", "mod",
+>                                       "ram";
+> -                       resets = <&de_be_clk>;
+> +                       resets = <&ccu RST_DE_BE>;
+>                         status = "disabled";
+>
+> -                       assigned-clocks = <&de_be_clk>;
+> +                       assigned-clocks = <&ccu CLK_DE_BE>;
+>                         assigned-clock-rates = <300000000>;
+>
+>                         ports {
+> @@ -330,6 +222,10 @@
+>         };
+>  };
+>
+> +&ccu {
+> +       compatible = "allwinner,sun5i-a13-ccu";
+> +};
+> +
+>  &cpu0 {
+>         clock-latency = <244144>; /* 8 32k periods */
+>         operating-points = <
+> diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+> index 8b058f53b7dc..4c1141396c99 100644
+> --- a/arch/arm/boot/dts/sun5i-r8.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+> @@ -51,9 +51,9 @@
+>                         compatible = "allwinner,simple-framebuffer",
+>                                      "simple-framebuffer";
+>                         allwinner,pipeline = "de_be0-lcd0-tve0";
+> -                       clocks = <&ahb_gates 34>, <&ahb_gates 36>,
+> -                                <&ahb_gates 44>, <&de_be_clk>,
+> -                                <&tcon_ch1_clk>, <&dram_gates 26>;
+> +                       clocks = <&ccu CLK_AHB_TVE>, <&ccu CLK_AHB_LCD>,
+> +                                <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+> +                                <&ccu CLK_TCON_CH1>, <&ccu CLK_DRAM_DE_BE>;
+>                         status = "disabled";
+>                 };
+>         };
+> @@ -62,8 +62,8 @@
+>                 tve0: tv-encoder at 01c0a000 {
+>                         compatible = "allwinner,sun4i-a10-tv-encoder";
+>                         reg = <0x01c0a000 0x1000>;
+> -                       clocks = <&ahb_gates 34>;
+> -                       resets = <&tcon_ch0_clk 0>;
+> +                       clocks = <&ccu CLK_AHB_TVE>;
+> +                       resets = <&ccu RST_TVE>;
+>                         status = "disabled";
+>
+>                         port {
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> index b4ccee8cfb02..2dbc7623ec04 100644
+> --- a/arch/arm/boot/dts/sun5i.dtsi
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+> @@ -44,13 +44,29 @@
+>
+>  #include "skeleton.dtsi"
+>
+> -#include <dt-bindings/clock/sun4i-a10-pll2.h>
+> +#include <dt-bindings/clock/sun5i-ccu.h>
+>  #include <dt-bindings/dma/sun4i-a10.h>
+>  #include <dt-bindings/pinctrl/sun4i-a10.h>
+> +#include <dt-bindings/reset/sun5i-ccu.h>
+>
+>  / {
+>         interrupt-parent = <&intc>;
+>
+> +       chosen {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               ranges;
+> +
+> +               framebuffer at 0 {
+> +                       compatible = "allwinner,simple-framebuffer",
+> +                                    "simple-framebuffer";
+> +                       allwinner,pipeline = "de_be0-lcd0";
+> +                       clocks = <&ccu CLK_AHB_LCD>, <&ccu CLK_AHB_DE_BE>, <&ccu CLK_DE_BE>,
+> +                                <&ccu CLK_TCON_CH0>, <&ccu CLK_DRAM_DE_BE>;
+> +                       status = "disabled";
+> +               };
+> +       };
+> +
+>         cpus {
+>                 #address-cells = <1>;
+>                 #size-cells = <0>;
+> @@ -59,7 +75,7 @@
+>                         device_type = "cpu";
+>                         compatible = "arm,cortex-a8";
+>                         reg = <0x0>;
+> -                       clocks = <&cpu>;
+> +                       clocks = <&ccu CLK_CPU>;
+>                 };
+>         };
+>
+> @@ -68,291 +84,19 @@
+>                 #size-cells = <1>;
+>                 ranges;
+>
+> -               /*
+> -                * This is a dummy clock, to be used as placeholder on
+> -                * other mux clocks when a specific parent clock is not
+> -                * yet implemented. It should be dropped when the driver
+> -                * is complete.
+> -                */
+> -               dummy: dummy {
+> -                       #clock-cells = <0>;
+> -                       compatible = "fixed-clock";
+> -                       clock-frequency = <0>;
+> -               };
+> -
+>                 osc24M: clk at 01c20050 {
+>                         #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-osc-clk";
+> -                       reg = <0x01c20050 0x4>;
+> +                       compatible = "fixed-clock";
+>                         clock-frequency = <24000000>;
+>                         clock-output-names = "osc24M";
+>                 };
+>
+> -               osc3M: osc3M_clk {
+> -                       compatible = "fixed-factor-clock";
+> -                       #clock-cells = <0>;
+> -                       clock-div = <8>;
+> -                       clock-mult = <1>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "osc3M";
+> -               };
+> -
+>                 osc32k: clk at 0 {
+>                         #clock-cells = <0>;
+>                         compatible = "fixed-clock";
+>                         clock-frequency = <32768>;
+>                         clock-output-names = "osc32k";
+>                 };
+> -
+> -               pll1: clk at 01c20000 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-pll1-clk";
+> -                       reg = <0x01c20000 0x4>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "pll1";
+> -               };
+> -
+> -               pll2: clk at 01c20008 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-pll2-clk";
+> -                       reg = <0x01c20008 0x8>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "pll2-1x", "pll2-2x",
+> -                                            "pll2-4x", "pll2-8x";
+> -               };
+> -
+> -               pll3: clk at 01c20010 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-pll3-clk";
+> -                       reg = <0x01c20010 0x4>;
+> -                       clocks = <&osc3M>;
+> -                       clock-output-names = "pll3";
+> -               };
+> -
+> -               pll3x2: pll3x2_clk {
+> -                       compatible = "allwinner,sun4i-a10-pll3-2x-clk", "fixed-factor-clock";
+> -                       #clock-cells = <0>;
+> -                       clock-div = <1>;
+> -                       clock-mult = <2>;
+> -                       clocks = <&pll3>;
+> -                       clock-output-names = "pll3-2x";
+> -               };
+> -
+> -               pll4: clk at 01c20018 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-pll1-clk";
+> -                       reg = <0x01c20018 0x4>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "pll4";
+> -               };
+> -
+> -               pll5: clk at 01c20020 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-pll5-clk";
+> -                       reg = <0x01c20020 0x4>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "pll5_ddr", "pll5_other";
+> -               };
+> -
+> -               pll6: clk at 01c20028 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-pll6-clk";
+> -                       reg = <0x01c20028 0x4>;
+> -                       clocks = <&osc24M>;
+> -                       clock-output-names = "pll6_sata", "pll6_other", "pll6";
+> -               };
+> -
+> -               pll7: clk at 01c20030 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-pll3-clk";
+> -                       reg = <0x01c20030 0x4>;
+> -                       clocks = <&osc3M>;
+> -                       clock-output-names = "pll7";
+> -               };
+> -
+> -               pll7x2: pll7x2_clk {
+> -                       compatible = "fixed-factor-clock";
+> -                       #clock-cells = <0>;
+> -                       clock-div = <1>;
+> -                       clock-mult = <2>;
+> -                       clocks = <&pll7>;
+> -                       clock-output-names = "pll7-2x";
+> -               };
+> -
+> -               /* dummy is 200M */
+> -               cpu: cpu at 01c20054 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-cpu-clk";
+> -                       reg = <0x01c20054 0x4>;
+> -                       clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
+> -                       clock-output-names = "cpu";
+> -               };
+> -
+> -               axi: axi at 01c20054 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-axi-clk";
+> -                       reg = <0x01c20054 0x4>;
+> -                       clocks = <&cpu>;
+> -                       clock-output-names = "axi";
+> -               };
+> -
+> -               ahb: ahb at 01c20054 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun5i-a13-ahb-clk";
+> -                       reg = <0x01c20054 0x4>;
+> -                       clocks = <&axi>, <&cpu>, <&pll6 1>;
+> -                       clock-output-names = "ahb";
+> -                       /*
+> -                        * Use PLL6 as parent, instead of CPU/AXI
+> -                        * which has rate changes due to cpufreq
+> -                        */
+> -                       assigned-clocks = <&ahb>;
+> -                       assigned-clock-parents = <&pll6 1>;
+> -               };
+> -
+> -               apb0: apb0 at 01c20054 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-apb0-clk";
+> -                       reg = <0x01c20054 0x4>;
+> -                       clocks = <&ahb>;
+> -                       clock-output-names = "apb0";
+> -               };
+> -
+> -               apb1: clk at 01c20058 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-apb1-clk";
+> -                       reg = <0x01c20058 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&osc32k>;
+> -                       clock-output-names = "apb1";
+> -               };
+> -
+> -               axi_gates: clk at 01c2005c {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-axi-gates-clk";
+> -                       reg = <0x01c2005c 0x4>;
+> -                       clocks = <&axi>;
+> -                       clock-indices = <0>;
+> -                       clock-output-names = "axi_dram";
+> -               };
+> -
+> -               nand_clk: clk at 01c20080 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c20080 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "nand";
+> -               };
+> -
+> -               ms_clk: clk at 01c20084 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c20084 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "ms";
+> -               };
+> -
+> -               mmc0_clk: clk at 01c20088 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-mmc-clk";
+> -                       reg = <0x01c20088 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "mmc0",
+> -                                            "mmc0_output",
+> -                                            "mmc0_sample";
+> -               };
+> -
+> -               mmc1_clk: clk at 01c2008c {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-mmc-clk";
+> -                       reg = <0x01c2008c 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "mmc1",
+> -                                            "mmc1_output",
+> -                                            "mmc1_sample";
+> -               };
+> -
+> -               mmc2_clk: clk at 01c20090 {
+> -                       #clock-cells = <1>;
+> -                       compatible = "allwinner,sun4i-a10-mmc-clk";
+> -                       reg = <0x01c20090 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "mmc2",
+> -                                            "mmc2_output",
+> -                                            "mmc2_sample";
+> -               };
+> -
+> -               ts_clk: clk at 01c20098 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c20098 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "ts";
+> -               };
+> -
+> -               ss_clk: clk at 01c2009c {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c2009c 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "ss";
+> -               };
+> -
+> -               spi0_clk: clk at 01c200a0 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c200a0 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "spi0";
+> -               };
+> -
+> -               spi1_clk: clk at 01c200a4 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c200a4 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "spi1";
+> -               };
+> -
+> -               spi2_clk: clk at 01c200a8 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c200a8 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "spi2";
+> -               };
+> -
+> -               ir0_clk: clk at 01c200b0 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-mod0-clk";
+> -                       reg = <0x01c200b0 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "ir0";
+> -               };
+> -
+> -               usb_clk: clk at 01c200cc {
+> -                       #clock-cells = <1>;
+> -                       #reset-cells = <1>;
+> -                       compatible = "allwinner,sun5i-a13-usb-clk";
+> -                       reg = <0x01c200cc 0x4>;
+> -                       clocks = <&pll6 1>;
+> -                       clock-output-names = "usb_ohci0", "usb_phy";
+> -               };
+> -
+> -               codec_clk: clk at 01c20140 {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun4i-a10-codec-clk";
+> -                       reg = <0x01c20140 0x4>;
+> -                       clocks = <&pll2 SUN4I_A10_PLL2_1X>;
+> -                       clock-output-names = "codec";
+> -               };
+> -
+> -               mbus_clk: clk at 01c2015c {
+> -                       #clock-cells = <0>;
+> -                       compatible = "allwinner,sun5i-a13-mbus-clk";
+> -                       reg = <0x01c2015c 0x4>;
+> -                       clocks = <&osc24M>, <&pll6 1>, <&pll5 1>;
+> -                       clock-output-names = "mbus";
+> -               };
+>         };
+>
+>         soc at 01c00000 {
+> @@ -395,7 +139,7 @@
+>                         compatible = "allwinner,sun4i-a10-dma";
+>                         reg = <0x01c02000 0x1000>;
+>                         interrupts = <27>;
+> -                       clocks = <&ahb_gates 6>;
+> +                       clocks = <&ccu CLK_AHB_DMA>;
+>                         #dma-cells = <2>;
+>                 };
+>
+> @@ -403,7 +147,7 @@
+>                         compatible = "allwinner,sun4i-a10-spi";
+>                         reg = <0x01c05000 0x1000>;
+>                         interrupts = <10>;
+> -                       clocks = <&ahb_gates 20>, <&spi0_clk>;
+> +                       clocks = <&ccu CLK_AHB_SPI0>, <&ccu CLK_SPI0>;
+>                         clock-names = "ahb", "mod";
+>                         dmas = <&dma SUN4I_DMA_DEDICATED 27>,
+>                                <&dma SUN4I_DMA_DEDICATED 26>;
+> @@ -417,7 +161,7 @@
+>                         compatible = "allwinner,sun4i-a10-spi";
+>                         reg = <0x01c06000 0x1000>;
+>                         interrupts = <11>;
+> -                       clocks = <&ahb_gates 21>, <&spi1_clk>;
+> +                       clocks = <&ccu CLK_AHB_SPI1>, <&ccu CLK_SPI1>;
+>                         clock-names = "ahb", "mod";
+>                         dmas = <&dma SUN4I_DMA_DEDICATED 9>,
+>                                <&dma SUN4I_DMA_DEDICATED 8>;
+> @@ -430,14 +174,8 @@
+>                 mmc0: mmc at 01c0f000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c0f000 0x1000>;
+> -                       clocks = <&ahb_gates 8>,
+> -                                <&mmc0_clk 0>,
+> -                                <&mmc0_clk 1>,
+> -                                <&mmc0_clk 2>;
+> -                       clock-names = "ahb",
+> -                                     "mmc",
+> -                                     "output",
+> -                                     "sample";
+> +                       clocks = <&ccu CLK_AHB_MMC0>, <&ccu CLK_MMC0>;
+> +                       clock-names = "ahb", "mmc";
+>                         interrupts = <32>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+> @@ -447,14 +185,8 @@
+>                 mmc1: mmc at 01c10000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c10000 0x1000>;
+> -                       clocks = <&ahb_gates 9>,
+> -                                <&mmc1_clk 0>,
+> -                                <&mmc1_clk 1>,
+> -                                <&mmc1_clk 2>;
+> -                       clock-names = "ahb",
+> -                                     "mmc",
+> -                                     "output",
+> -                                     "sample";
+> +                       clocks = <&ccu CLK_AHB_MMC1>, <&ccu CLK_MMC1>;
+> +                       clock-names = "ahb", "mmc";
+>                         interrupts = <33>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+> @@ -464,14 +196,8 @@
+>                 mmc2: mmc at 01c11000 {
+>                         compatible = "allwinner,sun5i-a13-mmc";
+>                         reg = <0x01c11000 0x1000>;
+> -                       clocks = <&ahb_gates 10>,
+> -                                <&mmc2_clk 0>,
+> -                                <&mmc2_clk 1>,
+> -                                <&mmc2_clk 2>;
+> -                       clock-names = "ahb",
+> -                                     "mmc",
+> -                                     "output",
+> -                                     "sample";
+> +                       clocks = <&ccu CLK_AHB_MMC2>, <&ccu CLK_MMC2>;
+> +                       clock-names = "ahb", "mmc";
+>                         interrupts = <34>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+> @@ -481,7 +207,7 @@
+>                 usb_otg: usb at 01c13000 {
+>                         compatible = "allwinner,sun4i-a10-musb";
+>                         reg = <0x01c13000 0x0400>;
+> -                       clocks = <&ahb_gates 0>;
+> +                       clocks = <&ccu CLK_AHB_OTG>;
+>                         interrupts = <38>;
+>                         interrupt-names = "mc";
+>                         phys = <&usbphy 0>;
+> @@ -496,9 +222,9 @@
+>                         compatible = "allwinner,sun5i-a13-usb-phy";
+>                         reg = <0x01c13400 0x10 0x01c14800 0x4>;
+>                         reg-names = "phy_ctrl", "pmu1";
+> -                       clocks = <&usb_clk 8>;
+> +                       clocks = <&ccu CLK_USB_PHY0>;
+>                         clock-names = "usb_phy";
+> -                       resets = <&usb_clk 0>, <&usb_clk 1>;
+> +                       resets = <&ccu RST_USB_PHY0>, <&ccu RST_USB_PHY1>;
+>                         reset-names = "usb0_reset", "usb1_reset";
+>                         status = "disabled";
+>                 };
+> @@ -507,7 +233,7 @@
+>                         compatible = "allwinner,sun5i-a13-ehci", "generic-ehci";
+>                         reg = <0x01c14000 0x100>;
+>                         interrupts = <39>;
+> -                       clocks = <&ahb_gates 1>;
+> +                       clocks = <&ccu CLK_AHB_EHCI>;
+>                         phys = <&usbphy 1>;
+>                         phy-names = "usb";
+>                         status = "disabled";
+> @@ -517,7 +243,7 @@
+>                         compatible = "allwinner,sun5i-a13-ohci", "generic-ohci";
+>                         reg = <0x01c14400 0x100>;
+>                         interrupts = <40>;
+> -                       clocks = <&usb_clk 6>, <&ahb_gates 2>;
+> +                       clocks = <&ccu CLK_USB_OHCI>, <&ccu CLK_AHB_OHCI>;
+>                         phys = <&usbphy 1>;
+>                         phy-names = "usb";
+>                         status = "disabled";
+> @@ -527,7 +253,7 @@
+>                         compatible = "allwinner,sun4i-a10-spi";
+>                         reg = <0x01c17000 0x1000>;
+>                         interrupts = <12>;
+> -                       clocks = <&ahb_gates 22>, <&spi2_clk>;
+> +                       clocks = <&ccu CLK_AHB_SPI2>, <&ccu CLK_SPI2>;
+>                         clock-names = "ahb", "mod";
+>                         dmas = <&dma SUN4I_DMA_DEDICATED 29>,
+>                                <&dma SUN4I_DMA_DEDICATED 28>;
+> @@ -537,6 +263,14 @@
+>                         #size-cells = <0>;
+>                 };
+>
+> +               ccu: clock at 01c20000 {
+> +                       reg = <0x01c20000 0x400>;
+> +                       clocks = <&osc24M>, <&osc32k>;
+> +                       clock-names = "hosc", "losc";
+> +                       #clock-cells = <1>;
+> +                       #reset-cells = <1>;
+> +               };
+> +
+>                 intc: interrupt-controller at 01c20400 {
+>                         compatible = "allwinner,sun4i-a10-ic";
+>                         reg = <0x01c20400 0x400>;
+> @@ -547,7 +281,7 @@
+>                 pio: pinctrl at 01c20800 {
+>                         reg = <0x01c20800 0x400>;
+>                         interrupts = <28>;
+> -                       clocks = <&apb0_gates 5>;
+> +                       clocks = <&ccu CLK_APB0_PIO>;
+>                         gpio-controller;
+>                         interrupt-controller;
+>                         #interrupt-cells = <3>;
+> @@ -641,7 +375,7 @@
+>                         compatible = "allwinner,sun4i-a10-timer";
+>                         reg = <0x01c20c00 0x90>;
+>                         interrupts = <22>;
+> -                       clocks = <&osc24M>;
+> +                       clocks = <&ccu CLK_HOSC>;
+>                 };
+>
+>                 wdt: watchdog at 01c20c90 {
+> @@ -661,7 +395,7 @@
+>                         compatible = "allwinner,sun4i-a10-codec";
+>                         reg = <0x01c22c00 0x40>;
+>                         interrupts = <30>;
+> -                       clocks = <&apb0_gates 0>, <&codec_clk>;
+> +                       clocks = <&ccu CLK_APB0_CODEC>, <&ccu CLK_CODEC>;
+>                         clock-names = "apb", "codec";
+>                         dmas = <&dma SUN4I_DMA_NORMAL 19>,
+>                                <&dma SUN4I_DMA_NORMAL 19>;
+> @@ -687,7 +421,7 @@
+>                         interrupts = <2>;
+>                         reg-shift = <2>;
+>                         reg-io-width = <4>;
+> -                       clocks = <&apb1_gates 17>;
+> +                       clocks = <&ccu CLK_APB1_UART1>;
+>                         status = "disabled";
+>                 };
+>
+> @@ -697,7 +431,7 @@
+>                         interrupts = <4>;
+>                         reg-shift = <2>;
+>                         reg-io-width = <4>;
+> -                       clocks = <&apb1_gates 19>;
+> +                       clocks = <&ccu CLK_APB1_UART3>;
+>                         status = "disabled";
+>                 };
+>
+> @@ -705,7 +439,7 @@
+>                         compatible = "allwinner,sun4i-a10-i2c";
+>                         reg = <0x01c2ac00 0x400>;
+>                         interrupts = <7>;
+> -                       clocks = <&apb1_gates 0>;
+> +                       clocks = <&ccu CLK_APB1_I2C0>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -715,7 +449,7 @@
+>                         compatible = "allwinner,sun4i-a10-i2c";
+>                         reg = <0x01c2b000 0x400>;
+>                         interrupts = <8>;
+> -                       clocks = <&apb1_gates 1>;
+> +                       clocks = <&ccu CLK_APB1_I2C1>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -725,7 +459,7 @@
+>                         compatible = "allwinner,sun4i-a10-i2c";
+>                         reg = <0x01c2b400 0x400>;
+>                         interrupts = <9>;
+> -                       clocks = <&apb1_gates 2>;
+> +                       clocks = <&ccu CLK_APB1_I2C2>;
+>                         status = "disabled";
+>                         #address-cells = <1>;
+>                         #size-cells = <0>;
+> @@ -735,7 +469,7 @@
+>                         compatible = "allwinner,sun5i-a13-hstimer";
+>                         reg = <0x01c60000 0x1000>;
+>                         interrupts = <82>, <83>;
+> -                       clocks = <&ahb_gates 28>;
+> +                       clocks = <&ccu CLK_AHB_HSTIMER>;
+>                 };
+>         };
+>  };
 
-Regards,
+The rest looks good.
 
-Hans
+ChenYu
