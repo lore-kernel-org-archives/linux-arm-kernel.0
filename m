@@ -1,7 +1,9 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Sun, 13 Nov 2016 00:15:31 -0600
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig Updates for v4.10
-Message-ID: <1479017736-13564-1-git-send-email-andy.gross@linaro.org>
+Date: Sun, 13 Nov 2016 00:15:33 -0600
+Subject: [GIT PULL] Qualcomm Defconfig Updates for v4.10
+In-Reply-To: <1479017736-13564-1-git-send-email-andy.gross@linaro.org>
+References: <1479017736-13564-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1479017736-13564-3-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,20 +13,20 @@ The following changes since commit 1001354ca34179f3db924eb66672442a173147dc:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.10
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.10
 
-for you to fetch changes up to a77a713395392a7f79d89e634fe3e018c4f83898:
+for you to fetch changes up to 206787737e308bb447d18adef7da7749188212f5:
 
-  arm64: configs: enable configs for msm899(2/4) basic support (2016-11-12 22:44:09 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Based defconfig Updates for v4.10
-
-* Enable defconfig options for MSM8992/8994
+  ARM: qcom_defconfig: Fix MDM9515 LCC and GCC config (2016-10-24 16:04:32 -0500)
 
 ----------------------------------------------------------------
-Jeremy McNicoll (1):
-      arm64: configs: enable configs for msm899(2/4) basic support
+Qualcomm ARM Based defconfig Updates for v4.10
 
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+* Fixup MDM9615 option names
+
+----------------------------------------------------------------
+Neil Armstrong (1):
+      ARM: qcom_defconfig: Fix MDM9515 LCC and GCC config
+
+ arch/arm/configs/qcom_defconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
