@@ -1,279 +1,81 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 13 Nov 2016 22:23:47 +0100
-Subject: [PATCH v2 04/19] ARM: dts: armada-370-xp: Use the node labels
+Date: Sun, 13 Nov 2016 22:24:02 +0100
+Subject: [PATCH v2 19/19] ARM: dts: armada-370-xp: Fixup regulator DT warning
 In-Reply-To: <20161113212402.3060-1-gregory.clement@free-electrons.com>
 References: <20161113212402.3060-1-gregory.clement@free-electrons.com>
-Message-ID: <20161113212402.3060-5-gregory.clement@free-electrons.com>
+Message-ID: <20161113212402.3060-20-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the node label when possible. As a result it flattens the device tree
-and it makes more visible the IP blocks specific to each SoC variant.
+regulator has a reg property so the unit name should contain an address.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370.dtsi | 105 +++++++++++++++++++-------------------
- arch/arm/boot/dts/armada-xp.dtsi  |  76 +++++++++++++--------------
- 2 files changed, 91 insertions(+), 90 deletions(-)
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts | 4 ++--
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts   | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 5ed086da1e51..079494e52554 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -134,14 +134,6 @@
- 				wt-override;
- 			};
+diff --git a/arch/arm/boot/dts/armada-370-synology-ds213j.dts b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+index 20ea2391da6e..9eb755534e70 100644
+--- a/arch/arm/boot/dts/armada-370-synology-ds213j.dts
++++ b/arch/arm/boot/dts/armada-370-synology-ds213j.dts
+@@ -186,7 +186,7 @@
+ 		pinctrl-0 = <&sata1_pwr_pin &sata2_pwr_pin>;
+ 		pinctrl-names = "default";
  
--			i2c0: i2c at 11000 {
--				reg = <0x11000 0x20>;
--			};
--
--			i2c1: i2c at 11100 {
--				reg = <0x11100 0x20>;
--			};
--
- 			gpio0: gpio at 18100 {
- 				compatible = "marvell,orion-gpio";
- 				reg = <0x18100 0x40>;
-@@ -175,20 +167,6 @@
- 				interrupts = <91>;
- 			};
+-		sata1_regulator: sata1-regulator {
++		sata1_regulator: sata1-regulator at 1 {
+ 			compatible = "regulator-fixed";
+ 			reg = <1>;
+ 			regulator-name = "SATA1 Power";
+@@ -199,7 +199,7 @@
+ 			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+ 		};
  
--			/*
--			 * Default UART pinctrl setting without RTS/CTS, can
--			 * be overwritten on board level if a different
--			 * configuration is used.
--			 */
--			uart0: serial at 12000 {
--				pinctrl-0 = <&uart0_pins>;
--				pinctrl-names = "default";
--			};
--
--			uart1: serial at 12100 {
--				pinctrl-0 = <&uart1_pins>;
--				pinctrl-names = "default";
--			};
+-		sata2_regulator: sata2-regulator {
++		sata2_regulator: sata2-regulator at 2 {
+ 			compatible = "regulator-fixed";
+ 			reg = <2>;
+ 			regulator-name = "SATA2 Power";
+diff --git a/arch/arm/boot/dts/armada-xp-synology-ds414.dts b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+index 45480d992e1e..ee3acb88ea8a 100644
+--- a/arch/arm/boot/dts/armada-xp-synology-ds414.dts
++++ b/arch/arm/boot/dts/armada-xp-synology-ds414.dts
+@@ -154,7 +154,7 @@
+ 			     &sata3_pwr_pin &sata4_pwr_pin>;
+ 		pinctrl-names = "default";
  
- 			systemc: system-controller at 18200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
-@@ -219,20 +197,6 @@
- 				reg = <0x18330 0x4>;
- 			};
+-		sata1_regulator: sata1-regulator {
++		sata1_regulator: sata1-regulator at 1 {
+ 			compatible = "regulator-fixed";
+ 			reg = <1>;
+ 			regulator-name = "SATA1 Power";
+@@ -167,7 +167,7 @@
+ 			gpio = <&gpio1 10 GPIO_ACTIVE_HIGH>;
+ 		};
  
--			interrupt-controller at 20a00 {
--				reg = <0x20a00 0x1d0>, <0x21870 0x58>;
--			};
--
--			timer at 20300 {
--				compatible = "marvell,armada-370-timer";
--				clocks = <&coreclk 2>;
--			};
--
--			watchdog at 20300 {
--				compatible = "marvell,armada-370-wdt";
--				clocks = <&coreclk 2>;
--			};
--
- 			cpuconf: cpu-config at 21000 {
- 				compatible = "marvell,armada-370-cpu-config";
- 				reg = <0x21000 0x8>;
-@@ -248,14 +212,6 @@
- 				status = "disabled";
- 			};
+-		sata2_regulator: sata2-regulator {
++		sata2_regulator: sata2-regulator at 2 {
+ 			compatible = "regulator-fixed";
+ 			reg = <2>;
+ 			regulator-name = "SATA2 Power";
+@@ -180,7 +180,7 @@
+ 			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
+ 		};
  
--			usb at 50000 {
--				clocks = <&coreclk 0>;
--			};
--
--			usb at 51000 {
--				clocks = <&coreclk 0>;
--			};
--
- 			xor0: xor at 60800 {
- 				compatible = "marvell,orion-xor";
- 				reg = <0x60800 0x100
-@@ -294,14 +250,6 @@
- 				};
- 			};
+-		sata3_regulator: sata3-regulator {
++		sata3_regulator: sata3-regulator at 3 {
+ 			compatible = "regulator-fixed";
+ 			reg = <3>;
+ 			regulator-name = "SATA3 Power";
+@@ -193,7 +193,7 @@
+ 			gpio = <&gpio1 13 GPIO_ACTIVE_HIGH>;
+ 		};
  
--			ethernet at 70000 {
--				compatible = "marvell,armada-370-neta";
--			};
--
--			ethernet at 74000 {
--				compatible = "marvell,armada-370-neta";
--			};
--
- 			cesa: crypto@90000 {
- 				compatible = "marvell,armada-370-crypto";
- 				reg = <0x90000 0x10000>;
-@@ -337,6 +285,59 @@
- 	};
- };
- 
-+/*
-+ * Default UART pinctrl setting without RTS/CTS, can be overwritten on
-+ * board level if a different configuration is used.
-+ */
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&uart1 {
-+	pinctrl-0 = <&uart1_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&i2c0 {
-+	reg = <0x11000 0x20>;
-+};
-+
-+&i2c1 {
-+	reg = <0x11100 0x20>;
-+};
-+
-+&mpic {
-+	reg = <0x20a00 0x1d0>, <0x21870 0x58>;
-+};
-+
-+&timer {
-+	compatible = "marvell,armada-370-timer";
-+	clocks = <&coreclk 2>;
-+};
-+
-+&watchdog {
-+	compatible = "marvell,armada-370-wdt";
-+	clocks = <&coreclk 2>;
-+};
-+
-+&usb0 {
-+	clocks = <&coreclk 0>;
-+};
-+
-+&usb1 {
-+	clocks = <&coreclk 0>;
-+};
-+
-+&eth0 {
-+	compatible = "marvell,armada-370-neta";
-+};
-+
-+&eth1 {
-+	compatible = "marvell,armada-370-neta";
-+};
-+
- &pinctrl {
- 	compatible = "marvell,mv88f6710-pinctrl";
- 
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 654a61e525b4..bb8f7dcaf656 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -84,16 +84,6 @@
- 				wt-override;
- 			};
- 
--			i2c0: i2c at 11000 {
--				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
--				reg = <0x11000 0x100>;
--			};
--
--			i2c1: i2c at 11100 {
--				compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
--				reg = <0x11100 0x100>;
--			};
--
- 			uart2: serial at 12200 {
- 				compatible = "snps,dw-apb-uart";
- 				pinctrl-0 = <&uart2_pins>;
-@@ -150,26 +140,6 @@
- 				clocks = <&coreclk 1>;
- 			};
- 
--			interrupt-controller at 20a00 {
--			      reg = <0x20a00 0x2d0>, <0x21070 0x58>;
--			};
--
--			timer at 20300 {
--				compatible = "marvell,armada-xp-timer";
--				clocks = <&coreclk 2>, <&refclk>;
--				clock-names = "nbclk", "fixed";
--			};
--
--			watchdog at 20300 {
--				compatible = "marvell,armada-xp-wdt";
--				clocks = <&coreclk 2>, <&refclk>;
--				clock-names = "nbclk", "fixed";
--			};
--
--			cpurst at 20800 {
--				reg = <0x20800 0x20>;
--			};
--
- 			cpu-config at 21000 {
- 				compatible = "marvell,armada-xp-cpu-config";
- 				reg = <0x21000 0x8>;
-@@ -183,14 +153,6 @@
- 				status = "disabled";
- 			};
- 
--			usb at 50000 {
--				clocks = <&gateclk 18>;
--			};
--
--			usb at 51000 {
--				clocks = <&gateclk 19>;
--			};
--
- 			usb2: usb at 52000 {
- 				compatible = "marvell,orion-ehci";
- 				reg = <0x52000 0x500>;
-@@ -308,6 +270,44 @@
- 	};
- };
- 
-+&i2c0 {
-+	compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-+	reg = <0x11000 0x100>;
-+};
-+
-+&i2c1 {
-+	compatible = "marvell,mv78230-i2c", "marvell,mv64xxx-i2c";
-+	reg = <0x11100 0x100>;
-+};
-+
-+&mpic {
-+	reg = <0x20a00 0x2d0>, <0x21070 0x58>;
-+};
-+
-+&timer {
-+	compatible = "marvell,armada-xp-timer";
-+	clocks = <&coreclk 2>, <&refclk>;
-+	clock-names = "nbclk", "fixed";
-+};
-+
-+&watchdog {
-+	compatible = "marvell,armada-xp-wdt";
-+	clocks = <&coreclk 2>, <&refclk>;
-+	clock-names = "nbclk", "fixed";
-+};
-+
-+&cpurst {
-+	reg = <0x20800 0x20>;
-+};
-+
-+&usb0 {
-+	clocks = <&gateclk 18>;
-+};
-+
-+&usb1 {
-+	clocks = <&gateclk 19>;
-+};
-+
- &pinctrl {
- 	ge0_gmii_pins: ge0-gmii-pins {
- 		marvell,pins =
+-		sata4_regulator: sata4-regulator {
++		sata4_regulator: sata4-regulator at 4 {
+ 			compatible = "regulator-fixed";
+ 			reg = <4>;
+ 			regulator-name = "SATA4 Power";
 -- 
 2.10.2
