@@ -1,100 +1,36 @@
-From: atull@opensource.altera.com (atull)
-Date: Sun, 13 Nov 2016 14:44:51 -0600
-Subject: [PATCH fpga 9/9] fpga: Remove support for non-sg drivers
-In-Reply-To: <8078ce27-5df0-c882-ffa3-d0c9316b7c54@gmail.com>
-References: <1478732303-13718-1-git-send-email-jgunthorpe@obsidianresearch.com>
- <1478732303-13718-10-git-send-email-jgunthorpe@obsidianresearch.com>
- <bad801c5-fe3a-665b-de67-bf69c42fb2b4@gmail.com>
- <20161110163315.GB22004@obsidianresearch.com>
- <8078ce27-5df0-c882-ffa3-d0c9316b7c54@gmail.com>
-Message-ID: <alpine.DEB.2.10.1611131439190.2735@atull-VirtualBox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 13 Nov 2016 21:05:18 +0000
+Subject: [PATCH v3] crypto: arm64/sha2: integrate OpenSSL implementations
+ of SHA256/SHA512
+In-Reply-To: <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
+References: <1478953953-11523-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20161112221520.GD24127@arm.com>
+ <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
+ <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
+Message-ID: <CAKv+Gu8ouGT31ZqtiX5dFk-QnezjdNHOnP9ErbTDg70tVUU+YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Nov 2016, Joshua Clayton wrote:
+On 13 November 2016 at 15:12, Andy Polyakov <appro@openssl.org> wrote:
+>> (+ Andy)
+>>
+>> ...
+>>>
+>>> Looking at the generated code, I see references to __ARMEB__ and
+>> __ILP32__.
+>>> The former is probably a bug,
+>
+> Oh! You mean that it should be __AARCH64EB__/__AARCH64EL__!
 
-> 
-> 
-> On 11/10/2016 08:33 AM, Jason Gunthorpe wrote:
-> >>>  struct fpga_manager_ops {
-> >>>  	enum fpga_mgr_states (*state)(struct fpga_manager *mgr);
-> >>> -	int (*write_init)(struct fpga_manager *mgr, u32 flags,
-> >>> -			  const char *buf, size_t count);
-> >>> -	int (*write)(struct fpga_manager *mgr, const char *buf, size_t count);
-> >>>  	int (*write_init_sg)(struct fpga_manager *mgr, u32 flags,
-> >>>  			     struct sg_table *sgt);
-> >>>  	int (*write_sg)(struct fpga_manager *mgr, struct sg_table *sgt);
-> >>> @@ -118,6 +113,8 @@ struct fpga_manager {
-> >>>  
-> >>>  int fpga_mgr_buf_load(struct fpga_manager *mgr, u32 flags,
-> >>>  		      const char *buf, size_t count);
-> >>> +int fpga_mgr_buf_load_sg(struct fpga_manager *mgr, u32 flags,
-> >>> +			 struct sg_table *sgt);
-> >>>  
-> >>>  int fpga_mgr_firmware_load(struct fpga_manager *mgr, u32 flags,
-> >>>  			   const char *image_name);
-> >> I don't have any feeling either way about switching to scatter-gather.
-> >> (Not zynq or socfpga user)
-> >> But I do object to renaming the API.
-> >> write_init() and write() do not imply a particular implementation, nor even that
-> >> the buffer is coherent.
-> > Neither the sg or old linear interface imply any particular
-> > underlying driver implementation.
-> >
-> > All that is being changed is how the list of physical pages gets
-> > passed to the driver. The linear interface requires them to be
-> > contiguously mapped (eg in a vmap) while the SG interface
-> > directly passes a list of physical page addresses.
-> >
-> > Any alogrithm that works with the old interface can run on the new
-> > interface, and the new interface can support much better options for
-> > DMA drivers, while not requiring the higher layers to perform a high
-> > order allocation (vmap or otherwise) to create the contiguous memory.
-> >
-> > The reason the old interface is being deleted here is so the fpga mgr
-> > API can be expanded to accept a sg list directly. Since we cannot
-> > convert a general sg list to linear memory the liner option must be
-> > totally removed.
-> OK. That sounds reasonable.
-> >> I am working to merge an fpga manager which uses SPI to load the bitstream
-> >> (see https://www.spinics.net/lists/arm-kernel/msg539328.html)
-> >> Any dma in use there would come from the spi driver. write_init_sg, and write_sg
-> >> don't make any sense in my case.
-> > No, it still make lots of sense.
-> >
-> > SPI has been slowly transforming to use the same sort of SG scheme
-> > universally, including facing the client. (see
-> > 6ad45a27cbe343ec8d7888e5edf6335499a4b555)
-> Thanks for sharing that link.
-> >
-> > Some day your driver can just pass the SGs directly to spi and
-> > everything will be great.
-> >
-> > In the mean time it can do sg_miter_next to get mapped buffers.
-> ..so I have a way forward if this series gets merged.
-> That was my main concern.
-> And as a dma n00b, learning to use dma engine structures to do
-> non-dma xfer was not very high on my list.
-> >> Would it not make sense to keep the top level API the same?
-> > Fundamentally no.
+Indeed:
 
-NACK for now.  Let's slow down here a bit.
+$ aarch64-linux-gnu-gcc -dM -E  - <<<""   |grep AARCH
+#define __AARCH64_CMODEL_SMALL__ 1
+#define __AARCH64EL__ 1
 
-I don't see any rush in getting rid of the contiguous
-buffer interface.
+$ aarch64-linux-gnu-gcc -dM -E -mbig-endian - <<<""   |grep AARCH
+#define __AARCH64_CMODEL_SMALL__ 1
+#define __AARCH64EB__ 1
 
-At the very least, my socfpga-a10 driver is using the old
-interface and has been just applied.  And currently your
-socfpga changes are untested whereas my original driver
-has been in use and is known to work.
-
-Let's wait on that patch until we have quite a few FPGA's
-supported and can be sure that we won't miss the old
-interface.
-
-Alan
-
-> >
-> > Jason
-> Joshua
-> 
+-- 
+Ard.
