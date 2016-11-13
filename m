@@ -1,66 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 13 Nov 2016 11:40:58 +0000
-Subject: Applied "ASoC: mioa701_wm9713: add missing white space in dev_err
- message" to the asoc tree
-In-Reply-To: <20161112163025.4801-1-colin.king@canonical.com>
-Message-ID: <E1c5t9e-0008OI-W7@finisterre>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 13 Nov 2016 11:41:30 +0000
+Subject: [PATCH v3 1/2] iommu/dma: Implement dma_{map,unmap}_resource()
+In-Reply-To: <7d54803d32968be46a1a525d7160feb13af72f00.1478887214.git.robin.murphy@arm.com>
+References: <7d54803d32968be46a1a525d7160feb13af72f00.1478887214.git.robin.murphy@arm.com>
+Message-ID: <20161113114129.GA24837@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Nov 11, 2016 at 06:27:34PM +0000, Robin Murphy wrote:
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index c5ab8667e6f2..8b745260b3bc 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -432,13 +432,12 @@ int iommu_dma_mmap(struct page **pages, size_t size, struct vm_area_struct *vma)
+>  	return ret;
+>  }
+>  
+> -dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
+> -		unsigned long offset, size_t size, int prot)
+> +dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+> +		size_t size, int prot)
 
-   ASoC: mioa701_wm9713: add missing white space in dev_err message
+This should be static.
 
-has been applied to the asoc tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 28ab49bf9bd9185d8221392a5195bb6c989ed7c7 Mon Sep 17 00:00:00 2001
-From: Colin Ian King <colin.king@canonical.com>
-Date: Sat, 12 Nov 2016 16:30:25 +0000
-Subject: [PATCH] ASoC: mioa701_wm9713: add missing white space in dev_err
- message
-
-There is a missing whitespace in the dev_err message between
-"will" and "lead".  Add the whitespace.
-
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/pxa/mioa701_wm9713.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/sound/soc/pxa/mioa701_wm9713.c b/sound/soc/pxa/mioa701_wm9713.c
-index d1661fa6ee08..0fe0abec8fc4 100644
---- a/sound/soc/pxa/mioa701_wm9713.c
-+++ b/sound/soc/pxa/mioa701_wm9713.c
-@@ -187,7 +187,7 @@ static int mioa701_wm9713_probe(struct platform_device *pdev)
- 	mioa701.dev = &pdev->dev;
- 	rc = devm_snd_soc_register_card(&pdev->dev, &mioa701);
- 	if (!rc)
--		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will"
-+		dev_warn(&pdev->dev, "Be warned that incorrect mixers/muxes setup will "
- 			 "lead to overheating and possible destruction of your device."
- 			 " Do not use without a good knowledge of mio's board design!\n");
- 	return rc;
 -- 
-2.10.2
+Catalin
