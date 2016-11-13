@@ -1,39 +1,82 @@
-From: appro@openssl.org (Andy Polyakov)
-Date: Sun, 13 Nov 2016 22:23:53 +0100
-Subject: [PATCH v3] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <CAKv+Gu8ouGT31ZqtiX5dFk-QnezjdNHOnP9ErbTDg70tVUU+YA@mail.gmail.com>
-References: <1478953953-11523-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161112221520.GD24127@arm.com>
- <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
- <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
- <CAKv+Gu8ouGT31ZqtiX5dFk-QnezjdNHOnP9ErbTDg70tVUU+YA@mail.gmail.com>
-Message-ID: <c82fd8f0-5c0e-74d9-fbf3-b2a5c0dc3a1c@openssl.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sun, 13 Nov 2016 22:23:43 +0100
+Subject: [PATCH v2 00/19] Various Armada 370/XP DT warning fixup
+Message-ID: <20161113212402.3060-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> (+ Andy)
->>>
->>> ...
->>>>
->>>> Looking at the generated code, I see references to __ARMEB__ and
->>> __ILP32__.
->>>> The former is probably a bug,
->>
->> Oh! You mean that it should be __AARCH64EB__/__AARCH64EL__!
-> 
-> Indeed:
-> 
-> $ aarch64-linux-gnu-gcc -dM -E  - <<<""   |grep AARCH
-> #define __AARCH64_CMODEL_SMALL__ 1
-> #define __AARCH64EL__ 1
-> 
-> $ aarch64-linux-gnu-gcc -dM -E -mbig-endian - <<<""   |grep AARCH
-> #define __AARCH64_CMODEL_SMALL__ 1
-> #define __AARCH64EB__ 1
+As it was done a few months ago for kirkwood, this patchset fixes up
+various warning from the DT compiler when using the flag W=1 with
+make.
 
-As it turns out it wasn't really an overlook, at least not in OpenSSL
-context, as I force __ARMEB__/__ARMEL__ in 64-bit build through
-arm_arch.h, which in turn is shared between 32- and 64-bit builds. But
-shared code should be preferred to be self-sufficient. It doesn't mean
-that it won't be fixed, only that it wasn't really a bug in OpenSSL context.
+In this second version I used the target and attributes property of
+the memory windows when MBUS_ID. Indeed by adding this information to
+the unit-address is really uniq as required bu the epar as explained
+in this email:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/466941.html.
+
+As for the first version, the only remaining warnings are the following:
+  DTC     arch/arm/boot/dts/armada-370-db.dtb
+Warning (unit_address_vs_reg): Node /sound/simple-audio-card,dai-link at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /sound/simple-audio-card,dai-link at 1 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /sound/simple-audio-card,dai-link at 2 has a unit name, but no reg property
+
+However it seems a false positive as here the '@' is part of the name
+of the node and is not a reference of an address. Moreover the node
+name is directly used by the driver so it must not be modified.
+
+Gregory
+
+Gregory CLEMENT (19):
+  ARM: dts: armada-xp-matrix: Fix the location of the pcie-controller
+    node
+  ARM: dts: armada-370-xp: move the cpurst node in the common file
+  ARM: dts: armada-370-xp: add node labels
+  ARM: dts: armada-370-xp: Use the node labels
+  ARM: dts: armada-370-xp: Fixup mdio DT warning
+  ARM: dts: armada-370-xp: Fixup bootrom DT warning
+  ARM: dts: armada-370-xp: Fixup devbus DT warning
+  ARM: dts: armada-370-xp: Fixup bm-bppi DT warning
+  ARM: dts: armada-370-xp: Fixup sa-ram DT warning
+  ARM: dts: armada-xp: Fixup pcie DT warnings
+  ARM: dts: armada-370: Fixup pcie DT warnings
+  ARM: dts: armada-370-xp: Remove skeleton.dtsi
+  ARM: dts: armada-370-xp: Fixup l2-cache DT warning
+  ARM: dts: armada-370-xp: Fixup internal-regs DT warning
+  ARM: dts: armada-370-xp: Fixup soc DT warning
+  ARM: dts: armada-370-xp: Fixup memory DT warning
+  ARM: dts: armada-370-xp: Remove address from dsa unit name
+  ARM: dts: armada-370-xp: Remove button address and fixup names
+  ARM: dts: armada-370-xp: Fixup regulator DT warning
+
+ arch/arm/boot/dts/armada-370-db.dts                |  67 ++++----
+ arch/arm/boot/dts/armada-370-dlink-dns327l.dts     |  34 ++---
+ arch/arm/boot/dts/armada-370-mirabox.dts           |  61 ++++----
+ arch/arm/boot/dts/armada-370-netgear-rn102.dts     |  54 +++----
+ arch/arm/boot/dts/armada-370-netgear-rn104.dts     |  62 ++++----
+ arch/arm/boot/dts/armada-370-rd.dts                |  61 ++++----
+ arch/arm/boot/dts/armada-370-seagate-nas-4bay.dts  |  31 ++--
+ arch/arm/boot/dts/armada-370-seagate-nas-xbay.dtsi |  49 +++---
+ .../dts/armada-370-seagate-personal-cloud-2bay.dts |   4 +-
+ .../boot/dts/armada-370-seagate-personal-cloud.dts |   4 +-
+ .../dts/armada-370-seagate-personal-cloud.dtsi     |  48 +++---
+ arch/arm/boot/dts/armada-370-synology-ds213j.dts   |  22 +--
+ arch/arm/boot/dts/armada-370-xp.dtsi               |  43 +++---
+ arch/arm/boot/dts/armada-370.dtsi                  | 144 +++++++++--------
+ arch/arm/boot/dts/armada-xp-axpwifiap.dts          |  72 ++++-----
+ arch/arm/boot/dts/armada-xp-db.dts                 | 170 ++++++++++-----------
+ arch/arm/boot/dts/armada-xp-gp.dts                 | 146 +++++++++---------
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    |  57 ++++---
+ arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  56 +++----
+ arch/arm/boot/dts/armada-xp-matrix.dts             |  24 +--
+ arch/arm/boot/dts/armada-xp-mv78230.dtsi           |  16 +-
+ arch/arm/boot/dts/armada-xp-mv78260.dtsi           |  24 +--
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi           |  26 ++--
+ arch/arm/boot/dts/armada-xp-netgear-rn2120.dts     |  71 ++++-----
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts   | 124 +++++++--------
+ arch/arm/boot/dts/armada-xp-synology-ds414.dts     |  79 +++++-----
+ arch/arm/boot/dts/armada-xp.dtsi                   | 106 ++++++-------
+ 27 files changed, 832 insertions(+), 823 deletions(-)
+
+-- 
+2.10.2
