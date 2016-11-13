@@ -1,39 +1,56 @@
-From: appro@openssl.org (Andy Polyakov)
-Date: Sun, 13 Nov 2016 22:47:34 +0100
-Subject: [PATCH v3] crypto: arm64/sha2: integrate OpenSSL implementations
- of SHA256/SHA512
-In-Reply-To: <c82fd8f0-5c0e-74d9-fbf3-b2a5c0dc3a1c@openssl.org>
-References: <1478953953-11523-1-git-send-email-ard.biesheuvel@linaro.org>
- <20161112221520.GD24127@arm.com>
- <CAKv+Gu_Y-ik0L9mh4z-g3fHKjPt780_znCQNU-jAwXifLgAo4A@mail.gmail.com>
- <c8306030-d4eb-fea7-441a-3476cd308496@openssl.org>
- <CAKv+Gu8ouGT31ZqtiX5dFk-QnezjdNHOnP9ErbTDg70tVUU+YA@mail.gmail.com>
- <c82fd8f0-5c0e-74d9-fbf3-b2a5c0dc3a1c@openssl.org>
-Message-ID: <75340ad1-0632-b853-c993-5097b98abf77@openssl.org>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Sun, 13 Nov 2016 16:59:32 -0500
+Subject: [PATCH V7 0/3] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1479074375-2629-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> Looking at the generated code, I see references to __ARMEB__ and
->>>> __ILP32__.
->>>>> The former is probably a bug,
->>>
->>> Oh! You mean that it should be __AARCH64EB__/__AARCH64EL__!
->>
->> Indeed:
->>
->> $ aarch64-linux-gnu-gcc -dM -E  - <<<""   |grep AARCH
->> #define __AARCH64_CMODEL_SMALL__ 1
->> #define __AARCH64EL__ 1
->>
->> $ aarch64-linux-gnu-gcc -dM -E -mbig-endian - <<<""   |grep AARCH
->> #define __AARCH64_CMODEL_SMALL__ 1
->> #define __AARCH64EB__ 1
-> 
-> As it turns out it wasn't really an overlook, at least not in OpenSSL
-> context, as I force __ARMEB__/__ARMEL__ in 64-bit build through
-> arm_arch.h, which in turn is shared between 32- and 64-bit builds. But
-> shared code should be preferred to be self-sufficient. It doesn't mean
-> that it won't be fixed, only that it wasn't really a bug in OpenSSL context.
-> 
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
-https://github.com/openssl/openssl/pull/1914.
+The first patch fixes IRQ probe deferral by allowing platform_device
+IRQ resources to be re-initialized if the ACPI core failed to find
+the IRQ domain during ACPI bus scan.
+
+The second patch adds support for ResourceSource/IRQ domain mapping
+when using Extended IRQ Resources with a specific ResourceSource.
+These changes are conditional on the ACPI_GENERIC_GSI config.
+
+The third patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
+
+Tested on top of v4.9-rc4.
+
+Changes V6 -> V7:
+* Consolidate changes for ResourceSource/IRQ domain mapping to the same
+  source file implementing the generic GSI support, making it conditional
+  on CONFIG_ACPI_GENERIC_GSI.
+* Eliminate some code duplication by implementing acpi_register_gsi in
+  terms of the new acpi_register_irq API.
+
+Changes V5 -> V6:
+* Drop probe table and on-demand probing based on resource_source
+* Add patch to fix probe deferral
+* Change back combiner driver to use the platform_device/platform_driver
+  APIs
+
+Agustin Vega-Frias (3):
+  ACPI: Retry IRQ conversion if it failed previously
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   2 +-
+ drivers/acpi/{gsi.c => irq.c}       |  98 +++++++++--
+ drivers/acpi/resource.c             |  88 ++++++++--
+ drivers/base/platform.c             |   9 +-
+ drivers/irqchip/Kconfig             |   8 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 337 ++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h                |  26 +++
+ 8 files changed, 541 insertions(+), 28 deletions(-)
+ rename drivers/acpi/{gsi.c => irq.c} (53%)
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
