@@ -1,998 +1,197 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 13 Nov 2016 17:34:44 +0800
-Subject: [PATCH 6/10] clk: sunxi-ng: Add A10s CCU driver
-In-Reply-To: <2110deed00d33bdb557efebe8f988976fbf5a440.1478625788.git-series.maxime.ripard@free-electrons.com>
-References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
- <2110deed00d33bdb557efebe8f988976fbf5a440.1478625788.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64cft9nWh13c+8jG8qhrD_RnVFc+s8btMTHbdDS155eQA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 13 Nov 2016 10:44:47 +0100
+Subject: Three different LED brightnesses (was Re: PM regression with LED
+ changes in next-20161109)
+In-Reply-To: <20161113091054.GA17790@amd>
+References: <5bd5333e-0dbb-6333-0a48-ca4d3a990f9c@samsung.com>
+ <20161110162925.GA28832@amd> <20161110175537.GF27724@atomide.com>
+ <20161110202910.GE28832@amd> <80b645e7-c3fa-8001-d9b1-c3c8c40394fd@gmail.com>
+ <20161111120114.GA1076@amd> <f7c9b2be-0003-f342-a4c7-802532faa424@gmail.com>
+ <d7ddbbb0-b99c-14a3-f462-3534b5ec67e6@redhat.com>
+ <20161111221224.GB10983@amd>
+ <3ca04742-6376-5a88-8d10-5b88fcd8f5e5@redhat.com>
+ <20161113091054.GA17790@amd>
+Message-ID: <3a3bb3f8-e54a-e7d0-da30-7f90b00c29b3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 9, 2016 at 1:23 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/Kconfig          |  10 +-
->  drivers/clk/sunxi-ng/Makefile         |   1 +-
->  drivers/clk/sunxi-ng/ccu-sun5i-a10s.c | 755 +++++++++++++++++++++++++++-
->  drivers/clk/sunxi-ng/ccu-sun5i.h      | 129 +++++-
->  4 files changed, 895 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i.h
+Hi,
+
+On 13-11-16 10:10, Pavel Machek wrote:
+> On Sat 2016-11-12 09:03:42, Hans de Goede wrote:
+>> Hi,
+>>
+>> On 11-11-16 23:12, Pavel Machek wrote:
+>>> Hi!
+>>>
+>>> Reason #1:
+>>>
+>>>>>> Hmm. So userland can read the LED state, and it can get _some_ value
+>>>>>> back, but it can not know if it is current state or not.
+>>
+>> That is not correct, the current behavior for eading the brightness
+>> atrribute is to always return the current state.
 >
-> diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-> index 8454c6e3dd65..e2becd36a1f9 100644
-> --- a/drivers/clk/sunxi-ng/Kconfig
-> +++ b/drivers/clk/sunxi-ng/Kconfig
-> @@ -64,6 +64,16 @@ config SUN50I_A64_CCU
->         select SUNXI_CCU_PHASE
->         default ARM64 && ARCH_SUNXI
+> No. (Because some hardware can't get back current state of
+> hardware-controlled leds, and because of blinking).
 >
-> +config SUN5I_A10S_CCU
-> +       bool "Support for the Allwinner A10s CCM"
-> +       select SUNXI_CCU_DIV
-> +       select SUNXI_CCU_NK
-> +       select SUNXI_CCU_NKM
-> +       select SUNXI_CCU_NM
-> +       select SUNXI_CCU_MP
-> +       select SUNXI_CCU_PHASE
-> +       default MACH_SUN5I
-> +
->  config SUN6I_A31_CCU
->         bool "Support for the Allwinner A31/A31s CCU"
->         select SUNXI_CCU_DIV
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index 24fbc6e5deb8..79e9a166dc83 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -19,6 +19,7 @@ obj-$(CONFIG_SUNXI_CCU_MP)    += ccu_mp.o
+>>>> Why a dedicated file? Are we going to mirror brightness here
+>>>> wrt r/w (show/store) behavior ? If not userspace now needs
+>>>> 2 open fds which is not really nice. If we are and we are
+>>>> not going to use poll for something else on brightness itself
+>>>> then why not just poll directly on brightness ?
+>>>
+>>> Reason #1 is above.
+>>
+>> See my reply above.
+>>
+>>> Reason #2 is "if userspace sees brightness file, it can not know if
+>>> the notifications on change actually work or not".
+>>
+>> If it needs to know that it can simply check the kernel version.
 >
->  # SoC support
->  obj-$(CONFIG_SUN50I_A64_CCU)   += ccu-sun50i-a64.o
-> +obj-$(CONFIG_SUN5I_A10S_CCU)   += ccu-sun5i-a10s.o
->  obj-$(CONFIG_SUN6I_A31_CCU)    += ccu-sun6i-a31.o
->  obj-$(CONFIG_SUN8I_A23_CCU)    += ccu-sun8i-a23.o
->  obj-$(CONFIG_SUN8I_A33_CCU)    += ccu-sun8i-a33.o
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c b/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
-> new file mode 100644
-> index 000000000000..94d9a5cbf60b
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun5i-a10s.c
-> @@ -0,0 +1,755 @@
-> +/*
-> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +
-> +#include "ccu_common.h"
-> +#include "ccu_reset.h"
-> +
-> +#include "ccu_div.h"
-> +#include "ccu_gate.h"
-> +#include "ccu_mp.h"
-> +#include "ccu_mult.h"
-> +#include "ccu_nk.h"
-> +#include "ccu_nkm.h"
-> +#include "ccu_nkmp.h"
-> +#include "ccu_nm.h"
-> +#include "ccu_phase.h"
-> +
-> +#include "ccu-sun5i.h"
-> +
-> +static struct ccu_nkmp pll_core_clk = {
-> +       .enable         = BIT(31),
-> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 5, 0),
-> +       .k              = _SUNXI_CCU_MULT(4, 2),
-> +       .m              = _SUNXI_CCU_DIV(0, 2),
-> +       .p              = _SUNXI_CCU_DIV(16, 2),
-> +       .common         = {
-> +               .reg            = 0x000,
-> +               .hw.init        = CLK_HW_INIT("pll-core",
-> +                                             "hosc",
-> +                                             &ccu_nkmp_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +/*
-> + * The Audio PLL is supposed to have 4 outputs: 3 fixed factors from
-> + * the base (2x, 4x and 8x), and one variable divider (the one true
-> + * pll audio).
-> + *
-> + * We don't have any need for the variable divider for now, so we just
-> + * hardcode it to match with the clock names
-> + */
-> +#define SUN5I_PLL_AUDIO_REG    0x008
-> +
-> +static struct ccu_nm pll_audio_base_clk = {
-> +       .enable         = BIT(31),
-> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 7, 0),
-> +       .m              = _SUNXI_CCU_DIV_OFFSET(0, 5, 0),
+> No. Because in case of hardware blinking we can't provide poll()
+> functionality.
 
-Nit: a note explaining that the datasheet is wrong would be nice.
+We have already decided that we do not want to wakeup poll()
+on blinking because it causes to many wakeups, and there is
+no use-case for waking poll for blinking (or for triggers).
 
-> +       .common         = {
-> +               .reg            = 0x008,
-> +               .hw.init        = CLK_HW_INIT("pll-audio-base",
-> +                                             "hosc",
-> +                                             &ccu_nm_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static struct ccu_mult pll_video0_clk = {
-> +       .enable         = BIT(31),
-> +       .mult           = _SUNXI_CCU_MULT_OFFSET_MIN_MAX(0, 7, 0, 9, 127),
-> +       .frac           = _SUNXI_CCU_FRAC(BIT(15), BIT(14),
-> +                                         270000000, 297000000),
-> +       .common         = {
-> +               .reg            = 0x010,
-> +               .features       = CCU_FEATURE_FRACTIONAL,
-> +               .hw.init        = CLK_HW_INIT("pll-video0",
-> +                                             "osc3M",
-> +                                             &ccu_mult_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static struct ccu_nkmp pll_ve_clk = {
-> +       .enable         = BIT(31),
-> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 5, 0),
-> +       .k              = _SUNXI_CCU_MULT(4, 2),
-> +       .m              = _SUNXI_CCU_DIV(0, 2),
-> +       .p              = _SUNXI_CCU_DIV(16, 2),
+> Plus, saying "simply check the kernel version" simply means you should
+> not be submitting patches to kernel... at all. (Hint... it also does
+> not work.)
 
-Any chance we'll support the bypass switch on this one?
+Lets keep things civil please.
 
-> +       .common         = {
-> +               .reg            = 0x018,
-> +               .hw.init        = CLK_HW_INIT("pll-ve",
-> +                                             "hosc",
-> +                                             &ccu_nkmp_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static struct ccu_nk pll_ddr_base_clk = {
-> +       .enable         = BIT(31),
-> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 5, 0),
-> +       .k              = _SUNXI_CCU_MULT(4, 2),
-> +       .common         = {
-> +               .reg            = 0x020,
-> +               .hw.init        = CLK_HW_INIT("pll-ddr-base",
-> +                                             "hosc",
-> +                                             &ccu_nk_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static SUNXI_CCU_M(pll_ddr_clk, "pll-ddr", "pll-ddr-base", 0x020, 0, 2, 0);
+>>> Reason #3 is that you broke Tony's system. Polling does not make sense
+>>> when trigger such as "CPU in use" is active.
+>>
+>> Have you seen v4 of my patch? It fixes this while keeping the
+>> polling on the brightness attribute itself, it basically goes
+>> back (more or less) to v1 of my patch which did not have this
+>> problem. I never wanted notification of trigger / blinking
+>> changes because I already feared Tony's problem would happen.
+>
+> Have you seen v67123 of my latest facebook post? It explains why you
+> are completely wrong.
 
-Maybe we should set CLK_IS_CRITICAL on this one as well... in case the
-bootloader uses pll-periph for mbus, and none of the dram gates are enabled.
+Lets keep things civil please.
 
-> +
-> +static struct ccu_div pll_ddr_other_clk = {
-> +       .div            = _SUNXI_CCU_DIV_FLAGS(16, 2, CLK_DIVIDER_POWER_OF_TWO),
-> +
-> +       .common         = {
-> +               .reg            = 0x020,
-> +               .hw.init        = CLK_HW_INIT("pll-ddr-other", "pll-ddr-base",
-> +                                             &ccu_div_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static struct ccu_nk pll_periph_clk = {
-> +       .enable         = BIT(31),
-> +       .n              = _SUNXI_CCU_MULT_OFFSET(8, 5, 0),
-> +       .k              = _SUNXI_CCU_MULT(4, 2),
-> +       .fixed_post_div = 2,
-> +       .common         = {
-> +               .reg            = 0x028,
-> +               .features       = CCU_FEATURE_FIXED_POSTDIV,
-> +               .hw.init        = CLK_HW_INIT("pll-periph",
-> +                                             "hosc",
-> +                                             &ccu_nk_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static struct ccu_mult pll_video1_clk = {
-> +       .enable         = BIT(31),
-> +       .mult           = _SUNXI_CCU_MULT_OFFSET_MIN_MAX(0, 7, 0, 9, 127),
-> +       .frac           = _SUNXI_CCU_FRAC(BIT(15), BIT(14),
-> +                                 270000000, 297000000),
-> +       .common         = {
-> +               .reg            = 0x030,
-> +               .features       = CCU_FEATURE_FRACTIONAL,
-> +               .hw.init        = CLK_HW_INIT("pll-video1",
-> +                                             "osc3M",
-> +                                             &ccu_mult_ops,
-> +                                             0),
-> +       },
-> +};
-> +
-> +static SUNXI_CCU_GATE(hosc_clk,        "hosc", "osc24M", 0x050, BIT(0), 0);
+>>> Reason #4 is that there are really two brightnesses:
+>>>
+>>> 1) maximum brightness trigger is going to use
+>>>
+>>> 2) current brightness
+>>>
+>>> Currently writing to "brightness" file changes 1), but reading returns
+>>> 2) when available.
+>>
+>> Right and Jacek has already said that we cannot change the
+>> reading behavior on the brightness file because of ABI concerns.
+>
+> Until there's user that actually reads that, ABI can be fixed. Given
+> that it basically returns random value,
 
-Why the extra "hosc" clock here? You should probably just internalize "osc24M".
+Jacek has pretty much nacked fixing this because of ABI concerns,
+so I see no use in further discussing changing the read behavior
+of the existing brightness sysfs attribute.
 
-> +
-> +#define SUN5I_AHB_REG  0x054
-> +static const char * const cpu_parents[] = { "osc32k", "hosc",
-> +                                           "pll-core" , "pll-periph" };
-> +static const struct ccu_mux_fixed_prediv cpu_predivs[] = {
-> +       { .index = 3, .div = 3, },
-> +};
-> +static struct ccu_mux cpu_clk = {
-> +       .mux            = {
-> +               .shift          = 16,
-> +               .width          = 2,
-> +               .fixed_predivs  = cpu_predivs,
-> +               .n_predivs      = ARRAY_SIZE(cpu_predivs),
-> +       },
-> +       .common         = {
-> +               .reg            = 0x054,
-> +               .features       = CCU_FEATURE_FIXED_PREDIV,
-> +               .hw.init        = CLK_HW_INIT_PARENTS("cpu",
-> +                                                     cpu_parents,
-> +                                                     &ccu_mux_ops,
-> +                                                     CLK_IS_CRITICAL),
-> +       }
-> +};
-> +
-> +static SUNXI_CCU_M(axi_clk, "axi", "cpu", 0x054, 0, 2, 0);
-> +
-> +static const char * const ahb_parents[] = { "axi" , "cpu", "pll-periph" };
-> +static struct ccu_div ahb_clk = {
-> +       .div            = _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
-> +       .mux            = _SUNXI_CCU_MUX(6, 2),
+>>> So, feel free to propose better interface. One that solves #1..#4
+>>> above.
+>>
+>> Proposal 1:
+>>
+>> v4 of my patch, see the list. It solves all but #4, which
+>> is out of scope for my patch, feel free to submit a patch to
+>> solve #4 (with a new sysfs attr).
+>
+> NAK on that. (And it does not solve #1 and #2 at least.)
+>
+>> Proposal 2:
+>>
+>> Add a new "user_brightness" file, which shows the last brightness
+>> as set by the user, this would show the read behavior we really
+>> want of brightness: show the real brightness when not blinking /
+>> triggers are active, show the brightness used when on when
+>> blinking / triggers are active.
+>
+> No, that's just adding more mess on the system.
+>
+> Here's better proposal:
+>
+> brightness (write): what we do today. (Mess, but too late to change it)
+> 	   (read): -Esomething or what we do today (if someone
+> 	   	   	       	       	  	   acutally uses it)
 
-There's a fixed /2 pre-divider on pll-periph.
+As said Jacek has already nacked any changes to read behavior.
 
-> +
-> +       .common         = {
-> +               .reg            = 0x054,
-> +               .hw.init        = CLK_HW_INIT_PARENTS("ahb",
-> +                                                     ahb_parents,
-> +                                                     &ccu_div_ops,
-> +                                                     0),
-> +       },
-> +};
-> +
-> +static struct clk_div_table apb0_div_table[] = {
-> +       { .val = 0, .div = 2 },
-> +       { .val = 1, .div = 2 },
-> +       { .val = 2, .div = 4 },
-> +       { .val = 3, .div = 8 },
-> +       { /* Sentinel */ },
-> +};
-> +static SUNXI_CCU_DIV_TABLE(apb0_clk, "apb0", "ahb",
-> +                          0x054, 8, 2, apb0_div_table, 0);
-> +
-> +static const char * const apb1_parents[] = { "hosc", "pll-periph", "osc32k" };
-> +static SUNXI_CCU_MP_WITH_MUX(apb1_clk, "apb1", apb1_parents, 0x058,
-> +                            0, 5,      /* M */
-> +                            16, 2,     /* P */
-> +                            24, 2,     /* mux */
-> +                            0);
-> +
-> +static SUNXI_CCU_GATE(axi_dram_clk,    "axi-dram",     "axi",
-> +                     0x05c, BIT(0), 0);
-> +
-> +static SUNXI_CCU_GATE(ahb_otg_clk,     "ahb-otg",      "ahb",
-> +                     0x060, BIT(0), 0);
-> +static SUNXI_CCU_GATE(ahb_ehci_clk,    "ahb-ehci",     "ahb",
-> +                     0x060, BIT(1), 0);
-> +static SUNXI_CCU_GATE(ahb_ohci_clk,    "ahb-ohci",     "ahb",
-> +                     0x060, BIT(2), 0);
-> +static SUNXI_CCU_GATE(ahb_ss_clk,      "ahb-ss",       "ahb",
-> +                     0x060, BIT(5), 0);
-> +static SUNXI_CCU_GATE(ahb_dma_clk,     "ahb-dma",      "ahb",
-> +                     0x060, BIT(6), 0);
-> +static SUNXI_CCU_GATE(ahb_bist_clk,    "ahb-bist",     "ahb",
-> +                     0x060, BIT(6), 0);
-> +static SUNXI_CCU_GATE(ahb_mmc0_clk,    "ahb-mmc0",     "ahb",
-> +                     0x060, BIT(8), 0);
-> +static SUNXI_CCU_GATE(ahb_mmc1_clk,    "ahb-mmc1",     "ahb",
-> +                     0x060, BIT(9), 0);
-> +static SUNXI_CCU_GATE(ahb_mmc2_clk,    "ahb-mmc2",     "ahb",
-> +                     0x060, BIT(10), 0);
-> +static SUNXI_CCU_GATE(ahb_nand_clk,    "ahb-nand",     "ahb",
-> +                     0x060, BIT(13), 0);
-> +static SUNXI_CCU_GATE(ahb_sdram_clk,   "ahb-sdram",    "ahb",
-> +                     0x060, BIT(14), CLK_IS_CRITICAL);
-> +static SUNXI_CCU_GATE(ahb_emac_clk,    "ahb-emac",     "ahb",
-> +                     0x060, BIT(17), 0);
-> +static SUNXI_CCU_GATE(ahb_ts_clk,      "ahb-ts",       "ahb",
-> +                     0x060, BIT(18), 0);
-> +static SUNXI_CCU_GATE(ahb_spi0_clk,    "ahb-spi0",     "ahb",
-> +                     0x060, BIT(20), 0);
-> +static SUNXI_CCU_GATE(ahb_spi1_clk,    "ahb-spi1",     "ahb",
-> +                     0x060, BIT(21), 0);
-> +static SUNXI_CCU_GATE(ahb_spi2_clk,    "ahb-spi2",     "ahb",
-> +                     0x060, BIT(22), 0);
-> +static SUNXI_CCU_GATE(ahb_gps_clk,     "ahb-gps",      "ahb",
-> +                     0x060, BIT(26), 0);
-> +static SUNXI_CCU_GATE(ahb_hstimer_clk, "ahb-hstimer",  "ahb",
-> +                     0x060, BIT(28), 0);
-> +
-> +static SUNXI_CCU_GATE(ahb_ve_clk,      "ahb-ve",       "ahb",
-> +                     0x064, BIT(0), 0);
-> +static SUNXI_CCU_GATE(ahb_tve_clk,     "ahb-tve",      "ahb",
-> +                     0x064, BIT(2), 0);
-> +static SUNXI_CCU_GATE(ahb_lcd_clk,     "ahb-lcd",      "ahb",
-> +                     0x064, BIT(4), 0);
-> +static SUNXI_CCU_GATE(ahb_csi_clk,     "ahb-csi",      "ahb",
-> +                     0x064, BIT(8), 0);
-> +static SUNXI_CCU_GATE(ahb_hdmi_clk,    "ahb-hdmi",     "ahb",
-> +                     0x064, BIT(11), 0);
-> +static SUNXI_CCU_GATE(ahb_de_be_clk,   "ahb-de-be",    "ahb",
-> +                     0x064, BIT(12), 0);
-> +static SUNXI_CCU_GATE(ahb_de_fe_clk,   "ahb-de-fe",    "ahb",
-> +                     0x064, BIT(14), 0);
-> +static SUNXI_CCU_GATE(ahb_iep_clk,     "ahb-iep",      "ahb",
-> +                     0x064, BIT(19), 0);
-> +static SUNXI_CCU_GATE(ahb_gpu_clk,     "ahb-gpu",      "ahb",
-> +                     0x064, BIT(20), 0);
-> +
-> +static SUNXI_CCU_GATE(apb0_codec_clk,  "apb0-codec",   "apb0",
-> +                     0x068, BIT(0), 0);
-> +static SUNXI_CCU_GATE(apb0_i2s_clk,    "apb0-i2s",     "apb0",
-> +                     0x068, BIT(3), 0);
-> +static SUNXI_CCU_GATE(apb0_pio_clk,    "apb0-pio",     "apb0",
-> +                     0x068, BIT(5), 0);
-> +static SUNXI_CCU_GATE(apb0_ir_clk,     "apb0-ir",      "apb0",
-> +                     0x068, BIT(6), 0);
-> +static SUNXI_CCU_GATE(apb0_keypad_clk, "apb0-keypad",  "apb0",
-> +                     0x068, BIT(10), 0);
-> +
-> +static SUNXI_CCU_GATE(apb1_i2c0_clk,   "apb1-i2c0",    "apb1",
-> +                     0x06c, BIT(0), 0);
-> +static SUNXI_CCU_GATE(apb1_i2c1_clk,   "apb1-i2c1",    "apb1",
-> +                     0x06c, BIT(1), 0);
-> +static SUNXI_CCU_GATE(apb1_i2c2_clk,   "apb1-i2c2",    "apb1",
-> +                     0x06c, BIT(2), 0);
-> +static SUNXI_CCU_GATE(apb1_uart0_clk,  "apb1-uart0",   "apb1",
-> +                     0x06c, BIT(16), 0);
-> +static SUNXI_CCU_GATE(apb1_uart1_clk,  "apb1-uart1",   "apb1",
-> +                     0x06c, BIT(17), 0);
-> +static SUNXI_CCU_GATE(apb1_uart2_clk,  "apb1-uart2",   "apb1",
-> +                     0x06c, BIT(18), 0);
-> +static SUNXI_CCU_GATE(apb1_uart3_clk,  "apb1-uart3",   "apb1",
-> +                     0x06c, BIT(19), 0);
-> +
-> +static const char * const mod0_default_parents[] = { "hosc", "pll-periph",
-> +                                                    "pll-ddr-other" };
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mod0_default_parents, 0x088,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mod0_default_parents, 0x08c,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents, 0x090,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(ts_clk, "ts", mod0_default_parents, 0x098,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(ss_clk, "ss", mod0_default_parents, 0x09c,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(spi0_clk, "spi0", mod0_default_parents, 0x0a0,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents, 0x0a4,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(spi2_clk, "spi2", mod0_default_parents, 0x0a8,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(ir_clk, "ir", mod0_default_parents, 0x0b0,
-> +                                 0, 4,         /* M */
-> +                                 16, 2,        /* P */
-> +                                 24, 2,        /* mux */
-> +                                 BIT(31),      /* gate */
-> +                                 0);
-> +
-> +static const char * const i2s_parents[] = { "pll-audio-8x", "pll-audio-4x",
-> +                                           "pll-audio-2x", "pll-audio" };
-> +static SUNXI_CCU_MUX_WITH_GATE(i2s_clk, "i2s", i2s_parents,
-> +                              0x0b8, 16, 2, BIT(31), 0);
+>            (poll): -Esomething
 
-CLK_SET_RATE_PARENT please.
+Making poll() on sysfs attributes return -Esomething is not possible,
+the internal sysfs API does not allow this.
 
-> +
-> +static const char * const keypad_parents[] = { "hosc", "losc"};
-> +static const u8 keypad_table[] = { 0, 2 };
-> +static struct ccu_mp keypad_clk = {
-> +       .enable         = BIT(31),
-> +       .m              = _SUNXI_CCU_DIV(8, 5),
-> +       .p              = _SUNXI_CCU_DIV(20, 2),
-> +       .mux            = _SUNXI_CCU_MUX_TABLE(24, 2, keypad_table),
-> +
-> +       .common         = {
-> +               .reg            = 0x0c4,
-> +               .hw.init        = CLK_HW_INIT_PARENTS("keypad",
-> +                                                     keypad_parents,
-> +                                                     &ccu_mp_ops,
-> +                                                     0),
-> +       },
-> +};
-> +
-> +static SUNXI_CCU_GATE(usb_ohci_clk,    "usb-ohci",     "pll-periph",
-> +                     0x0cc, BIT(6), 0);
-> +static SUNXI_CCU_GATE(usb_phy0_clk,    "usb-phy0",     "pll-periph",
-> +                     0x0cc, BIT(8), 0);
-> +static SUNXI_CCU_GATE(usb_phy1_clk,    "usb-phy1",     "pll-periph",
-> +                     0x0cc, BIT(9), 0);
-> +
-> +static const char * const gps_parents[] = { "hosc", "pll-periph",
-> +                                           "pll-video1", "pll-ve" };
-> +static SUNXI_CCU_M_WITH_MUX_GATE(gps_clk, "gps", gps_parents,
-> +                                0x0d0, 0, 3, 24, 2, BIT(31), 0);
-> +
-> +static SUNXI_CCU_GATE(dram_ve_clk,     "dram-ve",      "pll-ddr",
-> +                     0x100, BIT(0), 0);
-> +static SUNXI_CCU_GATE(dram_csi_clk,    "dram-csi",     "pll-ddr",
-> +                     0x100, BIT(1), 0);
-> +static SUNXI_CCU_GATE(dram_ts_clk,     "dram-ts",      "pll-ddr",
-> +                     0x100, BIT(3), 0);
-> +static SUNXI_CCU_GATE(dram_tve_clk,    "dram-tve",     "pll-ddr",
-> +                     0x100, BIT(5), 0);
-> +static SUNXI_CCU_GATE(dram_de_fe_clk,  "dram-de-fe",   "pll-ddr",
-> +                     0x100, BIT(25), 0);
-> +static SUNXI_CCU_GATE(dram_de_be_clk,  "dram-de-be",   "pll-ddr",
-> +                     0x100, BIT(26), 0);
-> +static SUNXI_CCU_GATE(dram_ace_clk,    "dram-ace",     "pll-ddr",
-> +                     0x100, BIT(29), 0);
-> +static SUNXI_CCU_GATE(dram_iep_clk,    "dram-iep",     "pll-ddr",
-> +                     0x100, BIT(31), 0);
-> +
-> +static const char * const de_parents[] = { "pll-video0", "pll-video1",
-> +                                          "pll-ddr-other" };
-> +static SUNXI_CCU_M_WITH_MUX_GATE(de_be_clk, "de-be", de_parents,
-> +                                0x104, 0, 4, 24, 2, BIT(31), 0);
-> +
-> +static SUNXI_CCU_M_WITH_MUX_GATE(de_fe_clk, "de-fe", de_parents,
-> +                                0x10c, 0, 4, 24, 2, BIT(31), 0);
-> +
-> +static const char * const tcon_parents[] = { "pll-video0", "pll-video1",
-> +                                            "pll-video0-2x", "pll-video1-2x" };
-> +static SUNXI_CCU_MUX_WITH_GATE(tcon_ch0_clk, "tcon-ch0-sclk", tcon_parents,
-> +                              0x118, 24, 2, BIT(31), 0);
+> current_brightness (write): -Esomething, or maybe change brightness
+> 		   for triggers that can work with that
+>               (read, poll): if the current trigger can get current
+> 	             state of led, do it, otherwise -Esomething...
+> 		     or maybe file should be simply hidden from sysfs.
 
-CLK_SET_RATE_PARENT?
+So write is -EINVAL and read is the same as what brightness currently does,
+so I see no use in introducing this new file.
 
-> +
-> +static SUNXI_CCU_M_WITH_MUX_GATE(tcon_ch1_sclk2_clk, "tcon-ch1-sclk2",
-> +                                tcon_parents,
-> +                                0x12c, 0, 4, 24, 2, BIT(31), 0);
+Also this reintroduces all the issues of v2 of my poll() patch since the
+CPU load problem is not actually in waking up userspace, it is in
+even checking if there are any userspace waiters. TLDR we simply cannot
+have poll behavior where we need to try and wakeup userspace on
+every blink / every time a trigger triggers.
 
-CLK_SET_RATE_PARENT?
+> trigger_max_brightness (read,write): change the maximum brightness for
+> 		       a trigger.
+> 	       (poll): -Esomething
 
-> +
-> +static SUNXI_CCU_M_WITH_GATE(tcon_ch1_sclk1_clk, "tcon-ch1-sclk1", "tcon-ch1-sclk2",
-> +                            0x12c, 11, 1, BIT(15), 0);
+The write behavior here is the same as what brightness currently does
+and the read behavior is that of what I suggested for user_brightness,
+minus that you've not definied the read behavior for when no trigger /
+blinking is active.
 
-CLK_SET_RATE_PARENT?
+In itself I would be fine with this file to work around the read
+behavior of trigger_max_brightness, but you've not solved the
+polling problem.
 
-> +
-> +static const char * const csi_parents[] = { "hosc", "pll-video0", "pll-video1",
-> +                                           "pll-video0-2x", "pll-video1-2x" };
-> +static const u8 csi_table[] = { 0, 1, 2, 5, 6 };
-> +static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(csi_clk, "csi",
-> +                                      csi_parents, csi_table,
-> +                                      0x134, 0, 5, 24, 2, BIT(31), 0);
+We've 2 sorts of brightness really:
 
-Do you know if CSI needs to change the module clock?
+1) transient brightness, aka current brightness, when blinking or
+triggers are used this will switch many times a second
+between off and some on level.
 
-> +
-> +static SUNXI_CCU_GATE(ve_clk,          "ve",           "pll-ve",
-> +                     0x13c, BIT(31), 0);
+2) non-transient brightness, for non blinking leds this is the
+actual brightness, for blinking leds this is the brightness
+level used when the led is on.
 
-CLK_SET_RATE_PARENT?
+Now we want to have a sysfs attribute reflecting 2, so that
+userspace can poll on that, both for my use-case as well as so
+that userspace process a can detect changes made by writing to
+the brightness file by process b.
 
-> +
-> +static SUNXI_CCU_GATE(codec_clk,       "codec",        "pll-audio",
-> +                     0x140, BIT(31), 0);
+So maybe we need to simply call the new attribute
+non_transient_brightness instead of user_brightness?
 
-CLK_SET_RATE_PARENT?
+> If you have hardware changing the brightness behind kernel's back,
+> that should be modelled as a trigger. Userspace should know
+> there's hardware changing it autonomously ... there should be
+> "hardware-keylight-brightness" trigger, probably impossible to change
+> (depends on hardware behaviour).
+>
+> On thinkpad, for example, for many LEDs kernel can select either
+> "hardware drives the LED", but then current_brightness is unavailable,
+> or "kernel drives the LED", but then hardware does not touch the led
+> at all.
 
-> +
-> +static SUNXI_CCU_GATE(avs_clk,         "avs",          "hosc",
-> +                     0x144, BIT(31), 0);
-> +
-> +static const char * const hdmi_parents[] = { "pll-video0", "pll-video0-2x" };
-> +static const u8 hdmi_table[] = { 0, 2 };
-> +static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(hdmi_clk, "hdmi",
-> +                                      hdmi_parents, hdmi_table,
-> +                                      0x150, 0, 4, 24, 2, BIT(31), 0);
+Whether or not the hardware changing the brightness behind kernel's
+should be modeled as a trigger is really outside of the scope of
+this discussion, as it is not related to the issues with the
+brightness atrribute / polling on the brightness attribute.
 
-CLK_SET_RATE_PARENT?
+Regards,
 
-> +
-> +static const char * const gpu_parents[] = { "pll-video0", "pll-ve",
-> +                                           "pll-ddr-other", "pll-video1",
-> +                                           "pll-video1-2x" };
-> +static SUNXI_CCU_M_WITH_MUX_GATE(gpu_clk, "gpu", gpu_parents,
-> +                                0x154, 0, 4, 24, 3, BIT(31), 0);
-> +
-> +static const char * const mbus_parents[] = { "hosc", "pll-periph", "pll-ddr" };
-> +static SUNXI_CCU_MP_WITH_MUX_GATE(mbus_clk, "mbus", mbus_parents,
-> +                                 0x15c, 0, 4, 16, 2, 24, 2, BIT(31), CLK_IS_CRITICAL);
-> +
-> +static SUNXI_CCU_GATE(iep_clk,         "iep",          "de-be",
-> +                     0x160, BIT(31), 0);
-> +
-> +static struct ccu_common *sun5i_a10s_ccu_clks[] = {
-> +       &hosc_clk.common,
-> +       &pll_core_clk.common,
-> +       &pll_audio_base_clk.common,
-> +       &pll_video0_clk.common,
-> +       &pll_ve_clk.common,
-> +       &pll_ddr_base_clk.common,
-> +       &pll_ddr_clk.common,
-> +       &pll_ddr_other_clk.common,
-> +       &pll_periph_clk.common,
-> +       &pll_video1_clk.common,
-> +       &cpu_clk.common,
-> +       &axi_clk.common,
-> +       &ahb_clk.common,
-> +       &apb0_clk.common,
-> +       &apb1_clk.common,
-> +       &axi_dram_clk.common,
-> +       &ahb_otg_clk.common,
-> +       &ahb_ehci_clk.common,
-> +       &ahb_ohci_clk.common,
-> +       &ahb_ss_clk.common,
-> +       &ahb_dma_clk.common,
-> +       &ahb_bist_clk.common,
-> +       &ahb_mmc0_clk.common,
-> +       &ahb_mmc1_clk.common,
-> +       &ahb_mmc2_clk.common,
-> +       &ahb_nand_clk.common,
-> +       &ahb_sdram_clk.common,
-> +       &ahb_emac_clk.common,
-> +       &ahb_ts_clk.common,
-> +       &ahb_spi0_clk.common,
-> +       &ahb_spi1_clk.common,
-> +       &ahb_spi2_clk.common,
-> +       &ahb_gps_clk.common,
-> +       &ahb_hstimer_clk.common,
-> +       &ahb_ve_clk.common,
-> +       &ahb_tve_clk.common,
-> +       &ahb_lcd_clk.common,
-> +       &ahb_csi_clk.common,
-> +       &ahb_hdmi_clk.common,
-> +       &ahb_de_be_clk.common,
-> +       &ahb_de_fe_clk.common,
-> +       &ahb_iep_clk.common,
-> +       &ahb_gpu_clk.common,
-> +       &apb0_codec_clk.common,
-> +       &apb0_i2s_clk.common,
-> +       &apb0_pio_clk.common,
-> +       &apb0_ir_clk.common,
-> +       &apb0_keypad_clk.common,
-> +       &apb1_i2c0_clk.common,
-> +       &apb1_i2c1_clk.common,
-> +       &apb1_i2c2_clk.common,
-> +       &apb1_uart0_clk.common,
-> +       &apb1_uart1_clk.common,
-> +       &apb1_uart2_clk.common,
-> +       &apb1_uart3_clk.common,
-> +       &nand_clk.common,
-> +       &mmc0_clk.common,
-> +       &mmc1_clk.common,
-> +       &mmc2_clk.common,
-> +       &ts_clk.common,
-> +       &ss_clk.common,
-> +       &spi0_clk.common,
-> +       &spi1_clk.common,
-> +       &spi2_clk.common,
-> +       &ir_clk.common,
-> +       &i2s_clk.common,
-> +       &keypad_clk.common,
-> +       &usb_ohci_clk.common,
-> +       &usb_phy0_clk.common,
-> +       &usb_phy1_clk.common,
-> +       &gps_clk.common,
-> +       &dram_ve_clk.common,
-> +       &dram_csi_clk.common,
-> +       &dram_ts_clk.common,
-> +       &dram_tve_clk.common,
-> +       &dram_de_fe_clk.common,
-> +       &dram_de_be_clk.common,
-> +       &dram_ace_clk.common,
-> +       &dram_iep_clk.common,
-> +       &de_be_clk.common,
-> +       &de_fe_clk.common,
-> +       &tcon_ch0_clk.common,
-> +       &tcon_ch1_sclk2_clk.common,
-> +       &tcon_ch1_sclk1_clk.common,
-> +       &csi_clk.common,
-> +       &ve_clk.common,
-> +       &codec_clk.common,
-> +       &avs_clk.common,
-> +       &hdmi_clk.common,
-> +       &gpu_clk.common,
-> +       &mbus_clk.common,
-> +       &iep_clk.common,
-> +};
-> +
-> +static CLK_FIXED_FACTOR(osc3M_clk, "osc3M", "hosc", 8, 1, 0);
-> +/* We hardcode the divider to 4 for now */
-> +static CLK_FIXED_FACTOR(pll_audio_clk, "pll-audio",
-> +                       "pll-audio-base", 4, 1, CLK_SET_RATE_PARENT);
-> +static CLK_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
-> +                       "pll-audio-base", 2, 1, CLK_SET_RATE_PARENT);
-> +static CLK_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
-> +                       "pll-audio-base", 1, 1, CLK_SET_RATE_PARENT);
-> +static CLK_FIXED_FACTOR(pll_audio_8x_clk, "pll-audio-8x",
-> +                       "pll-audio-base", 1, 2, CLK_SET_RATE_PARENT);
-> +static CLK_FIXED_FACTOR(pll_video0_2x_clk, "pll-video0-2x",
-> +                       "pll-video0", 1, 2, CLK_SET_RATE_PARENT);
-> +static CLK_FIXED_FACTOR(pll_video1_2x_clk, "pll-video1-2x",
-> +                       "pll-video1", 1, 2, CLK_SET_RATE_PARENT);
-> +
-> +static struct clk_hw_onecell_data sun5i_a10s_hw_clks = {
-> +       .hws    = {
-> +               [CLK_HOSC]              = &hosc_clk.common.hw,
-> +               [CLK_OSC3M]             = &osc3M_clk.hw,
-> +               [CLK_PLL_CORE]          = &pll_core_clk.common.hw,
-> +               [CLK_PLL_AUDIO_BASE]    = &pll_audio_base_clk.common.hw,
-> +               [CLK_PLL_AUDIO]         = &pll_audio_clk.hw,
-> +               [CLK_PLL_AUDIO_2X]      = &pll_audio_2x_clk.hw,
-> +               [CLK_PLL_AUDIO_4X]      = &pll_audio_4x_clk.hw,
-> +               [CLK_PLL_AUDIO_8X]      = &pll_audio_8x_clk.hw,
-> +               [CLK_PLL_VIDEO0]        = &pll_video0_clk.common.hw,
-> +               [CLK_PLL_VIDEO0_2X]     = &pll_video0_2x_clk.hw,
-> +               [CLK_PLL_VE]            = &pll_ve_clk.common.hw,
-> +               [CLK_PLL_DDR_BASE]      = &pll_ddr_base_clk.common.hw,
-> +               [CLK_PLL_DDR]           = &pll_ddr_clk.common.hw,
-> +               [CLK_PLL_DDR_OTHER]     = &pll_ddr_other_clk.common.hw,
-> +               [CLK_PLL_PERIPH]        = &pll_periph_clk.common.hw,
-> +               [CLK_PLL_VIDEO1]        = &pll_video1_clk.common.hw,
-> +               [CLK_PLL_VIDEO1_2X]     = &pll_video1_2x_clk.hw,
-> +               [CLK_CPU]               = &cpu_clk.common.hw,
-> +               [CLK_AXI]               = &axi_clk.common.hw,
-> +               [CLK_AHB]               = &ahb_clk.common.hw,
-> +               [CLK_APB0]              = &apb0_clk.common.hw,
-> +               [CLK_APB1]              = &apb1_clk.common.hw,
-> +               [CLK_DRAM_AXI]          = &axi_dram_clk.common.hw,
-> +               [CLK_AHB_OTG]           = &ahb_otg_clk.common.hw,
-> +               [CLK_AHB_EHCI]          = &ahb_ehci_clk.common.hw,
-> +               [CLK_AHB_OHCI]          = &ahb_ohci_clk.common.hw,
-> +               [CLK_AHB_SS]            = &ahb_ss_clk.common.hw,
-> +               [CLK_AHB_DMA]           = &ahb_dma_clk.common.hw,
-> +               [CLK_AHB_BIST]          = &ahb_bist_clk.common.hw,
-> +               [CLK_AHB_MMC0]          = &ahb_mmc0_clk.common.hw,
-> +               [CLK_AHB_MMC1]          = &ahb_mmc1_clk.common.hw,
-> +               [CLK_AHB_MMC2]          = &ahb_mmc2_clk.common.hw,
-> +               [CLK_AHB_NAND]          = &ahb_nand_clk.common.hw,
-> +               [CLK_AHB_SDRAM]         = &ahb_sdram_clk.common.hw,
-> +               [CLK_AHB_EMAC]          = &ahb_emac_clk.common.hw,
-> +               [CLK_AHB_TS]            = &ahb_ts_clk.common.hw,
-> +               [CLK_AHB_SPI0]          = &ahb_spi0_clk.common.hw,
-> +               [CLK_AHB_SPI1]          = &ahb_spi1_clk.common.hw,
-> +               [CLK_AHB_SPI2]          = &ahb_spi2_clk.common.hw,
-> +               [CLK_AHB_GPS]           = &ahb_gps_clk.common.hw,
-> +               [CLK_AHB_HSTIMER]       = &ahb_hstimer_clk.common.hw,
-> +               [CLK_AHB_VE]            = &ahb_ve_clk.common.hw,
-> +               [CLK_AHB_TVE]           = &ahb_tve_clk.common.hw,
-> +               [CLK_AHB_LCD]           = &ahb_lcd_clk.common.hw,
-> +               [CLK_AHB_CSI]           = &ahb_csi_clk.common.hw,
-> +               [CLK_AHB_HDMI]          = &ahb_hdmi_clk.common.hw,
-> +               [CLK_AHB_DE_BE]         = &ahb_de_be_clk.common.hw,
-> +               [CLK_AHB_DE_FE]         = &ahb_de_fe_clk.common.hw,
-> +               [CLK_AHB_IEP]           = &ahb_iep_clk.common.hw,
-> +               [CLK_AHB_GPU]           = &ahb_gpu_clk.common.hw,
-> +               [CLK_APB0_CODEC]        = &apb0_codec_clk.common.hw,
-> +               [CLK_APB0_I2S]          = &apb0_i2s_clk.common.hw,
-> +               [CLK_APB0_PIO]          = &apb0_pio_clk.common.hw,
-> +               [CLK_APB0_IR]           = &apb0_ir_clk.common.hw,
-> +               [CLK_APB0_KEYPAD]       = &apb0_keypad_clk.common.hw,
-> +               [CLK_APB1_I2C0]         = &apb1_i2c0_clk.common.hw,
-> +               [CLK_APB1_I2C1]         = &apb1_i2c1_clk.common.hw,
-> +               [CLK_APB1_I2C2]         = &apb1_i2c2_clk.common.hw,
-> +               [CLK_APB1_UART0]        = &apb1_uart0_clk.common.hw,
-> +               [CLK_APB1_UART1]        = &apb1_uart1_clk.common.hw,
-> +               [CLK_APB1_UART2]        = &apb1_uart2_clk.common.hw,
-> +               [CLK_APB1_UART3]        = &apb1_uart3_clk.common.hw,
-> +               [CLK_NAND]              = &nand_clk.common.hw,
-> +               [CLK_MMC0]              = &mmc0_clk.common.hw,
-> +               [CLK_MMC1]              = &mmc1_clk.common.hw,
-> +               [CLK_MMC2]              = &mmc2_clk.common.hw,
-> +               [CLK_TS]                = &ts_clk.common.hw,
-> +               [CLK_SS]                = &ss_clk.common.hw,
-> +               [CLK_SPI0]              = &spi0_clk.common.hw,
-> +               [CLK_SPI1]              = &spi1_clk.common.hw,
-> +               [CLK_SPI2]              = &spi2_clk.common.hw,
-> +               [CLK_IR]                = &ir_clk.common.hw,
-> +               [CLK_I2S]               = &i2s_clk.common.hw,
-> +               [CLK_KEYPAD]            = &keypad_clk.common.hw,
-> +               [CLK_USB_OHCI]          = &usb_ohci_clk.common.hw,
-> +               [CLK_USB_PHY0]          = &usb_phy0_clk.common.hw,
-> +               [CLK_USB_PHY1]          = &usb_phy1_clk.common.hw,
-> +               [CLK_GPS]               = &gps_clk.common.hw,
-> +               [CLK_DRAM_VE]           = &dram_ve_clk.common.hw,
-> +               [CLK_DRAM_CSI]          = &dram_csi_clk.common.hw,
-> +               [CLK_DRAM_TS]           = &dram_ts_clk.common.hw,
-> +               [CLK_DRAM_TVE]          = &dram_tve_clk.common.hw,
-> +               [CLK_DRAM_DE_FE]        = &dram_de_fe_clk.common.hw,
-> +               [CLK_DRAM_DE_BE]        = &dram_de_be_clk.common.hw,
-> +               [CLK_DRAM_ACE]          = &dram_ace_clk.common.hw,
-> +               [CLK_DRAM_IEP]          = &dram_iep_clk.common.hw,
-> +               [CLK_DE_BE]             = &de_be_clk.common.hw,
-> +               [CLK_DE_FE]             = &de_fe_clk.common.hw,
-> +               [CLK_TCON_CH0]          = &tcon_ch0_clk.common.hw,
-> +               [CLK_TCON_CH1_SCLK]     = &tcon_ch1_sclk2_clk.common.hw,
-> +               [CLK_TCON_CH1]          = &tcon_ch1_sclk1_clk.common.hw,
-> +               [CLK_CSI]               = &csi_clk.common.hw,
-> +               [CLK_VE]                = &ve_clk.common.hw,
-> +               [CLK_CODEC]             = &codec_clk.common.hw,
-> +               [CLK_AVS]               = &avs_clk.common.hw,
-> +               [CLK_HDMI]              = &hdmi_clk.common.hw,
-> +               [CLK_GPU]               = &gpu_clk.common.hw,
-> +               [CLK_MBUS]              = &mbus_clk.common.hw,
-> +               [CLK_IEP]               = &iep_clk.common.hw,
-> +       },
-> +       .num    = CLK_NUMBER,
-> +};
-> +
-> +static struct ccu_reset_map sun5i_a10s_ccu_resets[] = {
-> +       [RST_USB_PHY0]          =  { 0x0cc, BIT(0) },
-> +       [RST_USB_PHY1]          =  { 0x0cc, BIT(1) },
-> +
-> +       [RST_GPS]               =  { 0x0d0, BIT(30) },
-> +
-> +       [RST_DE_BE]             =  { 0x104, BIT(30) },
-> +
-> +       [RST_DE_FE]             =  { 0x10c, BIT(30) },
-> +
-> +       [RST_TVE]               =  { 0x118, BIT(29) },
-> +       [RST_LCD]               =  { 0x118, BIT(30) },
-> +
-> +       [RST_CSI]               =  { 0x134, BIT(30) },
-> +
-> +       [RST_VE]                =  { 0x13c, BIT(0) },
-> +
-> +       [RST_GPU]               =  { 0x154, BIT(30) },
-> +
-> +       [RST_IEP]               =  { 0x160, BIT(30) },
-> +};
-> +
-> +static const struct sunxi_ccu_desc sun5i_a10s_ccu_desc = {
-> +       .ccu_clks       = sun5i_a10s_ccu_clks,
-> +       .num_ccu_clks   = ARRAY_SIZE(sun5i_a10s_ccu_clks),
-> +
-> +       .hw_clks        = &sun5i_a10s_hw_clks,
-> +
-> +       .resets         = sun5i_a10s_ccu_resets,
-> +       .num_resets     = ARRAY_SIZE(sun5i_a10s_ccu_resets),
-> +};
-> +
-> +static void __init sun5i_a10s_ccu_setup(struct device_node *node)
-> +{
-> +       void __iomem *reg;
-> +       u32 val;
-> +
-> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +       if (IS_ERR(reg)) {
-> +               pr_err("%s: Could not map the clock registers\n",
-> +                      of_node_full_name(node));
-> +               return;
-> +       }
-> +
-> +       /* Force the PLL-Audio-1x divider to 4 */
-> +       val = readl(reg + SUN5I_PLL_AUDIO_REG);
-> +       val &= ~GENMASK(19, 16);
-> +       writel(val | (3 << 16), reg + SUN5I_PLL_AUDIO_REG);
-> +
-> +       /*
-> +        * Use the peripheral PLL as the AHB parent, instead of CPU /
-> +        * AXI which have rate changes due to cpufreq.
-> +        *
-> +        * This is especially a big deal for the HS timer whose parent
-> +        * clock is AHB.
-> +        */
-> +       val = readl(reg + SUN5I_AHB_REG);
-> +       val &= ~GENMASK(7, 6);
-> +       writel(val | (2 << 6), reg + SUN5I_AHB_REG);
-> +
-> +       sunxi_ccu_probe(node, reg, &sun5i_a10s_ccu_desc);
-> +}
-> +CLK_OF_DECLARE(sun5i_a10s_ccu, "allwinner,sun5i-a10s-ccu",
-> +              sun5i_a10s_ccu_setup);
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun5i.h b/drivers/clk/sunxi-ng/ccu-sun5i.h
-> new file mode 100644
-> index 000000000000..43f2ce3e9e6e
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun5i.h
-> @@ -0,0 +1,129 @@
-> +/*
-> + * Copyright 2016 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef _CCU_SUN5I_H_
-> +#define _CCU_SUN5I_H_
-> +
-> +#include <dt-bindings/clock/sun5i-ccu.h>
-> +#include <dt-bindings/reset/sun5i-ccu.h>
-> +
-> +#define CLK_HOSC               1
-> +#define CLK_OSC3M              2
-> +#define CLK_PLL_CORE           3
-> +#define CLK_PLL_AUDIO_BASE     4
-> +#define CLK_PLL_AUDIO          5
-> +#define CLK_PLL_AUDIO_2X       6
-> +#define CLK_PLL_AUDIO_4X       7
-> +#define CLK_PLL_AUDIO_8X       8
-> +#define CLK_PLL_VIDEO0         9
-> +#define CLK_PLL_VIDEO0_2X      10
-> +#define CLK_PLL_VE             11
-> +#define CLK_PLL_DDR_BASE       12
-> +#define CLK_PLL_DDR            13
-> +#define CLK_PLL_DDR_OTHER      14
-> +#define CLK_PLL_PERIPH         15
-> +#define CLK_PLL_VIDEO1         16
-> +#define CLK_PLL_VIDEO1_2X      17
-> +#define CLK_OSC24M             18
-> +#define CLK_CPU                        19
-> +#define CLK_AXI                        20
-> +#define CLK_AHB                        21
-> +#define CLK_APB0               22
-> +#define CLK_APB1               23
-> +#define CLK_DRAM_AXI           24
-> +#define CLK_AHB_OTG            25
-> +#define CLK_AHB_EHCI           26
-> +#define CLK_AHB_OHCI           27
-> +#define CLK_AHB_SS             28
-> +#define CLK_AHB_DMA            29
-> +#define CLK_AHB_BIST           30
-> +#define CLK_AHB_MMC0           31
-> +#define CLK_AHB_MMC1           32
-> +#define CLK_AHB_MMC2           33
-> +#define CLK_AHB_NAND           34
-> +#define CLK_AHB_SDRAM          35
-> +#define CLK_AHB_EMAC           36
-> +#define CLK_AHB_TS             37
-> +#define CLK_AHB_SPI0           38
-> +#define CLK_AHB_SPI1           39
-> +#define CLK_AHB_SPI2           40
-> +#define CLK_AHB_GPS            41
-> +#define CLK_AHB_HSTIMER                42
-> +#define CLK_AHB_VE             43
-> +#define CLK_AHB_TVE            44
-> +#define CLK_AHB_LCD            45
-> +#define CLK_AHB_CSI            46
-> +#define CLK_AHB_HDMI           47
-> +#define CLK_AHB_DE_BE          48
-> +#define CLK_AHB_DE_FE          49
-> +#define CLK_AHB_IEP            50
-> +#define CLK_AHB_GPU            51
-> +#define CLK_APB0_CODEC         52
-> +#define CLK_APB0_SPDIF         53
-> +#define CLK_APB0_I2S           54
-> +#define CLK_APB0_PIO           55
-> +#define CLK_APB0_IR            56
-> +#define CLK_APB0_KEYPAD                57
-> +#define CLK_APB1_I2C0          58
-> +#define CLK_APB1_I2C1          59
-> +#define CLK_APB1_I2C2          60
-> +#define CLK_APB1_UART0         61
-> +#define CLK_APB1_UART1         62
-> +#define CLK_APB1_UART2         63
-> +#define CLK_APB1_UART3         64
-> +#define CLK_NAND               65
-> +#define CLK_MMC0               66
-> +#define CLK_MMC1               67
-> +#define CLK_MMC2               68
-> +#define CLK_TS                 69
-> +#define CLK_SS                 70
-> +#define CLK_CE                 71
-> +#define CLK_SPI0               72
-> +#define CLK_SPI1               73
-> +#define CLK_SPI2               74
-> +#define CLK_IR                 75
-> +#define CLK_I2S                        76
-> +#define CLK_SPDIF              77
-> +#define CLK_KEYPAD             78
-> +#define CLK_USB_OHCI           79
-> +#define CLK_USB_PHY0           80
-> +#define CLK_USB_PHY1           81
-> +#define CLK_GPS                        82
-> +#define CLK_DRAM_VE            83
-> +#define CLK_DRAM_CSI           84
-> +#define CLK_DRAM_TS            85
-> +#define CLK_DRAM_TVE           86
-> +#define CLK_DRAM_DE_FE         87
-> +#define CLK_DRAM_DE_BE         88
-> +#define CLK_DRAM_ACE           89
-> +#define CLK_DRAM_IEP           90
-> +#define CLK_DE_BE              91
-> +#define CLK_DE_FE              92
-> +#define CLK_TCON_CH0           93
-> +#define CLK_TCON_CH1_SCLK      94
-> +#define CLK_TCON_CH1           95
-> +#define CLK_CSI                        96
-> +#define CLK_VE                 97
-> +#define CLK_CODEC              98
-> +#define CLK_AVS                        99
-> +#define CLK_HDMI               100
-> +#define CLK_GPU                        101
-> +#define CLK_MBUS               102
-> +#define CLK_IEP                        103
-> +
-> +#define CLK_NUMBER             (CLK_IEP + 1)
-> +
-> +#endif /* _CCU_SUN5I_H_ */
-
-Didn't you already list all the clocks in the device tree bindings header
-patch 5?
-
-
-Regards
-ChenYu
+Hans
