@@ -1,57 +1,76 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 13 Nov 2016 14:02:59 -0500
-Subject: [PATCH 0/3] soc: avoid module usage in non-modular code
-Message-ID: <20161113190302.18099-1-paul.gortmaker@windriver.com>
+From: atull@opensource.altera.com (atull)
+Date: Sun, 13 Nov 2016 16:37:20 -0600
+Subject: [PATCH 4/4] fpga mgr: socfpga: Expose support for encrypted
+ bitstreams
+In-Reply-To: <20161107001326.7395-5-moritz.fischer@ettus.com>
+References: <20161107001326.7395-1-moritz.fischer@ettus.com>
+ <20161107001326.7395-5-moritz.fischer@ettus.com>
+Message-ID: <alpine.DEB.2.10.1611131630510.2735@atull-VirtualBox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of commits is a part of a larger project to ensure
-people don't reference modular support functions in non-modular
-code.  Overall there was roughly 5k lines of dead code in the
-kernel due to this.  So far we've fixed several areas, like tty,
-x86, net, gpio ... and we continue to work on other areas.
+On Mon, 7 Nov 2016, Moritz Fischer wrote:
 
-There are several reasons to not use module support for code that
-can never be built as a module, but the big ones are:
+> Expose support for on the fly decryption of bitstreams.
+> This needs no additional work or configuration,
+> so just expose the new capability.
 
- (1) it is easy to accidentally code up unused module_exit and remove code
- (2) it can be misleading when reading the source, thinking it can be
-      modular when the Makefile and/or Kconfig prohibit it
- (3) it requires the include of the module.h header file which in turn
-     includes nearly everything else.
+Hi Moritz,
 
-Two of the changes are essentially source only -- the resuting module
-will be binary equivalent.  Only the FSL driver has unused code in
-addition to the use of modular macros that get converted.
+When we talked about this, I was thinking about the arria10
+support which I'd done more recently.  c5 and a10 are
+quite different here.
 
-Note the FSL SOC driver just appeared in linux-next and so this series
-won't apply on Linus' master branch.  These commits were applied to
-linux-next and build tested there.
+The c5 datasheet:
+  https://www.altera.com/literature/hb/cyclone-v/cv_5v4.pdf
 
-Paul.
----
+Look for the 'stat' register on page 4-12 onwards.  This
+register exposes the setting of the msel pins (are a dipswitch
+on some boards).  The msel pins determine the programming
+mode and whether it is expecting an encrypted and/or
+compressed bitstream.  So you could read this reg and
+set the capabilities accordingly.
 
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Scott Wood <oss@buserror.net>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Yangbo Lu <yangbo.lu@nxp.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-tegra at vger.kernel.org
+For arria10, encryption is enabled and if the bitstream
+says it's encrypted, the driver handles it.
 
-Paul Gortmaker (3):
-  soc: sunxi: make sunxi_sram explicitly non-modular
-  soc: tegra: make fuse-tegra explicitly non-modular
-  soc: fsl: make guts driver explicitly non-modular
+Alan
 
- drivers/soc/fsl/guts.c              | 17 ++---------------
- drivers/soc/sunxi/sunxi_sram.c      |  9 ++-------
- drivers/soc/tegra/fuse/fuse-tegra.c |  4 ++--
- 3 files changed, 6 insertions(+), 24 deletions(-)
-
--- 
-2.10.1
+> 
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Cc: Alan Tull <atull@opensource.altera.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+> 
+> Alan,
+> 
+> can you please let me know if that works this way, or where to find
+> information on encrypted bitstreams? I have a CycloneV SoCFPGA to test
+> on ...
+> 
+> Cheers,
+> 
+> Moritz
+> ---
+>  drivers/fpga/socfpga.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/fpga/socfpga.c b/drivers/fpga/socfpga.c
+> index fd9760c..ab57ec0c 100644
+> --- a/drivers/fpga/socfpga.c
+> +++ b/drivers/fpga/socfpga.c
+> @@ -579,6 +579,7 @@ static int socfpga_fpga_probe(struct platform_device *pdev)
+>  
+>  	fpga_mgr_cap_zero(&caps);
+>  	fpga_mgr_cap_set(FPGA_MGR_CAP_FULL_RECONF, caps);
+> +	fpga_mgr_cap_set(FPGA_MGR_CAP_DECRYPT, caps);
+>  
+>  	return fpga_mgr_register(dev, "Altera SOCFPGA FPGA Manager",
+>  				 &socfpga_fpga_ops, caps, priv);
+> -- 
+> 2.10.0
+> 
+> 
