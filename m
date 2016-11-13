@@ -1,36 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 13 Nov 2016 07:51:49 +0800
-Subject: [PATCH 10/10] ARM: gr8: Convert to CCU
-In-Reply-To: <14a9d0306074ca0276831dc42104929a65f3b666.1478625788.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <201611130734.k6XLPbXV%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 13 Nov 2016 11:48:33 +0800
+Subject: [PATCH 2/10] clk: sunxi-ng: nkm: Deal with fixed post dividers
+In-Reply-To: <f8333c3a1f3308fcebd87bfc3710ce605f9bb595.1478625788.git-series.maxime.ripard@free-electrons.com>
+References: <cover.326f50aecc25fbe292184527b52a1e3172aba9cf.1478625788.git-series.maxime.ripard@free-electrons.com>
+ <f8333c3a1f3308fcebd87bfc3710ce605f9bb595.1478625788.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64YW+7Grr4NvjuhsDNM2bF_fuhTkdW6Hs1=MXK2LFne0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Wed, Nov 9, 2016 at 1:23 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-[auto build test ERROR on ]
+It'd be better if you mentioned what clock needs this.
 
-url:    https://github.com/0day-ci/linux/commits/Maxime-Ripard/ARM-sun5i-Convert-sun5i-SoCs-to-sunxi-ng/20161109-014935
-base:    
-config: arm-pxa168_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi-ng/ccu_nkm.c | 17 ++++++++++++++---
+>  drivers/clk/sunxi-ng/ccu_nkm.h |  2 ++
+>  2 files changed, 16 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+> index 9b840a47a94d..fd3c6a9d987c 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+> @@ -75,7 +75,7 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+>                                         unsigned long parent_rate)
+>  {
+>         struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
+> -       unsigned long n, m, k;
+> +       unsigned long rate, n, m, k;
+>         u32 reg;
+>
+>         reg = readl(nkm->common.base + nkm->common.reg);
+> @@ -89,7 +89,11 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+>         m = reg >> nkm->m.shift;
+>         m &= (1 << nkm->m.width) - 1;
+>
+> -       return parent_rate * (n + 1) * (k + 1) / (m + 1);
+> +       rate = parent_rate * (n + 1) * (k + 1) / (m + 1);
+> +       if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +               rate /= nkm->fixed_post_div;
+> +
+> +       return rate;
+>  }
+>
+>  static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+> @@ -100,6 +104,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+>         struct ccu_nkm *nkm = data;
+>         struct _ccu_nkm _nkm;
+>
+> +       if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +               rate *= nkm->fixed_post_div;
+> +
+>         _nkm.min_n = nkm->n.min;
+>         _nkm.max_n = 1 << nkm->n.width;
+>         _nkm.min_k = nkm->k.min;
+> @@ -109,7 +116,11 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+>
+>         ccu_nkm_find_best(parent_rate, rate, &_nkm);
+>
+> -       return parent_rate * _nkm.n * _nkm.k / _nkm.m;
+> +       rate = parent_rate * _nkm.n * _nkm.k / _nkm.m;
+> +       if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +               rate = rate / nkm->fixed_post_div;
+> +
+> +       return rate;
+>  }
+>
 
-All errors (new ones prefixed by >>):
+You also need to handle this in the set_rate callback. You might need
+to read back
+the parent index value to determine if the post divider applies, as
+this clock supports
+a mux. Or don't support mux + post-div, and leave a TODO note.
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
+ChenYu
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 11419 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20161113/b504f40e/attachment-0001.gz>
+>  static int ccu_nkm_determine_rate(struct clk_hw *hw,
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
+> index 34580894f4d1..0f1dbca25719 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nkm.h
+> +++ b/drivers/clk/sunxi-ng/ccu_nkm.h
+> @@ -32,6 +32,8 @@ struct ccu_nkm {
+>         struct ccu_mult_internal        n;
+>         struct ccu_mult_internal        k;
+>         struct ccu_div_internal         m;
+> +
+> +       unsigned int            fixed_post_div;
+>         struct ccu_mux_internal mux;
+>
+>         struct ccu_common       common;
+> --
+> git-series 0.8.11
