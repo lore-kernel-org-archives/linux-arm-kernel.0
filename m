@@ -1,90 +1,113 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 13 Nov 2016 11:58:03 +0100
-Subject: [PATCH 0/2] mmc: allow mmc_alloc_host() and tmio_mmc_host_alloc()
-In-Reply-To: <CAK7LNAThxsE3QW4EdPUyxmxbnt_PPjeogi8Fox5AHkddsuu-Sg@mail.gmail.com>
-References: <1478784263-18777-1-git-send-email-yamada.masahiro@socionext.com>
- <20161110133559.GA10191@kroah.com>
- <CAK7LNAThxsE3QW4EdPUyxmxbnt_PPjeogi8Fox5AHkddsuu-Sg@mail.gmail.com>
-Message-ID: <20161113105803.GD8388@kroah.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 13 Nov 2016 11:38:14 +0000
+Subject: [PATCH v2 1/6] Documentation: dt-bindings: Document STM32 ADC DT
+ bindings
+In-Reply-To: <1478794738-28933-2-git-send-email-fabrice.gasnier@st.com>
+References: <1478794738-28933-1-git-send-email-fabrice.gasnier@st.com>
+ <1478794738-28933-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <471abcc6-7b07-8f4b-db57-a941707175c6@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 11, 2016 at 12:19:05PM +0900, Masahiro Yamada wrote:
-> 2016-11-10 22:35 GMT+09:00 Greg Kroah-Hartman <gregkh@linuxfoundation.org>:
-> > On Thu, Nov 10, 2016 at 10:24:21PM +0900, Masahiro Yamada wrote:
-> >>
-> >> sdhci_alloc_host() returns an error pointer when it fails.
-> >> but mmc_alloc_host() cannot.
-> >>
-> >> This series allow to propagate a proper error code
-> >> when host-allocation fails.
-> >
-> > Why?  What can we really do about the error except give up?  Why does
-> > having a explicit error value make any difference to the caller, they
-> > can't do anything different, right?
+On 10/11/16 16:18, Fabrice Gasnier wrote:
+> This patch adds documentation of device tree bindings for the STM32 ADC.
 > 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 85 ++++++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
 > 
-> The error code is shown in the console, like
+> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> new file mode 100644
+> index 0000000..8b20c23
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> @@ -0,0 +1,85 @@
+> +STMicroelectronics STM32 ADC device driver
+> +
+> +STM32 ADC is a successive approximation analog-to-digital converter.
+> +It has several multiplexed input channels. Conversions can be performed
+> +in single, continuous, scan or discontinuous mode. Result of the ADC is
+> +stored in a left-aligned or right-aligned 32-bit data register.
+> +Conversions can be launched in software or using hardware triggers.
+> +
+> +The analog watchdog feature allows the application to detect if the input
+> +voltage goes beyond the user-defined, higher or lower thresholds.
+> +
+> +Each STM32 ADC block can have up to 3 ADC instances.
+> +
+> +Each instance supports two contexts to manage conversions, each one has its
+> +own configurable sequence and trigger:
+> +- regular conversion can be done in sequence, running in background
+> +- injected conversions have higher priority, and so have the ability to
+> +  interrupt regular conversion sequence (either triggered in SW or HW).
+> +  Regular sequence is resumed, in case it has been interrupted.
+> +
+> +Contents of a stm32 adc root node:
+> +-----------------------------------
+> +Required properties:
+> +- compatible: Should be "st,stm32f4-adc-core".
+> +- reg: Offset and length of the ADC block register set.
+> +- interrupts: Must contain the interrupt for ADC block.
+> +- clocks: Clock for the analog circuitry (common to all ADCs).
+> +- clock-names: Must be "adc".
+> +- interrupt-controller: Identifies the controller node as interrupt-parent
+> +- vref-supply: Phandle to the vref input analog reference voltage.
+> +- #interrupt-cells = <1>;
+> +- #address-cells = <1>;
+> +- #size-cells = <0>;
+> +
+> +Optional properties:
+> +- A pinctrl state named "default" for each ADC channel may be defined to set
+> +  inX ADC pins in mode of operation for analog input on external pin.
+> +
+> +Contents of a stm32 adc child node:
+> +-----------------------------------
+> +An ADC block node should contain at least one subnode, representing an
+> +ADC instance available on the machine.
+> +
+> +Required properties:
+> +- compatible: Should be "st,stm32f4-adc".
+> +- reg: Offset of ADC instance in ADC block (e.g. may be 0x0, 0x100, 0x200).
+> +- st,adc-channels: List of single-ended channels muxed for this ADC.
+> +  It can have up to 16 channels, numbered from 0 to 15 (resp. for in0..in15).
+> +- interrupt-parent: Phandle to the parent interrupt controller.
+> +- interrupts: IRQ Line for the ADC (e.g. may be 0 for adc at 0, 1 for adc at 100 or
+> +  2 for adc at 200).
+> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+> +  Documentation/devicetree/bindings/iio/iio-bindings.txt
+> +
+> +Optional properties:
+> +- clocks: Input clock private to this ADC instance.
+I'm a little surprised this is optional.  Perhaps some text here explaining why?
+> +
+> +Example:
+> +	adc: adc at 40012000 {
+> +		compatible = "st,stm32f4-adc-core";
+> +		reg = <0x40012000 0x400>;
+> +		interrupts = <18>;
+> +		clocks = <&rcc 0 168>;
+> +		clock-names = "adc";
+> +		vref-supply = <&reg_vref>;
+> +		interrupt-controller;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&adc3_in8_pin>;
+> +
+> +		#interrupt-cells = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		adc at 0 {
+> +			compatible = "st,stm32f4-adc";
+> +			#io-channel-cells = <1>;
+> +			reg = <0x0>;
+> +			clocks = <&rcc 0 168>;
+> +			interrupt-parent = <&adc>;
+> +			interrupts = <0>;
+> +			st,adc-channels = <8>;
+> +		};
+> +		...
+> +		other adc child nodes follow...
+> +	};
 > 
->   probe of 5a000000.sdhc failed with error -12
-> 
-> 
-> The proper error code will give a clue why the driver failed to probe.
-
-Can't the mmc core show the reason once, and not require each and every
-individual driver to show/say the same thing?  All a driver needs to
-know is if it worked or didn't work.  Every time it didn't work, it
-needs to unwind stuff and then recover properly.
-
-The drivers do not do different things based on what type of error
-happened, as they don't care at all.
-
-So I strongly suggest leaving it simple, as it is today, as this makes
-drivers simpler, they don't have to duplicate the same type of error
-reporting all over the place, and it's easy to audit for.
-
-It also makes it so that large patchsets that touch every driver like
-this are not needed at all.
-
-> > I suggest just leaving it as-is, it's simple, and you don't have to mess
-> > with PTR_ERR() anywhere.
-> 
-> 
-> Why?
-> 
-> Most of driver just give up probing for any error,
-> but we still do ERR_PTR()/PTR_ERR() here and there.
-> I think this patch is the same pattern.
-
-I think we need to get rid of more of the ERR_PTR() stuff, as again,
-it's useless.  All we need to know is an error happened, that's it.
-
-> If a function returns NULL on failure, we need to think about
-> "what is the most common failure case".
-> 
-> Currently, MMC drivers assume -ENOMEM is the best
-> fit for mmc_alloc_host(), but the assumption is fragile.
-> 
-> Already, mmc_alloc_host() calls a function
-> that returns not only -ENOMEM, but also -ENOSPC.
-> 
-> In the future, some other failure cases might be
-> added to mmc_alloc_host().
-> 
-> Once we decide the API returns an error pointer,
-> drivers just propagate the return value from the API.
-> This is much more stable implementation.
-
-Again, no, it makes more work for the different drivers, duplicates code
-all over the place, and really doesn't help any user, or developer, out
-at all.
-
-Just have the mmc core properly log what went wrong, and all should be
-fine.
-
-Again, keep it simple, that's the best policy for the kernel, and
-really, most software :)
-
-thanks,
-
-greg k-h
