@@ -1,32 +1,39 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 13 Nov 2016 22:32:29 +0100
-Subject: [PATCH v2 08/13] ARM: dts: armada-375: Fixup pinctrl DT warnings
+Date: Sun, 13 Nov 2016 22:32:34 +0100
+Subject: [PATCH v2 13/13] ARM: dts: armada-375: Fixup ethernet child DT warning
 In-Reply-To: <20161113213234.3368-1-gregory.clement@free-electrons.com>
 References: <20161113213234.3368-1-gregory.clement@free-electrons.com>
-Message-ID: <20161113213234.3368-9-gregory.clement@free-electrons.com>
+Message-ID: <20161113213234.3368-14-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pinctrl has a ranges property, so the unit name should contain an
-address.
+Child of mvpp2 ethernet do not have a reg property so the unit name
+should not contain an address: remove them.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-375.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-375.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/armada-375.dtsi b/arch/arm/boot/dts/armada-375.dtsi
-index 4824a4c1883c..aedd74ee6f6b 100644
+index 0a3fff844c17..f54220099202 100644
 --- a/arch/arm/boot/dts/armada-375.dtsi
 +++ b/arch/arm/boot/dts/armada-375.dtsi
-@@ -307,7 +307,7 @@
+@@ -224,13 +224,13 @@
+ 				clock-names = "pp_clk", "gop_clk";
  				status = "disabled";
- 			};
  
--			pinctrl: pinctrl {
-+			pinctrl: pinctrl at 18000 {
- 				compatible = "marvell,mv88f6720-pinctrl";
- 				reg = <0x18000 0x24>;
+-				eth0: eth0 at c4000 {
++				eth0: eth0 {
+ 					interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 					port-id = <0>;
+ 					status = "disabled";
+ 				};
  
+-				eth1: eth1 at c5000 {
++				eth1: eth1 {
+ 					interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+ 					port-id = <1>;
+ 					status = "disabled";
 -- 
 2.10.2
